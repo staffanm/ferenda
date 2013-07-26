@@ -16,3 +16,11 @@ $ git push --tags # makes the release show up in Github
 $ python setup.py sdist upload -r testpypi
 $ git checkout master
 $ git merge release/0.1.0
+
+Smoke-testing the released code
+-------------------------------
+
+In a new virtualenv:
+
+$ pip install --extra-index-url https://testpypi.python.org/pypi ferenda
+

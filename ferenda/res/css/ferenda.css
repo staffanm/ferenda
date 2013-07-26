@@ -8,8 +8,8 @@
     
     .main > article,
     .main > aside {
-	width: 100%;
-	float: none;
+	width: 79%;
+	float: right;
 	!important
     }
     
@@ -63,7 +63,7 @@ header nav ul {
     margin-right: 0px;
 }
 @media only screen and (min-width: 480px) {
-    nav a {
+    .header-container nav a {
 	padding: 7px;
 	float: right;
     }
@@ -82,13 +82,38 @@ header nav ul {
     border-bottom: 20px solid #526B15;
 }
 
-nav a {
+.header-container nav li a {
+    float: left;
+    width: 27%;
+    text-align: center;
+}
+    
+nav ul {
+    margin-left: 1em;
+}
+body.toc nav ul {
+    margin-left: 0;
+}
+nav li a {
     background: #526B15;
+    float: none; /* override float: left in main.css */
+    width: 100%; /* override width: 27% in main.css */
+    text-align: left; /* override text-align: center in main.css */
+    margin-left: 0;
+		    
+}
+
+nav ul li {
+    display: list-item;
 }
 
 .footer-container,
 .main aside {
     border-top: 20px solid #526B15;
+}
+
+h1, h2, h3, h4 {
+    font-family: 'Raleway', sans-serif; 
 }
 
 aside h2 {
@@ -112,14 +137,17 @@ nav#toc {
     float: left;
 }
 
+nav#toc h1 {
+    font-size: 1.2em;
+}
 nav#toc > ul > li > p {
     font-family: sans-serif;
     font-weight: bold;
     font-size: 1.5em;
 }
+
 nav#toc li {
-    display: inline;
-    font-weight: bold;
+    /* No special styling */
 }
 
 nav#toc a {
@@ -127,12 +155,14 @@ nav#toc a {
     background: inherit;
     color: inherit;
     font-weight: normal;
-    float: none;
-    display: inline
 }
 
-body.toc article {
-    width: 79%;
-    float: right;
-    !important
+body.toc nav#toc li {
+    display: inline;
+    font-weight: bold;
+}
+
+body.toc nav#toc a {
+    float: none;
+    display: inline
 }

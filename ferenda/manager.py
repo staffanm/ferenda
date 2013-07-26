@@ -1248,10 +1248,27 @@ def _preflight_check():
 
 
 def _select_triplestore(sitename):
-    # Try triplestores in order: Sesame, Fuseki, Sleepycat, SQLite,
+    # Try triplestores in order: Fuseki, Sesame, Sleepycat, SQLite,
     # and return configuration for the first triplestore that works.
 
-    # 1. Sesame
+
+    # 1. Fuseki
+    try:
+        triplestore = os.environ.get('FERENDA_TRIPLESTORE_LOCATION',
+                                     'http://localhost:3030')
+        resp = requests.get(triplestore + "/ds/data?default")
+        resp.raise_for_status()
+        print("Fuseki server responding at %s" % triplestore)
+        # TODO: Find out how to create a new datastore in Fuseki
+        # programatically so we can use
+        # http://localhost:3030/$SITENAME instead
+        return('FUSEKI', triplestore, 'ds')
+    except (requests.exceptions.HTTPError,
+            requests.exceptions.ConnectionError) as e:
+        print("... Fuseki not available at %s: %s" % (triplestore, e))
+        pass
+
+    # 2. Sesame
     try:
         triplestore = os.environ.get('FERENDA_TRIPLESTORE_LOCATION',
                                      'http://localhost:8080/openrdf-sesame')
@@ -1274,22 +1291,6 @@ New repository. The following settings are recommended:
     except (requests.exceptions.HTTPError,
             requests.exceptions.ConnectionError) as e:
         print("... Sesame not available at %s: %s" % (triplestore, e))
-        pass
-
-    # 2. Fuseki
-    try:
-        triplestore = os.environ.get('FERENDA_TRIPLESTORE_LOCATION',
-                                     'http://localhost:3030/ds')
-        resp = requests.get(triplestore + "/data?default")
-        resp.raise_for_status()
-        print("Fuseki server responding at %s" % triplestore)
-        # TODO: Find out how to create a new datastore in Fuseki
-        # programatically so we can use
-        # http://localhost:3030/$SITENAME instead
-        return('FUSEKI', triplestore, 'ds')
-    except (requests.exceptions.HTTPError,
-            requests.exceptions.ConnectionError) as e:
-        print("... Fuseki not available at %s: %s" % (triplestore, e))
         pass
 
     # 3. RDFLib + Sleepycat
