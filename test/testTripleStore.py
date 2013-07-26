@@ -15,6 +15,7 @@ import tempfile
 import shutil
 import logging
 
+from six import text_type as str
 from rdflib import Graph
 from rdflib.util import guess_format
 from rdflib.compare import graph_diff, isomorphic
@@ -204,6 +205,7 @@ a:nm0000582 rdf:type foaf:Person;
 
         self.store.context = None # note the graph identifier in the Sparql query
         p = self.store.select(sq,"python")
+        self.assertIsInstance(p[0]['name'], str)
         self.assertEqual(p,[{'name':'Kevin Bacon'}])
         if self.store.storetype == self.store.SLEEPYCAT:
             self.store.graph.close()

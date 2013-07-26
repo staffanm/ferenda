@@ -288,3 +288,6 @@ class W3Standards(DocumentRepository):
             # desc.value(self.ns['dct'].isPartOf, part.parent.uri) # implied
         for subpart in part:
             self.decorate_bodyparts(subpart,baseuri)
+
+    def tabs(self):
+        return [("W3C standards", self.dataset_uri())]

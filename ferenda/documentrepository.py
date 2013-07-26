@@ -2122,7 +2122,6 @@ parsed document path to that documents dependency file."""
         # subheadings, orderedlists, tables...
         ul = UnorderedList([ListItem(x) for x in documentlist],role='main')
         doc.body = Body([nav,
-                         Heading([title]),
                          ul
                          ])
 
@@ -2353,9 +2352,9 @@ parsed document path to that documents dependency file."""
         repository and the document it contains)."""
         g = self.make_graph()
         qname = g.qname(self.rdf_type)
-        return ("<h2>Module %s</h2><p>Handles %s documents. "
+        return ("<h2><a href='%s'>Document repository '%s'</a></h2><p>Handles %s documents. "
                 "Contains %s published documents.</p>"
-                % (self.alias, qname,
+                % (self.dataset_uri(), self.alias, qname,
                    len(list(self.list_basefiles_for("_postgenerate")))))
 
     # @manager.action
@@ -2470,23 +2469,57 @@ parsed document path to that documents dependency file."""
             return [(util.uri_leaf(str(self.rdf_type)), uri)]
 
 
-    # FIXME: This is conceptually similar to basefile_from_uri (given
-    # either a URI or a PATH_INFO, find out if self handles the
-    # document/resource pointed out by same), we should perhaps unify
-    # them somehow?
+    def reconstruct_url(self, environ):
+        # from PEP 333
+        url = environ['wsgi.url_scheme']+'://'
+        if environ.get('HTTP_HOST'):
+            url += environ['HTTP_HOST']
+        else:
+            url += environ['SERVER_NAME']
+#         if environ['wsgi.url_scheme'] == 'https':
+#             if environ['SERVER_PORT'] != '443':
+#                url += ':' + environ['SERVER_PORT']
+#         else:
+#             if environ['SERVER_PORT'] != '80':
+#                url += ':' + environ['SERVER_PORT']
+
+        url += quote(environ.get('SCRIPT_NAME', ''))
+        url += quote(environ.get('PATH_INFO', ''))
+        if environ.get('QUERY_STRING'):
+            url += '?' + environ['QUERY_STRING']
+        return url
+
     def http_handle(self, environ):
         """Used by the WSGI support to indicate if this repo can provide a response to a particular request. If so, returns a tuple (fp, length, memtype), where fp is an open file of the document to be returned."""
-        if environ['PATH_INFO'].count("/") > 2:
-            null, res, alias, basefile = environ['PATH_INFO'].split("/", 3)
+        if environ['PATH_INFO'].count("/") >= 2:
+            segments = environ['PATH_INFO'].split("/", 3)
+            if len(segments) == 3:
+                null, res, alias = segments
+            else:
+                null, res, alias, basefile = segments
+                
             if (alias == self.alias):
                 # we SHOULD be able to handle this -- maybe provide
                 # apologetic message about this if we can't?
-                genpath = self.store.generated_path(basefile)
-                if os.path.exists(genpath):
-                    return (open(genpath, 'rb'),
-                            os.path.getsize(genpath),
+                uri = self.reconstruct_url(environ)
+                path = None
+                if res == "res": 
+                    basefile = self.basefile_from_uri(uri)
+                    path = self.store.generated_path(basefile)
+                elif res == "dataset":
+                    # FIXME: this reimplements the logic that
+                    # calculates basefile/path at the end of
+                    # toc_pagesets AND transform_links
+                    params = self.dataset_params_from_uri(uri)
+                    if params:
+                        pseudobasefile = "/".join(params)
+                    else:
+                        pseudobasefile = "index"
+                    path = self.store.path(pseudobasefile,'toc','.html')
+                if path and os.path.exists(path):
+                    return (open(path, 'rb'),
+                            os.path.getsize(path),
                             "text/html")
-                    
         return (None, None, None)
 
     @staticmethod

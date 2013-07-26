@@ -55,6 +55,7 @@ class RFC(DocumentRepository):
                   'dct',  # title, identifier, etc (could be replaced by equiv bibo prop?) 
                   'bibo', # Standard and DocumentPart classes, chapter prop
                   'xsd', # datatypes
+                  'foaf', # rfcs are foaf:Documents for now
                   ('rfc','http://example.org/ontology/rfc/')
                   )
 
@@ -350,7 +351,7 @@ class RFC(DocumentRepository):
 #                rest = chunk[m.end():]
 #                return (listtype,ordinal,separator,rest)
 #
-#            # match "IX. Foo… or "vii) bar…" but not "vi is a sucky
+#            # match "IX. Foo... or "vii) bar..." but not "vi is a sucky
 #            # editor" or "MMXIII is the current year"
 #            m = re.match('^([IVXivx]+)([\.\)]) +', chunk)
 #            if m:
@@ -585,3 +586,5 @@ class RFC(DocumentRepository):
                 # personal author identity
                 desc.value(self.ns['dct'].rightsHolder, line)
         
+    def tabs(self):
+        return [("RFCs", self.dataset_uri())]

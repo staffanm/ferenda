@@ -1,3 +1,11 @@
+2013-?? ?? RELEASE 0.1.1
+========================
+
+This release fixes a bug with TOC generation on python 2, creates a
+correct long_description for pypi and adds some uncommitted CSS
+improvements. Running the finished site under WSGI is now tested and
+works ok-ish (although the search box does nothing).
+
 2013-07-26 RELEASE 0.1.0
 ========================
 

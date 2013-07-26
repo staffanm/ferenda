@@ -46,9 +46,9 @@ Third-party libraries
 Command-line tools
    For some functionality, certain binaries must be present and in your ``$PATH``:
 
-   * PDFReader requires pdftotext and pdftohtml (from `poppler <http://poppler.freedesktop.org/>`_) and convert (from ImageMagic)
-   * Wordreader requires antiword to handle old .doc files. 
-   * TripleStore can perform some operations (bulk up- and download) much faster if curl is installed.
+   * :py:class:`~ferenda.PDFReader` requires pdftotext and pdftohtml (from `poppler <http://poppler.freedesktop.org/>`_) and convert (from ImageMagic)
+   * :py:class:`~ferenda.Wordreader` requires antiword to handle old .doc files. 
+   * :py:class:`~ferenda.TripleStore` can perform some operations (bulk up- and download) much faster if curl is installed.
 
 Once you start to collect a non-trivial number of documents and
 metadata about those documents, you'll need a RDF triple store, either
@@ -81,7 +81,7 @@ can get by with only rdflib, using either a Sqlite or a Berkely DB
    On Windows, we recommend using a binary distribution
    of lxml. Unfortunately, at the time of writing, no such
    distribution is available for Python 3.3, so for the time
-   beeing, you'll have to use python 3.2 on this platform.
+   being, you'll have to use python 3.2 on this platform.
 
 Example
 -------

@@ -16,7 +16,8 @@ and W3C standards, parse documents into structured, RDF-enabled XHTML
 documents, loads all RDF metadata into a triplestore and generates a 
 web site of static HTML5 files that are usable offline:
 
-    STATIC_DEPS=true pip install --extra-index-url https://testpypi.python.org/pypi ferenda
+    export STATIC_DEPS=true     # if using python 3.3 on Mac OS
+    pip install --extra-index-url https://testpypi.python.org/pypi ferenda
     ferenda-setup myproject
     cd myproject
     ./ferenda-build.py ferenda.sources.tech.RFC enable

@@ -310,7 +310,7 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
             for element in row:
                 #print element.tag # should be "binding"
                 key = element.attrib['name']
-                value = str(element[0].text) # note: str is really six.text_type, ie always unicode
+                value = str(element[0].text) # note: str is really six.text_type, ie str on py3, unicode on py2
                 d[key] = value
             res.append(d)
         return res
