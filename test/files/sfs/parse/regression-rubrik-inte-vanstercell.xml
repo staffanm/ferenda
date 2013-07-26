@@ -1,0 +1,25 @@
+<Forfattning>
+  <Paragraf id="P3" ordinal="3">
+    <Stycke id="P3S1">
+      <str>I denna lag används följande beteckningar med nedan angiven betydelse.</str>
+      <Tabell>
+        <Tabellrad>
+          <Tabellcell>
+            <str />
+            <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Tredje_man">Tredje man</LinkSubject>
+            <str />
+          </Tabellcell><Tabellcell>
+            <str>Någon annan än den registrerade, den personuppgiftsansvarige, personuppgiftsombudet, personuppgiftsbiträdet och sådana personer som under den personuppgiftsansvariges eller personuppgiftsbiträdets direkta ansvar har befogenhet att behandla personuppgifter.</str>
+          </Tabellcell>
+        </Tabellrad>
+      </Tabell>
+    </Stycke>
+  </Paragraf>
+  <Rubrik id="R1">Tillämpningsområde</Rubrik>
+  <Rubrik id="R2" type="underrubrik">Det territoriella tillämpningsområdet</Rubrik>
+  <Paragraf id="P4" ordinal="4">
+    <Stycke id="P4S1">
+      <str>Denna lag gäller för sådana personuppgiftsansvariga som är etablerade i Sverige.</str>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

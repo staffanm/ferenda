@@ -1,0 +1,235 @@
+# -*- coding: utf-8 -*-
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+
+<http://rinfo.lagrummet.se/publ/sfs/1736:0123_1> rdfs:label "byggningabalken"; dct:alternate "BB" .
+<http://rinfo.lagrummet.se/publ/sfs/1736:0123_2> rdfs:label "handelsbalken"; dct:alternate "HB" .
+<http://rinfo.lagrummet.se/publ/sfs/1810:0926> rdfs:label "successionsordningen"; dct:alternate "SO" .
+<http://rinfo.lagrummet.se/publ/sfs/1845:50_s._1> rdfs:label "lösöresköpslagen"; dct:alternate "LkL" . 
+<http://rinfo.lagrummet.se/publ/sfs/1904:26_1> dct:alternate "IÄL" .
+<http://rinfo.lagrummet.se/publ/sfs/1915:218> rdfs:label "avtalslagen"; dct:alternate "AvtL" .
+<http://rinfo.lagrummet.se/publ/sfs/1920:405> rdfs:label "giftermålsbalken"; dct:alternate "GB" .
+<http://rinfo.lagrummet.se/publ/sfs/1932:130> rdfs:label "växellagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1932:131> rdfs:label "checklagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1936:81> dct:alternate "SkbrL" .
+<http://rinfo.lagrummet.se/publ/sfs/1936:83> rdfs:label "gåvolagen"; dct:alternate "GåvoL" .
+<http://rinfo.lagrummet.se/publ/sfs/1942:740> rdfs:label "rättegångsbalken"; dct:alternate "RB" .
+<http://rinfo.lagrummet.se/publ/sfs/1946:808> dct:alternate "LsL" .
+<http://rinfo.lagrummet.se/publ/sfs/1949:105> rdfs:label "tryckfrihetsförordningen"; dct:alternate "TF" .
+<http://rinfo.lagrummet.se/publ/sfs/1949:381> rdfs:label "föräldrabalken"; dct:alternate "FB" .
+<http://rinfo.lagrummet.se/publ/sfs/1957:259> dct:alternate "Upplåtelser" .
+<http://rinfo.lagrummet.se/publ/sfs/1957:297> rdfs:label "luftfartslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1958:637> rdfs:label "ärvdabalken"; dct:alternate "ÄB" .
+<http://rinfo.lagrummet.se/publ/sfs/1960:644> rdfs:label "varumärkeslagen" ; dct:alternate "VML" .
+<http://rinfo.lagrummet.se/publ/sfs/1960:645> rdfs:label "kollektivmärkeslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1960:729> rdfs:label "upphovsrättslagen"; dct:alternate "URL" .
+<http://rinfo.lagrummet.se/publ/sfs/1962:700> rdfs:label "brottsbalken"; dct:alternate "BrB" .
+<http://rinfo.lagrummet.se/publ/sfs/1964:163> dct:alternate "BrP" .
+<http://rinfo.lagrummet.se/publ/sfs/1964:19> rdfs:label "krigshandelslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1966:209> rdfs:label "virkesmätningslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1967:837> rdfs:label "patentlagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1967:868> rdfs:label "förköpslagen" ; dct:alternate "FL" .
+<http://rinfo.lagrummet.se/publ/sfs/1968:45> rdfs:label "atomansvarighetslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1968:64> dct:alternate "NSL" .
+<http://rinfo.lagrummet.se/publ/sfs/1968:64> rdfs:label "narkotikastrafflagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1970:428> rdfs:label "delgivningslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1970:485> rdfs:label "mönsterskyddslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1970:624> rdfs:label "kupongskattelagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1970:979> rdfs:label "förmånsrättslagen" ; dct:alternate "FRL" .
+<http://rinfo.lagrummet.se/publ/sfs/1970:988> rdfs:label "fastighetsbildningslagen" ; dct:alternate "FBL" .
+<http://rinfo.lagrummet.se/publ/sfs/1970:994> rdfs:label "jordabalken"; dct:alternate "JB" .
+<http://rinfo.lagrummet.se/publ/sfs/1970:995> dct:alternate "JP" .
+<http://rinfo.lagrummet.se/publ/sfs/1971:289> dct:alternate "AFDL" .
+<http://rinfo.lagrummet.se/publ/sfs/1971:291> rdfs:label "förvaltningsprocesslagen" ; dct:alternate "FPL" .
+<http://rinfo.lagrummet.se/publ/sfs/1971:309> dct:alternate "BehL" .
+<http://rinfo.lagrummet.se/publ/sfs/1971:437> rdfs:label "rennäringslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1971:494> dct:alternate "FfL" .
+<http://rinfo.lagrummet.se/publ/sfs/1971:69> rdfs:label "skattebrottslagen" ; dct:alternate "SBL" .
+<http://rinfo.lagrummet.se/publ/sfs/1971:796> dct:alternate "LIA" .
+<http://rinfo.lagrummet.se/publ/sfs/1971:948> dct:alternate "VägL" .
+<http://rinfo.lagrummet.se/publ/sfs/1971:948> rdfs:label "väglagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1972:204> rdfs:label "resegarantilagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1972:205> rdfs:label "permutationslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1972:207> rdfs:label "skadeståndslagen"; dct:alternate "SkL".
+<http://rinfo.lagrummet.se/publ/sfs/1972:318> rdfs:label "växtskyddslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1972:719> rdfs:label "expropriationslagen" ; dct:alternate "ExprL"; dct:alternate "ExL" .
+<http://rinfo.lagrummet.se/publ/sfs/1973:1144> rdfs:label "ledningsrättslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1973:1149> rdfs:label "anläggningslagen" ; dct:alternate "AL" .
+<http://rinfo.lagrummet.se/publ/sfs/1973:1150> dct:alternate "SFL" .
+<http://rinfo.lagrummet.se/publ/sfs/1973:1173> rdfs:label "kreditupplysningslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1973:282> rdfs:label "sjömanslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1974:152> rdfs:label "regeringsformen"; dct:alternate "RF" .
+<http://rinfo.lagrummet.se/publ/sfs/1974:153> rdfs:label "riksdagsordningen"; dct:alternate "RO" .
+<http://rinfo.lagrummet.se/publ/sfs/1974:156> rdfs:label "firmalagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1974:157> rdfs:label "handelsregisterlagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1974:158> rdfs:label "prokuralagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1974:182> rdfs:label "inkassolagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1974:211> rdfs:label "bisjukdomslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1974:595> rdfs:label "abortlagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1975:1313> rdfs:label "terrängkörningslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1975:1410> rdfs:label "trafikskadelagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1975:197> rdfs:label "oljekrislagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1975:580> rdfs:label "steriliseringslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1975:635> rdfs:label "räntelagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1976:19> rdfs:label "lagföringslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1976:298> rdfs:label "utsädeslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1976:580> dct:alternate "MBL" .
+<http://rinfo.lagrummet.se/publ/sfs/1976:633> rdfs:label "kungörandelagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1977:1160> rdfs:label "arbetsmiljölagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1977:480> rdfs:label "semesterlagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1977:792> rdfs:label "bostadsförvaltningslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1978:262> rdfs:label "förfogandelagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1978:268> rdfs:label "ransoneringslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1978:302> rdfs:label "passlagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1978:304> rdfs:label "hyresförhandlingslagen" ; dct:alternate "HFL" .
+<http://rinfo.lagrummet.se/publ/sfs/1978:413> rdfs:label "brottsskadelagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1978:520> rdfs:label "familjebidragslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1979:1152> rdfs:label "fastighetstaxeringslagen" ; dct:alternate "FTL" .
+<http://rinfo.lagrummet.se/publ/sfs/1979:189> rdfs:label "bötesverkställighetslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1979:230> rdfs:label "jordförvärvslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1979:369> rdfs:label "folkomröstningslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1979:429> rdfs:label "skogsvårdslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1980:100> dct:alternate "SekrL" .
+<http://rinfo.lagrummet.se/publ/sfs/1980:152> rdfs:label "containerlagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1980:657> dct:alternate "SekrF" .
+<http://rinfo.lagrummet.se/publ/sfs/1981:130> rdfs:label "preskriptionslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1981:774> rdfs:label "utsökningsbalken"; dct:alternate "UB" .
+<http://rinfo.lagrummet.se/publ/sfs/1981:981> dct:alternate "UF" .
+<http://rinfo.lagrummet.se/publ/sfs/1982:670> rdfs:label "namnlagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1982:673> rdfs:label "arbetstidslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1982:713> rdfs:label "försäkringsrörelselagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1982:763> dct:alternate "HSL" .
+<http://rinfo.lagrummet.se/publ/sfs/1982:80> rdfs:label "anställningsskyddslagen"; dct:alternate "LAS" .
+<http://rinfo.lagrummet.se/publ/sfs/1983:929> rdfs:label "mönstringslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1984:387> dct:alternate "PolisL"; dct:alternate "PL".
+<http://rinfo.lagrummet.se/publ/sfs/1984:387> rdfs:label "polislagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1985:1100> rdfs:label "skollagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1985:125> rdfs:label "tandvårdslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1985:192> rdfs:label "järnvägstrafiklagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1985:206> dct:alternate "VitesL" .
+<http://rinfo.lagrummet.se/publ/sfs/1985:716> rdfs:label "konsumenttjänstlagen" ; dct:alternate "KTjL" .
+<http://rinfo.lagrummet.se/publ/sfs/1986:223> rdfs:label "förvaltningslagen" ; dct:alternate "FL" .
+<http://rinfo.lagrummet.se/publ/sfs/1987:10> dct:alternate "PBL" .
+<http://rinfo.lagrummet.se/publ/sfs/1987:11> dct:alternate "ESL" .
+<http://rinfo.lagrummet.se/publ/sfs/1987:230> rdfs:label "äktenskapsbalken"; dct:alternate "ÄktB" .
+<http://rinfo.lagrummet.se/publ/sfs/1987:259> rdfs:label "jaktlagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1987:619> rdfs:label "sparbankslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1987:672> rdfs:label "konkurslagen" ; dct:alternate "KL" .
+<http://rinfo.lagrummet.se/publ/sfs/1987:822> dct:alternate "CISG" .
+<http://rinfo.lagrummet.se/publ/sfs/1988:220> rdfs:label "strålskyddslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1988:254> rdfs:label "knivlagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1988:534> rdfs:label "djurskyddslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1988:870> dct:alternate "LVM" .
+<http://rinfo.lagrummet.se/publ/sfs/1989:978> rdfs:label "prisregleringslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1990:1144> rdfs:label "begravningslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1990:324> rdfs:label "taxeringslagen" ; dct:alternate "TaxL" .
+<http://rinfo.lagrummet.se/publ/sfs/1990:52> dct:alternate "LVU" .
+<http://rinfo.lagrummet.se/publ/sfs/1990:746> dct:alternate "LBH" .
+<http://rinfo.lagrummet.se/publ/sfs/1990:782> dct:alternate "ArkivL" .
+<http://rinfo.lagrummet.se/publ/sfs/1990:782> rdfs:label "arkivlagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1990:931> rdfs:label "köplagen" ; dct:alternate "KöpL" .
+<http://rinfo.lagrummet.se/publ/sfs/1990:932> rdfs:label "konsumentköplagen" ; dct:alternate "KKöpL" .
+<http://rinfo.lagrummet.se/publ/sfs/1991:1128> dct:alternate "LPT" .
+<http://rinfo.lagrummet.se/publ/sfs/1991:1129> dct:alternate "LRV" .
+<http://rinfo.lagrummet.se/publ/sfs/1991:1469> rdfs:label "yttrandefrihetsgrundlagen"; dct:alternate "YGL" .
+<http://rinfo.lagrummet.se/publ/sfs/1991:45> rdfs:label "minerallagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1991:481> rdfs:label "folkbokföringslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1991:586> dct:alternate "SINK" .
+<http://rinfo.lagrummet.se/publ/sfs/1991:614> rdfs:label "bostadsrättslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1991:641> dct:alternate "BRL" . 
+<http://rinfo.lagrummet.se/publ/sfs/1991:900> rdfs:label "kommunallagen" ; dct:alternate "KomL" ; dct:alternate "KL".
+<http://rinfo.lagrummet.se/publ/sfs/1992:1433> rdfs:label "sametingslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1992:1434> rdfs:label "högskolelagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1992:1672> rdfs:label "paketreselagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1992:1685> dct:alternate "KML" .
+<http://rinfo.lagrummet.se/publ/sfs/1992:18> rdfs:label "produktansvarslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1992:191> dct:alternate "Avgift" .
+<http://rinfo.lagrummet.se/publ/sfs/1992:497> rdfs:label "lönegarantilagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1992:830> rdfs:label "konsumentkreditlagen" ; dct:alternate "KKrL" .
+<http://rinfo.lagrummet.se/publ/sfs/1992:859> rdfs:label "läkemedelslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1993:1617> dct:alternate "OL" .
+<http://rinfo.lagrummet.se/publ/sfs/1993:1617> rdfs:label "ordningslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1993:1684> rdfs:label "postlagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1993:387> dct:alternate "LSS" .
+<http://rinfo.lagrummet.se/publ/sfs/1993:581> rdfs:label "tobakslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1993:787> rdfs:label "fiskelagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1994:1000> rdfs:label "lotterilagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1994:1009> rdfs:label "sjölagen" ; dct:alternate "SjöL" .
+<http://rinfo.lagrummet.se/publ/sfs/1994:1220> rdfs:label "stiftelselagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1994:1738> rdfs:label "alkohollagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1994:193> dct:alternate "IURF" .
+<http://rinfo.lagrummet.se/publ/sfs/1994:200> rdfs:label "mervärdesskattelagen" ; dct:alternate "ML" .
+<http://rinfo.lagrummet.se/publ/sfs/1994:260> dct:alternate "LOA" .
+<http://rinfo.lagrummet.se/publ/sfs/1994:448> dct:alternate "PbrL" .
+<http://rinfo.lagrummet.se/publ/sfs/1994:847> dct:alternate "BVL" .
+<http://rinfo.lagrummet.se/publ/sfs/1995:1000> rdfs:label "pantbankslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1995:1322> dct:alternate "VerksF" .
+<http://rinfo.lagrummet.se/publ/sfs/1995:1554> rdfs:label "årsredovisningslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1995:400> rdfs:label "fastighetsmäklarlagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1995:584> rdfs:label "föräldraledighetslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1996:1596> rdfs:label "bibliotekslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1996:1619> rdfs:label "rättshjälpslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1996:627> rdfs:label "säkerhetsskyddslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1996:67> rdfs:label "vapenlagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1996:799> rdfs:label "patientskadelagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1997:192> dct:alternate "LIF" .
+<http://rinfo.lagrummet.se/publ/sfs/1997:288> rdfs:label "elberedskapslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1997:306> rdfs:label "växtförädlarrättslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1997:483> rdfs:label "skattebetalningslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1997:857> dct:alternate "EL" .
+<http://rinfo.lagrummet.se/publ/sfs/1997:857> rdfs:label "ellagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1998:204> rdfs:label "personuppgiftslagen"; dct:alternate "PUL" .
+<http://rinfo.lagrummet.se/publ/sfs/1998:488> rdfs:label "körkortslagen" ; dct:alternate "KörkL" .
+<http://rinfo.lagrummet.se/publ/sfs/1998:490> rdfs:label "yrkestrafiklagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1998:622> rdfs:label "polisdatalagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1998:674> dct:alternate "LIP" .
+<http://rinfo.lagrummet.se/publ/sfs/1998:808> rdfs:label "miljöbalken"; dct:alternate "MB" .
+<http://rinfo.lagrummet.se/publ/sfs/1998:980> rdfs:label "körkortsförordningen" .
+<http://rinfo.lagrummet.se/publ/sfs/1999:1078> rdfs:label "bokföringslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1999:1079> rdfs:label "revisionslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1999:1229> rdfs:label "inkomstskattelagen" ; dct:alternate "IL" .
+<http://rinfo.lagrummet.se/publ/sfs/1999:1395> rdfs:label "studiestödslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1999:355> rdfs:label "kasinolagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1999:381> rdfs:label "sevesolagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1999:382> rdfs:label "sevesoförordningen" .
+<http://rinfo.lagrummet.se/publ/sfs/1999:657> rdfs:label "epizootilagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1999:658> rdfs:label "zoonoslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/1999:799> rdfs:label "socialförsäkringslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2000:1281> rdfs:label "tullagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2000:980> rdfs:label "socialavgiftslagen" ; dct:alternate "SAL" .
+<http://rinfo.lagrummet.se/publ/sfs/2001:1227> dct:alternate "LSK" .
+<http://rinfo.lagrummet.se/publ/sfs/2001:453> dct:alternate "SoL" .
+<http://rinfo.lagrummet.se/publ/sfs/2001:453> rdfs:label "socialtjänstlagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2001:883> rdfs:label "revisorslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2002:574> rdfs:label "fordonslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2003:234> dct:alternate "Tillhandahållande" .
+<http://rinfo.lagrummet.se/publ/sfs/2003:364> rdfs:label "fartygssäkerhetslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2003:376> rdfs:label "sambolagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2003:389> dct:alternate "LEK" .
+<http://rinfo.lagrummet.se/publ/sfs/2003:778> dct:alternate "LSO" .
+<http://rinfo.lagrummet.se/publ/sfs/2004:168> rdfs:label "smittskyddslagen" ; dct:alternate "SmittskL" .
+<http://rinfo.lagrummet.se/publ/sfs/2004:347> rdfs:label "prisinformationslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2004:451> rdfs:label "produktsäkerhetslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2004:519> rdfs:label "järnvägslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2005:104> rdfs:label "försäkringsavtalslagen" ; dct:alternate "FAL" .
+<http://rinfo.lagrummet.se/publ/sfs/2005:403> rdfs:label "naturgaslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2005:551> rdfs:label "aktiebolagslagen"; dct:alternate "ABL" .
+<http://rinfo.lagrummet.se/publ/sfs/2005:59> rdfs:label "distansavtalslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2005:716> rdfs:label "utlänningslagen" ; dct:alternate "UtlL" .
+<http://rinfo.lagrummet.se/publ/sfs/2005:837> rdfs:label "vallagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2006:227> rdfs:label "vägtrafikskattelagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2006:304> rdfs:label "rättsprövningslagen"; dct:alternate "RpL" ; dct:alternate "RättsprL" .
+<http://rinfo.lagrummet.se/publ/sfs/2006:548> rdfs:label "skuldsaneringslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2006:804> rdfs:label "livsmedelslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2007:612> rdfs:label "bidragsbrottslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2008:263> rdfs:label "fjärrvärmelagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2008:355> rdfs:label "patientdatalagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2008:486> rdfs:label "marknadsföringslagen" ; dct:alternate "MFL" .
+<http://rinfo.lagrummet.se/publ/sfs/2008:567> rdfs:label "diskrimineringslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2008:579> rdfs:label "konkurrenslagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2009:287> rdfs:label "studiestödsdatalagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2009:367> rdfs:label "apoteksdatalagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2009:400> rdfs:label "offentlighets- och sekretesslagen" ; dct:alternate "OSL" .
+<http://rinfo.lagrummet.se/publ/sfs/2009:600> rdfs:label "språklagen" .
+<http://rinfo.lagrummet.se/publ/sfs/2009:865> rdfs:label "kommissionslagen" .

@@ -1,0 +1,25 @@
+<Forfattning>
+  <Paragraf id="P5" ordinal="5">
+    <Stycke id="P5S1">
+      <str>I denna lag betyder</str>
+      <NumreradLista>
+        <Listelement id="P5S1N1" ordinal="1">
+          <str>1. </str>
+          <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Penningtvätt">penningtvätt</LinkSubject>
+          <str>: sådana åtgärder</str>
+          <Bokstavslista>
+            <Listelement id="P5S1N1Na" ordinal="a">
+              <str>a) med brottsligt förvärvad egendom, som kan medföra att egendomens samband med brott döljs, att den brottslige får möjlighet att undandra sig rättsliga påföljder eller att återskaffandet av egendomen försvåras, samt sådana åtgärder som innefattar förfogande över och förvärv, innehav eller brukande av egendomen,</str>
+            </Listelement><Listelement id="P5S1N1Nb" ordinal="b">
+              <str>b) med annan egendom än som avses i a, om åtgärderna är ägnade att dölja att någon har berikat sig genom brottslig gärning,</str>
+            </Listelement>
+          </Bokstavslista>
+        </Listelement><Listelement id="P5S1N8" ordinal="8">
+          <str>8. </str>
+          <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Person_i_politiskt_utsatt_ställning">person i politiskt utsatt ställning</LinkSubject>
+          <str>: personer som har eller tidigare har haft viktiga offentliga funktioner och sådana personers närmaste familjemedlemmar och kända medarbetare,</str>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

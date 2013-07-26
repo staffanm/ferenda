@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN"
+"http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+  <head about="http://example.org/base/123/a">
+    <title property="dct:title">Example</title>
+  </head>
+  <body about="http://example.org/base/123/a">
+    <p>This is part of the main document, but not part of any sub-resource.</p>
+    <div about="http://example.org/base/123/a#S1">
+      <p>This is part of document-part section 1</p>
+      <div about="http://example.org/base/123/a#S1.1">
+        <p>This is the text in subsection 1.1</p>
+      </div>
+    </div>
+    <div about="http://example.org/base/123/a#S2">
+      <p>This is the second main document part</p>
+    </div>
+    <p>This is the tail end of the main document</p>
+  </body>
+</html>

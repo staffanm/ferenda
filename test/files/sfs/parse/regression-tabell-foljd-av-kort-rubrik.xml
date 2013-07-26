@@ -1,0 +1,36 @@
+<Forfattning>
+  <Paragraf id="P5" ordinal="5">
+    <Stycke id="P5S1">
+      <str>Exempel från 2005 kolon 559, kapitel tre paragraf fem.</str>
+    </Stycke><Stycke id="P5S2">
+      <str>För ansökningsavgiftens storlek m.m. ska följande avgiftsklasser tillämpas:</str>
+      <Tabell>
+        <Tabellrad>
+          <Tabellcell>
+            <str>Ärendeslag</str>
+          </Tabellcell><Tabellcell>
+            <str>Avgiftsklass</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad>
+          <Tabellcell>
+            <str>Undantag enligt ett visst lagrum från förbudet i lagrum mot lån till förvärv av aktier i bolaget eller annat överordnat bolag i samma koncern</str>
+          </Tabellcell><Tabellcell>
+            <str>5</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad>
+          <Tabellcell>
+            <str>Undantag enligt ett lagrum i övriga fall</str>
+          </Tabellcell><Tabellcell>
+            <str>2</str>
+          </Tabellcell>
+        </Tabellrad>
+      </Tabell>
+    </Stycke>
+  </Paragraf>
+  <Rubrik id="R1">När avgiften skall betalas</Rubrik>
+  <Paragraf id="P6" ordinal="6">
+    <Stycke id="P6S1">
+      <str>En avgift enligt lagrum skall betalas när anmälan eller ansökan ges in.</str>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

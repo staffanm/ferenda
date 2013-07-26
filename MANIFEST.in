@@ -1,0 +1,1 @@
+recursive-include ferenda/res *.xsl *.css *.js *.txt *.png *.rq *.py *.ini *.n3 *.ebnf

@@ -1,0 +1,38 @@
+{
+    "http://www.ietf.org/download/rfc-index.txt": {
+	"file":"index.txt",
+	"content-type":"text/plain"
+    },
+    "http://tools.ietf.org/rfc/rfc6912.txt": {
+	"file":"rfc6912.txt",
+	"content-type": "text/plain",
+	"expect": "downloaded/6912.txt"
+    },
+    "http://tools.ietf.org/rfc/rfc6916.txt": {
+	"file":"rfc6916.txt",
+	"content-type": "text/plain",
+	"expect": "downloaded/6916.txt"
+    },
+    "http://tools.ietf.org/rfc/rfc6919.txt": {
+	"file":"rfc6919.txt",
+	"content-type": "text/plain",
+	"expect": "downloaded/6919.txt"
+    },
+    "http://tools.ietf.org/rfc/rfc6922.txt": {
+	"file":"rfc6922.txt",
+	"content-type": "text/plain",
+	"expect": "downloaded/6922.txt"
+    },
+    "http://tools.ietf.org/rfc/rfc6931.txt": {
+	"file":"rfc6931.txt",
+	"content-type": "text/plain",
+	"expect": "downloaded/6931.txt"
+    },
+    "http://tools.ietf.org/rfc/rfc6953.txt": {
+	"file":"rfc6953.txt",
+	"content-type": "text/plain",
+	"expect": "downloaded/6953.txt"
+    }
+ }
+ 
+ 

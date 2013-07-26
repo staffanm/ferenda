@@ -1,0 +1,8 @@
+1 kap. 8 § kungörelsen (1974:152) om beslutad ny regeringsform
+
+<list>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1974:152#K1P8">1 kap. 8 §</Link>
+  <str> kungörelsen (</str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1974:152">1974:152</Link>
+  <str>) om beslutad ny regeringsform</str>
+</list>

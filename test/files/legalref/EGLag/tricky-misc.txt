@@ -1,0 +1,37 @@
+En bestämmelse om skyldighet för arbetsgivare att göra information om
+kemiska ämnen och beredningar tillgänglig finns i artikel 35 i
+Europaparlamentets och rådets förordning (EG) nr 1907/2006 av den 18
+december 2006 om registrering, utvärdering, godkännande och
+begränsning av kemikalier (Reach), inrättande av en europeisk
+kemikaliemyndighet, ändring av direktiv 1999/45/EG och upphävande av
+rådets förordning (EEG) nr 793/93 och kommissionens förordning (EG) nr 1488/94 samt rådets direktiv 76/769/EEG och kommissionens direktiv
+91/155/EEG, 93/67/EEG, 93/105/EG och 2000/21/EG.
+
+<list>
+  <str>En bestämmelse om skyldighet för arbetsgivare att göra information om
+kemiska ämnen och beredningar tillgänglig finns i </str>
+  <Link uri="http://rinfo.lagrummet.se/ext/celex/32006R1907#35">artikel 35 i
+Europaparlamentets och rådets förordning (EG) nr 1907/2006 av den 18
+december 2006</Link>
+  <str> om registrering, utvärdering, godkännande och
+begränsning av kemikalier (Reach), inrättande av en europeisk
+kemikaliemyndighet, ändring av direktiv </str>
+  <Link uri="http://rinfo.lagrummet.se/ext/celex/31999L0045">1999/45/EG</Link>
+  <str> och upphävande av
+</str>
+  <Link uri="http://rinfo.lagrummet.se/ext/celex/31993R0793">rådets förordning (EEG) nr 793/93</Link>
+  <str> och </str>
+  <Link uri="http://rinfo.lagrummet.se/ext/celex/31994R1488">kommissionens förordning (EG) nr 1488/94</Link>
+  <str> samt </str>
+  <Link uri="http://rinfo.lagrummet.se/ext/celex/31976L0769">rådets direktiv 76/769/EEG</Link>
+  <str> och </str>
+  <Link uri="http://rinfo.lagrummet.se/ext/celex/31991L0155">kommissionens direktiv
+91/155/EEG</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/ext/celex/31993L0067">93/67/EEG</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/ext/celex/31993L0105">93/105/EG</Link>
+  <str> och </str>
+  <Link uri="http://rinfo.lagrummet.se/ext/celex/32000L0021">2000/21/EG</Link>
+  <str>.</str>
+</list>

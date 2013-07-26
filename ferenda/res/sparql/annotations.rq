@@ -1,0 +1,20 @@
+# Maybe should be called describe.rq instead?
+PREFIX dct: <http://purl.org/dc/terms/>
+
+CONSTRUCT
+{
+   ?part dct:isReferencedBy ?s .
+   ?s ?p ?o .
+}
+WHERE 
+{
+  ?s ?p ?o .
+  {
+    ?s dct:isPartOf* <%(uri)s> .
+  }
+  UNION
+  {
+    ?part dct:isPartOf* <%(uri)s> .
+    ?s dct:references ?part .
+  }
+}

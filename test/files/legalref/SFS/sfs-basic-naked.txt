@@ -1,0 +1,5 @@
+1998:204
+
+<list>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1998:204">1998:204</Link>
+</list>  

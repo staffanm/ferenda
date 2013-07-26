@@ -1,0 +1,8 @@
+<Body>
+  <Paragraph>
+    <str>This is a paragraph of text.</str>
+  </Paragraph>
+  <Paragraph>
+    <str>This is another paragraph just like the first. And that's it.</str>
+  </Paragraph>
+</Body>

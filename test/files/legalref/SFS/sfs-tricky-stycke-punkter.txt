@@ -1,0 +1,11 @@
+avses i tredje stycket 2, 3 eller 4 b i denna paragraf
+
+<list>
+  <str>avses i </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#S3N2">tredje stycket 2</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#S3N3">3</Link>
+  <str> eller </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#S3N4b">4 b</Link>
+  <str> i denna paragraf</str>
+</list>

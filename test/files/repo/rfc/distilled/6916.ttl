@@ -1,0 +1,20 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix rfc: <http://example.org/ontology/rfc/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://localhost:8000/res/rfc/6916> a bibo:Standard ;
+    rfc:BCP "182" ;
+    dct:category "Best Current Practice" ;
+    dct:creator "R. Gagliano",
+        "S. Kent",
+        "S. Turner" ;
+    dct:identifier "RFC 6916" ;
+    dct:issn "2070-1721" ;
+    dct:issued "2013-04-01"^^xsd:date ;
+    dct:publisher "Internet Engineering Task Force (IETF)" ;
+    dct:rightsHolder "BBN Technologies",
+        "Cisco Systems",
+        "IECA, Inc." ;
+    dct:title "Algorithm Agility Procedure for the Resource Public Key Infrastructure (RPKI)"@en ;
+    bibo:shortTitle "RPKI Algorithm Agility"@en.

@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/2002/06/xhtml2/"
+      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+      xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+      xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:dc="http://purl.org/dc/elements/1.1/"
+      xmlns:dct="http://purl.org/dc/terms/"
+      xmlns:foaf="http://xmlns.com/foaf/0.1/"
+      xmlns:skos="http://www.w3.org/2004/02/skos/core#"
+      xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xsi:schemaLocation="http://www.w3.org/2002/06/xhtml2/ http://www.w3.org/MarkUp/SCHEMA/xhtml2.xsd"
+      xml:lang="sv">
+    <head>
+      <title property="dc:title">Lagtext</title>
+    </head>
+    <body>
+
+      <h>Författningssamling i förvaltningsrätt</h>
+      <p>Från <a href="http://lagen.nu/">lagen.nu</a></p>
+      <h class="avdelningsrubrik">Allmän förvaltningsrätt</h>
+      <ul class="toc">
+	<li><a href="#L1971:289">Lag (1971:289) om allmänna förvaltningsdomstolar</a></li>
+	<li><a href="#L1971:309">Lag (1971:309) om behörighet för allmän förvaltningsdomstol att pröva vissa mål; </a></li>
+	<li><a href="#L1995:1322">Verksförordning (1995:1322);</a></li>
+	<li><a href="#L2003:234">Förordning (2003:234) om tiden för tillhandahållande av domar och beslut m.m.; </a></li>
+	<li><a href="#L1985:206">Lag (1985:206) om viten;</a></li>
+	<li><a href="#L1962:700">Brottsbalk (1962:700) 20 kap;</a></li>
+	<li><a href="#L1957:259">Lag (1957:259) om rätt för kommun att ta ut avgift för vissa upplåtelser av offentlig plats, m.m.;</a></li>
+	<li><a href="#L1986:223">Förvaltningslag (1986:223);</a></li>
+	<li><a href="#L1971:291">Förvaltningsprocesslag (1971:291);</a></li>
+	<li><a href="#L1991:900">Kommunallag (1991:900);</a></li>
+	<li><a href="#L1949:105">Tryckfrihetsförordning 2 kap (1949:105);</a></li>
+	<li><a href="#L1980:100">Sekretesslag (1980:100);</a></li>
+	<li><a href="#L1980:657">Sekretessförordning (1980:657);</a></li>
+	<li><a href="#L1990:782">Arkivlag (1990:782)</a></li>
+	<li><a href="#L2006:304">Rättsprövningslag (2006:304)</a></li>
+	<li><a href="#L1974:152">Regeringsformen (1974:152)</a></li>
+	<li><a href="#L1992:191">Avgiftsförordningen (1992:191)</a></li>
+      </ul>
+
+      <h class="avdelningsrubrik">Särskild förvaltningsrätt</h>
+      <ul class="toc">
+	<li><a href="#L1984:387">Polislag (1984:387);</a></li>
+	<li><a href="#L1993:1617">Ordningslag (1993:1617);</a></li>
+	<li><a href="#L2004:168">Smittskyddslag (2004:168</a></li>
+	<li><a href="#L2003:778">Lag (2003:778) om skydd mot olyckor</a></li>
+	<li><a href="#L1998:488">Körkortslag (1998:488);</a></li>
+	<li><a href="#L2001:453">Socialtjänstlag (2001:453);</a></li>
+	<li><a href="#L1990:52">Lag (1990:52) med särskilda bestämmelser om vård av unga;</a></li>
+	<li><a href="#L1988:870">Lag (1988:870) om vård av missbrukare i vissa fall;</a></li>
+	<li><a href="#L1991:1128">Lag (1991:1128) om psykiatrisk tvångsvård;</a></li>
+	<li><a href="#L1991:1129">Lag (1991:1129) om rättspsykiatrisk vård;</a></li>
+	<li><a href="#L1993:387">Lag (1993:387) om stöd och service till vissa funktionshindrade;</a></li>
+	<li><a href="#L1982:763">Hälso- och sjukvårdslag (1982:763);</a></li>
+	<li><a href="#L1987:10">Plan- och bygglag (1987:10), 6, 8-11, 13 kap;</a></li>
+	<li><a href="#L1998:808">Miljöbalk (1998:808) 2, 7, 9, 10, 14, 15, 26, 27 kap</a></li>
+	<li><a href="#L2005:716">Utlänningslag (2005:716)</a></li>
+      </ul>
+      
+      
+      <section id="L1971:289" property="dct:alternate" content="AFDL" class="paragrafindelning">
+	<!-- Lag (1971:289) om allmänna förvaltningsdomstolar; -->
+	<xi:include href="testdata/sfs/parsed/1971/289.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1971:309" property="dct:alternate" content="BehL" class="paragrafindelning">
+	<!-- Lag (1971:309) om behörighet för allmän förvaltningsdomstol att pröva vissa mål; -->
+	<xi:include href="testdata/sfs/parsed/1971/309.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1995:1322" property="dct:alternate" content="VerksF" class="paragrafindelning">
+	<!-- Verksförordning (1995:1322); -->
+	<xi:include href="testdata/sfs/parsed/1995/1322.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L2003:234" property="dct:alternate" content="Tillhandahållande" class="paragrafindelning">
+	<!-- Förordning (2003:234) om tiden för tillhandahållande av domar och beslut m.m.;  -->
+	<xi:include href="testdata/sfs/parsed/2003/234.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1985:206" property="dct:alternate" content="VitesL" class="paragrafindelning">
+	<!--Lag (1985:206) om viten; -->
+	<xi:include href="testdata/sfs/parsed/1985/206.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1962:700" property="dct:alternate" content="BrB" class="kapitelindelning">
+	<!-- Brottsbalk (1962:700) 20 kap; -->
+	<xi:include href="testdata/sfs/parsed/1962/700.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/h:h)"/>
+	<xi:include href="testdata/sfs/parsed/1962/700.xht2#element(K20)"/>
+      </section>
+	
+      <section id="L1957:259" property="dct:alternate" content="Upplåtelser" class="paragrafindelning">
+	<!-- Lag (1957:259) om rätt för kommun att ta ut avgift för vissa upplåtelser av offentlig plats, m.m.; -->
+	<xi:include href="testdata/sfs/parsed/1957/259.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1986:223" property="dct:alternate" content="FL" class="paragrafindelning">
+	<!-- Förvaltningslag (1986:223); -->
+	<xi:include href="testdata/sfs/parsed/1986/223.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1971:291" property="dct:alternate" content="FPL" class="paragrafindelning">
+	<!-- Förvaltningsprocesslag (1971:291); -->
+	<xi:include href="testdata/sfs/parsed/1971/291.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1991:900" property="dct:alternate" content="KomL" class="kapitelindelning">
+	<!-- Kommunallag (1991:900); -->
+	<xi:include href="testdata/sfs/parsed/1991/900.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+
+      <section id="L1949:105" property="dct:alternate" content="TF" class="kapitelindelning">
+	<!-- Tryckfrihetsförordning 2 kap (1949:105); -->
+	<xi:include href="testdata/sfs/parsed/1949/105.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/h:h)"/>
+	<xi:include href="testdata/sfs/parsed/1949/105.xht2#element(K2)"/>
+      </section>
+
+      <section id="L1980:100" property="dct:alternate" content="SekrL" class="kapitelindelning">
+	<!-- Sekretesslag (1980:100); -->
+	<xi:include href="testdata/sfs/parsed/1980/100.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1980:657" property="dct:alternate" content="SekrF" class="paragrafindelning">
+	<!-- Sekretessförordning (1980:657); -->
+	<xi:include href="testdata/sfs/parsed/1980/657.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1990:782" property="dct:alternate" content="ArkivL" class="paragrafindelning">
+	<!-- Arkivlag (1990:782).-->
+	<xi:include href="testdata/sfs/parsed/1990/782.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L2006:304" property="dct:alternate" content="RättsprL" class="paragrafindelning">
+	<!-- Rättsprövningslag (2006:304) -->
+	<xi:include href="testdata/sfs/parsed/2006/304.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1974:152" property="dct:alternate" content="RF" class="kapitelindelning">
+	<!-- Regeringsformen (1974:152) -->
+	<xi:include href="testdata/sfs/parsed/1974/152.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1992:191" property="dct:alternate" content="Avgift" class="paragrafindelning">
+	<!-- Avgiftsförordningen (1992:191) -->
+	<xi:include href="testdata/sfs/parsed/1992/191.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+
+
+
+      <section id="L1984:387" property="dct:alternate" content="PolisL" class="paragrafindelning">
+	<!-- Polislag (1984:387); -->
+	<xi:include href="testdata/sfs/parsed/1984/387.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1993:1617" property="dct:alternate" content="OL" class="kapitelindelning">
+	<!-- Ordningslag (1993:1617); -->
+	<xi:include href="testdata/sfs/parsed/1993/1617.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L2004:168" property="dct:alternate" content="SmittskL" class="kapitelindelning">
+	<!-- Smittskyddslag (2004:168)-->
+	<xi:include href="testdata/sfs/parsed/2004/168.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L2003:778" property="dct:alternate" content="LSO" class="kapitelindelning">
+	<!-- Lag (2003:778) om skydd mot olyckor;-->
+	<xi:include href="testdata/sfs/parsed/2003/778.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1998:488" property="dct:alternate" content="KörkL" class="kapitelindelning">
+	<!-- Körkortslag (1998:488); -->
+	<xi:include href="testdata/sfs/parsed/1998/488.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L2001:453" property="dct:alternate" content="SoL" class="kapitelindelning">
+	<!-- Socialtjänstlag (2001:453); -->
+	<xi:include href="testdata/sfs/parsed/2001/453.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1990:52" property="dct:alternate" content="LVU" class="paragrafindelning">
+	<!-- Lag (1990:52) med särskilda bestämmelser om vård av unga; -->
+	<xi:include href="testdata/sfs/parsed/1990/52.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1988:870" property="dct:alternate" content="LVM" class="paragrafindelning">
+	<!-- Lag (1988:870) om vård av missbrukare i vissa fall; -->
+	<xi:include href="testdata/sfs/parsed/1988/870.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1991:1128" property="dct:alternate" content="LPT" class="paragrafindelning">
+	<!-- Lag (1991:1128) om psykiatrisk tvångsvård; -->
+	<xi:include href="testdata/sfs/parsed/1991/1128.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1991:1129" property="dct:alternate" content="LRV" class="paragrafindelning">
+	<!-- Lag (1991:1129) om rättspsykiatrisk vård; -->
+	<xi:include href="testdata/sfs/parsed/1991/1129.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1993:387" property="dct:alternate" content="LSS" class="paragrafindelning">
+	<!-- Lag (1993:387) om stöd och service till vissa funktionshindrade; -->
+	<xi:include href="testdata/sfs/parsed/1993/387.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1982:763" property="dct:alternate" content="HSL" class="paragrafindelning">
+	<!-- Hälso- och sjukvårdslag (1982:763); -->
+	<xi:include href="testdata/sfs/parsed/1982/763.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+
+      <section id="L1987:10" property="dct:alternate" content="PBL" class="kapitelindelning">
+	<!-- Plan- och bygglag (1987:10), 6, 8-11, 13 kap; -->
+	<xi:include href="testdata/sfs/parsed/1987/10.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/h:h)"/>
+	<xi:include href="testdata/sfs/parsed/1987/10.xht2#element(K6)"/>
+	<xi:include href="testdata/sfs/parsed/1987/10.xht2#element(K8)"/>
+	<xi:include href="testdata/sfs/parsed/1987/10.xht2#element(K9)"/>
+	<xi:include href="testdata/sfs/parsed/1987/10.xht2#element(K10)"/>
+	<xi:include href="testdata/sfs/parsed/1987/10.xht2#element(K11)"/>
+	<xi:include href="testdata/sfs/parsed/1987/10.xht2#element(K13)"/>
+      </section>
+
+      <section id="L1998:808" property="dct:alternate" content="MB" class="kapitelindelning">
+	<!-- Miljöbalk (1998:808) 2, 7, 9, 10, 14, 15, 26, 27 kap;-->
+	<xi:include href="testdata/sfs/parsed/1998/808.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/h:h)"/>
+	<xi:include href="testdata/sfs/parsed/1998/808.xht2#element(K2)"/>
+	<xi:include href="testdata/sfs/parsed/1998/808.xht2#element(K7)"/>
+	<xi:include href="testdata/sfs/parsed/1998/808.xht2#element(K9)"/>
+	<xi:include href="testdata/sfs/parsed/1998/808.xht2#element(K10)"/>
+	<xi:include href="testdata/sfs/parsed/1998/808.xht2#element(K14)"/>
+	<xi:include href="testdata/sfs/parsed/1998/808.xht2#element(K15)"/>
+	<xi:include href="testdata/sfs/parsed/1998/808.xht2#element(K26)"/>
+	<xi:include href="testdata/sfs/parsed/1998/808.xht2#element(K27)"/>
+      </section>
+
+      <section id="L2005:716" property="dct:alternate" content="UtlL" class="kapitelindelning">
+	<!-- Utlänningslag (2005:716).-->
+	<xi:include href="testdata/sfs/parsed/2005/716.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+
+    </body>
+</html>

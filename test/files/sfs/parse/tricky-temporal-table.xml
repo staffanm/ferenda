@@ -1,0 +1,221 @@
+<Forfattning>
+  <Paragraf id="P6" ordinal="6" upphor="datetime.datetime(2007, 7, 1, 0, 0)">
+    <Stycke id="P6S1">
+      <str>Den som anges nedan ansvarar för att sådana anordningar och tecken för anvisning för trafiken som avses i </str>
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P1">1 §</LinkSubject>
+      <str> sätts upp, tas bort, underhålls, och utförs i den omfattning som anges för respektive plats.</str>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P6" ikrafttrader="datetime.datetime(2007, 7, 1, 0, 0)" ordinal="6">
+    <Stycke id="P6S1">
+      <str>Den som anges nedan ansvarar för att sådana anordningar och tecken för anvisning för trafiken som avses i </str>
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P1">1 §</LinkSubject>
+      <str> sätts upp, tas bort, underhålls och utförs i den omfattning som anges för respektive plats.</str>
+      <Tabell>
+        <Tabellrad>
+          <Tabellcell>
+            <str>Ansvarig</str>
+          </Tabellcell><Tabellcell>
+            <str>Plats</str>
+          </Tabellcell><Tabellcell>
+            <str>Ansvaret gäller</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad upphor="datetime.datetime(2007, 7, 1, 0, 0)">
+          <Tabellcell>
+            <str>1. Kommunen</str>
+          </Tabellcell><Tabellcell>
+            <str>a) På väg inom tättbebyggt område som inte är enskild och på sådan väg utom tättbebyggt område där kommunen är väghållare</str>
+          </Tabellcell><Tabellcell>
+            <str>I andra fall än enligt 2 a, 2 c och 7-10.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad upphor="datetime.datetime(2007, 7, 1, 0, 0)">
+          <Tabellcell />
+          <Tabellcell>
+            <str>b) På enskild väg inom tättbebyggt område och på sådan väg utom tättbebyggt område där kommunen är väghållare</str>
+          </Tabellcell><Tabellcell>
+            <str>Hastighetsbegränsningar, föreskrifter enligt </str>
+            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1971:948#P41">41 § väglagen (1971:948)</LinkSubject>
+            <str> samt trafiksignaler och andra anordningar för att reglera trafiken och tillgodose trafiksäkerheten när det behövs för att tillgodose ett allmänt behov.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad upphor="datetime.datetime(2007, 7, 1, 0, 0)">
+          <Tabellcell />
+          <Tabellcell>
+            <str>c) På alla vägar</str>
+          </Tabellcell><Tabellcell>
+            <str>Särskilda trafikregler enligt sådana föreskrifter som avses i </str>
+            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P14">10 kap. 14 § trafikförordningen (1998:1276)</LinkSubject>
+            <str> och som meddelats av kommunen.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad upphor="datetime.datetime(2007, 7, 1, 0, 0)">
+          <Tabellcell />
+          <Tabellcell>
+            <str>d) I terräng</str>
+          </Tabellcell><Tabellcell>
+            <str>Förbud, påbud eller andra anvisningar för att reglera trafiken och tillgodose trafiksäkerheten.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad ikrafttrader="datetime.datetime(2007, 7, 1, 0, 0)">
+          <Tabellcell>
+            <str>1. Kommunen</str>
+          </Tabellcell><Tabellcell>
+            <str>a) På väg inom tättbebyggt område som inte är enskild och på sådan väg utom tättbebyggt område där kommunen är väghållare</str>
+          </Tabellcell><Tabellcell>
+            <str>I andra fall än enligt 2 a, 2 c och 7-10.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad ikrafttrader="datetime.datetime(2007, 7, 1, 0, 0)">
+          <Tabellcell />
+          <Tabellcell>
+            <str>b) På enskild väg inom tättbebyggt område och på sådan väg utom tättbebyggt område där kommunen är väghållare</str>
+          </Tabellcell><Tabellcell>
+            <str>Hastighetsbegränsningar, föreskrifter enligt </str>
+            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1971:948#P41">41 § väglagen (1971:948)</LinkSubject>
+            <str>, andra lokala trafikföreskrifter enligt </str>
+            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P1">10 kap. 1 § trafikförordningen (1998:1276)</LinkSubject>
+            <str> än sådana som endast får meddelas efter medgivande av vägens ägare samt trafiksignaler och andra anordningar för att reglera trafiken och tillgodose trafiksäkerheten när det behövs för att tillgodose ett allmänt behov.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad ikrafttrader="datetime.datetime(2007, 7, 1, 0, 0)">
+          <Tabellcell />
+          <Tabellcell>
+            <str>c) På alla vägar</str>
+          </Tabellcell><Tabellcell>
+            <str>Särskilda trafikregler enligt sådana föreskrifter som avses i </str>
+            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P14">10 kap. 14 § trafikförordningen</LinkSubject>
+            <str> och som meddelats av kommunen.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad ikrafttrader="datetime.datetime(2007, 7, 1, 0, 0)">
+          <Tabellcell />
+          <Tabellcell>
+            <str>d) I terräng</str>
+          </Tabellcell><Tabellcell>
+            <str>Förbud, påbud eller andra anvisningar för att reglera trafiken och tillgodose trafiksäkerheten.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad>
+          <Tabellcell>
+            <str>2. Den statliga väghållningsmyndigheten</str>
+          </Tabellcell><Tabellcell>
+            <str>a) På allmän väg där staten är väghållare</str>
+          </Tabellcell><Tabellcell>
+            <str>I andra fall än enligt 7-10.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad upphor="datetime.datetime(2007, 7, 1, 0, 0)">
+          <Tabellcell />
+          <Tabellcell>
+            <str>b) På annan enskild väg utom tättbebyggt område än där kommunen är väghållare</str>
+          </Tabellcell><Tabellcell>
+            <str>Hastighetsbegränsningar, föreskrifter enligt </str>
+            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1971:948#P41">41 § väglagen</LinkSubject>
+            <str> samt trafiksignaler och andra anvisningar för att reglera trafiken och tillgodose trafiksäkerheten där det behövs för att tillgodose ett allmänt behov.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad ikrafttrader="datetime.datetime(2007, 7, 1, 0, 0)">
+          <Tabellcell />
+          <Tabellcell>
+            <str>b) På annan enskild väg utom tättbebyggt område än där kommunen är väghållare</str>
+          </Tabellcell><Tabellcell>
+            <str>Hastighetsbegränsningar, föreskrifter enligt </str>
+            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1971:948#P41">41 § väglagen</LinkSubject>
+            <str>, andra lokala trafikföreskrifter enligt </str>
+            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P1">10 kap. 1 § trafikförordningen</LinkSubject>
+            <str> än sådana som endast får meddelas efter medgivande av vägens ägare samt trafiksignaler och andra anordningar för att reglera trafiken och tillgodose trafiksäkerheten där det behövs för att tillgodose ett allmänt behov.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad>
+          <Tabellcell />
+          <Tabellcell>
+            <str>c) På väg som ansluter till allmän väg där staten är väghållare</str>
+          </Tabellcell><Tabellcell>
+            <str>Stopplikt eller väjningsplikt som följer av lokal trafikföreskrift om sådan plikt, om cirkulationsplats eller om att väg skall vara huvudled.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad>
+          <Tabellcell />
+          <Tabellcell>
+            <str>d) På alla vägar</str>
+          </Tabellcell><Tabellcell>
+            <str>Särskilda trafikregler enligt sådana föreskrifter som avses i </str>
+            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P14">10 kap. 14 § trafikförordningen</LinkSubject>
+            <str> och som meddelats av den statliga väghållningsmyndigheten.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad>
+          <Tabellcell>
+            <str>3. Den som svarar för skoterledhållningen på allmän skoterled</str>
+          </Tabellcell><Tabellcell>
+            <str>På allmän skoterled</str>
+          </Tabellcell><Tabellcell>
+            <str>Markeringar som anges i </str>
+            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1978:594#P9">9 § terrängkörningsförordningen (1978:594)</LinkSubject>
+            <str>.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad>
+          <Tabellcell>
+            <str>4. Ägare till enskild väg</str>
+          </Tabellcell><Tabellcell>
+            <str>På enskild väg</str>
+          </Tabellcell><Tabellcell>
+            <str>Sådant som inte skall märkas ut av någon annan.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad>
+          <Tabellcell>
+            <str>5. Markägare som avses i </str>
+            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1984:318#P2S2">2 § andra stycket</LinkSubject>
+            <str> lagen (</str>
+            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1984:318">1984:318</LinkSubject>
+            <str>) om kontrollavgift vid olovlig parkering</str>
+          </Tabellcell><Tabellcell>
+            <str>Inom område där markägaren förbjuder eller ställer upp villkor för parkering och tillkännager förbuden eller villkoren enligt lagen om kontrollavgift vid olovlig parkering</str>
+          </Tabellcell><Tabellcell>
+            <str>Förbud eller villkor som markägaren beslutat.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad>
+          <Tabellcell>
+            <str>6. Markägare</str>
+          </Tabellcell><Tabellcell>
+            <str>I terräng</str>
+          </Tabellcell><Tabellcell>
+            <str>Sådant som inte skall märkas ut av någon annan.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad>
+          <Tabellcell>
+            <str>7. Innehavare av järnväg eller spårväg</str>
+          </Tabellcell><Tabellcell>
+            <str>Vid plankorsning</str>
+          </Tabellcell><Tabellcell>
+            <str>Märke A39, kryssmärke, och säkerhetsanordningar vid plankorsning.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad>
+          <Tabellcell>
+            <str>8. Polis eller annan som förordnats att ge anvisningar till trafikant</str>
+          </Tabellcell><Tabellcell>
+            <str>På väg och i terräng</str>
+          </Tabellcell><Tabellcell>
+            <str>Polismans tecken och anordning X6, särskild varningsanordning.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad>
+          <Tabellcell>
+            <str>9. Polismyndighet</str>
+          </Tabellcell><Tabellcell>
+            <str>På väg och i terräng</str>
+          </Tabellcell><Tabellcell>
+            <str>Särskilda trafikregler enligt sådana föreskrifter som avses i </str>
+            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P14">10 kap. 14 § trafikförordningen</LinkSubject>
+            <str> och som meddelats av polismyndighet.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad>
+          <Tabellcell>
+            <str>10. Tullverket</str>
+          </Tabellcell><Tabellcell>
+            <str>På väg och i terräng</str>
+          </Tabellcell><Tabellcell>
+            <str>Särskilda trafikregler enligt sådana föreskrifter som avses i </str>
+            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P14">10 kap. 14 § trafikförordningen</LinkSubject>
+            <str> och som meddelats av Tullverket.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad>
+          <Tabellcell>
+            <str>11. Annan än de som anges i 1-10</str>
+          </Tabellcell><Tabellcell>
+            <str>På väg och i terräng</str>
+          </Tabellcell><Tabellcell>
+            <str>Anordning X6, särskild varningsanordning, i samband med uppställning av fordon eller vid annan verksamhet som kan medföra att framkomligheten minskar.</str>
+          </Tabellcell>
+        </Tabellrad>
+      </Tabell>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

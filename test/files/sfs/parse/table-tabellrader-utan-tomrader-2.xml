@@ -1,0 +1,23 @@
+<Forfattning>
+  <Tabell>
+    <Tabellrad>
+      <Tabellcell>
+        <str>Inkomstår</str>
+      </Tabellcell><Tabellcell>
+        <str>Uppräkningsfaktor</str>
+      </Tabellcell>
+    </Tabellrad><Tabellrad>
+      <Tabellcell>
+        <str>2004</str>
+      </Tabellcell><Tabellcell>
+        <str>1,035</str>
+      </Tabellcell>
+    </Tabellrad><Tabellrad>
+      <Tabellcell>
+        <str>2005</str>
+      </Tabellcell><Tabellcell>
+        <str>1,038</str>
+      </Tabellcell>
+    </Tabellrad>
+  </Tabell>
+</Forfattning>

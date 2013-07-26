@@ -1,0 +1,11 @@
+<Body>
+  <Paragraph id="state-a">
+    <str>State A: This is the first state of the document.</str>
+  </Paragraph>
+  <Paragraph id="state-b">
+    <str>State B: This is an intermediate state of the document.</str>
+  </Paragraph>
+  <Paragraph id="state-c">
+    <str>State C: This is the final state of the document.</str>
+  </Paragraph>
+</Body>

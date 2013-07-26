@@ -1,0 +1,8 @@
+sådana krav för obligatoriska skadeförsäkringar som avses i artikel
+30.2 i rådets direktiv 92/49/EEG
+
+<list>
+  <str>sådana krav för obligatoriska skadeförsäkringar som avses i </str>
+  <Link uri="http://rinfo.lagrummet.se/ext/celex/31992L0049#30.2">artikel
+30.2 i rådets direktiv 92/49/EEG</Link>
+</list>

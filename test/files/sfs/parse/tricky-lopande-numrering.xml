@@ -1,0 +1,20 @@
+<Forfattning>
+  <Kapitel id="K1" ordinal="1" rubrik="1 kap. Första kapitlet">
+    <Paragraf id="P1" ordinal="1">
+      <Stycke id="P1S1">
+        <str>Första paragrafen.</str>
+      </Stycke>
+    </Paragraf><Paragraf id="P2" ordinal="2">
+      <Stycke id="P2S1">
+        <str>Andra paragrafen.</str>
+      </Stycke>
+    </Paragraf>
+  </Kapitel>
+  <Kapitel id="K2" ordinal="2" rubrik="2 kap. Andra kapitlet">
+    <Paragraf id="P3" ordinal="3">
+      <Stycke id="P3S1">
+        <str>Tredje paragrafen - notera att paragrafnumreringen är löpande genom hela lagtexten.</str>
+      </Stycke>
+    </Paragraf>
+  </Kapitel>
+</Forfattning>

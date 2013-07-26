@@ -1,0 +1,75 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov-o/> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix rinfoex: <http://lagen.nu/terms#> .
+
+# basic info
+<https://lagen.nu/sfs/2008:344/konsolidering/2013:411> a rpubl:KonsolideradGrundforfattning ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2008:344/konsolidering/2013-05-30> ; # based on dct:published
+    rinfoex:senastHamtad "2013-06-12T18:58:58.242181"^^xsd:dateTime ;
+    rinfoex:senastKontrollerad "2013-06-13T18:58:58.242181"^^xsd:dateTime ;
+    dct:published "2013-05-30"^^xsd:date ; # Assume date of last change forfattning - not easily available
+    rpubl:konsoliderar <https://lagen.nu/sfs/2008:344> ;
+    rpubl:konsolideringsunderlag <https://lagen.nu/sfs/2008:344>,
+    				 <https://lagen.nu/sfs/2009:1550>,
+				 <https://lagen.nu/sfs/2013:411> ;
+    dct:identifier "SFS 2008:344 i lydelse enligt SFS 2013:411" ;
+    dct:publisher <http://lagen.nu/org/2008/regeringskansliet> ; 
+    dct:title "Lag (2008:344) om hälso- och sjukvård åt asylsökande m.fl."@sv ;
+    dct:creator <http://lagen.nu/org/2008/justitiedepartementet> .
+
+# The object of this triple changes -- right now this is the same
+# thing as that thing, but it might change (alternately we could HTTP
+# 303 it)
+<https://lagen.nu/sfs/2008:344/konsolidering> owl:sameAs <https://lagen.nu/sfs/2008:344/konsolidering/2013:411> . 
+    
+<https://lagen.nu/sfs/2008:344> a rpubl:Lag ;
+    dct:identifier "SFS 2008:344" ;
+    dct:publisher <http://lagen.nu/org/2008/regeringskansliet> ;
+    dct:title "Lag (2008:344) om hälso- och sjukvård åt asylsökande m.fl."@sv ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2008:344> ;
+    rpubl:arsutgava "2008";
+    rpubl:beslutadAv <http://lagen.nu/org/2008/regeringskansliet> ;
+    rpubl:departement <http://lagen.nu/org/2008/justitiedepartementet> ;
+    rpubl:forarbete <http://rinfo.lagrummet.se/publ/prop/2007/08:105>,
+                    <http://rinfo.lagrummet.se/publ/bet/2007/08:SfU8>,
+                    <http://rinfo.lagrummet.se/publ/rskr/2007/08:199> ;
+    rpubl:ikrafttradandedatum "2008-07-01"^^xsd:date ;
+    rpubl:lopnummer "344";
+    rpubl:utfardandedatum "2008-05-22"^^xsd:date ;
+    rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/sfs> .
+
+<https://lagen.nu/sfs/2009:1550> a rpubl:Lag ;
+    dct:identifier "SFS 2009:1550" ;
+    dct:publisher <http://lagen.nu/org/2008/regeringskansliet> ;
+    dct:title "Lag (2009:1550) om ändring i lagen (2008:344) om hälso- och sjukvård åt asylsökande m.fl."@sv ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2009:1550> ;
+    rpubl:arsutgava "2009";
+    rpubl:beslutadAv <http://lagen.nu/org/2008/regeringskansliet> ;
+    rpubl:forarbete <http://rinfo.lagrummet.se/publ/prop/2009/10:31>,
+                    <http://rinfo.lagrummet.se/publ/bet/2009/10:SfU8>,
+                    <http://rinfo.lagrummet.se/publ/rskr/2009/10:133> ;
+    rpubl:ikrafttradandedatum "2010-01-01"^^xsd:date ;
+    rpubl:lopnummer "1550";
+    rpubl:utfardandedatum "2009-12-17"^^xsd:date ;
+    rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/sfs> .
+    
+<https://lagen.nu/sfs/2013:411> a rpubl:Lag ;
+    dct:identifier "SFS 2013:411" ;
+    dct:publisher <http://lagen.nu/org/2008/regeringskansliet> ; 
+    dct:title "Lag (2013:411) om ändring i lagen (2008:388) om hälso- och sjukvård åt asylsökande m.fl."@sv ; # '2008:388' is a typo in the original data
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2013:411> ;
+    rpubl:arsutgava "2013";
+    rpubl:beslutadAv <http://lagen.nu/org/2008/regeringskansliet> ;
+    rpubl:forarbete <http://rinfo.lagrummet.se/publ/prop/2012/13:109>,
+                    <http://rinfo.lagrummet.se/publ/bet/2012/13:SoU20>,
+                    <http://rinfo.lagrummet.se/publ/rskr/2012/13:230> ;
+    rpubl:ikrafttradandedatum "2013-07-01"^^xsd:date ;
+    rpubl:lopnummer "411";
+    rpubl:utfardandedatum "2013-05-30"^^xsd:date ;
+    rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/sfs> .
+    
+    

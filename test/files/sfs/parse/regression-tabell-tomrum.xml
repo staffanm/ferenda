@@ -1,0 +1,60 @@
+<Forfattning>
+  <Rubrik id="R1">Förteckning över byggentreprenadkontrakt</Rubrik>
+  <Rubrik id="R2">NACE</Rubrik>
+  <Tabell>
+    <Tabellrad>
+      <Tabellcell>
+        <str>Avdelning F</str>
+      </Tabellcell><Tabellcell>
+        <str>Byggentreprenader</str>
+      </Tabellcell>
+    </Tabellrad><Tabellrad>
+      <Tabellcell>
+        <str>Huvudgrupp</str>
+      </Tabellcell><Tabellcell>
+        <str>Grupp</str>
+      </Tabellcell><Tabellcell>
+        <str>Undergrupp</str>
+      </Tabellcell><Tabellcell>
+        <str>Benämning</str>
+      </Tabellcell><Tabellcell>
+        <str>Anm.</str>
+      </Tabellcell><Tabellcell>
+        <str>CPV-kod</str>
+      </Tabellcell>
+    </Tabellrad><Tabellrad>
+      <Tabellcell>
+        <str>45</str>
+      </Tabellcell><Tabellcell>
+        <str>Byggverksamhet - nybyggnad, renovering och normal reparation</str>
+      </Tabellcell><Tabellcell>
+        <str>Omfattar:</str>
+      </Tabellcell><Tabellcell>
+        <str>45000000</str>
+      </Tabellcell>
+    </Tabellrad><Tabellrad>
+      <Tabellcell />
+      <Tabellcell>
+        <str>45.1</str>
+      </Tabellcell><Tabellcell>
+        <str>Mark- och grundarbeten</str>
+      </Tabellcell><Tabellcell>
+        <str>45100000</str>
+      </Tabellcell>
+    </Tabellrad><Tabellrad>
+      <Tabellcell />
+      <Tabellcell />
+      <Tabellcell>
+        <str>45.11 markarbeten</str>
+      </Tabellcell><Tabellcell>
+        <str>Rivning av hus;</str>
+      </Tabellcell>
+    </Tabellrad><Tabellrad>
+      <Tabellcell />
+      <Tabellcell />
+      <Tabellcell>
+        <str>Omfattar: - rivning och rasering av byggnader och andra anläggningar</str>
+      </Tabellcell>
+    </Tabellrad>
+  </Tabell>
+</Forfattning>

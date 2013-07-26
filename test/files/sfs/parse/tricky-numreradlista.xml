@@ -1,0 +1,13 @@
+<Forfattning>
+  <NumreradLista>
+    <Listelement id="N1" ordinal="1">
+      <str>1. Punkt 1</str>
+    </Listelement><Listelement id="N1a" ordinal="1a">
+      <str>1 a. En nyinförd punkt</str>
+    </Listelement><Listelement id="N2" ordinal="2">
+      <str>2. Punkt 2</str>
+    </Listelement><Listelement id="N4" ordinal="4">
+      <str>4. There is no step 3</str>
+    </Listelement>
+  </NumreradLista>
+</Forfattning>

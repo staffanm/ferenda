@@ -1,0 +1,27 @@
+<Forfattning>
+  <Tabell>
+    <Tabellrad>
+      <Tabellcell>
+        <str>1. Kommunen</str>
+      </Tabellcell><Tabellcell>
+        <str>a) På väg inom tättbebyggt område</str>
+      </Tabellcell><Tabellcell>
+        <str>I andra fall än enligt 2 a, 2 c och 7-10.</str>
+      </Tabellcell>
+    </Tabellrad><Tabellrad>
+      <Tabellcell />
+      <Tabellcell>
+        <str>b) På enskild väg inom tättbebyggt område</str>
+      </Tabellcell><Tabellcell>
+        <str>Hastighetsbegränsningar, föreskrifter samt trafiksignaler</str>
+      </Tabellcell>
+    </Tabellrad><Tabellrad>
+      <Tabellcell />
+      <Tabellcell>
+        <str>c) På alla vägar</str>
+      </Tabellcell><Tabellcell>
+        <str>Särskilda trafikregler enligt sådana föreskrifter som avses och som meddelats av kommunen.</str>
+      </Tabellcell>
+    </Tabellrad>
+  </Tabell>
+</Forfattning>

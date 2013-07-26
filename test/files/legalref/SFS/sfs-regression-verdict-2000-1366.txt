@@ -1,0 +1,9 @@
+10 kap. 1 § och 8 § rättegångsbalken (1942:740)
+
+<list>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1942:740#K10P1">10 kap. 1 §</Link>
+  <str> och </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1942:740#K10P8">8 §</Link>
+  <str> </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1942:740">rättegångsbalken (1942:740)</Link>
+</list>

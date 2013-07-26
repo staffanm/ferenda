@@ -1,0 +1,46 @@
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+                             RFC INDEX
+                           -------------
+
+(CREATED ON: 04/22/2013.)
+
+This file contains citations for all RFCs in numeric order.
+
+[...]
+
+RFCs may be obtained in a number of ways, using HTTP, FTP, or email.
+See the RFC Editor Web page http://www.rfc-editor.org
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+                                RFC INDEX
+                                ---------
+   
+
+
+6912 Principles for Unicode Code Point Inclusion in Labels in the DNS.
+     A. Sullivan, D. Thaler, J. Klensin, O. Kolkman. April 2013. (Format:
+     TXT=27078 bytes) (Status: INFORMATIONAL)
+
+6916 Algorithm Agility Procedure for the Resource Public Key
+     Infrastructure (RPKI). R. Gagliano, S. Kent, S. Turner. April 2013.
+     (Format: TXT=48395 bytes) (Also BCP0182) (Status: BEST CURRENT
+     PRACTICE)
+
+6919 Further Key Words for Use in RFCs to Indicate Requirement Levels.
+     R. Barnes, S. Kent, E. Rescorla. April 1 2013. (Format: TXT=11076
+     bytes) (Status: EXPERIMENTAL)
+
+6922 The application/sql Media Type. Y. Shafranovich. April 2013.
+     (Format: TXT=8453 bytes) (Status: INFORMATIONAL)
+
+6931 Additional XML Security Uniform Resource Identifiers (URIs). D.
+     Eastlake 3rd. April 2013. (Format: TXT=75220 bytes) (Obsoletes
+     RFC4051) (Status: PROPOSED STANDARD)
+
+6953 Protocol to Access White-Space (PAWS) Databases: Use Cases and
+     Requirements. A. Mancuso, Ed., S. Probasco, B. Patil. May 2013.
+     (Format: TXT=53560 bytes) (Status: INFORMATIONAL)

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"
+      xmlns:py="http://genshi.edgewall.org/">
+ 
+ <title py:content="title">Example Feed</title>
+ <subtitle py:content="subtitle">Från lagen.nu</subtitle>
+ <link href="${feeduri}" rel="self"/>
+ <link href="${pageuri}"/>
+ <updated py:content="timestamp">2003-12-13T18:30:02Z</updated>
+ <py:for each="entry in entries">
+   <entry>
+     <title py:content="entry.title">Atom-Powered Robots Run Amok</title>
+     <link href="${entry.uri}"/>
+     <id py:content="entry.id">urn:uuid:1225c695-cfb8-4ebb-aaaa-80da344efa6a</id>
+     <updated py:content="entry.timestamp.isoformat()">2003-12-13T18:30:02Z</updated>
+     <content type="xhtml">
+       <div xmlns="http://www.w3.org/1999/xhtml">
+	 ${Markup(entry.content)}
+       </div>
+     </content>
+   </entry>
+ </py:for>
+</feed>

@@ -1,0 +1,22 @@
+Bilaga 1
+
+Förteckning över vissa djur- och växtarter
+
+Detta är en förteckning från artskyddsförordningen, som har väldigt
+breda tabeller.
+
+S       B       -       -       F       Halichoerus grypus      gråsäl
+
+-       B       P       N       -       Monachus monachus       munksäl
+(havsmunk)
+
+S       B       -       -       F       Phoca hispida bottnica (Pusa hispida
+bottnica)       bottnisk vikare
+
+-       B       P       N       -       Phoca hispida saimensis (Pusa hispida
+saimensis)      saimasäl
+
+S       B       -       -       F       Phoca vitulina  knubbsäl
+
+S       -       -       -       F       övriga arter sälar
+

@@ -1,0 +1,22 @@
+<Forfattning>
+  <Kapitel id="K1" ordinal="1" rubrik="1 kap. Första kapitlet">
+    <Rubrik id="K1R1">Första rubriken</Rubrik>
+    <Paragraf id="K1P1" ordinal="1">
+      <Stycke id="K1P1S1">
+        <str>Första paragrafen.</str>
+      </Stycke>
+    </Paragraf><Paragraf id="K1P2" ordinal="2">
+      <Stycke id="K1P2S1">
+        <str>Andra paragrafen.</str>
+      </Stycke>
+    </Paragraf>
+  </Kapitel>
+  <Kapitel id="K2" ordinal="2" rubrik="2 kap. Andra kapitlet">
+    <Rubrik id="K2R1">Andra rubriken</Rubrik>
+    <Paragraf id="K2P1" ordinal="1">
+      <Stycke id="K2P1S1">
+        <str>Tredje paragrafen - notera att paragrafnumreringen startade om.</str>
+      </Stycke>
+    </Paragraf>
+  </Kapitel>
+</Forfattning>

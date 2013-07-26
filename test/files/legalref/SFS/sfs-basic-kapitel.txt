@@ -1,0 +1,11 @@
+Särskilda bestämmelser om europabolag finns i 1 a kap. eller
+kanske 2 Kap. denna lag
+
+<list>
+  <str>Särskilda bestämmelser om europabolag finns i </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K1a">1 a kap.</Link>
+  <str> eller
+kanske </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K2">2 Kap.</Link>
+  <str> denna lag</str>
+</list>

@@ -1,0 +1,29 @@
+<Forfattning>
+  <Paragraf id="P6" ordinal="6">
+    <Stycke id="P6S1">
+      <str>Inledningsvis, i normalfallet minst tre månader, ska aktiviteterna i jobbgarantin för ungdomar, inklusive sådan anställning eller utbildning som enligt </str>
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P10S2">10 § andra stycket</LinkSubject>
+      <str> kan ingå i garantin, täcka den enskildes arbetsutbud inom garantin och omfatta</str>
+      <Strecksatslista>
+        <Listelement id="P6S1N1" ordinal="1">
+          <str>- fördjupad kartläggning,</str>
+        </Listelement><Listelement id="P6S1N2" ordinal="2">
+          <str>- studie- och yrkesvägledning, och</str>
+        </Listelement><Listelement id="P6S1N3" ordinal="3">
+          <str>- jobbsökaraktiviteter med coachning.</str>
+        </Listelement>
+      </Strecksatslista>
+    </Stycke><Stycke id="P6S2">
+      <str>Därefter bör aktiviteterna i </str>
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P6S1">första stycket</LinkSubject>
+      <str> kombineras med</str>
+      <Strecksatslista>
+        <Listelement id="P6S2N1" ordinal="1">
+          <str>- arbetspraktik, och</str>
+        </Listelement><Listelement id="P6S2N2" ordinal="2">
+          <str>- utbildning.</str>
+        </Listelement>
+      </Strecksatslista>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

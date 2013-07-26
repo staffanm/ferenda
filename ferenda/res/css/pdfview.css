@@ -1,0 +1,54 @@
+
+.page {
+    position: relative; /* needed for contained div.annotations to be absolutely positioned relative to this container */
+}
+
+.pdfpage {
+    background: #fff;
+    border: solid 1px black;
+    margin-left:auto;
+    margin-right:auto;
+    position:relative;
+    margin-bottom: 1em;
+}
+
+.positioned {position:absolute;margin:0;padding:0;}
+
+.annotations {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 30%;
+    border: solid 1px black;
+    background:#c9de96;
+}
+
+ul.viewcontrol {
+    position: absolute;
+    top: 0;
+    left: 0;
+    list-style-type: none;
+    margin-left:200pt;
+    margin-bottom: 0;
+    margin-top: 0;
+    padding: 0;
+    display: block;
+    z-index: 1;
+}
+
+ul.viewcontrol li {
+    display: inline;
+    margin: 0;
+    padding:0;
+}
+
+ul.viewcontrol li a {
+    border: 1px solid black;
+    border-top: none;
+    color: black;
+    background: white;
+    text-decoration: none;
+    padding-top: 1px;
+    padding-left: 10pt;
+    padding-right: 10pt;
+}    

@@ -1,0 +1,15 @@
+Ett ingripande som begränsar någon av de grundläggande fri- och
+rättigheter som avses i  2 kap. regeringsformen får ej grundas enbart
+på bestämmelserna i  första stycket.
+
+<list>
+  <str>Ett ingripande som begränsar någon av de grundläggande fri- och
+rättigheter som avses i  </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1974:152#K2">2 kap.</Link>
+  <str> </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1974:152">regeringsformen</Link>
+  <str> får ej grundas enbart
+på bestämmelserna i  </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#S1">första stycket</Link>
+  <str>.</str>
+</list>

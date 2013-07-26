@@ -1,0 +1,14 @@
+9 kap. 15 eller 16 § rättegångsbalken (från femte kapitlet andra
+paragrafen)
+
+<list>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1942:740#K9">9 kap.</Link>
+  <str> </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1942:740#K9P15">15</Link>
+  <str> eller </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1942:740#K9P16">16 §</Link>
+  <str> </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1942:740">rättegångsbalken</Link>
+  <str> (från femte kapitlet andra
+paragrafen)</str>
+</list>

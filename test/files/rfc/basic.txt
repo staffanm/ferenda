@@ -1,0 +1,69 @@
+
+
+
+
+
+
+Internet Engineering Task Force (IETF)                       C. Holmberg
+Request for Comments: 6809                                   I. Sedlacek
+Category: Standards Track                                       Ericsson
+ISSN: 2070-1721                                                H. Kaplan
+                                                             Acme Packet
+                                                           November 2012
+
+
+     Mechanism to Indicate Support of Features and Capabilities in
+                 the Session Initiation Protocol (SIP)
+
+Abstract
+
+   This specification defines a new SIP header field, Feature-Caps.  The
+   Feature-Caps header field conveys feature-capability indicators that
+   are used to indicate support of features and capabilities for SIP
+   entities that are not represented by the Uniform Resource Identifier
+   (URI) of the Contact header field.
+
+   SIP entities that are represented by the URI of the SIP Contact
+   header field can convey media feature tags in the Contact header
+   field to indicate support of features and capabilities.
+
+1.  Introduction
+
+   This specification defines a new SIP header field, Feature-Caps.  The
+   Feature-Caps header field conveys feature-capability indicators that
+   are used to indicate support of features and capabilities for SIP
+   entities that are not represented by the Uniform Resource Identifier
+   (URI) of the Contact header field.  Such cases are:
+
+   o  The SIP entity acts as a SIP proxy.
+
+   o  The SIP entity acts as a SIP registrar.
+
+   o  The SIP entity acts as a Back-to-Back User Agent (B2BUA)
+      [RFC3261], where the Contact header field URI represents another
+      SIP entity.
+
+   SIP entities that are represented by the URI of the SIP Contact
+   header field can convey media feature tags in the Contact header
+   field to indicate support of features and capabilities.
+
+
+
+Holmberg, et al.             Standards Track                    [Page 3]
+
+RFC 6809                      Proxy Feature                November 2012
+
+
+   Unlike media feature tags, feature-capability indicators are intended
+   to only be used with SIP.
+
+4.  Feature-Caps Header Field
+
+4.1.  Introduction
+
+   The Feature-Caps header field is used by SIP entities to convey
+   support of features and capabilities, by setting feature-capability
+   indicators.  A feature-capability indicator conveyed in a
+   Feature-Caps header field indicates that a SIP entity in the SIP
+   message signaling path supports the associated feature and
+   capability.

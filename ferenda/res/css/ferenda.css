@@ -1,0 +1,138 @@
+/* custom styles goes here */
+
+@media only screen and (min-width: 768px) {
+
+    /* reset some rules from main.css -- we want similar rules, but with
+       other selectors (based on 'article section', not '.main
+       article' */
+    
+    .main > article,
+    .main > aside {
+	width: 100%;
+	float: none;
+	!important
+    }
+    
+    article header,
+    article section,
+    article footer {
+	float: left;
+	width: 57%;
+    }
+
+    article aside {
+        float: right;
+        width: 28%;
+    }
+
+/* header element positioning */
+
+h1.title {
+    font-family: 'Raleway', sans-serif;
+    font-size: 3em;
+    font-weight: 200;
+    margin-bottom:0.2em;
+}
+h2.title {
+    clear: both;
+    font-family: 'Raleway', sans-serif; 
+    font-size: 1em;
+    font-weight: 100;
+    margin-top:0;
+}
+
+header {
+    position: relative;
+}
+header form {
+    position: absolute;
+    top: 1em;
+    right: 0px;
+    width: 200pt;
+    clear: both;
+}
+header form input {
+    position: absolute;
+    align: right;
+    right: 0px;
+    clear: both;
+}
+
+header nav ul {
+    margin-left: auto;
+    margin-right: 0px;
+}
+@media only screen and (min-width: 480px) {
+    nav a {
+	padding: 7px;
+	float: right;
+    }
+}
+
+/* http://colorschemedesigner.com/#2j61ZK-hWpBpB */
+/* general look and feel */
+.header-container,
+.footer-container,
+.main aside {
+    background: #5E8600;
+    font-weight: 100;
+}
+
+.header-container {
+    border-bottom: 20px solid #526B15;
+}
+
+nav a {
+    background: #526B15;
+}
+
+.footer-container,
+.main aside {
+    border-top: 20px solid #526B15;
+}
+
+aside h2 {
+    font-family: 'Raleway', sans-serif; 
+    font-size: 1.3em;
+    margin-top: 0;
+}
+
+.main aside {
+    margin: 0;
+    padding: 5pt;
+    font-size: 80%;
+    line-height: 120%;
+}
+.main p {
+    margin: 0;
+}
+
+nav#toc {
+    width: 20%;
+    float: left;
+}
+
+nav#toc > ul > li > p {
+    font-family: sans-serif;
+    font-weight: bold;
+    font-size: 1.5em;
+}
+nav#toc li {
+    display: inline;
+    font-weight: bold;
+}
+
+nav#toc a {
+    padding: 0;
+    background: inherit;
+    color: inherit;
+    font-weight: normal;
+    float: none;
+    display: inline
+}
+
+body.toc article {
+    width: 79%;
+    float: right;
+    !important
+}

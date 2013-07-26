@@ -1,0 +1,13 @@
+<Forfattning>
+  <Stycke id="S1">
+    <str>Vid tillämpningen av följande bestämmelser i lagen (</str>
+    <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/2000:562">2000:562</LinkSubject>
+    <str>) om internationell rättslig hjälp i brottmål avses de överenskommelser som anges nedan.</str>
+  </Stycke>
+  <Stycke id="S2">
+    <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K1P5S2">1 kap. 5 § andra stycket</LinkSubject>
+  </Stycke>
+  <Stycke id="S3">
+    <str>I följande överenskommelser finns bestämmelser om att rättslig hjälp skall lämnas i ärenden som handläggs i ett administrativt förfarande eller i ett annat förfarande än ett straffrättsligt förfarande:</str>
+  </Stycke>
+</Forfattning>

@@ -1,0 +1,28 @@
+<Forfattning>
+  <Paragraf id="P1" ordinal="1">
+    <Stycke id="P1S1">
+      <str>I denna text finns följande ord som betyder saker.</str>
+      <Tabell>
+        <Tabellrad>
+          <Tabellcell>
+            <str>Beteckning</str>
+          </Tabellcell><Tabellcell>
+            <str>Betydelse</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad>
+          <Tabellcell>
+            <str>Biobank</str>
+          </Tabellcell><Tabellcell>
+            <str>Biologiskt material från en eller flera människor som samlas.</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad>
+          <Tabellcell>
+            <str>Huvudman för en biobank</str>
+          </Tabellcell><Tabellcell>
+            <str>Vårdgivare, forskningsinstitution eller annan som innehar en biobank.</str>
+          </Tabellcell>
+        </Tabellrad>
+      </Tabell>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

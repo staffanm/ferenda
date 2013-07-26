@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/2002/06/xhtml2/"
+      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+      xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+      xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.w3.org/2002/06/xhtml2/ http://www.w3.org/MarkUp/SCHEMA/xhtml2.xsd"
+      xmlns:dct="http://purl.org/dc/terms/"
+      xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
+      xmlns:rinfoex="http://lagen.nu/terms#"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xml:base="${doc['meta']['xml:base']}"
+      xml:lang="sv"
+      about="${doc['meta']['xml:base']}"
+      xmlns:py="http://genshi.edgewall.org/"
+      >
+  <xi:include href="base.template.xht2"/>
+    <head>
+      <title property="dct:identifier" py:content="doc['meta']['dct:identifier']">Dokumentidentifierare</title>
+      <!--! base is not valid in xhtml2 - but we need it to set the
+      base context for RDFa parsing. Fix this later through pyRDFa
+      transforms -->
+      <base href="${doc['meta']['xml:base']}"/>
+    </head>
+
+    <!--! the empty comments are for whitespace control -->
+    <p py:def="render_stycke(stycke)">
+      <py:for each="part in stycke" py:choose=""><!--!
+	--><div py:when="isinstance(part, Link)" py:strip="">${render_link(part)}</div><!--!
+	--><div py:when="isinstance(part, unicode)" py:strip="">${part}</div><!--!
+	--><div py:otherwise="" class="warning">${part.__class__.__name__} utelämnad pga internt fel i render_stycke</div><!--!
+	--></py:for>
+    </p>
+
+    <div py:def="render_sektion(sektion)">
+      <h>${sektion.rubrik}</h>
+      <py:for each="part in sektion" py:choose="">
+	<div py:when="isinstance(part, Sektion)" py:strip="">${render_sektion(part)}</div>
+	<div py:when="isinstance(part, Stycke)" py:strip="">${render_stycke(part)}</div>
+	<div py:otherwise="" class="warning">${part.__class__.__name__} utelämnad pga internt fel i render_sektion</div>
+      </py:for>
+    </div>
+    
+    <body typeof="${doc['meta']['rdfs:type']}">
+      ${render_metadata(doc['meta'])}
+      <section role="main">
+	<py:for each="part in doc['body']" py:choose="">
+	  <div py:when="isinstance(part, Sektion)" py:strip="">${render_sektion(part)}</div>
+	  <div py:when="isinstance(part, Stycke)" py:strip="">${render_stycke(part)}</div>
+	  <div py:otherwise="" class="warning">${part.__class__.__name__} utelämnad pga internt fel i main</div>
+	</py:for>
+      </section>
+    </body>
+</html>

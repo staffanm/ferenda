@@ -1,0 +1,21 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://localhost:8000/res/rfc/6912> a bibo:Standard ;
+    dct:category "Informational" ;
+    dct:creator "A. Sullivan",
+        "D. Thaler",
+        "J. Klensin",
+        "O. Kolkman" ;
+    dct:identifier "RFC 6912" ;
+    dct:issn "2070-1721" ;
+    dct:issued "2013-04-01"^^xsd:date ;
+    dct:publisher "Internet Architecture Board (IAB)" ;
+    dct:rightsHolder "Dyn, Inc.",
+        "Microsoft",
+        "NLnet Labs" ;
+    dct:title "Principles for Unicode Code Point Inclusion in Labels in the DNS"@en ;
+    bibo:shortTitle "DNS Zone Code Point Principles"@en.
+    
+

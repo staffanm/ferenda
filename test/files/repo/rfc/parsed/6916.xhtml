@@ -1,0 +1,447 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
+<html xmlns:rfc="http://example.org/ontology/rfc/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:dct="http://purl.org/dc/terms/" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+  <head about="http://localhost:8000/res/rfc/6916">
+    <meta content="182" property="rfc:BCP" xml:lang=""/>
+    <meta content="Best Current Practice" property="dct:category" xml:lang=""/>
+    <meta content="R. Gagliano" property="dct:creator" xml:lang=""/>
+    <meta content="S. Kent" property="dct:creator" xml:lang=""/>
+    <meta content="S. Turner" property="dct:creator" xml:lang=""/>
+    <meta content="RFC 6916" property="dct:identifier" xml:lang=""/>
+    <meta content="2070-1721" property="dct:issn" xml:lang=""/>
+    <meta datatype="xsd:date" content="2013-04-01" property="dct:issued"/>
+    <meta content="Internet Engineering Task Force (IETF)" property="dct:publisher" xml:lang=""/>
+    <meta content="BBN Technologies" property="dct:rightsHolder" xml:lang=""/>
+    <meta content="Cisco Systems" property="dct:rightsHolder" xml:lang=""/>
+    <meta content="IECA, Inc." property="dct:rightsHolder" xml:lang=""/>
+    <title property="dct:title">Algorithm Agility Procedure for the Resource Public Key Infrastructure (RPKI)</title>
+    <meta content="RPKI Algorithm Agility" property="bibo:shortTitle" xml:lang="en"/>
+    <link href="http://purl.org/ontology/bibo/Standard" rel="rdf:type"/>
+  </head>
+  <body about="http://localhost:8000/res/rfc/6916">
+    <div about="http://localhost:8000/res/rfc/6916#PS1" class="preamblesection" property="dct:title" content="Abstract" typeof="bibo:DocumentPart">
+      <p>This document specifies the process that Certification Authorities (CAs) and Relying Parties (RPs) participating in the Resource Public Key Infrastructure (RPKI) will need to follow to transition to a new (and probably cryptographically stronger) algorithm set. The process is expected to be completed over a timescale of several years. Consequently, no emergency transition is specified. The transition procedure defined in this document supports only a top-down migration (parent migrates before children).</p>
+    </div>
+    <div about="http://localhost:8000/res/rfc/6916#PS2" class="preamblesection" property="dct:title" content="Status of This Memo" typeof="bibo:DocumentPart">
+      <p>This memo documents an Internet Best Current Practice.</p>
+      <p>This document is a product of the Internet Engineering Task Force (IETF). It represents the consensus of the IETF community. It has received public review and has been approved for publication by the Internet Engineering Steering Group (IESG). Further information on BCPs is available in Section 2 of RFC 5741.</p>
+      <p>Information about the current status of this document, any errata, and how to provide feedback on it may be obtained at http://www.rfc-editor.org/info/rfc6916.</p>
+    </div>
+    <div about="http://localhost:8000/res/rfc/6916#PS3" class="preamblesection" property="dct:title" content="Copyright Notice" typeof="bibo:DocumentPart">
+      <p>Copyright (c) 2013 IETF Trust and the persons identified as the document authors. All rights reserved.</p>
+      <p>This document is subject to BCP 78 and the IETF Trust's Legal Provisions Relating to IETF Documents (http://trustee.ietf.org/license-info) in effect on the date of publication of this document. Please review these documents carefully, as they describe your rights and restrictions with respect to this document. Code Components extracted from this document must include Simplified BSD License text as described in Section 4.e of the Trust Legal Provisions and are provided without warranty as described in the Simplified BSD License.</p>
+    </div>
+    <div content="Introduction" about="http://localhost:8000/res/rfc/6916#S1" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="1" property="bibo:chapter" xml:lang=""/>
+      <p>   The Resource Public Key Infrastructure (RPKI) must accommodate
+   transitions between the public keys used by Certification Authorities
+   (CAs).  Transitions of this sort are usually termed "key rollover".
+   Planned key rollover will occur regularly throughout the life of the
+   RPKI, as each CA changes its public keys, in a non-coordinated
+   fashion.  (By non-coordinated we mean that the time at which each CA
+   elects to change its keys is locally determined, not coordinated
+   across the RPKI.)  Moreover, because a key change might be
+   necessitated by suspected private key compromise, one can never
+   assume coordination of these events among all of the CAs in the RPKI.
+   In an emergency key rollover, the old certificate is revoked and a
+   new certificate with a new key is issued.  The mechanisms to perform
+   a key rollover in RPKI (either planned or in an emergency), while
+   maintaining the same algorithm suite, are covered in <a href="#bib-RFC6489">[RFC6489]</a>.</p>
+      <p>This document describes the mechanism to perform a key rollover in the RPKI due to the migration to a new signature algorithm suite. It specifies the process that CAs and Relying Parties (RPs) participating in the RPKI will need to follow to transition to a new (and probably cryptographically stronger) algorithm set. The process is expected to be completed over a timescale of months or years. Consequently, no emergency transition is specified. The transition procedure defined in this document supports only a top-down migration (parent migrates before children).</p>
+      <p>A signature-algorithm suite encompasses both a signature algorithm (with a specified key size range) and a one-way hash algorithm. It is anticipated that the RPKI will require the adoption of updated key sizes and/or different algorithm suites over time. This document treats the adoption of a new hash algorithm while retaining the current signature algorithm as equivalent to an algorithm migration, and requires the CA to change its key. Migration to a new algorithm suite will be required in order to maintain an acceptable level of cryptographic security and protect the integrity of certificates, Certificate Revocation Lists (CRLs), and signed objects in the RPKI. All of the data structures in the RPKI explicitly identify the signature and hash algorithms being used. However, experience has demonstrated that the ability to represent algorithm IDs is not sufficient to enable migration to new algorithm suites (algorithm agility). One also must ensure that protocols, infrastructure elements, and operational procedures also accommodate the migration from one algorithm suite to another. Algorithm migration is expected to be very infrequent, and it will require the support of a "current" and "next" suite for a prolonged interval, probably several years.</p>
+      <p>This document defines how entities in the RPKI execute a planned CA key rollover when the algorithm suite changes. The description covers actions by CAs, repository operators, and RPs. It describes the behavior required of both CAs and RPs to make such key changes work in the RPKI context, including how the RPKI repository system is used to support key rollover.</p>
+      <p>This document does not specify any algorithm suite per se. The RPKI Certificate Policy (CP) <a href="#bib-RFC6484">[RFC6484]</a> mandates the use of the algorithms defined in <a href="#bib-RFC6485">[RFC6485]</a> by CAs and RPs. When an algorithm transition is initiated, <a href="#bib-RFC6485">[RFC6485]</a> MUST be updated (as defined in Section 4.1 of this document) to redefine the required algorithms for compliant RPKI CAs and RPs under the CP. The CP will not change as a side effect of algorithm transition, and thus the policy OID in RPKI certificates will not change.</p>
+      <p>For each algorithm transition, an additional document (the algorithm transition timetable) MUST be published (as a BCP) to define the dates for each milestone defined in this document. It will define dates for the phase transitions consistent with the descriptions provided in Section 4. It also will describe how the RPKI community will measure the readiness of CAs and RPs to transition to each phase. CAs publish certificates, CRLs, and other signed objects under the new algorithm suite as the transition progresses. This provides visibility into the deployment of the new algorithm suite, enabling the community to evaluate deployment progress. The transition procedure allows CAs to remove old certificates, CRLs, and signed products after the twilight date, which provides the ability to observe and measure the withdrawal of the old algorithm suite. Thus, the phases defined in this document enable the community to evaluate the progress of the transition. The timetable document will also describe procedures to amend the timetable if problems arise in implementing later phases of the transition. It is RECOMMENDED that the timetable document be developed by representatives of the RPKI community, e.g., IANA, Internet Registries, and network operators.</p>
+    </div>
+    <div content="Requirements Notation" about="http://localhost:8000/res/rfc/6916#S2" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="2" property="bibo:chapter" xml:lang=""/>
+      <p>The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", "NOT RECOMMENDED" and "OPTIONAL" in this document are to be interpreted as described in <a href="#bib-RFC2119">[RFC2119]</a>.</p>
+    </div>
+    <div content="Terminology" about="http://localhost:8000/res/rfc/6916#S3" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="3" property="bibo:chapter" xml:lang=""/>
+      <p>This document assumes that the reader is familiar with the terms and concepts described in "Internet X.509 Public Key Infrastructure Certificate and Certificate Revocation List (CRL) Profile" <a href="#bib-RFC5280">[RFC5280]</a>, "X.509 Extensions for IP Addresses and AS Identifiers" <a href="#bib-RFC3779">[RFC3779]</a>, and "A Profile for Resource Certificate Repository Structure" <a href="#bib-RFC6481">[RFC6481]</a>. Additional terms and conventions used in examples are provided below.</p>
+      <p>   Algorithm migration:  A planned transition from one signature and
+               hash algorithm to a new signature and hash algorithm.</p>
+      <p>   Algorithm Suite A:  The "current" algorithm suite used for hashing
+               and signing; used in examples in this document.</p>
+      <p>   Algorithm Suite B:  The "next" algorithm suite used for hashing and
+               signing; used in examples in this document.</p>
+      <p>   CA X:       The CA that issued CA Y's certificate (i.e., CA Y's
+               parent); used in examples in this document.</p>
+      <p>   CA Y:       The non-leaf CA; used in examples in this document.</p>
+      <p>   CA Z:       A CA that is a "child" of CA Y; used in examples in this
+               document.</p>
+      <p>   Correspond: Two certificates issued under different algorithm suites
+               correspond to one another if they are issued to the same
+               entity by the same CA and bind identical Internet Number
+               Resources (INRs) to that entity.  Two CRLs correspond if
+               they are issued by the same CA and enumerate
+               corresponding certificates.  Two signed objects (other
+               than manifests) correspond if they are verified using
+               corresponding end-entity (EE) certificates and they
+               contain the same encapsulated Context Info field.  Two
+               manifests correspond if they encompass corresponding
+               certificates, Route Origination Authorizations (ROAs),
+               CRLs, and other signed objects.  (The term "equivalent"
+               is used synonymously when referring to such RPKI signed
+               products.)</p>
+      <p>   Leaf CA:    A CA that issues only EE certificates.</p>
+      <p>   Non-Leaf CA:  A CA that issues certificates to other CAs.</p>
+      <p>   PoP (proof of possession):  Execution of a protocol that demonstrates
+               to an issuer that a subject requesting a certificate
+               possesses the private key corresponding to the public key
+               in the certificate request submitted by the subject.</p>
+      <p>   ROA:        Route Origination Authorization, as defined in <a href="#bib-RFC6482">[RFC6482]</a>.</p>
+      <p>   Signed product set (also called set or product set):  A collection of
+               certificates, signed objects, a CRL and a manifest that
+               are associated by virtue of being verifiable under the
+               same parent CA certificate</p>
+    </div>
+    <div content="Key Rollover Steps for Algorithm Migration" about="http://localhost:8000/res/rfc/6916#S4" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="4" property="bibo:chapter" xml:lang=""/>
+      <p>The "current" RPKI algorithm suite (Suite A) is defined in the RPKI CP document, by reference to <a href="#bib-RFC6485">[RFC6485]</a>. When a migration of the RPKI algorithm suite is needed, the first step MUST be an update of <a href="#bib-RFC6485">[RFC6485]</a> to define the new algorithm suite. The algorithm transition timeline document MUST also be published (as a BCP) to inform the community of the dates selected for milestones in the transition process, as described in Section 4.1.</p>
+      <div content="Milestones Definition" about="http://localhost:8000/res/rfc/6916#S4.1" property="dct:title" class="subsection" typeof="bibo:DocumentPart">
+        <span content="4.1" property="bibo:chapter" xml:lang=""/>
+        <p>   CA Ready Algorithm B Date:  After this date, all non-leaf CAs MUST be
+               ready to process a request from a child CA to issue a
+               certificate under the Algorithm Suite B.  All CAs
+               publishing an <a href="#bib-RFC6490">[RFC6490]</a> Trust Anchor Locator (TAL) for
+               Algorithm Suite A MUST also publish the correspondent TAL
+               for Algorithm Suite B.</p>
+        <p>   CA Go Algorithm B Date:  After this date, all CAs MUST have reissued
+               all their signed product sets under Algorithm Suite B.</p>
+        <p>   RP Ready Algorithm B Date:  After this date, all RPs MUST be prepared
+               to process signed material issued under Algorithm Suite
+               B.</p>
+        <p>   Twilight Date:  After this date, a CA MAY cease issuing signed
+               products under Algorithm Suite A.  Also, after this date,
+               an RP MAY cease to validate signed materials issued under
+               Algorithm Suite A.</p>
+        <p>   End-Of-Life (EOL) Date:  After this date, Algorithm Suite A MUST be
+               deprecated using the process in Section 10, and all
+               Algorithm Suite A TALs MUST be removed from their
+               publication points.</p>
+      </div>
+      <div content="Process Overview" about="http://localhost:8000/res/rfc/6916#S4.2" property="dct:title" class="subsection" typeof="bibo:DocumentPart">
+        <span content="4.2" property="bibo:chapter" xml:lang=""/>
+        <p>The migration process described in this document involves a series of steps that MUST be executed in chronological order by CAs and RPs. The only milestone at which both CAs and RPs take action at the same time is the EOL Date. Due to the decentralized nature of the RPKI infrastructure, it is expected that an algorithm transition will span several years.</p>
+        <p>   In order to facilitate the transition, CAs will start issuing
+   certificates using Algorithm B in a hierarchical, top-down fashion.
+   In our example, CA Y will issue certificates using Algorithm Suite B
+   only after CA X has started to do so (CA Y Ready Algorithm B Date &gt;
+   CA X Ready Algorithm B Date).  This ordered transition avoids the
+   issuance of "mixed" suite CA certificates, e.g., a CA certificate
+   signed using Suite A that contains a key from Suite B.  In the RPKI,
+   a CA MUST NOT sign a CA certificate carrying a subject key that
+   corresponds to an algorithm suite that differs from the one used to
+   sign the certificate.  (X.509 accommodates such mixed algorithm
+   certificates, but this process avoids using that capability.)  A non-
+   top-down transition approach would require the use of such mixed-mode
+   certificates and would lead to exponential growth of the RPKI
+   repository.  Also, because the RPKI CP mandates PoP for certificate
+   requests, it is not possible for a CA to request a certificate for
+   Algorithm Suite B until its parent CA supports that suite.  (See
+   Section 5 for more details.)</p>
+        <p>The algorithm agility model described here does not prohibit a CA from issuing an EE certificate with a subject public key from a different algorithm suite, if that certificate is not used to verify repository objects. This exception to the mixed algorithm suite certificate rule is allowed because an EE certificate that is not used to verify repository objects does not interfere with the ability of RPs to download and verify repository content. As noted above, every CA in the RPKI is required to perform a PoP check for the subject public key when issuing a certificate. In general, a subject cannot assume that a CA is capable of supporting a different algorithm. However, if the subject is closely affiliated with the CA, it is reasonable to assume that there are ways for the subject to know whether the CA can support a request to issue an EE certificate containing a specific, different public key algorithm. This document does not specify how a subject can determine whether a CA is capable of issuing a mixed suite EE certificate, because it anticipates that such certificates will be issued only in contexts where the subject and CA are sufficiently closely affiliated (for example, an ISP issuing certificates to devices that it manages).</p>
+        <p>The following figure gives an overview of the process:</p>
+        <p>Process for RPKI CAs:</p>
+        <p>     Phase 0    Phase 1   Phase 2             Phase 4  Phase 0
+   --x--------x---------x-------------------x--------x---------
+     ^        ^         ^                   ^        ^
+     |        |         |                   |        |
+    (1)      (2)       (3)                 (5)      (6)</p>
+        <p>Process for RPKI RPs:</p>
+        <p>               Phase 0              Phase 3   Phase 4  Phase 0
+   -------------------------------x---------x--------x---------
+     ^                            ^         ^        ^
+     |                            |         |        |
+    (1)                          (4)       (5)      (6)</p>
+        <p>   (1) RPKI algorithm document is updated, and the algorithm
+       transition timeline document is issued
+   (2) CA Ready Algorithm B Date
+   (3) CA Go Algorithm B Date
+   (4) RP Ready Algorithm B Date
+   (5) Twilight Date
+   (6) End-Of-Life (EOL) Date</p>
+        <p>Each of these milestones is discussed in the next section when each phase of the transition process is described.</p>
+        <p>Two situations have been identified that motivate pausing or rolling back the transition process. The first situation arises if the RPKI community is not ready to make the transition. For example, many CAs might not be prepared to issue signed products under Suite B, or many RPs might not be ready to process Suite B products. Under these circumstances, the timetable MUST be reissued, postponing the date for the phase in question and pushing back the dates for later phases. The other situation arises if, during the transition, serious concerns arise about the security of the Suite B algorithms. Such concerns would motivate terminating the transition and rolling back signed products, i.e., reverting to Suite A. In this case, the timetable MUST be republished, and the RPKI algorithm document MUST be superseded. The phase descriptions below allude to these two situations, as appropriate.</p>
+      </div>
+      <div content="Phase 0" about="http://localhost:8000/res/rfc/6916#S4.3" property="dct:title" class="subsection" typeof="bibo:DocumentPart">
+        <span content="4.3" property="bibo:chapter" xml:lang=""/>
+        <p>Phase 0 is the steady-state phase of the process; throughout this phase, Algorithm Suite A is the only supported algorithm suite in the RPKI. Phase 0 is also the steady state for the RPKI.</p>
+        <p>During Phase 0, CAs X, Y, and Z are required to generate signed product sets using only Algorithm Suite A. Also, RPs are required to validate signed product sets issued using only Algorithm Suite A.</p>
+        <p>The following figure shows an example of the structure of signed objects in the repository, indicating the algorithm suites in use and showing the relationships between three CAs (X, Y, and Z) that form a certification chain. Vertical alignment in the figure indicates objects signed by the same CA using the same private key. The differences in horizontal indentation also represent the use of different publication points for objects signed by different CAs. The characters "|-&gt;" are used for visualization purposes for both the signing relationship and the publication point change. For example, the objects CA-Y-Certificate-Algorithm-Suite-A, CA-X-CRL-Algorithm- Suite-A, and CA-X-Signed-Objects-Algorithm-Suite-A are all signed using the private key corresponding to CA-X-Certificate-Algorithm- Suite-A and published at CA X's corresponding publication point.</p>
+        <p>   CA-X-Certificate-Algorithm-Suite-A (Cert-XA)
+           |-&gt; CA-Y-Certificate-Algorithm-Suite-A (Cert-YA)
+                   |-&gt; CA-Z-Certificate-Algorithm-Suite-A (Cert-ZA)
+                           |-&gt; CA-Z-CRL-Algorithm-Suite-A (CRL-ZA)
+                           |-&gt; CA-Z-Signed-Objects-Algorithm-Suite-A
+                   |-&gt; CA-Y-CRL-Algorithm-Suite-A (CRL-YA)
+                   |-&gt; CA-Y-Signed-Objects-Algorithm-Suite-A
+           |-&gt; CA-X-CRL-Algorithm-Suite-A (CRL-XA)
+           |-&gt; CA-X-Signed-Objects-Algorithm-Suite-A</p>
+        <p>Note: Cert-XA represents the certificate for CA X, which is signed using Algorithm Suite A.</p>
+        <div content="Milestone 1" about="http://localhost:8000/res/rfc/6916#S4.3.1" property="dct:title" class="subsubsection" typeof="bibo:DocumentPart">
+          <span content="4.3.1" property="bibo:chapter" xml:lang=""/>
+          <p>The first milestone initiates the migration process. It updates <a href="#bib-RFC6485">[RFC6485]</a> with the following definitions for the RPKI:</p>
+          <ul>
+            <li>Algorithm Suite A</li>
+            <li>Algorithm Suite B</li>
+          </ul>
+          <p>Additionally, the new algorithm transition timeline document MUST be published with the following information:</p>
+          <ul>
+            <li>CA Ready Algorithm B Date</li>
+            <li>CA Go Algorithm B Date</li>
+            <li>RP Ready Algorithm B Date</li>
+            <li>Twilight Date</li>
+            <li>EOL Date</li>
+            <li>Readiness metrics for CAs and RPs in each phase</li>
+          </ul>
+          <p>Each date specified here is assumed to be at one minute after midnight, UTC. No finer granularity time specification is required or supported.</p>
+        </div>
+      </div>
+      <div content="Phase 1" about="http://localhost:8000/res/rfc/6916#S4.4" property="dct:title" class="subsection" typeof="bibo:DocumentPart">
+        <span content="4.4" property="bibo:chapter" xml:lang=""/>
+        <p>Phase 1 starts at the CA Ready Algorithm B Date. During Phase 1, all non-leaf CAs MUST be ready to process a request from a child CA to issue or revoke a certificate using Algorithm Suite B. If it is determined that a substantial number of CAs are not ready, the algorithm transition timeline document MUST be reissued, as noted in Section 4.2. However, CAs that are capable of issuing Suite B certificates may continue to do so, if requested by their child CAs. As this phase does not require any RPs to process signed objects under Suite B, and since Suite B product sets SHOULD be stored at independent publication points, there is no adverse impact on RPs. If the Suite B algorithm is deemed unsuitable, the algorithm transition timeline and the algorithm specification documents MUST be replaced, and Algorithm Suite B MUST be deprecated using the process described in Section 10.</p>
+        <p>Because the transition will happen using a hierarchical, top-down model, a child CA will be able to issue certificates using Algorithm Suite B only after its parent CA has issued its own. The RPKI provisioning protocol can identify if a parent CA is capable of issuing certificates using Algorithm Suite B and can identify the corresponding algorithm suite in each Certificate Signing Request (CSR; see Section 5). During much of this phase, the Suite B product tree will be incomplete, i.e., not all CAs will have issued products under Suite B. Thus, for production purposes, RPs MUST fetch and validate only Suite A products. Suite B products should be fetched and processed only for testing purposes.</p>
+        <p>The following figure shows the status of repository entries for the three example CAs during this phase. Two distinct certificate chains are maintained, and CA Z has not yet requested any material using Algorithm Suite B.</p>
+        <p>   CA-X-Certificate-Algorithm-Suite-A (Cert-XA)
+           |-&gt; CA-Y-Certificate-Algorithm-Suite-A (Cert-YA)
+                   |-&gt; CA-Z-Certificate-Algorithm-Suite-A (Cert-ZA)
+                           |-&gt; CA-Z-CRL-Algorithm-Suite-A (CRL-ZA)
+                           |-&gt; CA-Z-Signed-Objects-Algorithm-Suite-A
+                   |-&gt; CA-Y-CRL-Algorithm-Suite-A (CRL-YA)
+                   |-&gt; CA-Y-Signed-Objects-Algorithm-Suite-A
+           |-&gt; CA-X-CRL-Algorithm-Suite-A (CRL-XA)
+           |-&gt; CA-X-Signed-Objects-Algorithm-Suite-A</p>
+        <p>   CA-X-Certificate-Algorithm-Suite-B (Cert-XB)
+           |-&gt; CA-Y-Certificate-Algorithm-Suite-B (Cert-YB)
+                   |-&gt; CA-Y-CRL-Algorithm-Suite-B (CRL-YB)
+                   |-&gt; CA-Y-Signed-Objects-Algorithm-Suite-B
+           |-&gt; CA-X-CRL-Algorithm-Suite-B (CRL-XB)
+           |-&gt; CA-X-Signed-Objects-Algorithm-Suite-B</p>
+      </div>
+      <div content="Phase 2" about="http://localhost:8000/res/rfc/6916#S4.5" property="dct:title" class="subsection" typeof="bibo:DocumentPart">
+        <span content="4.5" property="bibo:chapter" xml:lang=""/>
+        <p>Phase 2 starts at the CA Go Algorithm B Date. At the start of this phase, each signed product set MUST be available using both Algorithm Suite A and Algorithm Suite B. Thus, prior to the start of this phase, every CA MUST ensure that there is a Suite B product corresponding to each Suite A product that the CA has issued. Throughout this phase, each CA MUST maintain this correspondence. During this phase, RPs MUST be prepared to validate sets issued using Algorithm Suite A and MAY be prepared to validate sets issued using the Algorithm Suite B.</p>
+        <p>   If it is determined that a substantial number of CAs are not ready,
+   the algorithm transition timeline document MUST be reissued, as noted
+   in Section 4.2.  (Since the processing requirement for RPs here is a
+   MAY, if RPs have problems with Suite B products, this does not
+   require pushing back the Phase 2 milestone, but it does motivate
+   delaying the start of Phase 3.)  CAs that are capable of publishing
+   products under Suite B MAY continue to do so.  Phase 2, like Phase 1,
+   does not require any RPs to process signed objects under Suite B.
+    Also, Suite B products SHOULD be stored at independent publication
+   points so that there is no adverse impact on RPs that are not
+   prepared to process Suite B products.  (See Section 9 for additional
+   details.)  If the Suite B algorithm is deemed unsuitable, the</p>
+        <p>algorithm transition timeline and the algorithm specification documents MUST be replaced, and Algorithm Suite B MUST be deprecated using the process described in Section 10.</p>
+        <p>It is RECOMMENDED that RPs that can process Algorithm Suite B fetch and validate Suite B products. RPs that are not ready to process Suite B products MUST continue to make use of Suite A products. An RP that elects to validate signed product sets using both Algorithm Suite A and Algorithm Suite B should expect the same results. If there are discrepancies when evaluating corresponding signed product sets, successful validation of either product set is acceptable. A detailed analysis of the validation of multiple instances of signed objects is included in Section 6.</p>
+        <p>The following figure shows the status of the repository entries for the three example CAs throughout this phase, where all signed objects are available using both algorithm suites.</p>
+        <p>   CA-X-Certificate-Algorithm-Suite-A (Cert-XA)
+           |-&gt; CA-Y-Certificate-Algorithm-Suite-A (Cert-YA)
+                   |-&gt; CA-Z-Certificate-Algorithm-Suite-A (Cert-ZA)
+                           |-&gt; CA-Z-CRL-Algorithm-Suite-A (CRL-ZA)
+                           |-&gt; CA-Z-Signed-Objects-Algorithm-Suite-A
+                   |-&gt; CA-Y-CRL-Algorithm-Suite-A (CRL-YA)
+                   |-&gt; CA-Y-Signed-Objects-Algorithm-Suite-A
+           |-&gt; CA-X-CRL-Algorithm-Suite-A (CRL-XA)
+           |-&gt; CA-X-Signed-Objects-Algorithm-Suite-A</p>
+        <p>   CA-X-Certificate-Algorithm-Suite-B (Cert-XB)
+           |-&gt; CA-Y-Certificate-Algorithm-Suite-B (Cert-YB)
+                   |-&gt; CA-Z-Certificate-Algorithm-Suite-B (Cert-ZB)
+                           |-&gt; CA-Z-CRL-Algorithm-Suite-B (CRL-ZB)
+                           |-&gt; CA-Z-Signed-Objects-Algorithm-Suite-B
+                   |-&gt; CA-Y-CRL-Algorithm-Suite-B (CRL-YB)
+                   |-&gt; CA-Y-Signed-Objects-Algorithm-Suite-B
+           |-&gt; CA-X-CRL-Algorithm-Suite-B (CRL-XB)
+           |-&gt; CA-X-Signed-Objects-Algorithm-Suite-B</p>
+      </div>
+      <div content="Phase 3" about="http://localhost:8000/res/rfc/6916#S4.6" property="dct:title" class="subsection" typeof="bibo:DocumentPart">
+        <span content="4.6" property="bibo:chapter" xml:lang=""/>
+        <p>   Phase 3 starts at the RP Ready Algorithm B Date.  During this phase,
+   all signed product sets are available using both algorithm suites,
+   and all RPs MUST be able to validate them.  (The correspondence
+   between Suite A and Suite B products was required for Phase 2 and was
+   maintained throughout that phase.  The same requirements apply
+   throughout this phase.)  It is RECOMMENDED that, in preparation for
+   Phase 4, RPs retrieve and process Suite B product sets first and</p>
+        <p>treat them as the preferred product sets for validation throughout this phase. Thus, an RP SHOULD try to validate the sets of signed products retrieved from the Algorithm Suite B repository first.</p>
+        <p>If a substantial number of RPs are unable to process product sets signed with Suite B, the algorithm transition timeline document MUST be reissued, pushing back the date for this and later milestones, as discussed in Section 4.2. Since the Suite B products SHOULD be published at distinct publication points, RPs that cannot process Suite B products can be expected to revert to the Suite A products that still exist. If the Suite B algorithm is deemed unsuitable, the algorithm transition timeline and the algorithm specification documents MUST be replaced and Algorithm Suite B MUST be deprecated using the process described in Section 10.</p>
+        <p>There are no changes to the CA behavior throughout this phase.</p>
+      </div>
+      <div content="Phase 4" about="http://localhost:8000/res/rfc/6916#S4.7" property="dct:title" class="subsection" typeof="bibo:DocumentPart">
+        <span content="4.7" property="bibo:chapter" xml:lang=""/>
+        <p>Phase 4 starts at the Twilight Date. At that date, Algorithm A is labeled as "old" and the Algorithm B is labeled as "current".</p>
+        <p>During this phase, all signed product sets MUST be issued using Algorithm Suite B and MAY be issued using Algorithm Suite A. All signed products sets issued using Suite B MUST be published at their corresponding publication points. Signed products sets issued using Suite A might not be available at their corresponding publication points. Every RP MUST validate signed product sets using Suite B. RPs MAY validate signed product sets using Suite A. However, RPs SHOULD NOT assume that the collection of Suite A product sets is complete. Thus, RPs SHOULD make use of only Suite B products sets. (See Section 6 for further details.)</p>
+        <p>If it is determined that many RPs are not capable of processing the new algorithm suite, the algorithm transition timeline document MUST be reissued, pushing back the date for this and the next milestone. The document MUST require the CA not to remove Suite A product sets if this phase is delayed. If Algorithm Suite B is deemed unsuitable, the algorithm transition timeline and the algorithm specification documents MUST be replaced, Algorithm Suite B MUST be deprecated using the process described in Section 10, and CAs MUST NOT remove Suite A product sets. At this stage, RPs are still capable of processing Suite A signed products, so the RPKI is still viable.</p>
+        <p>The following figure describes a possible status for the repositories of the example CAs.</p>
+        <p>   CA-X-Certificate-Algorithm-Suite-A (Cert-XA)
+           |-&gt; CA-Y-Certificate-Algorithm-Suite-A (Cert-YA)
+                   |-&gt; CA-Y-CRL-Algorithm-Suite-A (CRL-YA)
+                   |-&gt; CA-Y-Signed-Objects-Algorithm-Suite-A
+           |-&gt; CA-X-CRL-Algorithm-Suite-A (CRL-XA)
+           |-&gt; CA-X-Signed-Objects-Algorithm-Suite-A</p>
+        <p>   CA-X-Certificate-Algorithm-Suite-B (Cert-XB)
+           |-&gt; CA-Y-Certificate-Algorithm-Suite-B (Cert-YB)
+                   |-&gt; CA-Z-Certificate-Algorithm-Suite-B (Cert-ZB)
+                           |-&gt; CA-Z-CRL-Algorithm-Suite-A (CRL-ZB)
+                           |-&gt; CA-Z-Signed-Objects-Algorithm-Suite-B
+                   |-&gt; CA-Y-CRL-Algorithm-Suite-A (CRL-YB)
+                   |-&gt; CA-Y-Signed-Objects-Algorithm-Suite-B
+           |-&gt; CA-X-CRL-Algorithm-Suite-A (CRL-XB)
+           |-&gt; CA-X-Signed-Objects-Algorithm-Suite-B</p>
+      </div>
+      <div content="Return to Phase 0" about="http://localhost:8000/res/rfc/6916#S4.8" property="dct:title" class="subsection" typeof="bibo:DocumentPart">
+        <span content="4.8" property="bibo:chapter" xml:lang=""/>
+        <p>The EOL Date triggers the return to Phase 0 (steady state). At this point, the old algorithm suite, Algorithm Suite A, MUST be deprecated using the process described in Section 10.</p>
+        <p>This phase closes the loop, as the new algorithm suite (Algorithm Suite B) is now the only required algorithm suite in RPKI. From this point forward, this suite is referred to as Algorithm Suite A.</p>
+        <p>If it is determined that many RPs are not capable of processing the new algorithm suite, the algorithm transition timeline document MUST be reissued, pushing back the date for this milestone.</p>
+      </div>
+    </div>
+    <div content="Support for Multiple Algorithms in the RPKI Provisioning Protocol" about="http://localhost:8000/res/rfc/6916#S5" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="5" property="bibo:chapter" xml:lang=""/>
+      <p>The migration described in this document is a top-down process where two synchronization issues need to be solved between child and parent CAs:</p>
+      <ul>
+        <li>A child CA needs to identify which algorithm suites are supported
+      by its parent CA.</li>
+        <li>A child CA needs to signal which algorithm suite should be used by
+      its parent CA to sign a CSR.</li>
+      </ul>
+      <p>The RPKI provisioning protocol <a href="#bib-RFC6492">[RFC6492]</a> supports multiple algorithms suites by implementing different resource classes for each suite. Several different resource classes also may use the same algorithm suite for different resource sets.</p>
+      <p>A child CA that wants to identify which algorithm suites are supported by its parent CA MUST perform the following tasks:</p>
+      <p>1. Establish a provisioning protocol session with its parent CA.</p>
+      <p>   2.  Perform a "list" command as described in Section 3.3.1 of
+       <a href="#bib-RFC6492">[RFC6492]</a>.</p>
+      <p>   3.  From the Payload in the "list response" resource class, extract
+       the "issuer's certificate" for each class.  The algorithm suite
+       for each class will match the algorithm suite used to issue the
+       corresponding "issuer's certificate" (as specified in the
+       SubjectPublicKeyInfo field of that certificate).</p>
+      <p>A child CA that wants to specify an algorithm suite to its parent CA (e.g., in a certificate request) MUST perform the following tasks:</p>
+      <p>   1.  Perform the tasks described above to identify the algorithm
+       suites supported by its parent CA and the resource class
+       corresponding to each suite.</p>
+      <p>   2.  Identify the corresponding resource class in the appropriate
+       provisioning protocol command (e.g., "issue" or "revoke").</p>
+      <p>Upon receipt of a certificate request from a child CA, a parent CA will verify the PoP of the private key. If a child CA requests the issuing of a certificate using an algorithm suite that does not match a resource class, the PoP validation will fail and the request will not be performed.</p>
+    </div>
+    <div content="Validation of Multiple Instances of Signed Products" about="http://localhost:8000/res/rfc/6916#S6" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="6" property="bibo:chapter" xml:lang=""/>
+      <p>During Phases 1, 2, 3, and 4, two algorithm suites will be valid simultaneously in RPKI. In this section, we describe the RP behavior when validating corresponding signed products using different algorithm suites.</p>
+      <p>During Phase 1, two corresponding instances MAY be available for each signed product, one signed under Algorithm Suite A and one under Algorithm Suite B. As noted in Section 4.4, in this phase there is a preference for Suite A product sets. All products are available under Suite A, while only some products may be available under Suite B. For production purposes, an RP MAY fetch and validate only Suite A products. Suite B products SHOULD be fetched and validated only for test purposes. When product sets exist under both suites, they should yield equivalent results, to facilitate testing. (It is not possible to directly compare Suite A and Suite B product sets, because certificates, CRLs, and manifests will appear syntactically</p>
+      <p>different. However, the output of the process, i.e., the ROA payloads -- Autonomous System number and address prefix data -- SHOULD match, modulo timing issues.)</p>
+      <p>During Phases 2 and 3 of this process, two corresponding instances of all signed products MUST be available to RPs. As noted in Section 4.5, it is RECOMMENDED that Suite B capable RPs fetch and validate Suite B products sets during Phase 2. If an RP encounters validation problems with the Suite B products, it SHOULD revert to using Suite A products. RPs that are Suite B capable MAY fetch both product sets and compare the results (e.g., ROA outputs) for testing.</p>
+      <p>In Phase 3, all RPs MUST be Suite B capable and MUST fetch Suite B product sets. If an RP encounters problems with Suite B product sets, it can revert to Suite A products. RPs encountering such problems SHOULD contact the relevant repository maintainers (e.g., using the mechanism defined in <a href="#bib-RFC6493">[RFC6493]</a> to report problems.)</p>
+      <p>During Phase 4, only Suite B product sets are required to be present for all RPKI entities, as per Section 4.7. Thus, RPs SHOULD retrieve and validate only these product sets. Retrieval of Suite A products sets may yield an incomplete set of signed products and is NOT RECOMMENDED.</p>
+    </div>
+    <div content="Revocation" about="http://localhost:8000/res/rfc/6916#S7" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="7" property="bibo:chapter" xml:lang=""/>
+      <p>The algorithm migration process mandates the maintenance of two parallel but equivalent certification hierarchies during Phases 2 and 3 of the process. During these phases, a CA MUST revoke and request revocation of certificates consistently under both algorithm suites. When not performing a key rollover operation (as described in Section 8), a CA requesting the revocation of its certificate during these two phases MUST perform that request for both algorithm suites (A and B). A non-leaf CA SHOULD NOT verify that its child CAs comply with this requirement. Note that a CA MUST request revocation of its certificate relative to a specific algorithm suite using the mechanism described in Section 5</p>
+      <p>During Phase 1, a CA that revokes a certificate under Suite A SHOULD revoke the corresponding certificate under Suite B if that certificate exists. During Phase 4, a CA that revokes a certificate under Suite B SHOULD revoke the corresponding certificate under Suite A if that certificate exists.</p>
+      <p>During Phase 1, a CA may revoke certificates under Suite B without revoking them under Suite A, since the Suite B products are for test purposes. During Phase 4, a CA may revoke certificates issued under Suite A without revoking them under Suite B, since Suite A products are being deprecated.</p>
+    </div>
+    <div content="Key Rollover" about="http://localhost:8000/res/rfc/6916#S8" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="8" property="bibo:chapter" xml:lang=""/>
+      <p>Key rollover (without algorithm changes) is effected independently for each algorithm suite and MUST follow the process described in <a href="#bib-RFC6489">[RFC6489]</a>.</p>
+    </div>
+    <div content="Repository Structure" about="http://localhost:8000/res/rfc/6916#S9" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="9" property="bibo:chapter" xml:lang=""/>
+      <p>The two parallel hierarchies that will exist during the transition process SHOULD have independent publications points. The repository structures for each algorithm suite are described in <a href="#bib-RFC6481">[RFC6481]</a>.</p>
+    </div>
+    <div content="Deprecating an Algorithm Suite" about="http://localhost:8000/res/rfc/6916#S10" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="10" property="bibo:chapter" xml:lang=""/>
+      <p>To deprecate an algorithm suite, the following process MUST be executed by every CA in the RPKI:</p>
+      <p>   1.  Each CA MUST cease issuing certificates under the suite.  This
+       means that any request for a CA certificate from a child will be
+       rejected, e.g., sending an "error_response" message with error
+       code "request - no such resource class", as defined in <a href="#bib-RFC6492">[RFC6492]</a>.</p>
+      <p>   2.  Each CA MUST cease generating signed products, except the CRL and
+       manifest, under the deprecated algorithm suite.</p>
+      <p>   3.  Each CA MUST revoke the EE certificates for all signed products
+       that it has issued under the deprecated algorithm suite.  The CA
+       SHOULD delete these products from its publication point to avoid
+       burdening RPs with the need to download and process these
+       products.</p>
+      <p>   4.  Each CA MUST revoke all CA certificates that it has issued under
+       the deprecated algorithm suite.</p>
+      <p>   5.  Each CA SHOULD remove all CA certificates that it has issued
+       under the deprecated algorithm suite.</p>
+      <p>   6.  Each CA that publishes a TAL under the deprecated algorithm suite
+       MUST removed it from the TAL's publication point.</p>
+      <p>   7.  Each CA SHOULD continue to maintain the publication point for the
+       deprecated algorithm suite at least until the CRL nextUpdate.
+       This publication point MUST contain only the CRL and a manifest
+       for that publication point.  This behavior provides a window in
+       which RPs may be able to become aware of the revoked status of
+       the signed products that have been deleted.</p>
+      <p>   8.  Each RP MUST remove any TALs that is has published under the
+       deprecated algorithm suite.</p>
+      <p>CAs in the RPKI hierarchy may become aware of the deprecation of the algorithm suite at different times and may execute the procedure above asynchronously relative to one another. Thus, for example, a CA may request revocation of its CA certificate, only to learn that the certificate has already been revoked by the issuing CA. The revocation of a CA certificate makes the CRL and manifest issued under it incapable of validation. The asynchronous execution of this procedure likely will result in transient "inconsistencies" among the publication points associated with the deprecated algorithm suite. However, these inconsistencies should yield "fail-safe" results, i.e., the objects signed under the deprecated suite should be rejected by RPs.</p>
+    </div>
+    <div content="Security Considerations" about="http://localhost:8000/res/rfc/6916#S11" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="11" property="bibo:chapter" xml:lang=""/>
+      <p>An algorithm transition in RPKI should be a very infrequent event, and it requires wide community consensus. The events that may lead to an algorithm transition may be related to a weakness of the cryptographic strength of the algorithm suite in use by RPKI, which is normal to happen over time. The procedures described in this document mean that it will take years to complete an algorithm transition. During that time, the RPKI system will be vulnerable to any cryptographic weakness that may have triggered this procedure (e.g., a downgrade attack).</p>
+      <p>This document does not describe an emergency mechanism for algorithm migration. Due to the distributed nature of RPKI and the very large number of CAs and RPs, the authors do not believe it is feasible to effect an emergency algorithm migration procedure.</p>
+      <p>If a CA does not complete its migration to the new algorithm suite as described in this document (after the EOL of the "old" algorithm suite), its signed product set will no longer be valid. Consequently, the RPKI may, at the end of Phase 4, have a smaller number of valid signed products than before starting the process. Conversely, an RP that does not follow this process will lose the ability to validate signed products issued under the new algorithm</p>
+      <p>suite. The resulting incomplete view of routing information from the RPKI (as a result of a failure by CAs or RPs to complete the transition) could degrade routing in the public Internet.</p>
+    </div>
+    <div content="Acknowledgements" about="http://localhost:8000/res/rfc/6916#S12" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="12" property="bibo:chapter" xml:lang=""/>
+      <p>The authors would like to acknowledge the work of the SIDR working group co-chairs (Sandra Murphy, Chris Morrow, and Alexey Melnikov) as well as the contributions given by Geoff Huston, Arturo Servin, Brian Weis, Terry Manderson, Brian Dickson, David Black, and Danny McPherson.</p>
+    </div>
+    <div content="Normative References" about="http://localhost:8000/res/rfc/6916#S13" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="13" property="bibo:chapter" xml:lang=""/>
+      <p>   <a href="#bib-RFC2119">[RFC2119]</a>  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119, March 1997.</p>
+      <p>   <a href="#bib-RFC3779">[RFC3779]</a>  Lynn, C., Kent, S., and K. Seo, "X.509 Extensions for IP
+              Addresses and AS Identifiers", RFC 3779, June 2004.</p>
+      <p>   <a href="#bib-RFC5280">[RFC5280]</a>  Cooper, D., Santesson, S., Farrell, S., Boeyen, S.,
+              Housley, R., and W. Polk, "Internet X.509 Public Key
+              Infrastructure Certificate and Certificate Revocation List
+              (CRL) Profile", RFC 5280, May 2008.</p>
+      <p>   <a href="#bib-RFC6481">[RFC6481]</a>  Huston, G., Loomans, R., and G. Michaelson, "A Profile for
+              Resource Certificate Repository Structure", RFC 6481,
+              February 2012.</p>
+      <p>   <a href="#bib-RFC6482">[RFC6482]</a>  Lepinski, M., Kent, S., and D. Kong, "A Profile for Route
+              Origin Authorizations (ROAs)", RFC 6482, February 2012.</p>
+      <p>   <a href="#bib-RFC6484">[RFC6484]</a>  Kent, S., Kong, D., Seo, K., and R. Watro, "Certificate
+              Policy (CP) for the Resource Public Key Infrastructure
+              (RPKI)", BCP 173, RFC 6484, February 2012.</p>
+      <p>   <a href="#bib-RFC6485">[RFC6485]</a>  Huston, G., "The Profile for Algorithms and Key Sizes for
+              Use in the Resource Public Key Infrastructure (RPKI)",
+              RFC 6485, February 2012.</p>
+      <p>   <a href="#bib-RFC6489">[RFC6489]</a>  Huston, G., Michaelson, G., and S. Kent, "Certification
+              Authority (CA) Key Rollover in the Resource Public Key
+              Infrastructure (RPKI)", BCP 174, RFC 6489, February 2012.</p>
+      <p>   <a href="#bib-RFC6490">[RFC6490]</a>  Huston, G., Weiler, S., Michaelson, G., and S. Kent,
+              "Resource Public Key Infrastructure (RPKI) Trust Anchor
+              Locator", RFC 6490, February 2012.</p>
+      <p>   <a href="#bib-RFC6492">[RFC6492]</a>  Huston, G., Loomans, R., Ellacott, B., and R. Austein, "A
+              Protocol for Provisioning Resource Certificates",
+              RFC 6492, February 2012.</p>
+      <p>   <a href="#bib-RFC6493">[RFC6493]</a>  Bush, R., "The Resource Public Key Infrastructure (RPKI)
+              Ghostbusters Record", RFC 6493, February 2012.</p>
+      <p>Authors' Addresses</p>
+      <p>   Roque Gagliano
+   Cisco Systems
+   Avenue des Uttins 5
+   Rolle  1180
+   Switzerland</p>
+      <p>EMail: rogaglia@cisco.com</p>
+      <p>   Stephen Kent
+   BBN Technologies
+   10 Moulton St.
+   Cambridge, MA  02138
+   USA</p>
+      <p>EMail: kent@bbn.com</p>
+      <p>   Sean Turner
+   IECA, Inc.
+   3057 Nutley Street, Suite 106
+   Fairfax, VA  22031
+   USA</p>
+      <p>EMail: turners@ieca.com</p>
+    </div>
+  </body>
+</html>

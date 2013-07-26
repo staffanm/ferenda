@@ -1,0 +1,11 @@
+<Forfattning>
+  <Paragraf id="P3" ordinal="3">
+    <Stycke id="P3S1">
+      <str>Är brott som avses i </str>
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P1S1">1 § första stycket</LinkSubject>
+      <str> att anse som grovt, skall för </str>
+      <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Grovt_narkotikabrott">grovt narkotikabrott</LinkSubject>
+      <str> dömas till fängelse, lägst två år och högst tio år</str>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

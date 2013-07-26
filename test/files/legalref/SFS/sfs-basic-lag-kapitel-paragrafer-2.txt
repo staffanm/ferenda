@@ -1,0 +1,17 @@
+Var säljarens egendom avträdd till konkurs, skall vad om återvinning
+av lös egendom till konkursbo är stadgat i 4 kap. 19 och 20 §§
+konkurslagen (1987:672) äga motsvarande tillämpning.
+
+<list>
+  <str>Var säljarens egendom avträdd till konkurs, skall vad om återvinning
+av lös egendom till konkursbo är stadgat i </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1987:672#K4">4 kap.</Link>
+  <str> </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1987:672#K4P19">19</Link>
+  <str> och </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1987:672#K4P20">20 §§</Link>
+  <str>
+</str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1987:672">konkurslagen (1987:672)</Link>
+  <str> äga motsvarande tillämpning.</str>
+</list>

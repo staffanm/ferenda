@@ -1,0 +1,11 @@
+*~
+*.pyc
+/.coverage
+/.ropeproject
+/.tox
+/dist/
+/ferenda.egg-info/
+/htmlcov/
+/netstandards
+__pycache__/
+/doc/_build/

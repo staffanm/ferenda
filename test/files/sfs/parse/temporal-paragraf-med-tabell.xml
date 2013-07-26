@@ -1,0 +1,47 @@
+<Forfattning>
+  <Paragraf id="P9" ordinal="9" upphor="datetime.datetime(2008, 2, 15, 0, 0)">
+    <Stycke id="P9S1">
+      <str>A Bestämmelser om betydelsen av följande begrepp, termer och uttryck finns i nedan angivna paragrafer:</str>
+      <Tabell>
+        <Tabellrad>
+          <Tabellcell>
+            <str>absorption</str>
+          </Tabellcell><Tabellcell>
+            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K23P1">23 kap. 1 §</LinkSubject>
+          </Tabellcell>
+        </Tabellrad><Tabellrad>
+          <Tabellcell>
+            <str>apportegendom</str>
+          </Tabellcell><Tabellcell>
+            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K2P6">2 kap. 6 §</LinkSubject>
+          </Tabellcell>
+        </Tabellrad>
+      </Tabell>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P9" ikrafttrader="datetime.datetime(2008, 2, 15, 0, 0)" ordinal="9">
+    <Stycke id="P9S1">
+      <str>B Bestämmelser om betydelsen av följande begrepp, termer och uttryck finns i nedan angivna paragrafer:</str>
+      <Tabell>
+        <Tabellrad>
+          <Tabellcell>
+            <str>absorption</str>
+          </Tabellcell><Tabellcell>
+            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K23P1">23 kap. 1 §</LinkSubject>
+          </Tabellcell>
+        </Tabellrad><Tabellrad>
+          <Tabellcell>
+            <str>apportegendom</str>
+          </Tabellcell><Tabellcell>
+            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K2P6">2 kap. 6 §</LinkSubject>
+          </Tabellcell>
+        </Tabellrad>
+      </Tabell>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P10" ordinal="10">
+    <Stycke id="P10S1">
+      <str>Ett avstämningsbolag är ett aktiebolag vars bolagsordning innehåller förbehåll om.</str>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

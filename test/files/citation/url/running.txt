@@ -1,0 +1,1 @@
+A url (like http://example.org/1) may be, like http://example.org/2, in running http://example.org/text.html.

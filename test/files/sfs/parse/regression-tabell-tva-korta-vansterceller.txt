@@ -1,0 +1,16 @@
+17 § Lokaliseringsmärken anger väg till ort, plats, inrättning,
+anläggning eller liknande, om inte annat anges.
+Lokaliseringsmärken är följande.
+
+Märke
+
+Närmare föreskrifter
+
+F1 Orienteringstavla            Märket är en förberedande
+                                upplysning om korsning,
+                                cirkulationsplats eller
+                                motsvarande.
+
+                             Om det finns särskilda skäl kan
+                                upplysning om två korsningar
+                                anges på märket.

@@ -1,0 +1,70 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+  <title>XSL Transformations (XSLT)</title>
+</head>
+
+<body>
+
+<div class="head">
+<a href="http://www.w3.org/"><img src="http://www.w3.org/Icons/WWW/w3c_home"
+alt="W3C" height="48" width="72"></a>
+
+<h1>XSL Transformations (XSLT)<br>
+Version 1.0</h1>
+
+<h2>W3C Recommendation 16 November 1999</h2>
+</div>
+
+<h2><a name="abstract">Abstract</a></h2>
+
+<p>This specification defines the syntax and semantics of XSLT, which is a
+language for transforming XML documents into other XML documents.</p>
+
+<h2><a name="status">Status of this document</a></h2>
+
+<p>This document has been reviewed by W3C Members and other interested
+parties [...]</p>
+
+<h2><a name="contents">Table of contents</a></h2>
+1 Introduction <br>
+2 Stylesheet Structure <br>
+
+<h3>Appendices</h3>
+A <a href="#section-References">References</a> <br>
+A.1 Normative References<br>
+A.2 Other References<br>
+
+<hr>
+
+<h2><a name="section-Introduction"></a>1 Introduction</h2>
+
+<p>This specification defines the syntax and semantics of the XSLT language.</p>
+
+<h2><a name="section-Stylesheet-Structure"></a>2 Stylesheet Structure</h2>
+
+<h3><a name="xslt-namespace"></a>2.1 XSLT Namespace</h3>
+
+<p>The XSLT namespace has the URI
+<code>http://www.w3.org/1999/XSL/Transform</code>.</p>
+
+<h3><a name="section-Combining-Stylesheets"></a>2.6 Combining Stylesheets</h3>
+
+<p>XSLT provides two mechanisms to combine stylesheets:</p>
+
+<h4><a name="include"></a>2.6.1 Stylesheet Inclusion</h4>
+
+<p class="element-syntax"><a name="element-include"></a><code>&lt;!--
+Category: top-level-element --&gt;<br>
+&lt;xsl:include<br>
+&nbsp;&nbsp;<b>href</b> = <var>uri-reference</var>&nbsp;/&gt;</code></p>
+
+<h4><a name="import"></a>2.6.2 Stylesheet Import</h4>
+
+<p class="element-syntax"><a
+name="element-import"></a><code>&lt;xsl:import<br>
+&nbsp;&nbsp;<b>href</b> = <var>uri-reference</var>&nbsp;/&gt;</code></p>
+
+</body>
+</html>

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--! Genshi template for showing information about a keyword (primarily listing cases for now) -->
+<html xmlns="http://www.w3.org/2002/06/xhtml2/"
+      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+      xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+      xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.w3.org/2002/06/xhtml2/ http://www.w3.org/MarkUp/SCHEMA/xhtml2.xsd"
+      xmlns:dct="http://purl.org/dc/terms/"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xml:lang="sv"
+      xmlns:py="http://genshi.edgewall.org/"
+      >
+  <xi:include href="base.template.xht2"/>
+  <head>
+    <title py:content="title">Defaulttitel</title>
+  </head>
+  <body>
+    <div role="navigation">
+      <p>Navigation stuff (if any?) goes here</p>
+    </div>
+    <div role="note">
+      <p class="sidoruta">
+	Links to external places goes here. Maybe related keywords?
+      </p>
+    </div>
+    <div role="main">
+      <h py:content="title">Defaulttitel</h>
+      <p>Här kommer inom sinom tid en beskrivning av ${title}.
+        The licenses for most software and other practical works are designed
+	to take away your freedom to share and change the works.  By contrast,
+	the GNU General Public License is intended to guarantee your freedom to
+	share and change all versions of a program--to make sure it remains free
+	software for all its users.  We, the Free Software Foundation, use the
+	GNU General Public License for most of our software; it applies also to
+	any other work released this way by its authors.  You can apply it to
+	your programs, too.
+	
+	When we speak of free software, we are referring to freedom, not
+	price.  Our General Public Licenses are designed to make sure that you
+	have the freedom to distribute copies of free software (and charge for
+	them if you wish), that you receive source code or can get it if you
+	want it, that you can change the software or use pieces of it in new
+	free programs, and that you know you can do these things.
+      </p>
+      <h>Rättsfall med detta nyckelord</h>
+      <ul>
+      <py:for each="uri in sorted(legalcases.keys())">
+	<li><a href="${uri}" py:content="legalcases[uri]"></a></li>
+      </py:for>
+      </ul>
+    </div>
+  </body>
+</html>

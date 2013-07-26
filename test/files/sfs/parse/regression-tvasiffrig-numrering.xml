@@ -1,0 +1,12 @@
+<Forfattning>
+  <Paragraf id="P9" ordinal="9">
+    <Stycke id="P9S1">
+      <str>Här är nionde paragrafen.</str>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P10" ordinal="10">
+    <Stycke id="P10S1">
+      <str>Här är tionde paragrafen.</str>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

@@ -1,0 +1,33 @@
+Nollte omnämnandet av påhittadelagen. Första omnämnandet av
+påhittadelagen (1960:729). Andra omnämnandet av påhittadelagen.
+---
+Det här är en föreslagen ändring, som görs om anslagen
+beviljas. Tredje omnämnandet av påhittadelagen. Fjärde omnämnandet av
+påhittadelagen (1962:700). Femte omnämnandet av påhittadelagen. 
+---
+RESET: Sjätte omnämnandet av påhittadelagen.
+
+<list>
+  <str>Nollte omnämnandet av påhittadelagen. Första omnämnandet av
+</str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:729">påhittadelagen (1960:729)</Link>
+  <str>. Andra omnämnandet av </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:729">påhittadelagen</Link>
+  <str>.</str>
+</list>
+---
+<list>
+  <str>Det här är en föreslagen ändring, som görs om anslagen
+beviljas. Tredje omnämnandet av </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:729">påhittadelagen</Link>
+  <str>. Fjärde omnämnandet av
+</str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1962:700">påhittadelagen (1962:700)</Link>
+  <str>. Femte omnämnandet av </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1962:700">påhittadelagen</Link>
+  <str>. </str>
+</list>
+---
+<list>
+  <str>RESET: Sjätte omnämnandet av påhittadelagen.</str>
+</list>

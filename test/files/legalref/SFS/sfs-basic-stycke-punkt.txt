@@ -1,0 +1,7 @@
+föreligger enligt tredje stycket 2 i denna paragraf
+
+<list>
+  <str>föreligger enligt </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#S3N2">tredje stycket 2</Link>
+  <str> i denna paragraf</str>
+</list>

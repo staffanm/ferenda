@@ -1,0 +1,133 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
+<html xmlns:rfc="http://example.org/ontology/rfc/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:dct="http://purl.org/dc/terms/" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+  <head about="http://localhost:8000/res/rfc/6922">
+    <meta content="Informational" property="dct:category" xml:lang=""/>
+    <meta content="Y. Shafranovich" property="dct:creator" xml:lang=""/>
+    <meta content="RFC 6922" property="dct:identifier" xml:lang=""/>
+    <meta content="2070-1721" property="dct:issn" xml:lang=""/>
+    <meta datatype="xsd:date" content="2013-04-01" property="dct:issued"/>
+    <meta content="Internet Engineering Task Force (IETF)" property="dct:publisher" xml:lang=""/>
+    <meta content="BioFortis, Inc." property="dct:rightsHolder" xml:lang=""/>
+    <title property="dct:title">The application/sql Media Type</title>
+    <link href="http://purl.org/ontology/bibo/Standard" rel="rdf:type"/>
+  </head>
+  <body about="http://localhost:8000/res/rfc/6922">
+    <div about="http://localhost:8000/res/rfc/6922#PS1" class="preamblesection" property="dct:title" content="Abstract" typeof="bibo:DocumentPart">
+      <p>This document registers the application/sql media type to be used for the Structured Query Language (SQL).</p>
+    </div>
+    <div about="http://localhost:8000/res/rfc/6922#PS2" class="preamblesection" property="dct:title" content="Status of This Memo" typeof="bibo:DocumentPart">
+      <p>This document is not an Internet Standards Track specification; it is published for informational purposes.</p>
+      <p>This document is a product of the Internet Engineering Task Force (IETF). It represents the consensus of the IETF community. It has received public review and has been approved for publication by the Internet Engineering Steering Group (IESG). Not all documents approved by the IESG are a candidate for any level of Internet Standard; see Section 2 of RFC 5741.</p>
+      <p>Information about the current status of this document, any errata, and how to provide feedback on it may be obtained at http://www.rfc-editor.org/info/rfc6922.</p>
+    </div>
+    <div about="http://localhost:8000/res/rfc/6922#PS3" class="preamblesection" property="dct:title" content="Copyright Notice" typeof="bibo:DocumentPart">
+      <p>Copyright (c) 2013 IETF Trust and the persons identified as the document authors. All rights reserved.</p>
+      <p>This document is subject to BCP 78 and the IETF Trust's Legal Provisions Relating to IETF Documents (http://trustee.ietf.org/license-info) in effect on the date of publication of this document. Please review these documents carefully, as they describe your rights and restrictions with respect to this document. Code Components extracted from this document must include Simplified BSD License text as described in Section 4.e of the Trust Legal Provisions and are provided without warranty as described in the Simplified BSD License.</p>
+    </div>
+    <div content="Introduction" about="http://localhost:8000/res/rfc/6922#S1" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="1" property="bibo:chapter" xml:lang=""/>
+      <p>The Structured Query Language (SQL) has been in use for over 30 years with various types of database technologies. However, there is no current media type registered for SQL. Therefore, this document seeks to formally register the application/sql media type to be used for SQL with IANA.</p>
+    </div>
+    <div content="Conventions Used in This Document" about="http://localhost:8000/res/rfc/6922#S2" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="2" property="bibo:chapter" xml:lang=""/>
+      <p>The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in <a href="#bib-RFC2119">[RFC2119]</a> when they appear in ALL CAPS. These words may also appear in this document in lowercase as English prose, absent of the normative meanings mentioned above.</p>
+    </div>
+    <div content="Media Type Registration Application" about="http://localhost:8000/res/rfc/6922#S3" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="3" property="bibo:chapter" xml:lang=""/>
+      <p>This section provides the media type registration application for this media type (see <a href="#bib-RFC6838">[RFC6838]</a>, Section 5.6)</p>
+      <p>Type name: application</p>
+      <p>Subtype name: sql</p>
+      <p>Required parameters: N/A</p>
+      <p>Optional parameters:</p>
+      <p>      "charset" -- indicates the character set to be used.  When not
+      specified, a default value MUST NOT be assumed without inspection
+      of the content.</p>
+      <p>      Implementors should be aware that SQL may carry character set
+      information in-band.  In such cases, the "charset" parameter MUST
+      NOT be used in order to avoid conflict.  In cases where no
+      character set information is supplied in-band, and the character</p>
+      <p>      set is known, implementors SHOULD use the "charset" parameter.  If
+      no in-band or out-of-band character set information is available,
+      implementors MUST NOT specify the "charset" parameter.</p>
+      <p>Encoding considerations:</p>
+      <p>      If the "charset" parameter is used, the corresponding 7-bit,
+      8-bit, or binary encoding may be used.  If the "charset" parameter
+      is not used, binary encoding may be required.</p>
+      <p>Security considerations:</p>
+      <p>      Being that SQL is a full-fledged programming language and may
+      include embedded source code for other programming languages,
+      there is a risk of it being used to transfer malware, viruses, and
+      other malicious payloads.  Implementors and users are encouraged
+      only to exchange SQL files among trusted parties and utilize all
+      available security measures, such as restricted access, virus
+      scanners, etc., to minimize risk.</p>
+      <p>      Implementors should be aware that guessing character sets,
+      encodings, and possible conflicts between in-band and out-of-band
+      character set information may lead to the similar security issues
+      as described above.</p>
+      <p>      Implementors should also be aware that SQL does not provide or
+      guarantee any sort of confidentiality and integrity checking, and
+      SQL files can expose account information or private information
+      about database structure and contents.  It is therefore important
+      for applications to provide confidentiality and protection against
+      modification by malicious third parties while in transit.</p>
+      <p>Interoperability considerations:</p>
+      <p>      While a single standard exists ([ISO.9075.2011]), vendor
+      implementations of the standard vary significantly.  Implementors
+      and users should make sure that the exchanged SQL files match to
+      the specific database/tool and version that they are using.</p>
+      <p>Published specification:</p>
+      <p>      The most recent specification of SQL is available in
+      [ISO.9075.2011].</p>
+      <p>Applications that use this media type:</p>
+      <p>      Databases and related tools</p>
+      <p>Fragment identifier considerations: N/A</p>
+      <p>Additional information:</p>
+      <p>      Deprecated alias names for this type: N/A</p>
+      <p>      Magic number(s): N/A</p>
+      <p>      File extension(s): sql</p>
+      <p>      Macintosh File Type Code(s): N/A</p>
+      <p>Person &amp; email address to contact for further information:</p>
+      <p>      Yakov Shafranovich &lt;ietf@shaftek.org&gt;</p>
+      <p>Intended usage: COMMON</p>
+      <p>Restrictions on usage: N/A</p>
+      <p>Author: IESG</p>
+      <p>Change controller: IESG</p>
+      <p>Provisional registration? (standards tree only): N/A</p>
+    </div>
+    <div content="IANA Considerations" about="http://localhost:8000/res/rfc/6922#S4" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="4" property="bibo:chapter" xml:lang=""/>
+      <p>IANA has registered "application/sql" in the standards tree of the "Application Media Types" registry, using the application provided in Section 3 of this document.</p>
+    </div>
+    <div content="Security Considerations" about="http://localhost:8000/res/rfc/6922#S5" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="5" property="bibo:chapter" xml:lang=""/>
+      <p>See the Security Considerations item in the registration template in Section 3, above.</p>
+    </div>
+    <div content="Acknowledgments" about="http://localhost:8000/res/rfc/6922#S6" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="6" property="bibo:chapter" xml:lang=""/>
+      <p>To LTS, thanks for everything.</p>
+      <p>The author would also like to thank all of the folks at xml.resource.org for providing many of the tools used for preparing RFCs and Internet-Drafts.</p>
+      <p>A word of thanks to all IETF members who provided feedback on this document.</p>
+    </div>
+    <div content="Normative References" about="http://localhost:8000/res/rfc/6922#S7" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="7" property="bibo:chapter" xml:lang=""/>
+      <p>   [ISO.9075.2011]  International Organization for Standardization,
+                    "ISO/IEC 9075:2011, Information Technology -
+                    Database Languages -  Structured Query Language
+                    (SQL)", 2011.</p>
+      <p>   <a href="#bib-RFC2119">[RFC2119]</a>        Bradner, S., "Key words for use in RFCs to Indicate
+                    Requirement Levels", BCP 14, RFC 2119, March 1997.</p>
+      <p>   <a href="#bib-RFC6838">[RFC6838]</a>        Freed, N., Klensin, J., and T. Hansen, "Media Type
+                    Specifications and Registration Procedures", BCP 13,
+                    RFC 6838, January 2013.</p>
+      <p>Author's Address</p>
+      <p>   Yakov Shafranovich
+   BioFortis, Inc.
+   10320 Little Patuxent Parkway, Suite 410
+   Columbia, MD  21044
+   US</p>
+      <p>Phone: +1 443 276-2464 EMail: ietf@shaftek.org</p>
+    </div>
+  </body>
+</html>

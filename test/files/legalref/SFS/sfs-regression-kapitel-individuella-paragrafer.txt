@@ -1,0 +1,13 @@
+6 kap. 4 §, 6 §, 10 § och 11 § arbetsmiljölagen (1977:1160)
+
+<list>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1977:1160#K6P4">6 kap. 4 §</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1977:1160#K6P6">6 §</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1977:1160#K6P10">10 §</Link>
+  <str> och </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1977:1160#K6P11">11 §</Link>
+  <str> </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1977:1160">arbetsmiljölagen (1977:1160)</Link>
+</list>

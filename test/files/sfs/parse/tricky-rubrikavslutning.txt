@@ -1,0 +1,6 @@
+En rubrik
+
+1 § En paragraf.
+
+Texten avslutas med en rubrik
+

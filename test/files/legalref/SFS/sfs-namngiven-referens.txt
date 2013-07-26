@@ -1,0 +1,20 @@
+I 16 kap. 9 § brottsbalken finns bestämmelser om olaga
+diskriminering. Äktenskapsbalkens bestämmelser om förfogande över
+makars gemensamma bostad [...] I fråga om vissa
+starkströmsanläggningar finns ytterligare bestämmesler i
+elberedskapslagen (1997:288). Lag (1997:289).
+
+<list>
+  <str>I </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1962:700#K16P9">16 kap. 9 § brottsbalken</Link>
+  <str> finns bestämmelser om olaga
+diskriminering. </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1987:230">Äktenskapsbalkens</Link>
+  <str> bestämmelser om förfogande över
+makars gemensamma bostad [...] I fråga om vissa
+starkströmsanläggningar finns ytterligare bestämmesler i
+</str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1997:288">elberedskapslagen (1997:288)</Link>
+  <str>. </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#L1997:289">Lag (1997:289).</Link>
+</list>

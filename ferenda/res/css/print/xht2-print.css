@@ -1,0 +1,190 @@
+/* -*- coding: utf-8 -*- */
+@import "xhtml.css";
+/* @import "debug.css"; */
+@namespace rinfo "http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#";
+@namespace "http://www.w3.org/2002/06/xhtml2/";
+
+@page {
+    size: a4 portrait;
+    font: 10pt/1.4 Times;
+}
+
+@page:left {
+    @top-left {
+	content: "placeholder"
+	/* "Miljöbalk (1998:808), 2 kap. 4 § - 3 kap. 1 §" */
+	/* content: string(titel) ", " string(kapitelnr, start) " kap. " string(paragrafnr, start) " §  - " string(kapitelnr, last) " kap. " string(paragrafnr, last) " §"; */
+	/* Förvaltningslag (1986:223) */
+	/* content: string(titel) ", " string(paragrafnr, start) " §"; */
+	/* "Miljöbalk (1998:808), 13 kap." */
+	/* content: string(titel) ", " string(kapitelnr) " kap."; */
+    }
+    @bottom-left {
+	content: counter(page);
+    }
+}
+
+@page:right {
+    @top-right {
+	content: "placeholder"
+    }
+    @bottom-right { 
+        content: counter(page);
+    }
+}
+
+@page:first {
+    @top-right {
+	content: "";
+    }
+    @bottom-right {
+	content: "En PDF från lagen.nu";
+    }
+}
+
+@page kapitel:left {
+    @top-left {
+	content: string(titel) " " string(kapitelnr,first) ":" string(paragrafnr,first) "-" string(kapitelnr,last) ":" string(paragrafnr,last);
+    }
+}
+@page kapitel:right {
+    @top-right {
+	content: string(titel) " " string(kapitelnr,first) ":" string(paragrafnr,first) "-" string(kapitelnr,last) ":" string(paragrafnr,last);
+    }
+}
+
+@page paragraf:left {
+    @top-left {
+	content: string(titel) " " string(paragrafnr, first) "-" string(paragrafnr, last) " §§";
+    }
+}
+@page paragraf:right {
+    @top-right {
+	content: string(titel) " " string(paragrafnr, first) "-" string(paragrafnr, last) " §§";
+    }
+}
+
+
+/* Grundläggande typografi och utrymme */
+body {
+    font: 10pt/1.2 Times;
+    text-align: justify;
+    hyphens: auto;
+    prince-hyphenate-patterns: url("hyph_sv_SE.dic"); 
+    margin-outside: 3cm;
+}
+
+h {
+    display: block;
+    font-weight: bold;
+    margin-top: 10pt;
+}
+
+section {
+    display: block;
+    padding: 1pt;
+    margin-top: 5pt;
+}
+td { vertical-align: top; }
+
+/* visa inte metadatablocket i början (plocka ut ev "Ändring införd"-fältet senare) eller */
+*[role="contentinfo"] {
+    display: none;
+}
+*[role="secondary"] {
+    display: none;
+}
+/* indentera alla stycken utom det första i varje paragraf */
+p {
+    display: block;
+    padding-left: 10pt;
+    text-indent: -10pt hanging;
+    margin: 0;
+}
+/* första stycket i varje paragraf ska inte indenteras */
+section > p:first-of-type {
+    text-indent: 0;
+    padding-left: 0;
+}
+
+
+
+/* Vi använder inte <ol>, men vi kan få <ul class="numreradlista"> att se nästan likadant ut */
+ul { margin: 0; }
+ul.numreradlista > li, ul.strecksatslista > li, ul.bokstavslista > li {
+    list-style: none;
+    text-indent: 10pt hanging;
+    margin: 0;
+}
+
+
+/* typografikutym för paragrafbeteckningen */
+span.paragrafbeteckning {
+    font-weight: bold;
+}
+/* workaround för suboptimal XHT2-markup */
+span.paragrafbeteckning::after {
+    content: " ";
+}
+/* typografikutym för upphävda paragrafer */
+section.upphavd {
+    font-style: italic;
+}
+/* typografikutym för hänvisning till ändringsförfattning i slutet på paragrafer */
+span.andringsforfattning {
+    font-style: italic;
+    font-family: sans-serif;
+}
+
+span.ikrafttradande, span.upphor { 
+    font-style: italic;
+}
+
+
+/* Varje ny lag på en ny sida */
+/*
+body > section > h {
+    page-break-before: always;
+} 
+*/
+
+/* Skapa korrekta sidnummershänvisningar i innehållsförteckningen */
+ul.toc { list-style: none; }
+ul.toc a::after {   content: leader('.') target-counter(attr(href), page); }
+
+a[href] {
+    text-decoration: none;
+    color: inherit;
+    prince-link: inherit;
+}
+
+.warning {
+    border: solid 2pt red;
+    font-weight: bold;
+    font-style: italic;
+}
+
+/* Sättande av variabler som används i sidhuvudet */
+*[property="dct:alternate"] { string-set: titel attr(content); }
+*[property="rinfoex:kapitelnummer"] { string-set: kapitelnr attr(content); } 
+*[property="rinfoex:paragrafnummer"] { string-set: paragrafnr attr(content); }
+span.paragrafbeteckning { string-set: altparagraf content(); }
+/* Vi använder named pages (class="{kapitel,paragraf}indelning" sätts
+   i master.xht2) för att åstadkomma olika sorters sidhuvuden beroende på
+   om lagen är kapitelindelad eller inte */
+.kapitelindelning  { page: kapitel; }  /* Sidhuvud 'MB 12:2-12:8' */
+.paragrafindelning { page: paragraf; } /* Sidhuvud 'FL 4-6 §§ */
+
+
+
+
+    
+
+/* Instruktioner för att generera en vettig hierarki av PDF-bookmarks */ 
+section > h { prince-bookmark-level: 1 }
+section > h.underrubrik { prince-bookmark-level: none }
+section > section > h { prince-bookmark-level: 3 }
+section > section > h.kapitelrubrik { prince-bookmark-level: 2 }
+section > section > section > h { prince-bookmark-level: 4 }
+section > section > section > section > h { prince-bookmark-level: 5 }
+

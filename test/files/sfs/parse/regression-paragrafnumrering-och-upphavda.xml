@@ -1,0 +1,24 @@
+<Forfattning>
+  <Kapitel id="K22" ordinal="22" rubrik="22 kap. Högsta paragrafnummer är tre">
+    <Paragraf id="K22P1" ordinal="1">
+      <Stycke id="K22P1S1">
+        <str>Foobar.</str>
+      </Stycke>
+    </Paragraf><Paragraf id="K22P3" ordinal="3">
+      <Stycke id="K22P3S1">
+        <str>Blahonga.</str>
+      </Stycke>
+    </Paragraf>
+  </Kapitel>
+  <Kapitel id="K26" ordinal="26" rubrik="26 kap. Paragrafnummer nummer två ska inte tolkas som tabell">
+    <UpphavdParagraf ordinal="1">1 § har upphävts genom förordning (1885:28 s. 4).</UpphavdParagraf>
+    <UpphavdParagraf ordinal="2">2 § har upphävts genom lag (1984:1110).</UpphavdParagraf>
+  </Kapitel>
+  <Kapitel id="K27" ordinal="27" rubrik="27 kap. Ett extra kapitel med en riktig förstaparagraf">
+    <Paragraf id="K27P1" ordinal="1">
+      <Stycke id="K27P1S1">
+        <str>Foobar.</str>
+      </Stycke>
+    </Paragraf>
+  </Kapitel>
+</Forfattning>

@@ -1,0 +1,12 @@
+<Forfattning ikrafttrader="datetime.datetime(2028, 4, 1, 0, 0)">
+  <Paragraf id="P1" ordinal="1">
+    <Stycke id="P1S1">
+      <str>Denna lag träder i kraft om jättelång tid.</str>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P2" ordinal="2">
+    <Stycke id="P2S1">
+      <str>Andra paragrafen.</str>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

@@ -1,0 +1,368 @@
+# -*- mode: n3 -*-
+#
+# This is a set of sets of cases, each set beeing relevant to a
+# particular article in the TFEU treaty. The relevance judgments were
+# made based on whether the case was discussed at any substantial
+# length (ie. more than just a mention) in the standard textbook ``EU
+# Law''. (Steiner and Woods 2009) The theory behind this method of judging
+# was that any case considered illuminating or landmark-like would be
+# featured in such a textbook. All cases not described in any
+# substantial way were considered not relevant.
+
+
+# 101 TFEU (81 TEC) on prevention of competition. References from ch 29.2
+#
+
+# These cases have a high ratio of Court of First Instance (CFI) to
+# ECJ verdicts. This could be because of a requirement to bring such
+# cases up in CFI, before they can be appealed to ECJ
+
+@prefix eurlex: <http://lagen.nu/eurlex#> .
+@prefix celex: <http://lagen.nu/ext/celex/> . 
+@prefix ir: <http://lagen.nu/informationretrieval#> . 
+celex:12008E101 a eurlex:Article; ir:isRelevantFor
+    celex:61999A0319, # T-319/99 Fenin v Commission
+    celex:61982J0096, # 96/82 NV IAZ International Belgium v Commission
+    celex:61989A0066, celex:61992J0360, #  "[1989] 4 CMLR 825" Re the Application of the Publishers' Association
+    celex:61999J0309, # C-309/99 Wouters
+    celex:61969J0048, # 48/69 Impterial Chemical Industries Ltd v Commission (dyestuffs)
+    celex:61985J0089, # [61985J0089, 61985J0089(01)] C-89/85, C-104/85, C-114/85, C-116/85, C-117/86, C-125/86, C-126/86, C-127/86, C-128/86, C-129/86, A Ahlström OY v Commission (re wood pulp)
+    celex:61982J0107, # 107/82 AEG-Telefunken
+    celex:61984J0025, # 25/84 Ford Werke AG v. Commission
+    celex:62001A0208, # T-208/01 Wolkswagen
+    celex:62002J0002, # C-2/02, C-3/01 Bayer
+    celex:61965J0056, # 56/65 Société Technique Minière v Maschinenbau Ulm GmbH
+    celex:61972J0008, # 8/72 Vereeningn van Cementhandelaren v Commission
+    celex:61984J0161, # 161/84 Pronuptia
+    celex:61964J0056, # 56/64, 58/64 Établissements Consten SA v Commission
+    celex:61994A0374, # T-374/94, T-375/94, T-384/94 and T-388/94 European Night Services v Commission European Night Services v Commission
+    celex:61969J0005, # 5/69 Völk v Établissements Vervaecke Sprl
+    celex:61983J0229, # 229/83 Centres-Leclerc v 'Au Blé Vert' Sàrl
+    celex:61984J0161, # 161/84 Pronuptia v Schillgalis
+    celex:61976J0026, # 26/76 Metro-SB-Grossmärkte GmbH & Co KG v Commission
+    celex:61980J0031, # 31/80 L'Oréal
+    celex:61978J0258, # 258/78 LC Nungesser v Commission
+    celex:61992A0066, # T-66/92 Herlitz AG v Commission
+    celex:61986J0065, # 65/86 Bayer AG v Süllhöfer
+    celex:61999A0112, # T-112/99 Metropole Television v Commission
+    celex:62000A0185. # T-185/00, T-216/00, T-99/00, T-300/00 Metropole Television SA (M6) and ors v Commission
+
+# 263 TFEU (230 TEC) on direct action for annulment by ECJ for
+# legislative acts etc by Council, Commission, Parliament and
+# ECB. References from ch 12 (except 12.7 (deals with art 264 (231
+# TEC)) and 12.8 (deals with art 277 (241 TEC)))
+#
+# There seems to be relative few standout landmark cases that deal
+# with art 263. Rather, each miniscule aspect of each requirement have
+# been defined in several cases. Therefore, the list of relevant cases
+# is rather long.
+celex:12008E263 a eurlex:Article; ir:isRelevantFor
+    celex:61970J0022, # 22/70 Commission v Council (Re European Road Transport Agreement) AKA ERTA
+    celex:61966J0008, # 8-11/66 Re Noordwijk's Cement Accord    		    
+    celex:61995J0057, # C-57/95 France v Commission (Re Pensions Funds Communication)
+    celex:62001A0033, celex:62006J0125, # T-33/01, C-125/06 P Infront WM AG v Commission
+    celex:61999A0054, # T-54/99 max.mobil v Commission
+    celex:61993A0003, # T-3/93 Air France v Commission
+    # NB: Dysan isn't in our DB for some reason!
+    celex:61995B0134, # T-134/95 Dysan Magnetics Ltd v Commission
+    celex:62000A0377, # T-377/00, T-379/00, T-380/00, T-260/01 and T-272/01 Philip Morris International and others v Commission
+    celex:61981J0230, # 230/81 Luxembourg v Parliament
+    celex:61983J0294, # 294/83 Partie Ecologiste ('Les Verts') v Parliament
+    celex:62000A0353, celex:62003J0208, # T-353/00, C-208/03 P, Le Pen
+    celex:61987J0302, # 302/87 Parliament v Council (Comitology)
+    celex:61988J0070, # C-70/88 Parliament v Council (Chernobyl)
+    celex:61991J0181, # C-181/91, C-248/91 Parliament v Council (Re aid to Bangladesh)
+    celex:61991J0316, # C-316/91 Parliament v Council (Re European Development Fund)
+    celex:61993A0447, # T-447-449/93 Associazione Italiana Tecnico Economica del Cemento (AITEC) v Commission
+    # NB: Federolio isn't in our DB for some reason!
+    celex:61996B0122, # T-122/96 Federolio v Commission
+    # NB: Schmitz-Gotha isn't in our DB for some reason!    
+    celex:62001B0167, # T-167/2001 Schmitz-Gotha Fahrzeugwerke v Commission
+    celex:62001A0033, # T-33/01 Infront
+    celex:62006J0373, # C-373/06 P, C-379/06 P, C-382/06 P Flaherty and others v Commision
+    celex:61976J0101, # 101/76 Koninklijke Scholten-Honig NV v Council and Commission
+    celex:61979J0789, # 789/79, 790/79 Calpak SpA v Commission
+    celex:61995J0241, # C-241/95 R v Intervention Board for Acgricultural Produce, ex parte Accrington Beef Co Ltd
+    celex:61962J0016, # 16/62, 17/62 Confédération Nationale des Producteurs de Fruits et Légumes v Council
+    celex:61970J0041, # 41-4/70 International Fruit NV v Commission (No 1)
+    celex:61977J0113, celex:61977J0118, celex:61977J0119, celex:61977J0120, celex:61977J0121, # 113, 118-121/77 Japanese ball-bearing cases
+    celex:61982J0239, # 239, 275/82 Allied Corporation v Commission
+    celex:61982J0264, # 264/82 Timex Corporation v Council
+    celex:61989J0358, # C-358/89 Extramet Industrie SA v Council
+    celex:61988J0152, # C-152/88 Sofrimport v Commission
+    celex:61989J0309, # C-309/89 Cornidou SA v Council
+    celex:61989J0298, # C-298/89 Gibraltar v Council
+    celex:61998A0172, # T-172, T-175-177/98 Salamander and ord v European Parliament and Council
+    celex:61962J0025, # Plaumann & Co v Commission (case 25/62)
+    celex:61977J0123, # UNICME v Council (case 123/77)
+    celex:61982J0231, # Spijker Kwasten BV v Commission (case 231/82)
+    celex:61964J0001, # Glucoseries Réunies v Commission (case 1/64)
+    celex:61963J0106, # Alfred Toepfer KG v Commission (cases 106 and 107/63)
+    celex:61970J0062, # Werner A Bock KG v Commission (case 62/70)
+    celex:61979J0730, # Philip Morris BV v Commission (case 730/79)
+    celex:61993A0465, # Consorzio Gruppo di Azione Locale 'Murgia Messapica' v Commission (case T-465/93)
+    celex:61976J0026, # 26/76 Metro-SB-Grossmärkte GmbH & Co KG v Commission
+    celex:61982J0011, # AE Piraiki-Patraiki v Commission (case 11/82)
+    celex:61992J0188, # TWD Textilwerke Deggendorf GmbH v Germany (case C-188/92)
+    celex:62000J0050, # Union de Pequenos Agricultures (UPA) v Council (case C-50/00)
+    celex:62001A0177, # Jego-Quere et Cie v Commission (case T-177/01)
+    celex:62002J0263, # Jego-Quere (case C-263/02)
+    celex:61991J0195, # Bayer-AG v Commission (Case C-195/91 P)
+    celex:62000A0147, # Laboratoires Servier v Commission (case T-147/00)
+    celex:61992J0359, # Germany v Commission (case C-359/92)
+    celex:61994J0268, # Portugal v Council (case C-268/94)
+    celex:61979J0138, # Roquette Frères SA v Council (case 138/79)
+    celex:61979J0139, # Maizena GmbH v Council (case 139/79)
+    celex:62001A0033, # Infront (case T-33/01)
+    celex:61983J0145, # Adams v Commission (No 1) (case 145/83)
+    celex:61977J0103, # Royal Scholten-Honig (Holdings) Ltd v Intervention Board for Agricultural Produce (cases 103 and 145/77)
+    celex:61974J0017, # Transocean Marine Paint Association v Commission (case 17/74)
+    celex:61977J0112, # August Töpfer & Co GmbH v Commission (case 112/77)
+    celex:61994A0115, # Opel Austria GmbH v Council (case T-115/94)
+    celex:61996J0162, # Racke (case C-162/96)
+    celex:61994J0233, # Germany v Parliament (case C-233/94)
+    celex:61994J0122, # Commission v Council (case C-122/94)
+    celex:61993J0156, # Parliament v Commission (case C-156/93)
+    celex:61955J0008, # Fédération Charbommière de Belgique v High Authority (case 8/55)
+    celex:61992J0037. # BEUC v Commission (case T-37/92)
+
+# 267 TFEU (234 TEC, earlier art 177) on preliminary
+# rulings. References from ch 10.
+#
+# Note: "The procedure [preliminary rulings] accounts for over 50 per
+# cent of all cases heard by the ECJ" (p 224) -- shouldn't we have
+# more cases that cite this article? Right now we have about 1000
+# cases out of 11000 that cites art 267 or any of its predecessors.
+celex:12008E267 a eurlex:Article; ir:isRelevantFor
+    celex:61964J0006, # Costa v ENEL (case 6/64)
+    celex:61961J0013, # De Geus en Uitdenbogerd v Robert Bosch GmbH (case 13/61)
+    celex:61980J0246, # Broekmeulen (case 246/80)
+    celex:62000J0017, # de Coster (case C-17/00)
+    celex:61995J0074, # Criminal Proceeedings against X (Cases C-74 and 129/95)
+    celex:61996J0054, # Dorsch Consult (case C-54/96)
+    celex:61998J0110, # Gabalfrisa v AEAT (cases C-110-47/98)
+    celex:61999J0516, # Schmid (case C-516/99)
+    celex:62003J0053, # Synetairismos Farmakopoion Aitolas & Akarnanias v GlaxoSmithKline plc (case C-53/03)
+    celex:62008J0014, # Roda Golf and Beach Resort (case C-14/08)
+    celex:61981J0102, # Nordsee Deutsche Hochseefischerei GmbH (case 102/81)
+    celex:62004J0125, # Denuit v Transorient (case C-125/04)
+    celex:61988J0143, # Zuckerfabrik Süderdithmarschen AG v Hauptzollamt Itzehoe (cases C-143/88 and C-92/89)
+    celex:61993J0392, # R v Her Majesty's Treasury, ex parte British Telecommunications plc (case C-392/93)
+    celex:62001J0206, # Arsenal Football Club v Reed (case C-206/01)
+    celex:61979J0104, # Fogilia v Novello (No 1) (case 104/79)
+    celex:61980J0244, # Fogilia v Novello (No 2) (case 244/80)
+    celex:61991J0083, # Meilicke v ADV-ORGA AG (case C-83/91)
+    celex:62000J0318, # Bacardi-Martini SAS v Newcastle United Football Company Ltd (case C-318/00)
+    celex:61988J0297, # Dzodzi v Belgium (cases C-297/88 and case C-197/89)
+    celex:61995J0028, # Leur Bloem (case C-28/95)
+    # Note: Monin isn't in our DB for some reason!
+    celex:61993O0428, # Monin Automobiles - Maison du Deux-Roues (case C-428/93)
+    celex:61992J0188, # TWD Textilwerke GmbH v Germany (case C-188/92)
+    celex:61995J0241, # R v Intervention Board for Agriculture, ex parte Accrington Beef Co Ltd (case C-241/95)
+    celex:62000J0099, # Lyckeshog (case C-99/00)
+    celex:61981J0283, # CILFIT Srl (case 283/81)
+    celex:62001J0224, # Köbler (case C-224/01)
+    celex:61962J0028, # Da Costa en Schaake NV (cases 28-30/62)
+    celex:62003J0461, # Gaston Schul v Minister van Landbouw (case C-461/03)
+    celex:61961J0013, # De Geus en Uitdenbogerd v Robert Bosch GmbH (case 13/61)
+    celex:61980J0066, # International Chemical Corporation SpA v Amministrazione delle Finanze dello Stato (case 66/80)
+    celex:61973J0146, # Rheinmühlen-Düsseldorf (case 146/73)
+    celex:61975J0043, # Defrenne v Sabena (No 2)  (case 43/75)
+    celex:61979J0811, # Ariete SpA (case 811/79)
+    celex:61979J0066, # Salumi Srl (cases 66, 127 and 128/79)
+    celex:61986J0024, # Blaizot (case 24/86)
+    celex:61985J0309, # Barra (case 309/85)
+    celex:61988J0262, # Barber v Guardian Royal Exchange Assurance Group (case 262/88)
+    celex:61990J0006, # Francovich (case C-6 and 9/90)
+    celex:61991J0271, # Marshall (No 2) (case C-271/91)
+    celex:62000J0453. # Kühne & Heitz NV v Productshap voor Pluimvee en Eiren (case C-453/00)
+
+# 107 TFEU (87 TEC) on restrictions on state aid. References from ch 31 (except 32.2, 31.5 and 31.6)
+celex:12008E107 a eurlex:Article; ir:isRelevantFor
+    celex:61997J0075, # Belgium v Commission (Maribel bis-ter case, case C-75/97)
+    celex:61997J0256, # DMT (case C-256/97)
+    celex:61994J0039, # Syndicat Francais de l'Express International (SFEI) v La Poste (case C-39/94)
+    celex:62004A0196, # Ryanair v Commission (case T-196/04)
+    celex:62000J0053, # Ferring SA v Agence centrale des organismes de securite sociale (ACOSS) (case C-53/00)
+    celex:62000J0280, # Altmark Trans GmBH v Nahlverkehrsgesellschatft Altmark GmBH (case C-280/00)
+    celex:61976J0078, # Steinike und Weinleg (case 78/76)
+    celex:61985J0067, # Kwekerij Gebroeders van der Kooy BV v Commission (cases 67/85, 68/85 and 70/85)
+    celex:61991J0072, # Firma Sloman Neptun Schiffahrts AG v Seebetriebsrat Bodo Ziesmer of Sloman Neptun Schiffahrts AG (cases C-72/91 and 73/91)
+    celex:62002J0345, # Pearle (case C-345/02)
+    celex:61995A0214, # Vlaams Geweest v Commission (case T-214/95)
+    celex:61979J0730. # Philip Morris Holland BV v Commission (case 730/79)
+    
+# 296 TFEU (253 TEC, ex 190) on procedural requirements for adoption of acts. References from 12.6.2.
+#
+# Note: this article is hardly mentioned in "EU Law". Why do so many
+# cases (815) refer to it? It's possible that they overlap with art
+# 263 (230 TEC) cases, as art 296 states a procedural requirement,
+# which if unfulfilled can be a ground for annullment of an act under
+# art 263.
+@prefix eurlex: <http://lagen.nu/eurlex#> .
+@prefix celex: <http://lagen.nu/ext/celex/> . 
+@prefix ir: <http://lagen.nu/informationretrieval#> . 
+celex:12008E296 a eurlex:Article; ir:isRelevantFor
+    celex:61962J0024 . # Germany v Commission (Re Tariff Quotas on Wine) (case 24/62)
+
+# 108 TFEU (ex 88) about state aid (procedural rules) References from
+# ch 31.2.1 - 31.2.3 Very few cases (and not much text in the book),
+# therefore we include cases only mentioned in paranthesis
+celex:12008E108 a eurlex:Article; ir:isRelevantFor
+    celex:62000J0036, # C-36/00 Spain v Comission
+    celex:61982J0084, # Commission v Germany (case 84/82)
+    celex:61998J0099, # Austria v Commission (case C-99/98)
+    celex:61973J0120, # 120/73 Gebrüder Lorenz GmbH v Germany
+    celex:61991J0198, # William Cook v Commission case C-198/91
+    celex:61985J0259, # Commission v France case 259/85
+    celex:61988J0303, # Re aid to ENI Lanerossi case C-303/88
+    celex:61984J0052, # Comission v Belgium case 52/84
+    celex:61993A0244, # TWD Textilwerke Deggendorf GmbH v Commission (cases T-244 and 486/93)
+    celex:61993A0459, # Siemens SA v Commission case T-459/93
+    celex:62006J0177, # Commission v Spain case C-177/06
+    celex:61993J0349, # Commission v Italy case C-349/93
+    celex:61985J0223, # RSV Maschinefabrieken & Scheepswervem NV v Commission (case 223/85)
+    celex:61989J0005, # Commission v Germany (case C-5/89)
+    celex:61999J0261, # Commission v France (case C-261/99)
+    celex:62003J0346. # Atzeni joined cases C-346/03 and 529/03
+
+# 258 TFEU (Ex 226 TEC). References from ch 11.1 - 11.6
+celex:12008E258 a eurlex:Article; ir:isRelevantFor
+    # Lyckeskog and Köbler v Austria is mentioned, but do not seem to directly concern 258
+    celex:62000J0129, # Commission v Italy (case C-129/00)
+    celex:62002J0441, # Commission v Ireland (case  C-441/02)
+    celex:61995J0265, # Commission v France (case C-265/95)
+    celex:61969J0031, # Commission v Italy Re payment of export Rebates (case 31/69)
+    celex:61999J0230, # Commission v France (case C-230/99)
+    celex:61961J0007, # Commission v Italy Re Ban on Pork Imports (Case 7/61)
+    celex:61995J0191, # Commission v Germany (case C-191/95)
+    celex:61980J0142, # Amministrazione della Finanze dello Stato v Essevi SpA (cases 142/80 and 143/80)
+    celex:61965J0048, # Alfons Lütticke GmbH v Commission (cases 48/65)
+    celex:61985J0293, # Commission v Belgium Re university fees (case 293/85)
+    celex:61985J0085, # Commission v Belgium (case 85/85)
+    celex:61963J0090, # Commission v Luxembourg and Belgium re Import of Powdered Milk Products (cases 90/63 and 91/63)
+    celex:61984J0101, # Commission v Italy re transport statistics (Case 101/84)
+    celex:61986J0296, # McNicholl v Ministry of Agriculture (case 296/86)
+    celex:61981J0028, # Commission v Italy (case 28/81)
+    celex:61978J0128, # Commission v United Kingdom (Re Tachographs) (case 128/78)
+    celex:61973J0167, # Commission v France Re French Merchant Seamen (case 167/73)
+    celex:61984J0029, # Commission v Germany re Nursing Directives (case 29/84)
+    celex:61985J0168, # Commission v Italy (case 168/85)
+    celex:62002J0058, # Commission v Spain (case C-58/02)
+    celex:62005J0110. # Commission v Italy motorbike trailers (case C-110/05)    
+
+# 45 TFEU (ex 39) abt freedom of movement for workers.  References
+# from chapter 22 (particularly 22.3.1, but all references that deal
+# with freedom of movement for workers (as opposed to establishment or
+# services)
+
+celex:12008E045 a eurlex:Article; ir:isRelevantFor
+    celex:62005J0212, # Hartmann v Freistaat Bayern (case C-212/05)
+    celex:61969J0015, #  Ugliola (case 15/69)
+    celex:61973J0152, # Sotgiu v Deutsche Bundespost (case 152/73)
+    celex:61996J0015, # Schöning-Kougebetopoulou v Freue und Hansestadt Hamburg (case C-15/96)
+    celex:62002J0400, # Merida (case C-400/02)
+    # Laval un Partneri v Svenska Byggnadsarbetareförbundet (case C-341/05) # under art 49 TEC?
+    celex:61987J0379, # Groener v Minister for education (case 379/87)
+    celex:61992J0272, # Spotti v Freistaat Bayern (case C-272/92)
+    celex:61998J0281, # Angonese v Cassa di Risparmo di Bolzano SpA (C-281/98)
+    celex:61979J0149, # Commission v Belgium (case 149/79)
+    celex:61984J0307, # COmmission v France (French nurses) (case 307/84)
+    celex:61985J0066, # Lawrie-Blum v Land Baden-Würtenberg (case 66/85)
+    celex:61991J0004, # Bleis v Ministère de l'Education Nationale (case C-4/91)
+    celex:61994J0237, # O'Flynn v Adjudication Officer (case C-237/94)
+    celex:61993J0415, # Bosman (case C-415/93)
+    celex:61998J0190. # Volker Graf v Filzmoser Maschinenbau (case C-190/98)
+
+# 34 TFEU (ex 28) about quantitative restrictions on import. References from ch 19.3 - 19.6
+celex:12008E034 a eurlex:Article; ir:isRelevantFor
+    celex:62000J0325, # Commission v Germany (Quality Labels)  (case C-325/00)
+    celex:61995J0265, # Commission v France (Angry Farmers) (case C-265/95)
+    celex:62000J0112, # Schmidberger (case C-112/00)
+    celex:61984J0021, # Franking Machine (case 21/84)
+    celex:61981J0249, # Commission v Ireland ('Buy Irish' campaign) (case 249/81)
+    celex:62003J0470, # AGM-COS MET (case C-470/03)
+    # next four not super important
+    celex:61973J0002, # Riseria Luigi Geddo v Ente Nazionale Risi (case 2/73)
+    celex:61961J0007, # Commission v Italy Re Ban on Pork Imports (Case 7/61)
+    celex:61979J0034, # R v Henn (case 34/79)
+    celex:61968J0013, # Salgoil SpA v Italian Ministry for Foreign Trade (case 13/68)
+    
+    celex:61997J0067, # Ditlev Blume (case C-67/97)
+    celex:61971J0051, # International Fruit Co NV v Produktschap voor Groenten en Fruit (cases 51/71 - 54/71)
+    # The three landmarks:
+    celex:61974J0008, # Procurer du Roi v Dassonville (case 8/74)
+    celex:61978J0120, # Rewe-Zentral AG v Bundesmonopolverwaltung für Branntwein (Cassis de Dijon) (case 120/78)
+    celex:61991J0267, # Keck and Mithouard (case C-267/91 and C-268/91)
+
+    celex:61989J0023, # Quietlynn Ltd v Southend Borough Council (case C-23/89)
+    celex:61988J0145, # Torfaen Borough Council v B & Q plc (case 145/88)
+    celex:61994J0231, # Pistre (joined cases C-231/94 - 234/94)
+    celex:62002J0071, # Karner (case C-71/02)
+    celex:61975J0065, # Tasca (case 65/75)
+    celex:61977J0082, # van Tiggele (case 82/77)
+    celex:61979J0788, # Gilli (Italian cider vinegar case) (case 788/79)
+    celex:61981J0261, # Walter Rau Lebensmittelwerke v De Smedt PVBA (case 261/81)
+    celex:62006J0244, # Dynamic Medien (case C-244/06)
+    celex:61983J0207, # Comiision v UK (origin marking of retail Goods) (case 207/83)
+    celex:61991J0003, # Exportur SA v LOR SA et Confiserie du Tech (case C-3/91)
+    celex:61998J0190, # Volker Graf (caes C-190/98)
+    celex:61995J0368, # Verinigte Familiapres Zeitungsverkags- und Vertriebs GmbH v Heinrich Bauer Verlag (case C-368/95)
+    celex:62000J0416, # Morellato (case C-416/00)
+    celex:62004J0366, # Schwarz (case C-366/04)
+    celex:61993J0412, # Leclerc-Siplec (Case C-412/93)
+    celex:61995J0034, # Konsumentombudsmannen v De Agostini (C-34/95 - C-36/95)
+    celex:62007J0141, # Hospital Pharmaceutical Supply case (Commission v Germany (case C-141/07)
+    celex:62004J0170, # Rosengren (case C-170/04)
+    celex:62004J0158, # Alfa- Vita Vassilopolous and Carrefour-Marinopoulos (cases C-158/04, C-159/04 and C-82/05)
+    # continue at 19.6.4.2
+    celex:61998J0254, # Schutzverband gegen unlauteren Wettbewerb v TK-Heimdienst Sass GmbH (Case C-254/98)
+    celex:61998J0405, # Gourmet International Products (case C-405/98)
+    celex:62001J0322, # Deutscher Apothekerverband eV v 0800 DocMorris (case C-322/01)
+    celex:61998J0044, # BASF AG v Präsident des Deutschen Patentamts (case C-44/98)
+    celex:61997J0412, # ED Srl v Fenocchio (case C-412/97)
+    celex:61994J0140. # DIP SpA (cases C-140/94 - C-142/94)
+
+# Art 288 TFEU (ex 249 TEC) regarding adoption of secondary law. Cases
+# deal primarily with direct effect and indirect effect. References
+# from chapter 5 except 5.2.3 (treaties ie primary law) 5.2.8
+# (international agreements)
+celex:12008E288 a eurlex:Article; ir:isRelevantFor
+   # this concerns the direct effect of the treaty not secondary law
+   # Van Gend en Loos v Nederlandse Administratie de Belastingen (case 26/62)
+   # (see also Alfons Lütticke, Defrenne v Sabena, Walrave)
+   celex:62000J0253, # Antonio Munoz Cia SA v Frumar Ltd (case C-253/00)
+   celex:61970J0009, # Grad v Finanzamt Traunstein (case 9/70)
+   celex:61974J0041, # Van Duyn v Home Office (Case 41/74) #  landmark
+   celex:61999J0441, # Riksskatteverket v Soghra Gharehveran (case C-441/99)
+   celex:61978J0148, # Pubblico Ministerio v Ratti (case 148/78)
+   celex:61976J0051, # Verbond van Nederlandse Onderemingen (VNO) v Inspecteur der Invoerrechten en Accijnzen (case 51/76)
+   celex:61996J0129, # Inter-Environment Wallonie ASBL v Region Wallonie (cas C-129/96)
+   celex:62004J0144, # Mangold (C-144/04) #  landbark?
+   celex:61981J0008, # Becker v Finanzamt Munster-Innenstadt (case 8/81)
+   celex:61990J0087, # Verholen (cases C-87/90 to C-89/90)
+   celex:61984J0152, # Marschall v Southampton & South West Hampshire Area Health Authority (Teaching) Case (152/84)
+   celex:61988J0103, # Fratelli Costanzo SPA v Commune di Milano (Case 103/88)
+   celex:61989J0188, # Foster v British Gas plc (case C-188/89)
+   celex:61992J0091, # Dori v Recreb Srl (case C-91/92)
+   celex:62002J0201, # Wells v SoS for Transport, Local Government and the Regions (Case C-201/02)
+   celex:62007J0152, # Arcor (case C-152/07 - 154/07)
+   celex:61994J0194, # CIA Security International  SA v Signalsson SA (case C-194/94)
+   celex:61997J0226, # Lemmens (case C-226/97)
+   celex:61998J0443, # Unilever Italia SpA v Central Food SpA (case C-443/98)
+   celex:62002J0387, # Berlusconi and otheres (joined cases C-387/02, C-391/02 and C-403/02)
+   celex:62006J0080, # Ecorad (case C-80/06) #  correct?
+   celex:61988J0322, # Grimaldi v FOnds des Maladies PRofessionelles (case C-322/88)
+   #  5.3 Indirect effects (only of directives)
+   celex:61983J0014, # von Colson v Land Nordrhein-Westfalen (case 14/83)
+   celex:61983J0079, # Harz v Deutsch Tradax GmbH (case 79/83)
+   celex:61989J0106, # Marleasing SA v La Comercial Internacional de Alimentacion SA (case C-106/89)
+   celex:61992J0334, # Wagner Miret v Fondo de Garantira Salaria (case C-334/92)
+   celex:61995J0168, # Arcaro (case C-168/95)
+   celex:62006J0404, # Quelle AG v Bundesverband der Verbraucherzentralen und Verbraucherverbände (case C-404/06)
+   celex:61998J0240, # Oceano Grupo Editorial v Rocio Murciano Quintero (case C-240/98)
+   celex:61992J0236, # COmitato di Coordinamento per la Difesa della Cava v Regione Lombardia (case C-236/92)
+   celex:61995J0066, # R v Secretary of Stat for Social Security, ex parte Sutton (case C-66/95)
+   celex:61991J0271, # Marschall (No 2) case (C-271/91)
+   celex:61994J0192, # El Corte Inglés SA v Riviero (case C-192/94)
+   celex:61992J0091. # Dori v Recreb Srl (case C-91/92)

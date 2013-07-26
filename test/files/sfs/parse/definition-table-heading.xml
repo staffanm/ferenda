@@ -1,0 +1,24 @@
+<Forfattning>
+  <Paragraf id="P1" ordinal="1">
+    <Stycke id="P1S1">
+      <str>I denna lag används följande beteckningar med nedan angiven betydelse.</str>
+      <Tabell>
+        <Tabellrad>
+          <Tabellcell>
+            <str>Beteckning</str>
+          </Tabellcell><Tabellcell>
+            <str>Betydelse</str>
+          </Tabellcell>
+        </Tabellrad><Tabellrad>
+          <Tabellcell>
+            <str />
+            <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Biobank">Biobank</LinkSubject>
+            <str />
+          </Tabellcell><Tabellcell>
+            <str>Biologiskt material från en eller flera människor som samlas.</str>
+          </Tabellcell>
+        </Tabellrad>
+      </Tabell>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

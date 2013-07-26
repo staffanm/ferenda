@@ -1,0 +1,18 @@
+<Forfattning>
+  <Paragraf id="P1" ordinal="1">
+    <Stycke id="P1S1">
+      <str>En kort lag</str>
+    </Stycke>
+  </Paragraf>
+  <Overgangsbestammelser rubrik="Övergångsbestämmelser">
+    <Overgangsbestammelse id="L0000:000" sfsnr="0000:000">
+      <NumreradLista>
+        <Listelement id="L0000:000N1" ordinal="1">
+          <str>1. Det här är en övergångsbestämmelse.</str>
+        </Listelement><Listelement id="L0000:000N2" ordinal="2">
+          <str>2. Med två punkter</str>
+        </Listelement>
+      </NumreradLista>
+    </Overgangsbestammelse>
+  </Overgangsbestammelser>
+</Forfattning>

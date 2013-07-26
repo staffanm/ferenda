@@ -1,0 +1,25 @@
+<Forfattning>
+  <Paragraf id="P17" ordinal="17">
+    <Stycke id="P17S1">
+      <str>Lokaliseringsmärken anger väg till ort, plats, inrättning, anläggning eller liknande, om inte annat anges. Lokaliseringsmärken är följande.</str>
+    </Stycke>
+  </Paragraf>
+  <Rubrik id="R1">Märke</Rubrik>
+  <Stycke id="S1">
+    <str>Närmare föreskrifter</str>
+    <Tabell>
+      <Tabellrad>
+        <Tabellcell>
+          <str>F1 Orienteringstavla</str>
+        </Tabellcell><Tabellcell>
+          <str>Märket är en förberedande upplysning om korsning, cirkulationsplats eller motsvarande.</str>
+        </Tabellcell>
+      </Tabellrad><Tabellrad>
+        <Tabellcell />
+        <Tabellcell>
+          <str>Om det finns särskilda skäl kan upplysning om två korsningar anges på märket.</str>
+        </Tabellcell>
+      </Tabellrad>
+    </Tabell>
+  </Stycke>
+</Forfattning>

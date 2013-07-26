@@ -1,0 +1,23 @@
+<Forfattning>
+  <NumreradLista>
+    <Listelement id="N1" ordinal="1">
+      <str>1. Punkt nummer ett</str>
+      <Strecksatslista>
+        <Listelement id="N1N1" ordinal="1">
+          <str>- strecksats ett</str>
+        </Listelement><Listelement id="N1N2" ordinal="2">
+          <str>- strecksats två</str>
+        </Listelement>
+      </Strecksatslista>
+    </Listelement><Listelement id="N2" ordinal="2">
+      <str>2. Punkt nummer två</str>
+      <Bokstavslista>
+        <Listelement id="N2Na" ordinal="a">
+          <str>a) första underpunkten</str>
+        </Listelement><Listelement id="N2Nb" ordinal="b">
+          <str>b) andra underpunkten</str>
+        </Listelement>
+      </Bokstavslista>
+    </Listelement>
+  </NumreradLista>
+</Forfattning>

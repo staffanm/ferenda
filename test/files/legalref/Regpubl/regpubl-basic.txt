@@ -1,0 +1,11 @@
+Prop. 1996/97:85, bet. 1996/97:NU11, rskr. 1996/97:266
+
+<list>
+  <Link uri="http://rinfo.lagrummet.se/publ/prop/1996/97:85">Prop. 1996/97:85</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/bet/1996/97:NU11">bet. 1996/97:NU11</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/rskr/1996/97:266">rskr. 1996/97:266</Link>
+</list>
+
+

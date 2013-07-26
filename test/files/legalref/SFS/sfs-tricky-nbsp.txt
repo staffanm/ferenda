@@ -1,0 +1,22 @@
+1 §, 2 §, 46 §, 53 §, 54 §, 57 § och 61 § lagen (1960:729) om
+upphovsrätt till litterära och konstnärliga verk.
+
+<list>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:729#P1">1 §</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:729#P2">2 §</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:729#P46">46 §</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:729#P53">53 §</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:729#P54">54 §</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:729#P57">57 §</Link>
+  <str> och </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:729#P61">61 §</Link>
+  <str> lagen (</str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:729">1960:729</Link>
+  <str>) om
+upphovsrätt till litterära och konstnärliga verk.</str>
+</list>

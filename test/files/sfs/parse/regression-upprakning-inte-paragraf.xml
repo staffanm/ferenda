@@ -1,0 +1,32 @@
+<Forfattning>
+  <Paragraf id="P2" ordinal="2">
+    <Stycke id="P2S1">
+      <str>Följande föreskrifter i lagen gäller också arbetstagare hos kommuner, landsting och kommunalförbund, nämligen</str>
+    </Stycke><Stycke id="P2S2">
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P7">7</LinkSubject>
+      <str>-</str>
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P7c">7 c §§</LinkSubject>
+      <str> om bisysslor,</str>
+    </Stycke><Stycke id="P2S3">
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P23">23</LinkSubject>
+      <str>-</str>
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P29">29 §§</LinkSubject>
+      <str> om arbetskonflikter,</str>
+    </Stycke><Stycke id="P2S4">
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P38">38 §</LinkSubject>
+      <str> om interimistiskt beslut,</str>
+    </Stycke><Stycke id="P2S5">
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P42S1">42 § första</LinkSubject>
+      <str> och </str>
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P42S2">andra styckena</LinkSubject>
+      <str> om vissa undantag från lagen (</str>
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1976:580">1976:580</LinkSubject>
+      <str>) om medbestämmande i arbetslivet.</str>
+    </Stycke><Stycke id="P2S6">
+      <str>Föreskrifterna i </str>
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P30">30 §</LinkSubject>
+      <str> om periodiska hälsoundersökningar gäller också arbetstagare hos kommuner och landsting. </str>
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#L2001:1016">Lag (2001:1016).</LinkSubject>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

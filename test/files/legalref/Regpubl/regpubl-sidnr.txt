@@ -1,0 +1,9 @@
+Av förarbetena (se prop. 1989/90:89 s. 154) framgår att det är
+säljaren som har bevisbördan
+
+<list>
+  <str>Av förarbetena (se </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/prop/1989/90:89#s154">prop. 1989/90:89 s. 154</Link>
+  <str>) framgår att det är
+säljaren som har bevisbördan</str>
+</list>

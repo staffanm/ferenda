@@ -1,0 +1,24 @@
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://rinfo.lagrummet.se/publ/fffs/2007:15> a rpubl:Myndighetsforeskrift;
+    dct:identifier "FFFS 2007:15";
+    dct:issn "1102-7460";
+    dct:publisher <http://rinfo.lagrummet.se/org/finansinspektionen>;
+    dct:title "Föreskrifter om upphävande av vissa föreskrifter och allmänna råd inom Finansinspektionens område;"@sv;
+    rpubl:arsutgava "2007";
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/1992:308#P19a>,
+        <http://rinfo.lagrummet.se/publ/sfs/1995:1600#P4>,
+        <http://rinfo.lagrummet.se/publ/sfs/1995:1600#P5>,
+        <http://rinfo.lagrummet.se/publ/sfs/1995:1600#P7>,
+        <http://rinfo.lagrummet.se/publ/sfs/1995:1600#P8>;
+    rpubl:beslutadAv <http://rinfo.lagrummet.se/org/finansinspektionen>;
+    rpubl:beslutsdatum "2007-06-21"^^xsd:date;
+    rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/fffs>;
+    rpubl:ikrafttradandedatum "2006-12-31"^^xsd:date;
+    rpubl:lopnummer "15";
+    rpubl:upphaver <http://rinfo.lagrummet.se/publ/fffs/2002:22>,
+        <http://rinfo.lagrummet.se/publ/fffs/2003:13>;
+    rpubl:utkomFranTryck "2007-06-28"^^xsd:date .
+

@@ -1,0 +1,22 @@
+<Forfattning>
+  <Avdelning id="A1" ordinal="1" rubrik="AVD. I SKATTEFRIA INKOMSTER OCH INTE AVDRAGSGILLA UTGIFTER" underrubrik="None">
+    <Kapitel id="K1" ordinal="1" rubrik="1 kap. Inkomster som är skattefria">
+      <Rubrik id="K1R1">Innehåll</Rubrik>
+      <Paragraf id="K1P1" ordinal="1">
+        <Stycke id="K1P1S1">
+          <str>I detta kapitel finns bestämmelser om att vissa inkomster är skattefria vid inkomstbeskattningen.</str>
+        </Stycke>
+      </Paragraf>
+    </Kapitel>
+  </Avdelning>
+  <Avdelning id="A2" ordinal="2" rubrik="AVD. II KAPITALVINSTER OCH KAPITALFÖRLUSTER" underrubrik="None">
+    <Kapitel id="K2" ordinal="2" rubrik="2 kap. Grundläggande bestämmelser om kapitalvinster och kapitalförluster">
+      <Rubrik id="K2R1">Innehåll</Rubrik>
+      <Paragraf id="K2P1" ordinal="1">
+        <Stycke id="K2P1S1">
+          <str>I detta kapitel finns de grundläggande bestämmelserna om kapitalvinster och kapitalförluster.</str>
+        </Stycke>
+      </Paragraf>
+    </Kapitel>
+  </Avdelning>
+</Forfattning>

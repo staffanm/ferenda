@@ -1,0 +1,29 @@
+<Forfattning>
+  <Paragraf id="P3" ordinal="3">
+    <Stycke id="P3S1">
+      <str>Avgift ska inte betalas för registrering av</str>
+      <NumreradLista>
+        <Listelement id="P3S1N1" ordinal="1">
+          <str>1. ändrad postadress,</str>
+        </Listelement><Listelement id="P3S1N2" ordinal="2">
+          <str>2. eget utträde från uppdrag som revisor, revisorssuppleant, lekmannarevisor eller suppleant för lekmannarevisor,</str>
+        </Listelement><Listelement id="P3S1N3" ordinal="3">
+          <str>3. beslut om vinstutdelning enligt lagrumshänvi sning i namngivna lagar,</str>
+        </Listelement><Listelement id="P3S1N4" ordinal="4">
+          <str>4. förhållanden som en likvidator ska anmäla, såvida annat inte följer av lagrum,</str>
+        </Listelement><Listelement id="P3S1N5" ordinal="5">
+          <str>5. en underrättelse från domstol, eller</str>
+        </Listelement><Listelement id="P3S1N6" ordinal="6">
+          <str>6. en underrättelse från en behörig utländsk myndighet enligt ett lagrum i en namngiven lag. </str>
+          <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#L2008:24">Förordning (2008:24).</LinkSubject>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+  <Rubrik id="R1">Ansökningsärenden</Rubrik>
+  <Paragraf id="P4" ordinal="4">
+    <Stycke id="P4S1">
+      <str>För handläggning och prövning av ansökan enligt skall, i de fall som anges i 1-7, avgifter betalas med följande belopp.</str>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

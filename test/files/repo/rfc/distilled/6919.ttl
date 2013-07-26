@@ -1,0 +1,18 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://localhost:8000/res/rfc/6919> a bibo:Standard ;
+    dct:category "Experimental" ;
+    dct:creator "E. Rescorla",
+        "R. Barnes",
+        "S. Kent" ;
+    dct:identifier "RFC 6919" ;
+    dct:issn "2070-1721" ;
+    dct:publisher "Independent Submission" ;
+    dct:rightsHolder "1 April 2013",
+        "BBN",
+        "RTFM, Inc." ;
+    dct:title "Further Key Words for Use in RFCs to Indicate Requirement Levels"@en ;
+    bibo:shortTitle "Further RFC Key Words"@en.
+

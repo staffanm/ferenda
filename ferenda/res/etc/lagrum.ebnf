@@ -1,0 +1,139 @@
+# -*- coding: iso-8859-1  -*-
+# ------------ lagrum.ebnf ----------------
+
+sfsrefs              ::= (ExternalRefs/MultipleGenericRefs/ChapterSectionRefs/IndividualChapterSectionRefs/SectionPieceItemRefs/SectionPieceRefs/SectionRefs/SectionPieceExternalRefs/ExternalChapterSectionRefs/PieceAndItemRefs/SectionItemRefs)
+# this list overlaps with GenericRef
+sfsref               ::= (ChangeRef/ExternalRef/ChapterSectionPieceItemRef/ChapterSectionPieceRef/ChapterSectionRef/SectionPieceItemRef/SectionElementRef/SectionPieceRef/SectionSentenceRef/SectionItemRef/ChapterRef/SectionRef/PieceItemRef/PieceRef/SFSNr/LawRef/NamedExternalLawRef)
+
+# testing SectionItemRefAndSectionItemRefs, a ugly special case for string on the form
+# "6 § 1 eller 7 § 1 eller 2 förmånsrättslagen (1970:979)"
+SectionItemRefAndSectionItemRefs ::= SectionItemRef, WAndOrW, SectionItemRefs
+
+# MULTIPLE REFERENCES
+
+# Ideally, I'd like to simplify the definition of ExternalRefs to that
+# of SectionPieceExternalRefs, which should suffice for most kinds of
+# multiple external references. Might need some work with the
+# formatter, though.
+
+ExternalRefs                ::= SectionItemRefAndSectionItemRefs/MultipleGenericRefs, Whitespace, (In, Whitespace)?, ExternalLaw
+SectionPieceExternalRefs    ::= MultipleGenericRefs, ExternalRef
+
+ExternalChapterSectionRefs ::= MultipleGenericRefs, Whitespace, NamedExternalLawRef
+
+GenericRefs          ::= (SectionPieceItemRefs/SectionPieceRefs/SectionItemRefs/IndividualChapterSectionRefs/ChapterSectionPieceRefs/ChapterSectionRefs/AlternateChapterSectionRefs/SectionRefs/PieceItemRefs/GenericRef)
+
+CommaSpaceAndWhitespace ::= Comma, Whitespace, And, Whitespace
+
+MultipleGenericRefs  ::= (GenericRefs, (CommaSpaceAndWhitespace/CommaSpace/WAndOrW)?)+
+
+ChapterSectionRefs    ::= ChapterRef, Whitespace, SectionRefs
+
+ChapterSectionPieceRefs ::= ChapterRef, Whitespace, SectionPieceRefs
+
+# Things like '8 kap. 1 §, 2 § och 6§'
+IndividualChapterSectionRefs ::= ChapterSectionRef, (Comma, Whitespace, SectionRef)*, Whitespace, And, Whitespace, SectionRef
+
+# Things like '9 kap. 15 eller 16 §'
+# AlternateChapterSectionRefs ::= ChapterRef, Whitespace, SectionRefID, Whitespace, Or, Whitespace, SectionRef
+
+AlternateChapterSectionRefs  ::= ChapterRef, (IntervalOrSingle,CommaSpace)*, Whitespace, IntervalOrSingle, Whitespace,Or,Whitespace, SectionRef
+
+# is the PieceRef/PieceRefID alternative really neccesary? Won't it do
+# with just PieceRef? Nope, see testcase 1960-729-49a-4.txt (or just
+# the test string '2 § andra och tredje styckena')
+SectionPieceRefs      ::= SectionRef, Whitespace, ((PieceItemRef/PieceRef/PieceRefID), Comma, Whitespace)*, (PieceItemRef/PieceRef/PieceRefID), WAndOrW, (PieceItemRef/PieceRef)
+
+# this matches things on the form "3 § andra stycket 2-4"
+SectionPieceItemRefs  ::= SectionRef, Whitespace, PieceRef, Whitespace, ItemRef, Whitespace?, Hyphen, Whitespace?, ItemRef
+
+# Things like '2, 4-6 och 8 §§' 
+SectionRefs           ::= (IntervalOrSingle,CommaSpace/WAndOrW)*, LastIntervalOrSingle
+
+# Things like '1 §, 2 § och 6 §' -- NOTE: this production is not referenced!
+IndividualSectionRefs::= (SectionRef, Comma, Whitespace)*, SectionRef, Comma, Whitespace, And, Whitespace, SectionRef
+
+# This is a special-case rule for things like "första stycket och 3"
+PieceAndItemRefs     ::= PieceRef, WAndOrW, ItemRef
+
+# This is a very greedy rule, it could easily match "6 § 1 eller 7" in
+# "6 § 1 eller 7 § 1", which is not what we want. Therefore, it's not
+# included in the list of GenericRefs above. See testcase
+# SectionItems.txt (which we can't handle fully) for example.
+SectionItemRefs     ::= SectionRef, Whitespace, ItemRef, WAndOrW, ItemRef, ?-' §'
+PieceItemRefs       ::= PieceRef, Whitespace, ItemRefs
+ItemRefs            ::= (ItemRef, Comma, Whitespace)*, ItemRef, WAndOrW, ItemRef
+
+IntervalOrSingle     ::= (IntervalSection/SectionSentenceRef/SingleSectionRef) # the SectionSentenceRef does not really belong...
+SingleSectionRefID   ::= SectionRefID
+IntervalSection      ::= SingleSectionRef, Whitespace?,Hyphen, Hyphen?, Whitespace?, SingleSectionRef
+
+
+
+LastSectionRef       ::= SectionRefID, Whitespace, DoubleSectionMark
+SingleSectionRef      ::= SectionRefID
+LastIntervalOrSingle ::= (SingleSectionRef, Whitespace?, (Hyphen,Hyphen?)/AndOr, Whitespace?)*, LastSectionRef
+
+LastSectionRefID     ::= SectionRefID
+
+TheLaw		     ::= 'lagen'
+LawSynonyms          ::= ('lagens'/'balkens'/'förordningens'/'formens'/'ordningens'/'lagen'/'balken'/'förordningen'/'formen'/'ordningen'/'kungörelsen'/'lag'/'förordning'/'stadgan')
+
+# SINGLE REFERENCES
+# dont forget, when adding a new top-level construct, to add it to the
+# 'ref' construct above
+
+ChangeRef ::= ('Lag'/'lag'/'Förordning'/'förordning'),Whitespace,SFSNr,('.'/?-(' '/','))
+
+ExternalRef          ::= GenericRef, Whitespace, ExternalLaw
+
+ExternalLaw          ::= (AnonymousExternalLaw/NamedExternalLawRef/SameLaw)
+AnonymousExternalLaw ::= (In, Whitespace)?, LawSynonyms, Whitespace, SFSNr
+NamedExternalLawRef     ::= NamedLaw, (Whitespace, SFSNr)?
+NamedLaw		::= (char/'-'/'_')+, Pipe, LawSynonyms
+SameLaw			::= 'samma lag'/'nämnda lag'/'samma förordning'/'nämnda förordning'
+
+GenericRef            ::= (ChapterSectionPieceItemRef/ChapterSectionPieceSentenceRef/ChapterSectionPieceRef/ChapterSectionItemRef/ChapterSectionSentenceRef/ChapterSectionRef/SectionPieceItemRef/SectionPieceSentenceRef/SectionElementRef/SectionPieceRef/SectionSentenceRef/SectionItemRef/SectionRef/ChapterRef)
+
+ChapterSectionPieceItemRef     ::= ChapterRef, Whitespace, SectionPieceItemRef
+ChapterSectionPieceSentenceRef ::= ChapterRef, Whitespace, SectionPieceSentenceRef
+ChapterSectionPieceRef         ::= ChapterSectionRef, Whitespace, PieceRef
+ChapterSectionItemRef          ::= ChapterSectionRef, Whitespace, ItemRef
+ChapterSectionSentenceRef      ::= ChapterSectionRef, Whitespace, SentenceRef
+ChapterSectionRef              ::= ChapterRef, Whitespace, SectionRef
+
+SFSNr      ::= LeftParen, Whitespace?, LawRef, Whitespace?,RightParen
+LawRef     ::= LawRefID
+LawRefID   ::= LangtAr, Colon, ('bih.',' '?)?, number, ('.',digit)?, (Whitespace, ('s.', Whitespace?)?, digit+)?
+SectionRef ::= SectionRefID, Whitespace, '§'
+
+# Note the use of SectionRefChar instead of just char -- it's to avoid
+# matching things like '23 och 25 §§'. A hack, but it will have to do
+# for now. Actually no, we got to fix it, because it can't handle '23
+# eller 25 §§'. Oh look, the LookAheadOperator with negative match
+# ('?-char') to the rescue!
+SectionRefID      ::= number, (Whitespace, SectionRefChar, ?-char)?
+ChapterRef        ::= ChapterRefID, c"kap."/c"kap"
+ChapterRefID      ::= number, Whitespace, (char, Whitespace)?
+
+# PieceRef          ::= (ItemRef, Whitespace, PieceRefID, Whitespace, PieceOrPieces)/(PieceRefID, Whitespace, PieceOrPieces, (Whitespace, ItemRef)?)
+PieceRef          ::= PieceRefID, Whitespace, PieceOrPieces
+PieceRefID        ::= ordinal
+PieceItemRef      ::= (ItemNumericRef, Whitespace, PieceRef)/(PieceRef, Whitespace, ItemRef)
+SentenceRef	  ::= SentenceRefID, Whitespace, SentenceOrSentences
+SentenceRefID	  ::= ordinal
+SectionPieceRef   ::= SectionRef, Whitespace, PieceRef
+SectionPieceItemRef ::= SectionRef, Whitespace, (PieceRef, Whitespace?, ItemRef)/(ItemNumericRef, Whitespace, PieceRef)
+SectionPieceSentenceRef ::= SectionRef, Whitespace, PieceRef, Whitespace, SentenceRef
+SectionSentenceRef::= SectionRef, Whitespace, SentenceRef
+SectionElementRef ::= SectionRef, Whitespace, ElementRef
+SectionItemRef    ::= SectionRef, Whitespace, ItemRef
+ElementRef	  ::= ElementRefID, Whitespace, Element
+ElementRefID	  ::= number
+ItemRef           ::= ('anvisningarna punkt '?, ItemRefID, Period?, RightParen?)/(ItemNumericRefID, Whitespace, 'punkten')
+ItemNumericRef    ::= 'anvisningarna punkt '?, ItemNumericRefID, Period?, RightParen?
+ItemRefID         ::= number/(ItemRefChar, ?-char), (Whitespace,ItemRefChar,?-char)?
+ItemNumericRefID  ::= number/ordinal, (Whitespace,ItemRefChar,?-char)?
+ItemRefChar       ::= [a-h]/[j-z]
+
+# ------------ end of base.ebnf ----------------

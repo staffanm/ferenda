@@ -1,0 +1,19 @@
+<Forfattning>
+  <Paragraf id="P2" ordinal="2">
+    <Stycke id="P2S1">
+      <str>I förordningen avses med</str>
+    </Stycke><Stycke id="P2S2">
+      <str />
+      <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Riksdagspension">riksdagspension</LinkSubject>
+      <str> - pension enligt lagen (</str>
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1994:1065">1994:1065</LinkSubject>
+      <str>) om ekonomiska villkor för riksdagens ledamöter, egenpension enligt motsvarande äldre författningar eller pension enligt lagen (</str>
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1996:304">1996:304</LinkSubject>
+      <str>) om arvode m.m. till Sveriges företrädare i Europaparlamentet,</str>
+    </Stycke><Stycke id="P2S3">
+      <str />
+      <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Tjänstepension">tjänstepension</LinkSubject>
+      <str> - pension enligt statliga pensionsavtal eller pension eller inkomstgaranti enligt andra statliga pensionsbestämmelser,</str>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

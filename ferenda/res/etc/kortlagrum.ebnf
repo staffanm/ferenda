@@ -1,0 +1,11 @@
+# -*- coding: iso-8859-1  -*-
+# ------------ kortlagrum.ebnf ----------------
+
+# FÖRKORTADE LAGRUM saker som like "15 § AvtL", "JB 22:2 st. 2" 
+kortlagrumref          ::= (AbbrevLawNormalRef/AbbrevLawShortRef)
+AbbrevLawNormalRef     ::= (GenericRef, Whitespace, LawAbbreviation)/(LawAbbreviation, Whitespace, GenericRef)
+AbbrevLawShortRef      ::= LawAbbreviation, Whitespace, ShortChapterSectionRef
+ShortChapterSectionRef ::= ShortChapterRefID, Colon, ShortSectionRefID, (Whitespace, PieceRef)?
+ShortChapterRefID      ::= number
+ShortSectionRefID      ::= number
+# ------------ end of kortlagrum.ebnf ----------------

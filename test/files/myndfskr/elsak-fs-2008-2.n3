@@ -1,0 +1,19 @@
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://rinfo.lagrummet.se/publ/elsaek-fs/2008:2> a rpubl:Myndighetsforeskrift;
+    dct:identifier "ELSÄK-FS 2008:2";
+    dct:publisher <http://rinfo.lagrummet.se/org/elsaekerhetsverket>;
+    dct:title "Elsäkerhetsverkets föreskrifter och allmänna råd om varselmärkning vid elektriska starkströmsanläggningar;"@sv;
+    rpubl:arsutgava "2008";
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/1957:601#K1P2>,
+        <http://rinfo.lagrummet.se/publ/sfs/1957:601#K5P1>,
+        <http://rinfo.lagrummet.se/publ/sfs/1957:601#K5P2>;
+    rpubl:beslutadAv <http://rinfo.lagrummet.se/org/elsaekerhetsverket>;
+    rpubl:beslutsdatum "2008-01-31"^^xsd:date;
+    rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/elsaek-fs>;
+    rpubl:ikrafttradandedatum "2008-10-01"^^xsd:date;
+    rpubl:lopnummer "2";
+    rpubl:utkomFranTryck "2008-03-28"^^xsd:date .
+

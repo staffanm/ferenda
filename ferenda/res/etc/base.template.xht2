@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/2002/06/xhtml2/"
+      xmlns:py="http://genshi.edgewall.org/"
+      py:strip="">
+  <!--! Library of common Genshi template definitions -->
+  <a py:def="render_link(link)" rel="${link.predicate}" href="${link.uri}">${link}</a>
+ 
+  <div py:def="render_listvalue(item)" py:strip=""><!--!
+ --><py:for each="part in item" py:choose=""><div py:when="isinstance(part, Link)" py:strip="">${render_link(part)}</div><div py:when="isinstance(part, unicode)" py:strip="">${part}</div><div py:otherwise="" class="warning">${part.__class__.__name__} utelämnad pga internt fel i render_listvalue</div><!--!
+ --></py:for>
+  </div>
+  
+  <div py:def="render_listvalues(items)" py:strip="" py:choose="">
+    <py:for each="item in items" py:choose=""><!--!
+   --><dd py:when="isinstance(item,list)">${render_listvalue(item)}</dd><!--!
+   --><dd py:when="isinstance(item,Link)"
+	  py:content="item"
+	  rel="${item.predicate}"
+	  href="${item.uri}">Värde</dd><!--!
+   --><dd py:otherwise =""
+	  py:content="item"
+	  property="${item.predicate}">Värde</dd><!--!
+ --></py:for>
+  </div>
+
+  <dl py:def="render_metadata(meta)" role="contentinfo">
+    <py:for each="(key,val) in meta.items()" py:choose="">
+      <dt py:content="key">Nyckel</dt>
+      <div py:when="isinstance(val,list)" py:strip="">
+	${render_listvalues(val)}
+      </div>
+      <dd py:when="isinstance(val,Link)"
+	  py:content="val"
+	  rel="${val.predicate}"
+	  href="${val.uri}">Värde</dd>
+      <dd py:otherwise=""
+	  py:content="val"
+	  property="${val.predicate}">Värde</dd>
+    </py:for>
+  </dl>
+</html>

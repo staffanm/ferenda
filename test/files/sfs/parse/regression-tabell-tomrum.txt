@@ -1,0 +1,27 @@
+Förteckning över byggentreprenadkontrakt
+
+                        NACE
+
+Avdel-                  Byggentreprenader
+ning F
+
+Huvud-  Grupp   Under-  Benämning       Anm.            CPV-kod
+grupp           grupp
+
+45                      Byggverksamhet  Omfattar:       45000000
+                                        - nybyggnad,
+                                        renovering
+                                        och normal
+                                        reparation
+
+        45.1            Mark- och
+                        grundarbeten                    45100000
+
+                45.11   Rivning av hus;
+                        markarbeten
+
+                                        Omfattar:
+                                        - rivning och
+                                        rasering av
+                                        byggnader och andra anläggningar
+

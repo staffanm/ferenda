@@ -1,0 +1,11 @@
+sådana restriktionsområden som bestämts av regeringen enligt 1 kap. 3
+§ första stycket första meningen luftfartslagen (1957:297) får inte
+utföras utan tillstånd
+
+<list>
+  <str>sådana restriktionsområden som bestämts av regeringen enligt </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1957:297#K1P3S1M1">1 kap. 3
+§ första stycket första meningen luftfartslagen (1957:297)</Link>
+  <str> får inte
+utföras utan tillstånd</str>
+</list>

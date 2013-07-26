@@ -1,0 +1,14 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://localhost:8000/res/rfc/6922> a bibo:Standard ;
+    dct:category "Informational" ;
+    dct:creator "Y. Shafranovich" ;
+    dct:identifier "RFC 6922" ;
+    dct:issn "2070-1721" ;
+    dct:issued "2013-04-01"^^xsd:date ;
+    dct:publisher "Internet Engineering Task Force (IETF)" ;
+    dct:rightsHolder "BioFortis, Inc." ;
+    dct:title "The application/sql Media Type"@en .
+

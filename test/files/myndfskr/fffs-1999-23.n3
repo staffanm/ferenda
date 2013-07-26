@@ -1,0 +1,18 @@
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://rinfo.lagrummet.se/publ/fffs/1999:23> a rpubl:Myndighetsforeskrift;
+    dct:identifier "FFFS 1999:23";
+    dct:issn "1102-7460";
+    dct:publisher <http://rinfo.lagrummet.se/org/finansinspektionen>;
+    dct:title "Föreskrifter om upphävande av Finansinspektionens föreskrifter (FFFS 1998:1) om skyldighet att redogöra för beräkningarna av de försäkringstekniska avsättningarna;"@sv;
+    rpubl:arsutgava "1999";
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/1982:790#P49>;
+    rpubl:beslutadAv <http://rinfo.lagrummet.se/org/finansinspektionen>;
+    rpubl:beslutsdatum "1999-12-29"^^xsd:date;
+    rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/fffs>;
+    rpubl:ikrafttradandedatum "1999-12-31"^^xsd:date;
+    rpubl:lopnummer "23";
+    rpubl:upphaver <http://rinfo.lagrummet.se/publ/fffs/1998:1> .
+

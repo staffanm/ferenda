@@ -1,0 +1,21 @@
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://rinfo.lagrummet.se/publ/fffs/2011:26> a rpubl:Myndighetsforeskrift;
+    dct:identifier "FFFS 2011:26";
+    dct:issn "1102-7460";
+    dct:publisher <http://rinfo.lagrummet.se/org/finansinspektionen>;
+    dct:title "Finansinspektionens föreskrifter och allmänna råd om särskild tillsyn över finansiella konglomerat;"@sv;
+    rpubl:arsutgava "2011";
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2006:627>;
+    rpubl:beslutadAv <http://rinfo.lagrummet.se/org/finansinspektionen>;
+    rpubl:beslutsdatum "2011-03-17"^^xsd:date;
+    rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/fffs>;
+    rpubl:genomforDirektiv <http://rinfo.lagrummet.se/ext/eur-lex/32002L0087>;
+    rpubl:ikrafttradandedatum "2011-05-01"^^xsd:date;
+    rpubl:lopnummer "26";
+    rpubl:upphaver <http://rinfo.lagrummet.se/publ/fffs/2006:6>;
+    rpubl:utkomFranTryck "2011-04-04"^^xsd:date .
+
+

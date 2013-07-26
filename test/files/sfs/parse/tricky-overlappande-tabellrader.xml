@@ -1,0 +1,36 @@
+<Forfattning>
+  <Kapitel id="K16" ordinal="16" rubrik="16 kap. Om ansvar på tryckfrihetsförordningens och yttrandefrihetsgrundlagens områden för brott mot tystnadsplikt">
+    <Paragraf id="K16P1" ordinal="1">
+      <Stycke id="K16P1S1">
+        <str>Att friheten att meddela och offentliggöra uppgifter i vissa fall är begränsad framgår. De fall av uppsåtligt åsidosättande av tystnadsplikt, i vilka nämnda frihet i övrigt är begränsad, är de där tystnadsplikten följer av</str>
+        <Tabell>
+          <Tabellrad>
+            <Tabellcell>
+              <str>1. beslut enligt </str>
+              <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1974:152#K10P7S3M2">10 kap. 7 § tredje stycket andra meningen regeringsformen</LinkSubject>
+            </Tabellcell>
+          </Tabellrad><Tabellrad>
+            <Tabellcell>
+              <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1974:153#K2P4S2">2 kap. 4 § andra stycket riksdagsordningen</LinkSubject>
+              <str> eller beslut enligt </str>
+              <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1974:153#K4P17">4 kap. 17 §</LinkSubject>
+              <str> eller </str>
+              <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1974:153#K10P8">10 kap. 8 §</LinkSubject>
+              <str> </str>
+              <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1974:153">riksdagsordningen</LinkSubject>
+            </Tabellcell><Tabellcell>
+              <str>såvitt avser uppgift vars röjande kan antas sätta rikets säkerhet i fara eller annars skada landet</str>
+            </Tabellcell>
+          </Tabellrad><Tabellrad>
+            <Tabellcell>
+              <str>2. </str>
+              <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1949:105#K3P3">3 kap. 3 § tryckfrihetsförordningen</LinkSubject>
+              <str> eller </str>
+              <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1991:1469#K2P3">2 kap. 3 § yttrandefrihetsgrundlagen</LinkSubject>
+            </Tabellcell>
+          </Tabellrad>
+        </Tabell>
+      </Stycke>
+    </Paragraf>
+  </Kapitel>
+</Forfattning>

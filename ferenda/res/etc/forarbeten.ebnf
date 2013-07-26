@@ -1,0 +1,37 @@
+# -*- coding: iso-8859-1 -*-
+# ------------ forarbeten.ebnf ----------------
+
+# FÖRARBETEN - dvs propositioner, utskottsbetänkanden,
+# riksdagsskrivelser och CELEX-nummer, sånt som anges som förarbeten i
+# en SFS. (obs att SOU/Ds/Regeringssskrivelser etc inte är med)
+
+forarbeteref          ::= (PropRef/BetRef/SkrivelseRef/CelexRef)
+
+# exv "2007/08" eller "1999/2000"
+Riksmote       ::= LangtAr, (Slash, Ar)?
+# Riksmote       ::= digit, digit, digit, digit, (Slash, digit, digit, (digit, digit)?)?
+
+# Propositioner exv "Prop. 1999/2000:100"
+PropRef	       ::= PropPrefix, Whitespace, PropRefID, SidnrRef?
+PropPrefix     ::= ('prop.'/'Prop.')
+PropRefID      ::= Riksmote, Colon, number
+
+# Betänkanden exv "bet. 1998/99:Ju12"
+BetRef         ::= BetPrefix, Whitespace, BetRefID
+BetPrefix      ::= 'bet.'
+BetRefID       ::= Riksmote, Colon, BetNum
+BetNum         ::= char, char, char?, number
+
+# Riksdagsskrivelser exv "rskr. 1992/93:17"
+SkrivelseRef   ::= SkrivelsePrefix, Whitespace, SkrivelseRefID
+SkrivelsePrefix::= 'rskr.'
+SkrivelseRefID ::= Riksmote, Colon, number
+
+# CELEX-hänvisningar
+CelexRef       ::= CelexRefID
+CelexRefID     ::= '3', digit, digit, (digit, digit)?, 'L', digit, digit, digit, digit
+
+# Sidnr-hänvisningar ("prop. 1989/90:89 s. 154")
+SidnrRef       ::= Whitespace, 's.', Period?, Whitespace, SidnrRefID
+
+# ------------ end of forarbeten.ebnf ----------------

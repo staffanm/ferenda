@@ -1,0 +1,18 @@
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://rinfo.lagrummet.se/publ/elsaek-fs/2010:1> a rpubl:Myndighetsforeskrift;
+    dct:identifier "ELSÄK-FS 2010:1";
+    dct:publisher <http://rinfo.lagrummet.se/org/elsaekerhetsverket>;
+    dct:title "Elsäkerhetsverkets föreskrifter om ändring i föreskrifter (ELSÄK-FS 2008:1) och allmänna råd om hur elektriska anläggningar ska vara utförda;"@sv;
+    rpubl:andrar <http://rinfo.lagrummet.se/publ/elsaek-fs/2008:1>;
+    rpubl:arsutgava "2010";
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2009:22#P16>;
+    rpubl:beslutadAv <http://rinfo.lagrummet.se/org/elsaekerhetsverket>;
+    rpubl:beslutsdatum "2010-04-16"^^xsd:date;
+    rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/elsaek-fs>;
+    rpubl:ikrafttradandedatum "2010-05-07"^^xsd:date;
+    rpubl:lopnummer "1";
+    rpubl:utkomFranTryck "2010-05-07"^^xsd:date .
+    

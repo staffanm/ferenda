@@ -1,0 +1,24 @@
+2 §, 4 §, 5 §, 5 a §, 6 §, 15 §, 22 §, 25 §, och 36 § lagen (1982:80) om anställningsskydd
+
+<list>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1982:80#P2">2 §</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1982:80#P4">4 §</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1982:80#P5">5 §</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1982:80#P5a">5 a §</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1982:80#P6">6 §</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1982:80#P15">15 §</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1982:80#P22">22 §</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1982:80#P25">25 §</Link>
+  <str>, och </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1982:80#P36">36 §</Link>
+  <str> lagen (</str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1982:80">1982:80</Link>
+  <str>) om anställningsskydd</str>
+</list>

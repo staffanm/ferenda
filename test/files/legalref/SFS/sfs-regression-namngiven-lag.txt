@@ -1,0 +1,9 @@
+28 kap. 6 b § och 33 kap. 5 § 2 st 3 brottsbalken
+
+<list>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1962:700#K28P6b">28 kap. 6 b §</Link>
+  <str> och </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1962:700#K33P5S2N3">33 kap. 5 § 2 st 3</Link>
+  <str> </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1962:700">brottsbalken</Link>
+</list>

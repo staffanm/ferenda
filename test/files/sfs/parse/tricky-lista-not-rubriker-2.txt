@@ -1,0 +1,10 @@
+2 § Som betyg skall någon av följande beteckningar användas:
+
+Icke godkänt (IG)
+
+Godkänt (G)
+
+Väl godkänt (VG)
+
+Mycket väl godkänt (MVG).
+Förordning (2007:52).

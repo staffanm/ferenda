@@ -1,0 +1,13 @@
+Utmätt fastighet bör säljas inom fyra månader från utmätningen eller,
+i fall som avses i 4 kap. 27 § eller 8 kap. 1 § tredje stycket, från
+det att begäran om försäljning kom in till kronofogdemyndigheten
+
+<list>
+  <str>Utmätt fastighet bör säljas inom fyra månader från utmätningen eller,
+i fall som avses i </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K4P27">4 kap. 27 §</Link>
+  <str> eller </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K8P1S3">8 kap. 1 § tredje stycket</Link>
+  <str>, från
+det att begäran om försäljning kom in till kronofogdemyndigheten</str>
+</list>

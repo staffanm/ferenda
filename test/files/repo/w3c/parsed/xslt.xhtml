@@ -1,0 +1,60 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
+<html xmlns:owl="http://www.w3.org/2002/07/owl#" xmlns:foaf="http://xmlns.com/foaf/0.1/" xmlns:prov="http://www.w3.org/ns/prov-o/" xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#" xmlns:xhv="http://www.w3.org/1999/xhtml/vocab#" xmlns:dct="http://purl.org/dc/terms/" xmlns:skos="http://www.w3.org/2004/02/skos/core#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:bibo="http://purl.org/ontology/bibo/" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+  <head about="http://localhost:8000/res/w3c/1">
+    <meta content="1" property="dct:identifier" xml:lang=""/>
+    <meta datatype="xsd:date" property="dct:issued" content="1999-11-16"/>
+    <title property="dct:title">XSL Transformations (XSLT)</title>
+    <link href="http://purl.org/ontology/bibo/Standard" rel="rdf:type"></link>
+  </head>
+  <body about="http://localhost:8000/res/w3c/1">
+    <div class="preamblesection" property="dct:title" content="Abstract" typeof="bibo:DocumentPart" about="http://localhost:8000/res/w3c/1#PS1">
+      <p>This specification defines the syntax and semantics of XSLT, which is a
+language for transforming XML documents into other XML documents.</p>
+    </div>
+    <div class="preamblesection" property="dct:title" content="Status of this document" typeof="bibo:DocumentPart" about="http://localhost:8000/res/w3c/1#PS2">
+      <p>This document has been reviewed by W3C Members and other interested
+parties [...]</p>
+    </div>
+    <div class="preamblesection" property="dct:title" content="Table of contents" typeof="bibo:DocumentPart" about="http://localhost:8000/res/w3c/1#PS3">
+1 Introduction <br/>
+2 Stylesheet Structure <br/></div>
+    <div class="preamblesection" property="dct:title" content="Appendices" typeof="bibo:DocumentPart" about="http://localhost:8000/res/w3c/1#PS4">
+A <a href="#section-References">References</a><br/>
+A.1 Normative References<br/>
+A.2 Other References<br/></div>
+    <hr/>
+    <div typeof="bibo:DocumentPart" content="Introduction" property="dct:title" about="http://localhost:8000/res/w3c/1#S1" class="section">
+      <span content="1" property="bibo:chapter" xml:lang=""/>
+      <p>This specification defines the syntax and semantics of the XSLT language.</p>
+    </div>
+    <div typeof="bibo:DocumentPart" content="Stylesheet Structure" property="dct:title" about="http://localhost:8000/res/w3c/1#S2" class="section">
+      <span content="2" property="bibo:chapter" xml:lang=""/>
+      <div typeof="bibo:DocumentPart" content="XSLT Namespace" property="dct:title" about="http://localhost:8000/res/w3c/1#S2.1" class="subsection">
+        <span content="2.1" property="bibo:chapter" xml:lang=""/>
+        <p>The XSLT namespace has the URI
+<code>http://www.w3.org/1999/XSL/Transform</code>.</p>
+      </div>
+      <div typeof="bibo:DocumentPart" content="Combining Stylesheets" property="dct:title" about="http://localhost:8000/res/w3c/1#S2.6" class="subsection">
+        <span content="2.6" property="bibo:chapter" xml:lang=""/>
+        <p>XSLT provides two mechanisms to combine stylesheets:</p>
+        <div typeof="bibo:DocumentPart" content="Stylesheet Inclusion" property="dct:title" about="http://localhost:8000/res/w3c/1#S2.6.1" class="subsubsection">
+          <span content="2.6.1" property="bibo:chapter" xml:lang=""/>
+          <p class="element-syntax">
+            <a name="element-include"/>
+            <code>&lt;!--
+Category: top-level-element --&gt;<br/>
+&lt;xsl:include<br/><b>href</b> = <var>uri-reference</var> /&gt;</code>
+          </p>
+        </div>
+        <div typeof="bibo:DocumentPart" content="Stylesheet Import" property="dct:title" about="http://localhost:8000/res/w3c/1#S2.6.2" class="subsubsection">
+          <span content="2.6.2" property="bibo:chapter" xml:lang=""/>
+          <p class="element-syntax">
+            <a name="element-import"/>
+            <code>&lt;xsl:import<br/><b>href</b> = <var>uri-reference</var> /&gt;</code>
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

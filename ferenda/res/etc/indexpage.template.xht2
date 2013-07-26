@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--! Genshi template for generating general lists/indexes of available document -->
+<?python
+from operator import itemgetter
+import locale
+?>
+<html xmlns="http://www.w3.org/2002/06/xhtml2/"
+      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+      xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+      xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.w3.org/2002/06/xhtml2/ http://www.w3.org/MarkUp/SCHEMA/xhtml2.xsd"
+      xmlns:dct="http://purl.org/dc/terms/"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xml:lang="sv"
+      xmlns:py="http://genshi.edgewall.org/"
+      >
+  <xi:include href="base.template.xht2"/>
+  <head>
+    <title py:content="title">Defaulttitel</title>
+  </head>
+  <body>
+    <div role="navigation">
+      <py:for each="cat in documents.keys()">
+	<h py:content="cat">Kategorirubrik</h>
+	<p>
+	  <!--! can there be cases when we want a non-lexical order sort here? -->
+	<py:for each="pg in sorted(documents[cat].keys(),cmp=locale.strcoll)">
+	  <a href="${pg}.html" py:content="pagelabels[pg]">Indexpage label</a>
+	</py:for>
+	</p>
+      </py:for>
+    </div>
+    <div role="main" py:choose="">
+      <h property="dct:title" py:content="title">Defaulttitel</h>
+      <py:when test="isinstance(documents[currentcategory][currentpage], list)">
+	<ul>
+	  <py:for each="document in sorted(documents[currentcategory][currentpage], docsorter, key=itemgetter('sortkey'))">
+	    <li>${document['leader']}<a href="${document['uri']}" py:content="document['title']">Document display title</a>${document['trailer']}</li>
+	  </py:for>
+	</ul>
+      </py:when>
+      <py:when test="isinstance(documents[currentcategory][currentpage],dict)" py:choose="">
+	<py:when test="currentkeyword">
+	  <!-- rendering a keyword subpage, ie all documents that have the 'Konsumenträtt' keyword -->
+	  <ul>
+	    <py:for each="document in documents[currentcategory][currentpage][currentkeyword]">
+	      <li><a href="document['uri']" py:content="document['title']"></a></li>
+	    </py:for>
+	  </ul>
+	</py:when>
+	<py:when test="compactlisting">
+	  <!-- render all keywords for the given e.g. letter on one page, "nyckelbegrepp"-style -->
+	  <dl>
+	    <py:for each="key in documents[currentcategory][currentpage].keys()">
+	      <dt py:content="key">Nyckelbegrepp</dt>
+	      <py:for each="document in documents[currentcategory][currentpage][key]">
+		<li><a href="document['uri']" py:content="document['title']"></a></li>
+	      </py:for>
+	    </py:for>
+	  </dl>
+	</py:when>
+	<py:otherwise test="">
+	  <ul>
+	    <py:for each="keyword in documents[currentcategory][currentpage].keys()">
+	      <li><a href="urlify(keyword)" py:content="keyword">Sökord</a></li>
+	    </py:for>
+	  </ul>
+	</py:otherwise>
+      </py:when>
+      <py:otherwise>
+	<p>Can't render object of type ${documents[currentcategory][currentpage].__class__.__name__}</p>
+      </py:otherwise>
+    </div>
+  </body>
+</html>

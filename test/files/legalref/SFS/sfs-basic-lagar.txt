@@ -1,0 +1,31 @@
+För europabolag med säte i Sverige som har beviljats koncession
+att driva försäkringsrörelse gäller 2-5, 7 och 8 §§, 16 § första
+och andra styckena, 17-29 och 32 §§ i lagen (2004:575) om
+europabolag samt bestämmelserna i detta kapitel.
+
+<list>
+  <str>För europabolag med säte i Sverige som har beviljats koncession
+att driva försäkringsrörelse gäller </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/2004:575#P2">2</Link>
+  <str>-</str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/2004:575#P5">5</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/2004:575#P7">7</Link>
+  <str> och </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/2004:575#P8">8 §§</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/2004:575#P16S1">16 § första</Link>
+  <str>
+och </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/2004:575#P16S2">andra styckena</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/2004:575#P17">17</Link>
+  <str>-</str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/2004:575#P29">29</Link>
+  <str> och </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/2004:575#P32">32 §§</Link>
+  <str> i lagen (</str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/2004:575">2004:575</Link>
+  <str>) om
+europabolag samt bestämmelserna i detta kapitel.</str>
+</list>

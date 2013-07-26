@@ -1,0 +1,431 @@
+# -*- coding: utf-8 -*-
+@prefix eurlex: <http://lagen.nu/eurlex#> .
+@prefix celex: <http://lagen.nu/ext/celex/> . 
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+
+# This is a hand-written table of equivalencies between the articles
+# in the four different versions of the EU treaties (Rome, Maastricht,
+# Amsterdam and Lisbon). It only cover the Treaty on the Functioning
+# of the European Union (TFEU, previously TEC), not the Treaty on
+# European Union (TEU).
+
+# There are established CELEX numberings for all four of these (eg
+# 11992E007A is Article 7a in the Maastricht numbering), but no
+# eastablished URIs. We therefore define our own URI space based on
+# celex numberings (eg http://lagen.nu/ext/celex/11992E007A is the URI
+# for Article 7a in the Maastricht numbering)
+
+# This table of equivalencis is not exact due to the fact that
+# language and sometimes substantial meaning change between
+# versions. Sometimes (particularly in the Lisbon treaty) an older
+# article is split into several new articles, or several older
+# articles are combined into one new article. It is usually possible
+# to track these changes on a paragraph- or point-basis, but this
+# requires defining URIs for parts of articles, and relationships
+# between parts and their containing articles. Therefore, there are
+# some inexactness in the equivalence mappings below.
+
+# Due to this inexactness, owl:sameAs is perhaps too strong. A better
+# property to use would be ov:similarTo.
+
+# 12008E001 new
+# 11997E001 repealed
+# 11997E002 repealed, replaced in substance by 12008M003
+# 12008E002 new
+# 12008E003 new
+# 12008E004 new
+# 12008E005 new
+# 12008E006 new
+# 12008E007 new
+# 12008E003-12008E006 replaces paragraph 1 of 1997E003 in substance
+# 12008E008 is really only owl:sameAs paragraph 2 of 1997E003
+celex:12008E008 owl:sameAs celex:11997E003, celex:11992E003, celex:11957E003 .
+# 11997E005 repealed, replaced in substance by 12008M005
+# 12008E009 new
+# 12008E010 new
+celex:12008E011 owl:sameAs celex:11997E006, celex:11992E003C .
+# 12008E012 is really only owl:sameAs paragraph 2 of 1997E153, see 12008E169
+celex:12008E012 owl:sameAs celex:11997E153, celex:11992E129A, celex:11957E129A .
+# 12008E013 new
+# 11997E007 repealed, replaced in substance by 12008M013
+# 11997E008 repealed, replaced in substance by 12008M013 and p 1 of 12008E282
+# 11997E009 repealed
+# 11997E010 repealed, replaced in substance by p 3 of 12008M004
+# 11997E011 and 11997E011a replaced by 12008E326-12008E334+12008M020
+celex:12008E014 owl:sameAs celex:11997E016, celex:11992E007D .
+celex:12008E015 owl:sameAs celex:11997E255, celex:11992E191A .
+celex:12008E016 owl:sameAs celex:11997E286, celex:11992E213B .
+# 12008E017 new
+celex:12008E018 owl:sameAs celex:11997E012, celex:11992E006, celex:11957E007 .
+# Note: 1992E006A does not really exist (same for most added articles eg "Article 6a" -- at least for articles added by the Amsterdam and Lisbon treaties before renumbering) 
+celex:12008E019 owl:sameAs celex:11997E013, celex:11992E006A .
+celex:12008E020 owl:sameAs celex:11997E017, celex:11992E008 .
+celex:12008E021 owl:sameAs celex:11997E018, celex:11992E008A . 
+celex:12008E022 owl:sameAs celex:11997E019, celex:11992E008B .
+celex:12008E023 owl:sameAs celex:11997E020, celex:11992E008C .
+celex:12008E024 owl:sameAs celex:11997E021, celex:11992E008D, celex:11957E008D .
+celex:12008E025 owl:sameAs celex:11997E022, celex:11992E008E, celex:11957E008E .
+celex:12008E026 owl:sameAs celex:11997E014, celex:11992E007A, celex:11957E008A .
+celex:12008E027 owl:sameAs celex:11997E015, celex:11992E007C, celex:11957E008C .
+celex:12008E028 owl:sameAs celex:11997E023, celex:11992E009, celex:11957E009 .
+celex:12008E029 owl:sameAs celex:11997E024, celex:11992E010, celex:11957E010 .
+celex:12008E030 owl:sameAs celex:11997E025, celex:11992E012, celex:11957E012 .
+celex:12008E031 owl:sameAs celex:11997E026, celex:11992E028, celex:11957E028 .
+celex:12008E032 owl:sameAs celex:11997E027, celex:11992E029, celex:11957E029 .
+celex:12008E033 owl:sameAs celex:11997E135, celex:11992E116 .
+celex:12008E034 owl:sameAs celex:11997E028, celex:11992E030, celex:11957E030 .
+celex:12008E035 owl:sameAs celex:11997E029, celex:11992E034, celex:11957E034 .
+celex:12008E036 owl:sameAs celex:11997E030, celex:11992E036, celex:11957E036 . 
+celex:12008E037 owl:sameAs celex:11997E031, celex:11992E037, celex:11957E037 .
+celex:12008E038 owl:sameAs celex:11997E032, celex:11992E038, celex:11957E038 .
+celex:12008E039 owl:sameAs celex:11997E033, celex:11992E039, celex:11957E039 .
+celex:12008E040 owl:sameAs celex:11997E034, celex:11992E040, celex:11957E040 .
+celex:12008E041 owl:sameAs celex:11997E035, celex:11992E041, celex:11957E041 .
+celex:12008E042 owl:sameAs celex:11997E036, celex:11992E042, celex:11957E042 .
+celex:12008E043 owl:sameAs celex:11997E037, celex:11992E043, celex:11957E043 .
+celex:12008E044 owl:sameAs celex:11997E038, celex:11992E046, celex:11957E046 .
+celex:12008E045 owl:sameAs celex:11997E039, celex:11992E048, celex:11957E048 .
+celex:12008E046 owl:sameAs celex:11997E040, celex:11992E049, celex:11957E049 .
+celex:12008E047 owl:sameAs celex:11997E041, celex:11992E050, celex:11957E050 .
+celex:12008E048 owl:sameAs celex:11997E042, celex:11992E051, celex:11957E051 .
+celex:12008E049 owl:sameAs celex:11997E043, celex:11992E052, celex:11957E052 .
+celex:12008E050 owl:sameAs celex:11997E044, celex:11992E054, celex:11957E054 .
+celex:12008E051 owl:sameAs celex:11997E045, celex:11992E055, celex:11957E055 .
+celex:12008E052 owl:sameAs celex:11997E046, celex:11992E056, celex:11957E056 .
+celex:12008E053 owl:sameAs celex:11997E047, celex:11992E057, celex:11957E057 .
+celex:12008E054 owl:sameAs celex:11997E048, celex:11992E058, celex:11957E058 .
+celex:12008E055 owl:sameAs celex:11997E294, celex:11992E221, celex:11957E221 .
+celex:12008E056 owl:sameAs celex:11997E049, celex:11992E059, celex:11957E059 .
+celex:12008E057 owl:sameAs celex:11997E050, celex:11992E060, celex:11957E060 .
+celex:12008E058 owl:sameAs celex:11997E051, celex:11992E061, celex:11957E061 .
+celex:12008E059 owl:sameAs celex:11997E052, celex:11992E063, celex:11957E063 .
+celex:12008E060 owl:sameAs celex:11997E053, celex:11992E064, celex:11957E064 .
+celex:12008E061 owl:sameAs celex:11997E054, celex:11992E065, celex:11957E065 .
+celex:12008E062 owl:sameAs celex:11997E055, celex:11992E066, celex:11957E066 .
+celex:12008E063 owl:sameAs celex:11997E056, celex:11992E073B, celex:11957E073B .
+celex:12008E064 owl:sameAs celex:11997E057, celex:11992E073C, celex:11957E073C .
+celex:12008E065 owl:sameAs celex:11997E058, celex:11992E073D, celex:11957E073D .
+celex:12008E066 owl:sameAs celex:11997E059, celex:11992E073F, celex:11957E073F .
+# 12008E067 also replaces current 11997M029
+celex:12008E067 owl:sameAs celex:11997E061, celex:11992E073I .
+# 12008E068 new
+# 12008E069 new
+# 12008E070 new
+# 12008E071 replaces currrent 11997M036
+# 12008E072 replaces only p 1 of 11997E064, aslo replaces 11997M033
+celex:12008E072 owl:sameAs celex:11997E064, celex:11992E073L .
+# 12008E073 new
+celex:12008E074 owl:sameAs celex:11997E066, celex:11992E073N .
+celex:12008E075 owl:sameAs celex:11997E060, celex:11992E073G .
+# 12008E076 new
+celex:12008E077 owl:sameAs celex:11997E062, celex:11992E073J .
+# 12008E078 replaces point 1+2 in 11997E063 + p 2 in 11997E064
+celex:12008E078 owl:sameAs celex:11997E063, celex:11992E073K . 
+# 12008E079 replaces point 3+4 in 11997E063 
+celex:12008E079 owl:sameAs celex:11997E063, celex:11992E073K . 
+# 12008E080 new
+celex:12008E081 owl:sameAs celex:11997E065, celex:11992E073M .
+# 11997E066, 11997E067, 11997E068 and 11997E069 repealed
+# 12008E082, 12008E083, 12008E085 replaces 11997M031
+# 12008E084 new
+# 12008E086 new
+# 12008E087, 12008E088 replaces 11997M030
+# 12008E089 replaces 11997M033
+celex:12008E090 owl:sameAs celex:11997E070, celex:11992E074, celex:11957E074 .
+celex:12008E091 owl:sameAs celex:11997E071, celex:11992E075, celex:11957E075 .
+celex:12008E092 owl:sameAs celex:11997E072, celex:11992E076, celex:11957E076 .
+celex:12008E093 owl:sameAs celex:11997E073, celex:11992E077, celex:11957E077 .
+celex:12008E094 owl:sameAs celex:11997E074, celex:11992E078, celex:11957E078 .
+celex:12008E095 owl:sameAs celex:11997E075, celex:11992E079, celex:11957E079 .
+celex:12008E096 owl:sameAs celex:11997E076, celex:11992E080, celex:11957E080 .
+celex:12008E097 owl:sameAs celex:11997E077, celex:11992E081, celex:11957E081 .
+celex:12008E098 owl:sameAs celex:11997E078, celex:11992E082, celex:11957E082 .
+celex:12008E099 owl:sameAs celex:11997E079, celex:11992E083, celex:11957E083 .
+celex:12008E100 owl:sameAs celex:11997E080, celex:11992E084, celex:11957E084 .
+celex:12008E101 owl:sameAs celex:11997E081, celex:11992E085, celex:11957E085 .
+celex:12008E102 owl:sameAs celex:11997E082, celex:11992E086, celex:11957E086 .
+celex:12008E103 owl:sameAs celex:11997E083, celex:11992E087, celex:11957E087 .
+celex:12008E104 owl:sameAs celex:11997E084, celex:11992E088, celex:11957E088 .
+celex:12008E105 owl:sameAs celex:11997E085, celex:11992E089, celex:11957E089 .
+celex:12008E106 owl:sameAs celex:11997E086, celex:11992E090, celex:11957E090 .
+celex:12008E107 owl:sameAs celex:11997E087, celex:11992E092, celex:11957E092 .
+celex:12008E108 owl:sameAs celex:11997E088, celex:11992E093, celex:11957E093 .
+celex:12008E109 owl:sameAs celex:11997E089, celex:11992E094, celex:11957E094 .
+celex:12008E110 owl:sameAs celex:11997E090, celex:11992E095, celex:11957E095 .
+celex:12008E111 owl:sameAs celex:11997E091, celex:11992E096, celex:11957E096 .
+celex:12008E112 owl:sameAs celex:11997E092, celex:11992E098, celex:11957E098 .
+celex:12008E113 owl:sameAs celex:11997E093, celex:11992E099, celex:11957E099 .
+celex:12008E114 owl:sameAs celex:11997E095, celex:11992E100A, celex:11957E100A .
+celex:12008E115 owl:sameAs celex:11997E094, celex:11992E100, celex:11957E100 .
+celex:12008E116 owl:sameAs celex:11997E096, celex:11992E101, celex:11957E101 .
+celex:12008E117 owl:sameAs celex:11997E097, celex:11992E102, celex:11957E102 .
+# 12008E118 new
+celex:12008E119 owl:sameAs celex:11997E004, celex:11992E003A, celex:11957E003A .
+celex:12008E120 owl:sameAs celex:11997E098, celex:11992E102A, celex:11957E102A .
+celex:12008E121 owl:sameAs celex:11997E099, celex:11992E103, celex:11957E103 .
+celex:12008E122 owl:sameAs celex:11997E100, celex:11992E103A, celex:11957E103A .
+celex:12008E123 owl:sameAs celex:11997E101, celex:11992E104, celex:11957E104 .
+celex:12008E124 owl:sameAs celex:11997E102, celex:11992E104A, celex:11957E104A .
+celex:12008E125 owl:sameAs celex:11997E103, celex:11992E104B, celex:11957E104B .
+celex:12008E126 owl:sameAs celex:11997E104, celex:11992E104C, celex:11957E104C .
+celex:12008E127 owl:sameAs celex:11997E105, celex:11992E105, celex:11957E105 .
+celex:12008E128 owl:sameAs celex:11997E106, celex:11992E105A, celex:11957E105A .
+celex:12008E129 owl:sameAs celex:11997E107, celex:11992E106, celex:11957E106 .
+celex:12008E130 owl:sameAs celex:11997E108, celex:11992E107, celex:11957E107 .
+celex:12008E131 owl:sameAs celex:11997E109, celex:11992E108, celex:11957E108 .
+celex:12008E132 owl:sameAs celex:11997E110, celex:11992E108A, celex:11957E108A .
+# celex:12008E133 new
+celex:12008E134 owl:sameAs celex:11997E114, celex:11992E109C, celex:11957E109C .
+celex:12008E135 owl:sameAs celex:11997E115, celex:11992E109D, celex:11957E109D .
+# celex:12008E136 new
+# celex:12008E137 new 
+# 12008E138 only replaces p 4 of 11997E111
+celex:12008E138 owl:sameAs celex:11997E111, celex:11992E109, celex:11957E109 .
+# 11997E116 repealed
+# 12008E139 new
+# 12008E140 only replaces parts of 11997E121, also parts of 11997E122 and 11997E123
+celex:12008E140 owl:sameAs celex:11997E121, celex:11992E109J, celex:11957E109J .
+# 12008E141 only replaces parts of 11997E117, also part of 11997E123
+celex:12008E141 owl:sameAs celex:11997E117, celex:11992E109F, celex:11957E109F .
+# 11997E118 repealed
+# 12008E142 only replaces p 1 of 11997E124
+celex:12008E142 owl:sameAs celex:11997E124, celex:11992E109M, celex:11957E109M .
+celex:12008E143 owl:sameAs celex:11997E119, celex:11992E109H, celex:11957E .
+celex:12008E144 owl:sameAs celex:11997E120, celex:11992E109I, celex:11957E .
+celex:12008E145 owl:sameAs celex:11997E125, celex:11992E109N .
+celex:12008E146 owl:sameAs celex:11997E126, celex:11992E109O .
+celex:12008E147 owl:sameAs celex:11997E127, celex:11992E109P .
+celex:12008E148 owl:sameAs celex:11997E128, celex:11992E109Q .
+celex:12008E149 owl:sameAs celex:11997E129, celex:11992E109R .
+celex:12008E150 owl:sameAs celex:11997E130, celex:11992E109S .
+# 11997E132,  11997E134 repealed
+celex:12008E151 owl:sameAs celex:11997E136, celex:11992E117, celex:11957E117 .
+# 12008E152 new
+celex:12008E153 owl:sameAs celex:11997E137, celex:11992E118, celex:11957E118 .
+celex:12008E154 owl:sameAs celex:11997E138, celex:11992E118A, celex:11957E118A .
+celex:12008E155 owl:sameAs celex:11997E139, celex:11992E118B, celex:11957E118B .
+celex:12008E156 owl:sameAs celex:11997E140, celex:11992E118C, celex:11957E118C .
+celex:12008E157 owl:sameAs celex:11997E141, celex:11992E119, celex:11957E119 .
+celex:12008E158 owl:sameAs celex:11997E142, celex:11992E119A, celex:11957E119A .
+celex:12008E159 owl:sameAs celex:11997E143, celex:11992E120, celex:11957E120 .
+celex:12008E160 owl:sameAs celex:11997E144, celex:11992E121, celex:11957E121 .
+celex:12008E161 owl:sameAs celex:11997E145, celex:11992E122, celex:11957E122 .
+celex:12008E162 owl:sameAs celex:11997E146, celex:11992E123, celex:11957E123 .
+celex:12008E163 owl:sameAs celex:11997E147, celex:11992E124, celex:11957E124 .
+celex:12008E164 owl:sameAs celex:11997E148, celex:11992E125, celex:11957E125 .
+celex:12008E165 owl:sameAs celex:11997E149, celex:11992E126, celex:11957E126 .
+celex:12008E166 owl:sameAs celex:11997E150, celex:11992E127, celex:11957E127 .
+celex:12008E167 owl:sameAs celex:11997E151, celex:11992E128, celex:11957E128 .
+celex:12008E168 owl:sameAs celex:11997E152, celex:11992E129, celex:11957E129 .
+# also see 12008E012
+celex:12008E169 owl:sameAs celex:11997E153, celex:11992E129A, celex:11957E129A .
+celex:12008E170 owl:sameAs celex:11997E154, celex:11992E129B, celex:11957E129B .
+celex:12008E171 owl:sameAs celex:11997E155, celex:11992E129C, celex:11957E129C .
+celex:12008E172 owl:sameAs celex:11997E156, celex:11992E129D, celex:11957E129D .
+celex:12008E173 owl:sameAs celex:11997E157, celex:11992E130, celex:11957E130 .
+celex:12008E174 owl:sameAs celex:11997E158, celex:11992E130A, celex:11957E130A .
+celex:12008E175 owl:sameAs celex:11997E159, celex:11992E130B, celex:11957E130B .
+celex:12008E176 owl:sameAs celex:11997E160, celex:11992E130C, celex:11957E130C .
+celex:12008E177 owl:sameAs celex:11997E161, celex:11992E130D, celex:11957E130D .
+celex:12008E178 owl:sameAs celex:11997E162, celex:11992E130E, celex:11957E130E .
+celex:12008E179 owl:sameAs celex:11997E163, celex:11992E130F, celex:11957E130F .
+celex:12008E180 owl:sameAs celex:11997E164, celex:11992E130G, celex:11957E130G .
+celex:12008E181 owl:sameAs celex:11997E165, celex:11992E130H, celex:11957E130H .
+celex:12008E182 owl:sameAs celex:11997E166, celex:11992E130I, celex:11957E130I .
+celex:12008E183 owl:sameAs celex:11997E167, celex:11992E130J, celex:11957E130J .
+celex:12008E184 owl:sameAs celex:11997E168, celex:11992E130K, celex:11957E130K .
+celex:12008E185 owl:sameAs celex:11997E169, celex:11992E130L, celex:11957E130L .
+celex:12008E186 owl:sameAs celex:11997E170, celex:11992E130M, celex:11957E130M .
+celex:12008E187 owl:sameAs celex:11997E171, celex:11992E130N, celex:11957E130N .
+celex:12008E188 owl:sameAs celex:11997E172, celex:11992E130O, celex:11957E130O .
+# celex:12008E189 new
+celex:12008E190 owl:sameAs celex:11997E173, celex:11992E130P, celex:11957E130P .
+celex:12008E191 owl:sameAs celex:11997E174, celex:11992E130R, celex:11957E130R .
+celex:12008E192 owl:sameAs celex:11997E175, celex:11992E130S, celex:11957E130S .
+celex:12008E193 owl:sameAs celex:11997E176, celex:11992E130T, celex:11957E130T .
+# 12008E194 new
+# 12008E195 new
+# 12008E196 new
+# 12008E197 new
+celex:12008E198 owl:sameAs celex:11997E182, celex:11992E131, celex:11957E131 .
+celex:12008E199 owl:sameAs celex:11997E183, celex:11992E132, celex:11957E132 .
+celex:12008E200 owl:sameAs celex:11997E184, celex:11992E133, celex:11957E133 .
+celex:12008E201 owl:sameAs celex:11997E185, celex:11992E134, celex:11957E134 .
+celex:12008E202 owl:sameAs celex:11997E186, celex:11992E135, celex:11957E135 .
+celex:12008E203 owl:sameAs celex:11997E187, celex:11992E136, celex:11957E136 .
+celex:12008E204 owl:sameAs celex:11997E188, celex:11992E136A, celex:11957E137 .
+# 12008E205 new
+celex:12008E206 owl:sameAs celex:11997E131, celex:11992E110, celex:11957E110 .
+# 11997E132 repealed
+celex:12008E207 owl:sameAs celex:11997E133, celex:11992E113, celex:11957E113 .
+celex:12008E208 owl:sameAs celex:11997E177, celex:11992E130U, celex:11957E130U .
+# 11997E178 repealed (replaced in part by p 1 in 12008E208)
+celex:12008E209 owl:sameAs celex:11997E179, celex:11992E130W, celex:11957E130W .
+celex:12008E210 owl:sameAs celex:11997E180, celex:11992E130X, celex:11957E130X .
+celex:12008E211 owl:sameAs celex:11997E181, celex:11992E130Y, celex:11957E130Y .
+celex:12008E212 owl:sameAs celex:11997E181A .
+# 12008E213 new
+# 12008E214 new
+celex:12008E215 owl:sameAs celex:11997E301, celex:11992E228A, celex:11957E228A .
+# 12008E216 new
+celex:12008E217 owl:sameAs celex:11997E310, celex:11992E238, celex:11957E238 .
+celex:12008E218 owl:sameAs celex:11997E300, celex:11992E228, celex:11957E228 .
+# replaces p 1,2,3 and 5 11997E111 -- p 4 1997E111 is replaced by 12008E138
+celex:12008E219 owl:sameAs celex:11997E111, celex:11992E109, celex:11957E109 .
+# 12008E220 replaces 11997E302-11997E304
+celex:12008E220 owl:sameAs celex:11997E302, celex:11992E229, celex:11957E229 .
+celex:12008E220 owl:sameAs celex:11997E303, celex:11992E230, celex:11957E230 .
+celex:12008E220 owl:sameAs celex:11997E304, celex:11992E231, celex:11957E231 .
+# 12008E221 new
+# 12008E222 new
+# 12008E223 replaces p 4+5 of 11997E190
+celex:12008E223 owl:sameAs celex:11997E190, celex:11992E138, celex:11957E138 .
+# 12008E224 replaces p 2 of 11997E191
+celex:12008E224 owl:sameAs celex:11997E191, celex:11992E138A, celex:11957E138A .
+# 12008E225 replaces p 2 of 11997E192
+celex:12008E225 owl:sameAs celex:11997E192, celex:11992E138B, celex:11957E138B .
+celex:12008E226 owl:sameAs celex:11997E193, celex:11992E138C, celex:11957E138C .
+celex:12008E227 owl:sameAs celex:11997E194, celex:11992E138D, celex:11957E138D .
+celex:12008E228 owl:sameAs celex:11997E195, celex:11992E138E, celex:11957E138E .
+celex:12008E229 owl:sameAs celex:11997E196, celex:11992E139, celex:11957E139 .
+# 12008E230 replaces p 2-4 of 11997E197
+celex:12008E230 owl:sameAs celex:11997E197, celex:11992E140, celex:11957E140 .
+celex:12008E231 owl:sameAs celex:11997E198, celex:11992E141, celex:11957E141 .
+celex:12008E232 owl:sameAs celex:11997E199, celex:11992E142, celex:11957E142 .
+celex:12008E233 owl:sameAs celex:11997E200, celex:11992E143, celex:11957E143 .
+celex:12008E234 owl:sameAs celex:11997E201, celex:11992E144, celex:11957E144 .
+# 12008E235 new
+# 12008E236 new
+# 11997E202, 11997E203 repealed
+celex:12008E237 owl:sameAs celex:11997E204, celex:11992E147, celex:11957E147 .
+# 12008E230 replaces p 1,3 of 11997E205
+celex:12008E238 owl:sameAs celex:11997E205, celex:11992E148, celex:11957E148 .
+celex:12008E239 owl:sameAs celex:11997E206, celex:11992E150, celex:11957E150 .
+celex:12008E240 owl:sameAs celex:11997E207, celex:11992E151, celex:11957E151 .
+celex:12008E241 owl:sameAs celex:11997E208, celex:11992E152, celex:11957E152 .
+celex:12008E242 owl:sameAs celex:11997E209, celex:11992E153, celex:11957E153 .
+celex:12008E243 owl:sameAs celex:11997E210, celex:11992E154, celex:11957E154 .
+# 11997E211 repealed
+# 12008E244 new
+celex:12008E245 owl:sameAs celex:11997E213, celex:11992E157, celex:11957E157 .
+# 11997E214 repealed
+celex:12008E246 owl:sameAs celex:11997E215, celex:11992E159, celex:11957E159 .
+celex:12008E247 owl:sameAs celex:11997E216, celex:11992E160, celex:11957E160 .
+# 12008E248 replaces p 2 of 11997E217
+celex:12008E248 owl:sameAs celex:11997E217, celex:11992E161, celex:11957E161 .
+# 12008E249 replaces p 2 of 11997E218
+celex:12008E249 owl:sameAs celex:11997E218, celex:11992E162, celex:11957E162 .
+celex:12008E250 owl:sameAs celex:11997E219, celex:11992E163, celex:11957E163 .
+# 11997E220 repealed
+# 12008E251 replaces p 2,3 of 11997E221
+celex:12008E251 owl:sameAs celex:11997E221, celex:11992E165, celex:11957E165 .
+celex:12008E252 owl:sameAs celex:11997E222, celex:11992E166, celex:11957E166 .
+celex:12008E253 owl:sameAs celex:11997E223, celex:11992E167, celex:11957E167 .
+celex:12008E254 owl:sameAs celex:11997E224, celex:11992E168, celex:11957E168 .
+# 12008E255 new
+celex:12008E256 owl:sameAs celex:11997E225, celex:11992E168A, celex:11957E168A .
+celex:12008E257 owl:sameAs celex:11997E225A .
+celex:12008E258 owl:sameAs celex:11997E226, celex:11992E169, celex:11957E169 .
+celex:12008E259 owl:sameAs celex:11997E227, celex:11992E170, celex:11957E170 .
+celex:12008E260 owl:sameAs celex:11997E228, celex:11992E171, celex:11957E171 .
+celex:12008E261 owl:sameAs celex:11997E229, celex:11992E172, celex:11957E172 .
+celex:12008E262 owl:sameAs celex:11997E229A .
+celex:12008E263 owl:sameAs celex:11997E230, celex:11992E173, celex:11957E173 .
+celex:12008E264 owl:sameAs celex:11997E231, celex:11992E174, celex:11957E174 .
+celex:12008E265 owl:sameAs celex:11997E232, celex:11992E175, celex:11957E175 .
+celex:12008E266 owl:sameAs celex:11997E233, celex:11992E176, celex:11957E176 .
+celex:12008E267 owl:sameAs celex:11997E234, celex:11992E177, celex:11957E177 .
+celex:12008E268 owl:sameAs celex:11997E235, celex:11992E178, celex:11957E178 .
+# 12008E269 new
+celex:12008E270 owl:sameAs celex:11997E236, celex:11992E179, celex:11957E179 .
+celex:12008E271 owl:sameAs celex:11997E237, celex:11992E180, celex:11957E180 .
+celex:12008E272 owl:sameAs celex:11997E238, celex:11992E181, celex:11957E181 .
+celex:12008E273 owl:sameAs celex:11997E239, celex:11992E182, celex:11957E182 .
+celex:12008E274 owl:sameAs celex:11997E240, celex:11992E183, celex:11957E183 .
+# 12008E275 new
+# 12008E276 new
+celex:12008E277 owl:sameAs celex:11997E241, celex:11992E184, celex:11957E184 .
+celex:12008E278 owl:sameAs celex:11997E242, celex:11992E185, celex:11957E185 .
+celex:12008E279 owl:sameAs celex:11997E243, celex:11992E186, celex:11957E186 .
+celex:12008E280 owl:sameAs celex:11997E244, celex:11992E187, celex:11957E187 .
+celex:12008E281 owl:sameAs celex:11997E245, celex:11992E188, celex:11957E188 .
+# 12008E282 new
+celex:12008E283 owl:sameAs celex:11997E112, celex:11992E109A, celex:11957E109A .
+celex:12008E284 owl:sameAs celex:11997E113, celex:11992E109B, celex:11957E109B .
+celex:12008E285 owl:sameAs celex:11997E246, celex:11992E188A, celex:11957E188A .
+celex:12008E286 owl:sameAs celex:11997E247, celex:11992E188B, celex:11957E188B .
+celex:12008E287 owl:sameAs celex:11997E248, celex:11992E188C, celex:11957E188C .
+celex:12008E288 owl:sameAs celex:11997E249, celex:11992E189, celex:11957E189 .
+# 12008E289 new
+# 12008E290, 12008E291 new (replaces third indent of 11997E202 in substance)
+# 12008E292 new
+celex:12008E293 owl:sameAs celex:11997E250, celex:11992E189A, celex:11957E189A .
+celex:12008E294 owl:sameAs celex:11997E251, celex:11992E189B, celex:11957E189B .
+# 12008E295 new
+celex:12008E296 owl:sameAs celex:11997E253, celex:11992E190, celex:11957E190 .
+celex:12008E297 owl:sameAs celex:11997E254, celex:11992E191, celex:11957E191 .
+# 12008E298 new
+celex:12008E299 owl:sameAs celex:11997E256, celex:11992E192, celex:11957E192 .
+# 12008E300 new
+# 1997E257 repealed
+celex:12008E301 owl:sameAs celex:11997E258, celex:11992E194, celex:11957E194 .
+celex:12008E302 owl:sameAs celex:11997E259, celex:11992E195, celex:11957E195 .
+celex:12008E303 owl:sameAs celex:11997E260, celex:11992E196, celex:11957E196 .
+# 1997E261 repealed
+celex:12008E304 owl:sameAs celex:11997E262, celex:11992E198, celex:11957E198 .
+celex:12008E305 owl:sameAs celex:11997E263, celex:11992E198A, celex:11957E198A .
+celex:12008E306 owl:sameAs celex:11997E264, celex:11992E198B, celex:11957E198B .
+celex:12008E307 owl:sameAs celex:11997E265, celex:11992E198C, celex:11957E198C .
+celex:12008E308 owl:sameAs celex:11997E266, celex:11992E198D, celex:11957E198D .
+celex:12008E309 owl:sameAs celex:11997E267, celex:11992E198E, celex:11957E198E .
+celex:12008E310 owl:sameAs celex:11997E268, celex:11992E199, celex:11957E199 .
+celex:12008E311 owl:sameAs celex:11997E269, celex:11992E201, celex:11957E201 .
+# 1997E270 repealed
+# 12008E312 new
+# 12008E313 replaces p 1 of 11997E272
+celex:12008E313 owl:sameAs celex:11997E272, celex:11992E203, celex:11957E203 .
+# 12008E314 replaces p 2-10 of 11997E272
+celex:12008E314 owl:sameAs celex:11997E272, celex:11992E203, celex:11957E203 .
+celex:12008E315 owl:sameAs celex:11997E273, celex:11992E204, celex:11957E204 .
+celex:12008E316 owl:sameAs celex:11997E271, celex:11992E202, celex:11957E202 .
+celex:12008E317 owl:sameAs celex:11997E274, celex:11992E205, celex:11957E205 .
+celex:12008E318 owl:sameAs celex:11997E275, celex:11992E205A, celex:11957E205A .
+celex:12008E319 owl:sameAs celex:11997E276, celex:11992E206, celex:11957E206 .
+celex:12008E320 owl:sameAs celex:11997E277, celex:11992E207, celex:11957E207 .
+celex:12008E321 owl:sameAs celex:11997E278, celex:11992E208, celex:11957E208 .
+celex:12008E322 owl:sameAs celex:11997E279, celex:11992E209, celex:11957E209 .
+# 12008E323 new
+# 12008E324 new
+celex:12008E325 owl:sameAs celex:11997E280, celex:11992E209A, celex:11957E209A .
+# 12008E326-12008E334 replaces 11997E011, 11997E011a  and a bunch of articles inn 11997M...
+# 11997E281 repealed
+celex:12008E335 owl:sameAs celex:11997E282, celex:11992E211, celex:11957E211 .
+celex:12008E336 owl:sameAs celex:11997E283, celex:11992E212, celex:11957E212 .
+celex:12008E337 owl:sameAs celex:11997E284, celex:11992E213, celex:11957E213 .
+celex:12008E338 owl:sameAs celex:11997E285, celex:11992E213A, celex:11957E213A .
+celex:12008E339 owl:sameAs celex:11997E287, celex:11992E213B, celex:11957E213B .
+celex:12008E340 owl:sameAs celex:11997E288, celex:11992E215, celex:11957E215 .
+celex:12008E341 owl:sameAs celex:11997E289, celex:11992E216, celex:11957E216 .
+celex:12008E342 owl:sameAs celex:11997E290, celex:11992E217, celex:11957E217 .
+celex:12008E343 owl:sameAs celex:11997E291, celex:11992E218, celex:11957E218 .
+celex:12008E344 owl:sameAs celex:11997E292, celex:11992E219, celex:11957E219 .
+# 11997E292 repealed
+celex:12008E345 owl:sameAs celex:11997E295, celex:11992E222, celex:11957E222 .
+celex:12008E346 owl:sameAs celex:11997E296, celex:11992E223, celex:11957E223 .
+celex:12008E347 owl:sameAs celex:11997E297, celex:11992E224, celex:11957E224 .
+celex:12008E348 owl:sameAs celex:11997E298, celex:11992E225, celex:11957E225 .
+# 12008E349 replaces p 2(2)-p2(4) of 11997E299
+celex:12008E349 owl:sameAs celex:11997E299, celex:11992E227, celex:11957E227 .
+# 11997E305 repealed
+celex:12008E350 owl:sameAs celex:11997E306, celex:11992E233, celex:11957E233 .
+celex:12008E351 owl:sameAs celex:11997E307, celex:11992E234, celex:11957E234 .
+celex:12008E352 owl:sameAs celex:11997E308, celex:11992E235, celex:11957E235 .
+# 12008E353 new
+celex:12008E354 owl:sameAs celex:11997E309, celex:11992E236, celex:11957E236 .
+# 11997E311 repealed
+# 12008E355 replaces p 2(1),p 3-6 of 11997E299
+celex:12008E355 owl:sameAs celex:11997E299, celex:11992E227, celex:11957E227 .
+celex:12008E356 owl:sameAs celex:11997E312, celex:11992E240, celex:11957E240 .
+celex:12008E357 owl:sameAs celex:11997E313, celex:11992E247, celex:11957E247 .
+# 12008E358 new
+# 11997E314 repealed

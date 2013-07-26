@@ -1,0 +1,14 @@
+# -*- coding: iso-8859-1 -*-
+# ------------ egratt.ebnf ----------------
+
+ecjcaseref ::= SimpleECJCase
+
+# "Case C-176/09"
+SimpleECJCase ::= (Case,Whitespace)?, ECJCaseRef
+ECJCaseRef ::= DecisionRefID,'-', SerialRefID, '/', YearRefID
+
+Case ::= 'Case'
+
+DecisionRefID ::= 'C'/'T'/'F'
+YearRefID ::= Ar
+SerialRefID ::= number

@@ -1,0 +1,7 @@
+This is a url: 
+
+<url>
+  <scheme>http</scheme>
+  <netloc>example.org</netloc>
+  <path>/</path>
+</url>

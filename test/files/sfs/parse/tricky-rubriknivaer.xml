@@ -1,0 +1,35 @@
+<Forfattning>
+  <Kapitel id="K1" ordinal="1" rubrik="1 Kap. Första kapitlet">
+    <Rubrik id="K1R1">Allmänna bestämmelser</Rubrik>
+    <Rubrik id="K1R2" type="underrubrik">Syftet med lagen</Rubrik>
+    <Paragraf id="K1P1" ordinal="1">
+      <Stycke id="K1P1S1">
+        <str>Syftet med denna lag.</str>
+      </Stycke>
+    </Paragraf><Rubrik id="K1R3" type="underrubrik">Avvikande bestämmelser</Rubrik>
+    <Paragraf id="K1P2" ordinal="2">
+      <Stycke id="K1P2S1">
+        <str>Om det i en annan lag.</str>
+      </Stycke>
+    </Paragraf><Rubrik id="K1R4">Tillämpningsområde</Rubrik>
+    <Rubrik id="K1R5" type="underrubrik">Det territoriella tillämpningsområdet</Rubrik>
+    <Paragraf id="K1P3" ordinal="3">
+      <Stycke id="K1P3S1">
+        <str>Denna lag gäller för sådana.</str>
+      </Stycke>
+    </Paragraf>
+  </Kapitel>
+  <Kapitel id="K2" ordinal="2" rubrik="2 Kap. Andra kapitlet">
+    <Rubrik id="K2R1">Särskilda bestämmelser</Rubrik>
+    <Paragraf id="K2P1" ordinal="1">
+      <Stycke id="K2P1S1">
+        <str>Denna lag gäller för sådan.</str>
+      </Stycke>
+    </Paragraf><Rubrik id="K2R2">Undantag för privat behandling av personuppgifter</Rubrik>
+    <Paragraf id="K2P2" ordinal="2">
+      <Stycke id="K2P2S1">
+        <str>Denna lag gäller inte för sådan behandling.</str>
+      </Stycke>
+    </Paragraf>
+  </Kapitel>
+</Forfattning>

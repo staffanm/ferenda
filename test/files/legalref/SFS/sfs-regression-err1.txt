@@ -1,0 +1,17 @@
+/Upphör att gälla U:2004-10-08/
+Försäkringsrörelse får drivas endast av
+försäkringsaktiebolag och ömsesidiga försäkringsbolag som fått
+tillstånd (koncession) till detta enligt denna lag, om inte
+annat följer av 2 § eller 10 § tredje stycket. 
+
+<list>
+  <str>/Upphör att gälla U:2004-10-08/
+Försäkringsrörelse får drivas endast av
+försäkringsaktiebolag och ömsesidiga försäkringsbolag som fått
+tillstånd (koncession) till detta enligt denna lag, om inte
+annat följer av </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P2">2 §</Link>
+  <str> eller </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P10S3">10 § tredje stycket</Link>
+  <str>. </str>
+</list>

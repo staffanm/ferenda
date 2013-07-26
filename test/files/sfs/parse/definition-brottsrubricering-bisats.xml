@@ -1,0 +1,11 @@
+<Forfattning>
+  <Paragraf id="P3" ordinal="3">
+    <Stycke id="P3S1">
+      <str>Den som smädar annan genom kränkande tillmäle eller beskyllning eller genom annat skymfligt beteende mot honom, dömes, om gärningen ej är belagd med straff enligt 1 eller </str>
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P2">2 §</LinkSubject>
+      <str>, för </str>
+      <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Förolämpning">förolämpning</LinkSubject>
+      <str> till böter.</str>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

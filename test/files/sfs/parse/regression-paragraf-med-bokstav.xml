@@ -1,0 +1,11 @@
+<Forfattning>
+  <Paragraf id="P5a" ordinal="5 a">
+    <Stycke id="P5aS1">
+      <str>Bestämmelserna behöver inte tillämpas på behandling av personuppgifter som inte ingår i eller är avsedda att ingå i en samling av personuppgifter.</str>
+    </Stycke><Stycke id="P5aS2">
+      <str>Sådan behandling som avses i </str>
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P5aS1">första stycket</LinkSubject>
+      <str> får inte utföras, om den innebär en kränkning av den registrerades personliga integritet.</str>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

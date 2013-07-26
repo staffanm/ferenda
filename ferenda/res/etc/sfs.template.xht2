@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="utf-8"?>
+<?python
+from datetime import datetime
+?>
+<html xmlns="http://www.w3.org/2002/06/xhtml2/"
+      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+      xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.w3.org/2002/06/xhtml2/ http://www.w3.org/MarkUp/SCHEMA/xhtml2.xsd"
+      xmlns:dct="http://purl.org/dc/terms/"
+      xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
+      xmlns:rinfoex="http://lagen.nu/terms#"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xml:base="${meta['xml:base']}"
+      xml:lang="sv"
+      about="${meta['xml:base']}"
+      xmlns:py="http://genshi.edgewall.org/"
+      >
+  <xi:include href="base.template.xht2"/>
+    <head about="${meta['xml:base']}">
+      <title py:content="meta[u'Rubrik']">Författningsrubrik</title>
+      <!--! base is not valid in xhtml2 - but we need it to set the
+      base context for RDFa parsing. Fix this later through pyRDFa
+      transforms -->
+      <base href="${meta['xml:base']}"/>
+      <link rel="rinfo:forfattningsamling" href="http://rinfo.lagrummet.se/ref/sfs"/>
+      <meta property="rinfo:fsNummer" content="${meta[u'SFS nr']}"/>
+      <py:if test="u'Senast hämtad' in meta">
+	<meta property="rinfoex:senastHamtad" content="${meta[u'Senast hämtad']}" datatype="xsd:date"/>
+      </py:if>
+      <py:if test="u'uri' in meta[u'Utgivare']">
+	<link rel="dct:publisher" href="${meta[u'Utgivare'].uri}"/>
+      </py:if>
+      <py:if test="u'uri' in meta[u'Departement/ myndighet']">
+	<link rel="dct:creator" href="${meta[u'Departement/ myndighet'].uri}"/>
+      </py:if>
+      <py:if test="u'Utfärdad' in meta">
+	<meta property="rinfo:utfardandedatum"
+	      content="${meta[u'Utfärdad']}" datatype="xsd:date"/>
+      </py:if>
+      <py:if test="u'Förkortning' in meta">
+	<meta property="dct:alternate" content="${meta[u'Förkortning']}"/>
+      </py:if>
+      <py:if test="u'Ikraft' in meta">
+        <meta property="rinfo:ikrafttradandedatum"
+              content="${meta[u'Ikraft']}" datatype="xsd:date"/>
+      </py:if>
+      <link rel="rinfo:konsoliderar" href="${meta['xml:base']}"/>
+      <!--! FIXME: det vore snyggare med RDF-listor istället för
+	     oordnade högar med triples -->
+      <py:for each="uri in meta[u'Konsolideringsunderlag']">
+	<link rel="rinfo:konsolideringsunderlag" href="${uri}"/> 
+      </py:for>
+      
+      <py:if test="u'Förarbeten' in meta">
+	<py:for each="uri in meta[u'Förarbeten']">
+	  <link rel="rinfo:forarbete" href="${uri}"/>
+	</py:for>
+      </py:if>
+    </head>
+    <body typeof="rinfo:KonsolideradGrundforfattning">
+      <!--! macro definitions -->
+      <div py:def="render_rubrik(rubrik)" py:strip="" py:choose="">
+	<h py:when="rubrik.type == 'underrubrik'" py:content="rubrik" id="${rubrik.id}" class="underrubrik">Underrubrik</h>
+	<h py:otherwise="" py:content="rubrik" id="${rubrik.id}">Huvudrubrik</h>
+      </div>
+
+      <section py:def="render_avdelning(avdelning)"
+	       typeof="rinfo:Avdelning"
+	       id="${avdelning.id}"
+	       about="#${avdelning.id}">
+	<h py:content="avdelning.rubrik" class="avdelningsrubrik">Avdelningsrubrik</h>
+	<h py:if="avdelning.underrubrik" py:content="avdelning.underrubrik" class="avdelningsunderrubrik">Underrubrik</h>
+	<py:for each="part in avdelning" py:choose="">
+	  <div py:when="isinstance(part,Rubrik)"  py:strip="">${render_rubrik(part)}</div>
+	  <div py:when="isinstance(part,UpphavtKapitel)" py:strip="">${render_upphavtkapitel(part)}</div>
+	  <div py:when="isinstance(part,Kapitel)" py:strip="">${render_kapitel(part)}</div>
+	  <div py:otherwise="" py:strip="">${dispatch_render(part,'Avdelning')}</div>
+	</py:for>
+      </section>
+      
+      <section py:def="render_upphavtkapitel(paragraf)"
+	       class="upphavd">
+	       ${paragraf}
+      </section>
+
+      <section py:def="render_kapitel(kapitel)"
+	       id="${kapitel.id}"
+	       typeof="rinfo:Kapitel"
+	       about="#${kapitel.id}"
+	       property="rinfoex:kapitelnummer"
+	       content="${kapitel.ordinal}">
+	<span rel="dct:isPartOf" href="${meta['xml:base']}"/>
+	<h class="kapitelrubrik" py:content="kapitel.rubrik">Kapitelrubrik</h>
+	
+	<py:for each="part in kapitel" py:choose="">
+	  <div py:when="isinstance(part, Rubrik)"   py:strip="">${render_rubrik(part)}</div>
+	  <div py:when="isinstance(part, UpphavdParagraf)" py:strip="">${render_upphavdparagraf(part)}</div>
+	  <div py:when="isinstance(part, Paragraf)" py:strip="">${render_paragraf(part,'#'+kapitel.id)}</div>
+	  <div py:otherwise="" py:strip="">${dispatch_render(part,'Kapitel')}</div>
+	</py:for>
+      </section>
+      
+      
+      <section py:def="render_upphavdparagraf(paragraf)"
+	       class="upphavd">
+	       ${paragraf}
+      </section>
+
+      <section py:def="render_paragraf(paragraf,isPartOf='parent-to-paragraf')"
+	       id="${paragraf.id}"
+	       typeof="rinfo:Paragraf"
+	       about="#${paragraf.id}"
+	       property="rinfoex:paragrafnummer"
+	       content="${paragraf.ordinal}">
+	<span rel="dct:isPartOf" href="${isPartOf}"/>
+	<span class="ikrafttradande" py:if="paragraf.ikrafttrader">(Träder i kraft ${paragraf.ikrafttrader})</span>
+	<span class="upphor"         py:if="paragraf.upphor">(Upphör att gälla ${paragraf.upphor})</span>
+	<!--! första stycket måste rendreras tillsammans med
+	     paragrafbeteckningen (inuti samma p-element) -->
+        ${render_stycke(paragraf[0], '#'+paragraf.id, paragraf.ordinal)}
+        <py:for each="part in paragraf[1:]" py:choose="">
+	  <div py:when="isinstance(part, Stycke)" py:strip="">${render_stycke(part, '#'+paragraf.id)}</div>
+	  <div py:otherwise="" py:strip="">${dispatch_render(part,'Paragraf')}</div>
+        </py:for>
+      </section>
+            
+      <p py:def="render_stycke(stycke,isPartOf='parent-to-stycke',paragrafnummer=None)"
+	 id="${stycke.id}"
+	 about="#${stycke.id}"
+	 typeof="rinfo:Stycke">
+	<span rel="dct:isPartOf" href="${isPartOf}"/>
+        <span class="paragrafbeteckning" py:if="paragrafnummer">${paragrafnummer} §</span>      
+        <py:for each="part in stycke" py:choose=""><div py:when="isinstance(part, NumreradLista)" py:strip="">${render_numreradlista(part, '#'+stycke.id)}</div><div py:when="isinstance(part, Bokstavslista)" py:strip="">${render_bokstavslista(part, '#'+stycke.id)}</div><div py:when="isinstance(part, Strecksatslista)" py:strip="">${render_strecksatslista(part, '#'+stycke.id)}</div><div py:when="isinstance(part, Tabell)" py:strip="">${render_tabell(part)}</div><div py:when="isinstance(part, Link)" py:strip="">${render_link(part)}</div><div py:when="isinstance(part, unicode)" py:strip="">${part}</div><div py:otherwise="" py:strip="">${dispatch_render(part,'Stycke')}</div></py:for>
+      </p>
+
+      <!--! unfortunately, the XHTML2 model for ordered lists is too strict
+      to be compatible with how numbered lists are used in swedish law -
+      e.g Mervärdesskattelag (1994:200) 5 kap. 9 § features a numbered lists
+      that have ten items labeled 1, 2, 3, 4, 4 a, 5, 6, 6 a, 7, and 8.
+      Because of this we use <ul> instead of <ol> even for numbered lists.
+      -->
+      <ul py:def="render_numreradlista(lista, isPartOf='parent-to-listelement')"
+	  id="${lista.id}"
+	  about="#${lista.id}"
+	  class="numreradlista"
+	  >
+        <py:for each="part in lista" py:choose="">
+          <div py:when="isinstance(part, Listelement)" py:strip="">${render_listelement(part, isPartOf)}</div>
+	  <div py:otherwise="" py:strip="">${dispatch_render(part,'Numreradlista')}</div>
+        </py:for>
+      </ul>
+
+      <ul py:def="render_strecksatslista(lista, isPartOf='parent-to-listelement')"
+	  class="strecksatslista"
+	  id="${lista.id}"
+	  about="#${lista.id}"
+	  >
+        <py:for each="part in lista" py:choose="">
+          <div py:when="isinstance(part, Listelement)" py:strip="">${render_listelement(part, isPartOf)}</div>
+	  <div py:otherwise="" py:strip="">${dispatch_render(part,'Strecksatslista')}</div>
+        </py:for>
+      </ul>
+
+      <ul py:def="render_bokstavslista(lista, isPartOf='parent-to-listelement')"
+	  class="bokstavslista"
+	  id="${lista.id}"
+	  about="#${lista.id}"
+	  >
+        <py:for each="part in lista" py:choose="">
+          <div py:when="isinstance(part, Listelement)" py:strip="">${render_listelement(part, isPartOf)}</div>
+	  <div py:otherwise="" py:strip="">${dispatch_render(part,'Bokstavslista')}</div>
+        </py:for>
+      </ul>
+
+      <li py:def="render_listelement(listelement)"
+	  id="${listelement.id}"
+	  about="#${listelement.id}"
+	  >
+      <!--! for nested lists -->
+      <span rel="dct:isPartOf" href="${isPartOf}"/>
+      <py:for each="part in listelement" py:choose=""><div py:when="isinstance(part, NumreradLista)" py:strip="">${render_numreradlista(part,listelement.id)}</div><div py:when="isinstance(part, Strecksatslista)" py:strip="">${render_strecksatslista(part,listelement.id)}</div><div py:when="isinstance(part, Bokstavslista)" py:strip="">${render_bokstavslista(part,listelement.id)}</div><div py:when="isinstance(part, Link)" py:strip="">${render_link(part)}</div><div py:when="isinstance(part, unicode)" py:strip="">${part}</div><div py:otherwise="" py:strip="">${dispatch_render(part,'Listelement')}</div></py:for>
+      </li>
+
+      <table py:def="render_tabell(tabell)">
+	<py:for each="part in tabell" py:choose="">
+	  <tr py:when="isinstance(part, Tabellrad)">
+	    <py:for each="subpart in part" py:choose="">
+	      <td py:when="isinstance(subpart, Tabellcell)">
+		<py:for each="node in subpart" py:choose="">
+		  <div py:when="isinstance(node, Link)" py:strip="">${render_link(node)}</div>
+		  <div py:when="isinstance(node, unicode)" py:strip="">${node}</div>
+		  <div py:otherwise="" py:strip="">${dispatch_render(node,'Tabellcell')}</div>
+		</py:for>
+	      </td>
+	      <div py:otherwise="" py:strip="">${dispatch_render(subpart,'Tabellrad')}</div>
+	    </py:for>
+	  </tr>
+	  <div py:otherwise="" py:strip="">${dispatch_render(part,'Tabell')}</div>
+	</py:for>
+      </table>
+
+      <section py:def="render_overgangsbestammelser(obs)">
+	<h py:content="obs.rubrik">Övergångsbestämmelser</h>
+        <py:for each="part in obs" py:choose="">
+	  <div py:when="isinstance(part, Overgangsbestammelse)" py:strip="">${render_overgangsbestammelse(part)}</div>
+	  <div py:otherwise="" py:strip="">${dispatch_render(part,'Overgangsbestammelser')}</div>
+        </py:for>
+      </section>
+
+      <section py:def="render_overgangsbestammelse(ob)">
+        <py:for each="part in ob" py:choose="">
+	  <div py:when="isinstance(part, Rubrik)" py:strip="">${render_rubrik(part)}</div>
+	  <div py:when="isinstance(part, Stycke)" py:strip="">${render_stycke(part,'#ob')}</div>
+	  <div py:when="isinstance(part, NumreradLista)" py:strip="">${render_numreradlista(part,'#ob')}</div>
+	  <div py:when="isinstance(part, Bokstavslista)" py:strip="">${render_bokstavslista(part,'#ob')}</div>
+	  <div py:otherwise="" py:strip="">${dispatch_render(part,'Overgangsbestammelse')}</div>
+        </py:for>
+      </section>
+
+      <section py:def="render_bilaga(bilaga)"
+	       id="${bilaga.id}"
+	       about="#${bilaga.id}"
+	       typeof="rinfo:Bilaga">
+	<h py:content="bilaga.rubrik">Bilagerubrik</h>
+        <py:for each="part in bilaga" py:choose="">
+	  <div py:when="isinstance(part, Rubrik)" py:strip="">${render_rubrik(part)}</div>
+	  <div py:when="isinstance(part, Stycke)" py:strip="">${render_stycke(part,'#'+bilaga.id)}</div>
+	  <div py:when="isinstance(part, Tabell)" py:strip="">${render_tabell(part)}</div>
+	  <div py:when="isinstance(part, NumreradLista)" py:strip="">${render_numreradlista(part,'#'+bilaga.id)}</div>
+	  <div py:when="isinstance(part, Bokstavslista)" py:strip="">${render_numreradlista(part,'#'+bilaga.id)}</div>
+	  <div py:when="isinstance(part, Strecksatslista)" py:strip="">${render_numreradlista(part,'#'+bilaga.id)}</div>
+	  <div py:otherwise="" py:strip="">${dispatch_render(part,'Bilaga')}</div>
+        </py:for>
+      </section>
+
+      <section py:def="render_registerpost(rp)"
+	       id="${rp.id}"
+	       about="${rp.uri}">
+	<dl>
+	  <py:for each="(key,val) in rp.items()" py:choose="">
+	    <dt py:content="key">Nyckel</dt>
+	    <dd py:when="key == u'Övergångsbestämmelse'">
+	      ${render_overgangsbestammelse(val)}
+	    </dd>
+	    <dd py:when="isinstance(val,list)">
+	      ${render_listvalue(val)}
+	    </dd>
+	    <dd py:otherwise=""
+		py:content="val"
+		property="${val.predicate}">Värde</dd>
+	  </py:for>
+	</dl>
+      </section>
+
+      <section py:def="dispatch_render(part,context)" py:choose="">
+	${Markup('&lt;!--')}
+	<span class="warning">Internt fel: ${part.__class__.__name__} ska inte förekomma i ${context}</span>
+	${Markup('--&gt;')}
+	<div py:when="isinstance(part, Rubrik)"          py:strip="">${render_rubrik(part)}</div>
+	<div py:when="isinstance(part, Avdelning)"       py:strip="">${render_avdelning(part)}</div>
+	<div py:when="isinstance(part, UpphavtKapitel)"  py:strip="">${render_upphavtkapitel(part)}</div>
+	<div py:when="isinstance(part, Kapitel)"         py:strip="">${render_kapitel(part)}</div>
+	<div py:when="isinstance(part, UpphavdParagraf)" py:strip="">${render_upphavdparagraf(part)}</div>
+	<div py:when="isinstance(part, Paragraf)"        py:strip="">${render_paragraf(part,'unknown')}</div>
+	<div py:when="isinstance(part, Stycke)"          py:strip="">${render_stycke(part)}</div>
+	<div py:when="isinstance(part, NumreradLista)"   py:strip="">${render_numreradlista(part)}</div>
+	<div py:when="isinstance(part, Strecksatslista)" py:strip="">${render_strecksatslista(part)}</div>
+	<div py:when="isinstance(part, Bokstavslista)"   py:strip="">${render_bokstavslista(part)}</div>
+	<div py:when="isinstance(part, Listelement)"     py:strip="">${render_listelement(part)}</div>
+	<div py:when="isinstance(part, Tabell)"          py:strip="">${render_tabell(part)}</div>
+	<div py:when="isinstance(part, Bilaga)"          py:strip="">${render_bilaga(part)}</div>
+	<div py:when="isinstance(part, Overgangsbestammelse)" py:strip="">${render_overgangsbestammelse(part)}</div>
+	<div py:otherwise="" class="warning">${part.__class__.__name__} kan inte visas</div>
+      </section>
+      
+      <!--! main body -->
+      <h property="dct:title" py:content="meta[u'Rubrik']">Författningsrubrik</h>
+      ${render_metadata(meta)}
+      <p class="ikrafttradande" py:if="body.ikrafttrader">(Träder i kraft ${body.ikrafttrader})</p>
+      <section role="main">
+      <py:for each="part in body" py:choose="">
+	<div py:when="isinstance(part, Avdelning)"       py:strip="">${render_avdelning(part)}</div>
+	<div py:when="isinstance(part, UpphavtKapitel)"  py:strip="">${render_upphavtkapitel(part)}</div>
+	<div py:when="isinstance(part, Kapitel)"         py:strip="">${render_kapitel(part)}</div>
+	<div py:when="isinstance(part, Rubrik)"          py:strip="">${render_rubrik(part)}</div>
+	<div py:when="isinstance(part, UpphavdParagraf)" py:strip="">${render_upphavdparagraf(part)}</div>
+	<div py:when="isinstance(part, Paragraf)"        py:strip="">${render_paragraf(part,meta['xml:base'])}</div>
+	<div py:when="isinstance(part, Stycke)"          py:strip="">${render_stycke(part)}</div>
+	<div py:when="isinstance(part, NumreradLista)"   py:strip="">${render_numreradlista(part)}</div>
+	<div py:when="isinstance(part, Tabell)"          py:strip="">${render_tabell(part)}</div>
+	<div py:when="isinstance(part, Overgangsbestammelser)" py:strip=""><!--!${render_overgangsbestammelser(part)}--></div>
+	<div py:when="isinstance(part, Bilaga)"          py:strip="">${render_bilaga(part)}</div>
+	<div py:otherwise="" py:strip="">${dispatch_render(part,'main')}</div>
+      </py:for>
+      </section>
+      <section role="secondary">
+	<h1>Ändringar och övergångsbestämmelser</h1>
+	<py:for each="rp in registry">
+	  ${render_registerpost(rp)}
+	</py:for>
+      </section>
+    </body>
+</html>

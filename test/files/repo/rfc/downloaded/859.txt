@@ -1,0 +1,24 @@
+
+Network Working Group                                          J. Postel
+Request for Comments: 859                                    J. Reynolds
+                                                                     ISI
+Obsoletes: RFC 651 (NIC 31154)                                  May 1983
+
+                          TELNET STATUS OPTION
+
+
+This RFC specifies a standard for the ARPA Internet community.  Hosts on
+the ARPA Internet are expected to adopt and implement this standard.
+
+1. Command Name and Code
+
+   STATUS 5
+
+2. Command Meanings
+
+   This option applies separately to each direction of data flow.
+
+   IAC DON'T STATUS
+
+      Sender refuses to carry on any further discussion of the current
+      status of options.

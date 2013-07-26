@@ -1,0 +1,35 @@
+<Forfattning>
+  <Tabell>
+    <Tabellrad>
+      <Tabellcell>
+        <str>Varuslag</str>
+      </Tabellcell><Tabellcell>
+        <str>Procentandel av basmängden</str>
+      </Tabellcell>
+    </Tabellrad><Tabellrad>
+      <Tabellcell>
+        <str>Motorbensin</str>
+      </Tabellcell><Tabellcell>
+        <str>25</str>
+      </Tabellcell>
+    </Tabellrad><Tabellrad>
+      <Tabellcell>
+        <str>Fotogen</str>
+      </Tabellcell><Tabellcell>
+        <str>25</str>
+      </Tabellcell>
+    </Tabellrad><Tabellrad>
+      <Tabellcell>
+        <str>Dieselbrännolja/eldningsolja 1</str>
+      </Tabellcell><Tabellcell>
+        <str>25</str>
+      </Tabellcell>
+    </Tabellrad><Tabellrad>
+      <Tabellcell>
+        <str>Övriga eldningsoljor</str>
+      </Tabellcell><Tabellcell>
+        <str>25</str>
+      </Tabellcell>
+    </Tabellrad>
+  </Tabell>
+</Forfattning>

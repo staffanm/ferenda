@@ -1,0 +1,18 @@
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://rinfo.lagrummet.se/publ/fffs/2011:12> a rpubl:AllmannaRad;
+    dct:identifier "FFFS 2011:12";
+    dct:issn "1102-7460";
+    dct:publisher <http://rinfo.lagrummet.se/org/finansinspektionen>;
+    dct:title "Finansinspektionens allmänna råd om försäkringstekniska riktlinjer och försäkringstekniskt beräkningsunderlag;"@sv;
+    rpubl:arsutgava "2011";
+    rpubl:beslutadAv <http://rinfo.lagrummet.se/org/finansinspektionen>;
+    rpubl:beslutsdatum "2011-03-17"^^xsd:date;
+    rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/fffs>;
+    rpubl:ikrafttradandedatum "2011-05-01"^^xsd:date;
+    rpubl:lopnummer "12";
+    rpubl:upphaver <http://rinfo.lagrummet.se/publ/fffs/2003:8>;
+    rpubl:utkomFranTryck "2011-03-30"^^xsd:date .
+

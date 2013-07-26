@@ -1,0 +1,5 @@
+State A: This is the first state of the document.
+
+State B: This is an intermediate state of the document.
+
+State C: This is the final state of the document.

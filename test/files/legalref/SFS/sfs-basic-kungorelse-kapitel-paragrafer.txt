@@ -1,0 +1,12 @@
+2 kap. 18 § 2 st. och 11 kap. 4 § kungörelsen (1974:152) om beslutad
+ny regeringsform
+
+<list>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1974:152#K2P18S2">2 kap. 18 § 2 st.</Link>
+  <str> och </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1974:152#K11P4">11 kap. 4 §</Link>
+  <str> kungörelsen (</str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1974:152">1974:152</Link>
+  <str>) om beslutad
+ny regeringsform</str>
+</list>

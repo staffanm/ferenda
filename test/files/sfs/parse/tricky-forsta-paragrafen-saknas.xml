@@ -1,0 +1,28 @@
+<Forfattning>
+  <Kapitel id="K2" ordinal="2" rubrik="2 kap. Bildande av aktiebolag">
+    <Paragraf id="K2P1" ordinal="1">
+      <Stycke id="K2P1S1">
+        <str>Ett aktiebolag bildas av...</str>
+      </Stycke>
+    </Paragraf>
+  </Kapitel>
+  <Kapitel id="K3" ordinal="3" rubrik="3 kap. Bolagsordning">
+    <Paragraf id="K3P1" ordinal="1">
+      <Stycke id="K3P1S1">
+        <str>Bolagsordningen skall ange...</str>
+      </Stycke>
+    </Paragraf><Paragraf id="K3P11" ordinal="11">
+      <Stycke id="K3P11S1">
+        <str>I fråga om publika aktiebolag...</str>
+      </Stycke>
+    </Paragraf>
+  </Kapitel>
+  <Kapitel id="K4" ordinal="4" rubrik="4 kap.">
+    <Rubrik id="K4R1">Uppgift om redovisningsvaluta</Rubrik>
+    <Paragraf id="K4P2" ordinal="2">
+      <Stycke id="K4P2S1">
+        <str>Om bolaget skall ha euro som redovisningsvaluta...</str>
+      </Stycke>
+    </Paragraf>
+  </Kapitel>
+</Forfattning>

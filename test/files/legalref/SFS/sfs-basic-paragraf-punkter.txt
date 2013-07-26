@@ -1,0 +1,24 @@
+förmånsrätt enligt 6 § 1
+fordran som skall utgå med förmånsrätt enligt 6 § 1 eller 7 § 1 eller
+2 förmånsrättslagen (1970:979) och som förfaller till betalning senast
+den tillträdesdag som anges i 36 §
+
+<list>
+  <str>förmånsrätt enligt </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P6S1N1">6 § 1</Link>
+  <str>
+fordran som skall utgå med förmånsrätt enligt </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1970:979#P6S1N1">6 § 1</Link>
+  <str> eller </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1970:979#P7">7 §</Link>
+  <str> </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1970:979#P7S1N1">1</Link>
+  <str> eller
+</str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1970:979#P7S1N2">2</Link>
+  <str> </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1970:979">förmånsrättslagen (1970:979)</Link>
+  <str> och som förfaller till betalning senast
+den tillträdesdag som anges i </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P36">36 §</Link>
+</list>

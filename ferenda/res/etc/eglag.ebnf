@@ -1,0 +1,39 @@
+# -*- coding: iso-8859-1 -*-
+# ------------ eglag.ebnf ----------------
+
+# EG-LAGSTIFTNING - Rättsakter som direktiv, förordningar och själva fördraget
+eglagref ::= (ArtikelRattsaktRef/RattsaktRef/ArtikelRef)+
+
+
+# "artikel 25.6"
+ArtikelRef     ::= 'artikel',Whitespace,ArtikelRefID, (Period, UnderartikelRefID)?
+ArtikelRefID   ::= number
+UnderartikelRefID ::= number
+
+# "artikel 25.6 i rådets direktiv 96/46/EG"
+ArtikelRattsaktRef ::= ArtikelRef, Whitespace, 'i', Whitespace, RattsaktRef
+
+
+# "rådets direktiv 85/611/EG"
+# "rådets förordning (EEG) nr 2092/91"
+# "kommissionens förordning (EG) nr 1488/94"
+RattsaktRef     ::= (Instutition, Whitespace, AkttypRefId, Whitespace,
+                    DirektivRef/ForordningRef, (Whitespace,
+                    AvDatum)?)/DirektivRefID/ForordningRefID
+Instutition     ::= 'rådets'/('Europaparlamentets', Whitespace, 'och',
+                     Whitespace, 'rådets')/'kommissionens'
+#Instutition    ::= 'rådets'
+AkttypRefId     ::= ('direktiv'/'förordning')
+DirektivRefID   ::= DirektivRef
+DirektivRef     ::= ArRefID, Slash, LopnummerRefID, Slash, SamarbeteRefID
+ForordningRefID ::= ForordningRef
+ForordningRef   ::= LeftParen, SamarbeteRefID, RightParen, Whitespace,'nr', Whitespace, LopnummerRefID, Slash, ArRefID
+ArRefID         ::= Ar
+LopnummerRefID  ::= Lopnummer
+Lopnummer       ::= number
+SamarbeteRefID  ::= Samarbete
+Samarbete       ::= 'EG'/'EEG'
+AvDatum		::= 'av', Whitespace, 'den', Whitespace, Datum
+Datum           ::=  number, Whitespace, month, Whitespace, LangtAr
+# ------------ end of eglag.ebnf ----------------
+

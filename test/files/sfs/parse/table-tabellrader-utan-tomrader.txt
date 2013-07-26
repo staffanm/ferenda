@@ -1,0 +1,6 @@
+Varuslag                     Procentandel av basmängden
+
+Motorbensin                     25
+Fotogen                         25
+Dieselbrännolja/eldningsolja 1  25
+Övriga eldningsoljor            25

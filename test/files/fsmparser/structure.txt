@@ -1,0 +1,17 @@
+1 Top-level section
+
+This is some text.
+
+1.1 First sub-section
+
+And some more text.
+
+1.2 Second sub-section
+
+1.2.1 First subsubsection
+
+Did you notice that section 1.2 had no text of it's own?
+
+2 Another top-level section
+
+Aaaand we're done.

@@ -1,0 +1,16 @@
+<Forfattning>
+  <Rubrik id="R1">Aktieägarnas betalningsansvar</Rubrik>
+  <Paragraf id="P3" ordinal="3">
+    <Stycke id="P3S1">
+      <str>I ett aktiebolag har aktieägarna inte något personligt betalningsansvar för bolagets förpliktelser.</str>
+    </Stycke><Stycke id="P3S2">
+      <str>I xxxxxxxxxxxx finns bestämmelser om personligt betalningsansvar för aktieägare i samband med likvidationsskyldighet på grund av kapitalbrist. xxx (xxxx:xxx).</str>
+    </Stycke>
+  </Paragraf>
+  <Rubrik id="R2">Aktiekapital</Rubrik>
+  <Paragraf id="P4" ordinal="4">
+    <Stycke id="P4S1">
+      <str>Ett aktiebolag skall ha ett aktiekapital. Aktiekapitalet skall vara bestämt i bolagets redovisningsvaluta. Av xxxxxxxxxx xxxxxxxxxxxxxxx (xxxx:xxxx) framgår att redovisningsvalutan får vara antingen svenska kronor eller euro.</str>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

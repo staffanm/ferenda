@@ -1,0 +1,11 @@
+Vid ändring av en bolagsordning eller av en beviljad koncession
+gäller 3 § eller 4 a § i tillämpliga delar.
+
+<list>
+  <str>Vid ändring av en bolagsordning eller av en beviljad koncession
+gäller </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P3">3 §</Link>
+  <str> eller </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P4a">4 a §</Link>
+  <str> i tillämpliga delar.</str>
+</list>

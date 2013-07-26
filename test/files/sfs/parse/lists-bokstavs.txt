@@ -1,0 +1,5 @@
+a) Vissa ordnade listor använder bokstäver
+
+b) istället för siffror
+
+c) men i verkliga världen är de alltid underlistor

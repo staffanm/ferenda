@@ -1,0 +1,14 @@
+<Forfattning>
+  <Paragraf id="P1" ordinal="1">
+    <Stycke id="P1S1">
+      <str>En paragraf med en ändringsnotering. </str>
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#L1234:567">Lag (1234:567).</LinkSubject>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P2" ordinal="2">
+    <Stycke id="P2S1">
+      <str>En paragraf en annan notering. </str>
+      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#L1234:568">Förordning (1234:568).</LinkSubject>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

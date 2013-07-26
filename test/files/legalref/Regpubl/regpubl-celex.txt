@@ -1,0 +1,23 @@
+32002L0019, 32002L0020, 32002L0021, 32002L0022, 32002L0058
+392L0100  393L0083
+395L0046
+
+<list>
+  <Link uri="http://rinfo.lagrummet.se/ext/eur-lex/32002L0019">32002L0019</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/ext/eur-lex/32002L0020">32002L0020</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/ext/eur-lex/32002L0021">32002L0021</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/ext/eur-lex/32002L0022">32002L0022</Link>
+  <str>, </str>
+  <Link uri="http://rinfo.lagrummet.se/ext/eur-lex/32002L0058">32002L0058</Link>
+  <str>
+</str>
+  <Link uri="http://rinfo.lagrummet.se/ext/eur-lex/31992L0100">392L0100</Link>
+  <str>  </str>
+  <Link uri="http://rinfo.lagrummet.se/ext/eur-lex/31993L0083">393L0083</Link>
+  <str>
+</str>
+  <Link uri="http://rinfo.lagrummet.se/ext/eur-lex/31995L0046">395L0046</Link>
+</list>

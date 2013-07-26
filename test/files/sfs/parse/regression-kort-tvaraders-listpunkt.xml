@@ -1,0 +1,18 @@
+<Forfattning>
+  <Paragraf id="P1" ordinal="1">
+    <Stycke id="P1S1">
+      <str>I ärenden som rör registrering ska avgifter betalas med följande belopp:</str>
+      <NumreradLista>
+        <Listelement id="P1S1N6" ordinal="6">
+          <str>6. vid annan registreringsanmälan, 800 kronor. </str>
+          <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#L2008:24">Förordning (2008:24).</LinkSubject>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P2" ordinal="2">
+    <Stycke id="P2S1">
+      <str>Om en anmälan samtidigt omfattar registrering eller registrering av ändring av fler än en firma.</str>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

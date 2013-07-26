@@ -1,0 +1,23 @@
+/* -*- coding: utf-8 -*- */
+@import "xht2-print.css";
+
+@page {
+    margin-top: 50pt;
+    margin-bottom: 50pt;
+    margin-inside: 50pt;
+    margin-outside: 30pt;
+    padding: 0;
+}
+
+body {
+    margin: 0;
+    column-count: 2;
+    column-gap: 1.5em;
+    column-fill: auto; 
+    text-align: justify;
+    font: 8pt/1.2 Times;
+}
+    /*
+body > section > h {
+    page-break-before: auto;
+}*/

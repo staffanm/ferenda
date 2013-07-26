@@ -1,0 +1,15 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://localhost:8000/res/rfc/6931> a bibo:Standard ;
+    dct:category "Standards Track" ;
+    dct:creator "D. Eastlake 3rd" ;
+    dct:identifier "RFC 6931" ;
+    dct:issn "2070-1721" ;
+    dct:issued "2013-04-01"^^xsd:date ;
+    dct:publisher "Internet Engineering Task Force (IETF)" ;
+    dct:rightsHolder "Huawei" ;
+    dct:title "Additional XML Security Uniform Resource Identifiers (URIs)"@en ;
+    dct:replaces <http://localhost:8000/res/rfc/4051> ;
+    bibo:shortTitle "Additional XML Security URIs"@en.

@@ -1,0 +1,22 @@
+<Body>
+  <Section ordinal="1" title="Top-level section">
+    <Paragraph>
+      <str>This is some text.</str>
+    </Paragraph><Subsection ordinal="1.1" title="First sub-section">
+      <Paragraph>
+        <str>And some more text.</str>
+      </Paragraph>
+    </Subsection><Subsection ordinal="1.2" title="Second sub-section">
+      <Subsubsection ordinal="1.2.1" title="First subsubsection">
+        <Paragraph>
+          <str>Did you notice that section 1.2 had no text of it's own?</str>
+        </Paragraph>
+      </Subsubsection>
+    </Subsection>
+  </Section>
+  <Section ordinal="2" title="Another top-level section">
+    <Paragraph>
+      <str>Aaaand we're done.</str>
+    </Paragraph>
+  </Section>
+</Body>

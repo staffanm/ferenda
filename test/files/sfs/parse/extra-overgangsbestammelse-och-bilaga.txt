@@ -1,0 +1,11 @@
+1 § Det här är en paragraf.
+
+Övergångsbestämmelser
+
+1234:568
+
+Det här är en övergångsbestämmelse med ett stycke.
+
+Bilaga
+
+Det här är en enkel bilaga.

@@ -1,0 +1,29 @@
+A Query:
+
+<url>
+  <scheme>http</scheme>
+  <netloc>example.org</netloc>
+  <path>/</path>
+  <query>foo=bar</query>
+</url>
+
+. A fragment:
+
+<url>
+  <url>http</url>
+  <netloc>example.org</netloc>
+  <path>/</path>
+  <fragment>baz</fragment>
+</url>
+
+. Both:
+
+<url>
+  <scheme>http</scheme>
+  <netloc>example.org</netloc>
+  <path>/</path>
+  <query>foo=bar</query>
+  <fragment>baz</fragment>
+</url>
+
+.

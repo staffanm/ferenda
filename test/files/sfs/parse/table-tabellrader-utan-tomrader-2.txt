@@ -1,0 +1,4 @@
+Inkomstår       Uppräkningsfaktor
+
+2004            1,035
+2005            1,038

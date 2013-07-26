@@ -1,0 +1,18 @@
+<Forfattning>
+  <Paragraf id="P5" ordinal="5">
+    <Stycke id="P5S1">
+      <str>I denna lag betyder</str>
+      <NumreradLista>
+        <Listelement id="P5S1N1" ordinal="1">
+          <str>1. </str>
+          <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Affärsförbindelse">affärsförbindelse</LinkSubject>
+          <str>: en affärsmässig förbindelse som när kontakten etableras förväntas ha en viss varaktighet,</str>
+        </Listelement><Listelement id="P5S1N2" ordinal="2">
+          <str>2. </str>
+          <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Brevlådebank">brevlådebank</LinkSubject>
+          <str>: ett utländskt institut som är registrerat inom en jurisdiktion inom vilken det saknar verklig etablering och ledning och där institutet inte heller ingår i en finansiell grupp som omfattas av tillsyn,</str>
+        </Listelement>
+      </NumreradLista>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

@@ -1,0 +1,26 @@
+byggningabalken			1736:0123 1	BB
+handelsbalken			1736:0123 2	HB
+giftermålsbalken		1920:405	GB
+rättegångsbalken		1942:740	RB
+föräldrabalken			1949:381	FB
+ärvdabalken			1958:637	ÄB
+brottsbalken			1962:700	BrB
+jordabalken			1970:994	JB
+utsökningsbalken		1981:774	UB
+äktenskapsbalken		1987:230	ÄktB
+miljöbalken			1998:808	MB
+tryckfrihetsförordningen	1949:105	TF
+yttrandefrihetsgrundlagen	1991:1469	YGL
+successionsordningen		1810:0926	SO
+regeringsformen			1974:152	RF
+riksdagsordningen		1974:153	RO
+upphovsrättslagen		1960:729	URL,UppL
+avtalslagen			1915:218	AvtL
+distansavtalslagen		2000:274
+gåvolagen			1936:83
+aktiebolagslagen		1975:1385	ABL
+lösöresköpslagen		1845:50 s. 1
+knivlagen			1988:254
+anställningsskyddslagen		1982:80		LAS
+rättsprövningslagen		2006:304	RpL
+körkortsförordningen		1998:980

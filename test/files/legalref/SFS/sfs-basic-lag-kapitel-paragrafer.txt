@@ -1,0 +1,21 @@
+6 kap. 3 § och 7 kap. 19 § och 20 § alkohollagen (1994:1738)
+2 kap. 9 § och 10 § samt 10 kap. 8 § kommunallagen (1991:900)
+
+<list>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1994:1738#K6P3">6 kap. 3 §</Link>
+  <str> och </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1994:1738#K7P19">7 kap. 19 §</Link>
+  <str> och </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1994:1738#K7P20">20 §</Link>
+  <str> </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1994:1738">alkohollagen (1994:1738)</Link>
+  <str>
+</str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1991:900#K2P9">2 kap. 9 §</Link>
+  <str> och </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1991:900#K2P10">10 §</Link>
+  <str> samt </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1991:900#K10P8">10 kap. 8 §</Link>
+  <str> </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1991:900">kommunallagen (1991:900)</Link>
+</list>

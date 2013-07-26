@@ -1,0 +1,21 @@
+
+
+Network Working Group                                      J. Postel
+Request for Comments: 879                                  November 1983
+
+
+
+                      The TCP Maximum Segment Size
+                           and Related Topics
+
+This memo discusses the TCP Maximum Segment Size Option and related
+topics.  The purposes is to clarify some aspects of TCP and its
+interaction with IP.  This memo is a clarification to the TCP
+specification, and contains information that may be considered as
+"advice to implementers".
+
+1.  Introduction
+
+   This memo discusses the TCP Maximum Segment Size and its relation to
+   the IP Maximum Datagram Size.  TCP is specified in reference [1].  IP
+   is specified in references [2,3].

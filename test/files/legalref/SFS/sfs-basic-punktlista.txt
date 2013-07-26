@@ -1,0 +1,35 @@
+Var och en får återge verk, vilka ingår i de handlingar som avses i 9
+§ första stycket och är av de slag som anges i 9 § andra stycket
+2-4. Detta gäller dock inte ett sådant verk som avses i 9 § tredje
+stycket. Upphovsmannen har rätt till ersättning
+---
+Upptagningar som avses i första stycket och 3 får användas endast för
+de ändamål som anges där. Om sådana upptagningar har dokumentariskt
+värde, får de dock bevaras i Statens ljud- och bildarkiv.
+
+<list>
+  <str>Var och en får återge verk, vilka ingår i de handlingar som avses i </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P9S1">9
+§ första stycket</Link>
+  <str> och är av de slag som anges i </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P9S2">9 § andra stycket</Link>
+  <str>
+</str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P9S2N2">2</Link>
+  <str>-</str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P9S2N4">4.</Link>
+  <str> Detta gäller dock inte ett sådant verk som avses i </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P9S3">9 § tredje
+stycket</Link>
+  <str>. Upphovsmannen har rätt till ersättning</str>
+</list>
+---
+<list>
+  <str>Upptagningar som avses i </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#S1">första stycket</Link>
+  <str> och </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#S1N3">3</Link>
+  <str> får användas endast för
+de ändamål som anges där. Om sådana upptagningar har dokumentariskt
+värde, får de dock bevaras i Statens ljud- och bildarkiv.</str>
+</list>

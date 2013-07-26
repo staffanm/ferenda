@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/2002/06/xhtml2/"
+      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+      xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+      xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:dc="http://purl.org/dc/elements/1.1/"
+      xmlns:dct="http://purl.org/dc/terms/"
+      xmlns:foaf="http://xmlns.com/foaf/0.1/"
+      xmlns:skos="http://www.w3.org/2004/02/skos/core#"
+      xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xsi:schemaLocation="http://www.w3.org/2002/06/xhtml2/ http://www.w3.org/MarkUp/SCHEMA/xhtml2.xsd"
+      xml:lang="sv">
+    <head>
+      <title property="dc:title">Lagtext</title>
+    </head>
+    <body>
+
+      <h>Författningssamling i förvaltningsrätt</h>
+      <p>Från <a href="http://lagen.nu/">lagen.nu</a></p>
+      <h class="avdelningsrubrik">Allmän förvaltningsrätt</h>
+      <ul class="toc">
+	<li><a href="#L1985:206">Lag (1985:206) om viten;</a></li>
+	<li><a href="#L1986:223">Förvaltningslag (1986:223);</a></li>
+	<li><a href="#L1971:291">Förvaltningsprocesslag (1971:291);</a></li>
+	<li><a href="#L1991:900">Kommunallag (1991:900);</a></li>
+	<li><a href="#L1949:105">Tryckfrihetsförordning 2 kap (1949:105);</a></li>
+	<li><a href="#L1980:100">Sekretesslag (1980:100); 4, 7, 8, 9, 14, 15 kap</a></li>
+      </ul>
+
+      <h class="avdelningsrubrik">Särskild förvaltningsrätt</h>
+      <ul class="toc">
+	<li><a href="#L1984:387">Polislag (1984:387);</a></li>
+	<li><a href="#L1993:1617">Ordningslag (1993:1617); 1,3 kap</a></li>
+	<li><a href="#L2001:453">Socialtjänstlag (2001:453); 11 kap</a></li>
+	<li><a href="#L1998:808">Miljöbalk (1998:808) 2, 5, 6, 16, 26, 27 kap</a></li>
+	<li><a href="#L2005:716">Utlänningslag (2005:716) 13 kap</a></li>
+      </ul>
+      
+      <section id="L1985:206" property="dct:alternate" content="VitesL" class="paragrafindelning">
+	<!--Lag (1985:206) om viten; -->
+	<xi:include href="../testdata/sfs/parsed/1985/206.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1986:223" property="dct:alternate" content="FL" class="paragrafindelning">
+	<!-- Förvaltningslag (1986:223); -->
+	<xi:include href="../testdata/sfs/parsed/1986/223.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1971:291" property="dct:alternate" content="FPL" class="paragrafindelning">
+	<!-- Förvaltningsprocesslag (1971:291); -->
+	<xi:include href="../testdata/sfs/parsed/1971/291.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1991:900" property="dct:alternate" content="KomL" class="kapitelindelning">
+	<!-- Kommunallag (1991:900); -->
+	<xi:include href="../testdata/sfs/parsed/1991/900.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1949:105" property="dct:alternate" content="TF" class="kapitelindelning">
+	<!-- Tryckfrihetsförordning 2 kap (1949:105); -->
+	<xi:include href="../testdata/sfs/parsed/1949/105.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/h:h)"/>
+	<xi:include href="../testdata/sfs/parsed/1949/105.xht2#element(K2)"/>
+      </section>
+
+      <section id="L1980:100" property="dct:alternate" content="SekrL" class="kapitelindelning">
+	<!-- Sekretesslag (1980:100); -->
+	<xi:include href="../testdata/sfs/parsed/1980/100.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/h:h)"/>
+	<xi:include href="../testdata/sfs/parsed/1980/100.xht2#element(K4)"/>
+	<xi:include href="../testdata/sfs/parsed/1980/100.xht2#element(K7)"/>
+	<xi:include href="../testdata/sfs/parsed/1980/100.xht2#element(K8)"/>
+	<xi:include href="../testdata/sfs/parsed/1980/100.xht2#element(K9)"/>
+	<xi:include href="../testdata/sfs/parsed/1980/100.xht2#element(K14)"/>
+	<xi:include href="../testdata/sfs/parsed/1980/100.xht2#element(K15)"/>
+      </section>
+
+      <section id="L1984:387" property="dct:alternate" content="PolisL" class="paragrafindelning">
+	<!-- Polislag (1984:387); -->
+	<xi:include href="../testdata/sfs/parsed/1984/387.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/*)"/>
+      </section>
+      <section id="L1993:1617" property="dct:alternate" content="OL" class="kapitelindelning">
+	<!-- Ordningslag (1993:1617); -->
+	<xi:include href="../testdata/sfs/parsed/1993/1617.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/h:h)"/>
+	<xi:include href="../testdata/sfs/parsed/1993/1617.xht2#element(K1)"/>
+	<xi:include href="../testdata/sfs/parsed/1993/1617.xht2#element(K3)"/>
+      </section>
+      <section id="L2001:453" property="dct:alternate" content="SoL" class="kapitelindelning">
+	<!-- Socialtjänstlag (2001:453); -->
+	<xi:include href="../testdata/sfs/parsed/2001/453.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/h:h)"/>
+	<xi:include href="../testdata/sfs/parsed/2001/453.xht2#element(K11)"/>
+      </section>
+      <section id="L1998:808" property="dct:alternate" content="MB" class="kapitelindelning">
+	<!-- Miljöbalk (1998:808) 2, 7, 9, 10, 14, 15, 26, 27 kap;-->
+	<xi:include href="../testdata/sfs/parsed/1998/808.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/h:h)"/>
+	<xi:include href="../testdata/sfs/parsed/1998/808.xht2#element(K2)"/>
+	<xi:include href="../testdata/sfs/parsed/1998/808.xht2#element(K5)"/>
+	<xi:include href="../testdata/sfs/parsed/1998/808.xht2#element(K6)"/>
+	<xi:include href="../testdata/sfs/parsed/1998/808.xht2#element(K16)"/>
+	<xi:include href="../testdata/sfs/parsed/1998/808.xht2#element(K26)"/>
+	<xi:include href="../testdata/sfs/parsed/1998/808.xht2#element(K27)"/>
+      </section>
+
+      <section id="L2005:716" property="dct:alternate" content="UtlL" class="kapitelindelning">
+	<!-- Utlänningslag (2005:716).-->
+	<xi:include href="../testdata/sfs/parsed/2005/716.xht2#xmlns(h=http://www.w3.org/2002/06/xhtml2/)xpointer(h:html/h:body/h:h)"/>
+	<xi:include href="../testdata/sfs/parsed/2005/716.xht2#element(K13)"/>
+      </section>
+
+    </body>
+</html>

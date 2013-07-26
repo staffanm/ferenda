@@ -1,0 +1,18 @@
+<html>
+  <head>
+    <title>Index</title>
+  </head>
+  <body>
+    <h1>Some test documents</h1>
+    <ul>
+      <!-- The test here is to make sure that download looks at the
+      url's if the link texts don't match. -->
+      
+      <li><a href="http://example.org/docs/1.html">...</a></li>
+      <li><a href="http://example.org/docs/2.html">...</a></li>
+      <li><a href="http://example.org/docs/3.html">...</a></li>
+      <!-- last example contains an invalid basefile reference
+      (compared to DocumentRepository.document_url_regex) -->
+      <li><a href="http://example.org/docs/4/">...</a></li>
+  </body>
+</html>

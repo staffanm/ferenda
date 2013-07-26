@@ -1,0 +1,13 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://localhost:8000/res/rfc/879> a bibo:Standard ;
+    dct:creator "J. Postel" ;
+    dct:identifier "RFC 879" ;
+    dct:issued "1983-11-01"^^xsd:date ;
+    dct:publisher "Network Working Group" ;
+    dct:title "The TCP Maximum Segment Size and Related Topics"@en .
+    # bibo:shortTitle "TCP Maximum Segment Size"@en.
+    
+

@@ -1,0 +1,1 @@
+A Query: http://example.org/?foo=bar. A fragment: http://example.org/#baz. Both: http://example.org/?foo=bar#baz.

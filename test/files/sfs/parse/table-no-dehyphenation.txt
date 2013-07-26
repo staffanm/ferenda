@@ -1,0 +1,4 @@
+Vårdgivare              Fysisk eller juridisk person som
+                        yrkesmässigt bedriver hälso- och
+                        sjukvård.
+

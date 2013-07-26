@@ -1,0 +1,15 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://localhost:8000/res/rfc/859> a bibo:Standard ;
+    dct:creator "J. Postel" ;
+    dct:creator "J. Reynolds" ;
+    dct:rightsHolder "ISI" ;
+    dct:identifier "RFC 859" ;
+    dct:issued "1983-05-01"^^xsd:date ;
+    dct:publisher "Network Working Group" ;
+    dct:title "TELNET STATUS OPTION"@en ;
+    dct:replaces <http://localhost:8000/res/rfc/651> .
+    
+

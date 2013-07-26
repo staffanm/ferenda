@@ -1,0 +1,150 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
+<html xmlns:rfc="http://example.org/ontology/rfc/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:dct="http://purl.org/dc/terms/" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+  <head about="http://localhost:8000/res/rfc/6919">
+    <meta content="Experimental" property="dct:category" xml:lang=""/>
+    <meta content="E. Rescorla" property="dct:creator" xml:lang=""/>
+    <meta content="R. Barnes" property="dct:creator" xml:lang=""/>
+    <meta content="S. Kent" property="dct:creator" xml:lang=""/>
+    <meta content="RFC 6919" property="dct:identifier" xml:lang=""/>
+    <meta content="2070-1721" property="dct:issn" xml:lang=""/>
+    <meta content="Independent Submission" property="dct:publisher" xml:lang=""/>
+    <meta content="1 April 2013" property="dct:rightsHolder" xml:lang=""/>
+    <meta content="BBN" property="dct:rightsHolder" xml:lang=""/>
+    <meta content="RTFM, Inc." property="dct:rightsHolder" xml:lang=""/>
+    <title property="dct:title">Further Key Words for Use in RFCs to Indicate Requirement Levels</title>
+    <meta content="Further RFC Key Words" property="bibo:shortTitle" xml:lang="en"/>
+    <link href="http://purl.org/ontology/bibo/Standard" rel="rdf:type"/>
+  </head>
+  <body about="http://localhost:8000/res/rfc/6919">
+    <div  about="http://localhost:8000/res/rfc/6919#PS1" class="preamblesection" property="dct:title" content="Abstract" typeof="bibo:DocumentPart">
+      <p>RFC 2119 defines a standard set of key words for describing requirements of a specification. Many IETF documents have found that these words cannot accurately capture the nuanced requirements of their specification. This document defines additional key words that can be used to address alternative requirements scenarios. Authors who follow these guidelines should incorporate this phrase near the beginning of their document:</p>
+      <p>The key words "MUST (BUT WE KNOW YOU WON'T)", "SHOULD CONSIDER", "REALLY SHOULD NOT", "OUGHT TO", "WOULD PROBABLY", "MAY WISH TO", "COULD", "POSSIBLE", and "MIGHT" in this document are to be interpreted as described in RFC 6919.</p>
+    </div>
+    <div about="http://localhost:8000/res/rfc/6919#PS2" class="preamblesection" property="dct:title" content="Status of This Memo" typeof="bibo:DocumentPart">
+      <p>This document is not an Internet Standards Track specification; it is published for examination, experimental implementation, and evaluation.</p>
+      <p>This document defines an Experimental Protocol for the Internet community. This is a contribution to the RFC Series, independently of any other RFC stream. The RFC Editor has chosen to publish this document at its discretion and makes no statement about its value for implementation or deployment. Documents approved for publication by the RFC Editor are not a candidate for any level of Internet Standard; see Section 2 of RFC 5741.</p>
+      <p>Information about the current status of this document, any errata, and how to provide feedback on it may be obtained at http://www.rfc-editor.org/info/rfc6919.</p>
+    </div>
+    <div about="http://localhost:8000/res/rfc/6919#PS3" class="preamblesection" property="dct:title" content="Copyright Notice" typeof="bibo:DocumentPart">
+      <p>Copyright (c) 2013 IETF Trust and the persons identified as the document authors. All rights reserved.</p>
+      <p>This document is subject to BCP 78 and the IETF Trust's Legal Provisions Relating to IETF Documents (http://trustee.ietf.org/license-info) in effect on the date of publication of this document. Please review these documents carefully, as they describe your rights and restrictions with respect to this document.</p>
+    </div>
+    <div content="MUST (BUT WE KNOW YOU WON'T)" about="http://localhost:8000/res/rfc/6919#S1" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="1" property="bibo:chapter" xml:lang=""/>
+      <p>The phrase "MUST (BUT WE KNOW YOU WON'T)" is used to indicate requirements that are needed to meet formal review criteria (e.g., mandatory-to-implement security mechanisms), when these mechanisms are too inconvenient for implementers to actually implement.</p>
+      <p>This phrase is frequently used in a contracted form in which the parenthetical is omitted. The parenthetical may also be moved later in the sentence for stylistic reasons. If the parenthetical is present, authors MUST provide a reason why they know implementors will not heed this instruction in the parenthetical, as in the example (BUT WE KNOW YOU WON'T). In the below example, we show a case from RFC 6120 where the original text omitted the parenthetical, and we have indicated an appropriate parenthetical.</p>
+      <p>   For example: "For authentication only, servers and clients MUST
+   support the SASL Salted Challenge Response Authentication Mechanism
+   <a href="#bib-SCRAM">[SCRAM]</a> -- in particular, the SCRAM-SHA-1 and SCRAM-SHA-1-PLUS
+   variants [(BUT WE KNOW YOU WON'T, because your TLS library doesn't
+   support extracting channel binding information)]."  <a href="#bib-RFC6120">[RFC6120]</a></p>
+    </div>
+    <div content="SHOULD CONSIDER" about="http://localhost:8000/res/rfc/6919#S2" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="2" property="bibo:chapter" xml:lang=""/>
+      <p>The phrase "SHOULD CONSIDER" indicates that the authors of the specification think that implementations should do something, but they're not sure quite what.</p>
+      <p>For example: "Applications that take advantage of typed links should consider the attack vectors opened by automatically following, trusting, or otherwise using links gathered from HTTP headers." <a href="#bib-RFC5988">[RFC5988]</a></p>
+    </div>
+    <div content="REALLY SHOULD NOT" about="http://localhost:8000/res/rfc/6919#S3" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="3" property="bibo:chapter" xml:lang=""/>
+      <p>The phrase "REALLY SHOULD NOT" is used to indicate dangerous behaviors that some important vendor still does and therefore we were unable to make MUST NOT.</p>
+      <p>For example: "This command really should not be used" <a href="#bib-RFC0493">[RFC0493]</a></p>
+    </div>
+    <div content="OUGHT TO" about="http://localhost:8000/res/rfc/6919#S4" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="4" property="bibo:chapter" xml:lang=""/>
+      <p>The phrase "OUGHT TO" conveys an optimistic assertion of an implementation behavior that is clearly morally right, and thus does not require substantiation.</p>
+      <p>   For example: "If a decision might affect semantic transparency, the
+   implementor ought to err on the side of maintaining transparency
+   unless a careful and complete analysis shows significant benefits in
+   breaking transparency."  <a href="#bib-RFC2616">[RFC2616]</a></p>
+    </div>
+    <div content="WOULD PROBABLY" about="http://localhost:8000/res/rfc/6919#S5" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="5" property="bibo:chapter" xml:lang=""/>
+      <p>The phrase "WOULD PROBABLY" indicates the authors expectation about what a reasonable implementation is likely to do in a given case. There is no requirement for implementations to be reasonable.</p>
+      <p>This phrase is also a good example of an aspect of English grammar that is often useful in specification writing, namely the passive- aggressive voice, which provides a meaning in between the active and the passive voice.</p>
+      <p>   For example: "A SMTP client would probably only want to authenticate
+   an SMTP server whose server certificate has a domain name that is the
+   domain name that the client thought it was connecting to."  <a href="#bib-RFC3207">[RFC3207]</a></p>
+    </div>
+    <div content="MAY WISH TO" about="http://localhost:8000/res/rfc/6919#S6" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="6" property="bibo:chapter" xml:lang=""/>
+      <p>The phrase "MAY WISH TO" indicates a behavior that might seem appealing to some people, but which is regarded as ridiculous or unnecessary by others. This phrase is frequently used to avoid further delay in approval of a document.</p>
+      <p>   For example: "Verifiers MAY wish to track testing mode results to
+   assist the Signer."  <a href="#bib-RFC6376">[RFC6376]</a></p>
+    </div>
+    <div content="COULD" about="http://localhost:8000/res/rfc/6919#S7" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="7" property="bibo:chapter" xml:lang=""/>
+      <p>The phrase "COULD" provides a way for specification authors to articulate existential possibilities, in order to provide a hint that might be critical to reliable or secure operation, but without a hard requirement. The lack of a requirement allows for vendor product differentiation.</p>
+      <p>   For example: "An implementation could mitigate this race condition,
+   for example, using timers."  <a href="#bib-RFC6733">[RFC6733]</a></p>
+    </div>
+    <div content="POSSIBLE" about="http://localhost:8000/res/rfc/6919#S8" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="8" property="bibo:chapter" xml:lang=""/>
+      <p>The phrase "POSSIBLE" describes what some of the working group members thought of as an edge case that will never happen, but in practice allows the protocol to work at the most fundamental level.</p>
+      <p>   For example: "It is also possible for the server to send a completion
+   response for some other command (if multiple commands are in
+   progress), or untagged data."  <a href="#bib-RFC3501">[RFC3501]</a></p>
+    </div>
+    <div content="MIGHT" about="http://localhost:8000/res/rfc/6919#S9" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="9" property="bibo:chapter" xml:lang=""/>
+      <p>The phrase "MIGHT" conveys a requirement in an intentionally stealthy fashion, to facilitate product differentiation (cf. "COULD" above).</p>
+      <p>   For example: "In the case of audio and different "m" lines for
+   different codecs, an implementation might decide to act as a mixer
+   with the different incoming RTP sessions, which is the correct
+   behavior."  <a href="#bib-RFC5888">[RFC5888]</a></p>
+    </div>
+    <div content="Security Considerations" about="http://localhost:8000/res/rfc/6919#S10" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="10" property="bibo:chapter" xml:lang=""/>
+      <p>Traditionally, security requirements in IETF documents have been expressed with a mixture of requirements words from RFC 2119 <a href="#bib-RFC2119">[RFC2119]</a> and the phrases used above. The key words in RFC 2119 are principally useful when threats and mitigations are clear and well defined. The key words in this document can be applied when the threat model is ambiguous, and mitigations are unclear or inconvenient.</p>
+    </div>
+    <div content="References" about="http://localhost:8000/res/rfc/6919#S11" property="dct:title" class="section" typeof="bibo:DocumentPart">
+      <span content="11" property="bibo:chapter" xml:lang=""/>
+      <div content="Normative References" about="http://localhost:8000/res/rfc/6919#S11.1" property="dct:title" class="subsection" typeof="bibo:DocumentPart">
+        <span content="11.1" property="bibo:chapter" xml:lang=""/>
+        <p>   <a href="#bib-RFC2119">[RFC2119]</a>  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119, March 1997.</p>
+      </div>
+      <div content="Informative References" about="http://localhost:8000/res/rfc/6919#S11.2" property="dct:title" class="subsection" typeof="bibo:DocumentPart">
+        <span content="11.2" property="bibo:chapter" xml:lang=""/>
+        <p>   <a href="#bib-RFC0493">[RFC0493]</a>  Michener, J., Cotton, I., Kelley, K., Liddle, D., and E.
+              Meyer, "GRAPHICS PROTOCOL", RFC 493, April 1973.</p>
+        <p>   <a href="#bib-RFC2616">[RFC2616]</a>  Fielding, R., Gettys, J., Mogul, J., Frystyk, H.,
+              Masinter, L., Leach, P., and T. Berners-Lee, "Hypertext
+              Transfer Protocol -- HTTP/1.1", RFC 2616, June 1999.</p>
+        <p>   <a href="#bib-RFC3207">[RFC3207]</a>  Hoffman, P., "SMTP Service Extension for Secure SMTP over
+              Transport Layer Security", RFC 3207, February 2002.</p>
+        <p>   <a href="#bib-RFC3501">[RFC3501]</a>  Crispin, M., "INTERNET MESSAGE ACCESS PROTOCOL - VERSION
+              4rev1", RFC 3501, March 2003.</p>
+        <p>   <a href="#bib-RFC5888">[RFC5888]</a>  Camarillo, G. and H. Schulzrinne, "The Session Description
+              Protocol (SDP) Grouping Framework", RFC 5888, June 2010.</p>
+        <p>   <a href="#bib-RFC5988">[RFC5988]</a>  Nottingham, M., "Web Linking", RFC 5988, October 2010.</p>
+        <p>   <a href="#bib-RFC6120">[RFC6120]</a>  Saint-Andre, P., "Extensible Messaging and Presence
+              Protocol (XMPP): Core", RFC 6120, March 2011.</p>
+        <p>   <a href="#bib-RFC6376">[RFC6376]</a>  Crocker, D., Hansen, T., and M. Kucherawy, "DomainKeys
+              Identified Mail (DKIM) Signatures", RFC 6376,
+              September 2011.</p>
+        <p>   <a href="#bib-RFC6733">[RFC6733]</a>  Fajardo, V., Arkko, J., Loughney, J., and G. Zorn,
+              "Diameter Base Protocol", RFC 6733, October 2012.</p>
+        <p>Authors' Addresses</p>
+        <p>   Richard Barnes
+   BBN
+   1300 N 17th St
+   Arlington, VA  22209
+   US</p>
+        <p>EMail: rlb@ipv.sx</p>
+        <p>   Stephen Kent
+   BBN
+   10 Moulton St
+   Cambridge, MA  02138
+   US</p>
+        <p>EMail: kent@bbn.com</p>
+        <p>   Eric Rescorla
+   RTFM, Inc.
+   2064 Edgewood Drive
+   Palo Alto, CA  94303
+   US</p>
+        <p>EMail: ekr@rtfm.com</p>
+      </div>
+    </div>
+  </body>
+</html>

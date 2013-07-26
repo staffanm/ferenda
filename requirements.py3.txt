@@ -1,0 +1,14 @@
+beautifulsoup4
+lxml
+rdflib
+rdfextras
+html5lib
+requests
+six
+jsmin
+whoosh
+pyparsing
+sphinx
+mock # not needed for py3.3 +
+coverage
+bsddb3

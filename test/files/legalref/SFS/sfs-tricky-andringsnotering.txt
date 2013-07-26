@@ -1,0 +1,12 @@
+upph. 3 kap 14 §, rubr. närmast före 3 kap 14 §; ny rubr. närmast före 3
+kap 15 §
+
+<list>
+  <str>upph. </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K3P14">3 kap 14 §</Link>
+  <str>, rubr. närmast före </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K3P14">3 kap 14 §</Link>
+  <str>; ny rubr. närmast före </str>
+  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K3P15">3
+kap 15 §</Link>
+</list>

@@ -1,0 +1,34 @@
+<Body>
+  <OrderedList type="decimal">
+    <ListItem ordinal="1">
+      <str>For the purposes of this Regulation:</str>
+      <OrderedList type="lower-alpha">
+        <ListItem ordinal="a">
+          <str>"the Dublin Convention" means the Convention determining …;</str>
+        </ListItem><ListItem ordinal="b">
+          <str>an "applicant for asylum" means an alien who has made …;</str>
+        </ListItem><ListItem ordinal="c">
+          <str>"Member State of origin" means:</str>
+          <OrderedList type="lower-roman">
+            <ListItem ordinal="i">
+              <str>in relation to an applicant for asylum …;</str>
+            </ListItem><ListItem ordinal="ii">
+              <str>in relation to a person covered by Article 8 …;</str>
+            </ListItem><ListItem ordinal="iii">
+              <str>in relation to a person covered by Article 11 …;</str>
+            </ListItem>
+          </OrderedList>
+        </ListItem><ListItem ordinal="d">
+          <str>"refugee" means a person who has been recognised …;</str>
+        </ListItem><ListItem ordinal="e">
+          <str>"hit" shall mean the existence of a match… .</str>
+        </ListItem>
+      </OrderedList>
+    </ListItem><ListItem ordinal="2">
+      <str>The terms defined in Article 2 … .</str>
+    </ListItem><ListItem ordinal="3">
+      <str>Unless stated otherwise, the terms … .
+</str>
+    </ListItem>
+  </OrderedList>
+</Body>

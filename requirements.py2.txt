@@ -1,0 +1,17 @@
+beautifulsoup4
+lxml
+rdflib
+rdfextras
+html5lib
+requests
+six
+jsmin
+whoosh
+pyparsing==1.5.7
+SimpleParse
+unittest2 # not needed for py2.7 +
+ordereddict # not needed for py2.7 +
+sphinx
+mock
+coverage
+bsddb3

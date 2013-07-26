@@ -1,0 +1,16 @@
+<Forfattning>
+  <Paragraf id="P1" ordinal="1">
+    <Stycke id="P1S1">
+      <str>Den som berövar annan livet, döms för </str>
+      <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Mord">mord</LinkSubject>
+      <str> till fängelse på viss tid, lägst tio och högst arton år, eller på livstid.</str>
+    </Stycke>
+  </Paragraf>
+  <Paragraf id="P9" ordinal="9">
+    <Stycke id="P9S1">
+      <str>Utsätter någon av grov oaktsamhet annan för livsfara eller fara för svår kroppsskada eller allvarlig sjukdom, dömes för </str>
+      <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Framkallande_av_fara_för_annan">framkallande av fara för annan</LinkSubject>
+      <str> till böter eller fängelse i högst två år.</str>
+    </Stycke>
+  </Paragraf>
+</Forfattning>

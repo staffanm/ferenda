@@ -1,0 +1,51 @@
+{
+    "http://rkrattsbaser.gov.se/cgi-bin/thw?${HTML}=sfsr_lst&${OOHTML}=sfsr_dok&${SNHTML}=sfsr_err&${MAXPAGE}=26&${BASE}=SFSR&${FORD}=FIND&%C5R=FR%C5N+1600&%C5R=TILL+2013" : {
+	"file": "resultlist-1.html",
+	"charset": "latin-1"
+	},
+    "http://rkrattsbaser.gov.se/cgi-bin/thw?${MAXPAGE}=26&${APPL}=SFSR&${BASE}=SFSR&${HTML}=sfsr_lst&${THWIDS}=50.7/1370846887_16735&${HILITE}=0" : {
+	"file": "resultlist-2.html",
+	"charset": "latin-1"
+    },
+    "http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfst_dok&${HTML}=sfst_lst&${SNHTML}=sfst_err&${BASE}=SFST&${TRIPSHOW}=format=THW&BET=2013:352": {
+	"file" : "2013-352.html",
+	"charset": "latin-1",
+	"expect": "downloaded/2013/352.html"
+    },
+    "http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfsr_dok&${HTML}=sfst_lst&${SNHTML}=sfsr_err&${BASE}=SFSR&${TRIPSHOW}=format=THW&BET=2013:352": {
+	"file" : "2013-352-r.html",
+	"charset": "latin-1",
+	"expect": "register/2013/352.html"
+    },
+    "http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfst_dok&${HTML}=sfst_lst&${SNHTML}=sfst_err&${BASE}=SFST&${TRIPSHOW}=format=THW&BET=2013:353": {
+	"file" : "2013-353.html",
+	"charset": "latin-1",
+	"expect": "downloaded/2013/353.html"
+    },
+    "http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfsr_dok&${HTML}=sfst_lst&${SNHTML}=sfsr_err&${BASE}=SFSR&${TRIPSHOW}=format=THW&BET=2013:353": {
+	"file" : "2013-353-r.html",
+	"charset": "latin-1",
+	"expect": "register/2013/353.html"
+    },
+    "http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfst_dok&${HTML}=sfst_lst&${SNHTML}=sfst_err&${BASE}=SFST&${TRIPSHOW}=format=THW&BET=2013:361": {
+	"file" : "2013-361.html",
+	"charset": "latin-1",
+	"expect": "downloaded/2013/361.html"
+    },
+    "http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfsr_dok&${HTML}=sfst_lst&${SNHTML}=sfsr_err&${BASE}=SFSR&${TRIPSHOW}=format=THW&BET=2013:361": {
+	"file" : "2013-361-r.html",
+	"charset": "latin-1",
+	"expect": "register/2013/361.html"
+    },
+    "http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfst_dok&${HTML}=sfst_lst&${SNHTML}=sfst_err&${BASE}=SFST&${TRIPSHOW}=format=THW&BET=2013:363": {
+	"file" : "2013-363.html",
+	"charset": "latin-1",
+	"expect": "downloaded/2013/363.html"
+    },
+    "http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfsr_dok&${HTML}=sfst_lst&${SNHTML}=sfsr_err&${BASE}=SFSR&${TRIPSHOW}=format=THW&BET=2013:363": {
+	"file" : "2013-363-r.html",
+	"charset": "latin-1",
+	"expect": "register/2013/363.html"
+    }
+}
+
