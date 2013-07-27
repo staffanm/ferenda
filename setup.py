@@ -5,14 +5,10 @@ import os,sys
 
 # This is a RST version of the markdown in README.md. Try to keep
 # these in sync!  When bored, try some of the tips in
-# https://coderwall.com/p/qawuyq to automate the conversion
+# https://coderwall.com/p/qawuyq to automate the conversion. Note that
+# the leading headline + description from README.md is omitted here (since pypi recreates it)
 
 longdesc = """
-Ferenda
-=======
-
-*Converts document collections to structured Linked Data*
-
 Ferenda is a python library and framework to scrape and convert
 unstructured content into semantically-marked-up, Linked Data-enabled
 content. It is focused on documents, not individual pieces of data,
