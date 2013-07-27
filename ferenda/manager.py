@@ -25,6 +25,7 @@ import mimetypes
 from ast import literal_eval
 from datetime import datetime
 import xml.etree.cElementTree as ET
+import cgi
 
 try:
     from collections import OrderedDict
@@ -200,7 +201,7 @@ def makeresources(repos,
         link.attrib['href'] = tab[1]
 
     if not staticsite:
-        search = ET.SubElement(ET.SubElement(ET.SubElement(root, "search"), "form"), "input", type="search")
+        search = ET.SubElement(ET.SubElement(ET.SubElement(root, "search"), "form", action="/search/"), "input", type="search", name="q")
 
     stylesheets = ET.SubElement(root, "stylesheets")
     log.debug("Adding %s stylesheets to resources.xml"%len(res['css']))
@@ -411,10 +412,13 @@ def _wsgi_search(environ, start_response, args):
     """WSGI method, called by the wsgi app for requests that matches
        ``searchendpoint``."""
     def htmlify(d):
-        return "<ul>" + ("\n".join("<li>%s: %s" % (x, d[x]) for x in d.keys())) + "</ul>"
+        return "<ul>" + ("\n".join("<li>%s: %s" % (cgi.escape(x), cgi.escape(str(d[x]))) for x in d.keys())) + "</ul>"
 
-    msg = """<h1>Search endpoint</h1>Environ:%s Args:%s""" % (htmlify(environ),
-                                                              htmlify(args))
+    # FIXME
+    msg = "<h1>Search result</h1><p>You searched for <i>'%s'</i>. Unfortunately, search functionality is not yet implemented, but in the meantime, here's some debugging info.</p>" % cgi.escape(environ['QUERY_STRING'][2:])
+
+    msg += "Environ:%s Args:%s""" % (htmlify(environ),
+                                     htmlify(args))
     data = msg.encode('utf-8')
     start_response("200 OK", [
         ("Content-Type", "text/html; charset=utf-8"),
