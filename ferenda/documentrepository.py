@@ -25,6 +25,7 @@ import time
 import calendar
 import filecmp
 
+
 # 3rd party
 import pkg_resources
 from lxml import etree
@@ -41,6 +42,7 @@ import requests.exceptions
 
 import six
 from six import text_type as str
+from six import binary_type as bytes
 
 if six.PY3:
     from urllib.parse import quote, unquote 
@@ -1359,14 +1361,19 @@ parsed document path to that documents dependency file."""
                 if resource.tag == "{http://www.w3.org/1999/xhtml}head":
                     continue
                 about = resource.get('about')
+                if isinstance(about,bytes): # happens under py2
+                    about = about.decode()
                 desc.about(about)
+                repo = self.alias
+                if isinstance(repo,bytes): # again, py2
+                    repo = repo.decode()
                 plaintext = self._extract_plaintext(resource)
                 l = desc.getvalues(dct.title)
                 title = str(l[0]) if l else None
                 l = desc.getvalues(dct.identifier)
                 identifier = str(l[0]) if l else None
                 indexer.update(uri=about,
-                               repo=self.alias, 
+                               repo=repo,
                                basefile=basefile,
                                title=title,
                                identifier=identifier,

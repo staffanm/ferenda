@@ -1,11 +1,14 @@
 Introduction to Ferenda
 =======================
 
-Ferenda is a python library for downloading unstructured document
-collections, parsing them to add explicit semantic structure, and
-re-publishing the content with added information and an API. It uses 
-the XHTML and RDFa standards for representing semantic structure, and
-republishes content as Linked Data.
+Ferenda is a python library and framework for transforming
+unstructured document collections into structured Linked Data. It
+helps with downloading documents, parsing them to add explicit
+semantic structure and RDF-based metadata, finding relationships
+between documents, and publishing the results.
+
+It uses the XHTML and RDFa standards for representing semantic
+structure, and republishes content using Linked Data principles.
 
 It works best for large document collections that have some degree of
 internal standardization, such as the laws of a particular country,
@@ -46,9 +49,9 @@ Third-party libraries
 Command-line tools
    For some functionality, certain binaries must be present and in your ``$PATH``:
 
-   * :py:class:`~ferenda.PDFReader` requires pdftotext and pdftohtml (from `poppler <http://poppler.freedesktop.org/>`_) and convert (from ImageMagic)
-   * :py:class:`~ferenda.Wordreader` requires antiword to handle old .doc files. 
-   * :py:class:`~ferenda.TripleStore` can perform some operations (bulk up- and download) much faster if curl is installed.
+   * :py:class:`~ferenda.PDFReader` requires ``pdftotext`` and ``pdftohtml`` (from `poppler <http://poppler.freedesktop.org/>`_) and ``convert`` (from `ImageMagic <http://www.imagemagick.org/>`_)
+   * :py:class:`~ferenda.Wordreader` requires `antiword <http://www.winfield.demon.nl/>`_ to handle old .doc files. 
+   * :py:class:`~ferenda.TripleStore` can perform some operations (bulk up- and download) much faster if `curl <http://curl.haxx.se/>`_ is installed.
 
 Once you start to collect a non-trivial number of documents and
 metadata about those documents, you'll need a RDF triple store, either
@@ -90,7 +93,10 @@ This code creates a website containing all* RFCs and W3C recommended
 standards.
 
 .. literalinclude:: intro-example.py
-  
+
+* actually, it only downloads the 50 most recent of each. Downloading
+and handling close to 7000 RFC documents takes a very long time.
+		    
 Alternately, using the command line tools:
 
 .. literalinclude:: intro-example.sh

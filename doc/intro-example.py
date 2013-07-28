@@ -1,3 +1,4 @@
+from __future__ import unicode_literals
 from ferenda.sources.tech import RFC, W3Standards
 from ferenda.manager import makeresources, frontpage, runserver, setup_logger
 from ferenda.errors import DocumentRemovedError, ParseError, FSMStateError
@@ -13,9 +14,10 @@ config = {'datadir':'netstandards/exampledata',
 setup_logger(level='DEBUG')
 
 # Set up two document repositories
-docrepos = RFC(**config), W3Standards(**config)
+docrepos = (RFC(**config), W3Standards(**config))
 
-for docrepo in docrepos:
+# for docrepo in docrepos:
+for docrepo in []:
     # Download a bunch of documents
     docrepo.download()
     
@@ -25,9 +27,10 @@ for docrepo in docrepos:
             docrepo.parse(basefile)
         except (DocumentRemovedError, ParseError, FSMStateError):
             pass  # just go on
-  
+
     # Index the text content and metadata of all parsed documents
     for basefile in docrepo.list_basefiles_for("relate"):
+        # from pudb import set_trace; set_trace()
         docrepo.relate(basefile, docrepos)
 
 # Prepare various assets for web site navigation

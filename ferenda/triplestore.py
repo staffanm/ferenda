@@ -13,6 +13,7 @@ import requests.exceptions
 
 import six
 from six import text_type as str
+from six import binary_type as bytes
 if six.PY3:
     from urllib.parse import quote
 else:
@@ -80,6 +81,8 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
         self.repository = repository
         self.pending_graph = Graph()
         self.namespaces = {}
+        if isinstance(storetype, bytes): # for ill-behaved py2 clients
+            storetype = storetype.decode()
         if isinstance(storetype,str):
             if storetype == "SESAME":
                 self.storetype = self.SESAME
