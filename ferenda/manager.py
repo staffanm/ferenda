@@ -1196,7 +1196,8 @@ def _preflight_check():
     binaries = (('pdftotext', '-v'),
                 ('pdftohtml', '-v'),
                 ('antiword', '-h'),
-                ('convert', '-version'))
+                ('convert', '-version'),
+                ('curl', '-V'))
 
     # 1: Check python ver
     success = True

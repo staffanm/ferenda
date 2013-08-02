@@ -19,9 +19,9 @@ from six import text_type as str
 from rdflib import Graph
 from rdflib.util import guess_format
 from rdflib.compare import graph_diff, isomorphic
-from ferenda import util
+from ferenda import util, errors
 
-from ferenda.triplestore import TripleStore
+from ferenda.triplestore import TripleStore, SleepycatStore
 
 from ferenda.testutil import FerendaTestCase
 
@@ -116,32 +116,21 @@ a:nm0000582 rdf:type foaf:Person;
 
     def test_add_serialized_named_graph(self):
         self.test_add_serialized() # set up environment for this case
-        self.store.context = "http://example.org/ctx1"
-        self.store.add_serialized(self.dataset2,format="nt")
-        self.assertEqual(3,self.store.triple_count())
-        self.store.context = None
+        self.store.add_serialized(self.dataset2,format="nt", context="http://example.org/ctx1")
+        self.assertEqual(3,self.store.triple_count(context="http://example.org/ctx1"))
         self.assertEqual(10,self.store.triple_count())
 
     def test_add_contexts(self):
-        self.store.context = "http://example.org/movies"
-        self.store.add_serialized(self.movies,format="turtle")
-        self.assertEqual(21,self.store.triple_count())
-        self.store.context = "http://example.org/actors"
-        self.store.add_serialized(self.actors,format="turtle")
-        # print(self.store.get_serialized())
-        self.assertEqual(18,self.store.triple_count())
-        self.store.context = None
-        self.assertEqual(39,self.store.triple_count())
-        self.store.context = "http://example.org/movies"
-        self.store.clear()
-        # print(self.store.get_serialized())
-        self.assertEqual(0,self.store.triple_count())
-        self.store.context = None
-        self.assertEqual(18,self.store.triple_count())
-        self.store.context = "http://example.org/actors"
-        self.store.clear()
-        self.store.context = None
-        self.assertEqual(0,self.store.triple_count())
+        self.store.add_serialized(self.movies, format="turtle", context="http://example.org/movies")
+        self.assertEqual(21, self.store.triple_count(context="http://example.org/movies"))
+        self.store.add_serialized(self.actors, format="turtle", context="http://example.org/actors")
+        self.assertEqual(18, self.store.triple_count(context="http://example.org/actors"))
+        self.assertEqual(39, self.store.triple_count())
+        self.store.clear(context="http://example.org/movies")
+        self.assertEqual(0, self.store.triple_count("http://example.org/movies"))
+        self.assertEqual(18, self.store.triple_count())
+        self.store.clear(context="http://example.org/actors")
+        self.assertEqual(0, self.store.triple_count())
         
     def test_add_serialized_file(self):
         self.assertEqual(0,self.store.triple_count())
@@ -153,13 +142,11 @@ a:nm0000582 rdf:type foaf:Person;
             fp.write(self.dataset2)
 
         # default graph
-        self.store.add_serialized_file(tmp1,format="nt")
+        self.store.add_serialized_file(tmp1, format="nt")
         self.assertEqual(7,self.store.triple_count())
         # named graph
-        self.store.context = "http://example.org/ctx1"
-        self.store.add_serialized_file(tmp2,format="nt")
-        self.assertEqual(3,self.store.triple_count())
-        self.store.context = None
+        self.store.add_serialized_file(tmp2, format="nt", context="http://example.org/ctx1")
+        self.assertEqual(3,self.store.triple_count(context="http://example.org/ctx1"))
         self.assertEqual(10,self.store.triple_count())
 
         os.unlink(tmp1)
@@ -168,7 +155,7 @@ a:nm0000582 rdf:type foaf:Person;
     def test_roundtrip(self):
         data = """<http://example.org/1> <http://purl.org/dc/terms/title> "language literal"@sv ."""
         self.store.add_serialized(data, format="nt")
-        res = self.store.get_serialized(format="nt")
+        res = self.store.get_serialized(format="nt").strip()
         self.assertEqual(res, data)
 
     def test_clear(self):
@@ -178,7 +165,8 @@ a:nm0000582 rdf:type foaf:Person;
         self.assertEqual(0,self.store.triple_count())
         
     def test_get_serialized(self):
-        self.store.add_serialized(self.dataset,format="nt")
+        self.loader.add_serialized(self.dataset,format="nt")
+        del self.loader
         res = self.store.get_serialized(format="nt")
         self.assertEqualGraphs(Graph().parse(data=self.dataset, format="nt"),
                                Graph().parse(data=res, format="nt"))
@@ -187,15 +175,15 @@ a:nm0000582 rdf:type foaf:Person;
         want = tempfile.mktemp(suffix=".nt")
         util.writefile(want, self.dataset)
         got = tempfile.mktemp(suffix=".nt")
-        self.store.add_serialized(self.dataset,format="nt")
+        self.loader.add_serialized(self.dataset,format="nt")
+        del self.loader
         self.store.get_serialized_file(got, format="nt")
         self.assertEqualGraphs(want,got)
         
     def test_select(self):
-        self.store.context = "http://example.org/movies"
-        self.store.add_serialized(self.movies,format="turtle")
-        self.store.context = "http://example.org/actors"
-        self.store.add_serialized(self.actors,format="turtle")
+        self.loader.add_serialized(self.movies,format="turtle", context="http://example.org/movies")
+        self.loader.add_serialized(self.actors,format="turtle", context="http://example.org/actors")
+        del self.loader
         sq = """PREFIX foaf: <http://xmlns.com/foaf/0.1/>
                 PREFIX owl: <http://www.w3.org/2002/07/owl#>
 
@@ -203,15 +191,14 @@ a:nm0000582 rdf:type foaf:Person;
                 WHERE  { GRAPH <http://example.org/actors> { ?uri foaf:name ?name .
                         ?uri owl:sameAs <http://live.dbpedia.org/resource/Kevin_Bacon> } }"""
 
-        self.store.context = None # note the graph identifier in the Sparql query
         p = self.store.select(sq,"python")
         self.assertIsInstance(p[0]['name'], str)
         self.assertEqual(p,[{'name':'Kevin Bacon'}])
-        if self.store.storetype == self.store.SLEEPYCAT:
+        if self.store.__class__ == SleepycatStore:
             self.store.graph.close()
         
     def test_construct(self):
-        self.store.add_serialized("""
+        self.loader.add_serialized("""
 @prefix ab: <http://learningsparql.com/ns/addressbook#> .
 @prefix d: <http://learningsparql.com/ns/data#> .
 
@@ -230,17 +217,15 @@ d:i8301 ab:lastName "Ellis" .
 d:i8301 ab:email "craigellis@yahoo.com" .
 d:i8301 ab:email "c.ellis@usairwaysgroup.com" .
 """, format="turtle")
+        del self.loader
 
-        sq = """
-PREFIX ab: <http://learningsparql.com/ns/addressbook#>
-PREFIX d: <http://learningsparql.com/ns/data#>
+        sq = """PREFIX ab: <http://learningsparql.com/ns/addressbook#>
+                PREFIX d: <http://learningsparql.com/ns/data#>
 
-CONSTRUCT
-{ ?person ?p ?o . }
-WHERE {
-?person ab:firstName "Craig" ; ab:lastName "Ellis" ;
-?p ?o . }
-        """
+                CONSTRUCT { ?person ?p ?o . }
+                WHERE {
+                    ?person ab:firstName "Craig" ; ab:lastName "Ellis" ;
+                ?p ?o . }"""
         want = Graph()
         want.parse(data="""
 @prefix d:<http://learningsparql.com/ns/data#> . 
@@ -254,12 +239,13 @@ d:i8301
 """, format="turtle")
         got = self.store.construct(sq)
         self.assertTrue(isomorphic(want,got))
-        if self.store.storetype == self.store.SLEEPYCAT:
+        if self.store.__class__ == SleepycatStore:
             self.store.graph.close()
+
 
 @unittest.skipIf('SKIP_FUSEKI_TESTS' in os.environ,
                  "Skipping Fuseki tests")    
-class Fuseki(TripleStoreTestCase,unittest.TestCase):
+class Fuseki(TripleStoreTestCase, unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if cls.manage_server:
@@ -281,23 +267,24 @@ class Fuseki(TripleStoreTestCase,unittest.TestCase):
             subprocess.check_call("fuseki stop > /dev/null", shell=True)
         pass
 
-    def setUp(self):
-        # to filter out spurious warnings from requests/urllib3 under
-        # py3. Does not work when running the entire test suite, for
-        # some reason, but works fine when only testing with this module.
-        # logging.captureWarnings(True)
-        
-        self.store = TripleStore("http://localhost:3030/", "ds", storetype=TripleStore.FUSEKI)
+    def setUp(self):       
+        self.store = TripleStore.connect("FUSEKI", "http://localhost:3030/", "ds")
         self.store.clear()
+        self.loader = self.store
 
-    def tearDown(self):
-        # logging.captureWarnings(False)
-        pass
+
+@unittest.skipIf('SKIP_FUSEKI_TESTS' in os.environ,
+                 "Skipping Fuseki/curl tests")    
+class FusekiCurl(Fuseki):
+    def setUp(self):       
+        self.store = TripleStore.connect("FUSEKI", "http://localhost:3030/", "ds", curl=True)
+        self.store.clear()
+        self.loader = self.store
 
 
 @unittest.skipIf('SKIP_SESAME_TESTS' in os.environ,
                  "Skipping Sesame tests")    
-class Sesame(TripleStoreTestCase,unittest.TestCase):
+class Sesame(TripleStoreTestCase, unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # start up tomcat/sesame on port 8080
@@ -314,38 +301,118 @@ class Sesame(TripleStoreTestCase,unittest.TestCase):
             subprocess.check_call("catalina.sh stop > /dev/null", shell=True)
 
     def setUp(self):
-        # to filter out spurious warnings from requests/urllib3 under py3
-        # logging.captureWarnings(True) 
-        self.store = TripleStore("http://localhost:8080/openrdf-sesame", "ferenda", storetype=TripleStore.SESAME)
+        self.store = TripleStore.connect("SESAME", "http://localhost:8080/openrdf-sesame", "ferenda")
         self.store.clear()
+        self.loader = self.store
 
     def tearDown(self):
-        pass
-        # logging.captureWarnings(False)
-        
+        pass        
 
+
+class SesameCurl(Sesame):
+    def setUp(self):
+        self.store = TripleStore.connect("SESAME", "http://localhost:8080/openrdf-sesame", "ferenda", curl=True)
+        self.store.clear()
+        self.loader = self.store
+
+
+# A mixin class that changes the behaviour of most tests (tests that
+# attempt to modify the store, apart from initial loading of data,
+# should fail as inmemory stores are read-only).
+class Inmemory(object):
+
+    _store = None # the real store object
+
+    # self.store isn't set by the derived setUp methods (only
+    # self.loader). Some property magic to make self.store call
+    # self.getstore if needed
+    @property
+    def store(self):
+        if self._store is None: # happens for the Inmemory tests
+            self._store = self.getstore()
+        return self._store
+
+    @store.setter
+    def store(self, value):
+        self._store = value
+
+    @store.deleter
+    def store(self):
+        del self._store
+
+    def test_add_contexts(self):
+        with self.assertRaises(errors.TriplestoreError):
+            super(Inmemory,self).test_add_contexts()
+
+    def test_roundtrip(self):
+        with self.assertRaises(errors.TriplestoreError):
+            super(Inmemory,self).test_roundtrip()
+
+    def test_clear(self):
+        with self.assertRaises(errors.TriplestoreError):
+            super(Inmemory,self).test_clear()
+
+    def test_add_serialized_named_graph(self):
+        with self.assertRaises(errors.TriplestoreError):
+            super(Inmemory,self).test_add_serialized_named_graph()
+
+    def test_add_serialized_file(self):
+        with self.assertRaises(errors.TriplestoreError):
+            super(Inmemory,self).test_add_serialized_file()
+
+    def test_add_serialized(self):
+        with self.assertRaises(errors.TriplestoreError):
+            super(Inmemory,self).test_add_serialized()
+        
 class SQLite(TripleStoreTestCase,unittest.TestCase):
 
     def setUp(self):
-        self.store = TripleStore("ferenda.sqlite", "ferenda", storetype=TripleStore.SQLITE)
+        self.store = TripleStore.connect("SQLITE", "ferenda.sqlite", "ferenda")
         self.store.clear()
+        self.loader = self.store
 
     def tearDown(self):
         self.store.close()
         del self.store
         os.remove("ferenda.sqlite")
 
-@unittest.skipIf('SKIP_SLEEPYCAT_TESTS' in os.environ,
-                 "Skipping Fuseki tests")    
-class Sleepycat(TripleStoreTestCase,unittest.TestCase):
+
+class SQLiteInmemory(Inmemory, SQLite):
 
     def setUp(self):
-        self.store = TripleStore("ferenda.db", "ferenda", storetype=TripleStore.SLEEPYCAT)
+        self.loader = TripleStore.connect("SQLITE", "ferenda.sqlite", "ferenda")
+        self.loader.clear()
+
+    def getstore(self):
+        return TripleStore.connect("SQLITE", "ferenda.sqlite", "ferenda", inmemory=True)
+
+
+@unittest.skipIf('SKIP_SLEEPYCAT_TESTS' in os.environ,
+                 "Skipping Sleepycat tests")    
+class Sleepycat(TripleStoreTestCase, unittest.TestCase):
+
+    def setUp(self):
+        self.store = TripleStore.connect("SLEEPYCAT", "ferenda.db", "ferenda")
         self.store.clear()
+        self.loader = self.store
 
     def tearDown(self):
         del self.store
+        if hasattr(self,'loader'):
+            del self.loader
         if os.path.exists("ferenda.db"):
             shutil.rmtree("ferenda.db")
 
+
+@unittest.skipIf('SKIP_SLEEPYCAT_TESTS' in os.environ,
+                 "Skipping Sleepycat/inmemory tests")    
+class SleepycatInmemory(Inmemory, Sleepycat):
+
+    def setUp(self):
+        self.loader = TripleStore.connect("SLEEPYCAT", "ferenda.db", "ferenda")
+        self.loader.clear()
+        self.store = None
+
+    def getstore(self):
+        return TripleStore.connect("SLEEPYCAT", "ferenda.db", "ferenda", inmemory=True)
 

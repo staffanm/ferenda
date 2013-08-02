@@ -1195,12 +1195,13 @@ uri doesn't map to a basefile in this repo."""
             if util.outfile_is_newer(distilled,dump):
                 return False
             
-        store = TripleStore(
-            config.storelocation, config.storerepository, context, config.storetype)
+        store = TripleStore.connect(config.storetype,
+                                    config.storelocation,
+                                    config.storerepository)
         log = cls._setup_logger(cls.alias)
         log.info("Clearing context %s at repository %s" % (
             context, config.storerepository))
-        store.clear()
+        store.clear(context)
         # we can't clear the whoosh index in the same way as one index
         # contains documents from all repos. But we need to be able to
         # clear it from time to time, maybe with a clear/setup method
@@ -1222,8 +1223,9 @@ uri doesn't map to a basefile in this repo."""
         """
         # FIXME: should use dataset_uri(), but that's a instancemethod
         context = "%sdataset/%s" % (config.url, cls.alias)
-        store = TripleStore(
-            config.storelocation, config.storerepository, context, config.storetype)
+        store = TripleStore.connect(config.storetype,
+                                    config.storelocation,
+                                    config.storerepository)
         docstore = DocumentStore(config.datadir + os.sep + cls.alias)
         dump = docstore.path("dump", "distilled", ".nt")
         log = cls._setup_logger(cls.alias)
@@ -1261,12 +1263,12 @@ uri doesn't map to a basefile in this repo."""
         if self.config.fulltextindex:
             self.relate_fulltext(basefile)
 
-    def _get_triplestore(self):
+    def _get_triplestore(self, **kwargs):
         if not hasattr(self,'_triplestore'):
-            self._triplestore = TripleStore(self.config.storelocation,
-                                            self.config.storerepository,
-                                            self.dataset_uri(),
-                                            self.config.storetype)
+            self._triplestore = TripleStore.connect(self.config.storetype,
+                                                    self.config.storelocation,
+                                                    self.config.storerepository,
+                                                    **kwargs)
         return self._triplestore
         
     def relate_triples(self,basefile):
@@ -1282,12 +1284,12 @@ uri doesn't map to a basefile in this repo."""
         with util.logtime(self.log.debug,
                           "%(basefile)s: Added %(rdffile)s to context %(context)s in %(elapsed).3f sec",
                           {'basefile': basefile,
-                           'context': self._triplestore.context,
+                           'context': self.dataset_uri(),
                            'dataset': self.dataset_uri(),
                            'rdffile': self.store.distilled_path(basefile),
                            'triplestore': self.config.storelocation}):
             data = open(self.store.distilled_path(basefile)).read()
-            ts.add_serialized(data, format="xml")
+            ts.add_serialized(data, format="xml", context=self.dataset_uri())
 
     def _get_fulltext_indexer(self, batchoptimize=False):
         if not hasattr(self, '_fulltextindexer'):
@@ -1732,8 +1734,6 @@ parsed document path to that documents dependency file."""
         """
         
         query_template = self.sparql_annotations
-        # if self.config.storetype in ("SLEEPYCAT", "SQLITE"):
-        #     query_template = "%s.sparql10%s" % os.path.splitext(query_template)
         if os.path.exists(query_template):
             fp = open(query_template)
         elif pkg_resources.resource_exists('ferenda',query_template):
@@ -1744,13 +1744,14 @@ parsed document path to that documents dependency file."""
         sq = fp.read().decode('utf-8') % params
         fp.close()
         if self.config.storelocation:
-            store = TripleStore(self.config.storelocation,
-                                self.config.storerepository,
-                                None, # self.context(),
-                                self.config.storetype)
-            res = store.construct(sq)
-            if self.config.storetype in ("SLEEPYCAT", "SQLITE"):
-                store.graph.close()
+            with util.logtime(self.log.debug,
+                              "Got triplestore in %(elapsed).3f", {}):
+                if self.config.storetype in ("SQLITE", "SLEEPYCAT"):
+                    kwargs = {'inmemory': True}
+                ts = self._get_triplestore(**kwargs)
+            with util.logtime(self.log.debug,
+                              "Constructed graph in %(elapsed).3f", {}):
+                res = ts.construct(sq)
             return res
 
     # helper for the prep_annotation_file helper -- it expects a
@@ -1860,18 +1861,25 @@ parsed document path to that documents dependency file."""
         :rtype: set of dicts"""
 
 
-        store = TripleStore(self.config.storelocation,
-                            self.config.storerepository,
-                            None, # self.context(),
-                            self.config.storetype)
+        store = TripleStore.connect(self.config.storetype,
+                                    self.config.storelocation,
+                                    self.config.storerepository)
 
         if self.config.storetype in ('SQLITE','SLEEPYCAT'):
-            store.context = context
-            sq = self.toc_query(None)
+            sq = self.toc_query()
+            # FIXME: workaround for the fact that rdflib select uses
+            # FROM <%s> differently than Sesame/Fuseki. This
+            # reimplements most of RDFLibStore.select
+            raw_res = store._getcontextgraph(context).query(sq)
+            res = []
+            for r in raw_res.bindings:
+                d = {}
+                for (key,val) in r.items():
+                    d[str(key)]=str(val)
+                res.append(d)
         else:
             sq = self.toc_query(context)
-        self.log.debug("toc: querying:\n%s" % sq)
-        res = store.select(sq, "python")
+            res = store.select(sq, "python")
         store.close()
         return res
 

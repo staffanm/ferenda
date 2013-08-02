@@ -925,7 +925,7 @@ class Repo(RepoTester):
         import ferenda.documentrepository
         assert ferenda.documentrepository
         # We mock out TripleStore to avoid creating an actual triplestore
-        with patch('ferenda.documentrepository.TripleStore') as mock:
+        with patch('ferenda.documentrepository.TripleStore.connect') as mock:
             self.repo.relate_triples("root")
             self.assertTrue(mock.called)  # ie a TripleStore class has been instantiated
             # add_serialized is a new MagicMock object
@@ -1096,18 +1096,18 @@ b:1part a :DocumentPart;
 
     def tearDown(self):
         if self.storetype:
-            store = TripleStore(storetype=self.repo.config.storetype,
-                                location=self.repo.config.storelocation,
-                                repository=self.repo.config.storerepository)
+            store = TripleStore.connect(storetype=self.repo.config.storetype,
+                                        location=self.repo.config.storelocation,
+                                        repository=self.repo.config.storerepository)
             store.clear()
             if self.repo.config.storetype == "SLEEPYCAT":
                 store.graph.close()
         shutil.rmtree(self.datadir)
         
     def _load_store(self, repo):
-        store = TripleStore(storetype=repo.config.storetype,
-                            location=repo.config.storelocation,
-                            repository=repo.config.storerepository)
+        store = TripleStore.connect(storetype=repo.config.storetype,
+                                    location=repo.config.storelocation,
+                                    repository=repo.config.storerepository)
         store.add_serialized(self.repo_a, format="turtle")
         store.add_serialized(self.repo_b, format="turtle")
         if repo.config.storetype == "SLEEPYCAT":
@@ -1609,19 +1609,16 @@ ex:pm942051 a bibo:AcademicArticle;
         # now we go with the default type (SQLITE, guaranteed to
         # always work) but the non-rdflib backends use different code
         # paths.
-        self.store = TripleStore(storetype=defaults['storetype'],
-                                 location=self.datadir+os.sep+"test.sqlite",
-                                 repository=defaults['storerepository'])
+        self.store = TripleStore.connect(storetype=defaults['storetype'],
+                                         location=self.datadir+os.sep+"test.sqlite",
+                                         repository=defaults['storerepository'])
         self.store.clear()
-        self.store.context = "http://example.org/ctx/base"
-        self.store.add_serialized(self.books,format="turtle")
-        self.store.context = "http://example.org/ctx/other"
-        self.store.add_serialized(self.articles,format="turtle")
+        self.store.add_serialized(self.books,format="turtle", context="http://example.org/ctx/base")
+        self.store.add_serialized(self.articles,format="turtle", context="http://example.org/ctx/other")
 
 
     def tearDown(self):
         # clear triplestore
-        self.store.context = None
         self.store.clear()
         del self.store
         super(TOC, self).tearDown()

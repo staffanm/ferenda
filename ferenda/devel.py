@@ -76,10 +76,9 @@ class Devel(object):
         """
         # print("Creating store of type %s, location %s, repository %s" %
         #       (self.config.storetype, self.config.storelocation, self.config.storerepository))
-        store = TripleStore(self.config.storelocation,
-                            self.config.storerepository,
-                            None,
-                            self.config.storetype)
+        store = TripleStore.connect(self.config.storetype,
+                                    self.config.storelocation,
+                                    self.config.storerepository)
         print(store.get_serialized(format=format).decode('utf-8'))
 
 #    Not really useful for anything than finding bugs in ferenda itself
