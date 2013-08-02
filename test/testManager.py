@@ -6,7 +6,6 @@ import sys
 import tempfile
 import shutil
 import logging
-import hashlib
 import pkg_resources
 
 
@@ -16,8 +15,6 @@ import pkg_resources
 # the 'ferenda' package. We also have to call a resource method 
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 pkg_resources.resource_listdir('ferenda','res')
-#print("OK MANAGER IS LOADED: %s" % sys.path)
-#print("LISTDIR IS %s" % pkg_resources.resource_listdir('ferenda','res'))
 
 from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 

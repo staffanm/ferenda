@@ -10,7 +10,7 @@ Running the web application
 
 During development, you can just ``ferenda-build.py runserver``. This
 starts up a single-threaded web server in the foreground with the web
-application, by default accessible as ``http://localhost:8080/``
+application, by default accessible as ``http://localhost:8000/``
 
 You can also run the web application under any wsgi server, such as
 mod_wsgi, uWSGI or Gunicorn.  ferenda-setup creates a file called
@@ -45,10 +45,9 @@ command::
 
   $ ./ferenda-build.py makeresources --htaccess
 
+.. note::
 
-  .. note::
-
-     This doesn't actually work yet.
+   This doesn't actually work yet.
   
 Then, change the path where the dynamic web app is mounted in the URL
 space in your httpd.conf::
@@ -73,14 +72,18 @@ URLs used
 
 In keeping with Linked Data principles, all URIs for your documents
 should be retrievable. By default, all urls for your documents start
-with ``http://localhost:8080/``
-(e.g. ``http://localhost:8080/rfc/4711``). These URLs are
+with ``http://localhost:8000/res``
+(e.g. ``http://localhost:8000/res/rfc/4711``). These URLs are
 automatically retrievable when you run the built-in web server during
 development, as described above.
 
 
 URIs for things other than documents
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. note::
+
+   The functionality in this section is not yet implemented.
 
 It should be noted that the infamous httpRange-14
 (http://www.jenitennison.com/blog/node/159) issue is largely a
@@ -90,17 +93,17 @@ occasionally you need (or want) to use references to things that are
 not available on the web, for example to specify the publisher of a
 specific document, eg::
 
-  <http://localhost:8080/rfc/4711>
+  <http://localhost:8000/res/rfc/4711>
       dct:publisher <http://localhost:8080/things/org/IETF> .
 
-All n3 files present in the directory triples will be read and
-used. Eg. create triples/org.n3 with the content::
+All n3 files present in the directory ``triples`` will be read and
+used. Eg. create ``triples/org.n3`` with the content::
 
-  <http://localhost:8080/things/org/IETF>
+  <http://localhost:8000/things/org/IETF>
       rdfs:label "Internet Engineering Task Force (IETF)"@en ,
       foaf:homepage <http://www.ietf.org> .
 
-Now when you go to http://localhost:8080/things/org/IETF with a web
+Now when you go to http://localhost:8000/things/org/IETF with a web
 browser, it will redirect you to the IETF homepage, but if you perform
 a Accept: application/rdf+xml GET on the same URI, it'll reply with
 all statements about that URI in RDF/XML
@@ -109,37 +112,49 @@ all statements about that URI in RDF/XML
 Setting a different base url
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-When deploying, you won't use http://localhost:8080/ in your
+.. note::
+
+   The functionality in this section is not yet implemented either.
+
+When deploying, you won't use http://localhost:8000/ in your
 public-facing URLs. Instead, come up with an external base url such as
 ``http://example.org/netstandards/``, and in ferenda.ini set::
 
   [__root__]
   url=http://example.org/netstandards/   
-  develurl=http://localhost:8080/
+  develurl=http://localhost:8000/
 
 This will make all uris in parsed and generated documents on the form
-http://example.org/netstandards/rfc/4711, but during devel still
-support http://localhost:8080/rfc/4711.
+http://example.org/netstandards/res/rfc/4711, but during devel still
+support http://localhost:8000/res/rfc/4711.
 
 When you set url to a new value, you must re-run ``./ferenda-build.py parse --all --force`` and ``./ferenda-build.py generate --all --force`` for it to take effect.
 
 The RESTish API
 ---------------
 
-For each resource, use accept headers to get different versions of it:
+For each resource, use the Accept header to retrieve different
+versions of it:
 
-* ``curl -H "Accept: text/html" http://localhost:8080/rfc/4711`` returns rfc/generated/4711.html
-* ``curl -H "Accept: application/xhtml+xml" http://localhost:8080/rfc/4711`` returns rfc/parsed/4711.xhtml
-* ``curl -H "Accept: application/rdf+xml" http://localhost:8080/rfc/4711`` returns rfc/distilled/4711.rdf
-* ``curl -H "Accept: text/turle" http://localhost:8080/rfc/4711`` returns rfc/distilled/4711.rdf, but in Turtle format
-* ``curl -H "Accept: application/json" http://localhost:8080/rfc/4711`` returns rfc/distilled/4711.rdf, but in JSON-LD format
+* ``curl -H "Accept: text/html" http://localhost:8000/res/rfc/4711`` returns ``rfc/generated/4711.html``
+* ``curl -H "Accept: application/xhtml+xml" http://localhost:8000/res/rfc/4711`` returns ``rfc/parsed/4711.xhtml``
+* ``curl -H "Accept: application/rdf+xml" http://localhost:8000/res/rfc/4711`` returns ``rfc/distilled/4711.rdf``
+* ``curl -H "Accept: text/turle" http://localhost:8000/res/rfc/4711`` returns ``rfc/distilled/4711.rdf``, but in Turtle format
+* ``curl -H "Accept: application/json" http://localhost:8000/res/rfc/4711`` returns ``rfc/distilled/4711.rdf``, but in JSON-LD format
 
-You can also get extended information about a single document in various RDF flavours. This extended information includes everything that ``get_annotatons()`` returns.
+You can also get *extended information* about a single document in
+various RDF flavours. This extended information includes everything
+that :meth:`~ferenda.DocumentRepository.construct_annotations` returns.
 
-* ``curl -H "Accept: application/rdf+xml" http://localhost:8080/rfc/4711/data`` returns a RDF/XML combination of rfc/distilled/4711.rdf and rfc/annotation/4711.rdf
-* ``curl -H "Accept: text/turtle" http://localhost:8080/rfc/4711/data`` returns the same in Turtle format
-* ``curl -H "Accept: application/json" http://localhost:8080/rfc/4711/data`` returns the same in JSON-LD format.
+* ``curl -H "Accept: application/rdf+xml" http://localhost:8000/res/rfc/4711/data`` returns a RDF/XML combination of ``rfc/distilled/4711.rdf`` and ``rfc/annotation/4711.rdf``
+* ``curl -H "Accept: text/turtle" http://localhost:8000/res/rfc/4711/data`` returns the same in Turtle format
+* ``curl -H "Accept: application/json" http://localhost:8000/res/rfc/4711/data`` returns the same in JSON-LD format.
 
+.. note::
+
+   JSON-LD output is not yet supported. We're awaiting the first
+   public release of `rdflib-jsonld
+   <http://github.com/RDFLib/rdflib-jsonld>`_ on PyPI.
 
 
 

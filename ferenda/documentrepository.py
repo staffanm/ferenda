@@ -15,6 +15,7 @@ from tempfile import mkstemp
 from io import BytesIO
 from itertools import islice
 from wsgiref.handlers import format_date_time as format_http_date
+from wsgiref.util import request_uri
 import codecs
 import logging
 import logging.handlers
@@ -1230,7 +1231,7 @@ uri doesn't map to a basefile in this repo."""
         dump = docstore.path("dump", "distilled", ".nt")
         log = cls._setup_logger(cls.alias)
         util.ensure_dir(dump)
-        store.get_serialized_file(dump, format="nt")
+        store.get_serialized_file(dump, format="nt", context=context)
         # just to report the number of dumped triples -- may be unneccesary
         log.info("Dumped %(triplecount)s triples from context %(context)s to %(dumpfile)s" %
                  {'triplecount':sum(1 for line in open(dump)),
@@ -1746,8 +1747,9 @@ parsed document path to that documents dependency file."""
         if self.config.storelocation:
             with util.logtime(self.log.debug,
                               "Got triplestore in %(elapsed).3f", {}):
+                kwargs = {}
                 if self.config.storetype in ("SQLITE", "SLEEPYCAT"):
-                    kwargs = {'inmemory': True}
+                    kwargs['inmemory'] = True
                 ts = self._get_triplestore(**kwargs)
             with util.logtime(self.log.debug,
                               "Constructed graph in %(elapsed).3f", {}):
@@ -1780,6 +1782,31 @@ parsed document path to that documents dependency file."""
         resulttree = transform(intree)
         res = etree.tostring(resulttree,pretty_print=format)
         return res.decode('utf-8') 
+
+    # the inverse of graph_to_annotation_file
+    def annotation_file_to_graph(self, annotation_file):
+        """Converts a annotation file (using the Grit format) back into an RDFLib graph.
+
+        :param graph: The filename of a serialized XML document with RDF statements
+        :type  graph: str
+        :returns: The RDF statements as a regular graph
+        :rtype: rdflib.Graph
+        """
+        with open(annotation_file,"rb") as fp:
+            intree = etree.parse(fp)
+        stylesheet = "res/xsl/grit-grddl.xsl"
+        if os.path.exists(stylesheet):
+            fp = open(stylesheet)
+        elif pkg_resources.resource_exists('ferenda',stylesheet): # prefix stylesheet with 'res/xsl'?
+            fp = pkg_resources.resource_stream('ferenda',stylesheet)
+        else:
+            raise ValueError("Stylesheet %s not found" % stylesheet)
+        transform = etree.XSLT(etree.parse(fp))
+        resulttree = transform(intree)
+        res = etree.tostring(resulttree,pretty_print=format)
+        g = Graph()
+        g.parse(data=res)
+        return g
 
     def generated_url(self, basefile):
         """Get the full local url for the generated file for the
@@ -2484,26 +2511,6 @@ parsed document path to that documents dependency file."""
             return [(util.uri_leaf(str(self.rdf_type)), uri)]
 
 
-    def reconstruct_url(self, environ):
-        # from PEP 333
-        url = environ['wsgi.url_scheme']+'://'
-        if environ.get('HTTP_HOST'):
-            url += environ['HTTP_HOST']
-        else:
-            url += environ['SERVER_NAME']
-#         if environ['wsgi.url_scheme'] == 'https':
-#             if environ['SERVER_PORT'] != '443':
-#                url += ':' + environ['SERVER_PORT']
-#         else:
-#             if environ['SERVER_PORT'] != '80':
-#                url += ':' + environ['SERVER_PORT']
-
-        url += quote(environ.get('SCRIPT_NAME', ''))
-        url += quote(environ.get('PATH_INFO', ''))
-        if environ.get('QUERY_STRING'):
-            url += '?' + environ['QUERY_STRING']
-        return url
-
     def http_handle(self, environ):
         """Used by the WSGI support to indicate if this repo can provide a response to a particular request. If so, returns a tuple (fp, length, memtype), where fp is an open file of the document to be returned."""
         if environ['PATH_INFO'].count("/") >= 2:
@@ -2516,11 +2523,39 @@ parsed document path to that documents dependency file."""
             if (alias == self.alias):
                 # we SHOULD be able to handle this -- maybe provide
                 # apologetic message about this if we can't?
-                uri = self.reconstruct_url(environ)
+                uri = request_uri(environ)
                 path = None
-                if res == "res": 
+                if res == "res":
+                    if uri.endswith("/data"):
+                        data = True
+                        uri = uri[:-5]
+                    else:
+                        data = False
                     basefile = self.basefile_from_uri(uri)
-                    path = self.store.generated_path(basefile)
+                    assert basefile, "Couldn't find basefile in uri %s" % uri
+                    accept = environ.get('HTTP_ACCEPT','text/html')
+                    # mapping MIME-type -> callable that retrieves a path
+                    if not data:
+                        pathmap = {'text/html': self.store.generated_path,
+                                   'application/xhtml+xml': self.store.parsed_path,
+                                   'application/rdf+xml': self.store.distilled_path}
+                        pathfunc = pathmap.get(accept, None)
+                    else:
+                        pathfunc = None
+                    if pathfunc is None:
+                        g = Graph()
+                        g.parse(self.store.distilled_path(basefile))
+                        if data:
+                            annotation_graph = self.annotation_file_to_graph(self.store.annotation_path(basefile))
+                            g += annotation_graph
+                        format = {'application/rdf+xml': 'pretty-xml',
+                                  'text/turtle': 'turtle',
+                                  'text/plain': 'nt'}[accept]
+                        path = None
+                        data = g.serialize(format=format)
+                    else:
+                        path = pathfunc(basefile)
+                        data = None
                 elif res == "dataset":
                     # FIXME: this reimplements the logic that
                     # calculates basefile/path at the end of
@@ -2534,7 +2569,11 @@ parsed document path to that documents dependency file."""
                 if path and os.path.exists(path):
                     return (open(path, 'rb'),
                             os.path.getsize(path),
-                            "text/html")
+                            accept)
+                elif data:
+                    return (BytesIO(data),
+                            len(data),
+                            accept)
         return (None, None, None)
 
     @staticmethod

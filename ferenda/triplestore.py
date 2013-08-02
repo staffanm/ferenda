@@ -121,8 +121,8 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
 
     def get_serialized_file(self, filename, format="nt", context=None):
         """Saves all statements in the store to *filename*."""
-        data = self.get_serialized(format)
-        with open(filename,"w") as fp:
+        data = self.get_serialized(format, context)
+        with open(filename,"wb") as fp:
             fp.write(data)
 
            
@@ -192,8 +192,8 @@ class RDFLibStore(TripleStore):
         g.commit()      
 
     def get_serialized(self, format="nt", context=None):
-            g = self._getcontextgraph(context)
-            return g.serialize(format=format).decode('utf-8').strip()
+        g = self._getcontextgraph(context)
+        return g.serialize(format=format)
 
 
     def triple_count(self, context=None):
@@ -354,7 +354,7 @@ class RemoteStore(TripleStore):
                    'filename':tmp,
                    'method':'GET'}
             self._run_curl(opt)
-            with open(tmp) as fp:
+            with open(tmp, 'rb') as fp:
                 data = fp.read()
             os.unlink(tmp)
             return data
@@ -362,7 +362,7 @@ class RemoteStore(TripleStore):
             r = requests.get(self._statements_url(context),
                              headers={'Accept': self._contenttype[format]})
             r.raise_for_status()
-            return r.text.strip()
+            return r.content
             
 
     def get_serialized_file(self, filename, format="nt", context=None):

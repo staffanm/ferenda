@@ -1,0 +1,13 @@
+<graph xmlns:dct="http://purl.org/dc/terms/"
+       xmlns:bibo="http://purl.org/ontology/bibo/" 
+       xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <resource uri="http://example.org/base/123/a">
+    <a><bibo:Standard/></a>
+    <dct:isReferencedBy ref="http://example.org/base/other"/>
+  </resource>
+  <resource uri="http://example.org/base/other">
+    <a><bibo:Standard/></a>
+    <dct:title>Another document</dct:title>
+    <dct:references ref="http://example.org/base/123/a"/>
+  </resource>
+</graph>

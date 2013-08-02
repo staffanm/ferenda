@@ -153,7 +153,7 @@ a:nm0000582 rdf:type foaf:Person;
         os.unlink(tmp2)
 
     def test_roundtrip(self):
-        data = """<http://example.org/1> <http://purl.org/dc/terms/title> "language literal"@sv ."""
+        data = b'<http://example.org/1> <http://purl.org/dc/terms/title> "language literal"@sv .'
         self.store.add_serialized(data, format="nt")
         res = self.store.get_serialized(format="nt").strip()
         self.assertEqual(res, data)

@@ -6,7 +6,9 @@ from datetime import datetime
 import locale
 from operator import itemgetter
 
+import six
 from six import text_type as str
+
 from rdflib import Literal, Graph, URIRef, RDF, Namespace
 
 from ferenda import util, decorators
@@ -217,10 +219,12 @@ class W3Standards(DocumentRepository):
             else:
                 datestr = " ".join(m.groups())
                 date = None
-                # FIXME: should this contrived workaround to get default
-                # (english) locale for strptime be put in a util class?
+                # FIXME: This contrived workaround to get default
+                # (english/C) locale for strptime should be put in
+                # ferenda.util (eg util.strptime)
                 l = locale.getlocale(locale.LC_ALL)
-                locale.setlocale(locale.LC_ALL,'C')
+                newlocale = 'C' if six.PY3 else b'C'
+                locale.setlocale(locale.LC_ALL,newlocale)
                 try:
                      # 17 December 1996
                     date = datetime.strptime(datestr,"%d %B %Y").date()
