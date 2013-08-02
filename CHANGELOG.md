@@ -1,4 +1,4 @@
-2013-08-?? RELEASE 0.1.2
+2013-08-02 RELEASE 0.1.2
 ========================
 
 * If using a RDFLib based triple store (storetype="SQLITE" or
@@ -11,8 +11,8 @@
   up/downloading large datasets.
 
 * Content-negotiation when using the WSGI app (as described in
-  doc/wsgi.rst) is being developed
-	
+  doc/wsgi.rst) is supported
+
 2013-07-27 RELEASE 0.1.1
 ========================
 
