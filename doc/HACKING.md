@@ -14,7 +14,7 @@ $ git commit -a -m "Final release prep"
 $ git tag -a "v0.1.0" -m "Initial release"
 $ git push orgin release/0.1.0
 $ git push --tags # makes the release show up in Github
-$ python register -r testpypi
+$ python setup.py register -r testpypi
 $ python setup.py sdist upload -r testpypi
 $ git checkout master
 $ git merge release/0.1.0
