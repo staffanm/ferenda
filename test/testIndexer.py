@@ -129,6 +129,7 @@ class BasicQuery(unittest.TestCase):
         res = self.index.query("main")
         self.assertEqual(len(res),1)
         self.assertEqual(res[0]['identifier'], 'Doc #1')
+        self.assertEqual(res[0]['uri'], 'http://example.org/doc/1')
         res = self.index.query("document")
         self.assertEqual(len(res),2)
         # Doc #2 contains the term 'document' in title (which is a

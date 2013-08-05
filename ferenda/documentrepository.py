@@ -1657,7 +1657,11 @@ parsed document path to that documents dependency file."""
                 # configurationfile where os.relpath has been applied
                 # to them.
                 tree = etree.parse(conffile)
-                assert outfile.startswith(self.config.datadir), "outfile %s not under datadir %s" % (outfile, self.config.datadir)
+                if os.path.isabs(self.config.datadir):
+                    datadir = self.config.datadir
+                else:
+                    datadir = os.path.abspath(self.config.datadir)
+                assert outfile.startswith(datadir), "outfile %s not under datadir %s" % (outfile, datadir)
                 # "datadir/foo/bar/baz.html" -> "foo/bar"
                 # "/var/folders/sy/r4f/T/tmpcRojl/foo/bar/baz.html" -> "foo/bar"p
                 relative_outfile = outfile[len(self.config.datadir)+1:]

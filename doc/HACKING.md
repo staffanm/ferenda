@@ -18,6 +18,8 @@ $ python setup.py register -r testpypi
 $ python setup.py sdist upload -r testpypi
 $ git checkout master
 $ git merge release/0.1.0
+$ git push
+
 
 Smoke-testing the released code
 -------------------------------

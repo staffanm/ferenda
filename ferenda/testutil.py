@@ -245,7 +245,9 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
 
     def setUp(self):
         self.datadir = tempfile.mkdtemp()
-        self.repo = self.repoclass(datadir=self.datadir)
+        self.repo = self.repoclass(datadir=self.datadir,
+                                   storelocation=self.datadir+"/ferenda.sqlite",
+                                   indexlocation=self.datadir+"/whoosh",)
             
     def tearDown(self):
         # print("Not removing %s" % self.datadir)

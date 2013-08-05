@@ -46,9 +46,6 @@
       <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
       <title><xsl:call-template name="headtitle"/></title>
       <meta name="viewport" content="width=device-width" />
-      <!-- FIXME: manager.makeresources should have support for
-           directly referencing remote css/js files (who by default
-           are not combined). Hardcode for now. -->
       <xsl:copy-of select="$configuration/stylesheets/*"/>
       <!-- xhtml files can have custom stylesheets (ie pdf page backgrounds), just copy these -->
       <xsl:for-each select="xhtml:link[@rel='stylesheet']">
@@ -114,4 +111,5 @@
       </xsl:if>
     </body>
   </xsl:template>
+  
 </xsl:stylesheet>

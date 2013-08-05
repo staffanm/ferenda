@@ -17,6 +17,7 @@ from io import BytesIO
 import shutil
 
 from rdflib import Graph
+from lxml import etree
 
 from ferenda.testutil import RepoTester
     
@@ -33,8 +34,8 @@ class WSGI(RepoTester):
         super(WSGI,self).setUp()
         self.app = make_wsgi_app(port=8000,
                                  documentroot=self.datadir,
-                                 apiendpoint="myapi",
-                                 searchendpoint="mysearch",
+                                 apiendpoint="/myapi/",
+                                 searchendpoint="/mysearch/",
                                  repos = [self.repo])
 
         # Put files in place: parsed
@@ -95,7 +96,7 @@ class WSGI(RepoTester):
                'wsgi.url_scheme': 'http'}
         status, headers, content = self.call_wsgi(env)
         self.assertResponse("200 OK",
-                            {'Content-type': 'text/html'},
+                            {'Content-Type': 'text/html'},
                             util.readfile(self.repo.store.generated_path("123/a"), "rb"),
                             
                             status, headers, content)
@@ -104,7 +105,7 @@ class WSGI(RepoTester):
         env['HTTP_ACCEPT'] = 'application/xhtml+xml'
         status, headers, content = self.call_wsgi(env)
         self.assertResponse("200 OK",
-                            {'Content-type': 'application/xhtml+xml'},
+                            {'Content-Type': 'application/xhtml+xml'},
                             util.readfile(self.repo.store.parsed_path("123/a"), "rb"),
                             status, headers, content)
 
@@ -112,7 +113,7 @@ class WSGI(RepoTester):
         env['HTTP_ACCEPT'] = 'application/rdf+xml'
         status, headers, content = self.call_wsgi(env)
         self.assertResponse("200 OK",
-                            {'Content-type': 'application/rdf+xml'},
+                            {'Content-Type': 'application/rdf+xml'},
                             util.readfile(self.repo.store.distilled_path("123/a"), "rb"),
                             status, headers, content)
 
@@ -127,7 +128,7 @@ class WSGI(RepoTester):
         env['HTTP_ACCEPT'] = 'text/plain'
         status, headers, content = self.call_wsgi(env)
         self.assertResponse("200 OK",
-                            {'Content-type': 'text/plain'},
+                            {'Content-Type': 'text/plain'},
                             None,
                             status, headers, None)
         got = Graph()
@@ -138,7 +139,7 @@ class WSGI(RepoTester):
         env['HTTP_ACCEPT'] = 'text/turtle'
         status, headers, content = self.call_wsgi(env)
         self.assertResponse("200 OK",
-                            {'Content-type': 'text/turtle'},
+                            {'Content-Type': 'text/turtle'},
                             None,
                             status, headers, None)
         got = Graph()
@@ -151,7 +152,7 @@ class WSGI(RepoTester):
         g += self.repo.annotation_file_to_graph(self.repo.store.annotation_path("123/a"))
         status, headers, content = self.call_wsgi(env)
         self.assertResponse("200 OK",
-                            {'Content-type': 'application/rdf+xml'},
+                            {'Content-Type': 'application/rdf+xml'},
                             None,
                             status, headers, None)
         got = Graph()
@@ -163,7 +164,7 @@ class WSGI(RepoTester):
         env['HTTP_ACCEPT'] = 'text/plain'
         status, headers, content = self.call_wsgi(env)
         self.assertResponse("200 OK",
-                            {'Content-type': 'text/plain'},
+                            {'Content-Type': 'text/plain'},
                             None,
                             status, headers, None)
         got = Graph()
@@ -175,9 +176,61 @@ class WSGI(RepoTester):
         env['HTTP_ACCEPT'] = 'text/turtle'
         status, headers, content = self.call_wsgi(env)
         self.assertResponse("200 OK",
-                            {'Content-type': 'text/turtle'},
+                            {'Content-Type': 'text/turtle'},
                             None,
                             status, headers, None)
         got = Graph()
         got.parse(data=content, format="turtle")
         self.assertEqualGraphs(g, got)
+
+    def test_search(self):
+        # step 1: make sure parsed content is also related (ie in whoosh db)
+        self.repo.relate("123/a")
+
+        # search for 'part', which occurs in two Whoosh documents (123/a and 123/a#S1)
+        env = {'HTTP_ACCEPT': 'text/html',
+               'PATH_INFO':   '/mysearch/',
+               'QUERY_STRING': 'q=part',
+               'SERVER_NAME': 'localhost',
+               'SERVER_PORT': '8000',
+               'wsgi.url_scheme': 'http'}
+        status, headers, content = self.call_wsgi(env)
+        self.assertResponse("200 OK",
+                            {'Content-Type': 'text/html; charset=utf-8'},
+                            None,
+                            status, headers, None)
+
+        t = etree.fromstring(content)
+        css = t.findall("head/link[@rel='stylesheet']")
+        self.assertEqual(len(css),4) # normalize, main, ferenda, and fonts.googleapis.com
+        js = t.findall("head/script")
+        self.assertEqual(len(js),3) # jquery, modernizr and ferenda
+        
+        resulthead = t.find(".//article/h1").text
+        self.assertEqual(resulthead, "2 matches for 'part'")
+        docs = t.findall(".//div[@class='section-wrapper']")
+        self.assertEqual(len(docs), 2)
+        self.assertEqual(docs[0][0].tag, 'h2')
+        self.assertEqual(docs[0][0][0].text, 'Main')
+        self.assertEqual(docs[0][0][0].get('href'), 'http://example.org/base/123/a')
+        self.assertEqual(etree.tostring(docs[0][0][1]),
+                         'This is <strong class="match term0">part</strong> of the main document, but not part of any sub-resource')
+        
+        self.assertEqual(docs[0][0].tag, 'h2')
+        self.assertEqual(docs[1][0][0].text, '1st sect')
+        self.assertEqual(docs[1][0][0].get('href'), 'http://example.org/base/123/a')
+        self.assertEqual(etree.tostring(docs[0][1][1]),
+                         'This is <strong class="match term0">part</strong> of document-part section 1')
+        
+        
+        # search for 'subsection', which occurs in a single document
+        # (123/a#S1.1)
+        env['PATH_INFO'] = "/mysearch/?q=subsection"
+        status, headers, content = self.call_wsgi(env)
+        self.assertIn("1 match for 'subsection'", content)
+
+        
+                            
+        
+
+

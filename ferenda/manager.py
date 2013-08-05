@@ -44,19 +44,23 @@ from wsgiref.util import FileWrapper
 # from pprint import pprint
 from six.moves import configparser
 input = six.moves.input
+
 # 3rd party
 import pkg_resources
 import requests
 import requests.exceptions
+from rdflib import URIRef, Namespace, Literal
 
 # my modules
 from ferenda import DocumentRepository
 from ferenda import DocumentStore
-from ferenda import TripleStore
-from ferenda import util
-from ferenda import errors
+from ferenda import FulltextIndex
 from ferenda import LayeredConfig
-
+from ferenda import TripleStore
+from ferenda import elements
+from ferenda.elements  import html
+from ferenda import errors
+from ferenda import util
 
 # NOTE: This is part of the published API and must be callable in
 # scenarios without configfile or logger.
@@ -411,15 +415,48 @@ def make_wsgi_app(inifile=None, **kwargs):
 def _wsgi_search(environ, start_response, args):
     """WSGI method, called by the wsgi app for requests that matches
        ``searchendpoint``."""
-    def htmlify(d):
-        return "<ul>" + ("\n".join("<li>%s: %s" % (cgi.escape(x), cgi.escape(str(d[x]))) for x in d.keys())) + "</ul>"
+    # get the location for the index. Different repos could
+    # technically have different paths here, but that'd be stupid. It
+    # would be bettter if indexlocation was available direct from args
+    # (which requires changing _setup_runserver_args())
+    idx = FulltextIndex(args['repos'][0].config.indexlocation)
+    # FIXME: QUERY_STRING should probably be sanitized before calling
+    # .query() - but in what way?
+    query = environ['QUERY_STRING'][2:]
+    res = idx.query(query)
+    if len(res) == 1:
+        resulthead = "1 match"
+    else:
+        resulthead = "%s matches" % len(res)
+    resulthead += " for '%s'" % query  # query will be escaped later
 
-    # FIXME
-    msg = "<h1>Search result</h1><p>You searched for <i>'%s'</i>. Unfortunately, search functionality is not yet implemented, but in the meantime, here's some debugging info.</p>" % cgi.escape(environ['QUERY_STRING'][2:])
-
-    msg += "Environ:%s Args:%s""" % (htmlify(environ),
-                                     htmlify(args))
-    data = msg.encode('utf-8')
+    # Creates simple XHTML result page
+    repo = args['repos'][0]
+    doc = repo.make_document()
+    doc.uri = "http://example.org/"
+    doc.meta.add((URIRef(doc.uri),
+                  Namespace(util.ns['dct']).title,
+                  Literal(resulthead, lang="en")))
+    doc.body = elements.Body()
+    for r in res:
+        doc.body.append(html.Div(
+            [html.H2([elements.Link(r['title'], uri=r['uri'])]),
+             elements.Paragraph([r['text']])]))
+    
+    # Transform that XHTML into HTML5
+    
+    # FIXME: this way of transforming a etree to HTML5 is way too
+    # complicated, dependent on args['repo'][0], stores temporary
+    # files on disk for no good reason and duplicates code
+    xsltfile = "res/xsl/search.xsl"
+    tmpfile = args['documentroot']+"/_searchtmp-%s.xhtml" % os.getpid()
+    outfile = args['documentroot']+"/_searchtmp-%s.html" % os.getpid()
+    xsltdir = repo.setup_transform_templates(os.path.dirname(xsltfile))
+    params = repo.get_transform_configuration(xsltdir,outfile)
+    repo.render_xhtml(doc,tmpfile)
+    repo.transform_html("res/xsl/search.xsl",
+                        tmpfile, outfile, params, args['repos'][1:])
+    data = util.readfile(outfile,"rb")
     start_response("200 OK", [
         ("Content-Type", "text/html; charset=utf-8"),
         ("Content-Length", str(len(data)))
@@ -479,8 +516,8 @@ def _wsgi_static(environ, start_response, args):
             fp = six.BytesIO(msg.encode('utf-8'))
             iterdata = FileWrapper(fp)
     start_response(status, [
-        ("Content-type", mimetype),
-        ("Content-length", str(length))
+        ("Content-Type", mimetype),
+        ("Content-Length", str(length))
     ])
     return iterdata
     # FIXME: How can we make sure fp.close() is called, regardless of

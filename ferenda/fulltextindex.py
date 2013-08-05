@@ -40,7 +40,7 @@ class FulltextIndex(object):
 
     def _create_whoosh_index(self,location,fields):
         # maps our field classes to concrete whoosh field instances
-        mapped_field = {Identifier():   whoosh.fields.ID(unique=True),
+        mapped_field = {Identifier():   whoosh.fields.ID(unique=True, stored=True),
                         Label():        whoosh.fields.ID(stored=True),
                         Label(boost=16):whoosh.fields.ID(field_boost=16,stored=True),
                         Text(boost=4):  whoosh.fields.TEXT(field_boost=4,stored=True,
@@ -146,14 +146,14 @@ class FulltextIndex(object):
 
         .. note::
 
-           The *kwargs* parameters do not yet do anything -- only simple full text queries are possible.
+           The *kwargs* parameters do not yet do anything -- only
+           simple full text queries are possible.
 
         """
         searchfields = ['identifier','title','text']
         mparser = whoosh.qparser.MultifieldParser(searchfields,
                                                   self._index.schema)
         query = mparser.parse(q)
-        # query = whoosh.query.Term("text",q)
         with self._index.searcher() as searcher:
             res = self._convert_result(searcher.search(query))
 
