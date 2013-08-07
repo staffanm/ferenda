@@ -447,12 +447,19 @@ def _wsgi_search(environ, start_response, args):
     
     # FIXME: this way of transforming a etree to HTML5 is way too
     # complicated, dependent on args['repo'][0], stores temporary
-    # files on disk for no good reason and duplicates code
+    # files on disk for no good reason, abuses
+    # get_transform_configuration with a fake path and duplicates code
     xsltfile = "res/xsl/search.xsl"
     tmpfile = args['documentroot']+"/_searchtmp-%s.xhtml" % os.getpid()
     outfile = args['documentroot']+"/_searchtmp-%s.html" % os.getpid()
+    # create a fake path so taht get_transform_configuration selects a
+    # resources.xml with correct relative path
+    depth = len(list(filter(None,args['searchendpoint'].split("/"))))
+    fake_outfile = "%s/%s/search.html" % (args['documentroot'],
+                                          "/".join(["fake"]*depth))
     xsltdir = repo.setup_transform_templates(os.path.dirname(xsltfile))
-    params = repo.get_transform_configuration(xsltdir,outfile)
+    params = repo.get_transform_configuration(xsltdir,fake_outfile)
+    
     repo.render_xhtml(doc,tmpfile)
     repo.transform_html("res/xsl/search.xsl",
                         tmpfile, outfile, params, args['repos'][1:])

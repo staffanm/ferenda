@@ -1,3 +1,7 @@
+                                                                     
+                                                                     
+                                                                     
+                                             
 The WSGI app and it's ReST API
 ==============================
 
@@ -12,8 +16,12 @@ During development, you can just ``ferenda-build.py runserver``. This
 starts up a single-threaded web server in the foreground with the web
 application, by default accessible as ``http://localhost:8000/``
 
-You can also run the web application under any wsgi server, such as
-mod_wsgi, uWSGI or Gunicorn.  ferenda-setup creates a file called
+You can also run the web application under any `WSGI <http://wsgi.readthedocs.org/en/latest/>`_ 
+server, such as
+`mod_wsgi <http://code.google.com/p/modwsgi/>`_, 
+`uWSGI <https://uwsgi-docs.readthedocs.org/en/latest/index.html>`_ or
+`Gunicorn <http://gunicorn.org/>`_. 
+``ferenda-setup`` creates a file called
 ``wsgi.py`` alongside ``ferenda-build.py`` which is used to serve the
 ferenda web app using WSGI. This is the contents of that file::
 
@@ -47,7 +55,7 @@ command::
 
 .. note::
 
-   This doesn't actually work yet.
+   The ``--htaccess`` parameter doesn't actually work yet.
   
 Then, change the path where the dynamic web app is mounted in the URL
 space in your httpd.conf::
@@ -109,8 +117,8 @@ a Accept: application/rdf+xml GET on the same URI, it'll reply with
 all statements about that URI in RDF/XML
 
 
-Setting a different base url
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Using ``develurl`` during development
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. note::
 
@@ -128,34 +136,78 @@ This will make all uris in parsed and generated documents on the form
 http://example.org/netstandards/res/rfc/4711, but during devel still
 support http://localhost:8000/res/rfc/4711.
 
-When you set url to a new value, you must re-run ``./ferenda-build.py parse --all --force`` and ``./ferenda-build.py generate --all --force`` for it to take effect.
+When you set url to a new value, you must re-run ``./ferenda-build.py
+all generate --all --force``, ``./ferenda-build.py all toc --force``,
+``./ferenda-build.py all news --force`` and ``./ferenda-build.py all
+frontpage --force`` for it to take effect.
 
 The RESTish API
 ---------------
 
-For each resource, use the Accept header to retrieve different
+For each resource, use the ``Accept`` header to retrieve different
 versions of it:
 
-* ``curl -H "Accept: text/html" http://localhost:8000/res/rfc/4711`` returns ``rfc/generated/4711.html``
-* ``curl -H "Accept: application/xhtml+xml" http://localhost:8000/res/rfc/4711`` returns ``rfc/parsed/4711.xhtml``
-* ``curl -H "Accept: application/rdf+xml" http://localhost:8000/res/rfc/4711`` returns ``rfc/distilled/4711.rdf``
-* ``curl -H "Accept: text/turle" http://localhost:8000/res/rfc/4711`` returns ``rfc/distilled/4711.rdf``, but in Turtle format
-* ``curl -H "Accept: application/json" http://localhost:8000/res/rfc/4711`` returns ``rfc/distilled/4711.rdf``, but in JSON-LD format
+* ``curl -H "Accept: text/html" http://localhost:8000/res/rfc/4711``
+  returns ``rfc/generated/4711.html``
+* ``curl -H "Accept: application/xhtml+xml"
+  http://localhost:8000/res/rfc/4711`` returns
+  ``rfc/parsed/4711.xhtml``
+* ``curl -H "Accept: application/rdf+xml"
+  http://localhost:8000/res/rfc/4711`` returns
+  ``rfc/distilled/4711.rdf``
+* ``curl -H "Accept: text/turtle" http://localhost:8000/res/rfc/4711``
+  returns ``rfc/distilled/4711.rdf``, but in Turtle format
+* ``curl -H "Accept: text/plain" http://localhost:8000/res/rfc/4711``
+  returns ``rfc/distilled/4711.rdf``, but in NTriples format
+* ``curl -H "Accept: application/json"
+  http://localhost:8000/res/rfc/4711`` returns
+  ``rfc/distilled/4711.rdf``, but in JSON-LD format
 
 You can also get *extended information* about a single document in
 various RDF flavours. This extended information includes everything
-that :meth:`~ferenda.DocumentRepository.construct_annotations` returns.
+that :meth:`~ferenda.DocumentRepository.construct_annotations`
+returns, i.e. information about documents that refer to this document.
 
-* ``curl -H "Accept: application/rdf+xml" http://localhost:8000/res/rfc/4711/data`` returns a RDF/XML combination of ``rfc/distilled/4711.rdf`` and ``rfc/annotation/4711.rdf``
-* ``curl -H "Accept: text/turtle" http://localhost:8000/res/rfc/4711/data`` returns the same in Turtle format
-* ``curl -H "Accept: application/json" http://localhost:8000/res/rfc/4711/data`` returns the same in JSON-LD format.
+* ``curl -H "Accept: application/rdf+xml"
+  http://localhost:8000/res/rfc/4711/data`` returns a RDF/XML
+  combination of ``rfc/distilled/4711.rdf`` and
+  ``rfc/annotation/4711.grit.xml``
+* ``curl -H "Accept: text/turtle"
+  http://localhost:8000/res/rfc/4711/data`` returns the same in Turtle
+  format
+* ``curl -H "Accept: text/plain"
+  http://localhost:8000/res/rfc/4711/data`` returns the same in
+  NTriples format
+* ``curl -H "Accept: application/json"
+  http://localhost:8000/res/rfc/4711/data`` returns the same in
+  JSON-LD format.
 
 .. note::
 
-   JSON-LD output is not yet supported. We're awaiting the first
+   JSON-LD output is not yet supported, awaiting the first
    public release of `rdflib-jsonld
    <http://github.com/RDFLib/rdflib-jsonld>`_ on PyPI.
 
+Dataset resources
+^^^^^^^^^^^^^^^^^
 
+.. note::
 
+   Not implemented... yet!
 
+Each docrepo exposes information about the data it contains through
+it's dataset URI. This is a single URI (controlled by
+:meth:`~ferenda.DocumentRepository.dataset_uri`) which can be queried
+in a similar way as the document resources above:
+
+* ``curl -H "Accept: application/html" http://localhost/dataset/rfc``
+  returns a HTML view of a Table of Contents for all documents (see
+  :doc:`createdocrepos`, "Writing your own toc implementation").
+* ``curl -H "Accept: text/plain" http://localhost/dataset/rfc``
+  returns ``rfc/distilled/dump.nt`` which contains all RDF statements
+  for all documents in the repository.
+* ``curl -H "Accept: application/rdf+xml"
+  http://localhost/dataset/rfc`` returns the same, but in RDF/XML
+  format.
+* ``curl -H "Accept: text/turtle" http://localhost/dataset/rfc``
+  returns the same, but in turtle format.
