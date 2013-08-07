@@ -273,7 +273,6 @@ class Search(WSGI):
                             status, headers, None)
 
         t = etree.parse(BytesIO(content))
-        from pudb import set_trace; set_trace()
         css = t.findall("head/link[@rel='stylesheet']")
         self.assertEqual(len(css),4) # normalize, main, ferenda, and fonts.googleapis.com
         self.assertEqual(css[0].get('href'), '../rsrc/css/normalize.css')
@@ -288,13 +287,18 @@ class Search(WSGI):
         self.assertEqual(docs[0][0][0].text, 'Introduction')
         self.assertEqual(docs[0][0][0].get('href'), 'http://example.org/base/123/a#S1')
         self.assertEqual(etree.tostring(docs[0][1]).strip(),
-                         b'<p>This is <strong class="match term0">part</strong> of the main document, but not part of any sub-resource</p>')
+                         b'<p>This is <b class="match term0">part</b> of document-<b class="match term0">part</b> section 1</p>')
         
-        self.assertEqual(docs[0][0].tag, 'h2')
-        self.assertEqual(docs[1][0][0].text, '1st sect')
-        self.assertEqual(docs[1][0][0].get('href'), 'http://example.org/base/123/a')
-        self.assertEqual(etree.tostring(docs[0][1][1]),
-                         'This is <strong class="match term0">part</strong> of document-part section 1')
+        self.assertEqual(docs[1][0][0].text, 'Definitions and Abbreviations')
+        self.assertEqual(docs[1][0][0].get('href'), 'http://example.org/base/123/a#S2')
+        self.assertEqual(etree.tostring(docs[1][1]).strip(),
+                         b'<p>second main document <b class="match term0">part</b></p>')
+
+        self.assertEqual(docs[2][0][0].text, 'Example')
+        self.assertEqual(docs[2][0][0].get('href'), 'http://example.org/base/123/a')
+        self.assertEqual(etree.tostring(docs[2][1]).strip(),
+                         b'<p>This is <b class="match term0">part</b> of the main document</p>')
+        
         
 
     def test_search_single(self):

@@ -50,6 +50,7 @@ import pkg_resources
 import requests
 import requests.exceptions
 from rdflib import URIRef, Namespace, Literal
+from bs4 import BeautifulSoup
 
 # my modules
 from ferenda import DocumentRepository
@@ -419,7 +420,8 @@ def _wsgi_search(environ, start_response, args):
     # technically have different paths here, but that'd be stupid. It
     # would be bettter if indexlocation was available direct from args
     # (which requires changing _setup_runserver_args())
-    idx = FulltextIndex(args['repos'][0].config.indexlocation)
+    idx = FulltextIndex.connect("WHOOSH",
+                                args['repos'][0].config.indexlocation)
     # FIXME: QUERY_STRING should probably be sanitized before calling
     # .query() - but in what way?
     query = environ['QUERY_STRING'][2:]
@@ -439,9 +441,14 @@ def _wsgi_search(environ, start_response, args):
                   Literal(resulthead, lang="en")))
     doc.body = elements.Body()
     for r in res:
+        # it'd be better if we write our own whoosh highlighter that
+        # returns ferenda.Elements, but for now use
+        # elements.html.elements_from_soup
+        soup = BeautifulSoup(r['text']).find('p')
+        snippet = html.elements_from_soup(soup)
         doc.body.append(html.Div(
             [html.H2([elements.Link(r['title'], uri=r['uri'])]),
-             elements.Paragraph([r['text']])]))
+             snippet]))
     
     # Transform that XHTML into HTML5
     

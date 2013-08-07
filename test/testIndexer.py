@@ -57,7 +57,7 @@ class BasicIndex(unittest.TestCase):
 
     def setUp(self):
         self.location = mkdtemp()
-        self.index = FulltextIndex(self.location)
+        self.index = FulltextIndex.connect("WHOOSH", self.location)
         
     def tearDown(self):
         shutil.rmtree(self.location)
@@ -80,8 +80,8 @@ class BasicIndex(unittest.TestCase):
         self.assertEqual(wanted,got)
         # assert that the schema with underlying whoosh types is, in
         # fact, correct
-        got = self.index._index.schema
-        want = whoosh.fields.Schema(uri=whoosh.fields.ID(unique=True),
+        got = self.index.index.schema
+        want = whoosh.fields.Schema(uri=whoosh.fields.ID(unique=True, stored=True),
                                     repo=whoosh.fields.ID(stored=True),
                                     basefile=whoosh.fields.ID(stored=True),
                                     title=whoosh.fields.TEXT(field_boost=4,stored=True),
@@ -107,7 +107,7 @@ class BasicIndex(unittest.TestCase):
 class BasicQuery(unittest.TestCase):
     def setUp(self):
         self.location = mkdtemp()
-        self.index = FulltextIndex(self.location)
+        self.index = FulltextIndex.connect("WHOOSH", self.location)
         
     def tearDown(self):
         shutil.rmtree(self.location)
@@ -201,7 +201,7 @@ class CustomizedIndex(object):
 
     def test_setup():
         self.location = mkdtemp()
-        self.index = FulltextIndex(self.location, [DocRepo1(), DocRepo2()])
+        self.index = FulltextIndex.connect("WHOOSH", self.location, [DocRepo1(), DocRepo2()])
         # introspecting the schema (particularly if it's derived
         # directly from our definitions, not reverse-engineerded from
         # a Whoosh index on-disk) is useful for eg creating dynamic
@@ -226,7 +226,7 @@ class CustomizedIndex(object):
 class CustomQuery(object):        
     def setUp(self):
         self.location = mkdtemp()
-        self.index = FulltextIndex(self.location, [DocRepo1(), DocRepo2()])
+        self.index = FulltextIndex.connect("WHOOSH", self.location, [DocRepo1(), DocRepo2()])
         self.load(custom_dataset)
         
     def tearDown(self):

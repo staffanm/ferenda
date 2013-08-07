@@ -1294,7 +1294,8 @@ uri doesn't map to a basefile in this repo."""
 
     def _get_fulltext_indexer(self, batchoptimize=False):
         if not hasattr(self, '_fulltextindexer'):
-            self._fulltextindexer = FulltextIndex(self.config.indexlocation)
+            idx = FulltextIndex.connect("WHOOSH", self.config.indexlocation)
+            self._fulltextindexer = idx
             if hasattr(self.config, 'all'):
                 self._fulltextindexer._batchwriter = True
             
