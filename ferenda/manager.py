@@ -35,9 +35,9 @@ except ImportError:
 import six  # technically third-party, but needed for cross-version
             # system imports
 if six.PY3:
-    from urllib.parse import urlsplit    
+    from urllib.parse import urlsplit, parse_qs, urlencode
 else:
-    from urlparse import urlsplit
+    from urlparse import urlsplit, parse_qs, urlencode
 
 from wsgiref.simple_server import make_server
 from wsgiref.util import FileWrapper
@@ -424,12 +424,15 @@ def _wsgi_search(environ, start_response, args):
                                 args['repos'][0].config.indexlocation)
     # FIXME: QUERY_STRING should probably be sanitized before calling
     # .query() - but in what way?
-    query = environ['QUERY_STRING'][2:]
-    res = idx.query(query)
-    if len(res) == 1:
+    querystring = parse_qs(environ['QUERY_STRING'])
+    querystring['q'] = querystring['q'][0]
+    query = querystring['q']
+    pagenum = int(querystring.get('p',['1'])[0])
+    res, pager = idx.query(query,pagenum=pagenum)
+    if pager['totalresults'] == 1:
         resulthead = "1 match"
     else:
-        resulthead = "%s matches" % len(res)
+        resulthead = "%s matches" % pager['totalresults']
     resulthead += " for '%s'" % query  # query will be escaped later
 
     # Creates simple XHTML result page
@@ -441,15 +444,22 @@ def _wsgi_search(environ, start_response, args):
                   Literal(resulthead, lang="en")))
     doc.body = elements.Body()
     for r in res:
-        # it'd be better if we write our own whoosh highlighter that
-        # returns ferenda.Elements, but for now use
-        # elements.html.elements_from_soup
-        soup = BeautifulSoup(r['text']).find('p')
-        snippet = html.elements_from_soup(soup)
+        if not 'title' in r:
+            r['title'] = r['uri']
         doc.body.append(html.Div(
             [html.H2([elements.Link(r['title'], uri=r['uri'])]),
-             snippet]))
-    
+             r['text']], **{'class':'hit'}))
+
+    pages = [html.P(["Results %(firstresult)s to %(lastresult)s of %(totalresults)s" % pager])]
+    for pagenum in range(pager['pagecount']):
+        if pagenum + 1 == pager['pagenum']:
+            pages.append(html.Span([str(pagenum+1)],**{'class':'page'}))
+        else:
+            querystring['p'] = str(pagenum+1)
+            url = environ['PATH_INFO'] + "?" + urlencode(querystring)
+            pages.append(html.A([str(pagenum+1)],**{'class':'page',
+                                                  'href':url}))
+    doc.body.append(html.Div(pages, **{'class':'pager'}))
     # Transform that XHTML into HTML5
     
     # FIXME: this way of transforming a etree to HTML5 is way too

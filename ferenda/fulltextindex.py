@@ -160,8 +160,48 @@ import whoosh.analysis
 import whoosh.query
 import whoosh.qparser
 import whoosh.writing
+import whoosh.highlight
+
+from ferenda.elements import html
+
+class ElementsFormatter(whoosh.highlight.Formatter):
+    """Returns a tree of ferenda.elements representing the formatted hit."""
+
+    def __init__(self, wrapelement=html.P, hitelement=html.Strong, classname="hit", between=" ... "):
+        self.wrapelement = wrapelement
+        self.hitelement = hitelement
+        self.classname = classname
+        self.between = between
+
+
+    def format(self, fragments, replace=False):
+        res = self.wrapelement()
+        first = True
+        for fragment in fragments:
+            if not first:
+                res.append(self.between)
+            res.extend(self.format_fragment(fragment, replace=replace))
+            first = False
+        return res
+
+    def format_fragment(self, fragment, replace):
+        output = []
+        index = fragment.startchar
+        text = fragment.text
+
+        for t in fragment.matches:
+            if t.startchar > index:
+                output.append(text[index:t.startchar].strip() + " ")
+            hittext = whoosh.highlight.get_text(text,t,False)
+            output.append(self.hitelement([hittext], **{'class': self.classname}))
+            index = t.endchar
+        if index < len(text):
+            output.append(" " + text[index:fragment.endchar].strip())
+        return output
+
 class WhooshIndex(FulltextIndex):
-   
+
+
     def __init__(self,location):
         super(WhooshIndex, self).__init__(location)
         self._schema = self.get_default_schema()
@@ -237,25 +277,30 @@ class WhooshIndex(FulltextIndex):
         return self.index.doc_count()
 
 
-    def query(self,q, **kwargs):
+    def query(self,q, pagenum=1, pagelen=10, **kwargs):
         searchfields = ['identifier','title','text']
         mparser = whoosh.qparser.MultifieldParser(searchfields,
                                                   self.index.schema)
         query = mparser.parse(q)
         with self.index.searcher() as searcher:
-            res = self._convert_result(searcher.search(query))
-
-        return res
+            page = searcher.search_page(query, pagenum, pagelen)
+            res = self._convert_result(page)
+            pager = {'pagenum': pagenum,
+                     'pagecount':page.pagecount,
+                     'firstresult':page.offset+1,
+                     'lastresult': page.offset+page.pagelen,
+                     'totalresults': page.total}
+        return res, pager
 
 
     def _convert_result(self,res):
-        # converts a whoosh.searching.Results object to a plain list of dicts
+        # converts a whoosh.searching.ResultsPage object to a plain
+        # list of dicts
         l = []
-        # res.highlighter = highlight.Highlighter(
-        #     formatter=highlight.HtmlFormatter(tagname='strong', classname='match'))
+        hl = whoosh.highlight.Highlighter(formatter=ElementsFormatter())
         for hit in res:
             fields = hit.fields()
-            fields['text'] = hit.highlights("text")
+            fields['text'] = hl.highlight_hit(hit,"text",fields['text'])
             l.append(hit.fields())	
         return l
 

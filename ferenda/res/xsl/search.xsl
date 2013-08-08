@@ -23,7 +23,7 @@ It's a generic template for search result pages.
   <xsl:template name="headmetadata"><xsl:comment>headmetadata?</xsl:comment></xsl:template>
   <xsl:template name="bodyclass">search</xsl:template>
       
-  <xsl:template match="xhtml:div">
+  <xsl:template match="xhtml:div[@class='hit']">
     <section class="hit">
       <xsl:apply-templates/>
     </section>

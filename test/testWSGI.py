@@ -15,6 +15,7 @@ except ImportError:
     from mock import Mock
 from io import BytesIO
 import shutil
+import codecs
 
 from rdflib import Graph
 from lxml import etree
@@ -260,6 +261,21 @@ class Search(WSGI):
         super(Search, self).setUp()
         self.env['PATH_INFO'] = '/mysearch/'
 
+    def _copy_and_distill(self,basefile):
+        util.ensure_dir(self.repo.store.parsed_path(basefile))
+        shutil.copy2("test/files/base/parsed/%s.xhtml" % basefile,
+                     self.repo.store.parsed_path(basefile))
+        distilled_graph = Graph()
+        with codecs.open(self.repo.store.parsed_path(basefile),
+                         encoding="utf-8") as fp: 
+            distilled_graph.parse(data=fp.read(), format="rdfa")
+        
+        util.ensure_dir(self.repo.store.distilled_path(basefile))
+        with open(self.repo.store.distilled_path(basefile),
+                  "wb") as distilled_file:
+            distilled_graph.serialize(distilled_file, format="pretty-xml")
+
+
     def test_search_multiple(self):
         # step 1: make sure parsed content is also related (ie in whoosh db)
         self.repo.relate("123/a")
@@ -313,6 +329,7 @@ class Search(WSGI):
 
 
     def test_highlighted_snippet(self):
+        self._copy_and_distill("123/b")
         self.repo.relate("123/b") # contains one doc with much text and two instances of the sought term
         self.env['QUERY_STRING'] = "q=needle"
         status, headers, content = self.call_wsgi(self.env)
@@ -323,11 +340,12 @@ class Search(WSGI):
                             status, headers, None)                            
         
         t = etree.fromstring(content)
-        docs = t.findall(".//div[@class='hit']")
-        self.assertEqual(etree.tostring(docs[0][0][1]),
-                         '... lorem ipsum <strong class="match term0">needle</strong> lorem ipsum... ...unt so <strong class="match term0">needle</strong> weiter...')
-
+        docs = t.findall(".//section[@class='hit']")
+        self.assertEqual(etree.tostring(docs[0][1]).strip(),
+                         b'<p>sollicitudin justo <strong class="hit">needle</strong> tempor ut eu enim ... himenaeos. <strong class="hit">Needle</strong> id tincidunt orci</p>')
+        
     def test_paged(self):
+        self._copy_and_distill("123/c")
         self.repo.relate("123/c") # contains 50 docs, 25 of which contains 'needle'
         self.env['QUERY_STRING'] = "q=needle"
         status, headers, content = self.call_wsgi(self.env)
@@ -337,9 +355,10 @@ class Search(WSGI):
                             status, headers, None)                            
         
         t = etree.fromstring(content)
-        docs = t.findall(".//div[@class='hit']")
+        docs = t.findall(".//section[@class='hit']")
         self.assertEqual(10, len(docs)) # default page size (too small?)
         pager = t.find(".//div[@class='pager']")
+        
         # assert that pager looks like this:
         # <div class="pager">
         #   <p class="label">Results 1-10 of total 25</p>
@@ -347,13 +366,20 @@ class Search(WSGI):
         #   <a href="/mysearch/?q=needle&p=2" class="page">2</a>
         #   <a href="/mysearch/?q=needle&p=3" class="page">3</a>
         # </div>
+        self.assertEqual(4,len(pager))
+        self.assertEqual('p',pager[0].tag)
+        self.assertEqual('span',pager[1].tag)
+        self.assertEqual('a',pager[2].tag)
+        self.assertEqual('/mysearch/?q=needle&p=2',pager[2].get('href'))
 
         self.env['QUERY_STRING'] = "q=needle&p=2"
         status, headers, content = self.call_wsgi(self.env)
         t = etree.fromstring(content)
-        docs = t.findall(".//div[@class='hit']")
+        docs = t.findall(".//section[@class='hit']")
         self.assertEqual(10, len(docs)) # default page size (too small?)
         pager = t.find(".//div[@class='pager']")
+        self.assertEqual(4,len(pager))
+        self.assertEqual('/mysearch/?q=needle&p=1',pager[1].get('href'))
         # assert that pager looks like this:
         # <div class="pager">
         #   <p class="label">Results 11-20 of total 25</p>
@@ -365,9 +391,10 @@ class Search(WSGI):
         self.env['QUERY_STRING'] = "q=needle&p=3"
         status, headers, content = self.call_wsgi(self.env)
         t = etree.fromstring(content)
-        docs = t.findall(".//div[@class='hit']")
-        self.assertEqual(10, len(docs)) # default page size (too small?)
+        docs = t.findall(".//section[@class='hit']")
+        self.assertEqual(5, len(docs)) # only 5 remaining docs
         pager = t.find(".//div[@class='pager']")
+        self.assertEqual(4,len(pager))
         # assert that pager looks like this:
         # <div class="pager">
         #   <p class="label">Results 21-25 of total 25</p>
@@ -375,11 +402,3 @@ class Search(WSGI):
         #   <a href="/mysearch/?q=needle&p=2" class="page">2</a>
         #   <span class="page">3</span>
         # </div>
-
-        self.env['QUERY_STRING'] = "q=needle&p=4"
-        status, headers, content = self.call_wsgi(self.env)
-        self.assertResponse("404 Not Found",
-                            {'Content-Type': 'text/html; charset=utf-8'},
-                            None,
-                            status, headers, None)              
-        
