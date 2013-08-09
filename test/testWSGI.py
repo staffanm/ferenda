@@ -150,6 +150,8 @@ class ConNeg(WSGI):
 
     def test_turtle(self):
         # transform test 5: accept: text/turtle -> RDF statements (in Turtle)
+        g = Graph()
+        g.parse(source=self.repo.store.distilled_path("123/a"))
         self.env['HTTP_ACCEPT'] = 'text/turtle'
         status, headers, content = self.call_wsgi(self.env)
         self.assertResponse("200 OK",
@@ -172,6 +174,8 @@ class ConNeg(WSGI):
         # extended test 6: accept: "/data" -> extended RDF statements
         self.env['PATH_INFO'] = self.env['PATH_INFO'] + "/data"
         self.env['HTTP_ACCEPT'] = 'application/rdf+xml'
+        g = Graph()
+        g.parse(source=self.repo.store.distilled_path("123/a"))
         g += self.repo.annotation_file_to_graph(self.repo.store.annotation_path("123/a"))
         status, headers, content = self.call_wsgi(self.env)
         self.assertResponse("200 OK",
@@ -183,10 +187,13 @@ class ConNeg(WSGI):
         self.assertEqualGraphs(g, got)
 
     def test_extended_ntriples(self):
-        self.env['PATH_INFO'] = self.env['PATH_INFO'] + "/data"       
         # extended test 7: accept: "/data" + "text/plain" -> extended
         # RDF statements in NTriples
+        self.env['PATH_INFO'] = self.env['PATH_INFO'] + "/data"       
         self.env['HTTP_ACCEPT'] = 'text/plain'
+        g = Graph()
+        g.parse(source=self.repo.store.distilled_path("123/a"))
+        g += self.repo.annotation_file_to_graph(self.repo.store.annotation_path("123/a"))
         status, headers, content = self.call_wsgi(self.env)
         self.assertResponse("200 OK",
                             {'Content-Type': 'text/plain'},
@@ -197,10 +204,13 @@ class ConNeg(WSGI):
         self.assertEqualGraphs(g, got)
 
     def test_extended_turtle(self):
-        self.env['PATH_INFO'] = self.env['PATH_INFO'] + "/data"       
         # extended test 7: accept: "/data" + "text/turtle" -> extended
         # RDF statements in Turtle
+        self.env['PATH_INFO'] = self.env['PATH_INFO'] + "/data"       
         self.env['HTTP_ACCEPT'] = 'text/turtle'
+        g = Graph()
+        g.parse(source=self.repo.store.distilled_path("123/a"))
+        g += self.repo.annotation_file_to_graph(self.repo.store.annotation_path("123/a"))
         status, headers, content = self.call_wsgi(self.env)
         self.assertResponse("200 OK",
                             {'Content-Type': 'text/turtle'},
@@ -210,49 +220,54 @@ class ConNeg(WSGI):
         got.parse(data=content, format="turtle")
         self.assertEqualGraphs(g, got)
 
-    def test_dataset_html(self):
-        self.env['PATH_INFO'] = "/dataset/base"
-        status, headers, content = self.call_wsgi(self.env)
-        # FIXME: compare result to something (base/toc/index.html)
-        self.assertResponse("200 OK",
-                            {'Content-Type': 'text/html'},
-                            None,
-                            status, headers, None)
 
-    def test_dataset_ntriples(self):
-        self.env['PATH_INFO'] = "/dataset/base"
-        self.env['HTTP_ACCEPT'] = 'text/plain'
-        self.assertResponse("200 OK",
-                            {'Content-Type': 'text/html'},
-                            None,
-                            status, headers, None)
-        got = Graph()
-        got.parse(data=content, format="ntriples")
-        self.assertEqualGraphs(g, got)
-
-
-    def test_dataset_turtle(self):
-        self.env['PATH_INFO'] = "/dataset/base"
-        self.env['HTTP_ACCEPT'] = 'text/turtle'
-        self.assertResponse("200 OK",
-                            {'Content-Type': 'text/turtle'},
-                            None,
-                            status, headers, None)
-        got = Graph()
-        got.parse(data=content, format="turtle")
-        self.assertEqualGraphs(g, got)
-
-    def test_dataset_xml(self):
-        self.env['PATH_INFO'] = "/dataset/base"
-        self.env['HTTP_ACCEPT'] = 'application/rdf+xml'
-        self.assertResponse("200 OK",
-                            {'Content-Type': 'application/rdf+xml'},
-                            None,
-                            status, headers, None)
-        g = self._dataset_graph()
-        got = Graph()
-        got.parse(data=content, format="xml")
-        self.assertEqualGraphs(g, got)
+#     # these test require running relate_all and/or toc. skip them for now
+#     def test_dataset_html(self):
+#         self.env['PATH_INFO'] = "/dataset/base"
+#         status, headers, content = self.call_wsgi(self.env)
+#         # FIXME: compare result to something (base/toc/index.html)
+#         self.assertResponse("200 OK",
+#                             {'Content-Type': 'text/html'},
+#                             None,
+#                             status, headers, None)
+# 
+#     def test_dataset_ntriples(self):
+#         self.env['PATH_INFO'] = "/dataset/base"
+#         self.env['HTTP_ACCEPT'] = 'text/plain'
+#         status, headers, content = self.call_wsgi(self.env)
+#         self.assertResponse("200 OK",
+#                             {'Content-Type': 'text/html'},
+#                             None,
+#                             status, headers, None)
+#         got = Graph()
+#         got.parse(data=content, format="ntriples")
+#         self.assertEqualGraphs(g, got)
+# 
+# 
+#     def test_dataset_turtle(self):
+#         self.env['PATH_INFO'] = "/dataset/base"
+#         self.env['HTTP_ACCEPT'] = 'text/turtle'
+#         status, headers, content = self.call_wsgi(self.env)
+#         self.assertResponse("200 OK",
+#                             {'Content-Type': 'text/turtle'},
+#                             None,
+#                             status, headers, None)
+#         got = Graph()
+#         got.parse(data=content, format="turtle")
+#         self.assertEqualGraphs(g, got)
+# 
+#     def test_dataset_xml(self):
+#         self.env['PATH_INFO'] = "/dataset/base"
+#         self.env['HTTP_ACCEPT'] = 'application/rdf+xml'
+#         status, headers, content = self.call_wsgi(self.env)
+#         self.assertResponse("200 OK",
+#                             {'Content-Type': 'application/rdf+xml'},
+#                             None,
+#                             status, headers, None)
+#         g = self._dataset_graph()
+#         got = Graph()
+#         got.parse(data=content, format="xml")
+#         self.assertEqualGraphs(g, got)
 
 
 class Search(WSGI):
@@ -301,19 +316,22 @@ class Search(WSGI):
         self.assertEqual(len(docs), 3)
         self.assertEqual(docs[0][0].tag, 'h2')
         self.assertEqual(docs[0][0][0].text, 'Introduction')
-        self.assertEqual(docs[0][0][0].get('href'), 'http://example.org/base/123/a#S1')
+        self.assertEqual(docs[0][0][0].get('href'),
+                         'http://example.org/base/123/a#S1')
         self.assertEqual(etree.tostring(docs[0][1]).strip(),
-                         b'<p>This is <b class="match term0">part</b> of document-<b class="match term0">part</b> section 1</p>')
+                         b'<p>This is <strong class="match">part</strong> of document-<strong class="match">part</strong> section 1</p>')
         
         self.assertEqual(docs[1][0][0].text, 'Definitions and Abbreviations')
-        self.assertEqual(docs[1][0][0].get('href'), 'http://example.org/base/123/a#S2')
+        self.assertEqual(docs[1][0][0].get('href'),
+                         'http://example.org/base/123/a#S2')
         self.assertEqual(etree.tostring(docs[1][1]).strip(),
-                         b'<p>second main document <b class="match term0">part</b></p>')
+                         b'<p>second main document <strong class="match">part</strong></p>')
 
         self.assertEqual(docs[2][0][0].text, 'Example')
-        self.assertEqual(docs[2][0][0].get('href'), 'http://example.org/base/123/a')
+        self.assertEqual(docs[2][0][0].get('href'),
+                         'http://example.org/base/123/a')
         self.assertEqual(etree.tostring(docs[2][1]).strip(),
-                         b'<p>This is <b class="match term0">part</b> of the main document</p>')
+                         b'<p>This is <strong class="match">part</strong> of the main document</p>')
         
         
 
@@ -342,11 +360,12 @@ class Search(WSGI):
         t = etree.fromstring(content)
         docs = t.findall(".//section[@class='hit']")
         self.assertEqual(etree.tostring(docs[0][1]).strip(),
-                         b'<p>sollicitudin justo <strong class="hit">needle</strong> tempor ut eu enim ... himenaeos. <strong class="hit">Needle</strong> id tincidunt orci</p>')
+                         b'<p>sollicitudin justo <strong class="match">needle</strong> tempor ut eu enim ... himenaeos. <strong class="match">Needle</strong> id tincidunt orci</p>')
         
     def test_paged(self):
         self._copy_and_distill("123/c")
-        self.repo.relate("123/c") # contains 50 docs, 25 of which contains 'needle'
+        # 123/c contains 50 docs, 25 of which contains 'needle'
+        self.repo.relate("123/c") 
         self.env['QUERY_STRING'] = "q=needle"
         status, headers, content = self.call_wsgi(self.env)
         self.assertResponse("200 OK",
@@ -359,15 +378,16 @@ class Search(WSGI):
         self.assertEqual(10, len(docs)) # default page size (too small?)
         pager = t.find(".//div[@class='pager']")
         
-        # assert that pager looks like this:
+        # assert that pager looks smth like this:
         # <div class="pager">
-        #   <p class="label">Results 1-10 of total 25</p>
+        #   <p class="label">Results 1-10 of 25</p>
         #   <span class="page">1</span>
         #   <a href="/mysearch/?q=needle&p=2" class="page">2</a>
         #   <a href="/mysearch/?q=needle&p=3" class="page">3</a>
         # </div>
         self.assertEqual(4,len(pager))
         self.assertEqual('p',pager[0].tag)
+        self.assertEqual('Results 1-10 of 25',pager[0].text)
         self.assertEqual('span',pager[1].tag)
         self.assertEqual('a',pager[2].tag)
         self.assertEqual('/mysearch/?q=needle&p=2',pager[2].get('href'))
@@ -376,17 +396,11 @@ class Search(WSGI):
         status, headers, content = self.call_wsgi(self.env)
         t = etree.fromstring(content)
         docs = t.findall(".//section[@class='hit']")
-        self.assertEqual(10, len(docs)) # default page size (too small?)
+        self.assertEqual(10, len(docs)) 
         pager = t.find(".//div[@class='pager']")
         self.assertEqual(4,len(pager))
+        self.assertEqual('Results 11-20 of 25',pager[0].text)
         self.assertEqual('/mysearch/?q=needle&p=1',pager[1].get('href'))
-        # assert that pager looks like this:
-        # <div class="pager">
-        #   <p class="label">Results 11-20 of total 25</p>
-        #   <a href="/mysearch/?q=needle&p=1" class="page">1</a>
-        #   <span class="page">2</span>
-        #   <a href="/mysearch/?q=needle&p=3" class="page">3</a>
-        # </div>
 
         self.env['QUERY_STRING'] = "q=needle&p=3"
         status, headers, content = self.call_wsgi(self.env)
@@ -395,10 +409,4 @@ class Search(WSGI):
         self.assertEqual(5, len(docs)) # only 5 remaining docs
         pager = t.find(".//div[@class='pager']")
         self.assertEqual(4,len(pager))
-        # assert that pager looks like this:
-        # <div class="pager">
-        #   <p class="label">Results 21-25 of total 25</p>
-        #   <a href="/mysearch/?q=needle&p=1" class="page">1</a>
-        #   <a href="/mysearch/?q=needle&p=2" class="page">2</a>
-        #   <span class="page">3</span>
-        # </div>
+        self.assertEqual('Results 21-25 of 25',pager[0].text)

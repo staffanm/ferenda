@@ -126,16 +126,16 @@ class BasicQuery(unittest.TestCase):
     def test_basic(self):
         self.load(basic_dataset)
         self.assertEqual(self.index.doccount(),4)
-        res = self.index.query("main")
+        res, pager = self.index.query("main")
         self.assertEqual(len(res),1)
         self.assertEqual(res[0]['identifier'], 'Doc #1')
         self.assertEqual(res[0]['uri'], 'http://example.org/doc/1')
-        res = self.index.query("document")
+        res, pager = self.index.query("document")
         self.assertEqual(len(res),2)
         # Doc #2 contains the term 'document' in title (which is a
         # boosted field), not just in text.
         self.assertEqual(res[0]['identifier'], 'Doc #2') 
-        res = self.index.query("section*")
+        res, pager = self.index.query("section*")
         from pprint import pprint
         self.assertEqual(len(res),3)
         self.assertEqual(res[0]['identifier'], 'Doc #1 (section 1)') 
@@ -237,7 +237,7 @@ class CustomQuery(object):
             self.index.update(**doc)
 
     def test_boolean(self):
-        res = self.index.query(secret=True)
+        res, pager = self.index.query(secret=True)
         self.assertEqual(len(res),1)
         self.assertEqual(res[0]['identifier'], 'R2 D2')
         res = self.index.query(secret=False)
@@ -245,27 +245,27 @@ class CustomQuery(object):
         self.assertEqual(res[0]['identifier'], 'R2 D1')
     
     def test_keywords(self):
-        res = self.index.query(category='green')
+        res, pager = self.index.query(category='green')
         self.assertEqual(len(res),2)
         identifiers = set([x['identifier'] for x in res])
         self.assertEqual(identifiers, set(['R1 D1','R2 D1']))
         
     def test_repo_limited_freetext(self):
-        res = self.index.query('first', repo='repo1')
+        res, pager = self.index.query('first', repo='repo1')
         self.assertEqual(len(res),2)
         self.assertEqual(res[0]['identifier'], 'R1 D1') # contains the term 'first' twice
         self.assertEqual(res[1]['identifier'], 'R1 D2') #          -""-             once
 
     def test_repo_dateinterval(self):
 
-        res = self.index.query(issued=Less(datetime(2013,3,1)))
+        res, pager = self.index.query(issued=Less(datetime(2013,3,1)))
         self.assertEqual(len(res),1)
         self.assertEqual(res[0]['identifier'], 'R1 D1') 
 
-        res = self.index.query(issued=More(datetime(2013,3,1)))
+        res, pager = self.index.query(issued=More(datetime(2013,3,1)))
         self.assertEqual(res[0]['identifier'], 'R1 D2') 
 
-        res = self.index.query(issued=Between(datetime(2013,2,1),datetime(2013,4,1)))
+        res, pager = self.index.query(issued=Between(datetime(2013,2,1),datetime(2013,4,1)))
         self.assertEqual(len(res),2)
         identifiers = set([x['identifier'] for x in res])
         self.assertEqual(identifiers, set(['R1 D1','R1 D2']))

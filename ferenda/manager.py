@@ -35,9 +35,9 @@ except ImportError:
 import six  # technically third-party, but needed for cross-version
             # system imports
 if six.PY3:
-    from urllib.parse import urlsplit, parse_qs, urlencode
+    from urllib.parse import urlsplit, parse_qsl, urlencode
 else:
-    from urlparse import urlsplit, parse_qs, urlencode
+    from urlparse import urlsplit, parse_qsl, urlencode
 
 from wsgiref.simple_server import make_server
 from wsgiref.util import FileWrapper
@@ -424,10 +424,9 @@ def _wsgi_search(environ, start_response, args):
                                 args['repos'][0].config.indexlocation)
     # FIXME: QUERY_STRING should probably be sanitized before calling
     # .query() - but in what way?
-    querystring = parse_qs(environ['QUERY_STRING'])
-    querystring['q'] = querystring['q'][0]
+    querystring = OrderedDict(parse_qsl(environ['QUERY_STRING']))
     query = querystring['q']
-    pagenum = int(querystring.get('p',['1'])[0])
+    pagenum = int(querystring.get('p','1'))
     res, pager = idx.query(query,pagenum=pagenum)
     if pager['totalresults'] == 1:
         resulthead = "1 match"
@@ -450,7 +449,7 @@ def _wsgi_search(environ, start_response, args):
             [html.H2([elements.Link(r['title'], uri=r['uri'])]),
              r['text']], **{'class':'hit'}))
 
-    pages = [html.P(["Results %(firstresult)s to %(lastresult)s of %(totalresults)s" % pager])]
+    pages = [html.P(["Results %(firstresult)s-%(lastresult)s of %(totalresults)s" % pager])]
     for pagenum in range(pager['pagecount']):
         if pagenum + 1 == pager['pagenum']:
             pages.append(html.Span([str(pagenum+1)],**{'class':'page'}))
@@ -514,9 +513,10 @@ def _wsgi_static(environ, start_response, args):
     # mimetype, always text/html). None means no.
     fp = None
     for repo in args['repos']:
-        (fp, length, mimetype) = repo.http_handle(environ)  # and args?
+        (fp, length, status, mimetype) = repo.http_handle(environ)  # and args?
         if fp:
-            status = "200 OK"
+            status = {200:"200 OK",
+                      406:"406 Not Acceptable"}[status]
             iterdata = FileWrapper(fp)
             break
     if not fp:

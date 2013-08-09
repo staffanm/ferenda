@@ -16,3 +16,7 @@ reason or another, couldn't be directly fetched by setup.py from pypi.
   package isn't on pypi or is python3 compatible. Code using patches
   for python3 compatiblity by Johannes Berg, taken from
   https://raw.github.com/mcgrof/backports/master/lib/patch.py. MIT License.
+
+* httpheader by Deron Meranda
+  (http://deron.meranda.us/python/httpheader/). Included since the
+  package isn't on pypi or is python3 compatible. LGPL License

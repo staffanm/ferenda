@@ -36,6 +36,7 @@ import doctest
 
 from ferenda import DocumentEntry, TocPageset, TocPage, \
     TocCriteria, Describer, LayeredConfig, TripleStore, FulltextIndex
+from ferenda.fulltextindex import WhooshIndex
 from ferenda.errors import *
 
 # The main system under test (SUT)
@@ -884,11 +885,11 @@ class Repo(RepoTester):
         with open(d.store.distilled_path("123/a"),"wb") as fp:
             g.serialize(fp,"pretty-xml")
 
-        with patch.object(FulltextIndex,'update') as mock_method:
+        with patch.object(WhooshIndex,'update') as mock_method:
             d.relate_fulltext("123/a")
             calls = [call(title='Example', basefile='123/a',
                           uri='http://example.org/base/123/a', repo='base',
-                          text='This is part of the main document, but not part of any sub-resource. This is the tail end of the main document ',
+                          text='This is part of the main document, but not of any sub-resource. This is the tail end of the main document ',
                           identifier='123(A)'),
                      call(title='Introduction', basefile='123/a',
                           uri='http://example.org/base/123/a#S1', repo='base',

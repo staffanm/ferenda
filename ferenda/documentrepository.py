@@ -55,7 +55,7 @@ from ferenda import util, errors, decorators
 from ferenda import Describer, LayeredConfig, TripleStore, FulltextIndex, Document, DocumentEntry, NewsCriteria, TocCriteria, TocPageset, TocPage, DocumentStore
 from ferenda.elements import AbstractElement, serialize, Body, Nav, Link, Section, Subsection, Subsubsection, Heading, UnorderedList, ListItem, Preformatted, Paragraph
 from ferenda.elements.html import elements_from_soup
-from ferenda.thirdparty import patch
+from ferenda.thirdparty import patch, httpheader
 __version__ = (1, 6)
 __author__ = "Staffan Malmgren <staffan@tomtebo.org>"
 
@@ -2517,7 +2517,9 @@ parsed document path to that documents dependency file."""
 
 
     def http_handle(self, environ):
-        """Used by the WSGI support to indicate if this repo can provide a response to a particular request. If so, returns a tuple (fp, length, memtype), where fp is an open file of the document to be returned."""
+        """Used by the WSGI support to indicate if this repo can
+        provide a response to a particular request. If so, returns a
+        tuple (fp, length, memtype), where fp is an open file of the document to be returned."""
         if environ['PATH_INFO'].count("/") >= 2:
             segments = environ['PATH_INFO'].split("/", 3)
             if len(segments) == 3:
@@ -2539,25 +2541,48 @@ parsed document path to that documents dependency file."""
                     basefile = self.basefile_from_uri(uri)
                     assert basefile, "Couldn't find basefile in uri %s" % uri
                     accept = environ.get('HTTP_ACCEPT','text/html')
+
                     # mapping MIME-type -> callable that retrieves a path
+                    pathfunc = None
                     if not data:
                         pathmap = {'text/html': self.store.generated_path,
                                    'application/xhtml+xml': self.store.parsed_path,
                                    'application/rdf+xml': self.store.distilled_path}
-                        pathfunc = pathmap.get(accept, None)
-                    else:
-                        pathfunc = None
+                        if accept in pathmap:
+                            contenttype = accept
+                            pathfunc = pathmap[accept]
+                        else:
+                            # do proper content-negotiation, but make sure
+                            # application/xhtml+xml ISN'T one of the
+                            # available options (as modern browsers may
+                            # prefer it to text/html, and our
+                            # application/xhtml+xml isn't what they want)
+                            # -- ie we only serve application/xtml+xml if
+                            # a client specifically only asks for
+                            # that. Yep, that's a big FIXME.
+                            available = ("text/html") # add to this?
+                            preferred = httpheader.acceptable_content_type(accept, available)
+                            if preferred and preferred[0].media_type == "text/html":
+                                contenttype = preferred[0].media_type
+                                pathfunc = self.store.generated_path
+
                     if pathfunc is None:
-                        g = Graph()
-                        g.parse(self.store.distilled_path(basefile))
-                        if data:
-                            annotation_graph = self.annotation_file_to_graph(self.store.annotation_path(basefile))
-                            g += annotation_graph
-                        format = {'application/rdf+xml': 'pretty-xml',
-                                  'text/turtle': 'turtle',
-                                  'text/plain': 'nt'}[accept]
-                        path = None
-                        data = g.serialize(format=format)
+                        rdfformats = {'application/rdf+xml': 'pretty-xml',
+                                      'text/turtle': 'turtle',
+                                      'text/plain': 'nt'
+                                  } 
+                        if accept in rdfformats:
+                            contenttype = accept
+                            g = Graph()
+                            g.parse(self.store.distilled_path(basefile))
+                            if data:
+                                annotation_graph = self.annotation_file_to_graph(self.store.annotation_path(basefile))
+                                g += annotation_graph
+                            path = None
+                            # FIXME: we just changed the meaning of the "data" variable!
+                            data = g.serialize(format=rdfformats[accept])
+                        else:
+                            data = None
                     else:
                         path = pathfunc(basefile)
                         data = None
@@ -2571,15 +2596,25 @@ parsed document path to that documents dependency file."""
                     else:
                         pseudobasefile = "index"
                     path = self.store.path(pseudobasefile,'toc','.html')
+                    data = None
                 if path and os.path.exists(path):
                     return (open(path, 'rb'),
                             os.path.getsize(path),
-                            accept)
+                            200,
+                            contenttype)
                 elif data:
                     return (BytesIO(data),
                             len(data),
-                            accept)
-        return (None, None, None)
+                            200,
+                            contenttype)
+                else:
+                    msg = "<h1>406</h1>No acceptable media found for <tt>%s</tt>" % accept
+                    return(BytesIO(msg.encode('utf-8')),
+                           len(msg.encode('utf-8')),
+                           406,
+                           "text/html")
+                            
+        return (None, None, None, None)
 
     @staticmethod
     def _setup_logger(logname):

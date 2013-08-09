@@ -1,4 +1,5 @@
 from pprint import pprint
+import re
 
 from ferenda import util
 
@@ -167,12 +168,11 @@ from ferenda.elements import html
 class ElementsFormatter(whoosh.highlight.Formatter):
     """Returns a tree of ferenda.elements representing the formatted hit."""
 
-    def __init__(self, wrapelement=html.P, hitelement=html.Strong, classname="hit", between=" ... "):
+    def __init__(self, wrapelement=html.P, hitelement=html.Strong, classname="match", between=" ... "):
         self.wrapelement = wrapelement
         self.hitelement = hitelement
         self.classname = classname
         self.between = between
-
 
     def format(self, fragments, replace=False):
         res = self.wrapelement()
@@ -184,6 +184,7 @@ class ElementsFormatter(whoosh.highlight.Formatter):
             first = False
         return res
 
+    re_collapse = re.compile("\s+").sub
     def format_fragment(self, fragment, replace):
         output = []
         index = fragment.startchar
@@ -191,16 +192,16 @@ class ElementsFormatter(whoosh.highlight.Formatter):
 
         for t in fragment.matches:
             if t.startchar > index:
-                output.append(text[index:t.startchar].strip() + " ")
+                output.append(self.re_collapse(" ",text[index:t.startchar]))
             hittext = whoosh.highlight.get_text(text,t,False)
             output.append(self.hitelement([hittext], **{'class': self.classname}))
             index = t.endchar
         if index < len(text):
-            output.append(" " + text[index:fragment.endchar].strip())
+            output.append(self.re_collapse(" ",text[index:fragment.endchar]))
         return output
 
-class WhooshIndex(FulltextIndex):
 
+class WhooshIndex(FulltextIndex):
 
     def __init__(self,location):
         super(WhooshIndex, self).__init__(location)
