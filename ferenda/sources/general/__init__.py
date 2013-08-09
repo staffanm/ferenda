@@ -2,3 +2,4 @@
 from .keyword import Keyword
 from .skeleton import Skeleton
 from .wiki import Wiki
+from .static import Static

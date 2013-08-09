@@ -1035,7 +1035,7 @@ def _print_usage():
     if enabled:
         print("Available modules:")
         for (alias, desc) in enabled.items():
-            print(" * %s: %s" % alias, desc)
+            print(" * %s: %s" % (alias, desc))
 
 
 def _list_enabled_classes():
@@ -1054,7 +1054,10 @@ def _list_enabled_classes():
     res = OrderedDict()
     for (alias, classname) in _enabled_classes().items():
         cls = _load_class(classname)
-        res[alias] = cls.__doc__.split("\n")[0]
+        if cls.__doc__:
+            res[alias] = cls.__doc__.split("\n")[0]
+        else:
+            res[alias] = "[Undocumented]"
     return res
 
 

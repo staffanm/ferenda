@@ -532,15 +532,3 @@ def from_roman(s):
             index += len(numeral)
     return result
 
-def parse_accept_header(header):
-    # returns the preferred mime-type from a header like
-    result = []
-    for match in _accept_re.finditer(value):
-        quality = match.group(2)
-        if not quality:
-            quality = 1
-        else:
-            quality = max(min(float(quality), 1), 0)
-        result.append((match.group(1), quality))
-    return max(result)
-    

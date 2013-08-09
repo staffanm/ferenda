@@ -2596,6 +2596,7 @@ parsed document path to that documents dependency file."""
                     else:
                         pseudobasefile = "index"
                     path = self.store.path(pseudobasefile,'toc','.html')
+                    contenttype = "text/html"
                     data = None
                 if path and os.path.exists(path):
                     return (open(path, 'rb'),

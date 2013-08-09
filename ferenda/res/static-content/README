@@ -1,0 +1,8 @@
+This is a set of files to be used by the
+ferenda.sources.general.StaticContent docrepo. To use this, create the
+directory "static" in your project directory, then copy files here to
+there and modify away.
+
+Files are expected to be in RestructuredText, so using this module
+requires that DocUtils is installed.
+
