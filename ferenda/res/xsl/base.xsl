@@ -97,7 +97,7 @@
 	</div>
 	<div class="footer-container">
 	  <footer>
-	    <p>This is a footer|Legal info|Disclaimer|Think of the trees!</p>
+	    <xsl:copy-of select="$configuration/footerlinks/*"/>
 	  </footer>
 	</div>
 

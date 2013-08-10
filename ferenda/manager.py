@@ -187,6 +187,7 @@ def makeresources(repos,
     sitename_el.text = sitename
     sitedescription_el = ET.SubElement(root, "sitedescription")
     sitedescription_el.text = sitedescription
+
     tabs = ET.SubElement(
         ET.SubElement(ET.SubElement(root, "tabs"), "nav"), "ul")
 
@@ -204,6 +205,25 @@ def makeresources(repos,
         link = ET.SubElement(ET.SubElement(tabs, "li"), "a")
         link.text = tab[0]
         link.attrib['href'] = tab[1]
+
+    # FIXME: almost the exact same code as for tabs 
+    tabs = ET.SubElement(
+        ET.SubElement(ET.SubElement(root, "footerlinks"), "nav"), "ul")
+
+    sitefooter = []
+    for inst in repos:
+        if hasattr(inst, 'footer'):
+            for link in inst.footer():
+                if not link in sitefooter:
+                    (label, url) = link
+                    alias = inst.alias
+                    log.debug("Adding footer link %(label)s (%(url)s) from docrepo %(alias)s" % locals())
+                    sitefooter.append(link)
+
+    for text, href in sitefooter:
+        link = ET.SubElement(ET.SubElement(tabs, "li"), "a")
+        link.text = text
+        link.attrib['href'] = href
 
     if not staticsite:
         search = ET.SubElement(ET.SubElement(ET.SubElement(root, "search"), "form", action="/search/"), "input", type="search", name="q")

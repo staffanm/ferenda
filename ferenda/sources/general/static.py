@@ -42,7 +42,8 @@ class StaticStore(DocumentStore):
                 pathfrag  = x[len(self.staticdir)+1:-len(self.downloaded_suffix)]
                 yield self.pathfrag_to_basefile(pathfrag)
         else:
-            return super(StaticStore, self).list_basefiles_for(action,basedir)
+            for x in super(StaticStore, self).list_basefiles_for(action,basedir):
+                yield x
 
 class Static(DocumentRepository):
     alias = "static"
@@ -94,14 +95,16 @@ class Static(DocumentRepository):
         pass
     
     def tabs(self):
-        if os.path.exists(self.store.generated_path("about")):
-            return [("About", self.generated_url("about"))]
+        if os.path.exists(self.store.parsed_path("about")):
+            return [("About", self.canonical_uri("about"))]
+        else:
+            return[]
                 
     def footer(self):
         # FIXME: ordering?
         res = []
-        for basefile in self.store.list_basefiles_for("_postgenerate"):
-            uri = self.generated_url(basefile)
+        for basefile in self.store.list_basefiles_for("generate"):
+            uri = self.canonical_uri(basefile)
             g = Graph()
             g.parse(self.store.distilled_path(basefile))
             title = g.value(URIRef(uri), self.ns['dct'].title).toPython()

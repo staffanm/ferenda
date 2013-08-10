@@ -82,9 +82,12 @@ header nav ul {
     border-bottom: 20px solid #526B15;
 }
 
+.header-container nav {
+    width: 100%;
+}
 .header-container nav li a {
     float: left;
-    width: 35%;
+    width: 14%;
     text-align: center;
 }
     
@@ -165,4 +168,26 @@ body.toc nav#toc li {
 body.toc nav#toc a {
     float: none;
     display: inline
+}
+
+footer nav {
+    float: none;
+    width: 100%;
+    height: 12px;
+    line-height: 12px;
+}
+footer nav ul li {
+    display: inline;
+}
+footer nav ul li:after {
+    content: " | ";
+}
+
+
+footer nav ul li a {
+    background-color: transparent;
+    display: inline;
+    padding: 0;
+    margin: 0;
+    font-weight: normal;
 }

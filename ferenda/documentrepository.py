@@ -2520,8 +2520,18 @@ parsed document path to that documents dependency file."""
         else:
             return [(util.uri_leaf(str(self.rdf_type)), uri)]
 
+    def footer(self):
+        """Get a list of resources provided by this repo for publication in the site footer.
 
+        Works like :meth:`~ferenda.DocumentRepository.tabs`, but
+        normally returns an empty list. The repo
+        :class:`fereda.sources.general.Static` is an exception.
+        """
+        return []
+
+        
     def http_handle(self, environ):
+
         """Used by the WSGI support to indicate if this repo can
         provide a response to a particular request. If so, returns a
         tuple (fp, length, memtype), where fp is an open file of the document to be returned."""
