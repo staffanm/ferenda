@@ -501,7 +501,7 @@ class Body(CompoundElement):
         element = super(Body, self).as_xhtml(uri)
         element.set('about', uri)
         return element
-
+class Title(CompoundElement): pass
 class Page(CompoundElement, OrdinalElement): pass
 class Nav(CompoundElement): pass
 

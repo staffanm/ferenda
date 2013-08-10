@@ -1,7 +1,7 @@
 import os
 
-from rdflib import URIRef, Graph
-from docutils.core import publish_file
+from rdflib import URIRef, Graph, Literal
+from docutils.core import publish_doctree
 from docutils import writers, nodes
 import pkg_resources
 
@@ -9,6 +9,9 @@ from ferenda import DocumentRepository
 from ferenda import DocumentStore
 from ferenda import util
 from ferenda.decorators import managedparsing
+from ferenda import elements
+from ferenda.elements import html
+
 
 class StaticStore(DocumentStore):
     """Customized DocumentStore that looks for all "downloaded" resources
@@ -41,39 +44,6 @@ class StaticStore(DocumentStore):
         else:
             return super(StaticStore, self).list_basefiles_for(action,basedir)
 
-class Writer(writers.Writer):
-    supported = ('xhtml')
-    config_section = 'xhtml writer'
-    config_section_dependencies = ('writers',)
-
-    output = None
-    """Final translated form of `document`."""
-
-    def translate(self):
-        self.visitor = visitor = XHTMLTranslator(self.document)
-        self.document.walkabout(visitor)
-        self.output = ''.join(visitor.output)
-
-
-class XHTMLTranslator(nodes.GenericNodeVisitor):
-    def __init__(self, document):
-        nodes.NodeVisitor.__init__(self, document)
-        self.output = []
-
-    def default_visit(self, node):
-        from pudb import set_trace; set_trace()
-        self.output.append(node.starttag('"'))
-
-    def default_departure(self, node):
-        return None
-    
-    def visit_title(self,node):
-        super(XHTMLTranslator, self).visit_title()
-
-    
-    
-    
-
 class Static(DocumentRepository):
     alias = "static"
     downloaded_suffix = ".rst"
@@ -85,10 +55,44 @@ class Static(DocumentRepository):
 
     @managedparsing
     def parse(self, doc):
-        with self.store.open_downloaded(doc.basefile) as source:
-            with self.store.open_parsed(doc.basefile, "w") as destination:
-                publish_file(source=source, destination=destination, writer=Writer())
-        
+        source = util.readfile(self.store.downloaded_path(doc.basefile))
+        doctree = publish_doctree(source=source)
+        stack = []
+        root = self._transform(doctree,stack)
+        if isinstance(root[0], elements.Title):
+            doc.meta.add((URIRef(doc.uri), self.ns['dct'].title, Literal(str(root[0]),doc.lang)))
+            root.pop(0)
+        doc.body = root
+
+    # converts a tree of docutils.nodes into ferenda.elements
+    def _transform(self, node, stack):
+        cls = {'document':elements.Body,
+               'title':elements.Title,
+               'paragraph':elements.Paragraph,
+               '#text': str
+               }.get(node.tagname, elements.CompoundElement)
+        if hasattr(node,'attributes'):
+            attrs = dict((k,v) for (k,v) in node.attributes.items() if v)
+            el = cls(**attrs)
+        else:
+            el = cls(node) # !
+
+        if len(stack) > 0:
+            top = stack[-1]
+            top.append(el)
+            
+        if hasattr(node,'attributes'):
+            stack.append(el)
+            for childnode in node:
+                self._transform(childnode, stack)
+            return stack.pop()
+
+    def toc(self, otherrepos=[]):
+        pass
+
+    def news(self, otherrepos=[]):
+        pass
+    
     def tabs(self):
         if os.path.exists(self.store.generated_path("about")):
             return [("About", self.generated_url("about"))]

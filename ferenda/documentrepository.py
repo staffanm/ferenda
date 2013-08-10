@@ -1002,6 +1002,7 @@ uri doesn't map to a basefile in this repo."""
         doc = Document()
         doc.basefile = basefile
         doc.meta = self.make_graph()
+        doc.lang = self.lang
         if basefile:
             doc.basefile = basefile
             doc.uri = self.canonical_uri(basefile)
@@ -1662,6 +1663,10 @@ parsed document path to that documents dependency file."""
                     datadir = self.config.datadir
                 else:
                     datadir = os.path.abspath(self.config.datadir)
+                
+                if not os.path.isabs(outfile):
+                    outfile = os.path.abspath(outfile)
+                    
                 assert outfile.startswith(datadir), "outfile %s not under datadir %s" % (outfile, datadir)
                 # "datadir/foo/bar/baz.html" -> "foo/bar"
                 # "/var/folders/sy/r4f/T/tmpcRojl/foo/bar/baz.html" -> "foo/bar"p
