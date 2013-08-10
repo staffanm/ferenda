@@ -568,7 +568,8 @@ class Repo(RepoTester):
                                    ordinal='2', title='Second section')])
         want = """<html xmlns="http://www.w3.org/1999/xhtml"
                         xmlns:bibo="http://purl.org/ontology/bibo/"
-                        xmlns:dct="http://purl.org/dc/terms/">
+                        xmlns:dct="http://purl.org/dc/terms/"
+                        xml:lang="en">
   <head about="http://localhost:8000/res/base/basefile"/>
   <body about="http://localhost:8000/res/base/basefile">
     <h1>Toplevel heading</h1>
@@ -621,7 +622,8 @@ class Repo(RepoTester):
                                         html.P(['Even more text'])])])
         want = """<html xmlns="http://www.w3.org/1999/xhtml"
                         xmlns:bibo="http://purl.org/ontology/bibo/"
-                        xmlns:dct="http://purl.org/dc/terms/">
+                        xmlns:dct="http://purl.org/dc/terms/"
+                        xml:lang="en">
   <head about="http://localhost:8000/res/base/basefile"/>
   <body about="http://localhost:8000/res/base/basefile">
     <h1>Toplevel heading</h1>
@@ -684,7 +686,8 @@ class Repo(RepoTester):
         want  = """<html xmlns="http://www.w3.org/1999/xhtml"
                         xmlns:bibo="http://purl.org/ontology/bibo/"
                         xmlns:owl="http://www.w3.org/2002/07/owl#"
-                        xmlns:dct="http://purl.org/dc/terms/">
+                        xmlns:dct="http://purl.org/dc/terms/"
+                        xml:lang="en">
   <head about="http://localhost:8000/res/base/basefile"/>
   <body about="http://localhost:8000/res/base/basefile">
     <h1>Toplevel heading</h1>
@@ -759,7 +762,8 @@ class Repo(RepoTester):
 
         want = """<html xmlns="http://www.w3.org/1999/xhtml"
                         xmlns:bibo="http://purl.org/ontology/bibo/"
-                        xmlns:dct="http://purl.org/dc/terms/">
+                        xmlns:dct="http://purl.org/dc/terms/"
+                        xml:lang="en">
   <head about="http://localhost:8000/res/base/basefile"/>
   <body about="http://localhost:8000/res/base/basefile">
     <h1>Toplevel heading</h1>
@@ -784,7 +788,8 @@ class Repo(RepoTester):
         body = el.Body(['Toplevel\x1b heading'])
         want = """<html xmlns="http://www.w3.org/1999/xhtml"
                         xmlns:bibo="http://purl.org/ontology/bibo/"
-                        xmlns:dct="http://purl.org/dc/terms/">
+                        xmlns:dct="http://purl.org/dc/terms/"
+                        xml:lang="en">
   <head about="http://localhost:8000/res/base/basefile"/>
   <body about="http://localhost:8000/res/base/basefile">Toplevel heading</body>
 </html>"""
