@@ -18,6 +18,7 @@ $ python setup.py register -r testpypi
 $ python setup.py sdist upload -r testpypi
 $ git checkout master
 $ git merge release/0.1.0
+# update ferenda/__init__.py to eg version=0.1.1-dev
 $ git push
 
 
