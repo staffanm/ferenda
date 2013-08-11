@@ -49,5 +49,7 @@ with their respective licenses:
   (https://code.google.com/p/python-patch/), MIT
 * Grit XSLT by Niklas Lindström
   (http://code.google.com/p/oort/wiki/Grit), BSD
+* httpheader by Deron Meranda
+  (http://deron.meranda.us/python/httpheader/), LGPL
 
 

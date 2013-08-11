@@ -1,3 +1,21 @@
+2013-08-11 RELEASE 0.1.3
+
+* Search functionality when running under WSGI is now
+  implemented. Still a bit basic and not really customizable
+  (everything is done by manager._wsgi_search), but seems to actually
+  work.
+
+* New docrepo: ferenda.sources.general.Static, for publishing static
+  content (such as "About", "Contact", "Legal info") that goes into
+  the site footer.
+
+* The FulltextIndex class have been split up similarly to TripleStore
+  and the road has been paved to get alternative implementations that
+  connect to other fulltext index servers. ElasticSearch is next up to
+  be implemented, but is not done yet.
+  
+* General improvement of documentation
+
 2013-08-02 RELEASE 0.1.2
 ========================
 

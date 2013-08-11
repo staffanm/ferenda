@@ -392,6 +392,7 @@ class SQLiteInmemory(Inmemory, SQLite):
 class Sleepycat(TripleStoreTestCase, unittest.TestCase):
 
     def setUp(self):
+        # from pudb import set_trace; set_trace()
         self.store = TripleStore.connect("SLEEPYCAT", "ferenda.db", "ferenda")
         self.store.clear()
         self.loader = self.store

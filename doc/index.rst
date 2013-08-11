@@ -59,7 +59,6 @@ Classes
    api/textreader
    api/pdfreader
    api/wordreader
-   api/devel
 
 Modules
 -------
@@ -88,7 +87,17 @@ Errors
    :maxdepth: 2
 
    api/errors
-   
+
+Document repositories
+---------------------
+
+.. toctree::
+   :maxdepth: 2
+
+   docrepo/rfc
+   docrepo/w3c
+   docrepo/static
+   api/devel
    
 
 Indices and tables

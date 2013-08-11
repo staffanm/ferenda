@@ -1581,9 +1581,12 @@ parsed document path to that documents dependency file."""
         fp = os.fdopen(fileno)
         fp.close()
 
+        # FIXME: This is horrible
         if res.startswith(b"<remove-this-tag>"):
-            res = b"<!DOCTYPE html>\n"+res[17:-19].strip()
-
+            res = b"<!DOCTYPE html>\n"+res[17:-18].strip()
+            if res[-1] == b"<" or res[-1] == 60:
+                res = res[:-1]
+            
         with open(tmpfile,"wb") as fp:
             fp.write(res)
 

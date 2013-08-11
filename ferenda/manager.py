@@ -37,7 +37,8 @@ import six  # technically third-party, but needed for cross-version
 if six.PY3:
     from urllib.parse import urlsplit, parse_qsl, urlencode
 else:
-    from urlparse import urlsplit, parse_qsl, urlencode
+    from urlparse import urlsplit, parse_qsl
+    from urllib import urlencode
 
 from wsgiref.simple_server import make_server
 from wsgiref.util import FileWrapper

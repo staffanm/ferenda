@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, print_function
-
+import sys
+if sys.version_info[0] < 3:
+    bytes = str
+    str = unicode
+    
 """ Utility functions to work with HTTP headers.
 
  This module provides some utility functions useful for parsing
@@ -127,7 +131,7 @@ except NameError:
 
 def _is_string( obj ):
     """Returns True if the object is a string or unicode type."""
-    return isinstance(obj,str) or isinstance(obj,str)
+    return isinstance(obj,bytes) or isinstance(obj,str)
 
 
 def http_datetime( dt=None ):

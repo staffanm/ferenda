@@ -1,9 +1,18 @@
 import os
 
 from rdflib import URIRef, Graph, Literal
-from docutils.core import publish_doctree
-from docutils import writers, nodes
 import pkg_resources
+
+try:
+    from docutils.core import publish_doctree
+    from docutils import writers, nodes
+except ImportError:
+    # FIXME: allow this for now as no tests are run against the code,
+    # and we'd like to avoid the expensive docutils dependency for
+    # testing. But sooner or later we'll need to take that hit.
+    pass
+
+
 
 from ferenda import DocumentRepository
 from ferenda import DocumentStore
