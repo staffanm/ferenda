@@ -1180,13 +1180,6 @@ uri doesn't map to a basefile in this repo."""
         # FIXME: should use dataset_uri(), but that's a instancemethod
         context = "%sdataset/%s" % (config.url, cls.alias)
 
-        # FIXME: this blows away the entire triplestore content for a
-        # particular context, making it impossible to update just some
-        # data. One way would be to check the timestamp on dump.nt,
-        # and if it's newer than all distilled files (how to get them,
-        # given that this is a classmethod?), don't clear the
-        # triplestore (and don't run any relate() method)
-
         docstore = DocumentStore(config.datadir + os.sep + cls.alias)
         dump = docstore.path("dump", "distilled", ".nt")
 
@@ -1204,6 +1197,7 @@ uri doesn't map to a basefile in this repo."""
         log.info("Clearing context %s at repository %s" % (
             context, config.storerepository))
         store.clear(context)
+
         # we can't clear the whoosh index in the same way as one index
         # contains documents from all repos. But we need to be able to
         # clear it from time to time, maybe with a clear/setup method
@@ -1882,7 +1876,7 @@ parsed document path to that documents dependency file."""
         You can override any of these methods to customize any part of
         the toc generation process. Often overriding :py:meth:`~ferenda.DocumentRepository.toc_criteria` to
         specify other document properties will be sufficient."""
-        
+
         data = self.toc_select(self.dataset_uri())
         criteria = self.toc_criteria(self.toc_predicates())
         pagesets = self.toc_pagesets(data,criteria)
@@ -1979,10 +1973,18 @@ parsed document path to that documents dependency file."""
             else:
                 # selector and key for proper title sort
                 # (eg. disregarding leading "the", not counting
-                # spaces) -- really stretching the limit on what can
-                # be comfortably done with lambdas...
-                selector = lambda x: x['title'][4].lower() if x['title'].lower().startswith("the ") else x['title'][0].lower()
-                key = lambda x: "".join((x['title'][4:] if x['title'].lower().startswith("the ") else x['title']).lower().split())
+                # spaces)
+                def sortkey(d):
+                    title = d['title'].lower()
+                    if title.startswith("the "):
+                        title = title[4:]
+                    # filter away starting non-word characters (but not digits)
+                    title = re.sub("^\W+", "", title)
+                    # remove spaces
+                    return "".join(title.split())
+                    
+                selector = lambda x: sortkey(x)[0]
+                key = sortkey
                 label = label='Sorted by ' + util.uri_leaf(predicate)
                 pagetitle = 'Documents starting with "%s"'
 
