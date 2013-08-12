@@ -1667,7 +1667,7 @@ parsed document path to that documents dependency file."""
                 assert outfile.startswith(datadir), "outfile %s not under datadir %s" % (outfile, datadir)
                 # "datadir/foo/bar/baz.html" -> "foo/bar"
                 # "/var/folders/sy/r4f/T/tmpcRojl/foo/bar/baz.html" -> "foo/bar"p
-                relative_outfile = outfile[len(self.config.datadir)+1:]
+                relative_outfile = outfile[len(datadir)+1:]
                 if os.sep in relative_outfile:
                     outdir = relative_outfile.rsplit(os.sep,1)[0]
                 else:
