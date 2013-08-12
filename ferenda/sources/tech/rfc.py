@@ -16,7 +16,7 @@ from ferenda.decorators import recordlastdownload, managedparsing
 
 from ferenda import TextReader, Describer, FSMParser, CitationParser, URIFormatter
 
-from ferenda.elements import Body, Heading, Preformatted, Paragraph, UnorderedList, ListItem, Section, Subsection, Subsubsection, UnicodeElement, CompoundElement, serialize
+from ferenda.elements import Body, Heading, Preformatted, Paragraph, UnorderedList, ListItem, Section, Subsection, Subsubsection, UnicodeElement, CompoundElement, Link, serialize
 
 class RFCHeader(UnicodeElement): pass
 class DocTitle(UnicodeElement): pass
@@ -586,6 +586,26 @@ class RFC(DocumentRepository):
                 # company affiliation - include that separate from
                 # personal author identity
                 desc.value(self.ns['dct'].rightsHolder, line)
+
+    def toc_query(self, context=None):
+        from_graph = ("FROM <%s>" % context) if context else ""
+        return """PREFIX dct:<http://purl.org/dc/terms/> SELECT DISTINCT ?uri ?title ?issued ?identifier %s WHERE {?uri dct:title ?title . ?uri dct:issued ?issued . ?uri dct:identifier ?identifier . }""" % from_graph
         
+
+    def toc_criteria(self, predicates):
+        criteria = super(RFC, self).toc_criteria(predicates)
+        if criteria[1].binding == 'issued':
+            criteria[1].key = lambda x: x['identifier']
+            criteria[1].key_descending = True
+        return criteria
+            
+        
+    def toc_item(self, binding, row):
+        return [row['identifier'] + ": ",
+                Link(row['title'], 
+                     uri=row['uri'])]
+        
+
     def tabs(self):
         return [("RFCs", self.dataset_uri())]
+

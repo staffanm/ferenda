@@ -2121,7 +2121,8 @@ parsed document path to that documents dependency file."""
                 for page in pageset.pages:
                     if page.linktext == key:
                         s = sorted(documents[key],
-                                   key=criterion.key)
+                                   key=criterion.key,
+                                   reverse=criterion.key_descending)
                         res[(page.binding,page.value)] = [self.toc_item(criterion.binding, row) for row in s]
         return res
                 
