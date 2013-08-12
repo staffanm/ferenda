@@ -126,6 +126,8 @@ a:nm0000582 rdf:type foaf:Person;
         self.store.add_serialized(self.actors, format="turtle", context="http://example.org/actors")
         self.assertEqual(18, self.store.triple_count(context="http://example.org/actors"))
         self.assertEqual(39, self.store.triple_count())
+        dump = self.store.get_serialized(format="nt")
+        self.assertTrue(len(dump) > 10) # to account for any spurious newlines -- real dump should be over 4K
         self.store.clear(context="http://example.org/movies")
         self.assertEqual(0, self.store.triple_count("http://example.org/movies"))
         self.assertEqual(18, self.store.triple_count())
@@ -392,7 +394,6 @@ class SQLiteInmemory(Inmemory, SQLite):
 class Sleepycat(TripleStoreTestCase, unittest.TestCase):
 
     def setUp(self):
-        # from pudb import set_trace; set_trace()
         self.store = TripleStore.connect("SLEEPYCAT", "ferenda.db", "ferenda")
         self.store.clear()
         self.loader = self.store

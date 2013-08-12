@@ -584,4 +584,45 @@ class FusekiStore(RemoteStore):
     def initialize_repository(self):
         # I have no idea how to do this for Fuseki
         pass
-           
+
+    # To work around the fact that the default graph, by default in
+    # Fuseki, does not contain any triples in any named graph. The
+    # magic named graph <urn:x-arq:UnionGraph> however, contains all
+    # triples in all named graphs. It does not contain anything in the
+    # default graph, though, so we'll have get that separately. Note
+    # that this kills performance for any other format than nt, as
+    # other formats require that we join the two result sets using
+    # rdflib
+    def get_serialized(self, format="nt", context=None):
+        default = super(FusekiStore, self).get_serialized(format, context)
+        if context is not None:
+            return default
+        else:
+            context = "urn:x-arq:UnionGraph"
+            named = super(FusekiStore, self).get_serialized(format, context)
+            if format == "nt":
+                return default + named
+            else:
+                g = Graph()
+                g.parse(data=default, format=format)
+                g.parse(data=named, format=format)
+                return g.serialize(format=format)
+        
+
+    def get_serialized_file(self, filename, format="nt", context=None):
+        ret = super(FusekiStore, self).get_serialized_file(filename, format, context)
+        if context is not None:
+            return ret
+        else:
+            context = "urn:x-arq:UnionGraph"
+            named = super(FusekiStore, self).get_serialized(format, context)
+            if format == "nt":
+                # just append
+                with open(filename, "ab") as fp:
+                    fp.write(named)
+            else:
+                g = Graph()
+                g.parse(filename,format=format)
+                g.parse(data=named, format=format)
+                with open(filename, "wb") as fp:
+                    fp.write(g.serialize(format=format))
