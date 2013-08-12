@@ -23,6 +23,7 @@ It's a generic template for any kind of content
   <xsl:template name="linkalternate"/>
   <xsl:template name="headmetadata"/>
   <xsl:template name="bodyclass">frontpage</xsl:template>
+  <xsl:template name="pagetitle"/>
       
   <xsl:template match="xhtml:a">
     <xsl:call-template name="link"/>

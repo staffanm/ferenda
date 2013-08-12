@@ -103,6 +103,9 @@ class Static(DocumentRepository):
     def news(self, otherrepos=[]):
         pass
     
+    def frontpage_content(self, primary=False):
+        pass
+
     def tabs(self):
         if os.path.exists(self.store.parsed_path("about")):
             return [("About", self.canonical_uri("about"))]

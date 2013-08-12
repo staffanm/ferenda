@@ -40,6 +40,7 @@
     </html>
   </xsl:template>
   
+  
   <xsl:template match="xhtml:head">
     <head>
       <meta charset="utf-8" />
@@ -75,7 +76,7 @@
         &lt;![endif]</xsl:comment>
         <div class="header-container">
 	  <header class="wrapper clearfix">
-	    <h1 class="title"><xsl:value-of select="$configuration/sitename"/></h1>
+	    <h1 class="title"><a href="{$configuration/url}"><xsl:value-of select="$configuration/sitename"/></a></h1>
 	    <h2 class="title"><xsl:value-of select="$configuration/sitedescription"/></h2>
 	    <xsl:copy-of select="$configuration/search/*"/>
 	    <xsl:copy-of select="$configuration/tabs/*"/>
@@ -89,7 +90,7 @@
 	      </ul>
 	    </nav>
 	    <article class="clearfix">
-	      <h1><xsl:value-of select="../xhtml:head/xhtml:title"/></h1>
+	      <xsl:call-template name="pagetitle"/>
 	      <xsl:apply-templates/>
 	      <!-- Main document text: header, sections (possibly nested) and footer goes here -->
 	    </article>

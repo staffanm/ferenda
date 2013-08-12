@@ -22,6 +22,10 @@ $ git merge release/0.1.0
 $ git push
 
 
+Also, you should update readthedocs to feature the new point relase as
+the built one. Note that you might need to re-build 'latest' on RTD
+before the new tag shows up under Versions there.
+
 Smoke-testing the released code
 -------------------------------
 

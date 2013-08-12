@@ -33,6 +33,11 @@ h1.title {
     font-weight: 200;
     margin-bottom:0.2em;
 }
+h1.title a {
+    text-decoration: none;
+    color: white;
+    font-weight: 200;
+}
 h2.title {
     clear: both;
     font-family: 'Raleway', sans-serif; 

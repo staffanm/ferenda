@@ -1607,25 +1607,28 @@ parsed document path to that documents dependency file."""
             if not uri:
                 continue
 
-            for repo in repos:
-                basefile = repo.basefile_from_uri(uri)
-                # 2-tuple, empty tuple, or none
-                dataset_params = repo.dataset_params_from_uri(uri)
-                if basefile or (dataset_params is not None):
-                    break
-            
-            if basefile:
-                path = repo.store.generated_path(basefile)
-            elif dataset_params is not None:
-                # FIXME: This reimplements the logic that calculates
-                # basefile at the end of toc_pagesets
-                if dataset_params:
-                    pseudobasefile = "/".join(dataset_params)
-                else:
-                    pseudobasefile = "index"
-                path = repo.store.path(pseudobasefile,'toc','.html')
+            if uri == self.config.url: # root url
+                path = "data/index.html"
             else:
-                continue
+                for repo in repos:
+                    basefile = repo.basefile_from_uri(uri)
+                    # 2-tuple, empty tuple, or none
+                    dataset_params = repo.dataset_params_from_uri(uri)
+                    if basefile or (dataset_params is not None):
+                        break
+
+                if basefile:
+                    path = repo.store.generated_path(basefile)
+                elif dataset_params is not None:
+                    # FIXME: This reimplements the logic that calculates
+                    # basefile at the end of toc_pagesets
+                    if dataset_params:
+                        pseudobasefile = "/".join(dataset_params)
+                    else:
+                        pseudobasefile = "index"
+                    path = repo.store.path(pseudobasefile,'toc','.html')
+                else:
+                    continue
             relpath = os.path.relpath(path,os.path.dirname(base)).replace(os.sep,'/')
             part.set("href", relpath)
 

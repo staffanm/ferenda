@@ -22,6 +22,9 @@ It's a generic template for TOC pages (assumes that there exists a <ul role="nav
   <xsl:template name="linkalternate"><xsl:comment>Alternate link(s)</xsl:comment></xsl:template>
   <xsl:template name="headmetadata"><xsl:comment>headmetadata?</xsl:comment></xsl:template>
   <xsl:template name="bodyclass">toc</xsl:template>
+  <xsl:template name="pagetitle">
+    <h1><xsl:value-of select="../xhtml:head/xhtml:title"/></h1>
+  </xsl:template>
       
 
   <xsl:template match="xhtml:h1"><h1><xsl:apply-templates/></h1></xsl:template>

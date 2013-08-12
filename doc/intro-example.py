@@ -30,7 +30,6 @@ for docrepo in []:
 
     # Index the text content and metadata of all parsed documents
     for basefile in docrepo.list_basefiles_for("relate"):
-        # from pudb import set_trace; set_trace()
         docrepo.relate(basefile, docrepos)
 
 # Prepare various assets for web site navigation

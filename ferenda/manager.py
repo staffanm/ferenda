@@ -341,8 +341,9 @@ def frontpage(repos,
         # method should not have any xhtml template like below).
         for inst in repos:
             content = inst.frontpage_content()
-            blocks += "<div id='%s'>%s</div>" % (inst.alias, content)
-            log.debug("frontpage: repo %s provided %s chars of content" % (inst.alias, len(content)))
+            if content:
+                blocks += "<div id='%s'>%s</div>" % (inst.alias, content)
+                log.debug("frontpage: repo %s provided %s chars of content" % (inst.alias, len(content)))
         vars = {'title': sitename,
                 'blocks': blocks}
         xhtml = """<?xml version='1.0' encoding='utf-8'?>

@@ -22,6 +22,9 @@ It's a generic template for search result pages.
   <xsl:template name="linkalternate"><xsl:comment>Alternate link(s)</xsl:comment></xsl:template>
   <xsl:template name="headmetadata"><xsl:comment>headmetadata?</xsl:comment></xsl:template>
   <xsl:template name="bodyclass">search</xsl:template>
+  <xsl:template name="pagetitle">
+    <h1><xsl:value-of select="../xhtml:head/xhtml:title"/></h1>
+  </xsl:template>
       
   <xsl:template match="xhtml:div[@class='hit']">
     <section class="hit">
