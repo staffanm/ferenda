@@ -1970,6 +1970,7 @@ parsed document path to that documents dependency file."""
                 key = selector
                 label = 'Sorted by publication year'
                 pagetitle = 'Documents published in %s'
+                selector_descending = True
             else:
                 # selector and key for proper title sort
                 # (eg. disregarding leading "the", not counting
@@ -1987,12 +1988,14 @@ parsed document path to that documents dependency file."""
                 key = sortkey
                 label = label='Sorted by ' + util.uri_leaf(predicate)
                 pagetitle = 'Documents starting with "%s"'
+                selector_descending = False
 
             criteria.append(TocCriteria(binding=util.uri_leaf(predicate).lower(),
                                         label=label,
                                         pagetitle=pagetitle,
                                         selector=selector,
-                                        key=key))
+                                        key=key,
+                                        selector_descending=selector_descending))
         return criteria
         
 
@@ -2063,7 +2066,7 @@ parsed document path to that documents dependency file."""
             for row in data:
                 selector_values[selector(row)] = True
 
-            for value in sorted(list(selector_values.keys())):
+            for value in sorted(list(selector_values.keys()), reverse=criterion.selector_descending):
                 pageset.pages.append(TocPage(linktext=value,
                                              title=criterion.pagetitle % value,
                                              binding=binding,
@@ -2140,8 +2143,10 @@ parsed document path to that documents dependency file."""
 
     def toc_generate_first_page(self, pagecontent, pagesets, otherrepos=[]):
         """Generate the main page of TOC pages."""
-        (binding,value), documents = sorted(pagecontent.items(), key=itemgetter(0))[0]
-        return self.toc_generate_page(binding, value, documents, pagesets, "index", otherrepos)
+        firstpage = pagesets[0].pages[0] # has .binding and .value
+        documents = pagecontent[(firstpage.binding, firstpage.value)]
+        # (binding,value), documents = sorted(pagecontent.items(), key=itemgetter(0))[0]
+        return self.toc_generate_page(firstpage.binding, firstpage.value, documents, pagesets, "index", otherrepos)
         
     def toc_generate_page(self, binding, value, documentlist, pagesets, effective_basefile=None, otherrepos=[]):
         """Generate a single TOC page.

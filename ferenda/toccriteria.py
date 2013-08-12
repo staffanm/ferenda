@@ -23,12 +23,14 @@ class TocCriteria(object):
     :param key: Function that takes a single dict and returns a value
                 that can be used for sorting documents
     :type key: callable
-
+    :param selector_descending: Whether pagesets that uses this selector should be sorted in descending (reverse) order
+    :type  selector_descending: bool
     """
 
-    def __init__(self, binding, label, pagetitle, selector, key):
+    def __init__(self, binding, label, pagetitle, selector, key, selector_descending=False):
         self.binding = binding
         self.label = label
         self.pagetitle = pagetitle
         self.selector = selector
         self.key = key
+        self.selector_descending = selector_descending
