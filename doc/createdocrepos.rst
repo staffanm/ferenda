@@ -1,4 +1,3 @@
-
 Creating your own document repositories
 =======================================
 
@@ -257,7 +256,7 @@ a :py:class:`~ferenda.DocumentRepository` method). It constructs a set of site-w
 resources such as minified js and css files, and configuration for the
 site-wide XSLT template. It is easy to run using the command-line tool::
 
-  $ ./ferenda-build.py makeresources
+  $ ./ferenda-build.py all makeresources
 
 If you use the API, you need to provide a list of instances of the
 docrepos that you're using, and the path to where generated resources
@@ -371,6 +370,11 @@ the documents in different feeds, for example one feed for each RFC
 track.
 
 Se also :doc:`news`.
+
+Calling :py:func:`~ferenda.manager.frontpaage`
+----------------------------------------------
+
+Tbw
 
 Next steps
 ----------
