@@ -7,7 +7,7 @@ Document
 A :py:class:`~ferenda.Document` is the main unit of information in
 Ferenda. A document is primarily represented in serialized form as a
 XHTML 1.1 file with embedded metadata in RDFa format, and in code by
-the :py:class:`~ferenda.sources.Document` class. The class has five
+the :py:class:`~ferenda.Document` class. The class has five
 properties:
 
 * ``meta`` (a RDFLib :py:class:`~rdflib.graph.Graph`)
@@ -21,7 +21,7 @@ properties:
 * ``basefile`` (see below)
 
 The method
-:py:meth:`~ferenda.sources.DocumentRepository.render_xhtml`
+:py:meth:`~ferenda.DocumentRepository.render_xhtml`
 renders a :py:class:`~ferenda.Document` object into a XHTML 1.1+RDFa document.
 
 A document has a couple of different identifiers, and it's useful to
@@ -40,7 +40,7 @@ understand the difference and relation between them.
   provide good Linked data for that URI. You can point out the
   established canonical URI using a RDF owl:sameAs statement. The
   method
-  :py:meth:`~ferenda.sources.DocumentRepository.canonical_uri`
+  :py:meth:`~ferenda.DocumentRepository.canonical_uri`
   transforms a basefile to a canonical uri.
 * ``dct:identifier`` (optional): If the document has an established
   human-readable identifier, such as "RFC 1147" or "2003/98/EC" (The
@@ -74,7 +74,7 @@ documents, and then re-generating HTML documents with added niceties,
 for example references from documents from other docrepos.
 
 You add support for a new collection of documents by subclassing
-:py:class:`~ferenda.sources.DocumentRepository`. For more
+:py:class:`~ferenda.DocumentRepository`. For more
 details, see :doc:`createdocrepos`
 
 

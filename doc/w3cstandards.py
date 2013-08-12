@@ -1,4 +1,4 @@
-from ferenda.sources import DocumentRepository
+from ferenda import DocumentRepository
 
 class W3CStandards(DocumentRepository):
     alias = "w3c"

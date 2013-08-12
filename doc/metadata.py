@@ -1,4 +1,4 @@
-from ferenda.sources import DocumentRepository
+from ferenda import DocumentRepository
 
 class ExampleDocrepo(DocumentRepository):
 

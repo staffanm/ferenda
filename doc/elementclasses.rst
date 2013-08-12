@@ -67,7 +67,7 @@ Rendering to XHTML
 ------------------
 
 The built-in classes are rendered as XHTML by the built-in
-method :py:meth:`~ferenda.sources.DocumentRepository.render_xhtml`. Your own
+method :py:meth:`~ferenda.DocumentRepository.render_xhtml`. Your own
 classes can specify how they are to be rendered in XHTML by overriding
 the ``tagname`` property and the ``render`` method.
 

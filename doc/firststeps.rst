@@ -43,7 +43,7 @@ Creating a Document repository class
 
 A docrepo class is responsible for downloading documents in a specific
 document collection. These classes can inherit from 
-`ferenda.sources.DocumentRepository`, which amongst others provides the method
+`ferenda.DocumentRepository`, which amongst others provides the method
 `download()` for this. Since the details of how documents are made
 available differ greatly from collection to collection, you'll often
 have to override the default implementation, but in this particular

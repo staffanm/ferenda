@@ -1,9 +1,11 @@
-from ferenda.sources import DocumentRepository
+from ferenda import DocumentRepository
 class RFCs(DocumentRepository):
     alias = "rfc"
     start_url = "http://www.ietf.org/download/rfc-index.txt"
     document_url_regex = "http://tools.ietf.org/rfc/rfc(?P<basefile>).txt"
-
+    document_url_template = "http://tools.ietf.org/rfc/rfc%(basefile)s.txt"
+    downloaded_suffix = ".txt"
+    
     @recordlastdownload
     def download(self):
         self.log.debug("download: Start at %s" %  self.start_url)

@@ -12,7 +12,7 @@ document.
 
 Each document has a ``meta`` property which initially is an empty
 RDFLib :py:class:`~rdflib.graph.Graph` object. As part of the
-:py:meth:`~ferenda.sources.DocumentRepository.parse` method, you
+:py:meth:`~ferenda.DocumentRepository.parse` method, you
 should fill this graph with *triples* (metadata statements) about the
 document.
 
@@ -27,7 +27,7 @@ docrepo alias, and the basefile). By changing the ``url`` variable in
 your project configuration file, you can set the base URL from which
 all document URIs are derived. If you wish to have more control over
 the exact way URIs are constructed, you can override
-:py:meth:`~ferenda.sources.DocumentRepository.canonical_uri`.
+:py:meth:`~ferenda.DocumentRepository.canonical_uri`.
 
 .. note::
 
@@ -89,16 +89,16 @@ documents.
 Serialization of metadata
 -------------------------
 
-The :py:meth:`~ferenda.sources.DocumentRepository.render_xhtml` method
+The :py:meth:`~ferenda.DocumentRepository.render_xhtml` method
 serializes all information in ``doc.body`` and ``doc.meta`` to a
 XHTML+RDFa file (the exact location given by
-:py:meth:`~ferenda.sources.DocumentRepository.parsed_path`. The
+:py:meth:`~ferenda.DocumentStore.parsed_path`. The
 metadata specified by doc.meta ends up in the ``<head>`` section of
 this XHTML file.
 
 The actual RDF statements are also *distilled* to a separate RDF/XML
 file found alongside this file (the location given by
-:py:meth:`~ferenda.sources.DocumentRepository.distilled_path`) for
+:py:meth:`~ferenda.DocumentStore.distilled_path`) for
 convenience.
 
 Metadata about parts of the document
