@@ -13,7 +13,7 @@ else:
 # available from pypi, only from git repos (see
 # requirements.py3.txt). Is this possible?
 
-install_requires = ['beautifulsoup4 >= 4.2.0',
+install_requires = ['beautifulsoup4 >= 4.3.0',
                     'jsmin >= 2.0.2',
                     'lxml >= 3.2.0',
                     'rdflib >= 4.0.1',
