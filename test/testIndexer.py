@@ -16,6 +16,7 @@ import whoosh.index
 import whoosh.fields
 
 from ferenda import FulltextIndex, DocumentRepository
+from ferenda.testutil import FerendaTestCase
 from ferenda.fulltextindex import Identifier, Datetime, Text, Label, Keywords, Boolean, URI, Less, More, Between
 
 basic_dataset = [
@@ -50,8 +51,6 @@ basic_dataset = [
      'identifier':'Doc #2',
      'text':'This is the second document (not the first)'}
     ]
-
-
     
 class BasicIndex(unittest.TestCase):
 
@@ -139,8 +138,43 @@ class BasicQuery(unittest.TestCase):
         from pprint import pprint
         self.assertEqual(len(res),3)
         self.assertEqual(res[0]['identifier'], 'Doc #1 (section 1)') 
-        
 
+class IndexerTestCase(FerendaTestCase):
+    def test_create(self):
+        # assert that the index doesn't exist
+        self.assertFalse(self.index.exists())
+        # assert that we have no documents
+        self.assertEqual(self.index.doccount(),0)
+        # assert that the schema, using our types, looks OK
+        wanted = {'uri':Identifier(),
+                  'repo':Label(),
+                  'basefile':Label(),
+                  'title':Text(boost=4),
+                  'identifier':Label(boost=16),
+                  'text':Text()}
+        got = self.index.schema()
+        self.assertEqual(wanted,got)
+        self.assertEqual(sorted(want.names()), sorted(got.names()))
+        for fld in got.names():
+            self.assertEqual((fld,want[fld]),(fld,got[fld]))
+
+    def test_insert(self):
+        self.index.update(**basic_dataset[0])
+        self.index.update(**basic_dataset[1])
+        self.index.commit() 
+        self.assertEqual(self.index.doccount(),2)
+        
+        self.index.update(**basic_dataset[2])
+        self.index.update(**basic_dataset[3]) # updated version of basic_dataset[1]
+        self.index.commit() 
+        self.assertEqual(self.index.doccount(),3)
+
+class ESBasicIndexer(IndexerTestCase, unittest.TestCase):
+    def setUp(self):
+        self.index = FulltextIndex.connect("ELASTICSEARCH", "http://localhost:9200/ferenda/")
+    
+        
+        
 # ----------------------------------------------------------------
 # Non-working test classes - TBD!
 
@@ -269,9 +303,3 @@ class CustomQuery(object):
         self.assertEqual(len(res),2)
         identifiers = set([x['identifier'] for x in res])
         self.assertEqual(identifiers, set(['R1 D1','R1 D2']))
-                               
-        
-             
-                    
-
-    

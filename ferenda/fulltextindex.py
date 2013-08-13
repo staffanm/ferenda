@@ -1,6 +1,9 @@
 from pprint import pprint
 import re
 
+import requests
+import requests.exceptions
+
 from ferenda import util
 
 class FulltextIndex(object):
@@ -17,7 +20,9 @@ class FulltextIndex(object):
         :type  location: str
     """
         # create correct subclass and return it
-        return WhooshIndex(location)
+        return {'WHOOSH': WhooshIndex,
+                'ELASTICSEARCH': ElasticSearchIndex}[indextype](location)
+
 
     def __init__(self, location):
         self.location = location
@@ -25,7 +30,7 @@ class FulltextIndex(object):
             self.index = self.open()
         else:
             self.index = self.create(self.get_default_schema())
-        
+       
 
     def __del__(self):
         self.close()
@@ -36,7 +41,7 @@ class FulltextIndex(object):
                 'basefile':Label(),
                 'title':Text(boost=4),
                 'identifier':Label(boost=16),
-                'text':Text()}        
+                'text':Text()}       
 
     def exists(self):
         raise NotImplementedError
@@ -90,11 +95,11 @@ class FulltextIndex(object):
     def close(self):
         """Commits all pending updates and closes the index."""
         raise NotImplementedError
-            
+           
 
     def doccount(self):
         """Returns the number of currently indexed (non-deleted) documents."""
-        raise NotImplementedError        
+        raise NotImplementedError       
 
     def query(self,q, **kwargs):
         """Perform a free text query against the full text index, optionally restricted with
@@ -212,7 +217,7 @@ class WhooshIndex(FulltextIndex):
 
     def exists(self):
         return whoosh.index.exists_in(self.location)
-         
+        
 
     def open(self):
         return whoosh.index.open_dir(self.location)
@@ -257,7 +262,7 @@ class WhooshIndex(FulltextIndex):
                                      identifier=identifier,
                                      text=text,
                                       **kwargs)
-        
+       
 
     def commit(self):
         if self._writer:
@@ -272,7 +277,7 @@ class WhooshIndex(FulltextIndex):
         if self._writer:
             self._writer.close()
             self._writer = None
-            
+           
 
     def doccount(self):
         return self.index.doc_count()
@@ -302,30 +307,113 @@ class WhooshIndex(FulltextIndex):
         for hit in res:
             fields = hit.fields()
             fields['text'] = hl.highlight_hit(hit,"text",fields['text'])
-            l.append(hit.fields())	
+            l.append(hit.fields()) 
         return l
 
 # Base class for a HTTP-based API (eg. ElasticSearch)
+# the base class delegate the formulation of queries, updates etc to concrete subclasses, 
+# expected to return a formattted query/payload etc, and be able to decode responses to 
+# queries, but the base class handles the actual HTTP call, inc error handling.
 class RemoteIndex(FulltextIndex):
-
-    import requests
-
 
     def exists(self): pass
 
     def create(self, schema):
-        payload = self._create_schema_payload()
-        requests.put(self.location, payload)
+        relurl, payload = self._create_schema_payload(self.get_default_schema())
+        requests.put(self.location+relurl, payload)
 
+    def schema(self): return self.get_default_schema()
+
+    def update(self, uri, repo, basefile, title, identifier, text, **kwargs):
+        relurl, payload = self._update_payload(uri, repo, basefile, title, identifier, text, **kwargs)
+        requests.put(self.location+relurl, payload)
+
+    def doccount(self):
+        reluri, payload = self._count_payload()
+        if payload:
+            res = requsts.post(self.location+relurl, payload)
+        else:
+            res = requests.get(self.location+relurl)
+        return self._decode_count_result(res)
+
+    def query(self, q, pagenum=1, pagelen=10, **kwargs):
+        relurl, payload = self._query_payload(q, pagenum=1, pagelen=10, **kwargs)
+        if payload:
+            res = requsts.post(self.location+relurl, payload)
+        else:
+            res = requests.get(self.location+relurl)
+        return self._decode_query_result(res)
+
+    # these don't make no sense for a remote index accessed via HTTP/REST
     def open(self): pass
-    def schema(self): pass
-    def update(self, uri, repo, basefile, title, identifier, text, **kwargs): pass
     def commit(self): pass
     def close(self): pass
-    def doccount(self): pass
-    def query(self,q, **kwargs): pass
+
 
 class ElasticSearchIndex(RemoteIndex):
-    def _create_schema_payload():
-        pass
 
+    def exists(self):
+        r = requests.get(self.location+"_mapping/")
+        if r.status_code == 404:
+            return False
+        else:
+            return True
+    
+    def _update_payload(self, uri, repo, basefile, title, identifier, text, **kwargs):
+        relurl = "%s/%s" % repo, basefile # eg type, id
+        if "#" in uri: 
+            relurl += uri.split("#",1)[1]
+        payload = {'uri': uri,
+                   'basefile': basefile,
+                   'title': title,
+                   'identifier': identifier,
+                   'text': text}
+        payload.update(kwargs)
+        return relurl, payload
+
+    def _query_payload(self, q, pagenum=1, pagelen=10, **kwargs):
+        relurl = "_search?q=%s&size=%s&from=%s" % (urlencode(q), pagelen, (pagenum * pagelen) - pagelen)
+        return relurl, None
+
+    def _decode_result(self, response):
+        json = response.json
+        pager = {'pagenum': 0,
+                 'pagecount': 0,
+                 'firstresult': 0,
+                 'lastresult': 0,
+                 'totalresults': json['hits']['total'] }
+        return json['hits']['hits'], pager
+        
+    def _decode_count_result(self, response):
+        return response.json['count']
+
+    def _create_schema_payload(self, schema):
+        schema = {'settings': {
+            'number_of_shards': 3,
+            'number_of_replicas': 2
+            },
+                  'mappings': {}}
+
+                
+
+        # maps our field classes to concrete ES field properties 
+        # -- lots more to add (boosting in particular) but ES docs are hard
+        mapped_field = {Identifier():   {'type': 'text', 'index': 'not_analyzed'}, # uri
+                        Label():        {'type': 'text', 'index': 'not_analyzed'}, # repo, basefile (note: see below)
+                        Label(boost=16):{'type': 'text', 'boost': 16.0}, # identifier
+                        Text(boost=4):  {'type': 'text', 'boost': 4.0}, # title
+                        Text():         {'type': 'text'}} # text
+                        
+        es_fields = {}
+        from pudb import set_trace; set_trace()
+        for key,fieldtype in self.get_default_schema().items():
+            if key == 'repo':
+                continue # not really needed for ES, as type == repo.alias
+            es_fields[key] = mapped_field[fieldtype]
+        for repo in repos: # where to get?!
+            schema['mappings'][repo.alias] = {'_source': {'enabled': true}, # so we can get the text back
+                                              'properties': es_fields}
+        # self.location should be eg http://localhost:9200/ferenda/, not just http://localhost:9200/
+        return "", json.dumps(schema)
+
+ 
