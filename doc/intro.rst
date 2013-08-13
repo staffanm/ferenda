@@ -71,16 +71,6 @@ can get by with only rdflib, using either a Sqlite or a Berkely DB
    ``easy_install``/``pip`` as it has requirements of its own and is
    not essential.
 
-   On Mac OS X, there is a known incompatibility between the system
-   libraries, python 3.3, BeautifulSoup 4.2 and lower and lxml, which manifests
-   itself in the error message "Unicode parsing is not supported on
-   this platform". A workaround (until BeautifulSoup 4.3 is released) 
-   is to make sure lxml is statically
-   compiled with libxml2/libxslt by setting the environment
-   variable ``STATIC_DEPS`` to ``true``, eg::
-
-       STATIC_DEPS=true pip install lxml
-
    On Windows, we recommend using a binary distribution
    of lxml. Unfortunately, at the time of writing, no such
    distribution is available for Python 3.3, so for the time
