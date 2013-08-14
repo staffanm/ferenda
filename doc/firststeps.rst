@@ -5,8 +5,9 @@ Ferenda can be used in a project-like manner with a command-line tool
 (similar to how projects based on `Django
 <https://www.djangoproject.com/>`_, `Sphinx <http://sphinx-doc.org/>`_
 and `Scrapy <http://scrapy.org>`_ are used), or it can be used
-programatically through a simple API. In this guide, we'll be using
-the command-line tool.
+programatically through a simple API. In this guide, we'll primarily
+be using the command-line tool, and then show how to achieve the same thing
+using the API.
 
 The first step is to create a project. Lets make a simple website that
 contains published standards from W3C and IETF, called
@@ -37,6 +38,13 @@ documents on that page, and not all of them are links to recommended
 standards. A simple way to find only the recommended standards is to
 see if the link follows the pattern
 ``http://www.w3.org/TR/<year>/REC-<standardid>-<date>``.
+
+.. note::
+
+   When using the API, you don't create a project or deal with configuration 
+   files in the same way. Instead, your client code is responsible for
+   keeping track of which docrepos to use, and providing configuration
+   when calling their methods.
 
 Creating a Document repository class
 ------------------------------------
@@ -98,6 +106,12 @@ interchangably::
   $ ./ferenda-build.py w3c status # terse, exactly the same result
 
 
+.. note:: 
+
+   When using the API, there is no need (or possibility) to register
+   docrepo classes. Your client code directly instantiates the class(es)
+   it uses and calls methods on them.
+
 Downloading
 -----------
 
@@ -129,6 +143,14 @@ We can get a overview of the status of our docrepo using the
   download: rdf-plain-literal, owl2-xml-serialization, owl2-syntax... (2 more)
   parse: None.
   generated: None.
+
+.. note::
+
+   To do the same using the API:
+
+   .. literalinclude:: firststeps-api.py
+      :lines: 4-8
+
 
 Parsing
 -------
@@ -174,6 +196,14 @@ you'll need to override this through the ``--force`` flag (or set the
   2012-10-09 10:06:15 DEBUG: Parse rdf-direct-mapping start
   ...
 
+
+.. note::
+
+   To do the same using the API:
+
+   .. literalinclude:: firststeps-api.py
+      :lines: 12-14
+
 Note also that you can parse all downloaded documents through the
 ``--all`` flag, and control logging verbosity by the ``--loglevel`` flag::
 
@@ -183,28 +213,28 @@ Note also that you can parse all downloaded documents through the
   2012-10-09 10:06:15 INFO: Parse bar OK (3.423 sec)
   ...
 
+
+.. note::
+
+   To do the same using the API:
+
+   .. literalinclude:: firststeps-api.py
+      :lines: 18-28
+
+   Note that the API makes you explicitly list and iterate over any available files. This is 
+   so that client code has the opportunity to parallelize this work in an appropriate way.
+
 If we take a look at the files created in ``data/w3c/distilled``, we
 see some metadata for each document. This metadata has been
 automatically extracted from RDFa statements in the XHTML documents,
 but is so far very spartan.
 
-Now take a look at the files created in ``data/w3c/parsed``. Most of
-the nice structured formatting of the W3C documents (tables, headings,
-preformatted sections, structural <div> tags) are gone, replaced with
-simple <p> tags without class or id attributes -- essentially only the
-textual content has been kept, not any of the semantic structure. This
-is because the default implementation of parse() is focused on just
-keeping the text of the document, and discards all semantic markup.
+Now take a look at the files created in ``data/w3c/parsed``. The default
+implementation of ``parse()`` processes the DOM of the main body of the 
+document, but some tags and attribute that are used only for
+formatting are stripped, such as ``<style>`` and ``<script>``.
 
-.. note::
-
-   In the latest revisions of DocumentRepository, the default
-   implementation of ``parse()`` keeps existing semantic
-   structure. However, some tags and attribute that are used only for
-   formatting are stripped, such as ``<style>`` and ``<script>``.
-
-This is clearly not optimal for w3c documents, which generally has
-pretty good semantic markup. At the same time, the documents have
+At the same time, the documents have
 quite a lot of "boilerplate" text such as table of contents and links
 to latest and previous versions which we'd like to remove so that just
 the actual text is left (problem 1). And we'd like to explicitly extract some
@@ -212,41 +242,47 @@ parts of the document and represent these as metadata for the document
 -- for example the title, the publication date, the authors/editors of
 the document and it's abstract, if available (problem 2).
 
-Just like the default implementation of download() allowed for some
+Just like the default implementation of
+:meth:`~ferenda.DocumentRepository.download` allowed for some
 customization using class variables, we can solve problem 1 by setting
 two additional class variables:
 
 .. literalinclude:: w3cstandards.py
   :lines: 8-10
 
-The parse_content_selector member specifies, using `CSS selector
-syntax <http://www.w3.org/TR/CSS2/selector.html>`_, the part of the
-document which contains our main text. It defaults to ``"body"``, and
-can often be set to ``".content"`` (the first element that has a
-class="content" attribute"), ``"#main-text"`` (any element with the id
+The :py:data:`~ferenda.DocumentRepository.parse_content_selector`
+member specifies, using `CSS selector syntax
+<http://www.w3.org/TR/CSS2/selector.html>`_, the part of the document
+which contains our main text. It defaults to ``"body"``, and can often
+be set to ``".content"`` (the first element that has a class="content"
+attribute"), ``"#main-text"`` (any element with the id
 ``"main-text"``), ``"article"`` (the first ``<article>`` element) or
-similar.
-
-The ``parse_remove_selectors`` is a list of similar selectors, with
-the difference that all matching elements are removed from the
-tree. In this case, we use it to remove some boilerplate sections that
-often within the content specified by ``parse_content_selector``, but
+similar.  The
+:py:data:`~ferenda.DocumentRepository.parse_filter_selectors` is a list
+of similar selectors, with the difference that all matching elements
+are removed from the tree. In this case, we use it to remove some
+boilerplate sections that often within the content specified by
+:py:data:`~ferenda.DocumentRepository.parse_content_selector`, but
 which we don't want to appear in the final result.
 
 In order to solve problem 2, we can override one of the methods that
 the default implementation of parse() calls:
 
 .. literalinclude:: w3cstandards.py
-  :lines: 11-21
+   :lines: 11-21
 
-``parse_soup_metadata`` is called with a document object and the
-parsed HTML document in the form of a BeautifulSoup object. It is the
-responsibility of ``parse_soup_metadata`` to add document-level
-metadata for this document, such as it's title, publication date, and
-similar. Note that ``parse_soup_metadata`` is run before the
-``parse_content_selector`` and ``parse_remove_selectors`` are applied,
-so the BeautifulSoup object passed into it contains the entire
-document.
+:py:meth:`~ferenda.DocumentRepository.parse_metadata_from_soup` is
+called with a document object and the parsed HTML document in the form
+of a BeautifulSoup object. It is the responsibility of
+:py:meth:`~ferenda.DocumentRepository.parse_metadata_from_soup` to add
+document-level metadata for this document, such as it's title,
+publication date, and similar. Note that
+:py:meth:`~ferenda.DocumentRepository.parse_metadata_from_soup` is run
+before the
+:py:data:`~ferenda.DocumentRepository.parse_content_selector` and
+:py:data:`~ferenda.DocumentRepository.parse_filter_selectors` are
+applied, so the BeautifulSoup object passed into it contains the
+entire document.
 
 .. note::
 
@@ -268,32 +304,55 @@ content::
 
   $ ./ferenda-build.py w3c relate --all
   2012-10-09 10:06:15 INFO: 467 triples in total (data/w3c/distilled/rdf.nt)
+
+The next step is to prepare a number of files that are placed under
+``data/rsrc``. These resource files include css and javascript files
+for the new website we're creating, as well as a xml configuration
+file used by the XSLT transformation done by ``generate`` below::
+
+  $ ./ferenda-build.py w3c makeresources
    
 This is needed for the final few steps::
 
   $ ./ferenda-build.py w3c generate --all
 
-The generate --all command creates browser-ready HTML5 documents from
-our structured XHTML documents, using our site's navigation::
+The ``w3c generate --all`` command creates browser-ready HTML5
+documents from our structured XHTML documents, using our site's
+navigation::
 
   $ ./ferenda-build.py w3c toc
-  $ ./ferenda-build.py w3c feeds
+  $ ./ferenda-build.py w3c news
+  $ ./ferenda-build.py w3c frontpage
 
 The toc and feeds commands creates static files for general indexes/tables of contents
-of all documents in our docrepo as well as Atom feeds::
+of all documents in our docrepo as well as Atom feeds.
+
+.. note:: 
+
+
+   To do all of the above using the API:
+
+   .. literalinclude:: firststeps-api.py
+      :lines: 32-42
+
+Finally, to start a development web server and check out the finished
+result::
 
   $ ./ferenda-build.py w3c runserver
-
-The runserver command opens up a development webserver at ``localhost:8080``::
-
   $ open http://localhost:8080/
 
-And now you've created your own web site with structured documents. It
-contains listings of all documents, feeds with updated document (in
-both HTML and Atom flavors), full text search and even an JSON REST
-API! In order to deploy your site, you can run it under
-Apache+mod_wsgi, ngnix+uWSGI, Gunicorn or just about any WSGI capable
-web server, see :doc:`wsgi`.
+Now you've created your own web site with structured documents. It
+contains listings of all documents, feeds with updated documents (in
+both HTML and Atom flavors) and full text search. In order to deploy
+your site, you can run it under Apache+mod_wsgi, ngnix+uWSGI, Gunicorn
+or just about any WSGI capable web server, see :doc:`wsgi`.
+
+.. note::
+
+   Using :py:func:`~ferenda.manager.runserver` from the API does not really make any sense.
+   If your environment supports running WSGI applications, see the above link for information
+   about how to get the ferenda WSGI application. Otherwise, the app can be run by any standard 
+   WSGI host.
 
 To keep it up-to-date whenever the W3C issues new standards, use the
 following command::
@@ -303,7 +362,15 @@ following command::
 The "all" command is an alias that runs ``download``, ``parse --all``, ``relate
 --all``, ``generate --all``, ``toc`` and ``feeds`` in sequence. 
 
-This 20-line example took a lot of shortcuts by depending on the
+.. note::
+
+   The API doesn't have any corresponding method. Just run all of the
+   above code again. As long as you don't pass the ``force=True``
+   parameter when creating the docrepo instance, ferendas dependency
+   management should make sure that documents aren't needlessly
+   re-parsed etc.
+
+This 20-line example of a docrepo took a lot of shortcuts by depending on the
 default implementation of the ``download()`` and ``parse()`` methods. Ferenda
 tries to make it really to get *something* up and running quickly, and
 then improving each step incrementally.
@@ -312,6 +379,6 @@ In the next section :doc:`createdocrepos` we will take a closer look at
 each of the six main steps (download, parse, relate, generate, toc and
 feeds), including how to completely replace the built-in methods. 
 You can also take a look at the source code for
-``ferenda.sources.tech.W3C``, which contains a more complete 
-(and substantially longer) implementation of download(), parse()
+:py:class:`ferenda.sources.tech.W3C`, which contains a more complete 
+(and substantially longer) implementation of ``download()``, ``parse()``
 and the others.
