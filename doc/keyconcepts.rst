@@ -1,89 +1,26 @@
 Key concepts
 ============
 
-Document
---------
-
-A :py:class:`~ferenda.Document` is the main unit of information in
-Ferenda. A document is primarily represented in serialized form as a
-XHTML 1.1 file with embedded metadata in RDFa format, and in code by
-the :py:class:`~ferenda.Document` class. The class has five
-properties:
-
-* ``meta`` (a RDFLib :py:class:`~rdflib.graph.Graph`)
-* ``body`` (a tree of building blocks, normally instances of
-  :py:mod:`ferenda.elements` classes, representing the structure and
-  content of the document)
-* ``lang`` (an `IETF language
-  <http://en.wikipedia.org/wiki/IETF_language_tag>`_ tag, eg ``sv`` or
-  ``en-GB``)
-* ``uri`` (a string representing the canonical URI for this document)
-* ``basefile`` (see below)
-
-The method
-:py:meth:`~ferenda.DocumentRepository.render_xhtml`
-renders a :py:class:`~ferenda.Document` object into a XHTML 1.1+RDFa document.
-
-A document has a couple of different identifiers, and it's useful to
-understand the difference and relation between them.
-
-* ``basefile``: This is a short id, internal to the document repository,
-  and is used as the base for stored files on disk. For a docrepo of
-  RFCs, a good basefile for RFC 1147 is "1147", which corresponds to
-  the downloaded file rfc/downloads/1147.txt, the parsed file
-  rfc/parsed/1147.xhtml and the generated file rfc/generated/1147.html
-* ``uri``: The *canonical URI* for this resource. In case you're dealing
-  with documents that have no well-defined canonical URIs (which is
-  the common case), feel free to invent a URI scheme. Even if there is
-  a established canonical URI for your document, you might want to use
-  a URI that resolves to a server under your control, so that you can
-  provide good Linked data for that URI. You can point out the
-  established canonical URI using a RDF owl:sameAs statement. The
-  method
-  :py:meth:`~ferenda.DocumentRepository.canonical_uri`
-  transforms a basefile to a canonical uri.
-* ``dct:identifier`` (optional): If the document has an established
-  human-readable identifier, such as "RFC 1147" or "2003/98/EC" (The
-  EU directive on the re-use of public sector information), the
-  dct:identifier is used for this. See
-  `DCMI Terms <http://dublincore.org/documents/2012/06/14/dcmi-terms/#terms-identifier>`_
-  and :doc:`linkeddata`.
-
-DocumentEntry
--------------
-
-Information about how a document has been handled within the ferenda
-framework is not a part of the Document object as described
-above. Such information include when a document was first downloaded
-or updated, the URL from where it came, and when it was made available
-through the ferenda-based website, is encapsulated in the
-:py:class:`~ferenda.DocumentEntry` class. Such objects are created and
-updated by the download methods, stored alongside the documents
-themselves (in :py:mod:`pickle` format), and are read by the feeds
-methods in order to create valid Atom feeds.
-
-.. _keyconcept-documentrepository:
-
-DocumentRepository
-------------------
-
-A document repository (docrepo for short) is a class that handles all
-aspects of a document collection: Downloading the documents (or
-aquiring them in some other way), parsing them into structured
-documents, and then re-generating HTML documents with added niceties,
-for example references from documents from other docrepos.
-
-You add support for a new collection of documents by subclassing
-:py:class:`~ferenda.DocumentRepository`. For more
-details, see :doc:`createdocrepos`
-
 
 Project
 -------
 
 A collection of docrepos and configuration that is used to make a
 useful web site. The first step in creating a project is running
-`ferenda-setup.py <projectname>`.
+``ferenda-setup <projectname>``.
+
+A project is primarily defined by its configuration file at
+``<projectname>/ferenda.ini``, which specifies which docrepos are
+used, and settings for them as well as settings for the entire
+project.
+
+A project is managed using the ``ferenda-build.py`` tool.
+
+If using the API instead of these command line tools, your client code
+is responsible for calling the docrepo classes and providing them with
+proper settings. These can be loaded from a ferenda.ini-style file
+(the :class:~ferenda.LayeredConfig` class makes this simple), be
+hard-coded, or handled in any other way you see fit.
 
 .. _configuration:
 
@@ -102,8 +39,8 @@ instantiating the object, eg:
    Parameters that is not provided when instantiating the object are
    defaulted from the built-in configuration values (see below)
   
-Or it can be configured using the :py:class:`~ferenda.LayeredConfig` class, which takes
-configuration data from three places:
+Or it can be configured using the :py:class:`~ferenda.LayeredConfig`
+class, which takes configuration data from three places:
 
 * built-in configuration values (provided by
   :py:meth:`~ferenda.DocumentRepository.get_default_options`)
@@ -190,9 +127,87 @@ staticsite        Whether to generate static HTML files      False
 		  instead of canonical URIs)
 ================= ========================================== =========
 
+.. _keyconcept-documentrepository:
+
+DocumentRepository
+------------------
+
+A document repository (docrepo for short) is a class that handles all
+aspects of a document collection: Downloading the documents (or
+aquiring them in some other way), parsing them into structured
+documents, and then re-generating HTML documents with added niceties,
+for example references from documents from other docrepos.
+
+You add support for a new collection of documents by subclassing
+:py:class:`~ferenda.DocumentRepository`. For more
+details, see :doc:`createdocrepos`
+
+Document
+--------
+
+A :py:class:`~ferenda.Document` is the main unit of information in
+Ferenda. A document is primarily represented in serialized form as a
+XHTML 1.1 file with embedded metadata in RDFa format, and in code by
+the :py:class:`~ferenda.Document` class. The class has five
+properties:
+
+* ``meta`` (a RDFLib :py:class:`~rdflib.graph.Graph`)
+* ``body`` (a tree of building blocks, normally instances of
+  :py:mod:`ferenda.elements` classes, representing the structure and
+  content of the document)
+* ``lang`` (an `IETF language
+  <http://en.wikipedia.org/wiki/IETF_language_tag>`_ tag, eg ``sv`` or
+  ``en-GB``)
+* ``uri`` (a string representing the canonical URI for this document)
+* ``basefile`` (see below)
+
+The method :py:meth:`~ferenda.DocumentRepository.render_xhtml` renders
+a :py:class:`~ferenda.Document` object into a XHTML 1.1+RDFa document.
+
+A document has a couple of different identifiers, and it's useful to
+understand the difference and relation between them.
+
+* ``basefile``: This is a short id, internal to the document repository,
+  and is used as the base for stored files on disk. For a docrepo of
+  RFCs, a good basefile for RFC 1147 is "1147", which corresponds to
+  the downloaded file rfc/downloads/1147.txt, the parsed file
+  rfc/parsed/1147.xhtml and the generated file rfc/generated/1147.html
+* ``uri``: The *canonical URI* for this resource. In case you're dealing
+  with documents that have no well-defined canonical URIs (which is
+  the common case), feel free to invent a URI scheme. Even if there is
+  a established canonical URI for your document, you might want to use
+  a URI that resolves to a server under your control, so that you can
+  provide good Linked data for that URI. You can point out the
+  established canonical URI using a RDF owl:sameAs statement. The
+  method
+  :py:meth:`~ferenda.DocumentRepository.canonical_uri`
+  transforms a basefile to a canonical uri.
+* ``dct:identifier`` (optional): If the document has an established
+  human-readable identifier, such as "RFC 1147" or "2003/98/EC" (The
+  EU directive on the re-use of public sector information), the
+  dct:identifier is used for this. See
+  `DCMI Terms <http://dublincore.org/documents/2012/06/14/dcmi-terms/#terms-identifier>`_
+  and :doc:`linkeddata`.
+
+DocumentEntry
+-------------
+
+Information about how a document has been handled within the ferenda
+framework is not a part of the Document object as described
+above. Such information include when a document was first downloaded
+or updated, the URL from where it came, and when it was made available
+through the ferenda-based website, is encapsulated in the
+:py:class:`~ferenda.DocumentEntry` class. Such objects are created and
+updated by the download methods, stored alongside the documents
+themselves (in :py:mod:`pickle` format), and are read by the feeds
+methods in order to create valid Atom feeds.
+
+
+
 File storage
 ------------
 
+See :class:`~ferenda.DocumentStore`.
   
 Intermediate files
 ^^^^^^^^^^^^^^^^^^

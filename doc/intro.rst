@@ -79,13 +79,14 @@ can get by with only rdflib, using either a Sqlite or a Berkely DB
 Example
 -------
 
-This code creates a website containing all* RFCs and W3C recommended
+This code creates a website containing all(*) RFCs and W3C recommended
 standards.
 
 .. literalinclude:: intro-example.py
 
-* actually, it only downloads the 50 most recent of each. Downloading
-and handling close to 7000 RFC documents takes a very long time.
+(*) actually, it only downloads the 50 most recent of
+each. Downloading and handling close to 7000 RFC documents takes a
+very long time.
 		    
 Alternately, using the command line tools:
 

@@ -1,9 +1,8 @@
-Ferenda is a python library and framework to scrape and convert
-unstructured content into semantically-marked-up, Linked Data-enabled
-content. It is focused on documents, not individual pieces of data,
-but is useful for any kind of information that can be described in
-terms of resources (documents, people, places, events, etc...). It
-uses RDF for all metadata.
+Ferenda is a python library and framework for transforming
+unstructured document collections into structured Linked Data. It
+helps with downloading documents, parsing them to add explicit
+semantic structure and RDF-based metadata, finding relationships
+between documents, and publishing the results.
 
 Quick start
 -----------
