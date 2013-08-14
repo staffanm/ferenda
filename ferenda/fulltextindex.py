@@ -1,5 +1,5 @@
-from pprint import pprint
 import re
+import shutil
 
 import requests
 import requests.exceptions
@@ -47,6 +47,9 @@ class FulltextIndex(object):
         raise NotImplementedError
 
     def create(self, schema):
+        raise NotImplementedError
+
+    def destroy(self):
         raise NotImplementedError
 
     def open(self):
@@ -240,10 +243,12 @@ class WhooshIndex(FulltextIndex):
         util.mkdir(self.location)
         return whoosh.index.create_in(self.location,schema)
 
+    def destroy(self):
+        # self.index.close() ?!
+        shutil.rmtree(self.location)        
 
     def schema(self):
         return self._schema
-
     
     def update(self, uri, repo, basefile, title, identifier, text, **kwargs):
         if not self._writer:
@@ -394,8 +399,6 @@ class ElasticSearchIndex(RemoteIndex):
             },
                   'mappings': {}}
 
-                
-
         # maps our field classes to concrete ES field properties 
         # -- lots more to add (boosting in particular) but ES docs are hard
         mapped_field = {Identifier():   {'type': 'text', 'index': 'not_analyzed'}, # uri
@@ -405,7 +408,6 @@ class ElasticSearchIndex(RemoteIndex):
                         Text():         {'type': 'text'}} # text
                         
         es_fields = {}
-        from pudb import set_trace; set_trace()
         for key,fieldtype in self.get_default_schema().items():
             if key == 'repo':
                 continue # not really needed for ES, as type == repo.alias
