@@ -1269,7 +1269,7 @@ def _preflight_check():
 
     # Module, min ver, required
     modules = (
-        ('bs4', '4.2.0', True),
+        ('bs4', '4.3.0', True),
         # ('lxml', '3.2.0', True), # has no top level __version__ property
         ('rdflib', '4.0', True),
         ('html5lib', '1.0b1', True),
