@@ -284,6 +284,7 @@ class DocumentRepository(object):
                 'fsmdebug': False,
                 'refresh': False,
                 'lastdownload': None,
+                'downloadmax': None,
                 'conditionalget': True,
                 'url': 'http://localhost:8000/',
                 'fulltextindex': True,

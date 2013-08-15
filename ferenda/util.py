@@ -503,6 +503,28 @@ def logtime(method, format="The operation took %(elapsed).3f sec", values={}):
     values['elapsed'] = time.time() - start
     method(format % values)
 
+# Python docs recommends against this. Eh, what are you going to do?
+@contextmanager
+def c_locale():
+    """Temporarily change process locale to the C locale, for use when eg
+    parsing English dates on a system that may have non-english
+    locale.
+
+    >>> with c_locale:
+    ...     datetime.strptime("August 2013", "%B %Y")
+
+    """
+    
+    oldlocale = locale.getlocale(locale.LC_ALL)
+    newlocale = 'C' if six.PY3 else b'C'
+    locale.setlocale(locale.LC_ALL, newlocale)
+    try:
+        yield
+    finally:
+        locale.setlocale(locale.LC_ALL, oldlocale)
+    
+
+
 # Example code from http://www.diveintopython.org/
 def from_roman(s):
     """convert Roman numeral to integer.

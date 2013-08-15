@@ -94,6 +94,8 @@ refresh           Whether to re-download all files even if   False
                   previously downloaded.
 lastdownload      The datetime when this repo was last       None
                   downloaded (stored in conf file)
+downloadmax       Maximum number of documents to download    None
+                  (None means download all of them).
 conditionalget    Whether to use Conditional GET (through    True
                   the If-modified-since and/or
 		  If-none-match headers)

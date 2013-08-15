@@ -23,21 +23,10 @@ called ``ferenda-setup`` whose sole purpose is to create projects::
 
 The three files created by ``ferenda-setup`` is another command line
 tool (``ferenda-build.py``) used for management of the newly created
-project, a WSGI application (``wsgi.py``) as well as a configuration
+project, a WSGI application (``wsgi.py``, see :doc:`wsgi`) and a configuration
 file (``ferenda.ini``). By default, it specifies the default logging
 level, the directory where document files will be stored. and which
-triple store your project will be using. By enabling more document
-repositories, more sections in the config file will be created.
-  
-Any document collection is handled by a
-:ref:`keyconcept-documentrepository` class (or *docrepo* for
-short), so our first task is to create a docrepo for W3C standards.
-These standards are all available at
-http://www.w3.org/TR/tr-status-all. There are a lot of links to
-documents on that page, and not all of them are links to recommended
-standards. A simple way to find only the recommended standards is to
-see if the link follows the pattern
-``http://www.w3.org/TR/<year>/REC-<standardid>-<date>``.
+triple store your project will be using.   
 
 .. note::
 
@@ -49,36 +38,53 @@ see if the link follows the pattern
 Creating a Document repository class
 ------------------------------------
 
+Any document collection is handled by a
+:ref:`keyconcept-documentrepository` class (or *docrepo* for
+short), so our first task is to create a docrepo for W3C standards.
+
 A docrepo class is responsible for downloading documents in a specific
-document collection. These classes can inherit from 
-`ferenda.DocumentRepository`, which amongst others provides the method
-`download()` for this. Since the details of how documents are made
-available differ greatly from collection to collection, you'll often
-have to override the default implementation, but in this particular
-case, it suffices. The default implementation assumes that all
-documents are available from a single index page, and that the URLs of
-the documents follow a set pattern. The WC3 page above is set up just
-like that. Creating a docrepo that is able to download all web
+document collection. These classes can inherit from
+:class:`~ferenda.DocumentRepository`, which amongst others provides
+the method :meth:`~ferenda.DocumentRepository.download` for
+this. Since the details of how documents are made available on the web
+differ greatly from collection to collection, you'll often have to
+override the default implementation, but in this particular case, it
+suffices. The default implementation assumes that all documents are
+available from a single index page, and that the URLs of the documents
+follow a set pattern.
+
+
+The W3C standards are set up just like that:  All standards are available at
+``http://www.w3.org/TR/tr-status-all``. There are a lot of links to
+documents on that page, and not all of them are links to recommended
+standards. A simple way to find only the recommended standards is to
+see if the link follows the pattern
+``http://www.w3.org/TR/<year>/REC-<standardid>-<date>``.
+
+Creating a docrepo that is able to download all web
 standards is then as simple as creating a subclass and setting three
 class properties. Create this class in the current directory (or
 anywhere else on your python path) and save it as ``w3cstandards.py``
 
 .. literalinclude:: w3cstandards.py
-  :lines: 1-5
+  :lines: 1-6
   
-The first property, ``alias``, is required for all docrepos and
-controls the alias used by the command line tool for that docrepo, as
-well as the path where files are stored, amongst other things. If your
-project has a large collection of docrepos, it's important that they
-all have unique aliases.
+The first property, :data:`~ferenda.DocumentRepository.alias`, is
+required for all docrepos and controls the alias used by the command
+line tool for that docrepo, as well as the path where files are
+stored, amongst other things. If your project has a large collection
+of docrepos, it's important that they all have unique aliases.
 
 The other two properties are parameters which the default
-implementation of ``download()`` uses in order to find out which
-documents to download. ``start_url`` is just a simple regular URL,
-while ``document_url_regex`` is a standard :py:mod:`re` regex with named
-groups. The group named ``basefile`` has special meaning, and will be
-used as a base for stored files and elsewhere as a short identifier
-for the document. For example, the web standard found at URL
+implementation of :meth:`~ferenda.DocumentRepository.download` uses in
+order to find out which documents to
+download. :data:`~ferenda.DocumentRepository.start_url` is just a
+simple regular URL, while
+:data:`~ferenda.DocumentRepository.document_url_regex` is a standard
+:py:mod:`re` regex with named groups. The group named ``basefile`` has
+special meaning, and will be used as a base for stored files and
+elsewhere as a short identifier for the document. For example, the web
+standard found at URL
 http://www.w3.org/TR/2012/REC-rdf-plain-literal-20121211/ will have
 the basefile ``rdf-plain-literal``.
       
@@ -135,6 +141,14 @@ After a few minutes of downloading, the result is a bunch of files in ``data/w3c
   owl2-xml-serialization.html
   owl2-xml-serialization.html.etag
 
+
+.. note::
+
+   The ``.etag`` files are created in order to support Conditional
+   GET, so that we don't waste our time or remote server bandwith by
+   re-downloading documents that hasn't changed. They can be ignored
+   and might go away in future versions of Ferenda.
+
 We can get a overview of the status of our docrepo using the
 ``status`` command::
 
@@ -151,6 +165,12 @@ We can get a overview of the status of our docrepo using the
    .. literalinclude:: firststeps-api.py
       :lines: 4-8
 
+Finally, if the logging information scrolls by too quickly and you
+want to read it again, take a look in the ``logs`` directory in the
+current directory. Each invocation of ``ferenda-build.py`` creates a
+new log file containing the same information that is written to
+stdout.
+
 
 Parsing
 -------
@@ -162,7 +182,8 @@ we've downloaded::
   2012-10-09 10:06:15 DEBUG: Parse rdf-direct-mapping start
   2012-10-09 10:06:15 DEBUG: 3 triples extracted
   2012-10-09 10:06:15 INFO: Parse rdf-direct-mapping OK (3.423 sec)
-  
+
+
 By now, you might have realized that our command line tool generally
 is called in the following manner::
 
@@ -234,7 +255,7 @@ implementation of ``parse()`` processes the DOM of the main body of the
 document, but some tags and attribute that are used only for
 formatting are stripped, such as ``<style>`` and ``<script>``.
 
-At the same time, the documents have
+These documents have
 quite a lot of "boilerplate" text such as table of contents and links
 to latest and previous versions which we'd like to remove so that just
 the actual text is left (problem 1). And we'd like to explicitly extract some
@@ -269,7 +290,10 @@ In order to solve problem 2, we can override one of the methods that
 the default implementation of parse() calls:
 
 .. literalinclude:: w3cstandards.py
+   :language: python
    :lines: 11-21
+
+FIXME: code example should show from ferenda import Describer
 
 :py:meth:`~ferenda.DocumentRepository.parse_metadata_from_soup` is
 called with a document object and the parsed HTML document in the form
@@ -305,18 +329,32 @@ content::
   $ ./ferenda-build.py w3c relate --all
   2012-10-09 10:06:15 INFO: 467 triples in total (data/w3c/distilled/rdf.nt)
 
-The next step is to prepare a number of files that are placed under
-``data/rsrc``. These resource files include css and javascript files
+The next step is to create a number of *resource files*  (placed under
+``data/rsrc``). These resource files include css and javascript files
 for the new website we're creating, as well as a xml configuration
 file used by the XSLT transformation done by ``generate`` below::
 
   $ ./ferenda-build.py w3c makeresources
+  $ ls -lR data/rsrc
+  resources.xml
+  css/normalize.css
+  css/base.css
+  css/ferenda.css
+  js/jquery-1.2.3.js
+  js/modernizr-123.js
+  js/ferenda.js
    
-This is needed for the final few steps::
+
+.. note::
+
+   It is possible to combine and minify both javascript and css files using
+   the ``combineresources`` option in the configuration file.
+
+Running ``makeresources`` is needed for the final few steps::
 
   $ ./ferenda-build.py w3c generate --all
 
-The ``w3c generate --all`` command creates browser-ready HTML5
+The ``generate`` command creates browser-ready HTML5
 documents from our structured XHTML documents, using our site's
 navigation::
 
@@ -324,8 +362,8 @@ navigation::
   $ ./ferenda-build.py w3c news
   $ ./ferenda-build.py w3c frontpage
 
-The toc and feeds commands creates static files for general indexes/tables of contents
-of all documents in our docrepo as well as Atom feeds.
+The ``toc`` and ``feeds`` commands creates static files for general indexes/tables of contents
+of all documents in our docrepo as well as Atom feeds, and the ``frontpage`` command creates a suitable frontpage for the site as a whole.
 
 .. note:: 
 
@@ -371,14 +409,14 @@ The "all" command is an alias that runs ``download``, ``parse --all``, ``relate
    re-parsed etc.
 
 This 20-line example of a docrepo took a lot of shortcuts by depending on the
-default implementation of the ``download()`` and ``parse()`` methods. Ferenda
+default implementation of the :meth:`~ferenda.DocumentRepository.download` and :meth:`~ferenda.DocumentRepository.parse` methods. Ferenda
 tries to make it really to get *something* up and running quickly, and
 then improving each step incrementally.
 
 In the next section :doc:`createdocrepos` we will take a closer look at
-each of the six main steps (download, parse, relate, generate, toc and
-feeds), including how to completely replace the built-in methods. 
+each of the six main steps (``download``, ``parse``, ``relate``, ``generate``, ``toc`` and
+``news``), including how to completely replace the built-in methods. 
 You can also take a look at the source code for
 :py:class:`ferenda.sources.tech.W3C`, which contains a more complete 
-(and substantially longer) implementation of ``download()``, ``parse()``
+(and substantially longer) implementation of :meth:`~ferenda.DocumentRepository.download`, :meth:`~ferenda.DocumentRepository.parse`
 and the others.

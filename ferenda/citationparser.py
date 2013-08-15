@@ -119,7 +119,6 @@ class CitationParser(object):
             # FIXME: We need to keep track of the URI for the part
             # of the document we're in, so that we can resolve
             # partial/relative references
-
             # splits a string into a list of string and ParseResult objects
             nodes = self.parse_string(part)
             for node in nodes:
@@ -133,6 +132,6 @@ class CitationParser(object):
                         res.append(LinkSubject(
                             text, uri=uri, predicate="dct:references"))
                     else:
-                        res.append(node)
+                        res.append(text)
                 # FIXME: concatenate adjacent str nodes
             return res

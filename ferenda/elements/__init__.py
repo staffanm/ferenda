@@ -443,7 +443,14 @@ class Link(UnicodeElement):
         
 
 class LinkSubject(PredicateType, Link):
-    """A unicode string that has both ``predicate`` and ``uri`` attributes, i.e. a typed link."""
+    """A unicode string that has both ``predicate`` and ``uri``
+attributes, i.e. a typed link. Note that predicate should be a string that represents a Qname, eg 'dct:references', not a proper rdflib object."""
+    def as_xhtml(self, uri):
+        element = super(LinkSubject, self).as_xhtml(uri)
+        if hasattr(self,'predicate'):
+            element.set('rel', self.predicate)
+        return element
+        
     pass  # A RDFish link
 
 
@@ -542,7 +549,8 @@ class Subsubsection(SectionalElement): pass
 class Paragraph(CompoundElement):
     tagname = 'p'
     
-class Preformatted(Paragraph): pass
+class Preformatted(Paragraph):
+    tagname = 'pre'
 
 class Heading(CompoundElement, OrdinalElement):
     tagname = 'h1' # fixme: take level into account
