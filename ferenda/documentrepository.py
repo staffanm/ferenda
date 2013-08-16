@@ -11,7 +11,7 @@ from collections import defaultdict
 from operator import attrgetter, itemgetter
 from datetime import datetime
 from pprint import pprint
-from tempfile import mkstemp
+from tempfile import mkstemp, mkdtemp
 from io import BytesIO
 from itertools import islice
 from wsgiref.handlers import format_date_time as format_http_date
@@ -22,6 +22,7 @@ import logging.handlers
 import os
 import re
 import sys
+import shutil
 import time
 import calendar
 import filecmp
@@ -260,6 +261,9 @@ class DocumentRepository(object):
                 prefix = ns
                 # assume that any standalone prefix is well known
                 self.ns[prefix] = Namespace(util.ns[prefix])
+    def __del__(self):
+        if self._transform_resourcedir:
+            shutil.rmtree(self._transform_resourcedir)
 
     def get_default_options(self):
         """Returns the class' configuration default configuration
@@ -1004,6 +1008,7 @@ uri doesn't map to a basefile in this repo."""
         doc.basefile = basefile
         doc.meta = self.make_graph()
         doc.lang = self.lang
+        doc.body = Body()
         if basefile:
             doc.basefile = basefile
             doc.uri = self.canonical_uri(basefile)
@@ -1468,14 +1473,15 @@ parsed document path to that documents dependency file."""
                 self.log.debug("%s: Skipped", basefile)
                 return
             self.log.debug("%s: Starting", basefile)
-            xsltdir = self.setup_transform_templates(os.path.dirname(self.xslt_template))
+
+            xsltdir = self.setup_transform_templates("res/xsl", self.xslt_template)
             xsltfile = xsltdir + os.sep + os.path.basename(self.xslt_template)
             with util.logtime(self.log.debug,
                               "%(basefile)s get_transform_configuration in %(elapsed).3f sec",
                               {'basefile': basefile}):
                 params = self.get_transform_configuration(xsltdir,outfile)
 
-            assert 'configurationfile' in params
+            assert 'configurationfile' in params, "No configurationfile found, did you run makeresources?"
             # The actual function code
             with util.logtime(self.log.debug,
                               "%(basefile)s prep_annotation_file in %(elapsed).3f sec",
@@ -1701,24 +1707,33 @@ parsed document path to that documents dependency file."""
         return params
 
     _transform_resourcedir=None
-    def setup_transform_templates(self, xsltdir):
+    def setup_transform_templates(self, xsltdir, mainxslt):
         """Unpack/extract all XSLT files and other resources needed to
         for the XSLT transform, if needed (which is the case if
         ferenda is distributed as an egg, i.e. all files are contained
         in a zip file).
 
-        :param xsltdir: path to the directory where the root xslt file is stored
+        :param xsltdir: path to the directory where the supporting xslt files are stored
+        :type  xsltdir: str
+        :param xsltdir: path to the main xslt file
         :type  xsltdir: str
         :returns: The path to extracted files
         :rtype: str
         """
-        # Unpack/extract all the files (NB: if not using zip/eggs just
-        # return existing filesystem path)
+        # Unpack/extract all the files
         if not self._transform_resourcedir:
+            self._transform_resourcedir = mkdtemp()
+            # copy everything to this temp dir (note: this gets cleaned up in __del__)
             for f in pkg_resources.resource_listdir('ferenda',xsltdir):
-                p = pkg_resources.resource_filename('ferenda', xsltdir+"/"+f)
-                # print("extracted %s/%s to %s" % (xsltdir,f,p))
-            self._transform_resourcedir = os.path.dirname(p)
+                source_fp = pkg_resources.resource_stream('ferenda', xsltdir+"/"+f)
+                dest = self._transform_resourcedir + "/" + f
+                with open(self._transform_resourcedir + "/" + f, "wb") as dest_fp:
+                    dest_fp.write(source_fp.read())
+                # print("extracted %s/%s to %s" % (xsltdir,f,dest))
+
+        if os.path.basename(mainxslt) not in pkg_resources.resource_listdir('ferenda',xsltdir):
+            shutil.copy2(mainxslt, self._transform_resourcedir)
+            
         return self._transform_resourcedir
 
     def prep_annotation_file(self, basefile):
@@ -1732,6 +1747,7 @@ parsed document path to that documents dependency file."""
         :returns: The full path to the prepared RDF/XML file
         :rtype: str
         """
+        # return self.store.annotation_path(basefile)
         graph = self.construct_annotations(self.canonical_uri(basefile))
         if graph:
             with self.store.open_annotation(basefile,"w") as fp:
@@ -1747,7 +1763,7 @@ parsed document path to that documents dependency file."""
         
         query_template = self.sparql_annotations
         if os.path.exists(query_template):
-            fp = open(query_template)
+            fp = open(query_template,'rb')
         elif pkg_resources.resource_exists('ferenda',query_template):
             fp = pkg_resources.resource_stream('ferenda',query_template)
         else:
@@ -1765,6 +1781,11 @@ parsed document path to that documents dependency file."""
             with util.logtime(self.log.debug,
                               "Constructed graph in %(elapsed).3f", {}):
                 res = ts.construct(sq)
+                # bind namespace to look pretty
+                for prefix, uri in list(self.ns.items()):
+                    res.bind(prefix, uri)
+                
+                # print(res.serialize(format="turtle").decode('utf-8'))
             return res
 
     # helper for the prep_annotation_file helper -- it expects a
@@ -2199,7 +2220,7 @@ parsed document path to that documents dependency file."""
             self.log.debug("Transforming HTML to %s" % outfile)
             # configure params
             xsltfile = "res/xsl/toc.xsl"
-            xsltdir = self.setup_transform_templates(os.path.dirname(xsltfile))
+            xsltdir = self.setup_transform_templates(os.path.dirname(xsltfile), xsltfile)
             params = self.get_transform_configuration(xsltdir,outfile)
             self.transform_html("res/xsl/toc.xsl",
                                 tmpfile, outfile, params, otherrepos=otherrepos)

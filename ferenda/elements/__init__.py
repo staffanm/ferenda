@@ -206,6 +206,7 @@ class CompoundElement(AbstractElement, list):
         return ''.join(c for c in s if _valid(ord(c)))
 
     def as_plaintext(self):
+        """Returns the plain text of this element, including child elements."""
         res = []
         for subpart in self:
             if isinstance(subpart, str):
@@ -533,10 +534,16 @@ class SectionalElement(CompoundElement):
             # NOTE: we don't set xml:lang for either the main @content
             # or the @content in the below <span> -- the data does not
             # originate from RDF and so isn't typed like that.
-            attrs = {'about': newuri,
-                          'property': 'bibo:chapter',
-                          'content': self.ordinal}
-            element.insert(0,E('span',attrs))
+            if hasattr(self,'ordinal'):
+                attrs = {'about': newuri,
+                         'property': 'bibo:chapter',
+                         'content': self.ordinal}
+                element.insert(0,E('span',attrs))
+            if hasattr(self,'identifier'):
+                attrs = {'about': newuri,
+                         'property': 'dct:identifier',
+                         'content': self.identifier}
+                element.insert(0,E('span',attrs))
         return element
     
 

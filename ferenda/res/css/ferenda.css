@@ -1,4 +1,10 @@
 /* custom styles goes here */
+@media only screen and (min-width: 768px) {
+    .wrapper {
+	width: 1140px;
+	!important
+    }
+}
 
 @media only screen and (min-width: 768px) {
 
@@ -67,12 +73,14 @@ header nav ul {
     margin-left: auto;
     margin-right: 0px;
 }
+
 @media only screen and (min-width: 480px) {
     .header-container nav a {
 	padding: 7px;
 	float: right;
     }
 }
+
 
 /* http://colorschemedesigner.com/#2j61ZK-hWpBpB */
 /* general look and feel */
@@ -119,6 +127,10 @@ nav ul li {
 .main aside {
     border-top: 20px solid #526B15;
 }
+pre {
+    font-size: 8pt;
+    line-height: 9pt;
+    }
 
 h1, h2, h3, h4 {
     font-family: 'Raleway', sans-serif; 

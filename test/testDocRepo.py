@@ -1284,12 +1284,14 @@ b:1part a :DocumentPart;
         self.store = self._load_store(self.repo)
         self._test_generated()
 
-    def _generate_complex(self):
+    def _generate_complex(self, xsl=None):
         # Helper func for other tests -- this uses a single
         # semi-complex source doc, runs it through the generic.xsl
         # stylesheet, and then the tests using this helper confirm
         # various aspects of the transformed document
         self.repo = self._get_repo()
+        if xsl is not None:
+            self.repo.xslt_template = xsl
         test = """<?xml version='1.0' encoding='utf-8'?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
 <html xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:dct="http://purl.org/dc/terms/" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
@@ -1440,6 +1442,52 @@ b:1part a :DocumentPart;
         self.assertEqual("S4.1.1", secs[5].get('id'))
         self.assertEqual("S4.2", secs[6].get('id'))
 
+    def test_custom_xsl(self):
+        # test with a custom xslt in the current
+        # directory. setup_transform_templates should copy this over
+        # all the stuff in res/xsl to a temp directory, then do stuff.
+        with open("mystyle.xsl", "w") as fp:
+            # note that mystyle.xsl must depend on the systemwide base.xsl
+            fp.write("""<?xml version="1.0" encoding="utf-8"?>
+<xsl:stylesheet version="1.0"
+		xmlns:xhtml="http://www.w3.org/1999/xhtml"
+		xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+		xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+		xmlns:dct="http://purl.org/dc/terms/"
+		exclude-result-prefixes="xhtml rdf">
+
+  <xsl:include href="base.xsl"/>
+
+  <!-- Implementations of templates called by base.xsl -->
+  <xsl:template name="headtitle"><xsl:value-of select="//xhtml:title"/> | <xsl:value-of select="$configuration/sitename"/></xsl:template>
+  <xsl:template name="metarobots"/>
+  <xsl:template name="linkalternate"/>
+  <xsl:template name="headmetadata"/>
+  <xsl:template name="bodyclass">generic</xsl:template>
+  <xsl:template name="pagetitle">
+    <h1><xsl:value-of select="../xhtml:head/xhtml:title"/></h1>
+  </xsl:template>
+
+  <xsl:template match="xhtml:body/xhtml:div">
+     <p class="div">This is not a div</p>            
+  </xsl:template>
+
+  <!-- default template: translate everything from whatever namespace
+       it's in (usually the XHTML1.1 NS) into the default namespace
+       NOTE: It removes any attributes not accounted for otherwise
+       -->
+  <xsl:template match="*">
+    <xsl:element name="{local-name(.)}"><xsl:apply-templates select="node()"/></xsl:element>
+  </xsl:template>
+
+  <!-- toc handling (do nothing) -->
+  <xsl:template match="@*|node()" mode="toc"/>
+  
+</xsl:stylesheet>""")
+        tree = self._generate_complex("mystyle.xsl")
+        divs = tree.findall(".//p[@class='div']")
+        self.assertEqual(4,len(divs))
+        
         
 class TOC(RepoTester):
     # General datasets being reused in tests

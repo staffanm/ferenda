@@ -161,23 +161,36 @@ the downloaded file(s) for a particular document and parse it into a
 structured document with proper metadata, both for the document as a
 whole, but also for individual sections of the document.
 
-The parse method does not return anything, but should create a
-structured XHTML+RDFa file in the location returned by
-:meth:`~ferenda.DocumentRepository.parsed_path`
-
 .. literalinclude:: rfcs.py
    :start-after: # begin parse1
    :end-before: # end parse1
 
 This implementation builds a very simple object model of a RFC
-document, which through the magic of
-:func:`~ferenda.DocumentRepository.managedparsing` is
-serialized to a XHTML1.1+RDFa doc.
+document, which is serialized to a XHTML1.1+RDFa document by the
+:func:`~ferenda.DocumentRepository.managedparsing` decorator. If you
+run it (by calling ``ferenda-build.py rfc parse --all``) after having
+downloaded the rfc documents, the result will be a set of documents in
+``data/rfc/parsed``, and a set of RDF files in
+``data/rfc/distilled``. Take a look at them! The above might appear to
+be a lot of code, but it also accomplishes much. Furthermore, it
+should be obvious how to extend it, for instance to create more
+metadata from the fields in the header (such as capturing the RFC
+category, the publishing party, the authors etc) and better semantic
+representation of the body (such as marking up regular paragraphs,
+line drawings, bulleted lists, definition lists, EBNF definitions and
+so on).
 
-How does ``./ferenda-build.py rfc parse --all`` work? It calls
-:func:`list_basefiles_for` with the argument ``parse``, which lists
-all downloaded files, and extracts the basefile for each of them, then
-calls parse for each in turn.
+Next up, we'll extend this implementation in two ways: First by
+representing the nested nature of the sections and subsections in the
+documents, secondly by finding and linking citations/references to
+other parts of the text or other RFCs in full.
+
+.. note::
+
+   How does ``./ferenda-build.py rfc parse --all`` work? It calls
+   :func:`list_basefiles_for` with the argument ``parse``, which lists
+   all downloaded files, and extracts the basefile for each of them,
+   then calls parse for each in turn.
 
 
 Handling document structure
@@ -186,21 +199,77 @@ Handling document structure
 The main text of a RFC is structured into sections, which may contain
 subsections, which in turn can contain subsubsections. The start of
 each section is easy to identify, which means we can build a model of
-this structure in relatively few lines:
+this structure by extending our parse method with relatively few lines:
 
 .. literalinclude:: rfcs.py
    :start-after: # begin parse2
    :end-before: # end parse2
 
+This enhances parse so that instead of outputting a single long list of elements directly under ``body``:
+
+.. code-block:: xml
+
+    <h1>2.  Overview</h1>
+    <h1>2.1.  Date, Location, and Participants</h1>
+    <pre>
+       The second ForCES interoperability test meeting was held by the IETF
+       ForCES Working Group on February 24-25, 2011...
+    </pre>
+    <h1>2.2.  Testbed Configuration</h1>
+    <h1>2.2.1.  Participants' Access</h1>
+    <pre>
+       NTT and ZJSU were physically present for the testing at the Internet
+      Technology Lab (ITL) at Zhejiang Gongshang University in China.
+    </pre>
+  
+...we have a properly nested element structure, as well as much more
+metadata represented in RDFa form:
+
+.. code-block:: xml
+
+    <div class="section" property="dct:title" content=" Overview"
+         typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6984#S2.">
+      <span property="bibo:chapter" content="2."
+            about="http://localhost:8000/res/rfc/6984#S2."/>
+      <div class="subsection" property="dct:title" content=" Date, Location, and Participants"
+           typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6984#S2.1.">
+        <span property="bibo:chapter" content="2.1."
+              about="http://localhost:8000/res/rfc/6984#S2.1."/>
+        <pre>
+          The second ForCES interoperability test meeting was held by the
+          IETF ForCES Working Group on February 24-25, 2011...
+        </pre>
+        <div class="subsection" property="dct:title" content=" Testbed Configuration"
+             typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6984#S2.2.">
+          <span property="bibo:chapter" content="2.2."
+                about="http://localhost:8000/res/rfc/6984#S2.2."/>
+          <div class="subsubsection" property="dct:title" content=" Participants' Access"
+               typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6984#S2.2.1.">
+            <span content="2.2.1." about="http://localhost:8000/res/rfc/6984#S2.2.1."
+                  property="bibo:chapter"/>
+            <pre>
+              NTT and ZJSU were physically present for the testing at the
+              Internet Technology Lab (ITL) at Zhejiang Gongshang
+              University in China...
+            </pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+Note in particular that every section and subsection now has a defined
+URI (in the ``@about`` attribute). This will be useful later.
+    
 Handling citations in text
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-References / citations in RFC text is often of the form "are to be
-interpreted as described in [RFC2119]" (for citations to other RFCs in
-whole), "as described in Section 7.1" (for citations to other parts of
-the current document) or "Section 2.4 of [RFC2045] says" (for
-citations to a specific part in another document). We can quite easily
-define a grammar for these citations using pyparsing:
+References / citations in RFC text is often of the form ``"are to be
+interpreted as described in [RFC2119]"`` (for citations to other RFCs
+in whole), ``"as described in Section 7.1"`` (for citations to other
+parts of the current document) or ``"Section 2.4 of [RFC2045] says"``
+(for citations to a specific part in another document). We can define
+a simple grammar for these citations using `pyparsing
+<http://pyparsing.wikispaces.com/>`_:
 
 .. literalinclude:: rfcs.py
    :start-after: # begin citation1
@@ -224,16 +293,45 @@ go along, just use:
    :start-after: # begin citation3
    :end-before: # end citation3
 
-The end result is a structured document with unambigious references
-within the document and out to other documents (including parts of
-them). All this is recorded in the resulting XHTML and RDF files.
+The result of these lines is that the following block of plain text:
+
+.. code-block:: xml
+
+   <pre>
+      The behavior recommended in Section 2.5 is in line with generic error
+      treatment during the IKE_SA_INIT exchange, per Section 2.21.1 of
+      [RFC5996].
+   </pre>
+
+...transform into this hyperlinked text:
+   
+.. code-block:: xml
+
+   <pre>
+      The behavior recommended in <a href="#S2.5"
+      rel="dct:references">Section 2.5</a> is in line with generic
+      error treatment during the IKE_SA_INIT exchange, per <a
+      href="http://localhost:8000/res/rfc/5996#S2.21.1"
+      rel="dct:references">Section 2.21.1 of [RFC5996]</a>.
+   </pre>
+
+.. note::
+
+   The uri formatting function uses
+   :meth:`~ferenda.DocumentRepository.canonical_uri` to create the
+   base URI for each external reference. Proper design of the URIs
+   you'll be using is a big topic, and you should think through what
+   URIs you want to use for your documents and their parts. Ferenda
+   provides a default implementation to create URIs from document
+   properties, but you might want to override this. See also
+   :doc:`linkeddata`.
 
 The parse step is probably the part of your application which you'll
 spend the most time developing. You can start simple (like above) and
 then incrementally improve the end result by processing more metadata,
-model the semantic document structure, and handle in-line references
-in text. See also :doc:`elementclasses`, :doc:`fsmparser` and
-:doc:`citationparsing`.
+model the semantic document structure better, and handle in-line
+references in text more correctly. See also :doc:`elementclasses`,
+:doc:`fsmparser` and :doc:`citationparsing`.
 
 Calling :meth:`~ferenda.DocumentRepository.relate`
 -----------------------------------------------------
@@ -318,28 +416,132 @@ done.
 Getting annotations
 ^^^^^^^^^^^^^^^^^^^
 
-The :meth:`~ferenda.DocumentRepository.prep_annotation_file` step
-is driven by a `SPARQL construct query
+The :meth:`~ferenda.DocumentRepository.prep_annotation_file` step is
+driven by a `SPARQL construct query
 <http://www.w3.org/TR/rdf-sparql-query/#construct>`_. The default
 query fetches metadata about every other document that refers to the
-document (or sections thereof) you're generating. Set the class
-variable :data:`~ferenda.DocumentRepository.sparql_annotations`` to
-the file name of SPARQL query file of your choice, if you want to
-override the default.
+document (or sections thereof) you're generating, using the
+``dct:references`` predicate. By setting the class variable
+:data:`~ferenda.DocumentRepository.sparql_annotations` to the file
+name of SPARQL query file of your choice, you can override this query.
 
+Since our metadata contains more specialized statements on how
+document refer to each other, in the form of ``rfc:updates`` and
+``rfc:obsoletes`` statements, we want a query that'll fetch this
+metadata as well. When we query for metadata about a particular
+document, we want to know if there is any other document that updates
+or obsoletes this document. Using a CONSTRUCT query, we create
+``rfc:isUpdatedBy`` and ``rfc:isObsoletedBy`` references to such
+documents.
+
+.. literalinclude:: rfcs.py
+   :start-after: # begin annotations
+   :end-before: # end annotations
+
+The contents of ``rfc-annotations.rq``, placed in the current
+directory, should be:
+
+.. literalinclude:: rfc-annotations.rq
+
+Note that ``%(uri)s`` will be replaced with the URI for the document
+we're querying about.
+
+Now, when querying the triplestore for metadata about RFC 6021, the
+(abbreviated) result is:
+
+.. code-block:: xml
+
+    <graph xmlns:dct="http://purl.org/dc/terms/"
+           xmlns:rfc="http://example.org/ontology/rfc/"
+	   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+      <resource uri="http://localhost:8000/res/rfc/6021">
+        <rfc:isObsoletedBy ref="http://localhost:8000/res/rfc/6991"/>
+        <dct:published fmt="datatype">
+          <date xmlns="http://www.w3.org/2001/XMLSchema#">2010-10-01</date>
+        </dct:published>
+        <dct:title xml:lang="en">Common YANG Data Types</dct:title>
+      </resource>
+      <resource uri="http://localhost:8000/res/rfc/6991">
+        <a><rfc:RFC/></a>
+        <rfc:obsoletes ref="http://localhost:8000/res/rfc/6021"/>
+        <dct:published fmt="datatype">
+          <date xmlns="http://www.w3.org/2001/XMLSchema#">2013-07-01</date>
+        </dct:published>
+        <dct:title xml:lang="en">Common YANG Data Types</dct:title>
+      </resource>
+    </graph>    
+
+.. note::
+
+   You can find this file in ``data/rfc/annotations/6021.grit.xml``. It's
+   in the `Grit <http://code.google.com/p/oort/wiki/Grit>`_ format for
+   easy inclusion in XSLT processing.
+		    
+Even if you're not familiar with the format, or with RDF in general,
+you can see that it contains information about two resources: first
+the document we've queried about (RFC 6021), then the document that
+obsoletes the same document (RFC 6991).
+
+.. note::
+
+   If you're coming from a relational database/SQL background, it can
+   be a little difficult to come to grips with graph databases and
+   SPARQL. The book "Learning SPARQL" by Bob DuCharme is highly
+   recommended.
+
+   
 Transforming to HTML
 ^^^^^^^^^^^^^^^^^^^^^
 
-The :meth:`~ferenda.DocumentRepository.transform_html` step is
-driven by a XSLT stylesheet. The default stylesheet uses a site-wide
-configuration file (created by
-:func:`~ferenda.manager.makeresources`) for things like site name
-and top-level navigation, and lists the document content, section by
-section, alongside of other documents that contains references for
-each section. set
-:data:`~ferenda.DocumentRepository.xslt_template`` to the file name
-of a XSLT stylesheet of your choice, if you want to override the default.
+The :meth:`~ferenda.DocumentRepository.transform_html` step is driven
+by a XSLT stylesheet. The default stylesheet uses a site-wide
+configuration file (created by :func:`~ferenda.manager.makeresources`)
+for things like site name and top-level navigation, and lists the
+document content, section by section, alongside of other documents
+that contains references (in the form of ``dct:references``) for each
+section. The SPARQL query and the XSLT stylesheet often goes hand in
+hand -- if your stylesheet needs a certain piece of data, the query
+must be adjusted to fetch it. By setting he class variable
+:data:`~ferenda.DocumentRepository.xslt_template` in the same way as
+you did for the SPARQL query, you can override the default.
 
+.. literalinclude:: rfcs.py
+   :start-after: # begin xslt
+   :end-before: # end xslt
+
+The contents of ``rfc.xsl``, placed in the current
+directory, should be:
+
+.. literalinclude:: rfc.xsl
+   :language: xml		    
+
+This XSLT stylesheet depends on ``base.xsl`` (which resides in
+``ferenda/res/xsl`` in the source distribution of ferenda -- take a
+look if you want to know how everything fits together). The main
+responsibility of this stylesheet is to format individual elements of
+the document body.
+
+``base.xsl`` takes care of the main chrome of the page, and it has a
+default implementation (that basically transforms everything from
+XHTML1.1 to HTML5, and removes some RDFa-only elements). It also loads
+and provides the annotation file in the global variable
+$annotations. The above XSLT stylesheet uses this to fetch information
+about referencing documents. In particular, when processing an older
+document, it lists if later documents have updated or obsoleted it
+(see the named template ``aside-annotations``).
+
+You might notice that this XSLT template flattens the nested structure
+of sections which we spent so much effort to create in the parse
+step. This is to make it easier to put up the aside boxes next to each
+part of the document, independent of the nesting level.
+
+.. note::
+
+   While both the SPARQL query and the XSLT stylesheet might look
+   complicated (and unless you're a RDF/XSL expert, they are...), most
+   of the time you can get a good result using the default generic
+   query and stylesheet.
+   
 
 Calling (and customizing) :meth:`~ferenda.DocumentRepository.toc`
 --------------------------------------------------------------------
@@ -386,7 +588,7 @@ track.
 
 Se also :doc:`news`.
 
-Calling :func:`~ferenda.manager.frontpaage`
+Calling :func:`~ferenda.manager.frontpage`
 ----------------------------------------------
 
 Tbw
