@@ -132,7 +132,7 @@ class RFCs(DocumentRepository):
         desc.value(self.ns['dct'].identifier, "RFC " + basefile)
   
         # find and convert the publication date in the header to a datetime 
-        # object, and set it as the dct:published date for the document   
+        # object, and set it as the dct:issued date for the document   
         re_date = re.compile("(January|February|March|April|May|June|July|August|September|October|November|December) (\d{4})").search
         # This is a context manager that temporarily sets the system
         # locale to the "C" locale in order to be able to use strptime
@@ -143,13 +143,18 @@ class RFCs(DocumentRepository):
         pubdate = date(dt.year,dt.month,dt.day)
         # Note that using some python types (cf. datetime.date)
         # results in a datatyped RDF literal, ie in this case
-        #   <http://localhost:8000/res/rfc/6994> dct:published "2013-08-01"^^xsd:date
-        desc.value(self.ns['dct'].published, pubdate)
+        #   <http://localhost:8000/res/rfc/6994> dct:issued "2013-08-01"^^xsd:date
+        desc.value(self.ns['dct'].issued, pubdate)
   
         # find any older RFCs that this document updates or obsoletes
         obsoletes = re.search("^Obsoletes: ([\d+, ]+)", header, re.MULTILINE)
         updates = re.search("^Updates: ([\d+, ]+)", header, re.MULTILINE)
 
+        # Find the category of this RFC, store it as dct:subject
+        cat_match = re.search("^Category: ([\w ]+?)(  |$)", header, re.MULTILINE)
+        if cat_match:
+            desc.value(self.ns['dct'].subject, cat_match.group(1))
+            
         for predicate, matches in ((self.ns['rfc'].updates, updates),
                                    (self.ns['rfc'].obsoletes, obsoletes)):
             if matches is None:
@@ -274,11 +279,18 @@ class RFCs(DocumentRepository):
     xslt_template = "rfc.xsl"
 # end xslt
 
+    def toc_predicates(self):
+        return [self.ns['dct'].title,
+                self.ns['dct'].issued,
+                self.ns['dct'].subject,
+                self.ns['dct'].identifier]
+
+
 if __name__ == '__main__':
     from ferenda import manager, LayeredConfig
     manager.setup_logger("DEBUG")
     d = RFCs(downloadmax=10, force=True)
-    # d.download()
+#    # d.download()
 #    for basefile in d.list_basefiles_for("parse"):
 #        d.parse(basefile)
 #    RFCs.setup("relate", LayeredConfig(d.get_default_options()))
@@ -286,8 +298,8 @@ if __name__ == '__main__':
 #        d.relate(basefile)
 #    RFCs.teardown("relate", LayeredConfig(d.get_default_options()))
 #    manager.makeresources([d])
-    for basefile in d.list_basefiles_for("generate"):
-        d.generate(basefile)
-
+#    for basefile in d.list_basefiles_for("generate"):
+#    d.generate("6998")
+    d.toc()
     
     

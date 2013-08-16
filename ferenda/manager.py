@@ -360,9 +360,9 @@ def frontpage(repos,
         with open(xhtml_path,"w") as fp:
             fp.write(xhtml)
 
-        xsltdir = repos[0].setup_transform_templates(os.path.dirname(stylesheet))
+        xsltdir = repos[0].setup_transform_templates(os.path.dirname(stylesheet), stylesheet)
         params = repos[0].get_transform_configuration(xsltdir,xhtml_path)
-        repos[0].transform_html(stylesheet, xhtml_path, path, params, otherrepos=repos)
+        repos[0].transform_html(xsltdir+"/"+os.path.basename(stylesheet), xhtml_path, path, params, otherrepos=repos)
     return True
 
 
@@ -495,11 +495,11 @@ def _wsgi_search(environ, start_response, args):
     depth = len(list(filter(None,args['searchendpoint'].split("/"))))
     fake_outfile = "%s/%s/search.html" % (args['documentroot'],
                                           "/".join(["fake"]*depth))
-    xsltdir = repo.setup_transform_templates(os.path.dirname(xsltfile))
+    xsltdir = repo.setup_transform_templates(os.path.dirname(xsltfile), xsltfile)
     params = repo.get_transform_configuration(xsltdir,fake_outfile)
     
     repo.render_xhtml(doc,tmpfile)
-    repo.transform_html("res/xsl/search.xsl",
+    repo.transform_html(xsltdir + "/search.xsl",
                         tmpfile, outfile, params, args['repos'][1:])
     data = util.readfile(outfile,"rb")
     start_response("200 OK", [

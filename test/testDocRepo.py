@@ -1817,8 +1817,8 @@ ex:pm942051 a bibo:AcademicArticle;
         self.assertEqual(docs[0].text, 'And Then There Were None')
         self.assertEqual(docs[0].attrib['href'], 'http://example.org/books/And_Then_There_Were_None')
         
-        # 2.5 <h1 class="title"> correct?
-        header = t.find(".//header/h1")
+        # 2.5 <header><h1><a> correct?
+        header = t.find(".//header/h1/a")
         self.assertEqual(header.text, 'testsite')
        
         # 2.6 div[@class='main-container']/h1 correct?
@@ -1845,13 +1845,14 @@ ex:pm942051 a bibo:AcademicArticle;
         tree = etree.parse(path)
         # check content of path, particularly that css/js refs
         # and pageset links are correct. Also, that the selected
-        # indexpage is indeed the first (eg. issued/1791) 
-        self.assertEqual("http://localhost:8000/dataset/base?title=a",
+        # indexpage is indeed the first (eg. title/a)
+        # (NOTE: the first page in the first pageset (by title/a) isn't linked. The second one (by title/d) is).
+        self.assertEqual("http://localhost:8000/dataset/base?title=d",
                          tree.find(".//nav[@id='toc']").findall(".//a")[0].get("href"))
         self.assertEqual("../../rsrc/css/normalize.css",
                          tree.find(".//link").get("href"))
                          
-        self.assertEqual("Documents published in 1791",
+        self.assertEqual('Documents starting with "a"',
                          tree.find(".//article/h1").text)
                          
 

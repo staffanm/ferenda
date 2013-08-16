@@ -88,8 +88,8 @@ class RFC(DocumentRepository):
         iterator = reader.getiterator(reader.readparagraph)
 
 
-        if 'downloadmax' in self.config or 'FERENDA_DOWNLOADMAX' in os.environ:
-            if 'downloadmax' in self.config:
+        if ('downloadmax' in self.config and self.config.downloadmax)  or 'FERENDA_DOWNLOADMAX' in os.environ:
+            if ('downloadmax' in self.config and self.config.downloadmax):
                 maxdoc = int(self.config.downloadmax)
             else:
                 maxdoc = int(os.environ['FERENDA_DOWNLOADMAX'])

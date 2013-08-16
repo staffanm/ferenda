@@ -518,8 +518,8 @@ uri doesn't map to a basefile in this repo."""
         resp = requests.get(self.start_url)
         tree = lxml.html.document_fromstring(resp.text)
         tree.make_links_absolute(self.start_url, resolve_base_href=True)
-        if 'downloadmax' in self.config or 'FERENDA_DOWNLOADMAX' in os.environ:
-            if 'downloadmax' in self.config:
+        if ('downloadmax' in self.config and self.config.downloadmax) or 'FERENDA_DOWNLOADMAX' in os.environ:
+            if 'downloadmax' in self.config and self.config.downloadmax:
                 maxdoc = int(self.config.downloadmax)
             else:
                 maxdoc = int(os.environ['FERENDA_DOWNLOADMAX'])
@@ -1541,6 +1541,8 @@ parsed document path to that documents dependency file."""
         :rtype:            bool                   
         """
         assert not xinclude, "xinclude not supported yet"
+        # print("transform_html: stylesheet %s infile %s outfile %s" % (stylesheet, infile, outfile))
+
         # Open the XSLT stylesheet, either as a normal file
         # (user-provided) or a package resource (ferenda built-in)
         # FIXME: load-path mechanism (cf manager.makeresources())?
@@ -1919,7 +1921,7 @@ parsed document path to that documents dependency file."""
         :returns: The results of the query, as python objects
         :rtype: set of dicts"""
 
-
+        
         store = TripleStore.connect(self.config.storetype,
                                     self.config.storelocation,
                                     self.config.storerepository)
@@ -1963,13 +1965,16 @@ parsed document path to that documents dependency file."""
         >>> d.toc_query("http://example.org/ctx/base") == expected
         True
         """
-
-        # FIXME: create query from self.toc_criteria
         from_graph = ""
         if context:
             from_graph = "FROM <%s>" % context
-        # FIXME: load from res/sparql/toc.sq instead
-        return """PREFIX dct:<http://purl.org/dc/terms/> SELECT DISTINCT ?uri ?title ?issued %s WHERE {?uri dct:title ?title . ?uri dct:issued ?issued . }""" % from_graph
+        predicates  = self.toc_predicates()
+        g = self.make_graph()
+        bindings = " ".join(["?"+util.uri_leaf(b) for b in predicates])
+        whereclauses = " . ".join(["?uri %s ?%s" % (g.qname(b), util.uri_leaf(b)) for b in predicates])
+        # FIXME: this doesn't handle optional data so well...
+        query  = "PREFIX dct:<http://purl.org/dc/terms/> SELECT DISTINCT ?uri %s %s WHERE {%s . }" % (bindings, from_graph, whereclauses)
+        return query
 
     def toc_criteria(self, predicates=None):
         """Create the criteria used to organize the documents in the
@@ -1996,6 +2001,7 @@ parsed document path to that documents dependency file."""
                 label = 'Sorted by publication year'
                 pagetitle = 'Documents published in %s'
                 selector_descending = True
+
             else:
                 # selector and key for proper title sort
                 # (eg. disregarding leading "the", not counting
@@ -2033,7 +2039,8 @@ parsed document path to that documents dependency file."""
         Is used by toc_criteria, must match results from sparql query
         in toc_query."""
         
-        return [self.ns['dct']['title'], self.ns['dct']['issued']]
+        return [self.ns['dct'].title,
+                self.ns['dct'].issued]
 
     def toc_pagesets(self, data, criteria):
         """Calculate the set of needed TOC pages based on the result rows
@@ -2219,10 +2226,10 @@ parsed document path to that documents dependency file."""
             # Prepare a browser-ready HTML page using generic.xsl
             self.log.debug("Transforming HTML to %s" % outfile)
             # configure params
-            xsltfile = "res/xsl/toc.xsl"
-            xsltdir = self.setup_transform_templates(os.path.dirname(xsltfile), xsltfile)
+            xsltdir = self.setup_transform_templates("res/xsl", "res/xsl/toc.xsl")
+            xsltfile = xsltdir + os.sep + os.path.basename("res/xsl/toc.xsl")
             params = self.get_transform_configuration(xsltdir,outfile)
-            self.transform_html("res/xsl/toc.xsl",
+            self.transform_html(xsltfile,
                                 tmpfile, outfile, params, otherrepos=otherrepos)
             self.log.info("Created %s" % outfile)
             return outfile
@@ -2330,7 +2337,6 @@ parsed document path to that documents dependency file."""
         # function code only sets up basic constants and splits the
         # entries list into appropriate chunks
         def write_file(entries,suffix="",prevarchive=None, nextarchive=None):
-            # print("Called w suffix=%s, prevarchive=%s, nextarchive=%s" % (suffix, prevarchive, nextarchive))
             feedfile = self.store.path(basefile+suffix, 'feed', '.atom')
             nsmap = {None:'http://www.w3.org/2005/Atom',
                      'le':'http://purl.org/atompub/link-extensions/1.0'}
