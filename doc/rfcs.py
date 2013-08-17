@@ -34,8 +34,6 @@ class RFCs(DocumentRepository):
                 if not "Not Issued." in p: # Skip RFC known to not exist
                     basefile = str(int(p[:4]))  # eg. '0822' -> '822'
                     yield basefile
-                        
-                               
 # end download2
 
 # begin parse1
@@ -138,13 +136,15 @@ class RFCs(DocumentRepository):
         # locale to the "C" locale in order to be able to use strptime
         # with a string on the form "August 2013", even though the
         # system may use another locale.
-        with util.c_locale(): 
-            dt = datetime.strptime(re_date(header).group(0), "%B %Y")
-        pubdate = date(dt.year,dt.month,dt.day)
-        # Note that using some python types (cf. datetime.date)
-        # results in a datatyped RDF literal, ie in this case
-        #   <http://localhost:8000/res/rfc/6994> dct:issued "2013-08-01"^^xsd:date
-        desc.value(self.ns['dct'].issued, pubdate)
+        dt_match = re_date(header)
+        if dt_match:
+            with util.c_locale(): 
+                dt = datetime.strptime(re_date(header).group(0), "%B %Y")
+            pubdate = date(dt.year,dt.month,dt.day)
+            # Note that using some python types (cf. datetime.date)
+            # results in a datatyped RDF literal, ie in this case
+            #   <http://localhost:8000/res/rfc/6994> dct:issued "2013-08-01"^^xsd:date
+            desc.value(self.ns['dct'].issued, pubdate)
   
         # find any older RFCs that this document updates or obsoletes
         obsoletes = re.search("^Obsoletes: ([\d+, ]+)", header, re.MULTILINE)
@@ -189,7 +189,7 @@ class RFCs(DocumentRepository):
         # have dotted numbers, optionally with a trailing period, ie
         # '9.2.' or '11.3.1'
         def is_section(p):
-            return re.match(r"\d+\. +[A-Z]", p)
+            return re.match(r"\d+\.? +[A-Z]", p)
 
         def is_subsection(p):
             return re.match(r"\d+\.\d+\.? +[A-Z]", p)
@@ -233,7 +233,7 @@ class RFCs(DocumentRepository):
                 title, ordinal, identifier = split_sectionheader(para)
                 s = Subsubsection(title=title, ordinal=ordinal, identifier=identifier)
                 stack[3:] = [] # clear all but bottom three
-                stack[2].append(s) # add new subsubsection to current subsection
+                stack[-1].append(s) # add new subsubsection to current subsection
                 stack.append(s)
             elif is_heading(para):
                 stack[-1].append(Heading([para]))
@@ -329,20 +329,65 @@ class RFCs(DocumentRepository):
                 Link(row['title'], 
                      uri=row['uri'])]
 # end toc_item
+
+# begin news_criteria
+    def news_criteria(self):
+        from ferenda import Describer, NewsCriteria
+
+        # function that returns a closure, which acts as a custom
+        # selector function for the NewsCriteria objects.
+        def selector_for(category):
+            def selector(entry, graph):
+                desc = Describer(graph, entry.id)
+                return desc.getvalue(self.ns['dct'].subject) == category
+            return selector
+            
+        return [NewsCriteria('all','All RFCs'),
+                NewsCriteria('informational', 'Informational RFCs',
+                             selector=selector_for("Informational")),
+                NewsCriteria('bcp', 'Best Current Practice RFCs',
+                             selector=selector_for("Best Current Practice")),
+                NewsCriteria('experimental', 'Experimental RFCs',
+                             selector=selector_for("Experimental")),
+                NewsCriteria('standards', 'Standards Track RFCs',
+                             selector=selector_for("Standards Track"))]
+# end news_criteria
+
+# begin frontpage_content
+    def frontpage_content(self, primary=False):
+        from rdflib import URIRef
+        items = ""
+        for entry, graph in islice(self.news_entries(),5):
+            data = {'identifier': graph.value(URIRef(entry.id), self.ns['dct'].identifier).toPython(),
+                    'uri': entry.id,
+                    'title': entry.title}
+            items += '<li>%(identifier)s <a href="%(uri)s">%(title)s</a></li>' % data
+        return ("""<h2><a href="%(uri)s">Request for comments</a></h2>
+                   <p>A complete archive of RFCs in Linked Data form. Contains %(doccount)s documents.</p>
+                   <p>Latest 5 documents:</p>
+                   <ul>
+                      %(items)s
+                   </ul>""" % {'uri':self.dataset_uri(),
+                               'items': items,
+                               'doccount': len(list(self.list_basefiles_for("_postgenerate")))})
+# end frontpage_content
+
 if __name__ == '__main__':
     from ferenda import manager, LayeredConfig
     manager.setup_logger("DEBUG")
-    d = RFCs(downloadmax=10, force=True, staticsite=True)
-#    # d.download()
-#    for basefile in d.list_basefiles_for("parse"):
-#        d.parse(basefile)
-#    RFCs.setup("relate", LayeredConfig(d.get_default_options()))
-#    for basefile in d.list_basefiles_for("relate"):
-#        d.relate(basefile)
-#    RFCs.teardown("relate", LayeredConfig(d.get_default_options()))
-#    manager.makeresources([d])
-#    for basefile in d.list_basefiles_for("generate"):
-#    d.generate("6998")
+    d = RFCs(downloadmax=100)
+    #d.download()
+    #for basefile in d.list_basefiles_for("parse"):
+    #    d.parse(basefile)
+    #RFCs.setup("relate", LayeredConfig(d.get_default_options()))
+    #for basefile in d.list_basefiles_for("relate"):
+    #    d.relate(basefile)
+    #RFCs.teardown("relate", LayeredConfig(d.get_default_options()))
+    manager.makeresources([d])
+    for basefile in d.list_basefiles_for("generate"):
+        d.generate(basefile)
     d.toc()
+    d.news()
+    manager.frontpage([d])
     
     

@@ -381,7 +381,7 @@ should be stored::
   makeresources(myrepos,'mydata/myresources')
   
 
-Calling (and customizing) :meth:`~ferenda.DocumentRepository.generate`
+Customizing :meth:`~ferenda.DocumentRepository.generate`
 -------------------------------------------------------------------------
 
 The purpose of the
@@ -543,7 +543,7 @@ part of the document, independent of the nesting level.
    query and stylesheet.
    
 
-Calling (and customizing) :meth:`~ferenda.DocumentRepository.toc`
+Customizing :meth:`~ferenda.DocumentRepository.toc`
 --------------------------------------------------------------------
 
 The purpose of the :meth:`~ferenda.DocumentRepository.toc`
@@ -604,10 +604,10 @@ RFC number in this display. This is done by overriding
 
 Se also :doc:`toc`.
 
-Calling (and customizing) :meth:`~ferenda.DocumentRepository.news`
+Customizing :meth:`~ferenda.DocumentRepository.news`
 ---------------------------------------------------------------------
 The purpose of :meth:`~ferenda.DocumentRepository.news`,
-the final step, is to provide a set of news feeds for your document
+the next to final step, is to provide a set of news feeds for your document
 repository.
 
 The default implementation gives you one single news feed for all
@@ -621,12 +621,38 @@ the organization of your TOC pages, since you might want to split up
 the documents in different feeds, for example one feed for each RFC
 track.
 
+.. literalinclude:: rfcs.py
+   :start-after: # begin news_criteria
+   :end-before: # end news_criteria
+
+When running ``news``, this will create five different atom feeds
+(which are mirrored as HTML pages) under ``data/rfc/news``: One
+containing all documents, and four others that contain documents in a
+particular category.
+		
+.. note::
+
+   As you can see, the resulting HTML pages are a little rough around
+   the edges. Also, there isn't currently any way of discovering the
+   Atom feeds or HTML pages from the main site -- you need to know the
+   URLs. This will all be fixed in due time.
+		
 Se also :doc:`news`.
 
-Calling :func:`~ferenda.manager.frontpage`
+Customizing :func:`~ferenda.manager.frontpage`
 ----------------------------------------------
 
-Tbw
+Finally, :func:`~ferenda.manager.frontpage` creates a front page for
+your entire site with content from the different docrepos. Each
+docrepos :func:`~ferenda.DocumentRepository.frontpage_content` method
+will be called, and should return a XHTML fragment with information
+about the repository and it's content. Below is a simple example that
+uses functionality we've used in other contexts to create a list of
+the five latest documents, as well as a total count of documents.
+ 
+.. literalinclude:: rfcs.py
+   :start-after: # begin frontpage_content
+   :end-before: # end frontpage_content
 
 Next steps
 ----------

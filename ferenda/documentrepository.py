@@ -1774,20 +1774,15 @@ parsed document path to that documents dependency file."""
         sq = fp.read().decode('utf-8') % params
         fp.close()
         if self.config.storelocation:
-            with util.logtime(self.log.debug,
-                              "Got triplestore in %(elapsed).3f", {}):
-                kwargs = {}
-                if self.config.storetype in ("SQLITE", "SLEEPYCAT"):
-                    kwargs['inmemory'] = True
-                ts = self._get_triplestore(**kwargs)
-            with util.logtime(self.log.debug,
-                              "Constructed graph in %(elapsed).3f", {}):
-                res = ts.construct(sq)
-                # bind namespace to look pretty
-                for prefix, uri in list(self.ns.items()):
-                    res.bind(prefix, uri)
-                
-                # print(res.serialize(format="turtle").decode('utf-8'))
+            kwargs = {}
+            if self.config.storetype in ("SQLITE", "SLEEPYCAT"):
+                kwargs['inmemory'] = True
+            ts = self._get_triplestore(**kwargs)
+            res = ts.construct(sq)
+            # bind namespaces so that the constructed graph looks pretty
+            for prefix, uri in list(self.ns.items()):
+                res.bind(prefix, uri)
+
             return res
 
     # helper for the prep_annotation_file helper -- it expects a
@@ -2246,9 +2241,9 @@ parsed document path to that documents dependency file."""
         
         criteria = self.news_criteria()
         data = self.news_entries() # Generator of DocumentEntry objects
-        for entry in data:
+        for entry, graph in data:
             for criterion in criteria:
-                if criterion.selector(entry):
+                if criterion.selector(entry, graph):
                     criterion.entries.append(entry)
         for criterion in criteria:
             # should reverse=True be configurable? For datetime
@@ -2261,9 +2256,9 @@ parsed document path to that documents dependency file."""
                                  criterion.basefile)
 
             outfile = self.store.path(criterion.basefile, 'feed', '.html')
-            xsltdir = self.setup_transform_templates(os.path.dirname("res/xsl/atom.xsl"))
+            xsltdir = self.setup_transform_templates(os.path.dirname("res/xsl/atom.xsl"), "res/xsl/atom.xsl")
             params = self.get_transform_configuration(xsltdir,outfile)
-            self.transform_html("res/xsl/atom.xsl",
+            self.transform_html(xsltdir + "/atom.xsl",
                                 self.store.atom_path(criterion.basefile),
                                 outfile,
                                 params)
@@ -2273,7 +2268,7 @@ parsed document path to that documents dependency file."""
         return [NewsCriteria('main','New and updated documents')]
 
     def news_entries(self):
-        """Return a generator of all available DocumentEntry objects."""
+        """Return a generator of all available entries, represented as tuples of (DocumentEntry, rdflib.Graph) objects. The Graph contains all distilled metadata about the document."""
         republish_original = False
         # If we just republish eg. the original PDF file and don't
         # attempt to parse/enrich the document
@@ -2326,7 +2321,7 @@ parsed document path to that documents dependency file."""
                 # element, separate from the set_link <link>
                 entry.set_content(self.store.parsed_path(basefile),
                                   self.parsed_url(basefile))
-            yield entry
+            yield entry, g
     
     def news_write_atom(self, entries, title, basefile, archivesize=1000):
         """Given a list of Atom entry-like objects, including links to RDF
@@ -2687,4 +2682,3 @@ parsed document path to that documents dependency file."""
                         pass
                 log.addHandler(NullHandler())
         return log
-        

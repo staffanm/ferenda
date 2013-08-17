@@ -21,20 +21,22 @@ class DocumentEntry(object):
     :param path: If this file path is an existing JSON file, the object is initialized from that file.
     :type  path: str
     """
-
+    id = None
+    """The canonical uri for the document."""
+    
     orig_created = None
-    """The first time we fetched the resource from it's original location."""
+    """The first time we fetched the document from it's original location."""
 
     orig_updated = None
     """The last time the content at the original location of the
-    resource was changed."""
+    document was changed."""
 
     orig_checked = None
     """The last time we accessed the original location of this
-    resource, regardless of wheter this led to an update."""
+    document, regardless of wheter this led to an update."""
 
     orig_url = None
-    """The main url from where we fetched this resource."""
+    """The main url from where we fetched this document."""
 
     published = None
     """The date our parsed/processed version of the document was published."""
@@ -62,7 +64,7 @@ class DocumentEntry(object):
     (such as it's URI, length, MIME-type and MD5 hash)."""
 
     def __init__(self, path=None):
-        
+        # for json serialization
         def myhook(d):
             for key in ('orig_created', 'orig_updated', 'orig_checked', 'published', 'updated'):
                 if key in d and d[key]:

@@ -31,7 +31,7 @@ class NewsCriteria(object):
         self.basefile = basefile
         self.feedtitle = feedtitle
         if not selector:
-            self.selector = lambda x: True
+            self.selector = lambda entry, graph: True
         else:
             assert callable(selector)
             self.selector = selector
