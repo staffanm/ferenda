@@ -566,8 +566,43 @@ document (alphabetically sorted) and another by ``dct:issued``
 (numerically/calendarically sorted). The default implementation does
 exactly this.
 
-Se also :doc:`toc`.
+In our case, we wish to create four kinds of sorting: By identifier
+(RFC number), by date of issue, by title and by category. These map
+directly to four kinds of metadata that we've stored about each and
+every document. By overriding
+:meth:`~ferenda.DocumentRepository.toc_predicates` we can specify
+these four *predicates*.
 
+.. literalinclude:: rfcs.py
+   :start-after: # begin toc_predicates
+   :end-before: # end toc_predicates
+
+After running toc with this change, you can see that four sets of
+index pages are created. However, except for publication year, the
+actual partitioning of documents are still done by title. In order to
+correct this, we must create a set of :class:`~ferenda.TocCriteria`
+objects that specify how documents should be ordered for any
+particular criteria, and have
+:meth:`~ferenda.DocumentRepository.toc_criteria` return these.
+
+.. literalinclude:: rfcs.py
+   :start-after: # begin toc_criteria
+   :end-before: # end toc_criteria
+
+The above code gives some example of how :class:`~ferenda.TocCriteria`
+objects can be configured. However, a :class:`~ferenda.TocCriteria`
+object does not control how each individual document is listed on a
+toc page. The default formatting just lists the title of the document,
+linked to the document in question. For RFCs, who mainly is referenced
+using their RFC number rather than their title, we'd like to add the
+RFC number in this display. This is done by overriding
+:meth:`~ferenda.DocumentRepository.toc_item`.
+		
+.. literalinclude:: rfcs.py
+   :start-after: # begin toc_item
+   :end-before: # end toc_item
+
+Se also :doc:`toc`.
 
 Calling (and customizing) :meth:`~ferenda.DocumentRepository.news`
 ---------------------------------------------------------------------

@@ -554,3 +554,18 @@ def from_roman(s):
             index += len(numeral)
     return result
 
+def title_sortkey(s):
+    """Transform a document title into a key useful for sorting and partitioning documents.
+
+    >>> title_sortkey("The 'viewstate' property")
+    viewstateproperty
+
+    """
+    s = s.lower()
+    if s.startswith("the "):
+        s = s[4:]
+    # filter away starting non-word characters (but not digits)
+    s = re.sub("^\W+", "", s)
+    # remove spaces
+    return "".join(s.split())
+

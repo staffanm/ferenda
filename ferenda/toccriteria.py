@@ -25,8 +25,8 @@ class TocCriteria(object):
     :type key: callable
     :param selector_descending: Whether pagesets constructed by this selector should be sorted in descending (reverse) order
     :type  selector_descending: bool
-    :param selector_descending: Whether pages selected by this key should be sorted in descending (reverse) order
-    :type  selector_descending: bool
+    :param key_descending: Whether pages selected by this key should be sorted in descending (reverse) order
+    :type  key_descending: bool
     """
 
     def __init__(self, binding, label, pagetitle, selector, key, selector_descending=False, key_descending=False):

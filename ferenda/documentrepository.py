@@ -415,7 +415,7 @@ with the *config* object as single parameter.
 
         uri = "%sdataset/%s" % (self.config.url, self.alias)
         if param and value:
-            uri += "?%s=%s" % (param, value)
+            uri += "?%s=%s" % (param, quote(value))
         return uri
         
 
@@ -1999,7 +1999,7 @@ parsed document path to that documents dependency file."""
                 selector = lambda x: x['issued'][:4]
                 key = selector
                 label = 'Sorted by publication year'
-                pagetitle = 'Documents published in %s'
+                pagetitle = 'Documents published in %(select)s'
                 selector_descending = True
 
             else:
@@ -2018,7 +2018,7 @@ parsed document path to that documents dependency file."""
                 selector = lambda x: sortkey(x)[0]
                 key = sortkey
                 label = label='Sorted by ' + util.uri_leaf(predicate)
-                pagetitle = 'Documents starting with "%s"'
+                pagetitle = 'Documents starting with "%(select)s"'
                 selector_descending = False
 
             criteria.append(TocCriteria(binding=util.uri_leaf(predicate).lower(),
@@ -2060,12 +2060,12 @@ parsed document path to that documents dependency file."""
         >>> from operator import itemgetter
         >>> criteria = (TocCriteria(binding='title',
         ...                         label='By title',
-        ...                         pagetitle='Documents starting with "%s"',
+        ...                         pagetitle='Documents starting with "%(select)s"',
         ...                         selector=lambda x: x['title'][0].lower(),
         ...                         key=itemgetter('title')),
         ...             TocCriteria(binding='issued',
         ...                         label='By publication year',
-        ...                         pagetitle='Documents published in %s',
+        ...                         pagetitle='Documents published in %(select)s',
         ...                         selector=lambda x: x['issued'][:4],
         ...                         key=itemgetter('issued')))
         >>> # Note: you can get a suitable tuple of TocCriteria
@@ -2100,7 +2100,7 @@ parsed document path to that documents dependency file."""
 
             for value in sorted(list(selector_values.keys()), reverse=criterion.selector_descending):
                 pageset.pages.append(TocPage(linktext=value,
-                                             title=criterion.pagetitle % value,
+                                             title=criterion.pagetitle % {'select':value},
                                              binding=binding,
                                              value=value))
             res.append(pageset)

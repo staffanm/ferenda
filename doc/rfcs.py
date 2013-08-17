@@ -279,17 +279,60 @@ class RFCs(DocumentRepository):
     xslt_template = "rfc.xsl"
 # end xslt
 
+# begin toc_predicates
     def toc_predicates(self):
         return [self.ns['dct'].title,
                 self.ns['dct'].issued,
                 self.ns['dct'].subject,
                 self.ns['dct'].identifier]
+# end toc_predicates
 
+# begin toc_criteria
+    def toc_criteria(self, predicates=None):
+        from ferenda import TocCriteria
 
+        return [TocCriteria(binding='identifier',
+                            label='Sorted by RFC #',
+                            pagetitle='RFCs %(select)s--99',
+                            selector=lambda x: x['identifier'][4:-2]+"00",  # "RFC 6998" => "69"
+                            key=lambda x: int(x['identifier'][4:]),
+                            selector_descending=True,
+                            key_descending=True),   # "RFC 6998" => 6998
+
+                TocCriteria(binding='title',
+                            label='Sorted by title',
+                            pagetitle='Documents starting with "%(select)s"',
+                            selector=lambda x: util.title_sortkey(x['title'])[0], # "The 'view-state'" property => "v"
+                            key=lambda x: util.title_sortkey(x['title'])),
+
+                TocCriteria(binding='issued',
+                            label='Sorted by year',
+                            pagetitle='Documents published in %(select)s',
+                            selector = lambda x: x['issued'][:4],  # '2013-08-01' => '2013'
+                            key = lambda x: x['issued'],
+                            selector_descending=True,
+                            key_descending=True), 
+
+                TocCriteria(binding='subject',
+                            label='Sorted by category',
+                            pagetitle='Documents in the %(select)s category',
+                            selector = lambda x: x['subject'],
+                            key = lambda x: int(x['identifier'][4:]),
+                            key_descending=True
+                            )]
+# end toc_criteria
+
+# begin toc_item
+    def toc_item(self, binding, row):
+        from ferenda.elements import Link
+        return [row['identifier'] + ": ",
+                Link(row['title'], 
+                     uri=row['uri'])]
+# end toc_item
 if __name__ == '__main__':
     from ferenda import manager, LayeredConfig
     manager.setup_logger("DEBUG")
-    d = RFCs(downloadmax=10, force=True)
+    d = RFCs(downloadmax=10, force=True, staticsite=True)
 #    # d.download()
 #    for basefile in d.list_basefiles_for("parse"):
 #        d.parse(basefile)
