@@ -291,6 +291,7 @@ class DocumentRepository(object):
                 'storetype': 'SQLITE',
                 'storelocation': 'data/ferenda.sqlite',
                 'storerepository': 'ferenda',
+                'indextype': 'WHOOSH',
                 'indexlocation': 'data/whooshindex',
                 'combineresources': False,
                 'cssfiles': ['http://fonts.googleapis.com/css?family=Raleway:200,100',
@@ -1236,6 +1237,13 @@ uri doesn't map to a basefile in this repo."""
         
 
     def relate(self, basefile, otherrepos=[]):
+        """Runs various indexing operations for the document represented by
+           *basefile*: insert RDF statements into a triple store, add this
+           document to the dependency list to all documents that it refers to,
+           and put the text of the document into a fulltext index.
+
+        """
+        
         self.relate_triples(basefile)
         # FIXME: How should we pass in (or create) a list if
         # instantiated repositories?  When using API, the caller must
@@ -1289,7 +1297,10 @@ uri doesn't map to a basefile in this repo."""
 
     def _get_fulltext_indexer(self, batchoptimize=False):
         if not hasattr(self, '_fulltextindexer'):
-            idx = FulltextIndex.connect("WHOOSH", self.config.indexlocation)
+            
+            idx = FulltextIndex.connect(self.config.indextype,
+                                        self.config.indexlocation,
+                                        repos = [] ) # FIXME: need a real list of repos
             self._fulltextindexer = idx
             if hasattr(self.config, 'all'):
                 self._fulltextindexer._batchwriter = True

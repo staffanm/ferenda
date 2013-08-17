@@ -4,11 +4,10 @@ from __future__ import unicode_literals
 import os, sys
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 from ferenda.manager import setup_logger; setup_logger('CRITICAL')
-# unittest is imported by ferenda.testutil.RepoTester
-# if sys.version_info < (2, 7, 0):
-#     import unittest2 as unittest
-# else:
-#     import unittest
+if sys.version_info < (2, 7, 0):
+    import unittest2 as unittest
+else:
+    import unittest
 try:
     from unittest.mock import Mock
 except ImportError:
@@ -270,11 +269,7 @@ class ConNeg(WSGI):
 #         self.assertEqualGraphs(g, got)
 
 
-class Search(WSGI):
-
-    def setUp(self):
-        super(Search, self).setUp()
-        self.env['PATH_INFO'] = '/mysearch/'
+class Search(object):
 
     def _copy_and_distill(self,basefile):
         util.ensure_dir(self.repo.store.parsed_path(basefile))
@@ -332,8 +327,7 @@ class Search(WSGI):
                          'http://example.org/base/123/a')
         self.assertEqual(etree.tostring(docs[2][1]).strip(),
                          b'<p>This is <strong class="match">part</strong> of the main document</p>')
-        
-        
+
 
     def test_search_single(self):
         self.repo.relate("123/a")
@@ -355,13 +349,14 @@ class Search(WSGI):
         self.assertResponse("200 OK",
                             {'Content-Type': 'text/html; charset=utf-8'},
                             None,
-                            status, headers, None)                            
+                            status, headers, None)
         
         t = etree.fromstring(content)
         docs = t.findall(".//section[@class='hit']")
         self.assertEqual(etree.tostring(docs[0][1]).strip(),
                          b'<p>sollicitudin justo <strong class="match">needle</strong> tempor ut eu enim ... himenaeos. <strong class="match">Needle</strong> id tincidunt orci</p>')
-        
+
+
     def test_paged(self):
         self._copy_and_distill("123/c")
         # 123/c contains 50 docs, 25 of which contains 'needle'
@@ -410,3 +405,20 @@ class Search(WSGI):
         pager = t.find(".//div[@class='pager']")
         self.assertEqual(4,len(pager))
         self.assertEqual('Results 21-25 of 25',pager[0].text)
+
+
+class WhooshSearch(Search, WSGI):
+    def setUp(self):
+        super(WhooshSearch, self).setUp()
+        self.env['PATH_INFO'] = '/mysearch/'
+
+
+@unittest.skipIf('SKIP_ELASTICSEARCH_TESTS' in os.environ,
+                 "Skipping Elasticsearch tests")    
+class ESSearch(Search, WSGI):
+    def setUp(self):
+        super(ESSearch, self).setUp()
+        self.repo.config.indexlocation = "http://localhost:9200/ferenda/"
+        self.repo.config.indextype = "ELASTICSEARCH"
+        self.env['PATH_INFO'] = '/mysearch/'
+        

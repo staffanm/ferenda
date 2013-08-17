@@ -30,7 +30,7 @@ basic_dataset = [
      'basefile':'1',
      'title':'First sec',
      'identifier':'Doc #1 (section 1)',
-     'text':'This is an independent section'},
+     'text':'This is an independent section, with extra section boost'},
     {'uri':'http://example.org/doc/1#s2',
      'repo':'base',
      'basefile':'1',
@@ -42,7 +42,7 @@ basic_dataset = [
      'basefile':'1',
      'title':'First section',
      'identifier':'Doc #1 (section 1)',
-     'text':'This is an (updated version of a) independent section'},
+     'text':'This is an (updated version of a) independent section, with extra section boost'},
     {'uri':'http://example.org/doc/2',
      'repo':'base',
      'basefile':'2',
@@ -50,6 +50,8 @@ basic_dataset = [
      'identifier':'Doc #2',
      'text':'This is the second document (not the first)'}
     ]
+
+repos = [DocumentRepository()]
 
 class BasicIndex(object):
 
@@ -80,9 +82,8 @@ class BasicIndex(object):
     def test_insert(self):
         self.index.update(**basic_dataset[0])
         self.index.update(**basic_dataset[1])
-        self.index.commit() 
+        self.index.commit()
         self.assertEqual(self.index.doccount(),2)
-        
         self.index.update(**basic_dataset[2])
         self.index.update(**basic_dataset[3]) # updated version of basic_dataset[1]
         self.index.commit() 
@@ -95,7 +96,7 @@ class BasicQuery(object):
         # print("loading...")
         for doc in data:
             self.index.update(**doc)
-            self.index.commit()
+        self.index.commit()
 
     def test_basic(self):
         self.load(basic_dataset)
@@ -112,25 +113,33 @@ class BasicQuery(object):
         res, pager = self.index.query("section*")
         from pprint import pprint
         self.assertEqual(len(res),3)
+        # NOTE: ES scores all three results equally (1.0), so it doesn't
+        # neccesarily put section 1 in the top
         self.assertEqual(res[0]['identifier'], 'Doc #1 (section 1)') 
 
 class ESBase(unittest.TestCase):
     def setUp(self):
         self.location = "http://localhost:9200/ferenda/"
-        self.index = FulltextIndex.connect("ELASTICSEARCH", self.location)
+        self.index = FulltextIndex.connect("ELASTICSEARCH", self.location, repos)
 
     def tearDown(self):
         self.index.destroy()
 
+
+@unittest.skipIf('SKIP_ELASTICSEARCH_TESTS' in os.environ,
+                 "Skipping Elasticsearch tests")    
 class ESBasicIndex(BasicIndex, ESBase): pass
 
+
+@unittest.skipIf('SKIP_ELASTICSEARCH_TESTS' in os.environ,
+                 "Skipping Elasticsearch tests")    
 class ESBasicQuery(BasicQuery, ESBase): pass
 
 
 class WhooshBase(unittest.TestCase):
     def setUp(self):
         self.location = mkdtemp()
-        self.index = FulltextIndex.connect("WHOOSH", self.location)
+        self.index = FulltextIndex.connect("WHOOSH", self.location, repos)
 
     def tearDown(self):
         self.index.destroy()

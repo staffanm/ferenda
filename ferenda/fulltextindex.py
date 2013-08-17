@@ -1,5 +1,11 @@
 import re
 import shutil
+import json
+import six
+if six.PY3:
+    from urllib.parse import quote
+else:
+    from urllib import quote
 
 import requests
 import requests.exceptions
@@ -9,7 +15,7 @@ from ferenda import util
 class FulltextIndex(object):
 
     @staticmethod
-    def connect(indextype, location):
+    def connect(indextype, location, repos=[]):
         """Open a fulltext index (creating it if it
         doesn't already exists).
 
@@ -21,15 +27,15 @@ class FulltextIndex(object):
     """
         # create correct subclass and return it
         return {'WHOOSH': WhooshIndex,
-                'ELASTICSEARCH': ElasticSearchIndex}[indextype](location)
+                'ELASTICSEARCH': ElasticSearchIndex}[indextype](location, repos)
 
 
-    def __init__(self, location):
+    def __init__(self, location, repos):
         self.location = location
         if self.exists():
             self.index = self.open()
         else:
-            self.index = self.create(self.get_default_schema())
+            self.index = self.create(self.get_default_schema(), repos)
        
 
     def __del__(self):
@@ -44,21 +50,28 @@ class FulltextIndex(object):
                 'text':Text()}       
 
     def exists(self):
+        """Whether the fulltext index exists."""
         raise NotImplementedError
 
-    def create(self, schema):
+    def create(self, schema, repos):
+        """Creates a fulltext index using the provided default schema."""
         raise NotImplementedError
 
     def destroy(self):
+        """Destroys the index, if created."""
         raise NotImplementedError
 
     def open(self):
+        """Opens the index so that it can be queried."""
         raise NotImplementedError
 
     def schema(self):
-        """Returns the schema in use. A schema is a dict where the keys are field names 
-           and the values are any subclass of :py:class:`ferenda.fulltextindex.IndexedType`"""
-        return self.get_default_schema()
+        """Returns the schema that actually is in use. A schema is a dict
+           where the keys are field names and the values are any
+           subclass of
+           :py:class:`ferenda.fulltextindex.IndexedType`
+        """
+        raise NotImplementedError
 
     def update(self, uri, repo, basefile, title, identifier, text, **kwargs):
         """Insert (or update) a resource in the fulltext index. A resource may
@@ -211,8 +224,8 @@ class ElementsFormatter(whoosh.highlight.Formatter):
 
 class WhooshIndex(FulltextIndex):
 
-    def __init__(self,location):
-        super(WhooshIndex, self).__init__(location)
+    def __init__(self,location, repos):
+        super(WhooshIndex, self).__init__(location, repos)
         self._schema = self.get_default_schema()
         self._writer = None
         self._batchwriter = False
@@ -226,7 +239,7 @@ class WhooshIndex(FulltextIndex):
         return whoosh.index.open_dir(self.location)
 
 
-    def create(self, schema):
+    def create(self, schema, repos):
         # maps our field classes to concrete whoosh field instances
         mapped_field = {Identifier():   whoosh.fields.ID(unique=True, stored=True),
                         Label():        whoosh.fields.ID(stored=True),
@@ -248,6 +261,9 @@ class WhooshIndex(FulltextIndex):
         shutil.rmtree(self.location)        
 
     def schema(self):
+        # FIXME: This should iterate through self.index (the
+        # underlying whoosh index), convert each field to the
+        # corresponding IndexedType objects.
         return self._schema
     
     def update(self, uri, repo, basefile, title, identifier, text, **kwargs):
@@ -323,18 +339,26 @@ class RemoteIndex(FulltextIndex):
 
     def exists(self): pass
 
-    def create(self, schema):
-        relurl, payload = self._create_schema_payload(self.get_default_schema())
-        requests.put(self.location+relurl, payload)
+    def create(self, schema, repos):
+        relurl, payload = self._create_schema_payload(self.get_default_schema(), repos)
+        res = requests.put(self.location+relurl, payload)
+        try:
+            res.raise_for_status()
+        except Exception as e:
+            raise Exception("%s: %s" % (res.status_code, res.text))
 
-    def schema(self): return self.get_default_schema()
+    def schema(self):
+        relurl, payload = self._get_schema_payload()
+        res = requests.get(self.location+relurl) # payload is probably never used
+        return self._decode_schema(res)
 
     def update(self, uri, repo, basefile, title, identifier, text, **kwargs):
         relurl, payload = self._update_payload(uri, repo, basefile, title, identifier, text, **kwargs)
-        requests.put(self.location+relurl, payload)
+        res = requests.put(self.location+relurl, payload)
+        res.raise_for_status()
 
     def doccount(self):
-        reluri, payload = self._count_payload()
+        relurl, payload = self._count_payload()
         if payload:
             res = requsts.post(self.location+relurl, payload)
         else:
@@ -349,6 +373,10 @@ class RemoteIndex(FulltextIndex):
             res = requests.get(self.location+relurl)
         return self._decode_query_result(res)
 
+    def destroy(self):
+        reluri, payload = self._destroy_payload()
+        res = requests.delete(self.location+reluri)
+        
     # these don't make no sense for a remote index accessed via HTTP/REST
     def open(self): pass
     def commit(self): pass
@@ -357,7 +385,17 @@ class RemoteIndex(FulltextIndex):
 
 class ElasticSearchIndex(RemoteIndex):
 
+    def commit(self):
+        # after having updated documents, it seems ES needs a little
+        # while before it can accurately return the count of
+        # documents. There must be some sort of sync operation we can
+        # call, but until I find it...
+        from time import sleep
+        sleep(1)
+        
     def exists(self):
+        return True # FIXME: until we get create() and subsequent
+                    # update() to behave, see below...
         r = requests.get(self.location+"_mapping/")
         if r.status_code == 404:
             return False
@@ -365,57 +403,82 @@ class ElasticSearchIndex(RemoteIndex):
             return True
     
     def _update_payload(self, uri, repo, basefile, title, identifier, text, **kwargs):
-        relurl = "%s/%s" % repo, basefile # eg type, id
+        relurl = "%s/%s" % (repo, basefile) # eg type, id
         if "#" in uri: 
             relurl += uri.split("#",1)[1]
-        payload = {'uri': uri,
-                   'basefile': basefile,
-                   'title': title,
-                   'identifier': identifier,
-                   'text': text}
+        payload = {"uri": uri,
+                   "basefile": basefile,
+                   "title": title,
+                   "identifier": identifier,
+                   "text": text}
         payload.update(kwargs)
-        return relurl, payload
+        return relurl, json.dumps(payload)
 
     def _query_payload(self, q, pagenum=1, pagelen=10, **kwargs):
-        relurl = "_search?q=%s&size=%s&from=%s" % (urlencode(q), pagelen, (pagenum * pagelen) - pagelen)
+        from pudb import set_trace; set_trace()
+        relurl = "_search?q=%s&size=%s&from=%s" % (quote(q), pagelen, (pagenum * pagelen) - pagelen)
         return relurl, None
 
-    def _decode_result(self, response):
-        json = response.json
+    def _decode_query_result(self, response):
+        json = response.json()
+        res = []
+        for hit in json['hits']['hits']:
+            res.append(hit['_source'])
         pager = {'pagenum': 0,
-                 'pagecount': 0,
+                 'pagecount': len(json['hits']['hits']),
                  'firstresult': 0,
                  'lastresult': 0,
                  'totalresults': json['hits']['total'] }
-        return json['hits']['hits'], pager
+        return res, pager
+
+    def _count_payload(self):
+        return "_count", None
         
     def _decode_count_result(self, response):
-        return response.json['count']
+        return response.json()['count']
 
-    def _create_schema_payload(self, schema):
-        schema = {'settings': {
-            'number_of_shards': 3,
-            'number_of_replicas': 2
-            },
-                  'mappings': {}}
+    # FIXME: This is cheating!
+    def schema(self):
+        return self.get_default_schema()
+        
+    def _get_schema_payload(self):
+        return "", None
+
+    def _decode_schema_payload(self, response):
+        raise NotImplementedError
+
+    # FIXME: For some reason, createing a schema/mapping makes PUTting
+    # new documents to the index hang with the folloging error:
+    # 
+    #    UnavailableShardsException[[ferenda][1] [3] shardIt, [0] active : Timeout waiting for [1m]
+    #
+    # So we skip creating the schema as it isn't neccesary
+    def create(self, schema, repos):
+        pass
+        
+    def _create_schema_payload(self, schema, repos):
+        schema = {"mappings": {}}
 
         # maps our field classes to concrete ES field properties 
         # -- lots more to add (boosting in particular) but ES docs are hard
-        mapped_field = {Identifier():   {'type': 'text', 'index': 'not_analyzed'}, # uri
-                        Label():        {'type': 'text', 'index': 'not_analyzed'}, # repo, basefile (note: see below)
-                        Label(boost=16):{'type': 'text', 'boost': 16.0}, # identifier
-                        Text(boost=4):  {'type': 'text', 'boost': 4.0}, # title
-                        Text():         {'type': 'text'}} # text
+        mapped_field = {Identifier():   {"type": "string", "index": "not_analyzed"}, # uri
+                        Label():        {"type": "string", "index": "not_analyzed"}, # repo, basefile (note: see below)
+                        Label(boost=16):{"type": "string", "boost": 16.0}, # identifier
+                        Text(boost=4):  {"type": "string", "boost": 4.0}, # title
+                        Text():         {"type": "string"}} # text
                         
         es_fields = {}
         for key,fieldtype in self.get_default_schema().items():
-            if key == 'repo':
+            if key == "repo":
                 continue # not really needed for ES, as type == repo.alias
             es_fields[key] = mapped_field[fieldtype]
-        for repo in repos: # where to get?!
-            schema['mappings'][repo.alias] = {'_source': {'enabled': true}, # so we can get the text back
-                                              'properties': es_fields}
+        for repo in repos: 
+            schema["mappings"][repo.alias] = {"_source": {"enabled": True}, # so we can get the text back
+                                              "properties": es_fields}
         # self.location should be eg http://localhost:9200/ferenda/, not just http://localhost:9200/
         return "", json.dumps(schema)
 
+    def _destroy_payload(self):
+
+        return "", None
  
