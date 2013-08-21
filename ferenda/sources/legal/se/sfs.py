@@ -32,7 +32,7 @@ except ImportError:
     from ordereddict import OrderedDict
 
 # 3rdparty libs
-from rdflib import Graph, Namespace, URIRef, RDF, RDFS, Literal
+from rdflib import Graph, Namespace, URIRef, RDF, Literal
 import requests
 import lxml.html
 from lxml.builder import ElementMaker
@@ -42,13 +42,10 @@ import bs4
 from ferenda import util, LayeredConfig
 from ferenda import decorators
 from ferenda.elements import CompoundElement
-from ferenda.elements import DateElement
-from ferenda.elements import MapElement
 from ferenda.elements import OrdinalElement
-from ferenda.elements import PredicateType
 from ferenda.elements import TemporalElement
 from ferenda.elements import UnicodeElement
-from ferenda.legalref import LegalRef, Link, LinkSubject
+from ferenda.legalref import LegalRef, LinkSubject
 from ferenda import DocumentEntry, DocumentStore
 from ferenda import TextReader, Describer
 from ferenda.errors import DocumentRemovedError, ParseError
@@ -667,9 +664,9 @@ class SFS(SwedishLegalSource):
     re_ChapterId = re.compile(r'^(\d+( \w|)) [Kk]ap.').match
     re_DivisionId = re.compile(r'^AVD. ([IVX]*)').match
     re_SectionId = re.compile(
-        r'^(\d+ ?\w?) §[ \.]')  # used for both match+sub
+        r'^(\d+ ?\w?) \xa7[ \.]')  # used for both match+sub
     re_SectionIdOld = re.compile(
-        r'^§ (\d+ ?\w?).')     # as used in eg 1810:0926
+        r'^\xa7 (\d+ ?\w?).')     # as used in eg 1810:0926
     re_DottedNumber = re.compile(r'^(\d+ ?\w?)\. ')
     re_Bullet = re.compile(r'^(\-\-?|\x96) ')
     re_NumberRightPara = re.compile(r'^(\d+)\) ').match
@@ -677,7 +674,7 @@ class SFS(SwedishLegalSource):
     re_ElementId = re.compile(
         r'^(\d+) mom\.')        # used for both match+sub
     re_ChapterRevoked = re.compile(r'^(\d+( \w|)) [Kk]ap. (upph\xe4vd|har upph\xe4vts) genom (f\xf6rordning|lag) \([\d\:\. s]+\)\.?$').match
-    re_SectionRevoked = re.compile(r'^(\d+ ?\w?) §[ \.]([Hh]ar upph\xe4vts|[Nn]y beteckning (\d+ ?\w?) §) genom ([Ff]\xf6rordning|[Ll]ag) \([\d\:\. s]+\)\.$').match
+    re_SectionRevoked = re.compile(r'^(\d+ ?\w?) \xa7[ \.]([Hh]ar upph\xe4vts|[Nn]y beteckning (\d+ ?\w?) \xa7) genom ([Ff]\xf6rordning|[Ll]ag) \([\d\:\. s]+\)\.$').match
     re_RevokeDate = re.compile(
         r'/(?:Rubriken u|U)pph\xf6r att g\xe4lla U:(\d+)-(\d+)-(\d+)/')
     re_RevokeAuthorization = re.compile(
@@ -688,7 +685,7 @@ class SFS(SwedishLegalSource):
         r'/Tr\xe4der i kraft I:(den dag regeringen best\xe4mmer)/')
     re_dehyphenate = re.compile(r'\b- (?!(och|eller))', re.UNICODE).sub
     re_definitions = re.compile(r'^I (lagen|f\xf6rordningen|balken|denna lag|denna f\xf6rordning|denna balk|denna paragraf|detta kapitel) (avses med|betyder|anv\xe4nds f\xf6ljande)').match
-    re_brottsdef = re.compile(r'\b(d\xf6ms|d\xf6mes)(?: han)?(?:,[\w§ ]+,)? f\xf6r ([\w ]{3,50}) till (b\xf6ter|f\xe4ngelse)', re.UNICODE).search
+    re_brottsdef = re.compile(r'\b(d\xf6ms|d\xf6mes)(?: han)?(?:,[\w\xa7 ]+,)? f\xf6r ([\w ]{3,50}) till (b\xf6ter|f\xe4ngelse)', re.UNICODE).search
     re_brottsdef_alt = re.compile(r'[Ff]\xf6r ([\w ]{3,50}) (d\xf6ms|d\xf6mas) till (b\xf6ter|f\xe4ngelse)', re.UNICODE).search
     re_parantesdef = re.compile(r'\(([\w ]{3,50})\)\.', re.UNICODE).search
     re_loptextdef = re.compile(r'^Med ([\w ]{3,50}) (?:avses|f\xf6rst\xe5s) i denna (f\xf6rordning|lag|balk)', re.UNICODE).search
@@ -797,8 +794,6 @@ class SFS(SwedishLegalSource):
 
         # At this point, we basic metadata and a almost complete body
         # structure. Enhance the metadata:
-        desc.value(self.ns['rdfs'].comment, 'Räksmörgås')
-        doc.meta.add((URIRef(doc.uri), self.ns['rdfs'].label, Literal('Räksmörgås')))
         for uri in registry.keys():
             desc.rel(self.ns['rpubl'].konsolideringsunderlag, uri)
         desc.rdftype(self.ns['rpubl'].KonsolideradGrundforfattning)
@@ -827,7 +822,7 @@ class SFS(SwedishLegalSource):
         # it out.
         published = None
         # 1. if registry contains a single value (ie a
-        # Grundförfattning that hasn't been amended yet), we can
+        # Grundforfattning that hasn't been amended yet), we can
         # assume that dct:published == rpubl:utfardandedatum
         if len(registry) == 1:
             published = desc.getvalue(self.ns['rpubl'].utfardandedatum)
@@ -867,9 +862,9 @@ class SFS(SwedishLegalSource):
             
         if obs:
             del doc.body[obsidx]
-            reg = Register(rubrik='Ändringar och övergångsbestämmelser')
+            reg = Register(rubrik='\xc4ndringar och \xf6verg\xe5ngsbest\xe4mmelser')
         else:
-            reg = Register(rubrik='Ändringar')
+            reg = Register(rubrik='\xc4ndringar')
             
         for uri,graph in registry.items():
             identifier = graph.value(URIRef(uri),self.ns['dct'].identifier)
@@ -1108,7 +1103,7 @@ class SFS(SwedishLegalSource):
     #
     # Hittar adresserbara enheter (delresurser som ska ha unika URI:s,
     # dvs kapitel, paragrafer, stycken, punkter) och konstruerar id's
-    # f\xf6r dem, exv K1P2S3N4 f\xf6r 1 kap. 2 § 3 st. 4 p
+    # f\xf6r dem, exv K1P2S3N4 f\xf6r 1 kap. 2 \xa7 3 st. 4 p
     #
     # Hittar lagrumsh\xe4nvisningar i l\xf6ptexten
     def _construct_ids(self, element, prefix, baseuri, skip_fragments=[], find_definitions=False):
@@ -1525,10 +1520,10 @@ class SFS(SwedishLegalSource):
         firstline = self.reader.peekline()
         self.log.debug("      Ny paragraf: '%s...'" % firstline[:30])
         # L\xe4s f\xf6rbi paragrafnumret:
-        self.reader.read(len(paragrafnummer) + len(' § '))
+        self.reader.read(len(paragrafnummer) + len(' \xa7 '))
 
         # some really old laws have sections split up in "elements"
-        # (moment), eg '1 § 1 mom.', '1 § 2 mom.' etc
+        # (moment), eg '1 \xa7 1 mom.', '1 \xa7 2 mom.' etc
         match = self.re_ElementId.match(firstline)
         if self.re_ElementId.match(firstline):
             momentnummer = match.group(1)
@@ -1887,7 +1882,7 @@ class SFS(SwedishLegalSource):
 
         # '1 a kap.' -- almost always a headline, regardless if it
         # streches several lines but there are always special cases
-        # (1982:713 1 a kap. 7 §)
+        # (1982:713 1 a kap. 7 \xa7)
         #m = re.match(r'^(\d+( \w|)) [Kk]ap.',p)
         m = self.re_ChapterId(p)
         if m:
@@ -1916,11 +1911,11 @@ class SFS(SwedishLegalSource):
 
             # sometimes (2005:1207) it's a headline, referencing a
             # specific section somewhere else - if the "1 kap. " is
-            # immediately followed by "5 § " then that's probably the
+            # immediately followed by "5 \xa7 " then that's probably the
             # case
-            if (p.endswith(" §") or
-                p.endswith(" §§") or
-                    (p.endswith(" stycket") and " § " in p)):
+            if (p.endswith(" \xa7") or
+                p.endswith(" \xa7\xa7") or
+                    (p.endswith(" stycket") and " \xa7 " in p)):
                 return None
 
             # Om det ser ut som en tabell \xe4r det nog ingen
@@ -1987,7 +1982,7 @@ class SFS(SwedishLegalSource):
                 "isRubrik (%s): ends with comma/colon etc" % (p[:50]))
             return False
 
-        if self.re_ChangeNote.search(p):  # eg 1994:1512 8 §
+        if self.re_ChangeNote.search(p):  # eg 1994:1512 8 \xa7
             return False
 
         if p.startswith("/") and p.endswith("./"):
@@ -2054,11 +2049,11 @@ class SFS(SwedishLegalSource):
         # id. Try another way to detect this by looking at the first
         # character in the paragraph - if it's in lower case, it's
         # probably not a paragraph.
-        firstcharidx = (len(paragrafnummer) + len(' § '))
+        firstcharidx = (len(paragrafnummer) + len(' \xa7 '))
         # print "%r: %s" % (p, firstcharidx)
         if ((len(p) > firstcharidx) and
-                (p[len(paragrafnummer) + len(' § ')].islower())):
-            self.trace['paragraf'].debug("isParagraf: section '%s' did not start with uppercase" % p[len(paragrafnummer) + len(' § '):30])
+                (p[len(paragrafnummer) + len(' \xa7 ')].islower())):
+            self.trace['paragraf'].debug("isParagraf: section '%s' did not start with uppercase" % p[len(paragrafnummer) + len(' \xa7 '):30])
             return False
         return True
 
@@ -2491,7 +2486,7 @@ class SFS(SwedishLegalSource):
                       'uri': row['uri']}
 
             # if one case references two or more paragraphs in a
-            # particular section (ie "6 kap 1 § 1 st. och 6 kap 1 § 2
+            # particular section (ie "6 kap 1 \xa7 1 st. och 6 kap 1 \xa7 2
             # st.") we will get duplicates that we can't (easily)
             # filter out in the SPARQL query. Filter them out here
             # instead.
@@ -2792,7 +2787,7 @@ class SFS(SwedishLegalSource):
         parts = LegalURI.parse(uri)
         res = ""
         for (field, label) in (('chapter', 'kap.'),
-                              ('section', '§'),
+                              ('section', '\xa7'),
                               ('piece', 'st'),
                               ('item', 'p')):
             if field in parts and not (field == 'piece' and

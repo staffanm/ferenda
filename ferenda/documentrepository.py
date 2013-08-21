@@ -1393,7 +1393,6 @@ parsed document path to that documents dependency file."""
 
             indexer.commit() # NB: Destroys indexer._writer
 
-
     def _extract_plaintext(self,node):
         # helper to extract any text from a elementtree node,
         # excluding subnodes that are resources themselves (ie they

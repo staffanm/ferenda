@@ -77,3 +77,8 @@ class SparqlError(TriplestoreError):
     """Raised whenever a SPARQL query fails. The Exception should contain whatever error message that the Triple store returned, so the exact formatting may be dependent on which store is used."""
     pass
 
+class IndexingError(Exception):
+    """Raised whenever an attempt to put text into the fulltext index fails."""
+    pass
+class SearchingError(Exception):
+    """Raised whenever an attempt to do a full-text search fails."""

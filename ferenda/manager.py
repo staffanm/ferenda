@@ -442,7 +442,7 @@ def _wsgi_search(environ, start_response, args):
     # technically have different paths here, but that'd be stupid. It
     # would be bettter if indexlocation was available direct from args
     # (which requires changing _setup_runserver_args())
-    idx = FulltextIndex.connect("WHOOSH",
+    idx = FulltextIndex.connect(args['repos'][0].config.indextype,
                                 args['repos'][0].config.indexlocation)
     # FIXME: QUERY_STRING should probably be sanitized before calling
     # .query() - but in what way?
@@ -465,7 +465,7 @@ def _wsgi_search(environ, start_response, args):
                   Literal(resulthead, lang="en")))
     doc.body = elements.Body()
     for r in res:
-        if not 'title' in r:
+        if not 'title' in r or r['title'] is None:
             r['title'] = r['uri']
         doc.body.append(html.Div(
             [html.H2([elements.Link(r['title'], uri=r['uri'])]),

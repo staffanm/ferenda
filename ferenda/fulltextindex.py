@@ -9,8 +9,9 @@ else:
 
 import requests
 import requests.exceptions
+from bs4 import BeautifulSoup
 
-from ferenda import util
+from ferenda import util, errors
 
 class FulltextIndex(object):
 
@@ -19,8 +20,7 @@ class FulltextIndex(object):
         """Open a fulltext index (creating it if it
         doesn't already exists).
 
-        :param location: Type of fulltext index (right now only "WHOOSH" is
-                         supported)
+        :param location: Type of fulltext index ("WHOOSH" or "ELASTICSEARCH")
         :type  location: str
         :param location: The file path of the fulltext index.
         :type  location: str
@@ -354,8 +354,14 @@ class RemoteIndex(FulltextIndex):
 
     def update(self, uri, repo, basefile, title, identifier, text, **kwargs):
         relurl, payload = self._update_payload(uri, repo, basefile, title, identifier, text, **kwargs)
+
         res = requests.put(self.location+relurl, payload)
-        res.raise_for_status()
+        try: 
+            res.raise_for_status()
+            # print(json.dumps(res.json(), indent=4))
+        except requests.exceptions.HTTPError as e:
+            raise errors.IndexingError(str(e) + ": '%s'" % res.text)
+                
 
     def doccount(self):
         relurl, payload = self._count_payload()
@@ -366,12 +372,14 @@ class RemoteIndex(FulltextIndex):
         return self._decode_count_result(res)
 
     def query(self, q, pagenum=1, pagelen=10, **kwargs):
-        relurl, payload = self._query_payload(q, pagenum=1, pagelen=10, **kwargs)
+        relurl, payload = self._query_payload(q, pagenum, pagelen, **kwargs)
         if payload:
-            res = requsts.post(self.location+relurl, payload)
+            print("POSTing to %s:\n%s" % (relurl, payload))
+            res = requests.post(self.location+relurl, payload)
+            print("Recieved:\n%s" % (json.dumps(res.json(),indent=4)))
         else:
             res = requests.get(self.location+relurl)
-        return self._decode_query_result(res)
+        return self._decode_query_result(res, pagenum, pagelen)
 
     def destroy(self):
         reluri, payload = self._destroy_payload()
@@ -386,13 +394,9 @@ class RemoteIndex(FulltextIndex):
 class ElasticSearchIndex(RemoteIndex):
 
     def commit(self):
-        # after having updated documents, it seems ES needs a little
-        # while before it can accurately return the count of
-        # documents. There must be some sort of sync operation we can
-        # call, but until I find it...
-        from time import sleep
-        sleep(1)
-        
+        r = requests.post(self.location+"_refresh")
+        r.raise_for_status()
+                         
     def exists(self):
         return True # FIXME: until we get create() and subsequent
                     # update() to behave, see below...
@@ -403,7 +407,7 @@ class ElasticSearchIndex(RemoteIndex):
             return True
     
     def _update_payload(self, uri, repo, basefile, title, identifier, text, **kwargs):
-        relurl = "%s/%s" % (repo, basefile) # eg type, id
+        relurl = "%s/%s" % (repo, quote(basefile, safe="")) # eg type, id
         if "#" in uri: 
             relurl += uri.split("#",1)[1]
         payload = {"uri": uri,
@@ -415,19 +419,31 @@ class ElasticSearchIndex(RemoteIndex):
         return relurl, json.dumps(payload)
 
     def _query_payload(self, q, pagenum=1, pagelen=10, **kwargs):
-        from pudb import set_trace; set_trace()
-        relurl = "_search?q=%s&size=%s&from=%s" % (quote(q), pagelen, (pagenum * pagelen) - pagelen)
-        return relurl, None
+        # relurl = "_search?q=%s&size=%s&from=%s" % (quote(q), pagelen, (pagenum * pagelen) - pagelen)
+        relurl = "_search?from=%s&size=%s" % ((pagenum-1)*pagelen, pagelen)
+        payload = {'query': {'match': {'_all': q}},
+                   'highlight': {'fields': {'text': {},
+                                            'title': {}},
+                                 'pre_tags': ["<strong class='match'>"],
+                                 'post_tags': ["</strong>"],
+                                 'fragment_size': '40'}}
+        return relurl, json.dumps(payload,indent=4)
 
-    def _decode_query_result(self, response):
+    def _decode_query_result(self, response, pagenum, pagelen):
         json = response.json()
         res = []
         for hit in json['hits']['hits']:
-            res.append(hit['_source'])
-        pager = {'pagenum': 0,
+            h = hit['_source']
+            # wrap highlighted field in P, convert to elements
+            hltext = "...".join([x.strip() for x in hit['highlight']['text']])
+            soup = BeautifulSoup("<p>%s</p>" % hltext)
+            h['text'] = html.elements_from_soup(soup.html.body.p)
+            res.append(h)
+        from pudb import set_trace; set_trace()
+        pager = {'pagenum': pagenum, 
                  'pagecount': len(json['hits']['hits']),
-                 'firstresult': 0,
-                 'lastresult': 0,
+                 'firstresult': (pagenum-1)*pagelen,
+                 'lastresult': (pagenum-1)*pagelen + len(json['hits']['hits']),
                  'totalresults': json['hits']['total'] }
         return res, pager
 
