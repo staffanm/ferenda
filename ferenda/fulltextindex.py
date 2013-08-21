@@ -2,6 +2,7 @@ import re
 import shutil
 import json
 import six
+import math
 if six.PY3:
     from urllib.parse import quote
 else:
@@ -374,9 +375,9 @@ class RemoteIndex(FulltextIndex):
     def query(self, q, pagenum=1, pagelen=10, **kwargs):
         relurl, payload = self._query_payload(q, pagenum, pagelen, **kwargs)
         if payload:
-            print("POSTing to %s:\n%s" % (relurl, payload))
+            # print("POSTing to %s:\n%s" % (relurl, payload))
             res = requests.post(self.location+relurl, payload)
-            print("Recieved:\n%s" % (json.dumps(res.json(),indent=4)))
+            # print("Recieved:\n%s" % (json.dumps(res.json(),indent=4)))
         else:
             res = requests.get(self.location+relurl)
         return self._decode_query_result(res, pagenum, pagelen)
@@ -421,6 +422,7 @@ class ElasticSearchIndex(RemoteIndex):
     def _query_payload(self, q, pagenum=1, pagelen=10, **kwargs):
         # relurl = "_search?q=%s&size=%s&from=%s" % (quote(q), pagelen, (pagenum * pagelen) - pagelen)
         relurl = "_search?from=%s&size=%s" % ((pagenum-1)*pagelen, pagelen)
+        # relurl = "_search?size=50"
         payload = {'query': {'match': {'_all': q}},
                    'highlight': {'fields': {'text': {},
                                             'title': {}},
@@ -435,14 +437,13 @@ class ElasticSearchIndex(RemoteIndex):
         for hit in json['hits']['hits']:
             h = hit['_source']
             # wrap highlighted field in P, convert to elements
-            hltext = "...".join([x.strip() for x in hit['highlight']['text']])
-            soup = BeautifulSoup("<p>%s</p>" % hltext)
+            hltext = " ... ".join([x.strip() for x in hit['highlight']['text']])
+            soup = BeautifulSoup("<p>%s</p>" % re.sub("\s+", " ", hltext))
             h['text'] = html.elements_from_soup(soup.html.body.p)
             res.append(h)
-        from pudb import set_trace; set_trace()
         pager = {'pagenum': pagenum, 
-                 'pagecount': len(json['hits']['hits']),
-                 'firstresult': (pagenum-1)*pagelen,
+                 'pagecount': math.ceil(json['hits']['total'] / pagelen),
+                 'firstresult': (pagenum-1)*pagelen + 1,
                  'lastresult': (pagenum-1)*pagelen + len(json['hits']['hits']),
                  'totalresults': json['hits']['total'] }
         return res, pager

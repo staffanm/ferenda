@@ -22,7 +22,7 @@ from lxml import etree
 from ferenda.testutil import RepoTester
     
 from ferenda.manager import make_wsgi_app
-from ferenda import DocumentRepository
+from ferenda import DocumentRepository, FulltextIndex
 from ferenda import util
 
 # tests the wsgi app in-process, ie not with actual HTTP requests, but
@@ -271,6 +271,12 @@ class ConNeg(WSGI):
 
 class Search(object):
 
+    def tearDown(self):
+        super(Search,self).tearDown()
+        idx = FulltextIndex.connect(self.repo.config.indextype,
+                                    self.repo.config.indexlocation)
+        idx.destroy()
+    
     def _copy_and_distill(self,basefile):
         util.ensure_dir(self.repo.store.parsed_path(basefile))
         shutil.copy2("test/files/base/parsed/%s.xhtml" % basefile,
@@ -345,6 +351,12 @@ class Search(object):
         self.assertEqual(resulthead, "1 match for 'subsection'")
 
 
+    highlighted_expect = [
+        {'title':'Example',
+         'href':'http://example.org/base/123/b1',
+         'body':b'<p>sollicitudin justo <strong class="match">needle</strong> tempor ut eu enim ... himenaeos. <strong class="match">Needle</strong> id tincidunt orci</p>'}
+        ]
+        
     def test_highlighted_snippet(self):
         self._copy_and_distill("123/b")
         self.repo.relate("123/b") # contains one doc with much text and two instances of the sought term
@@ -358,8 +370,8 @@ class Search(object):
         
         t = etree.fromstring(content)
         docs = t.findall(".//section[@class='hit']")
-        self.assertEqual(etree.tostring(docs[0][1]).strip(),
-                         b'<p>sollicitudin justo <strong class="match">needle</strong> tempor ut eu enim ... himenaeos. <strong class="match">Needle</strong> id tincidunt orci</p>')
+        self.assertEqual(self.highlighted_expect[0]['body'],
+                         etree.tostring(docs[0][1]).strip())
 
 
     def test_paged(self):
@@ -385,7 +397,6 @@ class Search(object):
         #   <a href="/mysearch/?q=needle&p=2" class="page">2</a>
         #   <a href="/mysearch/?q=needle&p=3" class="page">3</a>
         # </div>
-        from pudb import set_trace; set_trace()
         self.assertEqual(4,len(pager))
         self.assertEqual('p',pager[0].tag)
         self.assertEqual('Results 1-10 of 25',pager[0].text)
@@ -436,6 +447,13 @@ class ESSearch(Search, WSGI):
          'href':'http://example.org/base/123/a#S1',
          'body':b'<p>This is <strong class="match">part</strong> of document-<strong class="match">part</strong> section 1</p>'}
     ]
+
+    highlighted_expect = [
+        {'title':'Example',
+         'href':'http://example.org/base/123/b1',
+         'body':b'<p><strong class="match">needle</strong> tempor ut eu enim. Aenean porta ... inceptos himenaeos. <strong class="match">Needle</strong> id</p>'}]
+
+
     def setUp(self):
         super(ESSearch, self).setUp()
         self.repo.config.indexlocation = "http://localhost:9200/ferenda/"
