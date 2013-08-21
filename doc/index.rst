@@ -25,8 +25,10 @@ between documents, and publishing the results.
    fsmparser
    citationparsing
    toc
+   news
    linkeddata
    wsgi
+   external-dbs
    advanced
 
    

@@ -163,18 +163,24 @@ conditionalget    Whether to use Conditional GET (through    True
 url               The basic URL for the created site, used   'http://localhost:8000/'
                   as template for all managed resources in
 		  a docrepo (see ``canonical_uri()``).
-fulltextindex     Whether to create a Whoosh fulltext index. True
-                  Note: This can take a lot of time.
+fulltextindex     Whether to index all text in a fulltext     True
+                  search engine. Note: This can take a lot
+		  of time.
 useragent         The user-agent used with any external      'ferenda-bot'
                   HTTP Requests. Please change this into
 		  something containing your contact info.
 storetype         Any of the suppored types: 'SQLITE',       'SQLITE'
-                  'SLEEPYCAT', 'SESAME' or 'FUSEKI'
+                  'SLEEPYCAT', 'SESAME' or 'FUSEKI'.
+		  See :ref:`external-triplestore`.
+
 storelocation     The file path or URL to the triple store,  'data/ferenda.sqlite'
                   dependent on the storetype
 storerepository   The repository/database to use within the  'ferenda'
                   given triple store (if applicable)
-indexlocation     The location of the whoosh index           'data/whooshindex'
+indextype         Any of the supported types: 'WHOOSH' or    'WHOOSH'
+                  'ELASTICSEARCH'. See
+		  :ref:`external-fulltext`.
+indexlocation     The location of the fulltext index         'data/whooshindex'
 combineresources  Whether to combine and minify all css and  False
                   js files into a single file each
 cssfiles          A list of all required css files           ['http://fonts.googleapis.com/css?family=Raleway:200,100',
