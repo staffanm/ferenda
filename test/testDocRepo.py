@@ -11,7 +11,7 @@ if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 
 from datetime import datetime,timedelta
-from operator import attrgetter
+from operator import itemgetter, attrgetter
 import codecs
 import collections
 import shutil
@@ -1640,12 +1640,12 @@ ex:pm942051 a bibo:AcademicArticle;
 
     criteria = [TocCriteria(binding='title',
                             label='Sorted by title',
-                            pagetitle='Documents starting with "%s"',
+                            pagetitle='Documents starting with "%(select)s"',
                             selector = lambda x: x['title'][4].lower() if x['title'].lower().startswith("the ") else x['title'][0].lower(),
                             key = lambda x: "".join((x['title'][4:] if x['title'].lower().startswith("the ") else x['title']).lower().split())),
                 TocCriteria(binding='issued',
                             label='Sorted by publication year',
-                            pagetitle='Documents published in %s',
+                            pagetitle='Documents published in %(select)s',
                             selector=lambda x: x['issued'][:4],
                             key=lambda x: x['issued'][:4])]
     def setUp(self):
@@ -1916,25 +1916,30 @@ class News(RepoTester):
         self.assertEqual(criteria[0].feedtitle, "New and updated documents")
         fakeentry = Mock()
         fakeentry.updated = datetime(2013,3,12,11,52)
+        fakegraph = Mock()
         self.assertEqual(criteria[0].key(fakeentry), datetime(2013,3,12,11,52))
-        self.assertTrue(criteria[0].selector(fakeentry))
+        self.assertTrue(criteria[0].selector(fakeentry, fakegraph))
 
     def test_entries(self):
         unsorted_entries = self.repo.news_entries() # not guaranteed particular order
+        def getupdated(tup):
+            return tup[0].updated
         # sort so that most recently updated first
         entries = sorted(list(unsorted_entries),
-                         key=attrgetter('updated'), reverse=True)
+                         key=getupdated, reverse=True)
         self.assertEqual(len(entries),25)
-        self.assertEqual(entries[0].title, "Doc #24")
-        self.assertEqual(entries[-1].title, "Doc #0")
+        self.assertEqual(entries[0][0].title, "Doc #24")
+        self.assertEqual(entries[-1][0].title, "Doc #0")
 
     def test_write_atom(self):
         self.maxDiff = None
         unsorted_entries = self.repo.news_entries() # not guaranteed
+        def getupdated(tup):
+            return tup[0].updated
         # particular order sort so that most recently updated first
         # (simplified ver of what news() does)
         entries = sorted(list(unsorted_entries),
-                         key=attrgetter('updated'), reverse=True)
+                         key=getupdated, reverse=True)
 
         paths = self.repo.news_write_atom(entries, 'New and updated documents', 'main',
                                   archivesize=6)

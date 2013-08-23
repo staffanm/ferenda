@@ -2346,7 +2346,8 @@ parsed document path to that documents dependency file."""
             nsmap = {None:'http://www.w3.org/2005/Atom',
                      'le':'http://purl.org/atompub/link-extensions/1.0'}
             E = ElementMaker(nsmap=nsmap)
-            updated = max(entries,key=attrgetter('updated')).updated
+
+            updated = max(entries,key=lambda x: x[0].updated)[0].updated
             contents = [E.id(feedid),
                         E.title(title),
                         E.updated(util.rfc_3339_timestamp(updated)),
@@ -2363,7 +2364,7 @@ parsed document path to that documents dependency file."""
                 contents.append(E.link({'rel':'next-archive',
                                         'href':nextarchive}))
                 
-            for entry in entries:
+            for entry, graph in entries:
                 entrynodes=[E.title(entry.title),
                             E.summary(str(entry.summary)),
                             E.id(entry.id),
