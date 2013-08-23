@@ -437,15 +437,15 @@ class ESSearch(Search, WSGI):
     # the point where Whoosh and ES act identicallyy. In the meantime,
     # here's a slightly different ordering of the expected results.
     search_multiple_expect = [
+        {'title':'Introduction',
+         'href':'http://example.org/base/123/a#S1',
+         'body':b'<p>This is <strong class="match">part</strong> of document-<strong class="match">part</strong> section 1</p>'},
         {'title':'Definitions and Abbreviations',
          'href':'http://example.org/base/123/a#S2',
          'body':b'<p>This is the second main document <strong class="match">part</strong></p>'},
         {'title':'Example',
          'href':'http://example.org/base/123/a',
-         'body':b'<p>This is <strong class="match">part</strong> of the main document</p>'},
-        {'title':'Introduction',
-         'href':'http://example.org/base/123/a#S1',
-         'body':b'<p>This is <strong class="match">part</strong> of document-<strong class="match">part</strong> section 1</p>'}
+         'body':b'<p>This is <strong class="match">part</strong> of the main document</p>'}
     ]
 
     highlighted_expect = [

@@ -122,9 +122,11 @@ class FulltextIndex(object):
         """Perform a free text query against the full text index, optionally restricted with
            parameters for individual fields.
 
-        :param q: Free text query, using the selected full text index's prefered query syntax
+        :param q: Free text query, using the selected full text index's
+                  prefered query syntax
         :type  q: str
-        :param **kwargs: any parameter will be used to match a similarly-named field
+        :param **kwargs: any parameter will be used to match a
+                         similarly-named field
         :type **kwargs: dict
         :returns: matching documents, each document as a dict of fields
         :rtype: list
@@ -380,6 +382,10 @@ class RemoteIndex(FulltextIndex):
             # print("Recieved:\n%s" % (json.dumps(res.json(),indent=4)))
         else:
             res = requests.get(self.location+relurl)
+        try:
+            res.raise_for_status()
+        except Exception as e:
+            raise errors.SearchingError("%s: %s" % (res.status_code, res.text))
         return self._decode_query_result(res, pagenum, pagelen)
 
     def destroy(self):
@@ -399,8 +405,6 @@ class ElasticSearchIndex(RemoteIndex):
         r.raise_for_status()
                          
     def exists(self):
-        return True # FIXME: until we get create() and subsequent
-                    # update() to behave, see below...
         r = requests.get(self.location+"_mapping/")
         if r.status_code == 404:
             return False
@@ -422,10 +426,12 @@ class ElasticSearchIndex(RemoteIndex):
     def _query_payload(self, q, pagenum=1, pagelen=10, **kwargs):
         # relurl = "_search?q=%s&size=%s&from=%s" % (quote(q), pagelen, (pagenum * pagelen) - pagelen)
         relurl = "_search?from=%s&size=%s" % ((pagenum-1)*pagelen, pagelen)
-        # relurl = "_search?size=50"
-        payload = {'query': {'match': {'_all': q}},
-                   'highlight': {'fields': {'text': {},
-                                            'title': {}},
+
+        # FIXME: Only searches in text, not title or identifier. But
+        # can't search on the _all field, because apparently that
+        # field isn't set up to use the my_analyzer we've defined...
+        payload = {'query': {'match': {'text': q}},
+                   'highlight': {'fields': {'text': {}},
                                  'pre_tags': ["<strong class='match'>"],
                                  'post_tags': ["</strong>"],
                                  'fragment_size': '40'}}
@@ -452,7 +458,10 @@ class ElasticSearchIndex(RemoteIndex):
         return "_count", None
         
     def _decode_count_result(self, response):
-        return response.json()['count']
+        if response.status_code == 404:
+            return 0
+        else:
+            return response.json()['count']
 
     # FIXME: This is cheating!
     def schema(self):
@@ -470,19 +479,40 @@ class ElasticSearchIndex(RemoteIndex):
     #    UnavailableShardsException[[ferenda][1] [3] shardIt, [0] active : Timeout waiting for [1m]
     #
     # So we skip creating the schema as it isn't neccesary
-    def create(self, schema, repos):
-        pass
+    #def create(self, schema, repos):
+    #    pass
         
     def _create_schema_payload(self, schema, repos):
-        schema = {"mappings": {}}
+        schema = {
+            # cargo cult configuration
+            "settings": {"number_of_shards": 1,
+                         "analysis": {
+                             "analyzer": {
+                                 "my_analyzer": {
+                                     "filter": ["lowercase", "snowball"],
+                                     "tokenizer": "standard",
+                                     "type": "custom"
+                                     }
+                                 },
+                             "filter": {
+                                 "snowball": {
+                                     "type": "snowball",
+                                     "language": "English"
+                                     }
+                                 }
+                             }
+                         },
+            # "mappings": {"_all": {"properties": {"analyzer": "my_analyzer"}}}
+            "mappings": {}
+            }
+
 
         # maps our field classes to concrete ES field properties 
-        # -- lots more to add (boosting in particular) but ES docs are hard
         mapped_field = {Identifier():   {"type": "string", "index": "not_analyzed"}, # uri
                         Label():        {"type": "string", "index": "not_analyzed"}, # repo, basefile (note: see below)
-                        Label(boost=16):{"type": "string", "boost": 16.0}, # identifier
-                        Text(boost=4):  {"type": "string", "boost": 4.0}, # title
-                        Text():         {"type": "string"}} # text
+                        Label(boost=16):{"type": "string", "boost": 16.0, "analyzer":"my_analyzer"}, # identifier
+                        Text(boost=4):  {"type": "string", "boost": 4.0, "analyzer":"my_analyzer"}, # title
+                        Text():         {"type": "string", "analyzer": "my_analyzer"}} # text
                         
         es_fields = {}
         for key,fieldtype in self.get_default_schema().items():
@@ -492,7 +522,6 @@ class ElasticSearchIndex(RemoteIndex):
         for repo in repos: 
             schema["mappings"][repo.alias] = {"_source": {"enabled": True}, # so we can get the text back
                                               "properties": es_fields}
-        # self.location should be eg http://localhost:9200/ferenda/, not just http://localhost:9200/
         return "", json.dumps(schema)
 
     def _destroy_payload(self):
