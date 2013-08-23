@@ -65,7 +65,8 @@ documents, you'll need a RDF triple store, either `Sesame
 <http://jena.apache.org/documentation/serving_data/index.html>`_.  For
 document collections small enough to keep all metadata in memory you
 can get by with only rdflib, using either a Sqlite or a Berkely DB
-(aka Sleepycat/bsddb) backend.
+(aka Sleepycat/bsddb) backend. For further information, see
+:doc:`external-dbs`.
 
 Similarly, once you have a large collection of text (either many short
 documents, or fewer long documents), you'll need an fulltext search

@@ -4,11 +4,10 @@ from __future__ import unicode_literals
 import os, sys
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 from ferenda.manager import setup_logger; setup_logger('CRITICAL')
-# unittest is imported by ferenda.testutil.RepoTester
-# if sys.version_info < (2, 7, 0):
-#     import unittest2 as unittest
-# else:
-#     import unittest
+if sys.version_info < (2, 7, 0):
+    import unittest2 as unittest
+else:
+    import unittest
 try:
     from unittest.mock import Mock
 except ImportError:
@@ -23,7 +22,7 @@ from lxml import etree
 from ferenda.testutil import RepoTester
     
 from ferenda.manager import make_wsgi_app
-from ferenda import DocumentRepository
+from ferenda import DocumentRepository, FulltextIndex
 from ferenda import util
 
 # tests the wsgi app in-process, ie not with actual HTTP requests, but
@@ -270,12 +269,14 @@ class ConNeg(WSGI):
 #         self.assertEqualGraphs(g, got)
 
 
-class Search(WSGI):
+class Search(object):
 
-    def setUp(self):
-        super(Search, self).setUp()
-        self.env['PATH_INFO'] = '/mysearch/'
-
+    def tearDown(self):
+        super(Search,self).tearDown()
+        idx = FulltextIndex.connect(self.repo.config.indextype,
+                                    self.repo.config.indexlocation)
+        idx.destroy()
+    
     def _copy_and_distill(self,basefile):
         util.ensure_dir(self.repo.store.parsed_path(basefile))
         shutil.copy2("test/files/base/parsed/%s.xhtml" % basefile,
@@ -290,7 +291,18 @@ class Search(WSGI):
                   "wb") as distilled_file:
             distilled_graph.serialize(distilled_file, format="pretty-xml")
 
-
+    # So that ESSearch can override the order
+    search_multiple_expect = [
+        {'title':'Introduction',
+         'href':'http://example.org/base/123/a#S1',
+         'body':b'<p>This is <strong class="match">part</strong> of document-<strong class="match">part</strong> section 1</p>'},
+        {'title':'Definitions and Abbreviations',
+         'href':'http://example.org/base/123/a#S2',
+         'body':b'<p>second main document <strong class="match">part</strong></p>'},
+        {'title':'Example',
+         'href':'http://example.org/base/123/a',
+         'body':b'<p>This is <strong class="match">part</strong> of the main document</p>'}
+    ]
     def test_search_multiple(self):
         # step 1: make sure parsed content is also related (ie in whoosh db)
         self.repo.relate("123/a")
@@ -315,25 +327,18 @@ class Search(WSGI):
         docs = t.findall(".//section[@class='hit']")
         self.assertEqual(len(docs), 3)
         self.assertEqual(docs[0][0].tag, 'h2')
-        self.assertEqual(docs[0][0][0].text, 'Introduction')
-        self.assertEqual(docs[0][0][0].get('href'),
-                         'http://example.org/base/123/a#S1')
-        self.assertEqual(etree.tostring(docs[0][1]).strip(),
-                         b'<p>This is <strong class="match">part</strong> of document-<strong class="match">part</strong> section 1</p>')
-        
-        self.assertEqual(docs[1][0][0].text, 'Definitions and Abbreviations')
-        self.assertEqual(docs[1][0][0].get('href'),
-                         'http://example.org/base/123/a#S2')
-        self.assertEqual(etree.tostring(docs[1][1]).strip(),
-                         b'<p>second main document <strong class="match">part</strong></p>')
+        expect = self.search_multiple_expect
+        self.assertEqual(expect[0]['title'], docs[0][0][0].text)
+        self.assertEqual(expect[0]['href'],  docs[0][0][0].get('href'))
+        self.assertEqual(expect[0]['body'],  etree.tostring(docs[0][1]).strip())
 
-        self.assertEqual(docs[2][0][0].text, 'Example')
-        self.assertEqual(docs[2][0][0].get('href'),
-                         'http://example.org/base/123/a')
-        self.assertEqual(etree.tostring(docs[2][1]).strip(),
-                         b'<p>This is <strong class="match">part</strong> of the main document</p>')
-        
-        
+        self.assertEqual(expect[1]['title'], docs[1][0][0].text)
+        self.assertEqual(expect[1]['href'],  docs[1][0][0].get('href'))
+        self.assertEqual(expect[1]['body'],  etree.tostring(docs[1][1]).strip())
+
+        self.assertEqual(expect[2]['title'], docs[2][0][0].text)
+        self.assertEqual(expect[2]['href'],  docs[2][0][0].get('href'))
+        self.assertEqual(expect[2]['body'],  etree.tostring(docs[2][1]).strip())
 
     def test_search_single(self):
         self.repo.relate("123/a")
@@ -346,6 +351,12 @@ class Search(WSGI):
         self.assertEqual(resulthead, "1 match for 'subsection'")
 
 
+    highlighted_expect = [
+        {'title':'Example',
+         'href':'http://example.org/base/123/b1',
+         'body':b'<p>sollicitudin justo <strong class="match">needle</strong> tempor ut eu enim ... himenaeos. <strong class="match">Needle</strong> id tincidunt orci</p>'}
+        ]
+        
     def test_highlighted_snippet(self):
         self._copy_and_distill("123/b")
         self.repo.relate("123/b") # contains one doc with much text and two instances of the sought term
@@ -355,13 +366,14 @@ class Search(WSGI):
         self.assertResponse("200 OK",
                             {'Content-Type': 'text/html; charset=utf-8'},
                             None,
-                            status, headers, None)                            
+                            status, headers, None)
         
         t = etree.fromstring(content)
         docs = t.findall(".//section[@class='hit']")
-        self.assertEqual(etree.tostring(docs[0][1]).strip(),
-                         b'<p>sollicitudin justo <strong class="match">needle</strong> tempor ut eu enim ... himenaeos. <strong class="match">Needle</strong> id tincidunt orci</p>')
-        
+        self.assertEqual(self.highlighted_expect[0]['body'],
+                         etree.tostring(docs[0][1]).strip())
+
+
     def test_paged(self):
         self._copy_and_distill("123/c")
         # 123/c contains 50 docs, 25 of which contains 'needle'
@@ -410,3 +422,41 @@ class Search(WSGI):
         pager = t.find(".//div[@class='pager']")
         self.assertEqual(4,len(pager))
         self.assertEqual('Results 21-25 of 25',pager[0].text)
+
+
+class WhooshSearch(Search, WSGI):
+    def setUp(self):
+        super(WhooshSearch, self).setUp()
+        self.env['PATH_INFO'] = '/mysearch/'
+
+
+@unittest.skipIf('SKIP_ELASTICSEARCH_TESTS' in os.environ,
+                 "Skipping Elasticsearch tests")    
+class ESSearch(Search, WSGI):
+    # FIXME: Can't yet control ordering and fragment construction to
+    # the point where Whoosh and ES act identicallyy. In the meantime,
+    # here's a slightly different ordering of the expected results.
+    search_multiple_expect = [
+        {'title':'Introduction',
+         'href':'http://example.org/base/123/a#S1',
+         'body':b'<p>This is <strong class="match">part</strong> of document-<strong class="match">part</strong> section 1</p>'},
+        {'title':'Definitions and Abbreviations',
+         'href':'http://example.org/base/123/a#S2',
+         'body':b'<p>This is the second main document <strong class="match">part</strong></p>'},
+        {'title':'Example',
+         'href':'http://example.org/base/123/a',
+         'body':b'<p>This is <strong class="match">part</strong> of the main document</p>'}
+    ]
+
+    highlighted_expect = [
+        {'title':'Example',
+         'href':'http://example.org/base/123/b1',
+         'body':b'<p><strong class="match">needle</strong> tempor ut eu enim. Aenean porta ... inceptos himenaeos. <strong class="match">Needle</strong> id</p>'}]
+
+
+    def setUp(self):
+        super(ESSearch, self).setUp()
+        self.repo.config.indexlocation = "http://localhost:9200/ferenda/"
+        self.repo.config.indextype = "ELASTICSEARCH"
+        self.env['PATH_INFO'] = '/mysearch/'
+        

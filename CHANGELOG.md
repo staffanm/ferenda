@@ -1,3 +1,13 @@
+2013-08-?? RELEASE 0.1.4
+
+* ElasticSearch is now supported as an alternate backend to Whoosh for
+  fulltext indexing and searching.
+
+* Documentation, particularly "Creating your own document
+  repositories" have been substantially overhauled, and in the process
+  various bugs that prevented the usage of custom SPARQL queries and
+  XSLT transforms were fixed.
+
 2013-08-11 RELEASE 0.1.3
 
 * Search functionality when running under WSGI is now

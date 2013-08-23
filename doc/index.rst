@@ -28,6 +28,7 @@ between documents, and publishing the results.
    news
    linkeddata
    wsgi
+   external-dbs
    advanced
 
    

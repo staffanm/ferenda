@@ -8,9 +8,9 @@ else:
     import unittest
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
+from datetime import datetime
 from tempfile import mkdtemp
 import shutil
-from datetime import datetime
 
 import whoosh.index
 import whoosh.fields
@@ -30,7 +30,7 @@ basic_dataset = [
      'basefile':'1',
      'title':'First sec',
      'identifier':'Doc #1 (section 1)',
-     'text':'This is an independent section'},
+     'text':'This is an independent section, with extra section boost'},
     {'uri':'http://example.org/doc/1#s2',
      'repo':'base',
      'basefile':'1',
@@ -42,7 +42,7 @@ basic_dataset = [
      'basefile':'1',
      'title':'First section',
      'identifier':'Doc #1 (section 1)',
-     'text':'This is an (updated version of a) independent section'},
+     'text':'This is an (updated version of a) independent section, with extra section boost'},
     {'uri':'http://example.org/doc/2',
      'repo':'base',
      'basefile':'2',
@@ -51,79 +51,55 @@ basic_dataset = [
      'text':'This is the second document (not the first)'}
     ]
 
+repos = [DocumentRepository()]
 
-    
-class BasicIndex(unittest.TestCase):
-
-    def setUp(self):
-        self.location = mkdtemp()
-        self.index = FulltextIndex.connect("WHOOSH", self.location)
-        
-    def tearDown(self):
-        shutil.rmtree(self.location)
+class BasicIndex(object):
 
     def test_create(self):
-        # assert that some files have been created at the specified location
-        self.assertNotEqual(os.listdir(self.location),[])
-        # assert that it's really a whoosh index
-        self.assertTrue(whoosh.index.exists_in(self.location))
-        # assert that we have no documents
-        self.assertEqual(self.index.doccount(),0)
+        # As long as the constructor creates the index, this code will
+        # fail:
+        
+        # # assert that the index doesn't exist
+        # self.assertFalse(self.index.exists())
+        # # assert that we have no documents
+        # self.assertEqual(self.index.doccount(),0)
+        
+        # # Do it
+        # self.index.create()
+        self.assertTrue(self.index.exists())
+
         # assert that the schema, using our types, looks OK
-        wanted = {'uri':Identifier(),
-                  'repo':Label(),
-                  'basefile':Label(),
-                  'title':Text(boost=4),
-                  'identifier':Label(boost=16),
-                  'text':Text()}
+        want = {'uri':Identifier(),
+                'repo':Label(),
+                'basefile':Label(),
+                'title':Text(boost=4),
+                'identifier':Label(boost=16),
+                'text':Text()}
         got = self.index.schema()
-        self.assertEqual(wanted,got)
-        # assert that the schema with underlying whoosh types is, in
-        # fact, correct
-        got = self.index.index.schema
-        want = whoosh.fields.Schema(uri=whoosh.fields.ID(unique=True, stored=True),
-                                    repo=whoosh.fields.ID(stored=True),
-                                    basefile=whoosh.fields.ID(stored=True),
-                                    title=whoosh.fields.TEXT(field_boost=4,stored=True),
-                                    identifier=whoosh.fields.ID(field_boost=16,stored=True),
-                                    text=whoosh.fields.TEXT(stored=True))
-        self.assertEqual(sorted(want.names()), sorted(got.names()))
-        for fld in got.names():
-            self.assertEqual((fld,want[fld]),(fld,got[fld]))
+        self.assertEqual(want,got)
                                     
 
     def test_insert(self):
         self.index.update(**basic_dataset[0])
         self.index.update(**basic_dataset[1])
-        self.index.commit() 
+        self.index.commit()
         self.assertEqual(self.index.doccount(),2)
-        
         self.index.update(**basic_dataset[2])
         self.index.update(**basic_dataset[3]) # updated version of basic_dataset[1]
         self.index.commit() 
         self.assertEqual(self.index.doccount(),3)
 
         
-class BasicQuery(unittest.TestCase):
-    def setUp(self):
-        self.location = mkdtemp()
-        self.index = FulltextIndex.connect("WHOOSH", self.location)
-        
-    def tearDown(self):
-        shutil.rmtree(self.location)
+class BasicQuery(object):
 
     def load(self, data):
         # print("loading...")
         for doc in data:
-            #print("adding %s" % doc['uri'])
             self.index.update(**doc)
-            # Note: commit needed here to make sure underlying
-            # writer.update_document actually deletes previous ver of
-            # a doc
             self.index.commit()
-            #print("Now %s documents" % self.index.doccount())
 
     def test_basic(self):
+        self.assertEqual(self.index.doccount(),0)
         self.load(basic_dataset)
         self.assertEqual(self.index.doccount(),4)
         res, pager = self.index.query("main")
@@ -135,10 +111,70 @@ class BasicQuery(unittest.TestCase):
         # Doc #2 contains the term 'document' in title (which is a
         # boosted field), not just in text.
         self.assertEqual(res[0]['identifier'], 'Doc #2') 
-        res, pager = self.index.query("section*")
+        res, pager = self.index.query("section")
         from pprint import pprint
         self.assertEqual(len(res),3)
-        self.assertEqual(res[0]['identifier'], 'Doc #1 (section 1)') 
+        # NOTE: ES scores all three results equally (1.0), so it doesn't
+        # neccesarily put section 1 in the top
+        if isinstance(self, ESBase):
+            self.assertEqual(res[0]['identifier'], 'Doc #1 (section 2)') 
+        else:
+            self.assertEqual(res[0]['identifier'], 'Doc #1 (section 1)') 
+
+class ESBase(unittest.TestCase):
+    def setUp(self):
+        self.location = "http://localhost:9200/ferenda/"
+        self.index = FulltextIndex.connect("ELASTICSEARCH", self.location, repos)
+
+    def tearDown(self):
+        self.index.destroy()
+
+
+@unittest.skipIf('SKIP_ELASTICSEARCH_TESTS' in os.environ,
+                 "Skipping Elasticsearch tests")    
+class ESBasicIndex(BasicIndex, ESBase): pass
+
+
+@unittest.skipIf('SKIP_ELASTICSEARCH_TESTS' in os.environ,
+                 "Skipping Elasticsearch tests")    
+class ESBasicQuery(BasicQuery, ESBase): pass
+
+
+class WhooshBase(unittest.TestCase):
+    def setUp(self):
+        self.location = mkdtemp()
+        self.index = FulltextIndex.connect("WHOOSH", self.location, repos)
+
+    def tearDown(self):
+        self.index.destroy()
+
+
+class WhooshBasicIndex(BasicIndex, WhooshBase): 
+    def test_create(self):
+        # First do the basic tests
+        super(WhooshBasicIndex,self).test_create()
+
+        # then do more low-level tests
+        # 1 assert that some files have been created at the specified location
+        self.assertNotEqual(os.listdir(self.location),[])
+        # 2 assert that it's really a whoosh index
+        self.assertTrue(whoosh.index.exists_in(self.location))
+
+        # 3. assert that the actual schema with whoosh types is, in
+        # fact, correct
+        got = self.index.index.schema
+        want = whoosh.fields.Schema(uri=whoosh.fields.ID(unique=True, stored=True),
+                                    repo=whoosh.fields.ID(stored=True),
+                                    basefile=whoosh.fields.ID(stored=True),
+                                    title=whoosh.fields.TEXT(field_boost=4,stored=True),
+                                    identifier=whoosh.fields.ID(field_boost=16,stored=True),
+                                    text=whoosh.fields.TEXT(stored=True))
+        self.assertEqual(sorted(want.names()), sorted(got.names()))
+        for fld in got.names():
+            self.assertEqual((fld,want[fld]),(fld,got[fld]))
+               
+       
+class WhooshBasicQuery(BasicQuery, WhooshBase): pass
         
 
 # ----------------------------------------------------------------
@@ -269,9 +305,3 @@ class CustomQuery(object):
         self.assertEqual(len(res),2)
         identifiers = set([x['identifier'] for x in res])
         self.assertEqual(identifiers, set(['R1 D1','R1 D2']))
-                               
-        
-             
-                    
-
-    

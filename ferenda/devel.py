@@ -261,7 +261,8 @@ class Devel(object):
         :param querystring: The query
         :type querystring: str
         """
-        index = FulltextIndex.connect("WHOOSH", self.config.indexlocation)
+        index = FulltextIndex.connect(self.config.indextype,
+                                      self.config.indexlocation)
         rows = index.query(querystring)
         for row in rows:
             print("%s (%s): %s" % (row['identifier'], row['about']))

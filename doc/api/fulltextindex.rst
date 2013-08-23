@@ -1,9 +1,9 @@
 The ``FulltextIndex`` class
 ============================
 
-Abstracts access to full text indexes (right now only a `Whoosh
-<https://pypi.python.org/pypi/Whoosh>`_ backend is supported, but
-maybe later `ElasticSearch <http://www.elasticsearch.org/>`_, `Solr
+Abstracts access to full text indexes (right now only `Whoosh
+<https://pypi.python.org/pypi/Whoosh>`_ and `ElasticSearch
+<http://www.elasticsearch.org/>`_ is supported, but maybe later, `Solr
 <http://lucene.apache.org/solr/>`_, `Xapian <http://xapian.org/>`_
 and/or `Sphinx <http://sphinxsearch.com/>`_ will be supported).
 
