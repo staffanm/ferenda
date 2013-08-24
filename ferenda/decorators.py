@@ -16,7 +16,7 @@ import time
 
 import six
 from six import text_type as str
-from rdflib import Graph
+from rdflib import Graph, URIRef
 
 from ferenda import util
 from ferenda.errors import DocumentRemovedError, ParseError
@@ -98,9 +98,17 @@ with :py:func:`~ferenda.decorators.makedocument`."""
         # Check to see that all metadata contained in doc.meta is
         # present in the serialized file.
         distilled_graph = Graph()
+        distilled_graph.namespace_manager = doc.meta.namespace_manager
         
         with codecs.open(self.store.parsed_path(doc.basefile), encoding="utf-8") as fp: # unicode
-            distilled_graph.parse(data=fp.read(), format="rdfa")
+            distilled_graph.parse(data=fp.read(), format="rdfa", publicID=doc.uri)
+        # The act of parsing from RDFa binds a lot of namespaces
+        # in the graph in an unneccesary manner. Particularly it
+        # binds both 'dc' and 'dcterms' to
+        # 'http://purl.org/dc/terms/', which makes serialization
+        # less than predictable. Blow these prefixes away.
+        distilled_graph.bind("dc", URIRef("http://purl.org/dc/elements/1.1/"))
+        distilled_graph.bind("dcterms", URIRef("http://example.org/this-prefix-should-not-be-used"))
         
         util.ensure_dir(self.store.distilled_path(doc.basefile))
         with open(self.store.distilled_path(doc.basefile), "wb") as distilled_file:

@@ -1,8 +1,110 @@
 @prefix bibo: <http://purl.org/ontology/bibo/> .
 @prefix dct: <http://purl.org/dc/terms/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rfc: <http://example.org/ontology/rfc/> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://localhost:8000/res/rfc/6919> a bibo:Standard ;
+<http://localhost:8000/res/rfc/6919#PS1> a bibo:DocumentPart ;
+    dct:references <http://localhost:8000/res/rfc/2119>,
+        <http://localhost:8000/res/rfc/6919> ;
+    dct:title "Abstract"@en .
+
+<http://localhost:8000/res/rfc/6919#PS2> a bibo:DocumentPart ;
+    dct:references <http://localhost:8000/res/rfc/5741#S2> ;
+    dct:title "Status of This Memo"@en .
+
+<http://localhost:8000/res/rfc/6919#PS3> a bibo:DocumentPart ;
+    dct:title "Copyright Notice"@en .
+
+<http://localhost:8000/res/rfc/6919#S1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6919, section 1"@en ;
+    dct:references <http://localhost:8000/res/rfc/6120> ;
+    dct:title "MUST (BUT WE KNOW YOU WON'T)"@en ;
+    bibo:chapter "1"@en .
+
+<http://localhost:8000/res/rfc/6919#S10> a bibo:DocumentPart ;
+    dct:identifier "RFC 6919, section 10"@en ;
+    dct:references <http://localhost:8000/res/rfc/2119> ;
+    dct:title "Security Considerations"@en ;
+    bibo:chapter "10"@en .
+
+<http://localhost:8000/res/rfc/6919#S11> a bibo:DocumentPart ;
+    dct:identifier "RFC 6919, section 11"@en ;
+    dct:title "References"@en ;
+    bibo:chapter "11"@en .
+
+<http://localhost:8000/res/rfc/6919#S11.1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6919, section 11.1"@en ;
+    dct:references <http://localhost:8000/res/rfc/2119> ;
+    dct:title "Normative References"@en ;
+    bibo:chapter "11.1"@en .
+
+<http://localhost:8000/res/rfc/6919#S11.2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6919, section 11.2"@en ;
+    dct:references <http://localhost:8000/res/rfc/0493>,
+        <http://localhost:8000/res/rfc/2616>,
+        <http://localhost:8000/res/rfc/3207>,
+        <http://localhost:8000/res/rfc/3501>,
+        <http://localhost:8000/res/rfc/493>,
+        <http://localhost:8000/res/rfc/5888>,
+        <http://localhost:8000/res/rfc/5988>,
+        <http://localhost:8000/res/rfc/6120>,
+        <http://localhost:8000/res/rfc/6376>,
+        <http://localhost:8000/res/rfc/6733> ;
+    dct:title "Informative References"@en ;
+    bibo:chapter "11.2"@en .
+
+<http://localhost:8000/res/rfc/6919#S2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6919, section 2"@en ;
+    dct:references <http://localhost:8000/res/rfc/5988> ;
+    dct:title "SHOULD CONSIDER"@en ;
+    bibo:chapter "2"@en .
+
+<http://localhost:8000/res/rfc/6919#S3> a bibo:DocumentPart ;
+    dct:identifier "RFC 6919, section 3"@en ;
+    dct:references <http://localhost:8000/res/rfc/0493> ;
+    dct:title "REALLY SHOULD NOT"@en ;
+    bibo:chapter "3"@en .
+
+<http://localhost:8000/res/rfc/6919#S4> a bibo:DocumentPart ;
+    dct:identifier "RFC 6919, section 4"@en ;
+    dct:references <http://localhost:8000/res/rfc/2616> ;
+    dct:title "OUGHT TO"@en ;
+    bibo:chapter "4"@en .
+
+<http://localhost:8000/res/rfc/6919#S5> a bibo:DocumentPart ;
+    dct:identifier "RFC 6919, section 5"@en ;
+    dct:references <http://localhost:8000/res/rfc/3207> ;
+    dct:title "WOULD PROBABLY"@en ;
+    bibo:chapter "5"@en .
+
+<http://localhost:8000/res/rfc/6919#S6> a bibo:DocumentPart ;
+    dct:identifier "RFC 6919, section 6"@en ;
+    dct:references <http://localhost:8000/res/rfc/6376> ;
+    dct:title "MAY WISH TO"@en ;
+    bibo:chapter "6"@en .
+
+<http://localhost:8000/res/rfc/6919#S7> a bibo:DocumentPart ;
+    dct:identifier "RFC 6919, section 7"@en ;
+    dct:references <http://localhost:8000/res/rfc/6733> ;
+    dct:title "COULD"@en ;
+    bibo:chapter "7"@en .
+
+<http://localhost:8000/res/rfc/6919#S8> a bibo:DocumentPart ;
+    dct:identifier "RFC 6919, section 8"@en ;
+    dct:references <http://localhost:8000/res/rfc/3501> ;
+    dct:title "POSSIBLE"@en ;
+    bibo:chapter "8"@en .
+
+<http://localhost:8000/res/rfc/6919#S9> a bibo:DocumentPart ;
+    dct:identifier "RFC 6919, section 9"@en ;
+    dct:references <http://localhost:8000/res/rfc/5888> ;
+    dct:title "MIGHT"@en ;
+    bibo:chapter "9"@en .
+
+<http://localhost:8000/res/rfc/6919> a rfc:RFC ;
     dct:category "Experimental" ;
     dct:creator "E. Rescorla",
         "R. Barnes",
@@ -14,5 +116,5 @@
         "BBN",
         "RTFM, Inc." ;
     dct:title "Further Key Words for Use in RFCs to Indicate Requirement Levels"@en ;
-    bibo:shortTitle "Further RFC Key Words"@en.
+    bibo:shortTitle "Further RFC Key Words"@en .
 

@@ -8,10 +8,11 @@ import requests
 import requests.exceptions
 
 import six
-from rdflib import Graph,Literal
+from rdflib import Literal
+from pyparsing import Word, CaselessLiteral, Optional, nums
 
 from ferenda import DocumentRepository
-from ferenda.errors import DocumentRemovedError, ParseError
+from ferenda.errors import ParseError
 from ferenda.decorators import recordlastdownload, managedparsing
 
 from ferenda import TextReader, Describer, FSMParser, CitationParser, URIFormatter
@@ -55,10 +56,12 @@ class RFC(DocumentRepository):
     namespaces = ('rdf',  # always needed
                   'dct',  # title, identifier, etc (could be replaced by equiv bibo prop?) 
                   'bibo', # Standard and DocumentPart classes, chapter prop
-                  'xsd', # datatypes
+                  'xsd',  # datatypes
                   'foaf', # rfcs are foaf:Documents for now
-                  ('rfc','http://example.org/ontology/rfc/')
+                  ('rfc','http://example.org/ontology/rfc/') # custom (fake) ontology
                   )
+    sparql_annotations = "rfc-annotations.rq"
+    xslt_template = "rfc.xsl"
 
     # NOTES:
     #
@@ -117,7 +120,7 @@ class RFC(DocumentRepository):
         
 
     @staticmethod # so as to be easily called from command line
-    def get_parser():
+    def get_parser(basefile="0"):
 
         # recognizers, constructors and helpers are created as nested
         # ordinary functions, but could just as well be staticmethods
@@ -184,15 +187,15 @@ class RFC(DocumentRepository):
                 return True
 
         def is_section(parser, chunk=None):
-            (ordinal,title) = analyze_sectionstart(parser,chunk)
+            (ordinal,title,identifier) = analyze_sectionstart(parser,chunk)
             return section_segments_count(ordinal) == 1
 
         def is_subsection(parser, chunk=None):
-            (ordinal,title) = analyze_sectionstart(parser,chunk)
+            (ordinal,title,identifier) = analyze_sectionstart(parser,chunk)
             return section_segments_count(ordinal) == 2
 
         def is_subsubsection(parser, chunk=None):
-            (ordinal,title) = analyze_sectionstart(parser,chunk)
+            (ordinal,title,identifier) = analyze_sectionstart(parser,chunk)
             return section_segments_count(ordinal) == 3
 
         def is_preformatted(parser, chunk=None):
@@ -275,20 +278,26 @@ class RFC(DocumentRepository):
             return Preformatted([chunk],**{'class':'bnf'})
 
         def make_section(parser):
-            (secnumber, title) = analyze_sectionstart(parser,parser.reader.next())
-            s = Section(ordinal=secnumber,title=title,uri=None,meta=None)
+            (secnumber, title, identifier) = analyze_sectionstart(parser,parser.reader.next())
+            s = Section(ordinal=secnumber,
+                        title=title,
+                        identifier=identifier)
             return parser.make_children(s)
         setattr(make_section,'newstate','section')
 
         def make_subsection(parser):
-            (secnumber, title) = analyze_sectionstart(parser,parser.reader.next())
-            s = Subsection(ordinal=secnumber,title=title,uri=None,meta=None)
+            (secnumber, title, identifier) = analyze_sectionstart(parser,parser.reader.next())
+            s = Subsection(ordinal=secnumber,
+                           title=title,
+                           identifier=identifier)
             return parser.make_children(s)
         setattr(make_subsection,'newstate','subsection')
 
         def make_subsubsection(parser):
-            (secnumber, title) = analyze_sectionstart(parser,parser.reader.next())
-            s = Subsubsection(ordinal=secnumber,title=title,uri=None,meta=None)
+            (secnumber, title, identifier) = analyze_sectionstart(parser,parser.reader.next())
+            s = Subsubsection(ordinal=secnumber,
+                              title=title,
+                              identifier=identifier)
             return parser.make_children(s)
         setattr(make_subsubsection,'newstate','subsubsection')
 
@@ -322,17 +331,21 @@ class RFC(DocumentRepository):
                     len(list(filter(None,s.split(".")))))
 
         # Matches
-        # "1 Blahonga" => ("1","Blahonga")
-        # "1.2.3. This is a subsubsection" => ("1.2.3", "This is a subsection")
+        # "1 Blahonga" => ("1","Blahonga", "RFC 1234, section 1")
+        # "1.2.3. This is a subsubsection" => ("1.2.3", "This is a subsection", "RFC 1234, section 1.2.3")
+        # "   Normal paragraph" => (None, "   Normal paragraph", None)
         re_sectionstart = re.compile("^(\d[\.\d]+) +(.*[^\.])$").match
         def analyze_sectionstart(parser,chunk=None):
             if not chunk:
                 chunk = parser.reader.peek()
             m = re_sectionstart(chunk)
             if m:
-                return (m.group(1).rstrip("."), m.group(2))
+                ordinal = m.group(1).rstrip(".")
+                title = m.group(2)
+                identifier = "RFC %s, section %s" % (basefile, ordinal)
+                return (ordinal, title, identifier)
             else:
-                return (None,chunk)
+                return (None, chunk, None)
 
         def analyze_listitem(chunk):
             # returns: same as list-style-type in CSS2.1, sans
@@ -341,40 +354,6 @@ class RFC(DocumentRepository):
 
             # FIXME: Tighten these patterns to RFC conventions
             # match "1. Foo..." or "14) bar..." but not "4 This is a heading"
-
-#            m = re.match('^(\d+)([\.\)]) +',chunk)
-#            if m:
-#                if chunk.startswith("0"):
-#                    listtype="decimal-leading-zero"
-#                else:
-#                    listtype="decimal"
-#                (ordinal,separator) = m.groups()
-#                rest = chunk[m.end():]
-#                return (listtype,ordinal,separator,rest)
-#
-#            # match "IX. Foo... or "vii) bar..." but not "vi is a sucky
-#            # editor" or "MMXIII is the current year"
-#            m = re.match('^([IVXivx]+)([\.\)]) +', chunk)
-#            if m:
-#                if chunk[0].islower():
-#                    listtype = 'lower-roman'
-#                else:
-#                    listtype = 'upper-roman'
-#                (ordinal,separator) = m.groups()
-#                rest = chunk[m.end():]
-#                return (listtype,ordinal,separator,rest)
-#
-#            # match "a. Foo… or "z) bar…" but not "to. Next sentence…"
-#            m = re.match('^([A-Za-z])([\.\)]) +', chunk)
-#            if m:
-#                if chunk[0].islower():
-#                    listtype = 'lower-alpha'
-#                else:
-#                    listtype = 'upper-alpha'
-#                (ordinal,separator) = m.groups()
-#                rest = chunk[m.end():]
-#                return (listtype,ordinal,separator,rest)
-#
             if chunk.startswith("   o  "):
                 return ("disc",None,None,chunk[6:])
                 
@@ -427,7 +406,26 @@ class RFC(DocumentRepository):
         p.initial_state = "body"
         p.initial_constructor = make_body
         return p
-                           
+
+    def make_citation_parser(self):
+        def rfc_uriformatter(parts):
+            uri = ""
+            if 'RFC' in parts:
+                uri += self.canonical_uri(parts['RFC'])
+            if 'Sec' in parts:
+                uri += "#S" + parts['Sec'].rstrip(".")
+            return uri
+        section_citation = (CaselessLiteral("section") + Word(nums+".").setResultsName("Sec")).setResultsName("SecRef")
+        rfc_citation = (Optional("[") + "RFC" + Word(nums).setResultsName("RFC") + Optional("]")).setResultsName("RFCRef")
+        section_rfc_citation = (section_citation + "of" + rfc_citation).setResultsName("SecRFCRef")
+        citparser = CitationParser(section_rfc_citation, 
+                                   section_citation,
+                                   rfc_citation)
+        citparser.set_formatter(URIFormatter(("SecRFCRef", rfc_uriformatter),
+                                             ("SecRef", rfc_uriformatter),
+                                             ("RFCRef", rfc_uriformatter)))
+        return citparser
+        
         
     @managedparsing
     def parse(self, doc):
@@ -442,7 +440,7 @@ class RFC(DocumentRepository):
         cleanparagraphs = (re.sub('.\b','',x) for x in
                            reader.getiterator(reader.readparagraph))
 
-        parser = self.get_parser()
+        parser = self.get_parser(doc.basefile)
 
         if not self.config.fsmdebug:
             self.config.fsmdebug = 'FERENDA_FSMDEBUG' in os.environ
@@ -462,7 +460,7 @@ class RFC(DocumentRepository):
         realid = self.get_rfc_num(header)
         doc.uri = self.canonical_uri(realid)
         desc = Describer(doc.meta, doc.uri)
-        desc.rdftype(self.ns['bibo'].Standard)
+        desc.rdftype(self.ns['rfc'].RFC)
         desc.value(self.ns['dct'].title, title, lang="en")
         self.parse_header(header,desc)
         doc.lang = "en"
@@ -474,14 +472,10 @@ class RFC(DocumentRepository):
             desc.value(self.ns['bibo'].shortTitle, shorttitle, lang="en")
         
         # process body - add good metadata
-        from pyparsing import Word,alphanums
-        bibref_cite = ("[" + Word(alphanums).setResultsName("ref") + "]").setResultsName("bibref")
-        citparser = CitationParser(bibref_cite)
-        citparser.set_formatter(URIFormatter(("bibref", lambda p: "#bib-%(ref)s" % p),
-                                             ))
+        citparser = self.make_citation_parser()
         doc.body = citparser.parse_recursive(doc.body)
         PreambleSection.counter = 0
-        self.decorate_bodyparts(doc.body,doc.uri)
+        # self.decorate_bodyparts(doc.body,doc.uri)
         if self.config.fsmdebug:
             print(serialize(doc.body))
 
@@ -552,8 +546,8 @@ class RFC(DocumentRepository):
             elif key == "ISSN":
                 desc.value(self.ns['dct'].issn, value)
             elif key in ("Updates", "Obsoletes"):
-                pred = {'Updates': self.ns['dct'].updates, # FIXME: dct:updates does not exist!
-                        'Obsoletes': self.ns['dct'].replaces}[key]
+                pred = {'Updates': self.ns['rfc'].updates,
+                        'Obsoletes': self.ns['rfc'].obsoletes}[key]
                 
                 for valuepart in value.split(", "):
                     rfcmatch = re.search('\d+',valuepart)
@@ -587,24 +581,88 @@ class RFC(DocumentRepository):
                 # personal author identity
                 desc.value(self.ns['dct'].rightsHolder, line)
 
-    def toc_query(self, context=None):
-        from_graph = ("FROM <%s>" % context) if context else ""
-        return """PREFIX dct:<http://purl.org/dc/terms/> SELECT DISTINCT ?uri ?title ?issued ?identifier %s WHERE {?uri dct:title ?title . ?uri dct:issued ?issued . ?uri dct:identifier ?identifier . }""" % from_graph
-        
+    def toc_predicates(self):
+        return [self.ns['dct'].title,
+                self.ns['dct'].issued,
+                self.ns['dct'].subject,
+                self.ns['dct'].identifier]
 
-    def toc_criteria(self, predicates):
-        criteria = super(RFC, self).toc_criteria(predicates)
-        if criteria[1].binding == 'issued':
-            criteria[1].key = lambda x: x['identifier']
-            criteria[1].key_descending = True
-        return criteria
-            
-        
+    def toc_criteria(self, predicates=None):
+        from ferenda import TocCriteria
+
+        return [TocCriteria(binding='identifier',
+                            label='Sorted by RFC #',
+                            pagetitle='RFCs %(select)s--99',
+                            selector=lambda x: x['identifier'][4:-2]+"00",  # "RFC 6998" => "69"
+                            key=lambda x: int(x['identifier'][4:]),
+                            selector_descending=True,
+                            key_descending=True),   # "RFC 6998" => 6998
+
+                TocCriteria(binding='title',
+                            label='Sorted by title',
+                            pagetitle='Documents starting with "%(select)s"',
+                            selector=lambda x: util.title_sortkey(x['title'])[0], # "The 'view-state'" property => "v"
+                            key=lambda x: util.title_sortkey(x['title'])),
+
+                TocCriteria(binding='issued',
+                            label='Sorted by year',
+                            pagetitle='Documents published in %(select)s',
+                            selector = lambda x: x['issued'][:4],  # '2013-08-01' => '2013'
+                            key = lambda x: x['issued'],
+                            selector_descending=True,
+                            key_descending=True), 
+
+                TocCriteria(binding='subject',
+                            label='Sorted by category',
+                            pagetitle='Documents in the %(select)s category',
+                            selector = lambda x: x['subject'],
+                            key = lambda x: int(x['identifier'][4:]),
+                            key_descending=True
+                            )]
+
     def toc_item(self, binding, row):
+        from ferenda.elements import Link
         return [row['identifier'] + ": ",
                 Link(row['title'], 
                      uri=row['uri'])]
-        
+
+    def news_criteria(self):
+        from ferenda import Describer, NewsCriteria
+
+        # function that returns a closure, which acts as a custom
+        # selector function for the NewsCriteria objects.
+        def selector_for(category):
+            def selector(entry, graph):
+                desc = Describer(graph, entry.id)
+                return desc.getvalue(self.ns['dct'].subject) == category
+            return selector
+            
+        return [NewsCriteria('all','All RFCs'),
+                NewsCriteria('informational', 'Informational RFCs',
+                             selector=selector_for("Informational")),
+                NewsCriteria('bcp', 'Best Current Practice RFCs',
+                             selector=selector_for("Best Current Practice")),
+                NewsCriteria('experimental', 'Experimental RFCs',
+                             selector=selector_for("Experimental")),
+                NewsCriteria('standards', 'Standards Track RFCs',
+                             selector=selector_for("Standards Track"))]
+
+    def frontpage_content(self, primary=False):
+        from rdflib import URIRef
+        items = ""
+        for entry, graph in islice(self.news_entries(),5):
+            data = {'identifier': graph.value(URIRef(entry.id), self.ns['dct'].identifier).toPython(),
+                    'uri': entry.id,
+                    'title': entry.title}
+            items += '<li>%(identifier)s <a href="%(uri)s">%(title)s</a></li>' % data
+        return ("""<h2><a href="%(uri)s">Request for comments</a></h2>
+                   <p>A complete archive of RFCs in Linked Data form. Contains %(doccount)s documents.</p>
+                   <p>Latest 5 documents:</p>
+                   <ul>
+                      %(items)s
+                   </ul>""" % {'uri':self.dataset_uri(),
+                               'items': items,
+                               'doccount': len(list(self.list_basefiles_for("_postgenerate")))})
 
     def tabs(self):
         return [("RFCs", self.dataset_uri())]

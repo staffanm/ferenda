@@ -1,8 +1,286 @@
 @prefix bibo: <http://purl.org/ontology/bibo/> .
 @prefix dct: <http://purl.org/dc/terms/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rfc: <http://example.org/ontology/rfc/> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://localhost:8000/res/rfc/6931> a bibo:Standard ;
+<http://localhost:8000/res/rfc/6931#PS1> a bibo:DocumentPart ;
+    dct:references <http://localhost:8000/res/rfc/4051> ;
+    dct:title "Abstract"@en .
+
+<http://localhost:8000/res/rfc/6931#PS2> a bibo:DocumentPart ;
+    dct:references <http://localhost:8000/res/rfc/5741#S2> ;
+    dct:title "Status of This Memo"@en .
+
+<http://localhost:8000/res/rfc/6931#PS3> a bibo:DocumentPart ;
+    dct:references <http://localhost:8000/res/rfc/6931#S4> ;
+    dct:title "Copyright Notice"@en .
+
+<http://localhost:8000/res/rfc/6931#S1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 1"@en ;
+    dct:references <http://localhost:8000/res/rfc/3075>,
+        <http://localhost:8000/res/rfc/3076>,
+        <http://localhost:8000/res/rfc/3275>,
+        <http://localhost:8000/res/rfc/3741>,
+        <http://localhost:8000/res/rfc/3986>,
+        <http://localhost:8000/res/rfc/4051>,
+        <http://localhost:8000/res/rfc/6931#S2>,
+        <http://localhost:8000/res/rfc/6931#S2.4>,
+        <http://localhost:8000/res/rfc/6931#S4> ;
+    dct:title "Introduction"@en ;
+    bibo:chapter "1"@en .
+
+<http://localhost:8000/res/rfc/6931#S1.1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 1.1"@en ;
+    dct:references <http://localhost:8000/res/rfc/2119> ;
+    dct:title "Terminology"@en ;
+    bibo:chapter "1.1"@en .
+
+<http://localhost:8000/res/rfc/6931#S1.2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 1.2"@en ;
+    dct:references <http://localhost:8000/res/rfc/2104>,
+        <http://localhost:8000/res/rfc/3986> ;
+    dct:title "Acronyms"@en ;
+    bibo:chapter "1.2"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.1.1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.1.1"@en ;
+    dct:references <http://localhost:8000/res/rfc/1321>,
+        <http://localhost:8000/res/rfc/2045>,
+        <http://localhost:8000/res/rfc/6151> ;
+    dct:title "MD5"@en ;
+    bibo:chapter "2.1.1"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.1.2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.1.2"@en ;
+    dct:references <http://localhost:8000/res/rfc/2045>,
+        <http://localhost:8000/res/rfc/6234> ;
+    dct:title "SHA-224"@en ;
+    bibo:chapter "2.1.2"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.1.3> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.1.3"@en ;
+    dct:references <http://localhost:8000/res/rfc/2045> ;
+    dct:title "SHA-384"@en ;
+    bibo:chapter "2.1.3"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.1.4> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.1.4"@en ;
+    dct:references <http://localhost:8000/res/rfc/2045> ;
+    dct:title "Whirlpool"@en ;
+    bibo:chapter "2.1.4"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.1.5> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.1.5"@en ;
+    dct:references <http://localhost:8000/res/rfc/2045> ;
+    dct:title "New SHA Functions"@en ;
+    bibo:chapter "2.1.5"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.2.2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.2.2"@en ;
+    dct:references <http://localhost:8000/res/rfc/6234>,
+        <http://localhost:8000/res/rfc/6931#S2.2.1> ;
+    dct:title "HMAC SHA Variations"@en ;
+    bibo:chapter "2.2.2"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.2.3> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.2.3"@en ;
+    dct:references <http://localhost:8000/res/rfc/6931#S2.2.1> ;
+    dct:title "HMAC-RIPEMD160"@en ;
+    bibo:chapter "2.2.3"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.3> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.3"@en ;
+    dct:references <http://localhost:8000/res/rfc/6931#S2.2> ;
+    dct:title "SignatureMethod Public-Key Signature Algorithms"@en ;
+    bibo:chapter "2.3"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.3.11> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.3.11"@en ;
+    dct:references <http://localhost:8000/res/rfc/3447>,
+        <http://localhost:8000/res/rfc/6931#S2.3.1> ;
+    dct:title "RSA-SHA224"@en ;
+    bibo:chapter "2.3.11"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.3.2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.3.2"@en ;
+    dct:references <http://localhost:8000/res/rfc/3447>,
+        <http://localhost:8000/res/rfc/6931#S2.3.1> ;
+    dct:title "RSA-SHA256"@en ;
+    bibo:chapter "2.3.2"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.3.3> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.3.3"@en ;
+    dct:references <http://localhost:8000/res/rfc/3447>,
+        <http://localhost:8000/res/rfc/6931#S2.3.1> ;
+    dct:title "RSA-SHA384"@en ;
+    bibo:chapter "2.3.3"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.3.4> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.3.4"@en ;
+    dct:references <http://localhost:8000/res/rfc/3447>,
+        <http://localhost:8000/res/rfc/6931#S2.3.1> ;
+    dct:title "RSA-SHA512"@en ;
+    bibo:chapter "2.3.4"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.3.5> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.3.5"@en ;
+    dct:references <http://localhost:8000/res/rfc/3447>,
+        <http://localhost:8000/res/rfc/6931#S2.3.1> ;
+    dct:title "RSA-RIPEMD160"@en ;
+    bibo:chapter "2.3.5"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.3.6> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.3.6"@en ;
+    dct:references <http://localhost:8000/res/rfc/3447>,
+        <http://localhost:8000/res/rfc/4050>,
+        <http://localhost:8000/res/rfc/6090> ;
+    dct:title "ECDSA-SHA*, ECDSA-RIPEMD160, ECDSA-Whirlpool"@en ;
+    bibo:chapter "2.3.6"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.3.7> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.3.7"@en ;
+    dct:title "ESIGN-SHA*"@en ;
+    bibo:chapter "2.3.7"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.3.8> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.3.8"@en ;
+    dct:references <http://localhost:8000/res/rfc/3447> ;
+    dct:title "RSA-Whirlpool"@en ;
+    bibo:chapter "2.3.8"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.3.9> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.3.9"@en ;
+    dct:references <http://localhost:8000/res/rfc/3447>,
+        <http://localhost:8000/res/rfc/4055>,
+        <http://localhost:8000/res/rfc/6194>,
+        <http://localhost:8000/res/rfc/6931#S2.1>,
+        <http://localhost:8000/res/rfc/6931#S2.3.10> ;
+    dct:title "RSASSA-PSS with Parameters"@en ;
+    bibo:chapter "2.3.9"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.5> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.5"@en ;
+    dct:title "Transform Algorithms"@en ;
+    bibo:chapter "2.5"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.5.1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.5.1"@en ;
+    dct:references <http://localhost:8000/res/rfc/3275> ;
+    dct:title "XPointer"@en ;
+    bibo:chapter "2.5.1"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.6> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.6"@en ;
+    dct:title "EncryptionMethod Algorithms"@en ;
+    bibo:chapter "2.6"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.6.1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.6.1"@en ;
+    dct:title "ARCFOUR Encryption Algorithm"@en ;
+    bibo:chapter "2.6.1"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.6.2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.6.2"@en ;
+    dct:references <http://localhost:8000/res/rfc/3713> ;
+    dct:title "Camellia Block Encryption"@en ;
+    bibo:chapter "2.6.2"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.6.3> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.6.3"@en ;
+    dct:references <http://localhost:8000/res/rfc/3394>,
+        <http://localhost:8000/res/rfc/3713> ;
+    dct:title "Camellia Key Wrap"@en ;
+    bibo:chapter "2.6.3"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.6.5> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.6.5"@en ;
+    dct:references <http://localhost:8000/res/rfc/4269> ;
+    dct:title "SEED Block Encryption"@en ;
+    bibo:chapter "2.6.5"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.6.6> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.6.6"@en ;
+    dct:references <http://localhost:8000/res/rfc/3394#S2.2.1>,
+        <http://localhost:8000/res/rfc/4010> ;
+    dct:title "SEED Key Wrap"@en ;
+    bibo:chapter "2.6.6"@en .
+
+<http://localhost:8000/res/rfc/6931#S3> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 3"@en ;
+    dct:references <http://localhost:8000/res/rfc/6931#S3.1>,
+        <http://localhost:8000/res/rfc/6931#S3.2> ;
+    dct:title "KeyInfo"@en ;
+    bibo:chapter "3"@en .
+
+<http://localhost:8000/res/rfc/6931#S4.1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 4.1"@en ;
+    dct:references <http://localhost:8000/res/rfc/3275> ;
+    dct:title "Fragment Index"@en ;
+    bibo:chapter "4.1"@en .
+
+<http://localhost:8000/res/rfc/6931#S5> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 5"@en ;
+    dct:title "Allocation Considerations"@en ;
+    bibo:chapter "5"@en .
+
+<http://localhost:8000/res/rfc/6931#S5.1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 5.1"@en ;
+    dct:references <http://localhost:8000/res/rfc/3986>,
+        <http://localhost:8000/res/rfc/4051> ;
+    dct:title "W3C Allocation Considerations"@en ;
+    bibo:chapter "5.1"@en .
+
+<http://localhost:8000/res/rfc/6931#S5.2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 5.2"@en ;
+    dct:references <http://localhost:8000/res/rfc/5226>,
+        <http://localhost:8000/res/rfc/6931>,
+        <http://localhost:8000/res/rfc/6931#S2.6.4>,
+        <http://localhost:8000/res/rfc/6931#S4.2> ;
+    dct:title "IANA Considerations"@en ;
+    bibo:chapter "5.2"@en .
+
+<http://localhost:8000/res/rfc/6931#S6> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 6"@en ;
+    dct:references <http://localhost:8000/res/rfc/6151>,
+        <http://localhost:8000/res/rfc/6194> ;
+    dct:title "Security Considerations"@en ;
+    bibo:chapter "6"@en .
+
+<http://localhost:8000/res/rfc/6931#S7> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 7"@en ;
+    dct:references <http://localhost:8000/res/rfc/1321>,
+        <http://localhost:8000/res/rfc/2045>,
+        <http://localhost:8000/res/rfc/2104>,
+        <http://localhost:8000/res/rfc/2119>,
+        <http://localhost:8000/res/rfc/2315>,
+        <http://localhost:8000/res/rfc/3075>,
+        <http://localhost:8000/res/rfc/3076>,
+        <http://localhost:8000/res/rfc/3092>,
+        <http://localhost:8000/res/rfc/3275>,
+        <http://localhost:8000/res/rfc/3394>,
+        <http://localhost:8000/res/rfc/3447>,
+        <http://localhost:8000/res/rfc/3713>,
+        <http://localhost:8000/res/rfc/3741>,
+        <http://localhost:8000/res/rfc/3986>,
+        <http://localhost:8000/res/rfc/4010>,
+        <http://localhost:8000/res/rfc/4050>,
+        <http://localhost:8000/res/rfc/4051>,
+        <http://localhost:8000/res/rfc/4055>,
+        <http://localhost:8000/res/rfc/4269>,
+        <http://localhost:8000/res/rfc/5226>,
+        <http://localhost:8000/res/rfc/6090>,
+        <http://localhost:8000/res/rfc/6151>,
+        <http://localhost:8000/res/rfc/6194>,
+        <http://localhost:8000/res/rfc/6234>,
+        <http://localhost:8000/res/rfc/6931#S> ;
+    dct:title "Acknowledgements"@en ;
+    bibo:chapter "7"@en .
+
+<http://localhost:8000/res/rfc/6931> a rfc:RFC ;
+    rfc:obsoletes <http://localhost:8000/res/rfc/4051> ;
     dct:category "Standards Track" ;
     dct:creator "D. Eastlake 3rd" ;
     dct:identifier "RFC 6931" ;
@@ -11,5 +289,88 @@
     dct:publisher "Internet Engineering Task Force (IETF)" ;
     dct:rightsHolder "Huawei" ;
     dct:title "Additional XML Security Uniform Resource Identifiers (URIs)"@en ;
-    dct:replaces <http://localhost:8000/res/rfc/4051> ;
-    bibo:shortTitle "Additional XML Security URIs"@en.
+    bibo:shortTitle "Additional XML Security URIs"@en .
+
+<http://localhost:8000/res/rfc/6931#S2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2"@en ;
+    dct:references <http://localhost:8000/res/rfc/3275>,
+        <http://localhost:8000/res/rfc/3986>,
+        <http://localhost:8000/res/rfc/4051>,
+        <http://localhost:8000/res/rfc/6931#S2.4>,
+        <http://localhost:8000/res/rfc/6931#S4> ;
+    dct:title "Algorithms"@en ;
+    bibo:chapter "2"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.1"@en ;
+    dct:title "DigestMethod (Hash) Algorithms"@en ;
+    bibo:chapter "2.1"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.2"@en ;
+    dct:references <http://localhost:8000/res/rfc/3275> ;
+    dct:title "SignatureMethod MAC Algorithms"@en ;
+    bibo:chapter "2.2"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.3.10> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.3.10"@en ;
+    dct:references <http://localhost:8000/res/rfc/3447> ;
+    dct:title "RSASSA-PSS without Parameters"@en ;
+    bibo:chapter "2.3.10"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.6.4> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.6.4"@en ;
+    dct:title "PSEC-KEM"@en ;
+    bibo:chapter "2.6.4"@en .
+
+<http://localhost:8000/res/rfc/6931#S3.1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 3.1"@en ;
+    dct:references <http://localhost:8000/res/rfc/2045>,
+        <http://localhost:8000/res/rfc/2315>,
+        <http://localhost:8000/res/rfc/3092> ;
+    dct:title "PKCS #7 Bag of Certificates and CRLs"@en ;
+    bibo:chapter "3.1"@en .
+
+<http://localhost:8000/res/rfc/6931#S3.2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 3.2"@en ;
+    dct:title "Additional RetrievalMethod Type Values"@en ;
+    bibo:chapter "3.2"@en .
+
+<http://localhost:8000/res/rfc/6931#S4.2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 4.2"@en ;
+    dct:references <http://localhost:8000/res/rfc/3275> ;
+    dct:title "URI Index"@en ;
+    bibo:chapter "4.2"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.2.1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.2.1"@en ;
+    dct:references <http://localhost:8000/res/rfc/2045>,
+        <http://localhost:8000/res/rfc/2104>,
+        <http://localhost:8000/res/rfc/3275>,
+        <http://localhost:8000/res/rfc/6151> ;
+    dct:title "HMAC-MD5"@en ;
+    bibo:chapter "2.2.1"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.4> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.4"@en ;
+    dct:references <http://localhost:8000/res/rfc/3075>,
+        <http://localhost:8000/res/rfc/3075#S6.5.1>,
+        <http://localhost:8000/res/rfc/3275> ;
+    dct:title "Minimal Canonicalization"@en ;
+    bibo:chapter "2.4"@en .
+
+<http://localhost:8000/res/rfc/6931#S4> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 4"@en ;
+    dct:title "Indexes"@en ;
+    bibo:chapter "4"@en .
+
+<http://localhost:8000/res/rfc/6931#S2.3.1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6931, section 2.3.1"@en ;
+    dct:references <http://localhost:8000/res/rfc/2045>,
+        <http://localhost:8000/res/rfc/3447>,
+        <http://localhost:8000/res/rfc/6151>,
+        <http://localhost:8000/res/rfc/6931#S8.2.1>,
+        <http://localhost:8000/res/rfc/6931#S9.2> ;
+    dct:title "RSA-MD5"@en ;
+    bibo:chapter "2.3.1"@en .
+

@@ -1,13 +1,23 @@
 @prefix bibo: <http://purl.org/ontology/bibo/> .
 @prefix dct: <http://purl.org/dc/terms/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rfc: <http://example.org/ontology/rfc/> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://localhost:8000/res/rfc/879> a bibo:Standard ;
+<http://localhost:8000/res/rfc/879> a rfc:RFC ;
     dct:creator "J. Postel" ;
     dct:identifier "RFC 879" ;
     dct:issued "1983-11-01"^^xsd:date ;
     dct:publisher "Network Working Group" ;
     dct:title "The TCP Maximum Segment Size and Related Topics"@en .
-    # bibo:shortTitle "TCP Maximum Segment Size"@en.
-    
+
+<http://localhost:8000/res/rfc/879#PS1> a bibo:DocumentPart ;
+    dct:title "(Abstract)"@en .
+
+<http://localhost:8000/res/rfc/879#S1> a bibo:DocumentPart ;
+    dct:identifier "RFC 879, section 1"@en ;
+    dct:title "Introduction"@en ;
+    bibo:chapter "1"@en .
 

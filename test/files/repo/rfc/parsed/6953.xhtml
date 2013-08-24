@@ -1,20 +1,20 @@
 <?xml version='1.0' encoding='utf-8'?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
-<html xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:dct="http://purl.org/dc/terms/" xmlns:rfc="http://example.org/ontology/rfc/" xmlns:foaf="http://xmlns.com/foaf/0.1/" xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<html xmlns:foaf="http://xmlns.com/foaf/0.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:rfc="http://example.org/ontology/rfc/" xmlns:dct="http://purl.org/dc/terms/" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
   <head about="http://localhost:8000/res/rfc/6953">
-    <meta xml:lang="" property="dct:category" content="Informational"/>
-    <meta xml:lang="" property="dct:creator" content="A. Mancuso, Ed."/>
-    <meta xml:lang="" property="dct:creator" content="B. Patil"/>
-    <meta xml:lang="" property="dct:creator" content="S. Probasco"/>
-    <meta xml:lang="" property="dct:identifier" content="RFC 6953"/>
-    <meta xml:lang="" property="dct:issn" content="2070-1721"/>
-    <meta property="dct:issued" datatype="xsd:date" content="2013-05-01"/>
-    <meta xml:lang="" property="dct:publisher" content="Internet Engineering Task Force (IETF)"/>
-    <meta xml:lang="" property="dct:rightsHolder" content="Cisco Systems"/>
-    <meta xml:lang="" property="dct:rightsHolder" content="Google"/>
+    <meta content="Informational" property="dct:category" xml:lang=""/>
+    <meta content="A. Mancuso, Ed." property="dct:creator" xml:lang=""/>
+    <meta content="B. Patil" property="dct:creator" xml:lang=""/>
+    <meta content="S. Probasco" property="dct:creator" xml:lang=""/>
+    <meta content="RFC 6953" property="dct:identifier" xml:lang=""/>
+    <meta content="2070-1721" property="dct:issn" xml:lang=""/>
+    <meta datatype="xsd:date" property="dct:issued" content="2013-05-01"/>
+    <meta content="Internet Engineering Task Force (IETF)" property="dct:publisher" xml:lang=""/>
+    <meta content="Cisco Systems" property="dct:rightsHolder" xml:lang=""/>
+    <meta content="Google" property="dct:rightsHolder" xml:lang=""/>
     <title property="dct:title">Protocol to Access White-Space (PAWS) Databases: Use Cases and Requirements</title>
-    <meta xml:lang="en" property="bibo:shortTitle" content="PAWS Use Cases and Requirements"/>
-    <link rel="rdf:type" href="http://purl.org/ontology/bibo/Standard"/>
+    <meta content="PAWS Use Cases and Requirements" property="bibo:shortTitle" xml:lang="en"/>
+    <link href="http://example.org/ontology/rfc/RFC" rel="rdf:type"/>
   </head>
   <body about="http://localhost:8000/res/rfc/6953">
     <div class="preamblesection" property="dct:title" content="Abstract" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#PS1">
@@ -22,27 +22,31 @@
     </div>
     <div class="preamblesection" property="dct:title" content="Status of This Memo" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#PS2">
       <p>This document is not an Internet Standards Track specification; it is published for informational purposes.</p>
-      <p>This document is a product of the Internet Engineering Task Force (IETF). It represents the consensus of the IETF community. It has received public review and has been approved for publication by the Internet Engineering Steering Group (IESG). Not all documents approved by the IESG are a candidate for any level of Internet Standard; see Section 2 of RFC 5741.</p>
+      <p>This document is a product of the Internet Engineering Task Force (IETF). It represents the consensus of the IETF community. It has received public review and has been approved for publication by the Internet Engineering Steering Group (IESG). Not all documents approved by the IESG are a candidate for any level of Internet Standard; see <a href="http://localhost:8000/res/rfc/5741#S2" rel="dct:references">Section 2 of RFC 5741</a>.</p>
       <p>Information about the current status of this document, any errata, and how to provide feedback on it may be obtained at http://www.rfc-editor.org/info/rfc6953.</p>
     </div>
     <div class="preamblesection" property="dct:title" content="Copyright Notice" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#PS3">
       <p>Copyright (c) 2013 IETF Trust and the persons identified as the document authors. All rights reserved.</p>
-      <p>This document is subject to BCP 78 and the IETF Trust's Legal Provisions Relating to IETF Documents (http://trustee.ietf.org/license-info) in effect on the date of publication of this document. Please review these documents carefully, as they describe your rights and restrictions with respect to this document. Code Components extracted from this document must include Simplified BSD License text as described in Section 4.e of the Trust Legal Provisions and are provided without warranty as described in the Simplified BSD License.</p>
+      <p>This document is subject to BCP 78 and the IETF Trust's Legal Provisions Relating to IETF Documents (http://trustee.ietf.org/license-info) in effect on the date of publication of this document. Please review these documents carefully, as they describe your rights and restrictions with respect to this document. Code Components extracted from this document must include Simplified BSD License text as described in <a href="#S4" rel="dct:references">Section 4.</a>e of the Trust Legal Provisions and are provided without warranty as described in the Simplified BSD License.</p>
     </div>
-    <div class="section" about="http://localhost:8000/res/rfc/6953#S1" property="dct:title" content="Introduction" typeof="bibo:DocumentPart">
-      <span xml:lang="" property="bibo:chapter" content="1"/>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S1.1" property="dct:title" content="Introduction to White Space" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="1.1"/>
+    <div class="section" property="dct:title" content="Introduction" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S1">
+      <span content="RFC 1, section 1" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S1"/>
+      <span content="1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S1"/>
+      <div class="subsection" property="dct:title" content="Introduction to White Space" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S1.1">
+        <span content="RFC 1, section 1.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S1.1"/>
+        <span content="1.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S1.1"/>
         <p>Wireless spectrum is a commodity that is regulated by governments. The spectrum is used for various purposes, which include, but are not limited to, entertainment (e.g., radio and television), communication (e.g., telephony and Internet access), military (e.g., radars, etc.), and navigation (e.g., satellite communication, GPS). Portions of the radio spectrum that are assigned to a licensed (primary) user but are unused or unoccupied at specific locations and times are defined as "white space". The concept of allowing additional (secondary) transmissions (which may or may not be licensed) in white space is a technique to "unlock" existing spectrum for new use.</p>
         <p>An obvious requirement is that these secondary transmissions do not interfere with the assigned use of the spectrum. One interesting observation is that often, in a given physical location, the primary user(s) may not be using the entire band assigned to them. The available spectrum for secondary transmissions would then depend on the location of the secondary user. The fundamental issue is how to determine, for a specific location and specific time, if any of the assigned spectrum is available for secondary use.</p>
-        <p>Academia and industry have studied multiple cognitive radio <a href="#bib-CRADIO" rel="dct:references">[CRADIO]</a> mechanisms for use in such a scenario. One simple mechanism is to use a geospatial database that contains the spatial and temporal profile of all primary licensees' spectrum usage, and require secondary users to query the database for available spectrum that they can use at their location. Such databases can be accessible and queryable by secondary users on the Internet.</p>
+        <p>Academia and industry have studied multiple cognitive radio [CRADIO] mechanisms for use in such a scenario. One simple mechanism is to use a geospatial database that contains the spatial and temporal profile of all primary licensees' spectrum usage, and require secondary users to query the database for available spectrum that they can use at their location. Such databases can be accessible and queryable by secondary users on the Internet.</p>
         <p>Any entity that is assigned spectrum that is not densely used may be asked by a governmental regulatory agency to share it to allow for more intensive use of the spectrum. Providing a mechanism by which secondary users share the spectrum with the primary user is attractive in many bands, in many countries.</p>
-        <p>This document includes the problem statement followed by use cases and requirements associated with the use of white-space spectrum by secondary users via a database query protocol. The final sections include the requirements associated with such a protocol. Note that the IETF has undertaken to develop a database query protocol (see <a href="#bib-PAWS" rel="dct:references">[PAWS]</a>).</p>
+        <p>This document includes the problem statement followed by use cases and requirements associated with the use of white-space spectrum by secondary users via a database query protocol. The final sections include the requirements associated with such a protocol. Note that the IETF has undertaken to develop a database query protocol (see [PAWS]).</p>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S1.2" property="dct:title" content="Scope" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="1.2"/>
-        <div class="subsubsection" about="http://localhost:8000/res/rfc/6953#S1.2.1" property="dct:title" content="In Scope" typeof="bibo:DocumentPart">
-          <span xml:lang="" property="bibo:chapter" content="1.2.1"/>
+      <div class="subsection" property="dct:title" content="Scope" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S1.2">
+        <span content="RFC 1, section 1.2" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S1.2"/>
+        <span content="1.2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S1.2"/>
+        <div class="subsubsection" property="dct:title" content="In Scope" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S1.2.1">
+          <span content="RFC 1, section 1.2.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S1.2.1"/>
+          <span content="1.2.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S1.2.1"/>
           <p>This document covers the requirements for a protocol to allow a device to access a database to obtain spectrum availability information. Such a protocol should allow a device to perform the following actions:</p>
           <p>1. Determine the relevant database to query.</p>
           <pre>   2.  Connect to and optionally register with the database using a
@@ -57,8 +61,9 @@
        device operation parameters.</pre>
           <p>Note: The above protocol actions should explicitly or implicitly support the ability of devices to re-register and/or re-query the database when they change their locations or operating parameters. This will allow them to receive permission to operate in their new locations and/or with their new operating parameters, and to send acknowledgments to the database that include information on their new operating parameters.</p>
         </div>
-        <div class="subsubsection" about="http://localhost:8000/res/rfc/6953#S1.2.2" property="dct:title" content="Out of Scope" typeof="bibo:DocumentPart">
-          <span xml:lang="" property="bibo:chapter" content="1.2.2"/>
+        <div class="subsubsection" property="dct:title" content="Out of Scope" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S1.2.2">
+          <span content="RFC 1, section 1.2.2" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S1.2.2"/>
+          <span content="1.2.2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S1.2.2"/>
           <p>The following topics are out of scope for this specification:</p>
           <pre>   1.  It is the device's responsibility to query the database for new
        spectrum when the device moves, changes operating parameters,
@@ -77,10 +82,12 @@
         </div>
       </div>
     </div>
-    <div class="section" about="http://localhost:8000/res/rfc/6953#S2" property="dct:title" content="Conventions Used in This Document" typeof="bibo:DocumentPart">
-      <span xml:lang="" property="bibo:chapter" content="2"/>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S2.1" property="dct:title" content="Terminology" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="2.1"/>
+    <div class="section" property="dct:title" content="Conventions Used in This Document" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S2">
+      <span content="RFC 1, section 2" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S2"/>
+      <span content="2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S2"/>
+      <div class="subsection" property="dct:title" content="Terminology" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S2.1">
+        <span content="RFC 1, section 2.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S2.1"/>
+        <span content="2.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S2.1"/>
         <pre>   Database:  A database is an entity that contains current information
       about available spectrum at a given location and time, as well as
       other types of information related to spectrum availability and
@@ -102,13 +109,15 @@
       a secondary user.  A white-space device can be a fixed or portable
       device such as an access point, base station, or cell phone.</pre>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S2.2" property="dct:title" content="Requirements Language" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="2.2"/>
-        <p>The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in RFC 2119 <a href="#bib-RFC2119" rel="dct:references">[RFC2119]</a>.</p>
+      <div class="subsection" property="dct:title" content="Requirements Language" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S2.2">
+        <span content="RFC 1, section 2.2" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S2.2"/>
+        <span content="2.2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S2.2"/>
+        <p>The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in <a href="http://localhost:8000/res/rfc/2119" rel="dct:references">RFC 2119 </a><a href="http://localhost:8000/res/rfc/2119" rel="dct:references">[RFC2119]</a>.</p>
       </div>
     </div>
-    <div class="section" about="http://localhost:8000/res/rfc/6953#S3" property="dct:title" content="Problem Statement" typeof="bibo:DocumentPart">
-      <span xml:lang="" property="bibo:chapter" content="3"/>
+    <div class="section" property="dct:title" content="Problem Statement" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S3">
+      <span content="RFC 1, section 3" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S3"/>
+      <span content="3" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S3"/>
       <p>The use of white-space spectrum is enabled via the capability of a device to query a database and obtain information about the availability of spectrum for use at a given location. The databases are reachable via the Internet, and the devices querying these databases are expected to have some form of Internet connectivity, directly or indirectly. While databases are expected to support the rule set(s) of one or more regulatory domains, and the regulations and available spectrum associated with each rule set may vary, the fundamental operation of the protocol must be independent of any particular regulatory environment.</p>
       <p>An example of the high-level architecture of the devices and databases is shown in Figure 1.</p>
       <pre>                 -----------
@@ -127,8 +136,9 @@
       <pre>      Figure 1: High-Level View of White-Space Database Architecture</pre>
       <p>Note that there could be multiple databases serving white-space devices. In some countries, such as the U.S., the regulator has determined that multiple databases may provide service to white-space devices.</p>
       <p>A messaging interface between the white-space devices and the database is required for operating a network using the white-space spectrum. The following sections discuss various aspects of such an interface and the need for a standard.</p>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S3.1" property="dct:title" content="Global Applicability" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="3.1"/>
+      <div class="subsection" property="dct:title" content="Global Applicability" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S3.1">
+        <span content="RFC 1, section 3.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S3.1"/>
+        <span content="3.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S3.1"/>
         <p>The use of white-space spectrum is currently approved or being considered in multiple regulatory domains, whose rules may differ. However, the need for devices that intend to use the spectrum to communicate with a database remains a common feature. The database</p>
         <p>implements rules that protect all primary users, independent of the characteristics of the white-space devices. It also provides a way to specify a schedule of use, since some primary users (for example, wireless microphones) only operate in limited time slots.</p>
         <p>Devices need to be able to query a database, directly or indirectly, over the public Internet and/or private IP networks prior to operating in available spectrum. Information about available spectrum, schedule, power, etc., are provided by the database as a response to the query from a device. The messaging interface needs to be:</p>
@@ -166,8 +176,9 @@
        regulators might require different device-characteristic
        information to be passed to the database.</pre>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S3.2" property="dct:title" content="Database Discovery" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="3.2"/>
+      <div class="subsection" property="dct:title" content="Database Discovery" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S3.2">
+        <span content="RFC 1, section 3.2" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S3.2"/>
+        <span content="3.2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S3.2"/>
         <p>The master device must obtain the address of a trusted database, which it will query for available white-space spectrum. If the master device uses a discovery service to locate a trusted database, it may perform the following steps (this description is intended as descriptive, not prescriptive):</p>
         <pre>   1.  The master device constructs and sends a request (e.g., over the
        Internet) to a trusted discovery service.</pre>
@@ -179,11 +190,12 @@
        receive service from the database.  If so, it establishes contact
        with the trusted database.</pre>
         <pre>   3.  The master device establishes a white-space network as described
-       in Section 4.</pre>
+       in <a href="#S4" rel="dct:references">Section 4.</a></pre>
         <p>Optionally, and in place of steps 1-2 above, the master device can be pre-configured with the address (e.g., URI) of one or more trusted databases. The master device can establish contact with one of these trusted databases.</p>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S3.3" property="dct:title" content="Device Registration" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="3.3"/>
+      <div class="subsection" property="dct:title" content="Device Registration" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S3.3">
+        <span content="RFC 1, section 3.3" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S3.3"/>
+        <span content="3.3" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S3.3"/>
         <p>The master device may register with the database before it queries the database for available spectrum. A registration process may consist of the following steps:</p>
         <pre>   1.  The master device sends registration information to the database.
        This information may include the device ID; serial number
@@ -198,20 +210,24 @@
        Additional information may be provided by the database in its
        response to the master device.</pre>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S3.4" property="dct:title" content="Protocol" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="3.4"/>
+      <div class="subsection" property="dct:title" content="Protocol" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S3.4">
+        <span content="RFC 1, section 3.4" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S3.4"/>
+        <span content="3.4" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S3.4"/>
         <p>A protocol that enables a white-space device to query a database to obtain information about available spectrum is needed. A device may be required to register with the database with some credentials prior to being allowed to query. The requirements for such a protocol are specified in this document.</p>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S3.5" property="dct:title" content="Data Model Definition" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="3.5"/>
+      <div class="subsection" property="dct:title" content="Data Model Definition" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S3.5">
+        <span content="RFC 1, section 3.5" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S3.5"/>
+        <span content="3.5" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S3.5"/>
         <p>The contents of the queries and response need to be specified. A data model is required; it must enable the white-space device to query the database while including all the relevant information, such as geolocation, radio technology, power characteristics, etc., which may be country, spectrum, and regulatory dependent. All databases are able to interpret the data model and respond to the queries using the same data model that is understood by all devices.</p>
       </div>
     </div>
-    <div class="section" about="http://localhost:8000/res/rfc/6953#S4" property="dct:title" content="Use Cases" typeof="bibo:DocumentPart">
-      <span xml:lang="" property="bibo:chapter" content="4"/>
+    <div class="section" property="dct:title" content="Use Cases" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S4">
+      <span content="RFC 1, section 4" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S4"/>
+      <span content="4" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S4"/>
       <p>There are many potential use cases for white-space spectrum -- for example, providing broadband Internet access in urban and densely populated hotspots, as well as rural and remote, underserved areas. Available white-space spectrum may also be used to provide Internet 'backhaul' for traditional Wi-Fi hotspots or for use by towns and cities to monitor/control traffic lights, read utility meters, and the like. Still other use cases include the ability to offload data traffic from another Internet access network (e.g., 3G cellular network) or to deliver data, information, or a service to a user based on the user's location. Some of these use cases are described in the following sections.</p>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S4.1" property="dct:title" content="Master-Slave White-Space Networks" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="4.1"/>
+      <div class="subsection" property="dct:title" content="Master-Slave White-Space Networks" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S4.1">
+        <span content="RFC 1, section 4.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S4.1"/>
+        <span content="4.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S4.1"/>
         <p>There are a number of common scenarios in which a master white-space device will act as proxy or mediator for one or more slave devices using its connection to the Internet to query the database for available spectrum for itself and for one or more slave devices. These slave devices may be fixed or mobile, in close proximity with each other (indoor network or urban hotspot), or at a distance (rural or remote WAN). Once slave devices switch to white-space spectrum for their communications, they may connect through the master to the Internet or use white-space spectrum for intra-network communications only. The master device can continue to arbitrate and control white- space communications by slave devices, and it may notify them when they are required to change white-space frequencies or cease white- space communications.</p>
         <p>Figure 2 depicts the general architecture of such a simple master- slave network in which the master device communicates with a database on its own behalf and on behalf of slave devices.</p>
         <pre>          --------
@@ -245,9 +261,9 @@
        white-space spectrum.</pre>
         <pre>   3.  The master has Internet connectivity, determines (or knows) its
        location, and establishes a connection to a trusted database (see
-       Section 3.2).</pre>
+       <a href="#S3.2" rel="dct:references">Section 3.2</a>).</pre>
         <pre>   4.  The master may register with the trusted database (see
-       Section 3.3).</pre>
+       <a href="#S3.3" rel="dct:references">Section 3.3</a>).</pre>
         <pre>   5.  The master sends a query to the trusted database requesting a
        list of available white-space spectrum based upon its
        geolocation.  Query parameters may include the master's location,
@@ -272,8 +288,9 @@
        spectrum frequencies.</pre>
         <p>Note: Steps 5 through 7 may be repeated by the master device when it (or a slave device that uses the master as a proxy to communicate with the database) changes its location or operating parameters -- for example, after a master changes location, it may query the database for available spectrum at its new location, then acknowledge the subsequent response received from the database with information on the spectrum and power levels it is using at the new location.</p>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S4.2" property="dct:title" content="Offloading: Moving Traffic to a White-Space Network" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="4.2"/>
+      <div class="subsection" property="dct:title" content="Offloading: Moving Traffic to a White-Space Network" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S4.2">
+        <span content="RFC 1, section 4.2" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S4.2"/>
+        <span content="4.2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S4.2"/>
         <p>This scenario is a variant of the master-slave network described in the previous use case. In this scenario, an access point (AP) offers a white-space service that offloads Internet traffic as an alternative data path to a more congested or costly Internet wire, wireless, or satellite service.</p>
         <p>Figure 3 shows an example of deployment of this scenario.</p>
         <pre>                              \|/
@@ -317,8 +334,9 @@
         <pre>   4.  The portable device accesses the Internet through the AP to
        stream the selected video.</pre>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S4.3" property="dct:title" content="White Space Serving as Backhaul" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="4.3"/>
+      <div class="subsection" property="dct:title" content="White Space Serving as Backhaul" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S4.3">
+        <span content="RFC 1, section 4.3" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S4.3"/>
+        <span content="4.3" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S4.3"/>
         <p>In this use case, an Internet connectivity service is provided to users over a common wireless standard, such as Wi-Fi, with a white- space master/slave network providing backhaul connectivity to the Internet. Note that Wi-Fi is referenced in Figure 4 and the following discussion, but any other technology can be substituted in its place.</p>
         <pre>   Figure 4 shows an example of deployment of this scenario.
                          \|/   White      \|/    \|/     Wi-Fi \|/
@@ -338,14 +356,15 @@
         <p>Once the bridged device (Slave Bridge + Wi-Fi) is connected to a master and WS network, a simplified operation scenario of backhaul for Wi-Fi consists of the following steps:</p>
         <pre>   1.  A bridged slave device (Slave Bridge + Wi-Fi) is connected to a
        master device operating in the WS spectrum (the master obtains
-       available white-space spectrum as described in Section 4.1).</pre>
+       available white-space spectrum as described in <a href="#S4.1" rel="dct:references">Section 4.1</a>).</pre>
         <pre>   2.  Once the slave device is connected to the master, the Wi-Fi
        access point has Internet connectivity as well.</pre>
         <pre>   3.  End users attach to the Wi-Fi network via their Wi-Fi-enabled
        devices and receive Internet connectivity.</pre>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S4.4" property="dct:title" content="Rapid Network Deployment during Emergencies" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="4.4"/>
+      <div class="subsection" property="dct:title" content="Rapid Network Deployment during Emergencies" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S4.4">
+        <span content="RFC 1, section 4.4" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S4.4"/>
+        <span content="4.4" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S4.4"/>
         <p>Organizations involved in handling emergency operations maintain an infrastructure that relies on dedicated spectrum for their operations. However, such infrastructures are often affected by the disasters they handle. To set up a replacement network, spectrum needs to be quickly cleared and reallocated to the crisis response organization. Automation of this allocation and assignment is often the best solution. A preferred option is to make use of a robust protocol that has been adopted and implemented by radio manufacturers. A typical network topology solution might include wireless access links to the public Internet or private network, wireless ad hoc network radios working independently of a fixed infrastructure, and satellite links for backup where lack of coverage, overload, or outage of wireless access links can occur.</p>
         <p>Figure 5 shows an example of deployment of this scenario.</p>
         <pre>                                \|/
@@ -371,12 +390,13 @@
                              | backhaul link |               ----------
                              -----------------</pre>
         <pre>      Figure 5: Rapidly Deployed Network with Partly Connected Nodes</pre>
-        <p>In the ad hoc network, all nodes are master nodes that allocate radio frequency (RF) channels from the database (as described in Section 4.1). However, the backhaul link may not be available to all nodes, such as depicted for the left node in the above figure. To handle RF channel allocation for such nodes, a master node with a</p>
+        <p>In the ad hoc network, all nodes are master nodes that allocate radio frequency (RF) channels from the database (as described in <a href="#S4.1" rel="dct:references">Section 4.1</a>). However, the backhaul link may not be available to all nodes, such as depicted for the left node in the above figure. To handle RF channel allocation for such nodes, a master node with a</p>
         <p>backhaul link relays or proxies the database query for them. So master nodes without a backhaul link follow the procedure as defined for clients. The ad hoc network radios utilize the provided RF channels. Details on forming and maintenance of the ad hoc network, including repair of segmented networks caused by segments operating on different RF channels, is out of scope of spectrum allocation.</p>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S4.5" property="dct:title" content="White Space Used for Local TV Broadcaster" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="4.5"/>
-        <p>Available white-space spectrum can be deployed in novel ways to leverage the public use of hand-held and portable devices. One such use is white-space spectrum used for local TV transmission of audio- video content to portable devices used by individuals in attendance at an event. In this use case, audience members at a seminar, entertainment event, or other venue plug a miniature TV receiver fob into their laptop, computer tablet, cell phone, or other portable device. A master device obtains a list of available white-space spectrum (as described in Section 4.1), then broadcasts audio-video content locally to the audience over one of the available frequencies. Audience members receive the content through their miniature TV receivers tuned to the appropriate white-space band for display on the monitors of their portable devices.</p>
+      <div class="subsection" property="dct:title" content="White Space Used for Local TV Broadcaster" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S4.5">
+        <span content="RFC 1, section 4.5" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S4.5"/>
+        <span content="4.5" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S4.5"/>
+        <p>Available white-space spectrum can be deployed in novel ways to leverage the public use of hand-held and portable devices. One such use is white-space spectrum used for local TV transmission of audio- video content to portable devices used by individuals in attendance at an event. In this use case, audience members at a seminar, entertainment event, or other venue plug a miniature TV receiver fob into their laptop, computer tablet, cell phone, or other portable device. A master device obtains a list of available white-space spectrum (as described in <a href="#S4.1" rel="dct:references">Section 4.1</a>), then broadcasts audio-video content locally to the audience over one of the available frequencies. Audience members receive the content through their miniature TV receivers tuned to the appropriate white-space band for display on the monitors of their portable devices.</p>
         <p>Figure 6 shows an example of deployment of this scenario.</p>
         <pre>                                                |------------|
                                                 |White-Space |
@@ -400,14 +420,16 @@
         <pre>             Figure 6: White Space Used for Local TV Broadcast</pre>
       </div>
     </div>
-    <div class="section" about="http://localhost:8000/res/rfc/6953#S5" property="dct:title" content="Requirements" typeof="bibo:DocumentPart">
-      <span xml:lang="" property="bibo:chapter" content="5"/>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S5.1" property="dct:title" content="Data Model Requirements" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="5.1"/>
+    <div class="section" property="dct:title" content="Requirements" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S5">
+      <span content="RFC 1, section 5" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S5"/>
+      <span content="5" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S5"/>
+      <div class="subsection" property="dct:title" content="Data Model Requirements" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S5.1">
+        <span content="RFC 1, section 5.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S5.1"/>
+        <span content="5.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S5.1"/>
         <pre>   D.1  The data model MUST support specifying the geolocation of the
         white-space device, the uncertainty in meters, the height and
         its uncertainty, and the percentage of confidence in the
-        location determination.  The data model MUST support <a href="#bib-WGS84" rel="dct:references">[WGS84]</a>.</pre>
+        location determination.  The data model MUST support [WGS84].</pre>
         <pre>   D.2  The data model MUST support specifying the data and other
         applicable requirements of the rule set that applies to the
         white-space device at a specified location.</pre>
@@ -450,8 +472,9 @@
         levels selected for use by a white-space device in the
         acknowledgment message.</pre>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S5.2" property="dct:title" content="Protocol Requirements" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="5.2"/>
+      <div class="subsection" property="dct:title" content="Protocol Requirements" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S5.2">
+        <span content="RFC 1, section 5.2" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S5.2"/>
+        <span content="5.2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S5.2"/>
         <pre>   P.1   The master device identifies a database to which it can
          register, make spectrum availability requests, etc.  The
          protocol MUST support the discovery of an appropriate database
@@ -483,24 +506,24 @@
          sensitive handling of device-provided data where such
          protection is feasible, allowed, and desired.</pre>
         <pre>   P.8   The protocol MUST support the master device registering with
-         the database; see Device Registration (Section 3.3).</pre>
+         the database; see Device Registration (<a href="#S3.3" rel="dct:references">Section 3.3</a>).</pre>
         <pre>   P.9   The protocol MUST support a registration acknowledgment
          indicating the success or failure of the master device
          registration.</pre>
         <pre>   P.10  The protocol MUST support an available spectrum request from
          the master device to the database, which may include one or
          more of the data items listed in Data Model Requirements
-         (Section 5.1).  The request may include data that the master
+         (<a href="#S5.1" rel="dct:references">Section 5.1</a>).  The request may include data that the master
          device sends on its own behalf and/or on behalf of one or more
          slave devices.</pre>
         <pre>   P.11  The protocol MUST support an available spectrum response from
          the database to the master device, which may include one or
          more of the data items listed in Data Model Requirements
-         (Section 5.1).  The response may include data related to master
+         (<a href="#S5.1" rel="dct:references">Section 5.1</a>).  The response may include data related to master
          and/or slave device operation.</pre>
         <pre>   P.12  The protocol MUST support a spectrum usage message from the
          master device to the database, which may include one or more of
-         the data items listed in Data Model Requirements (Section 5.1).
+         the data items listed in Data Model Requirements (<a href="#S5.1" rel="dct:references">Section 5.1</a>).
          The message may include data that the master device sends on
          its own behalf and/or on behalf of one or more slave devices.</pre>
         <pre>   P.13  The protocol MUST support a spectrum usage message
@@ -517,8 +540,9 @@
          inform master devices of changes to spectrum availability
          information.</pre>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S5.3" property="dct:title" content="Operational Requirements" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="5.3"/>
+      <div class="subsection" property="dct:title" content="Operational Requirements" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S5.3">
+        <span content="RFC 1, section 5.3" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S5.3"/>
+        <span content="5.3" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S5.3"/>
         <p>This section contains operational requirements of a database-device system, independent of the requirements of the protocol for communication between the database and devices.</p>
         <pre>   O.1  The master device must be able to connect to the database to
         send requests to the database and receive responses to, and
@@ -538,8 +562,9 @@
         white space at that location.</pre>
         <pre>   O.6  The database MUST respond to an available spectrum request.</pre>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S5.4" property="dct:title" content="Guidelines" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="5.4"/>
+      <div class="subsection" property="dct:title" content="Guidelines" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S5.4">
+        <span content="RFC 1, section 5.4" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S5.4"/>
+        <span content="5.4" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S5.4"/>
         <p>White-space technology itself is expected to evolve and include attributes such as coexistence and interference avoidance, spectrum brokering, alternative spectrum bands, etc. The design of the data model and protocol should be cognizant of the evolving nature of white-space technology and consider the following set of guidelines in the development of the data model and protocol:</p>
         <pre>   1.  The data model SHOULD provide a modular design separating
        messaging-specific, administrative-specific, and spectrum-
@@ -548,8 +573,9 @@
        administrative-specific and spectrum-specific modules are used.</pre>
       </div>
     </div>
-    <div class="section" about="http://localhost:8000/res/rfc/6953#S6" property="dct:title" content="Security Considerations" typeof="bibo:DocumentPart">
-      <span xml:lang="" property="bibo:chapter" content="6"/>
+    <div class="section" property="dct:title" content="Security Considerations" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S6">
+      <span content="RFC 1, section 6" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S6"/>
+      <span content="6" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S6"/>
       <p>PAWS is a protocol whereby a master device requests a schedule of available spectrum at its location (or the location of its slave devices) before it (or they) can operate using those frequencies. Whereas the information provided by the database must be accurate and conform to applicable regulatory rules, the database cannot enforce, through the protocol, that a client device uses only the spectrum it provided. In other words, devices can put energy in the air and cause interference without asking the database. Hence, PAWS security considerations do not include protection against malicious use of the white-space spectrum.</p>
       <p>Threat model for the PAWS protocol:</p>
       <pre>      Assumptions:</pre>
@@ -610,31 +636,35 @@
          pretend to be a database and send a revoke message to that
          device.  This results in denial of service to the master
          device.</pre>
-      <p>The security requirements arising from the above threats are captured in the requirements of Section 5.2.</p>
+      <p>The security requirements arising from the above threats are captured in the requirements of <a href="#S5.2" rel="dct:references">Section 5.2.</a></p>
     </div>
-    <div class="section" about="http://localhost:8000/res/rfc/6953#S7" property="dct:title" content="Acknowledgments" typeof="bibo:DocumentPart">
-      <span xml:lang="" property="bibo:chapter" content="7"/>
+    <div class="section" property="dct:title" content="Acknowledgments" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S7">
+      <span content="RFC 1, section 7" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S7"/>
+      <span content="7" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S7"/>
       <p>The authors acknowledge Gabor Bajko, Teco Boot, Nancy Bravin, Rex Buddenberg, Vincent Chen, Gerald Chouinard, Stephen Farrell, Michael Fitch, Joel M. Halpern, Jussi Kahtava, Paul Lambert, Barry Leiba, Subramanian Moonesamy, Pete Resnick, Brian Rosen, Andy Sago, Peter Stanforth, John Stine, and Juan Carlos Zuniga for their contributions to this document.</p>
     </div>
-    <div class="section" about="http://localhost:8000/res/rfc/6953#S8" property="dct:title" content="References" typeof="bibo:DocumentPart">
-      <span xml:lang="" property="bibo:chapter" content="8"/>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S8.1" property="dct:title" content="Normative References" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="8.1"/>
-        <pre>   <a href="#bib-RFC2119" rel="dct:references">[RFC2119]</a>  Bradner, S., "Key words for use in RFCs to Indicate
-              Requirement Levels", BCP 14, RFC 2119, March 1997.</pre>
-        <pre>   <a href="#bib-WGS84" rel="dct:references">[WGS84]</a>    National Imagery and Mapping Agency, "Department of
+    <div class="section" property="dct:title" content="References" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S8">
+      <span content="RFC 1, section 8" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S8"/>
+      <span content="8" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S8"/>
+      <div class="subsection" property="dct:title" content="Normative References" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S8.1">
+        <span content="RFC 1, section 8.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S8.1"/>
+        <span content="8.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S8.1"/>
+        <pre>   <a href="http://localhost:8000/res/rfc/2119" rel="dct:references">[RFC2119]</a>  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, <a href="http://localhost:8000/res/rfc/2119" rel="dct:references">RFC 2119</a>, March 1997.</pre>
+        <pre>   [WGS84]    National Imagery and Mapping Agency, "Department of
               Defense World Geodetic System 1984, Its Definition and
               Relationships with Local Geodetic Systems", NIMA
               TR8350.2 Third Edition Amendment 1, January 2000,
               &lt;http://earth-info.nga.mil/GandG/publications/tr8350.2/
               wgs84fin.pdf&gt;.</pre>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6953#S8.2" property="dct:title" content="Informative References" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="8.2"/>
-        <pre>   <a href="#bib-CRADIO" rel="dct:references">[CRADIO]</a>   Cognitive Radio Technologies Proceeding (CRTP), "Federal
+      <div class="subsection" property="dct:title" content="Informative References" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6953#S8.2">
+        <span content="RFC 1, section 8.2" property="dct:identifier" about="http://localhost:8000/res/rfc/6953#S8.2"/>
+        <span content="8.2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6953#S8.2"/>
+        <pre>   [CRADIO]   Cognitive Radio Technologies Proceeding (CRTP), "Federal
               Communications Commission", ET Docket No. 03-108,
               August 2010, &lt;http://fcc.gov/oet/cognitiveradio&gt;.</pre>
-        <pre>   <a href="#bib-PAWS" rel="dct:references">[PAWS]</a>     Chen, V., Ed., Das, S., Zhu, L., Malyar, J., and P.
+        <pre>   [PAWS]     Chen, V., Ed., Das, S., Zhu, L., Malyar, J., and P.
               McCann, "Protocol to Access Spectrum Database", Work
               in Progress, May 2013.</pre>
         <p>Authors' Addresses</p>

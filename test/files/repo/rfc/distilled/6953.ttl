@@ -1,8 +1,12 @@
 @prefix bibo: <http://purl.org/ontology/bibo/> .
 @prefix dct: <http://purl.org/dc/terms/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rfc: <http://example.org/ontology/rfc/> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://localhost:8000/res/rfc/6953> a bibo:Standard ;
+<http://localhost:8000/res/rfc/6953> a rfc:RFC ;
     dct:category "Informational" ;
     dct:creator "A. Mancuso, Ed.",
         "B. Patil",
@@ -14,5 +18,177 @@
     dct:rightsHolder "Cisco Systems",
         "Google" ;
     dct:title "Protocol to Access White-Space (PAWS) Databases: Use Cases and Requirements"@en ;
-    bibo:shortTitle "PAWS Use Cases and Requirements"@en.
+    bibo:shortTitle "PAWS Use Cases and Requirements"@en .
+
+<http://localhost:8000/res/rfc/6953#PS1> a bibo:DocumentPart ;
+    dct:title "Abstract"@en .
+
+<http://localhost:8000/res/rfc/6953#PS2> a bibo:DocumentPart ;
+    dct:references <http://localhost:8000/res/rfc/5741#S2> ;
+    dct:title "Status of This Memo"@en .
+
+<http://localhost:8000/res/rfc/6953#PS3> a bibo:DocumentPart ;
+    dct:references <http://localhost:8000/res/rfc/6953#S4> ;
+    dct:title "Copyright Notice"@en .
+
+<http://localhost:8000/res/rfc/6953#S1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 1"@en ;
+    dct:title "Introduction"@en ;
+    bibo:chapter "1"@en .
+
+<http://localhost:8000/res/rfc/6953#S1.1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 1.1"@en ;
+    dct:title "Introduction to White Space"@en ;
+    bibo:chapter "1.1"@en .
+
+<http://localhost:8000/res/rfc/6953#S1.2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 1.2"@en ;
+    dct:title "Scope"@en ;
+    bibo:chapter "1.2"@en .
+
+<http://localhost:8000/res/rfc/6953#S1.2.1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 1.2.1"@en ;
+    dct:title "In Scope"@en ;
+    bibo:chapter "1.2.1"@en .
+
+<http://localhost:8000/res/rfc/6953#S1.2.2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 1.2.2"@en ;
+    dct:title "Out of Scope"@en ;
+    bibo:chapter "1.2.2"@en .
+
+<http://localhost:8000/res/rfc/6953#S2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 2"@en ;
+    dct:title "Conventions Used in This Document"@en ;
+    bibo:chapter "2"@en .
+
+<http://localhost:8000/res/rfc/6953#S2.1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 2.1"@en ;
+    dct:title "Terminology"@en ;
+    bibo:chapter "2.1"@en .
+
+<http://localhost:8000/res/rfc/6953#S2.2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 2.2"@en ;
+    dct:references <http://localhost:8000/res/rfc/2119> ;
+    dct:title "Requirements Language"@en ;
+    bibo:chapter "2.2"@en .
+
+<http://localhost:8000/res/rfc/6953#S3> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 3"@en ;
+    dct:title "Problem Statement"@en ;
+    bibo:chapter "3"@en .
+
+<http://localhost:8000/res/rfc/6953#S3.1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 3.1"@en ;
+    dct:title "Global Applicability"@en ;
+    bibo:chapter "3.1"@en .
+
+<http://localhost:8000/res/rfc/6953#S3.4> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 3.4"@en ;
+    dct:title "Protocol"@en ;
+    bibo:chapter "3.4"@en .
+
+<http://localhost:8000/res/rfc/6953#S3.5> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 3.5"@en ;
+    dct:title "Data Model Definition"@en ;
+    bibo:chapter "3.5"@en .
+
+<http://localhost:8000/res/rfc/6953#S4.2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 4.2"@en ;
+    dct:title "Offloading: Moving Traffic to a White-Space Network"@en ;
+    bibo:chapter "4.2"@en .
+
+<http://localhost:8000/res/rfc/6953#S4.3> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 4.3"@en ;
+    dct:references <http://localhost:8000/res/rfc/6953#S4.1> ;
+    dct:title "White Space Serving as Backhaul"@en ;
+    bibo:chapter "4.3"@en .
+
+<http://localhost:8000/res/rfc/6953#S4.4> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 4.4"@en ;
+    dct:references <http://localhost:8000/res/rfc/6953#S4.1> ;
+    dct:title "Rapid Network Deployment during Emergencies"@en ;
+    bibo:chapter "4.4"@en .
+
+<http://localhost:8000/res/rfc/6953#S4.5> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 4.5"@en ;
+    dct:references <http://localhost:8000/res/rfc/6953#S4.1> ;
+    dct:title "White Space Used for Local TV Broadcaster"@en ;
+    bibo:chapter "4.5"@en .
+
+<http://localhost:8000/res/rfc/6953#S5> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 5"@en ;
+    dct:title "Requirements"@en ;
+    bibo:chapter "5"@en .
+
+<http://localhost:8000/res/rfc/6953#S5.3> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 5.3"@en ;
+    dct:title "Operational Requirements"@en ;
+    bibo:chapter "5.3"@en .
+
+<http://localhost:8000/res/rfc/6953#S5.4> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 5.4"@en ;
+    dct:title "Guidelines"@en ;
+    bibo:chapter "5.4"@en .
+
+<http://localhost:8000/res/rfc/6953#S6> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 6"@en ;
+    dct:references <http://localhost:8000/res/rfc/6953#S5.2> ;
+    dct:title "Security Considerations"@en ;
+    bibo:chapter "6"@en .
+
+<http://localhost:8000/res/rfc/6953#S7> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 7"@en ;
+    dct:title "Acknowledgments"@en ;
+    bibo:chapter "7"@en .
+
+<http://localhost:8000/res/rfc/6953#S8> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 8"@en ;
+    dct:title "References"@en ;
+    bibo:chapter "8"@en .
+
+<http://localhost:8000/res/rfc/6953#S8.1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 8.1"@en ;
+    dct:references <http://localhost:8000/res/rfc/2119> ;
+    dct:title "Normative References"@en ;
+    bibo:chapter "8.1"@en .
+
+<http://localhost:8000/res/rfc/6953#S8.2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 8.2"@en ;
+    dct:title "Informative References"@en ;
+    bibo:chapter "8.2"@en .
+
+<http://localhost:8000/res/rfc/6953#S3.2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 3.2"@en ;
+    dct:references <http://localhost:8000/res/rfc/6953#S4> ;
+    dct:title "Database Discovery"@en ;
+    bibo:chapter "3.2"@en .
+
+<http://localhost:8000/res/rfc/6953#S5.1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 5.1"@en ;
+    dct:title "Data Model Requirements"@en ;
+    bibo:chapter "5.1"@en .
+
+<http://localhost:8000/res/rfc/6953#S5.2> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 5.2"@en ;
+    dct:references <http://localhost:8000/res/rfc/6953#S3.3>,
+        <http://localhost:8000/res/rfc/6953#S5.1> ;
+    dct:title "Protocol Requirements"@en ;
+    bibo:chapter "5.2"@en .
+
+<http://localhost:8000/res/rfc/6953#S3.3> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 3.3"@en ;
+    dct:title "Device Registration"@en ;
+    bibo:chapter "3.3"@en .
+
+<http://localhost:8000/res/rfc/6953#S4> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 4"@en ;
+    dct:title "Use Cases"@en ;
+    bibo:chapter "4"@en .
+
+<http://localhost:8000/res/rfc/6953#S4.1> a bibo:DocumentPart ;
+    dct:identifier "RFC 6953, section 4.1"@en ;
+    dct:references <http://localhost:8000/res/rfc/6953#S3.2>,
+        <http://localhost:8000/res/rfc/6953#S3.3> ;
+    dct:title "Master-Slave White-Space Networks"@en ;
+    bibo:chapter "4.1"@en .
 

@@ -1,22 +1,22 @@
 <?xml version='1.0' encoding='utf-8'?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
-<html xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:dct="http://purl.org/dc/terms/" xmlns:rfc="http://example.org/ontology/rfc/" xmlns:foaf="http://xmlns.com/foaf/0.1/" xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<html xmlns:foaf="http://xmlns.com/foaf/0.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:rfc="http://example.org/ontology/rfc/" xmlns:dct="http://purl.org/dc/terms/" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
   <head about="http://localhost:8000/res/rfc/6912">
-    <meta xml:lang="" property="dct:category" content="Informational"/>
-    <meta xml:lang="" property="dct:creator" content="A. Sullivan"/>
-    <meta xml:lang="" property="dct:creator" content="D. Thaler"/>
-    <meta xml:lang="" property="dct:creator" content="J. Klensin"/>
-    <meta xml:lang="" property="dct:creator" content="O. Kolkman"/>
-    <meta xml:lang="" property="dct:identifier" content="RFC 6912"/>
-    <meta xml:lang="" property="dct:issn" content="2070-1721"/>
-    <meta property="dct:issued" datatype="xsd:date" content="2013-04-01"/>
-    <meta xml:lang="" property="dct:publisher" content="Internet Architecture Board (IAB)"/>
-    <meta xml:lang="" property="dct:rightsHolder" content="Dyn, Inc."/>
-    <meta xml:lang="" property="dct:rightsHolder" content="Microsoft"/>
-    <meta xml:lang="" property="dct:rightsHolder" content="NLnet Labs"/>
+    <meta content="Informational" property="dct:category" xml:lang=""/>
+    <meta content="A. Sullivan" property="dct:creator" xml:lang=""/>
+    <meta content="D. Thaler" property="dct:creator" xml:lang=""/>
+    <meta content="J. Klensin" property="dct:creator" xml:lang=""/>
+    <meta content="O. Kolkman" property="dct:creator" xml:lang=""/>
+    <meta content="RFC 6912" property="dct:identifier" xml:lang=""/>
+    <meta content="2070-1721" property="dct:issn" xml:lang=""/>
+    <meta datatype="xsd:date" property="dct:issued" content="2013-04-01"/>
+    <meta content="Internet Architecture Board (IAB)" property="dct:publisher" xml:lang=""/>
+    <meta content="Dyn, Inc." property="dct:rightsHolder" xml:lang=""/>
+    <meta content="Microsoft" property="dct:rightsHolder" xml:lang=""/>
+    <meta content="NLnet Labs" property="dct:rightsHolder" xml:lang=""/>
     <title property="dct:title">Principles for Unicode Code Point Inclusion in Labels in the DNS</title>
-    <meta xml:lang="en" property="bibo:shortTitle" content="DNS Zone Code Point Principles"/>
-    <link rel="rdf:type" href="http://purl.org/ontology/bibo/Standard"/>
+    <meta content="DNS Zone Code Point Principles" property="bibo:shortTitle" xml:lang="en"/>
+    <link href="http://example.org/ontology/rfc/RFC" rel="rdf:type"/>
   </head>
   <body about="http://localhost:8000/res/rfc/6912">
     <div class="preamblesection" property="dct:title" content="Abstract" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#PS1">
@@ -24,33 +24,35 @@
     </div>
     <div class="preamblesection" property="dct:title" content="Status of This Memo" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#PS2">
       <p>This document is not an Internet Standards Track specification; it is published for informational purposes.</p>
-      <p>This document is a product of the Internet Architecture Board (IAB) and represents information that the IAB has deemed valuable to provide for permanent record. It represents the consensus of the Internet Architecture Board (IAB). Documents approved for publication by the IAB are not a candidate for any level of Internet Standard; see Section 2 of RFC 5741.</p>
+      <p>This document is a product of the Internet Architecture Board (IAB) and represents information that the IAB has deemed valuable to provide for permanent record. It represents the consensus of the Internet Architecture Board (IAB). Documents approved for publication by the IAB are not a candidate for any level of Internet Standard; see <a href="http://localhost:8000/res/rfc/5741#S2" rel="dct:references">Section 2 of RFC 5741</a>.</p>
       <p>Information about the current status of this document, any errata, and how to provide feedback on it may be obtained at http://www.rfc-editor.org/info/rfc6912.</p>
     </div>
     <div class="preamblesection" property="dct:title" content="Copyright Notice" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#PS3">
       <p>Copyright (c) 2013 IETF Trust and the persons identified as the document authors. All rights reserved.</p>
       <p>This document is subject to BCP 78 and the IETF Trust's Legal Provisions Relating to IETF Documents (http://trustee.ietf.org/license-info) in effect on the date of publication of this document. Please review these documents carefully, as they describe your rights and restrictions with respect to this document.</p>
     </div>
-    <div class="section" about="http://localhost:8000/res/rfc/6912#S1" property="dct:title" content="Introduction" typeof="bibo:DocumentPart">
-      <span xml:lang="" property="bibo:chapter" content="1"/>
-      <p>Operators of a DNS zone need to set policies around what Unicode code points are allowed in labels in that zone. Typically there are a number of important goals to consider when constructing such policies. These include, for instance, avoiding possible visual confusability between two labels, avoiding possible confusion between Fully Qualified Domain Names (FQDNs) and IP address literals, accessibility to the disabled (see "Web Content Accessibility Guidelines (WCAG) 2.0" <a href="#bib-WCAG20" rel="dct:references">[WCAG20]</a> for some discussion in a web context), and other usability issues.</p>
+    <div class="section" property="dct:title" content="Introduction" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S1">
+      <span content="RFC 1, section 1" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S1"/>
+      <span content="1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S1"/>
+      <p>Operators of a DNS zone need to set policies around what Unicode code points are allowed in labels in that zone. Typically there are a number of important goals to consider when constructing such policies. These include, for instance, avoiding possible visual confusability between two labels, avoiding possible confusion between Fully Qualified Domain Names (FQDNs) and IP address literals, accessibility to the disabled (see "Web Content Accessibility Guidelines (WCAG) 2.0" [WCAG20] for some discussion in a web context), and other usability issues.</p>
       <p>This document provides a set of principles that zone operators can use to construct their code point policies in order to improve usability and clarity and thereby reduce confusion.</p>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6912#S1.1" property="dct:title" content="Terminology" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="1.1"/>
+      <div class="subsection" property="dct:title" content="Terminology" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S1.1">
+        <span content="RFC 1, section 1.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S1.1"/>
+        <span content="1.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S1.1"/>
         <p>This document uses the following terms.</p>
         <pre>      A-label: an LDH label that starts with "xn--" and meets all the
       IDNA requirements, with additional restrictions as explained in
-      Section 2.3.2.1 of the IDNA Definitions document <a href="#bib-RFC5890" rel="dct:references">[RFC5890]</a>.</pre>
+      <a href="#S2.3.2.1" rel="dct:references">Section 2.3.2.1</a> of the IDNA Definitions document <a href="http://localhost:8000/res/rfc/5890" rel="dct:references">[RFC5890]</a>.</pre>
         <pre>      Character: a member of a set of elements used for the
-      organization, control, or representation of data.  See Section 2
-      of the Internationalization Terminology document <a href="#bib-RFC6365" rel="dct:references">[RFC6365]</a> for
+      organization, control, or representation of data.  See <a href="#S2" rel="dct:references">Section 2</a>
+      of the Internationalization Terminology document <a href="http://localhost:8000/res/rfc/6365" rel="dct:references">[RFC6365]</a> for
       more details.</pre>
         <pre>      Language: a way that humans communicate.  The use of language
       occurs in many forms, the most common of which are speech,
-      writing, and signing.  See Section 2 of RFC 6365 for more details.</pre>
+      writing, and signing.  See <a href="http://localhost:8000/res/rfc/6365#S2" rel="dct:references">Section 2 of RFC 6365 </a>for more details.</pre>
         <pre>      LDH label: a string consisting of ASCII letters, digits, and the
-      hyphen, with additional restrictions as explained in Section 2.3.1
-      of RFC 5890.</pre>
+      hyphen, with additional restrictions as explained in <a href="http://localhost:8000/res/rfc/5890#S2.3.1" rel="dct:references">Section 2.3.1
+      of RFC 5890</a>.</pre>
         <pre>      Public zone: in this document, a DNS zone that accepts
       registration requests from organizations outside the zone
       administrator's own organization.  (Whether the zone performs
@@ -58,26 +60,27 @@
       diversity of the registration-requesting community.)  Note that
       under this definition, the root zone is a public zone, though one
       that has a unique function in the DNS.</pre>
-        <pre>      Rendering: the display of a string of text.  See Section 5 of RFC
-      6365 for more details.</pre>
+        <pre>      Rendering: the display of a string of text.  See <a href="http://localhost:8000/res/rfc/6365#S5" rel="dct:references">Section 5 of RFC
+      6365 </a>for more details.</pre>
         <pre>      Script: a set of graphic characters used for the written form of
-      one or more languages.  See Section 2 of RFC 6365 for more
+      one or more languages.  See <a href="http://localhost:8000/res/rfc/6365#S2" rel="dct:references">Section 2 of RFC 6365 </a>for more
       details.</pre>
         <pre>      U-label: a string of Unicode characters that meets all the IDNA
       requirements and includes at least one non-ASCII character, with
-      additional restrictions as explained in Section 2.3.2.1 of RFC
-      5890.</pre>
+      additional restrictions as explained in <a href="http://localhost:8000/res/rfc/5890#S2.3.2.1" rel="dct:references">Section 2.3.2.1 of RFC
+      5890</a>.</pre>
         <pre>      Writing system: a set of rules for using one or more scripts to
-      write a particular language.  See Section 2 of RFC 6365 for more
+      write a particular language.  See <a href="http://localhost:8000/res/rfc/6365#S2" rel="dct:references">Section 2 of RFC 6365 </a>for more
       details.</pre>
-        <p>This memo does not propose a protocol standard, and the use of words such as "should" follow the ordinary English meaning, and not that laid out in <a href="#bib-RFC2119" rel="dct:references">[RFC2119]</a>.</p>
+        <p>This memo does not propose a protocol standard, and the use of words such as "should" follow the ordinary English meaning, and not that laid out in <a href="http://localhost:8000/res/rfc/2119" rel="dct:references">[RFC2119]</a>.</p>
       </div>
     </div>
-    <div class="section" about="http://localhost:8000/res/rfc/6912#S2" property="dct:title" content="Background" typeof="bibo:DocumentPart">
-      <span xml:lang="" property="bibo:chapter" content="2"/>
-      <p>In recent communications <a href="#bib-IABCOMM1" rel="dct:references">[IABCOMM1]</a> <a href="#bib-IABCOMM2" rel="dct:references">[IABCOMM2]</a>, the IAB has emphasized the importance of conservatism in allocating labels conforming to IDNA2008 <a href="#bib-RFC5890" rel="dct:references">[RFC5890]</a> <a href="#bib-RFC5891" rel="dct:references">[RFC5891]</a> <a href="#bib-RFC5892" rel="dct:references">[RFC5892]</a> <a href="#bib-RFC5893" rel="dct:references">[RFC5893]</a> <a href="#bib-RFC5894" rel="dct:references">[RFC5894]</a> <a href="#bib-RFC5895" rel="dct:references">[RFC5895]</a> in DNS zones, and especially in the root zone. Traditional LDH labels in the root zone used only alphabetic characters (i.e., ASCII a-z, which under the DNS also match A-Z). Matters are more complicated with U-labels, however. The IAB communications recommended that U-labels permit only code points with a General_Category (gc) of Ll (Lowercase_Letter), Lo (Other_Letter), or Lm (Modifier_Letter), but noted that for practical considerations other code points might be permitted on a case-by-case basis.</p>
-      <p>The IAB recommendations do, however, leave some issues open that need to be addressed. It is not clear that all code points permitted under IDNA2008 that have a General_Category of Lo or Lm are appropriate for a zone such as the root zone. To take but one example, the code point U+02BC (MODIFIER LETTER APOSTROPHE) has a General_Category of Lm. In practically every rendering (and we are unaware of an exception), U+02BC is indistinguishable from U+2019 (RIGHT SINGLE QUOTATION MARK), which has a General_Category of Pf (Final_Punctuation). U+02BC will also be read by large numbers of people as being the same character as U+0027 (APOSTROPHE), which has a General_Category of Po (Other_Punctuation), and some computer systems may treat U+02BC as U+0027. U+02BC is PROTOCOL VALID (PVALID) under IDNA2008 (see the IDNA Code Points document <a href="#bib-RFC5892" rel="dct:references">[RFC5892]</a>), whereas both other code points are DISALLOWED. So, to begin with, it is plain that not every code point with a</p>
-      <p>General_Category of Ll, Lo, or Lm is consistent with the type of conservatism principle discussed in Section 4.1 below or the previous IAB recommendations.</p>
+    <div class="section" property="dct:title" content="Background" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S2">
+      <span content="RFC 1, section 2" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S2"/>
+      <span content="2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S2"/>
+      <p>In recent communications [IABCOMM1] [IABCOMM2], the IAB has emphasized the importance of conservatism in allocating labels conforming to IDNA2008 <a href="http://localhost:8000/res/rfc/5890" rel="dct:references">[RFC5890]</a> <a href="http://localhost:8000/res/rfc/5891" rel="dct:references">[RFC5891]</a> <a href="http://localhost:8000/res/rfc/5892" rel="dct:references">[RFC5892]</a> <a href="http://localhost:8000/res/rfc/5893" rel="dct:references">[RFC5893]</a> <a href="http://localhost:8000/res/rfc/5894" rel="dct:references">[RFC5894]</a> <a href="http://localhost:8000/res/rfc/5895" rel="dct:references">[RFC5895]</a> in DNS zones, and especially in the root zone. Traditional LDH labels in the root zone used only alphabetic characters (i.e., ASCII a-z, which under the DNS also match A-Z). Matters are more complicated with U-labels, however. The IAB communications recommended that U-labels permit only code points with a General_Category (gc) of Ll (Lowercase_Letter), Lo (Other_Letter), or Lm (Modifier_Letter), but noted that for practical considerations other code points might be permitted on a case-by-case basis.</p>
+      <p>The IAB recommendations do, however, leave some issues open that need to be addressed. It is not clear that all code points permitted under IDNA2008 that have a General_Category of Lo or Lm are appropriate for a zone such as the root zone. To take but one example, the code point U+02BC (MODIFIER LETTER APOSTROPHE) has a General_Category of Lm. In practically every rendering (and we are unaware of an exception), U+02BC is indistinguishable from U+2019 (RIGHT SINGLE QUOTATION MARK), which has a General_Category of Pf (Final_Punctuation). U+02BC will also be read by large numbers of people as being the same character as U+0027 (APOSTROPHE), which has a General_Category of Po (Other_Punctuation), and some computer systems may treat U+02BC as U+0027. U+02BC is PROTOCOL VALID (PVALID) under IDNA2008 (see the IDNA Code Points document <a href="http://localhost:8000/res/rfc/5892" rel="dct:references">[RFC5892]</a>), whereas both other code points are DISALLOWED. So, to begin with, it is plain that not every code point with a</p>
+      <p>General_Category of Ll, Lo, or Lm is consistent with the type of conservatism principle discussed in <a href="#S4.1" rel="dct:references">Section 4.1</a> below or the previous IAB recommendations.</p>
       <pre>   To make matters worse, some languages are dependent on code points
    with General_Category Mc (Spacing_Mark) or General_Category Mn
    (Nonspacing_Mark).  This dependency is particularly common in Indic
@@ -87,131 +90,150 @@
    users of those languages to only code points with General_Category of
    Ll, Lo, or Lm would be extremely limiting.  While DNS labels are not
    words, or sentences, or phrases (as noted in the next steps for IDN
-   <a href="#bib-RFC4690" rel="dct:references">[RFC4690]</a>), they are intended to support useful mnemonics.  Mnemonics
+   <a href="http://localhost:8000/res/rfc/4690" rel="dct:references">[RFC4690]</a>), they are intended to support useful mnemonics.  Mnemonics
    that diverge wildly from the usual conventions are poor ones, because
    in not following the usual conventions they are not easy to remember.
    Also, wide divergence from usual conventions, if not well-justified
    (and especially in a shared namespace like the root), invites
    political controversy.</pre>
-      <p>Many of the issues above turn out to be relevant to all public zones. Moreover, the overall issue of developing a policy for code point permission is common to all zones that accept A-labels or U-labels for registration. As Section 4.3 of the IDNA Protocol document <a href="#bib-RFC5891" rel="dct:references">[RFC5891]</a> says, every registry at every level of the DNS is "expected to establish policies about label registrations".</p>
+      <p>Many of the issues above turn out to be relevant to all public zones. Moreover, the overall issue of developing a policy for code point permission is common to all zones that accept A-labels or U-labels for registration. As <a href="#S4.3" rel="dct:references">Section 4.3</a> of the IDNA Protocol document <a href="http://localhost:8000/res/rfc/5891" rel="dct:references">[RFC5891]</a> says, every registry at every level of the DNS is "expected to establish policies about label registrations".</p>
       <p>For reasons of sound management, it is not desirable to decide whether to permit a given code point only when an application containing that code point is pending. That approach reduces predictability and is bound to appear subject to special pleas. It is better instead to produce the rules governing acceptance of code points in advance.</p>
       <p>As is evident from the foregoing discussion about the Letter and Mark categories, it is simply not possible to make code point decisions algorithmically. If it were possible to develop such an algorithm, it would already exist: the DNS is hardly unique in needing to impose restrictions on code points while accommodating many different linguistic communities. Nevertheless, new guidelines can be made by starting from overarching principles. These guidelines act more as meta-rules, leading to the establishment of other rules about the inclusion and exclusion of particular code points in labels in a given zone, always based on the list of code points permitted by IDNA.</p>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6912#S2.1" property="dct:title" content="More-Restrictive Rules Going Up the DNS Tree" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="2.1"/>
+      <div class="subsection" property="dct:title" content="More-Restrictive Rules Going Up the DNS Tree" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S2.1">
+        <span content="RFC 1, section 2.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S2.1"/>
+        <span content="2.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S2.1"/>
         <p>A set of principles derived from the above ideas follows in Sections 3 through 5 below. Such principles fall into three categories. Some principles apply to every DNS zone. Some additional principles apply to all public zones, including the root zone. Finally, other principles apply only to the root zone. This means that zones higher in the DNS tree tend to have more restrictive rules (since additional principles apply), and zones lower in the DNS tree tend to have less restrictive rules, since they are used within a more narrow context. In general, the relevant context for a principle is that of the zone, not that of a given subset of the user community; for the root zone, for example, the context is "the entire Internet population".</p>
       </div>
     </div>
-    <div class="section" about="http://localhost:8000/res/rfc/6912#S3" property="dct:title" content="Principles Applicable to All Zones" typeof="bibo:DocumentPart">
-      <span xml:lang="" property="bibo:chapter" content="3"/>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6912#S3.1" property="dct:title" content="Longevity Principle" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="3.1"/>
-        <p>Unicode properties of a code point ought to be stable across the versions of Unicode that users of the zone are likely to have installed. Because it is possible for the properties of a code point to change between Unicode versions, a good way to predict such stability is to ensure that a code point has in fact been stable for multiple successive versions of Unicode. This principle is related to the Stability Principle in Section 4.5.</p>
+    <div class="section" property="dct:title" content="Principles Applicable to All Zones" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S3">
+      <span content="RFC 1, section 3" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S3"/>
+      <span content="3" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S3"/>
+      <div class="subsection" property="dct:title" content="Longevity Principle" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S3.1">
+        <span content="RFC 1, section 3.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S3.1"/>
+        <span content="3.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S3.1"/>
+        <p>Unicode properties of a code point ought to be stable across the versions of Unicode that users of the zone are likely to have installed. Because it is possible for the properties of a code point to change between Unicode versions, a good way to predict such stability is to ensure that a code point has in fact been stable for multiple successive versions of Unicode. This principle is related to the Stability Principle in <a href="#S4.5" rel="dct:references">Section 4.5.</a></p>
         <p>The more diverse the community using the zone, the greater the importance of following this principle. The policy for a leaf zone in the DNS might only require stability across two Unicode versions, whereas a more public zone might require stability across four or more releases before the code point's properties are considered long- lived and stable.</p>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6912#S3.2" property="dct:title" content="Least Astonishment Principle" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="3.2"/>
+      <div class="subsection" property="dct:title" content="Least Astonishment Principle" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S3.2">
+        <span content="RFC 1, section 3.2" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S3.2"/>
+        <span content="3.2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S3.2"/>
         <p>Every zone administrator should be sensitive to the likely use of a code point to be permitted, particularly taking into account the population likely to use the zone. Zone administrators should especially consider whether a candidate code point could present difficulty if the code point is encountered outside the usual linguistic circumstances. By the same token, the failure to support a code point that is normal in some linguistic circumstances could be very surprising for users likely to encounter the names in that circumstance.</p>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6912#S3.3" property="dct:title" content="Contextual Safety Principle" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="3.3"/>
+      <div class="subsection" property="dct:title" content="Contextual Safety Principle" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S3.3">
+        <span content="RFC 1, section 3.3" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S3.3"/>
+        <span content="3.3" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S3.3"/>
         <p>Every zone administrator should be sensitive to ways in which a code point that is permitted could be used in support of malicious activity. This is not a completely new problem: the digit 1 and the lowercase letter l are, for instance, easily confused in many contexts. The very large repertoire of code points in Unicode (even just the subset permitted for IDNs) makes the problem somewhat worse, just because of the scale.</p>
       </div>
     </div>
-    <div class="section" about="http://localhost:8000/res/rfc/6912#S4" property="dct:title" content="Principles Applicable to All Public Zones" typeof="bibo:DocumentPart">
-      <span xml:lang="" property="bibo:chapter" content="4"/>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6912#S4.1" property="dct:title" content="Conservatism Principle" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="4.1"/>
+    <div class="section" property="dct:title" content="Principles Applicable to All Public Zones" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S4">
+      <span content="RFC 1, section 4" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S4"/>
+      <span content="4" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S4"/>
+      <div class="subsection" property="dct:title" content="Conservatism Principle" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S4.1">
+        <span content="RFC 1, section 4.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S4.1"/>
+        <span content="4.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S4.1"/>
         <p>Public zones are, by definition, zones that are shared by different groups of people. Therefore, any decision to permit a code point in a public zone (including the root) should be as conservative as practicable. Doubts should always be resolved in favor of rejecting a code point for inclusion rather than in favor of including it, in order to minimize risk.</p>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6912#S4.2" property="dct:title" content="Inclusion Principle" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="4.2"/>
+      <div class="subsection" property="dct:title" content="Inclusion Principle" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S4.2">
+        <span content="RFC 1, section 4.2" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S4.2"/>
+        <span content="4.2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S4.2"/>
         <p>Just as IDNA2008 starts from the principle that the Unicode range is excluded, and then adds code points according to derived properties of the code points, so a public zone should only permit inclusion of a code point if it is known to be "safe" in terms of usability and confusability within the context of that zone. The default treatment of a code point should be that it is excluded.</p>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6912#S4.3" property="dct:title" content="Simplicity Principle" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="4.3"/>
+      <div class="subsection" property="dct:title" content="Simplicity Principle" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S4.3">
+        <span content="RFC 1, section 4.3" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S4.3"/>
+        <span content="4.3" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S4.3"/>
         <p>The rules for determining whether a code point is to be included should be simple enough that they are readily understood by someone with a moderate background in the DNS and Unicode issues. This principle does not mean that a completely naive person needs to be able to understand the rationale for including a code point, but it does mean that if the reason for inclusion of a very peculiar code point, even a safe one, is too difficult to understand, the code point would not be permitted.</p>
         <p>The meaning of "simple" or "readily understood" is context-dependent. For instance, the root zone has to serve everyone in the world; for practical purposes, this means that the reasons for including a code point need to be comprehensible even to people who cannot use the script where the code point is found. In a zone that permits a constrained subset of Unicode characters (for instance, only those needed to write a single alphabetic language) and that supports a</p>
-        <p>clearly delineated linguistic community (for instance, the speakers of a single language with well-understood written conventions), more complicated rules might be acceptable. Compare this principle with the Least Astonishment Principle in Section 3.2.</p>
+        <p>clearly delineated linguistic community (for instance, the speakers of a single language with well-understood written conventions), more complicated rules might be acceptable. Compare this principle with the Least Astonishment Principle in <a href="#S3.2" rel="dct:references">Section 3.2.</a></p>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6912#S4.4" property="dct:title" content="Predictability Principle" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="4.4"/>
-        <p>The rules for determining whether a code point is to be included should be predictable enough that those with the requisite understanding of DNS, IDNA, and Unicode will usually reach the same conclusion. This is not a requirement for algorithmic treatment of code points; as previously noted, that is not possible. Rather, it is to say that the consistent application of professional judgment is likely to yield the same results; combined with the principle in Section 4.1, when results are not predictable, the anomalous code point would not be permitted.</p>
-        <p>Just as in Section 4.3, this principle tends to cause more restriction the more diverse the community using the zone; it is most restrictive for the root zone. This is because what is predictable within a given language community is possibly very surprising across languages.</p>
+      <div class="subsection" property="dct:title" content="Predictability Principle" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S4.4">
+        <span content="RFC 1, section 4.4" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S4.4"/>
+        <span content="4.4" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S4.4"/>
+        <p>The rules for determining whether a code point is to be included should be predictable enough that those with the requisite understanding of DNS, IDNA, and Unicode will usually reach the same conclusion. This is not a requirement for algorithmic treatment of code points; as previously noted, that is not possible. Rather, it is to say that the consistent application of professional judgment is likely to yield the same results; combined with the principle in <a href="#S4.1" rel="dct:references">Section 4.1</a>, when results are not predictable, the anomalous code point would not be permitted.</p>
+        <p>Just as in <a href="#S4.3" rel="dct:references">Section 4.3</a>, this principle tends to cause more restriction the more diverse the community using the zone; it is most restrictive for the root zone. This is because what is predictable within a given language community is possibly very surprising across languages.</p>
       </div>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6912#S4.5" property="dct:title" content="Stability Principle" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="4.5"/>
+      <div class="subsection" property="dct:title" content="Stability Principle" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S4.5">
+        <span content="RFC 1, section 4.5" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S4.5"/>
+        <span content="4.5" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S4.5"/>
         <p>Once a code point is permitted, it is at least very hard to stop permitting that code point. In public zones (including the root), the list of code points to be permitted should change very slowly, if at all, and usually only in the direction of permitting an addition as time and experience indicate that inclusion of such a code point is both safe and consistent with these principles.</p>
       </div>
     </div>
-    <div class="section" about="http://localhost:8000/res/rfc/6912#S5" property="dct:title" content="Principle Specific to the Root Zone" typeof="bibo:DocumentPart">
-      <span xml:lang="" property="bibo:chapter" content="5"/>
-      <div class="subsection" about="http://localhost:8000/res/rfc/6912#S5.1" property="dct:title" content="Letter Principle" typeof="bibo:DocumentPart">
-        <span xml:lang="" property="bibo:chapter" content="5.1"/>
-        <p>"Requirements for Internet Hosts - Application and Support" <a href="#bib-RFC1123" rel="dct:references">[RFC1123]</a> notes that top-level labels "will be alphabetic". In the absence of widespread agreement about the force of that note, prudence suggests that U-labels in the root zone should exclude code points that are not normally used to write words, or that are in some cases normally used for purposes other than writing words. This is not the same as using Unicode's General_Category to include only letters. It is a restriction that expands the possible class of included code points beyond the Unicode letters, but only expands so far as to include the things that are normally used to create words. Under this principle, code points with (for example) General_Category Mn (Nonspacing_Mark) might be included -- but only those that are used to write words and</p>
-        <p>not (for instance) musical symbols. In addition, such marks should only be used within a label in ways that they would be used when making a word: combinations that would be nonsense when used in a word should also be rejected when tried in DNS labels. This principle should be applied as narrowly as possible; as the next steps for IDN document <a href="#bib-RFC4690" rel="dct:references">[RFC4690]</a> says, "While DNS labels may conveniently be used to express words in many circumstances, the goal is not to express words (or sentences or phrases), but to permit the creation of unambiguous labels with good mnemonic value".</p>
+    <div class="section" property="dct:title" content="Principle Specific to the Root Zone" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S5">
+      <span content="RFC 1, section 5" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S5"/>
+      <span content="5" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S5"/>
+      <div class="subsection" property="dct:title" content="Letter Principle" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S5.1">
+        <span content="RFC 1, section 5.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S5.1"/>
+        <span content="5.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S5.1"/>
+        <p>"Requirements for Internet Hosts - Application and Support" <a href="http://localhost:8000/res/rfc/1123" rel="dct:references">[RFC1123]</a> notes that top-level labels "will be alphabetic". In the absence of widespread agreement about the force of that note, prudence suggests that U-labels in the root zone should exclude code points that are not normally used to write words, or that are in some cases normally used for purposes other than writing words. This is not the same as using Unicode's General_Category to include only letters. It is a restriction that expands the possible class of included code points beyond the Unicode letters, but only expands so far as to include the things that are normally used to create words. Under this principle, code points with (for example) General_Category Mn (Nonspacing_Mark) might be included -- but only those that are used to write words and</p>
+        <p>not (for instance) musical symbols. In addition, such marks should only be used within a label in ways that they would be used when making a word: combinations that would be nonsense when used in a word should also be rejected when tried in DNS labels. This principle should be applied as narrowly as possible; as the next steps for IDN document <a href="http://localhost:8000/res/rfc/4690" rel="dct:references">[RFC4690]</a> says, "While DNS labels may conveniently be used to express words in many circumstances, the goal is not to express words (or sentences or phrases), but to permit the creation of unambiguous labels with good mnemonic value".</p>
       </div>
     </div>
-    <div class="section" about="http://localhost:8000/res/rfc/6912#S6" property="dct:title" content="Confusion and Context" typeof="bibo:DocumentPart">
-      <span xml:lang="" property="bibo:chapter" content="6"/>
+    <div class="section" property="dct:title" content="Confusion and Context" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S6">
+      <span content="RFC 1, section 6" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S6"/>
+      <span content="6" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S6"/>
       <p>While many discussions of confusion have focused on characters, e.g., whether two characters are confusable with each other (and under what circumstances), a focus on characters alone could lead to the prohibition of very large numbers of labels, including many that present little risk. Instead, the focus should be on whether one label is confusable with another. For example, if a label contains several characters that are distinct to a particular script, and all of its characters are from that script, it is inherently not confusable with a label from any other script no matter what other characters might appear in it. Another label that lacks those distinguishing characters might be a problem. The notion extends from labels to domain names, in the sense that distinguishing characters used in a higher-level label may set expectations with respect to the characters in the lower-level labels. This expectation might be regarded as a benefit, but it is also a problem, since there is no technical way to require consistent policies in delegated namespaces.</p>
     </div>
-    <div class="section" about="http://localhost:8000/res/rfc/6912#S7" property="dct:title" content="Conclusion" typeof="bibo:DocumentPart">
-      <span xml:lang="" property="bibo:chapter" content="7"/>
-      <p>The principles outlined in this document can be applied when considering any range of Unicode code points for possible inclusion in a DNS zone. It is worth observing that doing anything (especially in light of Section 4.5) implicitly disadvantages communities with a writing system not yet well understood and not represented in the technical and policy communities involved in the discussion. That disadvantage is to be guarded against as much as practical, but is effectively impossible to prevent (while still taking action) in light of imperfect human knowledge.</p>
+    <div class="section" property="dct:title" content="Conclusion" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S7">
+      <span content="RFC 1, section 7" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S7"/>
+      <span content="7" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S7"/>
+      <p>The principles outlined in this document can be applied when considering any range of Unicode code points for possible inclusion in a DNS zone. It is worth observing that doing anything (especially in light of <a href="#S4.5" rel="dct:references">Section 4.5</a>) implicitly disadvantages communities with a writing system not yet well understood and not represented in the technical and policy communities involved in the discussion. That disadvantage is to be guarded against as much as practical, but is effectively impossible to prevent (while still taking action) in light of imperfect human knowledge.</p>
     </div>
-    <div class="section" about="http://localhost:8000/res/rfc/6912#S8" property="dct:title" content="Security Considerations" typeof="bibo:DocumentPart">
-      <span xml:lang="" property="bibo:chapter" content="8"/>
+    <div class="section" property="dct:title" content="Security Considerations" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S8">
+      <span content="RFC 1, section 8" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S8"/>
+      <span content="8" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S8"/>
       <p>The principles outlined in this memo are intended to improve usability and clarity and thereby reduce confusion among different labels. While these principles may contribute to reduction of risk, they are not sufficient to provide a comprehensive internationalization policy for zone management.</p>
-      <p>Additional discussion of security considerations can be found in the Unicode Security Considerations <a href="#bib-UTR36" rel="dct:references">[UTR36]</a>.</p>
+      <p>Additional discussion of security considerations can be found in the Unicode Security Considerations [UTR36].</p>
     </div>
-    <div class="section" about="http://localhost:8000/res/rfc/6912#S9" property="dct:title" content="Acknowledgements" typeof="bibo:DocumentPart">
-      <span xml:lang="" property="bibo:chapter" content="9"/>
+    <div class="section" property="dct:title" content="Acknowledgements" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S9">
+      <span content="RFC 1, section 9" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S9"/>
+      <span content="9" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S9"/>
       <p>The authors thank the participants in the IAB Internationalization program for the discussion of the ideas in this memo, particularly Marc Blanchet. In addition, Stephane Bortzmeyer, Paul Hoffman, Daniel Kalchev, Panagiotis Papaspiliopoulos, and Vaggelis Segredakis made specific comments.</p>
     </div>
-    <div class="section" about="http://localhost:8000/res/rfc/6912#S10" property="dct:title" content="IAB Members at the Time of Approval" typeof="bibo:DocumentPart">
-      <span xml:lang="" property="bibo:chapter" content="10"/>
+    <div class="section" property="dct:title" content="IAB Members at the Time of Approval" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S10">
+      <span content="RFC 1, section 10" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S10"/>
+      <span content="10" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S10"/>
       <p>Bernard Aboba Jari Arkko Marc Blanchet Ross Callon Alissa Cooper Spencer Dawkins Joel Halpern Russ Housley David Kessens Danny McPherson Jon Peterson Dave Thaler Hannes Tschofenig</p>
     </div>
-    <div class="section" about="http://localhost:8000/res/rfc/6912#S11" property="dct:title" content="Informative References" typeof="bibo:DocumentPart">
-      <span xml:lang="" property="bibo:chapter" content="11"/>
-      <pre>   <a href="#bib-IABCOMM1" rel="dct:references">[IABCOMM1]</a> Internet Architecture Board, "IAB Statement: 'The
+    <div class="section" property="dct:title" content="Informative References" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6912#S11">
+      <span content="RFC 1, section 11" property="dct:identifier" about="http://localhost:8000/res/rfc/6912#S11"/>
+      <span content="11" property="bibo:chapter" about="http://localhost:8000/res/rfc/6912#S11"/>
+      <pre>   [IABCOMM1] Internet Architecture Board, "IAB Statement: 'The
               interpretation of rules in the ICANN gTLD Applicant
               Guidebook'", February 2012, &lt;http://www.iab.org/
               documents/correspondence-reports-documents/201/&gt;.</pre>
-      <pre>   <a href="#bib-IABCOMM2" rel="dct:references">[IABCOMM2]</a> Internet Architecture Board, "Response to ICANN questions
+      <pre>   [IABCOMM2] Internet Architecture Board, "Response to ICANN questions
               concerning 'The interpretation of rules in the ICANN gTLD
               Applicant Guidebook'", March 2012, &lt;http://www.iab.org/
               documents/correspondence-reports-documents/201/&gt;.</pre>
-      <pre>   <a href="#bib-RFC1123" rel="dct:references">[RFC1123]</a>  Braden, R., "Requirements for Internet Hosts - Application
-              and Support", STD 3, RFC 1123, October 1989.</pre>
-      <pre>   <a href="#bib-RFC2119" rel="dct:references">[RFC2119]</a>  Bradner, S., "Key words for use in RFCs to Indicate
-              Requirement Levels", BCP 14, RFC 2119, March 1997.</pre>
-      <pre>   <a href="#bib-RFC4690" rel="dct:references">[RFC4690]</a>  Klensin, J., Faltstrom, P., Karp, C., and IAB, "Review and
+      <pre>   <a href="http://localhost:8000/res/rfc/1123" rel="dct:references">[RFC1123]</a>  Braden, R., "Requirements for Internet Hosts - Application
+              and Support", STD 3, <a href="http://localhost:8000/res/rfc/1123" rel="dct:references">RFC 1123</a>, October 1989.</pre>
+      <pre>   <a href="http://localhost:8000/res/rfc/2119" rel="dct:references">[RFC2119]</a>  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, <a href="http://localhost:8000/res/rfc/2119" rel="dct:references">RFC 2119</a>, March 1997.</pre>
+      <pre>   <a href="http://localhost:8000/res/rfc/4690" rel="dct:references">[RFC4690]</a>  Klensin, J., Faltstrom, P., Karp, C., and IAB, "Review and
               Recommendations for Internationalized Domain Names
-              (IDNs)", RFC 4690, September 2006.</pre>
-      <pre>   <a href="#bib-RFC5890" rel="dct:references">[RFC5890]</a>  Klensin, J., "Internationalized Domain Names for
+              (IDNs)", <a href="http://localhost:8000/res/rfc/4690" rel="dct:references">RFC 4690</a>, September 2006.</pre>
+      <pre>   <a href="http://localhost:8000/res/rfc/5890" rel="dct:references">[RFC5890]</a>  Klensin, J., "Internationalized Domain Names for
               Applications (IDNA): Definitions and Document Framework",
-              RFC 5890, August 2010.</pre>
-      <pre>   <a href="#bib-RFC5891" rel="dct:references">[RFC5891]</a>  Klensin, J., "Internationalized Domain Names in
-              Applications (IDNA): Protocol", RFC 5891, August 2010.</pre>
-      <pre>   <a href="#bib-RFC5892" rel="dct:references">[RFC5892]</a>  Faltstrom, P., "The Unicode Code Points and
+              <a href="http://localhost:8000/res/rfc/5890" rel="dct:references">RFC 5890</a>, August 2010.</pre>
+      <pre>   <a href="http://localhost:8000/res/rfc/5891" rel="dct:references">[RFC5891]</a>  Klensin, J., "Internationalized Domain Names in
+              Applications (IDNA): Protocol", <a href="http://localhost:8000/res/rfc/5891" rel="dct:references">RFC 5891</a>, August 2010.</pre>
+      <pre>   <a href="http://localhost:8000/res/rfc/5892" rel="dct:references">[RFC5892]</a>  Faltstrom, P., "The Unicode Code Points and
               Internationalized Domain Names for Applications (IDNA)",
-              RFC 5892, August 2010.</pre>
-      <pre>   <a href="#bib-RFC5893" rel="dct:references">[RFC5893]</a>  Alvestrand, H. and C. Karp, "Right-to-Left Scripts for
+              <a href="http://localhost:8000/res/rfc/5892" rel="dct:references">RFC 5892</a>, August 2010.</pre>
+      <pre>   <a href="http://localhost:8000/res/rfc/5893" rel="dct:references">[RFC5893]</a>  Alvestrand, H. and C. Karp, "Right-to-Left Scripts for
               Internationalized Domain Names for Applications (IDNA)",
-              RFC 5893, August 2010.</pre>
-      <pre>   <a href="#bib-RFC5894" rel="dct:references">[RFC5894]</a>  Klensin, J., "Internationalized Domain Names for
+              <a href="http://localhost:8000/res/rfc/5893" rel="dct:references">RFC 5893</a>, August 2010.</pre>
+      <pre>   <a href="http://localhost:8000/res/rfc/5894" rel="dct:references">[RFC5894]</a>  Klensin, J., "Internationalized Domain Names for
               Applications (IDNA): Background, Explanation, and
-              Rationale", RFC 5894, August 2010.</pre>
-      <pre>   <a href="#bib-RFC5895" rel="dct:references">[RFC5895]</a>  Resnick, P. and P. Hoffman, "Mapping Characters for
+              Rationale", <a href="http://localhost:8000/res/rfc/5894" rel="dct:references">RFC 5894</a>, August 2010.</pre>
+      <pre>   <a href="http://localhost:8000/res/rfc/5895" rel="dct:references">[RFC5895]</a>  Resnick, P. and P. Hoffman, "Mapping Characters for
               Internationalized Domain Names in Applications (IDNA)
-              2008", RFC 5895, September 2010.</pre>
-      <pre>   <a href="#bib-RFC6365" rel="dct:references">[RFC6365]</a>  Hoffman, P. and J. Klensin, "Terminology Used in
-              Internationalization in the IETF", BCP 166, RFC 6365,
+              2008", <a href="http://localhost:8000/res/rfc/5895" rel="dct:references">RFC 5895</a>, September 2010.</pre>
+      <pre>   <a href="http://localhost:8000/res/rfc/6365" rel="dct:references">[RFC6365]</a>  Hoffman, P. and J. Klensin, "Terminology Used in
+              Internationalization in the IETF", BCP 166, <a href="http://localhost:8000/res/rfc/6365" rel="dct:references">RFC 6365</a>,
               September 2011.</pre>
-      <pre>   <a href="#bib-UTR36" rel="dct:references">[UTR36]</a>    Davis, M. and M. Suignard, "Unicode Security
+      <pre>   [UTR36]    Davis, M. and M. Suignard, "Unicode Security
               Considerations", Unicode Technical Report #36, July 2012.</pre>
-      <pre>   <a href="#bib-WCAG20" rel="dct:references">[WCAG20]</a>   W3C, "Web Content Accessibility Guidelines (WCAG) 2.0",
+      <pre>   [WCAG20]   W3C, "Web Content Accessibility Guidelines (WCAG) 2.0",
               W3C Recommendation, December 2008,
               &lt;http://www.w3.org/TR/2008/REC-WCAG20-20081211/&gt;.</pre>
       <p>Authors' Addresses</p>
