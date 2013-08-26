@@ -71,13 +71,15 @@ can get by with only rdflib, using either a Sqlite or a Berkely DB
 Similarly, once you have a large collection of text (either many short
 documents, or fewer long documents), you'll need an fulltext search
 engine to use the search feature (enabled by default). For small
-document collections the embedded whoosh library is used. Right now,
-ElasticSearch is supported (*note:* or will be, when
-feature/elasticsearch lands).
+document collections the embedded `whoosh
+<https://bitbucket.org/mchaput/whoosh/wiki/Home>`_ library is
+used. Right now, `ElasticSearch <http://www.elasticsearch.org/>`_ is
+supported.
 
 As a rule of thumb, if your document collection contains over 100 000
 RDF triples or 100 000 words, you should start thinking about setting
-up an external triple store or a fulltext search engine.
+up an external triple store or a fulltext search engine. See
+:doc:`external-dbs`.
 
 .. note::
 
