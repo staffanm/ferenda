@@ -467,6 +467,8 @@ def _wsgi_search(environ, start_response, args):
     for r in res:
         if not 'title' in r or r['title'] is None:
             r['title'] = r['uri']
+        if r.get('identifier', False):
+            r['title'] = r['identifier'] + ": " + r['title']
         doc.body.append(html.Div(
             [html.H2([elements.Link(r['title'], uri=r['uri'])]),
              r['text']], **{'class':'hit'}))

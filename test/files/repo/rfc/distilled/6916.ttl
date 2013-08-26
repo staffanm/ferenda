@@ -8,7 +8,7 @@
 
 <http://localhost:8000/res/rfc/6916> a rfc:RFC ;
     rfc:BCP "182" ;
-    dct:category "Best Current Practice" ;
+    dct:subject "Best Current Practice" ;
     dct:creator "R. Gagliano",
         "S. Kent",
         "S. Turner" ;

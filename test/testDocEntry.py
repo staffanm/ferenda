@@ -20,6 +20,7 @@ from ferenda import DocumentEntry
 
 class DocEntry(unittest.TestCase):
     basic_json = """{
+  "basefile": null, 
   "content": {
     "hash": null, 
     "markup": null, 
@@ -43,6 +44,7 @@ class DocEntry(unittest.TestCase):
   "url": null
 }"""
     modified_json = """{
+  "basefile": null, 
   "content": {
     "hash": null, 
     "markup": "<div>xhtml fragment</div>", 

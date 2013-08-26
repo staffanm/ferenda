@@ -8,6 +8,8 @@
   various bugs that prevented the usage of custom SPARQL queries and
   XSLT transforms were fixed.
 
+* The example RFC docrepo parser has been improved.
+
 2013-08-11 RELEASE 0.1.3
 
 * Search functionality when running under WSGI is now

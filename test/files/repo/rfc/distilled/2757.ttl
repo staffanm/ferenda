@@ -1,0 +1,32 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rfc: <http://example.org/ontology/rfc/> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://localhost:8000/res/rfc/2757> a rfc:RFC ;
+    dcterms:creator "G. Montenegro",
+        "S. Dawkins" ;
+    dcterms:identifier "RFC 2757" ;
+    dcterms:issued "2000-01-01"^^xsd:date ;
+    dcterms:publisher "Network Working Group" ;
+    dcterms:rightsHolder "Nortel Networks",
+        "Sun Microsystems, Inc." ;
+    dcterms:subject "Informational" ;
+    dcterms:title "Long Thin Networks"@en .
+
+<http://localhost:8000/res/rfc/2757#PS1> a bibo:DocumentPart ;
+    dcterms:title "Status of this Memo"@en .
+
+<http://localhost:8000/res/rfc/2757#S1> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 2757, section 1"@en ;
+    dcterms:title "Introduction"@en ;
+    bibo:chapter "1"@en .
+
+<http://localhost:8000/res/rfc/2757#S1.1> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 2757, section 1.1"@en ;
+    dcterms:title "Network Architecture"@en ;
+    bibo:chapter "1.1"@en .
+

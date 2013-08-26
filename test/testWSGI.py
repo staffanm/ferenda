@@ -328,15 +328,15 @@ class Search(object):
         self.assertEqual(len(docs), 3)
         self.assertEqual(docs[0][0].tag, 'h2')
         expect = self.search_multiple_expect
-        self.assertEqual(expect[0]['title'], docs[0][0][0].text)
+        self.assertIn(expect[0]['title'], docs[0][0][0].text)
         self.assertEqual(expect[0]['href'],  docs[0][0][0].get('href'))
         self.assertEqual(expect[0]['body'],  etree.tostring(docs[0][1]).strip())
 
-        self.assertEqual(expect[1]['title'], docs[1][0][0].text)
+        self.assertIn(expect[1]['title'], docs[1][0][0].text)
         self.assertEqual(expect[1]['href'],  docs[1][0][0].get('href'))
         self.assertEqual(expect[1]['body'],  etree.tostring(docs[1][1]).strip())
 
-        self.assertEqual(expect[2]['title'], docs[2][0][0].text)
+        self.assertIn(expect[2]['title'], docs[2][0][0].text)
         self.assertEqual(expect[2]['href'],  docs[2][0][0].get('href'))
         self.assertEqual(expect[2]['body'],  etree.tostring(docs[2][1]).strip())
 

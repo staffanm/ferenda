@@ -14,7 +14,7 @@ ISSN: 2070-1721                                                H. Kaplan
       <str>SIP entities that are represented by the URI of the SIP Contact header field can convey media feature tags in the Contact header field to indicate support of features and capabilities.</str>
     </Paragraph>
   </PreambleSection>
-  <Section ordinal="1" title="Introduction" meta="None" uri="None">
+  <Section ordinal="1" title="Introduction" identifier="RFC 0, section 1">
     <Paragraph>
       <str>This specification defines a new SIP header field, Feature-Caps. The Feature-Caps header field conveys feature-capability indicators that are used to indicate support of features and capabilities for SIP entities that are not represented by the Uniform Resource Identifier (URI) of the Contact header field. Such cases are:</str>
     </Paragraph><UnorderedList type="disc">
@@ -34,8 +34,8 @@ ISSN: 2070-1721                                                H. Kaplan
       <str>Unlike media feature tags, feature-capability indicators are intended to only be used with SIP.</str>
     </Paragraph>
   </Section>
-  <Section ordinal="4" title="Feature-Caps Header Field" meta="None" uri="None">
-    <Subsection ordinal="4.1" title="Introduction" meta="None" uri="None">
+  <Section ordinal="4" title="Feature-Caps Header Field" identifier="RFC 0, section 4">
+    <Subsection ordinal="4.1" title="Introduction" identifier="RFC 0, section 4.1">
       <Paragraph>
         <str>The Feature-Caps header field is used by SIP entities to convey support of features and capabilities, by setting feature-capability indicators. A feature-capability indicator conveyed in a Feature-Caps header field indicates that a SIP entity in the SIP message signaling path supports the associated feature and capability.</str>
       </Paragraph>

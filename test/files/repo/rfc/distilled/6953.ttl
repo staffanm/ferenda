@@ -7,7 +7,7 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://localhost:8000/res/rfc/6953> a rfc:RFC ;
-    dct:category "Informational" ;
+    dct:subject "Informational" ;
     dct:creator "A. Mancuso, Ed.",
         "B. Patil",
         "S. Probasco" ;

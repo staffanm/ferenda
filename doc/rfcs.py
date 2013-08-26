@@ -51,7 +51,10 @@ class RFCs(DocumentRepository):
                   'foaf', # rfcs are foaf:Documents for now
                   ('rfc','http://example.org/ontology/rfc/')
                   )
+    from rdflib import Namespace
+    rdf_type = Namespace('http://example.org/ontology/rfc/').RFC
 
+    
     from ferenda.decorators import managedparsing
 
     @managedparsing
@@ -120,7 +123,7 @@ class RFCs(DocumentRepository):
         desc = Describer(doc.meta, doc.uri)
 
         # Set the rdf:type of the document
-        desc.rdftype(self.ns['rfc'].RFC)
+        desc.rdftype(self.rdf_type)
 
         # Set the title we've captured as the dct:title of the document and 
         # specify that it is in English
@@ -255,7 +258,7 @@ class RFCs(DocumentRepository):
         def rfc_uriformatter(parts):
             uri = ""
             if 'RFC' in parts:
-                 uri += self.canonical_uri(parts['RFC'])
+                 uri += self.canonical_uri(parts['RFC'].lstrip("0"))
             if 'Sec' in parts:
                  uri += "#S" + parts['Sec']
             return uri
@@ -333,11 +336,14 @@ class RFCs(DocumentRepository):
 # begin news_criteria
     def news_criteria(self):
         from ferenda import Describer, NewsCriteria
-
+        from rdflib import Graph
+        
         # function that returns a closure, which acts as a custom
         # selector function for the NewsCriteria objects.
         def selector_for(category):
-            def selector(entry, graph):
+            def selector(entry):
+                graph = Graph()
+                graph.parse(self.store.distilled_path(entry.basefile))
                 desc = Describer(graph, entry.id)
                 return desc.getvalue(self.ns['dct'].subject) == category
             return selector
@@ -374,20 +380,26 @@ class RFCs(DocumentRepository):
 
 if __name__ == '__main__':
     from ferenda import manager, LayeredConfig
+    import sys
     manager.setup_logger("DEBUG")
-    d = RFCs(downloadmax=100)
-    #d.download()
-    #for basefile in d.list_basefiles_for("parse"):
-    #    d.parse(basefile)
-    #RFCs.setup("relate", LayeredConfig(d.get_default_options()))
-    #for basefile in d.list_basefiles_for("relate"):
-    #    d.relate(basefile)
-    #RFCs.teardown("relate", LayeredConfig(d.get_default_options()))
-    manager.makeresources([d])
-    for basefile in d.list_basefiles_for("generate"):
-        d.generate(basefile)
-    d.toc()
+    d = RFCs(downloadmax=30)
+
+#    d.download()
+#    for basefile in d.list_basefiles_for("parse"):
+#        d.parse(basefile)
+#    RFCs.setup("relate", LayeredConfig(d.get_default_options()))
+#    for basefile in d.list_basefiles_for("relate"):
+#        d.relate(basefile)
+#    RFCs.teardown("relate", LayeredConfig(d.get_default_options()))
+#    manager.makeresources([d])
+#    for basefile in d.list_basefiles_for("generate"):
+#       d.generate(basefile)
+#    d.toc()
     d.news()
-    manager.frontpage([d])
+#    manager.frontpage([d])
+#    manager.runserver([d])
     
     
+
+
+

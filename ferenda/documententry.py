@@ -23,6 +23,9 @@ class DocumentEntry(object):
     """
     id = None
     """The canonical uri for the document."""
+
+    basefile = None
+    """The basefile for the document."""
     
     orig_created = None
     """The first time we fetched the document from it's original location."""
@@ -83,6 +86,7 @@ class DocumentEntry(object):
             self._path = path
         else:
             self.id = None
+            self.basefile = None
             self.orig_updated = None 
             self.orig_checked = None 
             self.orig_url = None

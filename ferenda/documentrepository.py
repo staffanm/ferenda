@@ -428,6 +428,8 @@ uri doesn't map to a basefile in this repo."""
             path = uri[len(self.config.url + "res/"):]
             if "/" in path:
                 alias, basefile = path.split("/", 1)
+                if "#" in basefile:
+                    basefile = basefile.split("#")[0]
                 if alias == self.alias:
                     return basefile
         
@@ -1249,8 +1251,8 @@ uri doesn't map to a basefile in this repo."""
            and put the text of the document into a fulltext index.
 
         """
-        
         self.relate_triples(basefile)
+
         # FIXME: How should we pass in (or create) a list if
         # instantiated repositories?  When using API, the caller must
         # be able to create and pass the list, eg repos=[] as method
@@ -1266,7 +1268,7 @@ uri doesn't map to a basefile in this repo."""
         # relative file path),
         
         # When otherrepos = [], should we still provide self as one repo? Yes.
-        if otherrepos == []:
+        if self not in otherrepos:
             otherrepos.append(self)
         
         self.relate_dependencies(basefile, otherrepos)
@@ -1331,7 +1333,8 @@ parsed document path to that documents dependency file."""
                         for repo in repos:
                             # find out if any docrepo can handle it
                             dep_basefile = repo.basefile_from_uri(str(o))
-                            if dep_basefile:
+                            if dep_basefile and dep_basefile != basefile:
+                                # self.log.debug("basefile %s adds dependency to %s" % (basefile, dep_basefile))
                                 # if so, add to that repo's dependencyfile
                                 repo.add_dependency(dep_basefile,
                                                     self.store.parsed_path(basefile))
@@ -1486,18 +1489,16 @@ parsed document path to that documents dependency file."""
 
             xsltdir = self.setup_transform_templates("res/xsl", self.xslt_template)
             xsltfile = xsltdir + os.sep + os.path.basename(self.xslt_template)
-            with util.logtime(self.log.debug,
-                              "%(basefile)s get_transform_configuration in %(elapsed).3f sec",
-                              {'basefile': basefile}):
-                params = self.get_transform_configuration(xsltdir,outfile)
+            params = self.get_transform_configuration(xsltdir,outfile)
 
             assert 'configurationfile' in params, "No configurationfile found, did you run makeresources?"
+            
             # The actual function code
             with util.logtime(self.log.debug,
-                              "%(basefile)s prep_annotation_file in %(elapsed).3f sec",
+                              "%(basefile)s: prep_annotation_file in %(elapsed).3f sec",
                               {'basefile': basefile}):
                 annotation_file = self.prep_annotation_file(basefile)
-
+                
             if annotation_file:
                 relpath = os.path.relpath(annotation_file,
                                           os.path.dirname(xsltfile))
@@ -1506,7 +1507,7 @@ parsed document path to that documents dependency file."""
                 relpath = relpath.replace("\\","/")
                 params['annotationfile'] = XSLT.strparam(relpath)
             with util.logtime(self.log.debug,
-                              "%(basefile)s transform_html %(elapsed).3f",
+                              "%(basefile)s: transform_html in %(elapsed).3f",
                               {'basefile': basefile}):
                 self.transform_html(xsltfile, infile, outfile, params, otherrepos=otherrepos)
 
@@ -1765,6 +1766,9 @@ parsed document path to that documents dependency file."""
             with self.store.open_annotation(basefile,"w") as fp:
                 fp.write(self.graph_to_annotation_file(graph))
             return self.store.annotation_path(basefile)
+        else:
+            self.log.warning("%s: No annotation data fetched, something might be wrong with the SPARQL query" % basefile)
+            
 
     def construct_annotations(self, uri):
         """Construct a RDF graph containing metadata relating to *uri* in some
@@ -1909,12 +1913,21 @@ parsed document path to that documents dependency file."""
         the toc generation process. Often overriding :py:meth:`~ferenda.DocumentRepository.toc_criteria` to
         specify other document properties will be sufficient."""
 
-        data = self.toc_select(self.dataset_uri())
-        criteria = self.toc_criteria(self.toc_predicates())
-        pagesets = self.toc_pagesets(data,criteria)
-        pagecontent = self.toc_select_for_pages(data, pagesets, criteria)
-        self.toc_generate_pages(pagecontent, pagesets, otherrepos)
-        self.toc_generate_first_page(pagecontent, pagesets, otherrepos)
+        params = {}
+        with util.logtime(self.log.debug,
+                          "toc: selected %(rowcount)s rows in %(elapsed).3f s",
+                          params):
+            data = self.toc_select(self.dataset_uri())
+            params['rowcount'] = len(data)
+        if data:
+            criteria = self.toc_criteria(self.toc_predicates())
+            pagesets = self.toc_pagesets(data,criteria)
+            pagecontent = self.toc_select_for_pages(data, pagesets, criteria)
+            self.toc_generate_pages(pagecontent, pagesets, otherrepos)
+            self.toc_generate_first_page(pagecontent, pagesets, otherrepos)
+        else:
+            self.log.error("toc_select found 0 results for query, can't generate TOC")
+            self.log.info("(query PROBABLY was '%s')" % self.toc_query())
 
     def toc_select(self,context=None):
         """Select all data from the triple store needed to make up all
@@ -1966,7 +1979,7 @@ parsed document path to that documents dependency file."""
         Example:
 
         >>> d = DocumentRepository()
-        >>> expected = 'PREFIX dct:<http://purl.org/dc/terms/> SELECT DISTINCT ?uri ?title ?issued FROM <http://example.org/ctx/base> WHERE {?uri dct:title ?title . ?uri dct:issued ?issued . }'
+        >>> expected = 'PREFIX bibo: <http://purl.org/ontology/bibo/> PREFIX dct: <http://purl.org/dc/terms/> PREFIX foaf: <http://xmlns.com/foaf/0.1/> PREFIX owl: <http://www.w3.org/2002/07/owl#> PREFIX prov: <http://www.w3.org/ns/prov-o/> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX skos: <http://www.w3.org/2004/02/skos/core#> PREFIX xhv: <http://www.w3.org/1999/xhtml/vocab#> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> SELECT DISTINCT ?uri ?title ?issued FROM <http://example.org/ctx/base> WHERE {?uri rdf:type foaf:Document ; dct:title ?title . OPTIONAL { ?uri dct:issued ?issued . }  }'
         >>> d.toc_query("http://example.org/ctx/base") == expected
         True
         """
@@ -1976,9 +1989,16 @@ parsed document path to that documents dependency file."""
         predicates  = self.toc_predicates()
         g = self.make_graph()
         bindings = " ".join(["?"+util.uri_leaf(b) for b in predicates])
-        whereclauses = " . ".join(["?uri %s ?%s" % (g.qname(b), util.uri_leaf(b)) for b in predicates])
-        # FIXME: this doesn't handle optional data so well...
-        query  = "PREFIX dct:<http://purl.org/dc/terms/> SELECT DISTINCT ?uri %s %s WHERE {%s . }" % (bindings, from_graph, whereclauses)
+        whereclause = "?uri rdf:type %s ; %s ?%s" % (g.qname(self.rdf_type),
+                                                     g.qname(predicates[0]),
+                                                     util.uri_leaf(predicates[0]))
+        optclauses = "".join(["OPTIONAL { ?uri %s ?%s . } " % (g.qname(b), util.uri_leaf(b)) for b in predicates[1:]])
+
+        # FIXME: The above doctest looks like crap since all
+        # registered namespaces in the repo is included. Should only
+        # include prefixes actually used
+        prefixes = " ".join(["PREFIX %s: <%s>" % (p, u) for p, u in sorted(self.ns.items())])
+        query  = "%s SELECT DISTINCT ?uri %s %s WHERE {%s . %s }" % (prefixes, bindings, from_graph, whereclause, optclauses)
         return query
 
     def toc_criteria(self, predicates=None):
@@ -2101,7 +2121,12 @@ parsed document path to that documents dependency file."""
             selector = criterion.selector
             binding = criterion.binding
             for row in data:
-                selector_values[selector(row)] = True
+                try:
+                    selector_values[selector(row)] = True
+                except KeyError as e:
+                    # this will happen a lot on simple selector
+                    # functions when handed incomplete data
+                    pass
 
             for value in sorted(list(selector_values.keys()), reverse=criterion.selector_descending):
                 pageset.pages.append(TocPage(linktext=value,
@@ -2147,9 +2172,11 @@ parsed document path to that documents dependency file."""
         for pageset, criterion in zip(pagesets,criteria):
             documents = defaultdict(list)
             for row in data:
-                key = criterion.selector(row)
-                # documents[key].append(self.toc_item(criterion.binding,row))
-                documents[key].append(row)
+                try:
+                    key = criterion.selector(row)
+                    documents[key].append(row)
+                except KeyError:
+                    pass
             for key in documents.keys():
                 # find appropriate page in pageset and read it's basefile
                 for page in pageset.pages:
@@ -2250,10 +2277,9 @@ parsed document path to that documents dependency file."""
         """
         
         criteria = self.news_criteria()
-        data = self.news_entries() # Generator of DocumentEntry objects
-        for entry, graph in data:
+        for entry in self.news_entries():
             for criterion in criteria:
-                if criterion.selector(entry, graph):
+                if criterion.selector(entry):
                     criterion.entries.append(entry)
         for criterion in criteria:
             # should reverse=True be configurable? For datetime
@@ -2294,19 +2320,21 @@ parsed document path to that documents dependency file."""
                 entry.id = self.canonical_uri(basefile)
             if not entry.url:
                 entry.url = self.generated_url(basefile)
+            if not entry.basefile:
+                entry.basefile = basefile
 
             if not os.path.exists(self.store.distilled_path(basefile)):
                 self.log.warn("%s: No distilled file at %s, skipping" % (basefile,
                                                                          self.store.distilled_path(basefile)))
                 continue
             
-            g = Graph()
-            g.parse(self.store.distilled_path(basefile))
-            desc = Describer(g,entry.id)
             
             dct = self.ns['dct']
             if not entry.title:
                 try:
+                    g = Graph()
+                    g.parse(self.store.distilled_path(basefile))
+                    desc = Describer(g,entry.id)
                     entry.title = desc.getvalue(dct.title)
                 except KeyError: # no dct:title -- not so good
                     self.log.warn("%s: No title available" % basefile)
@@ -2331,7 +2359,7 @@ parsed document path to that documents dependency file."""
                 # element, separate from the set_link <link>
                 entry.set_content(self.store.parsed_path(basefile),
                                   self.parsed_url(basefile))
-            yield entry, g
+            yield entry
     
     def news_write_atom(self, entries, title, basefile, archivesize=1000):
         """Given a list of Atom entry-like objects, including links to RDF
@@ -2347,7 +2375,9 @@ parsed document path to that documents dependency file."""
                      'le':'http://purl.org/atompub/link-extensions/1.0'}
             E = ElementMaker(nsmap=nsmap)
 
-            updated = max(entries,key=lambda x: x[0].updated)[0].updated
+            # entries SHOULD at this point be a list of DocumentEntry
+            # object, not (DocumentEntry, Graph). 
+            updated = max(entries,key=lambda x: x.updated).updated
             contents = [E.id(feedid),
                         E.title(title),
                         E.updated(util.rfc_3339_timestamp(updated)),
@@ -2364,7 +2394,7 @@ parsed document path to that documents dependency file."""
                 contents.append(E.link({'rel':'next-archive',
                                         'href':nextarchive}))
                 
-            for entry, graph in entries:
+            for entry in entries:
                 entrynodes=[E.title(entry.title),
                             E.summary(str(entry.summary)),
                             E.id(entry.id),

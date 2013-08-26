@@ -43,7 +43,7 @@
 
 <http://localhost:8000/res/rfc/6919#S11.2> a bibo:DocumentPart ;
     dct:identifier "RFC 6919, section 11.2"@en ;
-    dct:references <http://localhost:8000/res/rfc/0493>,
+    dct:references <http://localhost:8000/res/rfc/493>,
         <http://localhost:8000/res/rfc/2616>,
         <http://localhost:8000/res/rfc/3207>,
         <http://localhost:8000/res/rfc/3501>,
@@ -64,7 +64,7 @@
 
 <http://localhost:8000/res/rfc/6919#S3> a bibo:DocumentPart ;
     dct:identifier "RFC 6919, section 3"@en ;
-    dct:references <http://localhost:8000/res/rfc/0493> ;
+    dct:references <http://localhost:8000/res/rfc/493> ;
     dct:title "REALLY SHOULD NOT"@en ;
     bibo:chapter "3"@en .
 
@@ -105,7 +105,7 @@
     bibo:chapter "9"@en .
 
 <http://localhost:8000/res/rfc/6919> a rfc:RFC ;
-    dct:category "Experimental" ;
+    dct:subject "Experimental" ;
     dct:creator "E. Rescorla",
         "R. Barnes",
         "S. Kent" ;

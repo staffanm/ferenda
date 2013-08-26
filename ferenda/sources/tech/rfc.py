@@ -8,7 +8,7 @@ import requests
 import requests.exceptions
 
 import six
-from rdflib import Literal
+from rdflib import Literal, URIRef
 from pyparsing import Word, CaselessLiteral, Optional, nums
 
 from ferenda import DocumentRepository
@@ -16,6 +16,7 @@ from ferenda.errors import ParseError
 from ferenda.decorators import recordlastdownload, managedparsing
 
 from ferenda import TextReader, Describer, FSMParser, CitationParser, URIFormatter
+from ferenda import util
 
 from ferenda.elements import Body, Heading, Preformatted, Paragraph, UnorderedList, ListItem, Section, Subsection, Subsubsection, UnicodeElement, CompoundElement, Link, serialize
 
@@ -60,9 +61,9 @@ class RFC(DocumentRepository):
                   'foaf', # rfcs are foaf:Documents for now
                   ('rfc','http://example.org/ontology/rfc/') # custom (fake) ontology
                   )
-    sparql_annotations = "rfc-annotations.rq"
-    xslt_template = "rfc.xsl"
-
+    sparql_annotations = "res/sparql/rfc-annotations.rq"
+    xslt_template = "res/xsl/rfc.xsl"
+    rdf_type = URIRef("http://example.org/ontology/rfc/RFC")
     # NOTES:
     #
     # Like many large document collections that has existed for a long
@@ -334,7 +335,7 @@ class RFC(DocumentRepository):
         # "1 Blahonga" => ("1","Blahonga", "RFC 1234, section 1")
         # "1.2.3. This is a subsubsection" => ("1.2.3", "This is a subsection", "RFC 1234, section 1.2.3")
         # "   Normal paragraph" => (None, "   Normal paragraph", None)
-        re_sectionstart = re.compile("^(\d[\.\d]+) +(.*[^\.])$").match
+        re_sectionstart = re.compile("^(\d[\.\d]*) +(.*[^\.])$").match
         def analyze_sectionstart(parser,chunk=None):
             if not chunk:
                 chunk = parser.reader.peek()
@@ -411,7 +412,7 @@ class RFC(DocumentRepository):
         def rfc_uriformatter(parts):
             uri = ""
             if 'RFC' in parts:
-                uri += self.canonical_uri(parts['RFC'])
+                uri += self.canonical_uri(parts['RFC'].lstrip("0"))
             if 'Sec' in parts:
                 uri += "#S" + parts['Sec'].rstrip(".")
             return uri
@@ -458,11 +459,16 @@ class RFC(DocumentRepository):
         # basefile may be incorrect -- let whatever is in the header
         # override
         realid = self.get_rfc_num(header)
+        if not realid: # eg RFC 100 -- fallback to basefile in that case
+            realid = doc.basefile
         doc.uri = self.canonical_uri(realid)
         desc = Describer(doc.meta, doc.uri)
         desc.rdftype(self.ns['rfc'].RFC)
         desc.value(self.ns['dct'].title, title, lang="en")
         self.parse_header(header,desc)
+        if not desc.getvalues(self.ns['dct'].identifier):
+            desc.value(self.ns['dct'].identifier, "RFC %s" % doc.basefile)
+            
         doc.lang = "en"
         
         # process body - remove the temporary Pagebreak objects, after
@@ -478,21 +484,6 @@ class RFC(DocumentRepository):
         # self.decorate_bodyparts(doc.body,doc.uri)
         if self.config.fsmdebug:
             print(serialize(doc.body))
-
-    def decorate_bodyparts(self,part,baseuri):
-        if isinstance(part,six.text_type):
-            return
-        if isinstance(part,(Section, Subsection, Subsubsection)):
-            # print("Decorating %s %s" % (part.__class__.__name__,part.ordinal))
-            part.uri = "%s#S%s" % (baseuri,part.ordinal)
-            part.meta = self.make_graph()
-            desc = Describer(part.meta,part.uri)
-            desc.rdftype(self.ns['bibo'].DocumentPart)
-            desc.value(self.ns['dct'].title, Literal(part.title,lang="en"))
-            desc.value(self.ns['bibo'].chapter, part.ordinal)
-            # desc.value(self.ns['dct'].isPartOf, part.parent.uri) # implied
-        for subpart in part:
-            self.decorate_bodyparts(subpart,baseuri)
 
     def cleanup_body(self,part):
         shorttitle = None
@@ -519,7 +510,9 @@ class RFC(DocumentRepository):
                 continue
             (key,val) = (x.strip() for x in line.split(": "))
             if key == "Request for Comments":
-                return val
+                # only return integer part
+                return re.sub("\D", "", val)
+                
         raise ParseError("Couldn't find RFC number in header")
             
         
@@ -540,9 +533,15 @@ class RFC(DocumentRepository):
 
             (key,value) = (x.strip() for x in line.split(": "))
             if key == "Request for Comments":
-                desc.value(self.ns['dct'].identifier, "RFC %s" % value)
+                # make sure we only extract the numeric part --
+                # normally value should be numeric, but we've seen
+                # "RFC 1006", "#154" and there are doubtless other
+                # variants
+                value = re.sub("\D","", value)
+                if value: # eg RFC 100
+                    desc.value(self.ns['dct'].identifier, "RFC %s" % value)
             elif key == "Category":
-                desc.value(self.ns['dct'].category, value)
+                desc.value(self.ns['dct'].subject, value)
             elif key == "ISSN":
                 desc.value(self.ns['dct'].issn, value)
             elif key in ("Updates", "Obsoletes"):
@@ -573,7 +572,8 @@ class RFC(DocumentRepository):
                 desc.value(self.ns['dct'].creator, line)
             elif re.match("\w+ \d{4}$",line):
                 # NOTE: this requires english locale!
-                dt = datetime.strptime(line, "%B %Y")
+                with util.c_locale():
+                    dt = datetime.strptime(line, "%B %Y")
                 d = date(dt.year,dt.month,dt.day)
                 desc.value(self.ns['dct'].issued, d)
             else:
@@ -582,10 +582,10 @@ class RFC(DocumentRepository):
                 desc.value(self.ns['dct'].rightsHolder, line)
 
     def toc_predicates(self):
-        return [self.ns['dct'].title,
+        return [self.ns['dct'].identifier,
+                self.ns['dct'].title,
                 self.ns['dct'].issued,
-                self.ns['dct'].subject,
-                self.ns['dct'].identifier]
+                self.ns['dct'].subject]
 
     def toc_criteria(self, predicates=None):
         from ferenda import TocCriteria

@@ -98,7 +98,6 @@ with :py:func:`~ferenda.decorators.makedocument`."""
         # Check to see that all metadata contained in doc.meta is
         # present in the serialized file.
         distilled_graph = Graph()
-        distilled_graph.namespace_manager = doc.meta.namespace_manager
         
         with codecs.open(self.store.parsed_path(doc.basefile), encoding="utf-8") as fp: # unicode
             distilled_graph.parse(data=fp.read(), format="rdfa", publicID=doc.uri)

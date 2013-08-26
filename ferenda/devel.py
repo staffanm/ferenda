@@ -267,6 +267,42 @@ class Devel(object):
         for row in rows:
             print("%s (%s): %s" % (row['identifier'], row['about']))
 
+    @decorators.action
+    def construct(self, template, uri, format="turtle"):
+        sq = util.readfile(template) % {'uri': uri}
+        ts  = TripleStore.connect(self.config.storetype,
+                                  self.config.storelocation,
+                                  self.config.storerepository)
+        print("# Constructing the following from %s, repository %s, type %s" %
+              (self.config.storelocation,
+               self.config.storerepository,
+               self.config.storetype))
+        print("# ", "\n# ".join(sq.split("\n")))
+        p = {}
+        with util.logtime(print,
+                          "# %(triples)s triples constructed in %(elapsed).3f",
+                          p):
+            res = ts.construct(sq)
+            p['triples'] = len(res)
+            print(res.serialize(format=format).decode('utf-8'))
+
+    @decorators.action
+    def select(self, template, uri, format="json"):
+        sq = util.readfile(template) % {'uri': uri}
+        ts  = TripleStore.connect(self.config.storetype,
+                                  self.config.storelocation,
+                                  self.config.storerepository)
+        print(sq)
+        print("="*70)
+        p = {}
+        with util.logtime(print,
+                          "# %(triples)s triples constructed in %(elapsed).3f",
+                          p):
+            res = ts.select(sq, format=format)
+            p['triples'] = len(res)
+            print(res.serialize(format=format).decode('utf-8'))
+
+            
     def download(self): pass
     def parse(self, basefile): pass
     def relate(self, basefile): pass

@@ -1,0 +1,31 @@
+
+
+
+
+
+
+Network Working Group                                      G. Montenegro
+Request for Comments: 2757                        Sun Microsystems, Inc.
+Category: Informational                                       S. Dawkins
+                                                         Nortel Networks
+                                                            January 2000
+
+
+                           Long Thin Networks
+
+Status of this Memo
+
+   This memo provides information for the Internet community.  It does
+   not specify an Internet standard of any kind.  Distribution of this
+   memo is unlimited.
+
+1 Introduction
+
+   Optimized wireless networking is one of the major hurdles that Mobile
+   Computing must solve if it is to enable ubiquitous access to
+   networking resources.
+
+1.1 Network Architecture
+
+   One significant difference between LFNs and LTNs is that we assume
+   the W-WAN link is the last hop to the end user. 

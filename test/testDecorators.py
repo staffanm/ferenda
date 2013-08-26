@@ -105,6 +105,7 @@ class Decorators(unittest.TestCase):
         mockdoc.meta = MagicMock()
         mockdoc.body = []
         mockdoc.meta.__iter__.return_value = []
+        mockdoc.uri = "http://example.org/doc"
         with patch('ferenda.util.ensure_dir', return_value=True):
             testfunc(mockrepo, mockdoc)
         

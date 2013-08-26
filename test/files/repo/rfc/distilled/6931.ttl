@@ -281,7 +281,7 @@
 
 <http://localhost:8000/res/rfc/6931> a rfc:RFC ;
     rfc:obsoletes <http://localhost:8000/res/rfc/4051> ;
-    dct:category "Standards Track" ;
+    dct:subject "Standards Track" ;
     dct:creator "D. Eastlake 3rd" ;
     dct:identifier "RFC 6931" ;
     dct:issn "2070-1721" ;

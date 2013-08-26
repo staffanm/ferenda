@@ -110,6 +110,10 @@ nav ul {
 body.toc nav ul {
     margin-left: 0;
 }
+body.search section.hit h2 {
+    font: 12pt/14pt Helvetica, Helvetica Neue, Arial;
+    font-weight: bold;
+}
 nav li a {
     background: #526B15;
     float: none; /* override float: left in main.css */

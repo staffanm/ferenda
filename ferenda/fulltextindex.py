@@ -448,7 +448,7 @@ class ElasticSearchIndex(RemoteIndex):
             h['text'] = html.elements_from_soup(soup.html.body.p)
             res.append(h)
         pager = {'pagenum': pagenum, 
-                 'pagecount': math.ceil(json['hits']['total'] / pagelen),
+                 'pagecount': int(math.ceil(json['hits']['total'] / float(pagelen))),
                  'firstresult': (pagenum-1)*pagelen + 1,
                  'lastresult': (pagenum-1)*pagelen + len(json['hits']['hits']),
                  'totalresults': json['hits']['total'] }

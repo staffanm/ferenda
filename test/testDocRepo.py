@@ -1536,7 +1536,9 @@ ex:And_Then_There_Were_None a bibo:Book;
     dct:issued "1939-11-06"^^xsd:date;
     dct:publisher "Collins Crime Club" .
 """
-
+    # FIXME: these are typed as bibo:Book since the default toc_select
+    # assumes that all docs in a repo share the same rdf:type. Once
+    # fixed, these should be typed as bibo:AcademicArticle
     articles = """
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix dct: <http://purl.org/dc/terms/> .
@@ -1546,7 +1548,7 @@ ex:And_Then_There_Were_None a bibo:Book;
 
 # http://www.the-scientist.com/?articles.view/articleNo/9678/title/The-4-Most-Cited-Papers--Magic-In-These-Methods/
 
-ex:pm14907713 a bibo:AcademicArticle;
+ex:pm14907713 a bibo:Book;
     dct:title "Protein measurement with the Folin phenol reagent";
     dct:creator "Oliver H. Lowry",
                 "Nira J. Rosenbrough",
@@ -1555,13 +1557,13 @@ ex:pm14907713 a bibo:AcademicArticle;
     dct:issued "1951-11-01"^^xsd:date;
     dct:publisher "Journal of Biological Chemistry" .
     
-ex:pm5432063 a bibo:AcademicArticle;
+ex:pm5432063 a bibo:Book;
     dct:title "Cleavage of structural proteins during the assembly of the head of bacteriophage T4";
     dct:creator "Ulrich Karl Laemmli";
     dct:issued "1970-08-15"^^xsd:date;
     dct:publisher "Nature" .
 
-ex:pm5806584 a bibo:AcademicArticle;
+ex:pm5806584 a bibo:Book;
     dct:title "Reliability of molecular weight determinations by dodecyl sulfate-polyacrylamide gel electrophoresis";
     dct:creator "K. Weber",
 
@@ -1569,7 +1571,7 @@ ex:pm5806584 a bibo:AcademicArticle;
     dct:issued "1969-08-25"^^xsd:date;
     dct:publisher "Journal of Biological Chemistry" .
 
-ex:pm942051 a bibo:AcademicArticle;
+ex:pm942051 a bibo:Book;
     dct:title "A rapid and sensitive method for the quantitation of microgram quantities of protein utilizing the principle of protein dye-binding";
     dct:creator "Marion M. Bradford";
     dct:issued "1976-05-07"^^xsd:date;
@@ -1682,6 +1684,7 @@ ex:pm942051 a bibo:AcademicArticle;
         d = DocumentRepository(datadir=self.datadir,
                                loglevel='CRITICAL',
                                storelocation=self.datadir+os.sep+"test.sqlite")
+        d.rdf_type = rdflib.URIRef("http://purl.org/ontology/bibo/Book")
         # make sure only one named graph, not entire store, gets searched
         got = d.toc_select("http://example.org/ctx/base")
         self.assertEqual(len(got),6)
@@ -1918,28 +1921,24 @@ class News(RepoTester):
         fakeentry.updated = datetime(2013,3,12,11,52)
         fakegraph = Mock()
         self.assertEqual(criteria[0].key(fakeentry), datetime(2013,3,12,11,52))
-        self.assertTrue(criteria[0].selector(fakeentry, fakegraph))
+        self.assertTrue(criteria[0].selector(fakeentry))
 
     def test_entries(self):
         unsorted_entries = self.repo.news_entries() # not guaranteed particular order
-        def getupdated(tup):
-            return tup[0].updated
         # sort so that most recently updated first
         entries = sorted(list(unsorted_entries),
-                         key=getupdated, reverse=True)
+                         key=attrgetter('updated'), reverse=True)
         self.assertEqual(len(entries),25)
-        self.assertEqual(entries[0][0].title, "Doc #24")
-        self.assertEqual(entries[-1][0].title, "Doc #0")
+        self.assertEqual(entries[0].title, "Doc #24")
+        self.assertEqual(entries[-1].title, "Doc #0")
 
     def test_write_atom(self):
         self.maxDiff = None
-        unsorted_entries = self.repo.news_entries() # not guaranteed
-        def getupdated(tup):
-            return tup[0].updated
+        unsorted_entries = self.repo.news_entries()
         # particular order sort so that most recently updated first
         # (simplified ver of what news() does)
         entries = sorted(list(unsorted_entries),
-                         key=getupdated, reverse=True)
+                         key=lambda x: x.updated, reverse=True)
 
         paths = self.repo.news_write_atom(entries, 'New and updated documents', 'main',
                                   archivesize=6)

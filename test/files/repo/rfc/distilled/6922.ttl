@@ -7,7 +7,7 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://localhost:8000/res/rfc/6922> a rfc:RFC ;
-    dct:category "Informational" ;
+    dct:subject "Informational" ;
     dct:creator "Y. Shafranovich" ;
     dct:identifier "RFC 6922" ;
     dct:issn "2070-1721" ;
