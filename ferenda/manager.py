@@ -256,7 +256,13 @@ def makeresources(repos,
     res['xml'] = [_filepath_to_urlpath(outxmlfile,1)]
     if os.sep == "\\":
         for part in res:
-            res[part] = [x.replace('/',os.sep) for x in res[part]]
+            result = []
+            for x in res[part]:
+                if x.startswith("http://") or x.startswith("https://"):
+                    result.append(x)
+                else:
+                    result.append(x.replace('/',os.sep))
+            res[part] = result
     return res
 
 
