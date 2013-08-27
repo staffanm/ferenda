@@ -1,0 +1,11 @@
+{
+    "http://eur-lex.europa.eu/LexUriServ/LexUriServ.do?uri=OJ:C:2008:115:0001:01:EN:HTML#teu" : {
+	"file": "treaties.html",
+	"expect": "downloaded/teu.html"
+    },
+    "http://eur-lex.europa.eu/LexUriServ/LexUriServ.do?uri=OJ:C:2008:115:0001:01:EN:HTML#tfeu" : {
+	"file": "treaties.html",
+	"expect": "downloaded/tfeu.html"
+    }
+}
+

@@ -265,8 +265,9 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         return "1"
         
     def download_test(self, specfile):
-
+        from pudb import set_trace; set_trace()
         def my_get(url, **kwargs):
+            
             urlspec = spec[url]
             if isinstance(urlspec, str):
                 urlspec = {'file': urlspec}

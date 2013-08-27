@@ -2,7 +2,6 @@
 # -*- coding: iso-8859-1 -*-
 """Hanterar domslut (detaljer och referat) från Domstolsverket. Data
 hämtas från DV:s (ickepublika) FTP-server, eller från lagen.nu."""
-
 # system libraries
 import sys
 import os
