@@ -20,4 +20,5 @@ from .documentstore import DocumentStore
 from .documentrepository import DocumentRepository
 from .pdfdocumentrepository import PDFDocumentRepository
 from .compositerepository import CompositeRepository
+from .transformer import Transformer
 __version__ = "0.1.5-dev" #gets pulled into setup.py and docs/conf.py
