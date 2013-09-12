@@ -19,10 +19,7 @@ from contextlib import contextmanager
 from email.utils import parsedate_tz
 
 import six
-if six.PY3:
-    from urllib.parse import urlsplit, urlunsplit
-else:
-    from urlparse import urlsplit, urlunsplit
+from six.moves.urllib_parse import urlsplit, urlunsplit
 
 from . import errors
 
@@ -386,8 +383,12 @@ HTTP-date) to an UTC-localized (naive) datetime.
 # util.file
 def readfile(filename, mode="r", encoding="utf-8"):
     """Opens *filename*, reads it's contents and returns them as a string."""
-    with open(filename, mode=mode) as fp:
-        return fp.read()
+    if "b" in mode:
+        with open(filename, mode=mode) as fp:
+            return fp.read() # returns bytes, not str
+    else:
+        with codecs.open(filename, mode=mode, encoding=encoding) as fp:
+            return fp.read()
 
 # util.file
 def writefile(filename, contents, encoding="utf-8"):
@@ -505,23 +506,23 @@ def logtime(method, format="The operation took %(elapsed).3f sec", values={}):
 
 # Python docs recommends against this. Eh, what are you going to do?
 @contextmanager
-def c_locale():
+def c_locale(category=locale.LC_TIME):
     """Temporarily change process locale to the C locale, for use when eg
     parsing English dates on a system that may have non-english
     locale.
 
-    >>> with c_locale:
+    >>> with c_locale():
     ...     datetime.strptime("August 2013", "%B %Y")
 
     """
     
-    oldlocale = locale.getlocale(locale.LC_ALL)
+    oldlocale = locale.getlocale(category)
     newlocale = 'C' if six.PY3 else b'C'
-    locale.setlocale(locale.LC_ALL, newlocale)
+    locale.setlocale(category, newlocale)
     try:
         yield
     finally:
-        locale.setlocale(locale.LC_ALL, oldlocale)
+        locale.setlocale(category, oldlocale)
     
 
 

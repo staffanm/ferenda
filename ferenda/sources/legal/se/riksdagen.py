@@ -1,22 +1,19 @@
-#!/usr/bin/env python
-# -*- coding: iso-8859-1 -*-
-#
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 # A abstract base class for fetching documents from data.riksdagen.se
 
-import sys
 import os
-import re
-import datetime
 import socket
 import codecs
 
-# from mechanize import LinkNotFoundError, URLError
+import requests
+from lxml import etree
 from bs4 import BeautifulSoup
 
 from ferenda.describer import Describer
-from ferenda import DocumentRepository
 from ferenda import util
-from ferenda.decorators import managedparsing
+from ferenda.decorators import managedparsing, downloadmax
 from . import SwedishLegalSource
 from ferenda.elements import Paragraph
 
@@ -35,7 +32,7 @@ class Riksdagen(SwedishLegalSource):
     GRANSKNINGSRAPPORT = "rir"
     INTERPELLATION = "ip"
     KOMMITTEBERATTELSER = "komm"
-    MINISTERRADSPROMEMORIA = "minråd"
+    MINISTERRADSPROMEMORIA = "minrÃ¥d"
     MOTION = "mot"
     PROPOSITION = "prop"
     PROTOKOLL = "prot"
@@ -51,109 +48,113 @@ class Riksdagen(SwedishLegalSource):
     YTTRANDE = "yttr"
 
     # add typ=prop or whatever
-    start_url = "http://data.riksdagen.se/dokumentlista/?sz=100&sort=d&utformat=xml"
     downloaded_suffix = ".xml"
     storage_policy = "dir"
+    document_type = None # 
+    start_url = None
+    start_url_template = "http://data.riksdagen.se/dokumentlista/?sz=100&sort=d&utformat=xml&typ=%(doctype)s"
 
-    #def generic_path(self,basefile,maindir,suffix):
-    #    return super(Riksdagen,self).generic_path(basefile.replace("/","-"),maindir,suffix)
+    def download(self, basefile=None):
+        if basefile:
+            return self.download_single(basefile)
+        url = self.start_url_template % {'doctype': self.document_type}
+        for basefile, url in self.download_get_basefiles(url):
+            self.download_single(basefile, url)
 
-    def download(self):
-        refresh = self.get_moduleconfig('refresh', bool, False)
-        assert self.document_type is not None
-        url = self.start_url + "&typ=%s" % self.document_type
-        self.log.info("Starting at %s" % url)
-
-        self.browser.open(url)
+    @downloadmax
+    def download_get_basefiles(self, start_url):
+        self.log.info("Starting at %s" % start_url)
+        url = start_url
         done = False
-        pagecnt = 1
         while not done:
-            self.log.info('Result page #%s' % pagecnt)
-            mainsoup = BeautifulSoup.BeautifulStoneSoup(
-                self.browser.response())
-            subnodes = mainsoup.findAll(lambda tag: tag.name == "subtyp" and
+            pagecount = 1
+            resp = requests.get(url)
+            soup = BeautifulSoup(resp.text, features="xml")
+                    
+            subnodes = soup.find_all(lambda tag: tag.name == "subtyp" and
                                         tag.text == self.document_type)
             for doc in [x.parent for x in subnodes]:
                 # TMP: Only retrieve old documents
                 # if doc.rm.text > "1999":
                 #     continue
                 basefile = "%s:%s" % (doc.rm.text, doc.nummer.text)
+                attachment = None
                 if doc.tempbeteckning.text:
-                    basefile += "#%s" % doc.tempbeteckning.text
-                if self.download_single(basefile, refresh=refresh, url=doc.dokumentstatus_url_xml.text):
-                    self.log.info("Downloaded %s" % basefile)
+                    attachment = doc.tempbeteckning.text
+                yield (basefile, attachment), doc.dokumentstatus_url_xml.text
             try:
-                self.browser.open(mainsoup.dokumentlista['nasta_sida'])
+                url = soup.dokumentlista['nasta_sida']
                 pagecnt += 1
+                self.log.info("Getting page #%d" % pagecnt)
             except KeyError:
-                self.log.info(
-                    'No next page link found, this was the last page')
+                self.log.info("That was the last page")
                 done = True
 
-    def download_single(self, basefile, refresh=False, url=None):
+    def download_single(self, basefile, url=None):
+        if isinstance(basefile, tuple):
+            basefile, attachment = basefile
+        if attachment:
+            docname = attachment
+        else:
+            docname = "index"
+        
         if not url:
             url = self.remote_url(basefile)
             if not url:  # remote_url failed
-                return
-
-        xmlfile = self.downloaded_path(basefile)
-        if refresh or not os.path.exists(xmlfile):
-            existed = os.path.exists(xmlfile)
-            self.log.debug("  %s: Downloading to %s" % (basefile, xmlfile))
-            try:
-                updated = self.download_if_needed(url, xmlfile)
-
-                if existed:
-                    if updated:
-                        self.log.debug(
-                            "%s existed, but downloaded new" % xmlfile)
-                    else:
-                        self.log.debug(
-                            "%s is unchanged -- checking files" % xmlfile)
-                else:
-                    self.log.debug(
-                        "%s did not exist, so it was downloaded" % xmlfile)
-                fileupdated = False
-                r = None
-                docsoup = BeautifulSoup.BeautifulStoneSoup(open(xmlfile))
-                dokid = docsoup.find('dok_id').text
-                if docsoup.find('dokument_url_html'):
-                    htmlurl = docsoup.find('dokument_url_html').text
-                    htmlfile = self.generic_path(
-                        basefile, "downloaded", ".html")
-                    self.log.debug("   Downloading to %s" % htmlfile)
-                    r = self.download_if_needed(htmlurl, htmlfile)
-                elif docsoup.find('dokument_url_text'):
-                    texturl = docsoup.find('dokument_url_text').text
-                    textfile = self.generic_path(
-                        basefile, "downloaded", ".txt")
-                    self.log.debug("   Downloading to %s" % htmlfile)
-                    r = self.download_if_needed(texturl, textfile)
-                fileupdated = fileupdated or r
-
-                for b in docsoup.findAll('bilaga'):
-                    # self.log.debug("Looking for %s, found %s", dokid, b.dok_id.text)
-                    if b.dok_id.text != dokid:
-                        continue
-                    filetype = "." + b.filtyp.text
-                    filename = self.generic_path(
-                        basefile, "downloaded", filetype)
-                    self.log.debug("   Downloading to %s" % filename)
-                    r = self.download_if_needed(b.fil_url.text, filename)
-                    fileupdated = fileupdated or r
-                    break
-
-            except (URLError, socket.error) as e:
-                # 404 not found or similar -- logged in download_if_needed
                 return False
-            if updated or fileupdated:
-                return True  # Successful download of new or changed file
+                
+        xmlfile = self.store.downloaded_path(basefile)
+        if not (self.config.force or not os.path.exists(xmlfile)):
+            self.log.debug("%s already exists" % (xmlfile))
+            return False
+            
+        existed = os.path.exists(xmlfile)
+        self.log.debug("  %s: Downloading to %s" % (basefile, xmlfile))
+
+        updated = self.download_if_needed(url, basefile)
+
+        if existed:
+            if updated:
+                self.log.debug(
+                    "%s existed, but downloaded new" % xmlfile)
             else:
                 self.log.debug(
-                    "%s and all associated files unchanged" % xmlfile)
+                    "%s is unchanged -- checking files" % xmlfile)
         else:
-            self.log.debug("%s already exists" % (xmlfile))
-        return False
+            self.log.debug(
+                "%s did not exist, so it was downloaded" % xmlfile)
+        fileupdated = False
+        r = None
+        docsoup = BeautifulSoup(open(xmlfile), features="xml")
+        dokid = docsoup.find('dok_id').text
+        if docsoup.find('dokument_url_html'):
+            htmlurl = docsoup.find('dokument_url_html').text
+            htmlfile = self.store.downloaded_path(basefile, attachment=docname+".html")
+            self.log.debug("   Downloading to %s" % htmlfile)
+            r = self.download_if_needed(htmlurl, basefile, filename=htmlfile)
+        elif docsoup.find('dokument_url_text'):
+            texturl = docsoup.find('dokument_url_text').text
+            htmlfile = self.store.downloaded_path(basefile, attachment=docname+".txt")
+            self.log.debug("   Downloading to %s" % htmlfile)
+            r = self.download_if_needed(texturl, basefile, filename=textfile)
+        fileupdated = fileupdated or r
+
+        for b in docsoup.findAll('bilaga'):
+            # self.log.debug("Looking for %s, found %s", dokid, b.dok_id.text)
+            if b.dok_id.text != dokid:
+                continue
+            filetype = "." + b.filtyp.text
+            filename = self.store.downloaded_path(basefile, attachment=docname+filetype)
+            self.log.debug("   Downloading to %s" % filename)
+            r = self.download_if_needed(b.fil_url.text, basefile, filename=filename)
+            fileupdated = fileupdated or r
+            break
+
+        if updated or fileupdated:
+            return True  # Successful download of new or changed file
+        else:
+            self.log.debug(
+                "%s and all associated files unchanged" % xmlfile)
 
     @managedparsing
     def parse(self, doc):
@@ -182,4 +183,4 @@ class Riksdagen(SwedishLegalSource):
     def canonical_uri(self, basefile):
         seg = {self.ns['rpubl'].Proposition: "prop",
                self.ns['rpubl'].Skrivelse: "skr"}
-        return self.config['url'] + "publ/%s/%s" % (seg[self.rdf_type], basefile)
+        return self.config.url + "publ/%s/%s" % (seg[self.rdf_type], basefile)

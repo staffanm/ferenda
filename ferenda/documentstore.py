@@ -4,11 +4,7 @@ import os
 from tempfile import NamedTemporaryFile
 import filecmp
 
-import six
-if six.PY3:
-    from urllib.parse import quote, unquote 
-else:
-    from urllib import quote, unquote  # NOQA
+from six.moves.urllib_parse import quote, unquote
 
 from ferenda import util
 from ferenda import errors
@@ -263,7 +259,7 @@ class DocumentStore(object):
             actions = ('downloaded','parsed','generated')
         
         basedir = self.datadir
-        pathfrag = self.pathfrag_to_basefile(basefile)
+        pathfrag = self.basefile_to_pathfrag(basefile)
         yielded_basefiles = []
         for action in actions:
             directory = os.sep.join((basedir, "archive",
@@ -447,6 +443,20 @@ class DocumentStore(object):
         :rtype:   str
         """
         return self.path(basefile, 'entries', '.json', version)
+
+    def intermediate_path(self, basefile, version=None):
+
+        """Get the full path for the main intermediate file for the given
+        basefile (and optionally archived version).
+
+        :param basefile: The basefile for which to calculate the path
+        :type  basefile: str
+        :param  version: Optional. The archived version id
+        :type   version: str
+        :returns: The full filesystem path
+        :rtype:   str
+        """
+        return self.path(basefile, 'intermediate', '.xml', version)
 
     def parsed_path(self, basefile, version=None, attachment=None):
         """Get the full path for the parsed file for the given

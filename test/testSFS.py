@@ -2,11 +2,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 import sys, os
-if sys.version_info < (2, 7, 0):
-    import unittest2 as unittest
-else:
-    import unittest
-# if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
+from ferenda.compat import unittest
 
 from six import text_type as str
 
@@ -86,11 +82,3 @@ brokentests = ['definition-no-definition.txt',
 def broken(testname):
     return testname in brokentests
 file_parametrize(Parse,"test/files/sfs/parse",".txt", broken)
-
-from ferenda.testutil import RepoTester, parametrize_repotester
-
-class TestSFS(RepoTester):
-    repoclass = SFS
-    docroot = os.path.dirname(__file__)+"/files/repo/sfs"
-
-parametrize_repotester(TestSFS)

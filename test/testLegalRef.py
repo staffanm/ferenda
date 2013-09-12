@@ -16,6 +16,8 @@ from ferenda.elements import serialize
 from ferenda.testutil import file_parametrize
 
 
+@unittest.skipIf('SKIP_SIMPLEPARSE_TESTS' in os.environ,
+                 "Skipping SimpleParser dependent tests")    
 class TestLegalRef(unittest.TestCase):
     
     def _test_parser(self, testfile, parser):
@@ -46,31 +48,43 @@ class TestLegalRef(unittest.TestCase):
         self.maxDiff = None
         self.assertEqual(want, got)
 
+@unittest.skipIf('SKIP_SIMPLEPARSE_TESTS' in os.environ,
+                 "Skipping SimpleParser dependent tests")    
 class Lagrum(TestLegalRef):
     def parametric_test(self,datafile):
         p = LegalRef(LegalRef.LAGRUM)
         return self._test_parser(datafile, p)
 
+@unittest.skipIf('SKIP_SIMPLEPARSE_TESTS' in os.environ,
+                 "Skipping SimpleParser dependent tests")    
 class KortLagrum(TestLegalRef):
     def parametric_test(self,datafile):
         p = LegalRef(LegalRef.LAGRUM, LegalRef.KORTLAGRUM)
         return self._test_parser(datafile, p)
 
+@unittest.skipIf('SKIP_SIMPLEPARSE_TESTS' in os.environ,
+                 "Skipping SimpleParser dependent tests")    
 class Forarbeten(TestLegalRef):
     def parametric_test(self,datafile):
         p = LegalRef(LegalRef.FORARBETEN)
         return self._test_parser(datafile, p)
 
+@unittest.skipIf('SKIP_SIMPLEPARSE_TESTS' in os.environ,
+                 "Skipping SimpleParser dependent tests")    
 class Rattsfall(TestLegalRef):
     def parametric_test(self,datafile):
         p = LegalRef(LegalRef.RATTSFALL)
         return self._test_parser(datafile, p)
 
+@unittest.skipIf('SKIP_SIMPLEPARSE_TESTS' in os.environ,
+                 "Skipping SimpleParser dependent tests")    
 class EULaw(TestLegalRef):
     def parametric_test(self,datafile):
         p = LegalRef(LegalRef.EGLAGSTIFTNING)
         return self._test_parser(datafile, p)
 
+@unittest.skipIf('SKIP_SIMPLEPARSE_TESTS' in os.environ,
+                 "Skipping SimpleParser dependent tests")    
 class EUCaselaw(TestLegalRef):
     def parametric_test(self,datafile):
         p = LegalRef(LegalRef.EGRATTSFALL)

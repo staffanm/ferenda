@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals,print_function
-"""Hanterar (konsoliderade) f\xf6rfattningar i SFS fr\xe5n Regeringskansliet
-r\xe4ttsdatabaser.
+"""Hanterar (konsoliderade) författningar i SFS från Regeringskansliet
+rättsdatabaser.
 """
 
 # system libraries (+ six)
@@ -17,81 +17,69 @@ import logging
 import os
 import re
 import sys
-import xml.etree.ElementTree as PET
-import xml.etree.cElementTree as ET
-import six
+
 from six.moves import html_parser
-if six.PY3:
-    from urllib.parse import quote, unquote 
-else:
-    from urllib import quote, unquote  # NOQA
-try:
-    from collections import OrderedDict
-except ImportError:
-    # if on python 2.6
-    from ordereddict import OrderedDict
+from six.moves.urllib_parse import quote, unquote
+from six import text_type as str
+from ferenda.compat import OrderedDict
 
 # 3rdparty libs
 from rdflib import Graph, Namespace, URIRef, RDF, Literal
-import requests
-import lxml.html
+from lxml import etree
 from lxml.builder import ElementMaker
 import bs4
 
 # my own libraries
-from ferenda import util, LayeredConfig
+from . import Trips, RPUBL
+from ferenda import DocumentEntry, DocumentStore
+from ferenda import TextReader, Describer
 from ferenda import decorators
+from ferenda import legaluri
+from ferenda import util, LayeredConfig
 from ferenda.elements import CompoundElement
 from ferenda.elements import OrdinalElement
 from ferenda.elements import TemporalElement
 from ferenda.elements import UnicodeElement
-from ferenda.legalref import LegalRef, LinkSubject
-from ferenda import DocumentEntry, DocumentStore
-from ferenda import TextReader, Describer
 from ferenda.errors import DocumentRemovedError, ParseError
-from . import SwedishLegalSource, RPUBL
+from ferenda.legalref import LegalRef, LinkSubject
 
 E = ElementMaker(namespace="http://www.w3.org/1999/xhtml")
-
-
-__shortdesc__ = "F\xf6rfattningar i SFS"
-
-# Objektmodellen f\xf6r en f\xf6rfattning \xe4r uppbyggd av massa byggstenar
-# (kapitel, paragrafen, stycken m.m.) d\xe4r de allra flesta \xe4r n\xe5gon
-# form av lista. \xc4ven stycken \xe4r listor, dels d\xe5 de kan inneh\xe5lla
-# lagrumsh\xe4nvisningar i den l\xf6pande texten, som uttrycks som
-# Link-objekt mellan de vanliga unicodetextobjekten, dels d\xe5 de kan
-# inneh\xe5lla en punkt- eller nummerlista.
+# Objektmodellen för en författning är uppbyggd av massa byggstenar
+# (kapitel, paragrafen, stycken m.m.) där de allra flesta är någon
+# form av lista. Även stycken är listor, dels då de kan innehålla
+# lagrumshänvisningar i den löpande texten, som uttrycks som
+# Link-objekt mellan de vanliga unicodetextobjekten, dels då de kan
+# innehålla en punkt- eller nummerlista.
 #
-# Alla klasser \xe4rver fr\xe5n antingen CompoundElement (som \xe4r en list
-# med lite extraegenskaper), UnicodeElement (som \xe4r en unicode med
-# lite extraegenskaper) eller MapElement (som \xe4r ett dict med lite
+# Alla klasser ärver från antingen CompoundElement (som är en list
+# med lite extraegenskaper), UnicodeElement (som är en unicode med
+# lite extraegenskaper) eller MapElement (som är ett dict med lite
 # extraegenskaper).
 #
-# De kan \xe4ven \xe4rva fr\xe5n TemporalElement om det \xe4r ett objekt som kan
-# upph\xe4vas eller tr\xe4da ikraft (exv paragrafer och rubriker, men inte
-# enskilda stycken) och/eller OrdinalElement om det \xe4r ett objekt
-# som har n\xe5n sorts l\xf6pnummer, dvs kan sorteras p\xe5 ett meningsfullt
-# s\xe4tt (exv kapitel och paragrafer, men inte rubriker).
+# De kan även ärva från TemporalElement om det är ett objekt som kan
+# upphävas eller träda ikraft (exv paragrafer och rubriker, men inte
+# enskilda stycken) och/eller OrdinalElement om det är ett objekt
+# som har nån sorts löpnummer, dvs kan sorteras på ett meningsfullt
+# sätt (exv kapitel och paragrafer, men inte rubriker).
 
 
 class Forfattning(CompoundElement, TemporalElement):
-    """Grundklass f\xf6r en konsoliderad f\xf6rfattningstext."""
+    """Grundklass för en konsoliderad författningstext."""
     tagname = "body"
     classname = "konsolideradforfattning"
     
-# Rubrike \xe4r en av de f\xe5 byggstenarna som faktiskt inte kan inneh\xe5lla
-# n\xe5got annat (det f\xf6rekommer "aldrig" en h\xe4nvisning i en
-# rubriktext). Den \xe4rver allts\xe5 fr\xe5n UnicodeElement, inte
+# Rubrike är en av de få byggstenarna som faktiskt inte kan innehålla
+# något annat (det förekommer "aldrig" en hänvisning i en
+# rubriktext). Den ärver alltså från UnicodeElement, inte
 # CompoundElement.
 
 
 class Rubrik(UnicodeElement, TemporalElement):
-    """En rubrik av n\xe5got slag - kan vara en huvud- eller underrubrik
-    i l\xf6ptexten, en kapitelrubrik, eller n\xe5got annat"""
+    """En rubrik av något slag - kan vara en huvud- eller underrubrik
+    i löptexten, en kapitelrubrik, eller något annat"""
     fragment_label = "R"
     def _get_tagname(self):
-        if 'type' in self and self.type == "underrubrik":
+        if hasattr(self, 'type') and self.type == "underrubrik":
             return "h3"
         else:
             return "h2"
@@ -155,9 +143,9 @@ class Avdelning(CompoundElement, OrdinalElement):
 
 
 class UpphavtKapitel(UnicodeElement, OrdinalElement):
-    """Ett UpphavtKapitel \xe4r annorlunda fr\xe5n ett upph\xe4vt Kapitel p\xe5 s\xe5
-    s\xe4tt att inget av den egentliga lagtexten finns kvar, bara en
-    platsh\xe5llare"""
+    """Ett UpphavtKapitel är annorlunda från ett upphävt Kapitel på så
+    sätt att inget av den egentliga lagtexten finns kvar, bara en
+    platshållare"""
     pass
 
 
@@ -180,7 +168,7 @@ class Kapitel(CompoundElement, OrdinalElement):
 class UpphavdParagraf(UnicodeElement, OrdinalElement):
     pass
 
-# en paragraf har inget "eget" v\xe4rde, bara ett nummer och ett eller
+# en paragraf har inget "eget" värde, bara ett nummer och ett eller
 # flera stycken
 class Paragraf(CompoundElement, OrdinalElement):
     fragment_label = "P"
@@ -192,7 +180,7 @@ class Paragraf(CompoundElement, OrdinalElement):
         self.uri = kwargs.get("uri", None)
         super(Paragraf, self).__init__(*args, **kwargs)
 
-# kan inneh\xe5lla n\xe4stlade numrerade listor
+# kan innehålla nästlade numrerade listor
 
 
 class Listelement(CompoundElement, OrdinalElement):
@@ -208,7 +196,7 @@ class Listelement(CompoundElement, OrdinalElement):
 class Overgangsbestammelser(CompoundElement):
 
     def __init__(self, *args, **kwargs):
-        self.rubrik = kwargs.get('rubrik', '\xd6verg\xe5ngsbest\xe4mmelser')
+        self.rubrik = kwargs.get('rubrik', 'Övergångsbestämmelser')
         super(Overgangsbestammelser, self).__init__(*args, **kwargs)
 
 
@@ -231,8 +219,8 @@ class Bilaga(CompoundElement):
 
 
 class Register(CompoundElement):
-    """Inneh\xe5ller lite metadata om en grundf\xf6rfattning och dess
-    efterf\xf6ljande \xe4ndringsf\xf6rfattningar"""
+    """Innehåller lite metadata om en grundförfattning och dess
+    efterföljande ändringsförfattningar"""
     tagname = "div"
     classname = "register"
     
@@ -246,7 +234,6 @@ class Register(CompoundElement):
         return res
     
 
-# class Registerpost(MapElement):
 class Registerpost(CompoundElement):
     """Metadata for a particular Grundforfattning or Andringsforfattning in the form of a rdflib graph, optionally with a Overgangsbestammelse."""
     tagname = "div"
@@ -264,8 +251,8 @@ class Registerpost(CompoundElement):
     
     
 class IckeSFS(ParseError):
-    """Sl\xe4ngs n\xe4r en f\xf6rfattning som inte \xe4r en egentlig
-    SFS-f\xf6rfattning parsas"""
+    """Slängs när en författning som inte är en egentlig
+    SFS-författning parsas"""
     pass
 
 
@@ -291,13 +278,17 @@ class SFSDocumentStore(DocumentStore):
     def register_path(self, basefile):
         return self.path(basefile, "register", ".html")
 
-class SFS(SwedishLegalSource):
-    """
-    Documentation to come.
+    def metadata_path(self, basefile):
+        return self.path(basefile, "metadata", ".html")
+
+class SFS(Trips):
+    """Documentation to come.
 
     A note about logging:
 
-    There are four additional loggers available ('paragraf', 'tabell', 'numlist' and 'rubrik'). By default, manager.py turns them off unless config.trace.[logname] is set. Do something like
+    There are four additional loggers available ('paragraf', 'tabell',
+    'numlist' and 'rubrik'). By default, manager.py turns them off
+    unless config.trace.[logname] is set. Do something like
 
     ./ferenda-build.py sfs parse 2009:924 --force --sfs-trace-rubrik
 
@@ -308,11 +299,25 @@ class SFS(SwedishLegalSource):
     """
     alias = "sfs"
 
-    start_url = ("http://rkrattsbaser.gov.se/cgi-bin/thw?${HTML}=sfsr_lst&"
-                 "${OOHTML}=sfsr_dok&${SNHTML}=sfsr_err&"
-                 "${MAXPAGE}=26&${BASE}=SFSR&${FORD}=FIND&"
-                 "%%C5R=FR%%C5N+%(start)s&%%C5R=TILL+%(end)s" % {'start':1600,
-                                                                 'end':datetime.today().year})
+    app = "sfst"  # dir, prop, sfst 
+    base = "SFSR" # DIR, THWALLPROP, SFSR
+
+    start_url = ("http://rkrattsbaser.gov.se/cgi-bin/thw?${HTML}=%(app)s_lst"
+                 "&${OOHTML}=%(app)s_dok&${SNHTML}=%(app)s_err"
+                 "&${MAXPAGE}=%(maxpage)d&${BASE}=%(base)s"
+                 "&${FORD}=FIND&%%C5R=FR%%C5N+%(start)s&%%C5R=TILL+%(end)s")
+
+    download_params = [{'maxpage': 101,
+                        'app': app,
+                        'base': base,
+                        'start': '1600',
+                        'end': '2008'},
+                       {'maxpage': 101,
+                        'app': app,
+                        'base': base,
+                        'start': '2009',
+                        'end': str(datetime.today().year)}]
+
     document_url_template = ("http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfst_dok&" 
                              "${HTML}=sfst_lst&${SNHTML}=sfst_err&${BASE}=SFST&"
                              "${TRIPSHOW}=format=THW&BET=%(basefile)s")
@@ -351,43 +356,6 @@ class SFS(SwedishLegalSource):
         else:
             return "%s/%s" % (baseuri, basefile)
 
-    def download(self):
-        self.log.info("Getting first page of results")
-        resp = requests.get(self.start_url)
-        tree = lxml.html.document_fromstring(resp.text)
-        tree.make_links_absolute(self.start_url, resolve_base_href=True)
-        links = self.download_get_basefiles(tree.iterlinks())
-        for (basefile, link) in links:
-            self.download_single(basefile)
-            
-        self._set_last_sfsnr()
-
-    def download_get_basefiles(self, source):
-        done = False
-        while not done:
-            nextpage = False
-            pagecount = 1
-            for (element, attribute, link, pos) in source:
-                if element.text is None:
-                    continue
-                m = re.search("\d+:\d+", element.text)
-                if m and not element.text.startswith("N"):
-                    yield(element.text, link)
-                else:
-                    m = re.match("Fler poster", element.text)
-                    if m:
-                        nextpage = link
-            if nextpage:
-                pagecount += 1
-                self.log.info("Getting page #%s of results" % pagecount)
-                resp = requests.get(nextpage)
-                tree = lxml.html.document_fromstring(resp.text)
-                tree.make_links_absolute(self.start_url, resolve_base_href=True)
-                source = tree.iterlinks()
-            else:
-                done = True
-            
-
     def _set_last_sfsnr(self, last_sfsnr=None):
         maxyear = datetime.today().year 
         if not last_sfsnr:
@@ -417,7 +385,7 @@ class SFS(SwedishLegalSource):
         real_last_sfs_nr = False
         while not done:
             wanted_sfs_nr = '%s:%s' % (year, nr)
-            self.log.info('S\xf6ker efter SFS nr %s' % wanted_sfs_nr)
+            self.log.info('Söker efter SFS nr %s' % wanted_sfs_nr)
             base_sfsnr_list = self._check_for_sfs(year, nr)
             if base_sfsnr_list:
                 self.download_log.info(
@@ -426,8 +394,8 @@ class SFS(SwedishLegalSource):
                 for base_sfsnr in base_sfsnr_list:
                     uppdaterad_tom = self._downloadSingle(base_sfsnr)
                     if base_sfsnr_list[0] == wanted_sfs_nr:
-                        # initial grundf\xf6rfattning - varken
-                        # "Uppdaterad T.O.M. eller "Upph\xe4vd av" ska
+                        # initial grundförfattning - varken
+                        # "Uppdaterad T.O.M. eller "Upphävd av" ska
                         # vara satt
                         pass
                     elif util.numcmp(uppdaterad_tom, wanted_sfs_nr) < 0:
@@ -445,17 +413,17 @@ class SFS(SwedishLegalSource):
                         real_last_sfs_nr = wanted_sfs_nr
                     nr = nr + 1  # actual downloading next loop
                 elif datetime.today().year > year:
-                    self.log.info('    \xc4r det dags att byta \xe5r?')
+                    self.log.info('    Är det dags att byta år?')
                     base_sfsnr_list = self._check_for_sfs(
                         datetime.today().year, 1)
                     if base_sfsnr_list:
                         year = datetime.today().year
                         nr = 1  # actual downloading next loop
                     else:
-                        self.log.info('    Vi \xe4r klara')
+                        self.log.info('    Vi är klara')
                         done = True
                 else:
-                    self.log.info('    Vi \xe4r klara')
+                    self.log.info('    Vi är klara')
                     done = True
         if real_last_sfs_nr:
             self._set_last_sfsnr(real_last_sfs_nr)
@@ -464,46 +432,42 @@ class SFS(SwedishLegalSource):
 
     def _check_for_sfs(self, year, nr):
         """Givet ett SFS-nummer, returnera en lista med alla
-        SFS-numret f\xf6r dess grundf\xf6rfattningar. Normalt sett har en
-        \xe4ndringsf\xf6rfattning bara en grundf\xf6rfattning, men f\xf6r vissa
+        SFS-numret för dess grundförfattningar. Normalt sett har en
+        ändringsförfattning bara en grundförfattning, men för vissa
         (exv 2008:605) finns flera. Om SFS-numret inte finns alls,
         returnera en tom lista."""
-        # Titta f\xf6rst efter grundf\xf6rfattning
-        self.log.info('    Letar efter grundf\xf6rfattning')
+        # Titta först efter grundförfattning
+        self.log.info('    Letar efter grundförfattning')
         grundforf = []
         url = ("http://62.95.69.15/cgi-bin/thw?${HTML}=sfsr_lst&"
                "${OOHTML}=sfsr_dok&${SNHTML}=sfsr_err&${MAXPAGE}=26&"
                "${BASE}=SFSR&${FORD}=FIND&${FREETEXT}=&BET=%s:%s&"
                "\xC4BET=&ORG=" % (year, nr))
-        # FIXME: consider using mechanize
-        tmpfile = mktemp()
-        self.browser.retrieve(url, tmpfile)
-        t = TextReader(tmpfile, encoding="iso-8859-1")
+        t = TextReader(string=requests.get(url).text)
         try:
-            t.cue("<p>S\xf6kningen gav ingen tr\xe4ff!</p>")
+            t.cue("<p>Sökningen gav ingen träff!</p>")
         except IOError:  # hurra!
             grundforf.append("%s:%s" % (year, nr))
             return grundforf
 
-        # Sen efter \xe4ndringsf\xf6rfattning
-        self.log.info('    Letar efter \xe4ndringsf\xf6rfattning')
+        # Sen efter ändringsförfattning
+        self.log.info('    Letar efter ändringsförfattning')
         url = ("http://62.95.69.15/cgi-bin/thw?${HTML}=sfsr_lst&"
                "${OOHTML}=sfsr_dok&${SNHTML}=sfsr_err&${MAXPAGE}=26&"
                "${BASE}=SFSR&${FORD}=FIND&${FREETEXT}=&BET=&"
                "\xC4BET=%s:%s&ORG=" % (year, nr))
-        self.browser.retrieve(url, tmpfile)
-        # maybe this is better done through mechanize?
-        t = TextReader(tmpfile, encoding="iso-8859-1")
+
+        t = TextReader(string=requests.get(url).text)
         try:
-            t.cue("<p>S\xf6kningen gav ingen tr\xe4ff!</p>")
-            self.log.info('    Hittade ingen \xe4ndringsf\xf6rfattning')
+            t.cue("<p>Sökningen gav ingen träff!</p>")
+            self.log.info('    Hittade ingen ändringsförfattning')
             return grundforf
         except IOError:
             t.seek(0)
             try:
                 t.cuepast('<input type="hidden" name="BET" value="')
                 grundforf.append(t.readto("$"))
-                self.log.debug('    Hittade \xe4ndringsf\xf6rfattning (till %s)' %
+                self.log.debug('    Hittade ändringsförfattning (till %s)' %
                                grundforf[-1])
                 return grundforf
             except IOError:
@@ -511,22 +475,24 @@ class SFS(SwedishLegalSource):
                 page = t.read(sys.maxsize)
                 for m in re.finditer('>(\d+:\d+)</a>', page):
                     grundforf.append(m.group(1))
-                    self.log.debug('    Hittade \xe4ndringsf\xf6rfattning (till %s)'
+                    self.log.debug('    Hittade ändringsförfattning (till %s)'
                                    % grundforf[-1])
                 return grundforf
 
-    def download_single(self, basefile):
+    def download_single(self, basefile, url):
         """Laddar ner senaste konsoliderade versionen av
-        grundf\xf6rfattningen med angivet SFS-nr. Om en tidigare version
-        finns p\xe5 disk, arkiveras den. Returnerar det SFS-nummer till
-        vilket f\xf6rfattningen uppdaterats."""
+        grundförfattningen med angivet SFS-nr. Om en tidigare version
+        finns på disk, arkiveras den. Returnerar det SFS-nummer till
+        vilket författningen uppdaterats."""
         self.log.debug('Attempting to download %s' % (basefile))
+
         sfst_url = self.document_url_template % {'basefile': basefile.replace(" ", "+")}
         sfsr_url = self.document_sfsr_url_template % {'basefile': basefile.replace(" ", "+")}
         # FIXME: a lot of code duplication compared to
         # DocumentRepository.download_single. Maybe particularly the
         # DocumentEntry juggling should go into download_if_needed()?
         created = not os.path.exists(self.store.downloaded_path(basefile))
+        updated = False
         if self.download_if_needed(sfst_url, basefile):
             if created:
                 self.log.info("%s: downloaded from %s" % (basefile, sfst_url))
@@ -534,9 +500,11 @@ class SFS(SwedishLegalSource):
                 self.log.info(
                     "%s: downloaded new version from %s" % (basefile, sfst_url))
             updated = True
-        # using the attachmend functionality makes some sense, but
+        # using the attachment functionality makes some sense, but
         # requires that self.store.storage_policy = "dir"
         # regfilename= self.store.downloaded_path(basefile,attachment="register")
+        metadatafilename = self.store.metadata_path(basefile)
+        self.download_if_needed(url, basefile, archive=False, filename=metadatafilename)
         regfilename = self.store.register_path(basefile)
         self.download_if_needed(sfsr_url, basefile, archive=False, filename=regfilename)
         entry = DocumentEntry(self.store.documententry_path(basefile))
@@ -554,7 +522,7 @@ class SFS(SwedishLegalSource):
         return updated
 
     # FIXME: This doesn't work at all
-    def get_archive_version(self,basefile):
+    def get_archive_version(self,basefile, sfst_tempfile):
         sfst_file = self.store.downloaded_path(basefile)
         # FIXME: Implement get_archive_version
         if os.path.exists(sfst_file):
@@ -568,11 +536,11 @@ class SFS(SwedishLegalSource):
                 uppdaterad_tom = self._find_uppdaterad_tom(
                     basefile, sfst_tempfile)
                 if uppdaterad_tom != old_uppdaterad_tom:
-                    self.log.info('        %s har \xe4ndrats (%s -> %s)' % (
+                    self.log.info('        %s har ändrats (%s -> %s)' % (
                         basefile, old_uppdaterad_tom, uppdaterad_tom))
                     self._archive(sfst_file, basefile, old_uppdaterad_tom)
                 else:
-                    self.log.info('        %s har \xe4ndrats (gammal '
+                    self.log.info('        %s har ändrats (gammal '
                                   'checksum %s)' % (basefile, old_checksum))
                     self._archive(sfst_file,
                                   basefile, old_uppdaterad_tom, old_checksum)
@@ -581,10 +549,10 @@ class SFS(SwedishLegalSource):
                 # we've updated it or not
                 util.robust_rename(sfst_tempfile, sfst_file)
             elif upphavd_genom:
-                self.log.info('        %s har upph\xe4vts' % (basefile))
+                self.log.info('        %s har upphävts' % (basefile))
 
             else:
-                self.log.debug('        %s har inte \xe4ndrats (gammal '
+                self.log.debug('        %s har inte ändrats (gammal '
                                'checksum %s)' % (basefile, old_checksum))
         else:
             util.robust_rename(sfst_tempfile, sfst_file)
@@ -592,27 +560,24 @@ class SFS(SwedishLegalSource):
         sfsr_url = ("http://62.95.69.15/cgi-bin/thw?${OOHTML}=sfsr_dok&"
                     "${HTML}=sfst_lst&${SNHTML}=sfsr_err&${BASE}=SFSR&"
                     "${TRIPSHOW}=format=THW&BET=%s" % basefile.replace(" ", "+"))
-        sfsr_file = self.store.register_path(doc.basefile)
+        sfsr_file = self.store.register_path(basefile)
         if (old_uppdaterad_tom and
                 old_uppdaterad_tom != uppdaterad_tom):
             self._archive(sfsr_file, basefile, old_uppdaterad_tom)
 
-        util.ensure_dir(sfsr_file)
-        sfsr_tempfile = mktemp()
-        self.browser.retrieve(sfsr_url, sfsr_tempfile)
-        util.replace_if_different(sfsr_tempfile, sfsr_file)
+        self.download_if_needed(sfsr_url, basefile, filename=sfsr_file)
 
         if upphavd_genom:
             self.log.info(
-                '        %s \xe4r upph\xe4vd genom %s' % (basefile, upphavd_genom))
+                '        %s är upphävd genom %s' % (basefile, upphavd_genom))
             return upphavd_genom
         elif uppdaterad_tom:
             self.log.info(
-                '        %s \xe4r uppdaterad tom %s' % (basefile, uppdaterad_tom))
+                '        %s är uppdaterad tom %s' % (basefile, uppdaterad_tom))
             return uppdaterad_tom
         else:
             self.log.info(
-                '        %s \xe4r varken uppdaterad eller upph\xe4vd' % (basefile))
+                '        %s är varken uppdaterad eller upphävd' % (basefile))
             return None
 
     def _find_uppdaterad_tom(self, sfsnr, filename=None, reader=None):
@@ -646,7 +611,7 @@ class SFS(SwedishLegalSource):
             return None
 
     def _checksum(self, filename):
-        """MD5-checksumman f\xf6r den angivna filen"""
+        """MD5-checksumman för den angivna filen"""
         import hashlib
         c = hashlib.md5()
         try:
@@ -660,7 +625,7 @@ class SFS(SwedishLegalSource):
 
     re_SimpleSfsId = re.compile(r'(\d{4}:\d+)\s*$')
     re_SearchSfsId = re.compile(r'\((\d{4}:\d+)\)').search
-    re_ChangeNote = re.compile(r'(Lag|F\xf6rordning) \(\d{4}:\d+\)\.?$')
+    re_ChangeNote = re.compile(r'(Lag|Förordning) \(\d{4}:\d+\)\.?$')
     re_ChapterId = re.compile(r'^(\d+( \w|)) [Kk]ap.').match
     re_DivisionId = re.compile(r'^AVD. ([IVX]*)').match
     re_SectionId = re.compile(
@@ -673,22 +638,22 @@ class SFS(SwedishLegalSource):
     re_Bokstavslista = re.compile(r'^(\w)\) ')
     re_ElementId = re.compile(
         r'^(\d+) mom\.')        # used for both match+sub
-    re_ChapterRevoked = re.compile(r'^(\d+( \w|)) [Kk]ap. (upph\xe4vd|har upph\xe4vts) genom (f\xf6rordning|lag) \([\d\:\. s]+\)\.?$').match
-    re_SectionRevoked = re.compile(r'^(\d+ ?\w?) \xa7[ \.]([Hh]ar upph\xe4vts|[Nn]y beteckning (\d+ ?\w?) \xa7) genom ([Ff]\xf6rordning|[Ll]ag) \([\d\:\. s]+\)\.$').match
+    re_ChapterRevoked = re.compile(r'^(\d+( \w|)) [Kk]ap. (upphävd|har upphävts) genom (förordning|lag) \([\d\:\. s]+\)\.?$').match
+    re_SectionRevoked = re.compile(r'^(\d+ ?\w?) \xa7[ \.]([Hh]ar upphävts|[Nn]y beteckning (\d+ ?\w?) \xa7) genom ([Ff]örordning|[Ll]ag) \([\d\:\. s]+\)\.$').match
     re_RevokeDate = re.compile(
-        r'/(?:Rubriken u|U)pph\xf6r att g\xe4lla U:(\d+)-(\d+)-(\d+)/')
+        r'/(?:Rubriken u|U)pphör att gälla U:(\d+)-(\d+)-(\d+)/')
     re_RevokeAuthorization = re.compile(
-        r'/Upph\xf6r att g\xe4lla U:(den dag regeringen best\xe4mmer)/')
+        r'/Upphör att gälla U:(den dag regeringen bestämmer)/')
     re_EntryIntoForceDate = re.compile(
-        r'/(?:Rubriken t|T)r\xe4der i kraft I:(\d+)-(\d+)-(\d+)/')
+        r'/(?:Rubriken t|T)räder i kraft I:(\d+)-(\d+)-(\d+)/')
     re_EntryIntoForceAuthorization = re.compile(
-        r'/Tr\xe4der i kraft I:(den dag regeringen best\xe4mmer)/')
+        r'/Träder i kraft I:(den dag regeringen bestämmer)/')
     re_dehyphenate = re.compile(r'\b- (?!(och|eller))', re.UNICODE).sub
-    re_definitions = re.compile(r'^I (lagen|f\xf6rordningen|balken|denna lag|denna f\xf6rordning|denna balk|denna paragraf|detta kapitel) (avses med|betyder|anv\xe4nds f\xf6ljande)').match
-    re_brottsdef = re.compile(r'\b(d\xf6ms|d\xf6mes)(?: han)?(?:,[\w\xa7 ]+,)? f\xf6r ([\w ]{3,50}) till (b\xf6ter|f\xe4ngelse)', re.UNICODE).search
-    re_brottsdef_alt = re.compile(r'[Ff]\xf6r ([\w ]{3,50}) (d\xf6ms|d\xf6mas) till (b\xf6ter|f\xe4ngelse)', re.UNICODE).search
+    re_definitions = re.compile(r'^I (lagen|förordningen|balken|denna lag|denna förordning|denna balk|denna paragraf|detta kapitel) (avses med|betyder|används följande)').match
+    re_brottsdef = re.compile(r'\b(döms|dömes)(?: han)?(?:,[\w\xa7 ]+,)? för ([\w ]{3,50}) till (böter|fängelse)', re.UNICODE).search
+    re_brottsdef_alt = re.compile(r'[Ff]ör ([\w ]{3,50}) (döms|dömas) till (böter|fängelse)', re.UNICODE).search
     re_parantesdef = re.compile(r'\(([\w ]{3,50})\)\.', re.UNICODE).search
-    re_loptextdef = re.compile(r'^Med ([\w ]{3,50}) (?:avses|f\xf6rst\xe5s) i denna (f\xf6rordning|lag|balk)', re.UNICODE).search
+    re_loptextdef = re.compile(r'^Med ([\w ]{3,50}) (?:avses|förstås) i denna (förordning|lag|balk)', re.UNICODE).search
 
     # use this custom matcher to ensure any strings you intend to convert
     # are legal roman numerals (simpler than having from_roman throwing
@@ -736,19 +701,19 @@ class SFS(SwedishLegalSource):
         # documents a SFS nummer on the form "N1992:31". Filter
         # these out.
         if doc.basefile.startswith('N'):
-            raise IckeSFS()
+            raise IckeSFS("%s is not a regular SFS" % doc.basefile)
 
-        # Check to see if the F\xf6rfattning has been revoked (using
+        # Check to see if the Författning has been revoked (using
         # plain fast string searching, no fancy HTML parsing and
         # traversing)
         t = TextReader(sfst_file, encoding="iso-8859-1")
         if not self.config.keepexpired:
             try:
-                t.cuepast('<i>F\xf6rfattningen \xe4r upph\xe4vd/skall upph\xe4vas: ')
+                t.cuepast('<i>Författningen är upphävd/skall upphävas: ')
                 datestr = t.readto('</i></b>')
                 if datetime.strptime(datestr, '%Y-%m-%d') < datetime.today():
                     self.log.debug('%s: Expired' % doc.basefile)
-                    raise UpphavdForfattning()
+                    raise UpphavdForfattning("%s is an expired SFS" % doc.basefile)
             except IOError:
                 pass
 
@@ -759,8 +724,12 @@ class SFS(SwedishLegalSource):
         doc.uri = self.canonical_uri(doc.basefile, uppdaterad_tom)
         doc.lang = "sv"
         desc = Describer(doc.meta, doc.uri)
-        
-        registry = self.parse_sfsr(sfsr_file, doc.uri)
+
+        try:
+            registry = self.parse_sfsr(sfsr_file, doc.uri)
+        except UpphavdForfattning as e:
+            e.dummyfile = self.store.parsed_path(doc.basefile)
+            raise e
         
         #for uri, graph in registry.items():
         #    print("==== %s ====" % uri)
@@ -773,24 +742,24 @@ class SFS(SwedishLegalSource):
             (plaintext, patchdesc) = self.patch_if_needed(doc.basefile, plaintext)
             if patchdesc:
                 desc.value(self.ns['rinfoex'].patchdescription,
-                           patchdescription)
+                           patchdesc)
 
             self.parse_sfst(plaintext, doc)
         except IOError:
             self.log.warning("%s: Fulltext saknas" % self.id)
-            # extractSFST misslyckades, d\xe5 det fanns n\xe5gon post i
-            # SFST-databasen (det h\xe4nder alltf\xf6r ofta att bara
-            # SFSR-databasen \xe4r uppdaterad). 
+            # extractSFST misslyckades, då det fanns någon post i
+            # SFST-databasen (det händer alltför ofta att bara
+            # SFSR-databasen är uppdaterad). 
             desc.value(self.ns['dct'].title,
-                       registry.value(URIRef(docuri),
+                       registry.value(URIRef(doc.uri),
                                       self.ns['dct'].title))
             desc.rel(self.ns['dct'].publisher,
                      self.lookup_resource("Regeringskansliet"))
 
-            desc.value(self.ns['dct'].identifier, "SFS " + basefile)
+            desc.value(self.ns['dct'].identifier, "SFS " + doc.basefile)
                        
-            doc.body = Forfattning([Style(['Lagtext saknas'],
-                                      id='S1')])
+            doc.body = Forfattning([Stycke(['Lagtext saknas'],
+                                           id='S1')])
 
         # At this point, we basic metadata and a almost complete body
         # structure. Enhance the metadata:
@@ -832,8 +801,10 @@ class SFS(SwedishLegalSource):
             # rpubl:KonsolideradGrundforfattning has the same dct:published date
             last_post_uri = list(registry.keys())[-1]
             last_post_graph = registry[last_post_uri]
-            published = last_post_graph.value(URIRef(last_post_uri),
-                                              self.ns['rpubl'].utfardandedatum).toPython()
+            pub_lit = last_post_graph.value(URIRef(last_post_uri),
+                                            self.ns['rpubl'].utfardandedatum)
+            if pub_lit:
+                published = pub_lit.toPython()
         if not published:
             # 3. general fallback: Use the corresponding orig_updated
             # on the DocumentEntry. This is not correct (as it
@@ -855,16 +826,16 @@ class SFS(SwedishLegalSource):
         for idx, p in enumerate(doc.body):
             if isinstance(p, Overgangsbestammelser):
                 for ob in p:
-                    assert isinstance(p,Overgangsbestammelse)
-                    obs[self.canonical_url(ob.sfsid)] = ob
+                    assert isinstance(ob,Overgangsbestammelse)
+                    obs[self.canonical_uri(ob.sfsnr)] = ob
                     obsidx = idx
                 break
             
         if obs:
             del doc.body[obsidx]
-            reg = Register(rubrik='\xc4ndringar och \xf6verg\xe5ngsbest\xe4mmelser')
+            reg = Register(rubrik='Ändringar och övergångsbestämmelser')
         else:
-            reg = Register(rubrik='\xc4ndringar')
+            reg = Register(rubrik='Ändringar')
             
         for uri,graph in registry.items():
             identifier = graph.value(URIRef(uri),self.ns['dct'].identifier)
@@ -878,7 +849,7 @@ class SFS(SwedishLegalSource):
 
     def _forfattningstyp(self, forfattningsrubrik):
         if (forfattningsrubrik.startswith('Lag ') or
-            (forfattningsrubrik.endswith('lag') and not forfattningsrubrik.startswith('F\xf6rordning')) or
+            (forfattningsrubrik.endswith('lag') and not forfattningsrubrik.startswith('Förordning')) or
                 forfattningsrubrik.endswith('balk')):
             return self.ns['rpubl'].Lag
         else:
@@ -887,8 +858,8 @@ class SFS(SwedishLegalSource):
     def _dict_to_graph(self, d, graph, uri):
         mapping = {'SFS nr': self.ns['rpubl'].fsNummer,
                    'Rubrik': self.ns['dct'].title,
-                   'Senast h\xe4mtad': self.ns['rinfoex'].senastHamtad,
-                   'Utf\xe4rdad': self.ns['rpubl'].utfardandedatum,
+                   'Senast hämtad': self.ns['rinfoex'].senastHamtad,
+                   'Utfärdad': self.ns['rpubl'].utfardandedatum,
                    'Utgivare': self.ns['dct'].publisher,
                    'Departement/ myndighet': self.ns['dct'].creator
                    }
@@ -900,45 +871,13 @@ class SFS(SwedishLegalSource):
                 else:
                     desc.value(mapping[k], v)
     
-#    # metadataf\xe4lt (kan f\xf6rekomma i b\xe5de SFST-header och SFSR-datat)
-#    # som bara har ett enda v\xe4rde
-#    labels = {'SFS-nummer': RPUBL['fsNummer'],
-#              'SFS nr': RPUBL['fsNummer'],
-#              'Ansvarig myndighet': DCT['creator'],
-#              'Departement/ myndighet': DCT['creator'],
-#              'Utgivare': DCT['publisher'],
-#              'Rubrik': DCT['title'],
-#              'Utf\xe4rdad': RPUBL['utfardandedatum'],
-#              'Ikraft': RPUBL['ikrafttradandedatum'],
-#              'Observera': RDFS.comment,  # FIXME: hitta b\xe4ttre predikat
-#              '\xd6vrigt': RDFS.comment,  # FIXME: hitta b\xe4ttre predikat
-#              'Tidsbegr\xe4nsad': RINFOEX['tidsbegransad'],
-#              'Omtryck': RINFOEX['omtryck'],  # subtype av RPUBL['fsNummer']
-#              '\xc4ndring inf\xf6rd': RPUBL['konsolideringsunderlag'],
-#              'F\xf6rfattningen har upph\xe4vts genom':
-#              RINFOEX['upphavdAv'],
-#              # ska vara owl:inverseOf
-#              # rinfo:upphaver
-#              'Upph\xe4vd': RINFOEX['upphavandedatum']
-#              }
-#
-#    # metadataf\xe4lt som kan ha flera v\xe4rden (kommer representeras som
-#    # en lista av unicodeobjekt och LinkSubject-objekt)
-#    multilabels = {'F\xf6rarbeten': RPUBL['forarbete'],
-#                   'CELEX-nr': RPUBL['forarbete'],
-#                   'Omfattning': RPUBL['andrar'],  # ocks\xe5 RPUBL['ersatter'], RPUBL['upphaver'], RPUBL['inforsI']
-#                   }
-
     def parse_sfsr(self, filename, docuri):
-        """Parsear ut det SFSR-registret som inneh\xe5ller alla \xe4ndringar
-        i lagtexten fr\xe5n HTML-filer"""
-        all_attribs = []
+        """Parsear ut det SFSR-registret som innehåller alla ändringar
+        i lagtexten från HTML-filer"""
         with codecs.open(filename, encoding="iso-8859-1") as fp:
             soup = bs4.BeautifulSoup(fp.read(),"lxml")
 
         d = OrderedDict()
-        #g = Graph()
-        #desc  = Describer(g, docuri) 
         rubrik  = soup.body('table')[2].text.strip()
         changes = soup.body('table')[3:-2]
         for table in changes:
@@ -982,7 +921,7 @@ class SFS(SwedishLegalSource):
                     try:
                         authrec = self.lookup_resource(val)
                         desc.rel(self.ns['rpubl'].departement, authrec)
-                    except Exception as e:
+                    except Exception:
                         desc.value(self.ns['rpubl'].departement, val)
                 elif key == 'Rubrik':
                     if not self.id in val:
@@ -991,9 +930,9 @@ class SFS(SwedishLegalSource):
                     desc.rdftype(self._forfattningstyp(val))
                 elif key == 'Observera':
                     if not self.config.keepexpired:
-                        if 'F\xf6rfattningen \xe4r upph\xe4vd/skall upph\xe4vas: ' in val:
+                        if 'Författningen är upphävd/skall upphävas: ' in val:
                             if datetime.strptime(val[41:51], '%Y-%m-%d') < datetime.today():
-                                raise UpphavdForfattning()
+                                raise UpphavdForfattning("%s is an expired SFS" % self.id)
                     desc.value(self.ns['rdfs'].comment, val)
                 elif key == 'Ikraft':
                     desc.value(self.ns['rpubl'].ikrafttradandedatum,
@@ -1002,19 +941,19 @@ class SFS(SwedishLegalSource):
                     # First, create rdf statements for every
                     # single modified section we can find
                     for changecat in val.split('; '):
-                        if (changecat.startswith('\xe4ndr.') or
-                            changecat.startswith('\xe4ndr ') or
-                                changecat.startswith('\xe4ndring ')):
+                        if (changecat.startswith('ändr.') or
+                            changecat.startswith('ändr ') or
+                                changecat.startswith('ändring ')):
                             pred = self.ns['rpubl'].ersatter
                         elif (changecat.startswith('upph.') or
-                              changecat.startswith('utg\xe5r')):
+                              changecat.startswith('utgår')):
                             pred = self.ns['rpubl'].upphaver
                         elif (changecat.startswith('ny') or
                               changecat.startswith('ikrafttr.') or
                               changecat.startswith('ikrafftr.') or
                               changecat.startswith('ikraftr.') or
-                              changecat.startswith('ikrafttr\xe4d.') or
-                              changecat.startswith('till\xe4gg')):
+                              changecat.startswith('ikraftträd.') or
+                              changecat.startswith('tillägg')):
                             pred = self.ns['rpubl'].inforsI
                         elif (changecat.startswith('nuvarande') or
                               changecat in ('begr. giltighet','Omtryck',
@@ -1023,32 +962,32 @@ class SFS(SwedishLegalSource):
                                             'forts. giltighet av vissa best.')):
                             pred = None
                         else:
-                            self.log.warning("%s: Ok\xe4nd omfattningstyp %r" % (self.id, changecat))
+                            self.log.warning("%s: Okänd omfattningstyp %r" % (self.id, changecat))
                             pred = None
                             for node in self.lagrum_parser.parse(changecat, docuri, pred):
                                 if hasattr(node,'predicate'):
                                     desc.rel(node.predicate, node.uri)
                     # Secondly, preserve the entire text
                     desc.value(self.ns['rpubl'].andrar, val)
-                elif key == 'F\xf6rarbeten':
+                elif key == 'Förarbeten':
                     for node in self.forarbete_parser.parse(val):
                         if hasattr(node, 'uri'):
                             with desc.rel(self.ns['rpubl'].forarbete,
                                           node.uri):
                                 desc.value(self.ns['dct'].identifier,
-                                           six.text_type(node))
+                                           str(node))
                 elif key == 'CELEX-nr':
                     for celex in re.findall('3\d{2,4}[LR]\d{4}', val):
                         celexuri = "http://rinfo.lagrummet.se/ext/eur-lex/%s" % celex
                         with desc.rel(self.ns['rpubl'].genomforDirektiv,
                                       celexuri):
                             desc.value(self.ns['rpubl'].celexNummer, celex)
-                elif key == 'Tidsbegr\xe4nsad':
+                elif key == 'Tidsbegränsad':
                     expdate = datetime.strptime(val[:10], '%Y-%m-%d')
                     desc.value(self.ns['rinfoex'].tidsbegransad, expdate)
                     if expdate < datetime.today():
                         if not self.config.keepexpired:
-                            raise UpphavdForfattning()
+                            raise UpphavdForfattning("%s is an expired (time-limited) SFS" % filename)
                 else:
                     self.log.warning(
                         '%s: Obekant nyckel [\'%s\']' % self.id, key)
@@ -1081,7 +1020,7 @@ class SFS(SwedishLegalSource):
 
     def extract_sfst(self, filename):
         """Plockar fram plaintextversionen av den konsoliderade
-        lagtexten fr\xe5n nedladdade HTML-filer"""
+        lagtexten från nedladdade HTML-filer"""
         t = TextReader(filename, encoding="iso-8859-1")
         t.cuepast('<pre>')
         # remove &auml; et al
@@ -1097,23 +1036,23 @@ class SFS(SwedishLegalSource):
         capitalized = term[0].upper() + term[1:]
         return 'http://lagen.nu/concept/%s' % capitalized.replace(' ', '_')
 
-    # Post-processar dokumenttr\xe4det rekursivt och g\xf6r tre saker:
+    # Post-processar dokumentträdet rekursivt och gör tre saker:
     #
-    # Hittar begreppsdefinitioner i l\xf6ptexten
+    # Hittar begreppsdefinitioner i löptexten
     #
     # Hittar adresserbara enheter (delresurser som ska ha unika URI:s,
     # dvs kapitel, paragrafer, stycken, punkter) och konstruerar id's
-    # f\xf6r dem, exv K1P2S3N4 f\xf6r 1 kap. 2 \xa7 3 st. 4 p
+    # för dem, exv K1P2S3N4 för 1 kap. 2 \xa7 3 st. 4 p
     #
-    # Hittar lagrumsh\xe4nvisningar i l\xf6ptexten
+    # Hittar lagrumshänvisningar i löptexten
     def _construct_ids(self, element, prefix, baseuri, skip_fragments=[], find_definitions=False):
         find_definitions_recursive = find_definitions
         counters = defaultdict(int)
         if isinstance(element, CompoundElement):
             # Hitta begreppsdefinitioner
             if isinstance(element, Paragraf):
-                # kolla om f\xf6rsta stycket inneh\xe5ller en text som
-                # antyder att definitioner f\xf6ljer
+                # kolla om första stycket innehåller en text som
+                # antyder att definitioner följer
                 # self.log.debug("Testing %r against some regexes" % element[0][0])
                 if self.re_definitions(element[0][0]):
                     find_definitions = "normal"
@@ -1127,7 +1066,7 @@ class SFS(SwedishLegalSource):
 
                 find_definitions_recursive = find_definitions
 
-            # Hitta lagrumsh\xe4nvisningar + definitioner
+            # Hitta lagrumshänvisningar + definitioner
             if (isinstance(element, Stycke)
                 or isinstance(element, Listelement)
                     or isinstance(element, Tabellcell)):
@@ -1143,9 +1082,9 @@ class SFS(SwedishLegalSource):
                         if elementtext != "Beteckning":
                             term = elementtext
                             self.log.debug(
-                                '"%s" \xe4r nog en definition (1)' % term)
+                                '"%s" är nog en definition (1)' % term)
                     elif isinstance(element, Stycke):
-                        # Case 1: "antisladdsystem: ett tekniskt st\xf6dsystem"
+                        # Case 1: "antisladdsystem: ett tekniskt stödsystem"
                         # Sometimes, : is not the delimiter between
                         # the term and the definition, but even in
                         # those cases, : might figure in the
@@ -1168,38 +1107,38 @@ class SFS(SwedishLegalSource):
 
                                 if termdelimiter in elementtext:
                                     term = elementtext.split(termdelimiter)[0]
-                                    self.log.debug('"%s" \xe4r nog en definition (2.1)' % term)
+                                    self.log.debug('"%s" är nog en definition (2.1)' % term)
 
-                        # case 2: "Den som ber\xf6var annan livet, d\xf6ms
-                        # f\xf6r mord till f\xe4ngelse"
+                        # case 2: "Den som berövar annan livet, döms
+                        # för mord till fängelse"
                         m = self.re_brottsdef(elementtext)
                         if m:
                             term = m.group(2)
                             self.log.debug(
-                                '"%s" \xe4r nog en definition (2.2)' % term)
+                                '"%s" är nog en definition (2.2)' % term)
 
-                        # case 3: "F\xf6r milj\xf6brott d\xf6ms till b\xf6ter"
+                        # case 3: "För miljöbrott döms till böter"
                         m = self.re_brottsdef_alt(elementtext)
                         if m:
                             term = m.group(1)
                             self.log.debug(
-                                '"%s" \xe4r nog en definition (2.3)' % term)
+                                '"%s" är nog en definition (2.3)' % term)
 
-                        # case 4: "Inteckning f\xe5r p\xe5 ans\xf6kan av
-                        # fastighets\xe4garen d\xf6das (d\xf6dning)."
+                        # case 4: "Inteckning får på ansökan av
+                        # fastighetsägaren dödas (dödning)."
                         m = self.re_parantesdef(elementtext)
                         if m:
                             term = m.group(1)
                             self.log.debug(
-                                '"%s" \xe4r nog en definition (2.4)' % term)
+                                '"%s" är nog en definition (2.4)' % term)
 
                         # case 5: "Med detaljhandel avses i denna lag
-                        # f\xf6rs\xe4ljning av l\xe4kemedel"
+                        # försäljning av läkemedel"
                         m = self.re_loptextdef(elementtext)
                         if m:
                             term = m.group(1)
                             self.log.debug(
-                                '"%s" \xe4r nog en definition (2.5)' % term)
+                                '"%s" är nog en definition (2.5)' % term)
 
                     elif isinstance(element, Listelement):
                         # remove
@@ -1208,10 +1147,10 @@ class SFS(SwedishLegalSource):
                                    self.re_Bokstavslista):
                             elementtext = rx.sub('', elementtext)
                         term = elementtext.split(termdelimiter)[0]
-                        self.log.debug('"%s" \xe4r nog en definition (3)' % term)
+                        self.log.debug('"%s" är nog en definition (3)' % term)
 
-                    # Longest legitimate term found "Valutav\xe4xling,
-                    # betalnings\xf6verf\xf6ring och annan finansiell
+                    # Longest legitimate term found "Valutaväxling,
+                    # betalningsöverföring och annan finansiell
                     # verksamhet"
                     if term and len(term) < 68:
                         # this results in empty/hidden links -- might
@@ -1229,7 +1168,7 @@ class SFS(SwedishLegalSource):
                                   # if the Stycke has a NumreradLista
                                   # or similar
 
-                    if isinstance(p, six.text_type):  # look for stuff
+                    if isinstance(p, str):  # look for stuff
                         # normalize and convert some characters
                         s = " ".join(p.split())
                         s = s.replace("\x96", "-")
@@ -1245,7 +1184,7 @@ class SFS(SwedishLegalSource):
                                                                "dct:references")
                         for n in parsednodes:
                             # py2 compat FIxme
-                            if term and isinstance(n, six.text_type) and term in n:
+                            if term and isinstance(n, str) and term in n:
                                 (head, tail) = n.split(term, 1)
                                 nodes.extend((head, termnode, tail))
                             else:
@@ -1280,10 +1219,10 @@ class SFS(SwedishLegalSource):
                     self._construct_ids(p, fragment, baseuri, skip_fragments,
                                         find_definitions_recursive)
 
-                # Efter att f\xf6rsta tabellcellen i en rad hanterats,
+                # Efter att första tabellcellen i en rad hanterats,
                 # undvik att leta definitioner i tabellceller 2,3,4...
                 if isinstance(element, Tabellrad):
-                    #print "sl\xe4cker definitionsletarflaggan"
+                    #print "släcker definitionsletarflaggan"
                     find_definitions_recursive = False
 
     def _count_elements(self, element):
@@ -1334,7 +1273,7 @@ class SFS(SwedishLegalSource):
             # Simple string literals 
             if key == 'Rubrik':
                 desc.value(self.ns['dct'].title, Literal(val, lang="sv"))
-            elif key == '\xd6vrigt':
+            elif key == 'Övrigt':
                 desc.value(self.ns['rdfs'].comment, Literal(val, lang="sv"))
             elif key == 'SFS nr':
                 identifier = "SFS " + val
@@ -1342,23 +1281,23 @@ class SFS(SwedishLegalSource):
                 # amend this
                 
             # date literals
-            elif key == 'Utf\xe4rdad':
+            elif key == 'Utfärdad':
                 desc.value(self.ns['rpubl'].utfardandedatum,
                            datetime.strptime(val[:10], '%Y-%m-%d').date())
-            elif key == 'Tidsbegr\xe4nsad':
+            elif key == 'Tidsbegränsad':
                 desc.value(self.ns['rinfoex'].tidsbegransad,
                            datetime.strptime(val[:10], '%Y-%m-%d').date())
-            elif key == 'Upph\xe4vd':
+            elif key == 'Upphävd':
                 d = datetime.strptime(val[:10], '%Y-%m-%d')
                 desc.value(self.ns['rpubl'].upphavandedatum, d)
                 if not self.config.keepexpired and d < datetime.today():
-                    raise UpphavdForfattning()
+                    raise UpphavdForfattning("%s is an expired SFS" % self.id)
 
             # urirefs
             elif key == 'Departement/ myndighet':
                 authrec = self.lookup_resource(val)
                 desc.rel(self.ns['dct'].creator, authrec)
-            elif (key == '\xc4ndring inf\xf6rd' and re_sfs(val)): 
+            elif (key == 'Ändring införd' and re_sfs(val)): 
                 uppdaterad = re_sfs(val).group(1)
                 # not sure we need to add this, since parse_sfsr catches same
                 desc.rel(self.ns['rpubl'].konsolideringsunderlag,
@@ -1369,7 +1308,7 @@ class SFS(SwedishLegalSource):
             elif (key == 'Omtryck' and re_sfs(val)):
                 desc.rel(self.ns['rinfoex'].omtryck,
                          self.canonical_uri(re_sfs(val).group(1)))
-            elif (key == 'F\xf6rfattningen har upph\xe4vts genom' and
+            elif (key == 'Författningen har upphävts genom' and
                   re_sfs(val)):
                 desc.rel(self.ns['rinfoex'].upphavdAv,
                          self.canonical_uri(re_sfs(val).group(1)))
@@ -1389,18 +1328,18 @@ class SFS(SwedishLegalSource):
         while self.reader.peekline() == "":
             self.reader.readline()
 
-        self.log.debug('F\xf6rsta raden \'%s\'' % self.reader.peekline())
+        self.log.debug('Första raden \'%s\'' % self.reader.peekline())
         (line, upphor, ikrafttrader) = self.andringsDatum(
             self.reader.peekline())
         if ikrafttrader:
             self.log.debug(
-                'F\xf6rfattning med ikrafttr\xe4dandedatum %s' % ikrafttrader)
+                'Författning med ikraftträdandedatum %s' % ikrafttrader)
 
             b = Forfattning(ikrafttrader=ikrafttrader,
                             uri=self.canonical_uri(self.id))
             self.reader.readline()
         else:
-            self.log.debug('F\xf6rfattning utan ikrafttr\xe4dandedatum')
+            self.log.debug('Författning utan ikraftträdandedatum')
             b = Forfattning(uri=self.canonical_uri(self.id))
 
         while not self.reader.eof():
@@ -1433,10 +1372,10 @@ class SFS(SwedishLegalSource):
         while not self.reader.eof():
             state_handler = self.guess_state()
 
-            if state_handler in (self.makeAvdelning,  # Strukturer som signalerar att denna avdelning \xe4r slut
+            if state_handler in (self.makeAvdelning,  # Strukturer som signalerar att denna avdelning är slut
                                  self.makeOvergangsbestammelser,
                                  self.makeBilaga):
-                self.log.debug("  Avdelning %s f\xe4rdig" % p.ordinal)
+                self.log.debug("  Avdelning %s färdig" % p.ordinal)
                 return p
             else:
                 res = state_handler()
@@ -1449,7 +1388,7 @@ class SFS(SwedishLegalSource):
         kapitelnummer = self.idOfKapitel()
         c = UpphavtKapitel(self.reader.readline(),
                            ordinal=kapitelnummer)
-        self.log.debug("  Upph\xe4vt kapitel: '%s...'" % c[:30])
+        self.log.debug("  Upphävt kapitel: '%s...'" % c[:30])
 
         return c
 
@@ -1474,12 +1413,12 @@ class SFS(SwedishLegalSource):
         while not self.reader.eof():
             state_handler = self.guess_state()
 
-            if state_handler in (self.makeKapitel,  # Strukturer som signalerar slutet p\xe5 detta kapitel
+            if state_handler in (self.makeKapitel,  # Strukturer som signalerar slutet på detta kapitel
                                  self.makeUpphavtKapitel,
                                  self.makeAvdelning,
                                  self.makeOvergangsbestammelser,
                                  self.makeBilaga):
-                self.log.debug("    Kapitel %s f\xe4rdigt" % k.ordinal)
+                self.log.debug("    Kapitel %s färdigt" % k.ordinal)
                 return (k)
             else:
                 res = state_handler()
@@ -1511,7 +1450,7 @@ class SFS(SwedishLegalSource):
         p = UpphavdParagraf(self.reader.readline(),
                             ordinal=paragrafnummer)
         self.current_section = paragrafnummer
-        self.log.debug("      Upph\xe4vd paragraf: '%s...'" % p[:30])
+        self.log.debug("      Upphävd paragraf: '%s...'" % p[:30])
         return p
 
     def makeParagraf(self):
@@ -1519,7 +1458,7 @@ class SFS(SwedishLegalSource):
         self.current_section = paragrafnummer
         firstline = self.reader.peekline()
         self.log.debug("      Ny paragraf: '%s...'" % firstline[:30])
-        # L\xe4s f\xf6rbi paragrafnumret:
+        # Läs förbi paragrafnumret:
         self.reader.read(len(paragrafnummer) + len(' \xa7 '))
 
         # some really old laws have sections split up in "elements"
@@ -1532,7 +1471,7 @@ class SFS(SwedishLegalSource):
             momentnummer = None
 
         (fixedline, upphor, ikrafttrader) = self.andringsDatum(firstline)
-        # L\xe4s f\xf6rbi '/Upph\xf6r [...]/' och '/Ikrafttr\xe4der [...]/'-str\xe4ngarna
+        # Läs förbi '/Upphör [...]/' och '/Ikraftträder [...]/'-strängarna
         self.reader.read(len(firstline) - len(fixedline))
         kwargs = {'ordinal': paragrafnummer}
         if upphor:
@@ -1559,13 +1498,13 @@ class SFS(SwedishLegalSource):
                                  self.makeRubrik,
                                  self.makeOvergangsbestammelser,
                                  self.makeBilaga):
-                self.log.debug("      Paragraf %s f\xe4rdig" % paragrafnummer)
+                self.log.debug("      Paragraf %s färdig" % paragrafnummer)
                 return p
             elif state_handler == self.blankline:
-                state_handler()  # Bara att sl\xe4nga bort
+                state_handler()  # Bara att slänga bort
             elif state_handler == self.makeOvergangsbestammelse:
-                self.log.debug("      Paragraf %s f\xe4rdig" % paragrafnummer)
-                self.log.warning("%s: Avskiljande rubrik saknas mellan f\xf6rfattningstext och \xf6verg\xe5ngsbest\xe4mmelser" % self.id)
+                self.log.debug("      Paragraf %s färdig" % paragrafnummer)
+                self.log.warning("%s: Avskiljande rubrik saknas mellan författningstext och övergångsbestämmelser" % self.id)
                 return p
             else:
                 assert state_handler == self.makeStycke, "guess_state returned %s, not makeStycke" % state_handler.__name__
@@ -1592,7 +1531,7 @@ class SFS(SwedishLegalSource):
                 res = state_handler()
                 s.append(res)
             elif state_handler == self.blankline:
-                state_handler()  # Bara att sl\xe4nga bort
+                state_handler()  # Bara att slänga bort
             else:
                 #self.log.debug("            makeStycke: ...we're done")
                 return s
@@ -1601,8 +1540,8 @@ class SFS(SwedishLegalSource):
     def makeNumreradLista(self):
         n = NumreradLista()
         while not self.reader.eof():
-            # Utg\xe5 i f\xf6rsta hand fr\xe5n att n\xe4sta stycke \xe4r ytterligare
-            # en listpunkt (vissa t\xe4nkbara stycken kan \xe4ven matcha
+            # Utgå i första hand från att nästa stycke är ytterligare
+            # en listpunkt (vissa tänkbara stycken kan även matcha
             # tabell m.fl.)
             if self.isNumreradLista():
                 state_handler = self.makeNumreradLista
@@ -1640,7 +1579,7 @@ class SFS(SwedishLegalSource):
             if state_handler not in (self.blankline, self.makeBokstavslista):
                 return n
             elif state_handler == self.blankline:
-                res = state_handler()
+                state_handler()
             else:
                 self.log.debug("            Ny underpunkt: '%s...'" %
                                self.reader.peekline()[:30])
@@ -1661,7 +1600,7 @@ class SFS(SwedishLegalSource):
             if state_handler not in (self.blankline, self.makeStrecksatslista):
                 return n
             elif state_handler == self.blankline:
-                res = state_handler()
+                state_handler()
             else:
                 self.log.debug("            Ny strecksats: '%s...'" %
                                self.reader.peekline()[:60])
@@ -1680,14 +1619,14 @@ class SFS(SwedishLegalSource):
     def eof(self):
         return None
 
-    def makeOvergangsbestammelser(self, rubrik_saknas=False):  # svenska: \xf6verg\xe5ngsbest\xe4mmelser
+    def makeOvergangsbestammelser(self, rubrik_saknas=False):  # svenska: övergångsbestämmelser
         # det kan diskuteras om dessa ska ses som en del av den
-        # konsoliderade lagtexten \xf6ht, men det verkar vara kutym att
-        # ha med \xe5tminstone de som kan ha relevans f\xf6r g\xe4llande r\xe4tt
-        self.log.debug("    Ny \xd6verg\xe5ngsbest\xe4mmelser")
+        # konsoliderade lagtexten öht, men det verkar vara kutym att
+        # ha med åtminstone de som kan ha relevans för gällande rätt
+        self.log.debug("    Ny Övergångsbestämmelser")
 
         if rubrik_saknas:
-            rubrik = "[\xd6verg\xe5ngsbest\xe4mmelser]"
+            rubrik = "[Övergångsbestämmelser]"
         else:
             rubrik = self.reader.readparagraph()
         obs = Overgangsbestammelser(rubrik=rubrik)
@@ -1700,13 +1639,13 @@ class SFS(SwedishLegalSource):
             res = state_handler()
             if res is not None:
                 if state_handler != self.makeOvergangsbestammelse:
-                    # assume these are the initial \xd6verg\xe5ngsbest\xe4mmelser
+                    # assume these are the initial Övergångsbestämmelser
                     if hasattr(self, 'id') and '/' in self.id:
                         sfsnr = self.id
-                        self.log.warning("%s: \xd6verg\xe5ngsbest\xe4mmelsen saknar SFS-nummer - antar [%s]" % (self.id, sfsnr))
+                        self.log.warning("%s: Övergångsbestämmelsen saknar SFS-nummer - antar [%s]" % (self.id, sfsnr))
                     else:
                         sfsnr = '0000:000'
-                        self.log.warning("(unknown): \xd6verg\xe5ngsbest\xe4mmelsen saknar ett SFS-nummer - antar %s" % (sfsnr))
+                        self.log.warning("(unknown): Övergångsbestämmelsen saknar ett SFS-nummer - antar %s" % (sfsnr))
 
                     obs.append(Overgangsbestammelse([res], sfsnr=sfsnr))
                 else:
@@ -1716,7 +1655,7 @@ class SFS(SwedishLegalSource):
 
     def makeOvergangsbestammelse(self):
         p = self.reader.readline()
-        self.log.debug("      Ny \xd6verg\xe5ngsbest\xe4mmelse: %s" % p)
+        self.log.debug("      Ny Övergångsbestämmelse: %s" % p)
         ob = Overgangsbestammelse(sfsnr=p)
         while not self.reader.eof():
             state_handler = self.guess_state()
@@ -1751,7 +1690,7 @@ class SFS(SwedishLegalSource):
         return b
 
     def andringsDatum(self, line, match=False):
-        # Hittar \xe4ndringsdatumdirektiv i line. Om match, matcha fr\xe5n str\xe4ngens b\xf6rjan, annars s\xf6k i hela str\xe4ngen.
+        # Hittar ändringsdatumdirektiv i line. Om match, matcha från strängens början, annars sök i hela strängen.
         dates = {'ikrafttrader': None,
                  'upphor': None}
 
@@ -1822,23 +1761,23 @@ class SFS(SwedishLegalSource):
     def idOfAvdelning(self):
         # There are four main styles of parts ("Avdelning") in swedish law
         #
-        # 1998:808: "F\xd6RSTA AVDELNINGEN\n\n\xd6VERGRIPANDE BEST\xc4MMELSER"
+        # 1998:808: "FÖRSTA AVDELNINGEN\n\nÖVERGRIPANDE BESTÄMMELSER"
         #  (also in 1932:130, 1942:740, 1956:623, 1957:297, 1962:381, 1962:700,
         #   1970:988, 1970:994, 1971:235 (revoked), 1973:370 (revoked),
         #   1977:263 (revoked), 1987:230, 1992:300 (revoked), 1994:200,
         #   1998:674, 2000:192, 2005:104 and 2007:528 -- not always in all
-        #   uppercase. However, the initial line "F\xd6RSTA AVDELNININGEN"
+        #   uppercase. However, the initial line "FÖRSTA AVDELNININGEN"
         #   (in any casing) is always followed by another line that
         #   describes/labels the part.)
         #
-        # 1979:1152: "Avd. 1. Best\xe4mmelser om taxering av fastighet"
+        # 1979:1152: "Avd. 1. Bestämmelser om taxering av fastighet"
         #  (also in 1979:1193 (revoked))
         #
         # 1994:1009: "Avdelning I Fartyg"
         #
         # 1999:1229: "AVD. I INNEH\XE5LL OCH DEFINITIONER"
         #
-        # 2009:400: "AVDELNING I. INLEDANDE BEST\xc4MMELSER"
+        # 2009:400: "AVDELNING I. INLEDANDE BESTÄMMELSER"
         #
         # and also "1 avd." (in 1959:287 (revoked), 1959:420 (revoked)
         #
@@ -1918,7 +1857,7 @@ class SFS(SwedishLegalSource):
                     (p.endswith(" stycket") and " \xa7 " in p)):
                 return None
 
-            # Om det ser ut som en tabell \xe4r det nog ingen
+            # Om det ser ut som en tabell är det nog ingen
             # kapitelrubrik -- borttaget, triggade inget
             # regressionstest och orsakade bug 168
             #if self.isTabell(p, requireColumns=True):
@@ -2068,11 +2007,11 @@ class SFS(SwedishLegalSource):
             else:
                 return None
 
-    # Om assumeTable \xe4r True \xe4r testerna n\xe5got gener\xf6sare \xe4n
-    # annars. Den \xe4r False f\xf6r den f\xf6rsta raden i en tabell, men True
-    # f\xf6r de efterf\xf6ljande.
+    # Om assumeTable är True är testerna något generösare än
+    # annars. Den är False för den första raden i en tabell, men True
+    # för de efterföljande.
     #
-    # Om requireColumns \xe4r True kr\xe4vs att samtliga rader \xe4r
+    # Om requireColumns är True krävs att samtliga rader är
     # spaltuppdelade
 
     def isTabell(self, p=None, assumeTable=False, requireColumns=False):
@@ -2080,9 +2019,9 @@ class SFS(SwedishLegalSource):
         shorterline = 52
         if not p:
             p = self.reader.peekparagraph()
-        # Vissa snedformatterade tabeller kan ha en h\xf6gercell som g\xe5r
-        # ned en rad f\xf6r l\xe5ngt gentemot n\xe4sta rad, som har en tom
-        # h\xf6gercell:
+        # Vissa snedformatterade tabeller kan ha en högercell som går
+        # ned en rad för långt gentemot nästa rad, som har en tom
+        # högercell:
 
         # xxx xxx xxxxxx     xxxx xx xxxxxx xx
         # xxxxx xx xx x      xxxxxx xxx xxx x
@@ -2090,9 +2029,9 @@ class SFS(SwedishLegalSource):
         # xxx xx xxxxx xx
         # xx xxx xx x xx
 
-        # dvs n\xe5got som egentligen \xe4r tv\xe5 stycken l\xe4ses in som
-        # ett. F\xf6rs\xf6k hitta s\xe5dana fall, och titta i s\xe5 fall endast p\xe5
-        # f\xf6rsta stycket
+        # dvs något som egentligen är två stycken läses in som
+        # ett. Försök hitta sådana fall, och titta i så fall endast på
+        # första stycket
         lines = []
         emptyleft = False
         for l in p.split(self.reader.linesep):
@@ -2107,9 +2046,9 @@ class SFS(SwedishLegalSource):
                     lines.append(l)
 
         numlines = len(lines)
-        # Heuristiken f\xf6r att gissa om detta stycke \xe4r en tabellrad:
+        # Heuristiken för att gissa om detta stycke är en tabellrad:
         # Om varje rad
-        # 1. \xc4r kort (indikerar en tabellrad med en enda v\xe4nstercell)
+        # 1. Är kort (indikerar en tabellrad med en enda vänstercell)
         self.trace['tabell'].debug("assumeTable: %s numlines: %s requireColumns: %s " % (assumeTable, numlines, requireColumns))
         if (assumeTable or numlines > 1) and not requireColumns:
             matches = [l for l in lines if len(l) < shortline]
@@ -2117,12 +2056,12 @@ class SFS(SwedishLegalSource):
                 self.trace['tabell'].debug("isTabell('%s'): Endast en rad, men tydlig kolumnindelning" % (p[:20]))
                 return True
             if len(matches) == numlines:
-                self.trace['tabell'].debug("isTabell('%s'): Alla rader korta, unders\xf6ker undantag" % (p[:20]))
+                self.trace['tabell'].debug("isTabell('%s'): Alla rader korta, undersöker undantag" % (p[:20]))
 
-                # generellt undantag: Om en tabells f\xf6rsta rad har
-                # enbart v\xe4nsterkolumn M\XE5STE den f\xf6ljas av en
-                # spaltindelad rad - annars \xe4r det nog bara tv\xe5 korta
-                # stycken, ett kort stycke f\xf6ljt av kort rubrik, eller
+                # generellt undantag: Om en tabells första rad har
+                # enbart vänsterkolumn M\XE5STE den följas av en
+                # spaltindelad rad - annars är det nog bara två korta
+                # stycken, ett kort stycke följt av kort rubrik, eller
                 # liknande.
                 try:
                     p2 = self.reader.peekparagraph(2)
@@ -2135,52 +2074,52 @@ class SFS(SwedishLegalSource):
                 if not assumeTable and not self.isTabell(p2,
                                                          assumeTable=True,
                                                          requireColumns=True):
-                    self.trace['tabell'].debug("isTabell('%s'): generellt undantag fr\xe5n alla rader korta-regeln" % (p[:20]))
+                    self.trace['tabell'].debug("isTabell('%s'): generellt undantag från alla rader korta-regeln" % (p[:20]))
                     return False
                 elif numlines == 1:
                     # Om stycket har en enda rad *kan* det vara en kort
-                    # rubrik -- kolla om den f\xf6ljs av en paragraf, is\xe5fall
-                    # \xe4r nog tabellen slut
+                    # rubrik -- kolla om den följs av en paragraf, isåfall
+                    # är nog tabellen slut
                     # FIXME: Kolla om inte generella undantaget borde
-                    # f\xe5nga det h\xe4r. Testfall
+                    # fånga det här. Testfall
                     # regression-tabell-foljd-av-kort-rubrik.txt och
                     # temporal-paragraf-med-tabell.txt
                     if self.isParagraf(p2):
-                        self.trace['tabell'].debug("isTabell('%s'): Specialundantag: f\xf6ljs av Paragraf, inte Tabellrad" % (p[:20]))
+                        self.trace['tabell'].debug("isTabell('%s'): Specialundantag: följs av Paragraf, inte Tabellrad" % (p[:20]))
                         return False
                     if self.isRubrik(p2) and self.isParagraf(p3):
-                        self.trace['tabell'].debug("isTabell('%s'): Specialundantag: f\xf6ljs av Rubrik och sedan Paragraf, inte Tabellrad" % (p[:20]))
+                        self.trace['tabell'].debug("isTabell('%s'): Specialundantag: följs av Rubrik och sedan Paragraf, inte Tabellrad" % (p[:20]))
                         return False
-                    # Om stycket \xe4r *exakt* detta signalerar det nog
-                    # \xf6verg\xe5ngen fr\xe5n tabell (kanske i slutet p\xe5 en
-                    # bilaga, som i SekrL) till \xf6verg\xe5ngsbest\xe4mmelserna
+                    # Om stycket är *exakt* detta signalerar det nog
+                    # övergången från tabell (kanske i slutet på en
+                    # bilaga, som i SekrL) till övergångsbestämmelserna
                     if self.isOvergangsbestammelser():
-                        self.trace['tabell'].debug("isTabell('%s'): Specialundantag: \xd6verg\xe5ngsbest\xe4mmelser" % (p[:20]))
+                        self.trace['tabell'].debug("isTabell('%s'): Specialundantag: Övergångsbestämmelser" % (p[:20]))
                         return False
                     if self.isBilaga():
                         self.trace['tabell'].debug("isTabell('%s'): Specialundantag: Bilaga" % (p[:20]))
                         return False
 
-                # Detta undantag beh\xf6ves f\xf6rmodligen inte n\xe4r genererella undantaget anv\xe4nds
+                # Detta undantag behöves förmodligen inte när genererella undantaget används
                 #elif (numlines == 2 and
                 #      self.isNumreradLista() and (
-                #    lines[1].startswith('F\xf6rordning (') or
+                #    lines[1].startswith('Förordning (') or
                 #    lines[1].startswith('Lag ('))):
                 #
-                #        self.trace['tabell'].debug("isTabell('%s'): Specialundantag: ser ut som nummerpunkt f\xf6ljd av \xe4ndringsf\xf6rfattningsh\xe4nvisning" % (p[:20]))
+                #        self.trace['tabell'].debug("isTabell('%s'): Specialundantag: ser ut som nummerpunkt följd av ändringsförfattningshänvisning" % (p[:20]))
                 #        return False
 
-                # inget av undantagen till\xe4mpliga, huvudregel 1 g\xe4ller
+                # inget av undantagen tillämpliga, huvudregel 1 gäller
                 self.trace['tabell'].debug("isTabell('%s'): %s rader, alla korta" % (p[:20], numlines))
                 return True
 
-        # 2. Har mer \xe4n ett mellanslag i f\xf6ljd p\xe5 varje rad (spaltuppdelning)
+        # 2. Har mer än ett mellanslag i följd på varje rad (spaltuppdelning)
         matches = [l for l in lines if '  ' in l]
         if numlines > 1 and len(matches) == numlines:
             self.trace['tabell'].debug("isTabell('%s'): %s rader, alla spaltuppdelade" % (p[:20], numlines))
             return True
 
-        # 3. \xc4r kort ELLER har spaltuppdelning
+        # 3. Är kort ELLER har spaltuppdelning
         self.trace['tabell'].debug("test 3")
         if (assumeTable or numlines > 1) and not requireColumns:
             self.trace['tabell'].debug("test 3.1")
@@ -2189,7 +2128,7 @@ class SFS(SwedishLegalSource):
                 self.trace['tabell'].debug("isTabell('%s'): %s rader, alla korta eller spaltuppdelade" % (p[:20], numlines))
                 return True
 
-        # 3. \xc4r enrading med TYDLIG tabelluppdelning
+        # 3. Är enrading med TYDLIG tabelluppdelning
         if numlines == 1 and '   ' in l:
             self.trace['tabell'].debug("isTabell('%s'): %s rader, alla spaltuppdelade" % (p[:20], numlines))
             return True
@@ -2241,21 +2180,21 @@ class SFS(SwedishLegalSource):
         return t
 
     def makeTabellrad(self, p, tabstops=None, kwargs={}):
-        # Algoritmen \xe4r anpassad f\xf6r att hantera tabeller d\xe4r texten inte
-        # alltid \xe4r s\xe5 j\xe4mnt ordnat i spalter, som fallet \xe4r med
-        # SFSR-datat (gissningvis p\xe5 grund av n\xe5gon trasig
-        # tab-till-space-konvertering n\xe5nstans).
+        # Algoritmen är anpassad för att hantera tabeller där texten inte
+        # alltid är så jämnt ordnat i spalter, som fallet är med
+        # SFSR-datat (gissningvis på grund av någon trasig
+        # tab-till-space-konvertering nånstans).
         def makeTabellcell(text):
             if len(text) > 1:
                 text = self.re_dehyphenate("", text)
             return Tabellcell([util.normalize_space(text)])
 
         cols = ['', '', '', '', '', '', '', '']
-            # Ingen tabell kommer n\xe5nsin ha mer \xe4n \xe5tta kolumner
+            # Ingen tabell kommer nånsin ha mer än åtta kolumner
         if tabstops:
-            statictabstops = True  # Anv\xe4nd de tabbstoppositioner vi fick f\xf6rra raden
+            statictabstops = True  # Använd de tabbstoppositioner vi fick förra raden
         else:
-            statictabstops = False  # Bygg nya tabbstoppositioner fr\xe5n scratch
+            statictabstops = False  # Bygg nya tabbstoppositioner från scratch
             self.trace['tabell'].debug("rebuilding tabstops")
             tabstops = [0, 0, 0, 0, 0, 0, 0, 0]
         lines = p.split(self.reader.linesep)
@@ -2298,17 +2237,17 @@ class SFS(SwedishLegalSource):
                 if c == ' ':
                     spacecount += 1
                 else:
-                    if spacecount > 1:  # Vi har st\xf6tt p\xe5 en ny tabellcell
+                    if spacecount > 1:  # Vi har stött på en ny tabellcell
                                        # - fyll den gamla
-                        # L\xe4gg till en nyrad f\xf6r att ers\xe4tta den vi kapat -
-                        # \xf6verfl\xf6dig whitespace trimmas senare
+                        # Lägg till en nyrad för att ersätta den vi kapat -
+                        # överflödig whitespace trimmas senare
                         cols[colcount] += '\n' + l[
                             lasttab:charcount - (spacecount + 1)]
                         lasttab = charcount - 1
 
-                        # f\xf6r hantering av tomma v\xe4nsterceller
+                        # för hantering av tomma vänsterceller
                         if linecount > 1 or statictabstops:
-                            if tabstops[colcount + 1] + 7 < charcount:  # till\xe5t en oj\xe4mnhet om max sju tecken
+                            if tabstops[colcount + 1] + 7 < charcount:  # tillåt en ojämnhet om max sju tecken
                                 if len(tabstops) <= colcount + 2:
                                     tabstops.append(0)
                                     cols.append('')
@@ -2404,9 +2343,9 @@ class SFS(SwedishLegalSource):
         return None
 
     def isOvergangsbestammelser(self):
-        separators = ['\xd6verg\xe5ngsbest\xe4mmelser',
-                      'Ikrafttr\xe4dande- och \xf6verg\xe5ngsbest\xe4mmelser',
-                      '\xd6verg\xe5ngs- och ikrafttr\xe4dandebest\xe4mmelser']
+        separators = ['Övergångsbestämmelser',
+                      'Ikraftträdande- och övergångsbestämmelser',
+                      'Övergångs- och ikraftträdandebestämmelser']
 
         l = self.reader.peekline()
         if l not in separators:
@@ -2417,7 +2356,7 @@ class SFS(SwedishLegalSource):
             else:
                 return False
         try:
-            # if the separator "\xd6verg\xe5ngsbest\xe4mmelser" (or similar) is
+            # if the separator "Övergångsbestämmelser" (or similar) is
             # followed by a regular paragraph, it was probably not a
             # separator but an ordinary headline (occurs in a few law
             # texts)
@@ -2443,14 +2382,11 @@ class SFS(SwedishLegalSource):
     _document_name_cache = {}
 
     def _generateAnnotations(self, annotationfile, basefile):
-        p = LegalRef(LegalRef.LAGRUM)
-        # sfsnr = FilenameToSFSnr(basefile)
         baseuri = self.canonical_uri(basefile)
         start = time()
         # Putting togeher a (non-normalized) RDF/XML file, suitable
         # for XSLT inclusion in six easy steps
         stuff = {}
-        #
         # 1. all rinfo:Rattsfallsreferat that has baseuri as a
         # rinfo:lagrum, either directly or through a chain of
         # dct:isPartOf statements
@@ -2504,22 +2440,17 @@ class SFS(SwedishLegalSource):
 
         # 2. all law sections that has a dct:references that matches this (using dct:isPartOf).
         start = time()
-        #inboundlinks = self._store_run_query("sparql/sfs_inboundlinks_orig.sq",uri=baseuri)
-        #self.log.debug('%s: Orig: Selected %d inbound links (%.3f sec)', basefile, len(inboundlinks), time()-start)
         start = time()
         inboundlinks = self._store_run_query(
             "sparql/sfs_inboundlinks.sq", uri=baseuri)
         self.log.debug('%s:  New: Selected %d inbound links (%.3f sec)',
                        basefile, len(inboundlinks), time() - start)
-        # inboundlinks = []
-
         self.log.debug('%s: Selected %d inbound links (%.3f sec)',
                        basefile, len(inboundlinks), time() - start)
         stuff[baseuri]['inboundlinks'] = []
 
         # mapping <http://rinfo.lagrummet.se/publ/sfs/1999:175> =>
-        # "R\xe4ttsinformationsf\xf6rordning (1999:175)"
-        doctitles = {}
+        # "Rättsinformationsförordning (1999:175)"
         specifics = {}
         for row in inboundlinks:
             if 'lagrum' not in row:
@@ -2611,16 +2542,16 @@ class SFS(SwedishLegalSource):
         #     <rinfo:isLagrumFor>
         #       <rdf:Description about="http://rinfo.lagrummet.se/publ/dom/rh/2004:51">
         #           <dct:identifier>RH 2004:51</dct:identifier>
-        #           <dct:description>Hemsida p\xe5 Internet. Fr\xe5ga om...</dct:description>
+        #           <dct:description>Hemsida på Internet. Fråga om...</dct:description>
         #       </rdf:Description>
         #     </rinfo:isLagrumFor>
-        #     <dct:description>Personuppgiftslagens syfte \xe4r att skydda...</dct:description>
+        #     <dct:description>Personuppgiftslagens syfte är att skydda...</dct:description>
         #     <rinfo:isChangedBy>
         #        <rdf:Description about="http://rinfo.lagrummet.se/publ/sfs/2003:104">
         #           <dct:identifier>SFS 2003:104</dct:identifier>
         #           <rinfo:proposition>
         #             <rdf:Description about="http://rinfo.lagrummet.se/publ/prop/2002/03:123">
-        #               <dct:title>\xd6versyn av personuppgiftslagen</dct:title>
+        #               <dct:title>Översyn av personuppgiftslagen</dct:title>
         #               <dct:identifier>Prop. 2002/03:123</dct:identifier>
         #             </rdf:Description>
         #           </rinfo:proposition>
@@ -2630,27 +2561,27 @@ class SFS(SwedishLegalSource):
         # </rdf:RDF>
 
         start = time()
-        root_node = PET.Element("rdf:RDF")
+        root_node = etree.Element("rdf:RDF")
         for prefix in util.ns:
             # we need this in order to make elementtree not produce
             # stupid namespaces like "xmlns:ns0" when parsing an external
-            # string like we do below (the PET.fromstring call)
-            PET._namespace_map[util.ns[prefix]] = prefix
+            # string like we do below (the etree.fromstring call)
+            etree._namespace_map[util.ns[prefix]] = prefix
             root_node.set("xmlns:" + prefix, util.ns[prefix])
 
         for l in sorted(list(stuff.keys()), cmp=util.numcmp):
-            lagrum_node = PET.SubElement(root_node, "rdf:Description")
+            lagrum_node = etree.SubElement(root_node, "rdf:Description")
             lagrum_node.set("rdf:about", l)
             if 'rattsfall' in stuff[l]:
                 for r in stuff[l]['rattsfall']:
-                    islagrumfor_node = PET.SubElement(
+                    islagrumfor_node = etree.SubElement(
                         lagrum_node, "rinfo:isLagrumFor")
-                    rattsfall_node = PET.SubElement(
+                    rattsfall_node = etree.SubElement(
                         islagrumfor_node, "rdf:Description")
                     rattsfall_node.set("rdf:about", r['uri'])
-                    id_node = PET.SubElement(rattsfall_node, "dct:identifier")
+                    id_node = etree.SubElement(rattsfall_node, "dct:identifier")
                     id_node.text = r['id']
-                    desc_node = PET.SubElement(
+                    desc_node = etree.SubElement(
                         rattsfall_node, "dct:description")
                     desc_node.text = r['desc']
             if 'inboundlinks' in stuff[l]:
@@ -2666,7 +2597,7 @@ class SFS(SwedishLegalSource):
                     # 1) if the baseuri differs from the previous one,
                     # create a new dct:references node
                     if uri != prev_uri:
-                        references_node = PET.Element("dct:references")
+                        references_node = etree.Element("dct:references")
                         # 1.1) if the baseuri is the same as the uri
                         # for the law we're generating, place it first
                         if uri == baseuri:
@@ -2690,34 +2621,34 @@ class SFS(SwedishLegalSource):
                     else:
                         form = "absolute"
 
-                    inbound_node = PET.SubElement(
+                    inbound_node = etree.SubElement(
                         references_node, "rdf:Description")
                     inbound_node.set("rdf:about", inbound[i]['uri'])
-                    id_node = PET.SubElement(inbound_node, "dct:identifier")
+                    id_node = etree.SubElement(inbound_node, "dct:identifier")
                     id_node.text = self.display_title(inbound[i]['uri'], form)
 
                     prev_uri = uri
 
             if 'changes' in stuff[l]:
                 for r in stuff[l]['changes']:
-                    ischanged_node = PET.SubElement(
+                    ischanged_node = etree.SubElement(
                         lagrum_node, "rinfo:isChangedBy")
-                    #rattsfall_node = PET.SubElement(islagrumfor_node, "rdf:Description")
+                    #rattsfall_node = etree.SubElement(islagrumfor_node, "rdf:Description")
                     #rattsfall_node.set("rdf:about",r['uri'])
-                    id_node = PET.SubElement(ischanged_node, "rinfo:fsNummer")
+                    id_node = etree.SubElement(ischanged_node, "rinfo:fsNummer")
                     id_node.text = r['id']
             if 'desc' in stuff[l]:
-                desc_node = PET.SubElement(lagrum_node, "dct:description")
+                desc_node = etree.SubElement(lagrum_node, "dct:description")
                 xhtmlstr = "<xht2:div xmlns:xht2='%s'>%s</xht2:div>" % (
                     util.ns['xht2'], stuff[l]['desc'])
                 xhtmlstr = xhtmlstr.replace(
                     ' xmlns="http://www.w3.org/2002/06/xhtml2/"', '')
-                desc_node.append(PET.fromstring(xhtmlstr.encode('utf-8')))
+                desc_node.append(etree.fromstring(xhtmlstr.encode('utf-8')))
 
         util.indent_et(root_node)
-        tree = PET.ElementTree(root_node)
+        # tree = etree.ElementTree(root_node)
         tmpfile = mktemp()
-        treestring = PET.tostring(root_node, encoding="utf-8").replace(
+        treestring = etree.tostring(root_node, encoding="utf-8").replace(
             ' xmlns:xht2="http://www.w3.org/2002/06/xhtml2/"', '', 1)
         fp = open(tmpfile, "w")
         fp.write(treestring)
@@ -2763,7 +2694,7 @@ class SFS(SwedishLegalSource):
                 sleep(0.5)  # let sesame catch it's breath
 
         if not force and self._outfile_is_newer([infile, annotations], outfile):
-            self.log.debug("%s: \xd6verhoppad", basefile)
+            self.log.debug("%s: Överhoppad", basefile)
             return
 
         util.mkdir(os.path.dirname(outfile))
@@ -2774,17 +2705,14 @@ class SFS(SwedishLegalSource):
                   '../data/sfs/intermediate/%s.ann.xml' % basefile}
 
         # FIXME: Use pkg_resources to get at sfs.xsl
-        util.transform(__scriptdir__ + "/xsl/sfs.xsl",
-                       infile,
-                       outfile,
-                       parameters=params,
-                       validate=False)
+        self.transform_html("res/xsl/sfs.xsl", infile, outfile, parameters=params)
+
         self.log.info(
             '%s: OK (%s, %.3f sec)', basefile, outfile, time() - start)
         return
 
     def display_title(self, uri, form="absolute"):
-        parts = LegalURI.parse(uri)
+        parts = legaluri.parse(uri)
         res = ""
         for (field, label) in (('chapter', 'kap.'),
                               ('section', '\xa7'),
@@ -2797,7 +2725,7 @@ class SFS(SwedishLegalSource):
 
         if form == "absolute":
             if parts['law'] not in self._document_name_cache:
-                baseuri = LegalURI.construct({'type': LegalRef.LAGRUM,
+                baseuri = legaluri.construct({'type': LegalRef.LAGRUM,
                                               'law': parts['law']})
                 sq = """PREFIX dct:<http://purl.org/dc/terms/>
                         SELECT ?title WHERE {<%s> dct:title ?title }""" % baseuri
@@ -2839,7 +2767,6 @@ class SFS(SwedishLegalSource):
         parser = LegalRef(LegalRef.LAGRUM)
 
         # self.log.info("Making a mini graph")
-        DCT = Namespace(util.ns['dct'])
         mg = Graph()
         for key, value in list(util.ns.items()):
             mg.bind(key, Namespace(value))
@@ -2886,24 +2813,24 @@ class SFS(SwedishLegalSource):
         title_pred = util.ns['dct'] + 'title'
         type_pred = util.ns['rdf'] + 'type'
         type_obj = util.ns['rinfo'] + 'KonsolideradGrundforfattning'
-        year_lbl = 'Ordnade efter utgivnings\xe5r'
+        year_lbl = 'Ordnade efter utgivningsår'
         title_lbl = 'Ordnade efter titel'
         # construct the 404 page - we should really do this in the
         # form of a xht2 page that gets transformed using static.xsl,
         # but it's tricky to get xslt to output a href attribute with
         # an embedded (SSI) comment.
         doc = '''<?xml version="1.0"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:rinfoex="http://lagen.nu/terms#" xml:lang="sv" lang="sv"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>F\xf6rfattningstext saknas | Lagen.nu</title><script type="text/javascript" src="/js/jquery-1.2.6.min.js"></script><script type="text/javascript" src="/js/jquery.treeview.min.js"></script><script type="text/javascript" src="/js/base.js"></script><link rel="shortcut icon" href="/img/favicon.ico" type="image/x-icon" /><link rel="stylesheet" href="/css/screen.css" media="screen" type="text/css" /><link rel="stylesheet" href="/css/print.css" media="print" type="text/css" /></head><body><div id="vinjett"><h1><a href="/">lagen.nu</a></h1><ul id="navigation"><li><a href="/nyheter/">Nyheter</a></li><li><a href="/index/">Lagar</a></li><li><a href="/dom/index/">Domar</a></li><li><a href="/om/">Om</a></li></ul><form method="get" action="http://www.google.com/custom"><p><span class="accelerator">S</span>\xf6k:<input type="text" name="q" id="q" size="40" maxlength="255" value="" accesskey="S" /><input type="hidden" name="cof" value="S:http://bself.log.tomtebo.org/;AH:center;AWFID:22ac01fa6655f6b6;" /><input type="hidden" name="domains" value="lagen.nu" /><input type="hidden" name="sitesearch" value="lagen.nu" checked="checked" /></p></form></div><div id="colmask" class="threecol"><div id="colmid"><div id="colleft"><div id="dokument">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:rinfoex="http://lagen.nu/terms#" xml:lang="sv" lang="sv"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>Författningstext saknas | Lagen.nu</title><script type="text/javascript" src="/js/jquery-1.2.6.min.js"></script><script type="text/javascript" src="/js/jquery.treeview.min.js"></script><script type="text/javascript" src="/js/base.js"></script><link rel="shortcut icon" href="/img/favicon.ico" type="image/x-icon" /><link rel="stylesheet" href="/css/screen.css" media="screen" type="text/css" /><link rel="stylesheet" href="/css/print.css" media="print" type="text/css" /></head><body><div id="vinjett"><h1><a href="/">lagen.nu</a></h1><ul id="navigation"><li><a href="/nyheter/">Nyheter</a></li><li><a href="/index/">Lagar</a></li><li><a href="/dom/index/">Domar</a></li><li><a href="/om/">Om</a></li></ul><form method="get" action="http://www.google.com/custom"><p><span class="accelerator">S</span>ök:<input type="text" name="q" id="q" size="40" maxlength="255" value="" accesskey="S" /><input type="hidden" name="cof" value="S:http://bself.log.tomtebo.org/;AH:center;AWFID:22ac01fa6655f6b6;" /><input type="hidden" name="domains" value="lagen.nu" /><input type="hidden" name="sitesearch" value="lagen.nu" checked="checked" /></p></form></div><div id="colmask" class="threecol"><div id="colmid"><div id="colleft"><div id="dokument">
 
-    <h1>F\xf6rfattningstext saknas</h1>
-    <p>Det verkar inte finnas n\xe5gon f\xf6rfattning med SFS-nummer
-    <!--#echo var="REDIRECT_SFS" -->. Om den har funnits tidigare s\xe5
-    kanske den har blivit upph\xe4vd?</p>
-    <p>Om den har blivit upph\xe4vd kan den finnas i sin sista lydelse p\xe5
-    Regeringskansliets r\xe4ttsdatabaser:
-    <a href="http://62.95.69.15/cgi-bin/thw?${HTML}=sfst_lst&amp;${OOHTML}=sfst_dok&amp;${SNHTML}=sfst_err&amp;${BASE}=SFST&amp;${TRIPSHOW}=format%3DTHW&amp;BET=<!--#echo var="REDIRECT_SFS" -->">S\xf6k efter SFS <!--#echo var="REDIRECT_SFS" --></a>.</p>
+    <h1>Författningstext saknas</h1>
+    <p>Det verkar inte finnas någon författning med SFS-nummer
+    <!--#echo var="REDIRECT_SFS" -->. Om den har funnits tidigare så
+    kanske den har blivit upphävd?</p>
+    <p>Om den har blivit upphävd kan den finnas i sin sista lydelse på
+    Regeringskansliets rättsdatabaser:
+    <a href="http://62.95.69.15/cgi-bin/thw?${HTML}=sfst_lst&amp;${OOHTML}=sfst_dok&amp;${SNHTML}=sfst_err&amp;${BASE}=SFST&amp;${TRIPSHOW}=format%3DTHW&amp;BET=<!--#echo var="REDIRECT_SFS" -->">Sök efter SFS <!--#echo var="REDIRECT_SFS" --></a>.</p>
 
-  </div><div id="kommentarer"></div><div id="referenser"></div></div></div></div><div id="sidfot"><b>Lagen.nu</b> \xe4r en privat webbplats. Informationen h\xe4r \xe4r  inte officiell och kan vara felaktig | <a href="/om/ansvarsfriskrivning.html">Ansvarsfriskrivning</a> | <a href="/om/kontakt.html">Kontaktinformation</a></div><script type="text/javascript">var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www."); document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));</script><script type="text/javascript">var pageTracker = _gat._getTracker("UA-172287-1"); pageTracker._trackPageview();</script></body></html>'''
+  </div><div id="kommentarer"></div><div id="referenser"></div></div></div></div><div id="sidfot"><b>Lagen.nu</b> är en privat webbplats. Informationen här är  inte officiell och kan vara felaktig | <a href="/om/ansvarsfriskrivning.html">Ansvarsfriskrivning</a> | <a href="/om/kontakt.html">Kontaktinformation</a></div><script type="text/javascript">var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www."); document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));</script><script type="text/javascript">var pageTracker = _gat._getTracker("UA-172287-1"); pageTracker._trackPageview();</script></body></html>'''
 
         outfile = "%s/%s/generated/notfound.shtml" % (
             self.config.datadir, self.alias)
@@ -2918,18 +2845,18 @@ class SFS(SwedishLegalSource):
             title = by_subj_pred[subj][title_pred]
 
             sorttitle = re.sub(r'Kungl\. Maj:ts ', '', title)
-            sorttitle = re.sub(r'^(Lag|F\xf6rordning|Tillk\xe4nnagivande|[kK]ung\xf6relse) ?\([^\)]+\) ?(av|om|med|ang\xe5ende) ', '', sorttitle)
+            sorttitle = re.sub(r'^(Lag|Förordning|Tillkännagivande|[kK]ungörelse) ?\([^\)]+\) ?(av|om|med|angående) ', '', sorttitle)
             year = fsnr.split(':')[0]
             letter = sorttitle[0].lower()
 
-            pagetitles[year] = 'F\xf6rfattningar utgivna %s' % year
+            pagetitles[year] = 'Författningar utgivna %s' % year
             pagelabels[year] = year
             documents[year_lbl][year].append({'uri': subj,
                                               'sortkey': fsnr,
                                               'title': title})
 
             if letter.isalpha():
-                pagetitles[letter] = 'F\xf6rfattningar som b\xf6rjar p\xe5 "%s"' % letter.upper()
+                pagetitles[letter] = 'Författningar som börjar på "%s"' % letter.upper()
                 pagelabels[letter] = letter.upper()
                 documents[title_lbl][letter].append({'uri': subj,
                                                      'sortkey': sorttitle.lower(),
@@ -2972,15 +2899,15 @@ class SFS(SwedishLegalSource):
             changes[change] = True
             bases = m.group(2).split(", ")
             basefile = "%s/%s/parsed/%s.xht2" % (
-                self.config.datadir, self.alias, SFSnrToFilename(bases[0]))
+                self.config.datadir, self.alias, self.store.basefile_to_pathfrag(bases[0]))
             # print "opening %s" % basefile
             if not os.path.exists(basefile):
-                # om inte den parseade filen finns kan det bero p\xe5 att
-                # f\xf6rfattningen \xe4r upph\xe4vd _eller_ att det blev n\xe5got
+                # om inte den parseade filen finns kan det bero på att
+                # författningen är upphävd _eller_ att det blev något
                 # fel vid parseandet.
                 self.log.warning("File %s not found" % basefile)
                 continue
-            tree, ids = ET.XMLID(open(basefile).read())
+            tree, ids = etree.XMLID(open(basefile).read())
 
             if (change != bases[0]) and (not 'L' + change in ids):
                 self.log.warning(
@@ -3008,13 +2935,13 @@ class SFS(SwedishLegalSource):
                      'timestamp': timestamp,
                      'id': change,
                      'uri': uri,
-                     'content': '<p><a href="%s">F\xf6rfattningstext</a></p>%s' % (uri, content)}
+                     'content': '<p><a href="%s">Författningstext</a></p>%s' % (uri, content)}
             all_entries.append(entry)
 
             basetitle = self.re_sfsnr.sub('', title)
             # print "%s: %s" % (change, basetitle)
             if (basetitle.startswith('Lag ') or
-                (basetitle.endswith('lag') and not basetitle.startswith('F\xf6rordning')) or
+                (basetitle.endswith('lag') and not basetitle.startswith('Förordning')) or
                     basetitle.endswith('balk')):
                 lag_entries.append(entry)
             else:
@@ -3024,20 +2951,20 @@ class SFS(SwedishLegalSource):
             self.config.datadir, self.alias)
         atomfile = "%s/%s/generated/news/all.atom" % (
             self.config.datadir, self.alias)
-        self._render_newspage(htmlfile, atomfile, 'Nya och \xe4ndrade f\xf6rfattningar', 'De senaste 30 dagarna', all_entries)
+        self._render_newspage(htmlfile, atomfile, 'Nya och ändrade författningar', 'De senaste 30 dagarna', all_entries)
 
         htmlfile = "%s/%s/generated/news/lagar.html" % (
             self.config.datadir, self.alias)
         atomfile = "%s/%s/generated/news/lagar.atom" % (
             self.config.datadir, self.alias)
-        self._render_newspage(htmlfile, atomfile, 'Nya och \xe4ndrade lagar',
+        self._render_newspage(htmlfile, atomfile, 'Nya och ändrade lagar',
                               'De senaste 30 dagarna', lag_entries)
 
         htmlfile = "%s/%s/generated/news/forordningar.html" % (
             self.config.datadir, self.alias)
         atomfile = "%s/%s/generated/news/forordningar.atom" % (
             self.config.datadir, self.alias)
-        self._render_newspage(htmlfile, atomfile, 'Nya och \xe4ndrade f\xf6rordningar och \xf6vriga f\xf6rfattningar', 'De senaste 30 dagarna', ovr_entries)
+        self._render_newspage(htmlfile, atomfile, 'Nya och ändrade förordningar och övriga författningar', 'De senaste 30 dagarna', ovr_entries)
 
     def _element_to_string(self, e):
         """Creates a XHTML1 string from a elementtree.Element,

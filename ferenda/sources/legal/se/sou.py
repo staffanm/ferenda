@@ -1,7 +1,11 @@
 #!/usr/bin/env python
-# -*- coding: iso-8859-1 -*-
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import re
-from . import Regeringen
+
+
+from . import Regeringen, RPUBL
 
 # are there other sources? www.sou.gov.se directs here,
 # anyway. Possibly
@@ -10,13 +14,10 @@ from . import Regeringen
 # from regeringen.se (the data quality suggests some sort of auto
 # import). Some initial comparisons cannot find data that riksdagen.se
 # has that regeringen.se doesn't
-
-
 class SOU(Regeringen):
-    module_dir = "sou"
+    alias = "sou"
     re_basefile_strict = re.compile(r'SOU (\d{4}:\d+)')
     re_basefile_lax = re.compile(r'(?:SOU|) ?(\d{4}:\d+)', re.IGNORECASE)
+    rdf_type = RPUBL.Utredning
+    document_type = Regeringen.SOU
 
-    def __init__(self, options):
-        super(SOU, self).__init__(options)
-        self.document_type = self.SOU

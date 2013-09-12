@@ -1,8 +1,8 @@
-#!/usr/bin/env python
-# -*- coding: iso-8859-1 -*-
-#
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 # A number of different classes each fetching the same data from
-# different sources
+# different sources (and with different data formats and data fidelity)
 import sys
 import os
 import re
@@ -10,64 +10,38 @@ import datetime
 import logging
 import functools
 import codecs
+from six.moves.urllib_parse import quote, urljoin
 
 from bs4 import BeautifulSoup
 from rdflib import Literal, Namespace, URIRef, RDF, RDFS, Graph
+import requests
 
-from ferenda import util
+from . import SwedishLegalSource, Trips, Regeringen, RPUBL
+from ferenda import Describer
 from ferenda import DocumentRepository, PDFDocumentRepository, CompositeRepository, Document
-from ferenda.errors import DocumentRemovedError
-from . import SwedishLegalSource, Regeringen, RPUBL
-from ferenda.pdfreader import PDFReader, Page, Textbox, Textelement
-from ferenda.textreader import TextReader
+from ferenda import TextReader
+from ferenda import util
+from ferenda.decorators import downloadmax
 from ferenda.elements import Paragraph, Heading, UnicodeSubject, ListItem
-from ferenda.describer import Describer
+from ferenda.errors import DocumentRemovedError
+from ferenda.pdfreader import PDFReader, Page, Textbox, Textelement
 
 
 class Continuation(object):
     pass
 
 
-class DirTrips(SwedishLegalSource):
-    module_dir = "dirtrips"
+class DirTrips(Trips):
+    alias = "dirtrips"
+    app = "dir"
+    base = "DIR"
+    # start_url is created (by Trips.download_get_basefiles) from this:
+    download_params = [{'maxpage': 101, 'app': app, 'base': base}]
 
-    # It's possible to alter the ${MAXPAGE} parameter to get a page
-    # with all 3000+ documents. We don't do that, though. It's mean.
-    start_url = "http://62.95.69.15/cgi-bin/thw?${HTML}=dir_lst&${OOHTML}=dir_dok&${SNHTML}=dir_err&${MAXPAGE}=26&${TRIPSHOW}=format=THW&${BASE}=DIR"
-
-    # %s can be either on the form "Dir. 2010:51" or just
-    # "2010:52". We calculate the URL based on what is listed in the
-    # search result, using the optional url parameter to
-    # download_single
-    document_url = "http://62.95.69.15/cgi-bin/thw?${APPL}=DIR&${BASE}=DIR&${HTML}=dir_dok&${TRIPSHOW}=format=THW&BET=%s"
+    # overrides Trips.document_url_template
+    document_url_template = "http://rkrattsbaser.gov.se/cgi-bin/thw?${APPL}=DIR&${BASE}=DIR&${HTML}=dir_dok&${TRIPSHOW}=format=THW&BET=%(basefile)s"
 
     rdf_type = RPUBL.Direktiv
-
-    @classmethod
-    def basefile_from_path(cls, path):
-        # data/dirtrips/downloaded/2011/7.html => 2011:7
-        seg = os.path.splitext(path)[0].split(os.sep)
-        return ":".join(seg[seg.index(cls.module_dir) + 2:])
-
-    def download(self):
-        refresh = self.get_moduleconfig('refresh', bool, False)
-        self.log.info("Starting at %s" % self.start_url)
-        self.browser.open(self.start_url)
-        done = False
-        pagecnt = 1
-        while not done:
-            self.log.info('Result page #%s' % pagecnt)
-            for link in self.browser.links(text_regex=r'(\d{4}:\d+)'):
-                basefile = re.search('(\d{4}:\d+)', link.text).group(1)
-                url = self.document_url % urllib.parse.quote(link.text)
-                self.download_single(basefile, refresh=refresh, url=url)
-            try:
-                self.browser.follow_link(text='Fler poster')
-                pagecnt += 1
-            except LinkNotFoundError:
-                self.log.info(
-                    'No next page link found, this was the last page')
-                done = True
 
     def parse_basefile(self, basefile):
         # create an Document instance with an initialized doc.meta RDFLib graph
@@ -110,10 +84,10 @@ class DirTrips(SwedishLegalSource):
         # e.g. "Rubrik" -> dct:title
         predicates = {'Dir nr': dct.identifier,
                       'Departement': rpubl.departement,
-                      'Beslut vid regeringssammanträde':
+                      'Beslut vid regeringssammantrÃ¤de':
                       rpubl.beslutsdatum,
                       'Rubrik': dct.title,
-                      'Senast ändrad': dct.changed
+                      'Senast Ã¤ndrad': dct.changed
                       }
         # munger contains a set of tuples where the first item is a
         # method for converting a plain text into the appropriate
@@ -126,9 +100,9 @@ class DirTrips(SwedishLegalSource):
         # for Literals and .rel for URIRefs
         munger = {'Dir nr': (self.sanitize_identifier, d.value),  # the RDFLib constructor
                   'Departement': (functools.partial(self.lookup_resource, warn=False), d.rel),
-                  'Beslut vid regeringssammanträde': (self.parse_iso_date, d.value),
+                  'Beslut vid regeringssammantrÃ¤de': (self.parse_iso_date, d.value),
                   'Rubrik': (self.sanitize_rubrik, d.value),
-                  'Senast ändrad': (self.parse_iso_date, d.value)
+                  'Senast Ã¤ndrad': (self.parse_iso_date, d.value)
                   }
 
         # headerlines wraps a TextReader in an iterator that parses
@@ -150,7 +124,7 @@ class DirTrips(SwedishLegalSource):
         # print meta.serialize(format="turtle")
 
     def sanitize_rubrik(self, rubrik):
-        if rubrik == "Utgår":
+        if rubrik == "UtgÃ¥r":
             raise DocumentRemovedError()
 
         rubrik = re.sub("^/r2/ ", "", rubrik)
@@ -214,40 +188,40 @@ class DirTrips(SwedishLegalSource):
             self.process_body(p, fragment, baseuri)
 
     def canonical_uri(self, basefile):
-        return self.config['url'] + "publ/dir/" + basefile
+        return self.config.url + "res/dir/" + basefile
 
     @classmethod
     def tabs(cls, primary=False):
-        return [['Förarbeten', '/forarb/']]
+        return [['FÃ¶rarbeten', '/forarb/']]
 
 
 class DirAsp(SwedishLegalSource, PDFDocumentRepository):
-    module_dir = "dirasp"
-    start_url = "http://62.95.69.24/search.asp"
-    document_url = "http://62.95.69.24/KOMdoc/%s.PDF"
+    alias = "dirasp"
+    start_url = "http://rkrattsdb.gov.se/kompdf/search.asp"
+    document_url = "http://62.95.69.24/KOMdoc/%(yy)02d/%(yy)02d%(num)04d.PDF"
     source_encoding = "iso-8859-1"
-    browser_use_robustfactory = True
     rdf_type = RPUBL.Direktiv
 
-    def get_globals(self):
-        return globals()
+    def download(self):
+        resp = requests.get(self.start_url)
+        soup = BeautifulSoup(resp.text)
+        depts = [opt['value'] for opt in soup.find_all("option", value=True)]
+        for basefile, url in self.download_get_basefiles(depts):
+            self.download_single(basefile, url)
 
-    def download(self, startyear=2006):
-        refresh = self.get_moduleconfig('refresh', bool, False)
-        startyear = self.get_moduleconfig('startyear', int, 2006)
-
-        self.browser.open(self.start_url)
-        done = False
-        pagecnt = 1
-        for y in range(startyear, datetime.datetime.today().year + 1):
-            self.browser.select_form(nr=0)
-            self.browser["kom_nr"] = "%d:*" % y
-            self.browser["title"] = ""
-            self.browser.submit()
-            links = list(self.browser.links(text_regex=r'(\d{4}:\d+)'))
-            self.log.info(
-                "Searching for year %s, %d results" % (y, len(links)))
-            for link in links:
+    @downloadmax
+    def download_get_basefiles(self, depts):
+        for dept in depts:
+            resp = requests.post(urljoin(self.start_url, 'sql_search_rsp.asp'),
+                                 {'departement': dept.encode('latin-1'),
+                                  'kom_nr':'',
+                                  'title':'',
+                                  'ACTION':'  SÃ–K  '.encode('latin-1')})
+            soup = BeautifulSoup(resp.text)
+            hits = list(soup.find_all(True, text=re.compile(r'(\d{4}:\d+)')))
+            self.log.info("Searching for dept %s, %d results" % (dept, len(hits)))
+            for hit in hits:
+                link = hit.find_parent("a")
                 # convert 2006:02 to 2006:2 for consistency
                 segments = re.search("(\d+):(\d+)", link.text).groups()
                 basefile = ":".join([str(int(x)) for x in segments])
@@ -255,72 +229,35 @@ class DirAsp(SwedishLegalSource, PDFDocumentRepository):
                 # own basefile -> url code in remote_url. It seems
                 # that in least one case the URL formatting rule is
                 # not followed by the system...
-                self.download_single(
-                    basefile, refresh=refresh, url=link.absolute_url)
-            self.browser.back()
+                yield basefile, urljoin(self.start_url, link['href'])
 
     def remote_url(self, basefile):
         yy = int(basefile[2:4])
         num = int(basefile[5:])
-        segment = "%02d/%02d%04d" % (yy, yy, num)
-        return self.document_url % segment
+        return self.document_url % {'yy': yy, 'num': num}
 
     def canonical_uri(self, basefile):
-        return self.config['url'] + "publ/dir/" + basefile
+        return self.config.url + "res/dir/" + basefile
 
-    def parse_from_pdfreader(self, pdfreader, basefile):
-        doc = super(DirAsp, self).parse_from_pdfreader(pdfreader, basefile)
+    def parse_from_pdfreader(self, pdfreader, doc):
+        super(DirAsp, self).parse_from_pdfreader(pdfreader, doc)
         d = Describer(doc.meta, doc.uri)
-        self.infer_triples(d, basefile)
+        self.infer_triples(d, doc.basefile)
         return doc
 
     @classmethod
     def tabs(cls, primary=False):
-        return [['Förarbeten', '/forarb/']]
-
-
-class DirSou(SwedishLegalSource, PDFDocumentRepository):
-    module_dir = "dirsou"
-    start_url = "http://www.sou.gov.se/direktiv.htm"
-    document_url = "http://www.sou.gov.se/kommittedirektiv/%s.pdf"
-    basefile_template = "\d{4}:\d+"
-    rdf_type = RPUBL.Direktiv
-
-    # just to make download_single works in standalone mode (where a
-    # URL is not provided)
-    def remote_url(self, basefile):
-        (year, num) = basefile.split(":")
-        segment = "%s/dir%s_%s" % (year, year, num)
-        return self.document_url % segment
-
-    def get_globals(self):
-        return globals()
-
-    def canonical_uri(self, basefile):
-        return self.config['url'] + "publ/dir/" + basefile
-
-    def parse_from_pdfreader(self, pdfreader, basefile):
-        doc = super(DirSou, self).parse_from_pdfreader(pdfreader, basefile)
-        d = Describer(doc.meta, doc.uri)
-        self.infer_triples(d, basefile)
-        return doc
-
-    @classmethod
-    def tabs(cls, primary=False):
-        return [['Förarbeten', '/forarb/']]
+        return [['FÃ¶rarbeten', '/forarb/']]
 
 
 class DirPolopoly(Regeringen):
-    module_dir = "dirpolo"
+    alias = "dirpolo"
     cssfiles = ['../ferenda/res/css/pdfview.css']
     jsfiles = ['../ferenda/res/js/pdfviewer.js']
     re_basefile_strict = re.compile(r'Dir\. (\d{4}:\d+)')
     re_basefile_lax = re.compile(r'(?:[Dd]ir\.?|) ?(\d{4}:\d+)')
     rdf_type = RPUBL.Direktiv
-
-    def __init__(self, options):
-        super(DirPolopoly, self).__init__(options)
-        self.document_type = self.KOMMITTEDIREKTIV
+    document_type = Regeringen.KOMMITTEDIREKTIV
 
     def sanitize_identifier(self, identifier):
         # "Dir.1994:111" -> "Dir. 1994:111"
@@ -333,9 +270,9 @@ class DirPolopoly(Regeringen):
 # Does parsing, generating etc from base files:
 
 
-class Direktiv(SwedishLegalSource, CompositeRepository):
-    subrepos = DirPolopoly, DirSou, DirAsp, DirTrips
-    module_dir = "dir"
+class Direktiv(CompositeRepository, SwedishLegalSource):
+    subrepos = DirPolopoly, DirAsp, DirTrips
+    alias = "dir"
     xslt_template = "paged.xsl"
     xslt_template_toc = "toc.xsl"
     storage_policy = "dir"
@@ -344,7 +281,7 @@ class Direktiv(SwedishLegalSource, CompositeRepository):
     @classmethod
     def basefile_from_path(cls, path):
         seg = path.split(os.sep)
-        seg = seg[seg.index(cls.module_dir) + 2:-1]
+        seg = seg[seg.index(cls.alias) + 2:-1]
         seg = [x.replace("-", "/") for x in seg]
         # print len(seg)
         assert 2 <= len(seg) <= 3, "list of segments is too long or too short"
@@ -353,4 +290,4 @@ class Direktiv(SwedishLegalSource, CompositeRepository):
 
     @classmethod
     def tabs(cls, primary=False):
-        return [['Förarbeten', '/forarb/']]
+        return [['FÃ¶rarbeten', '/forarb/']]

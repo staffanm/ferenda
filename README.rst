@@ -4,6 +4,11 @@ helps with downloading documents, parsing them to add explicit
 semantic structure and RDF-based metadata, finding relationships
 between documents, and publishing the results.
 
+.. image:: https://travis-ci.org/staffanm/ferenda.png
+
+.. image:: https://coveralls.io/repos/staffanm/ferenda/badge.png?branch=master
+
+
 Quick start
 -----------
 
@@ -49,5 +54,6 @@ with their respective licenses:
   (http://code.google.com/p/oort/wiki/Grit), BSD
 * httpheader by Deron Meranda
   (http://deron.meranda.us/python/httpheader/), LGPL
-
+* wikimarkup by David Cramer
+  (https://pypi.python.org/pypi/py-wikimarkup), GPL3
 

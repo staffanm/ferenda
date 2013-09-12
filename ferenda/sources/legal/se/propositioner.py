@@ -1,149 +1,173 @@
-#!/usr/bin/env python
-# -*- coding: iso-8859-1 -*-
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
 import re
 import os
 from time import time
+from datetime import datetime
 import codecs
 
 from bs4 import BeautifulSoup
 from rdflib import Graph, Literal, Namespace, URIRef, RDF, RDFS
+from lxml import etree
+import requests
 
 from ferenda import util
 from ferenda.elements import UnicodeElement, CompoundElement, \
     MapElement, IntElement, DateElement, PredicateType, \
     UnicodeSubject, Heading, Preformatted, Paragraph, Section, Link, ListItem, \
     serialize
-from ferenda import DocumentRepository, CompositeRepository, PDFDocumentRepository, Describer, TextReader, PDFReader
+from ferenda import CompositeRepository, PDFDocumentRepository, Describer, TextReader, PDFReader, DocumentStore, DocumentEntry
 from ferenda.errors import ParseError, DocumentRemovedError
 from ferenda.decorators import managedparsing
-from . import SwedishLegalSource, Regeringen, Riksdagen, RPUBL
-
+from . import SwedishLegalSource, Trips, Regeringen, Riksdagen, RPUBL
 
 class PropPolo(Regeringen):
-    module_dir = "proppolo"
+    alias = "proppolo"
     re_basefile_strict = re.compile(r'Prop. (\d{4}/\d{2,4}:\d+)')
     re_basefile_lax = re.compile(
         r'(?:Prop\.?|) ?(\d{4}/\d{2,4}:\d+)', re.IGNORECASE)
     rdf_type = RPUBL.Proposition
+    document_type = Regeringen.PROPOSITION
+    storage_policy = "dir"
 
-    def __init__(self, options):
-        super(PropPolo, self).__init__(options)
-        self.document_type = self.PROPOSITION
+class PropTrips(Trips, PDFDocumentRepository):
+    alias = "proptrips"
+    base = "THWALLAPROP"
+    # base = "PROPARKIV0809"
+    app  ="prop"
 
+    basefile_regex = "(?P<basefile>\d+/\d+:\d+)$"
+    download_params = [{'maxpage': 101, 'app': app, 'base': base}]
 
-class PropTrips(SwedishLegalSource, PDFDocumentRepository):
-    module_dir = "proptrips"
     downloaded_suffix = ".html"
     rdf_type = RPUBL.Proposition
 
-    base = "THWALLAPROP"
-    # base = "PROPARKIV1011"
-    # base = "PROPARKIV9495"
-    start_url = "http://62.95.69.15/cgi-bin/thw?${HTML}=prop_lst&${OOHTML}=prop_dok&${SNHTML}=prop_err&${MAXPAGE}=26&${HILITE}=1&${TRIPSHOW}=format=THW&${SAVEHTML}=/prop/prop_form.html&${BASE}=%s" % base
+    def download_get_basefiles_page(self, pagetree):
+        # feed the lxml tree into beautifulsoup by serializing it to a
+        # string -- is there a better way?
+        soup = BeautifulSoup(etree.tostring(pagetree))
+        for tr in soup.findAll("tr"):
+            if ((not tr.find("a")) or
+                    not re.match(self.basefile_regex, tr.find("a").text)):
+                # FIXME: Maybe re.search instead of .match to find
+                # "Prop. 2012/13:152"
+                continue
+            # First, look at desc (third td):
+            descnodes = [util.normalize_space(x) for x
+                         in tr.find_all("td")[2]
+                         if isinstance(x, str)]
+            bilaga = None
+            if len(descnodes) > 1:
+                if descnodes[1].startswith("Bilaga:"):
+                    bilaga = util.normalize_space(descnodes[0].split(",")[-1])
+            desc = "\n".join(descnodes)
 
-    re_basefile_lax = re.compile(
-        r'(?:Prop\.?|) ?(\d{4}/\d{2,4}:\d+)', re.IGNORECASE)
-    storage_policy = "dir"
+            # then, find basefile (second td)
+            tds = tr.find_all("td")
+            td = tds[1]
+            basefile = td.a.text
+            assert re.match(self.basefile_regex, basefile)
 
-    @classmethod
-    def basefile_from_path(cls, path):
-        seg = path.split(os.sep)
-        seg = seg[seg.index(cls.module_dir) + 2:-1]
-        seg = [x.replace("-", "/") for x in seg]
-        # print len(seg)
-        assert 2 <= len(seg) <= 3, "list of segments is too long or too short"
-        # print "path: %s, seg: %r, basefile: %s" % (path,seg,":".join(seg))
-        return ":".join(seg)
+            basefile = self.sanitize_basefile(basefile)
 
-    def download(self):
-        refresh = self.get_moduleconfig('refresh', bool, False)
-        self.log.info("Starting at %s" % self.start_url)
-        resp = self.browser.open(self.start_url)
-        done = False
-        pagecnt = 1
-        # ["PROPARKIV%s%s" % (str(x)[2:],str(x+1)[2:]) for x in
-        #  range(1993,datetime.datetime.now().year+1)]
-        while not done:
-            self.log.info('Result page #%s' % pagecnt)
-            basefile = None
-            soup = BeautifulSoup(self.browser.response(),
-                                 convertEntities=BeautifulSoup.HTML_ENTITIES)
-            #for link in self.browser.links(text_regex=r'(\d{4}/\d{2,4}:\d+)'):
-            for tr in soup.findAll("tr"):
-                if ((not tr.find("a")) or
-                        not self.re_basefile_lax.match(tr.find("a").text)):
-                    continue
-                # First, look at desc (third td):
-                descnodes = [util.normalize_space(x) for x
-                             in tr.findAll("td")[2]
-                             if isinstance(x, str)]
-                bilaga = None
-                if len(descnodes) > 1:
-                    if descnodes[1].startswith("Bilaga:"):
-                        bilaga = util.normalize_space(
-                            descnodes[0].split(",")[-1])
+            url = td.a['href']
 
-                desc = "\n".join(descnodes)
+            # self.download_single(basefile, refresh=refresh, url=url)
 
-                # then, find basefile (second td)
-                tds = tr.findAll("td")
-                td = tds[1]
-                basefile = td.a.text
-                assert self.re_basefile_lax.match(basefile)
+            # and, if present, extra files (in td 4+5)
+            extraurls = []
+            for td in tr.findAll("td")[3:]:
+                extraurls.append(td.a['href'])
 
-                basefile = self.sanitize_basefile(basefile)
+            # we slightly abuse the protocol between
+            # download_get_basefiles and this generator -- instead of
+            # yielding just two strings, we yield two tuples with some
+            # extra information that download_single will need.
+            yield (basefile, bilaga), (url, extraurls)
 
-                if bilaga:
-                    basefile += "#%s" % bilaga
+        nextpage = None
+        for element, attribute, link, pos in pagetree.iterlinks():
+            if element.text == "Fler poster":
+                nextpage = link
+        raise NoMoreLinks(nextpage)
 
-                url = urljoin(self.browser.geturl(), td.a['href'])
-                self.download_single(basefile, refresh=refresh, url=url)
+    def download_single(self, basefile, url):
+        # unpack the tuples we may recieve instead of plain strings
+        if isinstance(basefile, tuple):
+            basefile, attachment = basefile
+            if attachment:
+                mainattachment = attachment+".html"
+            else:
+                mainattachment = None
+        if isinstance(url, tuple):
+            url, extraurls = url
+        updated = created = False
+        checked = True
 
-                # and, if present, extra files (in td 4+5)
-                for td in tr.findAll("td")[3:]:
-                    if td.a['href'].endswith('msword.application'):
-                        # NOTE: We cannot be sure that this is
-                        # actually a Word (CDF) file. For older files
-                        # it might be a WordPerfect file (.wpd) or a
-                        # RDF file, for newer it might be a .docx. We
-                        # cannot be sure until we've downloaded it.
-                        # So we quickly read the first 4 bytes
-                        url = urljoin(self.browser.geturl(), td.a['href'])
-                        sig = self.browser.open_novisit(url).read(4)
-                        if sig == '\xffWPC':
-                            doctype = ".wpd"
-                        elif sig == '\xd0\xcf\x11\xe0':
-                            doctype = ".doc"
-                        elif sig == 'PK\x03\x04':
-                            doctype = ".docx"
-                        elif sig == '{\\rt':
-                            doctype = ".rtf"
-                        else:
-                            self.log.error("%s: Attached file has signature %r -- don't know what type this is" % (basefile, sig))
-                            continue
-                    elif td.a['href'].endswith('pdf.application'):
-                        doctype = ".pdf"
-                    else:
-                        self.log.warning("Unknown doc type %s" %
-                                         td.a['href'].split("=")[-1])
-                        doctype = None
-                    filename = self.generic_path(
-                        basefile, "downloaded", doctype)
-                    url = urljoin(self.browser.geturl(), td.a['href'])
-
-                    if refresh or not os.path.exists(filename):
-                        self.log.info("   Also downloading %s as %s" %
-                                      (basefile, doctype))
-                        self.download_if_needed(url, filename)
-
-            try:
-                self.browser.follow_link(text='Fler poster')
-                pagecnt += 1
-            except LinkNotFoundError:
+        filename = self.store.downloaded_path(basefile, attachment=mainattachment)
+        created = not os.path.exists(filename)
+        if self.download_if_needed(url, basefile, filename=filename):
+            if created:
+                self.log.info("%s: downloaded from %s" % (basefile, url))
+            else:
                 self.log.info(
-                    'No next page link found, this was the last page')
-                done = True
+                    "%s: downloaded new version from %s" % (basefile, url))
+            updated = True
+        else:
+            self.log.debug("%s: exists and is unchanged" % basefile)
 
+        for url in extraurls:
+            if url.endswith('msword.application'):
+                # NOTE: We cannot be sure that this is
+                # actually a Word (CDF) file. For older files
+                # it might be a WordPerfect file (.wpd) or a
+                # RDF file, for newer it might be a .docx. We
+                # cannot be sure until we've downloaded it.
+                # So we quickly read the first 4 bytes
+                r = requests.get(url, stream=True)
+                sig = r.raw.read(4)
+                # r.raw.close()
+                #bodyidx = head.index("\n\n")
+                #sig = head[bodyidx:bodyidx+4]
+                if sig == b'\xffWPC':
+                    doctype = ".wpd"
+                elif sig == b'\xd0\xcf\x11\xe0':
+                    doctype = ".doc"
+                elif sig == b'PK\x03\x04':
+                    doctype = ".docx"
+                elif sig == b'{\\rt':
+                    doctype = ".rtf"
+                else:
+                    self.log.error("%s: Attached file has signature %r -- don't know what type this is" % (basefile, sig))
+                    continue
+            elif url.endswith('pdf.application'):
+                doctype = ".pdf"
+            else:
+                self.log.warning("Unknown doc type %s" %
+                                 td.a['href'].split("=")[-1])
+                doctype = None
+            if doctype:
+                if attachment:
+                    filename = self.store.downloaded_path(basefile, attachment=attachment + doctype)
+                else:
+                    filename = self.store.downloaded_path(basefile, attachment="index" + doctype)
+                self.log.debug("%s: downloading attachment %s" % (basefile, filename))
+                self.download_if_needed(url, basefile, filename=filename)
+
+        if mainattachment == None:
+            entry = DocumentEntry(self.store.documententry_path(basefile))
+            now = datetime.now()
+            entry.orig_url = url
+            if created:
+                entry.orig_created = now
+            if updated:
+                entry.orig_updated = now
+            if checked:
+                entry.orig_checked = now
+            entry.save()
+
+        return updated
+                
     # Correct some invalid identifiers spotted in the wild:
     # 1999/20 -> 1999/2000
     # 2000/2001 -> 2000/01
@@ -180,6 +204,8 @@ class PropTrips(SwedishLegalSource, PDFDocumentRepository):
         self.infer_triples(d, doc.basefile)
 
         # prefer PDF or Word files over the plaintext-containing HTML files
+        # FIXME: PDF or Word files are now stored as attachments
+        
         pdffile = self.generic_path(doc.basefile, 'downloaded', '.pdf')
 
         wordfiles = (self.generic_path(doc.basefile, 'downloaded', '.doc'),
@@ -239,7 +265,7 @@ class PropTrips(SwedishLegalSource, PDFDocumentRepository):
             # print "Handing %r (%s)" % (p[:40], len(doc.body))
             if not p.strip():
                 continue
-            elif not doc.body and 'Obs! Dokumenten i denna databas kan vara ofullständiga.' in p:
+            elif not doc.body and 'Obs! Dokumenten i denna databas kan vara ofullstÃ¤ndiga.' in p:
                 continue
             elif not doc.body and p.strip().startswith("Dokument:"):
                 # We already know this
@@ -250,41 +276,17 @@ class PropTrips(SwedishLegalSource, PDFDocumentRepository):
             else:
                 doc.body.append(Preformatted([p]))
 
-    def create_external_resources(self, doc):
-        if doc.body and isinstance(doc.body[0], PDFReader):
-            super(PropTrips, self).create_external_resources(doc)
-
-    @classmethod
-    def tabs(cls, primary=False):
-        return [['Förarbeten', '/forarb/']]
-
-
 class PropRiksdagen(Riksdagen):
-    module_dir = "propriksdagen"
+    alias = "propriksdagen"
     rdf_type = RPUBL.Proposition
-
-    def __init__(self, options):
-        super(PropRiksdagen, self).__init__(options)
-        self.document_type = self.PROPOSITION
-
-    @classmethod
-    def tabs(cls, primary=False):
-        return [['Förarbeten', '/forarb/']]
-
+    document_type = Riksdagen.PROPOSITION
 
 class Propositioner(CompositeRepository):
     subrepos = PropPolo, PropTrips, PropRiksdagen
-    module_dir = "prop"
+    alias = "prop"
     xslt_template = "paged.xsl"
     storage_policy = "dir"
     rdf_type = RPUBL.Proposition
 
-    @classmethod
-    def basefile_from_path(cls, path):
-        # data/dirtrips/downloaded/2011/7.html => 2011:7
-        seg = os.path.splitext(path)[0].split(os.sep)
-        return ":".join(seg[seg.index(cls.module_dir) + 2:])
-
-    @classmethod
-    def tabs(cls, primary=False):
-        return [['Förarbeten', '/forarb/']]
+    def tabs(self, primary=False):
+        return [('FÃ¶rarbeten', self.dataset_uri())]

@@ -16,10 +16,7 @@ import requests.exceptions
 import six
 from six import text_type as str
 from six import binary_type as bytes
-if six.PY3:
-    from urllib.parse import quote
-else:
-    from urllib import quote
+from six.moves.urllib_parse import quote
 
 from ferenda.thirdparty import SQLite
 from ferenda import util, errors

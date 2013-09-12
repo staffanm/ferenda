@@ -8,7 +8,7 @@ six
 jsmin
 whoosh
 pyparsing
-sphinx
+# sphinx
 mock # not needed for py3.3 +
 coverage
-bsddb3
+# bsddb3 

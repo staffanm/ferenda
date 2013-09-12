@@ -36,17 +36,23 @@ class WordReader(object):
         # the text from the binary blob (either through running
         # antiword for old-style doc documents, or by unzipping
         # document.xml, for new-style docx documents)
-        if filetype == "docx":
-            self.word_to_ooxml(wordfile, intermediatefile)
-        else:
-            try:
-                self.word_to_docbook(wordfile, intermediatefile)
-            except errors.ExternalCommandError:
-                # Some .doc files are .docx with wrong suffix
-                self.log.info("%s: Retrying as OOXML" % wordfile)
+        if not os.path.exists(intermediatefile):
+            if filetype == "docx":
                 self.word_to_ooxml(wordfile, intermediatefile)
-                filetype = "docx"
+            else:
+                try:
+                    self.word_to_docbook(wordfile, intermediatefile)
+                except errors.ExternalCommandError:
+                    # Some .doc files are .docx with wrong suffix
+                    self.log.info("%s: Retrying as OOXML" % wordfile)
+                    self.word_to_ooxml(wordfile, intermediatefile)
+                    filetype = "docx"
+        else:
+            # FIXME: sniff the intermediatefile to see if its a
+            # docbook or a OOXML file
+            pass
         return (intermediatefile, filetype)
+
 
     def word_to_docbook(self, indoc, outdoc):
         """Convert a old Word document (.doc) to a pseudo-docbook file through antiword."""
@@ -96,10 +102,12 @@ class WordReader(object):
         assert name in zipf.namelist(), "No %s in zipfile %s" % (name, indoc)
         data = zipf.read(name)
         util.ensure_dir(outdoc)
-        outfile = open(outdoc, "wb")
-        outfile.write(data)
-        outfile.close()
-        util.indent_xml_file(outdoc)
+        with open(outdoc, "wb") as fp:
+            fp.write(data)
+
+        # FIXME: We need to reimplement this old function (which ran
+        # tidy on the outfile) with an internal lxml based thingy
+        # util.indent_xml_file(outdoc)
         zi = zipf.getinfo(name)
         dt = datetime(*zi.date_time)
         ts = mktime(dt.timetuple())

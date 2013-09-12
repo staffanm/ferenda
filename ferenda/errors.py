@@ -24,6 +24,14 @@ class DocumentRemovedError(Exception):
     case if there exists a physical document, but whose contents are
     essentially a placeholder saying that the document has been
     removed).
+
+    You can set the attribute ``dummyfile`` on this exception when
+    raising it, preferably to the parsed_path that would be created,
+    if not this exception had occurred.. If present,
+    ``ferenda-build.py`` (or rather :meth:`ferenda.manager.run`) will
+    use this to create a dummy file at the indicated path. This
+    prevents endless re-parsing of expired documents.
+
     """
     pass
 

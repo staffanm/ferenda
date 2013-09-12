@@ -7,12 +7,7 @@ examples.
 
 """
 from __future__ import unicode_literals
-import six
-if six.PY3:
-    from urllib.parse import quote
-else:
-    from urllib import quote
-
+from six.moves.urllib_parse import quote
 
 def generic(d):
     """Converts any dict into a URL. The domain (netlog) is always

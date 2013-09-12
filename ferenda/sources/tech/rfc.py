@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
+
 import re
 import os
 from datetime import datetime, date
@@ -8,17 +9,15 @@ import requests
 import requests.exceptions
 
 import six
-from rdflib import Literal, URIRef
+from rdflib import URIRef, Graph
 from pyparsing import Word, CaselessLiteral, Optional, nums
 
 from ferenda import DocumentRepository
-from ferenda.errors import ParseError
-from ferenda.decorators import recordlastdownload, managedparsing
-
 from ferenda import TextReader, Describer, FSMParser, CitationParser, URIFormatter
 from ferenda import util
-
+from ferenda.decorators import recordlastdownload, managedparsing, downloadmax
 from ferenda.elements import Body, Heading, Preformatted, Paragraph, UnorderedList, ListItem, Section, Subsection, Subsubsection, UnicodeElement, CompoundElement, Link, serialize
+from ferenda.errors import ParseError
 
 class RFCHeader(UnicodeElement): pass
 class DocTitle(UnicodeElement): pass
@@ -90,18 +89,7 @@ class RFC(DocumentRepository):
         indextext = res.text
         reader = TextReader(string=indextext,linesep=TextReader.UNIX)  # see TextReader class
         iterator = reader.getiterator(reader.readparagraph)
-
-
-        if ('downloadmax' in self.config and self.config.downloadmax)  or 'FERENDA_DOWNLOADMAX' in os.environ:
-            if ('downloadmax' in self.config and self.config.downloadmax):
-                maxdoc = int(self.config.downloadmax)
-            else:
-                maxdoc = int(os.environ['FERENDA_DOWNLOADMAX'])
-            self.log.info("Only downloading max %s documents" % maxdoc)
-            links = islice(self.download_get_basefiles(iterator), maxdoc)
-        else:
-            links = self.download_get_basefiles(iterator)
-        for (basefile,url) in links:
+        for (basefile,url) in self.download_get_basefiles(iterator):
             try:
                 if not os.path.exists(self.store.downloaded_path(basefile)):
                     self.download_single(basefile)
@@ -112,6 +100,7 @@ class RFC(DocumentRepository):
                     with open(self.store.downloaded_path(basefile), "w"):
                         pass
 
+    @downloadmax
     def download_get_basefiles(self, source):
         for p in reversed(list(source)):
             if re.match("^(\d{4}) ",p): # looks like a RFC number
@@ -351,7 +340,7 @@ class RFC(DocumentRepository):
         def analyze_listitem(chunk):
             # returns: same as list-style-type in CSS2.1, sans
             # 'georgian', 'armenian' and 'greek', plus 'dashed'
-            listtype = ordinal = separator = rest = None
+            listtype = ordinal = separator = None
 
             # FIXME: Tighten these patterns to RFC conventions
             # match "1. Foo..." or "14) bar..." but not "4 This is a heading"
@@ -621,7 +610,6 @@ class RFC(DocumentRepository):
                             )]
 
     def toc_item(self, binding, row):
-        from ferenda.elements import Link
         return [row['identifier'] + ": ",
                 Link(row['title'], 
                      uri=row['uri'])]
@@ -632,7 +620,10 @@ class RFC(DocumentRepository):
         # function that returns a closure, which acts as a custom
         # selector function for the NewsCriteria objects.
         def selector_for(category):
-            def selector(entry, graph):
+            def selector(entry):
+                graph = Graph()
+                with self.store.open_distilled(entry.basefile) as fp:
+                    graph.parse(data=fp.read())
                 desc = Describer(graph, entry.id)
                 return desc.getvalue(self.ns['dct'].subject) == category
             return selector
@@ -650,7 +641,11 @@ class RFC(DocumentRepository):
     def frontpage_content(self, primary=False):
         from rdflib import URIRef
         items = ""
-        for entry, graph in islice(self.news_entries(),5):
+        for entry in islice(self.news_entries(),5):
+            graph = Graph()
+            with self.store.open_distilled(entry.basefile) as fp:
+                graph.parse(data=fp.read())
+            
             data = {'identifier': graph.value(URIRef(entry.id), self.ns['dct'].identifier).toPython(),
                     'uri': entry.id,
                     'title': entry.title}
@@ -662,8 +657,7 @@ class RFC(DocumentRepository):
                       %(items)s
                    </ul>""" % {'uri':self.dataset_uri(),
                                'items': items,
-                               'doccount': len(list(self.list_basefiles_for("_postgenerate")))})
+                               'doccount': len(list(self.store.list_basefiles_for("_postgenerate")))})
 
     def tabs(self):
         return [("RFCs", self.dataset_uri())]
-

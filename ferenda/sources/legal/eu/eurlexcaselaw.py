@@ -21,7 +21,7 @@ from ferenda.elements import UnicodeElement, CompoundElement, Paragraph
 #        Corresponding parsed/62008CN0028.xhtml and distilled/62008CN0028.ttl
 
 class EurlexCaselaw(DocumentRepository):
-    module_dir = "ecj"  # European Court of Justice
+    alias = "ecj"  # European Court of Justice
 
     start_url = "http://eur-lex.europa.eu/JURISIndex.do"
     document_url = "http://eur-lex.europa.eu/LexUriServ/LexUriServ.do?uri=CELEX:%(basefile)s:EN:NOT"
@@ -200,7 +200,7 @@ class EurlexCaselaw(DocumentRepository):
         desc = Describer(self.meta, self.uri)
         g = Graph()
         # :celex - first <h1>
-        celexnum = util.element_text(soup.h1)
+        celexnum = soup.h1.get_text(strip=True)
         if celexnum == "No documents matching criteria.":
             raise errors.DocumentRemovedError("No documents matching criteria " + celexnum)
         elif "no_data_found" in celexnum:

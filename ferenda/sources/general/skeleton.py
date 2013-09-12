@@ -1,30 +1,46 @@
-#!/usr/bin/env python
-# -*- coding: iso-8859-1 -*-
-#
-# A utility class to fetch all RDF data from a remote RDL system, find
-# out those resources that are referred to but not present in the data
-# (usually older documents that are not available in electronic form),
-# and create "skeleton entries" for those resources.
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import sys
 import re
-import xml.etree.ElementTree as ET
-from collections import Set
+from six.moves.urllib_parse import urljoin
 
 from rdflib import Graph, URIRef, Literal, BNode, RDF, RDFS
+from lxml import etree
+import requests
 
-from ferenda import util
-from ferenda import DocumentRepository
+from ferenda import DocumentRepository, TripleStore
 
 
 class Skeleton(DocumentRepository):
-    module_dir = "closet"
+    """Utility docrepo to fetch all RDF data from a triplestore (either our
+       triple store, or a remote one, fetched through the combined ferenda 
+       atom feed), find
+       out those resources that are referred to but not present in the data
+       (usually older documents that are not available in electronic form),
+       and create "skeleton entries" for those resources. """
+
+    alias = "closet"
     start_url = "http://rinfo.demo.lagrummet.se/feed/current"
+    downloaded_suffix = ".nt"
 
-    def downloaded_path(self, basefile):
-        return self.generic_path(basefile, 'downloaded', '.nt')
+    def download(self):
+        graph = self.download_from_triplestore()    
+        # or, alternatively
+        graph = self.download_from_atom()
 
-    def download(self, usecache=False):
-        refresh = self.get_moduleconfig('refresh', bool, False)
+    def download_from_triplestore(self):
+        sq = "SELECT ?something ?references ?uri where ?something ?references ?uri AND NOT ?uri ?references ?anything"
+        store = TripleStore(self.config.storetype,
+                            self.config.storelocation,
+                            self.config.storerepository)
+        with self.store.open_downloaded("biggraph") as fp:
+            for row in store.select(sq):
+               fp.write("<%(something)s> <%(references)s> <%(uri)s> .\n")
+
+
+    def download_from_atom(self):
+        refresh = self.config.force
         feed_url = self.start_url
         ns = 'http://www.w3.org/2005/Atom'
         done = False
@@ -34,7 +50,7 @@ class Skeleton(DocumentRepository):
 
         while not done:
             self.log.info("Feed: %s" % feed_url)
-            tree = ET.parse(urlopen(feed_url))
+            tree = etree.parse(requests.get(feed_url).text)
             for entry in tree.findall('{%s}entry' % (ns)):
                 try:
                     self.log.info("  Examining entry")
@@ -50,11 +66,13 @@ class Skeleton(DocumentRepository):
                     if rdf_url:
                         self.log.info("    RDF: %s" % rdf_url)
                         g = Graph()
-                        g.parse(urlopen(rdf_url))
+                        g.parse(requests.get(rdf_url).text)
                         for triple in g:
                             s, p, o = triple
-                            if not isinstance(o, URIRef):
+                            if (not isinstance(o, URIRef) or 
+                                not str(o).startswith(self.config.url)):
                                 g.remove(triple)
+                                
                         self.log.debug("     Adding %s triples" % len(g))
                         biggraph += g
                 except KeyboardInterrupt:
@@ -72,68 +90,51 @@ class Skeleton(DocumentRepository):
                     # done = True
 
         self.log.info("Done downloading")
-        outfile = self.downloaded_path("biggraph")
-        util.ensure_dir(outfile)
-        fp = open(outfile, "w")
-        fp.write(biggraph.serialize(format="nt"))
-        fp.close()
+        with self.store.open_downloaded("biggraph", "wb") as fp:
+            fp.write(biggraph.serialize(format="nt"))
 
     def parse(self, basefile):
         # Find out possible skeleton entries by loading the entire
         # graph of resource references, and find resources that only
-        # exist as objects. Save URIs as data/closet/intermediate/biggraph.txt
+        # exist as objects. 
+        #
+        # Note: if we used download_from_triplestore we know that this list 
+        #       is clean -- we could just iterate the graph w/o filtering
         g = Graph()
         self.log.info("Parsing %s" % basefile)
-        g.parse(self.downloaded_path(basefile), format="nt")
+        g.parse(self.store.downloaded_path(basefile), format="nt")
         self.log.info("Compiling object set")
-        # FIXME: This syntax is not py26 compatible. Change into
-        # something that is.
-        # objects = {str(o).split("#")[0] for s, p, o in g}
+        # create a uri -> True dict mapping -- maybe?
+        objects = dict(zip([str(o).split("#")[0] for (s, p, o) in g], True))
         self.log.info("Compiling subject set")
-        # subjects = {str(s).split("#")[0] for s, p, o in g}
+        subjects = dict(zip([str(s).split("#")[0] for (s, p, o) in g], True))
         self.log.info("%s objects, %s subjects. Iterating through existing objects" % (len(objects), len(subjects)))
-        skelfile = self.generic_path(basefile, 'intermediate', '.txt')
-        util.ensure_dir(skelfile)
-        with open(skelfile, "w") as fp:
-            for o in objects:
-                if not o.startswith("http://rinfo.lagrummet.se/publ/"):
-                    continue
-                if '9999:999' in o:
-                    continue
-                self.log.info("Examining object %s" % o)
-                if not o in subjects:
-                    self.log.info("...not found as a subject, creating skel")
-                    fp.write(o + "\n")
 
-        self.log.info("Created skel uri file")
+        for o in objects:
+            if not o.startswith(self.config.url):
+                continue
+            if '9999:999' in o:
+                continue
+            if o in subjects:
+                continue
+            for repo in otherrepos:
+                skelbase = repo.basefile_from_uri(repo)
+                if skelbase:
+                    skel = repo.triples_from_uri(o) # need to impl
+                    with self.store.open_distilled(skelbase,"wb") as fp:
+                        fp.write(skel.serialize(format="pretty-xml"))
 
-    def generate(self, basefile):
-        # Iterate through the list of URIs gathered by parse() and
-        # create skeleton entries in RDF/XML for these.
-        skelfile = self.generic_path(basefile, 'intermediate', '.txt')
-        with open(skelfile) as fp:
-            for uri in fp:
-                uri = uri.strip()
-                try:
-                    skel = self.parse_uri(uri)
-                except ValueError as e:
-                    self.log.error("ERROR: %s" % e)
-                    continue
-
-                basefile = urlparse(uri).path[1:]
-                outfile = self.distilled_path(basefile)
-                util.ensure_dir(outfile)
-                fp = open(outfile, "w")
-                fp.write(skel.serialize(format="pretty-xml"))
-                self.log.info("Serialized '%s'" % basefile)
-
+                    self.log.info("Created skel for %s" % o)
+    
+    # FIXME: Move this to SwedishLegalSource -- also unify
+    # triples_from_uri with SwedishLegalSource.infer_triples(basefile)
     RATTSFALL = 1
     KONSOLIDERAD = 2
     FORESKRIFT = 3
     PROPOSITION = 4
     UTREDNING = 5
 
-    def parse_uri(self, uri):
+    def triples_from_uri(self, uri):
 
         types = {self.RATTSFALL: self.ns['rpubl']["Rattsfallsreferat"],
                  self.KONSOLIDERAD: self.ns['rpubl']["KonsolideradGrundforfattning"],
@@ -223,11 +224,9 @@ class Skeleton(DocumentRepository):
             if key in dictionary:
                 dictionary[key] = dictionary[key].upper()
 
-        #self.log.info("templ %s, dict %r, id '%s'" %
-        #              (id_templ,dictionary,id_templ%dictionary))
         graph.add(
             (subj, predicate["identifier"], Literal(id_templ % dictionary)))
 
-        graph.add((subj, RDFS.comment, Literal("Detta dokument finns inte i elektronisk form i r‰ttsinformationssystemet")))
+        graph.add((subj, RDFS.comment, Literal("Detta dokument finns inte i elektronisk form i r√§ttsinformationssystemet")))
 
         return graph

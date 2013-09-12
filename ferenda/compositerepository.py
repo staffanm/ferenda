@@ -1,79 +1,84 @@
-from . import DocumentRepository
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
 
+import os
 
-class CompositeRepository(DocumentRepository):
-    instances = {}
+from . import DocumentRepository, DocumentStore
 
-    @classmethod
-    def get_instance(cls, instanceclass, options={}):
-        if not instanceclass in cls.instances:
-            # print "Creating a %s class with options %r" % (instanceclass.__name__,options)
-            cls.instances[instanceclass] = instanceclass(options)
-        return cls.instances[instanceclass]
+class CompositeStore(DocumentStore):
 
-    @classmethod
-    def list_basefiles_for(cls, action, basedir):
-        if action == "parse_all":
+    def __init__(self, datadir, downloaded_suffix=".html", storage_policy="file", docrepos=[]):
+        self.datadir = datadir # docrepo.datadir + docrepo.alias
+        self.downloaded_suffix = downloaded_suffix
+        self.storage_policy = storage_policy
+        self.docrepos=docrepos
+    
+    def list_basefiles_for(self, action, basedir=None):
+        if not basedir:
+            basedir = self.datadir
+        if action == "parse":
             documents = set()
-            for c in cls.subrepos:
-                # instance = cls.get_instance(c)
-                for basefile in c.list_basefiles_for("parse_all", basedir):
+            for inst in self.docrepos:
+                for basefile in inst.store.list_basefiles_for("parse"):
                     if basefile not in documents:
                         documents.add(basefile)
                         yield basefile
-        elif action in ("generate_all", "relate_all"):
-            #super(CompositeRepository,cls).list_basefiles_for(action,basedir)
-            # copied code from DocumentRepository.list_basefiles_for --
-            # couldn't figure out how to call super on a generator
-            # function.
-            directory = os.path.sep.join((basedir, cls.alias, "parsed"))
-            suffix = ".xhtml"
-            for x in util.list_dirs(directory, suffix, reverse=True):
-                yield cls.basefile_from_path(x)
-
-    def __init__(self, options):
-        self.myoptions = options
-        super(CompositeRepository, self).__init__(options)
-        if 'log' in self.myoptions:
-            # print "Log set: %s" % self.myoptions['log']
-            pass
         else:
-            # print "Setting log to %s" % self.log.getEffectiveLevel()
-            self.myoptions['log'] = logging.getLevelName(
-                self.log.getEffectiveLevel())
-        for c in self.subrepos:
-            inst = self.get_instance(c, dict(self.myoptions))
-            # print "DEBUG: Inst %s: log level %s" % (inst, logging.getLevelName(inst.log.getEffectiveLevel()))
+            for basefile in inst.store.list_basefiles_for(action):
+                yield basefile
 
+
+class CompositeRepository(DocumentRepository):
+    subrepos = () # list of classes
+    documentstore_class = CompositeStore
+
+    _instances = {}
+
+    def get_instance(self, instanceclass, options={}):
+        if not instanceclass in self._instances:
+            inst = instanceclass(**options)
+            inst.config = self.config # FIXME: this'll override **options...
+            self._instances[instanceclass] = inst
+        return self._instances[instanceclass]
+
+    def __init__(self, **kwargs):
+        self.myoptions = kwargs
+        super(CompositeRepository, self).__init__(**kwargs)
+        # FIXME: At this point, self._instances is empty. And we can't
+        # really populate it, because we need access to the config
+        # object that manager._run_class will set after __init__
+        # finishes... The best fix from this class POV would be to
+        # have config be a (special) kwargs parameter, but that
+        # violates the DocumentRepository API...
+        self.store = self.documentstore_class(self.config.datadir+os.sep+self.alias,
+                                              downloaded_suffix=self.downloaded_suffix,
+                                              storage_policy=self.storage_policy,
+                                              docrepos=self._instances)
+        
     def download(self):
         for c in self.subrepos:
-            inst = c(options=self.myoptions)
+            inst = self.get_instance(c, self.myoptions)
             inst.download()
 
+    # NOTE: this impl should NOT use the @managedparsing decorator
     def parse(self, basefile):
         start = time()
         self.log.debug("%s: Starting", basefile)
+        ret = False
         for c in self.subrepos:
             inst = self.get_instance(c, self.myoptions)
-            inst.log.setLevel(logging.INFO)
-            if os.path.exists(inst.downloaded_path(basefile)):
-                if os.path.exists(inst.parsed_path(basefile)):
-                    self.log.debug("%s: Using previously-created result (by %s)" %
-                                   (basefile, inst.__class__.__name__))
-                    self.copy_parsed(basefile, inst)
-                    return True
-                elif inst.parse(basefile):
-                    self.log.info("%s: Created %s (using %s)" %
-                                  (basefile, self.parsed_path(basefile), inst.__class__.__name__))
-                    self.copy_parsed(basefile, inst)
-                    self.log.info(
-                        '%s: OK (%.3f sec)', basefile, time() - start)
-                    return True
-        return False
-        # instancelist = ", ".join([x.__class__.__name__ for x in instances])
-        # self.log.debug("%s in %d repos (%s)" %
-        #               (basefile, len(instances),instancelist))
-        # self.join_parsed(basefile,instances)
+            try:
+                # each parse method should be smart about whether to re-parse
+                # or not (i.e. use the @managedparsing decorator)
+                ret = inst.parse(basefile)
+            except errors.ParseError: # or others
+                ret = False
+            if ret:
+                break
+        if ret:
+            self.copy_parsed(basefile, inst)
+        
 
     def copy_parsed(self, basefile, instance):
         # If the distilled and parsed links are recent, assume that
@@ -87,11 +92,10 @@ class CompositeRepository(DocumentRepository):
             return
 
         cnt = 0
-        for src in instance.list_external_resources(basefile):
+        for attachment in instance.store.list_attachments(doc.basefile, "parsed"):
             cnt += 1
-            target = (os.path.dirname(self.parsed_path(basefile)) +
-                      os.path.sep +
-                      os.path.basename(src))
+            src = instance.store.parser_path(basename, attachment=attachment)
+            target = self.store.parsed_path(basename, attachment=attachment)
             util.link_or_copy(src, target)
 
         util.link_or_copy(instance.distilled_path(basefile),
@@ -106,57 +110,3 @@ class CompositeRepository(DocumentRepository):
                             cnt,
                             os.path.dirname(instance.parsed_path(basefile)),
                             os.path.dirname(self.parsed_path(basefile))))
-
-    # Not used -- see copy_parsed instead
-    def join_parsed(self, basefile, instances):
-        # The default algorithm for creating a joined/composite result:
-        # 1. Load all distilled files and add any unique triple to a
-        #    composite graph
-        composite = Graph()
-        # FIXME: Construct this list of bound namespaces dynamically somehow)
-        composite.bind('dct', self.ns['dct'])
-        composite.bind('rpubl', self.ns['rpubl'])
-        composite.bind('xsd', self.ns['xsd'])
-        composite.bind('foaf', self.ns['foaf'])
-        composite.bind('xhv', self.ns['xhv'])
-
-        for inst in instances:
-            if os.path.exists(inst.distilled_path(basefile)):
-                g = Graph()
-                g.parse(inst.distilled_path(basefile))
-                composite += g
-
-        distilled_file = self.distilled_path(basefile)
-        util.ensure_dir(distilled_file)
-        composite.serialize(
-            distilled_file, format="pretty-xml", encoding="utf-8")
-
-        # 2. Use the first produced xhtml file (by the order specified
-        # in self.supbrepos)
-        #
-        # FIXME: The trouble with this is that our distilled RDF/XML
-        # file will most often contain a superset of all RDF triples
-        # found in one particular XHTML+RDFa file.
-        for inst in instances:
-            if os.path.exists(inst.parsed_path(basefile)):
-                self.copy_external_resources(basefile, inst)
-
-    # Not sure this belongs in CompositeRepository -- maybe should be
-    # part of the base implementation, or maybe we shouldn't copy
-    # resources like this at all (instead make sure the server serves
-    # resources up from the parsed directory)?
-    def generate(self, basefile):
-        # create self.generated_path(basefile)
-        super(CompositeRepository, self).generate(basefile)
-
-        # then link all other files from parsed that are not self.parse_path(basefile)
-        # FIXME: dup code of copy_parsed and Regeringen.list_resources()
-        parsed = self.parsed_path(basefile)
-        resource_dir = os.path.dirname(parsed)
-        for src in [os.path.join(resource_dir, x) for x in os.listdir(resource_dir)
-                    if os.path.join(resource_dir, x) != parsed]:
-            target = (os.path.dirname(self.generated_path(basefile)) +
-                      os.path.sep +
-                      os.path.basename(src))
-            self.log.debug("Linking %s to %s" % (target, src))
-            util.link_or_copy(src, target)

@@ -1,0 +1,22 @@
+{"https://lagen.nu/dv/downloaded/" : {"file": "index.html"},
+ "https://lagen.nu/dv/downloaded/NJA/": {"file": "index-nja.html"},
+ "https://lagen.nu/dv/downloaded/NJA/NJA_referat_2007.zip": {
+     "file": "NJA_referat_2007.zip",
+     "charset": null,
+     "expect": "downloaded/NJA/NJA_referat_2007.zip"
+ },
+ "https://lagen.nu/dv/downloaded/referat_2013-08-23.zip": {
+     "file": "referat_2013-08-23.zip",
+     "charset": null,
+     "expect": "downloaded/referat_2013-08-23.zip"
+ },
+ "ADO/2013-63": {"expect": "downloaded/ADO/2013-63.docx",
+		 "file": "ADO_2013-63.docx"},
+ "MIG/UM7533-12": {"expect": "downloaded/MIG/UM7533-12.docx",
+		   "file": "MIG_UM7533-12.docx"},
+ "HDO/Ö4503-04": {"expect": "downloaded/HDO/Ö4503-04.doc",
+		  "file": "HDO_O4503-04_BYTUT_2013-08-27.doc"},
+ "HDO/B86-05": {"expect": "downloaded/HDO/B86-05.doc",
+		"file": "HDO_B86-05.doc"}
+ }
+ 

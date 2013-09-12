@@ -1,114 +1,93 @@
-#!/usr/bin/env python
-# -*- coding: iso-8859-1 -*-
-#
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
 # A abstract base class for fetching and parsing documents
 # (particularly preparatory works) from regeringen.se
 import sys
 import os
 import re
-import datetime
+import codecs
 import logging
-import datetime
+from datetime import datetime
 from tempfile import mktemp
+from six import text_type as str
+from six.moves.urllib_parse import urljoin
 
+import requests    
 from bs4 import BeautifulSoup
 from rdflib import Literal, Namespace, URIRef, RDF, RDFS, Graph
 
-from ferenda import DocumentRepository, PDFDocumentRepository, CompositeRepository, Document
+from ferenda import PDFDocumentRepository, CompositeRepository, Document, DocumentEntry, Describer
 from ferenda import util
-from ferenda.elements import CompoundElement, Paragraph, Link, Page
+from ferenda.elements import Body, Paragraph, Link, Page
 from ferenda.pdfreader import PDFReader, Page, Textbox, Textelement
-from ferenda.describer import Describer
+from ferenda.decorators import recordlastdownload, downloadmax
 from . import SwedishLegalSource
 
 
 class Regeringen(SwedishLegalSource, PDFDocumentRepository):
-    KOMMITTEDIREKTIV = 1
-    DS = 2
-    PROPOSITION = 3
-    SKRIVELSE = 4
-    SOU = 5
-    SO = 6
+    DS = 1
+    KOMMITTEDIREKTIV = 2
+    LAGRADSREMISS = 3
+    PRESSMEDDELANDE = 4
+    PROMEMORIA = 5
+    PROPOSITION = 6
+    MINISTERRADSMOTE = 7
+    SKRIVELSE = 8
+    SOU = 9
+    SO = 10
+    WEBBUTSANDNING = 11
+    OVRIGA = 12
 
-    start_url = "http://regeringen.se/sb/d/108"
-    downloaded_suffix = ".html"
-    #xslt_template = "paged.xsl"
-    #storage_policy = "dir"
+    document_type = None # subclasses must override
+    start_url = None
+    start_url_template = "http://www.regeringen.se/sb/d/107/a/136/action/showAll/sort/byDate/targetDepartment/archiveDepartment?d=107&action=search&query=&type=advanced&a=136&sort=byDate&docTypes=%(doctype)s"
+    downloaded_suffix = ".html" # override PDFDocumentRepository
+    source_encoding = "latin-1"
 
-#    @classmethod
-#    def basefile_from_path(cls,path):
-#        seg = path.split(os.sep)
-#        seg = seg[seg.index(cls.module_dir)+2:-1]
-#        seg = [x.replace("-","/") for x in seg]
-#        # print len(seg)
-#        assert 2 <= len(seg) <= 3, "list of segments is too long or too short"
-#        # print "path: %s, seg: %r, basefile: %s" % (path,seg,":".join(seg))
-#        return ":".join(seg)
+    @recordlastdownload
+    def download(self, basefile=None):
+        if basefile:
+            return self.download_single(basefile)
 
-    def get_globals(self):
-        return globals()
+        # if self.config.lastdownloaded:
+        #     FIXME: use this to create a time-filtered start_url
+        start_url = self.start_url_template % {'doctype': self.document_type}
+        self.log.info("Starting at %s" % start_url)
+        for basefile, url in self.download_get_basefiles(start_url):
+            self.download_single(basefile, url)
 
-    def parse_basefile(self, basefile):
-        soup = self.soup_from_basefile(basefile, self.source_encoding)
-        doc = self.parse_from_soup(soup, basefile)
-        return doc
-
-    def downloaded_attachment_path(self, basefile, attachment):
-        return self.generic_path(basefile + "#" + attachment, 'downloaded', "")
-
-    def download(self):
-        refresh = self.get_moduleconfig('refresh', bool, False)
-
-        assert self.document_type is not None
-        self.log.info("Starting at %s" % self.start_url)
-        self.browser.open(self.start_url)
-
-        # Find the correct form on the page
-        for f in self.browser.forms():
-            if f.action.endswith("/sb/d/108"):
-                self.browser.form = f
-
-        self.browser["contentTypes"] = [str(self.document_type)]
-        self.browser.submit()
+    @downloadmax
+    def download_get_basefiles(self, url):
         done = False
         pagecnt = 1
-        existing_cnt = 0
+        # existing_cnt = 0
         while not done:
-            self.log.info(
-                'Result page #%s (%s)' % (pagecnt, self.browser.geturl()))
-            mainsoup = BeautifulSoup.BeautifulSoup(self.browser.response())
-            for link in mainsoup.findAll(href=re.compile("/sb/d/108/a/")):
-                desc = link.findNextSibling(
-                    "span", {'class': 'info'}).contents[0]
-                tmpurl = urllib.parse.urljoin(
-                    self.browser.geturl(), link['href'])
+            self.log.info('Result page #%s (%s)' % (pagecnt, url))
+            resp = requests.get(url)
+            mainsoup = BeautifulSoup(resp.text)
+            for link in mainsoup.find_all(href=re.compile("/sb/d/108/a/")):
+                desc = link.find_next_sibling("span", "info").get_text(strip=True)
+                tmpurl = urljoin(url, link['href'])
 
                 # use a strict regex first, then a more forgiving
                 m = self.re_basefile_strict.search(desc)
                 if not m:
                     m = self.re_basefile_lax.search(desc)
                     if not m:
-                        # FIXME: Maybe download the document and
-                        # see if it contains a DocID?
                         self.log.warning("Can't find Document ID from %s, forced to download doc page" % desc)
-                        self.browser.open(tmpurl)
-                        subsoup = BeautifulSoup.BeautifulSoup(
-                            self.browser.response())
-                        self.browser.back()
+                        resp = requests.get(tmpurl)
+                        subsoup = BeautifulSoup(resp.text)
 
-                        for a in subsoup.find("div", "doc").findAll("li", "pdf"):
-                            text = util.element_text(a)
+                        for a in subsoup.find("div", "doc").find_all("li", "pdf"):
+                            text = a.get_text(strip=True)
                             m = self.re_basefile_lax.search(text)
                             if m:
-                                # self.log.info("Yay i founded it (%s)" % m.group(1))
                                 break
                         else:
-                            self.log.error(
-                                "Cannot possibly find docid for %s" % tmpurl)
+                            self.log.error("Cannot possibly find docid for %s" % tmpurl)
                             continue
                     else:
-                        self.log.warning("%s (%s) not using preferred form: '%s'" %
-                                         (m.group(1), tmpurl, m.group(0)))
+                        self.log.warning("%s (%s) not using preferred form: '%s'" % (m.group(1), tmpurl, m.group(0)))
                 basefile = m.group(1)
 
                 # Extra checking -- sometimes ids like 2003/2004:45
@@ -120,47 +99,26 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
                         self.log.warning("%s (%s) using incorrect year format, should be '%s/%s:%s'" %
                                          (basefile, tmpurl, y1, y2[2:], o))
                         basefile = "%s/%s:%s" % (y1, y2[2:], o)
-                # self.log.info("Basefile %s" % basefile)
 
-                if not refresh and os.path.exists(self.downloaded_path(basefile)):
-                    self.log.debug(
-                        "%s exists, not calling download_single" % basefile)
-                    existing_cnt += 1
-                    if existing_cnt >= 5:
-                        self.log.info("Last five documents were already downloaded, we're probably done here")
-                        return
-                    continue
+                yield basefile, urljoin(url, link['href']) 
 
-                absolute_url = urllib.parse.urljoin(
-                    self.browser.geturl(), link['href'])
-                if self.download_single(basefile, refresh, absolute_url):
-                    self.log.info("Downloaded %s" % basefile)
-                    existing_cnt += 1
-                    # return
-            try:
-                pagecnt += 1
-                self.browser.follow_link(text=str(pagecnt))
-                #self.browser.follow_link(text='Nästa sida')
-            except LinkNotFoundError:
-                # self.log.info(u'No next page link found, this was the last page')
-                self.log.info('No link titled "%s" found, this was the last page' % str(pagecnt))
+            pagecnt += 1
+            next = mainsoup.find("a", text="NÃ¤sta sida")
+            if next:
+                url = urljoin(url,next['href'])
+            else:
                 done = True
-
+    
     def remote_url(self, basefile):
         # do a search to find the proper url for the document
-        self.log.info("Starting at %s" % self.start_url)
-        self.browser.open(self.start_url)
-        for f in self.browser.forms():
-            if f.action.endswith("/sb/d/108"):
-                self.browser.form = f
-        self.browser["contentTypes"] = ["1"]
-        self.browser["archiveQuery"] = basefile
-        self.browser.submit()
-        soup = BeautifulSoup.BeautifulSoup(self.browser.response())
-        for link in soup.findAll(href=re.compile("/sb/d/108/a/")):
-            desc = link.findNextSibling("span", {'class': 'info'}).text
+        templ = "http://www.regeringen.se/sb/d/107/a/136?query=s(basefile)&docTypes=s(doctype)&type=advanced&action=search"
+        url = templ % {'doctype': self.document_type,
+                       'basefile': basefile}
+        soup = BeautifulSoup(requests.get(url).text)
+        for link in soup.find_all(href=re.compile("/sb/d/108/a/")):
+            desc = link.find_next_sibling("span", {'class': 'info'}).text
             if basefile in desc:
-                url = urllib.parse.urljoin(self.browser.geturl(), link['href'])
+                url = urljoin(url, link['href'])
         if not url:
             self.log.error(
                 "Could not find document with basefile %s" % basefile)
@@ -175,19 +133,19 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
                self.SKRIVELSE: "skr",
                self.SOU: "utr/sou",
                self.SO: "so"}
-        return self.config['url'] + "publ/%s/%s" % (seg[document_type], basefile)
+        return self.config.url + "res/%s/%s" % (seg[document_type], basefile)
 
-    def download_single(self, basefile, refresh=False, url=None):
+    def download_single(self, basefile, url=None):
         if not url:
             url = self.remote_url(basefile)
             if not url:  # remote_url failed
                 return
-        filename = self.downloaded_path(basefile)  # just the html page
-        if (refresh or
-            self.config.get('force', False) or
-                not os.path.exists(filename)):
+        filename = self.store.downloaded_path(basefile)  # just the html page
+        updated = pdfupdated = False
+        created = not os.path.exists
+        if (not os.path.exists(filename) or self.config.force):
             existed = os.path.exists(filename)
-            updated = self.download_if_needed(url, filename)
+            updated = self.download_if_needed(url, basefile, filename=filename)
             docid = url.split("/")[-1]
             if existed:
                 if updated:
@@ -200,9 +158,8 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
                 self.log.debug(
                     "%s did not exist, so it was downloaded" % filename)
 
-            soup = BeautifulSoup.BeautifulSoup(open(filename))
+            soup = BeautifulSoup(codecs.open(filename, encoding=self.source_encoding))
             cnt = 0
-            pdfupdated = False
             pdffiles = self.find_pdf_links(soup, basefile)
             if pdffiles:
                 for pdffile in pdffiles:
@@ -214,11 +171,10 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
                             int(docid[:-4]), docid[-4:-2], docid[-2:])
                     else:
                         path = "c4/%02d/%s" % (int(docid[:-2]), docid[-2:])
-                    pdfurl = "http://regeringen.se/content/1/%s/%s" % (
+                    pdfurl = "http://www.regeringen.se/content/1/%s/%s" % (
                         path, pdffile)
-                    pdffilename = self.downloaded_attachment_path(
-                        basefile, pdffile)
-                    if self.download_if_needed(pdfurl, pdffilename):
+                    pdffilename = self.store.downloaded_path(basefile, attachment=pdffile)
+                    if self.download_if_needed(pdfurl, basefile, filename=pdffilename):
                         pdfupdated = True
                         self.log.debug(
                             "    %s is new or updated" % pdffilename)
@@ -228,63 +184,71 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
                 self.log.warning(
                     "%s (%s) has no downloadable PDF files" % (basefile, url))
             if updated or pdfupdated:
-                return True  # Successful download of new or changed file
+                pass
             else:
                 self.log.debug("%s and all PDF files are unchanged" % filename)
         else:
             self.log.debug("%s already exists" % (filename))
-        return False
 
-    def parse_from_soup(self, soup, basefile):
-        doc = self.make_document()
+        entry = DocumentEntry(self.store.documententry_path(basefile))
+        now = datetime.now()
+        entry.orig_url = url
+        if created:
+            entry.orig_created = now
+        if updated or pdfupdated:
+            entry.orig_updated = now
+        entry.orig_checked = now
+        entry.save()
+
+        return updated or pdfupdated
+
+    def parse_metadata_from_soup(self, soup, doc):
         doc.lang = "sv"
-        doc.uri = self.canonical_uri(basefile)
         d = Describer(doc.meta, doc.uri)
         d.rdftype(self.rdf_type)
-        d.value(self.ns['prov']['wasGeneratedBy'],
-                self.__class__.__module__ + "." + self.__class__.__name__)
-        d.rel(self.ns['owl']['sameAs'], self.sameas_uri(doc.uri))
+        d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
+        sameas = self.sameas_uri(doc.uri)
+        if sameas:
+            d.rel(self.ns['owl'].sameAs, sameas)
 
         content = soup.find(id="content")
         title = content.find("h1").string
-        d.value(self.ns['dct']['title'], Literal(title, lang=doc.lang))
+        d.value(self.ns['dct'].title, title, lang=doc.lang)
         identifier = self.sanitize_identifier(
             content.find("p", "lead").text)  # might need fixing up
-        d.value(self.ns['dct']['identifier'], identifier)
+        d.value(self.ns['dct'].identifier, identifier)
 
         definitions = content.find("dl", "definitions")
         if definitions:
-            for dt in definitions.findAll("dt"):
-                key = dt.text
-                value = dt.findNextSibling("dd").text
+            for dt in definitions.find_all("dt"):
+                key = dt.get_text(strip=True)
+                value = dt.find_next_sibling("dd").get_text(strip=True)
                 if key == "Utgiven:":
                     try:
-                        d.value(self.ns['dct'][
-                                'published'], self.parse_swedish_date(value))
+                        d.value(self.ns['dct'].published,
+                                self.parse_swedish_date(value))
                     except ValueError as e:
                         self.log.warning(
                             "Could not parse %s as swedish date" % value)
-                elif key == "Avsändare:":
+                elif key == "AvsÃ¤ndare:":
                     if value.endswith("departementet"):
-                        d.rel(self.ns['rpubl']
-                              .departement, self.lookup_resource(value))
+                        d.rel(self.ns['rpubl'].departement,
+                              self.lookup_resource(value))
                     else:
-                        d.rel(self.ns['dct'][
-                              'publisher'], self.lookup_resource(value))
+                        d.rel(self.ns['dct'].publisher,
+                              self.lookup_resource(value))
 
         if content.find("h2", text="Sammanfattning"):
-            sums = content.find(
-                "h2", text="Sammanfattning").parent.findNextSiblings("p")
+            sums = content.find("h2", text="Sammanfattning").find_next_siblings("p")
             # "\n\n" doesn't seem to survive being stuffed in a rdfa
             # content attribute. Replace with simple space.
-            summary = " ".join([x.text for x in sums])
-            d.value(
-                self.ns['dct']['abstract'], Literal(summary, lang=doc.lang))
-            # summary = summary[:40]
+            summary = " ".join([x.get_text(strip=True) for x in sums])
+            d.value(self.ns['dct'].abstract,
+                    summary, lang=doc.lang)
 
         # find related documents
         re_basefile = re.compile(r'\d{4}(|/\d{2,4}):\d+')
-        # legStep1=Kommittedirektiv, 2=Utredning, 3=lagrådsremiss,
+        # legStep1=Kommittedirektiv, 2=Utredning, 3=lagrÃ¥dsremiss,
         # 4=proposition. Assume that relationships between documents
         # are reciprocal (ie if the page for a Kommittedirektiv
         # references a Proposition, the page for that Proposition
@@ -296,11 +260,11 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
 
         for elementid in elements:
             box = content.find(id=elementid)
-            for listitem in box.findAll("li"):
+            for listitem in box.find_all("li"):
                 if not listitem.find("span", "info"):
                     continue
                 infospans = [x.text.strip(
-                ) for x in listitem.findAll("span", "info")]
+                ) for x in listitem.find_all("span", "info")]
 
                 rel_basefile = None
                 identifier = None
@@ -329,29 +293,31 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
                 elif elementid == "legStep3":
                     subjUri = self.canonical_uri(
                         rel_basefile, self.PROPOSITION)
-                d.rel(self.ns['rpubl']['utgarFran'], URIRef(subjUri))
+                d.rel(self.ns['rpubl'].utgarFran, subjUri)
 
         # find related pages
         related = content.find("h2", text="Relaterat")
         if related:
-            for link in related.findParent("div").findAll("a"):
-                r = urllib.parse.urljoin(
+            for link in related.findParent("div").find_all("a"):
+                r = urljoin(
                     "http://www.regeringen.se/", link["href"])
                 d.rel(RDFS.seeAlso, URIRef(r))
                 #with d.rel(RDFS.seeAlso, URIRef(r)):
-                #    d.value(RDFS.label, util.element_text(link))
+                #    d.value(RDFS.label, link.get_text(strip=True))
 
-        self.infer_triples(d, basefile)
+        self.infer_triples(d, doc.basefile)
         # print doc.meta.serialize(format="turtle")
 
         # find pdf file names in order
-        pdffiles = self.find_pdf_links(content, basefile)
+
+    def parse_document_from_soup(self, soup, doc):
+        pdffiles = self.find_pdf_links(soup, doc.basefile)
         if not pdffiles:
             self.log.error(
-                "%s: No PDF documents found, can't parse anything" % basefile)
+                "%s: No PDF documents found, can't parse anything" % doc.basefile)
             return None
 
-        doc.body = self.parse_pdfs(basefile, pdffiles)
+        doc.body = self.parse_pdfs(doc.basefile, pdffiles)
         return doc
 
     def sanitize_identifier(self, identifier):
@@ -361,9 +327,9 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
         pdffiles = []
         docsection = soup.find('div', 'doc')
         if docsection:
-            for li in docsection.findAll("li", "pdf"):
+            for li in docsection.find_all("li", "pdf"):
                 link = li.find('a')
-                m = re.match(r'/download/(\w+\.pdf).*', link['href'])
+                m = re.match(r'/download/(\w+\.pdf).*', link['href'], re.IGNORECASE)
                 if not m:
                     continue
                 pdfbasefile = m.group(1)
@@ -371,17 +337,17 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
         return pdffiles
 
     def parse_pdfs(self, basefile, pdffiles):
-        intermediate_dir = os.path.dirname(
-            self.generic_path(basefile, 'intermediate', '.foo'))
-        if not os.path.exists(intermediate_dir):
-            os.makedirs(intermediate_dir)
-
-        doc = CompoundElement()
+        doc = Body()
         for pdffile in pdffiles:
-            fullpdffile = intermediate_dir.replace(
-                "intermediate", "downloaded") + os.sep + pdffile
+            # FIXME: downloaded_path must be more fully mocked
+            # (support attachments) by testutil.RepoTester. In the
+            # meantime, we do some path munging ourselves
+            
+            pdf_path = self.store.downloaded_path(basefile).replace("index.html", pdffile)
+            intermediate_path = self.store.intermediate_path(basefile, attachment=pdffile)
+            intermediate_dir = os.path.dirname(intermediate_path)
             try:
-                pdf = self.parse_pdf(fullpdffile, intermediate_dir)
+                pdf = self.parse_pdf(pdf_path, intermediate_dir)
                 for page in pdf:
                     pass
                     # page.crop(left=50,top=0,bottom=900,right=700)
@@ -392,11 +358,6 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
         return doc
 
     def parse_pdf(self, pdffile, intermediatedir):
-        if 'log' in self.moduleconfig:
-            loglevel = self.moduleconfig['log']
-        else:
-            loglevel = self.config.get('log', 'INFO')
-        self.setup_logger('pdfreader', loglevel)
         pdf = PDFReader()
         pdf.read(pdffile, intermediatedir)
         return pdf
@@ -410,7 +371,7 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
             return
         # Step 1: Create CSS
         # 1.1 find css name
-        cssfile = self.generic_path(doc.basefile, 'parsed', '.css')
+        cssfile = self.store.parsed_path(doc.basefile, attachment='index.css')
         # 1.2 create static CSS
         fp = open(cssfile, "w")
         # 1.3 create css for fontspecs and pages
@@ -422,29 +383,26 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
 
         # 2 Copy all created png files to their correct locations
         totcnt = 0
-        src_base = os.path.splitext(
-            pdf.filename)[0].replace("/downloaded/", "/intermediate/")
-        dest_base = self.generic_path(
-            doc.basefile + "#background", "parsed", "")
+        src_base = os.path.dirname(self.store.intermediate_path(doc.basefile))
         for pdf in doc.body:
+            pdf_src_base = src_base + "/" + os.path.splitext(os.path.basename(pdf.filename))[0]
+
             cnt = 0
             for page in pdf:
                 totcnt += 1
                 cnt += 1
-                src = "%s%03d.png" % (src_base, page.number)
-                dest = "%s%04d.png" % (dest_base, totcnt)  # 4 digits, compound docs can be over 1K pages
+                src = "%s%03d.png" % (pdf_src_base, page.number)
+                # 4 digits, compound docs can be over 1K pages
+                attachment = "%04d.png" % (totcnt)
+                dest = self.store.parsed_path(doc.basefile,
+                                                  attachment=attachment)
+
                 if util.copy_if_different(src, dest):
                     self.log.debug("Copied %s to %s" % (src, dest))
 
                 fp.write("#page%03d { background: url('%s');}\n" %
                          (cnt, os.path.basename(dest)))
 
-    def list_external_resources(self, basefile):
-        parsed = self.parsed_path(basefile)
-        resource_dir = os.path.dirname(parsed)
-        for f in [os.path.join(resource_dir, x) for x in os.listdir(resource_dir)
-                  if os.path.join(resource_dir, x) != parsed]:
-            yield f
 
     # Not used right now
     def parse_pdf_complex(self, pdffile, intermediatedir):
@@ -506,7 +464,7 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
         # 3) Lookup resourcelabel from SPARQL db
 
         # 1)
-        # label = label.replace(u"å","aa").replace(u"ä","ae").replace(u"ö","oe")
+        # label = label.replace(u"Ã¥","aa").replace(u"Ã¤","ae").replace(u"Ã¶","oe")
         # return "http://rinfo.lagrummet.se/org/%s" % label.lower()
 
         # 2)
@@ -514,4 +472,4 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
 
     @classmethod
     def tabs(cls, primary=False):
-        return [['Förarbeten', '/forarb/']]
+        return [['FÃ¶rarbeten', '/forarb/']]
