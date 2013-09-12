@@ -15,8 +15,8 @@ install:
 env:
   - SKIP_FUSEKI_TESTS=1 SKIP_SESAME_TESTS=1 SKIP_SLEEPYCAT_TESTS=1
 script:
-  - if [[ $TRAVIS_PYTHON_VERSION == '2.6' ]]; then coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unittest2 discover test; fi
-  - if [[ $TRAVIS_PYTHON_VERSION != '2.6' ]]; then coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unittest discover test; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == '2.6' ]]; then PYTHONWARNINGS=i coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unittest2 discover test; fi
+  - if [[ $TRAVIS_PYTHON_VERSION != '2.6' ]]; then PYTHONWARNINGS=i coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unittest discover test; fi
 after_success:
   - coveralls
 
