@@ -2041,7 +2041,7 @@ class Storage(RepoTester):
         basefiles = ["124/b", "124/a", "123/b", "123/a"]
         for f in files:
             util.writefile(self.p(f),"Nonempty")
-        self.assertEqual(list(self.repo.list_basefiles_for("parse")),
+        self.assertEqual(list(self.repo.store.list_basefiles_for("parse")),
                          basefiles)
 
     def test_list_basefiles_dir(self):
@@ -2056,7 +2056,7 @@ class Storage(RepoTester):
         
         for f in files:
             util.writefile(self.p(f),"nonempty")
-        self.assertEqual(list(self.repo.list_basefiles_for("parse")),
+        self.assertEqual(list(self.repo.store.list_basefiles_for("parse")),
                          basefiles)
 
 

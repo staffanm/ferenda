@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
+from __future__ import unicode_literals, print_function
 # This is a set of class methods, originally from
 # ferenda.sources.legal.eu.EurlexTreaties, which perform graph
 # analysis on documents from ferenda.sources.legal.eu.EurlexCaselaw.
@@ -10,6 +9,37 @@ from __future__ import unicode_literals
 # inheriting from DocumentRepository and this class). For the time
 # being though, the code should not be included in tests and coverage
 # -- it's dead code, but with a hope of resuscitation.
+import os
+import subprocess
+from datetime import datetime
+from operator import itemgetter
+from pprint import pprint
+
+from lxml import etree as ET
+from rdflib import Graph, Literal, BNode, URIRef, Collection, Namespace, RDF
+from whoosh import analysis, fields, query, scoring
+from whoosh.filedb.filestore import RamStorage, FileStorage
+
+try:
+    import matplotlib.pyplot as plt
+    import matplotlib.cm as cm
+    import numpy.array as na
+    import networkx
+    from networkx.algorithms.link_analysis.pagerank_alg import pagerank
+    from networkx.algorithms.link_analysis.hits_alg import hits
+except ImportError:
+    plt = None
+    cm = None
+    na = None
+    networkx = None
+    pagerank = None
+    hits = None
+
+from ferenda import TripleStore
+from ferenda import util
+
+DCT = Namespace(util.ns['dct'])
+RINFOEX = Namespace('http://lagen.nu/terms#')
 
 class GraphAnalyze(object):
     def prep_annotation_file(self, basefile):
@@ -17,14 +47,14 @@ class GraphAnalyze(object):
         baseline_set = self.eval_get_ranked_set_baseline(basefile)
         baseline_map = self.eval_calc_map(
             self.eval_calc_aps(baseline_set, goldstandard))
-
+        print("Baseline MAP %f" % baseline_map)
         self.log.info("Calculating ranked set (pagerank, unrestricted)")
         pagerank_set = self.eval_get_ranked_set(basefile, "pagerank",
                                                 age_compensation=False,
                                                 restrict_cited=False)
         pagerank_map = self.eval_calc_map(
             self.eval_calc_aps(pagerank_set, goldstandard))
-
+        print("Pagerank MAP %f" % pagerank_map)
         sets = [{'label':'Baseline',
                  'data':baseline_set},
                 {'label':'Gold standard',
@@ -191,8 +221,9 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
 """ % (q, year)
 
     def temp_analyze(self):
-        store = TripleStore(
-            self.config['triplestore'], self.config['repository'])
+        store = TripleStore(self.config.storetype,
+                            self.config.storelocation,
+                            self.config.storerepository)
         # sq = self._query_cites('http://lagen.nu/ext/celex/12008E045',self._sameas(),False, True, 2012)
         sq = self._query_cites(None, self._sameas(), False, False, 2012)
         print(sq)
@@ -244,8 +275,9 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
             "Defined %s equivalent article references" % len(equivs))
 
         # Select unique articles citings
-        store = TripleStore(
-            self.config['triplestore'], self.config['repository'])
+        store = TripleStore(self.config.storetype,
+                            self.config.storelocation,
+                            self.config.storerepository)
         sq = """PREFIX eurlex:<http://lagen.nu/eurlex#>
                 SELECT DISTINCT ?case ?article WHERE {
                     ?case eurlex:cites ?article .
@@ -381,8 +413,9 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
         if None not in articles:
             articles.append(None)
         this_year = datetime.datetime.today().year
-        store = TripleStore(
-            self.config['triplestore'], self.config['repository'])
+        store = TripleStore(self.config.storetype,
+                            self.config.storelocation,
+                            self.config.storerepository)
         sameas = self._sameas()
         distributions = []
 
@@ -490,7 +523,7 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
                 engine, filetype, graph_filename)
             self.log.debug("Running %s" % cmdline)
             p = subprocess.Popen(cmdline, shell=True)
-            ret = p.wait()
+            p.wait()
             self.log.info("Graph %s created in %.3f sec" % (
                 graph_filename, time() - start))
 
@@ -498,9 +531,9 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
         self.log.debug("    Writing degree distribution graph")
         degree = cases
         # self.log.debug("    %s cases, first elements %r" % (len(cases),cases.values()[:5]))
-        this_year = datetime.datetime.today().year
+        # this_year = datetime.datetime.today().year
         maxcites = 40
-        maxage = this_year - 1954
+        # maxage = this_year - 1954
 
         for citing, cited in cites:
             if citing not in degree:
@@ -536,10 +569,10 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
 
     def analyze_citegraph_combined_degree_distribution(self, distributions):
         self.log.debug("    Writing combined degree distribution graph")
-        this_year = datetime.datetime.today().year
+        # this_year = datetime.datetime.today().year
         maxcites = 40
-        maxnumber = 1000
-        maxage = this_year - 1954
+        # maxnumber = 1000
+        # maxage = this_year - 1954
 
         fig = plt.figure()
         fig.set_size_inches(8, 4)
@@ -688,7 +721,6 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
         else:
             goldstandard = self.eval_get_goldstandard('tfeu')
             avg_precisions = []
-            f = self.eval_calc_aps
             for label, rankedset in sets:
                 aps = self.eval_calc_aps(rankedset, goldstandard)
                 avg_precisions.append((label, aps))
@@ -780,8 +812,9 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
         #   article, regardless of whether the cited case also cites
         #   the same TFEU article)
         sameas = self._sameas()
-        store = TripleStore(
-            self.config['triplestore'], self.config['repository'])
+        store = TripleStore(self.config.storetype,
+                            self.config.storelocation,
+                            self.config.storerepository)
         res = {}
 
         self.log.debug("Creating ranked set (%s,age_compensation=%s,restrict_cited=%s)" %
@@ -898,7 +931,7 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
         # all cases. Then, create a query for each article based on
         # the keyterms.
         connector = query.Or
-        indexdir = os.path.sep.join([self.config['datadir'], 'ecj', 'index'])
+        indexdir = os.path.sep.join([self.config.datadir, 'ecj', 'index'])
         storage = FileStorage(indexdir)
         idx = storage.open_index()
         searcher = idx.searcher(weighting=scoring.BM25F())
@@ -944,8 +977,9 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
 
         pred = util.ns['ir'] + 'isRelevantFor'
         res = {}
-        store = TripleStore(
-            self.config['triplestore'], self.config['repository'])
+        store = TripleStore(self.config.storetype,
+                            self.config.storelocation,
+                            self.config.storerepository)
         sq_templ = """PREFIX eurlex:<http://lagen.nu/eurlex#>
                       SELECT ?party ?casenum ?celexnum WHERE {
                           <%s> eurlex:party ?party ;

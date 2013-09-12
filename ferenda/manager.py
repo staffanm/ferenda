@@ -26,25 +26,16 @@ from ast import literal_eval
 from datetime import datetime
 import xml.etree.cElementTree as ET
 import cgi
+from ferenda.compat import OrderedDict
 
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
-
-import six  # technically third-party, but needed for cross-version
-            # system imports
-if six.PY3:
-    from urllib.parse import urlsplit, parse_qsl, urlencode
-else:
-    from urlparse import urlsplit, parse_qsl
-    from urllib import urlencode
+import six
+from six.moves.urllib_parse import urlsplit, parse_qsl, urlencode
+from six.moves import configparser
+input = six.moves.input
 
 from wsgiref.simple_server import make_server
 from wsgiref.util import FileWrapper
 # from pprint import pprint
-from six.moves import configparser
-input = six.moves.input
 
 # 3rd party
 import pkg_resources
@@ -929,8 +920,7 @@ def _run_class(enabled, argv):
 
     If the parameter ``--all`` is given (e.g. ``['myrepo', 'parse',
     '--all']``), the specified command is run once for every available
-    file for that action (as determined by each class' implementation
-    of :py:meth:`~ferenda.DocumentRepository.list_basefiles_for`).
+    file for that action.
 
     """
     log = setup_logger()
@@ -980,9 +970,17 @@ def _run_class(enabled, argv):
             else: 
                 # TODO: use multiprocessing.pool.map or celery for
                 # task queue handling
-                for basefile in inst.list_basefiles_for(command):
+                for basefile in inst.store.list_basefiles_for(command):
                     try:
                         res.append(clbl(basefile, **kwargs))
+                    except errors.DocumentRemovedError as e:
+                        if hasattr(e, 'dummyfile'):
+                            if not os.path.exists(e.dummyfile):
+                                util.writefile(e.dummyfile,"")
+                        else:
+                            log.error("%s of %s failed: %s" % (command,basefile,e))
+                            res.append(sys.exc_info())
+                            
                     except Exception as e:
                         log.error("%s of %s failed: %s" % (command,basefile,e))
                         res.append(sys.exc_info())
@@ -1282,7 +1280,7 @@ def _preflight_check():
         ('rdflib', '4.0', True),
         ('html5lib', '1.0b1', True),
         ('requests', '1.2.0', True),
-        ('six', '1.2.0', True),
+        ('six', '1.4.0', True),
         ('jsmin', '2.0.2', True),
         ('whoosh', '2.4.1', True),
         ('pyparsing', '1.5.7', True))

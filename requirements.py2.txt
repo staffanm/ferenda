@@ -11,7 +11,7 @@ pyparsing==1.5.7
 SimpleParse
 unittest2 # not needed for py2.7 +
 ordereddict # not needed for py2.7 +
-sphinx
+# sphinx
 mock
 coverage
-bsddb3
+# bsddb3

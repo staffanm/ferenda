@@ -4,14 +4,8 @@ import os
 import datetime
 import ast
 import logging
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
-
-import six
+from ferenda.compat import OrderedDict
 from six.moves import configparser
-
 
 class LayeredConfig(object):
     """Provide unified access to nested configuration parameters. The
@@ -158,13 +152,19 @@ class LayeredConfig(object):
                     return current._inifile[name]
                 current = current._parent
 
-        if name in self._defaults and not isinstance(self._defaults[name], type):
-            return self._defaults[name]
+        if name in self._defaults:
+            if isinstance(self._defaults[name], type):
+                return None # it's typed and therefore exists, but has no value
+            else:
+                return self._defaults[name]
         if self._cascade:
             current = self._parent
             while current:
-                if name in current._defaults and not isinstance(current._defaults[name], type):
-                    return current._defaults[name]
+                if name in current._defaults:
+                    if isinstance(current._defaults[name], type):
+                        return None # it's typed and therefore exists, but has no value
+                    else:
+                        return current._defaults[name]
                 current = current._parent
 
         raise AttributeError("Configuration key %s doesn't exist" % name)
@@ -275,7 +275,10 @@ class LayeredConfig(object):
                 return value
 
         def datetimeconvert(value):
-            return datetime.datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+            try:
+                return datetime.datetime.strptime(value, "%Y-%m-%d %H:%M:%S.%f")
+            except ValueError:
+                return datetime.datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
 
         # find the appropriate defaults object. In the case of
         # cascading, could be any parent that has a key key.

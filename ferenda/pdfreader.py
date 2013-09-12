@@ -8,6 +8,7 @@ from tempfile import mktemp
 import logging
 
 import six
+from six import text_type as str
 
 from ferenda import util
 from .elements import UnicodeElement, CompoundElement, OrdinalElement, serialize
@@ -81,6 +82,9 @@ hierarchy. After calling :py:meth:`~ferenda.PDFReader.read`, the PDFReader itsel
 
         # for each page element
         for pageelement in tree.getroot():
+            if pageelement.tag == "outline":
+                # FIXME: we want to do something with this information
+                continue
             page = Page(number=int(pageelement.attrib['number']),  # always int?
                         width=int(pageelement.attrib['width']),
                         height=int(pageelement.attrib['height']),
@@ -99,14 +103,13 @@ hierarchy. After calling :py:meth:`~ferenda.PDFReader.read`, the PDFReader itsel
                 if element.tag == 'fontspec':
                     self.fontspec[element.attrib['id']] = element.attrib
                 elif element.tag == 'text':
-                    # print ET.tostring(element)
-                    attribs = element.attrib
-                    attribs['fontspec'] = self.fontspec
-                    b = Textbox(**attribs)
                     # eliminate "empty" textboxes
                     if element.text and element.text.strip() == "" and not element.getchildren():
                         # print "Skipping empty box"
                         continue
+                    attribs = element.attrib
+                    attribs['fontspec'] = self.fontspec
+                    b = Textbox(**attribs)
 
                     if element.text and element.text.strip():
                         b.append(Textelement(str(element.text)))

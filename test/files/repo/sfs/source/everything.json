@@ -1,11 +1,20 @@
 {
-    "http://rkrattsbaser.gov.se/cgi-bin/thw?${HTML}=sfsr_lst&${OOHTML}=sfsr_dok&${SNHTML}=sfsr_err&${MAXPAGE}=26&${BASE}=SFSR&${FORD}=FIND&%C5R=FR%C5N+1600&%C5R=TILL+2013" : {
+    "http://rkrattsbaser.gov.se/cgi-bin/thw?${HTML}=sfst_lst&${OOHTML}=sfst_dok&${SNHTML}=sfst_err&${MAXPAGE}=101&${BASE}=SFSR&${FORD}=FIND&%C5R=FR%C5N+1600&%C5R=TILL+2008" : {
 	"file": "resultlist-1.html",
+	"charset": "latin-1"
+	},
+    "http://rkrattsbaser.gov.se/cgi-bin/thw?${HTML}=sfst_lst&${OOHTML}=sfst_dok&${SNHTML}=sfst_err&${MAXPAGE}=101&${BASE}=SFSR&${FORD}=FIND&%C5R=FR%C5N+2009&%C5R=TILL+2013" : {
+	"file": "resultlist-3.html",
 	"charset": "latin-1"
 	},
     "http://rkrattsbaser.gov.se/cgi-bin/thw?${MAXPAGE}=26&${APPL}=SFSR&${BASE}=SFSR&${HTML}=sfsr_lst&${THWIDS}=50.7/1370846887_16735&${HILITE}=0" : {
 	"file": "resultlist-2.html",
 	"charset": "latin-1"
+    },
+    "http://rkrattsbaser.gov.se/cgi-bin/thw?${APPL}=SFSR&${BASE}=SFSR&${THWIDS}=48.7/1370846887_16735&${HTML}=sfsr_dok&${THWURLSAVE}=35/1370846915_17238": {
+	"file" : "2013-352-m.html",
+	"charset": "latin-1",
+	"expect": "metadata/2013/352.html"
     },
     "http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfst_dok&${HTML}=sfst_lst&${SNHTML}=sfst_err&${BASE}=SFST&${TRIPSHOW}=format=THW&BET=2013:352": {
 	"file" : "2013-352.html",
@@ -17,6 +26,11 @@
 	"charset": "latin-1",
 	"expect": "register/2013/352.html"
     },
+    "http://rkrattsbaser.gov.se/cgi-bin/thw?${APPL}=SFSR&${BASE}=SFSR&${THWIDS}=49.7/1370846887_16735&${HTML}=sfsr_dok&${THWURLSAVE}=35/1370846915_17238": {
+	"file" : "2013-353-m.html",
+	"charset": "latin-1",
+	"expect": "metadata/2013/353.html"
+    },
     "http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfst_dok&${HTML}=sfst_lst&${SNHTML}=sfst_err&${BASE}=SFST&${TRIPSHOW}=format=THW&BET=2013:353": {
 	"file" : "2013-353.html",
 	"charset": "latin-1",
@@ -27,6 +41,11 @@
 	"charset": "latin-1",
 	"expect": "register/2013/353.html"
     },
+    "http://rkrattsbaser.gov.se/cgi-bin/thw?${APPL}=SFSR&${BASE}=SFSR&${THWIDS}=50.7/1370846887_16735&${HTML}=sfsr_dok&${THWURLSAVE}=26/1370847086_20192": {
+	"file" : "2013-361-m.html",
+	"charset": "latin-1",
+	"expect": "metadata/2013/361.html"
+    },
     "http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfst_dok&${HTML}=sfst_lst&${SNHTML}=sfst_err&${BASE}=SFST&${TRIPSHOW}=format=THW&BET=2013:361": {
 	"file" : "2013-361.html",
 	"charset": "latin-1",
@@ -36,6 +55,11 @@
 	"file" : "2013-361-r.html",
 	"charset": "latin-1",
 	"expect": "register/2013/361.html"
+    },
+    "http://rkrattsbaser.gov.se/cgi-bin/thw?${APPL}=SFSR&${BASE}=SFSR&${THWIDS}=51.7/1370846887_16735&${HTML}=sfsr_dok&${THWURLSAVE}=26/1370847086_20192": {
+	"file" : "2013-363-m.html",
+	"charset": "latin-1",
+	"expect": "metadata/2013/363.html"
     },
     "http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfst_dok&${HTML}=sfst_lst&${SNHTML}=sfst_err&${BASE}=SFST&${TRIPSHOW}=format=THW&BET=2013:363": {
 	"file" : "2013-363.html",

@@ -1,11 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
-try:
-    from collections import OrderedDict
-except ImportError:
-    # if on python 2.6
-    from ordereddict import OrderedDict
 
 from collections import defaultdict
 from operator import attrgetter, itemgetter
@@ -26,7 +21,7 @@ import shutil
 import time
 import calendar
 import filecmp
-
+from ferenda.compat import OrderedDict
 
 # 3rd party
 import pkg_resources
@@ -34,7 +29,6 @@ from lxml import etree
 from lxml.builder import ElementMaker
 from lxml.etree import XSLT
 import lxml.html
-
 
 from rdflib import Graph
 from rdflib import Literal, Namespace, URIRef
@@ -46,10 +40,7 @@ import six
 from six import text_type as str
 from six import binary_type as bytes
 
-if six.PY3:
-    from urllib.parse import quote, unquote 
-else:
-    from urllib import quote, unquote  # NOQA
+from six.moves.urllib_parse import quote, unquote
 
 # mine
 from ferenda import util, errors, decorators
@@ -57,9 +48,6 @@ from ferenda import Describer, LayeredConfig, TripleStore, FulltextIndex, Docume
 from ferenda.elements import AbstractElement, serialize, Body, Nav, Link, Section, Subsection, Subsubsection, Heading, UnorderedList, ListItem, Preformatted, Paragraph
 from ferenda.elements.html import elements_from_soup
 from ferenda.thirdparty import patch, httpheader
-__version__ = (1, 6)
-__author__ = "Staffan Malmgren <staffan@tomtebo.org>"
-
 
 class DocumentRepository(object):
     """Base class for downloading, parsing and generating HTML versions of a repository of documents.
@@ -124,6 +112,8 @@ class DocumentRepository(object):
 #            news_get_entry
 #
 #    frontpage_content
+
+
 
     ################
     # general class properties
@@ -239,8 +229,6 @@ class DocumentRepository(object):
         codedefaults = self.get_default_options()
         defaults = util.merge_dict_recursive(codedefaults, kwargs)
         self.config = LayeredConfig(defaults=defaults)
-        # FIXME: Make it possible to provide an alternative (subclass
-        # etc) to DocumentStore
         self.store = self.documentstore_class(self.config.datadir + os.sep + self.alias)
         # should documentstore have a connection to self, ie
         # self.store = DocumentStore(basedir, self) ?
@@ -261,6 +249,7 @@ class DocumentRepository(object):
                 prefix = ns
                 # assume that any standalone prefix is well known
                 self.ns[prefix] = Namespace(util.ns[prefix])
+
     def __del__(self):
         if self._transform_resourcedir:
             shutil.rmtree(self._transform_resourcedir)
@@ -287,8 +276,8 @@ class DocumentRepository(object):
                 'generateforce': False,
                 'fsmdebug': False,
                 'refresh': False,
-                'lastdownload': None,
-                'downloadmax': None,
+                'lastdownload': datetime,
+                'downloadmax': int,
                 'conditionalget': True,
                 'url': 'http://localhost:8000/',
                 'fulltextindex': True,
@@ -307,24 +296,6 @@ class DocumentRepository(object):
                             'res/js/modernizr-2.6.2-respond-1.1.0.min.js',
                             'res/js/ferenda.js'],
                 'staticsite': False}
-
-    def list_basefiles_for(self, action, basedir=None):
-        """Get all available basefiles that can be used for the
-        specified action.
-
-        :param action: The action for which to get available
-                       basefiles (``parse``, ``relate``, ``generate``
-                       or ``news``)
-        :type action: str
-        :param basedir: The base directory in which to search for
-                        available files. If not provided, defaults to
-                        ``self.config.datadir``.
-        :type basedir: str
-        :returns: All available basefiles
-        :rtype: generator
-        """
-        return self.store.list_basefiles_for(action,basedir)
-
 
     @classmethod
     def setup(cls, action, config):
@@ -368,10 +339,6 @@ with the *config* object as single parameter.
         """
         return str(len(list(self.store.list_versions(basefile)))+1)
 
-#    # FIXME: deprecated
-#    def context(self):
-#        return self.dataset_uri()
-
     def qualified_class_name(self):
         """The qualified class name of this class
 
@@ -393,7 +360,6 @@ with the *config* object as single parameter.
         # It might also be impossible to provide the canonical_uri
         # without actually parse()ing the document
         return "%sres/%s/%s" % (self.config.url, self.alias, basefile)
-
 
     def dataset_uri(self, param=None, value=None):
         """Returns the URI that identifies the dataset that this docrepository
@@ -514,31 +480,20 @@ uri doesn't map to a basefile in this repo."""
             self.log.debug("download: Not re-downloading downloaded files")
 
         self.log.debug("Starting at %s" % self.start_url)
-        # url_regex = self.document_url.replace("%s", "(.*)")
         updated = False
 
-        # self.browser.open(self.start_url)
         resp = requests.get(self.start_url)
         tree = lxml.html.document_fromstring(resp.text)
         tree.make_links_absolute(self.start_url, resolve_base_href=True)
-        if ('downloadmax' in self.config and self.config.downloadmax) or 'FERENDA_DOWNLOADMAX' in os.environ:
-            if 'downloadmax' in self.config and self.config.downloadmax:
-                maxdoc = int(self.config.downloadmax)
-            else:
-                maxdoc = int(os.environ['FERENDA_DOWNLOADMAX'])
-            self.log.info("Only downloading max %s documents" % maxdoc)
-            links = islice(self.download_get_basefiles(tree.iterlinks()), maxdoc)
-        else:
-            links = self.download_get_basefiles(tree.iterlinks())
-        for (basefile, link) in links:
+        for (basefile, link) in self.download_get_basefiles(tree.iterlinks()):
             if (refresh or
                 (not os.path.exists(self.store.downloaded_path(basefile)))):
                 ret = self.download_single(basefile, link)
                 updated = updated or ret
-
         self.config.lastdownload = datetime.now()
         return updated
 
+    @decorators.downloadmax
     def download_get_basefiles(self, source):
         """Given *source* (a iterator that provides (element, attribute, link,
         pos) tuples, like ``lxml.etree.iterlinks()``), generate tuples
@@ -587,7 +542,6 @@ uri doesn't map to a basefile in this repo."""
 
         updated = False
         created = False
-        checked = True
 
         filename = self.store.downloaded_path(basefile)
         created = not os.path.exists(filename)
@@ -609,8 +563,7 @@ uri doesn't map to a basefile in this repo."""
             entry.orig_created = now
         if updated:
             entry.orig_updated = now
-        if checked:
-            entry.orig_checked = now
+        entry.orig_checked = now
         entry.save()
 
         return updated
@@ -670,8 +623,10 @@ uri doesn't map to a basefile in this repo."""
                 except requests.exceptions.ConnectionError as e:
                     self.log.warning("Failed to fetch %s: error %s (%s remaining attempts)" % (url, e, remaining_attempts))
                     # close session in hope that this rectifies things
-                    s = requests.Session()
-                    s.close()
+                    # -- no it probably causes problems for other
+                    # things
+                    # s = requests.Session()
+                    # s.close()
                     remaining_attempts -= 1
                     time.sleep(1)
                            
@@ -697,8 +652,9 @@ uri doesn't map to a basefile in this repo."""
             util.robust_rename(tmpfile, filename)
             updated = True
         elif not filecmp.cmp(tmpfile, filename, shallow=False):
-            version = self.get_archive_version(basefile)
-            self.store.archive(basefile, version)
+            if archive:
+                version = self.get_archive_version(basefile)
+                self.store.archive(basefile, version)
             util.robust_rename(tmpfile, filename)
             updated = True
         else:
@@ -711,11 +667,8 @@ uri doesn't map to a basefile in this repo."""
             # .etag file (etag)
             if response.headers["last-modified"]:
                 mtime = calendar.timegm(util.parse_rfc822_date(
-                        response.headers["last-modified"]).timetuple())
-                # FIXME: set a orig_lastmodified on DocumentEntry
+                        response.headers["last-modified"]).timetuple()) 
                 os.utime(filename, (time.time(), mtime))
-            # FIXME: set this on DocumentEntry (orig_etag) instead
-            # of writing a separate file
             if response.headers["etag"]:
                 with open(filename + ".etag", "w") as fp:
                     fp.write(response.headers["etag"])
@@ -833,62 +786,29 @@ uri doesn't map to a basefile in this repo."""
         :param doc: The document object to fill in.
         :type  doc: ferenda.Document
         """
-        soup = self.soup_from_basefile(doc.basefile)
+        soup = self.soup_from_basefile(doc.basefile, self.source_encoding)
         self.parse_metadata_from_soup(soup, doc)
         self.parse_document_from_soup(soup, doc)
 
-    def patch_if_needed(self, basefile, text):
-        """Given *basefile* and the entire *text* of the downloaded or
-        intermediate document, find if there exists a patch file under
-        ``self.config.patchdir``, and if so, applies it. Returns
-        (patchedtext, patchdescription) if so, (text,None)
-        otherwise.
-
+    def soup_from_basefile(self, basefile, encoding='utf-8', parser='lxml'):
         """
-        
-        # 1. do we have a patch?
-        patchstore = self.documentstore_class(self.config.patchdir + os.sep + self.alias)
-        patchpath = patchstore.path(basefile, "patches", ".patch")
-        descpath =  patchstore.path(basefile, "patches", ".desc")
-        if os.path.exists(patchpath):
-            # 4. make sure error msgs from the patch modules are
-            # available if we fail.
-            from io import StringIO
-            pbuf = StringIO()
-            plog = logging.getLogger('ferenda.thirdparty.patch')
-            plog.setLevel(logging.WARNING)
-            plog.addHandler(logging.StreamHandler(pbuf))
+        Load the downloaded document for basefile into a BeautifulSoup object
 
-            # 2. read and parse it
-            with open(patchpath) as fp:
-                ps = patch.PatchSet()
-                success = ps.parse(fp)
-            if not success:
-                raise errors.PatchError("Patch %s couldn't be parsed: %s" % (patchpath, pbuf.getvalue()))
-            assert len(ps.items) == 1
-            # 3. Create a temporary file with the file to be patched
-            # open tmpfile
-            fileno, tmpfile = mkstemp()
-            fp = os.fdopen(fileno, "wb")
-            # dump text to tmpfile
-            fp.write(text.encode("utf-8")) # assume that patches are also in utf-8 
-            fp.close()
-            ps.items[0].source = tmpfile
-            # 5. now do the patching
-            success = ps.apply()
-            if not success:
-                raise errors.PatchError("Patch %s failed: %s" % (patchpath, pbuf.getvalue()))
-            else:
-                # 6. Finally get a patch description 
-                if ps.items[0].hunks[0].desc:
-                    desc = ps.items[0].hunks[0].desc
-                elif os.path.exists(descpath):
-                    desc = util.readfile(descpath)
-                else:
-                    desc = "(No patch description available)"
-                return util.readfile(tmpfile), desc
-        else:
-            return (text, None)
+        :param basefile: The basefile for the downloaded document to parse
+        :type  basefile: str
+        :param encoding: The encoding of the downloaded document
+        :type  encoding: str
+        :returns: The parsed document
+        :rtype: bs4.BeautifulSoup
+
+        .. note::
+
+           Helper function. You probably don't need to override it.
+        """
+        filename = self.store.downloaded_path(basefile)
+        with codecs.open(filename, encoding=encoding, errors='replace') as fp:
+            soup = bs4.BeautifulSoup(fp.read(), parser)
+        return soup
                         
                         
     def parse_metadata_from_soup(self, soup, doc):
@@ -973,25 +893,60 @@ uri doesn't map to a basefile in this repo."""
 
         doc.body = elements_from_soup(soup)
 
-    def soup_from_basefile(self, basefile, encoding='utf-8', parser='lxml'):
+
+    def patch_if_needed(self, basefile, text):
+        """Given *basefile* and the entire *text* of the downloaded or
+        intermediate document, find if there exists a patch file under
+        ``self.config.patchdir``, and if so, applies it. Returns
+        (patchedtext, patchdescription) if so, (text,None)
+        otherwise.
+
         """
-        Load the downloaded document for basefile into a BeautifulSoup object
+        
+        # 1. do we have a patch?
+        patchstore = self.documentstore_class(self.config.patchdir + os.sep + self.alias)
+        patchpath = patchstore.path(basefile, "patches", ".patch")
+        descpath =  patchstore.path(basefile, "patches", ".desc")
+        if os.path.exists(patchpath):
+            # 4. make sure error msgs from the patch modules are
+            # available if we fail.
+            from io import StringIO
+            pbuf = StringIO()
+            plog = logging.getLogger('ferenda.thirdparty.patch')
+            plog.setLevel(logging.WARNING)
+            plog.addHandler(logging.StreamHandler(pbuf))
 
-        :param basefile: The basefile for the downloaded document to parse
-        :type  basefile: str
-        :param encoding: The encoding of the downloaded document
-        :type  encoding: str
-        :returns: The parsed document
-        :rtype: bs4.BeautifulSoup
+            # 2. read and parse it
+            with open(patchpath) as fp:
+                ps = patch.PatchSet()
+                success = ps.parse(fp)
+            if not success:
+                raise errors.PatchError("Patch %s couldn't be parsed: %s" % (patchpath, pbuf.getvalue()))
+            assert len(ps.items) == 1
+            # 3. Create a temporary file with the file to be patched
+            # open tmpfile
+            fileno, tmpfile = mkstemp()
+            fp = os.fdopen(fileno, "wb")
+            # dump text to tmpfile
+            fp.write(text.encode("utf-8")) # assume that patches are also in utf-8 
+            fp.close()
+            ps.items[0].source = tmpfile
+            # 5. now do the patching
+            success = ps.apply()
+            if not success:
+                raise errors.PatchError("Patch %s failed: %s" % (patchpath, pbuf.getvalue()))
+            else:
+                # 6. Finally get a patch description 
+                if ps.items[0].hunks[0].desc:
+                    desc = ps.items[0].hunks[0].desc
+                elif os.path.exists(descpath):
+                    desc = util.readfile(descpath)
+                else:
+                    desc = "(No patch description available)"
+                return util.readfile(tmpfile), desc
+        else:
+            return (text, None)
 
-        .. note::
-
-           Helper function. You probably don't need to override it.
-        """
-        filename = self.store.downloaded_path(basefile)
-        with codecs.open(filename, encoding=encoding, errors='replace') as fp:
-            soup = bs4.BeautifulSoup(fp.read(), parser)
-        return soup
 
     def make_document(self, basefile=None):
         """
@@ -1042,25 +997,6 @@ uri doesn't map to a basefile in this repo."""
         """
         pass
 
-    def list_external_resources(self, basefile):
-        """Return a list of external files that parse (through
-        create_external_resources or otherwise) has created.
-
-        The default implementation returns an empty list.
-
-        .. note::
-
-           This is probably obsoleted by
-           :py:meth:`~ferenda.DocumentRepository.list_attachments`
-
-        :param doc: The document to list external files for
-        :type  doc: ferenda.Document
-        :returns: External files created by :py:meth:`~ferenda.DocumentRepository.parse`
-        :rtype: list
-
-        """
-        return []
-
     def render_xhtml(self, doc, outfile):
         """Renders the parsed object structure as a XHTML file with
         RDFa attributes (also returns the same XHTML as a string).
@@ -1074,14 +1010,25 @@ uri doesn't map to a basefile in this repo."""
         """
         XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 
-        def render_head(g, uri):
-            children = []
+        def render_head(g, uri, children=None):
+            if not children:
+                children = []
+                # if revlink == True, we're serializing triples for
+                # the main subject. This also means we don't have to
+                # set @about below, and that we should create a
+                # <title> tag for any dct:title triple (ideally, for
+                # any property that is rdfs:subPropertyOf dct:title,
+                # but...
+                revlink = True
+            else:
+                revlink = False
             # we sort to get a predictable order (by predicate, then by object)
             for (subj, pred, obj) in sorted(g, key=lambda t:(t[1],t[2])):
                 if str(subj) != uri and str(obj) != uri:
                     self.log.warning("%s != %s" % (subj, uri))
                     continue
-                if g.qname(pred) == "dct:title":
+
+                if g.qname(pred) == "dct:title" and revlink:
                     if obj.language:
                         children.append(
                             E.title({'property': 'dct:title', }, str(obj)))
@@ -1092,21 +1039,31 @@ uri doesn't map to a basefile in this repo."""
                 elif isinstance(obj, URIRef) and str(subj) == uri:
                     children.append(E.link({'rel': g.qname(pred),
                                             'href': str(obj)}))
+                    if not revlink:
+                        children[-1].set('about', uri)
+                    render_head(g,str(obj),children)
                 elif isinstance(obj, URIRef):
-                    children.append(E.link({'rev': g.qname(pred),
-                                            'href': str(subj)}))
+                    if revlink:
+                        children.append(E.link({'rev': g.qname(pred),
+                                                'href': str(subj)}))
                 elif obj.datatype:
                     children.append(E.meta({'property': g.qname(pred),
                                             'datatype': g.qname(obj.datatype),
                                             'content': str(obj)}))
+                    if not revlink:
+                        children[-1].set('about', uri)
                 elif obj.language:
                     children.append(E.meta({'property': g.qname(pred),
                                             XML_LANG: obj.language,
                                             'content': str(obj)}))
+                    if not revlink:
+                        children[-1].set('about', uri)
                 else:
                     children.append(E.meta({'property': g.qname(pred),
                                             'content': str(obj),
                                             XML_LANG: ''}))
+                    if not revlink:
+                        children[-1].set('about', uri)
 
             return E.head({'about': uri}, *children)
 
@@ -1252,20 +1209,6 @@ uri doesn't map to a basefile in this repo."""
 
         """
         self.relate_triples(basefile)
-
-        # FIXME: How should we pass in (or create) a list if
-        # instantiated repositories?  When using API, the caller must
-        # be able to create and pass the list, eg repos=[] as method
-        # signature When using manager, we'll probably have to do some
-        # specialcase in the run() method (like for
-        # makeresources/runserver, but different -- in particular, one
-        # instance of every registered repo should be created).
-
-        # the same problem exists for every html-generating method
-        # (generate, toc, news) when config.staticsite is True (needs
-        # to query every registered repo to see if they handle the
-        # document or dataset uri in order to convert to a local
-        # relative file path),
         
         # When otherrepos = [], should we still provide self as one repo? Yes.
         if self not in otherrepos:
@@ -2310,7 +2253,7 @@ parsed document path to that documents dependency file."""
         # attempt to parse/enrich the document
         
         directory = os.path.sep.join((self.config.datadir, self.alias, "entries"))
-        for basefile in self.list_basefiles_for("news"):
+        for basefile in self.store.list_basefiles_for("news"):
             path = self.store.documententry_path(basefile)
             entry = DocumentEntry(path)
             if not entry.published:
@@ -2376,8 +2319,11 @@ parsed document path to that documents dependency file."""
             E = ElementMaker(nsmap=nsmap)
 
             # entries SHOULD at this point be a list of DocumentEntry
-            # object, not (DocumentEntry, Graph). 
-            updated = max(entries,key=lambda x: x.updated).updated
+            # object, not (DocumentEntry, Graph).
+            if entries:
+                updated = max(entries,key=lambda x: x.updated).updated
+            else:
+                updated = datetime.now() # or never
             contents = [E.id(feedid),
                         E.title(title),
                         E.updated(util.rfc_3339_timestamp(updated)),
@@ -2485,7 +2431,7 @@ parsed document path to that documents dependency file."""
         return ("<h2><a href='%s'>Document repository '%s'</a></h2><p>Handles %s documents. "
                 "Contains %s published documents.</p>"
                 % (self.dataset_uri(), self.alias, qname,
-                   len(list(self.list_basefiles_for("_postgenerate")))))
+                   len(list(self.store.list_basefiles_for("_postgenerate")))))
 
     # @manager.action
     def status(self, basefile=None, samplesize=3):
@@ -2534,20 +2480,10 @@ parsed document path to that documents dependency file."""
         :meth:`~ferenda.DocumentRepository.status`.
 
         """
-        
-        # for step in ('download', 'parse', 'generate')
-        #     basefiles[step] = list_basefiles_for(step)
-        #     pathfunc = downloaded_path|parsed_path|generated_path
-        #     physicals[step] = [pathfunc(x) for x in basefiles[step]]
-        #     compare physical['parse'][idx] with physical['downloaded'][idx]
-        #     if older or nonexistent:
-        #         todo[step].append()
-
         status = OrderedDict()
-        # download
         exists = []
         todo = []
-        for basefile in self.list_basefiles_for("parse"):
+        for basefile in self.store.list_basefiles_for("parse"):
             exists.append(basefile)
             # no point in trying to append
         status['download'] = {'exists':exists,
@@ -2556,7 +2492,7 @@ parsed document path to that documents dependency file."""
         # parse
         exists = []
         todo = []
-        for basefile in self.list_basefiles_for("parse"):
+        for basefile in self.store.list_basefiles_for("parse"):
             dependency = self.store.downloaded_path(basefile)
             target = self.store.parsed_path(basefile)
             if os.path.exists(target):
@@ -2570,7 +2506,7 @@ parsed document path to that documents dependency file."""
         # generated
         exists = []
         todo = []
-        for basefile in self.list_basefiles_for("generate"):
+        for basefile in self.store.list_basefiles_for("generate"):
             dependency = self.store.parsed_path(basefile)
             target = self.store.generated_path(basefile)
             if os.path.exists(target):

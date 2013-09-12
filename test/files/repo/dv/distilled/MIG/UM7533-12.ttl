@@ -1,0 +1,40 @@
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://localhost:8000/res/dv/mig/2013:6> a rpubl:Rattsfallsreferat ;
+    dct:identifier "MIG 2013:6" ;
+    dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
+    rpubl:arsutgava "2013" ;
+    rpubl:lopnummer "6" ;
+    rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/mig> ;
+    rpubl:referatAvDomstolsavgorande <http://localhost:8000/res/dv/mig/UM7533-12/2013-03-22> ;
+    rpubl:referatrubrik "Ett barn, som lider av livshotande leukemi, har tillsammans med sin förälder beviljats uppehållstillstånd på grund av synnerligen ömmande omständigheter. Eftersom barnets behov av avancerad vård och behandling har bedömts vara av övergående natur har uppehållstillstånden tidsbegränsats."@sv ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/mig/2013:6> .
+
+<http://localhost:8000/res/dv/mig/UM7533-12/2013-03-22> a rpubl:VagledandeDomstolsavgorande ;
+    dct:publisher <http://lagen.nu/org/2008/migrationsoverdomstolen> ;
+    dct:relation "Prop. 2004/05:170 s. 191" ;
+    dct:subject <http://localhost:8000/concept/Barn>,
+        <http://localhost:8000/concept/Hälsotillstånd>,
+        <http://localhost:8000/concept/Leukemi>,
+        <http://localhost:8000/concept/Sjukdom>,
+        <http://localhost:8000/concept/Synnerligen_ömmande_omständigheter>,
+        <http://localhost:8000/concept/Tidsbegränsat_uppehållstillstånd>,
+        <http://localhost:8000/concept/Vårdbehov_av_övergående_natur> ;
+    dct:title "Ett barn, som lider av livshotande leukemi, har tillsammans med sin förälder beviljats uppehållstillstånd på grund av synnerligen ömmande omständigheter. Eftersom barnets behov av avancerad vård och behandling har bedömts vara av övergående natur har uppehållstillstånden tidsbegränsats."@sv ;
+    rpubl:avdelning <http://localhost:8000/res/dv/mig/1> ;
+    rpubl:avgorandedatum "2013-03-22T00:00:00"^^xsd:dateTime ;
+    rpubl:lagrum <http://localhost:8000/res/sfs/2005:716>,
+        <http://localhost:8000/res/sfs/2005:716#K1P10>,
+        <http://localhost:8000/res/sfs/2005:716#K5P6>,
+        <http://localhost:8000/res/sfs/2005:716#K5P9> ;
+    rpubl:malnummer <http://localhost:8000/res/dv/mig/UM7533-12> ;
+    rpubl:rattsfall <http://localhost:8000/res/dv/mig/2007:48>,
+        <http://localhost:8000/res/dv/mig/2010:23> ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/mig/UM7533-12/2013-03-22> .
+

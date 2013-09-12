@@ -1,20 +1,20 @@
+# -*- coding: utf-8 -*-
 from __future__ import unicode_literals
-import re
-import os
-import sys
-from datetime import datetime
-import locale
-from operator import itemgetter
 
-import six
+from datetime import datetime
+from operator import itemgetter
+import os
+import re
+import sys
+
 from six import text_type as str
 
 from rdflib import Literal, Graph, URIRef, RDF, Namespace
 
-from ferenda import util, decorators
-from ferenda import Describer, DocumentRepository, FSMParser
-from ferenda.elements import serialize, html, Body, Section, Subsection, Subsubsection
 from .rfc import PreambleSection
+from ferenda import Describer, DocumentRepository, FSMParser
+from ferenda import util, decorators
+from ferenda.elements import serialize, html, Body, Section, Subsection, Subsubsection
 
 class W3Standards(DocumentRepository):
     alias = "w3c"
@@ -222,21 +222,17 @@ class W3Standards(DocumentRepository):
                 # FIXME: This contrived workaround to get default
                 # (english/C) locale for strptime should be put in
                 # ferenda.util (eg util.strptime)
-                l = locale.getlocale(locale.LC_ALL)
-                newlocale = 'C' if six.PY3 else b'C'
-                locale.setlocale(locale.LC_ALL,newlocale)
-                try:
-                     # 17 December 1996
-                    date = datetime.strptime(datestr,"%d %B %Y").date()
-                except ValueError:
-                    try: 
-                        # 17 Dec 1996
-                        date = datetime.strptime(datestr,"%d %b %Y").date()
+                with util.c_locale():
+                    try:
+                         # 17 December 1996
+                        date = datetime.strptime(datestr,"%d %B %Y").date()
                     except ValueError:
-                        self.log.warning("%s: Could not parse datestr %s" %
-                                         (doc.basefile, datestr))
-                finally:
-                    locale.setlocale(locale.LC_ALL,l)
+                        try: 
+                            # 17 Dec 1996
+                            date = datetime.strptime(datestr,"%d %b %Y").date()
+                        except ValueError:
+                            self.log.warning("%s: Could not parse datestr %s" %
+                                             (doc.basefile, datestr))
                 if date:
                     d.value(dct.issued, date)
 

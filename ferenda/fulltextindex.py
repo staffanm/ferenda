@@ -3,11 +3,8 @@ import shutil
 import json
 import six
 import math
-if six.PY3:
-    from urllib.parse import quote
-else:
-    from urllib import quote
 
+from six.moves.urllib_parse import quote
 import requests
 import requests.exceptions
 from bs4 import BeautifulSoup

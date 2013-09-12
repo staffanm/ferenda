@@ -11,14 +11,17 @@ manage.py will be able to call it.
 """
 from __future__ import unicode_literals
 import functools
+import itertools
 import codecs
 import time
+from datetime import datetime
 
 import six
 from six import text_type as str
 from rdflib import Graph, URIRef
 
 from ferenda import util
+from ferenda import LayeredConfig
 from ferenda.errors import DocumentRemovedError, ParseError
 
 def timed(f):
@@ -44,7 +47,9 @@ def recordlastdownload(f):
     """
     @functools.wraps(f)
     def wrapper(self):
-        return f(self)
+        ret = f(self)
+        self.config.lastdownload = datetime.now()
+        LayeredConfig.write(self.config)
     return wrapper
 
 
@@ -185,10 +190,27 @@ def managedparsing(f):
             timed(
                 render(f))))
 
-
 def action(f):
     """Decorator that marks a class or instance method as runnable by
     :py:func:`ferenda.manager.run`
     """
     f.runnable = True
     return f
+
+def downloadmax(f):
+    """Makes any generator respect the ``downloadmax`` config parameter.
+
+    """
+    @functools.wraps(f)
+    def wrapper(self, params):
+        if self.config.downloadmax:
+            self.log.info("Downloading max %d documents" %
+                          (self.config.downloadmax))
+            generator = itertools.islice(f(self, params),
+                                         self.config.downloadmax)
+        else:
+            self.log.debug("Downloading all the docs" % self)
+            generator = f(self, params)
+        for value in generator:
+            yield value
+    return wrapper

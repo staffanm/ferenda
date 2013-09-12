@@ -11,11 +11,10 @@ else:
 from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 
 
-from ferenda.testutil import RepoTester, FerendaTestCase, testparser, file_parametrize, parametrize_repotester
+from ferenda.testutil import FerendaTestCase, testparser, file_parametrize
 from ferenda.sources.tech import RFC
 
-# import ferenda.sources.tech.rfc
-
+# FIXME: This test should be re-worked as a normal RepoTester test
 class Parse(unittest.TestCase, FerendaTestCase):
     def parametric_test(self, filename):
         # parser = ferenda.sources.tech.rfc.RFC.get_parser()
@@ -23,9 +22,3 @@ class Parse(unittest.TestCase, FerendaTestCase):
         testparser(self,parser,filename)
 
 file_parametrize(Parse,"test/files/rfc",".txt")
-
-class TestRFC(RepoTester):
-    repoclass = RFC
-    docroot = os.path.dirname(__file__)+"/files/repo/rfc"
-
-parametrize_repotester(TestRFC)

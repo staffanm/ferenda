@@ -1,20 +1,17 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 # Intermediate base class containing some small functionality useful
 # for handling data sources of swedish law.
 
-import os
 from datetime import datetime, date
 import difflib
+import os
 import re
 
-from rdflib import Literal, Namespace, URIRef, RDF, RDFS, Graph
+from rdflib import URIRef, RDFS, Graph
 from six import text_type as str
 
-
-from ferenda import util
-from ferenda import DocumentRepository, Describer
+from ferenda import DocumentRepository, DocumentStore
 from ferenda.elements import Paragraph, Section
 
 class Stycke(Paragraph):
@@ -24,8 +21,24 @@ class Stycke(Paragraph):
 class Sektion(Section):
     pass
 
+class SwedishLegalStore(DocumentStore):
+    """Customized DocumentStore."""
+
+    def basefile_to_pathfrag(self, basefile):
+        # "2012/13:152" => "2012-13/152"
+        # "2012:152"    => "2012/152"
+        return basefile.replace("/","-").replace(":","/")
+        
+    def pathfrag_to_basefile(self, pathfrag):
+        # "2012-13/152" => "2012/13:152"
+        # "2012/152"    => "2012:152"
+        return pathfrag.replace("/",":").replace("-","/")
+        
+    def intermediate_path(self, basefile, attachment=None):
+        return self.path(basefile, "intermediate", ".xml", attachment=attachment)
 
 class SwedishLegalSource(DocumentRepository):
+    documentstore_class = SwedishLegalStore
     namespaces = ['rdf', 'rdfs', 'xsd', 'dct', 'skos', 'foaf',
                   'xhv', 'owl', 'prov', 'bibo',
                   ('rpubl','http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#'),
@@ -36,6 +49,7 @@ class SwedishLegalSource(DocumentRepository):
                             'nionde', 'tionde', 'elfte', 'tolfte')
     swedish_ordinal_dict = dict(list(zip(
         swedish_ordinal_list, list(range(1, len(swedish_ordinal_list) + 1)))))
+
 
     def _swedish_ordinal(self, s):
         sl = s.lower()
@@ -93,10 +107,17 @@ class SwedishLegalSource(DocumentRepository):
         raise KeyError(resource)
 
     def sameas_uri(self, uri):
-         # maps <http://lagen.nu/publ/dir/2012:35> to
-         # <http://rinfo.lagrummet.se/publ/dir/2012:35>
-        assert uri.startswith(self.config['url'])
-        return uri.replace(self.config['url'], 'http://rinfo.lagrummet.se/')
+        # "http://localhost:8000/res/dir/2012:35" => "http://rinfo.lagrummet.se/publ/dir/2012:35",
+        # "http://localhost:8000/res/dv/hfd/2012:35" => "http://rinfo.lagrummet.se/publ/rattsfall/hdf/2012:35",
+        assert uri.startswith(self.config.url)
+        # FIXME: This hardcodes the res/ part of our local URIs
+        # needlessly -- make configurable
+        maps = (("res/dv/","publ/rattsfall/"),
+                ("res/", "publ/"))
+        for fr, to in maps:
+            if self.config.url + fr in uri:
+                return uri.replace(self.config.url + fr,
+                                   "http://rinfo.lagrummet.se/" + to)
 
     def parse_iso_date(self, datestr):
         # only handles YYYY-MM-DD now. Look into dateutil or isodate

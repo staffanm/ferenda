@@ -1,63 +1,75 @@
 #!/usr/bin/env python
-# -*- coding: iso-8859-1 -*-
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import sys
 import os
 import re
 from datetime import datetime, date
+from six.moves.urllib_parse import urljoin
 
 from rdflib import Graph, Namespace, URIRef, Literal, RDF
+import requests
+from bs4 import BeautifulSoup
 
-from ferenda import DocumentRepository
-from ferenda.elements import serialize
+from . import SwedishLegalSource
 from .swedishlegalsource import Stycke, Sektion
+from ferenda import DocumentRepository
+from ferenda.decorators import downloadmax, recordlastdownload
 from ferenda import util
-import ferenda.legaluri
+from ferenda.elements import serialize
 from ferenda.legalref import LegalRef, Link
+import ferenda.legaluri
 
+class JK(SwedishLegalSource):
+    alias = "jk"
 
-__version__ = (1, 6)
-__author__ = "Staffan Malmgren <staffan@tomtebo.org>"
+    start_url = "http://www.jk.se/Beslut.aspx?query=&type=all&dateFrom=1998-01-01&dateTo=2100-01-01&dnr="
+    document_url_regex = "http://www.jk.se/Beslut/(?P<kategori>[\w\-]+)/(?P<basefile>\d+\-\d+\-\d+).aspx"
 
+    @recordlastdownload
+    def download(self, basefile=None):
+        for basefile, url in self.download_get_basefiles(self.start_url):
+            self.download_single(basefile, url)
 
-class JK(DocumentRepository):
-    module_dir = "jk"
+    @downloadmax
+    def download_get_basefiles(self, start_url):
+        document_url_regex = re.compile("(?P<basefile>\d+\-\d+\-\d+).aspx")
+        done = False
+        url = start_url
+        pagecount = 1
+        while not done:
+            self.log.info("Getting page #%s" % pagecount)
+            soup = BeautifulSoup(requests.get(url).text)
+            for link in soup.find_all("a", href=document_url_regex):
+                basefile = document_url_regex.search(link["href"]).group("basefile")
+                yield basefile, urljoin(url, link["href"])
 
-    start_url = "http://www.jk.se/beslut/default.asp"
-    document_url = "http://www.jk.se/beslut/XmlToHtml.asp?XML=Files/%s.xml&XSL=../xsl/JK_Beslut.xsl"
-
-    def download_everything(self, cache=False):
-        self.browser.open(self.start_url)
-        for avd in (self.browser.links(url_regex=r'Default.asp\?Type=\d+')):
-            self.log.info(
-                "Retrieving section '%s'" % avd.text.decode('iso-8859-1'))
-            self.browser.follow_link(avd)
-            url = None
-            for dok in (self.browser.links(url_regex=r'XmlToHtml.asp\?XML=Files/\d+\w*-\d+-\d+')):
-                m = re.search("(\d+\w*-\d+-\d+)", dok.url)
-                if m.group(1) != url:
-                    url = m.group(1)
-                    self.download_single(url, cache)
+            next = soup.find("img",src="/common/images/navigation-pil-grey.png").find_parent("a")
+            if next:
+                url = urljoin(url, next["href"])
+                pagecount += 1
+            else:
+                done = True
 
     def parse_from_soup(self, soup):
         # Step 1: Find out basic metadata
         rubrik = soup.first("title").string
         beslutsdatum = soup.first(
             "meta", {'name': 'SG_Beslutsdatum'})['content']
-        # Converting this into a proper date object makes the RDFa
-        # statement use a typed literal (xsd:date), which is nice, but
-        # the currently released pyRdfa package doesn't support this
+
         beslutsdatum = datetime.strptime(beslutsdatum, "%Y-%m-%d").date()
         diarienummer = soup.first(
             "meta", {'name': 'SG_Dokumentbet'})['content']
         arendetyp = soup.first("meta", {'name': 'Subject'})['content']
         # the keywords for a documents is contained in a metatag
         # formatted like:
-        #    <meta name="Keywords" content="hets_mot_folkgrupp\nmeddelarfrihet\åklagare">
+        #    <meta name="Keywords" content="hets_mot_folkgrupp\nmeddelarfrihet\Ã¥klagare">
         #
         # Transform this into an array like:
         #    [u'http://lagen.nu/concept/Hets_mot_folkgrupp',
         #     u'http://lagen.nu/concept/Meddelarfrihet',
-        #     u'http://lagen.nu/concept/Åklagare']
+        #     u'http://lagen.nu/concept/Ã…klagare']
         nyckelord = soup.first("meta", {'name': 'Keywords'})['content']
         begrepp = ['http://lagen.nu/concept/%s' % util.ucfirst(
             x).strip().replace(" ", "_") for x in nyckelord.split("\n")]
@@ -128,7 +140,7 @@ class JK(DocumentRepository):
                 p = elements.popleft()
             except IndexError:
                 return sekt
-            text = util.element_text(p)
+            text = p.get_text(strip=True)
             # self.log.debug("%sp.name: %s, p['class']: %s, 'class' in p.attrs: %s" % ("  "*level,p.name,p['class'], (u'class' in p.attrs[0])))
             new_level = None
             if p.name == "h1":
@@ -166,5 +178,3 @@ class JK(DocumentRepository):
                     sekt.append(stycke)
 
 
-if __name__ == "__main__":
-    JK.run()

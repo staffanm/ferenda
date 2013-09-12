@@ -15,17 +15,13 @@ import logging
 import codecs
 from tempfile import mktemp
 from xml.sax.saxutils import escape as xml_escape
-import six
-if six.PY3:
-    from urllib.parse import urlsplit, urlunsplit
-else:
-    from urlparse import urlsplit, urlunsplit
+from six.moves.urllib_parse import urlsplit, urlunsplit
 
 from rdflib import Graph, URIRef, Literal
 from bs4 import BeautifulSoup
 import requests
+import six
 
-from ferenda import DocumentRepository
 from ferenda import TextReader
 from ferenda.legalref import LegalRef
 from ferenda import util
@@ -36,38 +32,20 @@ class MyndFskr(SwedishLegalSource):
     source_encoding = "utf-8"
     downloaded_suffix = ".pdf"
     alias = 'myndfskr'
-    # Very slightly adapted from documentrepository -- should we make
-    # it easier to specify that the main downloaded resources need not
-    # be .html files?
-    @classmethod
-    def list_basefiles_for(cls, funcname, base_dir):
-        if funcname == "parse_all":
-            directory = os.path.sep.join(
-                (base_dir, cls.alias, "downloaded"))
-            suffix = ".pdf"
 
-        elif funcname in ("generate_all", "relate_all", "news"):
-            directory = os.path.sep.join((base_dir, cls.alias, "parsed"))
-            suffix = ".xhtml"
-
-        for x in util.list_dirs(directory, suffix, reverse=True):
-            # There might be additional documents strewn about in the
-            # download directories, like "4-beslutspm_ny_frl_2011.pdf"
-            # (the FFFS downloader creates these). Don't include
-            # them.
-            if "-" in x or "_" in x:
-                continue
-            yield cls.basefile_from_path(x)
-
-    def download_everything(self, usecache=False):
+    def download(self, basefile=None):
         """Simple default implementation that downloads all PDF files
         from self.start_url that look like regulation document
         numbers."""
-        self.browser.open(self.start_url)
+        resp = requests.get(self.start_url)
         # regex to search the link url, text or title for something
         # looking like a FS number
         re_fsnr = re.compile('(\d{4})[:/_-](\d+)(|\.\w+)$')
-        for link in self.browser.links(url_regex='.[pP][dD][fF]$'):
+        tree = lxml.html.document_fromstring(resp.text)
+        tree.make_links_absolute(url, resolve_base_href=True)
+        for element, attribute, link, pos in tree.iterlinks():
+            if link[-4:].lower() != ".pdf":
+                continue
             done = False
             # print "Examining %s"  % link
             attrs = dict(link.attrs)
@@ -103,7 +81,7 @@ class MyndFskr(SwedishLegalSource):
             return super(MyndFskr, self).canonical_uri(basefile)
 
     def textreader_from_basefile(self, basefile, encoding):
-        infile = self.downloaded_path(basefile)
+        infile = self.store.downloaded_path(basefile)
         tmpfile = self.store.path(basefile, 'intermediate', '.pdf')
         outfile = self.store.path(basefile, 'intermediate', '.txt')
         util.copy_if_different(infile, tmpfile)
@@ -445,9 +423,8 @@ class SJVFS(MyndFskr):
     alias = "sjvfs"
     start_url = "http://www.jordbruksverket.se/forfattningar/forfattningssamling.4.5aec661121e2613852800012537.html"
 
-    def download_everything(self, usecache=False):
-        self.browser.open(self.start_url)
-        soup = BeautifulSoup(self.browser.response())
+    def download(self, basefile=None):
+        soup = BeautifulSoup(requests.get(self.start_url).text)
         main = soup.find("ul", "c112")
         extra = []
         for a in list(main.findAll("a")):
@@ -464,17 +441,9 @@ class SJVFS(MyndFskr):
             self.log.info("Extra2fetching %s" % (url))
             self.download_indexpage(url, usecache=usecache)
 
-    def download_indexpage(self, url, usecache=False):
-        try:
-            self.browser.open(url)
-        except URLError as e:
-            self.log.error("Failed to fetch %s: %s" % (url, e))
-            return []
-        except:
-            self.log.error("General error w %s" % url)
-            return []
+    def download_indexpage(self, url):
 
-        subsoup = BeautifulSoup(self.browser.response())
+        subsoup = BeautifulSoup(requests.get(url).text)
         submain = subsoup.find("div", "pagecontent")
         extrapages = []
         for a in submain.findAll("a"):
@@ -508,7 +477,7 @@ class SJVFS(MyndFskr):
                 else:
                     self.log.debug("I don't know what to do with %s" % a.text)
             else:
-                suburl = urllib.parse.urljoin(url, a['href'])
+                suburl = urljoin(url, a['href'])
                 extrapages.append(suburl)
         return extrapages
 
@@ -522,30 +491,28 @@ class FFFS(MyndFskr):
     start_url = "http://www.fi.se/Regler/FIs-forfattningar/Forteckning-FFFS/"
     document_url = "http://www.fi.se/Regler/FIs-forfattningar/Samtliga-forfattningar/%s/"
 
-    def download_everything(self, usecache=False):
-        self.browser.open(self.start_url)
-        soup = BeautifulSoup(self.browser.response())
+    def download(self, basefile=None):
+        soup = BeautifulSoup(requests.get(self.start_url).text)
         main = soup.find(id="mainarea")
         docs = []
         for numberlabel in main.findAll(text='NUMMER'):
             numberdiv = numberlabel.findParent('div').parent
 
             typediv = numberdiv.findNextSibling()
-            if util.element_text(typediv.find('div', 'FFFSListAreaLeft')) != "TYP":
+            if typediv.find('div', 'FFFSListAreaLeft').get_text(strip=True) != "TYP":
                 self.log.error("Expected TYP in div, found %s" %
-                               util.element_text(typediv))
+                               typediv.get_text(strip=True))
                 continue
 
             titlediv = typediv.findNextSibling()
-            if util.element_text(titlediv.find('div', 'FFFSListAreaLeft')) != "RUBRIK":
+            if titlediv.find('div', 'FFFSListAreaLeft').get_text(strip=True) != "RUBRIK":
                 self.log.error("Expected RUBRIK in div, found %s" %
-                               util.element_text(titlediv))
+                               titlediv.get_text(strip=True))
                 continue
 
-            number = util.element_text(
-                numberdiv.find('div', 'FFFSListAreaRight'))
+            number = numberdiv.find('div', 'FFFSListAreaRight').get_text(strip=True)
             tmpfile = mktemp()
-            snippetfile = self.downloaded_path(
+            snippetfile = self.store.downloaded_path(
                 number).replace(".pdf", ".snippet.html")
             fp = codecs.open(tmpfile, "w", encoding="utf-8")
             fp.write(str(numberdiv))
@@ -558,7 +525,7 @@ class FFFS(MyndFskr):
 
     def download_single(self, basefile, usecache=False):
         self.log.debug("%s: download_single..." % basefile)
-        pdffile = self.downloaded_path(basefile)
+        pdffile = self.store.downloaded_path(basefile)
         existed = os.path.exists(pdffile)
         if usecache and existed:
             self.log.debug("%s: already exists, not downloading" % basefile)
@@ -569,7 +536,7 @@ class FFFS(MyndFskr):
         soup = BeautifulSoup(open(snippetfile))
         href = soup.find(text="RUBRIK").findParent(
             "div").findPreviousSibling().find('a')['href']
-        url = urllib.parse.urljoin("http://www.fi.se/Regler/FIs-forfattningar/Forteckning-FFFS/", href)
+        url = urljoin("http://www.fi.se/Regler/FIs-forfattningar/Forteckning-FFFS/", href)
         if href.endswith(".pdf"):
             if self.download_if_needed(url, pdffile):
                 if existed:
@@ -583,8 +550,7 @@ class FFFS(MyndFskr):
             self.download_if_needed(url, descriptionfile)
             soup = BeautifulSoup(open(descriptionfile))
             for link in soup.find("div", id="mainarea").findAll("a"):
-                suburl = urllib.parse.urljoin(
-                    url, link['href']).replace(" ", "%20")
+                suburl = urljoin(url, link['href']).replace(" ", "%20")
                 if link.text == 'Grundförfattning':
                     if self.download_if_needed(suburl, pdffile):
                         self.log.info("%s: downloaded main PDF" % basefile)
@@ -627,20 +593,18 @@ class STAFS(MyndFskr):
 
     start_url = "http://www.swedac.se/sv/Det-handlar-om-fortroende/Lagar-och-regler/Alla-foreskrifter-i-nummerordning/"
 
-    def download_everything(self, usecache=False):
-        self.browser.open(self.start_url)
-        for link in list(self.browser.links(url_regex='/STAFS/'))[0:1]:
+    def download(self, basefile=None):
+        soup = BeautifulSoup(requests.get(self.start_url).text)
+        for link in list(soup.find_all("a", href=re.compile('/STAFS/'))):
             basefile = re.search('\d{4}:\d+', link.text).group(0)
-            self.download_single(basefile, usecache, link.absolute_url)
+            self.download_single(basefile, urljoin(self.start_url, link['href']))
 
-    def download_single(self, basefile, usecache=False, url=None):
+    def download_single(self, basefile, url):
         self.log.info("%s: %s" % (basefile, url))
-        self.browser.open(url)
-
         consolidated_link = None
         newest = None
-        for link in self.browser.links(text_regex=self.re_identifier):
-        # for link in self.browser.links():
+        soup = BeautifulSoup(requests.get(url).text)
+        for link in soup.find_all("a", text=self.re_identifier):
             self.log.info("   %s: %s %s" % (basefile, link.text, link.url))
             if "konso" in link.text:
                 consolidated_link = link
@@ -649,7 +613,7 @@ class STAFS(MyndFskr):
                 assert m
                 if link.url.endswith(".pdf"):
                     basefile = m.group(1) + ":" + m.group(2)
-                    filename = self.downloaded_path(basefile)
+                    filename = self.store.downloaded_path(basefile)
                     self.log.info("        Downloading to %s" % filename)
                     self.download_if_needed(link.absolute_url, filename)
                     if basefile > newest:
@@ -663,23 +627,99 @@ class STAFS(MyndFskr):
                             "%s not larger than %s" % (basefile, newest))
                 else:
                     # not pdf - link to yet another pg
-                    self.browser.follow_link(link)
-                    for sublink in self.browser.links(text_regex=self.re_identifier):
+                    subsoup = BeautifulSoup(requests.get(link).text)
+                    for sublink in soup.find_all("a", text=self.re_identifier):
                         self.log.info("   Sub %s: %s %s" %
-                                      (basefile, sublink.text, sublink.url))
+                                      (basefile, sublink.text, sublink['href']))
                         m = self.re_identifier.search(sublink.text)
                         assert m
                         if sublink.url.endswith(".pdf"):
                             subbasefile = m.group(1) + ":" + m.group(2)
-                            subfilename = self.downloaded_path(subbasefile)
-                            self.log.info(
-                                "        SubDownloading to %s" % subfilename)
-                            self.download_if_needed(
-                                sublink.absolute_url, subfilename)
-
-                    self.browser.back()
+                            self.download_if_needed(urljoin(link, sublink['href'], subbasefile))
 
         if consolidated_link:
-            filename = self.downloaded_path(consolidated_basefile)
+            filename = self.store.downloaded_path(consolidated_basefile)
             self.log.info("        Downloading consd to %s" % filename)
-            self.download_if_needed(consolidated_link.absolute_url, filename)
+            self.download_if_needed(consolidated_link.absolute_url, consolidated_basefile, filename=filename)
+
+
+class SKVFS(MyndFskr):
+    alias = "skvfs"
+    source_encoding = "utf-8"
+    downloaded_suffix = ".pdf"
+
+    # start_url = "http://www.skatteverket.se/rattsinformation/foreskrifter/tidigarear.4.1cf57160116817b976680001670.html"
+    # This url contains slightly more (older) links (and a different layout)?
+    start_url = "http://www.skatteverket.se/rattsinformation/lagrummet/foreskriftergallande/aldrear.4.19b9f599116a9e8ef3680003547.html"
+
+    # also consolidated versions
+    # http://www.skatteverket.se/rattsinformation/lagrummet/foreskrifterkonsoliderade/aldrear.4.19b9f599116a9e8ef3680004242.html
+
+
+    # URL's are highly unpredictable. We must find the URL for every
+    # resource we want to download, we cannot transform the resource
+    # id into a URL
+    def download(self, basefile=None):
+        self.log.info("Starting at %s" % self.start_url)
+        years = {}
+        soup = BeautifulSoup(requests.get(self.start_url).text)
+        for link in sorted(list(soup.find_all("a", text=re.compile('^\d{4}$'))),
+                           key=attrgetter('text')):
+            year = int(link.text)
+            # Documents for the years 1985-2003 are all on one page
+            # (with links leading to different anchors). To avoid
+            # re-downloading stuff when usecache=False, make sure we
+            # haven't seen this url (sans fragment) before
+            url = link.absolute_url.split("#")[0]
+            if year not in years and url not in list(years.values()):
+                self.download_year(year, url)
+                years[year] = url
+
+    # just download the most recent year
+    def download_new(self):
+        self.log.info("Starting at %s" % self.start_url)
+        soup = BeautifulSoup(requests.get(self.start_url).text)
+        link = sorted(list(soup.find_all("a", text=re.compile('^\d{4}$'))),
+                           key=attrgetter('text'), reverse=True)[0]
+        self.download_year(int(link.text), link.absolute_url, usecache=True)
+
+    def download_year(self, year, url):
+        self.log.info("Downloading year %s from %s" % (year, url))
+        soup = BeautifulSoup(requests.get(self.start_url).text)
+        for link in soup.find_all("a", text=re.compile('FS \d+:\d+')):
+            if "bilaga" in link.text:
+                self.log.warning("Skipping attachment in %s" % link.text)
+                continue
+
+            # sanitize trailing junk
+            linktext = re.match("\w+FS \d+:\d+", link.text).group(0)
+            # something like skvfs/2010/23 or rsfs/1996/9
+            basefile = linktext.strip(
+            ).lower().replace(" ", "/").replace(":", "/")
+            self.download_single(
+                basefile, link.absolute_url)
+
+    def download_single(self, basefile, url):
+        self.log.info("Downloading %s from %s" % (basefile, url))
+        self.document_url = url + "#%s"
+        html_downloaded = super(
+            SKVFS, self).download_single(basefile)
+        year = int(basefile.split("/")[1])
+        if year >= 2007:  # download pdf as well
+            filename = self.store.downloaded_path(basefile)
+            pdffilename = os.path.splitext(filename)[0] + ".pdf"
+            if not os.path.exists(pdffilename):
+                soup = self.soup_from_basefile(basefile)
+                pdflink = soup.find(href=re.compile('\.pdf$'))
+                if not pdflink:
+                    self.log.debug("No PDF file could be found")
+                    return html_downloaded
+                pdftext = pdflink.get_text(strip=True)
+                pdfurl = urljoin(url, pdflink['href'])
+                self.log.debug("Found %s at %s" % (pdftext, pdfurl))
+                pdf_downloaded = self.download_if_needed(pdfurl, pdffilename)
+                return html_downloaded and pdf_downloaded
+            else:
+                return False
+        else:
+            return html_downloaded

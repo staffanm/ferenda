@@ -12,6 +12,7 @@ import json
 import codecs
 import collections
 import filecmp
+import unicodedata
 from io import BytesIO, StringIO
 from difflib import unified_diff
 from ferenda.compat import unittest 
@@ -61,7 +62,10 @@ this class, ie::
            
         def _loadgraph(filename):
             g = rdflib.Graph()
-            g.parse(filename, format=guess_format(filename))
+            # we must read the data ourself, providing a non-ascii
+            # filename to Graph.parse fails deep in rdflib internals
+            g.parse(data=util.readfile(filename, "rb"),
+                    format=guess_format(filename))
             return g
 
         if not isinstance(want, rdflib.Graph):
@@ -259,9 +263,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         return "1"
         
     def download_test(self, specfile):
-        from pudb import set_trace; set_trace()
         def my_get(url, **kwargs):
-            
             urlspec = spec[url]
             if isinstance(urlspec, str):
                 urlspec = {'file': urlspec}
@@ -270,51 +272,65 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             url_location = os.path.join(os.path.dirname(specfile),
                                         urlspec['file'])
             res = Mock()
-            # load up both .text and .content properties
-            with codecs.open(url_location, "r", encoding=urlspec['charset']) as fp:
-                res.text = fp.read()
+            # load the .content property
             with open(url_location, "rb") as fp:
                 res.content = fp.read()
+            # but only load .text if a charset is present (note
+            # default value of 'utf-8' above -- set 'charset': null in
+            # the json file for binary files
+            if urlspec['charset']:
+                with codecs.open(url_location, "r", encoding=urlspec['charset']) as fp:
+                    res.text = fp.read()
             res.headers = collections.defaultdict(lambda: None)
             res.headers['X-These-Headers-Are'] = 'Faked'
             res.status_code = 200
             return res
-        with open(specfile) as fp:
+        with codecs.open(specfile, encoding="utf-8") as fp:
             spec = json.load(fp)
         with patch('requests.get', side_effect=my_get):
             self.repo.download()
 
         # organize a temporary copy of files that we can compare our results to
         wantdir = "%s/%s-want" % (self.datadir, self.repoclass.alias)
+        expected = False
         for url in spec:
             if "expect" in spec[url]:
+                expected = True
                 sourcefile = os.path.join(os.path.dirname(specfile),
                                           spec[url]['file'])
                 wantfile = "%s/%s" % (wantdir, spec[url]['expect'])
+                
                 util.copy_if_different(sourcefile,wantfile)
-
-        self.assertEqualDirs(wantdir,
-                             "%s/%s" % (self.datadir,
-                                        self.repoclass.alias))
+        if expected:
+            self.assertEqualDirs(wantdir,
+                                 "%s/%s" % (self.datadir,
+                                            self.repoclass.alias))
+        else:
+            self.fail('No files were marked as "expect" in specfile %s' %
+                      specfile)
 
     def distill_test(self, downloaded_file, rdf_file, docroot):
         try:
             prefixlen = len(docroot+"/downloaded/")
-            suffixlen = len(self.repo.store.downloaded_suffix)
+            if self.repo.storage_policy == "dir":
+                suffixlen = len(downloaded_file.split(os.sep)[-1])+1
+            else:
+                suffixlen = len(os.path.splitext(downloaded_file)[1])
             pathfrag  = downloaded_file[prefixlen:-suffixlen]
             basefile = self.repo.store.pathfrag_to_basefile(pathfrag)
         except:
             basefile = self.filename_to_basefile(downloaded_file)
-        with patch('ferenda.DocumentStore.downloaded_path',
-                   return_value=downloaded_file):
+        with patch.object(self.repo.documentstore_class, 'downloaded_path',
+                          return_value=downloaded_file):
             # self.repo.config.fsmdebug = True
             self.repo.parse(basefile)
         if 'FERENDA_SET_TESTFILES' in os.environ:
-            print("Overwriting %s with result of parse(%s)" % (rdf_file, basefile))
+            print("Overwriting %r with result of parse (%r)" % (rdf_file, basefile))
             g = rdflib.Graph()
-            g.parse(self.repo.store.distilled_path(basefile))
+            g.parse(data=util.readfile(self.repo.store.distilled_path(basefile)))
             util.robust_rename(rdf_file, rdf_file+"~")
-            g.serialize(rdf_file, format="turtle")
+            with open(rdf_file, "wb") as fp:
+                fp.write(g.serialize(format="turtle"))
             return 
         self.assertEqualGraphs(rdf_file,
                                self.repo.store.distilled_path(basefile),
@@ -325,11 +341,13 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         # patch method so we control where the downloaded doc is
         # loaded from.
         basefile = self.filename_to_basefile(downloaded_file)
-        with patch('ferenda.DocumentStore.downloaded_path',
-                   return_value=downloaded_file):
+        #with patch('ferenda.DocumentStore.downloaded_path',
+        #           return_value=downloaded_file):
+        with patch.object(self.repo.documentstore_class, 'downloaded_path',
+                          return_value=downloaded_file):
             self.repo.parse(basefile)
         if 'FERENDA_SET_TESTFILES' in os.environ:
-            print("Overwriting %s with result of parse(%s)" % (xhtml_file, basefile))
+            print("Overwriting %r with result of parse (%r)" % (xhtml_file, basefile))
             util.robust_rename(xhtml_file, xhtml_file+"~")
             shutil.copy2(self.repo.store.parsed_path(basefile), xhtml_file)
             return 
@@ -455,35 +473,41 @@ documentation for that class)."""
     
     docroot = cls.docroot
     # 1. download tests
-    for filename in os.listdir(docroot + "/source"):
-        if filename.endswith(".json"):
-            testname = "test_download_" + filename[:-5].replace("-", "_")
-            fullname = docroot + "/source/" + filename
-            parametrize(cls, cls.download_test, testname, (fullname,))
+    if os.path.exists(docroot + "/source"):
+        for filename in os.listdir(docroot + "/source"):
+            if filename.endswith(".json"):
+                testname = "test_download_" + filename[:-5].replace("-", "_")
+                fullname = docroot + "/source/" + filename
+                parametrize(cls, cls.download_test, testname, (fullname,))
     # 2. parse tests
-    suf = cls.repoclass.downloaded_suffix
     # for filename in os.listdir(docroot + "/downloaded"):
     basedir = docroot + "/downloaded"
-    for filename in util.list_dirs(basedir, suffix=suf):
+    store = cls.repoclass.documentstore_class(docroot)
+    store.downloaded_suffix = cls.repoclass.downloaded_suffix
+    store.storage_policy = cls.repoclass.storage_policy
+    for basefile in store.list_basefiles_for("parse"):
+        pathfrag = store.basefile_to_pathfrag(basefile)
+        filename = store.downloaded_path(basefile)
         filename = filename[len(basedir)+1:]
-        if filename.endswith(suf):
-            downloaded_file = "%s/downloaded/%s" % (docroot, filename)
-            basefile = os.path.splitext(filename)[0] # shld we use store.pathfrag_to_basefile?
-            basefile = basefile.replace("\\", "/")
-            basetest = basefile.replace("-","_").replace("/", "_")
-            # Test 1: is rdf distilled correctly?
-            rdf_file = "%s/distilled/%s.ttl" % (docroot, basefile)
-            testname = ("test_distill_" + basetest)
 
-            wrapper = unittest.expectedFailure if not os.path.exists(rdf_file) else None 
-            parametrize(cls, cls.distill_test, testname, (downloaded_file, rdf_file, docroot), wrapper)
+        downloaded_file = "%s/downloaded/%s" % (docroot, filename)
+        basetest = basefile.replace("-","_").replace("/", "_").replace(":","_")
+        # transliterate basetest (ie å -> a) 
+        basetest = "".join((c for c in unicodedata.normalize('NFKD',basetest)
+                            if not unicodedata.combining(c)))
+        # Test 1: is rdf distilled correctly?
+        rdf_file = "%s/distilled/%s.ttl" % (docroot, pathfrag)
+        testname = ("test_distill_" + basetest)
+        
+        wrapper = unittest.expectedFailure if not os.path.exists(rdf_file) else None 
+        parametrize(cls, cls.distill_test, testname, (downloaded_file, rdf_file, docroot), wrapper)
 
-            # Test 2: is xhtml parsed correctly?
-            xhtml_file = "%s/parsed/%s.xhtml" % (docroot, basefile)
-            testname = ("test_parse_" + basetest)
+        # Test 2: is xhtml parsed correctly?
+        xhtml_file = "%s/parsed/%s.xhtml" % (docroot, pathfrag)
+        testname = ("test_parse_" + basetest)
 
-            wrapper = unittest.expectedFailure if not os.path.exists(xhtml_file) else None 
-            parametrize(cls, cls.parse_test, testname, (downloaded_file, xhtml_file, docroot), wrapper)
+        wrapper = unittest.expectedFailure if not os.path.exists(xhtml_file) else None 
+        parametrize(cls, cls.parse_test, testname, (downloaded_file, xhtml_file, docroot), wrapper)
 
 
 def testparser(testcase, parser, filename):

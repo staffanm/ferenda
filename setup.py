@@ -21,7 +21,7 @@ install_requires = ['beautifulsoup4 >= 4.3.0',
                     'rdfextras >= 0.4',
                     'requests >= 1.2.0',
                     'Whoosh >= 2.4.1',
-                    'six >= 1.2.0']
+                    'six >= 1.4.0']
 
 if sys.version_info < (3,0,0):
     install_requires.append('pyparsing==1.5.7')
