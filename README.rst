@@ -5,9 +5,10 @@ semantic structure and RDF-based metadata, finding relationships
 between documents, and publishing the results.
 
 .. image:: https://travis-ci.org/staffanm/ferenda.png
+    :target: http://travis-ci.org/staffanm/ferenda/
 
 .. image:: https://coveralls.io/repos/staffanm/ferenda/badge.png?branch=master
-
+    :target: https://coveralls.io/r/staffanm/ferenda
 
 Quick start
 -----------
