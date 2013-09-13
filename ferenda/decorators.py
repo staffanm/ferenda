@@ -209,7 +209,7 @@ def downloadmax(f):
             generator = itertools.islice(f(self, params),
                                          self.config.downloadmax)
         else:
-            self.log.debug("Downloading all the docs" % self)
+            self.log.debug("Downloading all the docs")
             generator = f(self, params)
         for value in generator:
             yield value
