@@ -17,6 +17,7 @@ import six
 from six import text_type as str
 from six import binary_type as bytes
 from six.moves.urllib_parse import quote
+import pyparsing
 
 from ferenda.thirdparty import SQLite
 from ferenda import util, errors
@@ -199,7 +200,10 @@ class RDFLibStore(TripleStore):
 
 
     def select(self, query, format="sparql"):
-        res = self.graph.query(query)
+        try:
+            res = self.graph.query(query)
+        except pyparsing.ParseException as e:
+            raise errors.SparqlError(e)
         if format == "sparql":
             return res.serialize(format="xml")
         elif format == "json":
@@ -222,7 +226,10 @@ class RDFLibStore(TripleStore):
         :param query: A SPARQL query with all neccessary prefixes defined.
         :type query: str
         """
-        res = self.graph.query(query)
+        try:
+            res = self.graph.query(query)
+        except pyparsing.ParseException as e:
+            raise errors.SparqlError(e)
         return res.graph
 
     def clear(self, context=None):
@@ -418,7 +425,6 @@ class RemoteStore(TripleStore):
         url = self._endpoint_url()
         url += "?query=" + quote(query)
         try:
-            r = requests.get(url)
             format = "xml"
             headers = {'Accept': self._contenttype[format]}
             resp = requests.get(url, headers=headers, data=query)

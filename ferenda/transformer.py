@@ -4,23 +4,29 @@ from __future__ import unicode_literals
 from tempfile import mkdtemp
 import os
 import shutil
+import re
 
 import pkg_resources
 from lxml import etree
 from lxml.etree import XSLT
+
+from ferenda import errors, util
 
 # assumption: A transformer is initialized with a single template. If
 # you want to use a different template, create a different
 # transformer.
 class Transformer(object):
     def __init__(self, transformertype,
-                       template,
-                       templatedirs,
-                       documentroot=None):
+                 template,
+                 templatedirs,
+                 documentroot=None,
+                 config=None):
+
         cls = {'XSLT': XSLTTransform,
                'JINJA': JinjaTransform}[transformertype]
         self.t = cls(template, templatedirs)
         self.documentroot = documentroot
+        self.config = config
 
     # transform() always operate on the native datastructure -- this might 
     # be different depending on the transformer engine. For XSLT, which is 
@@ -30,32 +36,53 @@ class Transformer(object):
     # transform_file instead 
     #    
     # valid parameters 
-    # - configurationfile: resources.xml -- cannot be calculated until
-    #                                       we know the outfile
     # - annotationfile: intermediate/basefile.grit.xml
-    def transform(self, indata, depth, parameters=None):
+    def transform(self, indata, depth, parameters=None, uritransform=None):
         if parameters == None:
             parameters = {}
-        configfile = self.t.getconfig(depth)
-        if configfile:
-            parameters['configfile'] = configfile
-        from pudb import set_trace; set_trace()
-        outdata = self.t.transform(indata, parameters)
+
+        # the provided configuration (might be a file or a python dict
+        # or anything else, depending on the transformer engine) will
+        # contain lists of JS/CSS resources. In order to make it
+        # possible to use relative links to these (needed for offline
+        # static HTML files), we first do a transformer
+        # engine-specific adaption of the configuration depending on
+        # the directory depth level of the outfile (as provided
+        # through the depth parameter), then we provide this adapted
+        # configuration to the transform call
+        if self.config:
+            adapted_config = self.t.getconfig(self.config, depth)
+        else:
+            adapted_config = None
+        outdata = self.t.transform(indata, adapted_config, parameters)
+        if uritransform:
+            self._transform_links(outdata.getroot(), uritransform)
         return outdata
 
+    def _transform_links(self, tree, uritransform):
+        for part in tree:
+            # depth-first transformation seems the easiest
+            self._transform_links(part, uritransform)
+            if part.tag != "a": continue
+            uri = part.get("href")
+            if not uri: continue
+            part.set("href", uritransform(uri))
+        
+        
     # accepts a file-like object, returns a file-like object
     def transform_stream(self, instream,
                          parameters=None):
         return self.t.native_to_stream(
-            self.transform(self.t.stream_to_native(instream),
-                           
-))
+            self.transform(self.t.stream_to_native(instream)))
+
     # accepts two filenames, reads from one, writes to the other
-    def transform_file(self, infile, outfile, parameters):
+    def transform_file(self, infile, outfile,
+                       parameters=None, uritransform=None):
         depth = self._depth(outfile, self.documentroot)
         self.t.native_to_file(self.transform(self.t.file_to_native(infile),
                                              depth,
-                                             parameters),
+                                             parameters,
+                                             uritransform),
                               outfile)
 
     def _depth(self, outfile, root):
@@ -67,7 +94,7 @@ class TransformerEngine(object):
         pass
 
 class XSLTTransform(TransformerEngine):
-    def __init__(self, template, templatedirs):
+    def __init__(self, template, templatedirs, **kwargs):
         self.format = True # FIXME: make configurable
         self.templdir = self._setup_templates(template, templatedirs)
         worktemplate = self.templdir + os.sep + os.path.basename(template)
@@ -102,15 +129,47 @@ class XSLTTransform(TransformerEngine):
             shutil.copy2(template, workdir)
         return workdir
 
-    # getconfig may return different data depending on engine -- in this case 
-    # it creates a xml file and returns the path for it
-    def getconfig(self, depth):
-        pass
+    # getconfig may return different data depending on engine -- in
+    # this case it creates a xml file and returns the path for it
+    def getconfig(self, configfile, depth):
+        filename = configfile
+        if depth != 0:
+            (base, ext) = os.path.splitext(configfile)
+            filename = "%(base)s-depth-%(depth)d%(ext)s" % locals()
+            if not util.outfile_is_newer([configfile],  filename):
+                tree = etree.parse(configfile)
+                # adjust the relevant link attribute for some nodes
+                for xpath, attrib in (("stylesheets/link", "href"),
+                                      ("javascripts/script", "src")):
+                    for node in tree.findall(xpath):
+                        # don't adjust absolute links
+                        if not (re.match("(https?://|/)", node.get(attrib))):
+                            node.set(attrib, "../"*depth + node.get(attrib))
+                tree.write(filename)
+        return filename
 
+    def transform(self, indata, config=None, parameters={}):
+        strparams = {}
+        if config:
+            strparams['configurationfile'] = XSLT.strparam(config)
+        for key, value in parameters.items():
+            if key.endswith("file"):
+                # relativize path of file relative to the XSL file
+                # we'll be using. The mechanism could be clearer...
+                value = os.path.relpath(value, self.templdir)
+            strparams[key] = XSLT.strparam(value)
+        try:
+            return self._transformer(indata,**strparams)
+        except etree.XSLTApplyError as e:
+            raise errors.TransformError(str(e.error_log))
+        if len(transform.error_log) > 0:
+            raise errors.TransformError(str(transform.error_log))
+        
     # nativedata = lxml.etree
     def native_to_file(self, nativedata, outfile):
         res = self.html5_doctype_workaround(
             etree.tostring(nativedata, pretty_print=self.format))
+        util.ensure_dir(outfile)
         with open(outfile,"wb") as fp:
             fp.write(res)
 
@@ -118,24 +177,19 @@ class XSLTTransform(TransformerEngine):
     def html5_doctype_workaround(indata):
         # FIXME: This is horrible
         if indata.startswith(b"<remove-this-tag>"):
-            indata = b"<!DOCTYPE html>\n"+indata[17:-18].strip()
-            if indata[-1] == b"<" or indata[-1] == 60:
-                indata = indata[:-1]
+            found = False
+            endidx = -1
+            while not found:
+                if indata[endidx] == b"<" or indata[endidx] == 60:
+                    found = True
+                else:
+                    endidx -= 1
+            indata = b"<!DOCTYPE html>\n"+indata[17:endidx].strip()
         return indata
             
     def file_to_native(self, infile):
         return etree.parse(infile)
 
-    def transform(self, indata, parameters):
-        strparams = {}
-        for key, value in parameters.items():
-            strparams[key] = XSLT.strparam(value)
-        try:
-            return self._transformer(indata,**parameters)
-        except etree.XSLTApplyError as e:
-            raise errors.TransformError(str(e.error_log))
-        if len(transform.error_log) > 0:
-            raise errors.TransformError(str(transform.error_log))
         # FIXME: hook in the transform_links step somehow?
 
 class JinjaTransform(TransformerEngine):

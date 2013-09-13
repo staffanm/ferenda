@@ -14,11 +14,11 @@ from .tocpageset import TocPageset
 from .tocpage import TocPage
 from .toccriteria import TocCriteria
 from .newscriteria import NewsCriteria
+from .transformer import Transformer
 from .document import Document
 from .documententry import DocumentEntry
 from .documentstore import DocumentStore
 from .documentrepository import DocumentRepository
 from .pdfdocumentrepository import PDFDocumentRepository
 from .compositerepository import CompositeRepository
-from .transformer import Transformer
 __version__ = "0.1.5-dev" #gets pulled into setup.py and docs/conf.py

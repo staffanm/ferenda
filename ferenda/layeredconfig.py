@@ -6,6 +6,7 @@ import ast
 import logging
 from ferenda.compat import OrderedDict
 from six.moves import configparser
+from six import text_type as str
 
 class LayeredConfig(object):
     """Provide unified access to nested configuration parameters. The

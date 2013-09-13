@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
+
+import os
+
 from ferenda.testutil import RepoTester
 from ferenda import util
 
@@ -9,7 +12,8 @@ from ferenda import Transformer
 class Transform(RepoTester):
 
     def test_transform_html(self):
-        with open("_teststyle.xslt","w") as fp:
+        base = self.datadir+os.sep
+        with open(base+"teststyle.xslt","w") as fp:
             fp.write("""<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
     <xsl:param name="value"/>
     <xsl:param name="file"/>
@@ -23,15 +27,16 @@ class Transform(RepoTester):
     </xsl:template>
 </xsl:stylesheet>
 """)
-        with open("_paramfile.xml","w") as fp:
+        with open(base+"paramfile.xml","w") as fp:
             fp.write("""<root><node key='value'><subnode>textnode</subnode></node></root>""")
 
-        with open("_infile.xml","w") as fp:
+        with open(base+"infile.xml","w") as fp:
             fp.write("""<doc><title>Document title</title></doc>""")
-        t = Transformer("XSLT", "_teststyle.xslt", ["res/xsl"], "")
-        t.transform_file("_infile.xml", "_outfile.xml", {'value':'blahonga',
-                                                         'file':'_paramfile.xml'})
-        self.assertEqualXML(util.readfile("_outfile.xml"),"""
+        t = Transformer("XSLT", base+"teststyle.xslt", ["res/xsl"], "")
+        t.transform_file(base+"infile.xml", base+"outfile.xml",
+                         {'value':'blahonga',
+                          'file':base+'paramfile.xml'})
+        self.assertEqualXML(util.readfile(base+"outfile.xml"),"""
         <output>
             <paramvalue>blahonga</paramvalue>
             <paramfile><node key='value'><subnode>textnode</subnode></node></paramfile>

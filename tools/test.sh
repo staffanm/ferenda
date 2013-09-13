@@ -3,7 +3,8 @@ if [ -n "$1" ]
 then
     PYTHONPATH=test python -Wi -m unittest -v  "$1"
 else
+    # When running the entire suite, exit at first failure in order to
+    # not have to wait three minutes.
     python -Wi -m unittest discover -v -f test
-    # python -Wi -m unittest discover  test
     python -V
-fi    
+fi

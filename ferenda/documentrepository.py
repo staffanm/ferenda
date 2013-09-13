@@ -44,8 +44,12 @@ from six.moves.urllib_parse import quote, unquote
 
 # mine
 from ferenda import util, errors, decorators
-from ferenda import Describer, LayeredConfig, TripleStore, FulltextIndex, Document, DocumentEntry, NewsCriteria, TocCriteria, TocPageset, TocPage, DocumentStore
-from ferenda.elements import AbstractElement, serialize, Body, Nav, Link, Section, Subsection, Subsubsection, Heading, UnorderedList, ListItem, Preformatted, Paragraph
+from ferenda import (Describer, LayeredConfig, TripleStore, FulltextIndex,
+                     Document, DocumentEntry, NewsCriteria, TocCriteria,
+                     TocPageset, TocPage, DocumentStore, Transformer)
+from ferenda.elements import (AbstractElement, serialize, Body, Nav, Link,
+                              Section, Subsection, Subsubsection, Heading,
+                              UnorderedList, ListItem, Preformatted, Paragraph)
 from ferenda.elements.html import elements_from_soup
 from ferenda.thirdparty import patch, httpheader
 
@@ -249,10 +253,6 @@ class DocumentRepository(object):
                 prefix = ns
                 # assume that any standalone prefix is well known
                 self.ns[prefix] = Namespace(util.ns[prefix])
-
-    def __del__(self):
-        if self._transform_resourcedir:
-            shutil.rmtree(self._transform_resourcedir)
 
     def get_default_options(self):
         """Returns the class' configuration default configuration
@@ -997,7 +997,8 @@ uri doesn't map to a basefile in this repo."""
         """
         pass
 
-    def render_xhtml(self, doc, outfile):
+
+    def render_xhtml(self, doc, outfile=None):
         """Renders the parsed object structure as a XHTML file with
         RDFa attributes (also returns the same XHTML as a string).
 
@@ -1008,6 +1009,24 @@ uri doesn't map to a basefile in this repo."""
         :returns: The XHTML document
         :rtype: str
         """
+        xhtmldoc = self.render_xhtml_tree(doc)
+        doctype = ('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" '
+                   '"http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">')
+        res = etree.tostring(xhtmldoc,
+                             pretty_print=True,
+                             xml_declaration=True,
+                             encoding='utf-8',
+                             doctype=doctype)
+        fileno, tmpfile = mkstemp()
+        fp = os.fdopen(fileno)
+        fp.close()
+        with open(tmpfile, "wb") as fp:
+            fp.write(res)
+        util.replace_if_different(tmpfile, outfile)
+        return res
+        
+
+    def render_xhtml_tree(self, doc):
         XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 
         def render_head(g, uri, children=None):
@@ -1025,7 +1044,8 @@ uri doesn't map to a basefile in this repo."""
             # we sort to get a predictable order (by predicate, then by object)
             for (subj, pred, obj) in sorted(g, key=lambda t:(t[1],t[2])):
                 if str(subj) != uri and str(obj) != uri:
-                    self.log.warning("%s != %s" % (subj, uri))
+                    # This isn't a triple we should serialize to RDFa,
+                    # at least not in this iteration
                     continue
 
                 if g.qname(pred) == "dct:title" and revlink:
@@ -1083,20 +1103,7 @@ uri doesn't map to a basefile in this repo."""
             headcontent,
             bodycontent,
         )
-        doctype = ('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" '
-                   '"http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">')
-        res = etree.tostring(xhtmldoc,
-                             pretty_print=True,
-                             xml_declaration=True,
-                             encoding='utf-8',
-                             doctype=doctype)
-        fileno, tmpfile = mkstemp()
-        fp = os.fdopen(fileno)
-        fp.close()
-        with open(tmpfile, "wb") as fp:
-            fp.write(res)
-        util.replace_if_different(tmpfile, outfile)
-        return res
+        return xhtmldoc
 
 
     def parsed_url(self, basefile):
@@ -1414,45 +1421,56 @@ parsed document path to that documents dependency file."""
         """
         with util.logtime(self.log.info, "%(basefile)s OK (%(elapsed).3f sec)",
                           {'basefile': basefile}):
+            # This dependency management could be abstracted away like
+            # the parseifneeded decorator does for parse(). But unlike
+            # parse(), noone is expected to override generate(), so
+            # the proper place to handle this complexity is probably
+            # here.
             infile = self.store.parsed_path(basefile)
             annotations = self.store.annotation_path(basefile)
             if os.path.exists(self.store.dependencies_path(basefile)):
-                dependencies = util.readfile(self.store.dependencies_path(basefile)).split("\n")
+                deptxt = util.readfile(self.store.dependencies_path(basefile))
+                dependencies = deptxt.split("\n")
             else:
                 dependencies = []
             dependencies.extend((infile,annotations))
 
             outfile = self.store.generated_path(basefile)
-            force = (self.config.force or
-                     self.config.generateforce)
-            if not force and util.outfile_is_newer(dependencies, outfile):
+            if ((not self.config.force) and
+                util.outfile_is_newer(dependencies, outfile)):
                 self.log.debug("%s: Skipped", basefile)
                 return
             self.log.debug("%s: Starting", basefile)
 
-            xsltdir = self.setup_transform_templates("res/xsl", self.xslt_template)
-            xsltfile = xsltdir + os.sep + os.path.basename(self.xslt_template)
-            params = self.get_transform_configuration(xsltdir,outfile)
-
-            assert 'configurationfile' in params, "No configurationfile found, did you run makeresources?"
-            
-            # The actual function code
+            # All bookkeping done, now lets prepare and transform!
             with util.logtime(self.log.debug,
                               "%(basefile)s: prep_annotation_file in %(elapsed).3f sec",
                               {'basefile': basefile}):
+                # annotation_file should be the same as annotations above?
                 annotation_file = self.prep_annotation_file(basefile)
-                
+
+            params = {}
             if annotation_file:
-                relpath = os.path.relpath(annotation_file,
-                                          os.path.dirname(xsltfile))
-                # NOTE: Even on Win32, lxml needs to have this path using
-                # unix separators, i.e. / instead of the native \
-                relpath = relpath.replace("\\","/")
-                params['annotationfile'] = XSLT.strparam(relpath)
+                params['annotationfile'] =  annotation_file
+
             with util.logtime(self.log.debug,
-                              "%(basefile)s: transform_html in %(elapsed).3f",
+                              "%(basefile)s: transform in %(elapsed).3f",
                               {'basefile': basefile}):
-                self.transform_html(xsltfile, infile, outfile, params, otherrepos=otherrepos)
+                conffile = os.sep.join([self.config.datadir,'rsrc',
+                                        'resources.xml'])
+                transformer = Transformer('XSLT', self.xslt_template,
+                                          ["res/xsl"], config=conffile,
+                                          documentroot=self.config.datadir)
+                urltransform = None
+                if self.config.staticsite:
+                    repos = list(otherrepos)
+                    if self not in repos:
+                        repos.append(self)
+                    urltransform = self.get_url_transform_func(repos, os.path.dirname(outfile))
+
+                transformer.transform_file(infile, outfile,
+                                           params, urltransform)
+
 
             # At this point, outfile may appear untouched if it already
             # existed and wasn't actually changed. But this will cause the
@@ -1467,110 +1485,15 @@ parsed document path to that documents dependency file."""
             docentry.updated = now
             docentry.save()
 
-    def transform_html(self, stylesheet, infile, outfile,
-                       parameters={},
-                       format=True,
-                       xinclude=False,
-                       otherrepos=[]):
-        """Creates browser-ready HTML5 from a basic XHTML+RDFa file
-        using a XSLT transform.
-
-        :param stylesheet: the filename of the XSLT stylesheet to use
-        :type  stylesheet: string
-        :param infile:     The filename of the basic XHTML+RDFa file to be
-                           transformed
-        :type  infile:     string
-        :param outfile:    The filename of the created HTML5 file
-        :type  outfile:    string
-        :param parameters: Any parameters passed to the XSLT stylesheet (see
-                           :py:meth:`~ferenda.DocumentRepository.get_transform_configuration`)
-        :type  parameters: dict
-        :param format:     Whether to format/indent the resulting outfile
-        :type  format:     bool
-        :param xinclude:   Whether to process xinlude directives in the infile
-        :type  xinclude:   bool
-        :returns:          True if the transform resulted in a new or updated
-                           outfile, False if the result was identical
-                           to the previously existing outfile.
-        :rtype:            bool                   
-        """
-        assert not xinclude, "xinclude not supported yet"
-        # print("transform_html: stylesheet %s infile %s outfile %s" % (stylesheet, infile, outfile))
-
-        # Open the XSLT stylesheet, either as a normal file
-        # (user-provided) or a package resource (ferenda built-in)
-        # FIXME: load-path mechanism (cf manager.makeresources())?
-        if os.path.exists(stylesheet):
-            fp = open(stylesheet)
-        elif pkg_resources.resource_exists('ferenda',stylesheet): # prefix stylesheet with 'res/xsl'?
-            fp = pkg_resources.resource_stream('ferenda',stylesheet)
-        else:
-            raise ValueError("Stylesheet %s not found" % stylesheet)
-        parser = etree.XMLParser(remove_blank_text=format)
-        xsltree = etree.parse(fp,parser)
-        fp.close()
-        try:
-            transform = etree.XSLT(xsltree)
-        except etree.XSLTParseError as e:
-            raise errors.TransformError(str(e.error_log))
             
-        with open(infile) as fp:
-            intree = etree.parse(fp,parser)
-        try:
-            outtree = transform(intree,**parameters)
-            
-        except etree.XSLTApplyError as e:
-            raise errors.TransformError(str(e.error_log))
-        if len(transform.error_log) > 0:
-            raise errors.TransformError(str(transform.error_log))
+    def get_url_transform_func(self, repos, basedir):
+        # This implementation always transforms URLs to local file
+        # paths (or if they can't be mapped, leaves them alone)
 
-        if self.config.staticsite:
-            self.transform_links(outtree.getroot(), outfile, otherrepos)
-            
-        res = etree.tostring(outtree,pretty_print=format).strip()
-
-        if format:
-            bytefp = BytesIO(res)
-            parser = etree.XMLParser(remove_blank_text=True)
-            res = etree.tostring(etree.parse(bytefp,parser),pretty_print=True)
-        
-        fileno, tmpfile = mkstemp()
-        fp = os.fdopen(fileno)
-        fp.close()
-
-        # FIXME: This is horrible
-        if res.startswith(b"<remove-this-tag>"):
-            res = b"<!DOCTYPE html>\n"+res[17:-18].strip()
-            if res[-1] == b"<" or res[-1] == 60:
-                res = res[:-1]
-            
-        with open(tmpfile,"wb") as fp:
-            fp.write(res)
-
-        util.ensure_dir(outfile)
-        return util.replace_if_different(tmpfile,outfile)
-
-    def transform_links(self, tree, base, otherrepos):
-        """
-        Given a etree tree, transform all links that refer to any file
-        handled by this or any other repository into relative file
-        links. Useful for generating HTML files that can be used
-        offline, used if ``self.config.staticsite`` is set.
-
-        """
-        
-        repos = [self]
-        repos.extend(otherrepos)
-        for part in tree:
-            # depth-first transformation seems the easiest
-            self.transform_links(part, base, otherrepos)
-            if part.tag != "a":
-                continue
-            uri = part.get("href")
-            if not uri:
-                continue
-
-            if uri == self.config.url: # root url
+        # FIXME: apply some memoization to this
+        def transform(uri):
+            path = None
+            if uri == self.config.url:
                 path = "data/index.html"
             else:
                 for repo in repos:
@@ -1579,7 +1502,6 @@ parsed document path to that documents dependency file."""
                     dataset_params = repo.dataset_params_from_uri(uri)
                     if basefile or (dataset_params is not None):
                         break
-
                 if basefile:
                     path = repo.store.generated_path(basefile)
                 elif dataset_params is not None:
@@ -1590,107 +1512,12 @@ parsed document path to that documents dependency file."""
                     else:
                         pseudobasefile = "index"
                     path = repo.store.path(pseudobasefile,'toc','.html')
-                else:
-                    continue
-            relpath = os.path.relpath(path,os.path.dirname(base)).replace(os.sep,'/')
-            part.set("href", relpath)
+            if path:
+                return os.path.relpath(path, basedir)
+            else:
+                return uri
+        return transform
 
-    # xsltpath = os.path.join(os.curdir,'../ferenda',self.xslt_template)
-    def get_transform_configuration(self, xsltdir, outfile=None):
-        """
-        Set up a dict of parameters pointing to the configuration XML
-        file needed for XSLT transform.
-
-        .. note::
-
-           Maybe this should be an internal method.
-        
-        :param xsltdir: path to the directory where the root xslt file is stored
-        :type  xsltdir: str
-        :param outfile: path to the planned file resulting from the XSLT transfomrm
-        :type  outfile: str
-        :returns: The path to the resources.xml file, wrapped through lxml.etree.XSLT.strparam and put in a a dict
-        :rtype: dict
-        """
-        assert os.path.isdir(xsltdir), "%s does not exist (or is not a directory)" % xsltdir
-        params = {}
-        conffile = os.sep.join([self.config.datadir,'rsrc','resources.xml'])
-        if os.path.exists(conffile):
-            if outfile:
-                # We detect if stylesheet[@href] and script[@src]
-                # point correctly, and if not, create a new version of
-                # configurationfile where os.relpath has been applied
-                # to them.
-                tree = etree.parse(conffile)
-                if os.path.isabs(self.config.datadir):
-                    datadir = self.config.datadir
-                else:
-                    datadir = os.path.abspath(self.config.datadir)
-                
-                if not os.path.isabs(outfile):
-                    outfile = os.path.abspath(outfile)
-                    
-                assert outfile.startswith(datadir), "outfile %s not under datadir %s" % (outfile, datadir)
-                # "datadir/foo/bar/baz.html" -> "foo/bar"
-                # "/var/folders/sy/r4f/T/tmpcRojl/foo/bar/baz.html" -> "foo/bar"p
-                relative_outfile = outfile[len(datadir)+1:]
-                if os.sep in relative_outfile:
-                    outdir = relative_outfile.rsplit(os.sep,1)[0]
-                else:
-                    outdir = ""
-                for node in tree.findall("stylesheets/link"):
-                    if not (re.match("https?://", node.get('href'))):
-                        node.set('href', os.path.relpath(node.get('href'),outdir).replace(os.sep,"/"))
-                for node in tree.findall("javascripts/script"):
-                    if not (re.match("https?://", node.get('src'))):
-                        node.set('src', os.path.relpath(node.get('src'),outdir).replace(os.sep,"/"))
-                # loop through all css refs and use the first local ref:
-                depth = 0
-                for node in tree.findall("stylesheets/link"):
-                    if not (re.match("https?://", node.get('href'))):
-                        depth = node.get('href').count('..')
-                        break
-                if depth > 0:
-                    # create a new file
-                    (base, ext) = os.path.splitext(conffile)
-                    modfile = base + ("-depth-%s" % depth) + ext
-                    if not util.outfile_is_newer([conffile], modfile):
-                        tree.write(modfile)
-                    conffile = modfile
-            relpath = os.path.relpath(conffile,xsltdir).replace(os.sep,"/")
-            params['configurationfile'] = XSLT.strparam(relpath)
-
-        return params
-
-    _transform_resourcedir=None
-    def setup_transform_templates(self, xsltdir, mainxslt):
-        """Unpack/extract all XSLT files and other resources needed to
-        for the XSLT transform, if needed (which is the case if
-        ferenda is distributed as an egg, i.e. all files are contained
-        in a zip file).
-
-        :param xsltdir: path to the directory where the supporting xslt files are stored
-        :type  xsltdir: str
-        :param xsltdir: path to the main xslt file
-        :type  xsltdir: str
-        :returns: The path to extracted files
-        :rtype: str
-        """
-        # Unpack/extract all the files
-        if not self._transform_resourcedir:
-            self._transform_resourcedir = mkdtemp()
-            # copy everything to this temp dir (note: this gets cleaned up in __del__)
-            for f in pkg_resources.resource_listdir('ferenda',xsltdir):
-                source_fp = pkg_resources.resource_stream('ferenda', xsltdir+"/"+f)
-                dest = self._transform_resourcedir + "/" + f
-                with open(self._transform_resourcedir + "/" + f, "wb") as dest_fp:
-                    dest_fp.write(source_fp.read())
-                # print("extracted %s/%s to %s" % (xsltdir,f,dest))
-
-        if os.path.basename(mainxslt) not in pkg_resources.resource_listdir('ferenda',xsltdir):
-            shutil.copy2(mainxslt, self._transform_resourcedir)
-            
-        return self._transform_resourcedir
 
     def prep_annotation_file(self, basefile):
         """Helper function used by :py:meth:`generate` -- prepares a RDF/XML file
@@ -2169,8 +1996,6 @@ parsed document path to that documents dependency file."""
         if effective_basefile == None:
             effective_basefile = binding + "/" + value
         outfile = self.store.path(effective_basefile, 'toc', '.html')
-        tmpfile = self.store.path(effective_basefile, 'toc', '.xhtml')
-
         doc = self.make_document()
         doc.uri = self.dataset_uri(binding, value)
         d = Describer(doc.meta,doc.uri)
@@ -2195,20 +2020,19 @@ parsed document path to that documents dependency file."""
                          ul
                          ])
 
-        self.log.debug("Rendering XHTML to %s" % tmpfile)
-        self.render_xhtml(doc, tmpfile)
-        if not util.outfile_is_newer([tmpfile],outfile):
-            # Prepare a browser-ready HTML page using generic.xsl
-            self.log.debug("Transforming HTML to %s" % outfile)
-            # configure params
-            xsltdir = self.setup_transform_templates("res/xsl", "res/xsl/toc.xsl")
-            xsltfile = xsltdir + os.sep + os.path.basename("res/xsl/toc.xsl")
-            params = self.get_transform_configuration(xsltdir,outfile)
-            self.transform_html(xsltfile,
-                                tmpfile, outfile, params, otherrepos=otherrepos)
-            self.log.info("Created %s" % outfile)
-            return outfile
-        # if we didn't actually create an outfile:
+        conffile = os.sep.join([self.config.datadir,'rsrc','resources.xml'])
+        transformer = Transformer('XSLT', "res/xsl/toc.xsl", ["res/xsl"],
+                                  config=conffile)
+        # FIXME: This is a naive way of calculating the relative depth
+        # of the outfile
+        depth = len(outfile[len(self.store.datadir)+1:].split(os.sep))
+        tree = transformer.transform(self.render_xhtml_tree(doc), depth)
+        fixed = transformer.t.html5_doctype_workaround(etree.tostring(tree))
+
+        with self.store.open(effective_basefile, 'toc', '.html', "wb") as fp:
+            fp.write(fixed)
+
+        self.log.info("Created %s" % outfile)
         return outfile
 
 

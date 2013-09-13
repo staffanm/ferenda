@@ -270,6 +270,7 @@ class=testManager.staticmockclass2
         test = staticmockclass()
         test2 = staticmockclass2()
         outfile = self.tempdir+'/index.html'
+        manager.makeresources([test,test2], self.tempdir+'/rsrc')
         res = manager.frontpage([test,test2],
                                 path=outfile)
         self.assertTrue(res)
