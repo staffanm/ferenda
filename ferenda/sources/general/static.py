@@ -54,10 +54,42 @@ class StaticStore(DocumentStore):
                 yield x
 
 class Static(DocumentRepository):
+    """Generates documents from your own ``.rst`` files
+
+    The primary purpose of this docrepo is to provide a small set of
+    static pages for a complete ferenda-based web site, like "About
+    us", "Contact information", "Terms of service" or whatever else
+    you need. The ``download`` step of this docrepo does not do
+    anything, and it's ``parse`` step reads ReStructuredText
+    (``.rst``) files from a local directory and converts them into
+    XHTML+RDFa. From that point on, it works just like any other
+    docrepo.
+
+    After enabling this, you should set the configuration parameter
+    ``staticdir`` to the path of a directory where you keep your
+    ``.rst`` files::
+
+        [static]
+        class = ferenda.sources.general.Static
+        staticdir = /var/www/mysite/static/rst
+
+    .. note::
+
+       If this configuration parameter is not set, this docrepo will
+       use a small set of generic static pages, stored under
+       ``ferenda/res/static-pages`` in the distribution. To get
+       started, you can just copy this directory and set ``staticdir``
+       to point at your copy.
+
+    Every file present in ``staticdir`` results in a link in the site
+    footer. The link text will be the title of the document, i.e. the
+    first header in the ``.rst`` file.
+
+    """
     alias = "static"
     downloaded_suffix = ".rst"
     documentstore_class = StaticStore
-    # urls become on the form "http://lcoalhost:8000/static/about"
+    # urls become on the form "http://localhost:8000/static/about"
     
     def download(self):
         pass

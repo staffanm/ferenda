@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """Most of these decorators are intended to handle various aspects of
 a complete :py:meth:`~ferenda.DocumentRepository.parse`

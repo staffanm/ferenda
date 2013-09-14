@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 class TocPageset(object):
     """Represents a particular set of TOC pages, structured around some
 particular attribute(s) of documents, like title or publication

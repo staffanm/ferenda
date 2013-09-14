@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 from tempfile import mkdtemp
@@ -16,6 +15,32 @@ from ferenda import errors, util
 # you want to use a different template, create a different
 # transformer.
 class Transformer(object):
+    """Transforms parsed "pure content" documents into "browser-ready"
+    HTML5 files with site branding and navigation, using a template of
+    some kind.
+
+    :param transformertype: The engine to be used for transforming. Right now only ``"XSLT"`` is supported.
+    :type  transformertype: str
+    :param template: The main template file.
+    :type  template: str
+    :param templatedirs: Directories that may contain supporting templates used by the main template.
+    :type  templatedirs: str
+    :param documentroot: The base directory for all generated files -- used to make relative references to CSS/JS files correct.
+    :type  documentroot: str
+    :param config: Any configuration information used by the
+                   transforming engine. Can be a path to a config
+                   file, a python data structure, or anything else
+                   compatible with the engine selected by
+                   ``transformertype``.
+
+    .. note::
+
+       An initialized Transformer object only transforms using the
+       template file provided at initialization. If you need to use
+       another template file, create another Transformer object.
+
+    """
+    
     def __init__(self, transformertype,
                  template,
                  templatedirs,
@@ -38,6 +63,29 @@ class Transformer(object):
     # valid parameters 
     # - annotationfile: intermediate/basefile.grit.xml
     def transform(self, indata, depth, parameters=None, uritransform=None):
+        """Perform the transformation. This method always operates on the
+        "native" datastructure -- this might be different depending on
+        the transformer engine. For XSLT, which is implemented through
+        lxml, its in- and outdata are lxml trees
+
+        If you need an engine-indepent API, use :meth:`transform_stream` or 
+        :meth:`transform_file` instead 
+
+        :param indata: The document to be transformed
+        :param depth: The directory nesting level, compared to ``documentroot``
+        :type  depth: int
+        :param parameters: Any parameters that should be provided to the
+                           template
+        :type  parameters: dict
+        :param uritransform: A function, when called with an URI,
+                             returns a transformed URI/URL (such as
+                             the relative path to a static file) --
+                             used when transforming to files used for
+                             static offline use.
+        :type  uritransform: callable
+        :returns: The transformed document
+        """
+        
         if parameters == None:
             parameters = {}
 
@@ -69,15 +117,18 @@ class Transformer(object):
             part.set("href", uritransform(uri))
         
         
-    # accepts a file-like object, returns a file-like object
-    def transform_stream(self, instream,
-                         parameters=None):
+    def transform_stream(self, instream, depth,
+                         parameters=None, uritransform=None):
+        """Accepts a file-like object, returns a file-like object."""
         return self.t.native_to_stream(
-            self.transform(self.t.stream_to_native(instream)))
+            self.transform(self.t.stream_to_native(instream),
+                           depth,
+                           parameters,
+                           uritransform))
 
-    # accepts two filenames, reads from one, writes to the other
     def transform_file(self, infile, outfile,
                        parameters=None, uritransform=None):
+        """Accepts two filenames, reads from *infile*, writes to *outfile*."""
         depth = self._depth(outfile, self.documentroot)
         self.t.native_to_file(self.transform(self.t.file_to_native(infile),
                                              depth,

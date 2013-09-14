@@ -15,7 +15,6 @@ The module also contains the convenience functions
 hierarchies to and from strings.
 
 """
-
 from __future__ import unicode_literals
 
 import datetime

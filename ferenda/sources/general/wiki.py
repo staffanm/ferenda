@@ -24,7 +24,23 @@ MW_NS = "{http://www.mediawiki.org/xml/export-0.4/}"
 
 
 class MediaWiki(DocumentRepository):
-    """Downloads content from a Mediawiki system and converts it to annotations on other documents."""
+    """Downloads content from a Mediawiki system and converts it to annotations on other documents.
+
+    For efficient downloads, this docrepo requires that there exists a
+    XML dump (created by `dumpBackup.php
+    <http://www.mediawiki.org/wiki/Manual:DumpBackup.php>`_) of the
+    mediawiki contents that can be fetched over HTTP/HTTPS. Configure
+    the location of this dump using the ``mediawikiexport``
+    parameter::
+
+        [mediawiki]
+        class = ferenda.sources.general.MediaWiki
+        mediawikiexport = http://localhost/wiki/allpages-dump.xml
+
+    """
+
+
+    
     alias = "mediawiki"
     downloaded_suffix = ".xml"
 

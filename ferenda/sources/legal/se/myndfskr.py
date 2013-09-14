@@ -1,11 +1,4 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-#
-# A abstract base class for fetching and parsing regulations from
-# various swedish government agencies. These PDF documents often have
-# a similar structure both graphically and linguistically, enabling us
-# to parse them in a generalized way. (Downloading them often requires
-# special-case code, though.)
 from __future__ import unicode_literals,print_function
 
 import os
@@ -29,6 +22,11 @@ from . import SwedishLegalSource
 
 
 class MyndFskr(SwedishLegalSource):
+    """A abstract base class for fetching and parsing regulations from
+various swedish government agencies. These PDF documents often have
+a similar structure both graphically and linguistically, enabling us
+to parse them in a generalized way. (Downloading them often requires
+special-case code, though.)"""
     source_encoding = "utf-8"
     downloaded_suffix = ".pdf"
     alias = 'myndfskr'
@@ -582,7 +580,7 @@ class ELSAKFS(MyndFskr):
 
 
 class NFS(MyndFskr):
-    alias = "nfs"  # real name is ELSÄK-FS, but avoid swedchars, uppercase and dashes
+    alias = "nfs"
 
     start_url = "http://www.naturvardsverket.se/sv/Start/Lagar-och-styrning/Foreskrifter-och-allmanna-rad/Foreskrifter/"
 
@@ -641,7 +639,6 @@ class STAFS(MyndFskr):
             filename = self.store.downloaded_path(consolidated_basefile)
             self.log.info("        Downloading consd to %s" % filename)
             self.download_if_needed(consolidated_link.absolute_url, consolidated_basefile, filename=filename)
-
 
 class SKVFS(MyndFskr):
     alias = "skvfs"
