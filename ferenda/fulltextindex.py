@@ -1,9 +1,13 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+import json
+import math
 import re
 import shutil
-import json
-import six
-import math
+import sys
 
+import six
 from six.moves.urllib_parse import quote
 import requests
 import requests.exceptions
@@ -409,7 +413,15 @@ class ElasticSearchIndex(RemoteIndex):
             return True
     
     def _update_payload(self, uri, repo, basefile, title, identifier, text, **kwargs):
-        relurl = "%s/%s" % (repo, quote(basefile, safe="")) # eg type, id
+        safe = ''
+        if sys.version_info < (2,7,0):
+            # urllib.quote in python 2.6 cannot handle unicode values
+            # for the safe parameter (not even empty). FIXME: We
+            # should create a shim as ferenda.compat.quote and use
+            # that
+            safe = safe.encode('ascii')
+        
+        relurl = "%s/%s" % (repo, quote(basefile, safe=safe)) # eg type, id
         if "#" in uri: 
             relurl += uri.split("#",1)[1]
         payload = {"uri": uri,

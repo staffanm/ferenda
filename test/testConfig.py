@@ -12,6 +12,7 @@ else:
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
 import six
+from six import text_type as str
 
 from ferenda import util
 from ferenda.layeredconfig import LayeredConfig

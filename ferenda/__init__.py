@@ -14,6 +14,7 @@ from .tocpageset import TocPageset
 from .tocpage import TocPage
 from .toccriteria import TocCriteria
 from .newscriteria import NewsCriteria
+from .transformer import Transformer
 from .document import Document
 from .documententry import DocumentEntry
 from .documentstore import DocumentStore

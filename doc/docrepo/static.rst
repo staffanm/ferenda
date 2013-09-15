@@ -1,6 +1,4 @@
-The ``Static`` document repository
-==================================
+``ferenda.sources.general.Static`` -- generate documents from your own ``.rst`` files
+=====================================================================================
 
 .. autoclass:: ferenda.sources.general.Static
-  :members:
-  :member-order: bysource

@@ -23,7 +23,7 @@
   <xsl:template match="/">
     <!-- this is a ugly workaround required to get the proper html5
          doctype *and* the pre-rootnode conditional IE comments needed
-         for the h5bp template. Strip the <fakeroot> start and end
+         for the h5bp template. Strip the <remove-this-tag> start and end
          tags as a postprocessing step. -->
     <remove-this-tag>
       <xsl:apply-templates/>

@@ -78,6 +78,7 @@ class ListItem(CompoundElement):
 
 
 class EurlexTreaties(DocumentRepository):
+    """Handles the foundation treaties of the European union."""
     # overrides of superclass variables
     alias = "eut"  # European Union Treaties
     start_url = "http://eur-lex.europa.eu/LexUriServ/LexUriServ.do?uri=OJ:C:2008:115:0001:01:EN:HTML"

@@ -31,6 +31,8 @@ class Devel(object):
     class DummyStore(object):
         def __init__(self, path, **kwargs):
             pass
+        def list_basefiles_for(self, action, basedir=None):
+            return []
     downloaded_suffix = ".html"
     storage_policy = "file"
     documentstore_class = DummyStore

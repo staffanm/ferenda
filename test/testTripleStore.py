@@ -244,6 +244,13 @@ d:i8301
         if self.store.__class__ == SleepycatStore:
             self.store.graph.close()
 
+    def test_invalid_select(self):
+        with self.assertRaises(errors.SparqlError):
+            self.store.select("This is not a valid SPARQL query")
+
+    def test_invalid_construct(self):
+        with self.assertRaises(errors.SparqlError):
+            self.store.construct("This is not a valid SPARQL query")
 
 @unittest.skipIf('SKIP_FUSEKI_TESTS' in os.environ,
                  "Skipping Fuseki tests")    

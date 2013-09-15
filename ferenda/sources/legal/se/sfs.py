@@ -1,6 +1,6 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals,print_function
+
 """Hanterar (konsoliderade) författningar i SFS från Regeringskansliet
 rättsdatabaser.
 """

@@ -834,43 +834,6 @@ class Repo(RepoTester):
         self.maxDiff = 4096
         self.assertEqual(serialize(body),serialize(result))
 
-    # Move to Generate?
-    def test_transform_html(self):
-        base = self.datadir+os.sep
-        with open(base+"style.xslt","w") as fp:
-            fp.write("""<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
-    <xsl:param name="value"/>
-    <xsl:param name="file"/>
-    <xsl:variable name="content" select="document($file)/root/*"/>
-    <xsl:template match="/">
-        <output>
-            <paramvalue><xsl:value-of select="$value"/></paramvalue>
-            <paramfile><xsl:copy-of select="$content"/></paramfile>
-            <infile><xsl:value-of select="/doc/title"/></infile>
-        </output>
-    </xsl:template>
-</xsl:stylesheet>
-""")
-        with open(base+"paramfile.xml","w") as fp:
-            fp.write("""<root><node key='value'><subnode>textnode</subnode></node></root>""")
-
-        with open(base+"infile.xml","w") as fp:
-            fp.write("""<doc><title>Document title</title></doc>""")
-
-        d = DocumentRepository()
-        parampath = base+"paramfile.xml"
-        d.transform_html(base+"style.xslt",
-                         base+"infile.xml",
-                         base+"outfile.xml",
-                         {'value':XSLT.strparam('blahonga'),
-                          'file' :XSLT.strparam(parampath.replace(os.sep,"/"))})
-
-        self.assertEqualXML(util.readfile(base+"outfile.xml"),"""
-        <output>
-            <paramvalue>blahonga</paramvalue>
-            <paramfile><node key='value'><subnode>textnode</subnode></node></paramfile>
-            <infile>Document title</infile>
-        </output>""")
         
     # class Relate(RepoTester)
     def test_relate_fulltext(self):
@@ -1130,6 +1093,7 @@ b:1part a :DocumentPart;
         params = {'storetype':storetype,
                   'datadir':self.datadir,
                   'storerepository':'ferenda'}
+
         self.storetype = None
         if storetype == 'SQLITE':
             params['storelocation'] = self.datadir+"/ferenda.sqlite"
@@ -1284,12 +1248,14 @@ b:1part a :DocumentPart;
         self.store = self._load_store(self.repo)
         self._test_generated()
 
-    def _generate_complex(self, xsl=None):
+    def _generate_complex(self, xsl=None, staticsite=False):
         # Helper func for other tests -- this uses a single
         # semi-complex source doc, runs it through the generic.xsl
         # stylesheet, and then the tests using this helper confirm
         # various aspects of the transformed document
         self.repo = self._get_repo()
+        if staticsite:
+            self.repo.config.staticsite = True
         if xsl is not None:
             self.repo.xslt_template = xsl
         test = """<?xml version='1.0' encoding='utf-8'?>
@@ -1309,6 +1275,7 @@ b:1part a :DocumentPart;
         property="dct:title"
         content="Abstract">
       <p>Lorem ipsum dolor sit amet</p>
+      <p><a href="http://localhost:8000/res/test/something-else">external</a></p>
     </div>
     <div about="http://localhost:8000/res/w3c/hr-time#PS2"
         typeof="bibo:DocumentPart"
@@ -1488,8 +1455,15 @@ b:1part a :DocumentPart;
         divs = tree.findall(".//p[@class='div']")
         self.assertEqual(4,len(divs))
         
+    def test_staticsite_url(self):
+        self.repo = self._get_repo()
+        tree = self._generate_complex(staticsite=True)
+        link = tree.xpath(".//a[text()='external']")[0]
+        self.assertEqual("something-else.html", link.get("href"))
         
-class TOC(RepoTester):
+        
+
+class TOCSelect(RepoTester):
     # General datasets being reused in tests
     books = """
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -1577,7 +1551,6 @@ ex:pm942051 a bibo:Book;
     dct:issued "1976-05-07"^^xsd:date;
     dct:publisher "Analytical Biochemistry" .
 """ 
-
     results1 = [{'uri':'http://example.org/books/A_Tale_of_Two_Cities',
                  'title': 'A Tale of Two Cities',
                  'issued': '1859-04-30'},
@@ -1608,6 +1581,61 @@ ex:pm942051 a bibo:Book;
                 {'uri':'http://example.org/articles/pm942051',
                  'title': 'A rapid and sensitive method for the quantitation of microgram quantities of protein utilizing the principle of protein dye-binding',
                  'issued': '1976-05-07'}]
+
+    def setUp(self):
+        super(TOCSelect, self).setUp()
+        # (set up a triple store) and fill it with appropriate data
+        d = DocumentRepository()
+        defaults = d.get_default_options()
+        # FIXME: We really need to subclass at least the toc_select
+        # test to handle the four different possible storetypes. For
+        # now we go with the default type (SQLITE, guaranteed to
+        # always work) but the non-rdflib backends use different code
+        # paths.
+        self.store = TripleStore.connect(storetype=defaults['storetype'],
+                                         location=self.datadir+os.sep+"test.sqlite",
+                                         repository=defaults['storerepository'])
+        self.store.clear()
+        self.store.add_serialized(self.books,format="turtle", context="http://example.org/ctx/base")
+        self.store.add_serialized(self.articles,format="turtle", context="http://example.org/ctx/other")
+
+
+    def tearDown(self):
+        # clear triplestore
+        self.store.clear()
+        del self.store
+        super(TOCSelect, self).tearDown()
+
+    # FIXME: adapt to TripleStore setting so that these tests run with
+    # all supported triplestores
+    def test_toc_select(self):
+        d = DocumentRepository(datadir=self.datadir,
+                               loglevel='CRITICAL',
+                               storelocation=self.datadir+os.sep+"test.sqlite")
+        d.rdf_type = rdflib.URIRef("http://purl.org/ontology/bibo/Book")
+        # make sure only one named graph, not entire store, gets searched
+        got = d.toc_select("http://example.org/ctx/base")
+        self.assertEqual(len(got),6)
+        want = self.results1
+        for row in want:
+            self.assertIn(row, got)
+
+        got = d.toc_select("http://example.org/ctx/other")
+        self.assertEqual(len(got),4)
+        want2 = self.results2
+        for row in want2:
+            self.assertIn(row, got)
+    
+        got = d.toc_select()
+        self.assertEqual(len(got),10)
+        want3 = want+want2
+        for row in want3:
+            self.assertIn(row, got)
+
+        
+class TOC(RepoTester):
+    results1 = TOCSelect.results1
+    results2 = TOCSelect.results2
     
     pagesets = [TocPageset('Sorted by title',[
                 TocPage('a','Documents starting with "a"','title', 'a'),
@@ -1656,61 +1684,11 @@ ex:pm942051 a bibo:Book;
         util.ensure_dir(resources)
         shutil.copy2("%s/files/base/rsrc/resources.xml"%os.path.dirname(__file__),
                      resources)
-        
-        # (set up a triple store) and fill it with appropriate data
-        d = DocumentRepository()
-        defaults = d.get_default_options()
-        # FIXME: We really need to subclass at least the toc_select
-        # test to handle the four different possible storetypes. For
-        # now we go with the default type (SQLITE, guaranteed to
-        # always work) but the non-rdflib backends use different code
-        # paths.
-        self.store = TripleStore.connect(storetype=defaults['storetype'],
-                                         location=self.datadir+os.sep+"test.sqlite",
-                                         repository=defaults['storerepository'])
-        self.store.clear()
-        self.store.add_serialized(self.books,format="turtle", context="http://example.org/ctx/base")
-        self.store.add_serialized(self.articles,format="turtle", context="http://example.org/ctx/other")
 
-
-    def tearDown(self):
-        # clear triplestore
-        self.store.clear()
-        del self.store
-        super(TOC, self).tearDown()
-        
-
-    def test_toc_select(self):
-        d = DocumentRepository(datadir=self.datadir,
-                               loglevel='CRITICAL',
-                               storelocation=self.datadir+os.sep+"test.sqlite")
-        d.rdf_type = rdflib.URIRef("http://purl.org/ontology/bibo/Book")
-        # make sure only one named graph, not entire store, gets searched
-        got = d.toc_select("http://example.org/ctx/base")
-        self.assertEqual(len(got),6)
-        want = self.results1
-        for row in want:
-            self.assertIn(row, got)
-
-        got = d.toc_select("http://example.org/ctx/other")
-        self.assertEqual(len(got),4)
-        want2 = self.results2
-        for row in want2:
-            self.assertIn(row, got)
-    
-        got = d.toc_select()
-        self.assertEqual(len(got),10)
-        want3 = want+want2
-        for row in want3:
-            self.assertIn(row, got)
-    # toc_query is tested by test_toc_select
-            
     def test_toc_criteria(self):
-        d = DocumentRepository(datadir=self.datadir,
-                               loglevel='CRITICAL')
-        dct = d.ns['dct']
+        dct = self.repo.ns['dct']
         want = self.criteria
-        got = d.toc_criteria([dct.title, dct.issued])
+        got = self.repo.toc_criteria([dct.title, dct.issued])
         
         self.assertEqual(len(want), len(got))
         self.assertEqual(want[0].binding, got[0].binding)
@@ -1728,11 +1706,7 @@ ex:pm942051 a bibo:Book;
     # toc_selector is tested by test_toc_criteria
     
     def test_toc_pagesets(self):
-        d = DocumentRepository(datadir=self.datadir,
-                               loglevel='CRITICAL')
-        data = self.results1
-
-        got = d.toc_pagesets(data, self.criteria)
+        got = self.repo.toc_pagesets(self.results1, self.criteria)
         want = self.pagesets
         self.assertEqual(len(got), 2)
         self.assertEqual(got[0].label, want[0].label)
@@ -1741,47 +1715,13 @@ ex:pm942051 a bibo:Book;
         self.assertEqual(got[1], want[1])
 
     def test_select_for_pages(self):
-        d = DocumentRepository(datadir=self.datadir,
-                               loglevel='CRITICAL')
-        got = d.toc_select_for_pages(self.results1, self.pagesets, self.criteria)
+        got = self.repo.toc_select_for_pages(self.results1, self.pagesets, self.criteria)
         want = self.documentlists
         self.maxDiff = None
         self.assertEqual(got, want)
 
     def test_generate_page(self):
-        d = DocumentRepository(datadir=self.datadir,
-                               loglevel='CRITICAL')
-        path = d.toc_generate_page('title','a', self.documentlists[('title','a')], self.pagesets)
-
-        # 1. first, test intermediate XHTML file
-        intermediate = path.replace(".html",".xhtml")
-        self.assertTrue(os.path.exists(intermediate))
-        #with open(intermediate) as fp:
-        #    print(fp.read().decode('utf-8'))
-        #print("=" * 60)
-        t = etree.parse(intermediate)
-        xhtmlns = "{http://www.w3.org/1999/xhtml}"
-
-        # 1.1 Correct page title?
-        self.assertEqual(t.findtext(".//"+xhtmlns+"title"),
-                         'Documents starting with "a"')
-
-        # 1.2 Correct navigation?
-        # @id='nav' -> @role='navigation' ?
-        navlinks = t.findall(".//"+xhtmlns+"ul[@role='navigation']//"+xhtmlns+"a")
-        self.assertEqual(len(navlinks), 9) # 10 pages in total, but current page isn't linked
-        self.assertEqual(navlinks[0].text, 'd')
-        self.assertEqual(navlinks[0].get("href"), 'http://localhost:8000/dataset/base?title=d')
-        self.assertEqual(navlinks[3].get("href"), 'http://localhost:8000/dataset/base?issued=1791')
-
-        # 1.3 Correct document list?
-        # @id='documentlist' => @role='main'
-        docs = t.findall(".//"+xhtmlns+"ul[@role='main']/"+xhtmlns+"li/"+xhtmlns+"a")
-        self.assertEqual(len(docs),2)
-        # "And..." should go before "A Tale..."
-        self.assertEqual(docs[0].text, 'And Then There Were None')
-        self.assertEqual(docs[0].attrib['href'], 'http://example.org/books/And_Then_There_Were_None')
-
+        path = self.repo.toc_generate_page('title','a', self.documentlists[('title','a')], self.pagesets)
         # 2. secondly, test resulting HTML file
         self.assertTrue(os.path.exists(path))
         t = etree.parse(path)
@@ -1829,9 +1769,7 @@ ex:pm942051 a bibo:Book;
         self.assertEqual(header.text, 'Documents starting with "a"')
 
     def test_generate_pages(self):
-        d = DocumentRepository(datadir=self.datadir,
-                               loglevel='CRITICAL')
-        paths = d.toc_generate_pages(self.documentlists,self.pagesets)
+        paths = self.repo.toc_generate_pages(self.documentlists,self.pagesets)
         self.assertEqual(len(paths), 10)
         #print("=============%s====================" % paths[0])
         #with open(paths[0]) as fp:
@@ -1840,9 +1778,7 @@ ex:pm942051 a bibo:Book;
             self.assertTrue(os.path.exists(path))
 
     def test_generate_first_page(self):
-        d = DocumentRepository(datadir=self.datadir,
-                               loglevel='CRITICAL')
-        path = d.toc_generate_first_page(self.documentlists,self.pagesets)
+        path = self.repo.toc_generate_first_page(self.documentlists,self.pagesets)
         self.assertEqual(path, self.p("base/toc/index.html"))
         self.assertTrue(os.path.exists(path))
         tree = etree.parse(path)

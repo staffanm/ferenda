@@ -13,12 +13,14 @@ from ferenda import DocumentRepository, TripleStore
 
 
 class Skeleton(DocumentRepository):
-    """Utility docrepo to fetch all RDF data from a triplestore (either our
-       triple store, or a remote one, fetched through the combined ferenda 
-       atom feed), find
-       out those resources that are referred to but not present in the data
-       (usually older documents that are not available in electronic form),
-       and create "skeleton entries" for those resources. """
+    """Utility docrepo to fetch all RDF data from a triplestore (either
+       our triple store, or a remote one, fetched through the combined
+       ferenda atom feed), find out those resources that are referred
+       to but not present in the data (usually older documents that
+       are not available in electronic form), and create "skeleton
+       entries" for those resources.
+
+    """
 
     alias = "closet"
     start_url = "http://rinfo.demo.lagrummet.se/feed/current"

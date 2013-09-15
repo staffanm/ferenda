@@ -21,6 +21,7 @@ from ferenda.elements import UnicodeElement, CompoundElement, Paragraph
 #        Corresponding parsed/62008CN0028.xhtml and distilled/62008CN0028.ttl
 
 class EurlexCaselaw(DocumentRepository):
+    """Handles all case law from the European Court of Justice (ECJ)."""
     alias = "ecj"  # European Court of Justice
 
     start_url = "http://eur-lex.europa.eu/JURISIndex.do"
