@@ -7,7 +7,9 @@ import copy
 
 import six
 
+
 class TextReader(object):
+
     """Fancy file-like-class for reading (not writing) text files by line,
     paragraph, page or any other user-defined unit of text, with
     support for peeking ahead and looking backwards. It can read
@@ -114,9 +116,7 @@ class TextReader(object):
         return s.strip()
 
     def __dewrap(self, s):
-        return s.replace(self.linesep
-
-        , " ")
+        return s.replace(self.linesep, " ")
 
     def __dehyphenate(self, s):
         return s  # FIXME: implement
@@ -162,7 +162,7 @@ two or more consecutive line separators)."""
         # consume any leading newlines
         while self.peek(len(self.linesep)) == self.linesep:
             self.currpos += len(self.linesep)
-        
+
         # read actual paragrapgh
         res = self.readchunk(self.linesep * 2)
         # consume any trailing lines
@@ -174,7 +174,7 @@ two or more consecutive line separators)."""
 
     def readpage(self):
         """Reads and returns the next page (all text up to next form feed, ``"\\f"``)"""
-        
+
         return self.readchunk('\f')  # form feed - pdftotext generates
                                     # these to indicate page breaks
                                     # (other ascii oriented formats,
@@ -206,14 +206,13 @@ two or more consecutive line separators)."""
         # consume any leading newlines
         while self.peek(len(self.linesep)) == self.linesep:
             self.currpos += len(self.linesep)
-        
+
         # read actual paragrapgh
         res = self.peekchunk(self.linesep * 2, times)
 
         # print("peekparagraph: %r" % res[:40])
         self.currpos = startpos
         return res
-
 
     def peekchunk(self, delimiter, times=1):
         """Works like :meth:`readchunk`, but does not affect current seek position. If *times* is specified, peeks that many chunks ahead."""
@@ -286,13 +285,10 @@ two or more consecutive line separators)."""
         self.iterkwargs = kwargs
         return self
 
-
-
     #----------------------------------------------------------------
     # Implementation of a file-like interface
     def flush(self):
         """See :py:meth:`io.TextIOBase.flush`. This is a no-op."""
-        pass
 
     def read(self, size=0):
         """See :py:meth:`io.TextIOBase.read`."""

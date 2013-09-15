@@ -17,7 +17,9 @@ from ferenda.decorators import managedparsing
 
 MW_NS = "{http://www.mediawiki.org/xml/export-0.3/}"
 
+
 class Keyword(DocumentRepository):
+
     """Implements support for 'keyword hubs', conceptual resources which
        themselves aren't related to any document, but to which other
        documents are related. As an example, if a docrepo has
@@ -29,7 +31,7 @@ class Keyword(DocumentRepository):
        all other documents in any of the repos that refer to this
        concept resource are automatically listed.
 
-    """ # FIXME be more comprehensible
+    """  # FIXME be more comprehensible
     alias = "keyword"
     downloaded_suffix = ".txt"
 
@@ -38,15 +40,14 @@ class Keyword(DocumentRepository):
         # extra functions -- subclasses can add / remove from this
         self.termset_funcs = [self.download_termset_mediawiki,
                               self.download_termset_wikipedia]
-        
-    
+
     def get_default_options(self):
-        opts = super(Keyword,self).get_default_options()
+        opts = super(Keyword, self).get_default_options()
         # The API endpoint URLs change with MW language
         opts['mediawikiexport'] = 'http://localhost/wiki/Special:Export/%s(basefile)'
         opts['wikipediatitles'] = 'http://download.wikimedia.org/svwiki/latest/svwiki-latest-all-titles-in-ns0.gz'
         return opts
-    
+
     def download(self):
         # Get all "term sets" (used dct:subject Objects, wiki pages
         # describing legal concepts, swedish wikipedia pages...)
@@ -76,14 +77,14 @@ class Keyword(DocumentRepository):
         self.log.debug("Retrieved subject terms from triplestore" % len(terms))
 
         for termset_func in self.termset_funcs:
-             termset_func(terms)
+            termset_func(terms)
 
         for term in terms:
             if not term:
                 continue
             with self.store.open_downloaded(term, "w") as fp:
                 for termset in sorted(terms[term]):
-                   f.write(termset + "\n")
+                    f.write(termset + "\n")
 
     def download_termset_mediawiki(self, terms):
         # 2) Download the wiki.lagen.nu dump from
@@ -101,15 +102,15 @@ class Keyword(DocumentRepository):
                 continue
             if ":" in title and title.split(":")[0] in wikinamespaces:
                 continue  # only process pages in the main namespace
-            if title.startswith("SFS/"): # FIXME: should be handled in
+            if title.startswith("SFS/"):  # FIXME: should be handled in
                                          # subclass -- or
                                          # repo-specific pages should
                                          # be kept in subclasses
-                continue # only proces normal keywords
+                continue  # only proces normal keywords
             terms[title]['mediawiki'] = True
 
         self.log.debug("Retrieved subject terms from wiki, now have %s terms" %
-                        len(terms))
+                       len(terms))
 
     def download_termset_wikipedia(self, terms):
         # 3) Download the Wikipedia dump from
@@ -117,14 +118,13 @@ class Keyword(DocumentRepository):
         # -- term set "wikipedia"
         # FIXME: only download when needed
         resp = requests.get(self.config.wikipediatitles)
-        wikipediaterms = resp.text.split("\n") 
+        wikipediaterms = resp.text.split("\n")
         for utf8_term in wikipediaterms:
             term = utf8_term.decode('utf-8').strip()
             if term in terms:
                 terms[term]['wikipedia'] = True
 
         self.log.debug("Retrieved terms from wikipedia, now have %s terms" % len(terms))
-
 
     @managedparsing
     def parse(self, doc):
@@ -162,11 +162,9 @@ class Keyword(DocumentRepository):
 
         return etree.tostring(root, encoding='utf-8')
 
-
     re_tagstrip = re.compile(r'<[^>]*>')
 
-  
-    # FIXME: translate this to be consistent with construct_annotations 
+    # FIXME: translate this to be consistent with construct_annotations
     # (e.g. return a RDF graph through one or a few SPARQL queries),
     # not a XML monstrosity
     def construct_annotations(self, uri):
@@ -235,7 +233,7 @@ WHERE {
 }
 
 """ % (escuri, escuri, escuri, escuri)
-        #print sq
+        # print sq
         legaldefinitioner = self._store_select(sq)
         log.debug('%s: Selected %d legal definitions (%.3f sec)',
                   basefile, len(legaldefinitioner), time() - start)
@@ -307,8 +305,8 @@ WHERE {
             rattsfall_node = etree.SubElement(subject_node, "rdf:Description")
             rattsfall_node.set("rdf:about", l['uri'])
             id_node = etree.SubElement(rattsfall_node, "rdfs:label")
-            #id_node.text = "%s %s" % (l['uri'].split("#")[1], l['label'])
+            # id_node.text = "%s %s" % (l['uri'].split("#")[1], l['label'])
             id_node.text = self.sfsmgr.display_title(l['uri'])
 
         # FIXME: construct graph
-        return graph 
+        return graph

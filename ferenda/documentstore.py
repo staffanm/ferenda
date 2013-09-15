@@ -13,7 +13,9 @@ from six.moves.urllib_parse import quote, unquote
 from ferenda import util
 from ferenda import errors
 
+
 class DocumentStore(object):
+
     """
     Unifies handling of reading and writing of various data files
     during the ``download``, ``parse`` and ``generate`` stages.
@@ -38,8 +40,9 @@ class DocumentStore(object):
                            methods)
     :type storage_policy: str
     """
+
     def __init__(self, datadir, downloaded_suffix=".html", storage_policy="file"):
-        self.datadir = datadir # docrepo.datadir + docrepo.alias
+        self.datadir = datadir  # docrepo.datadir + docrepo.alias
         self.downloaded_suffix = downloaded_suffix
         self.storage_policy = storage_policy
 
@@ -53,18 +56,18 @@ class DocumentStore(object):
             finally:
                 tempname = fp.name
                 fp.close()
-                if not os.path.exists(filename) or not filecmp.cmp(tempname,filename):
+                if not os.path.exists(filename) or not filecmp.cmp(tempname, filename):
                     util.ensure_dir(filename)
-                    shutil.move(tempname,filename)
+                    shutil.move(tempname, filename)
                 else:
                     os.unlink(tempname)
         else:
             if "a" in mode and not os.path.exists(filename):
                 util.ensure_dir(filename)
-                
-            fp =  open(filename,mode)
+
+            fp = open(filename, mode)
             yield fp
-        
+
     def path(self, basefile, maindir, suffix, version=None, attachment=None):
         """Calculate a full filesystem path for the given parameters.
 
@@ -122,13 +125,13 @@ class DocumentStore(object):
                         'archive', maindir, pathfrag, v_pathfrag]
         else:
             segments = [self.datadir, maindir, pathfrag]
-            
-            
+
         if self.storage_policy == "dir":
             if attachment:
                 for illegal in ':/':
                     if illegal in attachment:
-                        raise errors.AttachmentNameError("Char '%s' in attachment name '%s' not allowed" % (illegal, attachment))
+                        raise errors.AttachmentNameError(
+                            "Char '%s' in attachment name '%s' not allowed" % (illegal, attachment))
                 segments.append(attachment)
             else:
                 segments.append("index" + suffix)
@@ -143,9 +146,8 @@ class DocumentStore(object):
         if os.sep == "/":
             return unixpath
         else:
-            return unixpath.replace("/",os.sep)
+            return unixpath.replace("/", os.sep)
 
-        
     @contextmanager
     def open(self, basefile, maindir, suffix, mode="r", version=None, attachment=None):
         """
@@ -172,12 +174,12 @@ class DocumentStore(object):
         finally:
             tempname = fp.name
             fp.close()
-            if not os.path.exists(filename) or not filecmp.cmp(tempname,filename):
+            if not os.path.exists(filename) or not filecmp.cmp(tempname, filename):
                 util.ensure_dir(filename)
-                shutil.move(tempname,filename)
+                shutil.move(tempname, filename)
             else:
                 os.unlink(tempname)
-            
+
     def list_basefiles_for(self, action, basedir=None):
         """Get all available basefiles that can be used for the
         specified action.
@@ -239,8 +241,8 @@ class DocumentStore(object):
 
             if os.path.exists(x) and os.path.getsize(x) > 0:
                 # get a pathfrag from full path
-                suffixlen = len(suffix) if self.storage_policy == "file" else len(suffix)+1
-                x = x[len(directory)+1:-suffixlen]
+                suffixlen = len(suffix) if self.storage_policy == "file" else len(suffix) + 1
+                x = x[len(directory) + 1:-suffixlen]
                 yield self.pathfrag_to_basefile(x)
 
     def list_versions(self, basefile, action=None):
@@ -255,13 +257,13 @@ class DocumentStore(object):
         :returns: All available versions for that basefile
         :rtype: generator
         """
-        
+
         if action:
-            assert action in ('downloaded','parsed','generated'), "Action %s invalid" % action
+            assert action in ('downloaded', 'parsed', 'generated'), "Action %s invalid" % action
             actions = (action,)
         else:
-            actions = ('downloaded','parsed','generated')
-        
+            actions = ('downloaded', 'parsed', 'generated')
+
         basedir = self.datadir
         pathfrag = self.basefile_to_pathfrag(basefile)
         yielded_basefiles = []
@@ -274,7 +276,7 @@ class DocumentStore(object):
                 if os.path.exists(x):
                     # /datadir/base/archive/downloaded/basefile/version.html
                     # => version.html
-                    x = x[len(directory)+1:]
+                    x = x[len(directory) + 1:]
                     if self.storage_policy == "dir":
                         # version/index.html => version
                         x = os.sep.join(x.split(os.sep)[:-1])
@@ -308,7 +310,7 @@ class DocumentStore(object):
         :returns: All available attachments for the basefile 
         :rtype: generator
         """
-        
+
         basedir = self.datadir
         pathfrag = self.pathfrag_to_basefile(basefile)
         if version:
@@ -320,16 +322,16 @@ class DocumentStore(object):
         # places throughout the code. Should subclasses be able to
         # control suffixes beyond the simple self.downloaded_suffix
         # mechanism?
-        suffixmap = {'downloaded':self.downloaded_suffix,
-                     'parsed':'.xhtml',
-                     'generated':'.html'}
-        mainfile = "index"+suffixmap[action]
+        suffixmap = {'downloaded': self.downloaded_suffix,
+                     'parsed': '.xhtml',
+                     'generated': '.html'}
+        mainfile = "index" + suffixmap[action]
         for x in util.list_dirs(directory, reverse=False):
             # /datadir/base/downloaded/basefile/attachment.txt => attachment.txt
-            x = x[len(directory)+1:]
+            x = x[len(directory) + 1:]
             if x != mainfile:
                 yield x
-    
+
     def basefile_to_pathfrag(self, basefile):
         """Given a basefile, returns a string that can safely be used
         as a fragment of the path for any representation of that
@@ -358,13 +360,13 @@ class DocumentStore(object):
         :rtype: str
         """
         safe = '/;@&=+,'
-        if sys.version_info < (2,7,0):
+        if sys.version_info < (2, 7, 0):
             # urllib.quote in python 2.6 cannot handle unicode values
             # for the safe parameter. FIXME: We should create a shim
             # as ferenda.compat.quote and use that
             safe = safe.encode('ascii')
 
-        return quote(basefile,safe=safe).replace('%', os.sep+'%')
+        return quote(basefile, safe=safe).replace('%', os.sep + '%')
 
     def pathfrag_to_basefile(self, pathfrag):
         """Does the inverse of
@@ -378,8 +380,8 @@ class DocumentStore(object):
         :rtype: str
         """
         if os.sep == "\\":
-            pathfrag = pathfrag.replace("\\","/")
-        return unquote(pathfrag.replace('/%','%'))
+            pathfrag = pathfrag.replace("\\", "/")
+        return unquote(pathfrag.replace('/%', '%'))
 
     def archive(self, basefile, version):
         """Moves the current version of a document to an archive. All
@@ -405,12 +407,12 @@ class DocumentStore(object):
             if not os.path.exists(src):
                 continue
             if os.path.exists(dest):
-                raise errors.ArchivingError("Archive destination %s for basefile %s version %s already exists!" % (dest,basefile,version))
+                raise errors.ArchivingError(
+                    "Archive destination %s for basefile %s version %s already exists!" % (dest, basefile, version))
             # self.log.debug("Archiving %s to %s" % (src,dest))
             # print("Archiving %s to %s" % (src,dest))
             util.ensure_dir(dest)
-            shutil.move(src,dest)
-
+            shutil.move(src, dest)
 
     def downloaded_path(self, basefile, version=None, attachment=None):
         """Get the full path for the downloaded file for the given
@@ -427,21 +429,20 @@ class DocumentStore(object):
         :rtype:   str
         """
         return self.path(basefile, 'downloaded',
-                                 self.downloaded_suffix, version, attachment)
+                         self.downloaded_suffix, version, attachment)
 
-    def open_downloaded(self,basefile, mode="r", version=None, attachment=None):
+    def open_downloaded(self, basefile, mode="r", version=None, attachment=None):
         """Opens files for reading and writing,
         c.f. :meth:`~ferenda.DocumentStore.open`. The parameters are
         the same as for
         :meth:`~ferenda.DocumentStore.downloaded_path`.
 
         """
-        
+
         filename = self.downloaded_path(basefile, version, attachment)
-        return self._open(filename,mode)
+        return self._open(filename, mode)
 
     def documententry_path(self, basefile, version=None):
-
         """Get the full path for the documententry file for the given
         basefile (and optionally archived version).
 
@@ -455,7 +456,6 @@ class DocumentStore(object):
         return self.path(basefile, 'entries', '.json', version)
 
     def intermediate_path(self, basefile, version=None):
-
         """Get the full path for the main intermediate file for the given
         basefile (and optionally archived version).
 
@@ -484,9 +484,9 @@ class DocumentStore(object):
         :rtype:   str
         """
         return self.path(basefile, 'parsed', '.xhtml',
-                                 version, attachment)
+                         version, attachment)
 
-    def open_parsed(self,basefile, mode="r", version=None, attachment=None):
+    def open_parsed(self, basefile, mode="r", version=None, attachment=None):
         """Opens files for reading and writing,
         c.f. :meth:`~ferenda.DocumentStore.open`. The parameters are
         the same as for
@@ -494,7 +494,7 @@ class DocumentStore(object):
 
         """
         filename = self.parsed_path(basefile, version, attachment)
-        return self._open(filename,mode)
+        return self._open(filename, mode)
 
     def distilled_path(self, basefile, version=None):
         """Get the full path for the distilled RDF/XML file for the given
@@ -508,9 +508,9 @@ class DocumentStore(object):
         :rtype:   str
         """
         return self.path(basefile, 'distilled', '.rdf',
-                                 version)
+                         version)
 
-    def open_distilled(self,basefile, mode="r", version=None):
+    def open_distilled(self, basefile, mode="r", version=None):
         """Opens files for reading and writing,
         c.f. :meth:`~ferenda.DocumentStore.open`. The parameters are
         the same as for
@@ -518,7 +518,7 @@ class DocumentStore(object):
 
         """
         filename = self.distilled_path(basefile, version)
-        return self._open(filename,mode)
+        return self._open(filename, mode)
 
     def generated_path(self, basefile, version=None, attachment=None):
         """Get the full path for the generated file for the given
@@ -535,7 +535,7 @@ class DocumentStore(object):
         :rtype:   str
         """
         return self.path(basefile, 'generated', '.html',
-                                 version, attachment)
+                         version, attachment)
 
     def open_generated(self, basefile, mode="r", version=None, attachment=None):
         """Opens files for reading and writing,
@@ -544,7 +544,7 @@ class DocumentStore(object):
         :meth:`~ferenda.DocumentStore.generated_path`.
 
         """
-        filename = self.generated_path(basefile,version,attachment)
+        filename = self.generated_path(basefile, version, attachment)
         return self._open(filename, mode)
 
     def annotation_path(self, basefile, version=None):
@@ -559,14 +559,14 @@ class DocumentStore(object):
         :rtype:   str
         """
         return self.path(basefile, 'annotations', '.grit.xml',
-                                 version)
+                         version)
 
-    def open_annotation(self, basefile, mode="r", version=None): 
+    def open_annotation(self, basefile, mode="r", version=None):
         """Opens files for reading and writing,
         c.f. :meth:`~ferenda.DocumentStore.open`. The parameters are
         the same as for
         :meth:`~ferenda.DocumentStore.annotation_path`."""
-        filename = self.annotation_path(basefile,version)
+        filename = self.annotation_path(basefile, version)
         return self._open(filename, mode)
 
     def dependencies_path(self, basefile):

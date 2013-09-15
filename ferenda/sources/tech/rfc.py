@@ -19,13 +19,23 @@ from ferenda.decorators import recordlastdownload, managedparsing, downloadmax
 from ferenda.elements import Body, Heading, Preformatted, Paragraph, UnorderedList, ListItem, Section, Subsection, Subsubsection, UnicodeElement, CompoundElement, Link, serialize
 from ferenda.errors import ParseError
 
-class RFCHeader(UnicodeElement): pass
-class DocTitle(UnicodeElement): pass
-class Pagebreak(CompoundElement): pass
+
+class RFCHeader(UnicodeElement):
+    pass
+
+
+class DocTitle(UnicodeElement):
+    pass
+
+
+class Pagebreak(CompoundElement):
+    pass
+
 
 class PreambleSection(CompoundElement):
     tagname = "div"
     counter = 0
+
     def _get_classname(self):
         return self.__class__.__name__.lower()
     classname = property(_get_classname)
@@ -47,18 +57,19 @@ class PreambleSection(CompoundElement):
         # element.set('about', uri + "#" + self.title.lower().replace(" ", "_"))
         return element
 
+
 class RFC(DocumentRepository):
     alias = "rfc"
-    start_url             = "http://www.ietf.org/download/rfc-index.txt"
+    start_url = "http://www.ietf.org/download/rfc-index.txt"
     document_url_template = "http://tools.ietf.org/rfc/rfc%(basefile)s.txt"
-    document_url_regex    = "http://tools.ietf.org/rfc/rfc(?P<basefile>\w+).txt"
-    downloaded_suffix     = ".txt"
+    document_url_regex = "http://tools.ietf.org/rfc/rfc(?P<basefile>\w+).txt"
+    downloaded_suffix = ".txt"
     namespaces = ('rdf',  # always needed
-                  'dct',  # title, identifier, etc (could be replaced by equiv bibo prop?) 
-                  'bibo', # Standard and DocumentPart classes, chapter prop
+                  'dct',  # title, identifier, etc (could be replaced by equiv bibo prop?)
+                  'bibo',  # Standard and DocumentPart classes, chapter prop
                   'xsd',  # datatypes
-                  'foaf', # rfcs are foaf:Documents for now
-                  ('rfc','http://example.org/ontology/rfc/') # custom (fake) ontology
+                  'foaf',  # rfcs are foaf:Documents for now
+                  ('rfc', 'http://example.org/ontology/rfc/')  # custom (fake) ontology
                   )
     sparql_annotations = "res/sparql/rfc-annotations.rq"
     xslt_template = "res/xsl/rfc.xsl"
@@ -71,7 +82,7 @@ class RFC(DocumentRepository):
     #
     # Most older RFCs - headers are often all-caps (can be handled by
     # parser or constructor)
-    # 
+    #
     # RFC 759 - Header is totally different (can be patched), header
     #           has a IEN: 113 field
     # RFC 869 - Header is totally different (RFC 759-like), most
@@ -80,16 +91,16 @@ class RFC(DocumentRepository):
     # RFC 909 - Header is totally different (RFC 759-like), document
     #           headings are centered (can be handled by alternate
     #           recognizer)
-    
+
     @recordlastdownload
     def download(self, basefile=None):
         if basefile and self.document_url_template:
             return self.download_single(basefile)
         res = requests.get(self.start_url)
         indextext = res.text
-        reader = TextReader(string=indextext,linesep=TextReader.UNIX)  # see TextReader class
+        reader = TextReader(string=indextext, linesep=TextReader.UNIX)  # see TextReader class
         iterator = reader.getiterator(reader.readparagraph)
-        for (basefile,url) in self.download_get_basefiles(iterator):
+        for (basefile, url) in self.download_get_basefiles(iterator):
             try:
                 if not os.path.exists(self.store.downloaded_path(basefile)):
                     self.download_single(basefile)
@@ -103,13 +114,12 @@ class RFC(DocumentRepository):
     @downloadmax
     def download_get_basefiles(self, source):
         for p in reversed(list(source)):
-            if re.match("^(\d{4}) ",p): # looks like a RFC number
-                if not "Not Issued." in p: # Skip RFC known to not exist
+            if re.match("^(\d{4}) ", p):  # looks like a RFC number
+                if not "Not Issued." in p:  # Skip RFC known to not exist
                     basefile = str(int(p[:4]))  # eg. '0822' -> '822'
-                    yield (basefile, None) 
-        
+                    yield (basefile, None)
 
-    @staticmethod # so as to be easily called from command line
+    @staticmethod  # so as to be easily called from command line
     def get_parser(basefile="0"):
 
         # recognizers, constructors and helpers are created as nested
@@ -143,28 +153,27 @@ class RFC(DocumentRepository):
         # FIXME: use this in parse_header as well
         def _splitcolumns(chunk):
             linelens = []
-            leftlines = [] 
+            leftlines = []
             rightlines = []
             for line in chunk.split("\n"):
                 linelens.append(len(line))
                 if "   " in line:
-                    (left,right) = line.split("   ",1)
+                    (left, right) = line.split("   ", 1)
                 else:
                     (left, right) = line, ""
                 leftlines.append(left)
                 rightlines.append(right)
             return (leftlines, rightlines, linelens)
-            
-        
 
-        def is_doctitle(parser,chunk=None): return True
+        def is_doctitle(parser, chunk=None):
+            return True
 
-        def is_pagebreak(parser,chunk=None):
+        def is_pagebreak(parser, chunk=None):
             if not chunk:
                 chunk = parser.reader.peek()
             return ('\f' in chunk)
-        
-        def is_header(parser,chunk=None):
+
+        def is_header(parser, chunk=None):
             if not chunk:
                 chunk = parser.reader.peek()
             stripchunk = chunk.strip()
@@ -173,19 +182,19 @@ class RFC(DocumentRepository):
             if ((stripchunk != "") and
                 (len(stripchunk.split("\n")) == 1) and
                 (not stripchunk.endswith('.')) and
-                (not chunk.startswith(' '))):
+                    (not chunk.startswith(' '))):
                 return True
 
         def is_section(parser, chunk=None):
-            (ordinal,title,identifier) = analyze_sectionstart(parser,chunk)
+            (ordinal, title, identifier) = analyze_sectionstart(parser, chunk)
             return section_segments_count(ordinal) == 1
 
         def is_subsection(parser, chunk=None):
-            (ordinal,title,identifier) = analyze_sectionstart(parser,chunk)
+            (ordinal, title, identifier) = analyze_sectionstart(parser, chunk)
             return section_segments_count(ordinal) == 2
 
         def is_subsubsection(parser, chunk=None):
-            (ordinal,title,identifier) = analyze_sectionstart(parser,chunk)
+            (ordinal, title, identifier) = analyze_sectionstart(parser, chunk)
             return section_segments_count(ordinal) == 3
 
         def is_preformatted(parser, chunk=None):
@@ -204,14 +213,14 @@ class RFC(DocumentRepository):
                     "...." in stripped or
                     ". . . " in stripped)
 
-        def is_bnf(parser,chunk=None):
+        def is_bnf(parser, chunk=None):
             if not chunk:
                 chunk = parser.reader.peek()
-                return (is_preformatted(parser,chunk) and " = " in chunk)
+                return (is_preformatted(parser, chunk) and " = " in chunk)
 
         def is_paragraph(parser, chunk=None):
             return True
-        
+
         def is_ul_listitem(parser, chunk=None):
             if not chunk:
                 chunk = parser.reader.peek()
@@ -228,18 +237,18 @@ class RFC(DocumentRepository):
 
         def make_body(parser):
             return p.make_children(Body())
-        setattr(make_body,'newstate','body')
-        
+        setattr(make_body, 'newstate', 'body')
+
         def make_preamble_section(parser):
             s = PreambleSection(title=parser.reader.next())
             return p.make_children(s)
-        setattr(make_preamble_section,'newstate','preamble-section')
+        setattr(make_preamble_section, 'newstate', 'preamble-section')
 
         # used for older rfcs
         def make_abstract(parser):
             s = PreambleSection(title="(Abstract)")
             return p.make_children(s)
-        setattr(make_abstract,'newstate','preamble-section')
+        setattr(make_abstract, 'newstate', 'preamble-section')
 
         def skip_pagebreak(parser):
             chunk = parser.reader.next()
@@ -265,67 +274,68 @@ class RFC(DocumentRepository):
 
         def make_bnf(parser):
             chunk = p.reader.next()
-            return Preformatted([chunk],**{'class':'bnf'})
+            return Preformatted([chunk], **{'class': 'bnf'})
 
         def make_section(parser):
-            (secnumber, title, identifier) = analyze_sectionstart(parser,parser.reader.next())
+            (secnumber, title, identifier) = analyze_sectionstart(parser, parser.reader.next())
             s = Section(ordinal=secnumber,
                         title=title,
                         identifier=identifier)
             return parser.make_children(s)
-        setattr(make_section,'newstate','section')
+        setattr(make_section, 'newstate', 'section')
 
         def make_subsection(parser):
-            (secnumber, title, identifier) = analyze_sectionstart(parser,parser.reader.next())
+            (secnumber, title, identifier) = analyze_sectionstart(parser, parser.reader.next())
             s = Subsection(ordinal=secnumber,
                            title=title,
                            identifier=identifier)
             return parser.make_children(s)
-        setattr(make_subsection,'newstate','subsection')
+        setattr(make_subsection, 'newstate', 'subsection')
 
         def make_subsubsection(parser):
-            (secnumber, title, identifier) = analyze_sectionstart(parser,parser.reader.next())
+            (secnumber, title, identifier) = analyze_sectionstart(parser, parser.reader.next())
             s = Subsubsection(ordinal=secnumber,
                               title=title,
                               identifier=identifier)
             return parser.make_children(s)
-        setattr(make_subsubsection,'newstate','subsubsection')
+        setattr(make_subsubsection, 'newstate', 'subsubsection')
 
         def make_unordered_list(parser):
-            (listtype,ordinal,separator,rest) = analyze_listitem(parser.reader.peek())
-            ol = UnorderedList(type=listtype) # should 
-            ol.append(parser.make_child(make_listitem,"listitem"))
+            (listtype, ordinal, separator, rest) = analyze_listitem(parser.reader.peek())
+            ol = UnorderedList(type=listtype)  # should
+            ol.append(parser.make_child(make_listitem, "listitem"))
             return parser.make_children(ol)
-        setattr(make_unordered_list,'newstate','unorderedlist')
-                
+        setattr(make_unordered_list, 'newstate', 'unorderedlist')
+
         def make_listitem(parser):
             chunk = parser.reader.next()
-            (listtype,ordinal,separator,rest) = analyze_listitem(chunk)
+            (listtype, ordinal, separator, rest) = analyze_listitem(chunk)
             li = ListItem(ordinal=ordinal)
             li.append(rest)
             return parser.make_children(li)
-        setattr(make_listitem,'newstate','listitem')
+        setattr(make_listitem, 'newstate', 'listitem')
 
         def make_rfcheader(parser):
-            headerchunk =  parser.reader.next()
+            headerchunk = parser.reader.next()
             if is_rfcheader(parser, lenient=False):
                 headerchunk += "\n" + parser.reader.next()
             return RFCHeader(headerchunk)
 
         def make_doctitle(parser):
             return DocTitle(parser.reader.next())
-        
+
         # Some helpers for the above
         def section_segments_count(s):
-            return ((s is not None) and 
-                    len(list(filter(None,s.split(".")))))
+            return ((s is not None) and
+                    len(list(filter(None, s.split(".")))))
 
         # Matches
         # "1 Blahonga" => ("1","Blahonga", "RFC 1234, section 1")
         # "1.2.3. This is a subsubsection" => ("1.2.3", "This is a subsection", "RFC 1234, section 1.2.3")
         # "   Normal paragraph" => (None, "   Normal paragraph", None)
         re_sectionstart = re.compile("^(\d[\.\d]*) +(.*[^\.])$").match
-        def analyze_sectionstart(parser,chunk=None):
+
+        def analyze_sectionstart(parser, chunk=None):
             if not chunk:
                 chunk = parser.reader.peek()
             m = re_sectionstart(chunk)
@@ -345,9 +355,9 @@ class RFC(DocumentRepository):
             # FIXME: Tighten these patterns to RFC conventions
             # match "1. Foo..." or "14) bar..." but not "4 This is a heading"
             if chunk.startswith("   o  "):
-                return ("disc",None,None,chunk[6:])
-                
-            return (listtype,ordinal,separator,chunk) # None * 3
+                return ("disc", None, None, chunk[6:])
+
+            return (listtype, ordinal, separator, chunk)  # None * 3
 
         p = FSMParser()
 
@@ -366,32 +376,32 @@ class RFC(DocumentRepository):
         # start_state: "body" or "rfcheader", then "title", then
         # "preamble" (consisting of preamblesections that has title
         # (eg "Abstract", "Status of This Memo" + content), then "section".
-        commonstates = ("section","subsection","subsubsection")
-        p.set_transitions({("body", is_rfcheader):(make_rfcheader,"doctitle"),
-                           ("doctitle", is_doctitle):(make_doctitle,"preamble"),
-                           ("preamble", is_header):(make_preamble_section,"preamble-section"),
-                           ("preamble", is_paragraph):(make_abstract, "preamble-section"),
-                           ("preamble-section", is_paragraph):(make_paragraph,None),
-                           ("preamble-section", is_header):(False,None),
-                           ("preamble-section", is_pagebreak):(skip_pagebreak,None),
-                           ("preamble-section", is_section):(False,"after-preamble"),
-                           ("after-preamble", is_section):(make_section, "section"),
-                           ("section", is_subsection): (make_subsection,"subsection"),
-                           ("section", is_section): (False,None),
+        commonstates = ("section", "subsection", "subsubsection")
+        p.set_transitions({("body", is_rfcheader): (make_rfcheader, "doctitle"),
+                           ("doctitle", is_doctitle): (make_doctitle, "preamble"),
+                           ("preamble", is_header): (make_preamble_section, "preamble-section"),
+                           ("preamble", is_paragraph): (make_abstract, "preamble-section"),
+                           ("preamble-section", is_paragraph): (make_paragraph, None),
+                           ("preamble-section", is_header): (False, None),
+                           ("preamble-section", is_pagebreak): (skip_pagebreak, None),
+                           ("preamble-section", is_section): (False, "after-preamble"),
+                           ("after-preamble", is_section): (make_section, "section"),
+                           ("section", is_subsection): (make_subsection, "subsection"),
+                           ("section", is_section): (False, None),
                            ("subsection", is_subsubsection): (make_subsubsection, "subsubsection"),
-                           ("subsection", is_subsection):(False,None),
-                           ("subsection", is_section):(False,None),
-                           ("subsubsection", is_subsubsection):(False,None),
-                           ("subsubsection", is_subsection):(False,None),
-                           ("subsubsection", is_section):(False,None),
-                           (commonstates, is_ul_listitem):(make_unordered_list, "ul-list"),
-                           ("ul-list", is_ul_listitem):(make_listitem, "listitem"),
-                           ("ul-list", is_paragraph):(False,None),
-                           ("listitem", is_paragraph):(False,None),
-                           (commonstates, is_bnf):(make_bnf,None),
-                           (commonstates, is_preformatted):(make_preformatted,None),
-                           (commonstates, is_paragraph):(make_paragraph,None),
-                           (commonstates, is_pagebreak):(skip_pagebreak,None),
+                           ("subsection", is_subsection): (False, None),
+                           ("subsection", is_section): (False, None),
+                           ("subsubsection", is_subsubsection): (False, None),
+                           ("subsubsection", is_subsection): (False, None),
+                           ("subsubsection", is_section): (False, None),
+                           (commonstates, is_ul_listitem): (make_unordered_list, "ul-list"),
+                           ("ul-list", is_ul_listitem): (make_listitem, "listitem"),
+                           ("ul-list", is_paragraph): (False, None),
+                           ("listitem", is_paragraph): (False, None),
+                           (commonstates, is_bnf): (make_bnf, None),
+                           (commonstates, is_preformatted): (make_preformatted, None),
+                           (commonstates, is_paragraph): (make_paragraph, None),
+                           (commonstates, is_pagebreak): (skip_pagebreak, None),
                            })
         p.initial_state = "body"
         p.initial_constructor = make_body
@@ -405,18 +415,19 @@ class RFC(DocumentRepository):
             if 'Sec' in parts:
                 uri += "#S" + parts['Sec'].rstrip(".")
             return uri
-        section_citation = (CaselessLiteral("section") + Word(nums+".").setResultsName("Sec")).setResultsName("SecRef")
-        rfc_citation = (Optional("[") + "RFC" + Word(nums).setResultsName("RFC") + Optional("]")).setResultsName("RFCRef")
+        section_citation = (CaselessLiteral("section") + Word(
+            nums + ".").setResultsName("Sec")).setResultsName("SecRef")
+        rfc_citation = (
+            Optional("[") + "RFC" + Word(nums).setResultsName("RFC") + Optional("]")).setResultsName("RFCRef")
         section_rfc_citation = (section_citation + "of" + rfc_citation).setResultsName("SecRFCRef")
-        citparser = CitationParser(section_rfc_citation, 
+        citparser = CitationParser(section_rfc_citation,
                                    section_citation,
                                    rfc_citation)
         citparser.set_formatter(URIFormatter(("SecRFCRef", rfc_uriformatter),
                                              ("SecRef", rfc_uriformatter),
                                              ("RFCRef", rfc_uriformatter)))
         return citparser
-        
-        
+
     @managedparsing
     def parse(self, doc):
 
@@ -427,7 +438,7 @@ class RFC(DocumentRepository):
         # interleaved with backspace control sequences). Note: that
         # is '\b' as in backspace, not r'\b' as in word boundary
         # docstring = re.sub('.\b','',docstring)
-        cleanparagraphs = (re.sub('.\b','',x) for x in
+        cleanparagraphs = (re.sub('.\b', '', x) for x in
                            reader.getiterator(reader.readparagraph))
 
         parser = self.get_parser(doc.basefile)
@@ -437,35 +448,35 @@ class RFC(DocumentRepository):
         parser.debug = self.config.fsmdebug
         doc.body = parser.parse(cleanparagraphs)
 
-        header = doc.body.pop(0) # body.findByClass(RFCHeader)
-        title  = " ".join(doc.body.pop(0).split()) # body.findByClass(DocHeader)
+        header = doc.body.pop(0)  # body.findByClass(RFCHeader)
+        title = " ".join(doc.body.pop(0).split())  # body.findByClass(DocHeader)
         for part in doc.body:
-            if isinstance(part,PreambleSection) and part.title == "Table of Contents":
+            if isinstance(part, PreambleSection) and part.title == "Table of Contents":
                 doc.body.remove(part)
                 break
-        
+
         # create (RDF) metadata for document Note: The provided
         # basefile may be incorrect -- let whatever is in the header
         # override
         realid = self.get_rfc_num(header)
-        if not realid: # eg RFC 100 -- fallback to basefile in that case
+        if not realid:  # eg RFC 100 -- fallback to basefile in that case
             realid = doc.basefile
         doc.uri = self.canonical_uri(realid)
         desc = Describer(doc.meta, doc.uri)
         desc.rdftype(self.ns['rfc'].RFC)
         desc.value(self.ns['dct'].title, title, lang="en")
-        self.parse_header(header,desc)
+        self.parse_header(header, desc)
         if not desc.getvalues(self.ns['dct'].identifier):
             desc.value(self.ns['dct'].identifier, "RFC %s" % doc.basefile)
-            
+
         doc.lang = "en"
-        
+
         # process body - remove the temporary Pagebreak objects, after
         # having extracted the shortTitle found in them
         shorttitle = self.cleanup_body(doc.body)
         if shorttitle and (desc.getvalue(self.ns['dct'].title) != shorttitle):
             desc.value(self.ns['bibo'].shortTitle, shorttitle, lang="en")
-        
+
         # process body - add good metadata
         citparser = self.make_citation_parser()
         doc.body = citparser.parse_recursive(doc.body)
@@ -474,14 +485,14 @@ class RFC(DocumentRepository):
         if self.config.fsmdebug:
             print(serialize(doc.body))
 
-    def cleanup_body(self,part):
+    def cleanup_body(self, part):
         shorttitle = None
-        newparts = [] # a copy of the children w/o any Pagebreaks
+        newparts = []  # a copy of the children w/o any Pagebreaks
         for subpart in part:
-            if isinstance(subpart,Pagebreak):
+            if isinstance(subpart, Pagebreak):
                 shorttitle = subpart.shorttitle
             else:
-                if isinstance(subpart,six.text_type):
+                if isinstance(subpart, six.text_type):
                     pass
                 else:
                     short = self.cleanup_body(subpart)
@@ -490,26 +501,25 @@ class RFC(DocumentRepository):
                 newparts.append(subpart)
         part[:] = newparts
         return shorttitle
-    
+
     def get_rfc_num(self, header):
         lines = header.split("\n")
-        left = [x.split("   ",1)[0].strip() for x in lines]
+        left = [x.split("   ", 1)[0].strip() for x in lines]
         for line in left[1:]:
             if ":" not in line:
                 continue
-            (key,val) = (x.strip() for x in line.split(": "))
+            (key, val) = (x.strip() for x in line.split(": "))
             if key == "Request for Comments":
                 # only return integer part
                 return re.sub("\D", "", val)
-                
+
         raise ParseError("Couldn't find RFC number in header")
-            
-        
-    def parse_header(self,header,desc):
+
+    def parse_header(self, header, desc):
         # split header in left-hand and right-hand side, and line by line
         lines = header.split("\n")
-        left = [x.split("   ",1)[0].strip() for x in lines]
-        right= [x.split("   ",1)[1].strip() for x in lines if "   " in x]
+        left = [x.split("   ", 1)[0].strip() for x in lines]
+        right = [x.split("   ", 1)[1].strip() for x in lines if "   " in x]
         # first line of lefthand side is publishing organization (?)
         desc.value(self.ns['dct'].publisher, left[0])
         # following lefthand side are key-value headers
@@ -520,14 +530,14 @@ class RFC(DocumentRepository):
                 self.log.warning("Cannot treat %r as a key-value header" % line)
                 continue
 
-            (key,value) = (x.strip() for x in line.split(": "))
+            (key, value) = (x.strip() for x in line.split(": "))
             if key == "Request for Comments":
                 # make sure we only extract the numeric part --
                 # normally value should be numeric, but we've seen
                 # "RFC 1006", "#154" and there are doubtless other
                 # variants
-                value = re.sub("\D","", value)
-                if value: # eg RFC 100
+                value = re.sub("\D", "", value)
+                if value:  # eg RFC 100
                     desc.value(self.ns['dct'].identifier, "RFC %s" % value)
             elif key == "Category":
                 desc.value(self.ns['dct'].subject, value)
@@ -536,9 +546,9 @@ class RFC(DocumentRepository):
             elif key in ("Updates", "Obsoletes"):
                 pred = {'Updates': self.ns['rfc'].updates,
                         'Obsoletes': self.ns['rfc'].obsoletes}[key]
-                
+
                 for valuepart in value.split(", "):
-                    rfcmatch = re.search('\d+',valuepart)
+                    rfcmatch = re.search('\d+', valuepart)
                     if rfcmatch:
                         uri = self.canonical_uri(rfcmatch.group(0))
                         desc.rel(pred, uri)
@@ -552,18 +562,18 @@ class RFC(DocumentRepository):
                 desc.value(self.ns['rfc'].FYI, value)
             else:
                 # Unknown headers seen: BCP, STD, FYI
-                self.log.warning("Unknown header key %s (value %s)" % (key,value))
+                self.log.warning("Unknown header key %s (value %s)" % (key, value))
 
         # For right hand side, any line beginning with a single letter
         # followed by '. ' is probably a name
         for line in right:
-            if re.match("[A-Z]\. ",line):
+            if re.match("[A-Z]\. ", line):
                 desc.value(self.ns['dct'].creator, line)
-            elif re.match("\w+ \d{4}$",line):
+            elif re.match("\w+ \d{4}$", line):
                 # NOTE: this requires english locale!
                 with util.c_locale():
                     dt = datetime.strptime(line, "%B %Y")
-                d = date(dt.year,dt.month,dt.day)
+                d = date(dt.year, dt.month, dt.day)
                 desc.value(self.ns['dct'].issued, d)
             else:
                 # company affiliation - include that separate from
@@ -582,7 +592,7 @@ class RFC(DocumentRepository):
         return [TocCriteria(binding='identifier',
                             label='Sorted by RFC #',
                             pagetitle='RFCs %(select)s--99',
-                            selector=lambda x: x['identifier'][4:-2]+"00",  # "RFC 6998" => "69"
+                            selector=lambda x: x['identifier'][4:-2] + "00",  # "RFC 6998" => "69"
                             key=lambda x: int(x['identifier'][4:]),
                             selector_descending=True,
                             key_descending=True),   # "RFC 6998" => 6998
@@ -590,28 +600,29 @@ class RFC(DocumentRepository):
                 TocCriteria(binding='title',
                             label='Sorted by title',
                             pagetitle='Documents starting with "%(select)s"',
-                            selector=lambda x: util.title_sortkey(x['title'])[0], # "The 'view-state'" property => "v"
+                            # "The 'view-state'" property => "v"
+                            selector=lambda x: util.title_sortkey(x['title'])[0],
                             key=lambda x: util.title_sortkey(x['title'])),
 
                 TocCriteria(binding='issued',
                             label='Sorted by year',
                             pagetitle='Documents published in %(select)s',
-                            selector = lambda x: x['issued'][:4],  # '2013-08-01' => '2013'
-                            key = lambda x: x['issued'],
+                            selector=lambda x: x['issued'][:4],  # '2013-08-01' => '2013'
+                            key=lambda x: x['issued'],
                             selector_descending=True,
-                            key_descending=True), 
+                            key_descending=True),
 
                 TocCriteria(binding='subject',
                             label='Sorted by category',
                             pagetitle='Documents in the %(select)s category',
-                            selector = lambda x: x['subject'],
-                            key = lambda x: int(x['identifier'][4:]),
+                            selector=lambda x: x['subject'],
+                            key=lambda x: int(x['identifier'][4:]),
                             key_descending=True
                             )]
 
     def toc_item(self, binding, row):
         return [row['identifier'] + ": ",
-                Link(row['title'], 
+                Link(row['title'],
                      uri=row['uri'])]
 
     def news_criteria(self):
@@ -627,8 +638,8 @@ class RFC(DocumentRepository):
                 desc = Describer(graph, entry.id)
                 return desc.getvalue(self.ns['dct'].subject) == category
             return selector
-            
-        return [NewsCriteria('all','All RFCs'),
+
+        return [NewsCriteria('all', 'All RFCs'),
                 NewsCriteria('informational', 'Informational RFCs',
                              selector=selector_for("Informational")),
                 NewsCriteria('bcp', 'Best Current Practice RFCs',
@@ -641,21 +652,22 @@ class RFC(DocumentRepository):
     def frontpage_content(self, primary=False):
         from rdflib import URIRef
         items = ""
-        for entry in islice(self.news_entries(),5):
+        for entry in islice(self.news_entries(), 5):
             graph = Graph()
             with self.store.open_distilled(entry.basefile) as fp:
                 graph.parse(data=fp.read())
-            
-            data = {'identifier': graph.value(URIRef(entry.id), self.ns['dct'].identifier).toPython(),
-                    'uri': entry.id,
-                    'title': entry.title}
+
+            data = {
+                'identifier': graph.value(URIRef(entry.id), self.ns['dct'].identifier).toPython(),
+                'uri': entry.id,
+                'title': entry.title}
             items += '<li>%(identifier)s <a href="%(uri)s">%(title)s</a></li>' % data
         return ("""<h2><a href="%(uri)s">Request for comments</a></h2>
                    <p>A complete archive of RFCs in Linked Data form. Contains %(doccount)s documents.</p>
                    <p>Latest 5 documents:</p>
                    <ul>
                       %(items)s
-                   </ul>""" % {'uri':self.dataset_uri(),
+                   </ul>""" % {'uri': self.dataset_uri(),
                                'items': items,
                                'doccount': len(list(self.store.list_basefiles_for("_postgenerate")))})
 

@@ -1,24 +1,23 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import sys
-import os
 import re
-from datetime import datetime, date
+from datetime import datetime
 from six.moves.urllib_parse import urljoin
 
-from rdflib import Graph, Namespace, URIRef, Literal, RDF
+from rdflib import Graph
+from rdflib import URIRef
+from rdflib import Literal
+from rdflib import RDF
 import requests
 from bs4 import BeautifulSoup
 
 from . import SwedishLegalSource
 from .swedishlegalsource import Stycke, Sektion
-from ferenda import DocumentRepository
 from ferenda.decorators import downloadmax, recordlastdownload
 from ferenda import util
-from ferenda.elements import serialize
 from ferenda.legalref import LegalRef, Link
-import ferenda.legaluri
+
 
 class JK(SwedishLegalSource):
     alias = "jk"
@@ -44,7 +43,7 @@ class JK(SwedishLegalSource):
                 basefile = document_url_regex.search(link["href"]).group("basefile")
                 yield basefile, urljoin(url, link["href"])
 
-            next = soup.find("img",src="/common/images/navigation-pil-grey.png").find_parent("a")
+            next = soup.find("img", src="/common/images/navigation-pil-grey.png").find_parent("a")
             if next:
                 url = urljoin(url, next["href"])
                 pagecount += 1
@@ -175,5 +174,3 @@ class JK(SwedishLegalSource):
                     stycke = Stycke(nodes)
                     # self.log.debug("%sCreated stycke: '%s'" % ("  "*level,stycke))
                     sekt.append(stycke)
-
-

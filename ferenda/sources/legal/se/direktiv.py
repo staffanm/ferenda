@@ -3,28 +3,27 @@ from __future__ import unicode_literals
 
 # A number of different classes each fetching the same data from
 # different sources (and with different data formats and data fidelity)
-import sys
 import os
 import re
-import datetime
-import logging
 import functools
 import codecs
-from six.moves.urllib_parse import quote, urljoin
+from six.moves.urllib_parse import urljoin
 
 from bs4 import BeautifulSoup
-from rdflib import Literal, Namespace, URIRef, RDF, RDFS, Graph
+from rdflib import Literal
 import requests
 
 from . import SwedishLegalSource, Trips, Regeringen, RPUBL
 from ferenda import Describer
-from ferenda import DocumentRepository, PDFDocumentRepository, CompositeRepository, Document
+from ferenda import PDFDocumentRepository
+from ferenda import CompositeRepository
 from ferenda import TextReader
 from ferenda import util
 from ferenda.decorators import downloadmax
-from ferenda.elements import Paragraph, Heading, UnicodeSubject, ListItem
+from ferenda.elements import Paragraph
+from ferenda.elements import Heading
+from ferenda.elements import ListItem
 from ferenda.errors import DocumentRemovedError
-from ferenda.pdfreader import PDFReader, Page, Textbox, Textelement
 
 
 class Continuation(object):
@@ -32,6 +31,7 @@ class Continuation(object):
 
 
 class DirTrips(Trips):
+
     """Downloads Direktiv in plain text format from http://rkrattsbaser.gov.se/dir/"""
     alias = "dirtrips"
     app = "dir"
@@ -117,7 +117,8 @@ class DirTrips(Trips):
                 (transformer, setter) = munger[key]
                 setter(pred, transformer(val))
             except (KeyError, ValueError) as e:
-                self.log.error("Couldn't munge value '%s' into a proper object for predicate '%s'" % (val, key))
+                self.log.error(
+                    "Couldn't munge value '%s' into a proper object for predicate '%s'" % (val, key))
 
         d.rel(dct.publisher, self.lookup_resource("Regeringskansliet"))
         d.rel(owl.sameAs, self.sameas_uri(uri))
@@ -143,7 +144,7 @@ class DirTrips(Trips):
         current_type = None
         for p in reader.getiterator(reader.readparagraph):
             new_type = self.guess_type(p, current_type)
-            #if not new_type == None:
+            # if not new_type == None:
             #    print "Guessed %s for %r" % (new_type.__name__,p[:20])
             if new_type is None:
                 pass
@@ -197,6 +198,7 @@ class DirTrips(Trips):
 
 
 class DirAsp(SwedishLegalSource, PDFDocumentRepository):
+
     """Downloads Direktiv in PDF format from http://rkrattsdb.gov.se/kompdf/"""
     alias = "dirasp"
     start_url = "http://rkrattsdb.gov.se/kompdf/search.asp"
@@ -216,9 +218,9 @@ class DirAsp(SwedishLegalSource, PDFDocumentRepository):
         for dept in depts:
             resp = requests.post(urljoin(self.start_url, 'sql_search_rsp.asp'),
                                  {'departement': dept.encode('latin-1'),
-                                  'kom_nr':'',
-                                  'title':'',
-                                  'ACTION':'  SÖK  '.encode('latin-1')})
+                                  'kom_nr': '',
+                                  'title': '',
+                                  'ACTION': '  SÖK  '.encode('latin-1')})
             soup = BeautifulSoup(resp.text)
             hits = list(soup.find_all(True, text=re.compile(r'(\d{4}:\d+)')))
             self.log.info("Searching for dept %s, %d results" % (dept, len(hits)))
@@ -253,6 +255,7 @@ class DirAsp(SwedishLegalSource, PDFDocumentRepository):
 
 
 class DirPolopoly(Regeringen):
+
     """Downloads Direktiv in PDF format from http://www.regeringen.se/"""
     alias = "dirpolo"
     cssfiles = ['../ferenda/res/css/pdfview.css']
@@ -274,6 +277,7 @@ class DirPolopoly(Regeringen):
 
 
 class Direktiv(CompositeRepository, SwedishLegalSource):
+
     "A composite repository containing ``DirTrips``, ``DirAsp`` and ``DirPolopoly``."""
     subrepos = DirPolopoly, DirAsp, DirTrips
     alias = "dir"

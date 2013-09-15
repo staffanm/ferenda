@@ -873,7 +873,7 @@ class Repo(RepoTester):
                           identifier='123(A)\xb62')]
             mock_method.assert_has_calls(calls)
 
-    test_rdf_xml = """<?xml version="1.0" encoding="utf-8"?>
+    test_rdf_xml = b"""<?xml version="1.0" encoding="utf-8"?>
 <rdf:RDF
   xmlns:dcterms="http://purl.org/dc/terms/"
   xmlns:bibo="http://purl.org/ontology/bibo/"
@@ -888,7 +888,7 @@ class Repo(RepoTester):
             
     def test_relate_triples(self):
         # dump known triples as rdf/xml (want) to self.repo.store.distilled_path
-        with self.repo.store.open_distilled('root', 'w') as fp:
+        with self.repo.store.open_distilled('root', 'wb') as fp:
             fp.write(self.test_rdf_xml)
 
         import ferenda.documentrepository
@@ -914,7 +914,7 @@ class Repo(RepoTester):
         # 2.  create distilled for basefile 'root' in repo A that refers to
         #  2.1.  one resource res-a in repo A, and
         #  2.2. another resource res-b in repo B
-        with self.repo.store.open_distilled('root', 'w') as fp:
+        with self.repo.store.open_distilled('root', 'wb') as fp:
             fp.write(self.test_rdf_xml)
         
         # 3. relate_dependencies on repo A for basefile root

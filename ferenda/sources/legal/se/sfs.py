@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals,print_function
+from __future__ import unicode_literals, print_function
 
 """Hanterar (konsoliderade) författningar i SFS från Regeringskansliet
 rättsdatabaser.
@@ -64,10 +64,11 @@ E = ElementMaker(namespace="http://www.w3.org/1999/xhtml")
 
 
 class Forfattning(CompoundElement, TemporalElement):
+
     """Grundklass för en konsoliderad författningstext."""
     tagname = "body"
     classname = "konsolideradforfattning"
-    
+
 # Rubrike är en av de få byggstenarna som faktiskt inte kan innehålla
 # något annat (det förekommer "aldrig" en hänvisning i en
 # rubriktext). Den ärver alltså från UnicodeElement, inte
@@ -75,16 +76,18 @@ class Forfattning(CompoundElement, TemporalElement):
 
 
 class Rubrik(UnicodeElement, TemporalElement):
+
     """En rubrik av något slag - kan vara en huvud- eller underrubrik
     i löptexten, en kapitelrubrik, eller något annat"""
     fragment_label = "R"
+
     def _get_tagname(self):
         if hasattr(self, 'type') and self.type == "underrubrik":
             return "h3"
         else:
             return "h2"
     tagname = property(_get_tagname, "Docstring here")
-            
+
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
         self.uri = kwargs.get("uri", None)
@@ -94,8 +97,8 @@ class Rubrik(UnicodeElement, TemporalElement):
 class Stycke(CompoundElement):
     fragment_label = "S"
     tagname = "p"
-    typeof = "rinfoex:Stycke" # not defined by the rpubl vocab
-    
+    typeof = "rinfoex:Stycke"  # not defined by the rpubl vocab
+
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
         self.uri = kwargs.get("uri", None)
@@ -106,14 +109,16 @@ class Strecksatslista (CompoundElement):
     tagname = "ul"
     classname = "strecksatslista"
 
+
 class NumreradLista (CompoundElement):
-    tagname = "ul" # These list are not always monotonically
+    tagname = "ul"  # These list are not always monotonically
                    # increasing, which a <ol> requrires
     classname = "numreradlista"
 
+
 class Bokstavslista (CompoundElement):
-    tagname = "ul" # See above
-    classname =  "bokstavslista"
+    tagname = "ul"  # See above
+    classname = "bokstavslista"
 
 
 # class Preformatted(UnicodeElement):
@@ -143,16 +148,16 @@ class Avdelning(CompoundElement, OrdinalElement):
 
 
 class UpphavtKapitel(UnicodeElement, OrdinalElement):
+
     """Ett UpphavtKapitel är annorlunda från ett upphävt Kapitel på så
     sätt att inget av den egentliga lagtexten finns kvar, bara en
     platshållare"""
-    pass
 
 
 class Kapitel(CompoundElement, OrdinalElement):
     fragment_label = "K"
     dagname = "div"
-    typeof = "rpubl:Kapitel" # FIXME: This is qname string, not
+    typeof = "rpubl:Kapitel"  # FIXME: This is qname string, not
                              # rdflib.URIRef (which would be better),
                              # since as_xhtml doesn't have access to
                              # a graph with namespace bindings, which
@@ -170,11 +175,13 @@ class UpphavdParagraf(UnicodeElement, OrdinalElement):
 
 # en paragraf har inget "eget" värde, bara ett nummer och ett eller
 # flera stycken
+
+
 class Paragraf(CompoundElement, OrdinalElement):
     fragment_label = "P"
     tagname = "div"
-    typeof = "rpubl:Paragraf" # FIXME: see above
-    
+    typeof = "rpubl:Paragraf"  # FIXME: see above
+
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
         self.uri = kwargs.get("uri", None)
@@ -209,6 +216,7 @@ class Overgangsbestammelse(CompoundElement, OrdinalElement):
         self.uri = kwargs.get("uri", None)
         super(Overgangsbestammelse, self).__init__(*args, **kwargs)
 
+
 class Bilaga(CompoundElement):
     fragment_label = "B"
 
@@ -219,11 +227,12 @@ class Bilaga(CompoundElement):
 
 
 class Register(CompoundElement):
+
     """Innehåller lite metadata om en grundförfattning och dess
     efterföljande ändringsförfattningar"""
     tagname = "div"
     classname = "register"
-    
+
     def __init__(self, *args, **kwargs):
         self.rubrik = kwargs.get('rubrik', None)
         super(Register, self).__init__(*args, **kwargs)
@@ -232,14 +241,15 @@ class Register(CompoundElement):
         res = super(Register, self).as_xhtml()
         res.insert(0, E('h1', self.rubrik))
         return res
-    
+
 
 class Registerpost(CompoundElement):
+
     """Metadata for a particular Grundforfattning or Andringsforfattning in the form of a rdflib graph, optionally with a Overgangsbestammelse."""
     tagname = "div"
     classname = "registerpost"
 
-    def __init__(self, *args, **kwargs): 
+    def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
         self.uri = kwargs.get("uri", None)
         super(Registerpost, self).__init__(*args, **kwargs)
@@ -248,12 +258,12 @@ class Registerpost(CompoundElement):
         # FIXME: Render this better (particularly the rpubl:andring
         # property -- should be parsed and linked)
         return super(Registerpost, self).as_xhtml()
-    
-    
+
+
 class IckeSFS(ParseError):
+
     """Slängs när en författning som inte är en egentlig
     SFS-författning parsas"""
-    pass
 
 
 class UpphavdForfattning(DocumentRemovedError):
@@ -269,11 +279,12 @@ RINFOEX = Namespace("http://lagen.nu/terms#")
 
 
 class SFSDocumentStore(DocumentStore):
+
     def basefile_to_pathfrag(self, basefile):
         return quote(basefile.replace(":", "/"))
 
     def pathfrag_to_basefile(self, pathfrag):
-        return unquote(pathfrag.replace("\\","/").replace("/", ":"))
+        return unquote(pathfrag.replace("\\", "/").replace("/", ":"))
 
     def register_path(self, basefile):
         return self.path(basefile, "register", ".html")
@@ -281,7 +292,9 @@ class SFSDocumentStore(DocumentStore):
     def metadata_path(self, basefile):
         return self.path(basefile, "metadata", ".html")
 
+
 class SFS(Trips):
+
     """Documentation to come.
 
     A note about logging:
@@ -299,8 +312,8 @@ class SFS(Trips):
     """
     alias = "sfs"
 
-    app = "sfst"  # dir, prop, sfst 
-    base = "SFSR" # DIR, THWALLPROP, SFSR
+    app = "sfst"  # dir, prop, sfst
+    base = "SFSR"  # DIR, THWALLPROP, SFSR
 
     start_url = ("http://rkrattsbaser.gov.se/cgi-bin/thw?${HTML}=%(app)s_lst"
                  "&${OOHTML}=%(app)s_dok&${SNHTML}=%(app)s_err"
@@ -318,7 +331,7 @@ class SFS(Trips):
                         'start': '2009',
                         'end': str(datetime.today().year)}]
 
-    document_url_template = ("http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfst_dok&" 
+    document_url_template = ("http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfst_dok&"
                              "${HTML}=sfst_lst&${SNHTML}=sfst_err&${BASE}=SFST&"
                              "${TRIPSHOW}=format=THW&BET=%(basefile)s")
 
@@ -327,7 +340,7 @@ class SFS(Trips):
                                   "${TRIPSHOW}=format=THW&BET=%(basefile)s")
 
     documentstore_class = SFSDocumentStore
-    
+
     def __init__(self, **kwargs):
         super(SFS, self).__init__(**kwargs)
         self.trace = {}
@@ -347,7 +360,7 @@ class SFS(Trips):
         return opts
 
     def canonical_uri(self, basefile, konsolidering=False):
-        baseuri = "https://lagen.nu/sfs" # should(?) be hardcoded
+        baseuri = "https://lagen.nu/sfs"  # should(?) be hardcoded
         if konsolidering:
             if konsolidering == True:
                 return "%s/%s/konsolidering" % (baseuri, basefile)
@@ -357,7 +370,7 @@ class SFS(Trips):
             return "%s/%s" % (baseuri, basefile)
 
     def _set_last_sfsnr(self, last_sfsnr=None):
-        maxyear = datetime.today().year 
+        maxyear = datetime.today().year
         if not last_sfsnr:
             self.log.info("Setting last SFS-nr")
             last_sfsnr = "1600:1"
@@ -514,7 +527,7 @@ class SFS(Trips):
             entry.orig_created = now
         if updated:
             entry.orig_updated = now
-        checked  = True
+        checked = True
         if checked:
             entry.orig_checked = now
         entry.save()
@@ -522,7 +535,7 @@ class SFS(Trips):
         return updated
 
     # FIXME: This doesn't work at all
-    def get_archive_version(self,basefile, sfst_tempfile):
+    def get_archive_version(self, basefile, sfst_tempfile):
         sfst_file = self.store.downloaded_path(basefile)
         # FIXME: Implement get_archive_version
         if os.path.exists(sfst_file):
@@ -638,8 +651,10 @@ class SFS(Trips):
     re_Bokstavslista = re.compile(r'^(\w)\) ')
     re_ElementId = re.compile(
         r'^(\d+) mom\.')        # used for both match+sub
-    re_ChapterRevoked = re.compile(r'^(\d+( \w|)) [Kk]ap. (upphävd|har upphävts) genom (förordning|lag) \([\d\:\. s]+\)\.?$').match
-    re_SectionRevoked = re.compile(r'^(\d+ ?\w?) \xa7[ \.]([Hh]ar upphävts|[Nn]y beteckning (\d+ ?\w?) \xa7) genom ([Ff]örordning|[Ll]ag) \([\d\:\. s]+\)\.$').match
+    re_ChapterRevoked = re.compile(
+        r'^(\d+( \w|)) [Kk]ap. (upphävd|har upphävts) genom (förordning|lag) \([\d\:\. s]+\)\.?$').match
+    re_SectionRevoked = re.compile(
+        r'^(\d+ ?\w?) \xa7[ \.]([Hh]ar upphävts|[Nn]y beteckning (\d+ ?\w?) \xa7) genom ([Ff]örordning|[Ll]ag) \([\d\:\. s]+\)\.$').match
     re_RevokeDate = re.compile(
         r'/(?:Rubriken u|U)pphör att gälla U:(\d+)-(\d+)-(\d+)/')
     re_RevokeAuthorization = re.compile(
@@ -649,18 +664,21 @@ class SFS(Trips):
     re_EntryIntoForceAuthorization = re.compile(
         r'/Träder i kraft I:(den dag regeringen bestämmer)/')
     re_dehyphenate = re.compile(r'\b- (?!(och|eller))', re.UNICODE).sub
-    re_definitions = re.compile(r'^I (lagen|förordningen|balken|denna lag|denna förordning|denna balk|denna paragraf|detta kapitel) (avses med|betyder|används följande)').match
-    re_brottsdef = re.compile(r'\b(döms|dömes)(?: han)?(?:,[\w\xa7 ]+,)? för ([\w ]{3,50}) till (böter|fängelse)', re.UNICODE).search
-    re_brottsdef_alt = re.compile(r'[Ff]ör ([\w ]{3,50}) (döms|dömas) till (böter|fängelse)', re.UNICODE).search
+    re_definitions = re.compile(
+        r'^I (lagen|förordningen|balken|denna lag|denna förordning|denna balk|denna paragraf|detta kapitel) (avses med|betyder|används följande)').match
+    re_brottsdef = re.compile(
+        r'\b(döms|dömes)(?: han)?(?:,[\w\xa7 ]+,)? för ([\w ]{3,50}) till (böter|fängelse)', re.UNICODE).search
+    re_brottsdef_alt = re.compile(
+        r'[Ff]ör ([\w ]{3,50}) (döms|dömas) till (böter|fängelse)', re.UNICODE).search
     re_parantesdef = re.compile(r'\(([\w ]{3,50})\)\.', re.UNICODE).search
-    re_loptextdef = re.compile(r'^Med ([\w ]{3,50}) (?:avses|förstås) i denna (förordning|lag|balk)', re.UNICODE).search
+    re_loptextdef = re.compile(
+        r'^Med ([\w ]{3,50}) (?:avses|förstås) i denna (förordning|lag|balk)', re.UNICODE).search
 
     # use this custom matcher to ensure any strings you intend to convert
     # are legal roman numerals (simpler than having from_roman throwing
     # an exception)
     re_roman_numeral_matcher = re.compile(
         '^M?M?M?(CM|CD|D?C?C?C?)(XC|XL|L?X?X?X?)(IX|IV|V?I?I?I?)$').match
-
 
     @decorators.action
     @decorators.managedparsing
@@ -670,7 +688,7 @@ class SFS(Trips):
 
         # 1. use self._find_uppdaterad_tom(sfst_file, doc.basefile). Note
         # that this value is often wrong (particularly typos are common).
-        
+
         # 2. call self.parse_sfsr(sfsr_file) and find the last
         # value. Note that SFSR might be updated before SFST and so
         # the last sfs no might be later than what's really in the SFS file.
@@ -689,7 +707,8 @@ class SFS(Trips):
         if not os.path.exists(sfsr_file):
             sfsr_file = sfst_file.replace("/downloaded/", "/register/")
         if not os.path.exists(docentry_file):
-            docentry_file = sfst_file.replace("/downloaded/", "/entries/").replace(".html",".json")
+            docentry_file = sfst_file.replace(
+                "/downloaded/", "/entries/").replace(".html", ".json")
 
         # legacy code -- try to remove this by providing doc.basefile
         # to all methods that need it
@@ -719,7 +738,7 @@ class SFS(Trips):
 
         # Find out last uppdaterad_tom value
         t.seek(0)
-        uppdaterad_tom = self._find_uppdaterad_tom(doc.basefile,reader=t)
+        uppdaterad_tom = self._find_uppdaterad_tom(doc.basefile, reader=t)
         # now we can set doc.uri for reals
         doc.uri = self.canonical_uri(doc.basefile, uppdaterad_tom)
         doc.lang = "sv"
@@ -730,11 +749,11 @@ class SFS(Trips):
         except UpphavdForfattning as e:
             e.dummyfile = self.store.parsed_path(doc.basefile)
             raise e
-        
-        #for uri, graph in registry.items():
+
+        # for uri, graph in registry.items():
         #    print("==== %s ====" % uri)
         #    print(graph.serialize(format="turtle").decode("utf-8"))
-        
+
         try:
             plaintext = self.extract_sfst(sfst_file)
             plaintextfile = self.store.path(doc.basefile, "intermediate", ".txt")
@@ -749,7 +768,7 @@ class SFS(Trips):
             self.log.warning("%s: Fulltext saknas" % self.id)
             # extractSFST misslyckades, då det fanns någon post i
             # SFST-databasen (det händer alltför ofta att bara
-            # SFSR-databasen är uppdaterad). 
+            # SFSR-databasen är uppdaterad).
             desc.value(self.ns['dct'].title,
                        registry.value(URIRef(doc.uri),
                                       self.ns['dct'].title))
@@ -757,7 +776,7 @@ class SFS(Trips):
                      self.lookup_resource("Regeringskansliet"))
 
             desc.value(self.ns['dct'].identifier, "SFS " + doc.basefile)
-                       
+
             doc.body = Forfattning([Stycke(['Lagtext saknas'],
                                            id='S1')])
 
@@ -766,7 +785,8 @@ class SFS(Trips):
         for uri in registry.keys():
             desc.rel(self.ns['rpubl'].konsolideringsunderlag, uri)
         desc.rdftype(self.ns['rpubl'].KonsolideradGrundforfattning)
-        desc.rev(self.ns['owl'].sameAs, self.canonical_uri(doc.basefile, True)) # FIXME: make this part of head metadata
+        # FIXME: make this part of head metadata
+        desc.rev(self.ns['owl'].sameAs, self.canonical_uri(doc.basefile, True))
         desc.rel(self.ns['rpubl'].konsoliderar, self.canonical_uri(doc.basefile))
         de = DocumentEntry(docentry_file)
         desc.value(self.ns['rinfoex'].senastHamtad, de.orig_updated)
@@ -780,7 +800,7 @@ class SFS(Trips):
                 os.path.dirname(__file__) + os.sep + resource_path)
         g.load(resource_path, format="n3")
         grf_uri = self.canonical_uri(doc.basefile)
-        v  = g.value(URIRef(grf_uri), self.ns['dct'].alternate, any=True)
+        v = g.value(URIRef(grf_uri), self.ns['dct'].alternate, any=True)
         if v:
             desc.value(self.ns['dct'].alternate, v)
 
@@ -815,7 +835,8 @@ class SFS(Trips):
         assert isinstance(published, date)
         desc.value(self.ns['dct'].published, published)
 
-        rinfo_sameas = "http://rinfo.lagrummet.se/publ/sfs/%s/konsolidering/%s" % (doc.basefile, published.strftime("%Y-%m-%d"))
+        rinfo_sameas = "http://rinfo.lagrummet.se/publ/sfs/%s/konsolidering/%s" % (
+            doc.basefile, published.strftime("%Y-%m-%d"))
         desc.rel(self.ns['owl'].sameAs, rinfo_sameas)
 
         # finally, combine data from the registry with any possible
@@ -826,19 +847,19 @@ class SFS(Trips):
         for idx, p in enumerate(doc.body):
             if isinstance(p, Overgangsbestammelser):
                 for ob in p:
-                    assert isinstance(ob,Overgangsbestammelse)
+                    assert isinstance(ob, Overgangsbestammelse)
                     obs[self.canonical_uri(ob.sfsnr)] = ob
                     obsidx = idx
                 break
-            
+
         if obs:
             del doc.body[obsidx]
             reg = Register(rubrik='Ändringar och övergångsbestämmelser')
         else:
             reg = Register(rubrik='Ändringar')
-            
-        for uri,graph in registry.items():
-            identifier = graph.value(URIRef(uri),self.ns['dct'].identifier)
+
+        for uri, graph in registry.items():
+            identifier = graph.value(URIRef(uri), self.ns['dct'].identifier)
             identifier = identifier.replace("SFS ", "L")
             rp = Registerpost(uri=uri, meta=graph, id=identifier)
             reg.append(rp)
@@ -854,7 +875,7 @@ class SFS(Trips):
             return self.ns['rpubl'].Lag
         else:
             return self.ns['rpubl'].Forordning
-                
+
     def _dict_to_graph(self, d, graph, uri):
         mapping = {'SFS nr': self.ns['rpubl'].fsNummer,
                    'Rubrik': self.ns['dct'].title,
@@ -864,32 +885,33 @@ class SFS(Trips):
                    'Departement/ myndighet': self.ns['dct'].creator
                    }
         desc = Describer(graph, uri)
-        for (k,v) in d.items():
+        for (k, v) in d.items():
             if k in mapping:
                 if hasattr(v, 'uri'):
-                    desc.rel(mapping[k],v.uri)
+                    desc.rel(mapping[k], v.uri)
                 else:
                     desc.value(mapping[k], v)
-    
+
     def parse_sfsr(self, filename, docuri):
         """Parsear ut det SFSR-registret som innehåller alla ändringar
         i lagtexten från HTML-filer"""
         with codecs.open(filename, encoding="iso-8859-1") as fp:
-            soup = bs4.BeautifulSoup(fp.read(),"lxml")
+            soup = bs4.BeautifulSoup(fp.read(), "lxml")
 
         d = OrderedDict()
-        rubrik  = soup.body('table')[2].text.strip()
+        rubrik = soup.body('table')[2].text.strip()
         changes = soup.body('table')[3:-2]
         for table in changes:
-            sfsnr = table.find(text="SFS-nummer:").find_parent("td").find_next_sibling("td").text.strip()
+            sfsnr = table.find(text="SFS-nummer:").find_parent(
+                "td").find_next_sibling("td").text.strip()
             # FIXME: canonical uri for this docrepo is consolidated
             # documents. we need the uri for the base document. Either
             # create a helper docrepo (ferenda.legal.se.SFSPrint) or
             # implement a helper method.
             docuri = self.canonical_uri(sfsnr)
-            g = self.make_graph() # to get proper namespace bindings
+            g = self.make_graph()  # to get proper namespace bindings
             d[docuri] = g
-            desc = Describer(g,docuri)
+            desc = Describer(g, docuri)
 
             rowdict = {}
             for row in table('tr'):
@@ -906,17 +928,17 @@ class SFS(Trips):
             # first change does not contain a "Rubrik" key. Fake it.
             if 'Rubrik' not in rowdict and rubrik:
                 rowdict['Rubrik'] = rubrik
-                rubrik = None 
-                
-            for key,val in rowdict.items():
-                    
+                rubrik = None
+
+            for key, val in rowdict.items():
+
                 if key == 'SFS-nummer':
                     (arsutgava, lopnummer) = val.split(":")
                     desc.value(self.ns['dct'].identifier, "SFS " + val)
                     desc.value(self.ns['rpubl'].arsutgava, arsutgava)
                     desc.value(self.ns['rpubl'].lopnummer, lopnummer)
                     # desc.value("rpubl:lopnummer", lopnummer)
-                    
+
                 elif key == 'Ansvarig myndighet':
                     try:
                         authrec = self.lookup_resource(val)
@@ -925,7 +947,8 @@ class SFS(Trips):
                         desc.value(self.ns['rpubl'].departement, val)
                 elif key == 'Rubrik':
                     if not self.id in val:
-                        self.log.warning("%s: Base SFS %s not found in title %r" % (self.id, self.id, val))
+                        self.log.warning(
+                            "%s: Base SFS %s not found in title %r" % (self.id, self.id, val))
                     desc.value(self.ns['dct'].title, Literal(val, lang="sv"))
                     desc.rdftype(self._forfattningstyp(val))
                 elif key == 'Observera':
@@ -956,7 +979,7 @@ class SFS(Trips):
                               changecat.startswith('tillägg')):
                             pred = self.ns['rpubl'].inforsI
                         elif (changecat.startswith('nuvarande') or
-                              changecat in ('begr. giltighet','Omtryck',
+                              changecat in ('begr. giltighet', 'Omtryck',
                                             'omtryck', 'forts.giltighet',
                                             'forts. giltighet',
                                             'forts. giltighet av vissa best.')):
@@ -965,7 +988,7 @@ class SFS(Trips):
                             self.log.warning("%s: Okänd omfattningstyp %r" % (self.id, changecat))
                             pred = None
                             for node in self.lagrum_parser.parse(changecat, docuri, pred):
-                                if hasattr(node,'predicate'):
+                                if hasattr(node, 'predicate'):
                                     desc.rel(node.predicate, node.uri)
                     # Secondly, preserve the entire text
                     desc.value(self.ns['rpubl'].andrar, val)
@@ -987,7 +1010,8 @@ class SFS(Trips):
                     desc.value(self.ns['rinfoex'].tidsbegransad, expdate)
                     if expdate < datetime.today():
                         if not self.config.keepexpired:
-                            raise UpphavdForfattning("%s is an expired (time-limited) SFS" % filename)
+                            raise UpphavdForfattning(
+                                "%s is an expired (time-limited) SFS" % filename)
                 else:
                     self.log.warning(
                         '%s: Obekant nyckel [\'%s\']' % self.id, key)
@@ -1005,17 +1029,16 @@ class SFS(Trips):
             utfardandedatum = self._find_utfardandedatum(sfsnr)
             if utfardandedatum:
                 desc.value(self.ns['rpubl'].utfardandedatum, utfardandedatum)
-            
+
         return d
-        
 
     def _find_utfardandedatum(self, sfsnr):
         # FIXME: Code to instantiate a SFSTryck object and muck about goes here
-        fake = {'2013:363': date(2013,5,23),
-                '2008:344': date(2008,5,22),
-                '2009:1550': date(2009,12,17),
-                '2013:411': date(2013,5,30),
-        }
+        fake = {'2013:363': date(2013, 5, 23),
+                '2008:344': date(2008, 5, 22),
+                '2009:1550': date(2009, 12, 17),
+                '2013:411': date(2013, 5, 30),
+                }
         return fake.get(sfsnr, None)
 
     def extract_sfst(self, filename):
@@ -1222,7 +1245,7 @@ class SFS(Trips):
                 # Efter att första tabellcellen i en rad hanterats,
                 # undvik att leta definitioner i tabellceller 2,3,4...
                 if isinstance(element, Tabellrad):
-                    #print "släcker definitionsletarflaggan"
+                    # print "släcker definitionsletarflaggan"
                     find_definitions_recursive = False
 
     def _count_elements(self, element):
@@ -1245,23 +1268,20 @@ class SFS(Trips):
         desc = Describer(doc.meta, doc.uri)
         self.make_header(desc)
         doc.body = self.makeForfattning()
-        
+
         elements = self._count_elements(doc.body)
         if 'K' in elements and elements['P1'] < 2:
             skipfragments = ['A', 'K']
         else:
             skipfragments = ['A']
-            
+
         self._construct_ids(doc.body, '',
                             self.canonical_uri(doc.basefile),
                             skipfragments)
 
-
-
     #----------------------------------------------------------------
     #
     # SFST-PARSNING
-
     def make_header(self, desc):
         subreader = self.reader.getreader(
             self.reader.readchunk, self.reader.linesep * 4)
@@ -1270,7 +1290,7 @@ class SFS(Trips):
             if ":" in line:
                 (key, val) = [util.normalize_space(x)
                               for x in line.split(":", 1)]
-            # Simple string literals 
+            # Simple string literals
             if key == 'Rubrik':
                 desc.value(self.ns['dct'].title, Literal(val, lang="sv"))
             elif key == 'Övrigt':
@@ -1279,7 +1299,7 @@ class SFS(Trips):
                 identifier = "SFS " + val
                 # delay actual writing to graph, since we may need to
                 # amend this
-                
+
             # date literals
             elif key == 'Utfärdad':
                 desc.value(self.ns['rpubl'].utfardandedatum,
@@ -1297,14 +1317,14 @@ class SFS(Trips):
             elif key == 'Departement/ myndighet':
                 authrec = self.lookup_resource(val)
                 desc.rel(self.ns['dct'].creator, authrec)
-            elif (key == 'Ändring införd' and re_sfs(val)): 
+            elif (key == 'Ändring införd' and re_sfs(val)):
                 uppdaterad = re_sfs(val).group(1)
                 # not sure we need to add this, since parse_sfsr catches same
                 desc.rel(self.ns['rpubl'].konsolideringsunderlag,
                          self.canonical_uri(uppdaterad))
                 if identifier and identifier != "SFS " + uppdaterad:
                     identifier += " i lydelse enligt SFS " + uppdaterad
-                
+
             elif (key == 'Omtryck' and re_sfs(val)):
                 desc.rel(self.ns['rinfoex'].omtryck,
                          self.canonical_uri(re_sfs(val).group(1)))
@@ -1316,7 +1336,7 @@ class SFS(Trips):
             else:
                 self.log.warning(
                     '%s: Obekant nyckel [\'%s\']' % (self.id, key))
-        
+
         desc.value(self.ns['dct'].identifier, identifier)
         desc.rel(self.ns['dct'].publisher,
                  self.lookup_resource("Regeringskansliet"))
@@ -1504,11 +1524,12 @@ class SFS(Trips):
                 state_handler()  # Bara att slänga bort
             elif state_handler == self.makeOvergangsbestammelse:
                 self.log.debug("      Paragraf %s färdig" % paragrafnummer)
-                self.log.warning("%s: Avskiljande rubrik saknas mellan författningstext och övergångsbestämmelser" % self.id)
+                self.log.warning(
+                    "%s: Avskiljande rubrik saknas mellan författningstext och övergångsbestämmelser" % self.id)
                 return p
             else:
                 assert state_handler == self.makeStycke, "guess_state returned %s, not makeStycke" % state_handler.__name__
-                #if state_handler != self.makeStycke:
+                # if state_handler != self.makeStycke:
                 #    self.log.warning("behandlar '%s...' som stycke, inte med %s" % (self.reader.peekline()[:30], state_handler.__name__))
                 res = self.makeStycke()
                 p.append(res)
@@ -1642,10 +1663,12 @@ class SFS(Trips):
                     # assume these are the initial Övergångsbestämmelser
                     if hasattr(self, 'id') and '/' in self.id:
                         sfsnr = self.id
-                        self.log.warning("%s: Övergångsbestämmelsen saknar SFS-nummer - antar [%s]" % (self.id, sfsnr))
+                        self.log.warning(
+                            "%s: Övergångsbestämmelsen saknar SFS-nummer - antar [%s]" % (self.id, sfsnr))
                     else:
                         sfsnr = '0000:000'
-                        self.log.warning("(unknown): Övergångsbestämmelsen saknar ett SFS-nummer - antar %s" % (sfsnr))
+                        self.log.warning(
+                            "(unknown): Övergångsbestämmelsen saknar ett SFS-nummer - antar %s" % (sfsnr))
 
                     obs.append(Overgangsbestammelse([res], sfsnr=sfsnr))
                 else:
@@ -1690,7 +1713,8 @@ class SFS(Trips):
         return b
 
     def andringsDatum(self, line, match=False):
-        # Hittar ändringsdatumdirektiv i line. Om match, matcha från strängens början, annars sök i hela strängen.
+        # Hittar ändringsdatumdirektiv i line. Om match, matcha från strängens
+        # början, annars sök i hela strängen.
         dates = {'ikrafttrader': None,
                  'upphor': None}
 
@@ -1830,7 +1854,8 @@ class SFS(Trips):
             # attempts to filter these out by looking for some typical line endings for those cases
             if (p.endswith(",") or
                 p.endswith(";") or
-                # p.endswith(")") or  # but in some cases, a chapter actually ends in ), eg 1932:131
+                # p.endswith(")") or  # but in some cases, a chapter actually ends in ),
+                # eg 1932:131
                 p.endswith(" och") or  # in unlucky cases, a chapter heading might span two lines in a way that the first line ends with "och" (eg 1998:808 kap. 3)
                 p.endswith(" om") or
                 p.endswith(" samt") or
@@ -1860,7 +1885,7 @@ class SFS(Trips):
             # Om det ser ut som en tabell är det nog ingen
             # kapitelrubrik -- borttaget, triggade inget
             # regressionstest och orsakade bug 168
-            #if self.isTabell(p, requireColumns=True):
+            # if self.isTabell(p, requireColumns=True):
             #    return None
             else:
                 return m.group(1)
@@ -1939,7 +1964,8 @@ class SFS(Trips):
         # infinite recursion)
         if not indirect:
             if (not self.isParagraf(nextp)) and (not self.isRubrik(nextp)):
-                self.trace['rubrik'].debug("isRubrik (%s): is not followed by a paragraf or rubrik" % (p[:50]))
+                self.trace['rubrik'].debug(
+                    "isRubrik (%s): is not followed by a paragraf or rubrik" % (p[:50]))
                 return False
 
         # if this headline is followed by a second headline, that
@@ -1980,7 +2006,8 @@ class SFS(Trips):
         # start of a new section. One example of that is
         # /1991:1469#K1P7S1.
         if util.numcmp(paragrafnummer, self.current_section) < 0:
-            self.trace['paragraf'].debug("isParagraf: section numbering compare failed (%s <= %s)" % (paragrafnummer, self.current_section))
+            self.trace['paragraf'].debug(
+                "isParagraf: section numbering compare failed (%s <= %s)" % (paragrafnummer, self.current_section))
             return False
 
         # a similar case exists in 1994:260 and 2007:972, but there
@@ -1992,7 +2019,8 @@ class SFS(Trips):
         # print "%r: %s" % (p, firstcharidx)
         if ((len(p) > firstcharidx) and
                 (p[len(paragrafnummer) + len(' \xa7 ')].islower())):
-            self.trace['paragraf'].debug("isParagraf: section '%s' did not start with uppercase" % p[len(paragrafnummer) + len(' \xa7 '):30])
+            self.trace['paragraf'].debug(
+                "isParagraf: section '%s' did not start with uppercase" % p[len(paragrafnummer) + len(' \xa7 '):30])
             return False
         return True
 
@@ -2040,7 +2068,8 @@ class SFS(Trips):
                 lines.append(l)
             else:
                 if emptyleft:
-                    self.trace['tabell'].debug("isTabell('%s'): Snedformatterade tabellrader" % (p[:20]))
+                    self.trace['tabell'].debug(
+                        "isTabell('%s'): Snedformatterade tabellrader" % (p[:20]))
                     break
                 else:
                     lines.append(l)
@@ -2049,14 +2078,17 @@ class SFS(Trips):
         # Heuristiken för att gissa om detta stycke är en tabellrad:
         # Om varje rad
         # 1. Är kort (indikerar en tabellrad med en enda vänstercell)
-        self.trace['tabell'].debug("assumeTable: %s numlines: %s requireColumns: %s " % (assumeTable, numlines, requireColumns))
+        self.trace['tabell'].debug(
+            "assumeTable: %s numlines: %s requireColumns: %s " % (assumeTable, numlines, requireColumns))
         if (assumeTable or numlines > 1) and not requireColumns:
             matches = [l for l in lines if len(l) < shortline]
             if numlines == 1 and '  ' in lines[0]:
-                self.trace['tabell'].debug("isTabell('%s'): Endast en rad, men tydlig kolumnindelning" % (p[:20]))
+                self.trace['tabell'].debug(
+                    "isTabell('%s'): Endast en rad, men tydlig kolumnindelning" % (p[:20]))
                 return True
             if len(matches) == numlines:
-                self.trace['tabell'].debug("isTabell('%s'): Alla rader korta, undersöker undantag" % (p[:20]))
+                self.trace['tabell'].debug(
+                    "isTabell('%s'): Alla rader korta, undersöker undantag" % (p[:20]))
 
                 # generellt undantag: Om en tabells första rad har
                 # enbart vänsterkolumn M\XE5STE den följas av en
@@ -2074,7 +2106,8 @@ class SFS(Trips):
                 if not assumeTable and not self.isTabell(p2,
                                                          assumeTable=True,
                                                          requireColumns=True):
-                    self.trace['tabell'].debug("isTabell('%s'): generellt undantag från alla rader korta-regeln" % (p[:20]))
+                    self.trace['tabell'].debug(
+                        "isTabell('%s'): generellt undantag från alla rader korta-regeln" % (p[:20]))
                     return False
                 elif numlines == 1:
                     # Om stycket har en enda rad *kan* det vara en kort
@@ -2085,23 +2118,27 @@ class SFS(Trips):
                     # regression-tabell-foljd-av-kort-rubrik.txt och
                     # temporal-paragraf-med-tabell.txt
                     if self.isParagraf(p2):
-                        self.trace['tabell'].debug("isTabell('%s'): Specialundantag: följs av Paragraf, inte Tabellrad" % (p[:20]))
+                        self.trace['tabell'].debug(
+                            "isTabell('%s'): Specialundantag: följs av Paragraf, inte Tabellrad" % (p[:20]))
                         return False
                     if self.isRubrik(p2) and self.isParagraf(p3):
-                        self.trace['tabell'].debug("isTabell('%s'): Specialundantag: följs av Rubrik och sedan Paragraf, inte Tabellrad" % (p[:20]))
+                        self.trace['tabell'].debug(
+                            "isTabell('%s'): Specialundantag: följs av Rubrik och sedan Paragraf, inte Tabellrad" % (p[:20]))
                         return False
                     # Om stycket är *exakt* detta signalerar det nog
                     # övergången från tabell (kanske i slutet på en
                     # bilaga, som i SekrL) till övergångsbestämmelserna
                     if self.isOvergangsbestammelser():
-                        self.trace['tabell'].debug("isTabell('%s'): Specialundantag: Övergångsbestämmelser" % (p[:20]))
+                        self.trace['tabell'].debug(
+                            "isTabell('%s'): Specialundantag: Övergångsbestämmelser" % (p[:20]))
                         return False
                     if self.isBilaga():
-                        self.trace['tabell'].debug("isTabell('%s'): Specialundantag: Bilaga" % (p[:20]))
+                        self.trace['tabell'].debug(
+                            "isTabell('%s'): Specialundantag: Bilaga" % (p[:20]))
                         return False
 
                 # Detta undantag behöves förmodligen inte när genererella undantaget används
-                #elif (numlines == 2 and
+                # elif (numlines == 2 and
                 #      self.isNumreradLista() and (
                 #    lines[1].startswith('Förordning (') or
                 #    lines[1].startswith('Lag ('))):
@@ -2110,13 +2147,15 @@ class SFS(Trips):
                 #        return False
 
                 # inget av undantagen tillämpliga, huvudregel 1 gäller
-                self.trace['tabell'].debug("isTabell('%s'): %s rader, alla korta" % (p[:20], numlines))
+                self.trace['tabell'].debug(
+                    "isTabell('%s'): %s rader, alla korta" % (p[:20], numlines))
                 return True
 
         # 2. Har mer än ett mellanslag i följd på varje rad (spaltuppdelning)
         matches = [l for l in lines if '  ' in l]
         if numlines > 1 and len(matches) == numlines:
-            self.trace['tabell'].debug("isTabell('%s'): %s rader, alla spaltuppdelade" % (p[:20], numlines))
+            self.trace['tabell'].debug(
+                "isTabell('%s'): %s rader, alla spaltuppdelade" % (p[:20], numlines))
             return True
 
         # 3. Är kort ELLER har spaltuppdelning
@@ -2125,15 +2164,18 @@ class SFS(Trips):
             self.trace['tabell'].debug("test 3.1")
             matches = [l for l in lines if '  ' in l or len(l) < shorterline]
             if len(matches) == numlines:
-                self.trace['tabell'].debug("isTabell('%s'): %s rader, alla korta eller spaltuppdelade" % (p[:20], numlines))
+                self.trace['tabell'].debug(
+                    "isTabell('%s'): %s rader, alla korta eller spaltuppdelade" % (p[:20], numlines))
                 return True
 
         # 3. Är enrading med TYDLIG tabelluppdelning
         if numlines == 1 and '   ' in l:
-            self.trace['tabell'].debug("isTabell('%s'): %s rader, alla spaltuppdelade" % (p[:20], numlines))
+            self.trace['tabell'].debug(
+                "isTabell('%s'): %s rader, alla spaltuppdelade" % (p[:20], numlines))
             return True
 
-        self.trace['tabell'].debug("isTabell('%s'): %s rader, inga test matchade (aT:%r, rC: %r)" % (p[:20], numlines, assumeTable, requireColumns))
+        self.trace['tabell'].debug("isTabell('%s'): %s rader, inga test matchade (aT:%r, rC: %r)" %
+                                   (p[:20], numlines, assumeTable, requireColumns))
         return False
 
     def makeTabell(self):
@@ -2227,7 +2269,8 @@ class SFS(Trips):
                 emptyleft = True
             else:
                 if emptyleft:
-                    self.trace['tabell'].debug('makeTabellrad: skapar ny tabellrad pga snedformatering')
+                    self.trace['tabell'].debug(
+                        'makeTabellrad: skapar ny tabellrad pga snedformatering')
                     rows.append(cols)
                     cols = ['', '', '', '', '', '', '', '']
                     emptyleft = False
@@ -2247,12 +2290,15 @@ class SFS(Trips):
 
                         # för hantering av tomma vänsterceller
                         if linecount > 1 or statictabstops:
-                            if tabstops[colcount + 1] + 7 < charcount:  # tillåt en ojämnhet om max sju tecken
+                            # tillåt en ojämnhet om max sju tecken
+                            if tabstops[colcount + 1] + 7 < charcount:
                                 if len(tabstops) <= colcount + 2:
                                     tabstops.append(0)
                                     cols.append('')
-                                self.trace['tabell'].debug('colcount is %d, # of tabstops is %d' % (colcount, len(tabstops)))
-                                self.trace['tabell'].debug('charcount shoud be max %s, is %s - adjusting to next tabstop (%s)' % (tabstops[colcount + 1] + 5, charcount, tabstops[colcount + 2]))
+                                self.trace['tabell'].debug(
+                                    'colcount is %d, # of tabstops is %d' % (colcount, len(tabstops)))
+                                self.trace['tabell'].debug('charcount shoud be max %s, is %s - adjusting to next tabstop (%s)' % (
+                                    tabstops[colcount + 1] + 5, charcount, tabstops[colcount + 2]))
                                 if tabstops[colcount + 2] != 0:
                                     self.trace['tabell'].debug(
                                         'safe to advance colcount')
@@ -2470,7 +2516,7 @@ class SFS(Trips):
                 stuff[lagrum] = {}
             if not 'inboundlinks' in stuff[lagrum]:
                 stuff[lagrum]['inboundlinks'] = []
-            #print "adding %s under %s" % (row['id'],lagrum)
+            # print "adding %s under %s" % (row['id'],lagrum)
             stuff[lagrum]['inboundlinks'].append({'uri': row['uri']})
 
         # remove inbound links that refer to the law itself plus at
@@ -2538,7 +2584,7 @@ class SFS(Trips):
         # The RDF dump looks something like:
         #
         # <rdf:RDF>
-        #   <rdf:Description about="http://rinfo.lagrummet.se/publ/sfs/1998:204#P1">
+        # <rdf:Description about="http://rinfo.lagrummet.se/publ/sfs/1998:204#P1">
         #     <rinfo:isLagrumFor>
         #       <rdf:Description about="http://rinfo.lagrummet.se/publ/dom/rh/2004:51">
         #           <dct:identifier>RH 2004:51</dct:identifier>
@@ -2615,7 +2661,8 @@ class SFS(Trips):
                     # If uri is the same as the next one OR uri is the
                     # same as baseuri, use relative form for creating
                     # dct:identifer
-                    # print "uri: %s, next_uri: %s, baseuri: %s" % (uri[35:],next_uri[35:],baseuri[35:])
+                    # print "uri: %s, next_uri: %s, baseuri: %s" %
+                    # (uri[35:],next_uri[35:],baseuri[35:])
                     if (uri == next_uri) or (uri == baseuri):
                         form = "relative"
                     else:
@@ -2634,7 +2681,7 @@ class SFS(Trips):
                     ischanged_node = etree.SubElement(
                         lagrum_node, "rinfo:isChangedBy")
                     #rattsfall_node = etree.SubElement(islagrumfor_node, "rdf:Description")
-                    #rattsfall_node.set("rdf:about",r['uri'])
+                    # rattsfall_node.set("rdf:about",r['uri'])
                     id_node = etree.SubElement(ischanged_node, "rinfo:fsNummer")
                     id_node.text = r['id']
             if 'desc' in stuff[l]:
@@ -2688,7 +2735,8 @@ class SFS(Trips):
             self._generateAnnotations(annotations, basefile)
             if time() - start > 5:
                 self.log.info("openrdf-sesame is getting slow, reloading")
-                cmd = "curl -u %s:%s http://localhost:8080/manager/reload?path=/openrdf-sesame" % (self.config['tomcatuser'], self.config['tomcatpassword'])
+                cmd = "curl -u %s:%s http://localhost:8080/manager/reload?path=/openrdf-sesame" % (
+                    self.config['tomcatuser'], self.config['tomcatpassword'])
                 util.runcmd(cmd)
             else:
                 sleep(0.5)  # let sesame catch it's breath
@@ -2736,7 +2784,7 @@ class SFS(Trips):
                 else:
                     self._document_name_cache[parts[
                         'law']] = "SFS %s" % parts['law']
-                    #print "Cache miss for %s (%s)" % (parts['law'],
+                    # print "Cache miss for %s (%s)" % (parts['law'],
                     #                              self._document_name_cache[parts['law']])
 
             res += self._document_name_cache[parts['law']]
@@ -2845,7 +2893,8 @@ class SFS(Trips):
             title = by_subj_pred[subj][title_pred]
 
             sorttitle = re.sub(r'Kungl\. Maj:ts ', '', title)
-            sorttitle = re.sub(r'^(Lag|Förordning|Tillkännagivande|[kK]ungörelse) ?\([^\)]+\) ?(av|om|med|angående) ', '', sorttitle)
+            sorttitle = re.sub(
+                r'^(Lag|Förordning|Tillkännagivande|[kK]ungörelse) ?\([^\)]+\) ?(av|om|med|angående) ', '', sorttitle)
             year = fsnr.split(':')[0]
             letter = sorttitle[0].lower()
 
@@ -2872,7 +2921,8 @@ class SFS(Trips):
                     self.config.datadir, self.alias, pageid)
                 title = pagetitles[pageid]
                 if category == year_lbl:
-                    self._render_indexpage(outfile, title, documents, pagelabels, category, pageid, docsorter=util.numcmp)
+                    self._render_indexpage(
+                        outfile, title, documents, pagelabels, category, pageid, docsorter=util.numcmp)
                 else:
                     self._render_indexpage(outfile, title, documents,
                                            pagelabels, category, pageid)
@@ -2951,7 +3001,8 @@ class SFS(Trips):
             self.config.datadir, self.alias)
         atomfile = "%s/%s/generated/news/all.atom" % (
             self.config.datadir, self.alias)
-        self._render_newspage(htmlfile, atomfile, 'Nya och ändrade författningar', 'De senaste 30 dagarna', all_entries)
+        self._render_newspage(
+            htmlfile, atomfile, 'Nya och ändrade författningar', 'De senaste 30 dagarna', all_entries)
 
         htmlfile = "%s/%s/generated/news/lagar.html" % (
             self.config.datadir, self.alias)
@@ -2964,7 +3015,8 @@ class SFS(Trips):
             self.config.datadir, self.alias)
         atomfile = "%s/%s/generated/news/forordningar.atom" % (
             self.config.datadir, self.alias)
-        self._render_newspage(htmlfile, atomfile, 'Nya och ändrade förordningar och övriga författningar', 'De senaste 30 dagarna', ovr_entries)
+        self._render_newspage(
+            htmlfile, atomfile, 'Nya och ändrade förordningar och övriga författningar', 'De senaste 30 dagarna', ovr_entries)
 
     def _element_to_string(self, e):
         """Creates a XHTML1 string from a elementtree.Element,
@@ -2973,7 +3025,9 @@ class SFS(Trips):
         tag = m.group(2)
 
         if list(e.attrib.keys()):
-            attributestr = " " + " ".join([x + '="' + e.attrib[x].replace('"', '&quot;') + '"' for x in list(e.attrib.keys()) if x not in ['rel', 'property']])
+            attributestr = " " + \
+                " ".join([x + '="' + e.attrib[x].replace('"', '&quot;') +
+                         '"' for x in list(e.attrib.keys()) if x not in ['rel', 'property']])
         else:
             attributestr = ""
 

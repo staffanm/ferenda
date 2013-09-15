@@ -3,7 +3,9 @@ from __future__ import unicode_literals
 
 from operator import attrgetter
 
+
 class NewsCriteria(object):
+
     """Represents a particular subset of the documents in a repository,
     for the purpose of generating a news feed for that subset. These
     criteria objects are used by
@@ -30,6 +32,7 @@ class NewsCriteria(object):
     :type  key: callable
 
     """
+
     def __init__(self, basefile, feedtitle, selector=None, key=None):
         self.basefile = basefile
         self.feedtitle = feedtitle
@@ -39,7 +42,7 @@ class NewsCriteria(object):
             assert callable(selector)
             self.selector = selector
         if not key:
-            self.key = attrgetter('updated') # or lambda x: x.updated
+            self.key = attrgetter('updated')  # or lambda x: x.updated
         else:
             assert callable(key)
             self.key = key

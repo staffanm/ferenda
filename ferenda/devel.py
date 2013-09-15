@@ -2,7 +2,6 @@
 from __future__ import unicode_literals, print_function
 import sys
 import os
-import logging
 
 from rdflib import Graph
 
@@ -10,7 +9,10 @@ from ferenda import TextReader, TripleStore
 from ferenda.elements import serialize
 from ferenda import decorators
 from ferenda import util
+
+
 class Devel(object):
+
     """This module acts as a docrepo (and as such is easily callable from
     ``ferenda-manager.py``), but instead of ``download``, ``parse``,
     ``generate`` et al, contains various tool commands that is useful
@@ -28,17 +30,18 @@ class Devel(object):
 
     alias = "devel"
     # FIXME: manager.py should not strictly require these to be present
+
     class DummyStore(object):
+
         def __init__(self, path, **kwargs):
             pass
+
         def list_basefiles_for(self, action, basedir=None):
             return []
     downloaded_suffix = ".html"
     storage_policy = "file"
     documentstore_class = DummyStore
 
-
-    
     # Don't document this -- just needed for ferenda.manager compatibility
     def get_default_options(self):
         return {}
@@ -64,7 +67,7 @@ class Devel(object):
         print((g.serialize(None, format=format).decode("utf-8")))
 
     @decorators.action
-    def dumpstore(self,format="turtle"):
+    def dumpstore(self, format="turtle"):
         """Extract all RDF data from the system triplestore and dump
         it to stdout using the specified format.
 
@@ -84,7 +87,7 @@ class Devel(object):
         print(store.get_serialized(format=format).decode('utf-8'))
 
 #    Not really useful for anything than finding bugs in ferenda itself
-# 
+#
 #    def testlog(self):
 #        """Logs a series of messages at various levels, to test that
 #        your client code logging configuration behaves as
@@ -145,7 +148,8 @@ class Devel(object):
             basefile = file_to_patch.split("/sfs/intermediate/")[1]
             import SFS
             p = SFS.SFSParser()
-            sourcefile = file_to_patch.replace("/intermediate/", "/downloaded/sfst/").replace(".txt", ".html")
+            sourcefile = file_to_patch.replace(
+                "/intermediate/", "/downloaded/sfst/").replace(".txt", ".html")
             print(("source %s, basefile %s, sourcefile %s" % (
                 source, basefile, sourcefile)))
             plaintext = p._extractSFST([sourcefile])
@@ -247,15 +251,16 @@ class Devel(object):
 
         """
         # fixme: do magic import() dance
-        print("parsefunc %s (really ferenda.sources.tech.rfc.RFC.get_parser()), source %s)" % (functionname,source))
+        print("parsefunc %s (really ferenda.sources.tech.rfc.RFC.get_parser()), source %s)" %
+              (functionname, source))
         import ferenda.sources.tech.rfc
         parser = ferenda.sources.tech.rfc.RFC.get_parser()
         parser.debug = True
-        tr=TextReader(source)
+        tr = TextReader(source)
         b = parser.parse(tr.getiterator(tr.readparagraph))
         # print("=========
         print(serialize(b))
-        
+
     @decorators.action
     def queryindex(self, querystring):
         """Query the system fulltext index and return the IDs/URIs for matching documents.
@@ -272,9 +277,9 @@ class Devel(object):
     @decorators.action
     def construct(self, template, uri, format="turtle"):
         sq = util.readfile(template) % {'uri': uri}
-        ts  = TripleStore.connect(self.config.storetype,
-                                  self.config.storelocation,
-                                  self.config.storerepository)
+        ts = TripleStore.connect(self.config.storetype,
+                                 self.config.storelocation,
+                                 self.config.storerepository)
         print("# Constructing the following from %s, repository %s, type %s" %
               (self.config.storelocation,
                self.config.storerepository,
@@ -291,11 +296,11 @@ class Devel(object):
     @decorators.action
     def select(self, template, uri, format="json"):
         sq = util.readfile(template) % {'uri': uri}
-        ts  = TripleStore.connect(self.config.storetype,
-                                  self.config.storelocation,
-                                  self.config.storerepository)
+        ts = TripleStore.connect(self.config.storetype,
+                                 self.config.storelocation,
+                                 self.config.storerepository)
         print(sq)
-        print("="*70)
+        print("=" * 70)
         p = {}
         with util.logtime(print,
                           "# %(triples)s triples constructed in %(elapsed).3f",
@@ -304,18 +309,34 @@ class Devel(object):
             p['triples'] = len(res)
             print(res.serialize(format=format).decode('utf-8'))
 
-            
-    def download(self): pass
-    def parse(self, basefile): pass
-    def relate(self, basefile): pass
-    def generate(self, basefile): pass
-    def toc(self, otherrepos): pass
-    def news(self, otherrepos): pass
-    def status(self): pass
-    def list_basefiles_for(self, command): return []
-    @classmethod
-    def setup(cls, action, config): pass
-    @classmethod
-    def teardown(cls, action, config): pass
+    def download(self):
+        pass
 
-    
+    def parse(self, basefile):
+        pass
+
+    def relate(self, basefile):
+        pass
+
+    def generate(self, basefile):
+        pass
+
+    def toc(self, otherrepos):
+        pass
+
+    def news(self, otherrepos):
+        pass
+
+    def status(self):
+        pass
+
+    def list_basefiles_for(self, command):
+        return []
+
+    @classmethod
+    def setup(cls, action, config):
+        pass
+
+    @classmethod
+    def teardown(cls, action, config):
+        pass

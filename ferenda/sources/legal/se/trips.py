@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
-                                                                     
+
 # Base class for fetching data from an ancient database system used by
 # swedish gov IT...
 import re
@@ -12,24 +12,27 @@ import lxml.html
 from ferenda.decorators import downloadmax
 from . import SwedishLegalSource
 
+
 class NoMoreLinks(Exception):
+
     def __init__(self, nextpage=None):
         super(NoMoreLinks, self).__init__()
         self.nextpage = nextpage
-            
+
 
 class Trips(SwedishLegalSource):
-    alias = None # abstract class
+    alias = None  # abstract class
     basefile_regex = "(?P<basefile>\d{4}:\d+)$"
 
-    app = None # komm, dir, prop, sfst 
-    base = None # KOMM, DIR, THWALLPROP, SFSR
+    app = None  # komm, dir, prop, sfst
+    base = None  # KOMM, DIR, THWALLPROP, SFSR
 
-    # NOTE: both SFS and direktiv.DirTrips override this -- hard to find a template that works for everyone
-    document_url_template  = ("http://rkrattsbaser.gov.se/cgi-bin/thw?"
-                              "${HTML}=%(app)s_lst"
-                              "&${OOHTML}=%(app)s_doc&${BASE}=%(base)s"
-                              "&${TRIPSHOW}=format=THW&BET=%(basefile)s")
+    # NOTE: both SFS and direktiv.DirTrips override this -- hard to find a
+    # template that works for everyone
+    document_url_template = ("http://rkrattsbaser.gov.se/cgi-bin/thw?"
+                             "${HTML}=%(app)s_lst"
+                             "&${OOHTML}=%(app)s_doc&${BASE}=%(base)s"
+                             "&${TRIPSHOW}=format=THW&BET=%(basefile)s")
     start_url = ("http://rkrattsbaser.gov.se/cgi-bin/thw?${HTML}=%(app)s_lst"
                  "&${OOHTML}=%(app)s_doc&${SNHTML}=%(app)s_err"
                  "&${MAXPAGE}=%(maxpage)d&${TRIPSHOW}=format=THW"
@@ -53,7 +56,7 @@ class Trips(SwedishLegalSource):
     #                     'base': base,
     #                     'start': '2009',
     #                     'end': str(datetime.today().year)}]
-                       
+
     def download(self, basefile=None):
         if basefile:
             return self.download_single(basefile)
@@ -71,7 +74,7 @@ class Trips(SwedishLegalSource):
                 resp = requests.get(url)
                 tree = lxml.html.document_fromstring(resp.text)
                 tree.make_links_absolute(url, resolve_base_href=True)
-                try: 
+                try:
                     for basefile, url in self.download_get_basefiles_page(tree):
                         yield basefile, url
                 except NoMoreLinks as e:
@@ -102,8 +105,6 @@ class Trips(SwedishLegalSource):
                 if m:
                     nextpage = link
         raise NoMoreLinks(nextpage)
-                    
-        
 
     def download_single(self, basefile, url=None):
         # explicitly call superclass' download_single WITHOUT url
@@ -114,7 +115,6 @@ class Trips(SwedishLegalSource):
         return super(Trips, self).download_single(basefile)
 
     def remote_url(self, basefile):
-        return self.document_url_template % {'basefile':quote(basefile),
-                                             'app':self.app,
-                                             'base':self.base}
-
+        return self.document_url_template % {'basefile': quote(basefile),
+                                             'app': self.app,
+                                             'base': self.base}

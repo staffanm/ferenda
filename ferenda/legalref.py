@@ -6,17 +6,10 @@ sections, eg 'Upphovsrättslag (1960:729) 49 a §') in plaintext"""
 import sys
 import os
 import re
-import codecs
-import traceback
-from io import StringIO
-from pprint import pprint
 import hashlib
-import locale
 import logging
-import shutil
 import tempfile
 # 3rdparty libs
-import pyparsing
 
 # needed early
 from . import util
@@ -28,12 +21,12 @@ try:
 except ImportError:
     # Mimic the simpleparse interface (the very few parts we're using)
     # but call external python 2.7 processes behind the scene.
-    
+
     external_simpleparse_state = tempfile.mkdtemp()
     # external_simpleparse_state = "simpleparse.tmp"
     python_exe = os.environ.get("FERENDA_PYTHON2_FALLBACK",
                                 "python2.7")
-    buildtagger_script = external_simpleparse_state+os.sep+"buildtagger.py"
+    buildtagger_script = external_simpleparse_state + os.sep + "buildtagger.py"
     util.writefile(buildtagger_script, """import sys,os
 if sys.version_info >= (3,0,0):
     raise OSError("This is python %s, not python 2.6 or 2.7!" % sys.version_info)
@@ -50,8 +43,8 @@ t = p.buildTagger(production)
 with open(picklefile,"wb") as fp:
     pickle.dump(t,fp)""")
 
-    tagstring_script = external_simpleparse_state+os.sep+"tagstring.py"
-    util.writefile(tagstring_script,"""import sys, os
+    tagstring_script = external_simpleparse_state + os.sep + "tagstring.py"
+    util.writefile(tagstring_script, """import sys, os
 if sys.version_info >= (3,0,0):
     raise OSError("This is python %s, not python 2.6 or 2.7!" % sys.version_info)
 pickled_tagger = sys.argv[1] # what buildtagger.py returned -- full path
@@ -73,6 +66,7 @@ with open(picklefile,"wb") as fp:
         """)
 
     class Parser(object):
+
         def __init__(self, declaration, root='root', prebuilts=(), definitionSources=[]):
             # 2. dump declaration to a tmpfile read by the script
             c = hashlib.md5()
@@ -80,7 +74,7 @@ with open(picklefile,"wb") as fp:
             self.declaration_md5 = c.hexdigest()
             declaration_filename = "%s/%s" % (external_simpleparse_state,
                                               self.declaration_md5)
-            with open(declaration_filename,"wb") as fp:
+            with open(declaration_filename, "wb") as fp:
                 fp.write(declaration)
 
         def buildTagger(self, production=None, processor=None):
@@ -98,13 +92,13 @@ with open(picklefile,"wb") as fp:
                 util.runcmd(cmdline, require_success=True)
                 #    4. the script builds tagtable and dumps it to a pickle file
                 assert os.path.exists(pickled_tagger)
-            return pickled_tagger # filename instead of tagtable struct
+            return pickled_tagger  # filename instead of tagtable struct
 
     def tag(text, tagtable, sliceleft, sliceright):
         c = hashlib.md5()
         c.update(text)
         text_checksum = c.hexdigest()
-        pickled_tagger = tagtable # remember, not a real tagtable struct
+        pickled_tagger = tagtable  # remember, not a real tagtable struct
         pickled_tagged = "%s-%s.pickle" % (pickled_tagger, text_checksum)
 
         if not os.path.exists(pickled_tagged):
@@ -121,9 +115,9 @@ with open(picklefile,"wb") as fp:
                          pickled_tagger,
                          full_text_path,
                          text_checksum),
-                        require_success = True)
+                        require_success=True)
         # 4. load tagged text pickle
-        with open(pickled_tagged,"rb") as fp:
+        with open(pickled_tagged, "rb") as fp:
             res = pickle.load(fp)
         return res
 
@@ -131,11 +125,14 @@ with open(picklefile,"wb") as fp:
 import six
 from six.moves import cPickle as pickle
 
-from rdflib import Graph, BNode, Literal, Namespace, URIRef, RDF, RDFS
+from rdflib import Graph
+from rdflib import Namespace
+from rdflib import RDFS
 
 # my own libraries
 
-from .elements import UnicodeElement, PredicateType, Link, LinkSubject, serialize
+from .elements import Link
+from .elements import LinkSubject
 
 # The charset used for the bytestrings that is sent to/from
 # simpleparse (which does not handle unicode)
@@ -146,7 +143,9 @@ log = logging.getLogger('lr')
 
 
 class NodeTree:
+
     """Encapsuates the node structure from mx.TextTools in a tree oriented interface"""
+
     def __init__(self, root, data, offset=0, isRoot=True):
         self.data = data
         self.root = root
@@ -171,6 +170,7 @@ class NodeTree:
 
 
 class ParseError(Exception):
+
     def __init__(self, value):
         self.value = value
 
@@ -222,15 +222,19 @@ class LegalRef:
     EGRATTSFALL = 9        # Rättsfall i EG-domstolen/förstainstansrätten
     INTLRATTSFALL = 10     # Europadomstolen
 
-    # re_urisegments = re.compile(r'([\w]+://[^/]+/[^\d]*)(\d+:(bih\. |N|)?\d+( s\.\d+|))#?(K(\d+)|)(P(\d+)|)(S(\d+)|)(N(\d+)|)')
-    re_urisegments = re.compile(r'([\w]+://[^/]+/[^\d]*)(\d+:(bih\.[_ ]|N|)?\d+([_ ]s\.\d+|))#?(K([a-z0-9]+)|)(P([a-z0-9]+)|)(S(\d+)|)(N(\d+)|)')
+    # re_urisegments = re.compile(r'([\w]+://[^/]+/[^\d]*)(\d+:(bih\.
+    # |N|)?\d+( s\.\d+|))#?(K(\d+)|)(P(\d+)|)(S(\d+)|)(N(\d+)|)')
+    re_urisegments = re.compile(
+        r'([\w]+://[^/]+/[^\d]*)(\d+:(bih\.[_ ]|N|)?\d+([_ ]s\.\d+|))#?(K([a-z0-9]+)|)(P([a-z0-9]+)|)(S(\d+)|)(N(\d+)|)')
     re_escape_compound = re.compile(
         r'\b(\w+-) (och) (\w+-?)(lagen|förordningen)\b', re.UNICODE)
-    re_escape_named = re.compile(r'\B(lagens?|balkens?|förordningens?|formens?|ordningens?|kungörelsens?|stadgans?)\b', re.UNICODE)
+    re_escape_named = re.compile(
+        r'\B(lagens?|balkens?|förordningens?|formens?|ordningens?|kungörelsens?|stadgans?)\b', re.UNICODE)
 
     re_descape_compound = re.compile(
         r'\b(\w+-)_(och)_(\w+-?)(lagen|förordningen)\b', re.UNICODE)
-    re_descape_named = re.compile(r'\|(lagens?|balkens?|förordningens?|formens?|ordningens?|kungörelsens?|stadgans?)')
+    re_descape_named = re.compile(
+        r'\|(lagens?|balkens?|förordningens?|formens?|ordningens?|kungörelsens?|stadgans?)')
     re_xmlcharref = re.compile("&#\d+;")
 
     def __init__(self, *args):
@@ -242,9 +246,9 @@ class LegalRef:
         #n3file = os.path.sep.join([scriptdir,"etc","sfs-extra.n3"])
         #n3url = "file://" + n3file.replace("\\","/")
 
-        #print "scriptdir: %s" % scriptdir
-        #print "n3file: %s" % n3file
-        #print "n3url: %s" % n3url
+        # print "scriptdir: %s" % scriptdir
+        # print "n3file: %s" % n3file
+        # print "n3url: %s" % n3url
 
         self.graph = Graph()
         n3file = os.path.relpath(scriptdir + "/res/etc/sfs-extra.n3")
@@ -252,7 +256,7 @@ class LegalRef:
         self.graph.load(n3file, format="n3")
         self.roots = []
         self.uriformatter = {}
-        self.decl = "" # try to make it unicode clean all the way
+        self.decl = ""  # try to make it unicode clean all the way
         self.namedlaws = {}
         self.load_ebnf(scriptdir + "/res/etc/base.ebnf")
 
@@ -284,7 +288,7 @@ class LegalRef:
             # Make sure longer law abbreviations come before shorter
             # ones (so that we don't mistake "3 § MBL" for "3 § MB"+"L")
             # lawlist.sort(cmp=lambda x, y: len(y) - len(x))
-            lawlist.sort(key=len,reverse=True)
+            lawlist.sort(key=len, reverse=True)
             lawdecl = "LawAbbreviation ::= ('%s')\n" % "'/'".join(lawlist)
             self.decl += lawdecl
             self.roots.insert(0, "kortlagrumref")
@@ -311,7 +315,6 @@ class LegalRef:
                 self.uriformatter[p] = self.egrattsfall_format_uri
             self.roots.append("ecjcaseref")
 
-
         rootprod = "root ::= (%s/plain)+\n" % "/".join(self.roots)
         self.decl += rootprod
 
@@ -336,11 +339,11 @@ class LegalRef:
         *Ref och *RefId-produktioner"""
         # base.ebnf contains 0x1A, ie the EOF character on windows,
         # therefore we need to read it in binary mode
-        
+
         f = open(file, 'rb')
         # assume our ebnf files use the same charset
         content = f.read(os.stat(file).st_size).decode(SP_CHARSET)
-        self.decl += content 
+        self.decl += content
         f.close()
         return [x.group(1) for x in re.finditer(r'(\w+(Ref|RefID))\s*::=', content)]
 
@@ -382,7 +385,7 @@ class LegalRef:
         # FIXME: Obviously, this shouldn't be done in a general class,
         # but rather in a subclas or via proxy/adapter
 
-        fixedindata = indata # FIXME: Nonsensical
+        fixedindata = indata  # FIXME: Nonsensical
         if self.LAGRUM in self.args:
             fixedindata = self.re_escape_compound.sub(
                 r'\1_\2_\3\4', fixedindata)
@@ -403,7 +406,7 @@ class LegalRef:
             print(("calling tag with '%s'" % (fixedindata.decode(SP_CHARSET))))
         # print "tagger length: %d" % len(repr(self.tagger))
         taglist = tag(fixedindata, self.tagger, 0, len(fixedindata))
-        
+
         result = []
 
         root = NodeTree(taglist, fixedindata)
@@ -558,12 +561,14 @@ class LegalRef:
         if "format_" + part.tag in dir(self):
             formatter = getattr(self, "format_" + part.tag)
             if self.verbose:
-                print(((". " * self.depth) + "formatter_dispatch: format_%s defined, calling it" % part.tag))
+                print(
+                    ((". " * self.depth) + "formatter_dispatch: format_%s defined, calling it" % part.tag))
             res = formatter(part)
             assert res is not None, "Custom formatter for %s didn't return anything" % part.tag
         else:
             if self.verbose:
-                print(((". " * self.depth) + "formatter_dispatch: no format_%s, using format_tokentree" % part.tag))
+                print(
+                    ((". " * self.depth) + "formatter_dispatch: no format_%s, using format_tokentree" % part.tag))
             res = self.format_tokentree(part)
 
         if res is None:
@@ -595,10 +600,12 @@ class LegalRef:
             else:
                 for subpart in part.nodes:
                     if self.verbose and part.tag == 'LawRef':
-                        print(((". " * self.depth) + "format_tokentree: part '%s' is a %s" % (subpart.text, subpart.tag)))
+                        print(
+                            ((". " * self.depth) + "format_tokentree: part '%s' is a %s" % (subpart.text, subpart.tag)))
                     res.extend(self.formatter_dispatch(subpart))
         if self.verbose:
-            print(((". " * self.depth) + "format_tokentree: returning '%s' for %s" % (res, part.tag)))
+            print(
+                ((". " * self.depth) + "format_tokentree: returning '%s' for %s" % (res, part.tag)))
         return res
 
     def prettyprint(self, root, indent=0):
@@ -625,7 +632,8 @@ class LegalRef:
         except:
             exc = sys.exc_info()
             # If something else went wrong, just return the plaintext
-            log.warning("(unknown): Unable to format link for text %s (production %s)" % (part.text, part.tag))
+            log.warning("(unknown): Unable to format link for text %s (production %s)" %
+                        (part.text, part.tag))
             return part.text
 
         if self.verbose:
@@ -658,7 +666,7 @@ class LegalRef:
         else:
             return Link(text, uri=uri)
 
-    ################################################################
+    #
     # KOD FÖR LAGRUM
     def clear_state(self):
         self.currentlaw = None
@@ -670,7 +678,7 @@ class LegalRef:
         # sometimes '1736:0123 2' is given as '1736:0123 s. 2' or
         # '1736:0123.2'. This fixes that.
         sfsid = re.sub(r'(\d+:\d+)\.(\d)', r'\1 \2', sfsid)
-        #return sfsid.replace('s. ','').replace('s.','') # more advanced normalizations to come...
+        # return sfsid.replace('s. ','').replace('s.','') # more advanced normalizations to come...
         return sfsid
 
     def normalize_lawname(self, lawname):
@@ -838,7 +846,7 @@ class LegalRef:
                 val = None
 
             if val:
-                if not isinstance(val,six.text_type):
+                if not isinstance(val, six.text_type):
                     val = val.decode(SP_CHARSET)
                 if addfragment:
                     res += '#'
@@ -873,12 +881,12 @@ class LegalRef:
         self.currentchapter = part.nodes[0].text.strip()
 
         if self.currentlaw:
-            res = [self.format_custom_link({'law':self.currentlaw,
-                                            'chapter':self.currentchapter},
+            res = [self.format_custom_link({'law': self.currentlaw,
+                                            'chapter': self.currentchapter},
                                            part.text,
                                            part.tag)]
         else:
-            res = [self.format_custom_link({'chapter':self.currentchapter},
+            res = [self.format_custom_link({'chapter': self.currentchapter},
                                            part.text,
                                            part.tag)]
 
@@ -951,11 +959,13 @@ class LegalRef:
             # namedlaw_node = self.find_node(root, 'NamedLawExternalLawRef')
             namedlaw_node = self.find_node(root, 'NamedLaw')
             if namedlaw_node is None:
-                # As a last chance, this might be a reference back to a previously mentioned law ("...enligt 4 § samma lag")
+                # As a last chance, this might be a reference back to a previously
+                # mentioned law ("...enligt 4 § samma lag")
                 samelaw_node = self.find_node(root, 'SameLaw')
                 assert(samelaw_node is not None)
                 if self.lastlaw is None:
-                    log.warning("(unknown): found reference to \"{samma,nämnda} {lag,förordning}\", but self.lastlaw is not set")
+                    log.warning(
+                        "(unknown): found reference to \"{samma,nämnda} {lag,förordning}\", but self.lastlaw is not set")
 
                 self.currentlaw = self.lastlaw
             else:
@@ -975,9 +985,9 @@ class LegalRef:
                 # print "remember that %s is %s!" % (namedlaw, self.currentlaw)
                 self.currentlynamedlaws[namedlaw] = self.currentlaw
 
-        #print "DEBUG: middle of format_ExternalRefs; self.currentlaw is %s" % self.currentlaw
+        # print "DEBUG: middle of format_ExternalRefs; self.currentlaw is %s" % self.currentlaw
         if self.lastlaw is None:
-            #print "DEBUG: format_ExternalRefs: setting self.lastlaw to %s" % self.currentlaw
+            # print "DEBUG: format_ExternalRefs: setting self.lastlaw to %s" % self.currentlaw
             self.lastlaw = self.currentlaw
 
         # if the node tree only contains a single reference, it looks
@@ -996,7 +1006,7 @@ class LegalRef:
     def format_SectionItemRefs(self, root):
         assert(root.nodes[0].nodes[0].tag == 'SectionRefID')
         self.currentsection = root.nodes[0].nodes[0].text.strip()
-        #res = self.formatter_dispatch(root.nodes[0]) # was formatter_dispatch(self.root)
+        # res = self.formatter_dispatch(root.nodes[0]) # was formatter_dispatch(self.root)
         res = self.format_tokentree(root)
         self.currentsection = None
         return res
@@ -1032,7 +1042,7 @@ class LegalRef:
 
     def format_ChangeRef(self, root):
         id = self.find_node(root, 'LawRefID').data
-        return [self.format_custom_link({'lawref':id},
+        return [self.format_custom_link({'lawref': id},
                                         root.text,
                                         root.tag)]
 
@@ -1041,12 +1051,12 @@ class LegalRef:
             sfsid = self.find_node(root, 'LawRefID').data
             baseuri = 'http://rinfo.lagrummet.se/publ/sfs/%s#' % sfsid.decode(SP_CHARSET)
             self.baseuri_attributes = {'baseuri': baseuri}
-                                       
+
         return self.format_tokentree(root)
 
     def format_NamedExternalLawRef(self, root):
         resetcurrentlaw = False
-        #print "format_NamedExternalLawRef: self.currentlaw is %r"  % self.currentlaw
+        # print "format_NamedExternalLawRef: self.currentlaw is %r"  % self.currentlaw
         if self.currentlaw is None:
             resetcurrentlaw = True
             lawrefid_node = self.find_node(root, 'LawRefID')
@@ -1058,17 +1068,17 @@ class LegalRef:
                     self.find_node(root, 'NamedLaw').text)
                 # print "remember that %s is %s!" % (namedlaw, self.currentlaw)
                 self.currentlynamedlaws[namedlaw] = self.currentlaw
-            #print "format_NamedExternalLawRef: self.currentlaw is now %r"  % self.currentlaw
+            # print "format_NamedExternalLawRef: self.currentlaw is now %r"  % self.currentlaw
 
-        #print "format_NamedExternalLawRef: self.baseuri is %r" % self.baseuri
+        # print "format_NamedExternalLawRef: self.baseuri is %r" % self.baseuri
         if self.currentlaw is None:  # if we can't find a ID for this law, better not <link> it
             res = [root.text]
         else:
             res = [self.format_generic_link(root)]
 
-        #print "format_NamedExternalLawRef: self.baseuri is %r" % self.baseuri
+        # print "format_NamedExternalLawRef: self.baseuri is %r" % self.baseuri
         if self.baseuri is None and self.currentlaw is not None:
-            #print "format_NamedExternalLawRef: setting baseuri_attributes"
+            # print "format_NamedExternalLawRef: setting baseuri_attributes"
             # use this as the new baseuri_attributes
             m = self.re_urisegments.match(self.currentlaw)
             if m:
@@ -1079,7 +1089,8 @@ class LegalRef:
                                            'piece': m.group(10),
                                            'item': m.group(12)}
             else:
-                self.baseuri_attributes = {'baseuri': 'http://rinfo.lagrummet.se/publ/sfs/' + self.currentlaw + '#'}
+                self.baseuri_attributes = {
+                    'baseuri': 'http://rinfo.lagrummet.se/publ/sfs/' + self.currentlaw + '#'}
 
         if resetcurrentlaw:
             if self.currentlaw is not None:
@@ -1087,7 +1098,7 @@ class LegalRef:
             self.currentlaw = None
         return res
 
-    ################################################################
+    #
     # KOD FÖR KORTLAGRUM
     def format_AbbrevLawNormalRef(self, root):
         lawabbr_node = self.find_node(root, 'LawAbbreviation')
@@ -1117,7 +1128,7 @@ class LegalRef:
         self.currentlaw = None
         return res
 
-    ################################################################
+    #
     # KOD FÖR FORARBETEN
     def forarbete_format_uri(self, attributes):
         # res = self.baseuri_attributes['baseuri']
@@ -1146,7 +1157,7 @@ class LegalRef:
         self.currentchapter = root.nodes[0].nodes[0].text.strip()
         return [self.format_generic_link(root)]
 
-    ################################################################
+    #
     # KOD FÖR EGLAGSTIFTNING
     def eglag_format_uri(self, attributes):
         res = 'http://rinfo.lagrummet.se/ext/celex/'
@@ -1177,7 +1188,8 @@ class LegalRef:
         else:
             if not self.baseuri_attributes['baseuri'].startswith(res):
                 # FIXME: should we warn about this?
-                # print "Relative reference, but base context %s is not a celex context" % self.baseuri_attributes['baseuri']
+                # print "Relative reference, but base context %s is not a celex context" %
+                # self.baseuri_attributes['baseuri']
                 return None
 
         if 'artikel' in attributes:
@@ -1187,7 +1199,7 @@ class LegalRef:
 
         return res
 
-    ################################################################
+    #
     # KOD FÖR RATTSFALL
     def rattsfall_format_uri(self, attributes):
         # Listan härledd från containers.n3/rattsfallsforteckningar.n3 i
@@ -1208,7 +1220,8 @@ class LegalRef:
             attributes['domstol'] = attributes['nja']
 
         assert 'domstol' in attributes, "No court provided"
-        assert attributes['domstol'] in containerid, "%s is an unknown court" % attributes['domstol']
+        assert attributes[
+            'domstol'] in containerid, "%s is an unknown court" % attributes['domstol']
         res = "http://rinfo.lagrummet.se" + containerid[attributes['domstol']]
 
         if 'lopnr' in attributes and ":" in attributes['lopnr']:
@@ -1225,7 +1238,7 @@ class LegalRef:
 
         return res
 
-    ################################################################
+    #
     # KOD FÖR EGRÄTTSFALL
     def egrattsfall_format_uri(self, attributes):
         descriptormap = {'C': 'J',  # Judgment of the Court
@@ -1246,4 +1259,3 @@ class LegalRef:
         descriptor = descriptormap[attributes['decision']]
         uri = "http://lagen.nu/ext/celex/6%s%s%s" % (year, descriptor, serial)
         return uri
-

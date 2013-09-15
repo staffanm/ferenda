@@ -11,13 +11,13 @@ from ferenda.elements import CompoundElement, OrdinalElement
 
 # More TODO: create test/files/repo/eut/source/all.json like
 # {'http://eur-lex.europa.eu/LexUriServ/LexUriServ.do?uri=OJ:C:2008:115:0001:01:EN:HTML': 'treaties.html'}
-# 
+#
 # Create downloaded/tfeu.html and teu.html (same content or possibly a bit shortened)
 #
 # Create distilled/tfeu.ttl and distilled/teu.ttl, should include structural elements
 #
 # Create parsed/tfeu.xhtml and parsed/teu.xhtml.
-# 
+#
 # Then done!
 
 # The general outline of a treaty is:
@@ -41,16 +41,21 @@ from ferenda.elements import CompoundElement, OrdinalElement
 # or should we have a class method ontology_uri, complimentary to canonical_uri/dataset_uri ?
 vocab_uri = "http://lagen.nu/eurlex#"
 
+
 class PreambleRecital(CompoundElement, OrdinalElement):
     pass
 
 # the most toplevel structural element. Only used for TFEU, not TEU
+
+
 class Part(CompoundElement, OrdinalElement):
     pass
 
 # nb: this is completely different from ferenda.elements.Title -- this title is a toplevel
 # structural element that encompasses chapters, sections, articles etc
-class Title(CompoundElement, OrdinalElement): 
+
+
+class Title(CompoundElement, OrdinalElement):
     pass
 
 
@@ -61,9 +66,10 @@ class Chapter(CompoundElement, OrdinalElement):
 class Section(CompoundElement, OrdinalElement):
     pass
 
+
 class Article(CompoundElement, OrdinalElement):
     fragment_label = "A"
-    # FIXME: extend CompoundElement.as_xhtml to check for rdf_type and use it as an @about 
+    # FIXME: extend CompoundElement.as_xhtml to check for rdf_type and use it as an @about
     # attribute (using a make_graph() graph to qname it)
     rdf_type = URIRef(vocab_uri + "Article")
 
@@ -72,12 +78,14 @@ class Subarticle(CompoundElement, OrdinalElement):
     fragment_label = "P"
     rdf_type = URIRef(vocab_uri + "SubArticle")
 
+
 class ListItem(CompoundElement):
     fragment_label = "L"
     rdf_type = URIRef(vocab_uri + "ListItem")
 
 
 class EurlexTreaties(DocumentRepository):
+
     """Handles the foundation treaties of the European union."""
     # overrides of superclass variables
     alias = "eut"  # European Union Treaties
@@ -85,16 +93,16 @@ class EurlexTreaties(DocumentRepository):
     document_url_template = "http://eur-lex.europa.eu/LexUriServ/LexUriServ.do?uri=OJ:C:2008:115:0001:01:EN:HTML#%(basefile)s"
     rdf_type = URIRef(vocab_uri + "Treaty")
 
-################################################################
+#
 # Downloading
 
     def download(self, basefile=None):
-        # NB: The very same document contains both TEU and TFEU. We download it twice 
+        # NB: The very same document contains both TEU and TFEU. We download it twice
         # (wasting some storage space) and let parse() pick out the relevant parts.
         self.download_single("teu")
         self.download_single("tfeu")
 
-################################################################
+#
 # Parsing -- FIXME: this should be easily ported to FSMParser
 
     re_part = re.compile("PART (ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN)$").match
@@ -111,7 +119,6 @@ class EurlexTreaties(DocumentRepository):
     ordinal_dict = dict(
         list(zip(ordinal_list, list(range(1, len(ordinal_list) + 1)))))
 
-
     def parse_metadata_from_soup(self, soup, doc):
         if not doc.uri:
             doc.uri = self.canonical_uri(doc.basefile)
@@ -120,8 +127,9 @@ class EurlexTreaties(DocumentRepository):
         if basefile == "teu":
             desc.value(self.ns['dct'].title, "Treaty on European Union", lang="en")
         elif basefile == "tfeu":
-            desc.value(self.ns['dct'].title, "Treaty on the Functioning of the European Union", lang="en")
-  
+            desc.value(
+                self.ns['dct'].title, "Treaty on the Functioning of the European Union", lang="en")
+
     def parse_document_from_soup(soup, doc):
         if basefile == "teu":
             startnode = soup.findAll(text="-" * 50)[1].parent

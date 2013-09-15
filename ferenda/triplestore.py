@@ -6,23 +6,23 @@ from io import BytesIO
 import tempfile
 import logging
 
-from rdflib import Literal, BNode, Namespace, URIRef
+from rdflib import URIRef
 from rdflib import Graph
-from rdflib.plugins.parsers.ntriples import NTriplesParser
-from rdflib import Namespace, URIRef, Literal, RDFS, RDF, ConjunctiveGraph, plugin, store
+from rdflib import URIRef
+from rdflib import ConjunctiveGraph
 import requests
 import requests.exceptions
 
-import six
 from six import text_type as str
-from six import binary_type as bytes
 from six.moves.urllib_parse import quote
 import pyparsing
 
 from ferenda.thirdparty import SQLite
 from ferenda import util, errors
-    
+
+
 class TripleStore(object):
+
     """Presents a limited but uniform interface to different triple
 stores. It supports both standalone servers accessed over HTTP (Fuseki
 and Sesame, right now) as well as RDFLib-based persistant stores (The
@@ -43,7 +43,7 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
     implements the following API.
 
     """
-    
+
     @staticmethod
     def connect(storetype, location, repository, **kwargs):
         """Returns a initialized object, the exact type depending on the
@@ -85,7 +85,8 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
         available.
 
         """
-        assert isinstance(storetype, str), "storetype must be a (unicode) str, not %s" % type(storetype)
+        assert isinstance(
+            storetype, str), "storetype must be a (unicode) str, not %s" % type(storetype)
         cls = {'SESAME': SesameStore,
                'FUSEKI': FusekiStore,
                'SLEEPYCAT': SleepycatStore,
@@ -105,7 +106,7 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
 
     def add_serialized(self, data, format, context=None):
         """Add the serialized RDF statements in the string *data* directly to the repository."""
-        raise NotImplementedError       
+        raise NotImplementedError
 
     def add_serialized_file(self, filename, format, context=None):
         """Add the serialized RDF statements contained in the file *filename* directly to the repository."""
@@ -120,10 +121,9 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
     def get_serialized_file(self, filename, format="nt", context=None):
         """Saves all statements in the store to *filename*."""
         data = self.get_serialized(format, context)
-        with open(filename,"wb") as fp:
+        with open(filename, "wb") as fp:
             fp.write(data)
 
-           
     def select(self, query, format="sparql"):
         """
         Run a SPARQL SELECT query against the triple store and returns the results.
@@ -134,7 +134,6 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
         :type format: str
         """
         raise NotImplementedError
-
 
     def construct(self, query):
         """
@@ -155,16 +154,15 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
 
     def close(self):
         """Close all connections to the triplestore. Needed if using RDFLib-based triple store, a no-op if using HTTP based stores."""
-        pass
-         
+
 
 class RDFLibStore(TripleStore):
 
     def __init__(self, location, repository, inmemory=False):
-        super(RDFLibStore,self).__init__(location, repository)
+        super(RDFLibStore, self).__init__(location, repository)
         self.inmemory = inmemory
         self.closed = False
-        graphid = URIRef("file://"+self.repository)
+        graphid = URIRef("file://" + self.repository)
         g = ConjunctiveGraph(store=self._storeid(), identifier=graphid)
         if os.path.exists(self.location):
             g.open(self.location, create=False)
@@ -186,18 +184,16 @@ class RDFLibStore(TripleStore):
         if self.inmemory:
             raise errors.TriplestoreError("In-memory stores are read-only")
         g = self._getcontextgraph(context)
-        g.parse(data=data,format=format)
-        g.commit()      
+        g.parse(data=data, format=format)
+        g.commit()
 
     def get_serialized(self, format="nt", context=None):
         g = self._getcontextgraph(context)
         return g.serialize(format=format)
 
-
     def triple_count(self, context=None):
         g = self._getcontextgraph(context)
         return len(g)
-
 
     def select(self, query, format="sparql"):
         try:
@@ -214,8 +210,8 @@ class RDFLibStore(TripleStore):
             l = []
             for r in res.bindings:
                 d = {}
-                for (key,val) in r.items():
-                    d[str(key)]=str(val)
+                for (key, val) in r.items():
+                    d[str(key)] = str(val)
                 l.append(d)
             return l
 
@@ -233,8 +229,8 @@ class RDFLibStore(TripleStore):
         return res.graph
 
     def clear(self, context=None):
-        for (s,p,o) in self._getcontextgraph(context):
-            self.graph.remove((s,p,o))
+        for (s, p, o) in self._getcontextgraph(context):
+            self.graph.remove((s, p, o))
         self.graph.commit()
 
     def close(self):
@@ -242,7 +238,8 @@ class RDFLibStore(TripleStore):
             import sqlite3
             try:
                 self.graph.close(True)
-            except sqlite3.ProgrammingError: # 'Cannot operate on a closed database' -- can't figure out why this happens on win32
+            # 'Cannot operate on a closed database' -- can't figure out why this happens on win32
+            except sqlite3.ProgrammingError:
                 pass
             self.closed = True
 
@@ -252,7 +249,8 @@ class RDFLibStore(TripleStore):
     def remove_repository(self):
         self.graph.destroy()
 
-    # returns a string we can pass as store parameter to the ConjunctiveGraph constructor, see __init__
+    # returns a string we can pass as store parameter to the ConjunctiveGraph
+    # constructor, see __init__
     def _storeid(self):
         raise NotImplementedError
 
@@ -273,15 +271,15 @@ class SQLiteStore(RDFLibStore):
 
     def triple_count(self, context=None):
         g = self._getcontextgraph(context)
-        return len(list(g)) # bug? otherwise returns # of unique subjects
-
+        return len(list(g))  # bug? otherwise returns # of unique subjects
 
     def _storeid(self):
         return "SQLite"
 
 # -----------------
-# For servers implementing the SPARQL 1.1 Graph Store HTTP Protocol 
+# For servers implementing the SPARQL 1.1 Graph Store HTTP Protocol
 # http://www.w3.org/TR/sparql11-http-rdf-update/
+
 
 class RemoteStore(TripleStore):
 
@@ -292,18 +290,18 @@ class RemoteStore(TripleStore):
                     "turtle": "application/x-turtle",
                     "n3": "text/rdf+n3",
                     "trix": "application/trix",
-                     "trig": "application/x-trig",
+                    "trig": "application/x-trig",
                     "json": "application/sparql-results+json",
                     "binary": "application/x-binary-rdf-results-table"}
 
     def __init__(self, location, repository, curl=False):
-        super(RemoteStore,self).__init__(location, repository)
+        super(RemoteStore, self).__init__(location, repository)
         self.curl = curl
         if self.location.endswith("/"):
             self.location = self.location[:-1]
 
     def add_serialized(self, data, format, context=None):
-        if isinstance(data,str):
+        if isinstance(data, str):
             data = data.encode('utf-8')
         if self.curl:
             fp = tempfile.NamedTemporaryFile(delete=False)
@@ -322,23 +320,23 @@ class RemoteStore(TripleStore):
             # file-like object. All ways are good except the bad.
             datastream = BytesIO(data)
             datastream.len = len(data)
-            headers={'Content-Type':
-                     self._contenttype[format] + "; charset=UTF-8"}
+            headers = {'Content-Type':
+                       self._contenttype[format] + "; charset=UTF-8"}
             resp = requests.post(self._statements_url(context),
                                  headers=headers,
                                  data=datastream)
             if resp.status_code >= 400:
                 print("Something went wrong posting to %s" % self._statements_url(context))
-                print(resp.text.encode('latin-1',errors='xmlcharrefreplace'))
+                print(resp.text.encode('latin-1', errors='xmlcharrefreplace'))
             resp.raise_for_status()
 
     def add_serialized_file(self, filename, format, context=None):
         if self.curl:
-            opt = {'url':self._statements_url(context),
-                   'contenttype':self._contenttype[format]+";charset=UTF-8",
-                   'filename':filename,
-                   'method':'POST'}
-            self._run_curl(opt) 
+            opt = {'url': self._statements_url(context),
+                   'contenttype': self._contenttype[format] + ";charset=UTF-8",
+                   'filename': filename,
+                   'method': 'POST'}
+            self._run_curl(opt)
         else:
             # initialize req
             with open(filename, "rb") as fp:
@@ -353,10 +351,10 @@ class RemoteStore(TripleStore):
             fileno, tmp = tempfile.mkstemp()
             fp = os.fdopen(fileno)
             fp.close()
-            opt = {'url':self._statements_url(context),
-                   'accept':self._contenttype[format],
-                   'filename':tmp,
-                   'method':'GET'}
+            opt = {'url': self._statements_url(context),
+                   'accept': self._contenttype[format],
+                   'filename': tmp,
+                   'method': 'GET'}
             self._run_curl(opt)
             with open(tmp, 'rb') as fp:
                 data = fp.read()
@@ -367,25 +365,23 @@ class RemoteStore(TripleStore):
                              headers={'Accept': self._contenttype[format]})
             r.raise_for_status()
             return r.content
-            
 
     def get_serialized_file(self, filename, format="nt", context=None):
         if self.curl:
-            opt = {'url':self._statements_url(context),
-                   'accept':self._contenttype[format],
-                   'filename':filename,
-                   'method':'GET'}
+            opt = {'url': self._statements_url(context),
+                   'accept': self._contenttype[format],
+                   'filename': filename,
+                   'method': 'GET'}
             self._run_curl(opt)
         else:
-            super(RemoteStore,self).get_serialized_file(filename, format, context)
-        
+            super(RemoteStore, self).get_serialized_file(filename, format, context)
 
     def clear(self, context=None):
         try:
             url = self._statements_url(context)
             resp = requests.delete(url)
             resp.raise_for_status()
-                
+
         except requests.exceptions.ConnectionError as e:
             raise errors.TriplestoreError(
                 "Triplestore %s not responding: %s" % (url, e))
@@ -402,7 +398,7 @@ class RemoteStore(TripleStore):
             url += "&"
         else:
             url += "?"
-        url += "query=" + quote(query.replace("\n", " ")).replace("/","%2F")
+        url += "query=" + quote(query.replace("\n", " ")).replace("/", "%2F")
 
         headers = {}
         if format == "python":
@@ -430,11 +426,10 @@ class RemoteStore(TripleStore):
             resp = requests.get(url, headers=headers, data=query)
             resp.raise_for_status()
             result = Graph()
-            result.parse(data=resp.text,format=format)
+            result.parse(data=resp.text, format=format)
             return result
         except requests.exceptions.HTTPError as e:
             raise errors.SparqlError(e.response.text)
-
 
     def _sparql_results_to_list(self, results):
         res = []
@@ -442,9 +437,10 @@ class RemoteStore(TripleStore):
         for row in tree.findall(".//{http://www.w3.org/2005/sparql-results#}result"):
             d = {}
             for element in row:
-                #print element.tag # should be "binding"
+                # print element.tag # should be "binding"
                 key = element.attrib['name']
-                value = str(element[0].text) # note: str is really six.text_type, ie str on py3, unicode on py2
+                # note: str is really six.text_type, ie str on py3, unicode on py2
+                value = str(element[0].text)
                 d[key] = value
             res.append(d)
         return res
@@ -458,19 +454,21 @@ class RemoteStore(TripleStore):
     # this method does not take a context parameter. Restrict to
     # context/graph in the query instead.
     def _endpoint_url(self):
-         return "%s/%s/query" % (self.location, self.repository)
+        return "%s/%s/query" % (self.location, self.repository)
 
-    def _run_curl(self, options): 
+    def _run_curl(self, options):
         if options['method'] == 'GET':
             cmd = 'curl -o "%(filename)s" --header "Accept:%(accept)s" "%(url)s"' % options
         elif options['method'] == 'POST':
             cmd = 'curl -X POST --data-binary "@%(filename)s" --header "Content-Type:%(contenttype)s" "%(url)s"' % options
-        (ret,stdout,stderr) = util.runcmd(cmd)
+        (ret, stdout, stderr) = util.runcmd(cmd)
         if ret != 0:
             raise errors.TriplestoreError(stderr)
-        return stdout       
+        return stdout
+
 
 class SesameStore(RemoteStore):
+
     def add_serialized(self, data, format, context=None):
         if format == "turtle":
             # Sesame has a problem with turtle like the following:
@@ -484,15 +482,15 @@ class SesameStore(RemoteStore):
             #
             # Therefore, we convert it to nt prior to posting
             g = Graph()
-            g.parse(data=data,format="turtle")
+            g.parse(data=data, format="turtle")
             data = g.serialize(format="nt")
-        super(SesameStore,self).add_serialized(data, format, context)
+        super(SesameStore, self).add_serialized(data, format, context)
 
     def triple_count(self, context=None):
         # Sesame has a non-standardized but quick way of finding out # of triples
         if context:
             url = "%s/repositories/%s/size?context=<%s>" % (
-                   self.location, self.repository, context)
+                self.location, self.repository, context)
         else:
             url = "%s/repositories/%s/size" % (self.location, self.repository)
         ret = requests.get(url)
@@ -512,7 +510,7 @@ class SesameStore(RemoteStore):
         # @prefix sr: <http://www.openrdf.org/config/repository/sail#>.
         # @prefix sail: <http://www.openrdf.org/config/sail#>.
         # @prefix ns: <http://www.openrdf.org/config/sail/native#>.
-        # 
+        #
         # [] a rep:Repository ;
         #    rep:repositoryID "netstandards" ;
         #    rdfs:label "Ferenda repository for netstandards" ;
@@ -522,25 +520,25 @@ class SesameStore(RemoteStore):
         #          sail:sailType "openrdf:NativeStore" ;
         #          ns:tripleIndexes "spoc,posc,cspo,opsc,psoc"
         #       ]
-        #    ]. 
+        #    ].
         #
         # See http://answers.semanticweb.com/questions/16108/createdelete-a-sesame-repository-via-http
         # Note in particular
-        # 
+        #
         # > Just to add one thing I noticed in actually implementing
         # > this, the graph created from a template must be POSTed to a
         # > named context in the SYSTEM repository otherwise Sesame
         # > doesn't like it i.e. if you just post a graph to the SYSTEM
         # > repo without a named context Sesame will recognize that it
         # > exists but won't be able to load it properly
-        # 
+        #
         # Good point Rob. In addition, the named context identifier is
         # expected to be typed as an instance of type
         # sys:RepositoryContext.  We are considering to change this
         # though, to make doing these kinds of things easier.
         pass
 
-     # These deviate from the SPARQL 1.1 Protocol and SPARQL 1.1 Graph Store HTTP Protocol. 
+     # These deviate from the SPARQL 1.1 Protocol and SPARQL 1.1 Graph Store HTTP Protocol.
      # FIXME: Test if sesame still needs these or if we can use the standards
 
     def _statements_url(self, context):
@@ -550,7 +548,7 @@ class SesameStore(RemoteStore):
             return "%s/repositories/%s/statements" % (self.location, self.repository)
 
     def _endpoint_url(self):
-         return "%s/repositories/%s" % (self.location,self.repository)
+        return "%s/repositories/%s" % (self.location, self.repository)
 
 
 class FusekiStore(RemoteStore):
@@ -610,7 +608,6 @@ class FusekiStore(RemoteStore):
                 g.parse(data=default, format=format)
                 g.parse(data=named, format=format)
                 return g.serialize(format=format)
-        
 
     def get_serialized_file(self, filename, format="nt", context=None):
         ret = super(FusekiStore, self).get_serialized_file(filename, format, context)
@@ -625,7 +622,7 @@ class FusekiStore(RemoteStore):
                     fp.write(named)
             else:
                 g = Graph()
-                g.parse(filename,format=format)
+                g.parse(filename, format=format)
                 g.parse(data=named, format=format)
                 with open(filename, "wb") as fp:
                     fp.write(g.serialize(format=format))

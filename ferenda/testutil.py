@@ -2,7 +2,6 @@
 """:py:mod:`unittest`-based classes and accompanying functions to
 create some types of ferenda-specific tests easier."""
 from __future__ import unicode_literals
-import sys
 import os
 import tempfile
 import shutil
@@ -12,9 +11,9 @@ import codecs
 import collections
 import filecmp
 import unicodedata
-from io import BytesIO, StringIO
+from io import BytesIO
 from difflib import unified_diff
-from ferenda.compat import unittest 
+from ferenda.compat import unittest
 from ferenda.compat import Mock, patch
 
 import six
@@ -32,7 +31,9 @@ from ferenda import TextReader
 from ferenda import elements
 from ferenda import util
 
+
 class FerendaTestCase(object):
+
     """Convenience class with extra AssertEqual methods. Note that even
 though this method provides :py:class:`unittest.TestCase`-like assert methods, it
 does not derive from :py:class:`~unittest.TestCase`. When creating a test case that
@@ -58,7 +59,7 @@ this class, ie::
         :param exact: Whether to require that the graphs are exactly alike (True) or only if all triples in want exists in got (False)
         :type  exact: bool
         """
-           
+
         def _loadgraph(filename):
             g = rdflib.Graph()
             # we must read the data ourself, providing a non-ascii
@@ -75,10 +76,10 @@ this class, ie::
         (in_both, in_first, in_second) = graph_diff(want, got)
         msg = ""
         if in_first:
-            for (s, p, o) in sorted(in_first, key=lambda t:(t[0], t[1],t[2])):
+            for (s, p, o) in sorted(in_first, key=lambda t: (t[0], t[1], t[2])):
                 msg += "- %s %s %s\n" % (s.n3(), p.n3(), o.n3())
         if (exact and in_second) or in_first:
-            for (s, p, o) in sorted(in_second, key=lambda t:(t[0], t[1],t[2])):
+            for (s, p, o) in sorted(in_second, key=lambda t: (t[0], t[1], t[2])):
                 msg += "+ %s %s %s\n" % (s.n3(), p.n3(), o.n3())
         if ((len(in_first) > 0) or (len(in_second) > 0 and exact)):
             if len(in_first) > 0:
@@ -87,7 +88,7 @@ this class, ie::
                 msg = "%s unexpected triples were found\n" % len(in_second) + msg
             msg = "%r != %r\n" % (want, got) + msg
             self.fail(msg)
-        
+
     def assertAlmostEqualDatetime(self, datetime1, datetime2, delta=1):
         """Assert that two datetime objects are reasonably equal.
 
@@ -159,7 +160,7 @@ this class, ie::
 
         def treeify(something):
             if isinstance(something, str):
-                
+
                 fp = BytesIO(something.encode('utf-8'))
                 # return etree.fromstring(something)
                 return etree.parse(fp)
@@ -177,21 +178,21 @@ this class, ie::
             tmp = BytesIO()
             tree.write_c14n(tmp)
             return tmp.getvalue().decode('utf-8')
-            
+
         errors = []
         want_tree = treeify(want)
         got_tree = treeify(got)
         xml_compare(want_tree.getroot(),
                     got_tree.getroot(),
                     errors.append)
-        
+
         if errors:
             want_lines = [x + "\n" for x in c14nize(want_tree).split("\n")]
             got_lines = [x + "\n" for x in c14nize(got_tree).split("\n")]
             diff = unified_diff(want_lines, got_lines, "want.xml", "got.xml")
             msg = "".join(diff) + "\n\nERRORS:" + "\n".join(errors)
             raise AssertionError(msg)
-        
+
     def assertEqualDirs(self, want, got, suffix=None, filterdir="entries"):
         """Assert that two directory trees contains identical files
 
@@ -204,18 +205,20 @@ this class, ie::
         :param filterdir: If given, don't compare the parts of the tree that starts with filterdir
         :type  suffix: str
         """
-        wantfiles = [x[len(want) + 1:] for x in util.list_dirs(want, suffix) if not x.startswith(want+os.sep+filterdir)]
-        gotfiles = [x[len(got) + 1:] for x in util.list_dirs(got, suffix) if not x.startswith(got+os.sep+filterdir)]
+        wantfiles = [x[len(want) + 1:]
+                     for x in util.list_dirs(want, suffix) if not x.startswith(want + os.sep + filterdir)]
+        gotfiles = [x[len(got) + 1:]
+                    for x in util.list_dirs(got, suffix) if not x.startswith(got + os.sep + filterdir)]
         self.maxDiff = None
         self.assertEqual(wantfiles, gotfiles)  # or assertIn?
         for f in gotfiles:
             self.assertTrue(filecmp.cmp(os.path.join(want, f),
                                         os.path.join(got, f),
                                         shallow=False))
-    
+
 
 class RepoTester(unittest.TestCase, FerendaTestCase):
-    
+
     """A unittest.TestCase-based convenience class for creating file-based
        integration tests for an entire docrepo. To use this, you only
        need a very small amount of boilerplate code, and some files
@@ -235,7 +238,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
     repoclass = DocumentRepository
     """The actual documentrepository class to be tested. Must be
        overridden when creating a testcase class."""
-    
+
     docroot = '/tmp'
     """The location of test files to create tests from. Must be overridden
        when creating a testcase class"""
@@ -243,9 +246,9 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
     def setUp(self):
         self.datadir = tempfile.mkdtemp()
         self.repo = self.repoclass(datadir=self.datadir,
-                                   storelocation=self.datadir+"/ferenda.sqlite",
-                                   indexlocation=self.datadir+"/whoosh",)
-            
+                                   storelocation=self.datadir + "/ferenda.sqlite",
+                                   indexlocation=self.datadir + "/whoosh",)
+
     def tearDown(self):
         # print("Not removing %s" % self.datadir)
         shutil.rmtree(self.datadir)
@@ -260,7 +263,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
 
         """
         return "1"
-        
+
     def download_test(self, specfile):
         def my_get(url, **kwargs):
             urlspec = spec[url]
@@ -298,8 +301,8 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
                 sourcefile = os.path.join(os.path.dirname(specfile),
                                           spec[url]['file'])
                 wantfile = "%s/%s" % (wantdir, spec[url]['expect'])
-                
-                util.copy_if_different(sourcefile,wantfile)
+
+                util.copy_if_different(sourcefile, wantfile)
         if expected:
             self.assertEqualDirs(wantdir,
                                  "%s/%s" % (self.datadir,
@@ -310,12 +313,12 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
 
     def distill_test(self, downloaded_file, rdf_file, docroot):
         try:
-            prefixlen = len(docroot+"/downloaded/")
+            prefixlen = len(docroot + "/downloaded/")
             if self.repo.storage_policy == "dir":
-                suffixlen = len(downloaded_file.split(os.sep)[-1])+1
+                suffixlen = len(downloaded_file.split(os.sep)[-1]) + 1
             else:
                 suffixlen = len(os.path.splitext(downloaded_file)[1])
-            pathfrag  = downloaded_file[prefixlen:-suffixlen]
+            pathfrag = downloaded_file[prefixlen:-suffixlen]
             basefile = self.repo.store.pathfrag_to_basefile(pathfrag)
         except:
             basefile = self.filename_to_basefile(downloaded_file)
@@ -327,29 +330,28 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             print("Overwriting %r with result of parse (%r)" % (rdf_file, basefile))
             g = rdflib.Graph()
             g.parse(data=util.readfile(self.repo.store.distilled_path(basefile)))
-            util.robust_rename(rdf_file, rdf_file+"~")
+            util.robust_rename(rdf_file, rdf_file + "~")
             with open(rdf_file, "wb") as fp:
                 fp.write(g.serialize(format="turtle"))
-            return 
+            return
         self.assertEqualGraphs(rdf_file,
                                self.repo.store.distilled_path(basefile),
                                exact=False)
-                     
-        
+
     def parse_test(self, downloaded_file, xhtml_file, docroot):
         # patch method so we control where the downloaded doc is
         # loaded from.
         basefile = self.filename_to_basefile(downloaded_file)
-        #with patch('ferenda.DocumentStore.downloaded_path',
+        # with patch('ferenda.DocumentStore.downloaded_path',
         #           return_value=downloaded_file):
         with patch.object(self.repo.documentstore_class, 'downloaded_path',
                           return_value=downloaded_file):
             self.repo.parse(basefile)
         if 'FERENDA_SET_TESTFILES' in os.environ:
             print("Overwriting %r with result of parse (%r)" % (xhtml_file, basefile))
-            util.robust_rename(xhtml_file, xhtml_file+"~")
+            util.robust_rename(xhtml_file, xhtml_file + "~")
             shutil.copy2(self.repo.store.parsed_path(basefile), xhtml_file)
-            return 
+            return
         self.assertEqualXML(util.readfile(xhtml_file),
                             util.readfile(self.repo.store.parsed_path(basefile)))
 
@@ -406,6 +408,7 @@ def parametrize(cls, template_method, name, params, wrapper=None):
 
     """
     # internal entrypoint for tesst
+
     def test_method(self):
         template_method(self, *params)
 
@@ -423,7 +426,6 @@ def parametrize(cls, template_method, name, params, wrapper=None):
 
 
 def file_parametrize(cls, directory, suffix, filter=None, wrapper=None):
-
     """Creates a test for each file in a given directory. Call with
      any class that subclasses unittest.TestCase and which has a
      method called `` parametric_test``, eg::
@@ -451,7 +453,7 @@ def file_parametrize(cls, directory, suffix, filter=None, wrapper=None):
     :param wrapper: A unittest decorator like :py:meth:`unittest.skip` or :py:meth:`unittest.expectedFailure`.
     :param wrapper: callable (decorator)
 
-    """    
+    """
     params = []
     for filename in os.listdir(directory):
         if filename.endswith(suffix):
@@ -469,7 +471,7 @@ def parametrize_repotester(cls):
     """Helper function to activate a
 :py:class:`ferenda.testutil.RepoTester` based class (see the
 documentation for that class)."""
-    
+
     docroot = cls.docroot
     # 1. download tests
     if os.path.exists(docroot + "/source"):
@@ -487,25 +489,25 @@ documentation for that class)."""
     for basefile in store.list_basefiles_for("parse"):
         pathfrag = store.basefile_to_pathfrag(basefile)
         filename = store.downloaded_path(basefile)
-        filename = filename[len(basedir)+1:]
+        filename = filename[len(basedir) + 1:]
 
         downloaded_file = "%s/downloaded/%s" % (docroot, filename)
-        basetest = basefile.replace("-","_").replace("/", "_").replace(":","_")
-        # transliterate basetest (ie å -> a) 
-        basetest = "".join((c for c in unicodedata.normalize('NFKD',basetest)
+        basetest = basefile.replace("-", "_").replace("/", "_").replace(":", "_")
+        # transliterate basetest (ie å -> a)
+        basetest = "".join((c for c in unicodedata.normalize('NFKD', basetest)
                             if not unicodedata.combining(c)))
         # Test 1: is rdf distilled correctly?
         rdf_file = "%s/distilled/%s.ttl" % (docroot, pathfrag)
         testname = ("test_distill_" + basetest)
-        
-        wrapper = unittest.expectedFailure if not os.path.exists(rdf_file) else None 
+
+        wrapper = unittest.expectedFailure if not os.path.exists(rdf_file) else None
         parametrize(cls, cls.distill_test, testname, (downloaded_file, rdf_file, docroot), wrapper)
 
         # Test 2: is xhtml parsed correctly?
         xhtml_file = "%s/parsed/%s.xhtml" % (docroot, pathfrag)
         testname = ("test_parse_" + basetest)
 
-        wrapper = unittest.expectedFailure if not os.path.exists(xhtml_file) else None 
+        wrapper = unittest.expectedFailure if not os.path.exists(xhtml_file) else None
         parametrize(cls, cls.parse_test, testname, (downloaded_file, xhtml_file, docroot), wrapper)
 
 
@@ -525,7 +527,7 @@ def testparser(testcase, parser, filename):
         with codecs.open(wantfilename, encoding="utf-8") as fp:
             want = fp.read().strip()
         got = elements.serialize(b).strip()
-        testcase.assertEqualXML(want,got)
+        testcase.assertEqualXML(want, got)
     else:
         raise AssertionError("Want file not found. Result of parse:\n" +
                              elements.serialize(b))

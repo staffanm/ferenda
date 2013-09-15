@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
+
+
 class URIFormatter(object):
 
     """Companion class to :py:class:`ferenda.CitationParser`, that handles the work of 
@@ -20,6 +22,7 @@ class URIFormatter(object):
     :type \*formatters: tuple (name, callable)
 
  """
+
     def __init__(self, *formatters):
         self._formatters = dict(formatters)
 
@@ -40,4 +43,3 @@ class URIFormatter(object):
     def formatterfor(self, key):
         """Returns an appropriate formatting callable for the given key, or None if not found."""
         return self._formatters.get(key, None)
-        

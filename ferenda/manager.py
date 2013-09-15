@@ -37,12 +37,10 @@ import pkg_resources
 import requests
 import requests.exceptions
 from rdflib import URIRef, Namespace, Literal
-from bs4 import BeautifulSoup
 from lxml import etree
 
 # my modules
 from ferenda import DocumentRepository
-from ferenda import DocumentStore
 from ferenda import FulltextIndex
 from ferenda import LayeredConfig
 from ferenda import Transformer
@@ -54,6 +52,8 @@ from ferenda.elements import html
 
 # NOTE: This is part of the published API and must be callable in
 # scenarios without configfile or logger.
+
+
 def makeresources(repos,
                   resourcedir="data/rsrc",
                   combine=False,
@@ -91,13 +91,13 @@ def makeresources(repos,
         if cssfile in processed_files:
             continue
         cssurls.append(_process_file(
-                cssfile, cssbuffer, cssdir, "ferenda.ini", combine))
+            cssfile, cssbuffer, cssdir, "ferenda.ini", combine))
         processed_files.append(cssfile)
 
     # 2. Visit each enabled class and see if it specifies additional
     # css files to read
     for inst in repos:
-        if not hasattr(inst,'config'):
+        if not hasattr(inst, 'config'):
             continue
         for cssfile in inst.config.cssfiles:
             if cssfile in processed_files:
@@ -106,20 +106,20 @@ def makeresources(repos,
             # relative to the module source code file instead
             # of cwd
             cssurls.append(_process_file(
-                    cssfile, cssbuffer, cssdir, inst.alias, combine))
+                cssfile, cssbuffer, cssdir, inst.alias, combine))
             processed_files.append(cssfile)
-    cssurls = list(filter(None,cssurls))
+    cssurls = list(filter(None, cssurls))
     if combine:
         # 3. Minify the result using cssmin
         css = cssbuffer.getvalue().decode('utf-8')
         log.debug("Read %s files, CSS is now %s bytes" % (len(
-                    cssfiles), len(css)))
+            cssfiles), len(css)))
         from .thirdparty import cssmin
-        css = cssmin.cssmin(css) 
+        css = cssmin.cssmin(css)
         log.debug("After minifying, CSS is now %s bytes" % (len(css)))
         outcssfile = cssdir + os.sep + 'combined.css'
         util.writefile(outcssfile, css)
-        res['css'] = [_filepath_to_urlpath(outcssfile,2)]
+        res['css'] = [_filepath_to_urlpath(outcssfile, 2)]
     else:
         res['css'] = cssurls
 
@@ -136,7 +136,7 @@ def makeresources(repos,
         processed_files.append(jsfile)
 
     for inst in repos:
-        if not hasattr(inst,'config'):
+        if not hasattr(inst, 'config'):
             continue
         for jsfile in inst.config.jsfiles:
             if jsfile in processed_files:
@@ -145,21 +145,21 @@ def makeresources(repos,
                 jsfile, jsbuffer, jsdir, inst.alias, combine))
             processed_files.append(jsfile)
 
-    jsurls = list(filter(None,jsurls))
+    jsurls = list(filter(None, jsurls))
     if combine:
         js = jsbuffer.getvalue().decode('utf-8')
         log.debug("Read %s files, JS is now %s bytes" % (len(jsfiles),
                                                          len(js)))
         # slimit provides better perf, but isn't py3 compatible
         # import slimit
-        #js = slimit.minify(
+        # js = slimit.minify(
         #     jsbuffer.getvalue(), mangle=True, mangle_toplevel=True)
         import jsmin
         js = jsmin.jsmin(js)
         log.debug("After compression, JS is now %s bytes" % (len(js)))
         outjsfile = jsdir + os.sep + 'combined.js'
         util.writefile(outjsfile, js)
-        res['js'] = [_filepath_to_urlpath(outjsfile,2)]
+        res['js'] = [_filepath_to_urlpath(outjsfile, 2)]
     else:
         res['js'] = jsurls
 
@@ -195,7 +195,7 @@ def makeresources(repos,
         link.text = tab[0]
         link.attrib['href'] = tab[1]
 
-    # FIXME: almost the exact same code as for tabs 
+    # FIXME: almost the exact same code as for tabs
     tabs = ET.SubElement(
         ET.SubElement(ET.SubElement(root, "footerlinks"), "nav"), "ul")
 
@@ -206,7 +206,8 @@ def makeresources(repos,
                 if not link in sitefooter:
                     (label, url) = link
                     alias = inst.alias
-                    log.debug("Adding footer link %(label)s (%(url)s) from docrepo %(alias)s" % locals())
+                    log.debug(
+                        "Adding footer link %(label)s (%(url)s) from docrepo %(alias)s" % locals())
                     sitefooter.append(link)
 
     for text, href in sitefooter:
@@ -215,15 +216,16 @@ def makeresources(repos,
         link.attrib['href'] = href
 
     if not staticsite:
-        search = ET.SubElement(ET.SubElement(ET.SubElement(root, "search"), "form", action="/search/"), "input", type="search", name="q")
+        search = ET.SubElement(
+            ET.SubElement(ET.SubElement(root, "search"), "form", action="/search/"), "input", type="search", name="q")
 
     stylesheets = ET.SubElement(root, "stylesheets")
-    log.debug("Adding %s stylesheets to resources.xml"%len(res['css']))
+    log.debug("Adding %s stylesheets to resources.xml" % len(res['css']))
     for f in res['css']:
         stylesheet = ET.SubElement(stylesheets, "link")
         stylesheet.attrib['rel'] = "stylesheet"
         stylesheet.attrib['href'] = f
-    log.debug("Adding %s javascripts to resources.xml"%len(res['js']))
+    log.debug("Adding %s javascripts to resources.xml" % len(res['js']))
     javascripts = ET.SubElement(root, "javascripts")
     for f in res['js']:
         javascript = ET.SubElement(javascripts, "script")
@@ -231,17 +233,17 @@ def makeresources(repos,
         javascript.text = " "
     util.indent_node(root)
     tree = ET.ElementTree(root)
-    outxmlfile = resourcedir+os.sep+"resources.xml"
+    outxmlfile = resourcedir + os.sep + "resources.xml"
     util.ensure_dir(outxmlfile)
     tree.write(outxmlfile, encoding="utf-8")
-    log.debug("Wrote %s" %outxmlfile)
+    log.debug("Wrote %s" % outxmlfile)
     # NOTE: If DocumentRepository.generate feels like it, it may
     # create a temporary copy of resources.xml with js/css paths
     # modified to be relative to the generated file (which may be 2-3
     # directories deep) instead of the document root, in order to
     # support static HTML file generation with arbitrarily deep
     # directory structure.
-    res['xml'] = [_filepath_to_urlpath(outxmlfile,1)]
+    res['xml'] = [_filepath_to_urlpath(outxmlfile, 1)]
     if os.sep == "\\":
         for part in res:
             result = []
@@ -249,7 +251,7 @@ def makeresources(repos,
                 if x.startswith("http://") or x.startswith("https://"):
                     result.append(x)
                 else:
-                    result.append(x.replace('/',os.sep))
+                    result.append(x.replace('/', os.sep))
             res[part] = result
     return res
 
@@ -275,19 +277,20 @@ def _process_file(filename, buf, destdir, origin="", combine=False):
     # FIXME: extend this through a load-path mechanism?
     if os.path.exists(filename):
         log.debug("Process file found %s as a file relative to %s" % (filename, os.getcwd()))
-        fp = open(filename,"rb")
-    elif pkg_resources.resource_exists('ferenda',filename):
+        fp = open(filename, "rb")
+    elif pkg_resources.resource_exists('ferenda', filename):
         log.debug("Found %s as a resource" % filename)
-        fp = pkg_resources.resource_stream('ferenda',filename)
+        fp = pkg_resources.resource_stream('ferenda', filename)
     elif filename.startswith("http://") or filename.startswith("https://"):
         if combine:
-            raise errors.ConfigurationError("makeresources: Can't use combine=True in combination with external js/css URLs (%s)" % filename)
+            raise errors.ConfigurationError(
+                "makeresources: Can't use combine=True in combination with external js/css URLs (%s)" % filename)
         log.debug("Using external url %s" % filename)
         return filename
     else:
         log.warning("file %(filename)s (specified in %(origin)s) doesn't exist" % locals())
         return None
-        
+
     (base, ext) = os.path.splitext(filename)
     if ext in mapping:
         outfile = base + mapping[ext]['suffix']
@@ -299,13 +302,13 @@ def _process_file(filename, buf, destdir, origin="", combine=False):
         fp.close()
         return None
     else:
-        log.debug("writing %s out to %s" % (filename,destdir))
+        log.debug("writing %s out to %s" % (filename, destdir))
         outfile = destdir + os.sep + os.path.basename(filename)
         util.ensure_dir(outfile)
-        with open(outfile,"wb") as fp2:
+        with open(outfile, "wb") as fp2:
             fp2.write(fp.read())
         fp.close()
-        return _filepath_to_urlpath(outfile,2)
+        return _filepath_to_urlpath(outfile, 2)
 
 
 def _transform_scss(infile, outfile):
@@ -327,7 +330,7 @@ def frontpage(repos,
     log = setup_logger()
     with util.logtime(log.info,
                       "frontpage: wrote %(path)s (%(elapsed).3f sec)",
-                      {'path':path}):
+                      {'path': path}):
         blocks = ""
         # TODO: if any of the repos has inst.config.primaryfrontpage =
         # True, then all other repos should provide their
@@ -337,7 +340,8 @@ def frontpage(repos,
             content = inst.frontpage_content()
             if content:
                 blocks += "<div id='%s'>%s</div>" % (inst.alias, content)
-                log.debug("frontpage: repo %s provided %s chars of content" % (inst.alias, len(content)))
+                log.debug("frontpage: repo %s provided %s chars of content" %
+                          (inst.alias, len(content)))
         vars = {'title': sitename,
                 'blocks': blocks}
         xhtml = """<?xml version='1.0' encoding='utf-8'?>
@@ -351,14 +355,14 @@ def frontpage(repos,
       </body>
     </html>""" % vars
         xhtml_path = os.path.splitext(path)[0] + ".xhtml"
-        with open(xhtml_path,"w") as fp:
+        with open(xhtml_path, "w") as fp:
             fp.write(xhtml)
         # FIXME: We don't need to actually store the xhtml file on
         # disk -- we could just keep it in memory as an lxml tree and
         # call .transform(tree) just like
         # DocuementRepository.toc_create_page does
         docroot = os.path.dirname(path)
-        conffile = os.sep.join([docroot,'rsrc','resources.xml'])
+        conffile = os.sep.join([docroot, 'rsrc', 'resources.xml'])
         transformer = Transformer('XSLT', stylesheet, ["res/xsl"],
                                   config=conffile,
                                   documentroot=docroot)
@@ -368,7 +372,7 @@ def frontpage(repos,
 
 def runserver(repos,
               port=8000,
-              documentroot="data", # relative to cwd
+              documentroot="data",  # relative to cwd
               apiendpoint="/api/",
               searchendpoint="/search/"):
     """Starts up a internal webserver and runs the WSGI app (see
@@ -392,10 +396,10 @@ def runserver(repos,
 
     """
     print("Serving wsgi app at http://localhost:%s/" % port)
-    kwargs = {'port':port,
+    kwargs = {'port': port,
               'documentroot': documentroot,
               'apiendpoint': apiendpoint,
-              'searchendpoint' :searchendpoint,
+              'searchendpoint': searchendpoint,
               'repos': repos}
     httpd = make_server('', port, make_wsgi_app(None, **kwargs))
     httpd.serve_forever()
@@ -417,7 +421,8 @@ def make_wsgi_app(inifile=None, **kwargs):
 
     """
     if inifile:
-        assert os.path.exists(inifile), "INI file %s doesn't exist (relative to %s)" % (inifile, os.getcwd())
+        assert os.path.exists(
+            inifile), "INI file %s doesn't exist (relative to %s)" % (inifile, os.getcwd())
         config = _load_config(inifile)
         args = _setup_runserver_args(config, inifile)
     else:
@@ -448,8 +453,8 @@ def _wsgi_search(environ, start_response, args):
     # .query() - but in what way?
     querystring = OrderedDict(parse_qsl(environ['QUERY_STRING']))
     query = querystring['q']
-    pagenum = int(querystring.get('p','1'))
-    res, pager = idx.query(query,pagenum=pagenum)
+    pagenum = int(querystring.get('p', '1'))
+    res, pager = idx.query(query, pagenum=pagenum)
     if pager['totalresults'] == 1:
         resulthead = "1 match"
     else:
@@ -471,23 +476,23 @@ def _wsgi_search(environ, start_response, args):
             r['title'] = r['identifier'] + ": " + r['title']
         doc.body.append(html.Div(
             [html.H2([elements.Link(r['title'], uri=r['uri'])]),
-             r['text']], **{'class':'hit'}))
+             r['text']], **{'class': 'hit'}))
 
     pages = [html.P(["Results %(firstresult)s-%(lastresult)s of %(totalresults)s" % pager])]
     for pagenum in range(pager['pagecount']):
         if pagenum + 1 == pager['pagenum']:
-            pages.append(html.Span([str(pagenum+1)],**{'class':'page'}))
+            pages.append(html.Span([str(pagenum + 1)], **{'class': 'page'}))
         else:
-            querystring['p'] = str(pagenum+1)
+            querystring['p'] = str(pagenum + 1)
             url = environ['PATH_INFO'] + "?" + urlencode(querystring)
-            pages.append(html.A([str(pagenum+1)],**{'class':'page',
-                                                  'href':url}))
-    doc.body.append(html.Div(pages, **{'class':'pager'}))
+            pages.append(html.A([str(pagenum + 1)], **{'class': 'page',
+                                                       'href': url}))
+    doc.body.append(html.Div(pages, **{'class': 'pager'}))
     # Transform that XHTML into HTML5
-    conffile = os.sep.join([args['documentroot'],'rsrc','resources.xml'])
+    conffile = os.sep.join([args['documentroot'], 'rsrc', 'resources.xml'])
     transformer = Transformer('XSLT', "res/xsl/search.xsl", ["res/xsl"],
                               config=conffile)
-    depth = len(args['searchendpoint'].split("/")) - 2 # '/mysearch/' = depth 1
+    depth = len(args['searchendpoint'].split("/")) - 2  # '/mysearch/' = depth 1
     repo = DocumentRepository()
     tree = transformer.transform(repo.render_xhtml_tree(doc), depth)
     data = transformer.t.html5_doctype_workaround(etree.tostring(tree))
@@ -501,16 +506,16 @@ def _wsgi_search(environ, start_response, args):
 def _wsgi_api(environ, start_response, args):
     """WSGI method, called by the wsgi app for requests that matches
        ``apiendpoint``."""
-    d = dict((str(key),str(environ[key])) for key in environ.keys())
-    
+    d = dict((str(key), str(environ[key])) for key in environ.keys())
+
     data = json.dumps(dict(d), indent=4).encode('utf-8')
     start_response("200 OK", [
         ("Content-Type", "application/json"),
         ("Content-Length", str(len(data)))
     ])
     return iter([data])
-    
-    
+
+
 def _wsgi_static(environ, start_response, args):
     """WSGI method, called by the wsgi app for all other requests not handled
     by :py:func:`~ferenda.Manager.search` or :py:func:`~ferenda.Manager.api`"""
@@ -526,8 +531,8 @@ def _wsgi_static(environ, start_response, args):
     for repo in args['repos']:
         (fp, length, status, mimetype) = repo.http_handle(environ)  # and args?
         if fp:
-            status = {200:"200 OK",
-                      406:"406 Not Acceptable"}[status]
+            status = {200: "200 OK",
+                      406: "406 Not Acceptable"}[status]
             iterdata = FileWrapper(fp)
             break
     if not fp:
@@ -565,7 +570,8 @@ loglevels = {'DEBUG': logging.DEBUG,
              'ERROR': logging.ERROR,
              'CRITICAL': logging.CRITICAL}
 
-def setup_logger(level='INFO',filename=None):
+
+def setup_logger(level='INFO', filename=None):
     """Sets up the logging facilities and creates the module-global log
        object as a root logger.
 
@@ -578,16 +584,16 @@ def setup_logger(level='INFO',filename=None):
     """
     if not isinstance(level, int):
         loglevel = loglevels[level]
-        
-    l = logging.getLogger() # get the root logger
-        
-    #if l.handlers == []:
+
+    l = logging.getLogger()  # get the root logger
+
+    # if l.handlers == []:
     if filename:
         h = logging.FileHandler(filename)
     else:
         h = logging.StreamHandler()
     for existing_handler in l.handlers:
-        #if type(h) == type(existing_handler):
+        # if type(h) == type(existing_handler):
         #    print("A %s already existed, not adding a new one" % h)
         return l
 
@@ -622,21 +628,22 @@ def run(argv):
                  prefixed with ``--``, e.g. ``--loglevel=INFO``, or
                  positional arguments to the specified action).
     """
-    config = _load_config(_find_config_file(),argv)
+    config = _load_config(_find_config_file(), argv)
 
     # if logfile is set to True, autogenerate logfile name from
     # current datetime. Otherwise assume logfile is set to the desired
     # file name of the log
-    log = setup_logger(level=config.loglevel,filename=None)
+    log = setup_logger(level=config.loglevel, filename=None)
     if config.logfile:
-        if isinstance(config.logfile,bool):
-            logfile = "%s/logs/%s.log" % (config.datadir,datetime.now().strftime("%Y%m%d-%H%M%S"))
+        if isinstance(config.logfile, bool):
+            logfile = "%s/logs/%s.log" % (config.datadir, datetime.now().strftime("%Y%m%d-%H%M%S"))
         else:
-            logfile = config.logfile 
+            logfile = config.logfile
         util.ensure_dir(logfile)
-        setup_logger(level=config.loglevel,filename=logfile)
-    
-    enabled = _enabled_classes()  # reads only ferenda.ini using configparser rather than layeredconfig
+        setup_logger(level=config.loglevel, filename=logfile)
+
+    # reads only ferenda.ini using configparser rather than layeredconfig
+    enabled = _enabled_classes()
     # returns {'ferenda.sources.docrepo.DocRepo':'base',...}
     enabled_aliases = dict(reversed(item) for item in enabled.items())
     if len(argv) < 1:
@@ -654,7 +661,7 @@ def run(argv):
                 return None
         elif action == 'runserver':
             args = _setup_runserver_args(config, _find_config_file())
-            return runserver(**args) # Note: the actual runserver method never returns
+            return runserver(**args)  # Note: the actual runserver method never returns
 
         elif action == 'makeresources':
             repoclasses = _classes_from_classname(enabled, classname)
@@ -669,11 +676,11 @@ def run(argv):
             repoclasses = _classes_from_classname(enabled, classname)
             args = _setup_frontpage_args(config, argv)
             return frontpage(**args)
-            
+
         elif action == 'all':
             classnames = _setup_classnames(enabled, classname)
             results = OrderedDict()
-            for action in ("download", 
+            for action in ("download",
                            "parse", "relate", "makeresources",
                            "generate", "toc", "news", "frontpage"):
                 if action in ("makeresources", "frontpage"):
@@ -689,11 +696,11 @@ def run(argv):
                         argscopy = list(args)
                         argscopy.extend(_filter_argv_options(argv))
                         if (action in ("parse", "relate", "generate") and
-                            "--all" not in argscopy):
+                                "--all" not in argscopy):
                             argscopy.append("--all")
                         argscopy.insert(0, action)
                         argscopy.insert(0, classname)
-                        results[action][alias] =  run(argscopy)
+                        results[action][alias] = run(argscopy)
             return results
         else:
             if classname == "all":
@@ -761,7 +768,7 @@ def setup():
         print(("Project directory %s already exists" % projdir))
         return False
     sitename = os.path.basename(projdir)
-    
+
     ok = _preflight_check()
     if not ok:
         print("There were some errors when checking your environment. Proceed anyway? (y/N)")
@@ -805,7 +812,7 @@ should be a full path to a ferenda.ini file) and/or command line
 arguments into a :py:class:`~ferenda.LayeredConfig` instance. It
 contains a built-in dict of default configuration values which can be
 overridden by the config file or command line arguments."""
-    
+
     # FIXME: Expand on this list of defaults? Note that it only
     # pertains to global configuration, not docrepo configuration
     # (those have the get_default_options() method).
@@ -849,16 +856,16 @@ def _setup_makeresources_args(config):
     # our config file stores the cssfiles and jsfiles parameters as string
     def getlist(config, key):
         if hasattr(config, key):
-            if isinstance(getattr(config,key), six.text_type):
-                return literal_eval(getattr(config,key))
+            if isinstance(getattr(config, key), six.text_type):
+                return literal_eval(getattr(config, key))
             else:
-                return getattr(config,key)
+                return getattr(config, key)
         else:
             return []
-    
+
     cssfiles = getlist(config, 'cssfiles')
     jsfiles = getlist(config, 'jsfiles')
-    
+
     return {'resourcedir': config.datadir + os.sep + 'rsrc',
             'combine':     config.combineresources,
             'staticsite':  config.staticsite,
@@ -916,7 +923,7 @@ def _run_class(enabled, argv):
     log = setup_logger()
     (alias, command, args) = _filter_argv(argv)
     with util.logtime(log.info, "%(alias)s %(command)s finished in %(elapsed).3f sec",
-                      {'alias':alias,
+                      {'alias': alias,
                        'command': command}):
         _enabled_classes = dict(reversed(item) for item in enabled.items())
 
@@ -943,21 +950,21 @@ def _run_class(enabled, argv):
             return
 
         kwargs = {}
-        if command in ('relate','generate','toc','news'):
+        if command in ('relate', 'generate', 'toc', 'news'):
             # we need to provide the otherrepos parameter
             otherrepos = []
             for othercls in _classes_from_classname(enabled, 'all'):
                 if othercls != inst.__class__:
                     otherrepos.append(_instantiate_class(othercls, argv=argv))
             kwargs['otherrepos'] = otherrepos
-        
+
         if hasattr(inst.config, 'all') and inst.config.all == True:
             res = []
             # semi-magic handling
-            ret = cls.setup(command,inst.config)
+            ret = cls.setup(command, inst.config)
             if ret == False:
                 log.info("%s %s: Nothing to do!" % (alias, command))
-            else: 
+            else:
                 # TODO: use multiprocessing.pool.map or celery for
                 # task queue handling
                 for basefile in inst.store.list_basefiles_for(command):
@@ -966,18 +973,19 @@ def _run_class(enabled, argv):
                     except errors.DocumentRemovedError as e:
                         if hasattr(e, 'dummyfile'):
                             if not os.path.exists(e.dummyfile):
-                                util.writefile(e.dummyfile,"")
+                                util.writefile(e.dummyfile, "")
                         else:
-                            log.error("%s of %s failed: %s" % (command,basefile,e))
+                            log.error("%s of %s failed: %s" % (command, basefile, e))
                             res.append(sys.exc_info())
-                            
+
                     except Exception as e:
-                        log.error("%s of %s failed: %s" % (command,basefile,e))
+                        log.error("%s of %s failed: %s" % (command, basefile, e))
                         res.append(sys.exc_info())
-                cls.teardown(command,inst.config)
+                cls.teardown(command, inst.config)
         else:
             res = clbl(*args, **kwargs)
     return res
+
 
 def _instantiate_class(cls, configfile="ferenda.ini", argv=[]):
     """Given a class object, instantiate that class and make sure the
@@ -993,24 +1001,24 @@ def _instantiate_class(cls, configfile="ferenda.ini", argv=[]):
     classcfg = getattr(globalcfg, cls.alias)
     inst.config = classcfg
     inst.store = inst.documentstore_class(classcfg.datadir + os.sep + inst.alias,
-                                          downloaded_suffix = inst.downloaded_suffix,
-                                          storage_policy = inst.storage_policy)
+                                          downloaded_suffix=inst.downloaded_suffix,
+                                          storage_policy=inst.storage_policy)
     # FIXME: this is a quick hack for controlling trace loggers for
     # ferenda.sources.legal.se.SFS. Must think abt how to generalize
     # this.
-    if hasattr(inst,'trace'):
+    if hasattr(inst, 'trace'):
         for tracelog in inst.trace:
             try:
-                
+
                 loglevel = getattr(inst.config.trace, tracelog)
-                log = logging.getLogger(inst.alias+"."+tracelog)
-                log.setLevel(loglevels.get(loglevel,'DEBUG')) 
+                log = logging.getLogger(inst.alias + "." + tracelog)
+                log.setLevel(loglevels.get(loglevel, 'DEBUG'))
             except AttributeError:
-                logging.getLogger(inst.alias+"."+tracelog).propagate = False
+                logging.getLogger(inst.alias + "." + tracelog).propagate = False
     return inst
 
-def _enabled_classes(inifile=None):
 
+def _enabled_classes(inifile=None):
     """Returns a mapping (alias -> classname) for all registered classes.
 
     >>> enable("ferenda.DocumentRepository") == 'base'
@@ -1089,7 +1097,8 @@ def _print_class_usage(cls):
     if actions:
         print("Valid actions are:")
     else:
-        print("No valid actions in this class (%s). Did you forget the @action decorator?" % cls.__name__)
+        print("No valid actions in this class (%s). Did you forget the @action decorator?" %
+              cls.__name__)
     for action, desc in actions.items():
         print(" * %s: %s" % (action, desc))
 
@@ -1149,14 +1158,15 @@ def _filter_argv(args):
                 commandargs.append(arg)
     return (alias, command, commandargs)
 
+
 def _filter_argv_options(args):
-    options=[]
+    options = []
     for arg in args:
         if arg.startswith("--"):
             options.append(arg)
     return options
 
-    
+
 def _load_class(classname):
     """Given a classname, imports and returns the corresponding class object.
 
@@ -1168,8 +1178,10 @@ def _load_class(classname):
     if "." in classname:
         (modulename, localclassname) = classname.rsplit(".", 1)
     else:
-        raise ValueError("Classname '%s' should be the fully qualified name of a class (i.e. 'modulename.%s')" % (classname, classname))
-    # NOTE: Don't remove this line! (or make sure testManager works after you do) 
+        raise ValueError(
+            "Classname '%s' should be the fully qualified name of a class (i.e. 'modulename.%s')" %
+            (classname, classname))
+    # NOTE: Don't remove this line! (or make sure testManager works after you do)
     # log = logging.getLogger()
     log = setup_logger()
 
@@ -1195,9 +1207,9 @@ def _find_config_file(path=None, create=False):
         path = os.getcwd()
     inipath = path + os.sep + "ferenda.ini"
     if not create and not os.path.exists(inipath):
-        raise errors.ConfigurationError("Config file %s not found (relative to %s)" % (inipath, os.getcwd()))
+        raise errors.ConfigurationError(
+            "Config file %s not found (relative to %s)" % (inipath, os.getcwd()))
     return inipath
-
 
 
 def _setup_runserver_args(config, inifilename):
@@ -1215,23 +1227,24 @@ def _setup_runserver_args(config, inifilename):
     port = urlsplit(config.url).port or 80
     relativeroot = os.path.join(os.path.dirname(inifilename), config.datadir)
 
-    # create an instance of every enabled repo 
+    # create an instance of every enabled repo
     enabled = _enabled_classes(inifilename)
     repoclasses = _classes_from_classname(enabled, 'all')
     repos = []
     for cls in repoclasses:
         instconfig = getattr(config, cls.alias)
-        config_as_dict = dict([(k,getattr(instconfig,k)) for k in instconfig])
+        config_as_dict = dict([(k, getattr(instconfig, k)) for k in instconfig])
         inst = cls(**config_as_dict)
         repos.append(inst)
 
-    #for repo in repos:
+    # for repo in repos:
     #    print("Repo %r %s: config.datadir is %s" % (repo, id(repo), repo.config.datadir))
     return {'port':           port,
             'documentroot':   relativeroot,
             'apiendpoint':    config.apiendpoint,
             'searchendpoint': config.searchendpoint,
             'repos':          repos}
+
 
 def _setup_frontpage_args(config, argv):
     # FIXME: This way of instantiating repo classes should maybe be
@@ -1240,7 +1253,8 @@ def _setup_frontpage_args(config, argv):
     # FIXME: why do we pass a config object when we re-read
     # ferenda.ini at least twice (_enabled_classes and
     # _instantiate_class) ?!
-    enabled = _enabled_classes()  # reads only ferenda.ini using configparser rather than layeredconfig
+    # reads only ferenda.ini using configparser rather than layeredconfig
+    enabled = _enabled_classes()
     repoclasses = _classes_from_classname(enabled, classname="all")
     repos = []
     for cls in repoclasses:
@@ -1249,16 +1263,16 @@ def _setup_frontpage_args(config, argv):
     return {'sitename': config.sitename,
             'path': config.datadir + "/index.html",
             'repos': repos}
-    
 
-def _filepath_to_urlpath(path,keep_segments=2):
+
+def _filepath_to_urlpath(path, keep_segments=2):
     """
     :param path: the full or relative filepath to transform into a urlpath
     :param keep_segments: the number of directory segments to keep (the ending filename is always kept)
     """
     # data/repo/rsrc/js/main.js, 3 -> repo/rsrc/js/main.js
     # /var/folders/tmp4q6b1g/rsrc/resources.xml, 1 -> rsrc/resources.xml
-    urlpath = os.sep.join(path.split(os.sep)[-(keep_segments+1):])
+    urlpath = os.sep.join(path.split(os.sep)[-(keep_segments + 1):])
     # print("_filepath_to_urlpath (%s): %s -> %s" % (keep_segments, path, urlpath))
     return urlpath.replace(os.sep, "/")
 
@@ -1298,12 +1312,13 @@ def _preflight_check():
     for (mod, ver, required) in modules:
         try:
             m = __import__(mod)
-            version = getattr(m,'__version__', None)
+            version = getattr(m, '__version__', None)
             if isinstance(version, tuple):
                 version = ".".join([str(x) for x in version])
             if not hasattr(m, '__version__'):
-                print("WARNING: Module %s has no version information, it might be older than required" % mod)
-            elif version < ver: # FIXME: use util.numcmp?
+                print(
+                    "WARNING: Module %s has no version information, it might be older than required" % mod)
+            elif version < ver:  # FIXME: use util.numcmp?
                 if required:
                     print("ERROR: Module %s has version %s, need %s" %
                           (mod, version, ver))
@@ -1322,7 +1337,7 @@ def _preflight_check():
 
     # 3: Check binaries
     for (cmd, arg) in binaries:
-        try: 
+        try:
             ret = subprocess.call([cmd, arg],
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
@@ -1342,7 +1357,6 @@ def _select_triplestore(sitename):
     # Try triplestores in order: Fuseki, Sesame, Sleepycat, SQLite,
     # and return configuration for the first triplestore that works.
 
-
     # 1. Fuseki
     try:
         triplestore = os.environ.get('FERENDA_TRIPLESTORE_LOCATION',
@@ -1357,7 +1371,6 @@ def _select_triplestore(sitename):
     except (requests.exceptions.HTTPError,
             requests.exceptions.ConnectionError) as e:
         print("... Fuseki not available at %s: %s" % (triplestore, e))
-        pass
 
     # 2. Sesame
     try:
@@ -1382,7 +1395,6 @@ New repository. The following settings are recommended:
     except (requests.exceptions.HTTPError,
             requests.exceptions.ConnectionError) as e:
         print("... Sesame not available at %s: %s" % (triplestore, e))
-        pass
 
     # 3. RDFLib + Sleepycat
     try:
@@ -1400,6 +1412,6 @@ New repository. The following settings are recommended:
         return ('SQLITE', 'data/ferenda.sqlite', 'ferenda')
     except ImportError as e:
         print("...SQLite not available: %s" % e)
-    
+
     print("No usable triplestores, the actions 'relate', 'generate' and 'toc' won't work")
     return (None, None, None)
