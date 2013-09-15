@@ -42,3 +42,7 @@ class Transform(RepoTester):
             <paramfile><node key='value'><subnode>textnode</subnode></node></paramfile>
             <infile>Document title</infile>
         </output>""")
+
+    # FIXME: We should isolate parts of the tests in
+    # testDocRepo.Generate, testDocRepo.TOC and testWSGI.Search that
+    # deals with transformation, and bring them here instead.
