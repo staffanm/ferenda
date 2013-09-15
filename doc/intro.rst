@@ -115,8 +115,8 @@ Alternately, using the command line tools and the project framework:
    7000 RFC documents takes several hours. In order to process all
    documents, remove the ``downloadmax`` configuration
    parameter/command line option, and be prepared to wait. You should
-   also set up an external triple store (see :doc:`triplestore`) and
-   an external fulltext search engine (see :doc:`fulltextsearch`).
+   also set up an external triple store (see :ref:`external-triplestore`) and
+   an external fulltext search engine (see :ref:`external-fulltext`).
 
 Features
 --------

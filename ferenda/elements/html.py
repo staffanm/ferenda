@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """The purpose of this module is to provide classes corresponding to
 most elements (except ``<style>``, ``<script>`` and similar
 non-document content elements) and core attributes (except ``@style``
@@ -8,6 +9,8 @@ that elements of a particular kind only contain allowed
 sub-elements.
 
 """
+from __future__ import unicode_literals
+
 import logging
 import six
 

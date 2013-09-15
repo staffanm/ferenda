@@ -53,6 +53,7 @@ Classes
    api/elements
    api/elements-html
    api/describer
+   api/transformer
    api/fsmparser
    api/citationparser
    api/uriformatter
@@ -96,9 +97,13 @@ Document repositories
 .. toctree::
    :maxdepth: 2
 
-   docrepo/rfc
-   docrepo/w3c
    docrepo/static
+   docrepo/keyword
+   docrepo/mediawiki
+   docrepo/skeleton
+   docrepo/tech
+   docrepo/legal-eu
+   docrepo/legal-se
    api/devel
    
 

@@ -18,16 +18,16 @@ from ferenda.decorators import managedparsing
 MW_NS = "{http://www.mediawiki.org/xml/export-0.3/}"
 
 class Keyword(DocumentRepository):
-    """Implements support for keyword hubs, conceptual resources which
+    """Implements support for 'keyword hubs', conceptual resources which
        themselves aren't related to any document, but to which other
        documents are related. As an example, if a docrepo has
        documents that each contains a set of keywords, and the docrepo
-       parse implementation extracts these keywords as dct:subject
+       parse implementation extracts these keywords as ``dct:subject``
        resources, this docrepo creates a document resource for each of
        those keywords. The main content for the keyword may come from
-       the mediawiki docrepo, and all other documents in any of the
-       repos that refer to this concept resource are automatically
-       listed.
+       the :class:`~ferenda.sources.general.MediaWiki` docrepo, and
+       all other documents in any of the repos that refer to this
+       concept resource are automatically listed.
 
     """ # FIXME be more comprehensible
     alias = "keyword"

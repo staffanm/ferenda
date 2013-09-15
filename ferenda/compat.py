@@ -1,13 +1,13 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""kind of like six.moves but primarily for py26 support.
+
+Client code uses this like::
+
+    from ferenda.compat import OrderedDict
+    from ferenda.compat import unittest 
+    from ferenda.compat import Mock, patch
+"""
 from __future__ import unicode_literals
-# ferenda/compat.py -- kind of like six.moves but primarily for py26 support
-#
-# client code uses this like:
-#
-# from ferenda.compat import OrderedDict
-# from ferenda.compat import unittest 
-# from ferenda.compat import Mock, patch
 import sys
 try:
     from collections import OrderedDict

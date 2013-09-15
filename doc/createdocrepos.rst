@@ -402,7 +402,7 @@ The default implementation does this in two steps. In the first,
 :meth:`~ferenda.DocumentRepository.prep_annotation_file`
 fetches metadata about other documents that relates to the document to
 be generated into an *annotation file*. In the second,
-:meth:`~ferenda.DocumentRepository.transform_html` runs an
+:class:`~ferenda.Transformer` runs an
 XSLT transformation on the source file (which sources the annotation
 file and a configuration file created by
 :func:`~ferenda.manager.makeresources`) in order to create the
@@ -493,15 +493,15 @@ obsoletes the same document (RFC 6991).
 Transforming to HTML
 ^^^^^^^^^^^^^^^^^^^^^
 
-The :meth:`~ferenda.DocumentRepository.transform_html` step is driven
-by a XSLT stylesheet. The default stylesheet uses a site-wide
-configuration file (created by :func:`~ferenda.manager.makeresources`)
-for things like site name and top-level navigation, and lists the
-document content, section by section, alongside of other documents
-that contains references (in the form of ``dct:references``) for each
-section. The SPARQL query and the XSLT stylesheet often goes hand in
-hand -- if your stylesheet needs a certain piece of data, the query
-must be adjusted to fetch it. By setting he class variable
+The :class:`~ferenda.Transformer` step is driven by a XSLT
+stylesheet. The default stylesheet uses a site-wide configuration file
+(created by :func:`~ferenda.manager.makeresources`) for things like
+site name and top-level navigation, and lists the document content,
+section by section, alongside of other documents that contains
+references (in the form of ``dct:references``) for each section. The
+SPARQL query and the XSLT stylesheet often goes hand in hand -- if
+your stylesheet needs a certain piece of data, the query must be
+adjusted to fetch it. By setting he class variable
 :data:`~ferenda.DocumentRepository.xslt_template` in the same way as
 you did for the SPARQL query, you can override the default.
 

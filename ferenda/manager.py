@@ -13,29 +13,24 @@ else, for you.
 from __future__ import unicode_literals
 # system
 import os
-import time
 import stat
 import subprocess
 import sys
 import inspect
-import itertools
 import logging
 import json
 import mimetypes
 from ast import literal_eval
 from datetime import datetime
 import xml.etree.cElementTree as ET
-import cgi
 from ferenda.compat import OrderedDict
+from wsgiref.simple_server import make_server
+from wsgiref.util import FileWrapper
 
 import six
 from six.moves.urllib_parse import urlsplit, parse_qsl, urlencode
 from six.moves import configparser
 input = six.moves.input
-
-from wsgiref.simple_server import make_server
-from wsgiref.util import FileWrapper
-# from pprint import pprint
 
 # 3rd party
 import pkg_resources
@@ -43,17 +38,19 @@ import requests
 import requests.exceptions
 from rdflib import URIRef, Namespace, Literal
 from bs4 import BeautifulSoup
+from lxml import etree
 
 # my modules
 from ferenda import DocumentRepository
 from ferenda import DocumentStore
 from ferenda import FulltextIndex
 from ferenda import LayeredConfig
+from ferenda import Transformer
 from ferenda import TripleStore
 from ferenda import elements
-from ferenda.elements  import html
 from ferenda import errors
 from ferenda import util
+from ferenda.elements import html
 
 # NOTE: This is part of the published API and must be callable in
 # scenarios without configfile or logger.
@@ -356,10 +353,16 @@ def frontpage(repos,
         xhtml_path = os.path.splitext(path)[0] + ".xhtml"
         with open(xhtml_path,"w") as fp:
             fp.write(xhtml)
-
-        xsltdir = repos[0].setup_transform_templates(os.path.dirname(stylesheet), stylesheet)
-        params = repos[0].get_transform_configuration(xsltdir,xhtml_path)
-        repos[0].transform_html(xsltdir+"/"+os.path.basename(stylesheet), xhtml_path, path, params, otherrepos=repos)
+        # FIXME: We don't need to actually store the xhtml file on
+        # disk -- we could just keep it in memory as an lxml tree and
+        # call .transform(tree) just like
+        # DocuementRepository.toc_create_page does
+        docroot = os.path.dirname(path)
+        conffile = os.sep.join([docroot,'rsrc','resources.xml'])
+        transformer = Transformer('XSLT', stylesheet, ["res/xsl"],
+                                  config=conffile,
+                                  documentroot=docroot)
+        transformer.transform_file(xhtml_path, path)
     return True
 
 
@@ -481,26 +484,13 @@ def _wsgi_search(environ, start_response, args):
                                                   'href':url}))
     doc.body.append(html.Div(pages, **{'class':'pager'}))
     # Transform that XHTML into HTML5
-    
-    # FIXME: this way of transforming a etree to HTML5 is way too
-    # complicated, dependent on args['repo'][0], stores temporary
-    # files on disk for no good reason, abuses
-    # get_transform_configuration with a fake path and duplicates code
-    xsltfile = "res/xsl/search.xsl"
-    tmpfile = args['documentroot']+"/_searchtmp-%s.xhtml" % os.getpid()
-    outfile = args['documentroot']+"/_searchtmp-%s.html" % os.getpid()
-    # create a fake path so taht get_transform_configuration selects a
-    # resources.xml with correct relative path
-    depth = len(list(filter(None,args['searchendpoint'].split("/"))))
-    fake_outfile = "%s/%s/search.html" % (args['documentroot'],
-                                          "/".join(["fake"]*depth))
-    xsltdir = repo.setup_transform_templates(os.path.dirname(xsltfile), xsltfile)
-    params = repo.get_transform_configuration(xsltdir,fake_outfile)
-    
-    repo.render_xhtml(doc,tmpfile)
-    repo.transform_html(xsltdir + "/search.xsl",
-                        tmpfile, outfile, params, args['repos'][1:])
-    data = util.readfile(outfile,"rb")
+    conffile = os.sep.join([args['documentroot'],'rsrc','resources.xml'])
+    transformer = Transformer('XSLT', "res/xsl/search.xsl", ["res/xsl"],
+                              config=conffile)
+    depth = len(args['searchendpoint'].split("/")) - 2 # '/mysearch/' = depth 1
+    repo = DocumentRepository()
+    tree = transformer.transform(repo.render_xhtml_tree(doc), depth)
+    data = transformer.t.html5_doctype_workaround(etree.tostring(tree))
     start_response("200 OK", [
         ("Content-Type", "text/html; charset=utf-8"),
         ("Content-Length", str(len(data)))
@@ -1127,7 +1117,11 @@ def _list_class_usage(cls):
     for attrname in dir(cls):
         attr = getattr(cls, attrname)
         if hasattr(attr, "runnable"):
-            res[attr.__name__] = attr.__doc__.split("\n")[0]
+            doc = attr.__doc__
+            if doc:
+                res[attr.__name__] = doc.split("\n")[0]
+            else:
+                res[attr.__name__] = "(Undocumented)"
     return res
 
 

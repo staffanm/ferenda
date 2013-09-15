@@ -32,6 +32,7 @@ class Continuation(object):
 
 
 class DirTrips(Trips):
+    """Downloads Direktiv in plain text format from http://rkrattsbaser.gov.se/dir/"""
     alias = "dirtrips"
     app = "dir"
     base = "DIR"
@@ -196,6 +197,7 @@ class DirTrips(Trips):
 
 
 class DirAsp(SwedishLegalSource, PDFDocumentRepository):
+    """Downloads Direktiv in PDF format from http://rkrattsdb.gov.se/kompdf/"""
     alias = "dirasp"
     start_url = "http://rkrattsdb.gov.se/kompdf/search.asp"
     document_url = "http://62.95.69.24/KOMdoc/%(yy)02d/%(yy)02d%(num)04d.PDF"
@@ -251,6 +253,7 @@ class DirAsp(SwedishLegalSource, PDFDocumentRepository):
 
 
 class DirPolopoly(Regeringen):
+    """Downloads Direktiv in PDF format from http://www.regeringen.se/"""
     alias = "dirpolo"
     cssfiles = ['../ferenda/res/css/pdfview.css']
     jsfiles = ['../ferenda/res/js/pdfviewer.js']
@@ -271,6 +274,7 @@ class DirPolopoly(Regeringen):
 
 
 class Direktiv(CompositeRepository, SwedishLegalSource):
+    "A composite repository containing ``DirTrips``, ``DirAsp`` and ``DirPolopoly``."""
     subrepos = DirPolopoly, DirAsp, DirTrips
     alias = "dir"
     xslt_template = "paged.xsl"

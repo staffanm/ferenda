@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """:py:mod:`unittest`-based classes and accompanying functions to
 create some types of ferenda-specific tests easier."""
@@ -15,14 +14,8 @@ import filecmp
 import unicodedata
 from io import BytesIO, StringIO
 from difflib import unified_diff
-try:
-    from unittest.mock import Mock, patch
-except ImportError:
-    from mock import Mock, patch
-if sys.version_info < (2, 7, 0):
-    import unittest2 as unittest
-else:
-    import unittest
+from ferenda.compat import unittest 
+from ferenda.compat import Mock, patch
 
 import six
 from six import text_type as str

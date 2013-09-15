@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
 class TocPage(object):
     """Represents a particular TOC page.
     
