@@ -487,6 +487,7 @@ def uri_leaf(uri):
         if sep and leaf:
             return leaf
 
+
 @contextmanager
 def logtime(method, format="The operation took %(elapsed).3f sec", values={}):
     """

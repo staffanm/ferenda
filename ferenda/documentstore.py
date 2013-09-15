@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 from contextlib import contextmanager
 import shutil
 import os
+import sys
 from tempfile import NamedTemporaryFile
 import filecmp
 
@@ -90,13 +91,13 @@ class DocumentStore(object):
         >>> d = DocumentStore(datadir="/tmp/base")
         >>> realsep = os.sep
         >>> os.sep = "/"
-        >>> d.path('123/a', 'parsed', '.xhtml')
-        '/tmp/base/parsed/123/a.xhtml'
+        >>> d.path('123/a', 'parsed', '.xhtml') == '/tmp/base/parsed/123/a.xhtml'
+        True
         >>> d.storage_policy = "dir"
-        >>> d.path('123/a', 'parsed', '.xhtml')
-        '/tmp/base/parsed/123/a/index.xhtml'
-        >>> d.path('123/a', 'downloaded', None, 'r4711', 'appendix.txt')
-        '/tmp/base/archive/downloaded/123/a/r4711/appendix.txt'
+        >>> d.path('123/a', 'parsed', '.xhtml') == '/tmp/base/parsed/123/a/index.xhtml'
+        True
+        >>> d.path('123/a', 'downloaded', None, 'r4711', 'appendix.txt') == '/tmp/base/archive/downloaded/123/a/r4711/appendix.txt'
+        True
         >>> os.sep = realsep
         
         :param basefile: The basefile for which to calculate the path
@@ -341,8 +342,8 @@ class DocumentStore(object):
         >>> d = DocumentStore("/tmp")
         >>> realsep = os.sep
         >>> os.sep = "/"
-        >>> d.basefile_to_pathfrag('1998:204') 
-        '1998/%3A204'
+        >>> d.basefile_to_pathfrag('1998:204') == '1998/%3A204'
+        True
         >>> os.sep = realsep
 
         If you wish to override how document files are stored in
@@ -356,8 +357,14 @@ class DocumentStore(object):
         :returns: The encoded path fragment
         :rtype: str
         """
-        return quote(basefile,
-        safe='/;@&=+,').replace('%', os.sep+'%')
+        safe = '/;@&=+,'
+        if sys.version_info < (2,7,0):
+            # urllib.quote in python 2.6 cannot handle unicode values
+            # for the safe parameter. FIXME: We should create a shim
+            # as ferenda.compat.quote and use that
+            safe = safe.encode('ascii')
+
+        return quote(basefile,safe=safe).replace('%', os.sep+'%')
 
     def pathfrag_to_basefile(self, pathfrag):
         """Does the inverse of
