@@ -84,19 +84,18 @@ class FSMParser():
           body = p.parse(BeautifulSoup("foo.html").find_all("#main p"), "body", make_body)
           body = p.parse(ElementTree.parse("foo.xml").find(".//paragraph"), "body", make_body)
 
-        :param chunks: The document to be parsed.
-        :type chunks: A list (or any other iterable) of text-like objects.
+        :param chunks: The document to be parsed, as a list or any other
+                       iterable of text-like objects.
         :param initialstate: The initial state for the machine. The
                              state must be present in the transition
-                             table.
-        :type initialstate: Could be any object, but strings are
-                            preferrable as they make error messages
-                            easier to understand.
+                             table. This could be any object, but strings are
+                             preferrable as they make error messages
+                             easier to understand.
         :param initialconstructor: A function that creates a document
                                    root object, and then fills it with
                                    child objects using
                                    .make_children()
-        :type initialconstructor: Callable
+        :type initialconstructor: callable
         :returns: A document object tree.
         """
         if self.debug:
@@ -169,9 +168,9 @@ class FSMParser():
     def make_children(self, parent):
         """Creates child nodes for the current (parent) document node.
 
-        :param parent: The parent document node.
-        :type parent: Any list-like object (preferrably a subclass of
-                      ferenda.element.CompoundElement)
+        :param parent: The parent document node, as any list-like object
+                       (preferrably a subclass of
+                       :py:class:`ferenda.element.CompoundElement`)
         :returns: The same ``parent`` object.
         
         """

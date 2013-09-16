@@ -49,7 +49,6 @@ class Transformer(object):
                  templatedirs,
                  documentroot=None,
                  config=None):
-
         cls = {'XSLT': XSLTTransform,
                'JINJA': JinjaTransform}[transformertype]
         self.t = cls(template, templatedirs)
@@ -133,16 +132,17 @@ class Transformer(object):
     def transform_file(self, infile, outfile,
                        parameters=None, uritransform=None):
         """Accepts two filenames, reads from *infile*, writes to *outfile*."""
-        depth = self._depth(outfile, self.documentroot)
+        depth = self._depth(os.path.dirname(outfile),
+                            self.documentroot+os.sep+"index.html")
         self.t.native_to_file(self.transform(self.t.file_to_native(infile),
                                              depth,
                                              parameters,
                                              uritransform),
                               outfile)
 
-    def _depth(self, outfile, root):
-        # NB: root must be a dir, not a file
-        return os.path.relpath(outfile, root).count("..")
+    def _depth(self, outfiledir, root):
+        # NB: root must be a file in the root dir
+        return os.path.relpath(outfiledir, root).count("..") + 1
 
 
 class TransformerEngine(object):
@@ -219,9 +219,9 @@ class XSLTTransform(TransformerEngine):
         try:
             return self._transformer(indata, **strparams)
         except etree.XSLTApplyError as e:
-            raise errors.TransformError(str(e.error_log))
-        if len(transform.error_log) > 0:
-            raise errors.TransformError(str(transform.error_log))
+            raise errors.TransformError(str(e))
+        if len(self._transformer.error_log) > 0:
+            raise errors.TransformError(str(_transformer.error_log))
 
     # nativedata = lxml.etree
     def native_to_file(self, nativedata, outfile):

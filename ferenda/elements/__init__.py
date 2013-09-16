@@ -122,7 +122,7 @@ class AbstractElement(object):
     """If set, this property gets converted to a ``@class`` attribute in the resulting XHTML."""
     
     def as_xhtml(self, uri=None):
-        """Converts this object to a :py:class:`lxml.etree` object (with children)
+        """Converts this object to a ``lxml.etree`` object (with children)
 
         :param uri: If provided, gets converted to an ``@about`` attribute in the resulting XHTML.
         :type uri: str
@@ -155,7 +155,7 @@ properties (such as ordinal label, date of enactment, etc)."""
 
 
 class IntElement(AbstractElement, int):
-    """Based on :py:class:`int`, but can also have other properties."""
+    """Based on :py:func:`int`, but can also have other properties."""
 
     # immutable objects must provide a __new__ method
     def __new__(cls, arg=0, *args, **kwargs):

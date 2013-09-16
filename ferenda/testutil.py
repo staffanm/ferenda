@@ -52,10 +52,8 @@ this class, ie::
     def assertEqualGraphs(self, want, got, exact=True):
         """Assert that two RDF graphs are identical (isomorphic).
 
-        :param want: The graph as expected
-        :type  want: rdflib.Graph object or the filename of a serialized graph
-        :param got: The actual graph
-        :type  got: rdflib.Graph object or the filename of a serialized graph
+        :param want: The graph as expected, as an :py:class:`~rdflib.graph.Graph` object or the filename of a serialized graph
+        :param got: The actual graph, as an :py:class:`~rdflib.graph.Graph` object or the filename of a serialized graph
         :param exact: Whether to require that the graphs are exactly alike (True) or only if all triples in want exists in got (False)
         :type  exact: bool
         """
@@ -112,10 +110,8 @@ this class, ie::
     def assertEqualXML(self, want, got):
         """Assert that two xml trees are canonically identical.
 
-        :param want: The XML document as expected
-        :type  want: A string, byte string or ElementTree element
-        :param got: The actual XML document
-        :type  got: A string, byte string or ElementTree element
+        :param want: The XML document as expected, as a string, byte string or ElementTree element
+        :param got: The actual XML document, as a string, byte string or ElementTree element
         """
         # Adapted from formencode, https://bitbucket.org/ianb/formencode/
         def xml_compare(want, got, reporter):
@@ -395,16 +391,14 @@ def parametrize(cls, template_method, name, params, wrapper=None):
         - world
         + hello
         
-    :param cls: TestCase to add the parametrized test to.
-    :type  cls: class
+    :param cls: The ``TestCase`` class to add the parametrized test to.
     :param template_method: The method to use for parametrization
-    :type  template_method: callable (bound method)
     :param name: The name for the new test method
     :type  name: str
     :param params: The parameter list (Note: keyword parameters are not supported)
-    :type  params: iterable
-    :param wrapper: A unittest decorator like :py:meth:`unittest.skip` or :py:meth:`unittest.expectedFailure`.
-    :param wrapper: callable (decorator)
+    :type  params: list
+    :param wrapper: A unittest decorator like :py:func:`unittest.skip` or :py:func:`unittest.expectedFailure`.
+    :param wrapper: callable
 
     """
     # internal entrypoint for tesst

@@ -31,7 +31,7 @@ class LayeredConfig(object):
 
        Configuration parameters can be changed in code. Such changes
        are persisted to the configuration file by calling
-       :py:meth:`write`.
+       :py:meth:`~ferenda.LayeredConfig.write`.
 
        :param defaults: A dict with configuration keys and values. If
                         any values are dicts, these are turned into

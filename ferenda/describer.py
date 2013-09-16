@@ -58,7 +58,7 @@ class Describer(OrigDescriber):
     def getvalue(self, p):
         """Get a single literal value for the given property and the
         current subject. If the graph contains zero or more than one
-        such literal, a :py:class:`KeyError` will be raised.
+        such literal, a :py:exc:`KeyError` will be raised.
 
         .. note::
 
@@ -85,7 +85,7 @@ class Describer(OrigDescriber):
     def getrel(self, p):
         """Get a single URI for the given property and the current
         subject. If the graph contains zero or more than one such URI,
-        a :py:class:`KeyError` will be raised.
+        a :py:exc:`KeyError` will be raised.
 
         :param p: The property of the sought literal.
         :type  p: :py:class:`rdflib.term.URIRef`

@@ -2,9 +2,8 @@ from __future__ import unicode_literals, print_function
 import subprocess
 import os
 
-# scripts = ("doc/fail.sh", "doc/win.sh")
-# pyscripts = ("doc/intro-example.py",)
-scripts = ("doc/intro-example.sh",)
+scripts = ("doc/intro-example.py",
+           "doc/intro-example.sh")
 
 failings = []
 

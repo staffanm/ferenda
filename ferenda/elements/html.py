@@ -23,17 +23,16 @@ def elements_from_soup(soup,
                        remove_tags=('script', 'style', 'font', 'map', 'center'),
                        keep_attributes=('class', 'id', 'dir', 'lang', 'src', 'href', 'name', 'alt')):
     """Converts a BeautifulSoup tree into a tree of
-    :py:class:`ferenda.elements.HTMLElement` objects. Some
+    :py:class:`ferenda.elements.html.HTMLElement` objects. Some
     non-semantic attributes and tags are removed in the process.
 
     :param soup: Soup object to convert
-    :type soup: bs4.BeautifulSoup
-    :param remove_tags: Tags that should not be included 
-    :type remove_tags: iterable
-    :param keep_attributes: The attributes to keep 
-    :type keep_attributes: iterable
+    :param remove_tags: Tags that should not be included
+    :type  remove_tags: list
+    :param keep_attributes: Attributes to keep
+    :type  keep_attributes: list
     :returns: tree of element objects
-    :rtype: ferenda.elements.HTMLElement
+    :rtype: ferenda.elements.html.HTMLElement
 
     """
     log = logging.getLogger(__name__)

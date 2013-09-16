@@ -87,8 +87,9 @@ class FulltextIndex(object):
         :type  repo: str
         :param basefile: The basefile which contains resource
         :type  basefile: str
-        :param title: User-displayable title of resource (if applicable). Should not 
-                      contain the same information as ``identifier``. 
+        :param title: User-displayable title of resource (if applicable).
+                      Should not contain the same information as
+                      ``identifier``. 
         :type  title: str
         :param identifier: User-displayable short identifier for resource (if applicable)
         :type  identifier: str
@@ -98,8 +99,9 @@ class FulltextIndex(object):
         .. note::
 
            Calling this method may not directly update the fulltext
-           index -- you need to call :meth:`commit` or :meth:`close`
-           for that.
+           index -- you need to call
+           :meth:`~ferenda.FulltextIndex.commit` or
+           :meth:`~ferenda.FulltextIndex.close` for that.
 
         """
         raise NotImplementedError
@@ -123,9 +125,9 @@ class FulltextIndex(object):
         :param q: Free text query, using the selected full text index's
                   prefered query syntax
         :type  q: str
-        :param **kwargs: any parameter will be used to match a
+        :param \*\*kwargs: any parameter will be used to match a
                          similarly-named field
-        :type **kwargs: dict
+        :type \*\*kwargs: dict
         :returns: matching documents, each document as a dict of fields
         :rtype: list
 

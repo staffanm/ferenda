@@ -126,7 +126,7 @@ class DocumentRepository(object):
     directory (the default filename being ``index`` +suffix),
     otherwise each doc gets stored as a file in a directory with other
     files.  Affects
-    :py:meth:`~ferenda.DocumentRepository.path` (and therefore
+    :py:meth:`ferenda.DocumentStore.path` (and therefore
     all other ``*_path`` methods)"""
 
     alias = "base"
@@ -220,7 +220,7 @@ class DocumentRepository(object):
     """Class that implements the :class:`~ferenda.DocumentStore` interface."""
 
     def __init__(self, **kwargs):
-        """See class docstring for constructor doc."""
+        """See :py:class:`~ferenda.DocumentRepository`."""
         codedefaults = self.get_default_options()
         defaults = util.merge_dict_recursive(codedefaults, kwargs)
         self.config = LayeredConfig(defaults=defaults)
@@ -511,21 +511,21 @@ uri doesn't map to a basefile in this repo."""
     def download_single(self, basefile, url=None):
         """Downloads the document from the web (unless explicitly
         specified, the URL to download is determined by
-        :py:meth:`~ferenda.DocumentRepository.document_url` combined
+        :py:data:`~ferenda.DocumentRepository.document_url_template` combined
         with basefile, the location on disk is determined by the
         function
-        :py:meth:`~ferenda.DocumentRepository.downloaded_path()`).
+        :py:meth:`~ferenda.DocumentStore.downloaded_path`).
 
         If the document exists on disk, but the version on the web is
         unchanged (determined using a conditional GET), the file on disk
         is left unchanged (i.e. the timestamp is not modified).
 
         :param basefile: The basefile of the document to download
-        :param url: The URL to download (optional)
         :type basefile: string
-        :type url: string or None
-        :returns: True if the document was downloaded and stored on
-                  disk, False if the file on disk was not updated.
+        :param url: The URL to download (optional)
+        :type url: str
+        :returns: ``True`` if the document was downloaded and stored on
+                  disk, ``False`` if the file on disk was not updated.
         """
         if url is None:
             url = self.remote_url(basefile)
@@ -781,9 +781,8 @@ uri doesn't map to a basefile in this repo."""
         :param basefile: The basefile for the downloaded document to parse
         :type  basefile: str
         :param encoding: The encoding of the downloaded document
-        :type  encoding: str
-        :returns: The parsed document
-        :rtype: bs4.BeautifulSoup
+        :type  encoding: str 
+        :returns: The parsed document as a ``BeautifulSoup`` object
 
         .. note::
 
@@ -807,8 +806,7 @@ uri doesn't map to a basefile in this repo."""
            ``prov:wasGeneratedBy`` properties in ``doc.meta``, as well
            as setting the language of the document in ``doc.lang``.
         
-        :param soup: A parsed document
-        :type  soup: bs4.BeautifulSoup
+        :param soup: A parsed document, as ``BeautifulSoup`` object
         :param  doc: Our document
         :type   doc: ferenda.Document
         :returns: None
@@ -1115,7 +1113,7 @@ uri doesn't map to a basefile in this repo."""
     def relate_all_setup(cls, config):
         """Runs any cleanup action needed prior to relating all documents in
         a docrepo. The default implementation clears the corresponsing
-        context (see :py:meth:`~ferenda.DocumentRepository.context`)
+        context (see :py:meth:`~ferenda.DocumentRepository.dataset_uri`)
         in the triple store.
 
         .. note::
@@ -1430,8 +1428,8 @@ parsed document path to that documents dependency file."""
             with util.logtime(self.log.debug,
                               "%(basefile)s: transform in %(elapsed).3f",
                               {'basefile': basefile}):
-                conffile = os.sep.join([self.config.datadir, 'rsrc',
-                                        'resources.xml'])
+                conffile = os.path.abspath(
+                    os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
                 transformer = Transformer('XSLT', self.xslt_template,
                                           ["res/xsl"], config=conffile,
                                           documentroot=self.config.datadir)
@@ -1491,7 +1489,7 @@ parsed document path to that documents dependency file."""
         return transform
 
     def prep_annotation_file(self, basefile):
-        """Helper function used by :py:meth:`generate` -- prepares a RDF/XML file
+        """Helper function used by :py:meth:`~ferenda.DocumentRepository.generate` -- prepares a RDF/XML file
         containing statements that in some way annotates the
         information found in the document that generate handles, like
         URI/title of other documents that refers to this one.
@@ -1549,7 +1547,7 @@ parsed document path to that documents dependency file."""
         inclusion.
 
         :param graph: The graph to convert
-        :type  graph: rdflib.Graph
+        :type  graph: rdflib.graph.Graph
         :returns: A serialized XML document with the RDF statements 
         :rtype: str
         """
@@ -1751,10 +1749,10 @@ parsed document path to that documents dependency file."""
 
         :param predicates: The :py:class:`~rdflib.term.URIRef` terms to use as base for criteria
         :type  predicates: list
-        :returns: :py:class:`~ferenda.sources.documentsource.TocCriteria`
+        :returns: :py:class:`~ferenda.TocCriteria`
                   objects, each representing a particular way of organizing the
                   documents, and each corresponding to a TocPageset object (constructed
-                  by :py:meth:`~ferenda.sources.DocumentRepository.toc_pagesets`)
+                  by :py:meth:`~ferenda.DocumentRepository.toc_pagesets`)
         :rtype: list
         """
 
@@ -1995,7 +1993,8 @@ parsed document path to that documents dependency file."""
                          ul
                          ])
 
-        conffile = os.sep.join([self.config.datadir, 'rsrc', 'resources.xml'])
+        conffile = os.path.abspath(
+            os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
         transformer = Transformer('XSLT', "res/xsl/toc.xsl", ["res/xsl"],
                                   config=conffile)
         # FIXME: This is a naive way of calculating the relative depth
@@ -2022,6 +2021,10 @@ parsed document path to that documents dependency file."""
             for criterion in criteria:
                 if criterion.selector(entry):
                     criterion.entries.append(entry)
+        conffile = os.path.abspath(
+            os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
+        transformer = Transformer("XSLT", "res/xsl/atom.xsl", ["res/xsl"],
+                                  config=conffile)
         for criterion in criteria:
             # should reverse=True be configurable? For datetime
             # properties it makes sense to use most recent first, but
@@ -2033,13 +2036,15 @@ parsed document path to that documents dependency file."""
                                  criterion.basefile)
 
             outfile = self.store.path(criterion.basefile, 'feed', '.html')
-            xsltdir = self.setup_transform_templates(
-                os.path.dirname("res/xsl/atom.xsl"), "res/xsl/atom.xsl")
-            params = self.get_transform_configuration(xsltdir, outfile)
-            self.transform_html(xsltdir + "/atom.xsl",
-                                self.store.atom_path(criterion.basefile),
-                                outfile,
-                                params)
+            #xsltdir = self.setup_transform_templates(
+            #    os.path.dirname("res/xsl/atom.xsl"), "res/xsl/atom.xsl")
+            #params = self.get_transform_configuration(xsltdir, outfile)
+            #self.transform_html(xsltdir + "/atom.xsl",
+            #                    self.store.atom_path(criterion.basefile),
+            #                    outfile,
+            #                    params)
+            transformer.transform_file(self.store.atom_path(criterion.basefile),
+                                       outfile)
 
     def news_criteria(self):
         """Returns a list of NewsCriteria objects."""
@@ -2334,7 +2339,7 @@ parsed document path to that documents dependency file."""
 
         Works like :meth:`~ferenda.DocumentRepository.tabs`, but
         normally returns an empty list. The repo
-        :class:`fereda.sources.general.Static` is an exception.
+        :class:`ferenda.sources.general.Static` is an exception.
         """
         return []
 

@@ -69,12 +69,12 @@ def makeresources(repos,
     (concatenated and minified js/css files, resources.xml used by
     most XSLT stylesheets, etc).
 
-    :param repos: The repositories to create resources for
-    :type  repos: list (or other iterable) of docrepo objects
+    :param repos: The repositories to create resources for, as instantiated and configured docrepo objects
+    :type  repos: list
     :param combine: whether to combine and compact/minify CSS and JS files
     :type  combine: bool
     :param resourcedir: where to put generated/copied resources
-    :type  resourcedir: string (directory name)
+    :type  resourcedir: str
     :returns: All created/copied css, js and resources.xml files
     :rtype: dict of lists
     """
@@ -330,9 +330,11 @@ def frontpage(repos,
               sitename="MySite"):
     """Create a suitable frontpage.
 
-    :param repos: The repositories to list on the frontpage
-    :type repos: list (or other iterable) of docrepo objects
-    :param path: the filename to create."""
+    :param repos: The repositories to list on the frontpage, as instantiated and configured docrepo objects
+    :type repos: list
+    :param path: the filename to create.
+    :type  path: str
+    """
     log = setup_logger()
     with util.logtime(log.info,
                       "frontpage: wrote %(path)s (%(elapsed).3f sec)",
@@ -568,7 +570,7 @@ def _wsgi_static(environ, start_response, args):
                 mimetypes.init()
             mimetype = mimetypes.types_map.get(ext, 'text/plain')
             status = "200 OK"
-            length = str(os.path.getsize(fullpath))
+            length = os.path.getsize(fullpath)
             fp = open(fullpath, "rb")
             iterdata = FileWrapper(fp)
         else:
@@ -576,10 +578,10 @@ def _wsgi_static(environ, start_response, args):
                                                                fullpath)
             mimetype = "text/html"
             status = "404 Not Found"
-            length = str(len(msg.encode('utf-8')))
+            length = len(msg.encode('utf-8'))
             fp = six.BytesIO(msg.encode('utf-8'))
             iterdata = FileWrapper(fp)
-
+    length = str(length)
     start_response(_str(status), [
         (_str("Content-Type"), _str(mimetype)),
         (_str("Content-Length"), _str(length))
@@ -1005,13 +1007,19 @@ def _run_class(enabled, argv):
                             if not os.path.exists(e.dummyfile):
                                 util.writefile(e.dummyfile, "")
                         else:
-                            log.error(
-                                "%s of %s failed: %s" % (command, basefile, e))
+                            errmsg = str(e)
+                            if not errmsg:
+                                errmsg = repr(e)
+                            log.error("%s of %s failed: %s" %
+                                      (command, basefile, errmsg))
                             res.append(sys.exc_info())
 
                     except Exception as e:
+                        errmsg = str(e)
+                        if not errmsg:
+                            errmsg = repr(e)
                         log.error("%s of %s failed: %s" %
-                                  (command, basefile, e))
+                                  (command, basefile, errmsg))
                         res.append(sys.exc_info())
                 cls.teardown(command, inst.config)
         else:

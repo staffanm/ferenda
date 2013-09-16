@@ -257,7 +257,13 @@ class Textbox(CompoundElement):
 
     """A textbox is a amount of text on a PDF page, with *top*, *left*,
 *width* and *height* properties that specifies the bounding box of the
-text. The *font* property specifies the id of font used (use :py:meth:`getfont` to get a dict of all font properties). A textbox consists of a list of Textelements which may differ in basic formatting (bold and or italics), but otherwise all text in a Textbox has the same font and size."""
+text. The *font* property specifies the id of font used (use
+:py:meth:`~ferenda.pdfreader.Textbox.getfont` to get a dict of all
+font properties). A textbox consists of a list of Textelements which
+may differ in basic formatting (bold and or italics), but otherwise
+all text in a Textbox has the same font and size.
+
+    """
 
     def __init__(self, *args, **kwargs):
         assert 'top' in kwargs, "top attribute missing"

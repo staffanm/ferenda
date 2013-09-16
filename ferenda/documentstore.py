@@ -478,7 +478,7 @@ class DocumentStore(object):
         :type   version: str
         :param attachment: Optional. Any associated file needed by the
                            main file (created by
-                           :py:meth:`~ferenda.DocumentStore.parse`)
+                           :py:meth:`~ferenda.DocumentRepository.parse`)
         :type  attachment: str
         :returns: The full filesystem path
         :rtype:   str
