@@ -49,6 +49,7 @@ def recordlastdownload(f):
         ret = f(self)
         self.config.lastdownload = datetime.now()
         LayeredConfig.write(self.config)
+        return ret
     return wrapper
 
 

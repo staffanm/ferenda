@@ -447,7 +447,6 @@ uri doesn't map to a basefile in this repo."""
         :returns: True if any document was downloaded, False otherwise.
         :rtype: bool
         """
-
         if basefile:
             if self.document_url_template:
                 return self.download_single(basefile)
