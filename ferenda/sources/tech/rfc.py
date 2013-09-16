@@ -15,7 +15,7 @@ from pyparsing import Word, CaselessLiteral, Optional, nums
 from ferenda import DocumentRepository
 from ferenda import TextReader, Describer, FSMParser, CitationParser, URIFormatter
 from ferenda import util
-from ferenda.decorators import recordlastdownload, managedparsing, downloadmax
+from ferenda.decorators import action, recordlastdownload, managedparsing, downloadmax
 from ferenda.elements import Body, Heading, Preformatted, Paragraph, UnorderedList, ListItem, Section, Subsection, Subsubsection, UnicodeElement, CompoundElement, Link, serialize
 from ferenda.errors import ParseError
 
@@ -92,8 +92,11 @@ class RFC(DocumentRepository):
     #           headings are centered (can be handled by alternate
     #           recognizer)
 
+
+    @action
     @recordlastdownload
     def download(self, basefile=None):
+        """Download rfcs starting from http://www.ietf.org/download/rfc-index.txt"""
         if basefile and self.document_url_template:
             return self.download_single(basefile)
         res = requests.get(self.start_url)
@@ -428,8 +431,11 @@ class RFC(DocumentRepository):
                                              ("RFCRef", rfc_uriformatter)))
         return citparser
 
+
+    @action
     @managedparsing
     def parse(self, doc):
+        """Parse downloaded documents into structured XML and RDF."""
 
         reader = TextReader(self.store.downloaded_path(doc.basefile),
                             linesep=TextReader.UNIX)

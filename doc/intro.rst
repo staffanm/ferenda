@@ -66,20 +66,20 @@ documents, you'll need a RDF triple store, either `Sesame
 document collections small enough to keep all metadata in memory you
 can get by with only rdflib, using either a Sqlite or a Berkely DB
 (aka Sleepycat/bsddb) backend. For further information, see
-:doc:`external-dbs`.
+:ref:`external-triplestore`.
 
 Similarly, once you have a large collection of text (either many short
 documents, or fewer long documents), you'll need an fulltext search
 engine to use the search feature (enabled by default). For small
 document collections the embedded `whoosh
 <https://bitbucket.org/mchaput/whoosh/wiki/Home>`_ library is
-used. Right now, `ElasticSearch <http://www.elasticsearch.org/>`_ is
-supported.
+used. Right now, `ElasticSearch <http://www.elasticsearch.org/>`_ is the only
+supported external fulltext search engine.
 
 As a rule of thumb, if your document collection contains over 100 000
 RDF triples or 100 000 words, you should start thinking about setting
 up an external triple store or a fulltext search engine. See
-:doc:`external-dbs`.
+:ref:`external-fulltext`.
 
 .. note::
 
@@ -92,7 +92,7 @@ up an external triple store or a fulltext search engine. See
    not essential.
 
    On Windows, we recommend using a binary distribution
-   of lxml. Unfortunately, at the time of writing, no such
+   of ``lxml``. Unfortunately, at the time of writing, no such
    distribution is available for Python 3.3, so for the time
    being, you'll have to use python 3.2 on this platform.
 

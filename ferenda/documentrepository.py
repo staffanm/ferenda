@@ -414,6 +414,7 @@ uri doesn't map to a basefile in this repo."""
     #
     #
     @decorators.action
+    @decorators.recordlastdownload
     def download(self, basefile=None):
         """Downloads all documents from a remote web service.
 

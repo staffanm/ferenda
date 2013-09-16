@@ -56,6 +56,7 @@ class W3Standards(DocumentRepository):
 
     @decorators.action
     def stats(self):
+        """Stats of amount of triples and things (RDF classes) within each parsed document."""
         stuff = []
         for basefile in self.store.list_basefiles_for("generate"):
             g = Graph()

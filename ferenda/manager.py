@@ -31,16 +31,19 @@ import six
 from six.moves.urllib_parse import urlsplit, parse_qsl, urlencode
 from six.moves import configparser
 input = six.moves.input
+from six import text_type as str
 
 # 3rd party
 import pkg_resources
 import requests
 import requests.exceptions
 from rdflib import URIRef, Namespace, Literal
+from bs4 import BeautifulSoup
 from lxml import etree
 
 # my modules
 from ferenda import DocumentRepository
+from ferenda import DocumentStore
 from ferenda import FulltextIndex
 from ferenda import LayeredConfig
 from ferenda import Transformer
@@ -187,7 +190,8 @@ def makeresources(repos,
                 if not tab in sitetabs:
                     (label, url) = tab
                     alias = inst.alias
-                    log.debug("Adding tab %(label)s (%(url)s) from docrepo %(alias)s" % locals())
+                    log.debug(
+                        "Adding tab %(label)s (%(url)s) from docrepo %(alias)s" % locals())
                     sitetabs.append(tab)
 
     for tab in sitetabs:
@@ -276,7 +280,8 @@ def _process_file(filename, buf, destdir, origin="", combine=False):
     log = setup_logger()
     # FIXME: extend this through a load-path mechanism?
     if os.path.exists(filename):
-        log.debug("Process file found %s as a file relative to %s" % (filename, os.getcwd()))
+        log.debug("Process file found %s as a file relative to %s" %
+                  (filename, os.getcwd()))
         fp = open(filename, "rb")
     elif pkg_resources.resource_exists('ferenda', filename):
         log.debug("Found %s as a resource" % filename)
@@ -288,7 +293,8 @@ def _process_file(filename, buf, destdir, origin="", combine=False):
         log.debug("Using external url %s" % filename)
         return filename
     else:
-        log.warning("file %(filename)s (specified in %(origin)s) doesn't exist" % locals())
+        log.warning(
+            "file %(filename)s (specified in %(origin)s) doesn't exist" % locals())
         return None
 
     (base, ext) = os.path.splitext(filename)
@@ -362,7 +368,8 @@ def frontpage(repos,
         # call .transform(tree) just like
         # DocuementRepository.toc_create_page does
         docroot = os.path.dirname(path)
-        conffile = os.sep.join([docroot, 'rsrc', 'resources.xml'])
+        conffile = os.path.abspath(
+            os.sep.join([docroot, 'rsrc', 'resources.xml']))
         transformer = Transformer('XSLT', stylesheet, ["res/xsl"],
                                   config=conffile,
                                   documentroot=docroot)
@@ -440,6 +447,19 @@ def make_wsgi_app(inifile=None, **kwargs):
     return app
 
 
+def _str(s, encoding="ascii"):
+    """If running under python2.6, return byte string version of the
+    argument, otherwise return the argument unchanged.
+
+    Needed since wsgiref under python 2.6 hates unicode.
+
+    """
+    if sys.version_info < (2, 7, 0):
+        return s.encode("ascii")
+    else:
+        return s
+
+
 def _wsgi_search(environ, start_response, args):
     """WSGI method, called by the wsgi app for requests that matches
        ``searchendpoint``."""
@@ -453,6 +473,8 @@ def _wsgi_search(environ, start_response, args):
     # .query() - but in what way?
     querystring = OrderedDict(parse_qsl(environ['QUERY_STRING']))
     query = querystring['q']
+    if not isinstance(query, str):  # happens on py26
+        query = query.decode("utf-8")
     pagenum = int(querystring.get('p', '1'))
     res, pager = idx.query(query, pagenum=pagenum)
     if pager['totalresults'] == 1:
@@ -478,7 +500,8 @@ def _wsgi_search(environ, start_response, args):
             [html.H2([elements.Link(r['title'], uri=r['uri'])]),
              r['text']], **{'class': 'hit'}))
 
-    pages = [html.P(["Results %(firstresult)s-%(lastresult)s of %(totalresults)s" % pager])]
+    pages = [
+        html.P(["Results %(firstresult)s-%(lastresult)s of %(totalresults)s" % pager])]
     for pagenum in range(pager['pagecount']):
         if pagenum + 1 == pager['pagenum']:
             pages.append(html.Span([str(pagenum + 1)], **{'class': 'page'}))
@@ -492,13 +515,14 @@ def _wsgi_search(environ, start_response, args):
     conffile = os.sep.join([args['documentroot'], 'rsrc', 'resources.xml'])
     transformer = Transformer('XSLT', "res/xsl/search.xsl", ["res/xsl"],
                               config=conffile)
-    depth = len(args['searchendpoint'].split("/")) - 2  # '/mysearch/' = depth 1
+    # '/mysearch/' = depth 1
+    depth = len(args['searchendpoint'].split("/")) - 2
     repo = DocumentRepository()
     tree = transformer.transform(repo.render_xhtml_tree(doc), depth)
     data = transformer.t.html5_doctype_workaround(etree.tostring(tree))
-    start_response("200 OK", [
-        ("Content-Type", "text/html; charset=utf-8"),
-        ("Content-Length", str(len(data)))
+    start_response(_str("200 OK"), [
+        (_str("Content-Type"), _str("text/html; charset=utf-8")),
+        (_str("Content-Length"), _str(str(len(data))))
     ])
     return iter([data])
 
@@ -509,9 +533,9 @@ def _wsgi_api(environ, start_response, args):
     d = dict((str(key), str(environ[key])) for key in environ.keys())
 
     data = json.dumps(dict(d), indent=4).encode('utf-8')
-    start_response("200 OK", [
-        ("Content-Type", "application/json"),
-        ("Content-Length", str(len(data)))
+    start_response(_str("200 OK"), [
+        (_str("Content-Type"), _str("application/json")),
+        (_str("Content-Length"), _str(str(len(data))))
     ])
     return iter([data])
 
@@ -544,7 +568,7 @@ def _wsgi_static(environ, start_response, args):
                 mimetypes.init()
             mimetype = mimetypes.types_map.get(ext, 'text/plain')
             status = "200 OK"
-            length = os.path.getsize(fullpath)
+            length = str(os.path.getsize(fullpath))
             fp = open(fullpath, "rb")
             iterdata = FileWrapper(fp)
         else:
@@ -552,12 +576,13 @@ def _wsgi_static(environ, start_response, args):
                                                                fullpath)
             mimetype = "text/html"
             status = "404 Not Found"
-            length = len(msg.encode('utf-8'))
+            length = str(len(msg.encode('utf-8')))
             fp = six.BytesIO(msg.encode('utf-8'))
             iterdata = FileWrapper(fp)
-    start_response(status, [
-        ("Content-Type", mimetype),
-        ("Content-Length", str(length))
+
+    start_response(_str(status), [
+        (_str("Content-Type"), _str(mimetype)),
+        (_str("Content-Length"), _str(length))
     ])
     return iterdata
     # FIXME: How can we make sure fp.close() is called, regardless of
@@ -593,17 +618,17 @@ def setup_logger(level='INFO', filename=None):
     else:
         h = logging.StreamHandler()
     for existing_handler in l.handlers:
-        # if type(h) == type(existing_handler):
-        #    print("A %s already existed, not adding a new one" % h)
-        return l
+        if h.__class__ == existing_handler.__class__:
+            # print("A %s already existed, not adding a new one" % h)
+            return l
 
-    h.setLevel(level)
+    h.setLevel(loglevel)
     h.setFormatter(
         logging.Formatter(
             "%(asctime)s %(name)s %(levelname)s %(message)s",
             datefmt="%H:%M:%S"))
     l.addHandler(h)
-    l.setLevel(level)
+    l.setLevel(loglevel)
 
     # turn of some library loggers we're not interested in
     for logname in ['requests.packages.urllib3.connectionpool',
@@ -636,7 +661,8 @@ def run(argv):
     log = setup_logger(level=config.loglevel, filename=None)
     if config.logfile:
         if isinstance(config.logfile, bool):
-            logfile = "%s/logs/%s.log" % (config.datadir, datetime.now().strftime("%Y%m%d-%H%M%S"))
+            logfile = "%s/logs/%s.log" % (
+                config.datadir, datetime.now().strftime("%Y%m%d-%H%M%S"))
         else:
             logfile = config.logfile
         util.ensure_dir(logfile)
@@ -661,7 +687,8 @@ def run(argv):
                 return None
         elif action == 'runserver':
             args = _setup_runserver_args(config, _find_config_file())
-            return runserver(**args)  # Note: the actual runserver method never returns
+            # Note: the actual runserver method never returns
+            return runserver(**args)
 
         elif action == 'makeresources':
             repoclasses = _classes_from_classname(enabled, classname)
@@ -922,9 +949,10 @@ def _run_class(enabled, argv):
     """
     log = setup_logger()
     (alias, command, args) = _filter_argv(argv)
-    with util.logtime(log.info, "%(alias)s %(command)s finished in %(elapsed).3f sec",
-                      {'alias': alias,
-                       'command': command}):
+    with util.logtime(
+        log.info, "%(alias)s %(command)s finished in %(elapsed).3f sec",
+        {'alias': alias,
+         'command': command}):
         _enabled_classes = dict(reversed(item) for item in enabled.items())
 
         if alias not in enabled and alias not in _enabled_classes:
@@ -932,7 +960,8 @@ def _run_class(enabled, argv):
             return
         if alias in argv:
             argv.remove(alias)
-        if alias in _enabled_classes:  # ie a fully qualified classname was used
+        # ie a fully qualified classname was used
+        if alias in _enabled_classes:
             classname = alias
         else:
             classname = enabled[alias]
@@ -943,7 +972,8 @@ def _run_class(enabled, argv):
             assert(callable(clbl))
         except:  # action was None or not a callable thing
             if command:
-                log.error("%s is not a valid command for %s" % (command, classname))
+                log.error("%s is not a valid command for %s" %
+                          (command, classname))
             else:
                 log.error("No command given for %s" % classname)
             _print_class_usage(cls)
@@ -975,11 +1005,13 @@ def _run_class(enabled, argv):
                             if not os.path.exists(e.dummyfile):
                                 util.writefile(e.dummyfile, "")
                         else:
-                            log.error("%s of %s failed: %s" % (command, basefile, e))
+                            log.error(
+                                "%s of %s failed: %s" % (command, basefile, e))
                             res.append(sys.exc_info())
 
                     except Exception as e:
-                        log.error("%s of %s failed: %s" % (command, basefile, e))
+                        log.error("%s of %s failed: %s" %
+                                  (command, basefile, e))
                         res.append(sys.exc_info())
                 cls.teardown(command, inst.config)
         else:
@@ -1000,9 +1032,10 @@ def _instantiate_class(cls, configfile="ferenda.ini", argv=[]):
                               argv, cascade=True)
     classcfg = getattr(globalcfg, cls.alias)
     inst.config = classcfg
-    inst.store = inst.documentstore_class(classcfg.datadir + os.sep + inst.alias,
-                                          downloaded_suffix=inst.downloaded_suffix,
-                                          storage_policy=inst.storage_policy)
+    inst.store = inst.documentstore_class(
+        classcfg.datadir + os.sep + inst.alias,
+        downloaded_suffix=inst.downloaded_suffix,
+        storage_policy=inst.storage_policy)
     # FIXME: this is a quick hack for controlling trace loggers for
     # ferenda.sources.legal.se.SFS. Must think abt how to generalize
     # this.
@@ -1014,7 +1047,8 @@ def _instantiate_class(cls, configfile="ferenda.ini", argv=[]):
                 log = logging.getLogger(inst.alias + "." + tracelog)
                 log.setLevel(loglevels.get(loglevel, 'DEBUG'))
             except AttributeError:
-                logging.getLogger(inst.alias + "." + tracelog).propagate = False
+                logging.getLogger(
+                    inst.alias + "." + tracelog).propagate = False
     return inst
 
 
@@ -1097,8 +1131,9 @@ def _print_class_usage(cls):
     if actions:
         print("Valid actions are:")
     else:
-        print("No valid actions in this class (%s). Did you forget the @action decorator?" %
-              cls.__name__)
+        print(
+            "No valid actions in this class (%s). Did you forget the @action decorator?" %
+            cls.__name__)
     for action, desc in actions.items():
         print(" * %s: %s" % (action, desc))
 
@@ -1233,7 +1268,8 @@ def _setup_runserver_args(config, inifilename):
     repos = []
     for cls in repoclasses:
         instconfig = getattr(config, cls.alias)
-        config_as_dict = dict([(k, getattr(instconfig, k)) for k in instconfig])
+        config_as_dict = dict(
+            [(k, getattr(instconfig, k)) for k in instconfig])
         inst = cls(**config_as_dict)
         repos.append(inst)
 
@@ -1324,8 +1360,9 @@ def _preflight_check():
                           (mod, version, ver))
                     success = False
                 else:
-                    print("WARNING: Module %s has version %s, would like to hav %s" %
-                          (mod, version, ver))
+                    print(
+                        "WARNING: Module %s has version %s, would like to hav %s" %
+                        (mod, version, ver))
             else:
                 print("Module %s OK" % mod)
         except ImportError:
@@ -1371,6 +1408,7 @@ def _select_triplestore(sitename):
     except (requests.exceptions.HTTPError,
             requests.exceptions.ConnectionError) as e:
         print("... Fuseki not available at %s: %s" % (triplestore, e))
+        pass
 
     # 2. Sesame
     try:
@@ -1395,23 +1433,24 @@ New repository. The following settings are recommended:
     except (requests.exceptions.HTTPError,
             requests.exceptions.ConnectionError) as e:
         print("... Sesame not available at %s: %s" % (triplestore, e))
+        pass
 
-    # 3. RDFLib + Sleepycat
+    # 3. RDFLib + SQLite
     try:
-        t = TripleStore("test.db", "ferenda", storetype=TripleStore.SLEEPYCAT)
+        t = TripleStore.connect("SQLITE", "test.sqlite", "ferenda")
+        print("SQLite-backed RDFLib triplestore seems to work")
+        return ('SQLITE', 'data/ferenda.sqlite', 'ferenda')
+    except ImportError as e:
+        print("...SQLite not available: %s" % e)
+
+    # 4. RDFLib + Sleepycat
+    try:
+        t = TripleStore.connect("SLEEPYCAT", "test.db", "ferenda")
         # No boom?
         print("Sleepycat-backed RDFLib triplestore seems to work")
         return ('SLEEPYCAT', 'data/ferenda.db', 'ferenda')
     except ImportError as e:
         print("...Sleepycat not available: %s" % e)
-
-    # 4. RDFLib + SQLite
-    try:
-        t = TripleStore("test.sqlite", "ferenda", storetype=TripleStore.SQLITE)
-        print("SQLite-backed RDFLib triplestore seems to work")
-        return ('SQLITE', 'data/ferenda.sqlite', 'ferenda')
-    except ImportError as e:
-        print("...SQLite not available: %s" % e)
 
     print("No usable triplestores, the actions 'relate', 'generate' and 'toc' won't work")
     return (None, None, None)
