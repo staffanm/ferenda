@@ -170,7 +170,7 @@ class FSMParser():
 
         :param parent: The parent document node, as any list-like object
                        (preferrably a subclass of
-                       :py:class:`ferenda.element.CompoundElement`)
+                       :py:class:`ferenda.elements.CompoundElement`)
         :returns: The same ``parent`` object.
         
         """

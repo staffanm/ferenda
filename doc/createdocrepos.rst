@@ -167,7 +167,7 @@ whole, but also for individual sections of the document.
 
 This implementation builds a very simple object model of a RFC
 document, which is serialized to a XHTML1.1+RDFa document by the
-:func:`~ferenda.DocumentRepository.managedparsing` decorator. If you
+:func:`~ferenda.decorators.managedparsing` decorator. If you
 run it (by calling ``ferenda-build.py rfc parse --all``) after having
 downloaded the rfc documents, the result will be a set of documents in
 ``data/rfc/parsed``, and a set of RDF files in
@@ -188,9 +188,9 @@ other parts of the text or other RFCs in full.
 .. note::
 
    How does ``./ferenda-build.py rfc parse --all`` work? It calls
-   :func:`list_basefiles_for` with the argument ``parse``, which lists
-   all downloaded files, and extracts the basefile for each of them,
-   then calls parse for each in turn.
+   :func:`~ferenda.DocumentStore.list_basefiles_for` with the
+   argument ``parse``, which lists all downloaded files, and extracts
+   the basefile for each of them, then calls parse for each in turn.
 
 
 Handling document structure
@@ -364,10 +364,12 @@ Calling :func:`~ferenda.manager.makeresources`
 This method needs to run at some point before generate and the rest of
 the methods. Unlike the other methods described above and below, which
 are run for one docrepo at a time, this method is run for the project
-as a whole (that is why it is a function in :mod:`ferenda.manager`instead of
-a :class:`~ferenda.DocumentRepository` method). It constructs a set of site-wide
-resources such as minified js and css files, and configuration for the
-site-wide XSLT template. It is easy to run using the command-line tool::
+as a whole (that is why it is a function in
+:mod:`ferenda.manager` instead of a
+:class:`~ferenda.DocumentRepository` method). It constructs a set of
+site-wide resources such as minified js and css files, and
+configuration for the site-wide XSLT template. It is easy to run using
+the command-line tool::
 
   $ ./ferenda-build.py all makeresources
 

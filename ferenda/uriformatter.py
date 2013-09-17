@@ -4,24 +4,28 @@ from __future__ import unicode_literals
 
 class URIFormatter(object):
 
-    """Companion class to :py:class:`ferenda.CitationParser`, that handles the work of 
-    formatting the dicts or dict-like objects that CitationParser creates, and 
+    """Companion class to :py:class:`ferenda.CitationParser`, that handles
+    the work of formatting the dicts or dict-like objects that
+    CitationParser creates.
 
-    The class is initialized with a list of formatters, where each formatter is a tuple 
-    (key, callable). When :py:meth:`format` is passed a citation reference in the form of a 
-    pyparsing.ParseResult object (which has a .getName() method),
-    the name of that reference is matched against the key of all formatters. If there is
-    a match, the corresponding callable is called with the parseresult object as a 
+    The class is initialized with a list of formatters, where each
+    formatter is a tuple (key, callable). When
+    :py:meth:`~ferenda.URIFormatter.format` is passed a citation
+    reference in the form of a ``pyparsing.ParseResult`` object (which
+    has a ``.getName`` method), the name of that reference is matched
+    against the key of all formatters. If there is a match, the
+    corresponding callable is called with the parseresult object as a
     single parameter, and the resulting string is returned.
 
-    An initialized URIFormatter object is not used directly. Instead, call 
-    :py:meth:`ferenda.CitationParser.set_formatter` with the object as parameter. 
-    See :doc:`../citationparsing`.
+    An initialized ``URIFormatter`` object is not used
+    directly. Instead, call
+    :py:meth:`ferenda.CitationParser.set_formatter` with the object as
+    parameter.  See :doc:`../citationparsing`.
 
-    :param \*formatters: List of formatters.
-    :type \*formatters: tuple (name, callable)
+    :param \*formatters: Formatters, each provided as a *(name, callable)* tuple.
+    :type \*formatters: list
 
- """
+    """
 
     def __init__(self, *formatters):
         self._formatters = dict(formatters)

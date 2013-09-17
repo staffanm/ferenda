@@ -35,6 +35,7 @@ from six import binary_type as bytes
 from six.moves.urllib_parse import quote
 
 # mine
+import ferenda
 from ferenda import util, errors, decorators
 from ferenda import (Describer, LayeredConfig, TripleStore, FulltextIndex,
                      Document, DocumentEntry, NewsCriteria, TocCriteria,
@@ -216,8 +217,9 @@ class DocumentRepository(object):
     sparql_annotations = "res/sparql/annotations.rq"
     """A template SPARQL CONSTRUCT query for document annotations."""
 
+    # FIXME: Sphinx really wants to treat this class as a reference, but cannot resolve it
     documentstore_class = DocumentStore
-    """Class that implements the :class:`~ferenda.DocumentStore` interface."""
+#    """Class that implements the :class:`~ferenda.DocumentStore` interface."""
 
     def __init__(self, **kwargs):
         """See :py:class:`~ferenda.DocumentRepository`."""
@@ -851,8 +853,7 @@ uri doesn't map to a basefile in this repo."""
            and
            :py:data:`~ferenda.DocumentRepository.parse_filter_selectors`.
 
-        :param soup: A parsed document
-        :type  soup: bs4.BeautifulSoup
+        :param soup: A parsed document as a ``BeautifulSoup`` object
         :param  doc: Our document
         :type   doc: ferenda.Document
         :returns: None

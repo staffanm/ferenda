@@ -25,7 +25,6 @@ from rdflib.compare import graph_diff
 from rdflib.util import guess_format
 from lxml import etree
 
-
 from ferenda import DocumentRepository
 from ferenda import TextReader
 from ferenda import elements
@@ -230,11 +229,13 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
 
     """
 
-    # A subclass must override these two
+    # A subclass must override these two FIXME: Sphinx really wants to
+    # treat this class as a reference (thinking it must be a class
+    # alias), but cannot resolve it
     repoclass = DocumentRepository
     """The actual documentrepository class to be tested. Must be
        overridden when creating a testcase class."""
-
+    
     docroot = '/tmp'
     """The location of test files to create tests from. Must be overridden
        when creating a testcase class"""
@@ -444,7 +445,7 @@ def file_parametrize(cls, directory, suffix, filter=None, wrapper=None):
     :type  directory: str
     :param filter: Will be called with the name of each matching file. If the ``filter`` callable returns True, no test is created
     :type  params: callable
-    :param wrapper: A unittest decorator like :py:meth:`unittest.skip` or :py:meth:`unittest.expectedFailure`.
+    :param wrapper: A unittest decorator like :py:func:`unittest.skip` or :py:func:`unittest.expectedFailure`.
     :param wrapper: callable (decorator)
 
     """

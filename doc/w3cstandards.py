@@ -18,3 +18,4 @@ class W3CStandards(DocumentRepository):
         for editor in soup.find("dt", text="Editors").find_siblings("dd"):
             editor_name = editor.split(", ")[0]
             d.value(self.predicate("dct:editor", editor_name))
+

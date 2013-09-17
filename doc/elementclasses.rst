@@ -10,7 +10,7 @@ create documents by creating such trees of elements. The
 
 Most of the classes can be used like python lists (and are, in fact,
 subclasses of :py:class:`list`). Unlike the aproach used by
-:py:class:`~xml.etree.ElementTree` and BeautifulSoup, where all
+``xml.etree.ElementTree`` and ``BeautifulSoup``, where all
 objects are of a specific class, and a object property determines the
 type of element, the element objects are of different classes if the
 elements are different. This means that elements representing a

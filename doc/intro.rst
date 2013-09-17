@@ -53,7 +53,7 @@ Command-line tools
      ``pdftohtml`` (from `poppler <http://poppler.freedesktop.org/>`_)
      and ``convert`` (from `ImageMagic
      <http://www.imagemagick.org/>`_)
-   * :py:class:`~ferenda.Wordreader` requires `antiword
+   * :py:class:`~ferenda.WordReader` requires `antiword
      <http://www.winfield.demon.nl/>`_ to handle old ``.doc`` files.
    * :py:class:`~ferenda.TripleStore` can perform some operations
      (bulk up- and download) much faster if `curl
@@ -122,34 +122,34 @@ Features
 --------
 
 * Handles downloading, structural parsing and regeneration of large
-  document collections
-* Contains libraries to make reading of text, PDF and MS Word
-  documents as easy as HTML *(Note: these are far from finished)*
+  document collections.
+* Contains libraries to make reading of plain text, PDF and MS Word
+  documents as easy as HTML *(Note: these are far from finished)*.
+* Uses established information standards as much as possible: If you
+  like XHTML, XSLT, XML namespaces, RDF and SPARQL, you'll feel right
+  at home.
 * Leverages your favourite python libraries: `requests
   <http://docs.python-requests.org/en/latest/>`_, `beautifulsoup
   <http://www.crummy.com/software/BeautifulSoup/>`_, `rdflib
   <https://rdflib.readthedocs.org/en/latest/>`_, `lxml
   <http://lxml.de/>`_, `pyparsing <http://pyparsing.wikispaces.com/>`_
   and `whoosh <https://bitbucket.org/mchaput/whoosh/wiki/Home>`_.
-* Uses established information standards as much as possible: If you
-  like XHTML, XSLT, XML namespaces, RDF and SPARQL, you'll feel right
-  at home
-* Possible to patch documents if the source content has errors
+* Possible to patch documents if the source content has errors.
 * Easy to write reference/citation parsers and run them on document
-  text
+  text.
 * Documents in the same and other collections are automatically
-  cross-referenced
+  cross-referenced.
 * Uses caches and dependency management to avoid performing the same
-  work over and over
+  work over and over.
 * Once documents are downloaded and structured, you get a usable web
   site with API, Atom feeds and search for free *(Note: API
-  functionality not yet implemented)*
+  functionality not yet implemented)*.
 * Web site generation can create a set of static HTML pages for
   offline use (though you lose search and API functionality).
 * Pull in commentary for documents from other sources *(Note: you'll
-  have to do most of this work yourself)*
+  have to do most of this work yourself)*.
 * Create topic hubs / keyword pages for document from multiple
-  collections *(Note: remains undocumented)*
+  collections *(Note: remains undocumented)*.
 
 Next step
 ---------

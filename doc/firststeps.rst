@@ -23,10 +23,11 @@ called ``ferenda-setup`` whose sole purpose is to create projects::
 
 The three files created by ``ferenda-setup`` is another command line
 tool (``ferenda-build.py``) used for management of the newly created
-project, a WSGI application (``wsgi.py``, see :doc:`wsgi`) and a configuration
-file (``ferenda.ini``). By default, it specifies the default logging
-level, the directory where document files will be stored. and which
-triple store your project will be using.   
+project, a WSGI application (``wsgi.py``, see :doc:`wsgi`) and a
+configuration file (``ferenda.ini``). By default, this configuration
+file specifies the default logging level, the directory where document
+files will be stored and which triple store your project will be
+using.
 
 .. note::
 
@@ -417,6 +418,6 @@ In the next section :doc:`createdocrepos` we will take a closer look at
 each of the six main steps (``download``, ``parse``, ``relate``, ``generate``, ``toc`` and
 ``news``), including how to completely replace the built-in methods. 
 You can also take a look at the source code for
-:py:class:`ferenda.sources.tech.W3C`, which contains a more complete 
+:py:class:`ferenda.sources.tech.W3Standards`, which contains a more complete 
 (and substantially longer) implementation of :meth:`~ferenda.DocumentRepository.download`, :meth:`~ferenda.DocumentRepository.parse`
 and the others.

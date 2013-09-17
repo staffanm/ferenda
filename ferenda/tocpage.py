@@ -12,7 +12,7 @@ class TocPage(object):
     :type  label: str
     :param binding: The variable binding used for defining this TOC page, like "title" or "issued"
     :type  binding: str
-    :param value: The particular value of bound variable that corresponds to this TOC page, like "a" or "2013". The :py:data:`~ferenda.TocCriteria.selector` function is used to select this value out of the raw data.
+    :param value: The particular value of bound variable that corresponds to this TOC page, like "a" or "2013". The ``selector`` function of a :py:class:`~ferenda.TocCriteria` object is used to select this value out of the raw data.
     :type  value: str
     """
 

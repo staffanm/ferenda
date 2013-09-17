@@ -70,8 +70,9 @@ class Transformer(object):
         the transformer engine. For XSLT, which is implemented through
         lxml, its in- and outdata are lxml trees
 
-        If you need an engine-indepent API, use :meth:`transform_stream` or 
-        :meth:`transform_file` instead 
+        If you need an engine-indepent API, use
+        :meth:`~ferenda.Transformer.transform_stream` or
+        :meth:`~ferenda.Transformer.transform_file` instead
 
         :param indata: The document to be transformed
         :param depth: The directory nesting level, compared to ``documentroot``
@@ -86,6 +87,7 @@ class Transformer(object):
                              static offline use.
         :type  uritransform: callable
         :returns: The transformed document
+
         """
 
         if parameters == None:

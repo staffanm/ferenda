@@ -192,16 +192,16 @@ two or more consecutive line separators)."""
         return self.__process(self.lastread)
 
     def peek(self, size=0):
-        """Works like :meth:`read`, but does not affect current seek position."""
+        """Works like :meth:`~ferenda.TextReader.read`, but does not affect current seek position."""
         res = self.data[self.currpos:self.currpos + size]
         return self.__process(res)
 
     def peekline(self, times=1):
-        """Works like :meth:`readline`, but does not affect current seek position. If *times* is specified, peeks that many lines ahead."""
+        """Works like :meth:`~ferenda.TextReader.readline`, but does not affect current seek position. If *times* is specified, peeks that many lines ahead."""
         return self.peekchunk(self.linesep, times)
 
     def peekparagraph(self, times=1):
-        """Works like :meth:`readparagraph`, but does not affect current seek position. If *times* is specified, peeks that many paragraphs ahead."""
+        """Works like :meth:`~ferenda.TextReader.readparagraph`, but does not affect current seek position. If *times* is specified, peeks that many paragraphs ahead."""
         startpos = self.currpos
         # consume any leading newlines
         while self.peek(len(self.linesep)) == self.linesep:
@@ -215,7 +215,7 @@ two or more consecutive line separators)."""
         return res
 
     def peekchunk(self, delimiter, times=1):
-        """Works like :meth:`readchunk`, but does not affect current seek position. If *times* is specified, peeks that many chunks ahead."""
+        """Works like :meth:`~ferenda.TextReader.readchunk`, but does not affect current seek position. If *times* is specified, peeks that many chunks ahead."""
         oldpos = self.currpos
         for i in range(times):
             (res, newpos) = self.__find(delimiter, oldpos)
@@ -227,20 +227,20 @@ two or more consecutive line separators)."""
         return self.__process(res)
 
     def prev(self, size=0):
-        """Works like :meth:`read`, but reads backwards from current seek position, and does not affect it."""
+        """Works like :meth:`~ferenda.TextReader.read`, but reads backwards from current seek position, and does not affect it."""
         res = self.data[self.currpos - size:self.currpos]
         return self.__process(res)
 
     def prevline(self, times=1):
-        """Works like :meth:`readline`, but reads backwards from current seek position, and does not affect it. If *times* is specified, reads the line that many times back."""
+        """Works like :meth:`~ferenda.TextReader.readline`, but reads backwards from current seek position, and does not affect it. If *times* is specified, reads the line that many times back."""
         return self.prevchunk(self.linesep, times)
 
     def prevparagraph(self, times=1):
-        """Works like :meth:`readparagraph`, but reads backwards from current seek position, and does not affect it. If *times* is specified, reads the paragraph that many times back."""
+        """Works like :meth:`~ferenda.TextReader.readparagraph`, but reads backwards from current seek position, and does not affect it. If *times* is specified, reads the paragraph that many times back."""
         return self.prevchunk(self.linesep * 2, times)
 
     def prevchunk(self, delimiter, times=1):
-        """Works like :meth:`readchunk`, but reads backwards from current seek position, and does not affect it. If *times* is specified, reads the chunk that many times back."""
+        """Works like :meth:`~ferenda.TextReader.readchunk`, but reads backwards from current seek position, and does not affect it. If *times* is specified, reads the chunk that many times back."""
         oldpos = self.currpos
         for i in range(times):
             (res, newpos) = self.__rfind(delimiter, oldpos)
@@ -288,7 +288,7 @@ two or more consecutive line separators)."""
     #----------------------------------------------------------------
     # Implementation of a file-like interface
     def flush(self):
-        """See :py:meth:`io.TextIOBase.flush`. This is a no-op."""
+        """See :py:meth:`io.IOBase.flush`. This is a no-op."""
 
     def read(self, size=0):
         """See :py:meth:`io.TextIOBase.read`."""
@@ -327,7 +327,7 @@ two or more consecutive line separators)."""
         return IOError("TextReaders are read-only")
 
     def writelines(sequence):
-        """See :py:meth:`io.TextIOBase.writelines`.
+        """See :py:meth:`io.IOBase.writelines`.
 
         .. note::
 
@@ -347,7 +347,7 @@ two or more consecutive line separators)."""
     # alias for py2 compat
     next = __next__
     """Backwards-compatibility alias for iterating over a file in python
-2. Use :meth:`getiterator` to make iteration work over anything other
+2. Use :meth:`~ferenda.TextReader.getiterator` to make iteration work over anything other
 than lines (eg paragraphs, pages, etc).
 
     """
