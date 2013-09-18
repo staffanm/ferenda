@@ -1,0 +1,6 @@
+<div about="http://example.org/doc#42"
+     typeof="bibo:DocumentPart"
+     content="Doc:4711, p 42"
+     rel="dct:identifier">
+     This is a part of a document
+</div>

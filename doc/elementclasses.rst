@@ -30,16 +30,12 @@ which aren't directly expressible as HTML elements
 Each element constructor (or at least those derived from
 :py:class:`~ferenda.elements.CompoundElement`) takes a list as an
 argument (same as :py:class:`list`), but also any number of keyword
-arguments. This enables you to construct a simple document like this::
+arguments. This enables you to construct a simple document like this:
 
-  from ferenda.elements import Body, Heading, Paragraph, Footnote
+.. literalinclude:: elementclasses.py
+   :start-after: # begin makedoc
+   :end-before: # end makedoc
   
-  doc = Body([Heading(["About Doc 43/2012 and it's interpretation"],predicate="dct:title"),
-              Paragraph(["According to Doc 43/2012",
-                         Footnote(["Available at http://example.org/xyz"]),
-                         " the bizbaz should be frobnicated"])
-             ])
-
 .. note::
 
    Since :py:class:`~ferenda.elements.CompoundElement` works like
@@ -55,18 +51,11 @@ Creating your own element classes
 The exact structure of documents differ greatly. A general document
 format such as XHTML or ODF cannot contain special constructs for
 preamble recitals of EC directives or patent claims of US patents. But
-your own code can create new classes for this. Example::
+your own code can create new classes for this. Example:
 
-  from ferenda.elements import CompoundElement, OrderedElement
-  
-  class Preamble(CompoundElement): pass
-  class PreambleRecital(CompoundElement,OrderedElement):
-      tagname = "div"
-      rdftype = "eurlex:PreambleRecital"
-  
-  doc = Preamble([PreambleRecital("Un",ordinal=1)],
-                 [PreambleRecital("Deux",ordinal=2)],
-                 [PreambleRecital("Trois",ordinal=3)])
+.. literalinclude:: elementclasses.py
+   :start-after: # begin derived-class
+   :end-before: # end derived-class
   
 
 Mixin classes
@@ -80,8 +69,6 @@ as mixins:
 
 * :py:class:`~ferenda.elements.OrdinalElement` (for representing
   elements with some sort of ordinal numbering)
-* :py:class:`~ferenda.elements.PredicateType` (for representing
-  literal data that are typed using a RDF predicaet)
 * :py:class:`~ferenda.elements.TemporalElement` (for representing
   things that has a start and/or a end date
 

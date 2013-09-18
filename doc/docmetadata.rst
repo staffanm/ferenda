@@ -16,18 +16,21 @@ RDFLib :py:class:`~rdflib.graph.Graph` object. As part of the
 should fill this graph with *triples* (metadata statements) about the
 document.
 
+.. _parsing-uri:
+
 Document URI
 ------------
-In order to do this, you should first create a suitable URI
-for your document. Preferably, this should be a URI based on the URL
-where your web site will be published, ie if you plan on publishing it
-on http://mynetstandards.org/, a URI for RFC 4711 might be
+
+In order to do this, you should first create a suitable URI for your
+document. Preferably, this should be a URI based on the URL where your
+web site will be published, ie if you plan on publishing it on
+http://mynetstandards.org/, a URI for RFC 4711 might be
 http://mynetstandards.org/rfc/4711 (ie based on the base URL, the
 docrepo alias, and the basefile). By changing the ``url`` variable in
 your project configuration file, you can set the base URL from which
 all document URIs are derived. If you wish to have more control over
 the exact way URIs are constructed, you can override
-:py:meth:`~ferenda.DocumentRepository.canonical_uri`.
+:py:meth:`~ferenda.DocumentRepository.canonical_uri`. 
 
 .. note::
 
@@ -47,9 +50,8 @@ With this, you can create metadata for your document using the RDFLib
 Graph API.
 
 .. literalinclude:: metadata.py
-   :lines: 6-37
-   :language: py
-
+   :start-after: # begin simple
+   :end-before: # end simple
 
 
 A simpler way of adding metadata
@@ -64,13 +66,14 @@ references to popular vocabularies. The above can be made more succint
 like this:
 
 .. literalinclude:: metadata.py
-   :lines: 39-53
-   :language: py
-       
+   :start-after: # begin simple
+   :end-before: # end simple
+
 .. note::
 
-   parse_metadata_from_soup() doesn't return anything. It only
-   modifies the ``doc`` object passed to it.
+   :meth:`~ferenda.DocumentRepository.parse_metadata_from_soup()`
+   doesn't return anything. It only modifies the ``doc`` object passed
+   to it.
 
 Vocabularies
 ------------
@@ -92,9 +95,8 @@ Serialization of metadata
 The :py:meth:`~ferenda.DocumentRepository.render_xhtml` method
 serializes all information in ``doc.body`` and ``doc.meta`` to a
 XHTML+RDFa file (the exact location given by
-:py:meth:`~ferenda.DocumentStore.parsed_path`. The
-metadata specified by doc.meta ends up in the ``<head>`` section of
-this XHTML file.
+:py:meth:`~ferenda.DocumentStore.parsed_path`). The metadata specified
+by doc.meta ends up in the ``<head>`` section of this XHTML file.
 
 The actual RDF statements are also *distilled* to a separate RDF/XML
 file found alongside this file (the location given by
@@ -103,8 +105,19 @@ convenience.
 
 Metadata about parts of the document
 ------------------------------------
-TBW
 
-Metadata about external things
-------------------------------
-TBW
+Just like the main Document object, individual parts of the document
+(represented as :py:mod:`ferenda.elements` objects) can have ``uri``
+and ``meta`` properties. Unlike the main Document objects, these
+properties are not initialized beforehand. But if you do create these
+properties, they are used to serialize metadata into RDFa properties
+for each
+
+.. literalinclude:: metadata.py
+   :start-after: # begin simple
+   :end-before: # end simple
+
+This results in the following document fragment:
+
+.. literalinclude:: metadata-result.xml
+		    
