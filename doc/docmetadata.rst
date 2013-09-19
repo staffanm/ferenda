@@ -21,11 +21,12 @@ document.
 Document URI
 ------------
 
-In order to do this, you should first create a suitable URI for your
-document. Preferably, this should be a URI based on the URL where your
-web site will be published, ie if you plan on publishing it on
-http://mynetstandards.org/, a URI for RFC 4711 might be
-http://mynetstandards.org/rfc/4711 (ie based on the base URL, the
+In order to create these metadata statements, you should first create a 
+suitable URI for your document. Preferably, this should be a URI based
+on the URL where your web site will be published, ie if you plan on 
+publishing it on
+``http://mynetstandards.org/``, a URI for RFC 4711 might be
+``http://mynetstandards.org/res/rfc/4711`` (ie based on the base URL, the
 docrepo alias, and the basefile). By changing the ``url`` variable in
 your project configuration file, you can set the base URL from which
 all document URIs are derived. If you wish to have more control over
@@ -103,6 +104,9 @@ file found alongside this file (the location given by
 :py:meth:`~ferenda.DocumentStore.distilled_path`) for
 convenience.
 
+.. _parsing-metadata-parts:
+
+
 Metadata about parts of the document
 ------------------------------------
 
@@ -114,10 +118,9 @@ properties, they are used to serialize metadata into RDFa properties
 for each
 
 .. literalinclude:: metadata.py
-   :start-after: # begin simple
-   :end-before: # end simple
+   :start-after: # begin part
+   :end-before: # end part
 
 This results in the following document fragment:
 
 .. literalinclude:: metadata-result.xml
-		    

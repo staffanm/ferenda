@@ -20,3 +20,12 @@ doc = Preamble([PreambleRecital("Un",ordinal=1)],
                [PreambleRecital("Deux",ordinal=2)],
                [PreambleRecital("Trois",ordinal=3)])
 # end derived-class
+
+# begin as-xhtml
+p = SectionalElement(["Some content"],
+                     ordinal = "1a",
+                     identifier = "Doc pt 1(a)"
+                     title="Title or name of the part")
+body = Body([p])
+etree.tostring(body.as_xhtml("http://example.org/doc")
+# end as-xhtml

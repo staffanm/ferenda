@@ -1,0 +1,32 @@
+<Body>
+  <Section title="First section">
+    <Paragraph>
+      <str>This is a regular paragraph. It will not be matched by is_section
+(unlike the above chunk) or is_preformatted (unlike the below chunk),
+but by the catch-all is_paragraph. The recognizers are run in the
+order specified by FSMParser.set_transitions().</str>
+    </Paragraph>
+    <Preformatted>
+      <str>    This is a preformatted section.
+        It could be used for source code,
+    +-------------------+
+    |   line drawings   |
+    +-------------------+
+        or what have                 you.</str>
+    </Preformatted>
+  </Section>
+  <Section title="Second section">
+    <Paragraph>
+      <str>The above new section implicitly closed the first section which we
+were in. This was made explicit by the last transition rule, which
+stated that any time a section is encountered while in the "section"
+state, we should not create any more children (False) but instead
+return to our previous state (which in this case is "body", but for a
+more complex language could be any number of states).</str>
+    </Paragraph>
+  </Section>
+</Body>
+
+	
+
+    

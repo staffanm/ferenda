@@ -23,9 +23,9 @@ covers many basic document elements, and the submodule
 all HTML tags. There is some functional overlap between these two
 module, but :py:mod:`ferenda.elements` contains several constructs
 which aren't directly expressible as HTML elements
-(eg. :py:class:`ferenda.elements.Page`,
-:py:class:`ferenda.elements.SectionalElement` and
-:py:class:`ferenda.elements.Footnote`)
+(eg. :py:class:`~ferenda.elements.Page`,
+:~py:class:`ferenda.elements.SectionalElement` and
+:~py:class:`ferenda.elements.Footnote`)
 
 Each element constructor (or at least those derived from
 :py:class:`~ferenda.elements.CompoundElement`) takes a list as an
@@ -67,22 +67,65 @@ one main class who's semantics you're extending, and one mixin class
 that contains particular properties. The following classes are useful
 as mixins:
 
-* :py:class:`~ferenda.elements.OrdinalElement` (for representing
-  elements with some sort of ordinal numbering)
-* :py:class:`~ferenda.elements.TemporalElement` (for representing
-  things that has a start and/or a end date
+* :py:class:`~ferenda.elements.OrdinalElement`: for representing
+  elements with some sort of ordinal numbering. An ordinal element has
+  an ``ordinal`` property, and different ordinal objects can be
+  compared or sorted. The sort is based on the ordinal property. The
+  ordinal property is a string, but comparisons/sorts are done in a
+  natural way, i.e. "2" < "2 a" < "10".
+
+* :py:class:`~ferenda.elements.TemporalElement`: for representing
+  things that has a start and/or a end date. A temporal element has
+  an ``in_effect`` method which takes a date (or uses today's date if
+  none given) and returns true if that date falls between the start
+  and end date.
 
 
 Rendering to XHTML
 ------------------
 
 The built-in classes are rendered as XHTML by the built-in method
-:py:meth:`~ferenda.DocumentRepository.render_xhtml`. Your own classes
-can specify how they are to be rendered in XHTML by overriding the
-:data:`~ferenda.elements.AbstractElement.tagname` and
+:py:meth:`~ferenda.DocumentRepository.render_xhtml`, which first
+creates a ``<head>`` section containing all document-level metadata
+(i.e. the data you have specified in your documents ``meta``
+property), and then calls the ``as_xhtml`` method on the root body
+element. The method is called with ``doc.uri`` as a single argument,
+which is then used as the RDF subject for all triples in the document
+(except for those sub-elements which themselves have a ``uri``
+property)
+
+All built-in element classes derive from
+:class:`~ferenda.elements.AbstractElement`, which contains a generic
+implementation of :meth:`~ferenda.elements.AbstractElement.as_xhtml`,
+that recursively creates a lxml element tree from itself and it's
+children.
+
+Your own classes can specify how they are to be rendered in XHTML by
+overriding the :data:`~ferenda.elements.AbstractElement.tagname` and
 :data:`~ferenda.elements.AbstractElement.classname` properties, or for
-full control, the :data:`~ferenda.elements.AbstractElement.as_xhtml`
+full control, the :meth:`~ferenda.elements.AbstractElement.as_xhtml`
 method.
+
+As an example, the class :class:`~ferenda.elements.SectionalElement`
+overrides ``as_xhtml`` to the effect that if you provide
+``identifier``, ``ordinal`` and ``title`` properties for the object, a
+resource URI is automatically constructed and four RDF triples are
+created (rdf:type, dct:title, dct:identifier, and bibo:chapter):
+
+.. literalinclude:: elementclasses.py
+   :start-after: # begin as-xhtml
+   :end-before: # end as-xhtml
+
+...which results in:
+
+.. literalinclude:: elementclasses-part.xhtml
+  
+However, this is a convenience method of SectionalElement, amd may not
+be appropriate for your needs. The general way of attaching metdata to
+document parts, as specified in :ref:`parsing-metadata-parts`, is to
+provide each document part with a ``uri`` and ``meta`` property. These
+are then automatically serialized as RDFa statements by the default
+``as_xhtml`` implementation.
 
 
 Convenience methods
