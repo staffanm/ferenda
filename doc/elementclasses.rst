@@ -32,7 +32,7 @@ Each element constructor (or at least those derived from
 argument (same as :py:class:`list`), but also any number of keyword
 arguments. This enables you to construct a simple document like this:
 
-.. literalinclude:: elementclasses.py
+.. literalinclude:: examples/elementclasses.py
    :start-after: # begin makedoc
    :end-before: # end makedoc
   
@@ -53,7 +53,7 @@ format such as XHTML or ODF cannot contain special constructs for
 preamble recitals of EC directives or patent claims of US patents. But
 your own code can create new classes for this. Example:
 
-.. literalinclude:: elementclasses.py
+.. literalinclude:: examples/elementclasses.py
    :start-after: # begin derived-class
    :end-before: # end derived-class
   
@@ -112,13 +112,13 @@ overrides ``as_xhtml`` to the effect that if you provide
 resource URI is automatically constructed and four RDF triples are
 created (rdf:type, dct:title, dct:identifier, and bibo:chapter):
 
-.. literalinclude:: elementclasses.py
+.. literalinclude:: examples/elementclasses.py
    :start-after: # begin as-xhtml
    :end-before: # end as-xhtml
 
 ...which results in:
 
-.. literalinclude:: elementclasses-part.xhtml
+.. literalinclude:: examples/elementclasses-part.xhtml
   
 However, this is a convenience method of SectionalElement, amd may not
 be appropriate for your needs. The general way of attaching metdata to

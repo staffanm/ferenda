@@ -222,17 +222,13 @@ class W3Standards(DocumentRepository):
             else:
                 datestr = " ".join(m.groups())
                 date = None
-                # FIXME: This contrived workaround to get default
-                # (english/C) locale for strptime should be put in
-                # ferenda.util (eg util.strptime)
-                with util.c_locale():
-                    try:
-                         # 17 December 1996
-                        date = datetime.strptime(datestr, "%d %B %Y").date()
+                try:
+                    # 17 December 1996
+                    date = util.strptime(datestr, "%d %B %Y")
                     except ValueError:
                         try:
                             # 17 Dec 1996
-                            date = datetime.strptime(datestr, "%d %b %Y").date()
+                            date = util.strptime(datestr, "%d %b %Y")
                         except ValueError:
                             self.log.warning("%s: Could not parse datestr %s" %
                                              (doc.basefile, datestr))

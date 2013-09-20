@@ -3,7 +3,9 @@ changelog.md
 2013-09-?? RELEASE 0.1.5
 
 (WIP) Documentation, particularly code examples, has been updated to
-better fit reality.
+better fit reality. They have (should) also been added to the test
+suite, so they're almost guaranteed to be updated when the API
+changes.
 
 Backwards-incompatible changes
 

@@ -336,14 +336,14 @@ be used in the same way:
 
 Instead of:
 
-.. literalinclude:: keyconcepts-file.py
+.. literalinclude:: examples/keyconcepts-file.py
    :start-after: # begin path
    :end-before: # end path
 
 
 use:
 
-.. literalinclude:: keyconcepts-file.py
+.. literalinclude:: examples/keyconcepts-file.py
    :start-after: # begin open
    :end-before: # end open
 
@@ -357,7 +357,7 @@ inline images. These can be handled as attachments by the download
 method. Just use the optional attachment parameter to the appropriate
 *_path / open_* methods:
 
-.. literalinclude:: keyconcepts-attachments.py
+.. literalinclude:: examples/keyconcepts-attachments.py
    :language: python		    
    :start-after: # begin
    :end-before: # end

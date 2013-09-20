@@ -9,11 +9,12 @@ al), you should also use :py:func:`~ferenda.decorators.action` so that
 manage.py will be able to call it.
 """
 from __future__ import unicode_literals
+from datetime import datetime
+import codecs
 import functools
 import itertools
-import codecs
+import os
 import time
-from datetime import datetime
 
 import six
 from rdflib import Graph, URIRef
@@ -39,14 +40,10 @@ def timed(f):
 
 def recordlastdownload(f):
     """Automatically stores current time in ``self.config.lastdownloaded``
-
-    .. note::
-
-       Does not work.
     """
     @functools.wraps(f)
-    def wrapper(self):
-        ret = f(self)
+    def wrapper(self, *args, **kwargs):
+        ret = f(self, *args, **kwargs)
         self.config.lastdownload = datetime.now()
         LayeredConfig.write(self.config)
         return ret
@@ -206,6 +203,8 @@ def downloadmax(f):
     """
     @functools.wraps(f)
     def wrapper(self, params):
+        if 'FERENDA_DOWNLOADMAX' in os.environ:
+            self.config.downloadmax = int(os.environ['FERENDA_DOWNLOADMAX'])
         if self.config.downloadmax:
             self.log.info("Downloading max %d documents" %
                           (self.config.downloadmax))

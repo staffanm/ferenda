@@ -88,7 +88,7 @@ http://tools.ietf.org/rfc/rfc6725.txt. Our first attempt will look like
 this (save as ``rfcs.py``)
 
    
-.. literalinclude:: rfcs.py
+.. literalinclude:: examples/rfcs.py
   :start-after: # begin download1
   :end-before: # end download1
   
@@ -115,7 +115,7 @@ But in order to download *everything* we need to parse the index text
 file to find out all available basefiles. In order to do that, we must
 override :meth:`~ferenda.DocumentRepository.download`. 
 
-.. literalinclude:: rfcs.py
+.. literalinclude:: examples/rfcs.py
    :start-after: # begin download2
    :end-before: # end download2
 
@@ -161,7 +161,7 @@ the downloaded file(s) for a particular document and parse it into a
 structured document with proper metadata, both for the document as a
 whole, but also for individual sections of the document.
 
-.. literalinclude:: rfcs.py
+.. literalinclude:: examples/rfcs.py
    :start-after: # begin parse1
    :end-before: # end parse1
 
@@ -201,7 +201,7 @@ subsections, which in turn can contain subsubsections. The start of
 each section is easy to identify, which means we can build a model of
 this structure by extending our parse method with relatively few lines:
 
-.. literalinclude:: rfcs.py
+.. literalinclude:: examples/rfcs.py
    :start-after: # begin parse2
    :end-before: # end parse2
 
@@ -271,7 +271,7 @@ parts of the current document) or ``"Section 2.4 of [RFC2045] says"``
 a simple grammar for these citations using `pyparsing
 <http://pyparsing.wikispaces.com/>`_:
 
-.. literalinclude:: rfcs.py
+.. literalinclude:: examples/rfcs.py
    :start-after: # begin citation1
    :end-before: # end citation1
 
@@ -281,7 +281,7 @@ will result in the named matches Sec = "2.4" and RFC = "2045". The
 CitationParser class can be used to extract these matches into a dict,
 which is then passed to a uri formatter function like:
 
-.. literalinclude:: rfcs.py
+.. literalinclude:: examples/rfcs.py
    :start-after: # begin citation2
    :end-before: # end citation2
 
@@ -289,7 +289,7 @@ And to initialize a citation parser and have it run over the entire
 structured text, finding citations and formatting them into URIs as we
 go along, just use:
 
-.. literalinclude:: rfcs.py
+.. literalinclude:: examples/rfcs.py
    :start-after: # begin citation3
    :end-before: # end citation3
 
@@ -436,14 +436,14 @@ or obsoletes this document. Using a CONSTRUCT query, we create
 ``rfc:isUpdatedBy`` and ``rfc:isObsoletedBy`` references to such
 documents.
 
-.. literalinclude:: rfcs.py
+.. literalinclude:: examples/rfcs.py
    :start-after: # begin annotations
    :end-before: # end annotations
 
 The contents of ``rfc-annotations.rq``, placed in the current
 directory, should be:
 
-.. literalinclude:: rfc-annotations.rq
+.. literalinclude:: examples/rfc-annotations.rq
 
 Note that ``%(uri)s`` will be replaced with the URI for the document
 we're querying about.
@@ -507,14 +507,14 @@ adjusted to fetch it. By setting he class variable
 :data:`~ferenda.DocumentRepository.xslt_template` in the same way as
 you did for the SPARQL query, you can override the default.
 
-.. literalinclude:: rfcs.py
+.. literalinclude:: examples/rfcs.py
    :start-after: # begin xslt
    :end-before: # end xslt
 
 The contents of ``rfc.xsl``, placed in the current
 directory, should be:
 
-.. literalinclude:: rfc.xsl
+.. literalinclude:: examples/rfc.xsl
    :language: xml		    
 
 This XSLT stylesheet depends on ``base.xsl`` (which resides in
@@ -575,7 +575,7 @@ every document. By overriding
 :meth:`~ferenda.DocumentRepository.toc_predicates` we can specify
 these four *predicates*.
 
-.. literalinclude:: rfcs.py
+.. literalinclude:: examples/rfcs.py
    :start-after: # begin toc_predicates
    :end-before: # end toc_predicates
 
@@ -587,7 +587,7 @@ objects that specify how documents should be ordered for any
 particular criteria, and have
 :meth:`~ferenda.DocumentRepository.toc_criteria` return these.
 
-.. literalinclude:: rfcs.py
+.. literalinclude:: examples/rfcs.py
    :start-after: # begin toc_criteria
    :end-before: # end toc_criteria
 
@@ -600,7 +600,7 @@ using their RFC number rather than their title, we'd like to add the
 RFC number in this display. This is done by overriding
 :meth:`~ferenda.DocumentRepository.toc_item`.
 		
-.. literalinclude:: rfcs.py
+.. literalinclude:: examples/rfcs.py
    :start-after: # begin toc_item
    :end-before: # end toc_item
 
@@ -623,7 +623,7 @@ the organization of your TOC pages, since you might want to split up
 the documents in different feeds, for example one feed for each RFC
 track.
 
-.. literalinclude:: rfcs.py
+.. literalinclude:: examples/rfcs.py
    :start-after: # begin news_criteria
    :end-before: # end news_criteria
 
@@ -652,7 +652,7 @@ about the repository and it's content. Below is a simple example that
 uses functionality we've used in other contexts to create a list of
 the five latest documents, as well as a total count of documents.
  
-.. literalinclude:: rfcs.py
+.. literalinclude:: examples/rfcs.py
    :start-after: # begin frontpage_content
    :end-before: # end frontpage_content
 

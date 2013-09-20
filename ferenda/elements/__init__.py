@@ -40,7 +40,8 @@ DCT = Namespace(util.ns['dct'])
 RDF = Namespace(util.ns['rdf'])
 XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 log = logging.getLogger(__name__)
-E = ElementMaker(namespace="http://www.w3.org/1999/xhtml")
+E = ElementMaker(namespace="http://www.w3.org/1999/xhtml",
+                 nsmap={None: "http://www.w3.org/1999/xhtml"})
 
 def serialize(root):
     """Given any :py:class:`~ferenda.elements.AbstractElement` *root*
@@ -134,7 +135,6 @@ class AbstractElement(object):
             if hasattr(self,stdattr):
                 attrs[stdattr] = getattr(self,stdattr)
         return E(self.tagname, attrs, str(self))
-
 
 
 class UnicodeElement(AbstractElement, six.text_type):
@@ -264,7 +264,6 @@ class CompoundElement(AbstractElement, list):
 
         # for each childen that is a string, make sure it doesn't
         # contain any XML illegal characters
-        
         return E(self.tagname, attrs, *children)
 
     def _span(self, subj, pred, obj, graph):
@@ -495,6 +494,10 @@ class SectionalElement(CompoundElement):
                          'property': 'dct:identifier',
                          'content': self.identifier}
                 element.insert(0,E('span',attrs))
+            if element.text: # make sure that naked PCDATA comes after the elements we've inserted
+                element[-1].tail = element.text
+                element.text = None
+
         return element
     
 

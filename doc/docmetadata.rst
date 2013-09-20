@@ -50,7 +50,7 @@ Adding metadata using the RDFLib API
 With this, you can create metadata for your document using the RDFLib
 Graph API.
 
-.. literalinclude:: metadata.py
+.. literalinclude:: examples/metadata.py
    :start-after: # begin simple
    :end-before: # end simple
 
@@ -66,7 +66,7 @@ somewhat easier. The ``ns`` class property also contains a number of
 references to popular vocabularies. The above can be made more succint
 like this:
 
-.. literalinclude:: metadata.py
+.. literalinclude:: examples/metadata.py
    :start-after: # begin simple
    :end-before: # end simple
 
@@ -117,10 +117,10 @@ properties are not initialized beforehand. But if you do create these
 properties, they are used to serialize metadata into RDFa properties
 for each
 
-.. literalinclude:: metadata.py
+.. literalinclude:: examples/metadata.py
    :start-after: # begin part
    :end-before: # end part
 
 This results in the following document fragment:
 
-.. literalinclude:: metadata-result.xml
+.. literalinclude:: examples/metadata-result.xml

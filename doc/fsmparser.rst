@@ -87,13 +87,13 @@ ReStructuredText).
 
 Recognizers for these three elements are easy to build:
 
-.. literalinclude:: fsmparser-example.py
+.. literalinclude:: examples/fsmparser-example.py
   :lines: 3-17
 
 The ``elements`` module contains ready-built classes which we can use
 to build our constructors:
 
-.. literalinclude:: fsmparser-example.py
+.. literalinclude:: examples/fsmparser-example.py
   :lines: 19-33
 
 Note that any constructor which may contain sub-elements must itself
@@ -106,13 +106,13 @@ in this very simple example).
 The final step in putting this together is defining the transition
 table, and then creating, configuring and running the parser:
 
-.. literalinclude:: fsmparser-example.py
+.. literalinclude:: examples/fsmparser-example.py
   :lines: 35-69
 
 The result of this parse is the following document object tree (passed
 through :func:`~ferenda.elements.serialize`):
 
-.. literalinclude:: fsmparser-result.xml
+.. literalinclude:: examples/fsmparser-result.xml
 
 Writing complex parsers
 -----------------------

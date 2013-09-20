@@ -14,7 +14,7 @@ contains published standards from W3C and IETF, called
 "netstandards". Ferenda installs a system-wide command-line tool
 called ``ferenda-setup`` whose sole purpose is to create projects:
 
-.. literalinclude:: firststeps.sh
+.. literalinclude:: examples/firststeps.sh
   :start-after: # begin setup
   :end-before: # end setup
 
@@ -63,7 +63,7 @@ standards is then as simple as creating a subclass and setting three
 class properties. Create this class in the current directory (or
 anywhere else on your python path) and save it as ``w3cstandards.py``
 
-.. literalinclude:: w3cstandards.py
+.. literalinclude:: examples/w3cstandards.py
   :start-after: # begin basic-properties
   :end-before: # end basic-properties
   
@@ -94,7 +94,7 @@ the command line tool present in your project directory. To register
 the class (together with a short alias) in your ``ferenda.ini``
 configuration file, run the following:
 
-.. literalinclude:: firststeps.sh
+.. literalinclude:: examples/firststeps.sh
   :start-after: # begin enable
   :end-before: # end enable
 
@@ -107,7 +107,7 @@ following:
 From this point on, you can use the class name or the alias "w3c"
 interchangably:
 
-.. literalinclude:: firststeps.sh
+.. literalinclude:: examples/firststeps.sh
   :start-after: # begin status-example
   :end-before: # end status-example
 
@@ -124,14 +124,14 @@ To test the downloading capabilities of our class, you can run the
 download method directly from the command line using the command line
 tool:
 
-.. literalinclude:: firststeps.sh
+.. literalinclude:: examples/firststeps.sh
   :start-after: # begin download
   :end-before: # end download
 
 After a few minutes of downloading, the result is a bunch of files in
 ``data/w3c/downloaded``:
 
-.. literalinclude:: firststeps.sh
+.. literalinclude:: examples/firststeps.sh
   :start-after: # begin list-downloaded
   :end-before: # end list-downloaded
 
@@ -147,7 +147,7 @@ After a few minutes of downloading, the result is a bunch of files in
 We can get a overview of the status of our docrepo using the
 ``status`` command:
 
-.. literalinclude:: firststeps.sh
+.. literalinclude:: examples/firststeps.sh
   :start-after: # begin status
   :end-before: # end status
 
@@ -155,7 +155,7 @@ We can get a overview of the status of our docrepo using the
 
    To do the same using the API:
 
-   .. literalinclude:: firststeps-api.py
+   .. literalinclude:: examples/firststeps-api.py
       :start-after: # begin download-status
       :end-before: # end download-status
 
@@ -171,7 +171,7 @@ Parsing
 Let's try the next step in the workflow, to parse one of the documents
 we've downloaded.
 
-.. literalinclude:: firststeps.sh
+.. literalinclude:: examples/firststeps.sh
   :start-after: # begin parse
   :end-before: # end parse
 
@@ -183,21 +183,21 @@ is called in the following manner::
 The parse command resulted in one new file being created in
 ``data/w3c/parsed``.
 
-.. literalinclude:: firststeps.sh
+.. literalinclude:: examples/firststeps.sh
    :start-after: # begin list-parsed
    :end-before: # end list-parsed
 
 And we can again use the ``status`` command to get a comprehensive
 overview of our document repository.
 
-.. literalinclude:: firststeps.sh
+.. literalinclude:: examples/firststeps.sh
    :start-after: # begin status-2
    :end-before: # end status-2
 
 Note that by default, subsequent invocations of parse won't actually
 parse documents that don't need parsing.
 
-.. literalinclude:: firststeps.sh
+.. literalinclude:: examples/firststeps.sh
    :start-after: # begin parse-again
    :end-before: # end parse-again
   
@@ -205,7 +205,7 @@ But during development, when you change the parsing code frequently,
 you'll need to override this through the ``--force`` flag (or set the
 ``force`` parameter in ``ferenda.ini``).
 
-.. literalinclude:: firststeps.sh
+.. literalinclude:: examples/firststeps.sh
    :start-after: # begin parse-force
    :end-before: # end parse-force
 
@@ -213,7 +213,7 @@ you'll need to override this through the ``--force`` flag (or set the
 
    To do the same using the API:
 
-   .. literalinclude:: firststeps-api.py
+   .. literalinclude:: examples/firststeps-api.py
       :start-after: # begin parse-force
       :end-before: # end parse-force
 
@@ -221,7 +221,7 @@ Note also that you can parse all downloaded documents through the
 ``--all`` flag, and control logging verbosity by the ``--loglevel``
 flag.
 
-.. literalinclude:: firststeps.sh
+.. literalinclude:: examples/firststeps.sh
   :start-after: # begin parse-all
   :end-before: # end parse-all
 
@@ -229,7 +229,7 @@ flag.
 
    To do the same using the API:
 
-   .. literalinclude:: firststeps-api.py
+   .. literalinclude:: examples/firststeps-api.py
       :start-after: # begin parse-all
       :end-before: # end parse-all
 
@@ -260,7 +260,7 @@ Just like the default implementation of
 customization using class variables, we can solve problem 1 by setting
 two additional class variables:
 
-.. literalinclude:: w3cstandards.py
+.. literalinclude:: examples/w3cstandards.py
    :start-after: # begin parse-properties
    :end-before: # end parse-properties
 
@@ -283,7 +283,7 @@ which we don't want to appear in the final result.
 In order to solve problem 2, we can override one of the methods that
 the default implementation of parse() calls:
 
-.. literalinclude:: w3cstandards.py
+.. literalinclude:: examples/w3cstandards.py
    :language: python
    :start-after: # begin metadata
    :end-before: # end metadata
@@ -320,7 +320,7 @@ all that metadata and put it into a triple store. The relate command
 does this, as well as creating a full text index of all textual
 content:
 
-.. literalinclude:: firststeps.sh
+.. literalinclude:: examples/firststeps.sh
    :start-after: # begin relate-all
    :end-before: # end relate-all
 
@@ -329,7 +329,7 @@ The next step is to create a number of *resource files* (placed under
 for the new website we're creating, as well as a xml configuration
 file used by the XSLT transformation done by ``generate`` below:
 
-.. literalinclude:: firststeps.sh
+.. literalinclude:: examples/firststeps.sh
    :start-after: # begin makeresources
    :end-before: # end makeresources
 
@@ -340,14 +340,14 @@ file used by the XSLT transformation done by ``generate`` below:
 
 Running ``makeresources`` is needed for the final few steps.
 
-.. literalinclude:: firststeps.sh
+.. literalinclude:: examples/firststeps.sh
    :start-after: # begin generate-all
    :end-before: # end generate-all
 
 The ``generate`` command creates browser-ready HTML5 documents from
 our structured XHTML documents, using our site's navigation.
 
-.. literalinclude:: firststeps.sh
+.. literalinclude:: examples/firststeps.sh
    :start-after: # begin final-commands
    :end-before: # end final-commands
 
@@ -360,7 +360,7 @@ for the site as a whole.
 
    To do all of the above using the API:
 
-   .. literalinclude:: firststeps-api.py
+   .. literalinclude:: examples/firststeps-api.py
       :start-after: # begin final-commands
       :end-before: # end final-commands
 
@@ -387,7 +387,7 @@ or just about any WSGI capable web server, see :doc:`wsgi`.
 To keep it up-to-date whenever the W3C issues new standards, use the
 following command:
 
-.. literalinclude:: firststeps.sh
+.. literalinclude:: examples/firststeps.sh
    :start-after: # begin all
    :end-before: # end all
 

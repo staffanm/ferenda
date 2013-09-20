@@ -287,7 +287,9 @@ class DocumentRepository(object):
             'jsfiles': ['res/js/jquery-1.9.0.js',
                         'res/js/modernizr-2.6.2-respond-1.1.0.min.js',
                         'res/js/ferenda.js'],
-            'staticsite': False}
+            'staticsite': False,
+            'class': self.qualified_class_name()
+        }
 
     @classmethod
     def setup(cls, action, config):
