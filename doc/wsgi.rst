@@ -16,14 +16,14 @@ During development, you can just ``ferenda-build.py runserver``. This
 starts up a single-threaded web server in the foreground with the web
 application, by default accessible as ``http://localhost:8000/``
 
-You can also run the web application under any `WSGI <http://wsgi.readthedocs.org/en/latest/>`_ 
-server, such as
-`mod_wsgi <http://code.google.com/p/modwsgi/>`_, 
-`uWSGI <https://uwsgi-docs.readthedocs.org/en/latest/index.html>`_ or
-`Gunicorn <http://gunicorn.org/>`_. 
-``ferenda-setup`` creates a file called
-``wsgi.py`` alongside ``ferenda-build.py`` which is used to serve the
-ferenda web app using WSGI. This is the contents of that file::
+You can also run the web application under any `WSGI
+<http://wsgi.readthedocs.org/en/latest/>`_ server, such as `mod_wsgi
+<http://code.google.com/p/modwsgi/>`_, `uWSGI
+<https://uwsgi-docs.readthedocs.org/en/latest/index.html>`_ or
+`Gunicorn <http://gunicorn.org/>`_.  ``ferenda-setup`` creates a file
+called ``wsgi.py`` alongside ``ferenda-build.py`` which is used to
+serve the ferenda web app using WSGI. This is the contents of that
+file::
 
   from ferenda.manager import make_wsgi_app
   inifile = os.path.join(os.path.dirname(__file__), "ferenda.ini")

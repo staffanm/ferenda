@@ -22,13 +22,16 @@ class TestExamples(unittest.TestCase, FerendaTestCase):
         # interminglings of commands (prefixed by "$ ") and output.
         env = dict(os.environ) # create a copy which we'll modify (maybe?)
         expected = out = ""
-        for line in open(script):
+        from pudb import set_trace; set_trace()
+        for line in open(shfile):
             # check that output from previous command was what was expected
             self.assertEqual(expected, out)
-            if line.startswith("$ "):
+            if line.startswith("#") or line.strip() == '':
+                continue
+            elif line.startswith("$ "):
                 cmdline = line[2:]
                 process = subprocess.Popen(cmdline,
-                                           shell=shell,
+                                           shell=True,
                                            stdout=subprocess.PIPE,
                                            stderr=subprocess.STDOUT,
                                            env=env)
@@ -78,7 +81,16 @@ class TestExamples(unittest.TestCase, FerendaTestCase):
 
     # w3cstandards is tested by firststeps.py/.sh
 
+    def test_citationparsing_urls(self):
+        self._test_pyfile("doc/examples/citationparsing-parsers.py")
         
+    def test_citationparsing_parsers(self):
+        # FIXME: read before.xhtml, compare result to after.xhtml
+        self._test_pyfile("doc/examples/citationparsing-parsers.py")
+        
+    def test_citationparsing_custom(self):
+        self._test_pyfile("doc/examples/citationparsing-custom.py")
+
         
 
         

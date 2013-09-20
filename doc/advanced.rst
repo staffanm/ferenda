@@ -70,11 +70,8 @@ number of sub-docrepos using a class property.
   
 A CompositeRepository can act as a proxy for your specialized repositories::
 
-  ./ferenda-build.py patents.CompositePatents enable
-  ./ferenda-build.py pat download # calls download() for all subrepos
-  ./ferenda-build.py pat parse 5723765 # selects the best subrepo that has  patent 5,723,765, calls parse() for that, then copies the result to pat/parsed/ 5723765 (or links)
-  ./ferenda-build.py pat generate 5723765 # uses the pat/parsed/5723765 data. From here on, we're just like any other docrepo.
-  
+.. literalinclude:: examples/composite-repository.sh
+		    
 Note that patents.XMLPatents and the other subrepos are never
 enabled/registered, just called behind-the-scenes by
 patents.CompositePatents.

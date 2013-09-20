@@ -225,13 +225,13 @@ class W3Standards(DocumentRepository):
                 try:
                     # 17 December 1996
                     date = util.strptime(datestr, "%d %B %Y")
+                except ValueError:
+                    try:
+                        # 17 Dec 1996
+                        date = util.strptime(datestr, "%d %b %Y")
                     except ValueError:
-                        try:
-                            # 17 Dec 1996
-                            date = util.strptime(datestr, "%d %b %Y")
-                        except ValueError:
-                            self.log.warning("%s: Could not parse datestr %s" %
-                                             (doc.basefile, datestr))
+                        self.log.warning("%s: Could not parse datestr %s" %
+                                         (doc.basefile, datestr))
                 if date:
                     d.value(dct.issued, date)
 
