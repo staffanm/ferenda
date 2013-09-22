@@ -2,10 +2,10 @@
 
 # begin setup
 $ ferenda-setup netstandards
-Prerequites ok
+Prerequisites ok
 Selected SQLITE as triplestore
 Selected WHOOSH as search engine
-Created project in netstandards
+Project created in netstandards
 $ cd netstandards
 $ ls
 ferenda-build.py

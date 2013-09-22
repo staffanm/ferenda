@@ -773,7 +773,7 @@ def enable(classname):
     return alias
 
 
-def setup():
+def setup(force=False, verbose=False, unattended=False):
     """Creates a project, complete with configuration file and
     ferenda-build tool. Takes no parameters, but expects ``sys.argv``
     to contain the path to the project being created.
@@ -793,26 +793,36 @@ def setup():
         print(("Usage: %s [project-directory]" % sys.argv[0]))
         return False
     projdir = sys.argv[1]
-    if os.path.exists(projdir):
+    if os.path.exists(projdir) and not force:
         print(("Project directory %s already exists" % projdir))
         return False
     sitename = os.path.basename(projdir)
 
-    ok = _preflight_check()
-    if not ok:
-        print("There were some errors when checking your environment. Proceed anyway? (y/N)")
-        answer = input()
+    ok = _preflight_check(verbose)
+    if not ok and not force:
+        if unattended:
+            answer = "n"
+        else:
+            print("There were some errors when checking your environment. Proceed anyway? (y/N)")
+            answer = input()
         if answer != "y":
             sys.exit(1)
 
     # The template ini file needs values for triple store
     # configuration. Find out the best triple store we can use.
-    storetype, storelocation, storerepository = _select_triplestore(sitename)
+    storetype, storelocation, storerepository = _select_triplestore(sitename, verbose)
+    print("Selected %s as triplestore" % storetype)
     if not storetype:
-        print("Cannot find a useable triple store. Proceed anyway? (y/N)")
-        answer = input()
+        if unattended:
+            answer = "n"
+        else:
+            print("Cannot find a useable triple store. Proceed anyway? (y/N)")
+            answer = input()
         if answer != "y":
             sys.exit(1)
+
+    indextype, indexlocation = _select_fulltextindex(verbose)
+    print("Selected %s as search engine" % indextype)
 
     if not os.path.exists(projdir):
         os.makedirs(projdir)
@@ -1321,7 +1331,7 @@ def _filepath_to_urlpath(path, keep_segments=2):
     return urlpath.replace(os.sep, "/")
 
 
-def _preflight_check():
+def _preflight_check(verbose=False):
     """Perform a check of needed modules and binaries."""
     pythonver = (2, 6, 0)
 
@@ -1350,7 +1360,8 @@ def _preflight_check():
               (".".join(pythonver), sys.version.split()[0]))
         success = False
     else:
-        print("Python version %s OK" % sys.version.split()[0])
+        if verbose:
+            print("Python version %s OK" % sys.version.split()[0])
 
     # 2: Check modules -- TODO: Do we really need to do this?
     for (mod, ver, required) in modules:
@@ -1372,7 +1383,8 @@ def _preflight_check():
                         "WARNING: Module %s has version %s, would like to hav %s" %
                         (mod, version, ver))
             else:
-                print("Module %s OK" % mod)
+                if verbose:
+                    print("Module %s OK" % mod)
         except ImportError:
             if required:
                 print("ERROR: Missing module %s" % mod)
@@ -1390,15 +1402,17 @@ def _preflight_check():
                 print("ERROR: Binary %s failed to execute")
                 success = False
             else:
-                print("Binary %s OK" % cmd)
+                if verbose:
+                    print("Binary %s OK" % cmd)
         except OSError as e:
             print("ERROR: Binary %s failed: %s" % (cmd, e))
             success = False
-
+    if success:
+        print("Prerequisites ok")
     return success
 
 
-def _select_triplestore(sitename):
+def _select_triplestore(sitename, verbose=False):
     # Try triplestores in order: Fuseki, Sesame, Sleepycat, SQLite,
     # and return configuration for the first triplestore that works.
 
@@ -1408,14 +1422,16 @@ def _select_triplestore(sitename):
                                      'http://localhost:3030')
         resp = requests.get(triplestore + "/ds/data?default")
         resp.raise_for_status()
-        print("Fuseki server responding at %s" % triplestore)
+        if verbose:
+            print("Fuseki server responding at %s" % triplestore)
         # TODO: Find out how to create a new datastore in Fuseki
         # programatically so we can use
         # http://localhost:3030/$SITENAME instead
         return('FUSEKI', triplestore, 'ds')
     except (requests.exceptions.HTTPError,
             requests.exceptions.ConnectionError) as e:
-        print("... Fuseki not available at %s: %s" % (triplestore, e))
+        if verbose:
+            print("... Fuseki not available at %s: %s" % (triplestore, e))
         pass
 
     # 2. Sesame
@@ -1425,7 +1441,8 @@ def _select_triplestore(sitename):
         resp = requests.get(triplestore + '/protocol')
         resp.raise_for_status()
         workbench = triplestore.replace('openrdf-sesame', 'openrdf-workbench')
-        print("Sesame server responding at %s (%s)" % (triplestore, resp.text))
+        if verbose:
+            print("Sesame server responding at %s (%s)" % (triplestore, resp.text))
         # TODO: It is possible, if you put the exactly right triples
         # in the SYSTEM repository, to create a new repo
         # programmatically.
@@ -1440,25 +1457,50 @@ New repository. The following settings are recommended:
         return('SESAME', triplestore, sitename)
     except (requests.exceptions.HTTPError,
             requests.exceptions.ConnectionError) as e:
-        print("... Sesame not available at %s: %s" % (triplestore, e))
+        if verbose:
+            print("... Sesame not available at %s: %s" % (triplestore, e))
         pass
 
     # 3. RDFLib + SQLite
     try:
         t = TripleStore.connect("SQLITE", "test.sqlite", "ferenda")
-        print("SQLite-backed RDFLib triplestore seems to work")
+        if verbose:
+            print("SQLite-backed RDFLib triplestore seems to work")
         return ('SQLITE', 'data/ferenda.sqlite', 'ferenda')
     except ImportError as e:
-        print("...SQLite not available: %s" % e)
+        if verbose:
+            print("...SQLite not available: %s" % e)
 
     # 4. RDFLib + Sleepycat
     try:
         t = TripleStore.connect("SLEEPYCAT", "test.db", "ferenda")
         # No boom?
-        print("Sleepycat-backed RDFLib triplestore seems to work")
+        if verbose:
+            print("Sleepycat-backed RDFLib triplestore seems to work")
         return ('SLEEPYCAT', 'data/ferenda.db', 'ferenda')
     except ImportError as e:
-        print("...Sleepycat not available: %s" % e)
+        if verbose:
+            print("...Sleepycat not available: %s" % e)
 
     print("No usable triplestores, the actions 'relate', 'generate' and 'toc' won't work")
     return (None, None, None)
+
+
+def _select_fulltextindex(verbose=False):
+    # 1. Elasticsearch
+    try:
+        fulltextindex = os.environ.get('FERENDA_FULLTEXTINDEX_LOCATION',
+                                       'http://localhost:9200/')
+        resp = requests.get(fulltextindex)
+        resp.raise_for_status()
+        if verbose:
+            print("Elasticsearch server responding at %s" % triplestore)
+        return('ELASTICSEARCH', fulltextindex)
+    except (requests.exceptions.HTTPError,
+            requests.exceptions.ConnectionError) as e:
+        if verbose:
+            print("... Elasticsearch not available at %s: %s" %
+                  (fulltextindex, e))
+        pass
+    # 2. Whoosh (just assume that it works)
+    return ("WHOOSH", "data/whooshindex")

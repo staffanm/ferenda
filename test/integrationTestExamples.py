@@ -21,15 +21,23 @@ class TestExamples(unittest.TestCase, FerendaTestCase):
         # these are not normal shell scripts, but rather docutils-like
         # interminglings of commands (prefixed by "$ ") and output.
         env = dict(os.environ) # create a copy which we'll modify (maybe?)
-        expected = out = ""
+        expected = ""
+        out = b""
         from pudb import set_trace; set_trace()
         for line in open(shfile):
-            # check that output from previous command was what was expected
-            self.assertEqual(expected, out)
             if line.startswith("#") or line.strip() == '':
                 continue
             elif line.startswith("$ "):
+                # check that output from previous command was what was expected
+                self.assertEqual(expected, out.decode("utf-8"))
+                out = b""
+                expected = ""
                 cmdline = line[2:]
+                # special hack to account for that ferenda-setup not being
+                # available for a non-installed ferenda source checkout
+                if cmdline.startswith("ferenda-setup"):
+                    cmdline = cmdline.replace("ferenda-setup",
+                                              "python ferenda-setup.py")
                 process = subprocess.Popen(cmdline,
                                            shell=True,
                                            stdout=subprocess.PIPE,
