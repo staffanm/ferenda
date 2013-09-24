@@ -5,8 +5,7 @@
 (unlike the above chunk) or is_preformatted (unlike the below chunk),
 but by the catch-all is_paragraph. The recognizers are run in the
 order specified by FSMParser.set_transitions().</str>
-    </Paragraph>
-    <Preformatted>
+    </Paragraph><Preformatted>
       <str>    This is a preformatted section.
         It could be used for source code,
     +-------------------+

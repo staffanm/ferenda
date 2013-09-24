@@ -88,26 +88,29 @@ ReStructuredText).
 Recognizers for these three elements are easy to build:
 
 .. literalinclude:: examples/fsmparser-example.py
-  :lines: 3-17
+  :start-after: # begin recognizers
+  :end-before: # end recognizers
 
 The ``elements`` module contains ready-built classes which we can use
 to build our constructors:
 
 .. literalinclude:: examples/fsmparser-example.py
-  :lines: 19-33
+  :start-after: # begin constructors
+  :end-before: # end constructors
 
 Note that any constructor which may contain sub-elements must itself
-call the ``make_children`` method of the parser. That method takes a
-parent object, and then repeatedly creates child objects which it
-attaches to that parent object, until a exit condition is met. Each
-call to create a child object may, in turn, call make_children (not so
-in this very simple example).
+call the :meth:`~ferenda.FSMParser.make_children` method of the
+parser. That method takes a parent object, and then repeatedly creates
+child objects which it attaches to that parent object, until a exit
+condition is met. Each call to create a child object may, in turn,
+call make_children (not so in this very simple example).
 
 The final step in putting this together is defining the transition
 table, and then creating, configuring and running the parser:
 
 .. literalinclude:: examples/fsmparser-example.py
-  :lines: 35-69
+  :start-after: # begin main
+  :end-before: # end main
 
 The result of this parse is the following document object tree (passed
 through :func:`~ferenda.elements.serialize`):

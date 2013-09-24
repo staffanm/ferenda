@@ -1,3 +1,4 @@
+# begin recognizers
 from ferenda import elements, FSMParser
 
 def is_section(parser):
@@ -15,7 +16,9 @@ def is_preformatted(parser):
 
 def is_paragraph(parser):
     return True
+# end recognizers
 
+# begin constructors
 def make_body(parser):
     b = elements.Body()
     return parser.make_children(b)
@@ -25,13 +28,16 @@ def make_section(parser):
     title = chunk.split("\n")[0]
     s = elements.Section(title=title)
     return parser.make_children(s)
+setattr(make_section,'newstate','section')
     
 def make_paragraph(parser):
     return elements.Paragraph([parser.reader.next()])
 
 def make_preformatted(parser):
     return elements.Preformatted([parser.reader.next()])
+# end constructors
 
+# begin main
 transitions = {("body", is_section): (make_section, "section"),
                ("section", is_paragraph): (make_paragraph, None),
                ("section", is_preformatted): (make_preformatted, None),
@@ -65,5 +71,10 @@ more complex language could be any number of states)."""
 p = FSMParser()
 p.set_recognizers(is_section, is_preformatted, is_paragraph)
 p.set_transitions(transitions)
-body = p.parse(text.split("\n\n"), "body", make_body) 
-print(elements.serialize(body))
+p.initial_constructor = make_body
+p.initial_state = "body"
+body = p.parse(text.split("\n\n"))
+# print(elements.serialize(body))
+
+# end main
+return_value = elements.serialize(body)

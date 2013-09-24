@@ -73,7 +73,9 @@ class DescriberDocrepo(DocumentRepository):
         # would be the preferred way to cite that part in another
         # document
         d.value(self.ns['dct'].identifier, "Doc:4711, p 42")
-# end part                     
+# end part
+        from lxml import etree
+        return etree.tostring(part.as_xhtml("http://example.org/doc"))
 
 # test running code
                     
@@ -83,6 +85,6 @@ d.parse_metadata_from_soup(None, doc)
 
 d = DescriberDocrepo()
 d.parse_metadata_from_soup(None, doc)
-d.parse_document_from_soup(None, doc)
-return_value = True
+ret = d.parse_document_from_soup(None, doc)
+return_value = ret 
                     

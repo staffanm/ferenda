@@ -359,9 +359,7 @@ method. Just use the optional attachment parameter to the appropriate
 
 .. literalinclude:: examples/keyconcepts-attachments.py
    :language: python		    
-   :start-after: # begin
-   :end-before: # end
-    
+   :lines: 2-14,18-22	    
 
 .. note:: 
 

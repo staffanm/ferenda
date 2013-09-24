@@ -13,7 +13,7 @@ ferenda.ini
 wsgi.py
 # end setup
 
-$ cp ../doc/w3cstandards.py .
+$ mv ../w3cstandards.py .
 
 # begin enable
 $ ./ferenda-build.py w3cstandards.W3CStandards enable
@@ -25,7 +25,6 @@ $ ./ferenda-build.py w3cstandards.W3CStandards status # verbose
 $ ./ferenda-build.py w3c status # terse, exactly the same result
 # end status-example
 
-export FERENDA_DOWNLOADMAX=3
 ls # begin download
 $ ./ferenda-build.py w3c download 
 20:16:40 w3c DEBUG download: Starting full download

@@ -1,6 +1,9 @@
-<div about="http://example.org/doc#42"
+<div xmlns="http://www.w3.org/1999/xhtml"
+     about="http://example.org/doc#42"
      typeof="bibo:DocumentPart"
-     content="Doc:4711, p 42"
-     rel="dct:identifier">
+     class="page">
+  <span property="dct:identifier"
+	content="Doc:4711, p 42"
+	xml:lang=""/>
      This is a part of a document
 </div>

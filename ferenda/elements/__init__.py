@@ -460,7 +460,9 @@ class Body(CompoundElement):
         element.set('about', uri)
         return element
 class Title(CompoundElement): pass
-class Page(CompoundElement, OrdinalElement): pass
+class Page(CompoundElement, OrdinalElement):
+    tagname = "div"
+    classname = "page"
 class Nav(CompoundElement): pass
 
 class SectionalElement(CompoundElement):
