@@ -228,7 +228,7 @@ information is encapsulated in the :py:class:`~ferenda.DocumentEntry`
 class.  Such objects are created and updated by various methods in
 :py:class:`~ferenda.DocumentRepository`. The objects are persisted to
 JSON files, stored alongside the documents themselves, and are used by
-the :py:meth:`~ferenda.DocumenRepository.news` method in order to
+the :py:meth:`~ferenda.DocumentRepository.news` method in order to
 create valid Atom feeds.
 
 
@@ -251,7 +251,7 @@ the document is then stored:
 
 * At the same time, a DocumentEntry object is serialized as
   ``data/foo/entries/bar.json``, as determined by
-  ``d.store.``:meth:`~ferenda.DocumentStore.entry_path`
+  ``d.store.``:meth:`~ferenda.DocumentStore.documententry_path`
 
 * If the downloaded source needs to be transformed into some
   intermediate format before parsing (which is the case for eg. PDF or
@@ -305,25 +305,25 @@ The result of this process is that a version id for the previously
 existing files is calculated (by default, this is just a simple
 incrementing integer, but the document in your docrepo might have a
 more suitable version identifier already, in which case you should
-override :py:meth:`~ferenda.DocumentRepository.archive_version` to
+override :py:meth:`~ferenda.DocumentRepository.get_archive_version` to
 return this), and then all the above files (if they have been
 generated) are moved into the subdirectory ``archive`` in the
 following way.
 
 ``data/foo/downloaded/bar.html`` -> ``data/foo/archive/downloaded/bar/42.html``
 
-The method :py:meth:`~ferenda.DocumentRepository.archive_version` is
+The method :py:meth:`~ferenda.DocumentRepository.get_archive_version` is
 used to calculate the version id. The default implementation just
 provides a simple incrementing integer, but if the documents in your
 docrepo has a more suitable version identifier already, you should
-override :py:meth:`~ferenda.DocumentRepository.archive_version` to
+override :py:meth:`~ferenda.DocumentRepository.get_archive_version` to
 return this.
 
 The archive path is calculated by providing the optional ``version``
 parameter to any of the ``*_path`` methods above.
 
 To list all archived versions for a given basefile, use the
-:meth:`~ferenda.DocumentStore.list_archived_versions` method.
+:meth:`~ferenda.DocumentStore.list_versions` method.
 
 The ``open_*`` methods
 ^^^^^^^^^^^^^^^^^^^^^^

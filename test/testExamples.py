@@ -20,11 +20,11 @@ from ferenda.testutil import FerendaTestCase
 # imports needed by the scripts. I do not fully understand exactly how
 # imports are scoped when using exec, but this is the only way apart
 # from importing inside of the functions that use the code to work.
-from ferenda import elements, DocumentRepository, DocumentStore
+from ferenda import elements, DocumentRepository, DocumentStore, TocCriteria
 from bs4 import BeautifulSoup
 import requests
 from six.moves.urllib_parse import urljoin
-
+XMLPatents = HTMLPatents = ScannedPatents = None
 
 class TestExamples(unittest.TestCase, FerendaTestCase):
     def _test_pyfile(self, pyfile, want=True, comparator=None):
@@ -69,3 +69,9 @@ class TestExamples(unittest.TestCase, FerendaTestCase):
         
     def test_citationparsing_custom(self):
         self._test_pyfile("doc/examples/citationparsing-custom.py")
+
+    def test_composite(self):
+        self._test_pyfile("doc/examples/patents.py")
+
+    def test_toc(self):
+        self._test_pyfile("doc/examples/toc.py")

@@ -101,6 +101,9 @@ class TestIntegration(unittest.TestCase, FerendaTestCase):
         # perhaps setup rfc-annotations.rq and rfc.xsl?
         self._test_pyfile("doc/examples/rfc.py")
 
+    def test_composite(self):
+        self._test_shfile("doc/examples/composite-repository.sh")
+
     # w3cstandards is tested by firststeps.py/.sh
 
         
