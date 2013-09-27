@@ -22,9 +22,10 @@ called ``ferenda-setup`` whose sole purpose is to create projects:
 The three files created by ``ferenda-setup`` is another command line
 tool (``ferenda-build.py``) used for management of the newly created
 project, a WSGI application (``wsgi.py``, see :doc:`wsgi`) and a
-configuration file (``ferenda.ini``). By default, it specifies the
-default logging level, the directory where document files will be
-stored. and which triple store your project will be using.
+configuration file (``ferenda.ini``). The default configuration file
+specifies most, but not all, of the available configuration
+parameters. See :ref:`configuration` for a full list of the standard
+configuration parameters.
 
 .. note::
 

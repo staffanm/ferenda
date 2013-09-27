@@ -1,6 +1,5 @@
-changelog.md
-
 2013-09-?? RELEASE 0.1.5
+========================
 
 (WIP) Documentation, particularly code examples, has been updated to
 better fit reality. They have (should) also been added to the test
@@ -24,9 +23,11 @@ New features:
 
 * New ferenda.Transformer class (see above)
 
-* A new decorator, ferenda.decorators.downloadmax can be used to limit
-  the maximum number of documents that a docrepo will download. This
-  is primarily useful for testing and trying out new docrepos.
+* A new decorator, ferenda.decorators.downloadmax, can be used to
+  limit the maximum number of documents that a docrepo will
+  download. It looks for eitther the "FERENDA_DOWNLOADMAX" environment
+  variable or the downloadmax configuration parameteter. This is
+  primarily useful for testing and trying out new docrepos.
 
 * DocumentRepository.render_xhtml will now include RDFa statements for
   all (non-BNode) subjects in doc.meta, not just the doc.uri
@@ -65,6 +66,7 @@ Infrastructural changes:
 
 
 2013-08-26 RELEASE 0.1.4
+========================
 
 * ElasticSearch is now supported as an alternate backend to Whoosh for
   fulltext indexing and searching.
@@ -78,6 +80,7 @@ Infrastructural changes:
 
 
 2013-08-11 RELEASE 0.1.3
+========================
 
 * Search functionality when running under WSGI is now
   implemented. Still a bit basic and not really customizable

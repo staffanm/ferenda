@@ -39,7 +39,9 @@ class W3CStandards(DocumentRepository):
         from ferenda import util
         import re
         DCT = Namespace("http://purl.org/dc/terms/")
+        FOAF = Namespace("http://xmlns.com/foaf/0.1/")
         d = Describer(doc.meta, doc.uri)
+        d.rdftype(FOAF.Document)
         d.value(DCT.title, soup.find("title").text, lang=doc.lang)
         d.value(DCT.abstract, soup.find(True, "abstract"), lang=doc.lang)
         # find the issued date -- assume it's the first thing that looks

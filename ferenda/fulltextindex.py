@@ -119,8 +119,8 @@ class FulltextIndex(object):
         raise NotImplementedError
 
     def query(self, q, **kwargs):
-        """Perform a free text query against the full text index, optionally restricted with
-           parameters for individual fields.
+        """Perform a free text query against the full text index, optionally
+           restricted with parameters for individual fields.
 
         :param q: Free text query, using the selected full text index's
                   prefered query syntax

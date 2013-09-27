@@ -89,10 +89,27 @@ PatchError is raised.
 External annotations
 --------------------
 
-See `~ferenda.sources.general.MediaWiki`
+Ferenda contains a general docrepo class that fetches data from a
+separate MediaWiki server and stores this as annotations/descriptions
+related to the documents in your main docrepos. This makes it possible
+to present a source document and commentary on it (including
+annotations about individual sections) side-by-side.
+
+See :class:`ferenda.sources.general.MediaWiki`
 
 
 Keyword hubs
 ------------
 
-See `~ferenda.sources.general.Keyword`
+Ferenda also contains a general docrepo class that lists all keywords
+used by documents in your main docrepos (by default, it looks for all
+``dct:subject`` properties used in any document) and generate
+documents for each of them. These documents have no content of their
+own, but act as hub pages that list all documents that use a certain
+keyword in one place.
+
+When used together with the MediaWiki module above, this makes it
+possible to write editorial descriptions about each keyword used, that
+is presented alongside the list of documents that use that keyword.
+
+See :class:`ferenda.sources.general.Keyword`

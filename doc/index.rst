@@ -26,7 +26,6 @@ between documents, and publishing the results.
    citationparsing
    toc
    news
-   linkeddata
    wsgi
    external-dbs
    advanced

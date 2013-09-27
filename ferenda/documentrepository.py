@@ -1235,8 +1235,14 @@ uri doesn't map to a basefile in this repo."""
                                         self.config.indexlocation,
                                         repos=[])  # FIXME: need a real list of repos
             self._fulltextindexer = idx
-            if hasattr(self.config, 'all'):
-                self._fulltextindexer._batchwriter = True
+
+            # The batchwriter functionality seems a litte broken --
+            # gave a "ValueError: seek of closed file" error. Since
+            # it's used to speed things up, and we now have
+            # ElasticSearch support for that, it's disabled until
+            # further notice.
+            # if hasattr(self.config, 'all'):
+            #     self._fulltextindexer._batchwriter = True
 
         return self._fulltextindexer
 
@@ -2025,8 +2031,9 @@ parsed document path to that documents dependency file."""
                     criterion.entries.append(entry)
         conffile = os.path.abspath(
             os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
+        docroot = os.path.dirname(self.store.path('foo','feed','.x'))
         transformer = Transformer("XSLT", "res/xsl/atom.xsl", ["res/xsl"],
-                                  config=conffile)
+                                  docroot, config=conffile)
         for criterion in criteria:
             # should reverse=True be configurable? For datetime
             # properties it makes sense to use most recent first, but
@@ -2038,13 +2045,6 @@ parsed document path to that documents dependency file."""
                                  criterion.basefile)
 
             outfile = self.store.path(criterion.basefile, 'feed', '.html')
-            #xsltdir = self.setup_transform_templates(
-            #    os.path.dirname("res/xsl/atom.xsl"), "res/xsl/atom.xsl")
-            #params = self.get_transform_configuration(xsltdir, outfile)
-            #self.transform_html(xsltdir + "/atom.xsl",
-            #                    self.store.atom_path(criterion.basefile),
-            #                    outfile,
-            #                    params)
             transformer.transform_file(self.store.atom_path(criterion.basefile),
                                        outfile)
 
@@ -2094,8 +2094,9 @@ parsed document path to that documents dependency file."""
                 pass
 
             # 4: Set links to RDF metadata and document content
-                entry.set_link(self.store.distilled_path(basefile),
-                               self.distilled_url(basefile))
+            
+            entry.set_link(self.store.distilled_path(basefile),
+                           self.distilled_url(basefile))
 
             if (republish_original):
                 entry.set_content(self.store.downloaded_path(basefile),

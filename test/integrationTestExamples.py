@@ -6,6 +6,7 @@ import os
 import subprocess
 import tempfile
 import shutil
+import re
 
 import six
 
@@ -23,6 +24,8 @@ from six.moves.urllib_parse import urljoin
 
 class TestIntegration(unittest.TestCase, FerendaTestCase):
 
+    verbose = False
+
     # FIXME: copied from testExamples.py -- unittest makes it a lot of
     # work to inherit from other testcases
     def _test_pyfile(self, pyfile, want=True, comparator=None):
@@ -34,30 +37,52 @@ class TestIntegration(unittest.TestCase, FerendaTestCase):
             comparator = self.assertEqual
         comparator(want, got)
 
+        
+
     def _test_shfile(self, shfile, workingdir=None, extraenv={}):
+        self.maxDiff = None
         # these are not normal shell scripts, but rather docutils-like
         # interminglings of commands (prefixed by "$ ") and output.
+        def _mask_temporal(s):
+            # mask things that may differ from run to run
+            masks =  [re.compile(r"^()(\d{2}:\d{2}:\d{2})()", re.MULTILINE),
+                      re.compile(r"(finished in )(\d.\d+)( sec)"),
+                      re.compile(r"(\()(\d.\d+)( sec\))")]
+            for mask in masks:
+                s = mask.sub(r"\1[MASKED]\3", s)
+            return s
+
         env = dict(os.environ) # create a copy which we'll modify (maybe?)
         env.update(extraenv)
         expected = ""
         out = b""
+        cmd_lineno = 0
         ferenda_setup = "python %s/ferenda-setup.py" % os.getcwd()
         if workingdir:
             self.datadir = workingdir
         else:
             self.datadir = os.getcwd()
         cwd = self.datadir
-        for line in open(shfile):
+        for lineno, line in enumerate(open(shfile)):
             if line.startswith("#") or line.strip() == '':
                 continue
             elif line.startswith("$ "):
+                line = line.strip()
                 # check that output from previous command was what was expected
-                self.assertEqual(expected, out.decode("utf-8"))
+                self.assertEqual(_mask_temporal(expected),
+                                 _mask_temporal(out.decode("utf-8")),
+                                 "Not expected output from %s at line %s" % (shfile, cmd_lineno))
+                print("ok")
                 out = b""
                 expected = ""
+                cmd_lineno = lineno
                 cmdline = line[2:]
                 # special hack to account for that ferenda-setup not being
                 # available for a non-installed ferenda source checkout
+                if self.verbose:
+                    print("Running '%s'" % cmdline,
+                          end="...",
+                          flush=True)
                 if cmdline.startswith("ferenda-setup"):
                     cmdline = cmdline.replace("ferenda-setup",
                                               ferenda_setup)
@@ -79,13 +104,17 @@ class TestIntegration(unittest.TestCase, FerendaTestCase):
             else:
                 expected += line
         # check that final output was what was expected
-        self.assertEqual(expected, out)
+        self.assertEqual(_mask_temporal(expected),
+                         _mask_temporal(out.decode("utf-8")),
+                         "Not expected output from %s at line %s" % (shfile, cmd_lineno))
+        if self.verbose:
+            print("ok")
 
     def test_firststeps_api(self):
         self._test_pyfile("doc/examples/firststeps-api.py")
         
     def test_firststeps(self):
-        # setup w3cstandards.py
+        self.verbose = True
         workingdir = tempfile.mkdtemp()
         shutil.copy2("doc/examples/w3cstandards.py", workingdir)
         self._test_shfile("doc/examples/firststeps.sh", workingdir,
@@ -108,7 +137,3 @@ class TestIntegration(unittest.TestCase, FerendaTestCase):
         self._test_shfile("doc/examples/composite-repository.sh")
 
     # w3cstandards is tested by firststeps.py/.sh
-
-        
-
-        
