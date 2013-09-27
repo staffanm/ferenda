@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 # firststeps-api.py
 import sys
 sys.path.append("doc/examples") # to find w3cstandards.py

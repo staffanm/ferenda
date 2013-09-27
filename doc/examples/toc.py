@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 class TocExample(DocumentRepository):
 # begin predicates
     def toc_predicates(self):

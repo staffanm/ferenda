@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 from ferenda import DocumentRepository
 
 class ExampleDocrepo(DocumentRepository):

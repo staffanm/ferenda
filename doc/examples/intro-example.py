@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 from ferenda.sources.tech import RFC, W3Standards
 from ferenda.manager import makeresources, frontpage, runserver, setup_logger

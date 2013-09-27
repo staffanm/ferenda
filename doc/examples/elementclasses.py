@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 # begin makedoc
 from ferenda.elements import Body, Heading, Paragraph, Footnote
 

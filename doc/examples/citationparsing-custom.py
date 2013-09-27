@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
 # begin
 from ferenda import CitationParser, URIFormatter, citationpatterns, uriformats
 from ferenda.elements import Link

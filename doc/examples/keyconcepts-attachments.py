@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
 # begin part-1
 class TestDocrepo(DocumentRepository):
 

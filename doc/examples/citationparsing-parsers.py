@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 from ferenda.compat import Mock
 from ferenda.elements.html import elements_from_soup
 from bs4 import BeautifulSoup

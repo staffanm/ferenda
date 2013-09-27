@@ -1,15 +1,14 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
 import sys, os
-if sys.version_info < (2,7,0):
-    import unittest2 as unittest
-else:
-    import unittest
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
+import pkg_resources
+pkg_resources.resource_listdir('ferenda','res')
 
 from pyparsing import Word,nums
+
+from ferenda.compat import unittest
 
 from ferenda.citationparser import CitationParser
 from ferenda.uriformatter import URIFormatter
