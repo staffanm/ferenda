@@ -323,8 +323,7 @@ The result of these lines is that the following block of plain text:
    you'll be using is a big topic, and you should think through what
    URIs you want to use for your documents and their parts. Ferenda
    provides a default implementation to create URIs from document
-   properties, but you might want to override this. See also
-   :doc:`linkeddata`.
+   properties, but you might want to override this.
 
 The parse step is probably the part of your application which you'll
 spend the most time developing. You can start simple (like above) and

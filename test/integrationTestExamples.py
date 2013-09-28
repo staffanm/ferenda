@@ -17,10 +17,14 @@ from ferenda.testutil import FerendaTestCase
 # imports needed by the scripts. I do not fully understand exactly how
 # imports are scoped when using exec, but this is the only way apart
 # from importing inside of the functions that use the code to work.
-from ferenda import elements, DocumentRepository, DocumentStore
+from ferenda import elements, DocumentRepository, DocumentStore, TextReader
+from ferenda.decorators import downloadmax
+
 from bs4 import BeautifulSoup
-import requests
+from datetime import datetime, date
+from itertools import islice
 from six.moves.urllib_parse import urljoin
+import requests
 
 class TestIntegration(unittest.TestCase, FerendaTestCase):
 
@@ -39,7 +43,7 @@ class TestIntegration(unittest.TestCase, FerendaTestCase):
 
         
 
-    def _test_shfile(self, shfile, workingdir=None, extraenv={}):
+    def _test_shfile(self, shfile, workingdir=None, extraenv={}, check_output=True):
         self.maxDiff = None
         # these are not normal shell scripts, but rather docutils-like
         # interminglings of commands (prefixed by "$ ") and output.
@@ -69,10 +73,12 @@ class TestIntegration(unittest.TestCase, FerendaTestCase):
             elif line.startswith("$ "):
                 line = line.strip()
                 # check that output from previous command was what was expected
-                self.assertEqual(_mask_temporal(expected),
-                                 _mask_temporal(out.decode("utf-8")),
-                                 "Not expected output from %s at line %s" % (shfile, cmd_lineno))
-                print("ok")
+                if check_output:
+                    self.assertEqual(_mask_temporal(expected),
+                                     _mask_temporal(out.decode("utf-8")),
+                                     "Not expected output from %s at line %s" % (shfile, cmd_lineno))
+                if self.verbose:
+                    print("ok")
                 out = b""
                 expected = ""
                 cmd_lineno = lineno
@@ -101,16 +107,19 @@ class TestIntegration(unittest.TestCase, FerendaTestCase):
                                                env=env)
                     out, err = process.communicate()
                     retcode = process.poll()
+                    self.assertEqual(0, retcode)
             else:
                 expected += line
         # check that final output was what was expected
-        self.assertEqual(_mask_temporal(expected),
-                         _mask_temporal(out.decode("utf-8")),
-                         "Not expected output from %s at line %s" % (shfile, cmd_lineno))
+        if check_output:
+            self.assertEqual(_mask_temporal(expected),
+                             _mask_temporal(out.decode("utf-8")),
+                             "Not expected output from %s at line %s" % (shfile, cmd_lineno))
         if self.verbose:
             print("ok")
 
     def test_firststeps_api(self):
+        from ferenda.manager import setup_logger; setup_logger('CRITICAL')
         self._test_pyfile("doc/examples/firststeps-api.py")
         
     def test_firststeps(self):
@@ -121,17 +130,28 @@ class TestIntegration(unittest.TestCase, FerendaTestCase):
                           {'FERENDA_MAXDOWNLOAD': '3',
                            'PYTHONPATH': os.getcwd()})
 
-
+    # FIXME: Both intro-example.py and intro-example.sh ends with a
+    # call to runserver, which never returns. We need to mock this
+    # call somehow (should be simple for intro-example.py as
+    # everything's running in the same process, more difficult for
+    # intro-example.sh unless we specifically check for calls to
+    # runserver and disable them)
     def test_intro_example_py(self):
         self._test_pyfile("doc/examples/intro-example.py")
 
     def test_intro_example_sh(self):
-        self._test_shfile("doc/examples/intro-example.sh")
-
+        self.verbose = True
+        self._test_shfile("doc/examples/intro-example.sh",
+                          check_output=False)
 
     def test_rfc(self):
-        # perhaps setup rfc-annotations.rq and rfc.xsl?
-        self._test_pyfile("doc/examples/rfc.py")
+        try:
+            shutil.copy("doc/examples/rfc-annotations.rq", "rfc-annotations.rq")
+            shutil.copy("doc/examples/rfc.xsl", "rfc.xsl")
+            self._test_pyfile("doc/examples/rfcs.py")
+        finally:
+            os.unlink("rfc-annotations.rq")
+            os.unlink("rfc.xsl")            
 
     def test_composite(self):
         self._test_shfile("doc/examples/composite-repository.sh")

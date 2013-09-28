@@ -14,12 +14,12 @@ repo.status()
 # end download-status
 
 # make sure the basid we use for examples is available
-repo.download("rdb-direct-mapping")
+repo.download("rdfa-core")
 
 # begin parse-force
 from w3cstandards import W3CStandards
 repo = W3CStandards(force=True)
-repo.parse("rdb-direct-mapping")
+repo.parse("rdfa-core")
 # end parse-force
 
 # begin parse-all
@@ -49,3 +49,5 @@ repo.toc()
 repo.news()
 manager.frontpage([repo])
 # end final-commands
+
+return_value = True

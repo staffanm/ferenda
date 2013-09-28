@@ -3,7 +3,6 @@ from __future__ import unicode_literals
 
 # begin download1
 import re
-from itertools import islice
 from datetime import datetime, date
 
 import requests
@@ -27,10 +26,10 @@ class RFCs(DocumentRepository):
         if not isinstance(self.config.downloadmax, (int, type(None))):
             self.config.downloadmax = int(self.config.downloadmax)
             
-        for basefile in islice(self.download_get_basefiles(iterator),
-                        self.config.downloadmax):
+        for basefile in self.download_get_basefiles(iterator):
             self.download_single(basefile)
 
+    @downloadmax
     def download_get_basefiles(self, source):
         for p in reversed(list(source)):
             if re.match("^(\d{4}) ",p): # looks like a RFC number
@@ -133,7 +132,7 @@ class RFCs(DocumentRepository):
         desc.value(self.ns['dct'].title, util.normalize_space(title), lang="en")
 
         # Construct the dct:identifier (eg "RFC 6991") for this document from the basefile
-        desc.value(self.ns['dct'].identifier, "RFC " + basefile)
+        desc.value(self.ns['dct'].identifier, "RFC " + doc.basefile)
   
         # find and convert the publication date in the header to a datetime 
         # object, and set it as the dct:issued date for the document   
@@ -207,7 +206,7 @@ class RFCs(DocumentRepository):
             # returns a tuple of title, ordinal, identifier
             ordinal, title = p.split(" ",1)
             ordinal = ordinal.strip(".")
-            return title.strip(), ordinal, "RFC %s, section %s" % (basefile, ordinal)
+            return title.strip(), ordinal, "RFC %s, section %s" % (doc.basefile, ordinal)
 
         # Use a list as a simple stack to keep track of the nesting
         # depth of a document. Every time we create a Section,
@@ -364,9 +363,13 @@ class RFCs(DocumentRepository):
 
 # begin frontpage_content
     def frontpage_content(self, primary=False):
-        from rdflib import URIRef
+        from rdflib import URIRef, Graph
+        from itertools import islice
         items = ""
-        for entry, graph in islice(self.news_entries(),5):
+        for entry in islice(self.news_entries(),5):
+            graph = Graph()
+            with self.store.open_distilled(entry.basefile) as fp:
+                graph.parse(data=fp.read())
             data = {'identifier': graph.value(URIRef(entry.id), self.ns['dct'].identifier).toPython(),
                     'uri': entry.id,
                     'title': entry.title}
@@ -378,30 +381,30 @@ class RFCs(DocumentRepository):
                       %(items)s
                    </ul>""" % {'uri':self.dataset_uri(),
                                'items': items,
-                               'doccount': len(list(self.list_basefiles_for("_postgenerate")))})
+                               'doccount': len(list(self.store.list_basefiles_for("_postgenerate")))})
 # end frontpage_content
 
-if __name__ == '__main__':
-    from ferenda import manager, LayeredConfig
-    import sys
-    manager.setup_logger("DEBUG")
-    d = RFCs(downloadmax=30)
 
-#    d.download()
-#    for basefile in d.list_basefiles_for("parse"):
-#        d.parse(basefile)
-#    RFCs.setup("relate", LayeredConfig(d.get_default_options()))
-#    for basefile in d.list_basefiles_for("relate"):
-#        d.relate(basefile)
-#    RFCs.teardown("relate", LayeredConfig(d.get_default_options()))
-#    manager.makeresources([d])
-#    for basefile in d.list_basefiles_for("generate"):
-#       d.generate(basefile)
-#    d.toc()
-    d.news()
-#    manager.frontpage([d])
-#    manager.runserver([d])
-    
+from ferenda import manager, LayeredConfig
+import sys
+manager.setup_logger("DEBUG")
+d = RFCs(downloadmax=5)
+
+# d.download()
+# for basefile in d.store.list_basefiles_for("parse"):
+#     d.parse(basefile)
+# RFCs.setup("relate", LayeredConfig(d.get_default_options()))
+# for basefile in d.store.list_basefiles_for("relate"):
+#     d.relate(basefile)
+# RFCs.teardown("relate", LayeredConfig(d.get_default_options()))
+# manager.makeresources([d])
+for basefile in d.store.list_basefiles_for("generate"):
+   d.generate(basefile)
+d.toc()
+d.news()
+manager.frontpage([d])
+return_value = True
+
     
 
 
