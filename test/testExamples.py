@@ -29,7 +29,8 @@ XMLPatents = HTMLPatents = ScannedPatents = None
 
 class TestExamples(unittest.TestCase, FerendaTestCase):
     def _test_pyfile(self, pyfile, want=True, comparator=None):
-        pycode = compile(util.readfile(pyfile), pyfile, 'exec')
+        with open(pyfile, 'rb') as fp:
+            pycode = compile(fp.read(), pyfile, 'exec')
         result = six.exec_(pycode, globals(), locals())
         # the exec:ed code is expected to set return_value
         got = locals()['return_value']
