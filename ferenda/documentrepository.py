@@ -1945,14 +1945,18 @@ parsed document path to that documents dependency file."""
 
     # pagecontent -> documentlists?
     def toc_generate_pages(self, pagecontent, pagesets, otherrepos=[]):
-        """Creates a set of TOC pages by calling :meth:`~ferenda.DocumentRepository.toc_generate_page`.
+        """Creates a set of TOC pages by calling
+         :meth:`~ferenda.DocumentRepository.toc_generate_page`.
 
-        :param pagecontent: Result from :meth:`~ferenda.DocumentRepository.toc_select_for_pages`
-        :param pagesets: Result from :meth:`~ferenda.DocumentRepository.toc_pagesets`
+        :param pagecontent: Result from
+                            :meth:`~ferenda.DocumentRepository.toc_select_for_pages`
+        :param pagesets: Result from
+                         :meth:`~ferenda.DocumentRepository.toc_pagesets`
         :param otherrepos: A list of document repository instances
+
         """
         paths = []
-        for (binding, value), documents in pagecontent.items():
+        for (binding, value), documents in sorted(pagecontent.items()):
             paths.append(self.toc_generate_page(
                 binding, value, documents, pagesets, None, otherrepos))
         return paths

@@ -76,12 +76,12 @@ class TestIntegration(unittest.TestCase, FerendaTestCase):
                 out = b""
                 expected = ""
                 cmd_lineno = lineno
-                cmdline = line[2:]
+                cmdline = line[2:].split("#")[0].strip()
                 # special hack to account for that ferenda-setup not being
                 # available for a non-installed ferenda source checkout
                 if self.verbose:
                     print("Running '%s'" % cmdline,
-                          end="...",
+                          end=" ... ",
                           flush=True)
                 if cmdline.startswith("ferenda-setup"):
                     cmdline = cmdline.replace("ferenda-setup",

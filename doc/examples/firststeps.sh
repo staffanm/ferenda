@@ -142,10 +142,10 @@ $ ./ferenda-build.py w3c generate --all
 
 # begin final-commands
 $ ./ferenda-build.py w3c toc
-16:11:39 w3c INFO Created data/w3c/toc/title/x.html
-16:11:39 w3c INFO Created data/w3c/toc/title/h.html
 16:11:39 w3c INFO Created data/w3c/toc/issued/2013.html
+16:11:39 w3c INFO Created data/w3c/toc/title/h.html
 16:11:39 w3c INFO Created data/w3c/toc/title/r.html
+16:11:39 w3c INFO Created data/w3c/toc/title/x.html
 16:11:39 w3c INFO Created data/w3c/toc/index.html
 16:11:39 root INFO w3c toc finished in 1.658 sec
 $ ./ferenda-build.py w3c news
@@ -162,4 +162,22 @@ $ ./ferenda-build.py w3c frontpage
 
 # begin all
 $ ./ferenda-build.py w3c all
+10:45:05 w3c INFO Downloading max 3 documents
+10:45:05 root INFO w3cstandards.W3CStandards download finished in 0.977 sec
+10:45:05 root INFO w3cstandards.W3CStandards parse finished in 0.009 sec
+10:45:05 root INFO w3cstandards.W3CStandards relate: Nothing to do!
+10:45:05 root INFO w3cstandards.W3CStandards relate finished in 0.004 sec
+10:45:05 w3c INFO xhtml-rdfa OK (0.000 sec)
+10:45:05 w3c INFO rdfa-core OK (0.000 sec)
+10:45:05 w3c INFO html-rdfa OK (0.000 sec)
+10:45:05 root INFO w3cstandards.W3CStandards generate finished in 0.006 sec
+10:45:07 w3c INFO Created data/w3c/toc/issued/2013.html
+10:45:07 w3c INFO Created data/w3c/toc/title/h.html
+10:45:07 w3c INFO Created data/w3c/toc/title/r.html
+10:45:07 w3c INFO Created data/w3c/toc/title/x.html
+10:45:07 w3c INFO Created data/w3c/toc/index.html
+10:45:07 root INFO w3cstandards.W3CStandards toc finished in 1.655 sec
+10:45:07 w3c INFO feed main: 3 entries
+10:45:07 root INFO w3cstandards.W3CStandards news finished in 0.045 sec
+10:45:07 root INFO frontpage: wrote data/index.html (0.012 sec)
 # end all
