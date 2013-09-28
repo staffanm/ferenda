@@ -1,30 +1,19 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import unittest
-import sys
-import time
 import re
 import os
-from lxml import etree
-from datetime import datetime
-from time import time
-from tempfile import mktemp
-from pprint import pprint
-from collections import defaultdict
 
 from six import text_type as str
 
 # 3rd party
 from bs4 import BeautifulSoup
-from rdflib import Namespace
 import requests
 
 # My own stuff
 from ferenda import PDFDocumentRepository
 from ferenda import util
 from ferenda.decorators import downloadmax
-from ferenda.legalref import LegalRef, ParseError, Link, LinkSubject
 from ferenda.elements import UnicodeElement, CompoundElement, \
     MapElement, IntElement, DateElement, PredicateType, \
     serialize
@@ -32,6 +21,7 @@ from . import SwedishLegalSource
 
 
 class ARN(SwedishLegalSource, PDFDocumentRepository):
+
     """Hanterar referat från Allmäna Reklamationsnämnden, www.arn.se.
 
     Modulen hanterar hämtande av referat från ARNs webbplats, omvandlande
@@ -41,7 +31,7 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
     alias = "arn"
     xslt_template = "res/xsl/arn.xsl"
     start_url = "http://adokweb.arn.se/digiforms/sessionInitializer?processName=SearchRefCasesProcess"
-    
+
     def download(self, basefile=None):
         self.session = requests.Session()
         resp = self.session.get(self.start_url)
@@ -70,26 +60,29 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
         while not done:
             # First we need to use the files argument to send the POST
             # request as multipart/form-data
-            req = requests.Request("POST", action, cookies=self.session.cookies, files=params).prepare()
+            req = requests.Request(
+                "POST", action, cookies=self.session.cookies, files=params).prepare()
             # Then we need to remove filename and content-type fields
             # from req.body in an unsupported manner in order not to
             # upset the sensitive server
-            req.body = re.sub('; filename="[\w\-\/]+"\r\nContent-Type: [\w\-\/]+', '', req.body).encode()
+            req.body = re.sub(
+                '; filename="[\w\-\/]+"\r\nContent-Type: [\w\-\/]+', '', req.body).encode()
             req.headers['Content-Length'] = str(len(req.body))
             # And finally we have to allow RFC-violating redirects for POST
             resp = self.session.send(req, allow_redirects=True)
             soup = BeautifulSoup(resp.text)
             for link in soup.find_all("input", "standardlink", onclick=re.compile("javascript:window.open")):
-                url = link['onclick'][24:-2] # remove 'javascript:window.open' call around the url
+                url = link['onclick'][24:-2]  # remove 'javascript:window.open' call around the url
                 # this probably wont break...
-                basefile = link.find_parent("table").find_parent("table").find_all("div", "strongstandardtext")[1].text
+                basefile = link.find_parent("table").find_parent(
+                    "table").find_all("div", "strongstandardtext")[1].text
                 yield basefile, url
             if soup.find('Nästa sida'):
                 params = {}
                 action = []
             else:
                 done = True
-        
+
     def download_single(self, basefile, url):
         super(ARN, self).download_single(basefile, url)
         # after downloading: see if our PDF in reality was something else
@@ -109,8 +102,9 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
                 elif sig == b'%PDF':
                     doctype = ".pdf"
                 else:
-                    self.log.warning("%s has unknown signature %r -- don't know what kind of file it is" % (d, sig))
-                    doctype = ".pdf" # don't do anything
+                    self.log.warning(
+                        "%s has unknown signature %r -- don't know what kind of file it is" % (d, sig))
+                    doctype = ".pdf"  # don't do anything
             if doctype != '.pdf':
                 util.robust_rename(d, d.replace(".pdf", doctype))
 
@@ -118,7 +112,6 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
         # find out if we have a .pdf or a .doc (possibly .wpd?)
         type = self.guess_type
         self.parse_from_pdf(self, doc, "...")
-        
 
     def parse_from_pdf(self, pdfreader, doc):
         pass

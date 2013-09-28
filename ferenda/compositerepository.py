@@ -5,14 +5,15 @@ import os
 
 from . import DocumentRepository, DocumentStore
 
+
 class CompositeStore(DocumentStore):
 
     def __init__(self, datadir, downloaded_suffix=".html", storage_policy="file", docrepos=[]):
-        self.datadir = datadir # docrepo.datadir + docrepo.alias
+        self.datadir = datadir  # docrepo.datadir + docrepo.alias
         self.downloaded_suffix = downloaded_suffix
         self.storage_policy = storage_policy
-        self.docrepos=docrepos
-    
+        self.docrepos = docrepos
+
     def list_basefiles_for(self, action, basedir=None):
         if not basedir:
             basedir = self.datadir
@@ -29,7 +30,7 @@ class CompositeStore(DocumentStore):
 
 
 class CompositeRepository(DocumentRepository):
-    subrepos = () # list of classes
+    subrepos = ()  # list of classes
     documentstore_class = CompositeStore
 
     _instances = {}
@@ -37,7 +38,7 @@ class CompositeRepository(DocumentRepository):
     def get_instance(self, instanceclass, options={}):
         if not instanceclass in self._instances:
             inst = instanceclass(**options)
-            inst.config = self.config # FIXME: this'll override **options...
+            inst.config = self.config  # FIXME: this'll override **options...
             self._instances[instanceclass] = inst
         return self._instances[instanceclass]
 
@@ -50,11 +51,11 @@ class CompositeRepository(DocumentRepository):
         # finishes... The best fix from this class POV would be to
         # have config be a (special) kwargs parameter, but that
         # violates the DocumentRepository API...
-        self.store = self.documentstore_class(self.config.datadir+os.sep+self.alias,
+        self.store = self.documentstore_class(self.config.datadir + os.sep + self.alias,
                                               downloaded_suffix=self.downloaded_suffix,
                                               storage_policy=self.storage_policy,
                                               docrepos=self._instances)
-        
+
     def download(self):
         for c in self.subrepos:
             inst = self.get_instance(c, self.myoptions)
@@ -71,13 +72,12 @@ class CompositeRepository(DocumentRepository):
                 # each parse method should be smart about whether to re-parse
                 # or not (i.e. use the @managedparsing decorator)
                 ret = inst.parse(basefile)
-            except errors.ParseError: # or others
+            except errors.ParseError:  # or others
                 ret = False
             if ret:
                 break
         if ret:
             self.copy_parsed(basefile, inst)
-        
 
     def copy_parsed(self, basefile, instance):
         # If the distilled and parsed links are recent, assume that

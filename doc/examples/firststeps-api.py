@@ -1,20 +1,28 @@
-# firststeps-api.py
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
 
-# --- INCLUDE BELOW ---
+# firststeps-api.py
+import sys
+sys.path.append("doc/examples") # to find w3cstandards.py
+
+# begin download-status
 from w3cstandards import W3CStandards
 repo = W3CStandards()
 repo.download()
 repo.status()
 # or use repo.get_status() to get all status information in a nested dict
-# --- INCLUDE ABOVE ---
+# end download-status
 
-# --- INCLUDE BELOW ---
+# make sure the basid we use for examples is available
+repo.download("rdfa-core")
+
+# begin parse-force
 from w3cstandards import W3CStandards
 repo = W3CStandards(force=True)
-repo.parse("rdb-direct-mapping")
-# --- INCLUDE ABOVE ---
+repo.parse("rdfa-core")
+# end parse-force
 
-# --- INCLUDE BELOW ---
+# begin parse-all
 import logging
 from w3cstandards import W3CStandards
 # client code is responsible for setting the effective log level -- ferenda 
@@ -22,22 +30,24 @@ from w3cstandards import W3CStandards
 # subsystem in an appropriate way
 logging.getLogger().setLevel(logging.INFO)
 repo = W3CStandards()
-for basefile in repo.list_basefiles_for("parse"):
+for basefile in repo.store.list_basefiles_for("parse"):
     # You you might want to try/catch the exception
     # ferenda.errors.ParseError or any of it's children here
     repo.parse(basefile)
-# --- INCLUDE ABOVE ---
+# end parse-all
 
-# --- INCLUDE BELOW ---
+# begin final-commands
 from ferenda import manager
 from w3cstandards import W3CStandards
 repo = W3CStandards()
-for basefile in repo.list_basefiles_for("relate"):
+for basefile in repo.store.list_basefiles_for("relate"):
     repo.relate(basefile)
 manager.makeresources([repo], sitename="Standards", sitedescription="W3C standards, in a new form")
-for basefile in repo.list_basefiles_for("generate"):
+for basefile in repo.store.list_basefiles_for("generate"):
     repo.generate(basefile)
 repo.toc()
 repo.news()
 manager.frontpage([repo])
-# --- INCLUDE ABOVE ---
+# end final-commands
+
+return_value = True

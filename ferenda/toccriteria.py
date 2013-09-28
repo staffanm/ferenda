@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+
 class TocCriteria(object):
+
     """Represents a particular way of organizing the documents in a
     repository, for the purpose of generating a table of contents for
     those douments.

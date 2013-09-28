@@ -16,10 +16,11 @@ project.
 
 A project is managed using the ``ferenda-build.py`` tool.
 
-If using the API instead of these command line tools, your client code
-is responsible for calling the docrepo classes and providing them with
-proper settings. These can be loaded from a ferenda.ini-style file
-(the :class:~ferenda.LayeredConfig` class makes this simple), be
+If using the API instead of these command line tools, there is no concept
+of a project except for what your code provides. Your client code
+is responsible for creating the docrepo classes and providing them with
+proper settings. These can be loaded from a ``ferenda.ini``-style file
+(the :class:`~ferenda.LayeredConfig` class makes this simple), be
 hard-coded, or handled in any other way you see fit.
 
 .. _configuration:
@@ -28,7 +29,7 @@ Configuration
 -------------
 
 A ferenda docrepo object can be configured in two ways - either when
-instantiating the object, eg:
+creating the object, eg:
 
 .. code-block:: py
 
@@ -36,7 +37,7 @@ instantiating the object, eg:
 
 .. note::
 
-   Parameters that is not provided when instantiating the object are
+   Parameters that is not provided when creating the object are
    defaulted from the built-in configuration values (see below)
   
 Or it can be configured using the :py:class:`~ferenda.LayeredConfig`
@@ -61,8 +62,8 @@ Configuration values from the configuration file overrides built-in
 configuration values, and command line parameters override
 configuration file values.
 
-By setting the ``config`` property on you override any parameters provided when
-instantiating the object.
+By setting the ``config`` property, you override any parameters provided when
+creating the object.
 
 .. note::
 
@@ -167,75 +168,212 @@ properties:
   <http://en.wikipedia.org/wiki/IETF_language_tag>`_ tag, eg ``sv`` or
   ``en-GB``)
 * ``uri`` (a string representing the canonical URI for this document)
-* ``basefile`` (see below)
+* ``basefile`` (a short internal id)
 
-The method :py:meth:`~ferenda.DocumentRepository.render_xhtml` renders
-a :py:class:`~ferenda.Document` object into a XHTML 1.1+RDFa document.
+The method :py:meth:`~ferenda.DocumentRepository.render_xhtml` (which
+is called automatically, as long as your ``parse`` method use the
+:py:func:`~ferenda.decorators.managedparsing` decorator) renders a
+:py:class:`~ferenda.Document` object into a XHTML 1.1+RDFa document.
 
-A document has a couple of different identifiers, and it's useful to
-understand the difference and relation between them.
+Identifiers
+-----------
 
-* ``basefile``: This is a short id, internal to the document repository,
-  and is used as the base for stored files on disk. For a docrepo of
-  RFCs, a good basefile for RFC 1147 is "1147", which corresponds to
-  the downloaded file rfc/downloads/1147.txt, the parsed file
-  rfc/parsed/1147.xhtml and the generated file rfc/generated/1147.html
-* ``uri``: The *canonical URI* for this resource. In case you're dealing
-  with documents that have no well-defined canonical URIs (which is
-  the common case), feel free to invent a URI scheme. Even if there is
-  a established canonical URI for your document, you might want to use
-  a URI that resolves to a server under your control, so that you can
-  provide good Linked data for that URI. You can point out the
-  established canonical URI using a RDF owl:sameAs statement. The
-  method
-  :py:meth:`~ferenda.DocumentRepository.canonical_uri`
-  transforms a basefile to a canonical uri.
-* ``dct:identifier`` (optional): If the document has an established
+Documents, and parts of documents, in ferenda have a couple of
+different identifiers, and it's useful to understand the difference
+and relation between them.
+
+* ``basefile``: The *internal id* for a document. This is is internal
+  to the document repository and is used as the base for the filenames
+  for the stored files . The basefile isn't totally random and is
+  expected to have some relationship with a human-readable identifier
+  for the document. As an example from the RFC docrepo, the basefile
+  for RFC 1147 would simply be "1147". By the rules encoded in
+  :py:class:`~ferenda.DocumentStore`, this results in the downloaded
+  file ``rfc/downloads/1147.txt``, the parsed file
+  ``rfc/parsed/1147.xhtml`` and the generated file
+  ``rfc/generated/1147.html``. Only documents themselves, not parts of
+  documents, have basefile identifiers.
+
+* ``uri``: The *canonical URI* for a document **or** a part of a
+  document (generally speaking, a *resource*). This identifier is used
+  when storing data related to the resource in a triple store and a
+  fulltext search engine, and is also used as the external URL for the
+  document when republishing (see :doc:`wsgi` and also
+  :ref:`parsing-uri`). URI:s for documents can be set by settings the
+  ``uri`` property of the Document object.  URIs for parts of
+  documents are set by setting the ``uri`` property on any
+  :py:mod:`~ferenda.elements` based object in the body tree. When
+  rendering the document into XHTML, render_xhtml creates RDFa
+  statements based on this property and the ``meta`` property.
+
+* ``dct:identifier``: The *human readable* identifier for a document
+  or a part of a document. If the document has an established
   human-readable identifier, such as "RFC 1147" or "2003/98/EC" (The
   EU directive on the re-use of public sector information), the
-  dct:identifier is used for this. See
-  `DCMI Terms <http://dublincore.org/documents/2012/06/14/dcmi-terms/#terms-identifier>`_
-  and :doc:`linkeddata`.
-
+  dct:identifier is used for this. Unlike ``basefile`` and ``uri``,
+  this identifier isn't set directly as a property on an
+  object. Instead, you add a triple with ``dct:identifier`` as the
+  predicate to the object's ``meta`` property, see :doc:`docmetadata`
+  and also `DCMI Terms
+  <http://dublincore.org/documents/2012/06/14/dcmi-terms/#terms-identifier>`_.
+ 
 DocumentEntry
 -------------
 
-Information about how a document has been handled within the ferenda
-framework is not a part of the Document object as described
-above. Such information include when a document was first downloaded
-or updated, the URL from where it came, and when it was made available
-through the ferenda-based website, is encapsulated in the
-:py:class:`~ferenda.DocumentEntry` class. Such objects are created and
-updated by the download methods, stored alongside the documents
-themselves (in :py:mod:`pickle` format), and are read by the feeds
-methods in order to create valid Atom feeds.
-
+Apart from information about what a document contains, there is also
+information about how it has been handled, such as when a document was
+first downloaded or updated from a remote source, the URL from where
+it came, and when it was made available through Ferenda. .This
+information is encapsulated in the :py:class:`~ferenda.DocumentEntry`
+class.  Such objects are created and updated by various methods in
+:py:class:`~ferenda.DocumentRepository`. The objects are persisted to
+JSON files, stored alongside the documents themselves, and are used by
+the :py:meth:`~ferenda.DocumentRepository.news` method in order to
+create valid Atom feeds.
 
 
 File storage
 ------------
 
-See :class:`~ferenda.DocumentStore`.
-  
-Intermediate files
-^^^^^^^^^^^^^^^^^^
+During the course of processing, data about each individual document
+is stored in many different files in various formats. The
+:class:`~ferenda.DocumentStore` class handles most aspects of this
+file handling. A configured DocumentStore object is available as the
+``store`` property on any DocumentRepository object.
 
-In many cases, the data that you want parse to work on differs
-slightly from what download actually downloaded. For example, if
-you're downloading PDF files or Word documents, you will probably
-massage them into a form that is easier to parse (eg. by using
-`pdftohtml` or `antiword`). This initial transformation often takes
-time and is not likely to need changing once in place. Furthermore,
-PDF and Word files are unsuitable as a base for patching (see below),
-but the transformed HTML/XML/Text files usually are better for this.
+Example: If a created docrepo object ``d`` has the alias ``foo``, and
+handles a document with the basefile identifier ``bar``, data about
+the document is then stored:
 
-Therefore, many docrepos will be using intermediate files (However,
-our examples used in the netstandards site, do not need them).
+* When downloaded, the original data as retrieved from the remote
+  server, is stored as ``data/foo/downloaded/bar.html``, as determined
+  by ``d.store.``:meth:`~ferenda.DocumentStore.downloaded_path`
 
-- main and auxillary intermediate files
+* At the same time, a DocumentEntry object is serialized as
+  ``data/foo/entries/bar.json``, as determined by
+  ``d.store.``:meth:`~ferenda.DocumentStore.documententry_path`
 
-Annotation files
-^^^^^^^^^^^^^^^^
+* If the downloaded source needs to be transformed into some
+  intermediate format before parsing (which is the case for eg. PDF or
+  Word documents), the intermediate data is stored as
+  ``data/foo/intermediate/bar.xml``, as determined by
+  ``d.store.``:meth:`~ferenda.DocumentStore.intermediate_path`
 
-(More properly called "pertinent RDF statements for a particular file")
+* When the downloaded data has been parsed, the parsed XHTML+RDFa
+  document is stored as ``data/foo/parsed/bar.xhtml``, as determined
+  by ``d.store.``:meth:`~ferenda.DocumentStore.parsed_path`
+
+* From the parsed document is automatically destilled a RDF/XML file
+  containing all RDFa statements from the parsed file, which is stored
+  as ``data/foo/distilled/bar.rdf``, as determined by ``d.store.``
+  ``data/foo/annotations/bar.grit.txt``, as determined by
+  ``d.store.``:meth:`~ferenda.DocumentStore.annotation_path`.
+
+* During the ``relate`` step, all documents which are referred to by
+  any other document are marked as dependencies of that document. If
+  the ``bar`` document is dependent on another document, then this
+  dependency is recorded in a dependency file stored at
+  ``data/foo/deps/bar.txt``, as determined by
+  ``d.store.``:meth:`~ferenda.DocumentStore.dependencies_path`.
+
+* Just prior to the generation of browser-ready HTML5 files, all
+  metadata in the system as a whole which is relevant to ``bar`` is
+  serialized in an annotation file in GRIT/XML format at
+  ``data/foo/annotations/bar.grit.txt``, as determined by
+  ``d.store.``:meth:`~ferenda.DocumentStore.annotation_path`.
+
+* Finally, the generated HTML5 file is created at
+  ``data/foo/generated/bar.html``, as determined by
+  ``d.store.``:meth:`~ferenda.DocumentStore.generated_path`. (This
+  step also updates the serialized DocumentEntry object described
+  above)
+
+
+Archiving 
+^^^^^^^^^
+
+Whenever a new version of an existing document is downloaded, an
+archiving process takes place when
+:meth:`~ferenda.DocumentStore.archive` is called (by
+:meth:`~ferenda.DocumentRepository.download_if_needed`). This method
+requires a version id, which can be any string that uniquely
+identifies a certain revision of the document. When called, all of the
+above files are moved into the subdirectory in the following way
+(assuming that the version id is "42"):
+
+The result of this process is that a version id for the previously
+existing files is calculated (by default, this is just a simple
+incrementing integer, but the document in your docrepo might have a
+more suitable version identifier already, in which case you should
+override :py:meth:`~ferenda.DocumentRepository.get_archive_version` to
+return this), and then all the above files (if they have been
+generated) are moved into the subdirectory ``archive`` in the
+following way.
+
+``data/foo/downloaded/bar.html`` -> ``data/foo/archive/downloaded/bar/42.html``
+
+The method :py:meth:`~ferenda.DocumentRepository.get_archive_version` is
+used to calculate the version id. The default implementation just
+provides a simple incrementing integer, but if the documents in your
+docrepo has a more suitable version identifier already, you should
+override :py:meth:`~ferenda.DocumentRepository.get_archive_version` to
+return this.
+
+The archive path is calculated by providing the optional ``version``
+parameter to any of the ``*_path`` methods above.
+
+To list all archived versions for a given basefile, use the
+:meth:`~ferenda.DocumentStore.list_versions` method.
+
+The ``open_*`` methods
+^^^^^^^^^^^^^^^^^^^^^^
+
+In many cases, you don't really need to know the filename that the
+``*_path`` methods return, because you only want to read from or write to
+it. For these cases, you can use the ``open_*`` methods instead. These
+work as context managers just as the builtin open method do, and can
+be used in the same way:
+
+Instead of:
+
+.. literalinclude:: examples/keyconcepts-file.py
+   :start-after: # begin path
+   :end-before: # end path
+
+
+use:
+
+.. literalinclude:: examples/keyconcepts-file.py
+   :start-after: # begin open
+   :end-before: # end open
+
+
+Attachments
+^^^^^^^^^^^
+
+In many cases, a single file cannot represent the entirety of a
+document. For example, a downloaded HTML file may need a series of
+inline images. These can be handled as attachments by the download
+method. Just use the optional attachment parameter to the appropriate
+*_path / open_* methods:
+
+.. literalinclude:: examples/keyconcepts-attachments.py
+   :language: python		    
+   :lines: 2-14,18-22	    
+
+.. note:: 
+
+   The DocumentStore object must be configured to handle attachments
+   by setting the ``storage_policy`` property to ``dir``. This alters
+   the behaviour of all ``*_path`` methods, so that eg. the main
+   downloaded path becomes ``data/foo/downloaded/bar/index.html``
+   instead of ``data/foo/downloaded/bar.html``
+
+To list all attachments for a document, use
+:meth:`~ferenda.DocumentStore.list_attachments` method.
+
+Note that only some of the ``*_path`` / ``open_*`` methods supports the
+``attachment`` parameter (it doesn't make sense to have attachments for
+DocumentEntry files or distilled RDF/XML files).
+
 

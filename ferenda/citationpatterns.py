@@ -7,7 +7,7 @@ examples.
 from __future__ import unicode_literals
 from pyparsing import *
 
-################################################################
+#
 #
 # ferenda.citationpatterns.url
 #
@@ -34,13 +34,14 @@ url = (url_scheme.setResultsName("scheme") + Literal("://").suppress() +
 'https://example.org/?key=value#fragment' (note: only the
 schemes/protocols 'http', 'https' and 'ftp' are supported)"""
 
-################################################################
+#
 #
 # ferenda.citationpatterns.eulaw
 #
 LongYear = Word(nums, exact=4)
 ShortYear = Word(nums, exact=2)
-Month = oneOf("januari februari mars april maj juni juli augusti september oktober november december")
+Month = oneOf(
+    "januari februari mars april maj juni juli augusti september oktober november december")
 DayInMonth = Word(nums, max=2)
 Date = (DayInMonth + Month + LongYear)
 

@@ -41,7 +41,9 @@ from ferenda import util
 DCT = Namespace(util.ns['dct'])
 RINFOEX = Namespace('http://lagen.nu/terms#')
 
+
 class GraphAnalyze(object):
+
     def prep_annotation_file(self, basefile):
         goldstandard = self.eval_get_goldstandard(basefile)
         baseline_set = self.eval_get_ranked_set_baseline(basefile)
@@ -55,11 +57,11 @@ class GraphAnalyze(object):
         pagerank_map = self.eval_calc_map(
             self.eval_calc_aps(pagerank_set, goldstandard))
         print("Pagerank MAP %f" % pagerank_map)
-        sets = [{'label':'Baseline',
-                 'data':baseline_set},
-                {'label':'Gold standard',
-                 'data':goldstandard},
-                {'label':'PageRank',
+        sets = [{'label': 'Baseline',
+                 'data': baseline_set},
+                {'label': 'Gold standard',
+                 'data': goldstandard},
+                {'label': 'PageRank',
                  'data': pagerank_set}]
 
         g = Graph()
@@ -129,7 +131,6 @@ class GraphAnalyze(object):
         dot.write(path=filename, prog="dot", format=imageformat)
         self.log.debug("Wrote %s" % filename)
 
-
     top_articles = []
     graph_filetype = "png"
     # yields an iterator of Article URIs
@@ -159,7 +160,7 @@ class GraphAnalyze(object):
         # XHT_NS = "{http://www.w3.org/1999/xhtml}"
         #tree = ET.parse(self.parsed_path(basefile))
         #els = tree.findall("//"+XHT_NS+"div")
-        #for el in els:
+        # for el in els:
         #    if 'typeof' in el.attrib and el.attrib['typeof'] == "eurlex:Article":
         #        yield el.attrib['about']
 
@@ -311,7 +312,7 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
         # Report the most common cites to older treaty articles that
         # we have no equivalents for in TFEU
         # sorted_unmapped = sorted(unmapped.iteritems(), key=itemgetter(1))[-num_of_articles:]
-        #if not quiet:
+        # if not quiet:
         #    print "UNMAPPED:"
         #    pprint(sorted_unmapped)
 
@@ -461,7 +462,9 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
                 if (cite['subj'] != cite['obj']):
                     citedict[(cite['subj'], cite['obj'])] = True
 
-            self.log.debug("    Normalized graph contains %s citations (%s cited cases not found)" % (len(citedict), len(missingcases)))
+            self.log.debug(
+                "    Normalized graph contains %s citations (%s cited cases not found)" %
+                (len(citedict), len(missingcases)))
             # pprint(missingcases.keys()[:10])
 
             # Step 2. Dotify the list (maybe the direction of arrows from
@@ -588,7 +591,7 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
         styles = []
         for i in range(1, 5):
             for j in (['-', '--', '-.', ':']):
-            #for j in (['-','-','-','-','-']):
+            # for j in (['-','-','-','-','-']):
                 styles.append((i, j))
 
         cnt = 0
@@ -650,11 +653,11 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
         ax = plt.subplot(211)
         plt.hexbin(cited_by_age, citations, gridsize=maxcites,
                    bins='log', cmap=cm.hot_r)
-        #plt.scatter(age,citations)
+        # plt.scatter(age,citations)
         ax.set_title("Distribution of citations by age")
         ax.set_ylabel("# of citations")
         #cb = plt.colorbar()
-        #cb.set_label('log(# of cases with # of citations)')
+        # cb.set_label('log(# of cases with # of citations)')
         ax = plt.subplot(212)
         ax.set_title("Distribution of cases by age")
         plt.axis([0, maxage, 0, max(cases_by_age)])
@@ -671,13 +674,13 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
         plt.close()
         self.log.debug("    Created %s" % filename)
 
-################################################################
+#
 # Evaluation
 
     def evaluate(self):
         result_cache = self.generic_path("result_cache", "eval", ".py")
         if os.path.exists(result_cache):
-        #if False:
+        # if False:
             self.log.info("Using result cache in %s" % result_cache)
             sets = eval(open(result_cache).read())
         else:
@@ -834,11 +837,11 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
             for year in years:
                 restrict_citing = True  # always performs better
                 if (article, year, restrict_cited) in self._graph_cache:
-                    #self.log.debug("Resuing cached graph (%s) for %s in %s" %
+                    # self.log.debug("Resuing cached graph (%s) for %s in %s" %
                     #               (restrict_cited, article_celex,year))
                     graph = self._graph_cache[(article, year, restrict_cited)]
                 else:
-                    #self.log.debug("Calculating graph for %s in %s" %
+                    # self.log.debug("Calculating graph for %s in %s" %
                     #               (article_celex,year))
                     sq = self._query_cites(article, sameas, restrict_citing,
                                            restrict_cited, year)
@@ -871,7 +874,7 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
                                   in result_by_years
                                   if d in result_by_year]
                         avg_score = sum(scores) / float(age)
-                        #self.log.debug("Result %s (age %s, avg score %s) %r" %
+                        # self.log.debug("Result %s (age %s, avg score %s) %r" %
                         #               (d,age,avg_score,scores))
                         compensated_ranking[d] = avg_score
                     except ValueError:
@@ -879,7 +882,8 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
 
             # return just a list of results, no scores
             if age_compensation:
-                res[article] = [result for result in sorted(compensated_ranking, key=compensated_ranking.__getitem__, reverse=True)]
+                res[article] = [result for result in sorted(
+                    compensated_ranking, key=compensated_ranking.__getitem__, reverse=True)]
             else:
                 res[article] = [result[0] for result in ranked]
 
@@ -998,7 +1002,7 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
                 parties = store.select(sq, format="python")
                 if parties:
                     pass
-                    #self.log.debug("   %s: %s (%s)" %
+                    # self.log.debug("   %s: %s (%s)" %
                     #               (parties[0]['celexnum'],
                     #                parties[0]['casenum'],
                     #                " v ".join([x['party'] for x in parties])))
@@ -1052,7 +1056,7 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
         plt.savefig(filename)
         self.log.info("Created average precision chart as %s" % filename)
         plt.close()
-        #plt.show()
+        # plt.show()
 
     def eval_aps_table(self, avg_precisions):
         filetype = "tex"

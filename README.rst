@@ -4,7 +4,7 @@ helps with downloading documents, parsing them to add explicit
 semantic structure and RDF-based metadata, finding relationships
 between documents, and publishing the results.
 
-.. image:: https://travis-ci.org/staffanm/ferenda.png
+.. image:: https://travis-ci.org/staffanm/ferenda.png?branch=master
     :target: http://travis-ci.org/staffanm/ferenda/
 
 .. image:: https://coveralls.io/repos/staffanm/ferenda/badge.png?branch=master

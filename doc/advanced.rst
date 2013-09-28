@@ -2,8 +2,8 @@ Advanced topics
 ===============
 
 
-CompositeDocumentRepository
----------------------------
+Composite docrepos
+------------------
 
 In some cases, a document collection may available from multiple
 sources, with varying degrees of completeness and/or quality. For
@@ -14,36 +14,10 @@ some in the form of TIFF files that you scanned yourself. The
 implementation of both download() and parse() will differ wildly for
 these sources. You'll have something like this:
 
-.. code-block:: py
+.. literalinclude:: examples/patents.py
+   :start-after: # begin subrepos
+   :end-before: # end subrepos
 
-  class XMLPatents(DocRepository)
-      alias = "patxml"
-  
-      def download(self, basefile = None):
-          download_from_api()
-  
-      def parse(self,doc):
-          transform_patent_xml_to_xhtml(doc.basefile)
-  
-  class HTMLPatents(DocRepository)
-      alias = "pathtml"
-    
-      def download(self, basefile = None):
-          screenscrape()
-  
-      def parse(self,doc):
-          analyze_tagsoup(doc)
-  
-  class ScannedPatents(DocRepository):
-      alias = "patscan"
-  
-      # Assume that we, when we scanned the documents, placed them in their
-      # correct place under download
-      def download(self, *args): pass
-  
-      def parse(self,doc):
-          ocr_and_structure(doc)
-  
 But since the result of all three parse() implementations are
 XHTML1.1+RDFa documents (possibly with varying degrees of data
 fidelity), the implementation of generate() will be substantially the
@@ -53,61 +27,89 @@ structured XML if they're available, documents derived from tagsoup
 HTML if an XML version wasn't available, and finally documents derived
 from your scanned documents if nothing else is available.
 
-The class CompositeRepository makes this possible. You specify a
-number of sub-docrepos using a class property.
+The class :class:`~ferenda.CompositeRepository` makes this
+possible. You specify a number of subordinate docrepo classes using
+the ``subrepos`` class property.
 
-.. code-block:: py
-
-  class CompositePatents(CompositeRepository):
-      alias = "pat"
-      subrepos = (XMLPatents, HTMLPatents, ScannedPatents)
+.. literalinclude:: examples/patents.py
+   :start-after: # begin composite
+   :end-before: # end composite
   
-      def generate(self, basefile):
-          # Code to transform XHTML1.1+RDFa documents, regardless of 
-          # wheter these are derived from structured XML, tagsoup HTML
-          # or scanned TIFFs
-          do_the_work()
-  
-A CompositeRepository can act as a proxy for your specialized repositories::
+The CompositeRepository docrepo then acts as a proxy for all of your
+specialized repositories::
 
-  ./ferenda-build.py patents.CompositePatents enable
-  ./ferenda-build.py pat download # calls download() for all subrepos
-  ./ferenda-build.py pat parse 5723765 # selects the best subrepo that has  patent 5,723,765, calls parse() for that, then copies the result to pat/parsed/ 5723765 (or links)
-  ./ferenda-build.py pat generate 5723765 # uses the pat/parsed/5723765 data. From here on, we're just like any other docrepo.
-  
-Note that patents.XMLPatents and the other subrepos are never
-enabled/registered, just called behind-the-scenes by
-patents.CompositePatents.
+.. literalinclude:: examples/composite-repository.sh
 
-If you prefer scanned TIFFs over tagsoup HTML, simple change the order
-in the subrepos class property.
+Note that ``patents.XMLPatents`` and the other subrepos are never
+registered in ferenda.ini``. They're just called behind-the-scenes by
+``patents.CompositePatents``.
+
 
 Patch files
 -----------
 
-Applied on downloaded or intermediate files. 
-* Reason for patching: Correcting bad data, privacy, handling
-difficult and rare parse situations
-* Creating a patch: devel mkpatch <path-to-intermediate-file>
-* Managing patches: like other project assets
-* Resulting metadata in RDFa files
+It is not uncommon that source documents in a document repository
+contains formatting irregularities, sensitive information that must be
+redacted, or just outright errors. In some cases, your parse
+implementation can detect and correct these things, but in other
+cases, the irregularities are so uncommon or unique that this is not
+possible to do in a general way.
 
-External resources
-------------------
-Not everything from the downloaded document content may be reproduced
-in the XHTML 1.1 serialization that parse() creates. In particular,
-images must be stored separately. In some cases (such as documents
-produced by PDFDocumentRepository) CSS files are also created in the
-parsing process. All such files are external resources, and stored
-alongside the main XHTML file. They are enumerated through the
-`list_external_resources()` method.
+As an alternative, you can patch the source document (or it's
+intermediate representation) before the main part of your parsing
+logic.
+
+The method :meth:`~ferenda.DocumentRepository.patch_if_needed`
+automates most of this work for you. It expects a basefile and the
+corresponding source document as a string, looks in a *patch
+directory* for a corresponding patch file, and applies it if found.
+
+By default, the patch directory is alongside the data directory. The
+patch file for document foo in repository bar should be placed in
+``patches/bar/foo.patch``. An optional description of the patch (as a
+plaintext, UTF-8 encoded file) can be placed in
+``patches/bar/foo.desc``.
+
+
+:meth:`~ferenda.DocumentRepository.patch_if_needed` returns a tuple
+(text, description). If there was no available patch, text is
+identical to the text passed in and description is None. If there was
+a patch available and it applied cleanly, text is the patched text and
+description is a description of the patch (or "(No patch description
+available)"). If there was a patch, but it didn't apply cleanly, a
+PatchError is raised.
+
+.. note:: 
+
+   There is a ``mkpatch`` command in the Devel class which aims to
+   automate the creation of patch files. It does not work at the
+   moment.
+
 
 External annotations
 --------------------
-From wikis and other places. Just create a DocRepo for which documents
-are downloaded, parsed but not generated. eg. wiki/parsed/pat/5723765
-may be a commentary on the '765 patent, that explicitly refers to that
-using its canonical uri. When `./ferenda-build.py pat generate
-5723765` runs, the content of that commentary is pulled into the
-annotation file and displayed alongside the main document text.
 
+Ferenda contains a general docrepo class that fetches data from a
+separate MediaWiki server and stores this as annotations/descriptions
+related to the documents in your main docrepos. This makes it possible
+to present a source document and commentary on it (including
+annotations about individual sections) side-by-side.
+
+See :class:`ferenda.sources.general.MediaWiki`
+
+
+Keyword hubs
+------------
+
+Ferenda also contains a general docrepo class that lists all keywords
+used by documents in your main docrepos (by default, it looks for all
+``dct:subject`` properties used in any document) and generate
+documents for each of them. These documents have no content of their
+own, but act as hub pages that list all documents that use a certain
+keyword in one place.
+
+When used together with the MediaWiki module above, this makes it
+possible to write editorial descriptions about each keyword used, that
+is presented alongside the list of documents that use that keyword.
+
+See :class:`ferenda.sources.general.Keyword`

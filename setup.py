@@ -9,10 +9,6 @@ if os.path.exists("README.rst"):
 else:
     longdesc = ""
 
-# FIXME: We'd like to install rdflib-sqlalchemy but this isn't
-# available from pypi, only from git repos (see
-# requirements.py3.txt). Is this possible?
-
 install_requires = ['beautifulsoup4 >= 4.3.0',
                     'jsmin >= 2.0.2',
                     'lxml >= 3.2.0',
@@ -21,15 +17,12 @@ install_requires = ['beautifulsoup4 >= 4.3.0',
                     'rdfextras >= 0.4',
                     'requests >= 1.2.0',
                     'Whoosh >= 2.4.1',
-                    'six >= 1.4.0']
+                    'six >= 1.4.0',
+                    'pyparsing >= 2.0.1']
 
 if sys.version_info < (3,0,0):
-    install_requires.append('pyparsing==1.5.7')
     # not py3 compatible, but not essential either
     install_requires.append('SimpleParse >= 2.1.1') 
-else:
-    # lastest version 2.0.0 is not py2 compatible
-    install_requires.append('pyparsing') 
 
 if sys.version_info < (2,7,0):
     install_requires.append('ordereddict >= 1.1')

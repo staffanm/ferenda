@@ -73,9 +73,9 @@ def robust_rename(old, new):
     # print "robust_rename: %s -> %s" % (old,new)
     ensure_dir(new)
     if os.path.exists(new):
-        #try:
+        # try:
         os.unlink(new)
-        #except WindowsError:
+        # except WindowsError:
         #    print "Caught WindowsError, sleeping"
         #    import time
         #    time.sleep(1)
@@ -93,17 +93,18 @@ def robust_rename(old, new):
 def robust_remove(filename):
     """Removes a filename no matter what (unlike :py:func:`os.unlink`, does not raise an error if the file does not exist)."""
     if os.path.exists(filename):
-        #try:
+        # try:
         os.unlink(filename)
+
 
 def relurl(url, starturl):
     """Works like :py:func:`os.path.relpath`, but for urls"""
     urlseg = urlsplit(url)
     startseg = urlsplit(starturl)
-    urldomain = urlunsplit(urlseg[:2]+tuple('' for i in range(3)))
-    startdomain = urlunsplit(startseg[:2]+tuple('' for i in range(3)))
-    if urldomain != startdomain: # different domain, no relative url possible
-        return url 
+    urldomain = urlunsplit(urlseg[:2] + tuple('' for i in range(3)))
+    startdomain = urlunsplit(startseg[:2] + tuple('' for i in range(3)))
+    if urldomain != startdomain:  # different domain, no relative url possible
+        return url
 
     relpath = posixpath.relpath(urlseg.path, posixpath.dirname(startseg.path))
     res = urlunsplit(('', '', relpath, urlseg.query, urlseg.fragment))
@@ -112,6 +113,8 @@ def relurl(url, starturl):
 # util.Sort
 
 # still used by SFS.py
+
+
 def numcmp(x, y):
     """Sorts ['1','10','1a', '2'] => ['1', '1a', '2', '10']"""
     nx = split_numalpha(x)
@@ -119,6 +122,8 @@ def numcmp(x, y):
     return (nx > ny) - (nx < ny)  # equivalent to cmp which is not in py3
 
 # util.Sort
+
+
 def split_numalpha(s):
     """Converts a string into a list of alternating string and
 integers. This makes it possible to sort a list of strings numerically
@@ -140,11 +145,13 @@ even though they might not be fully convertable to integers
             seg = c
             digit = not digit
     res.append(int(seg) if seg.isdigit() else seg)
-    if isinstance(res[0],int):
-        res.insert(0,'') # to make sure every list has type str,int,str,int....
+    if isinstance(res[0], int):
+        res.insert(0, '')  # to make sure every list has type str,int,str,int....
     return res
 
 # util.Process
+
+
 def runcmd(cmdline, require_success=False, cwd=None):
     """Run a shell command, wait for it to finish and return the results.
 
@@ -187,6 +194,8 @@ def runcmd(cmdline, require_success=False, cwd=None):
     return (p.returncode, stdout, stderr)
 
 # util.String
+
+
 def normalize_space(string):
     """Normalize all whitespace in string so that only a single space between words is ever used, and that the string neither starts with nor ends with whitespace.
 
@@ -228,7 +237,9 @@ def list_dirs(d, suffix=None, reverse=False):
 
 # util.String (or XML?)
 # Still used by manager.makeresources, should be removed in favor of lxml
-# 
+#
+
+
 def indent_node(elem, level=0):
     """indents a etree node, recursively.
 
@@ -249,6 +260,8 @@ def indent_node(elem, level=0):
             elem.tail = i
 
 # util.File
+
+
 def replace_if_different(src, dst, archivefile=None):
     """Like :py:func:`shutil.move`, except the *src* file isn't moved if the
     *dst* file already exists and is identical to *src*. Also doesn't
@@ -305,9 +318,11 @@ doesn't require that the directory of *dst* exists beforehand.
         pass
 
 # util.File
+
+
 def outfile_is_newer(infiles, outfile):
     """Check if a given *outfile* is newer (has a more recent modification time) than a list of *infiles*. Returns True if so, False otherwise (including if outfile doesn't exist)."""
-    
+
     if not os.path.exists(outfile):
         return False
     outfile_mtime = os.stat(outfile).st_mtime
@@ -320,6 +335,8 @@ def outfile_is_newer(infiles, outfile):
     return True
 
 # util.file
+
+
 def link_or_copy(src, dst):
     """Create a symlink at *dst* pointing back to *src* on systems that support it. On other systems (i.e. Windows), copy *src* to *dst* (using :py:func:`copy_if_different`)
     """
@@ -353,6 +370,8 @@ def ucfirst(string):
 
 # util.time
 # From http://bugs.python.org/issue7584#msg96917
+
+
 def rfc_3339_timestamp(dt):
     """Converts a datetime object to a RFC 3339-style date
 
@@ -379,18 +398,29 @@ HTTP-date) to an UTC-localized (naive) datetime.
     return (datetime.datetime(*parsed_date[:7]) -
             datetime.timedelta(seconds=parsed_date[9]))
 
+def strptime(datestr, format):
+    """Like datetime.strptime, but guaranteed to not be affected by
+       current system locale -- all datetime parsing is done using the
+       C locale.
 
-# util.file
+    """
+    with c_locale():
+        return datetime.datetime.strptime(datestr, format).date()
+        
+    
+# Util.file
 def readfile(filename, mode="r", encoding="utf-8"):
     """Opens *filename*, reads it's contents and returns them as a string."""
     if "b" in mode:
         with open(filename, mode=mode) as fp:
-            return fp.read() # returns bytes, not str
+            return fp.read()  # returns bytes, not str
     else:
         with codecs.open(filename, mode=mode, encoding=encoding) as fp:
             return fp.read()
 
 # util.file
+
+
 def writefile(filename, contents, encoding="utf-8"):
     """Create *filename* and write *contents* to it."""
     ensure_dir(filename)
@@ -423,6 +453,7 @@ def md5sum(filename):
         c.update(fp.read())
     return c.hexdigest()
 
+
 def merge_dict_recursive(base, other):
     """Merges the *other* dict into the *base* dict. If any value in other is itself a dict and the base also has a dict for the same key, merge these sub-dicts (and so on, recursively)."""
     for (key, value) in list(other.items()):
@@ -433,6 +464,7 @@ def merge_dict_recursive(base, other):
         else:
             base[key] = value
     return base
+
 
 def resource_extract(resource_name, outfile, params={}):
     """Copy a file from the ferenda package resources to a specified path, optionally performing variable substitutions on the contents of the file.
@@ -446,25 +478,25 @@ def resource_extract(resource_name, outfile, params={}):
     if params:
         resource = resource % params
     ensure_dir(outfile)
-    with codecs.open(outfile,"w") as fp:
+    with codecs.open(outfile, "w") as fp:
         fp.write(resource)
 
 # Deprecated -- was only ever used to find a handle leak
-# 
-# # http://stackoverflow.com/a/7142094
+#
+# http://stackoverflow.com/a/7142094
 # def print_open_fds():
 #     '''
 #     return the number of open file descriptors for current process
-# 
+#
 #     .. warning: will only work on UNIX-like os-es.
 #     '''
 #     import subprocess
 #     import os
-# 
+#
 #     pid = os.getpid()
-#     procs = subprocess.check_output( 
+#     procs = subprocess.check_output(
 #         [ "lsof", '-w', '-Ff', "-p", str( pid ) ] ).decode('utf-8')
-# 
+#
 #     fprocs = list(filter(lambda s: s and s[ 0 ] == 'f' and s[1: ].isdigit(),
 #                 procs.split( '\n' )))
 #     print("Open file descriptors: " + ", ".join(fprocs))
@@ -506,6 +538,8 @@ def logtime(method, format="The operation took %(elapsed).3f sec", values={}):
     method(format % values)
 
 # Python docs recommends against this. Eh, what are you going to do?
+
+
 @contextmanager
 def c_locale(category=locale.LC_TIME):
     """Temporarily change process locale to the C locale, for use when eg
@@ -516,7 +550,7 @@ def c_locale(category=locale.LC_TIME):
     ...     datetime.strptime("August 2013", "%B %Y")
 
     """
-    
+
     oldlocale = locale.getlocale(category)
     newlocale = 'C' if six.PY3 else b'C'
     locale.setlocale(category, newlocale)
@@ -524,7 +558,6 @@ def c_locale(category=locale.LC_TIME):
         yield
     finally:
         locale.setlocale(category, oldlocale)
-    
 
 
 # Example code from http://www.diveintopython.org/
@@ -556,6 +589,7 @@ def from_roman(s):
             index += len(numeral)
     return result
 
+
 def title_sortkey(s):
     """Transform a document title into a key useful for sorting and partitioning documents.
 
@@ -570,4 +604,3 @@ def title_sortkey(s):
     s = re.sub("^\W+", "", s)
     # remove spaces
     return "".join(s.split())
-

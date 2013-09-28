@@ -7,13 +7,13 @@ sys.path.append("..")
 
 try:
     from ferenda.manager import make_wsgi_app
-            
+
     # FIXME: should we chdir to os.path.dirname(__file__) instead?
     inifile = os.path.join(os.path.dirname(__file__), "ferenda.ini")
     application = make_wsgi_app(inifile=inifile)
 except ImportError as e:
     exception_data = str(e)
-    
+
     def application(environ, start_response):
         msg = """500 Internal Server Error: %s
 
@@ -25,4 +25,3 @@ except ImportError as e:
             ("Content-Length", str(len(msg)))
         ])
         return iter([msg])
-

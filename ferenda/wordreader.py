@@ -12,7 +12,9 @@ from time import mktime
 
 from ferenda import errors, util
 
+
 class WordReader(object):
+
     """Reads .docx and .doc-files (the latter with support from `antiword <http://www.winfield.demon.nl/>`_) and presents a slightly easier API for dealing with them.
 
     .. note::
@@ -20,7 +22,7 @@ class WordReader(object):
        This module isn't really working right now."""
 
     log = logging.getLogger(__name__)
-    
+
     def read(self, wordfile, intermediatefile):
         """Converts the word file to a more easily parsed format.
 
@@ -52,7 +54,6 @@ class WordReader(object):
             # docbook or a OOXML file
             pass
         return (intermediatefile, filetype)
-
 
     def word_to_docbook(self, indoc, outdoc):
         """Convert a old Word document (.doc) to a pseudo-docbook file through antiword."""
@@ -149,4 +150,3 @@ class WordReader(object):
             print((e[2][2]))
             errlog = open(outhtml + ".err.log", "w")
             errlog.write("%s:\n%s" % (indoc, e))
-

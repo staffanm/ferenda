@@ -10,7 +10,7 @@ create documents by creating such trees of elements. The
 
 Most of the classes can be used like python lists (and are, in fact,
 subclasses of :py:class:`list`). Unlike the aproach used by
-:py:class:`~xml.etree.ElementTree` and BeautifulSoup, where all
+``xml.etree.ElementTree`` and ``BeautifulSoup``, where all
 objects are of a specific class, and a object property determines the
 type of element, the element objects are of different classes if the
 elements are different. This means that elements representing a
@@ -23,23 +23,19 @@ covers many basic document elements, and the submodule
 all HTML tags. There is some functional overlap between these two
 module, but :py:mod:`ferenda.elements` contains several constructs
 which aren't directly expressible as HTML elements
-(eg. :py:class:`ferenda.elements.Page`,
-:py:class:`ferenda.elements.SectionalElement` and
-:py:class:`ferenda.elements.Footnote`)
+(eg. :py:class:`~ferenda.elements.Page`,
+:~py:class:`ferenda.elements.SectionalElement` and
+:~py:class:`ferenda.elements.Footnote`)
 
 Each element constructor (or at least those derived from
 :py:class:`~ferenda.elements.CompoundElement`) takes a list as an
 argument (same as :py:class:`list`), but also any number of keyword
-arguments. This enables you to construct a simple document like this::
+arguments. This enables you to construct a simple document like this:
 
-  from ferenda.elements import Body, Heading, Paragraph, Footnote
+.. literalinclude:: examples/elementclasses.py
+   :start-after: # begin makedoc
+   :end-before: # end makedoc
   
-  doc = Body([Heading(["About Doc 43/2012 and it's interpretation"],predicate="dct:title"),
-              Paragraph(["According to Doc 43/2012",
-                         Footnote(["Available at http://example.org/xyz"]),
-                         " the bizbaz should be frobnicated"])
-             ])
-
 .. note::
 
    Since :py:class:`~ferenda.elements.CompoundElement` works like
@@ -55,18 +51,11 @@ Creating your own element classes
 The exact structure of documents differ greatly. A general document
 format such as XHTML or ODF cannot contain special constructs for
 preamble recitals of EC directives or patent claims of US patents. But
-your own code can create new classes for this. Example::
+your own code can create new classes for this. Example:
 
-  from ferenda.elements import CompoundElement, OrderedElement
-  
-  class Preamble(CompoundElement): pass
-  class PreambleRecital(CompoundElement,OrderedElement):
-      tagname = "div"
-      rdftype = "eurlex:PreambleRecital"
-  
-  doc = Preamble([PreambleRecital("Un",ordinal=1)],
-                 [PreambleRecital("Deux",ordinal=2)],
-                 [PreambleRecital("Trois",ordinal=3)])
+.. literalinclude:: examples/elementclasses.py
+   :start-after: # begin derived-class
+   :end-before: # end derived-class
   
 
 Mixin classes
@@ -78,24 +67,65 @@ one main class who's semantics you're extending, and one mixin class
 that contains particular properties. The following classes are useful
 as mixins:
 
-* :py:class:`~ferenda.elements.OrdinalElement` (for representing
-  elements with some sort of ordinal numbering)
-* :py:class:`~ferenda.elements.PredicateType` (for representing
-  literal data that are typed using a RDF predicaet)
-* :py:class:`~ferenda.elements.TemporalElement` (for representing
-  things that has a start and/or a end date
+* :py:class:`~ferenda.elements.OrdinalElement`: for representing
+  elements with some sort of ordinal numbering. An ordinal element has
+  an ``ordinal`` property, and different ordinal objects can be
+  compared or sorted. The sort is based on the ordinal property. The
+  ordinal property is a string, but comparisons/sorts are done in a
+  natural way, i.e. "2" < "2 a" < "10".
+
+* :py:class:`~ferenda.elements.TemporalElement`: for representing
+  things that has a start and/or a end date. A temporal element has
+  an ``in_effect`` method which takes a date (or uses today's date if
+  none given) and returns true if that date falls between the start
+  and end date.
 
 
 Rendering to XHTML
 ------------------
 
 The built-in classes are rendered as XHTML by the built-in method
-:py:meth:`~ferenda.DocumentRepository.render_xhtml`. Your own classes
-can specify how they are to be rendered in XHTML by overriding the
-:data:`~ferenda.elements.AbstractElement.tagname` and
+:py:meth:`~ferenda.DocumentRepository.render_xhtml`, which first
+creates a ``<head>`` section containing all document-level metadata
+(i.e. the data you have specified in your documents ``meta``
+property), and then calls the ``as_xhtml`` method on the root body
+element. The method is called with ``doc.uri`` as a single argument,
+which is then used as the RDF subject for all triples in the document
+(except for those sub-elements which themselves have a ``uri``
+property)
+
+All built-in element classes derive from
+:class:`~ferenda.elements.AbstractElement`, which contains a generic
+implementation of :meth:`~ferenda.elements.AbstractElement.as_xhtml`,
+that recursively creates a lxml element tree from itself and it's
+children.
+
+Your own classes can specify how they are to be rendered in XHTML by
+overriding the :data:`~ferenda.elements.AbstractElement.tagname` and
 :data:`~ferenda.elements.AbstractElement.classname` properties, or for
-full control, the :data:`~ferenda.elements.AbstractElement.as_xhtml`
+full control, the :meth:`~ferenda.elements.AbstractElement.as_xhtml`
 method.
+
+As an example, the class :class:`~ferenda.elements.SectionalElement`
+overrides ``as_xhtml`` to the effect that if you provide
+``identifier``, ``ordinal`` and ``title`` properties for the object, a
+resource URI is automatically constructed and four RDF triples are
+created (rdf:type, dct:title, dct:identifier, and bibo:chapter):
+
+.. literalinclude:: examples/elementclasses.py
+   :start-after: # begin as-xhtml
+   :end-before: # end as-xhtml
+
+...which results in:
+
+.. literalinclude:: examples/elementclasses-part.xhtml
+  
+However, this is a convenience method of SectionalElement, amd may not
+be appropriate for your needs. The general way of attaching metdata to
+document parts, as specified in :ref:`parsing-metadata-parts`, is to
+provide each document part with a ``uri`` and ``meta`` property. These
+are then automatically serialized as RDFa statements by the default
+``as_xhtml`` implementation.
 
 
 Convenience methods

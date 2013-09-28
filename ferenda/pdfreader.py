@@ -1,20 +1,19 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
-import sys
 import os
-import re
 import xml.etree.cElementTree as ET
-from tempfile import mktemp
 import logging
 
-import six
 from six import text_type as str
 
 from ferenda import util
-from .elements import UnicodeElement, CompoundElement, OrdinalElement, serialize
+from .elements import UnicodeElement
+from .elements import CompoundElement
+from .elements import OrdinalElement
 
 
 class PDFReader(CompoundElement):
+
     """Parses PDF files and makes the content available as a object
 hierarchy. After calling :py:meth:`~ferenda.PDFReader.read`, the PDFReader itself is a list of
 :py:class:`ferenda.pdfreader.Page` objects, which each is a list of
@@ -24,7 +23,7 @@ hierarchy. After calling :py:meth:`~ferenda.PDFReader.read`, the PDFReader itsel
 
        This class depends on the command line tool pdftohtml from `poppler <http://poppler.freedesktop.org/>`_.
     """
-    
+
     def __init__(self):
         self.fontspec = {}
         self.log = logging.getLogger('pdfreader')
@@ -35,7 +34,7 @@ hierarchy. After calling :py:meth:`~ferenda.PDFReader.read`, the PDFReader itsel
         :param pdffile: The full path to the PDF file
         :param workdir: A directory where intermediate files (particularly background PNG files) are stored
         """
-        
+
         self.filename = pdffile
         assert os.path.exists(pdffile), "PDF %s not found" % pdffile
         if not workdir:
@@ -66,7 +65,7 @@ hierarchy. After calling :py:meth:`~ferenda.PDFReader.read`, the PDFReader itsel
                                                        require_success=True)
         return self._parse_xml(xmlfile)
 
-    #def set_background_path():
+    # def set_background_path():
     #    pass
 
     def _parse_xml(self, xmlfile):
@@ -77,7 +76,7 @@ hierarchy. After calling :py:meth:`~ferenda.PDFReader.read`, the PDFReader itsel
         except ET.ParseError as e:
             self.log.warning("'%s', working around" % e)
             #fix = PDFXMLFix()
-            #fix.fix(xmlfile)
+            # fix.fix(xmlfile)
             tree = ET.parse(xmlfile)
 
         # for each page element
@@ -122,7 +121,7 @@ hierarchy. After calling :py:meth:`~ferenda.PDFReader.read`, the PDFReader itsel
                         grandchildren = child.getchildren()
                         # special handling of the <i><b> construct
                         if grandchildren != []:
-                            #print "Grandchildren handling: %s '%s' '%s'" % (len(grandchildren),
+                            # print "Grandchildren handling: %s '%s' '%s'" % (len(grandchildren),
                             #                                                child.text,
                             #                                                child.tail)
                             assert (len(grandchildren) == 1), "General grandchildren not supported"
@@ -171,8 +170,9 @@ hierarchy. After calling :py:meth:`~ferenda.PDFReader.read`, the PDFReader itsel
 
 
 class Page(CompoundElement, OrdinalElement):
+
     """Represents a Page in a PDF file. Has *width* and *height* properties."""
- 
+
     def vertical_gutters(self):
         """
         Returns the x-coordinates for the start and end of the left and right gutter (the part of the page which contains no text) of the Page.
@@ -204,20 +204,21 @@ class Page(CompoundElement, OrdinalElement):
         if not right:
             right = self.width
         for box in self:
-            # print u"    Examining [%dx%d][%dx%d] against constraints [%dx%d][%dx%d]" % (box.top,box.left,box.bottom,box.right, top,left,bottom,right)
+            # print u"    Examining [%dx%d][%dx%d] against constraints [%dx%d][%dx%d]"
+            # % (box.top,box.left,box.bottom,box.right, top,left,bottom,right)
 
-            #if (box.top >= top): print "        Top OK"
-            #if (box.left >= left): print "        Left OK"
-            #if (box.bottom <= bottom): print "        Bottom OK"
-            #if (box.right <= right): print "        Right OK"
+            # if (box.top >= top): print "        Top OK"
+            # if (box.left >= left): print "        Left OK"
+            # if (box.bottom <= bottom): print "        Bottom OK"
+            # if (box.right <= right): print "        Right OK"
 
             if (box.top >= top and
                 box.left >= left and
                 box.bottom <= bottom and
                     box.right <= right):
-                #print "    SUCCESS"
+                # print "    SUCCESS"
                 yield box
-            #else:
+            # else:
             #    print "    FAIL"
 
     def crop(self, top=0, left=0, bottom=None, right=None):
@@ -247,15 +248,23 @@ class Page(CompoundElement, OrdinalElement):
     def __unicode__(self):
         textexcerpt = " ".join([str(x) for x in self])
         return "Page %d (%d x %d): '%s...'" % (self.number, self.width, self.height, str(textexcerpt[:40]))
-    
+
     def __str__(self):
         return str(self).encode('ascii')
 
+
 class Textbox(CompoundElement):
+
     """A textbox is a amount of text on a PDF page, with *top*, *left*,
 *width* and *height* properties that specifies the bounding box of the
-text. The *font* property specifies the id of font used (use :py:meth:`getfont` to get a dict of all font properties). A textbox consists of a list of Textelements which may differ in basic formatting (bold and or italics), but otherwise all text in a Textbox has the same font and size."""
-    
+text. The *font* property specifies the id of font used (use
+:py:meth:`~ferenda.pdfreader.Textbox.getfont` to get a dict of all
+font properties). A textbox consists of a list of Textelements which
+may differ in basic formatting (bold and or italics), but otherwise
+all text in a Textbox has the same font and size.
+
+    """
+
     def __init__(self, *args, **kwargs):
         assert 'top' in kwargs, "top attribute missing"
         assert 'left' in kwargs, "left attribute missing"
@@ -291,12 +300,12 @@ text. The *font* property specifies the id of font used (use :py:meth:`getfont` 
 
 
 class Textelement(UnicodeElement):
+
     """Represent a single part of text where each letter has the exact
     same formatting. The ``tag`` property specifies whether the text
     as a whole is bold (``'b'``) , italic(``'i'`` bold + italic
     (``'bi'``) or regular (``None``).
     """
-    pass
 
 # The below code fixes a error with incorrectly nested tags often
 # found in pdftohtml generated xml. Main problem is that this relies
@@ -307,33 +316,33 @@ class Textelement(UnicodeElement):
 # import sgmllib
 # from xml.sax.saxutils import escape as xml_escape
 # import unicodedata
-# 
+#
 # class PDFXMLFix(sgmllib.SGMLParser):
 #     selfclosing = ["fontspec"]
-# 
-#     # preparations to remove invalid chars in handle_data
+#
+# preparations to remove invalid chars in handle_data
 #     all_chars = (unichr(i) for i in range(0x10000))
 #     control_chars = ''.join(
 #         c for c in all_chars if unicodedata.category(c) == 'Cc')
-#     # tab and newline are technically Control characters in
-#     # unicode, but we want to keep them.
+# tab and newline are technically Control characters in
+# unicode, but we want to keep them.
 #     control_chars = control_chars.replace("\t", "").replace("\n", "")
 #     control_char_re = re.compile('[%s]' % re.escape(control_chars))
-# 
+#
 #     def __init__(self):
 #         sgmllib.SGMLParser.__init__(self)
 #         self.tags = []
 #         self.fp = None
-# 
+#
 #     def fix(self, filename):
 #         usetempfile = not self.fp
-# 
+#
 #         if usetempfile:
 #             tmpfile = mktemp()
 #             self.fp = open(tmpfile, "w")
-# 
+#
 #         self.fp.write('<?xml version="1.0" encoding="UTF-8"?>')
-# 
+#
 #         f = open(filename)
 #         while True:
 #             s = f.read(8192)
@@ -341,14 +350,14 @@ class Textelement(UnicodeElement):
 #                 break
 #             self.feed(s)
 #         self.close()
-# 
+#
 #         if usetempfile:
 #             self.fp.close()
 #             if util.replace_if_different(tmpfile, filename):
 #                 print(("replaced %s with %s" % (filename, tmpfile)))
 #             else:
 #                 print(("%s was identical to %s" % (filename, tmpfile)))
-# 
+#
 #     def close(self):
 #         sgmllib.SGMLParser.close(self)
 #         if self.tags:
@@ -356,39 +365,39 @@ class Textelement(UnicodeElement):
 #                 "WARNING: opened tag(s) %s not closed" % self.tags)
 #             self.fp.write(
 #                 "".join(["</%s>" % x for x in reversed(self.tags)]))
-# 
+#
 #     def handle_decl(self, decl):
-#         # self.fp.write "Decl: ", decl
+# self.fp.write "Decl: ", decl
 #         self.fp.write("<!%s>" % decl)
-# 
+#
 #     def handle_data(self, data):
 #         len_before = len(data)
 #         data = xml_escape(self.control_char_re.sub('', data))
 #         len_after = len(data)
-#         # self.fp.write "Data: ", data.strip()
-#         #if len_before != len_after:
-#         #    sys.stderr.write("WARNING: data changed from %s to %s chars: %r\n" % (len_before,len_after,data))
+# self.fp.write "Data: ", data.strip()
+# if len_before != len_after:
+# sys.stderr.write("WARNING: data changed from %s to %s chars: %r\n" % (len_before,len_after,data))
 #         self.fp.write(data)
-# 
+#
 #     def unknown_starttag(self, start, attrs):
-#         # self.fp.write "Start: ", start, attrs
+# self.fp.write "Start: ", start, attrs
 #         if start in self.selfclosing:
 #             close = "/"
 #         else:
 #             close = ""
 #             self.tags.append(start)
-#             # sys.stderr.write(repr(self.tags)+"\n")
+# sys.stderr.write(repr(self.tags)+"\n")
 #         if attrs:
 #             fmt = ['%s="%s"' % (x[0], x[1]) for x in attrs]
 #             self.fp.write("<%s %s%s>" % (start, " ".join(fmt), close))
 #         else:
 #             self.fp.write("<%s>" % start)
-# 
+#
 #     def unknown_endtag(self, end):
-#         # sys.stderr.write(repr(self.tags)+"\n")
+# sys.stderr.write(repr(self.tags)+"\n")
 #         start = self.tags.pop()
 #         if end != start and end in self.tags:
-#             # sys.stderr.write("%s is not %s, working around\n" % (end, start))
+# sys.stderr.write("%s is not %s, working around\n" % (end, start))
 #             self.fp.write("</%s>" % start)
 #             self.fp.write("</%s>" % end)
 #             self.fp.write("<%s>" % start)

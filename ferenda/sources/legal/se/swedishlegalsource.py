@@ -14,6 +14,7 @@ from six import text_type as str
 from ferenda import DocumentRepository, DocumentStore
 from ferenda.elements import Paragraph, Section
 
+
 class Stycke(Paragraph):
     pass
 
@@ -21,27 +22,30 @@ class Stycke(Paragraph):
 class Sektion(Section):
     pass
 
+
 class SwedishLegalStore(DocumentStore):
+
     """Customized DocumentStore."""
 
     def basefile_to_pathfrag(self, basefile):
         # "2012/13:152" => "2012-13/152"
         # "2012:152"    => "2012/152"
-        return basefile.replace("/","-").replace(":","/")
-        
+        return basefile.replace("/", "-").replace(":", "/")
+
     def pathfrag_to_basefile(self, pathfrag):
         # "2012-13/152" => "2012/13:152"
         # "2012/152"    => "2012:152"
-        return pathfrag.replace("/",":").replace("-","/")
-        
+        return pathfrag.replace("/", ":").replace("-", "/")
+
     def intermediate_path(self, basefile, attachment=None):
         return self.path(basefile, "intermediate", ".xml", attachment=attachment)
+
 
 class SwedishLegalSource(DocumentRepository):
     documentstore_class = SwedishLegalStore
     namespaces = ['rdf', 'rdfs', 'xsd', 'dct', 'skos', 'foaf',
                   'xhv', 'owl', 'prov', 'bibo',
-                  ('rpubl','http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#'),
+                  ('rpubl', 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#'),
                   ('rinfoex', 'http://lagen.nu/terms#')]
 
     swedish_ordinal_list = ('första', 'andra', 'tredje', 'fjärde',
@@ -49,7 +53,6 @@ class SwedishLegalSource(DocumentRepository):
                             'nionde', 'tionde', 'elfte', 'tolfte')
     swedish_ordinal_dict = dict(list(zip(
         swedish_ordinal_list, list(range(1, len(swedish_ordinal_list) + 1)))))
-
 
     def _swedish_ordinal(self, s):
         sl = s.lower()
@@ -112,7 +115,7 @@ class SwedishLegalSource(DocumentRepository):
         assert uri.startswith(self.config.url)
         # FIXME: This hardcodes the res/ part of our local URIs
         # needlessly -- make configurable
-        maps = (("res/dv/","publ/rattsfall/"),
+        maps = (("res/dv/", "publ/rattsfall/"),
                 ("res/", "publ/"))
         for fr, to in maps:
             if self.config.url + fr in uri:

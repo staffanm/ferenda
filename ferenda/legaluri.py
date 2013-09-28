@@ -5,13 +5,14 @@ of that document. Alternatively, given a URI for a document, parse the
 different properties for the document"""
 
 # system libs
-import sys
 import re
-from pprint import pformat
 
 # 3rdparty libs
 
-from rdflib import Literal, Namespace, URIRef, RDF, RDFS
+from rdflib import Literal
+from rdflib import Namespace
+from rdflib import URIRef
+from rdflib import RDF
 from rdflib import Graph
 from rdflib import BNode
 
@@ -49,11 +50,14 @@ types = {LegalRef.RATTSFALL: RPUBL["Rattsfallsreferat"],
 dicttypes = dict([[v, k] for k, v in list(types.items())])
 
 patterns = {LegalRef.RATTSFALL:
-            re.compile("http://rinfo.lagrummet.se/publ/rattsfall/(?P<publikation>\w+)/(?P<artal>\d+)(s(?P<sidnummer>\d+)|((:| nr | ref )(?P<lopnummer>\d+)))").match,
+            re.compile(
+                "http://rinfo.lagrummet.se/publ/rattsfall/(?P<publikation>\w+)/(?P<artal>\d+)(s(?P<sidnummer>\d+)|((:| nr | ref )(?P<lopnummer>\d+)))").match,
             LegalRef.MYNDIGHETSBESLUT:
-            re.compile("http://rinfo.lagrummet.se/publ/beslut/(?P<myndighet>\w+)/(?P<dnr>.*)").match,
+            re.compile(
+                "http://rinfo.lagrummet.se/publ/beslut/(?P<myndighet>\w+)/(?P<dnr>.*)").match,
             LegalRef.LAGRUM:
-            re.compile("http://rinfo.lagrummet.se/publ/sfs/(?P<law>\d{4}:\w+)#?(K(?P<chapter>[0-9a-z]+))?(P(?P<section>[0-9a-z]+))?(S(?P<piece>[0-9a-z]+))?(N(?P<item>[0-9a-z]+))?").match
+            re.compile(
+                "http://rinfo.lagrummet.se/publ/sfs/(?P<law>\d{4}:\w+)#?(K(?P<chapter>[0-9a-z]+))?(P(?P<section>[0-9a-z]+))?(S(?P<piece>[0-9a-z]+))?(N(?P<item>[0-9a-z]+))?").match
             }
 
 

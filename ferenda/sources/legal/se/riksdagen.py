@@ -4,11 +4,9 @@ from __future__ import unicode_literals
 # A abstract base class for fetching documents from data.riksdagen.se
 
 import os
-import socket
 import codecs
 
 import requests
-from lxml import etree
 from bs4 import BeautifulSoup
 
 from ferenda.describer import Describer
@@ -50,7 +48,7 @@ class Riksdagen(SwedishLegalSource):
     # add typ=prop or whatever
     downloaded_suffix = ".xml"
     storage_policy = "dir"
-    document_type = None # 
+    document_type = None
     start_url = None
     start_url_template = "http://data.riksdagen.se/dokumentlista/?sz=100&sort=d&utformat=xml&typ=%(doctype)s"
 
@@ -70,9 +68,9 @@ class Riksdagen(SwedishLegalSource):
             pagecount = 1
             resp = requests.get(url)
             soup = BeautifulSoup(resp.text, features="xml")
-                    
+
             subnodes = soup.find_all(lambda tag: tag.name == "subtyp" and
-                                        tag.text == self.document_type)
+                                     tag.text == self.document_type)
             for doc in [x.parent for x in subnodes]:
                 # TMP: Only retrieve old documents
                 # if doc.rm.text > "1999":
@@ -97,17 +95,17 @@ class Riksdagen(SwedishLegalSource):
             docname = attachment
         else:
             docname = "index"
-        
+
         if not url:
             url = self.remote_url(basefile)
             if not url:  # remote_url failed
                 return False
-                
+
         xmlfile = self.store.downloaded_path(basefile)
         if not (self.config.force or not os.path.exists(xmlfile)):
             self.log.debug("%s already exists" % (xmlfile))
             return False
-            
+
         existed = os.path.exists(xmlfile)
         self.log.debug("  %s: Downloading to %s" % (basefile, xmlfile))
 
@@ -129,12 +127,12 @@ class Riksdagen(SwedishLegalSource):
         dokid = docsoup.find('dok_id').text
         if docsoup.find('dokument_url_html'):
             htmlurl = docsoup.find('dokument_url_html').text
-            htmlfile = self.store.downloaded_path(basefile, attachment=docname+".html")
+            htmlfile = self.store.downloaded_path(basefile, attachment=docname + ".html")
             self.log.debug("   Downloading to %s" % htmlfile)
             r = self.download_if_needed(htmlurl, basefile, filename=htmlfile)
         elif docsoup.find('dokument_url_text'):
             texturl = docsoup.find('dokument_url_text').text
-            htmlfile = self.store.downloaded_path(basefile, attachment=docname+".txt")
+            htmlfile = self.store.downloaded_path(basefile, attachment=docname + ".txt")
             self.log.debug("   Downloading to %s" % htmlfile)
             r = self.download_if_needed(texturl, basefile, filename=textfile)
         fileupdated = fileupdated or r
@@ -144,7 +142,7 @@ class Riksdagen(SwedishLegalSource):
             if b.dok_id.text != dokid:
                 continue
             filetype = "." + b.filtyp.text
-            filename = self.store.downloaded_path(basefile, attachment=docname+filetype)
+            filename = self.store.downloaded_path(basefile, attachment=docname + filetype)
             self.log.debug("   Downloading to %s" % filename)
             r = self.download_if_needed(b.fil_url.text, basefile, filename=filename)
             fileupdated = fileupdated or r

@@ -8,7 +8,9 @@ from ferenda import DocumentRepository, Describer, PDFReader
 from ferenda.decorators import managedparsing
 from ferenda.elements import Body
 
+
 class PDFDocumentRepository(DocumentRepository):
+
     """Base class for handling repositories of PDF documents. Parsing
     of these documents are a bit more complicated than HTML or text
     documents, particularly with the handling of external resources
@@ -26,7 +28,7 @@ class PDFDocumentRepository(DocumentRepository):
         pdffile = self.store.downloaded_path(basefile)
         # Convoluted way of getting the directory of the intermediate
         # xml + png files that PDFReader will create
-        
+
         intermediate_dir = os.path.dirname(self.store.intermediate_path(basefile))
         pdf = PDFReader()
         pdf.read(pdffile, intermediate_dir)
@@ -59,8 +61,10 @@ class PDFDocumentRepository(DocumentRepository):
                 for page in pdf:
                     totcnt += 1
                     cnt += 1
-                    src = self.store.intermediate_path(doc.basefile, attachment="%s%03d.png" % (pdfbase, page.number))
-                    dest = self.store.parsed_path(doc.basefile, attachment="%s%03d.png" % (pdfbase, page.number))
+                    src = self.store.intermediate_path(
+                        doc.basefile, attachment="%s%03d.png" % (pdfbase, page.number))
+                    dest = self.store.parsed_path(
+                        doc.basefile, attachment="%s%03d.png" % (pdfbase, page.number))
                     if util.copy_if_different(src, dest):
                         self.log.debug("Copied %s to %s" % (src, dest))
 
