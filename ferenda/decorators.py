@@ -9,19 +9,20 @@ al), you should also use :py:func:`~ferenda.decorators.action` so that
 manage.py will be able to call it.
 """
 from __future__ import unicode_literals
+from datetime import datetime
+import codecs
 import functools
 import itertools
-import codecs
+import os
 import time
-from datetime import datetime
 
 import six
-from six import text_type as str
 from rdflib import Graph, URIRef
 
 from ferenda import util
 from ferenda import LayeredConfig
 from ferenda.errors import DocumentRemovedError, ParseError
+
 
 def timed(f):
     """Automatically log a statement of how long the function call takes"""
@@ -39,16 +40,13 @@ def timed(f):
 
 def recordlastdownload(f):
     """Automatically stores current time in ``self.config.lastdownloaded``
-
-    .. note::
-
-       Does not work.
     """
     @functools.wraps(f)
-    def wrapper(self):
-        ret = f(self)
+    def wrapper(self, *args, **kwargs):
+        ret = f(self, *args, **kwargs)
         self.config.lastdownload = datetime.now()
         LayeredConfig.write(self.config)
+        return ret
     return wrapper
 
 
@@ -82,19 +80,19 @@ object to XHTML+RDFa and RDF/XML files. Must be used in conjunction
 with :py:func:`~ferenda.decorators.makedocument`."""
     def iterate_graphs(node):
         res = []
-        if hasattr(node,'meta') and node.meta is not None:
+        if hasattr(node, 'meta') and node.meta is not None:
             res.append(node.meta)
         for subnode in node:
-            if not isinstance(subnode,six.string_types):
+            if not isinstance(subnode, six.string_types):
                 res.extend(iterate_graphs(subnode))
         return res
-    
+
     @functools.wraps(f)
     def wrapper(self, doc):
         ret = f(self, doc)
         updated = self.render_xhtml(doc, self.store.parsed_path(doc.basefile))
         if updated:
-            self.log.debug("%s: Created %s" % (doc.basefile,self.store.parsed_path(doc.basefile)))
+            self.log.debug("%s: Created %s" % (doc.basefile, self.store.parsed_path(doc.basefile)))
 
         # css file + background images + png renderings of text
         self.create_external_resources(doc)
@@ -102,8 +100,8 @@ with :py:func:`~ferenda.decorators.makedocument`."""
         # Check to see that all metadata contained in doc.meta is
         # present in the serialized file.
         distilled_graph = Graph()
-        
-        with codecs.open(self.store.parsed_path(doc.basefile), encoding="utf-8") as fp: # unicode
+
+        with codecs.open(self.store.parsed_path(doc.basefile), encoding="utf-8") as fp:  # unicode
             distilled_graph.parse(data=fp.read(), format="rdfa", publicID=doc.uri)
         # The act of parsing from RDFa binds a lot of namespaces
         # in the graph in an unneccesary manner. Particularly it
@@ -111,19 +109,20 @@ with :py:func:`~ferenda.decorators.makedocument`."""
         # 'http://purl.org/dc/terms/', which makes serialization
         # less than predictable. Blow these prefixes away.
         distilled_graph.bind("dc", URIRef("http://purl.org/dc/elements/1.1/"))
-        distilled_graph.bind("dcterms", URIRef("http://example.org/this-prefix-should-not-be-used"))
-        
+        distilled_graph.bind(
+            "dcterms", URIRef("http://example.org/this-prefix-should-not-be-used"))
+
         util.ensure_dir(self.store.distilled_path(doc.basefile))
         with open(self.store.distilled_path(doc.basefile), "wb") as distilled_file:
-            #print("============distilled===============")
-            #print(distilled_graph.serialize(format="turtle").decode('utf-8'))
+            # print("============distilled===============")
+            # print(distilled_graph.serialize(format="turtle").decode('utf-8'))
             distilled_graph.serialize(distilled_file, format="pretty-xml")
         self.log.debug(
             '%s: %s triples extracted to %s', doc.basefile, len(distilled_graph), self.store.distilled_path(doc.basefile))
 
         for g in iterate_graphs(doc.body):
             doc.meta += g
-        
+
         for triple in distilled_graph:
             # len_before = len(doc.meta)
             doc.meta.remove(triple)
@@ -156,14 +155,14 @@ def handleerror(f):
         except ParseError as e:
             self.log.error("%s: ParseError %s", doc.basefile, e)
             if (hasattr(self.config, 'fatalexceptions') and
-                self.config.fatalexceptions):
+                    self.config.fatalexceptions):
                 raise
             else:
                 return False
         except:
             self.log.exception("parse of %s failed", doc.basefile)
             if (hasattr(self.config, 'fatalexceptions') and
-                self.config.fatalexceptions):
+                    self.config.fatalexceptions):
                 raise
             else:
                 return False
@@ -185,9 +184,10 @@ def managedparsing(f):
     (:py:func:`~ferenda.decorators.makedocument`, :py:func:`~ferenda.decorators.parseifneeded`, :py:func:`~ferenda.decorators.timed`, :py:func:`~ferenda.decorators.render`)"""
     return makedocument(
         parseifneeded(
-            #handleerror( # is this really a good idea?
+            # handleerror( # is this really a good idea?
             timed(
                 render(f))))
+
 
 def action(f):
     """Decorator that marks a class or instance method as runnable by
@@ -196,12 +196,15 @@ def action(f):
     f.runnable = True
     return f
 
+
 def downloadmax(f):
     """Makes any generator respect the ``downloadmax`` config parameter.
 
     """
     @functools.wraps(f)
     def wrapper(self, params):
+        if 'FERENDA_DOWNLOADMAX' in os.environ:
+            self.config.downloadmax = int(os.environ['FERENDA_DOWNLOADMAX'])
         if self.config.downloadmax:
             self.log.info("Downloading max %d documents" %
                           (self.config.downloadmax))

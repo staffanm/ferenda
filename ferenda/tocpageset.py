@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+
 class TocPageset(object):
+
     """Represents a particular set of TOC pages, structured around some
 particular attribute(s) of documents, like title or publication
 date. :py:meth:`~ferenda.DocumentRepository.toc_pagesets` returns a
@@ -14,6 +16,7 @@ TocPageset objects.
     :type  pages: list
 
     """
+
     def __init__(self, label, pages):
         self.label = label
         self.pages = pages
@@ -22,5 +25,5 @@ TocPageset objects.
         return self.__dict__ == other.__dict__
 
     def __repr__(self):
-        dictrepr = "".join((" %s=%s"%(k,v) for k,v in sorted(self.__dict__.items())))
+        dictrepr = "".join((" %s=%s" % (k, v) for k, v in sorted(self.__dict__.items())))
         return ("<%s%s>" % (self.__class__.__name__, dictrepr))

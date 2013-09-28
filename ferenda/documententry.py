@@ -9,7 +9,9 @@ from datetime import datetime
 
 from ferenda import util
 
+
 class DocumentEntry(object):
+
     """This class has two primary uses -- it is used to represent and store
     aspects of the downloading of each document (when it was initially
     downloaded, optionally updated, and last checked, as well as the URL
@@ -26,7 +28,7 @@ class DocumentEntry(object):
 
     basefile = None
     """The basefile for the document."""
-    
+
     orig_created = None
     """The first time we fetched the document from it's original location."""
 
@@ -51,17 +53,17 @@ class DocumentEntry(object):
 
     url = None
     """The URL to the browser-ready version of the page, equivalent to what
-    :meth:`~ferenda.DocumentEntry.generated_url` returns."""
+    :meth:`~ferenda.DocumentRepository.generated_url` returns."""
 
     title = None
     """A title/label for the document, as used in an Atom feed."""
-    
+
     summary = None
     """A summary of the document, as used in an Atom feed."""
 
     content = None
     """A dict that represents metadata about the document file."""
-    
+
     link = None
     """A dict that represents metadata about the document RDF metadata
     (such as it's URI, length, MIME-type and MD5 hash)."""
@@ -78,7 +80,7 @@ class DocumentEntry(object):
                         dt = datetime.strptime(d[key], '%Y-%m-%dT%H:%M:%S')
                     d[key] = dt
             return d
-        
+
         if path and os.path.exists(path):
             with open(path) as fp:
                 d = json.load(fp, object_hook=myhook)
@@ -87,8 +89,8 @@ class DocumentEntry(object):
         else:
             self.id = None
             self.basefile = None
-            self.orig_updated = None 
-            self.orig_checked = None 
+            self.orig_updated = None
+            self.orig_checked = None
             self.orig_url = None
             self.published = None
             self.updated = None
@@ -109,8 +111,7 @@ class DocumentEntry(object):
         self.link = {'href': None, 'type': None, 'length': None, 'hash': None}
 
     def __repr__(self):
-        return '<%s id=%s>' % (self.__class__.__name__,self.id)
-
+        return '<%s id=%s>' % (self.__class__.__name__, self.id)
 
     def save(self, path=None):
         """Saves the state of the documententry to a JSON file at *path*. If
@@ -120,20 +121,21 @@ with.
         """
 
         def mydefault(obj):
-            if isinstance(obj,datetime):
+            if isinstance(obj, datetime):
                 return obj.isoformat()
             raise TypeError("%r is not JSON serializable" % obj)
 
         if not path:
-            path = self._path # better be there
-        d = dict((k,v) for (k,v) in self.__dict__.items() if k[0] != "_")
+            path = self._path  # better be there
+        d = dict((k, v) for (k, v) in self.__dict__.items() if k[0] != "_")
         util.ensure_dir(path)
-        with open(path,"w") as fp:
+        with open(path, "w") as fp:
             json.dump(d, fp, default=mydefault, indent=2, sort_keys=True)
     # If inline=True, the contents of filename is included in the Atom
     # entry. Otherwise, it just references it.
     #
     # Note that you can only have one content element.
+
     def set_content(self, filename, url, mimetype=None, inline=False):
         """Sets the ``content`` property and calculates md5 hash for the file
 

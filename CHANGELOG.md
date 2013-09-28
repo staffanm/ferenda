@@ -1,4 +1,72 @@
-2013-08-?? RELEASE 0.1.4
+2013-09-?? RELEASE 0.1.5
+========================
+
+(WIP) Documentation, particularly code examples, has been updated to
+better fit reality. They have (should) also been added to the test
+suite, so they're almost guaranteed to be updated when the API
+changes.
+
+Backwards-incompatible changes
+
+* Transformation of XHTML1.1+RDFa files to HTML5 is now done
+  using the new Transformer class, instead of the
+  DocumentRepository.transform_to_html method, which has been removed
+
+* DocumentRepository.list_basefiles_for (which was a shortcut for
+  calling list_basefiles_for on the docrepos' store object) has been
+  removed. Typical change needed:
+
+  -        for basefile in self.list_basefiles_for("parse"):
+  +        for basefile in self.store.list_basefiles_for("parse"):
+
+New features:
+
+* New ferenda.Transformer class (see above)
+
+* A new decorator, ferenda.decorators.downloadmax, can be used to
+  limit the maximum number of documents that a docrepo will
+  download. It looks for eitther the "FERENDA_DOWNLOADMAX" environment
+  variable or the downloadmax configuration parameteter. This is
+  primarily useful for testing and trying out new docrepos.
+
+* DocumentRepository.render_xhtml will now include RDFa statements for
+  all (non-BNode) subjects in doc.meta, not just the doc.uri
+  subject. This makes it possible to state that a document is written
+  by some person or published by some entity, and then include
+  metadata on that person/entity. It also makes it possible to
+  describe documents related to the main document, using the
+  information gleaned from the main document
+
+* DocumentStore now has a intermediate_path method -- previously some
+  derived subclasses implemented their own, but now it's part of the
+  base class.
+
+* ferenda.errors.DocumentRemovedError now has a dummyfile attribute,
+  which is used by ferenda.manager.run to avoid endless re-parsing of
+  downloaded files that do not contain an actual document.
+
+* A new shim module, ferenda.compat (modelled after six.moves),
+  simplified imports of modules that may or may not be present in the
+  stdlib depending on python version. So far, this includes
+  OrderedDict, unittest and mock.
+
+Infrastructural changes:
+
+* Most of the bundled document repository classes in ferenda.sources
+  has been overhauled and adapted to the changes that has occurred to
+  the API since the old days.
+
+* Continous integration and coverage is now set up with Travis-CI
+  (https://travis-ci.org/staffanm/ferenda/) and Coveralls
+  (https://coveralls.io/r/staffanm/ferenda)
+
+* py-wikimarkup (https://pypi.python.org/pypi/py-wikimarkup) has been
+  ported to python3 and is included (vendorized?)  under
+  ferenda.thirdparty.wikimarkup
+
+
+2013-08-26 RELEASE 0.1.4
+========================
 
 * ElasticSearch is now supported as an alternate backend to Whoosh for
   fulltext indexing and searching.
@@ -10,7 +78,9 @@
 
 * The example RFC docrepo parser has been improved.
 
+
 2013-08-11 RELEASE 0.1.3
+========================
 
 * Search functionality when running under WSGI is now
   implemented. Still a bit basic and not really customizable

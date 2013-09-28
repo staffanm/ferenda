@@ -21,9 +21,8 @@ from ferenda.thirdparty import wikimarkup
 MW_NS = "{http://www.mediawiki.org/xml/export-0.4/}"
 
 
-
-
 class MediaWiki(DocumentRepository):
+
     """Downloads content from a Mediawiki system and converts it to annotations on other documents.
 
     For efficient downloads, this docrepo requires that there exists a
@@ -39,27 +38,26 @@ class MediaWiki(DocumentRepository):
 
     """
 
-
-    
     alias = "mediawiki"
     downloaded_suffix = ".xml"
 
     def get_default_options(self):
-        opts = super(MediaWiki,self).get_default_options()
+        opts = super(MediaWiki, self).get_default_options()
         # The API endpoint URLs change with MW language
         opts['mediawikiexport'] = 'http://localhost/wiki/Special:Export/%s(basefile)'
-        opts['mediawikidump']   = 'http://localhost/wiki/allpages-dump.xml'
-        opts['mediawikinamespaces'] = ['Category'] # process pages in this namespace (as well as pages in the default namespace)
+        opts['mediawikidump'] = 'http://localhost/wiki/allpages-dump.xml'
+        opts['mediawikinamespaces'] = ['Category']
+            # process pages in this namespace (as well as pages in the default namespace)
         return opts
 
     def download(self, basefile=None):
         if basefile:
-            return self.download_single(basefile) 
+            return self.download_single(basefile)
 
         if not self.config.mediawikidump:
             resp = requests.get(self.config.mediawikidump)
             xml = etree.parse(resp.content)
-           
+
         wikinamespaces = []
         # FIXME: Find out the proper value of MW_NS
         for ns_el in xml.findall("//" + MW_NS + "namespace"):
@@ -68,7 +66,7 @@ class MediaWiki(DocumentRepository):
         # Get list of currently downloaded pages - if any of those
         # does not appear in the XML dump, remove them afterwards
         basefiles = self.store.list_basefiles_for("parse")
-        downloaded_files = [self.store.downloaded_path(x) for x in basefiles] 
+        downloaded_files = [self.store.downloaded_path(x) for x in basefiles]
 
         for page_el in xml.findall(MW_NS + "page"):
             basefile = page_el.find(MW_NS + "title").text
@@ -77,7 +75,7 @@ class MediaWiki(DocumentRepository):
             if ":" in basefile and basefile.split(":")[0] in wikinamespaces:
                 (namespace, localtitle) = basefile.split(":", 1)
                 if namespace not in self.config.mediawikinamespaces:
-                    continue 
+                    continue
             with self.store.open_downloaded(title, "w"):
                 f.write(etree.tostring(page_el, encoding="utf-8"))
 
@@ -100,7 +98,7 @@ class MediaWiki(DocumentRepository):
     # FIXME: these belong in a subclass of MediaWiki
     re_sfs_uri = re.compile('https?://[^/]*lagen.nu/(\d+):(.*)')
     re_dom_uri = re.compile('https?://[^/]*lagen.nu/dom/(.*)')
-    
+
     def parse_document_from_soup(self, soup, doc):
 
         wikitext = soup.find("text")
@@ -113,16 +111,18 @@ class MediaWiki(DocumentRepository):
         try:
             xhtml = etree.fromstring(html.encode('utf-8'))
         except SyntaxError:
-            self.log.warn("%s: wikiparser did not return well-formed markup (working around)" % basefile)
+            self.log.warn(
+                "%s: wikiparser did not return well-formed markup (working around)" % basefile)
             tmpfilename = mktemp()  # FIXME: security hole
             fp = open(tmpfilename, "w")
             fp.write(html.encode('utf-8'))
             fp.close()
-            tidied = util.tidy(html.encode('utf-8')).replace(' xmlns="http://www.w3.org/1999/xhtml"', '').replace('&nbsp;', '&#160;')
+            tidied = util.tidy(html.encode('utf-8')).replace(
+                ' xmlns="http://www.w3.org/1999/xhtml"', '').replace('&nbsp;', '&#160;')
             # print "Valid markup:\n%s" % tidied
             xhtml = etree.fromstring(tidied.encode('utf-8')).find("body/div")
 
-        # FIXME: Again, belongs to a subclass. And we'll need to figure out an 
+        # FIXME: Again, belongs to a subclass. And we'll need to figure out an
         # extensible mechanism.
         p = LegalRef(LegalRef.LAGRUM, LegalRef.KORTLAGRUM,
                      LegalRef.FORARBETEN, LegalRef.RATTSFALL)
@@ -178,7 +178,8 @@ class MediaWiki(DocumentRepository):
                     current.set("property", "dct:description")
                     current.set("datatype", "rdf:XMLLiteral")
                 except AttributeError:
-                    self.log.warning('%s är uppmärkt som en rubrik, men verkar inte vara en lagrumshänvisning' % child.text)
+                    self.log.warning(
+                        '%s är uppmärkt som en rubrik, men verkar inte vara en lagrumshänvisning' % child.text)
             else:
                 serialized = etree.tostring(child, 'utf-8').decode('utf-8')
                 separator = ""
@@ -214,15 +215,17 @@ class MediaWiki(DocumentRepository):
 
                 # restore the replaced markers
                 for marker, replacement in list(markers.items()):
-                    #print "%s: '%s'" % (marker,util.normalize_space(replacement))
+                    # print "%s: '%s'" % (marker,util.normalize_space(replacement))
                     # normalize URIs, and remove 'empty' links
                     if 'href="https://lagen.nu/"' in replacement:
                         replacement = self.re_anchor.sub('\\1', replacement)
                     elif self.re_sfs_uri.search(replacement):
-                        replacement = self.re_sfs_uri.sub('http://rinfo.lagrummet.se/publ/sfs/\\1:\\2', replacement)
+                        replacement = self.re_sfs_uri.sub(
+                            'http://rinfo.lagrummet.se/publ/sfs/\\1:\\2', replacement)
                     elif self.re_dom_uri.search(replacement):
-                        replacement = self.re_dom_uri.sub('http://rinfo.lagrummet.se/publ/rattsfall/\\1', replacement)
-                    #print "%s: '%s'" % (marker,util.normalize_space(replacement))
+                        replacement = self.re_dom_uri.sub(
+                            'http://rinfo.lagrummet.se/publ/rattsfall/\\1', replacement)
+                    # print "%s: '%s'" % (marker,util.normalize_space(replacement))
                     res = res.replace(marker, replacement)
 
                 current.append(etree.fromstring(res.encode('utf-8')))
@@ -232,9 +235,8 @@ class MediaWiki(DocumentRepository):
         res = etree.tostring(root, encoding='utf-8')
         return res
 
-
-    # differ from the default relate_triples in that it uses a different 
-    # context for every basefile and clears this beforehand. 
+    # differ from the default relate_triples in that it uses a different
+    # context for every basefile and clears this beforehand.
     # Note that a basefile can contain statements
     # about multiple and changing subjects, so it's not trivial to erase all
     # statements that stem from a basefile w/o a dedicated context.
@@ -245,8 +247,7 @@ class MediaWiki(DocumentRepository):
         ts.clear(context=context)
         ts.add_serialized(data, format="xml", context=context)
 
-
-    # FIXME: Copy the few testcases from svn test/Wiki, 
+    # FIXME: Copy the few testcases from svn test/Wiki,
     # maybe translate the answers from XHT2 to XHTML1.1,
     # move the code into a RepoTester class
     testparams = {'Parse': {'dir': 'test/Wiki',
@@ -261,7 +262,7 @@ class MediaWiki(DocumentRepository):
         if verbose is None:
             verbose = False
         if quiet is None:
-            #quiet=True
+            # quiet=True
             pass
 
         p = WikiParser()
@@ -274,12 +275,13 @@ class MediaWiki(DocumentRepository):
 
 
 class LinkedWikimarkup(wikimarkup.Parser):
+
     def __init__(self, show_toc=True):
         super(wikimarkup.Parser, self).__init__()
         self.show_toc = show_toc
 
     def parse(self, text):
-        #print "Running subclassed parser!"
+        # print "Running subclassed parser!"
         utf8 = isinstance(text, str)
         text = wikimarkup.to_unicode(text)
         if text[-1:] != '\n':

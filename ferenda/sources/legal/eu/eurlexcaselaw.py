@@ -1,26 +1,22 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import sys
-import os
 import re
 import datetime
-import codecs
-import itertools 
-from rdflib import Namespace, URIRef, Literal, RDF, Graph
+import itertools
+from rdflib import Graph
 
 from ferenda import DocumentRepository
-from ferenda.errors import ParseError
-from ferenda import util
-from ferenda import legaluri
-from ferenda.legalref import LegalRef, Link
-from ferenda.elements import UnicodeElement, CompoundElement, Paragraph
+from ferenda.legalref import LegalRef
+from ferenda.elements import Paragraph
 
 # FIXME: 2008.json, containing a handful of cases, some which should not be fetched, and one continuation link.
 #        A few downloaded/62008CN0028.html (abbreviated)
 #        Corresponding parsed/62008CN0028.xhtml and distilled/62008CN0028.ttl
 
+
 class EurlexCaselaw(DocumentRepository):
+
     """Handles all case law from the European Court of Justice (ECJ)."""
     alias = "ecj"  # European Court of Justice
 
@@ -50,7 +46,8 @@ class EurlexCaselaw(DocumentRepository):
             # between the config file and command line options)
             self.config.startyear = year
             self.config.write()
-            # FIXME: URL parameters may have changed -- this seem to produce every case from year up till today
+            # FIXME: URL parameters may have changed -- this seem to produce every
+            # case from year up till today
             list_url = "http://eur-lex.europa.eu/Result.do?T1=V6&T2=%d&T3=&RechType=RECH_naturel" % year
             self.log.debug("Searching for %d" % year)
             res = request.get(list_url)
@@ -84,7 +81,7 @@ class EurlexCaselaw(DocumentRepository):
                     else:
                         pass
                         #self.log.debug("Not downloading doc %s" % celexno)
-                
+
                 # see if there are any "next" pages
                 url = lxml.html.parse(res.text).find("a", text=">").get('href', None)
                 if url:
@@ -92,7 +89,6 @@ class EurlexCaselaw(DocumentRepository):
                 else:
                     self.log.info('No next page link found, we must be done')
                     done = True
-
 
     def parse_metadata_from_soup(self, soup, doc):
         # AVAILABLE METADATA IN CASES
@@ -156,22 +152,22 @@ class EurlexCaselaw(DocumentRepository):
         #     - "31991Q0530-A114"
         #     - "62007K0023"
         #     - "62008A0012"
-        # 
+        #
         # convenience functions -- should not be needed now that we have Describer
         # def add_literal(predicate, literal):
         #     g.add((URIRef(uri),
         #            voc[predicate],
         #            Literal(literal, lang=lang)))
-        # 
+        #
         # def add_celex_object(predicate, celexno):
         #     g.add((URIRef(uri),
         #            voc[predicate],
         #            URIRef("http://lagen.nu/ext/celex/%s" % celexno)))
-        #  
+        #
         # def get_predicate(predicate):
         #     predicates = list(g.objects(URIRef(uri), voc[predicate]))
         #     return predicates != []
-        # 
+        #
         # These are a series of refinments for the "Affecting"
         # relationship. "Cites" doesn't have these (or similar), but
         # "is affected by" has (the inverse properties)
@@ -209,7 +205,8 @@ class EurlexCaselaw(DocumentRepository):
                 "%s: No data found (try re-downloading)!" % basefile)
             raise errors.DocumentRemovedError("No data found!")
 
-        assert celexnum == doc.basefile, "Celex number in file (%s) differ from filename (%s)" % (celexnum, basefile)
+        assert celexnum == doc.basefile, "Celex number in file (%s) differ from filename (%s)" % (
+            celexnum, basefile)
         doc.lang = soup.html['lang']
 
         m = self.re_celexno.match(celexnum)
@@ -238,7 +235,8 @@ class EurlexCaselaw(DocumentRepository):
                         continue
                     string = para.string.strip()
 
-                    if not get_predicate('courtdecision'):  # optional: do sanitychecks to see if this really is a :courtdecision
+                    # optional: do sanitychecks to see if this really is a :courtdecision
+                    if not get_predicate('courtdecision'):
                         add_literal('courtdecision', string)
                     elif not get_predicate('party'):
                         # this will be one or two items. Are they position dependent?
@@ -258,7 +256,6 @@ class EurlexCaselaw(DocumentRepository):
                     elif get_predicate('legalissue'):
                         # fixme: Split this up somehow
                         add_literal('legalissue', string)
-                    pass
             elif section.string == "Relationship between documents":
                 for item in section.findNextSibling("ul").findAll("li"):
                     predicate = None
@@ -274,13 +271,15 @@ class EurlexCaselaw(DocumentRepository):
                                 if nodetext in affects_predicates:
                                     subpredicate = affects_predicates[nodetext]
                                 else:
-                                    self.log.warning("Can't express '%s' as a affects predicate" % nodetext)
+                                    self.log.warning(
+                                        "Can't express '%s' as a affects predicate" % nodetext)
                             elif predicate == "isaffected" and nodetext:
                                 if nodetext in isaffected_predicates:
                                     subpredicate = isaffected_predicates[
                                         nodetext]
                                 else:
-                                    self.log.warning("Can't express '%s' as a isaffected predicate" % nodetext)
+                                    self.log.warning(
+                                        "Can't express '%s' as a isaffected predicate" % nodetext)
 
                         elif node.name == "strong":
                             subpredicate = None

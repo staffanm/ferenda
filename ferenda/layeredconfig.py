@@ -8,7 +8,9 @@ from ferenda.compat import OrderedDict
 from six.moves import configparser
 from six import text_type as str
 
+
 class LayeredConfig(object):
+
     """Provide unified access to nested configuration parameters. The
        source Of these configuration parameters can be default
        settings in code, a config file (using .ini-file style syntax)
@@ -29,7 +31,7 @@ class LayeredConfig(object):
 
        Configuration parameters can be changed in code. Such changes
        are persisted to the configuration file by calling
-       :py:meth:`write`.
+       :py:meth:`~ferenda.LayeredConfig.write`.
 
        :param defaults: A dict with configuration keys and values. If
                         any values are dicts, these are turned into
@@ -106,7 +108,7 @@ class LayeredConfig(object):
             return True
         except ValueError:
             return False
-   
+
     @staticmethod
     def write(config):
         """Write changed properties to inifile (if provided at initialization)."""
@@ -134,7 +136,7 @@ class LayeredConfig(object):
 
         if name in self._subsections:
             return self._subsections[name]
-        
+
         if name in self._commandline:
             return self._commandline[name]
         if self._cascade:
@@ -155,7 +157,7 @@ class LayeredConfig(object):
 
         if name in self._defaults:
             if isinstance(self._defaults[name], type):
-                return None # it's typed and therefore exists, but has no value
+                return None  # it's typed and therefore exists, but has no value
             else:
                 return self._defaults[name]
         if self._cascade:
@@ -163,7 +165,7 @@ class LayeredConfig(object):
             while current:
                 if name in current._defaults:
                     if isinstance(current._defaults[name], type):
-                        return None # it's typed and therefore exists, but has no value
+                        return None  # it's typed and therefore exists, but has no value
                     else:
                         return current._defaults[name]
                 current = current._parent
@@ -177,7 +179,7 @@ class LayeredConfig(object):
             return
 
         # First make sure that the higher-priority
-        #commandline-derived data doesn't shadow the new value.
+        # commandline-derived data doesn't shadow the new value.
         if name in self._commandline:
             del self._commandline[name]
         # then update our internal representation
@@ -235,7 +237,7 @@ class LayeredConfig(object):
             logging.warn("INI file %s does not exist" % inifilename)
             self._configparser = None
             return
-            
+
         self._configparser = configparser.ConfigParser(dict_type=OrderedDict)
         self._configparser.read(inifilename)
 
@@ -289,12 +291,12 @@ class LayeredConfig(object):
             while cfg_obj is not None:
                 if key in cfg_obj._defaults:
                     defaults = cfg_obj._defaults
-                    break # done!
+                    break  # done!
                 if hasattr(cfg_obj, '_parent'):
                     cfg_obj = cfg_obj._parent
                 else:
                     cfg_obj = None
-                
+
         if key in defaults:
             if type(defaults[key]) == type:
                 # print("Using class for %s" % key)
@@ -351,7 +353,7 @@ class LayeredConfig(object):
                 self._commandline[key].append(value)
             else:
                 self._commandline[key] = value
-        
+
         else:
             (sectionkey) = parts[0]
             if sectionkey not in self._subsections:

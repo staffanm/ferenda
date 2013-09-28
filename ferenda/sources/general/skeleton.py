@@ -5,7 +5,11 @@ import sys
 import re
 from six.moves.urllib_parse import urljoin
 
-from rdflib import Graph, URIRef, Literal, BNode, RDF, RDFS
+from rdflib import Graph
+from rdflib import URIRef
+from rdflib import Literal
+from rdflib import RDF
+from rdflib import RDFS
 from lxml import etree
 import requests
 
@@ -13,6 +17,7 @@ from ferenda import DocumentRepository, TripleStore
 
 
 class Skeleton(DocumentRepository):
+
     """Utility docrepo to fetch all RDF data from a triplestore (either
        our triple store, or a remote one, fetched through the combined
        ferenda atom feed), find out those resources that are referred
@@ -27,7 +32,7 @@ class Skeleton(DocumentRepository):
     downloaded_suffix = ".nt"
 
     def download(self):
-        graph = self.download_from_triplestore()    
+        graph = self.download_from_triplestore()
         # or, alternatively
         graph = self.download_from_atom()
 
@@ -38,8 +43,7 @@ class Skeleton(DocumentRepository):
                             self.config.storerepository)
         with self.store.open_downloaded("biggraph") as fp:
             for row in store.select(sq):
-               fp.write("<%(something)s> <%(references)s> <%(uri)s> .\n")
-
+                fp.write("<%(something)s> <%(references)s> <%(uri)s> .\n")
 
     def download_from_atom(self):
         refresh = self.config.force
@@ -71,10 +75,10 @@ class Skeleton(DocumentRepository):
                         g.parse(requests.get(rdf_url).text)
                         for triple in g:
                             s, p, o = triple
-                            if (not isinstance(o, URIRef) or 
-                                not str(o).startswith(self.config.url)):
+                            if (not isinstance(o, URIRef) or
+                                    not str(o).startswith(self.config.url)):
                                 g.remove(triple)
-                                
+
                         self.log.debug("     Adding %s triples" % len(g))
                         biggraph += g
                 except KeyboardInterrupt:
@@ -98,9 +102,9 @@ class Skeleton(DocumentRepository):
     def parse(self, basefile):
         # Find out possible skeleton entries by loading the entire
         # graph of resource references, and find resources that only
-        # exist as objects. 
+        # exist as objects.
         #
-        # Note: if we used download_from_triplestore we know that this list 
+        # Note: if we used download_from_triplestore we know that this list
         #       is clean -- we could just iterate the graph w/o filtering
         g = Graph()
         self.log.info("Parsing %s" % basefile)
@@ -110,7 +114,8 @@ class Skeleton(DocumentRepository):
         objects = dict(zip([str(o).split("#")[0] for (s, p, o) in g], True))
         self.log.info("Compiling subject set")
         subjects = dict(zip([str(s).split("#")[0] for (s, p, o) in g], True))
-        self.log.info("%s objects, %s subjects. Iterating through existing objects" % (len(objects), len(subjects)))
+        self.log.info("%s objects, %s subjects. Iterating through existing objects" %
+                      (len(objects), len(subjects)))
 
         for o in objects:
             if not o.startswith(self.config.url):
@@ -122,12 +127,12 @@ class Skeleton(DocumentRepository):
             for repo in otherrepos:
                 skelbase = repo.basefile_from_uri(repo)
                 if skelbase:
-                    skel = repo.triples_from_uri(o) # need to impl
-                    with self.store.open_distilled(skelbase,"wb") as fp:
+                    skel = repo.triples_from_uri(o)  # need to impl
+                    with self.store.open_distilled(skelbase, "wb") as fp:
                         fp.write(skel.serialize(format="pretty-xml"))
 
                     self.log.info("Created skel for %s" % o)
-    
+
     # FIXME: Move this to SwedishLegalSource -- also unify
     # triples_from_uri with SwedishLegalSource.infer_triples(basefile)
     RATTSFALL = 1
@@ -161,17 +166,22 @@ class Skeleton(DocumentRepository):
                      }
 
         patterns = {self.RATTSFALL:
-                            re.compile("http://rinfo.lagrummet.se/publ/rf/(?P<rf>\w+)/(?P<arsutgava>\d+)(/|)(?P<sep>[s:])(_(?P<sidnummer>\d+)|(?P<lopnummer>\d+))").match,
+                    re.compile(
+                        "http://rinfo.lagrummet.se/publ/rf/(?P<rf>\w+)/(?P<arsutgava>\d+)(/|)(?P<sep>[s:])(_(?P<sidnummer>\d+)|(?P<lopnummer>\d+))").match,
                     self.KONSOLIDERAD:
                     # NB: These shouldn't have any
                     # rpubl:forfattningssamling triples.
-                    re.compile("http://rinfo.lagrummet.se/publ/sfs/(?P<arsutgava>\d{4}):(?P<lopnummer>\w+)#?(k_(?P<kapitel>[0-9a-z]+))?(p_(?P<paragraf>[0-9a-z]+))?").match,
+                    re.compile(
+                        "http://rinfo.lagrummet.se/publ/sfs/(?P<arsutgava>\d{4}):(?P<lopnummer>\w+)#?(k_(?P<kapitel>[0-9a-z]+))?(p_(?P<paragraf>[0-9a-z]+))?").match,
                     self.FORESKRIFT:
-                    re.compile("http://rinfo.lagrummet.se/publ/(?P<fs>[\w-]+fs)/(?P<arsutgava>\d{4}):(?P<lopnummer>\w+)").match,
+                    re.compile(
+                        "http://rinfo.lagrummet.se/publ/(?P<fs>[\w-]+fs)/(?P<arsutgava>\d{4}):(?P<lopnummer>\w+)").match,
                     self.UTREDNING:
-                    re.compile("http://rinfo.lagrummet.se/publ/(?P<utr>(sou|ds))/(?P<arsutgava>\d{4}(/\d{2}|)):(?P<lopnummer>\w+)").match,
+                    re.compile(
+                        "http://rinfo.lagrummet.se/publ/(?P<utr>(sou|ds))/(?P<arsutgava>\d{4}(/\d{2}|)):(?P<lopnummer>\w+)").match,
                     self.PROPOSITION:
-                    re.compile("http://rinfo.lagrummet.se/publ/(?P<prop>prop)/(?P<arsutgava>\d{4}(/\d{2}|)):(?P<lopnummer>\w+)").match
+                    re.compile(
+                        "http://rinfo.lagrummet.se/publ/(?P<prop>prop)/(?P<arsutgava>\d{4}(/\d{2}|)):(?P<lopnummer>\w+)").match
                     }
 
         identifier = {self.RATTSFALL: "%(rf)s %(arsutgava)s%(sep)s%(lopnummer)s",
@@ -229,6 +239,7 @@ class Skeleton(DocumentRepository):
         graph.add(
             (subj, predicate["identifier"], Literal(id_templ % dictionary)))
 
-        graph.add((subj, RDFS.comment, Literal("Detta dokument finns inte i elektronisk form i rättsinformationssystemet")))
+        graph.add(
+            (subj, RDFS.comment, Literal("Detta dokument finns inte i elektronisk form i rättsinformationssystemet")))
 
         return graph

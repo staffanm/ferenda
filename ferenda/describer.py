@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 from rdflib.extras.describer import Describer as OrigDescriber
-from rdflib import URIRef, Literal, RDF, Graph
+from rdflib import URIRef
+from rdflib import Literal
+from rdflib import RDF
 
 
 class Describer(OrigDescriber):
+
     """Extends the utility class
     :py:class:`rdflib.extras.describer.Describer` so that it reads
     values and refences as well as write them.
@@ -51,11 +54,11 @@ class Describer(OrigDescriber):
         :rtype: string
         """
         return self.getrel(RDF.type)
-    
+
     def getvalue(self, p):
         """Get a single literal value for the given property and the
         current subject. If the graph contains zero or more than one
-        such literal, a :py:class:`KeyError` will be raised.
+        such literal, a :py:exc:`KeyError` will be raised.
 
         .. note::
 
@@ -77,12 +80,12 @@ class Describer(OrigDescriber):
             raise KeyError("No objects for predicate %s" % p)
         elif len(values) > 1:
             raise KeyError("More than one object for predicatee %s" % p)
-        return values[0] 
+        return values[0]
 
     def getrel(self, p):
         """Get a single URI for the given property and the current
         subject. If the graph contains zero or more than one such URI,
-        a :py:class:`KeyError` will be raised.
+        a :py:exc:`KeyError` will be raised.
 
         :param p: The property of the sought literal.
         :type  p: :py:class:`rdflib.term.URIRef`

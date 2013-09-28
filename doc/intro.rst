@@ -53,7 +53,7 @@ Command-line tools
      ``pdftohtml`` (from `poppler <http://poppler.freedesktop.org/>`_)
      and ``convert`` (from `ImageMagic
      <http://www.imagemagick.org/>`_)
-   * :py:class:`~ferenda.Wordreader` requires `antiword
+   * :py:class:`~ferenda.WordReader` requires `antiword
      <http://www.winfield.demon.nl/>`_ to handle old ``.doc`` files.
    * :py:class:`~ferenda.TripleStore` can perform some operations
      (bulk up- and download) much faster if `curl
@@ -66,20 +66,20 @@ documents, you'll need a RDF triple store, either `Sesame
 document collections small enough to keep all metadata in memory you
 can get by with only rdflib, using either a Sqlite or a Berkely DB
 (aka Sleepycat/bsddb) backend. For further information, see
-:doc:`external-dbs`.
+:ref:`external-triplestore`.
 
 Similarly, once you have a large collection of text (either many short
 documents, or fewer long documents), you'll need an fulltext search
 engine to use the search feature (enabled by default). For small
 document collections the embedded `whoosh
 <https://bitbucket.org/mchaput/whoosh/wiki/Home>`_ library is
-used. Right now, `ElasticSearch <http://www.elasticsearch.org/>`_ is
-supported.
+used. Right now, `ElasticSearch <http://www.elasticsearch.org/>`_ is the only
+supported external fulltext search engine.
 
 As a rule of thumb, if your document collection contains over 100 000
 RDF triples or 100 000 words, you should start thinking about setting
 up an external triple store or a fulltext search engine. See
-:doc:`external-dbs`.
+:ref:`external-fulltext`.
 
 .. note::
 
@@ -92,7 +92,7 @@ up an external triple store or a fulltext search engine. See
    not essential.
 
    On Windows, we recommend using a binary distribution
-   of lxml. Unfortunately, at the time of writing, no such
+   of ``lxml``. Unfortunately, at the time of writing, no such
    distribution is available for Python 3.3, so for the time
    being, you'll have to use python 3.2 on this platform.
 
@@ -102,11 +102,11 @@ Example
 This code uses the Ferenda API to create a website containing all(*)
 RFCs and W3C recommended standards.
 
-.. literalinclude:: intro-example.py
+.. literalinclude:: examples/intro-example.py
 		    
 Alternately, using the command line tools and the project framework:
  
-.. literalinclude:: intro-example.sh
+.. literalinclude:: examples/intro-example.sh
 
 .. note::
 
@@ -122,34 +122,34 @@ Features
 --------
 
 * Handles downloading, structural parsing and regeneration of large
-  document collections
-* Contains libraries to make reading of text, PDF and MS Word
-  documents as easy as HTML *(Note: these are far from finished)*
+  document collections.
+* Contains libraries to make reading of plain text, PDF and MS Word
+  documents as easy as HTML *(Note: these are far from finished)*.
+* Uses established information standards as much as possible: If you
+  like XHTML, XSLT, XML namespaces, RDF and SPARQL, you'll feel right
+  at home.
 * Leverages your favourite python libraries: `requests
   <http://docs.python-requests.org/en/latest/>`_, `beautifulsoup
   <http://www.crummy.com/software/BeautifulSoup/>`_, `rdflib
   <https://rdflib.readthedocs.org/en/latest/>`_, `lxml
   <http://lxml.de/>`_, `pyparsing <http://pyparsing.wikispaces.com/>`_
   and `whoosh <https://bitbucket.org/mchaput/whoosh/wiki/Home>`_.
-* Uses established information standards as much as possible: If you
-  like XHTML, XSLT, XML namespaces, RDF and SPARQL, you'll feel right
-  at home
-* Possible to patch documents if the source content has errors
+* Possible to patch documents if the source content has errors.
 * Easy to write reference/citation parsers and run them on document
-  text
+  text.
 * Documents in the same and other collections are automatically
-  cross-referenced
+  cross-referenced.
 * Uses caches and dependency management to avoid performing the same
-  work over and over
+  work over and over.
 * Once documents are downloaded and structured, you get a usable web
   site with API, Atom feeds and search for free *(Note: API
-  functionality not yet implemented)*
+  functionality not yet implemented)*.
 * Web site generation can create a set of static HTML pages for
   offline use (though you lose search and API functionality).
 * Pull in commentary for documents from other sources *(Note: you'll
-  have to do most of this work yourself)*
+  have to do most of this work yourself)*.
 * Create topic hubs / keyword pages for document from multiple
-  collections *(Note: remains undocumented)*
+  collections *(Note: remains undocumented)*.
 
 Next step
 ---------

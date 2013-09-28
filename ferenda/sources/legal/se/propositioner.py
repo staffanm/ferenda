@@ -2,12 +2,10 @@
 from __future__ import unicode_literals
 import re
 import os
-from time import time
 from datetime import datetime
 import codecs
 
 from bs4 import BeautifulSoup
-from rdflib import Graph, Literal, Namespace, URIRef, RDF, RDFS
 from lxml import etree
 import requests
 
@@ -16,10 +14,18 @@ from ferenda.elements import UnicodeElement, CompoundElement, \
     MapElement, IntElement, DateElement, PredicateType, \
     UnicodeSubject, Heading, Preformatted, Paragraph, Section, Link, ListItem, \
     serialize
-from ferenda import CompositeRepository, PDFDocumentRepository, Describer, TextReader, PDFReader, DocumentStore, DocumentEntry
-from ferenda.errors import ParseError, DocumentRemovedError
+from ferenda import CompositeRepository
+from ferenda import PDFDocumentRepository
+from ferenda import Describer
+from ferenda import TextReader
+from ferenda import PDFReader
+from ferenda import DocumentEntry
 from ferenda.decorators import managedparsing
-from . import SwedishLegalSource, Trips, Regeringen, Riksdagen, RPUBL
+from . import Trips
+from . import Regeringen
+from . import Riksdagen
+from . import RPUBL
+
 
 class PropPolo(Regeringen):
     alias = "proppolo"
@@ -30,11 +36,12 @@ class PropPolo(Regeringen):
     document_type = Regeringen.PROPOSITION
     storage_policy = "dir"
 
+
 class PropTrips(Trips, PDFDocumentRepository):
     alias = "proptrips"
     base = "THWALLAPROP"
     # base = "PROPARKIV0809"
-    app  ="prop"
+    app = "prop"
 
     basefile_regex = "(?P<basefile>\d+/\d+:\d+)$"
     download_params = [{'maxpage': 101, 'app': app, 'base': base}]
@@ -96,7 +103,7 @@ class PropTrips(Trips, PDFDocumentRepository):
         if isinstance(basefile, tuple):
             basefile, attachment = basefile
             if attachment:
-                mainattachment = attachment+".html"
+                mainattachment = attachment + ".html"
             else:
                 mainattachment = None
         if isinstance(url, tuple):
@@ -138,7 +145,8 @@ class PropTrips(Trips, PDFDocumentRepository):
                 elif sig == b'{\\rt':
                     doctype = ".rtf"
                 else:
-                    self.log.error("%s: Attached file has signature %r -- don't know what type this is" % (basefile, sig))
+                    self.log.error(
+                        "%s: Attached file has signature %r -- don't know what type this is" % (basefile, sig))
                     continue
             elif url.endswith('pdf.application'):
                 doctype = ".pdf"
@@ -148,7 +156,8 @@ class PropTrips(Trips, PDFDocumentRepository):
                 doctype = None
             if doctype:
                 if attachment:
-                    filename = self.store.downloaded_path(basefile, attachment=attachment + doctype)
+                    filename = self.store.downloaded_path(
+                        basefile, attachment=attachment + doctype)
                 else:
                     filename = self.store.downloaded_path(basefile, attachment="index" + doctype)
                 self.log.debug("%s: downloading attachment %s" % (basefile, filename))
@@ -167,7 +176,7 @@ class PropTrips(Trips, PDFDocumentRepository):
             entry.save()
 
         return updated
-                
+
     # Correct some invalid identifiers spotted in the wild:
     # 1999/20 -> 1999/2000
     # 2000/2001 -> 2000/01
@@ -205,7 +214,7 @@ class PropTrips(Trips, PDFDocumentRepository):
 
         # prefer PDF or Word files over the plaintext-containing HTML files
         # FIXME: PDF or Word files are now stored as attachments
-        
+
         pdffile = self.generic_path(doc.basefile, 'downloaded', '.pdf')
 
         wordfiles = (self.generic_path(doc.basefile, 'downloaded', '.doc'),
@@ -225,7 +234,8 @@ class PropTrips(Trips, PDFDocumentRepository):
                 doc.basefile, "intermediate", ".pdf")
             if not os.path.exists(intermediate_pdf):
                 cmdline = "%s --headless -convert-to pdf -outdir '%s' %s" % (self.config.get('soffice', 'soffice'),
-                                                                             os.path.dirname(intermediate_pdf),
+                                                                             os.path.dirname(
+                                                                                 intermediate_pdf),
                                                                              wordfile)
                 self.log.debug(
                     "%s: Converting to PDF: %s" % (doc.basefile, cmdline))
@@ -276,10 +286,12 @@ class PropTrips(Trips, PDFDocumentRepository):
             else:
                 doc.body.append(Preformatted([p]))
 
+
 class PropRiksdagen(Riksdagen):
     alias = "propriksdagen"
     rdf_type = RPUBL.Proposition
     document_type = Riksdagen.PROPOSITION
+
 
 class Propositioner(CompositeRepository):
     subrepos = PropPolo, PropTrips, PropRiksdagen

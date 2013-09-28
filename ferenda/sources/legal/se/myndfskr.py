@@ -1,14 +1,12 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals,print_function
+from __future__ import unicode_literals, print_function
 
 import os
 import re
-import datetime
 import logging
 import codecs
 from tempfile import mktemp
 from xml.sax.saxutils import escape as xml_escape
-from six.moves.urllib_parse import urlsplit, urlunsplit
 
 from rdflib import Graph, URIRef, Literal
 from bs4 import BeautifulSoup
@@ -22,6 +20,7 @@ from . import SwedishLegalSource
 
 
 class MyndFskr(SwedishLegalSource):
+
     """A abstract base class for fetching and parsing regulations from
 various swedish government agencies. These PDF documents often have
 a similar structure both graphically and linguistically, enabling us
@@ -65,7 +64,7 @@ special-case code, though.)"""
         # distilled RDF graph instead.
         if not os.path.exists(self.store.distilled_path(basefile)):
             return None
-        
+
         g = Graph()
         g.parse(self.store.distilled_path(basefile))
         subjects = list(g.subject_objects(self.ns['rdf']['type']))
@@ -98,7 +97,6 @@ special-case code, though.)"""
         # return r.sub(lambda f: table[f.string[f.start():f.end()]], s.lower())
         return r.sub(lambda m: table[m.group(0)], s.lower())
 
-
     def download_resource_lists(self, resource_url, graph_path):
         hdr = self._addheaders()
         hdr['Accept'] = 'application/rdf+xml'
@@ -106,14 +104,13 @@ special-case code, though.)"""
         g = Graph()
         g.parse(data=resp.text, format="xml")
         for subj in g.subjects(self.ns['rdf'].type,
-                                    self.ns['rpubl'].Forfattningssamling):
+                               self.ns['rpubl'].Forfattningssamling):
             resp = requests.get(str(subj), headers=hdr)
             resp.encoding = "utf-8"
             g.parse(data=resp.text, format="xml")
-        with open(graph_path,"wb") as fp:
+        with open(graph_path, "wb") as fp:
             data = g.serialize(format="xml")
             fp.write(data)
-
 
     def parse_from_textreader(self, reader, basefile):
         tracelog = logging.getLogger("%s.tracelog" % self.alias)
@@ -123,13 +120,13 @@ special-case code, though.)"""
 
         # 1.2: Load known entities and their URIs (we have to add some
         # that are not yet in the official resource lists
-        resource_list_file = self.store.path('resourcelist','intermediate','.rdf')
+        resource_list_file = self.store.path('resourcelist', 'intermediate', '.rdf')
         if not os.path.exists(resource_list_file):
             self.download_resource_lists("http://service.lagrummet.se/var/common",
                                          resource_list_file)
         resources = Graph()
         resources.parse(resource_list_file, format="xml")
-            
+
         # 1.3: Define regexps for the data we search for.
         fwdtests = {'dct:issn': ['^ISSN (\d+\-\d+)$'],
                     'dct:title': ['((?:Föreskrifter|[\w ]+s (?:föreskrifter|allmänna råd)).*?)\n\n'],
@@ -208,7 +205,8 @@ special-case code, though.)"""
                     m = re.search(test, page, re.MULTILINE | re.UNICODE)
                     if m:
                         props[prop] = util.normalize_space(m.group(1))
-                        #print u"%s: '%s' resulted in match '%s' at page %s from end" % (prop,test,props[prop], cnt)
+                        # print u"%s: '%s' resulted in match '%s' at page %s from end" %
+                        # (prop,test,props[prop], cnt)
 
             # Single required propery. If we find this, we're done
             if 'rpubl:ikrafttradandedatum' in props:
@@ -221,12 +219,12 @@ special-case code, though.)"""
                                                     props['dct:identifier'])
             # FIXME: Read resources graph instead
             fs = resources.value(predicate=self.ns['skos'].altLabel,
-                                 object=Literal(publication,lang='sv'))
+                                 object=Literal(publication, lang='sv'))
             props['rpubl:forfattningssamling'] = fs
             publ = resources.value(subject=fs,
                                    predicate=self.ns['dct'].publisher)
             props['dct:publisher'] = publ
-            
+
             props['rpubl:arsutgava'] = Literal(
                 year)  # conversion to int, date not needed
             props['rpubl:lopnummer'] = Literal(ordinal)
@@ -251,7 +249,8 @@ special-case code, though.)"""
             if agency:
                 props['rpubl:beslutadAv'] = agency
             else:
-                self.log.warning("Cannot find URI for rpubl:beslutadAv value %r" % props['rpubl:beslutadAv'])
+                self.log.warning(
+                    "Cannot find URI for rpubl:beslutadAv value %r" % props['rpubl:beslutadAv'])
                 del props['rpubl:beslutadAv']
 
         tracelog.info("Cleaning dct:issn")
@@ -638,7 +637,9 @@ class STAFS(MyndFskr):
         if consolidated_link:
             filename = self.store.downloaded_path(consolidated_basefile)
             self.log.info("        Downloading consd to %s" % filename)
-            self.download_if_needed(consolidated_link.absolute_url, consolidated_basefile, filename=filename)
+            self.download_if_needed(
+                consolidated_link.absolute_url, consolidated_basefile, filename=filename)
+
 
 class SKVFS(MyndFskr):
     alias = "skvfs"
@@ -651,7 +652,6 @@ class SKVFS(MyndFskr):
 
     # also consolidated versions
     # http://www.skatteverket.se/rattsinformation/lagrummet/foreskrifterkonsoliderade/aldrear.4.19b9f599116a9e8ef3680004242.html
-
 
     # URL's are highly unpredictable. We must find the URL for every
     # resource we want to download, we cannot transform the resource
@@ -677,7 +677,7 @@ class SKVFS(MyndFskr):
         self.log.info("Starting at %s" % self.start_url)
         soup = BeautifulSoup(requests.get(self.start_url).text)
         link = sorted(list(soup.find_all("a", text=re.compile('^\d{4}$'))),
-                           key=attrgetter('text'), reverse=True)[0]
+                      key=attrgetter('text'), reverse=True)[0]
         self.download_year(int(link.text), link.absolute_url, usecache=True)
 
     def download_year(self, year, url):

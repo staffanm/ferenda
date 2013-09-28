@@ -19,9 +19,10 @@ from ferenda import DocumentStore
 from ferenda import util
 from ferenda.decorators import managedparsing
 from ferenda import elements
-from ferenda.elements import html
+
 
 class StaticStore(DocumentStore):
+
     """Customized DocumentStore that looks for all "downloaded" resources
     from the specified ``staticdir``. If ``staticdir`` isn't provided
     or doesn't exist, falls back to a collection of package resources
@@ -29,8 +30,9 @@ class StaticStore(DocumentStore):
     are handled like normal, ie stored under
     ``[datadir]/static/{parsed,distilled,generated,...}/``
     """
+
     def __init__(self, datadir, downloaded_suffix=".rst", storage_policy="file", staticdir="static"):
-        super(StaticStore,self).__init__(datadir, downloaded_suffix, storage_policy)
+        super(StaticStore, self).__init__(datadir, downloaded_suffix, storage_policy)
         if os.path.exists(staticdir):
             self.staticdir = staticdir
         else:
@@ -38,22 +40,24 @@ class StaticStore(DocumentStore):
             p = pkg_resources.resource_filename('ferenda',
                                                 'res/static-content/README')
             self.staticdir = os.path.dirname(p)
-    
+
     def downloaded_path(self, basefile, version=None, attachment=None):
         segments = [self.staticdir,
-                    self.basefile_to_pathfrag(basefile)+self.downloaded_suffix]
-        return "/".join(segments).replace("/",os.sep)
+                    self.basefile_to_pathfrag(basefile) + self.downloaded_suffix]
+        return "/".join(segments).replace("/", os.sep)
 
-    def list_basefiles_for(self,action,basedir=None):
+    def list_basefiles_for(self, action, basedir=None):
         if action == "parse":
             for x in util.list_dirs(self.staticdir, self.downloaded_suffix):
-                pathfrag  = x[len(self.staticdir)+1:-len(self.downloaded_suffix)]
+                pathfrag = x[len(self.staticdir) + 1:-len(self.downloaded_suffix)]
                 yield self.pathfrag_to_basefile(pathfrag)
         else:
-            for x in super(StaticStore, self).list_basefiles_for(action,basedir):
+            for x in super(StaticStore, self).list_basefiles_for(action, basedir):
                 yield x
 
+
 class Static(DocumentRepository):
+
     """Generates documents from your own ``.rst`` files
 
     The primary purpose of this docrepo is to provide a small set of
@@ -90,7 +94,7 @@ class Static(DocumentRepository):
     downloaded_suffix = ".rst"
     documentstore_class = StaticStore
     # urls become on the form "http://localhost:8000/static/about"
-    
+
     def download(self):
         pass
 
@@ -99,30 +103,30 @@ class Static(DocumentRepository):
         source = util.readfile(self.store.downloaded_path(doc.basefile))
         doctree = publish_doctree(source=source)
         stack = []
-        root = self._transform(doctree,stack)
+        root = self._transform(doctree, stack)
         if isinstance(root[0], elements.Title):
-            doc.meta.add((URIRef(doc.uri), self.ns['dct'].title, Literal(str(root[0]),doc.lang)))
+            doc.meta.add((URIRef(doc.uri), self.ns['dct'].title, Literal(str(root[0]), doc.lang)))
             root.pop(0)
         doc.body = root
 
     # converts a tree of docutils.nodes into ferenda.elements
     def _transform(self, node, stack):
-        cls = {'document':elements.Body,
-               'title':elements.Title,
-               'paragraph':elements.Paragraph,
+        cls = {'document': elements.Body,
+               'title': elements.Title,
+               'paragraph': elements.Paragraph,
                '#text': str
                }.get(node.tagname, elements.CompoundElement)
-        if hasattr(node,'attributes'):
-            attrs = dict((k,v) for (k,v) in node.attributes.items() if v)
+        if hasattr(node, 'attributes'):
+            attrs = dict((k, v) for (k, v) in node.attributes.items() if v)
             el = cls(**attrs)
         else:
-            el = cls(node) # !
+            el = cls(node)  # !
 
         if len(stack) > 0:
             top = stack[-1]
             top.append(el)
-            
-        if hasattr(node,'attributes'):
+
+        if hasattr(node, 'attributes'):
             stack.append(el)
             for childnode in node:
                 self._transform(childnode, stack)
@@ -133,7 +137,7 @@ class Static(DocumentRepository):
 
     def news(self, otherrepos=[]):
         pass
-    
+
     def frontpage_content(self, primary=False):
         pass
 
@@ -142,7 +146,7 @@ class Static(DocumentRepository):
             return [("About", self.canonical_uri("about"))]
         else:
             return[]
-                
+
     def footer(self):
         # FIXME: ordering?
         res = []
@@ -153,5 +157,5 @@ class Static(DocumentRepository):
             title = g.value(URIRef(uri), self.ns['dct'].title).toPython()
             if not title:
                 title = basefile
-            res.append((title,uri))
+            res.append((title, uri))
         return res

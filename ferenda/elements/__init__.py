@@ -40,7 +40,8 @@ DCT = Namespace(util.ns['dct'])
 RDF = Namespace(util.ns['rdf'])
 XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 log = logging.getLogger(__name__)
-E = ElementMaker(namespace="http://www.w3.org/1999/xhtml")
+E = ElementMaker(namespace="http://www.w3.org/1999/xhtml",
+                 nsmap={None: "http://www.w3.org/1999/xhtml"})
 
 def serialize(root):
     """Given any :py:class:`~ferenda.elements.AbstractElement` *root*
@@ -122,7 +123,7 @@ class AbstractElement(object):
     """If set, this property gets converted to a ``@class`` attribute in the resulting XHTML."""
     
     def as_xhtml(self, uri=None):
-        """Converts this object to a :py:class:`lxml.etree` object (with children)
+        """Converts this object to a ``lxml.etree`` object (with children)
 
         :param uri: If provided, gets converted to an ``@about`` attribute in the resulting XHTML.
         :type uri: str
@@ -134,7 +135,6 @@ class AbstractElement(object):
             if hasattr(self,stdattr):
                 attrs[stdattr] = getattr(self,stdattr)
         return E(self.tagname, attrs, str(self))
-
 
 
 class UnicodeElement(AbstractElement, six.text_type):
@@ -155,7 +155,7 @@ properties (such as ordinal label, date of enactment, etc)."""
 
 
 class IntElement(AbstractElement, int):
-    """Based on :py:class:`int`, but can also have other properties."""
+    """Based on :py:func:`int`, but can also have other properties."""
 
     # immutable objects must provide a __new__ method
     def __new__(cls, arg=0, *args, **kwargs):
@@ -264,7 +264,6 @@ class CompoundElement(AbstractElement, list):
 
         # for each childen that is a string, make sure it doesn't
         # contain any XML illegal characters
-        
         return E(self.tagname, attrs, *children)
 
     def _span(self, subj, pred, obj, graph):
@@ -453,54 +452,6 @@ attributes, i.e. a typed link. Note that predicate should be a string that repre
         
     pass  # A RDFish link
 
-
-
-
-
-# Commented this out in order to keep documented API surface smaller
-# -- let's see what breaks
-# 
-
-# # Examples of other mixins and inherited classes
-# class EvenMixin():
-#     def iseven(self):
-#         return (len(self.keyword) % 2 == 0)
-# 
-# 
-# class DerivedUnicode(UnicodeElement, EvenMixin):
-#     # an example on how to customize object initialization, while still
-#     # letting the base class do it's initialization
-#     def __init__(self, *args, **kwargs):
-#         if kwargs['keyword']:
-#             self.keyword = kwargs['keyword'].upper()
-#             del kwargs['keyword']
-#         super(DerivedUnicode, self).__init__(*args, **kwargs)
-# 
-# 
-# class DerivedList(CompoundElement, EvenMixin):
-#     pass
-# 
-# 
-# class DerivedDict(MapElement, EvenMixin):
-#     pass
-# 
-# 
-# class DerivedInt(IntElement, EvenMixin):
-#     pass
-# 
-# 
-# class DerivedDate(DateElement, EvenMixin):
-#     pass
-# 
-# 
-# class RDFString(PredicateType, UnicodeElement):
-#     # N.B: if we inherit from (UnicodeElement,PredicateType)
-#     # instead, PredicateType.__init__ never gets called! But this way,
-#     # AbstractElement.__init__ never gets called. I think i must
-#     # read descrintro again...
-#     pass
-# 
-# 
 class UnicodeSubject(PredicateType, UnicodeElement): pass
 
 class Body(CompoundElement):
@@ -509,7 +460,9 @@ class Body(CompoundElement):
         element.set('about', uri)
         return element
 class Title(CompoundElement): pass
-class Page(CompoundElement, OrdinalElement): pass
+class Page(CompoundElement, OrdinalElement):
+    tagname = "div"
+    classname = "page"
 class Nav(CompoundElement): pass
 
 class SectionalElement(CompoundElement):
@@ -543,6 +496,10 @@ class SectionalElement(CompoundElement):
                          'property': 'dct:identifier',
                          'content': self.identifier}
                 element.insert(0,E('span',attrs))
+            if element.text: # make sure that naked PCDATA comes after the elements we've inserted
+                element[-1].tail = element.text
+                element.text = None
+
         return element
     
 
@@ -575,60 +532,6 @@ class UnorderedList(CompoundElement):
 # class Definition(CompoundElement): pass
 class ListItem(CompoundElement, OrdinalElement):
     tagname = 'li'
-# 
-# if __name__ == '__main__':
-# 
-#     # print "Testing DerivedUnicode"
-#     u = DerivedUnicode('blahonga', keyword='myunicode')
-#     # print "\trepr(u): %s"   % repr(u)
-#     # print "\tu[1:4]: %r"    % u[1:4]
-#     # print "\tu.keyword: %r" % u.keyword
-#     # print "\tu.iseven: %r"  % u.iseven()
-# 
-#     # print "Testing DerivedList"
-#     l = DerivedList(['x', 'y', 'z'], keyword='mylist')
-#     # print "\tl[1]: %r"      % l[1]
-#     # print "\tl.keyword: %r" % l.keyword
-#     # print "\tl.iseven: %r"  % l.iseven()
-# 
-#     # print "Testing DerivedDict"
-#     d = DerivedDict({'a': 'foo', 'b': 'bar'}, keyword='mydict')
-#     # print "\td['a']: %r"    % d['a']
-#     # print "\td.keyword: %r" % d.keyword
-#     # print "\td.iseven: %r"  % d.iseven()
-# 
-#     # print "Testing DerivedInt"
-#     i = DerivedInt(42, keyword='myint')
-#     # print "\ti: %r"    % i
-#     # print "\ti+5: %r"  % (i+5)
-#     # print "\ti.keyword: %r" % d.keyword
-#     # print "\ti.iseven: %r"  % d.iseven()
-# 
-#     # print "Testing DerivedDate"
-#     nativedate = datetime.date(2008, 3, 15)
-#     dt = DerivedDate(nativedate, keyword='mydate')
-#     # print "\tdt: %r"    % dt
-#     # print "\tdt.keyword: %r" % dt.keyword
-#     # print "\tdt.iseven: %r"  % dt.iseven()
-# 
-#     # print "Testing RDFString"
-#     r = RDFString('Typisk dokumentrubrik', keyword='mysubject')
-#     # print "\trepr(r): %s"   % repr(r)
-#     # print "\tr[1:4]: %r"    % r[1:4]
-#     # print "\tr.keyword: %r" % r.keyword
-#     # print "\tr.predicate: %r" % r.predicate
-#     from rdflib import URIRef
-#     r.predicate = URIRef('http://purl.org/dc/terms/title')
-#     # print "\tr.predicate: %r" % r.predicate
-# 
-#     c = DerivedList([u, l, d, i, dt, r])
-#     x = serialize(c)
-#     print(x)
-#     print()
-#     y = deserialize(x, globals())
-#     print((serialize(y)))
-
-
 
 # http://infix.se/2007/02/06/gentlemen-_indentElement-your-xml
 def _indentTree(elem, level=0):

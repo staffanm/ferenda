@@ -2,27 +2,20 @@
 from __future__ import unicode_literals
 
 # From python stdlib
-import unittest
-import sys
-import time
 import re
-import os
-import datetime
-import logging
-from six.moves.urllib_parse import urljoin
 
 # 3rd party modules
-from bs4 import BeautifulSoup
 import lxml.html
 import requests
 
 # My own stuff
 from ferenda import decorators
-from ferenda import util
 from ferenda import PDFDocumentRepository
 from . import SwedishLegalSource
 
+
 class JO(SwedishLegalSource, PDFDocumentRepository):
+
     """Hanterar beslut från Riksdagens Ombudsmän, www.jo.se
 
     Modulen hanterar hämtande av beslut från JOs webbplats i PDF samt
@@ -37,9 +30,9 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
     def download(self, basefile=None):
         for basefile, url in self.download_get_basefiles(self.start_url):
             self.download_single(basefile, url)
-        
+
     @decorators.downloadmax
-    def download_get_basefiles(self, start_url): 
+    def download_get_basefiles(self, start_url):
         done = False
         url = start_url
         pagecount = 1
@@ -47,7 +40,7 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
             nextpage = None
             assert "pn=%s" % pagecount in url
             soughtnext = url.replace("pn=%s" % pagecount,
-                                     "pn=%s" % (pagecount+1)),
+                                     "pn=%s" % (pagecount + 1)),
             self.log.info("Getting page #%s" % pagecount)
             resp = requests.get(url)
             tree = lxml.html.document_fromstring(resp.text)
@@ -62,4 +55,3 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
                 url = nextpage
             else:
                 done = True
-

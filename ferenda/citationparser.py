@@ -1,22 +1,22 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import pyparsing
 import six
 
-from ferenda.elements import LinkSubject, serialize
+from ferenda.elements import LinkSubject
 
 
 class CitationParser(object):
+
     """Finds citations to documents and other resources in text
     strings. Each type of citation is specified by a
-    :py:mod:`pyparsing` grammar, and for each found citation a URI
-    can be constructed using a :py:class:`~ferenda.URIFormatter`
-    object.
+    `pyparsing <http://pyparsing.wikispaces.com/Documentation>`_
+    grammar, and for each found citation a URI can be constructed
+    using a :py:class:`~ferenda.URIFormatter` object.
     
     :param grammars: The grammar(s) for the citations that this
                       parser should find, in order of priority.
-    :type  grammars: list of :py:class:`pyparsing.ParserElement`
+    :type  grammars: list of ``pyparsing.ParserElement`` objects
 
     Usage:
 
@@ -57,7 +57,7 @@ class CitationParser(object):
         """Add another grammar.
 
         :param grammar: The grammar to add
-        :type grammar: :py:class:`pyparsing.ParserElement`
+        :type grammar: ``pyparsing.ParserElement``
         """
         self._grammars.append(grammar)
 
@@ -68,10 +68,11 @@ class CitationParser(object):
         :type string: str
         :returns: strings (for parts of the input text that do not contain
                   any citation) and/or tuples (for found citation) consisting
-                  of (string, :py:class:`pyparsing.ParseResult`)
+                  of (string, ``pyparsing.ParseResult``)
         :rtype: list
         """
-        # Returns a list of strings and/or tuples, where each tuple is (string,pyparsing.ParseResult)
+        # Returns a list of strings and/or tuples, where each tuple is
+        # (string,pyparsing.ParseResult)
         nodes = [string]
         for grammar in self._grammars:
             res = []
@@ -103,7 +104,7 @@ class CitationParser(object):
         :type  part: list
         :returns: a correspondingly nested structure.
         :rtype: list"""
-        
+
         res = []
         if not isinstance(part, six.text_type):
             for subpart in part:
@@ -111,7 +112,8 @@ class CitationParser(object):
                     res.extend(self.parse_recursive(subpart))
                 else:
                     res.append(self.parse_recursive(subpart))
-            part[:] = res[:]  # replace our exising subparts/children with the combined result of parse_recursive
+            # replace our exising subparts/children with the combined result of parse_recursive
+            part[:] = res[:]
             return part
 
         else:  # ok, simple string

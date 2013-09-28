@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 from ferenda.sources.tech import RFC, W3Standards
 from ferenda.manager import makeresources, frontpage, runserver, setup_logger
@@ -16,20 +17,19 @@ setup_logger(level='DEBUG')
 # Set up two document repositories
 docrepos = (RFC(**config), W3Standards(**config))
 
-# for docrepo in docrepos:
-for docrepo in []:
+for docrepo in docrepos:
     # Download a bunch of documents
     docrepo.download()
     
     # Parse all downloaded documents
-    for basefile in docrepo.list_basefiles_for("parse"):
+    for basefile in docrepo.store.list_basefiles_for("parse"):
         try:
             docrepo.parse(basefile)
-        except (DocumentRemovedError, ParseError, FSMStateError):
-            pass  # just go on
+        except ParseError as e:
+            pass  # or handle this in an appropriate way
 
     # Index the text content and metadata of all parsed documents
-    for basefile in docrepo.list_basefiles_for("relate"):
+    for basefile in docrepo.store.list_basefiles_for("relate"):
         docrepo.relate(basefile, docrepos)
 
 # Prepare various assets for web site navigation
@@ -42,7 +42,7 @@ makeresources(docrepos,
 for docrepo in docrepos:
     # Generate static HTML files from the parsed documents, 
     # with back- and forward links between them, etc.
-    for basefile in docrepo.list_basefiles_for("generate"):
+    for basefile in docrepo.store.list_basefiles_for("generate"):
         docrepo.generate(basefile)
         
     # Generate a table of contents of all available documents

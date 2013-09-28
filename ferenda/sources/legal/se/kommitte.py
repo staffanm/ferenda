@@ -1,19 +1,21 @@
 # -*- coding: utf-8 -*-
 import re
-from six.moves.urllib_parse import quote
 
-from . import SwedishLegalSource, SwedishLegalStore, Trips
+from . import SwedishLegalStore
+from . import Trips
+
 
 class KommitteStore(SwedishLegalStore):
 
     def basefile_to_pathfrag(self, basefile):
         # "Ju 2012:01"    => "Ju/2012/01"
-        return basefile.replace(" ","/").replace(":","/")
-        
+        return basefile.replace(" ", "/").replace(":", "/")
+
     def pathfrag_to_basefile(self, pathfrag):
         # "Ju/2012/01"    => "2012:152"
-        return pathfrag.replace("/"," ",1).replace("/",":")
-    
+        return pathfrag.replace("/", " ", 1).replace("/", ":")
+
+
 class Kommitte(Trips):
     documentstore_class = KommitteStore
     alias = "komm"

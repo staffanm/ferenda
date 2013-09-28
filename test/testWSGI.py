@@ -1,17 +1,12 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 import os, sys
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
+from ferenda.compat import unittest, Mock
+
 from ferenda.manager import setup_logger; setup_logger('CRITICAL')
-if sys.version_info < (2, 7, 0):
-    import unittest2 as unittest
-else:
-    import unittest
-try:
-    from unittest.mock import Mock
-except ImportError:
-    from mock import Mock
+
+if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
+
 from io import BytesIO
 import shutil
 import codecs

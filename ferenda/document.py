@@ -5,6 +5,7 @@ from rdflib import Graph
 
 
 class Document(object):
+
     """A document represents the content of a document together with a
     RDF graph containing metadata about the document. Don't create
     instances of :class:`~ferenda.Document` directly. Create them
@@ -17,6 +18,7 @@ class Document(object):
     :param lang: The main language of the document as a IETF language tag, i.e. "sv" or "en-GB"
     :param basefile: The basefile of the document
     """
+
     def __init__(self, meta=None, body=None, uri=None, lang=None, basefile=None):
         if meta:
             self.meta = meta
@@ -27,4 +29,3 @@ class Document(object):
         self.uri = uri
         self.lang = lang
         self.basefile = basefile
-

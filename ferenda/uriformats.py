@@ -9,6 +9,7 @@ examples.
 from __future__ import unicode_literals
 from six.moves.urllib_parse import quote
 
+
 def generic(d):
     """Converts any dict into a URL. The domain (netlog) is always
 example.org, and all keys/values of the dict is turned into a
@@ -18,7 +19,7 @@ querystring.
     "http://example.org/?foo=1&bar=2"
 
     """
-    
+
     querystring = "&".join([quote(k) + "=" + quote(v) for (k, v) in d.items()])
     return "http://example.org/?%s" % querystring
 
@@ -52,5 +53,5 @@ CELEX-based URI.
        This is not yet implemented.
 
     """
-    
+
     raise NotImplementedError()

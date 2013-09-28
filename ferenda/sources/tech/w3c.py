@@ -16,17 +16,18 @@ from ferenda import Describer, DocumentRepository, FSMParser
 from ferenda import util, decorators
 from ferenda.elements import serialize, html, Body, Section, Subsection, Subsubsection
 
+
 class W3Standards(DocumentRepository):
     alias = "w3c"
     start_url = "http://www.w3.org/TR/tr-status-all"
     rdf_type = Namespace(util.ns['bibo']).Standard
     document_url_regex = "http://www.w3.org/TR/(?P<year>\d{4})/REC-(?P<basefile>.*)-(?P<date>\d+)"
-    document_url_template = None # no simple way of creating a url
+    document_url_template = None  # no simple way of creating a url
                                  # from a basefile alone (we also need
                                  # the published date)
-    basefile_regex = None # Link text on index page do not contain basefile
-    parse_content_selector="body"
-    parse_filter_selectors=["div.toc", "div.head"]
+    basefile_regex = None  # Link text on index page do not contain basefile
+    parse_content_selector = "body"
+    parse_filter_selectors = ["div.toc", "div.head"]
 
     # NOTES:
     #
@@ -55,6 +56,7 @@ class W3Standards(DocumentRepository):
 
     @decorators.action
     def stats(self):
+        """Stats of amount of triples and things (RDF classes) within each parsed document."""
         stuff = []
         for basefile in self.store.list_basefiles_for("generate"):
             g = Graph()
@@ -66,10 +68,10 @@ class W3Standards(DocumentRepository):
                           len(list(g.subject_objects(RDF.type)))
                           ))
         print("\t".join(("identifier", "issued", "triples", "things")))
-        for docstat in sorted(stuff,key=itemgetter(3)):
+        for docstat in sorted(stuff, key=itemgetter(3)):
             print("\t".join([str(x) for x in docstat]))
 
-    @staticmethod # so as to be easily called from command line
+    @staticmethod  # so as to be easily called from command line
     def get_parser():
 
         def is_header(parser):
@@ -87,30 +89,31 @@ class W3Standards(DocumentRepository):
                                                     "status of this document",
                                                     "table of contents",
                                                     "appendices")
+
         def is_preambleending(parser):
             chunk = parser.reader.peek()
 
             return type(chunk) in (html.HR,)
-            
+
         def is_section(parser):
             if not is_header(parser):
                 return False
             chunk = parser.reader.peek()
-            (ordinal,title) = analyze_sectionstart(chunk.as_plaintext())
+            (ordinal, title) = analyze_sectionstart(chunk.as_plaintext())
             return section_segments_count(ordinal) == 1
 
         def is_subsection(parser):
             if not is_header(parser):
                 return False
             chunk = parser.reader.peek()
-            (ordinal,title) = analyze_sectionstart(chunk.as_plaintext())
+            (ordinal, title) = analyze_sectionstart(chunk.as_plaintext())
             return section_segments_count(ordinal) == 2
 
         def is_subsubsection(parser):
             if not is_header(parser):
                 return False
             chunk = parser.reader.peek()
-            (ordinal,title) = analyze_sectionstart(chunk.as_plaintext())
+            (ordinal, title) = analyze_sectionstart(chunk.as_plaintext())
             return section_segments_count(ordinal) == 3
 
         def is_other(parser, chunk=None):
@@ -118,51 +121,50 @@ class W3Standards(DocumentRepository):
 
         def make_body(parser):
             return p.make_children(Body())
-        setattr(make_body,'newstate','body')
-        
+        setattr(make_body, 'newstate', 'body')
+
         def make_preamble_section(parser):
             s = PreambleSection(title=parser.reader.next().as_plaintext())
             return p.make_children(s)
-        setattr(make_preamble_section,'newstate','preamblesection')
+        setattr(make_preamble_section, 'newstate', 'preamblesection')
 
         def make_other(parser):
             return p.reader.next()
 
         def make_section(parser):
             (secnumber, title) = analyze_sectionstart(parser.reader.next().as_plaintext())
-            s = Section(ordinal=secnumber,title=title,uri=None,meta=None)
+            s = Section(ordinal=secnumber, title=title, uri=None, meta=None)
             return parser.make_children(s)
-        setattr(make_section,'newstate','section')
+        setattr(make_section, 'newstate', 'section')
 
         def make_subsection(parser):
             (secnumber, title) = analyze_sectionstart(parser.reader.next().as_plaintext())
-            s = Subsection(ordinal=secnumber,title=title,uri=None,meta=None)
+            s = Subsection(ordinal=secnumber, title=title, uri=None, meta=None)
             return parser.make_children(s)
-        setattr(make_subsection,'newstate','subsection')
+        setattr(make_subsection, 'newstate', 'subsection')
 
         def make_subsubsection(parser):
             (secnumber, title) = analyze_sectionstart(parser.reader.next().as_plaintext())
-            s = Subsubsection(ordinal=secnumber,title=title,uri=None,meta=None)
+            s = Subsubsection(ordinal=secnumber, title=title, uri=None, meta=None)
             return parser.make_children(s)
-        setattr(make_subsubsection,'newstate','subsubsection')
+        setattr(make_subsubsection, 'newstate', 'subsubsection')
 
-        
         # Some helpers for the above
         def section_segments_count(s):
-            return ((s is not None) and 
-                    len(list(filter(None,s.split(".")))))
+            return ((s is not None) and
+                    len(list(filter(None, s.split(".")))))
 
         # Matches
         # "1 Blahonga" => ("1","Blahonga")
         # "1.2.3. This is a subsubsection" => ("1.2.3", "This is a subsection")
         re_sectionstart = re.compile("^(\d[\.\d]*) +(.*[^\.])$").match
+
         def analyze_sectionstart(chunk):
             m = re_sectionstart(chunk)
             if m:
                 return (m.group(1).rstrip("."), m.group(2))
             else:
-                return (None,chunk)
-
+                return (None, chunk)
 
         p = FSMParser()
 
@@ -173,22 +175,23 @@ class W3Standards(DocumentRepository):
                           is_preambleending,
                           is_header,
                           is_other)
-        commonstates = ("body", "preamblesection", "section","subsection","subsubsection")
-        p.set_transitions({("body", is_preamblesection):(make_preamble_section, "preamblesection"),
-                           ("preamblesection", is_preamblesection):(False,None),
-                           ("preamblesection", is_preambleending):(False,None),
-                           ("preamblesection", is_section):(False,None),
-                           ("body", is_section): (make_section, "section"),
-                           (commonstates, is_other): (make_other, None),
-                           ("section", is_subsection): (make_subsection,"subsection"),
-                           ("section", is_section): (False,None),
-                           ("subsection", is_subsubsection): (make_subsubsection, "subsubsection"),
-                           ("subsection", is_subsection):(False,None),
-                           ("subsection", is_section):(False,None),
-                           ("subsubsection", is_subsubsection):(False,None),
-                           ("subsubsection", is_subsection):(False,None),
-                           ("subsubsection", is_section):(False,None),
-                           })
+        commonstates = ("body", "preamblesection", "section", "subsection", "subsubsection")
+        p.set_transitions(
+            {("body", is_preamblesection): (make_preamble_section, "preamblesection"),
+             ("preamblesection", is_preamblesection): (False, None),
+             ("preamblesection", is_preambleending): (False, None),
+             ("preamblesection", is_section): (False, None),
+             ("body", is_section): (make_section, "section"),
+             (commonstates, is_other): (make_other, None),
+             ("section", is_subsection): (make_subsection, "subsection"),
+             ("section", is_section): (False, None),
+             ("subsection", is_subsubsection): (make_subsubsection, "subsubsection"),
+             ("subsection", is_subsection): (False, None),
+             ("subsection", is_section): (False, None),
+             ("subsubsection", is_subsubsection): (False, None),
+             ("subsubsection", is_subsection): (False, None),
+             ("subsubsection", is_section): (False, None),
+             })
         p.initial_state = "body"
         p.initial_constructor = make_body
         return p
@@ -200,16 +203,16 @@ class W3Standards(DocumentRepository):
         dct = self.ns['dct']
 
         # dct:title
-        d.value(dct.title,soup.find("title").string, lang=doc.lang)
-        d.value(dct.identifier,doc.basefile)
+        d.value(dct.title, soup.find("title").string, lang=doc.lang)
+        d.value(dct.identifier, doc.basefile)
         # dct:abstract
         abstract = soup.find(_class="abstract")
         if abstract:
-            d.value(dct['abstract'],abstract.string, lang=doc.lang)
+            d.value(dct['abstract'], abstract.string, lang=doc.lang)
 
         # dct:published
-        datehdr = soup.find(lambda x: x.name in ('h2','h3')
-                            and re.search("W3C\s+Recommendation,?\s+",x.text))
+        datehdr = soup.find(lambda x: x.name in ('h2', 'h3')
+                            and re.search("W3C\s+Recommendation,?\s+", x.text))
         if datehdr:
             datestr = " ".join(datehdr.text.split())
             m = re.search("(\d+)[ \-](\w+),?[ \-](\d{4})", datestr)
@@ -219,20 +222,16 @@ class W3Standards(DocumentRepository):
             else:
                 datestr = " ".join(m.groups())
                 date = None
-                # FIXME: This contrived workaround to get default
-                # (english/C) locale for strptime should be put in
-                # ferenda.util (eg util.strptime)
-                with util.c_locale():
+                try:
+                    # 17 December 1996
+                    date = util.strptime(datestr, "%d %B %Y")
+                except ValueError:
                     try:
-                         # 17 December 1996
-                        date = datetime.strptime(datestr,"%d %B %Y").date()
+                        # 17 Dec 1996
+                        date = util.strptime(datestr, "%d %b %Y")
                     except ValueError:
-                        try: 
-                            # 17 Dec 1996
-                            date = datetime.strptime(datestr,"%d %b %Y").date()
-                        except ValueError:
-                            self.log.warning("%s: Could not parse datestr %s" %
-                                             (doc.basefile, datestr))
+                        self.log.warning("%s: Could not parse datestr %s" %
+                                         (doc.basefile, datestr))
                 if date:
                     d.value(dct.issued, date)
 
@@ -245,13 +244,13 @@ class W3Standards(DocumentRepository):
                 d.value(dct.editor, editor_name)
 
         # assure we got exactly one of each of the required properties
-        for required in (dct.title,dct.issued):
-            d.getvalue(required) # throws KeyError if not found (or more than one)
+        for required in (dct.title, dct.issued):
+            d.getvalue(required)  # throws KeyError if not found (or more than one)
 
     def parse_document_from_soup(self, soup, doc):
         # first run inherited version to get a doc.body tree that's
         # close to the actual HTML
-        super(W3Standards,self).parse_document_from_soup(soup,doc)
+        super(W3Standards, self).parse_document_from_soup(soup, doc)
         # then clean up doc.body best as you can with a FSMParser
 
         parser = self.get_parser()
@@ -264,31 +263,30 @@ class W3Standards(DocumentRepository):
             print("Exception")
             if parser.debug:
                 import traceback
-                (type,value,tb) = sys.exc_info()
-                traceback.print_exception(type,value,tb)
+                (type, value, tb) = sys.exc_info()
+                traceback.print_exception(type, value, tb)
             raise
-            
+
         PreambleSection.counter = 0
-        self.decorate_bodyparts(doc.body,doc.uri)
+        self.decorate_bodyparts(doc.body, doc.uri)
 
         if parser.debug:
             print(serialize(doc.body))
 
-
-    def decorate_bodyparts(self,part,baseuri):
+    def decorate_bodyparts(self, part, baseuri):
         if isinstance(part, str):
             return
-        if isinstance(part,(Section, Subsection, Subsubsection)):
+        if isinstance(part, (Section, Subsection, Subsubsection)):
             # print("Decorating %s %s" % (part.__class__.__name__,part.ordinal))
-            part.uri = "%s#S%s" % (baseuri,part.ordinal)
+            part.uri = "%s#S%s" % (baseuri, part.ordinal)
             part.meta = self.make_graph()
-            desc = Describer(part.meta,part.uri)
+            desc = Describer(part.meta, part.uri)
             desc.rdftype(self.ns['bibo'].DocumentPart)
-            desc.value(self.ns['dct'].title, Literal(part.title,lang="en"))
+            desc.value(self.ns['dct'].title, Literal(part.title, lang="en"))
             desc.value(self.ns['bibo'].chapter, part.ordinal)
             # desc.value(self.ns['dct'].isPartOf, part.parent.uri) # implied
         for subpart in part:
-            self.decorate_bodyparts(subpart,baseuri)
+            self.decorate_bodyparts(subpart, baseuri)
 
     def tabs(self):
         return [("W3C standards", self.dataset_uri())]
