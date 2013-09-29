@@ -66,11 +66,15 @@ class DocEntry(unittest.TestCase):
 }"""
 
     def setUp(self):
+        self.maxDiff = None
         self.datadir = tempfile.mkdtemp()
         self.repo = DocumentRepository(datadir=self.datadir)
 
     def tearDown(self):
         shutil.rmtree(self.datadir)
+
+    def d2u(self, s):
+        return s.replace("\r\n", "\n")
         
     def test_init(self):
         d = DocumentEntry()
@@ -104,7 +108,7 @@ class DocEntry(unittest.TestCase):
         d.save(path=path)
 
         self.maxDiff = None
-        self.assertEqual(util.readfile(path), self.basic_json)
+        self.assertEqual(self.d2u(util.readfile(path)), self.basic_json)
 
     def test_modify(self):
         path = self.repo.store.documententry_path("123/a")
@@ -121,7 +125,7 @@ class DocEntry(unittest.TestCase):
         d.set_content(self.datadir+"/xhtml", "http://example.org/test",
                       mimetype="xhtml", inline=True)
         d.save()
-        self.assertEqual(util.readfile(path), self.modified_json)
+        self.assertEqual(self.d2u(util.readfile(path)), self.modified_json)
 
     def test_set_content(self):
         t = tempfile.mktemp()

@@ -16,6 +16,7 @@ from ferenda.layeredconfig import LayeredConfig
 
 class Main(unittest.TestCase):
     def setUp(self):
+        self.maxDiff = None
         with open("ferenda.ini","w") as fp:
             fp.write("""
 [__root__]
@@ -311,7 +312,7 @@ jsfiles = ['pdfviewer.js','zepto.js']
 lastrun = 2013-09-18 15:41:00
 
 """
-        got = util.readfile("ferenda.ini")
+        got = util.readfile("ferenda.ini").replace("\r\n","\n")
         #if not isinstance(got, six.text_type):
         #    got = got.decode("utf-8")
         self.assertEqual(want,got)
