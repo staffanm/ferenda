@@ -58,7 +58,7 @@ class WordReader(object):
     def word_to_docbook(self, indoc, outdoc):
         """Convert a old Word document (.doc) to a pseudo-docbook file through antiword."""
         tmpfile = mktemp()
-        cmd = "antiword -x db %s > %s" % (indoc, tmpfile)
+        indoc = os.path.normpath(indoc)
         wrapper = textwrap.TextWrapper(break_long_words=False,
                                        width=72)
 
@@ -71,6 +71,9 @@ class WordReader(object):
         if not os.path.exists(indoc):
             self.log.warning("indoc %s does not exist" % indoc)
             return
+        if " " in indoc:
+            indoc = '"%s"' % indoc
+        cmd = "antiword -x db %s > %s" % (indoc, tmpfile)
         self.log.debug("Executing %s" % cmd)
         (ret, stdout, stderr) = util.runcmd(cmd)
 
