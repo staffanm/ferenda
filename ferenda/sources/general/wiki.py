@@ -15,7 +15,6 @@ from ferenda import DocumentRepository
 from ferenda import util
 from ferenda.legalref import LegalRef, Link
 
-from ferenda.thirdparty import wikimarkup
 # FIXME: Need to dynamically set this namespace (by inspecting the root?)
 # as it varies with MW version
 MW_NS = "{http://www.mediawiki.org/xml/export-0.4/}"
@@ -274,8 +273,8 @@ class MediaWiki(DocumentRepository):
             return res.decode('utf-8')
 
 
-class LinkedWikimarkup(wikimarkup.Parser):
-
+# class LinkedWikimarkup(wikimarkup.Parser):
+class LinkedWikimarkup(object):
     def __init__(self, show_toc=True):
         super(wikimarkup.Parser, self).__init__()
         self.show_toc = show_toc

@@ -20,7 +20,3 @@ reason or another, couldn't be directly fetched by setup.py from pypi.
 * httpheader by Deron Meranda
   (http://deron.meranda.us/python/httpheader/). Included since the
   package isn't on pypi or is python3 compatible. LGPL License
-
-* wikimarkup by David Cramer
-  (https://pypi.python.org/pypi/py-wikimarkup). Included since the
-  original code wasn't python3 compatible. GPL3 License.

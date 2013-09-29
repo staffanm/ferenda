@@ -1,10 +1,9 @@
-2013-09-?? RELEASE 0.1.5
+2013-09-29 RELEASE 0.1.5
 ========================
 
-(WIP) Documentation, particularly code examples, has been updated to
-better fit reality. They have (should) also been added to the test
-suite, so they're almost guaranteed to be updated when the API
-changes.
+Documentation, particularly code examples, has been updated to better
+fit reality. They have also been added to the test suite, so they're
+almost guaranteed to be updated when the API changes.
 
 Backwards-incompatible changes
 
@@ -59,10 +58,6 @@ Infrastructural changes:
 * Continous integration and coverage is now set up with Travis-CI
   (https://travis-ci.org/staffanm/ferenda/) and Coveralls
   (https://coveralls.io/r/staffanm/ferenda)
-
-* py-wikimarkup (https://pypi.python.org/pypi/py-wikimarkup) has been
-  ported to python3 and is included (vendorized?)  under
-  ferenda.thirdparty.wikimarkup
 
 
 2013-08-26 RELEASE 0.1.4

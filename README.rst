@@ -55,6 +55,4 @@ with their respective licenses:
   (http://code.google.com/p/oort/wiki/Grit), BSD
 * httpheader by Deron Meranda
   (http://deron.meranda.us/python/httpheader/), LGPL
-* wikimarkup by David Cramer
-  (https://pypi.python.org/pypi/py-wikimarkup), GPL3
 
