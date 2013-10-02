@@ -203,13 +203,17 @@ def downloadmax(f):
     """
     @functools.wraps(f)
     def wrapper(self, params):
+        downloadmax = None
         if 'FERENDA_DOWNLOADMAX' in os.environ:
-            self.config.downloadmax = int(os.environ['FERENDA_DOWNLOADMAX'])
-        if self.config.downloadmax:
+            downloadmax = int(os.environ['FERENDA_DOWNLOADMAX'])
+        elif self.config.downloadmax:
+            downloadmax = self.config.downloadmax
+
+        if downloadmax:
             self.log.info("Downloading max %d documents" %
-                          (self.config.downloadmax))
+                          (downloadmax))
             generator = itertools.islice(f(self, params),
-                                         self.config.downloadmax)
+                                         downloadmax)
         else:
             self.log.debug("Downloading all the docs")
             generator = f(self, params)

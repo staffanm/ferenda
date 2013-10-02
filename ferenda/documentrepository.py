@@ -657,11 +657,11 @@ uri doesn't map to a basefile in this repo."""
             # headers to find if we should change file
             # modification time (last-modified) and/or create a
             # .etag file (etag)
-            if response.headers["last-modified"]:
+            if response.headers.get("last-modified"):
                 mtime = calendar.timegm(util.parse_rfc822_date(
                     response.headers["last-modified"]).timetuple())
                 os.utime(filename, (time.time(), mtime))
-            if response.headers["etag"]:
+            if response.headers.get("etag"):
                 with open(filename + ".etag", "w") as fp:
                     fp.write(response.headers["etag"])
         return updated

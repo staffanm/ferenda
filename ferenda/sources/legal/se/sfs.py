@@ -28,6 +28,7 @@ from rdflib import Graph, Namespace, URIRef, RDF, Literal
 from lxml import etree
 from lxml.builder import ElementMaker
 import bs4
+import requests
 
 # my own libraries
 from . import Trips, RPUBL
@@ -339,6 +340,10 @@ class SFS(Trips):
                                   "${HTML}=sfst_lst&${SNHTML}=sfsr_err&${BASE}=SFSR&"
                                   "${TRIPSHOW}=format=THW&BET=%(basefile)s")
 
+    document_sfsr_change_url_template = ("http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfsr_dok&"
+                                         "${HTML}=sfst_lst&${SNHTML}=sfsr_err&${BASE}=SFSR&"
+                                         "${TRIPSHOW}=format=THW&%%C4BET=%(basefile)s")
+
     documentstore_class = SFSDocumentStore
 
     def __init__(self, **kwargs):
@@ -355,8 +360,13 @@ class SFS(Trips):
         self.current_headline_level = 0  # 0 = unknown, 1 = normal, 2 = sub
 
     def get_default_options(self):
+        resource_path = "../../../res/etc/sfs-extra.n3"
+        resource_path = os.path.normpath(
+            os.path.dirname(__file__) + os.sep + resource_path)
+        
         opts = super(SFS, self).get_default_options()
         opts['keepexpired'] = False
+        opts['lawabbrevs'] = resource_path
         return opts
 
     def canonical_uri(self, basefile, konsolidering=False):
@@ -368,6 +378,16 @@ class SFS(Trips):
                 return "%s/%s/konsolidering/%s" % (baseuri, basefile, konsolidering)
         else:
             return "%s/%s" % (baseuri, basefile)
+
+    def download(self, basefile=None):
+        if self.config.refresh or (not 'next_sfsnr' in self.config):
+            ret = super(SFS,self).download(basefile)
+            self._set_last_sfsnr()
+        else:
+            ret = self.download_new()
+        return ret
+        
+        
 
     def _set_last_sfsnr(self, last_sfsnr=None):
         maxyear = datetime.today().year
@@ -398,45 +418,48 @@ class SFS(Trips):
         real_last_sfs_nr = False
         while not done:
             wanted_sfs_nr = '%s:%s' % (year, nr)
-            self.log.info('Söker efter SFS nr %s' % wanted_sfs_nr)
+            self.log.info('Looking for %s' % wanted_sfs_nr)
             base_sfsnr_list = self._check_for_sfs(year, nr)
             if base_sfsnr_list:
-                self.download_log.info(
-                    "%s:%s [%s]" % (year, nr, ", ".join(base_sfsnr_list)))
                 # usually only a 1-elem list
                 for base_sfsnr in base_sfsnr_list:
-                    uppdaterad_tom = self._downloadSingle(base_sfsnr)
+                    self.download_single(base_sfsnr)
+                    # get hold of uppdaterad_tom from the
+                    # just-downloaded doc
+                    filename = self.store.downloaded_path(base_sfsnr)
+                    uppdaterad_tom = self._find_uppdaterad_tom(base_sfsnr,
+                                                               filename)
                     if base_sfsnr_list[0] == wanted_sfs_nr:
                         # initial grundförfattning - varken
                         # "Uppdaterad T.O.M. eller "Upphävd av" ska
                         # vara satt
                         pass
                     elif util.numcmp(uppdaterad_tom, wanted_sfs_nr) < 0:
-                        self.log.warning("    Texten uppdaterad t.o.m. %s, "
-                                         "inte %s" %
+                        self.log.warning("    Text updated to and including %s, "
+                                         "not %s" %
                                          (uppdaterad_tom, wanted_sfs_nr))
                         if not real_last_sfs_nr:
                             real_last_sfs_nr = wanted_sfs_nr
                 nr = nr + 1
             else:
-                self.log.info('tjuvkikar efter SFS nr %s:%s' % (year, nr + 1))
+                self.log.info('Peeking for SFS %s:%s' % (year, nr + 1))
                 base_sfsnr_list = self._check_for_sfs(year, nr + 1)
                 if base_sfsnr_list:
                     if not real_last_sfs_nr:
                         real_last_sfs_nr = wanted_sfs_nr
                     nr = nr + 1  # actual downloading next loop
                 elif datetime.today().year > year:
-                    self.log.info('    Är det dags att byta år?')
+                    self.log.info('    Time to change year?')
                     base_sfsnr_list = self._check_for_sfs(
                         datetime.today().year, 1)
                     if base_sfsnr_list:
                         year = datetime.today().year
                         nr = 1  # actual downloading next loop
                     else:
-                        self.log.info('    Vi är klara')
+                        self.log.info("    We're done")
                         done = True
                 else:
-                    self.log.info('    Vi är klara')
+                    self.log.info("    We're done")
                     done = True
         if real_last_sfs_nr:
             self._set_last_sfsnr(real_last_sfs_nr)
@@ -450,12 +473,10 @@ class SFS(Trips):
         (exv 2008:605) finns flera. Om SFS-numret inte finns alls,
         returnera en tom lista."""
         # Titta först efter grundförfattning
-        self.log.info('    Letar efter grundförfattning')
+        self.log.debug('    Looking for base act')
         grundforf = []
-        url = ("http://62.95.69.15/cgi-bin/thw?${HTML}=sfsr_lst&"
-               "${OOHTML}=sfsr_dok&${SNHTML}=sfsr_err&${MAXPAGE}=26&"
-               "${BASE}=SFSR&${FORD}=FIND&${FREETEXT}=&BET=%s:%s&"
-               "\xC4BET=&ORG=" % (year, nr))
+        basefile = "%s:%s" % (year,nr)
+        url = self.document_sfsr_url_template % {'basefile': basefile}
         t = TextReader(string=requests.get(url).text)
         try:
             t.cue("<p>Sökningen gav ingen träff!</p>")
@@ -464,23 +485,19 @@ class SFS(Trips):
             return grundforf
 
         # Sen efter ändringsförfattning
-        self.log.info('    Letar efter ändringsförfattning')
-        url = ("http://62.95.69.15/cgi-bin/thw?${HTML}=sfsr_lst&"
-               "${OOHTML}=sfsr_dok&${SNHTML}=sfsr_err&${MAXPAGE}=26&"
-               "${BASE}=SFSR&${FORD}=FIND&${FREETEXT}=&BET=&"
-               "\xC4BET=%s:%s&ORG=" % (year, nr))
-
+        self.log.debug('    Looking for change act')
+        url = self.document_sfsr_change_url_template % {'basefile': basefile}
         t = TextReader(string=requests.get(url).text)
         try:
             t.cue("<p>Sökningen gav ingen träff!</p>")
-            self.log.info('    Hittade ingen ändringsförfattning')
+            self.log.debug('    Found no change act')
             return grundforf
         except IOError:
             t.seek(0)
             try:
                 t.cuepast('<input type="hidden" name="BET" value="')
                 grundforf.append(t.readto("$"))
-                self.log.debug('    Hittade ändringsförfattning (till %s)' %
+                self.log.debug('    Found change act (to %s)' %
                                grundforf[-1])
                 return grundforf
             except IOError:
@@ -488,11 +505,11 @@ class SFS(Trips):
                 page = t.read(sys.maxsize)
                 for m in re.finditer('>(\d+:\d+)</a>', page):
                     grundforf.append(m.group(1))
-                    self.log.debug('    Hittade ändringsförfattning (till %s)'
+                    self.log.debug('    Found change act (to %s)'
                                    % grundforf[-1])
                 return grundforf
 
-    def download_single(self, basefile, url):
+    def download_single(self, basefile, url=None):
         """Laddar ner senaste konsoliderade versionen av
         grundförfattningen med angivet SFS-nr. Om en tidigare version
         finns på disk, arkiveras den. Returnerar det SFS-nummer till
@@ -516,8 +533,12 @@ class SFS(Trips):
         # using the attachment functionality makes some sense, but
         # requires that self.store.storage_policy = "dir"
         # regfilename= self.store.downloaded_path(basefile,attachment="register")
-        metadatafilename = self.store.metadata_path(basefile)
-        self.download_if_needed(url, basefile, archive=False, filename=metadatafilename)
+        # The method used by download_new does not allow us to
+        # discover the magic URL to the database view containing
+        # metadata
+        if url: 
+            metadatafilename = self.store.metadata_path(basefile)
+            self.download_if_needed(url, basefile, archive=False, filename=metadatafilename)
         regfilename = self.store.register_path(basefile)
         self.download_if_needed(sfsr_url, basefile, archive=False, filename=regfilename)
         entry = DocumentEntry(self.store.documententry_path(basefile))
@@ -794,11 +815,7 @@ class SFS(Trips):
         # find any established abbreviation -- FIXME: simplifize, most
         # code should be in SwedishLegalSource (c.f. lookup_resource)
         g = Graph()
-        resource_path = "../../../res/etc/sfs-extra.n3"
-        if not resource_path.startswith(os.sep):
-            resource_path = os.path.normpath(
-                os.path.dirname(__file__) + os.sep + resource_path)
-        g.load(resource_path, format="n3")
+        g.load(self.config.lawabbrevs, format="n3")
         grf_uri = self.canonical_uri(doc.basefile)
         v = g.value(URIRef(grf_uri), self.ns['dct'].alternate, any=True)
         if v:

@@ -280,6 +280,11 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             if urlspec['charset']:
                 with codecs.open(url_location, "r", encoding=urlspec['charset']) as fp:
                     res.text = fp.read()
+            # FIXME: Using a defaultdict ensures that we'll never trip
+            # over the non-existance of certain headers. WE should
+            # specify only the most basic headers to make sure calling
+            # code doesn't rely on eg. the etag header always being
+            # there, because it won't
             res.headers = collections.defaultdict(lambda: None)
             res.headers['X-These-Headers-Are'] = 'Faked'
             res.status_code = 200

@@ -54,6 +54,13 @@ class SwedishLegalSource(DocumentRepository):
     swedish_ordinal_dict = dict(list(zip(
         swedish_ordinal_list, list(range(1, len(swedish_ordinal_list) + 1)))))
 
+    def get_default_options(self):
+        resource_path = os.path.normpath(
+            os.path.dirname(__file__) + "../../../res/etc/authrec.n3")
+        opts = super(SwedishLegalSource, self).get_default_options()
+        opts['authrec'] = resource_path
+        return opts
+
     def _swedish_ordinal(self, s):
         sl = s.lower()
         if sl in self.swedish_ordinal_dict:
@@ -62,10 +69,7 @@ class SwedishLegalSource(DocumentRepository):
 
     def _load_resources(self, resource_path):
         # returns a mapping [resource label] => [resource uri]
-        # resource_path is given relative to the current source code file
-        if not resource_path.startswith(os.sep):
-            resource_path = os.path.normpath(
-                os.path.dirname(__file__) + os.sep + resource_path)
+        # resource_path is given relative to cwd
         graph = Graph()
         graph.load(resource_path, format='n3')
         d = {}
@@ -82,7 +86,7 @@ class SwedishLegalSource(DocumentRepository):
         parameter) entity."""
         keys = []
         if not hasattr(self, 'org_resources'):
-            self.org_resources = self._load_resources("../../../res/etc/authrec.n3")
+            self.org_resources = self._load_resources(self.config.authrec)
 
         for (key, value) in list(self.org_resources.items()):
             if resource_label.lower().startswith(key.lower()):
@@ -102,7 +106,7 @@ class SwedishLegalSource(DocumentRepository):
 
     def lookup_label(self, resource):
         if not hasattr(self, 'org_resources'):
-            self.org_resources = self._load_resources("../res/etc/authrec.n3")
+            self.org_resources = self._load_resources(self.config.authrec)
         for (key, value) in list(self.org_resources.items()):
             if resource == value:
                 return key
