@@ -56,7 +56,7 @@ class SwedishLegalSource(DocumentRepository):
 
     def get_default_options(self):
         resource_path = os.path.normpath(
-            os.path.dirname(__file__) + "../../../res/etc/authrec.n3")
+            os.path.dirname(__file__) + "../../../../res/etc/authrec.n3")
         opts = super(SwedishLegalSource, self).get_default_options()
         opts['authrec'] = resource_path
         return opts
