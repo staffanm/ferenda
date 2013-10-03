@@ -231,6 +231,7 @@ JSON files, stored alongside the documents themselves, and are used by
 the :py:meth:`~ferenda.DocumentRepository.news` method in order to
 create valid Atom feeds.
 
+.. _file-storage:
 
 File storage
 ------------

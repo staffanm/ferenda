@@ -1,5 +1,6 @@
-Creating your own document repositories
-=======================================
+=========================================
+ Creating your own document repositories
+=========================================
 
 The next step is to do more substantial adjustments to the
 download/parse/generate cycle. As the source for our next docrepo
@@ -15,77 +16,30 @@ collection in a better way.
 .. _implementing-download:
 
 Writing your own ``download`` implementation
---------------------------------------------
+============================================
 
-The purpose of the
-:meth:`~ferenda.DocumentRepository.download` method is to
-fetch source documents from a remote source and store them locally,
-possibly under different filenames but otherwise bit-for-bit identical
-with how they were stored at the remote source.
+The purpose of the :meth:`~ferenda.DocumentRepository.download` method
+is to fetch source documents from a remote source and store them
+locally, possibly under different filenames but otherwise bit-for-bit
+identical with how they were stored at the remote source (see
+:ref:`file-storage` for more information about how and where files are
+stored locally).
 
-Each document must have a short internal identifier (the ``basefile``
-of the document). This basefile is used when naming of all files
-related to that document. When creating a
-:class:`~ferenda.DocumentRepository` object, a
-:class:`~ferenda.DocumentStore` object is also created and is
-available as the ``store`` property. This object is used when storing
-or reading any file related to the document.
+The default implementation of
+:meth:`~ferenda.DocumentRepository.download` uses a small number of
+methods and class variables to do the actual work. By selectively
+overriding these, you can often avoid rewriting a complete
+implementation of :meth:`~ferenda.DocumentRepository.download`.
 
-.. note::
-
-   Right now, ferenda stores all content as normal files on
-   disk. Because of this, it's often easiest to retrieve a filename
-   using any of the methods in :class:`~ferenda.DocumentStore` and
-   then use normal file operations using that filename. However, there
-   exists a number of :class:`~ferenda.DocumentStore` methods that
-   returns open filehandles (for instance
-   :meth:`~ferenda.DocumentStore.open_downloaded`; if your code can be
-   written to use these, it will be easier to transition to other
-   storage backends such as MongoDB, Amazon S3 or Git, if supported in
-   the future.
-
-
-To find out the location of the downloaded source file for any
-document, use the :meth:`~ferenda.DocumentStore.downloaded_path`
-method. The default implementation (which you can override) is to use
-a name like
-``<datadir>/<alias>/downloaded/<basefile>.<downloaded_suffix>``, eg
-for RFC 6725 in our example ``data/rfc/downloaded/6725.txt``.
-
-.. note::
-
-   Reasons for overriding this naming scheme can be that you have a
-   large (over 1000) number of documents, which makes it impractical
-   to put them all in the same root directory, or that you wish to use
-   basefiles that have characters not allowed in file names (such as
-   ``:``)
-
-When writing your own
-:meth:`~ferenda.DocumentRepository.download`
-implementation, the main flow of the method is usually to perform some
-sort of search or listing, then iterating through the results, finding
-the basefile of each document together with the URL of the
-document. The helper method
-:meth:`~ferenda.DocumentRepository.download_single`
-performs the actual downloading and places the retrieved file in the
-correct location.
-
-In this approach, it's neccessary that the result data contains enough
-information to find out the basefile of any document before it's
-downloaded. Fortunately, that is almost often the case.
-
-.. note::
-
-   The ``basefile`` is a purely internal identifier; by default it
-   shows up in URI paths, but if you want you can hide it entirely
-   from public view.
+A simple example
+----------------
 
 We'll start out by creating a class similar to our W3C class in
 :doc:`firststeps`. All RFC documents are listed in the index file at
 http://www.ietf.org/download/rfc-index.txt, while a individual
 document (such as RFC 6725) are available at
-http://tools.ietf.org/rfc/rfc6725.txt. Our first attempt will look like
-this (save as ``rfcs.py``)
+http://tools.ietf.org/rfc/rfc6725.txt. Our first attempt will look
+like this (save as ``rfcs.py``)
 
    
 .. literalinclude:: examples/rfcs.py
@@ -100,20 +54,9 @@ And we'll enable it and try to run it like before:
   $ ./ferenda-build.py rfc download
   
 This doesn't work! This is because start page contains no actual HTML
-links -- it's a plaintext file. However, we CAN do the following::
-
-  $ ./ferenda-build.py rfc download 6725
-
-This is because the default implementation of download delegates the
-downloading of individual documents to
-:meth:`~ferenda.DocumentRepository.download_single`, which in turn
-uses the :data:`~ferenda.DocumentRepository.document_url_template` as
-a template to find out that basefile 6725 can be found at
-http://tools.ietf.org/rfc/rfc6725.txt
-
-But in order to download *everything* we need to parse the index text
-file to find out all available basefiles. In order to do that, we must
-override :meth:`~ferenda.DocumentRepository.download`. 
+links -- it's a plaintext file. We need to parse the index text file
+to find out all available basefiles. In order to do that, we must
+override :meth:`~ferenda.DocumentRepository.download`.
 
 .. literalinclude:: examples/rfcs.py
    :start-after: # begin download2
@@ -124,13 +67,13 @@ Since the RFC index is a plain text file, we use the
 functionality to make it easier to work with plain text files. In this
 case, we'll iterate through the file one paragraph at a time, and if
 the paragraph starts with a four-digit number (and the number hasn't
-been marked "Not Issued.") we'll download it by callling
+been marked "Not Issued.") we'll download it by calling
 :meth:`~ferenda.DocumentRepository.download_single`.
 
 Like the default implementation, we offload the main work to
-:meth:`~ferenda.DocumentRepository.download_single`, which will
-look if the file exists on disk and only if not, attempt to download
-it. If the ``--refresh`` parameter is provided, a `conditional get
+:meth:`~ferenda.DocumentRepository.download_single`, which will look
+if the file exists on disk and only if not, attempt to download it. If
+the ``--refresh`` parameter is provided, a `conditional get
 <http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.3>`_ is
 performed and only if the server says the document has changed, it is
 re-downloaded.
@@ -152,8 +95,172 @@ actual content combined with a HTML document with document
 metadata). For these cases, you need to override
 :meth:`~ferenda.DocumentRepository.download_single`.
 
+
+The main flow of the download process
+-------------------------------------
+
+The main flow is that the :meth:`~ferenda.DocumentRepository.download`
+method itself does some source-specific setup, which often include
+downloading some sort of index or search results page. The location of
+that index resource is given by the class variable
+:data:`~ferenda.DocumentRepository.start_url`.
+:meth:`~ferenda.DocumentRepository.download` then calls
+:meth:`~ferenda.DocumentRepository.download_get_basefiles` which
+returns an iterator of basefiles.
+
+
+For each basefile, :meth:`~ferenda.DocumentRepository.download_single`
+is called. This method is responsible for downloading everything
+related to a single document. Most of the time, this is just a single
+file, but can occasionally be a set of files (like a HTML document
+with accompanying images, or a set of PDF files that conceptually is a
+single document).
+
+The default implementation of
+:meth:`~ferenda.DocumentRepository.download_single` assumes that a
+document is just a single file, and calculates the URL of that
+document by calling the :meth:`~ferenda.DocumentRepository.remote_url`
+method.
+
+The default :meth:`~ferenda.DocumentRepository.remote_url` method uses
+the class variable
+:data:`~ferenda.DocumentRepository.document_url_template`. This string
+template should be using string formatting and expect a variable
+called ``basefile``. The default implementation of
+:meth:`~ferenda.DocumentRepository.remote_url` can in other words only
+be used if the URLs of the remote source are predictable and directly
+based on the ``basefile``.
+
+.. note::
+
+   In many cases, the URL for the remote version of a document can be
+   impossible to calculate from the basefile only, but be readily
+   available from the main index page or search result page. For those
+   cases, :meth:`~ferenda.DocumentRepository.download_get_basefiles`
+   should return a iterator that yields ``(basefile, url)``
+   tuples. The default implementation of
+   :meth:`~ferenda.DocumentRepository.download` handles this and uses
+   ``url`` as the second, optional argument to download_single.
+
+Finally, the actual downloading of individual files is done by the
+:meth:`~ferenda.DocumentRepository.download_if_needed` method. As the
+name implies, this method tries to avoid downloading anything from the
+network if it's not strictly needed.  If there is a file in-place
+already, a conditional GET is done (using the timestamp of the file
+for a ``If-modified-since`` header, and an associated .etag file for a
+``If-none-match`` header). This avoids re-downloading the (potentially
+large) file if it hasn't changed.
+
+To summarize: The main chain of calls looks something like this::
+
+    download
+      start_url (class variable)
+      download_get_basefiles (instancemethod) - iterator 
+      download_single (instancemethod)
+         remote_url (instancemethod)
+             document_url_template (class variable)
+         download_if_needed (instancemethod)
+
+
+These are the methods that you may override, and when you might want to do so:
+
+
+====================== ==================================  ==================================
+method                 Default behaviour                   Override when
+====================== ==================================  ==================================
+download               Download the contents of            All your documents are not linked 
+                       ``start_url`` and extracts all      from a single index page (i.e. paged
+                       links by ``lxml.html.iterlinks``,   search results). In these cases, you 
+                       which are passed to                 should override  
+                       ``download_get_basefiles``.         ``download_get_basefiles`` as well
+                       For each item that is returned,     and make that method responsible for
+                       call download_single.               fetching all pages of search results.
+---------------------- ----------------------------------  ----------------------------------
+download_get_basefiles Iterate through the (element,       The basefile/url extraction is more
+                       attribute, link, url) tuples from   complicated than what can be achieved
+                       the source and examine if link      through the ``basefile_regex`` /
+                       matches ``basefile_regex`` or if    ``document_url_regex`` mechanism, or 
+                       url match ``document_url_regex``.   when you've overridden download to 
+                       If so, yield a                      pass a different argument than a 
+                       (text, url) tuple.                  link iterator. Note that you must
+		                                           return an iterator by using the 
+		                                           ``yield`` statement for each basefile
+							   found.
+---------------------- ----------------------------------  ----------------------------------
+download_single        Calculates the url of the document  The complete contents of your 
+                       to download (or, if a URL is        document is contained in several
+                       provided, uses that), and calls     different files. In these cases, you
+                       ``download_if_needed`` with that.   should start with the main one and
+                       Afterwards, updates the             call ``download_if_needed`` for that,
+                       ``DocumentEntry`` of the document   then calculate urls and file paths
+                       to reflect source url and download  (using the ``attachment`` parameter to
+                       timestamps.                         ``store.downloaded_path``) for each
+                                                           additional file, then call
+                                                           ``download_if_needed`` for each. Finally,
+							   you must update the ``DocumentEntry``
+							   object.
+---------------------- ----------------------------------  ----------------------------------
+remote_url             Calculates a URL from a basename    The rules for producing a URL from a
+                       using ``document_url_template``     basefile is more complicated than 
+                                                           what string formatting can achieve.
+---------------------- ----------------------------------  ----------------------------------
+download_if_needed     Downloads an individual URL to a    You really shouldn't. 
+                       local file. Makes sure the local 
+                       file has the same timestamp as the
+                       Last-modified header from the
+                       server. If an older version of the
+                       file is present, this can either 
+                       be archived (the default) or
+                       overwritten.             
+====================== ==================================  ==================================
+
+
+The optional basefile argument
+------------------------------
+
+During early stages of development, it's often useful to just download
+a single document, both in order to check out that download_single
+works as it should, and to have sample documents for parse. When using
+the ferenda-build.py tool, the download command can take a single
+optional parameter, ie.::
+
+    ./ferenda-build.py rfc download 6725
+
+If provided, this parameter is passed to the download method as the
+optional basefile parameter.  The default implementation of download
+checks if this parameter is provided, and if so, simply calls
+download_single with that parameter, skipping the full download
+procedure. If you're overriding download, you should support this
+usage, by starting your implementation with something like this::
+
+    def download(self, basefile=None):
+        if basefile:
+            return self.download_single(basefile)
+
+        # the rest of your code
+
+
+The :func:`~ferenda.decorators.downloadmax` decorator
+-----------------------------------------------------
+
+As we saw in :doc:`intro`, the built-in docrepos support a
+``downloadmax`` configuration parameter. The effect of this parameter
+is simply to interrupt the downloading process after a certain amount
+of documents have been downloaded. This can be useful when doing
+integration-type testing, or if you just want to make it easy for
+someone else to try out your docrepo class. The separation between the
+main :meth:`~ferenda.DocumentRepository.download` method anbd the
+:meth:`~ferenda.DocumentRepository.download_get_basefiles` helper
+method makes this easy -- just add the
+``@``:func:`~ferenda.decorators.downloadmax` to the latter. This
+decorator reads the ``downloadmax`` configuration parameter (it also
+looks for a ``FERENDA_DOWNLOADMAX`` environment variable) and if set,
+limits the number of basefiles returned by
+:meth:`~ferenda.DocumentRepository.download_get_basefiles`.
+	
+
 Writing your own ``parse`` implementation
------------------------------------------
+=========================================
 
 The purpose of the
 :meth:`~ferenda.DocumentRepository.parse` method is to take
@@ -194,7 +301,7 @@ other parts of the text or other RFCs in full.
 
 
 Handling document structure
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+---------------------------
 
 The main text of a RFC is structured into sections, which may contain
 subsections, which in turn can contain subsubsections. The start of
@@ -261,7 +368,7 @@ Note in particular that every section and subsection now has a defined
 URI (in the ``@about`` attribute). This will be useful later.
     
 Handling citations in text
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+--------------------------
 
 References / citations in RFC text is often of the form ``"are to be
 interpreted as described in [RFC2119]"`` (for citations to other RFCs
@@ -333,7 +440,7 @@ references in text more correctly. See also :doc:`elementclasses`,
 :doc:`fsmparser` and :doc:`citationparsing`.
 
 Calling :meth:`~ferenda.DocumentRepository.relate`
------------------------------------------------------
+==================================================
 
 The purpose of the :meth:`~ferenda.DocumentRepository.relate`
 method is to make sure that all document data and metadata is properly
@@ -358,7 +465,7 @@ docrepo, you should not have to change anything about this step.
 
 
 Calling :func:`~ferenda.manager.makeresources`
------------------------------------------------------
+==============================================
 
 This method needs to run at some point before generate and the rest of
 the methods. Unlike the other methods described above and below, which
@@ -383,7 +490,7 @@ should be stored::
   
 
 Customizing :meth:`~ferenda.DocumentRepository.generate`
--------------------------------------------------------------------------
+========================================================
 
 The purpose of the
 :meth:`~ferenda.DocumentRepository.generate` method is to
@@ -415,7 +522,7 @@ want to control how the annotation file and the XSLT transformation is
 done.
 
 Getting annotations
-^^^^^^^^^^^^^^^^^^^
+-------------------
 
 The :meth:`~ferenda.DocumentRepository.prep_annotation_file` step is
 driven by a `SPARQL construct query
@@ -492,7 +599,7 @@ obsoletes the same document (RFC 6991).
 
    
 Transforming to HTML
-^^^^^^^^^^^^^^^^^^^^^
+--------------------
 
 The :class:`~ferenda.Transformer` step is driven by a XSLT
 stylesheet. The default stylesheet uses a site-wide configuration file
@@ -545,7 +652,7 @@ part of the document, independent of the nesting level.
    
 
 Customizing :meth:`~ferenda.DocumentRepository.toc`
---------------------------------------------------------------------
+===================================================
 
 The purpose of the :meth:`~ferenda.DocumentRepository.toc`
 method is to create a set of pages that acts as tables of contents for
@@ -606,7 +713,7 @@ RFC number in this display. This is done by overriding
 Se also :doc:`toc`.
 
 Customizing :meth:`~ferenda.DocumentRepository.news`
----------------------------------------------------------------------
+====================================================
 The purpose of :meth:`~ferenda.DocumentRepository.news`,
 the next to final step, is to provide a set of news feeds for your document
 repository.
@@ -641,7 +748,7 @@ particular category.
 Se also :doc:`news`.
 
 Customizing :func:`~ferenda.manager.frontpage`
-----------------------------------------------
+==============================================
 
 Finally, :func:`~ferenda.manager.frontpage` creates a front page for
 your entire site with content from the different docrepos. Each
@@ -656,7 +763,7 @@ the five latest documents, as well as a total count of documents.
    :end-before: # end frontpage_content
 
 Next steps
-----------
+==========
 
 When you have written code and customized downloading, parsing and all
 the other steps, you'll want to run all these steps for all your
