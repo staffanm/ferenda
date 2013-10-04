@@ -15,6 +15,7 @@ import shutil
 import tempfile
 import time
 import calendar
+import json
 
 import lxml.etree as etree
 from lxml.etree import XSLT
@@ -22,12 +23,7 @@ from lxml.builder import ElementMaker
 import rdflib
 
 # import six
-try:
-    # assume we're on py3.3 and fall back if not
-    from unittest.mock import Mock, MagicMock, patch, call
-except ImportError:
-    from mock import Mock, patch, call
-# from requests.exceptions import HTTPError
+from ferenda.compat import Mock, patch, call
 from bs4 import BeautifulSoup
 import doctest
 
@@ -932,216 +928,30 @@ class Repo(RepoTester):
                          len(list(util.list_dirs(self.datadir, '.txt'))))
 
 class Generate(RepoTester):
-    repo_a = """
-@prefix dct: <http://purl.org/dc/terms/> .
-@prefix : <http://example.org/repo/a/> .
-
-:1 a :FooDoc;
-   dct:title "The title of Document A 1";
-   dct:identifier "A1" .
-
-:1part a :DocumentPart;
-   dct:isPartOf :1;
-   dct:identifier "A1(part)" .
-
-:2 a :FooDoc;
-   dct:title "The title of Document A 2";
-   dct:identifier "A2";
-   dct:references :1 . 
-
-:2part1 a :DocumentPart;
-   dct:isPartOf :2;
-   dct:identifier "A2(part1)";
-   dct:references :1 . 
-
-:2part2 a :DocumentPart;
-   dct:isPartOf :2;
-   dct:identifier "A2(part2)";
-   dct:references <http://example.org/repo/a/1part> .
-
-:3 a :FooDoc;
-   dct:title "The title of Document A 3";
-   dct:identifier "A3" .
-"""
-    repo_b = """
-@prefix dct: <http://purl.org/dc/terms/> .
-@prefix a: <http://example.org/repo/a/> .
-@prefix : <http://example.org/repo/b/> .
-
-:1 a :BarDoc;
-   dct:title "The title of Document B 1";
-   dct:identifier "B1";
-   dct:references a:1 . 
-
-:1part a a:DocumentPart;
-   dct:isPartOf :1;
-   dct:identifier "B1(part)";
-   dct:references a:1 . 
-
-:2 a :BarDoc;
-   dct:title "The title of Document B 2";
-   dct:identifier "B2" .
-"""
-    # this is the graph we expect when querying for
-    # http://example.org/repo/a/1
-    annotations_a1 = """
-@prefix dct: <http://purl.org/dc/terms/> .
-@prefix : <http://example.org/repo/a/> .
-@prefix b: <http://example.org/repo/b/> .
-
-:1 a :FooDoc;
-   dct:title "The title of Document A 1";
-   dct:identifier "A1" ;
-   dct:isReferencedBy :2,
-                      :2part1,
-                      b:1,
-                      b:1part .
-
-:1part a :DocumentPart;
-    dct:isPartOf :1;
-    dct:identifier "A1(part)";
-    dct:isReferencedBy :2part2 .
-
-:2 a :FooDoc;
-    dct:references :1;
-    dct:title "The title of Document A 2";
-    dct:identifier "A2" .
-
-:2part1 a :DocumentPart;
-    dct:references :1;
-    dct:isPartOf :2;
-    dct:identifier "A2(part1)" .
-
-:2part2 a :DocumentPart;
-    dct:references :1part;
-    dct:isPartOf :2;
-    dct:identifier "A2(part2)" .
-
-b:1 a b:BarDoc;
-    dct:references :1;
-    dct:title "The title of Document B 1";
-    dct:identifier "B1" . 
-
-b:1part a :DocumentPart;
-    dct:isPartOf b:1;
-    dct:references :1;
-    dct:identifier "B1(part)" .
-"""
-
-    annotations_b1 = """
-@prefix dct: <http://purl.org/dc/terms/> .
-@prefix a: <http://example.org/repo/a/> .
-@prefix : <http://example.org/repo/b/> .
-
-:1 a :BarDoc;
-   dct:isReferencedBy :1part;
-   dct:title "The title of Document B 1";
-   dct:identifier "B1";
-   dct:references a:1 . 
-
-:1part a a:DocumentPart;
-   dct:isPartOf :1;
-   dct:identifier "B1(part)";
-   dct:references a:1 . 
-"""
 
     class TestRepo(DocumentRepository):
         alias = "test"
         
         def canonical_uri(self,basefile):
             return "http://example.org/repo/a/%s" % basefile
+
+    repoclass = TestRepo
             
-    
     def setUp(self):
-        self.datadir = tempfile.mkdtemp()
-        self.storetype = None
+        super(Generate, self).setUp() # sets up self.repo, self.datadir
         resources = self.datadir+os.sep+"rsrc"+os.sep+"resources.xml"
         util.ensure_dir(resources)
         shutil.copy2("%s/files/base/rsrc/resources.xml"%os.path.dirname(__file__),
                      resources)
 
-    def tearDown(self):
-        if self.storetype:
-            store = TripleStore.connect(storetype=self.repo.config.storetype,
-                                        location=self.repo.config.storelocation,
-                                        repository=self.repo.config.storerepository)
-            store.clear()
-            if self.repo.config.storetype == "SLEEPYCAT":
-                store.graph.close()
-        shutil.rmtree(self.datadir)
-        
-    def _load_store(self, repo):
-        store = TripleStore.connect(storetype=repo.config.storetype,
-                                    location=repo.config.storelocation,
-                                    repository=repo.config.storerepository)
-        store.add_serialized(self.repo_a, format="turtle")
-        store.add_serialized(self.repo_b, format="turtle")
-        if repo.config.storetype == "SLEEPYCAT":
-            store.graph.close()
-        # return store
-        
-    def _test_construct_annotations(self, repo):
-        want = rdflib.Graph()
-        want.parse(data=self.annotations_a1,format="turtle")
-        got = repo.construct_annotations("http://example.org/repo/a/1")
-        self.assertEqualGraphs(want, got, exact=True)
-
-    def _get_repo(self, storetype=None):
-        params = {'storetype':storetype,
-                  'datadir':self.datadir,
-                  'storerepository':'ferenda'}
-
-        self.storetype = None
-        if storetype == 'SQLITE':
-            params['storelocation'] = self.datadir+"/ferenda.sqlite"
-        elif storetype == 'SLEEPYCAT':
-            params['storelocation'] = self.datadir+"/ferenda.db"
-        elif storetype == 'FUSEKI':
-            params['storelocation'] = 'http://localhost:3030/'
-            params['storerepository'] = 'ds'
-        elif storetype == 'SESAME':
-            params['storelocation'] = 'http://localhost:8080/openrdf-sesame'
-        elif storetype == None:
-            del params['storetype']
-            del params['storerepository']
-            params['storelocation'] = None
-        else:
-            self.fail("Storetype %s not valid" % storetype)
-        return self.TestRepo(**params)
-            
-    def test_construct_annotations_sqlite(self):
-        self.repo = self._get_repo('SQLITE')
-        self._load_store(self.repo)
-        self._test_construct_annotations(self.repo)
-
-    @unittest.skipIf('SKIP_SLEEPYCAT_TESTS' in os.environ,
-                     "Skipping Sleepycat tests")    
-    def test_construct_annotations_sleepycat(self):
-        self.repo = self._get_repo('SLEEPYCAT')
-        self._load_store(self.repo)
-        self._test_construct_annotations(self.repo)
-
-    @unittest.skipIf('SKIP_FUSEKI_TESTS' in os.environ,
-                     "Skipping Fuseki tests")    
-    def test_construct_annotations_fuseki(self):
-        self.repo = self._get_repo('FUSEKI')
-        self._load_store(self.repo)
-        self._test_construct_annotations(self.repo)
-
-    @unittest.skipIf('SKIP_SESAME_TESTS' in os.environ,
-                     "Skipping Sesame tests")    
-    def test_construct_annotations_sesame(self):
-        self.repo = self._get_repo('SESAME')
-        self._load_store(self.repo)
-        self._test_construct_annotations(self.repo)
-
     def test_graph_to_annotation_file(self):
         testgraph = rdflib.Graph()
-        testgraph.parse(data=self.annotations_b1,format="turtle")
+        testgraph.parse(
+            data=util.readfile("test/files/datasets/annotations_b1.ttl"),
+            format="turtle")
         testgraph.bind("a", rdflib.Namespace("http://example.org/repo/a/"))
         testgraph.bind("b", rdflib.Namespace("http://example.org/repo/b/"))
         testgraph.bind("dct", rdflib.Namespace("http://purl.org/dc/terms/"))
-        self.repo = self._get_repo()
         annotations = self.repo.graph_to_annotation_file(testgraph)
         self.maxDiff = None
         want = """<graph xmlns:dct="http://purl.org/dc/terms/"
@@ -1164,7 +974,7 @@ b:1part a :DocumentPart;
 </graph>"""
         self.assertEqualXML(want,annotations)
 
-    def _test_generated(self):
+    def test_generated(self):
         with self.repo.store.open_parsed("1", "w") as fp:
             fp.write("""<?xml version='1.0' encoding='utf-8'?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
@@ -1183,14 +993,15 @@ b:1part a :DocumentPart;
 </html>""")
         self.assertEqual("http://example.org/repo/a/1",
                          self.repo.canonical_uri("1"))
-        self.repo.generate("1")
-        
-        # print("-----------------ANNOTATIONS--------------")
-        # with self.repo.store.open_annotation("1") as fp:
-        #     print(fp.read())
-        # print("-----------------GENERATED RESULT--------------")
-        # with self.repo.store.open_generated("1") as fp:
-        #     print(fp.read())
+        g = rdflib.Graph()
+        g.parse(data=util.readfile("test/files/datasets/annotations_a1.ttl"),
+                format="turtle")
+        # Semi-advanced patching: Make sure that the staticmethod
+        # TripleStore.connect returns a mock object, whose construct
+        # method returns our graph
+        config = {'connect.return_value': Mock(**{'construct.return_value': g})}
+        with patch('ferenda.documentrepository.TripleStore', **config):
+            self.repo.generate("1")
         
         t = etree.parse(self.repo.store.generated_path("1"))
 
@@ -1219,38 +1030,11 @@ b:1part a :DocumentPart;
         self.assertEqual('A2(part2)',
                          annotations[0].text)
 
-    @unittest.skipIf('SKIP_FUSEKI_TESTS' in os.environ,
-                     "Skipping Fuseki tests")    
-    def test_generate_fuseki(self):
-        self.repo = self._get_repo('FUSEKI')
-        self.store = self._load_store(self.repo)
-        self._test_generated()
-
-    @unittest.skipIf('SKIP_SESAME_TESTS' in os.environ,
-                     "Skipping Sesame tests")    
-    def test_generate_sesame(self):
-        self.repo = self._get_repo('SESAME')
-        self.store = self._load_store(self.repo)
-        self._test_generated()
-
-    @unittest.skipIf('SKIP_SLEEPYCAT_TESTS' in os.environ,
-                     "Skipping Sleepycat tests")    
-    def test_generate_sleepycat(self):
-        self.repo = self._get_repo('SLEEPYCAT')
-        self.store = self._load_store(self.repo)
-        self._test_generated()
-
-    def test_generate_sqlite(self):
-        self.repo = self._get_repo('SQLITE')
-        self.store = self._load_store(self.repo)
-        self._test_generated()
-
     def _generate_complex(self, xsl=None, staticsite=False):
         # Helper func for other tests -- this uses a single
         # semi-complex source doc, runs it through the generic.xsl
         # stylesheet, and then the tests using this helper confirm
         # various aspects of the transformed document
-        self.repo = self._get_repo()
         if staticsite:
             self.repo.config.staticsite = True
         if xsl is not None:
@@ -1332,7 +1116,9 @@ b:1part a :DocumentPart;
         """
         with self.repo.store.open_parsed("a", mode="w") as fp:
             fp.write(test)
-        self.repo.generate("a")
+
+        with patch('ferenda.documentrepository.TripleStore'):
+            self.repo.generate("a")
         return etree.parse(self.repo.store.generated_path("a"))
 
     def test_rdfa_removal(self):
@@ -1453,187 +1239,15 @@ b:1part a :DocumentPart;
         self.assertEqual(4,len(divs))
         
     def test_staticsite_url(self):
-        self.repo = self._get_repo()
         tree = self._generate_complex(staticsite=True)
         link = tree.xpath(".//a[text()='external']")[0]
         self.assertEqual("something-else.html", link.get("href"))
         
-        
-
-class TOCSelect(RepoTester):
-    # General datasets being reused in tests
-    books = """
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-@prefix dct: <http://purl.org/dc/terms/> .
-@prefix bibo: <http://purl.org/ontology/bibo/> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix ex: <http://example.org/books/> .
-
-# From http://en.wikipedia.org/wiki/List_of_best-selling_books
-
-ex:A_Tale_of_Two_Cities a bibo:Book;
-    dct:title "A Tale of Two Cities";
-    dct:creator "Charles Dickens";
-    dct:issued "1859-04-30"^^xsd:date;
-    dct:publisher "Chapman & Hall" .
-
-ex:The_Lord_of_the_Rings a bibo:Book;
-    dct:title "The Lord of the Rings";
-    dct:creator "J. R. R. Tolkien";
-    dct:issued "1954-07-29"^^xsd:date;
-    dct:publisher "George Allen & Unwin" .
-
-ex:The_Little_Prince a bibo:Book;
-    dct:title "The Little Prince";
-    dct:creator "Antoine de Saint-Exup\xe9ry";
-    dct:issued "1943-01-01"^^xsd:date;
-    dct:publisher "Reynal & Hitchcock" .
-
-ex:The_Hobbit a bibo:Book;
-    dct:title "The Hobbit";
-    dct:creator "J. R. R. Tolkien";
-    dct:issued "1937-09-21"^^xsd:date;
-    dct:publisher "George Allen & Unwin" .
-
-ex:Dream_of_the_Red_Chamber a bibo:Book;
-    dct:title "Dream of the Red Chamber";
-    dct:creator "Cao Xueqin";
-    dct:issued "1791-01-01"^^xsd:date;
-    dct:publisher "Cheng Weiyuan & Gao E" .
-
-ex:And_Then_There_Were_None a bibo:Book;
-    dct:title "And Then There Were None";
-    dct:creator "Agatha Christie";
-    dct:issued "1939-11-06"^^xsd:date;
-    dct:publisher "Collins Crime Club" .
-"""
-    # FIXME: these are typed as bibo:Book since the default toc_select
-    # assumes that all docs in a repo share the same rdf:type. Once
-    # fixed, these should be typed as bibo:AcademicArticle
-    articles = """
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-@prefix dct: <http://purl.org/dc/terms/> .
-@prefix bibo: <http://purl.org/ontology/bibo/> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix ex: <http://example.org/articles/> .
-
-# http://www.the-scientist.com/?articles.view/articleNo/9678/title/The-4-Most-Cited-Papers--Magic-In-These-Methods/
-
-ex:pm14907713 a bibo:Book;
-    dct:title "Protein measurement with the Folin phenol reagent";
-    dct:creator "Oliver H. Lowry",
-                "Nira J. Rosenbrough",
-                "A. Lewis Farr",
-                "R.J. Randall";
-    dct:issued "1951-11-01"^^xsd:date;
-    dct:publisher "Journal of Biological Chemistry" .
     
-ex:pm5432063 a bibo:Book;
-    dct:title "Cleavage of structural proteins during the assembly of the head of bacteriophage T4";
-    dct:creator "Ulrich Karl Laemmli";
-    dct:issued "1970-08-15"^^xsd:date;
-    dct:publisher "Nature" .
-
-ex:pm5806584 a bibo:Book;
-    dct:title "Reliability of molecular weight determinations by dodecyl sulfate-polyacrylamide gel electrophoresis";
-    dct:creator "K. Weber",
-
-    "M. Osborn";
-    dct:issued "1969-08-25"^^xsd:date;
-    dct:publisher "Journal of Biological Chemistry" .
-
-ex:pm942051 a bibo:Book;
-    dct:title "A rapid and sensitive method for the quantitation of microgram quantities of protein utilizing the principle of protein dye-binding";
-    dct:creator "Marion M. Bradford";
-    dct:issued "1976-05-07"^^xsd:date;
-    dct:publisher "Analytical Biochemistry" .
-""" 
-    results1 = [{'uri':'http://example.org/books/A_Tale_of_Two_Cities',
-                 'title': 'A Tale of Two Cities',
-                 'issued': '1859-04-30'},
-                {'uri':'http://example.org/books/The_Lord_of_the_Rings',
-                 'title': 'The Lord of the Rings',
-                 'issued': '1954-07-29'},
-                {'uri':'http://example.org/books/The_Little_Prince',
-                 'title': 'The Little Prince',
-                 'issued': '1943-01-01'},
-                {'uri':'http://example.org/books/The_Hobbit',
-                 'title': 'The Hobbit',
-                 'issued': '1937-09-21'},
-                {'uri':'http://example.org/books/Dream_of_the_Red_Chamber',
-                 'title': 'Dream of the Red Chamber',
-                 'issued': '1791-01-01'},
-                {'uri':'http://example.org/books/And_Then_There_Were_None',
-                 'title': 'And Then There Were None',
-                 'issued': '1939-11-06'}]
-    results2 = [{'uri':'http://example.org/articles/pm14907713',
-                 'title': 'Protein measurement with the Folin phenol reagent',
-                 'issued': '1951-11-01'},
-                {'uri':'http://example.org/articles/pm5432063',
-                 'title': 'Cleavage of structural proteins during the assembly of the head of bacteriophage T4',
-                 'issued': '1970-08-15'},
-                {'uri':'http://example.org/articles/pm5806584',
-                 'title': 'Reliability of molecular weight determinations by dodecyl sulfate-polyacrylamide gel electrophoresis',
-                 'issued': '1969-08-25'},
-                {'uri':'http://example.org/articles/pm942051',
-                 'title': 'A rapid and sensitive method for the quantitation of microgram quantities of protein utilizing the principle of protein dye-binding',
-                 'issued': '1976-05-07'}]
-
-    def setUp(self):
-        super(TOCSelect, self).setUp()
-        # (set up a triple store) and fill it with appropriate data
-        d = DocumentRepository()
-        defaults = d.get_default_options()
-        # FIXME: We really need to subclass at least the toc_select
-        # test to handle the four different possible storetypes. For
-        # now we go with the default type (SQLITE, guaranteed to
-        # always work) but the non-rdflib backends use different code
-        # paths.
-        self.store = TripleStore.connect(storetype=defaults['storetype'],
-                                         location=self.datadir+os.sep+"test.sqlite",
-                                         repository=defaults['storerepository'])
-        self.store.clear()
-        self.store.add_serialized(self.books,format="turtle", context="http://example.org/ctx/base")
-        self.store.add_serialized(self.articles,format="turtle", context="http://example.org/ctx/other")
-
-
-    def tearDown(self):
-        # clear triplestore
-        self.store.clear()
-        del self.store
-        super(TOCSelect, self).tearDown()
-
-    # FIXME: adapt to TripleStore setting so that these tests run with
-    # all supported triplestores
-    def test_toc_select(self):
-        d = DocumentRepository(datadir=self.datadir,
-                               loglevel='CRITICAL',
-                               storelocation=self.datadir+os.sep+"test.sqlite")
-        d.rdf_type = rdflib.URIRef("http://purl.org/ontology/bibo/Book")
-        # make sure only one named graph, not entire store, gets searched
-        got = d.toc_select("http://example.org/ctx/base")
-        self.assertEqual(len(got),6)
-        want = self.results1
-        for row in want:
-            self.assertIn(row, got)
-
-        got = d.toc_select("http://example.org/ctx/other")
-        self.assertEqual(len(got),4)
-        want2 = self.results2
-        for row in want2:
-            self.assertIn(row, got)
-    
-        got = d.toc_select()
-        self.assertEqual(len(got),10)
-        want3 = want+want2
-        for row in want3:
-            self.assertIn(row, got)
-
-        
 class TOC(RepoTester):
-    results1 = TOCSelect.results1
-    results2 = TOCSelect.results2
-    
+    results1 = json.load(open("test/files/datasets/results1.json"))
+    results2 = json.load(open("test/files/datasets/results2.json"))
+
     pagesets = [TocPageset('Sorted by title',[
                 TocPage('a','Documents starting with "a"','title', 'a'),
                 TocPage('d','Documents starting with "d"','title', 'd'),

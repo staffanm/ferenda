@@ -1,0 +1,28 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix a: <http://example.org/actors/> .
+
+a:nm0000102 rdf:type foaf:Person;
+    foaf:name "Kevin Bacon";
+    owl:sameAs <http://live.dbpedia.org/resource/Kevin_Bacon> .
+    
+a:nm0000134 rdf:type foaf:Person;
+    foaf:name "Robert De Niro";
+    owl:sameAs <http://live.dbpedia.org/resource/Robert_De_Niro> .
+    
+a:nm0000093 rdf:type foaf:Person;
+    foaf:name "Brad Pitt";
+    owl:sameAs <http://live.dbpedia.org/resource/Brad_Pitt> .
+
+a:nm0001570 rdf:type foaf:Person;
+    foaf:name "Edward Norton";
+    owl:sameAs <http://live.dbpedia.org/resource/Edward_Norton> .
+
+a:nm0000501 rdf:type foaf:Person;
+    foaf:name "Ray Liotta";
+    owl:sameAs <http://live.dbpedia.org/resource/Ray_Liotta> .
+
+a:nm0000582 rdf:type foaf:Person;
+    foaf:name "Joe Pesci";
+    owl:sameAs <http://live.dbpedia.org/resource/Joe_Pesci> .

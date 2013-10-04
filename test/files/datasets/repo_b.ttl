@@ -1,0 +1,17 @@
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix a: <http://example.org/repo/a/> .
+@prefix : <http://example.org/repo/b/> .
+
+:1 a :BarDoc;
+   dct:title "The title of Document B 1";
+   dct:identifier "B1";
+   dct:references a:1 . 
+
+:1part a a:DocumentPart;
+   dct:isPartOf :1;
+   dct:identifier "B1(part)";
+   dct:references a:1 . 
+
+:2 a :BarDoc;
+   dct:title "The title of Document B 2";
+   dct:identifier "B2" .

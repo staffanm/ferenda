@@ -1,0 +1,31 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix schema: <http://schema.org/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix a: <http://example.org/actors/> .
+@prefix m: <http://example.org/movies/> .
+
+m:tt0117665 rdf:type schema:Movie;
+    schema:name "Sleepers"@en,
+                "Kardeş Gibiydiler"@tr;
+    schema:actor a:nm0000102,
+                 a:nm0000134,
+                 a:nm0000093;
+    schema:datePublished "1996-10-18"^^xsd:date;
+    owl:sameAs <http://www.imdb.com/title/tt0117665/> .
+
+m:tt0137523 rdf:type schema:Movie;
+    schema:name "Fight Club"@en,
+                "Бойцовский клуб"@ru;
+    schema:actor a:nm0000093,
+                 a:nm0001570;
+    owl:sameAs <http://www.imdb.com/title/tt0137523/> .
+
+m:tt0099685 rdf:type schema:Movie;
+    schema:name "Goodfellas"@en,
+                "Maffiabröder"@sv;
+    schema:actor a:nm0000134,
+                 a:nm0000501,
+                 a:nm0000582;
+    owl:sameAs <http://www.imdb.com/title/tt099685/> .

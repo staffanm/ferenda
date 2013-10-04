@@ -11,6 +11,7 @@ import os
 import tempfile
 import shutil
 import logging
+import json
 
 from six import text_type as str
 from rdflib import Graph
@@ -28,103 +29,41 @@ class TripleStoreTestCase(FerendaTestCase):
     # automatically start and stop the triple store's process for you.
     manage_server = False
 
-    dataset = """<http://localhost/publ/dir/2012:35> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Direktiv> .
-<http://localhost/publ/dir/2012:35> <http://purl.org/dc/terms/identifier> "Dir. 2012:35" .
-<http://localhost/publ/dir/2012:35> <http://purl.org/dc/terms/title> "Ett minskat och f\\u00F6renklat uppgiftsl\\u00E4mnande f\\u00F6r f\\u00F6retagen"@sv .
-<http://localhost/publ/dir/2012:35> <http://purl.org/dc/terms/published> "2012-04-26"^^<http://www.w3.org/2001/XMLSchema#date> .
-<http://localhost/publ/dir/2012:35> <http://www.w3.org/2002/07/owl#sameAs> <http://rinfo.lagrummet.se/publ/dir/2012:35> .
-<http://localhost/publ/dir/2012:35> <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#departement> <http://lagen.nu/org/2008/naringsdepartementet> .
-<http://localhost/publ/dir/2012:35> <http://www.w3.org/ns/prov-o/wasGeneratedBy> "ferenda.sources.Direktiv.DirPolopoly" .
-"""
-    dataset2 = """
-<http://localhost/publ/dir/2012:36> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Direktiv> .
-<http://localhost/publ/dir/2012:36> <http://purl.org/dc/terms/identifier> "Dir. 2012:36" .
-<http://localhost/publ/dir/2012:36> <http://purl.org/dc/terms/title> "Barns s\\u00E4kerhet i f\\u00F6rskolan"@sv .
-"""
-    movies = """
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-@prefix schema: <http://schema.org/> .
-@prefix foaf: <http://xmlns.com/foaf/0.1/> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix a: <http://example.org/actors/> .
-@prefix m: <http://example.org/movies/> .
-
-m:tt0117665 rdf:type schema:Movie;
-    schema:name "Sleepers"@en,
-                "Kardeş Gibiydiler"@tr;
-    schema:actor a:nm0000102,
-                 a:nm0000134,
-                 a:nm0000093;
-    schema:datePublished "1996-10-18"^^xsd:date;
-    owl:sameAs <http://www.imdb.com/title/tt0117665/> .
-
-m:tt0137523 rdf:type schema:Movie;
-    schema:name "Fight Club"@en,
-                "Бойцовский клуб"@ru;
-    schema:actor a:nm0000093,
-                 a:nm0001570;
-    owl:sameAs <http://www.imdb.com/title/tt0137523/> .
-
-m:tt0099685 rdf:type schema:Movie;
-    schema:name "Goodfellas"@en,
-                "Maffiabröder"@sv;
-    schema:actor a:nm0000134,
-                 a:nm0000501,
-                 a:nm0000582;
-    owl:sameAs <http://www.imdb.com/title/tt099685/> .
-"""
-    actors = """
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-@prefix foaf: <http://xmlns.com/foaf/0.1/> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix a: <http://example.org/actors/> .
-
-a:nm0000102 rdf:type foaf:Person;
-    foaf:name "Kevin Bacon";
-    owl:sameAs <http://live.dbpedia.org/resource/Kevin_Bacon> .
-    
-a:nm0000134 rdf:type foaf:Person;
-    foaf:name "Robert De Niro";
-    owl:sameAs <http://live.dbpedia.org/resource/Robert_De_Niro> .
-    
-a:nm0000093 rdf:type foaf:Person;
-    foaf:name "Brad Pitt";
-    owl:sameAs <http://live.dbpedia.org/resource/Brad_Pitt> .
-
-a:nm0001570 rdf:type foaf:Person;
-    foaf:name "Edward Norton";
-    owl:sameAs <http://live.dbpedia.org/resource/Edward_Norton> .
-
-a:nm0000501 rdf:type foaf:Person;
-    foaf:name "Ray Liotta";
-    owl:sameAs <http://live.dbpedia.org/resource/Ray_Liotta> .
-
-a:nm0000582 rdf:type foaf:Person;
-    foaf:name "Joe Pesci";
-    owl:sameAs <http://live.dbpedia.org/resource/Joe_Pesci> .
-"""
+    store = None
 
     def test_add_serialized(self):
         # test adding to default graph
         self.assertEqual(0,self.store.triple_count())
-        self.store.add_serialized(self.dataset,format="nt")
+        self.store.add_serialized(
+            util.readfile("test/files/datasets/dataset.nt"),
+            format="nt")
         self.assertEqual(7,self.store.triple_count())
 
     def test_add_serialized_named_graph(self):
         self.test_add_serialized() # set up environment for this case
-        self.store.add_serialized(self.dataset2,format="nt", context="http://example.org/ctx1")
-        self.assertEqual(3,self.store.triple_count(context="http://example.org/ctx1"))
+        self.store.add_serialized(
+            util.readfile("test/files/datasets/dataset2.nt"),
+            format="nt", context="http://example.org/ctx1")
+        self.assertEqual(3,self.store.triple_count(
+            context="http://example.org/ctx1"))
         self.assertEqual(10,self.store.triple_count())
 
     def test_add_contexts(self):
-        self.store.add_serialized(self.movies, format="turtle", context="http://example.org/movies")
-        self.assertEqual(21, self.store.triple_count(context="http://example.org/movies"))
-        self.store.add_serialized(self.actors, format="turtle", context="http://example.org/actors")
-        self.assertEqual(18, self.store.triple_count(context="http://example.org/actors"))
+        self.store.add_serialized(
+            util.readfile("test/files/datasets/movies.ttl"),
+            format="turtle", context="http://example.org/movies")
+        self.assertEqual(21, self.store.triple_count(
+            context="http://example.org/movies"))
+        self.store.add_serialized(
+            util.readfile("test/files/datasets/actors.ttl"),
+            format="turtle", context="http://example.org/actors")
+        self.assertEqual(18, self.store.triple_count(
+            context="http://example.org/actors"))
         self.assertEqual(39, self.store.triple_count())
         dump = self.store.get_serialized(format="nt")
-        self.assertTrue(len(dump) > 10) # to account for any spurious newlines -- real dump should be over 4K
+        self.assertTrue(len(dump) > 10) # to account for any spurious
+                                        # newlines -- real dump should
+                                        # be over 4K
         self.store.clear(context="http://example.org/movies")
         self.assertEqual(0, self.store.triple_count("http://example.org/movies"))
         self.assertEqual(18, self.store.triple_count())
@@ -133,23 +72,18 @@ a:nm0000582 rdf:type foaf:Person;
         
     def test_add_serialized_file(self):
         self.assertEqual(0,self.store.triple_count())
-        tmp1 = tempfile.mktemp()
-        with open(tmp1,"w") as fp:
-            fp.write(self.dataset)
-        tmp2 = tempfile.mktemp()
-        with open(tmp2,"w") as fp:
-            fp.write(self.dataset2)
 
         # default graph
-        self.store.add_serialized_file(tmp1, format="nt")
+        self.store.add_serialized_file("test/files/datasets/dataset.nt",
+                                       format="nt")
         self.assertEqual(7,self.store.triple_count())
         # named graph
-        self.store.add_serialized_file(tmp2, format="nt", context="http://example.org/ctx1")
-        self.assertEqual(3,self.store.triple_count(context="http://example.org/ctx1"))
+        self.store.add_serialized_file("test/files/datasets/dataset2.nt",
+                                       format="nt",
+                                       context="http://example.org/ctx1")
+        self.assertEqual(3,self.store.triple_count(
+            context="http://example.org/ctx1"))
         self.assertEqual(10,self.store.triple_count())
-
-        os.unlink(tmp1)
-        os.unlink(tmp2)
 
     def test_roundtrip(self):
         data = b'<http://example.org/1> <http://purl.org/dc/terms/title> "language literal"@sv .'
@@ -164,24 +98,29 @@ a:nm0000582 rdf:type foaf:Person;
         self.assertEqual(0,self.store.triple_count())
         
     def test_get_serialized(self):
-        self.loader.add_serialized(self.dataset,format="nt")
+        self.loader.add_serialized(util.readfile("test/files/datasets/dataset.nt"),format="nt")
         del self.loader
         res = self.store.get_serialized(format="nt")
-        self.assertEqualGraphs(Graph().parse(data=self.dataset, format="nt"),
+        self.assertEqualGraphs(Graph().parse(data=util.readfile("test/files/datasets/dataset.nt"), format="nt"),
                                Graph().parse(data=res, format="nt"))
 
     def test_get_serialized_file(self):
         want = tempfile.mktemp(suffix=".nt")
-        util.writefile(want, self.dataset)
+        util.writefile(want, util.readfile("test/files/datasets/dataset.nt"))
         got = tempfile.mktemp(suffix=".nt")
-        self.loader.add_serialized(self.dataset,format="nt")
+        self.loader.add_serialized(
+            util.readfile("test/files/datasets/dataset.nt"),format="nt")
         del self.loader
         self.store.get_serialized_file(got, format="nt")
         self.assertEqualGraphs(want,got)
         
     def test_select(self):
-        self.loader.add_serialized(self.movies,format="turtle", context="http://example.org/movies")
-        self.loader.add_serialized(self.actors,format="turtle", context="http://example.org/actors")
+        self.loader.add_serialized(
+            util.readfile("test/files/datasets/movies.ttl"),
+            format="turtle", context="http://example.org/movies")
+        self.loader.add_serialized(
+            util.readfile("test/files/datasets/actors.ttl"),
+            format="turtle", context="http://example.org/actors")
         del self.loader
         sq = """PREFIX foaf: <http://xmlns.com/foaf/0.1/>
                 PREFIX owl: <http://www.w3.org/2002/07/owl#>
@@ -197,25 +136,9 @@ a:nm0000582 rdf:type foaf:Person;
             self.store.graph.close()
         
     def test_construct(self):
-        self.loader.add_serialized("""
-@prefix ab: <http://learningsparql.com/ns/addressbook#> .
-@prefix d: <http://learningsparql.com/ns/data#> .
-
-d:i0432 ab:firstName "Richard" .
-d:i0432 ab:lastName "Mutt" .
-d:i0432 ab:homeTel "(229) 276-5135" .
-d:i0432 ab:email "richard49@hotmail.com" .
-
-d:i9771 ab:firstName "Cindy" .
-d:i9771 ab:lastName "Marshall" .
-d:i9771 ab:homeTel "(245) 646-5488" .
-d:i9771 ab:email "cindym@gmail.com" .
-
-d:i8301 ab:firstName "Craig" .
-d:i8301 ab:lastName "Ellis" .
-d:i8301 ab:email "craigellis@yahoo.com" .
-d:i8301 ab:email "c.ellis@usairwaysgroup.com" .
-""", format="turtle")
+        self.loader.add_serialized(
+            util.readfile("test/files/datasets/addressbook.ttl"),
+            format="turtle")
         del self.loader
 
         sq = """PREFIX ab: <http://learningsparql.com/ns/addressbook#>
@@ -241,6 +164,68 @@ d:i8301
         if self.store.__class__ == SleepycatStore:
             self.store.graph.close()
 
+    def test_construct_annotations(self):
+        self.loader.add_serialized(
+            util.readfile("test/files/datasets/repo_a.ttl"), format="turtle")
+        self.loader.add_serialized(
+            util.readfile("test/files/datasets/repo_b.ttl"), format="turtle")
+
+        # NOTE: The real mechanism for constructing the SPARQL query
+        # (in construct_annotations) is more complex, but this gets
+        # the same result in the base case.
+        uri = "http://example.org/repo/a/1"
+        sq = util.readfile("ferenda/res/sparql/annotations.rq") % {'uri': uri}
+        got = self.store.construct(sq)
+        want = Graph()
+        want.parse(data=util.readfile("test/files/datasets/annotations_a1.ttl"),
+                   format="turtle")
+        self.assertEqualGraphs(want, got, exact=True)
+
+    def test_select_toc(self):
+        results1 = json.load(open("test/files/datasets/results1.json"))
+        results2 = json.load(open("test/files/datasets/results2.json"))
+
+        self.loader.add_serialized(
+            util.readfile("test/files/datasets/books.ttl"),
+            format="turtle", context="http://example.org/ctx/base")
+        self.loader.add_serialized(
+            util.readfile("test/files/datasets/articles.ttl"),
+            format="turtle", context="http://example.org/ctx/other")
+
+        # Since the query is partially constructed by DocumentRepository, we
+        # need to run that code.
+        import rdflib
+        from ferenda import DocumentRepository
+        repo = DocumentRepository()
+        repo.config.storetype = self.storetype
+        repo.rdf_type = rdflib.URIRef("http://purl.org/ontology/bibo/Book")
+
+        # test 1
+        sq = repo.toc_query("http://example.org/ctx/base")
+        got = self.store.select(sq, format="python")
+        self.assertEqual(len(got), len(results1))
+        for row in results1:
+            self.assertIn(row, got)
+
+        # test 2
+        sq = repo.toc_query("http://example.org/ctx/other")
+        got = self.store.select(sq, format="python")
+        self.assertEqual(len(got), len(results2))
+        for row in results2:
+            self.assertIn(row, got)
+
+        # test 3
+        sq = repo.toc_query()
+        got = self.store.select(sq, format="python")
+        want = results1 + results2
+        self.assertEqual(len(got), len(want))
+        for row in want:
+            self.assertIn(row, got)
+
+        if self.storetype == "SLEEPYCAT":
+            self.store.graph.close()
+
+
     def test_invalid_select(self):
         with self.assertRaises(errors.SparqlError):
             self.store.select("This is not a valid SPARQL query")
@@ -252,6 +237,7 @@ d:i8301
 @unittest.skipIf('SKIP_FUSEKI_TESTS' in os.environ,
                  "Skipping Fuseki tests")    
 class Fuseki(TripleStoreTestCase, unittest.TestCase):
+    storetype = "FUSEKI"
     @classmethod
     def setUpClass(cls):
         if cls.manage_server:
@@ -274,7 +260,7 @@ class Fuseki(TripleStoreTestCase, unittest.TestCase):
         pass
 
     def setUp(self):       
-        self.store = TripleStore.connect("FUSEKI", "http://localhost:3030/", "ds")
+        self.store = TripleStore.connect(self.storetype, "http://localhost:3030/", "ds")
         self.store.clear()
         self.loader = self.store
 
@@ -283,7 +269,7 @@ class Fuseki(TripleStoreTestCase, unittest.TestCase):
                  "Skipping Fuseki/curl tests")    
 class FusekiCurl(Fuseki):
     def setUp(self):       
-        self.store = TripleStore.connect("FUSEKI", "http://localhost:3030/", "ds", curl=True)
+        self.store = TripleStore.connect(self.storetype, "http://localhost:3030/", "ds", curl=True)
         self.store.clear()
         self.loader = self.store
 
@@ -291,6 +277,7 @@ class FusekiCurl(Fuseki):
 @unittest.skipIf('SKIP_SESAME_TESTS' in os.environ,
                  "Skipping Sesame tests")    
 class Sesame(TripleStoreTestCase, unittest.TestCase):
+    storetype = "SESAME"
     @classmethod
     def setUpClass(cls):
         # start up tomcat/sesame on port 8080
@@ -307,7 +294,7 @@ class Sesame(TripleStoreTestCase, unittest.TestCase):
             subprocess.check_call("catalina.sh stop > /dev/null", shell=True)
 
     def setUp(self):
-        self.store = TripleStore.connect("SESAME", "http://localhost:8080/openrdf-sesame", "ferenda")
+        self.store = TripleStore.connect(self.storetype, "http://localhost:8080/openrdf-sesame", "ferenda")
         self.store.clear()
         self.loader = self.store
 
@@ -317,7 +304,7 @@ class Sesame(TripleStoreTestCase, unittest.TestCase):
 
 class SesameCurl(Sesame):
     def setUp(self):
-        self.store = TripleStore.connect("SESAME", "http://localhost:8080/openrdf-sesame", "ferenda", curl=True)
+        self.store = TripleStore.connect(self.storetype, "http://localhost:8080/openrdf-sesame", "ferenda", curl=True)
         self.store.clear()
         self.loader = self.store
 
@@ -371,9 +358,9 @@ class Inmemory(object):
             super(Inmemory,self).test_add_serialized()
         
 class SQLite(TripleStoreTestCase,unittest.TestCase):
-
+    storetype = "SQLITE"
     def setUp(self):
-        self.store = TripleStore.connect("SQLITE", "ferenda.sqlite", "ferenda")
+        self.store = TripleStore.connect(self.storetype, "ferenda.sqlite", "ferenda")
         self.store.clear()
         self.loader = self.store
 
@@ -386,7 +373,7 @@ class SQLite(TripleStoreTestCase,unittest.TestCase):
 class SQLiteInmemory(Inmemory, SQLite):
 
     def setUp(self):
-        self.loader = TripleStore.connect("SQLITE", "ferenda.sqlite", "ferenda")
+        self.loader = TripleStore.connect(self.storetype, "ferenda.sqlite", "ferenda")
         self.loader.clear()
 
     def getstore(self):
@@ -396,9 +383,10 @@ class SQLiteInmemory(Inmemory, SQLite):
 @unittest.skipIf('SKIP_SLEEPYCAT_TESTS' in os.environ,
                  "Skipping Sleepycat tests")    
 class Sleepycat(TripleStoreTestCase, unittest.TestCase):
+    storetype = "SLEEPYCAT"
 
     def setUp(self):
-        self.store = TripleStore.connect("SLEEPYCAT", "ferenda.db", "ferenda")
+        self.store = TripleStore.connect(self.storetype, "ferenda.db", "ferenda")
         self.store.clear()
         self.loader = self.store
 
@@ -415,7 +403,7 @@ class Sleepycat(TripleStoreTestCase, unittest.TestCase):
 class SleepycatInmemory(Inmemory, Sleepycat):
 
     def setUp(self):
-        self.loader = TripleStore.connect("SLEEPYCAT", "ferenda.db", "ferenda")
+        self.loader = TripleStore.connect(self.storetype, "ferenda.db", "ferenda")
         self.loader.clear()
         self.store = None
 

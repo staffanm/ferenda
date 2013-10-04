@@ -106,7 +106,7 @@ this class, ie::
                              (datetime1.isoformat(), datetime2.isoformat(),
                               absdiff))
 
-    def assertEqualXML(self, want, got):
+    def assertEqualXML(self, want, got, namespace_aware=True):
         """Assert that two xml trees are canonically identical.
 
         :param want: The XML document as expected, as a string, byte string or ElementTree element
@@ -114,8 +114,14 @@ this class, ie::
         """
         # Adapted from formencode, https://bitbucket.org/ianb/formencode/
         def xml_compare(want, got, reporter):
-            if want.tag != got.tag:
-                reporter("Tags do not match: 'want': %s, 'got': %s" % (want.tag, got.tag))
+            if namespace_aware:
+                wanttag = want.tag
+                gottag = got.tag
+            else:
+                wanttag = want.tag.rsplit("}")[-1]
+                gottag = got.tag.rsplit("}")[-1]
+            if wanttag != gottag:
+                reporter("Tags do not match: 'want': %s, 'got': %s" % (wanttag, gottag))
                 return False
             for name, value in want.attrib.items():
                 if got.attrib.get(name) != value:
@@ -164,8 +170,7 @@ this class, ie::
                 # return etree.parse(fp).getroot()
                 return etree.parse(fp)
             elif isinstance(want, etree._Element):
-                # FIXME: wrap in ElementTree
-                return something
+                return etree.ElementTree(something)
             else:
                 raise ValueError("Can't convert a %s into an ElementTree" % type(something))
 

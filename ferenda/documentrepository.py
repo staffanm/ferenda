@@ -1497,19 +1497,22 @@ parsed document path to that documents dependency file."""
         return transform
 
     def prep_annotation_file(self, basefile):
-        """Helper function used by :py:meth:`~ferenda.DocumentRepository.generate` -- prepares a RDF/XML file
-        containing statements that in some way annotates the
-        information found in the document that generate handles, like
-        URI/title of other documents that refers to this one.
+        """Helper function used by
+        :py:meth:`~ferenda.DocumentRepository.generate` -- prepares a
+        RDF/XML file containing statements that in some way annotates
+        the information found in the document that generate handles,
+        like URI/title of other documents that refers to this one.
 
-        :param basefile: The basefile for which to collect annotating statements.
+        :param basefile: The basefile for which to collect annotating
+                         statements.
         :type basefile: str
         :returns: The full path to the prepared RDF/XML file
         :rtype: str
+
         """
         # return self.store.annotation_path(basefile)
         graph = self.construct_annotations(self.canonical_uri(basefile))
-        if graph:
+        if graph and len(graph) > 0:
             with self.store.open_annotation(basefile, "w") as fp:
                 fp.write(self.graph_to_annotation_file(graph))
             return self.store.annotation_path(basefile)
@@ -1692,21 +1695,8 @@ parsed document path to that documents dependency file."""
                                     self.config.storelocation,
                                     self.config.storerepository)
 
-        if self.config.storetype in ('SQLITE', 'SLEEPYCAT'):
-            sq = self.toc_query()
-            # FIXME: workaround for the fact that rdflib select uses
-            # FROM <%s> differently than Sesame/Fuseki. This
-            # reimplements most of RDFLibStore.select
-            raw_res = store._getcontextgraph(context).query(sq)
-            res = []
-            for r in raw_res.bindings:
-                d = {}
-                for (key, val) in r.items():
-                    d[str(key)] = str(val)
-                res.append(d)
-        else:
-            sq = self.toc_query(context)
-            res = store.select(sq, "python")
+        sq = self.toc_query(context)
+        res = store.select(sq, "python")
         store.close()
         return res
 
@@ -1734,6 +1724,9 @@ parsed document path to that documents dependency file."""
         from_graph = ""
         if context:
             from_graph = "FROM <%s>" % context
+        elif self.config.storetype == "FUSEKI":
+            from_graph = "FROM <urn:x-arq:UnionGraph>"
+
         predicates = self.toc_predicates()
         g = self.make_graph()
         bindings = " ".join(["?" + util.uri_leaf(b) for b in predicates])

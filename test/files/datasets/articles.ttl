@@ -1,0 +1,40 @@
+# FIXME: these are typed as bibo:Book since the default toc_select
+# assumes that all docs in a repo share the same rdf:type. Once
+# fixed, these should be typed as bibo:AcademicArticle
+
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix ex: <http://example.org/articles/> .
+
+# http://www.the-scientist.com/?articles.view/articleNo/9678/title/The-4-Most-Cited-Papers--Magic-In-These-Methods/
+
+ex:pm14907713 a bibo:Book;
+    dct:title "Protein measurement with the Folin phenol reagent";
+    dct:creator "Oliver H. Lowry",
+                "Nira J. Rosenbrough",
+                "A. Lewis Farr",
+                "R.J. Randall";
+    dct:issued "1951-11-01"^^xsd:date;
+    dct:publisher "Journal of Biological Chemistry" .
+    
+ex:pm5432063 a bibo:Book;
+    dct:title "Cleavage of structural proteins during the assembly of the head of bacteriophage T4";
+    dct:creator "Ulrich Karl Laemmli";
+    dct:issued "1970-08-15"^^xsd:date;
+    dct:publisher "Nature" .
+
+ex:pm5806584 a bibo:Book;
+    dct:title "Reliability of molecular weight determinations by dodecyl sulfate-polyacrylamide gel electrophoresis";
+    dct:creator "K. Weber",
+
+    "M. Osborn";
+    dct:issued "1969-08-25"^^xsd:date;
+    dct:publisher "Journal of Biological Chemistry" .
+
+ex:pm942051 a bibo:Book;
+    dct:title "A rapid and sensitive method for the quantitation of microgram quantities of protein utilizing the principle of protein dye-binding";
+    dct:creator "Marion M. Bradford";
+    dct:issued "1976-05-07"^^xsd:date;
+    dct:publisher "Analytical Biochemistry" .

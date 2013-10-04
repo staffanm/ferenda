@@ -5,6 +5,7 @@ import os
 from io import BytesIO
 import tempfile
 import logging
+import re
 
 from rdflib import URIRef
 from rdflib import Graph
@@ -125,13 +126,18 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
             fp.write(data)
 
     def select(self, query, format="sparql"):
-        """
-        Run a SPARQL SELECT query against the triple store and returns the results.
+        """Run a SPARQL SELECT query against the triple store and returns the results.
 
         :param query: A SPARQL query with all neccessary prefixes defined.
-        :type query: str
-        :param format: Either one of the standard formats for queries (``"sparql"``, ``"json"`` or ``"binary"``) -- returns whatever ``requests.get().text`` returns -- or the special value ``"python"`` which returns a python list of dicts representing rows and columns.
-        :type format: str
+        :type  query: str
+        :param format: Either one of the standard formats for queries
+                       (``"sparql"``, ``"json"`` or ``"binary"``) --
+                       returns whatever ``requests.get().text``
+                       returns -- or the special value ``"python"``
+                       which returns a python list of dicts
+                       representing rows and columns.
+        :type  format: str
+
         """
         raise NotImplementedError
 
@@ -196,8 +202,18 @@ class RDFLibStore(TripleStore):
         return len(g)
 
     def select(self, query, format="sparql"):
+        # FIXME: workaround for the fact that rdflib select uses FROM
+        # <%s> differently than Sesame/Fuseki. We remove the 'FROM
+        # <%s>' part from the query and instead get a context graph
+        # for the same URI.
+        re_fromgraph = re.compile(r" FROM <(?P<graphuri>[^>]+)> ")
+        graphuri = None
+        m = re_fromgraph.search(query)
+        if m:
+            graphuri = m.group("graphuri")
+            query = re_fromgraph.sub(" ", query)
         try:
-            res = self.graph.query(query)
+            res = self._getcontextgraph(graphuri).query(query)
         except pyparsing.ParseException as e:
             raise errors.SparqlError(e)
         if format == "sparql":
