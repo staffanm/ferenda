@@ -12,14 +12,14 @@ import pkg_resources
 # NOTE: by inserting cwd (which *should* be the top-level source code
 # dir, with 'ferenda' and 'test' as subdirs) into sys.path as early as
 # possible, we make it possible for pkg_resources to find resources in
-# the 'ferenda' package. We also have to call a resource method
+# the 'ferenda' package even when we change the cwd later on. We also
+# have to call a resource method to make it stick.
 sys.path.insert(0,os.getcwd())
 pkg_resources.resource_listdir('ferenda','res')
 
 from ferenda.manager import setup_logger; setup_logger('CRITICAL')
-
-from ferenda.compat import unittest
-from ferenda.compat import OrderedDict
+from ferenda.compat import unittest, OrderedDict
+from ferenda.testutil import RepoTester
 
 from six.moves import configparser, reload_module
 try:
@@ -334,6 +334,15 @@ class=testManager.staticmockclass2
         self.assertIn("Handles foaf:Document", divs[0].find("p").text)
         self.assertIn("Contains 3 published documents", divs[0].find("p").text)
 
+
+class Setup(RepoTester):
+
+    def test_setup(self):
+        # FIXME: patch requests.get to selectively return 404
+        res = manager.setup(force=True, verbose=False, unattended=True,
+                            argv=['ferenda-build.py',
+                                  self.datadir+os.sep+'myproject'])
+        self.assertTrue(res)
 
 class Run(unittest.TestCase):
     """Tests manager interface using only the run() entry point used by ferenda-build.py"""

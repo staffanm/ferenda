@@ -766,7 +766,7 @@ def enable(classname):
     return alias
 
 
-def setup(force=False, verbose=False, unattended=False):
+def setup(force=False, verbose=False, unattended=False, argv=None):
     """Creates a project, complete with configuration file and
     ferenda-build tool. Takes no parameters, but expects ``sys.argv``
     to contain the path to the project being created.
@@ -782,10 +782,12 @@ def setup(force=False, verbose=False, unattended=False):
        a tiny wrapper around this function.
 
     """
-    if len(sys.argv) < 2:
-        print(("Usage: %s [project-directory]" % sys.argv[0]))
+    if not argv:
+        argv = sys.argv
+    if len(argv) < 2:
+        print(("Usage: %s [project-directory]" % argv[0]))
         return False
-    projdir = sys.argv[1]
+    projdir = argv[1]
     if os.path.exists(projdir) and not force:
         print(("Project directory %s already exists" % projdir))
         return False
@@ -836,6 +838,7 @@ def setup(force=False, verbose=False, unattended=False):
     # step 3: create WSGI app
     wsgifile = projdir + os.sep + "wsgi.py"
     util.resource_extract('res/scripts/wsgi.py', wsgifile)
+    return True
 
 
 def _load_config(filename, argv=[]):
