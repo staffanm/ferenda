@@ -3,20 +3,21 @@ from __future__ import unicode_literals
 import os, sys
 from ferenda.compat import unittest, Mock, patch
 
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
+from ferenda import manager
+manager.setup_logger('CRITICAL')
 
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
 from io import BytesIO
 import shutil
 import codecs
+import json
 
 from rdflib import Graph
 from lxml import etree
 
 from ferenda.testutil import RepoTester
-    
-from ferenda.manager import make_wsgi_app
+from ferenda import manager
 from ferenda import DocumentRepository, FulltextIndex
 from ferenda import util
 from ferenda.elements import html
@@ -27,11 +28,11 @@ from ferenda.elements import html
 class WSGI(RepoTester): # base class w/o tests
     def setUp(self):
         super(WSGI,self).setUp()
-        self.app = make_wsgi_app(port=8000,
-                                 documentroot=self.datadir,
-                                 apiendpoint="/myapi/",
-                                 searchendpoint="/mysearch/",
-                                 repos = [self.repo])
+        self.app = manager.make_wsgi_app(port=8000,
+                                         documentroot=self.datadir,
+                                         apiendpoint="/myapi/",
+                                         searchendpoint="/mysearch/",
+                                         repos = [self.repo])
         self.env = {'HTTP_ACCEPT': 'text/xml, application/xml, application/xhtml+xml, text/html;q=0.9, text/plain;q=0.8, image/png,*/*;q=0.5',
                     'PATH_INFO':   '/',
                     'SERVER_NAME': 'localhost',
@@ -65,6 +66,11 @@ class WSGI(RepoTester): # base class w/o tests
         shutil.copy2("test/files/base/rsrc/resources.xml",
                      resources)
 
+        # index.html
+        index = self.datadir+os.sep+"index.html"
+        with open(index, "wb") as fp:
+            fp.write(b'<h1>index.html</h1>')
+            
 
     def call_wsgi(self, environ):
         start_response = Mock()
@@ -89,7 +95,67 @@ class WSGI(RepoTester): # base class w/o tests
             self.assertEqual(got_headers[key], value)
         if wanted_content:
             self.assertEqual(wanted_content, got_content)
+
+class Fileserving(WSGI):
+    def test_index_html(self):
+        self.env['PATH_INFO'] = '/'
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse("200 OK",
+                            {'Content-Type': 'text/html'},
+                            b'<h1>index.html</h1>',
+                            status, headers, content)
+
+    def test_not_found(self):
+        self.env['PATH_INFO'] = '/nonexistent'
+        status, headers, content = self.call_wsgi(self.env)
+        msg = '<h1>404</h1>The path /nonexistent not found at %s/nonexistent' % self.datadir
+        self.assertResponse("404 Not Found",
+                            {'Content-Type': 'text/html'},
+                            msg.encode(),
+                            status, headers, content)
+    
+class API(WSGI):
+    def setUp(self):
+       super(API, self).setUp()
+       self.env['PATH_INFO'] = '/myapi/'
+
+    def test_basic(self):
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse("200 OK",
+                            {'Content-Type': 'application/json'},
+                            None,
+                            status, headers, content)
+        resp = json.loads(content.decode())
+        self.assertEqual(self.env, resp)
         
+class Runserver(WSGI):
+    def test_make_wsgi_app_args(self):
+        res = manager.make_wsgi_app(port='8080',
+                                    documentroot=self.datadir,
+                                    apiendpoint='/api-endpoint/',
+                                    searchendpoint='/search-endpoint/',
+                                    repos=[])
+        self.assertTrue(callable(res))
+
+    def test_make_wsgi_app_ini(self):
+        inifile = self.datadir + os.sep + "ferenda.ini"
+        with open(inifile, "w") as fp:
+            fp.write("""[__root__]
+datadir = /dev/null
+url = http://localhost:7777/
+apiendpoint = /myapi/
+searchendpoint = /mysearch/            
+""")
+        res = manager.make_wsgi_app(inifile)
+        self.assertTrue(callable(res))
+    
+    def test_runserver(self):
+        m = Mock()
+        with patch('ferenda.manager.make_server', return_value=m) as m2:
+            manager.runserver([])
+            self.assertTrue(m2.called)
+            self.assertTrue(m.serve_forever.called)
+
 class ConNeg(WSGI):
     def setUp(self):
        super(ConNeg, self).setUp()
@@ -384,8 +450,6 @@ class Search(WSGI):
         self.assertEqualXML(res[0][0]['text'].as_xhtml(),
                             docs[0][1],
                             namespace_aware=False)
-
-
 
     def test_paged(self):
         def mkres(page=1, pagesize=10, total=25):

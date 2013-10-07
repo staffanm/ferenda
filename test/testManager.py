@@ -119,6 +119,7 @@ class=testManager.staticmockclass2
 """%self.tempdir)
         util.writefile(self.tempdir+"/test.js", "// test.js code goes here")
         util.writefile(self.tempdir+"/test.css", "/* test.css code goes here */")
+        util.writefile(self.tempdir+"/transformed.scss", "a { color: red + green; }")
 
     def tearDown(self):
         if os.path.exists("ferenda.ini"):
@@ -264,7 +265,55 @@ class=testManager.staticmockclass2
         # test6: include one external resource but with combine=True, which is unsupported
         with self.assertRaises(errors.ConfigurationError):
             got = manager.makeresources([test],self.tempdir+os.sep+'rsrc', combine=True)
+
+        # test7: test the footer() functionality
+        from ferenda.sources.general import Static
+        static = Static()
+        for b in static.store.list_basefiles_for("parse"):
+            static.parse(b)
+        got = manager.makeresources([Static()], self.tempdir+os.sep+'rsrc')
+        tree = ET.parse(self.tempdir+os.sep+got['xml'][0])
+        footerlinks=tree.findall("footerlinks/nav/ul/li")
+        self.assertTrue(footerlinks)
+        self.assertEqual(3,len(footerlinks))
+
+        # test8: test win32 path generation on all OS:es, including one full URL
+        test = staticmockclass()
+        test.config.cssfiles.append('http://example.org/css/main.css')
+        want = {'css':['rsrc\\css\\test.css',
+                       'http://example.org/css/main.css'],
+                'js':['rsrc\\js\\test.js'],
+                'xml':['rsrc\\resources.xml']}
+        try:
+            realsep = os.sep
+            os.sep = "\\"
+            got = manager.makeresources([test], self.tempdir+os.sep+'rsrc')
+            self.assertEqual(want,got)
+        finally:
+            os.sep = realsep
+            
+        # test9: nonexistent resources should not be included
+        test = staticmockclass()
+        test.config.cssfiles = ['nonexistent.css']
+        want = {'css':[],
+                'js':[s.join(['rsrc', 'js','test.js'])],
+                'xml':[s.join(['rsrc', 'resources.xml'])]
+        }
+        got = manager.makeresources([test], self.tempdir+os.sep+'rsrc')
+        self.assertEqual(want,got)
         
+        # test10: scss files should be transformed to css
+        # disabled until pyScss is usable on py3 again
+        # test = staticmockclass()
+        # test.config.cssfiles[0] = test.config.cssfiles[0].replace("test.css", "transformed.scss")
+        # want = {'css':[s.join(['rsrc', 'css','transformed.css'])],
+        #        'js':[s.join(['rsrc', 'js','test.js'])],
+        #        'xml':[s.join(['rsrc', 'resources.xml'])]
+        # }
+        # from pudb import set_trace; set_trace()
+        # got = manager.makeresources([test], self.tempdir+os.sep+'rsrc')
+        # self.assertEqual(want,got)
+
 
     def test_frontpage(self):
         test = staticmockclass()

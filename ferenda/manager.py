@@ -91,8 +91,6 @@ def makeresources(repos,
 
     # 1. Process all css files specified in the main config
     for cssfile in cssfiles:
-        if cssfile in processed_files:
-            continue
         cssurls.append(_process_file(
             cssfile, cssbuffer, cssdir, "ferenda.ini", combine))
         processed_files.append(cssfile)
@@ -100,8 +98,6 @@ def makeresources(repos,
     # 2. Visit each enabled class and see if it specifies additional
     # css files to read
     for inst in repos:
-        if not hasattr(inst, 'config'):
-            continue
         for cssfile in inst.config.cssfiles:
             if cssfile in processed_files:
                 continue
@@ -132,15 +128,11 @@ def makeresources(repos,
     jsurls = []
     jsdir = resourcedir + os.sep + "js"
     for jsfile in jsfiles:
-        if jsfile in processed_files:
-            continue
         jsurls.append(_process_file(
             jsfile, jsbuffer, jsdir, "ferenda.ini", combine))
         processed_files.append(jsfile)
 
     for inst in repos:
-        if not hasattr(inst, 'config'):
-            continue
         for jsfile in inst.config.jsfiles:
             if jsfile in processed_files:
                 continue
@@ -200,7 +192,7 @@ def makeresources(repos,
         link.attrib['href'] = tab[1]
 
     # FIXME: almost the exact same code as for tabs
-    tabs = ET.SubElement(
+    footer = ET.SubElement(
         ET.SubElement(ET.SubElement(root, "footerlinks"), "nav"), "ul")
 
     sitefooter = []
@@ -215,7 +207,7 @@ def makeresources(repos,
                     sitefooter.append(link)
 
     for text, href in sitefooter:
-        link = ET.SubElement(ET.SubElement(tabs, "li"), "a")
+        link = ET.SubElement(ET.SubElement(footer, "li"), "a")
         link.text = text
         link.attrib['href'] = href
 
@@ -274,9 +266,10 @@ def _process_file(filename, buf, destdir, origin="", combine=False):
     :returns: The URL path of the resulting file, relative to the web root (or None if combine == True)
     :rtype: str
     """
-    mapping = {'.scss': {'transform': _transform_scss,
-                         'suffix': '.css'}
-               }
+    # disabled until pyScss is usable on py3 again
+    # mapping = {'.scss': {'transform': _transform_scss,
+    #                     'suffix': '.css'}
+    #            }
     log = setup_logger()
     # FIXME: extend this through a load-path mechanism?
     if os.path.exists(filename):
@@ -298,10 +291,11 @@ def _process_file(filename, buf, destdir, origin="", combine=False):
         return None
 
     (base, ext) = os.path.splitext(filename)
-    if ext in mapping:
-        outfile = base + mapping[ext]['suffix']
-        mapping[ext]['transform'](filename, outfile)
-        filename = outfile
+    # disabled until pyScss is usable on py3 again
+    # if ext in mapping:
+    #     outfile = base + mapping[ext]['suffix']
+    #     mapping[ext]['transform'](filename, outfile)
+    #     filename = outfile
     if combine:
         log.debug("combining %s into buffer" % filename)
         buf.write(fp.read())
@@ -316,13 +310,12 @@ def _process_file(filename, buf, destdir, origin="", combine=False):
         fp.close()
         return _filepath_to_urlpath(outfile, 2)
 
-
-def _transform_scss(infile, outfile):
-    print(("Transforming %s to %s" % (infile, outfile)))
-    from scss import Scss
-    compiler = Scss()
-    util.writefile(outfile, compiler.compile(util.readfile(infile)))
-
+# disabled until pyScss is usable on py3 again
+# def _transform_scss(infile, outfile):
+#     print(("Transforming %s to %s" % (infile, outfile)))
+#     from scss import Scss
+#     compiler = Scss()
+#     util.writefile(outfile, compiler.compile(util.readfile(infile)))
 
 def frontpage(repos,
               path="data/index.html",
@@ -404,7 +397,7 @@ def runserver(repos,
     :type searchendpoint: str
 
     """
-    print("Serving wsgi app at http://localhost:%s/" % port)
+    setup_logger().info("Serving wsgi app at http://localhost:%s/" % port)
     kwargs = {'port': port,
               'documentroot': documentroot,
               'apiendpoint': apiendpoint,
