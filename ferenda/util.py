@@ -96,9 +96,16 @@ def robust_remove(filename):
         # try:
         os.unlink(filename)
 
-
+# util.string
 def relurl(url, starturl):
-    """Works like :py:func:`os.path.relpath`, but for urls"""
+    """Works like :py:func:`os.path.relpath`, but for urls
+
+    >>> relurl("http://example.org/other/index.html", "http://example.org/main/index.html")
+    '../other/index.html'
+    >>> relurl("http://other.org/foo.html", "http://example.org/bar.html")
+    'http://other.org/foo.html'
+
+    """
     urlseg = urlsplit(url)
     startseg = urlsplit(starturl)
     urldomain = urlunsplit(urlseg[:2] + tuple('' for i in range(3)))
@@ -110,13 +117,24 @@ def relurl(url, starturl):
     res = urlunsplit(('', '', relpath, urlseg.query, urlseg.fragment))
     return res
 
+
 # util.Sort
-
-# still used by SFS.py
-
-
 def numcmp(x, y):
-    """Sorts ['1','10','1a', '2'] => ['1', '1a', '2', '10']"""
+    # still used by SFS.py
+    """Works like ``cmp`` in python 2, but compares two strings using a
+    'natural sort' order, ie "10" < "2". Also handles strings that
+    contains a mixture of numbers and letters, ie "2" < "2 a".
+
+    Return negative if x<y, zero if x==y, positive if x>y.
+
+    >>> numcmp("10", "2")
+    1
+    >>> numcmp("2", "2 a")
+    -1
+    >>> numcmp("3", "2 a")
+    1
+
+    """
     nx = split_numalpha(x)
     ny = split_numalpha(y)
     return (nx > ny) - (nx < ny)  # equivalent to cmp which is not in py3
@@ -126,13 +144,15 @@ def numcmp(x, y):
 
 def split_numalpha(s):
     """Converts a string into a list of alternating string and
-integers. This makes it possible to sort a list of strings numerically
-even though they might not be fully convertable to integers
+    integers. This makes it possible to sort a list of strings
+    numerically even though they might not be fully convertable to
+    integers
 
     >>> split_numalpha('10 a §')
-    [10, ' a §']
+    ['', 10, ' a §']
     >>> sorted(['2 §', '10 §', '1 §'], key=split_numalpha)
     ['1 §', '2 §', '10 §']
+
     """
     res = []
     seg = ''
@@ -200,7 +220,7 @@ def normalize_space(string):
     """Normalize all whitespace in string so that only a single space between words is ever used, and that the string neither starts with nor ends with whitespace.
 
     >>> normalize_space(" This is  a long \\n string\\n")
-    "This is a long string"
+    'This is a long string'
     """
     return ' '.join(string.split())
 
@@ -238,8 +258,6 @@ def list_dirs(d, suffix=None, reverse=False):
 # util.String (or XML?)
 # Still used by manager.makeresources, should be removed in favor of lxml
 #
-
-
 def indent_node(elem, level=0):
     """indents a etree node, recursively.
 
@@ -358,7 +376,7 @@ def ucfirst(string):
     """Returns string with first character uppercased but otherwise unchanged.
 
     >>> ucfirst("iPhone")
-    >>> "IPhone"
+    'IPhone'
     """
     l = len(string)
     if l == 0:
@@ -400,12 +418,15 @@ HTTP-date) to an UTC-localized (naive) datetime.
 
 def strptime(datestr, format):
     """Like datetime.strptime, but guaranteed to not be affected by
-       current system locale -- all datetime parsing is done using the
-       C locale.
+    current system locale -- all datetime parsing is done using the C
+    locale.
+
+    >>> strptime("Mon, 4 Aug 1997 02:14:05", "%a, %d %b %Y %H:%M:%S")
+    datetime.datetime(1997, 8, 4, 2, 14, 5)
 
     """
     with c_locale():
-        return datetime.datetime.strptime(datestr, format).date()
+        return datetime.datetime.strptime(datestr, format)
         
     
 # Util.file
@@ -419,8 +440,6 @@ def readfile(filename, mode="r", encoding="utf-8"):
             return fp.read()
 
 # util.file
-
-
 def writefile(filename, contents, encoding="utf-8"):
     """Create *filename* and write *contents* to it."""
     ensure_dir(filename)
@@ -430,7 +449,20 @@ def writefile(filename, contents, encoding="utf-8"):
 
 # util.string
 def extract_text(html, start, end, decode_entities=True, strip_tags=True):
-    """Given *html*, a string of HTML content, and two substrings (*start* and *end*) present in this string, return all text between the substrings, optionally decoding any HTML entities and removing HTML tags."""
+    """Given *html*, a string of HTML content, and two substrings (*start* and *end*) present in this string, return all text between the substrings, optionally decoding any HTML entities and removing HTML tags.
+
+    >>> extract_text("<body><div><b>Hello</b> <i>World</i>&trade;</div></body>",
+    ...              "<div>", "</div>")
+    'Hello World™'
+    >>> extract_text("<body><div><b>Hello</b> <i>World</i>&trade;</div></body>",
+    ...              "<div>", "</div>", decode_entities=False)
+    'Hello World&trade;'
+    >>> extract_text("<body><div><b>Hello</b> <i>World</i>&trade;</div></body>",
+    ...              "<div>", "</div>", strip_tags=False)
+    '<b>Hello</b> <i>World</i>™'
+
+    
+    """
     startidx = html.index(start)
     endidx = html.rindex(end)
     text = html[startidx + len(start):endidx]
@@ -455,7 +487,18 @@ def md5sum(filename):
 
 
 def merge_dict_recursive(base, other):
-    """Merges the *other* dict into the *base* dict. If any value in other is itself a dict and the base also has a dict for the same key, merge these sub-dicts (and so on, recursively)."""
+    """Merges the *other* dict into the *base* dict. If any value in other is itself a dict and the base also has a dict for the same key, merge these sub-dicts (and so on, recursively).
+
+    >>> base = {'a': 1, 'b': {'c': 3}}
+    >>> other = {'x': 4, 'b': {'y': 5}}
+    >>> want = {'a': 1, 'x': 4, 'b': {'c': 3, 'y': 5}}
+    >>> got = merge_dict_recursive(base, other)
+    >>> got == want
+    True
+    >>> base == want
+    True
+    """
+
     for (key, value) in list(other.items()):
         if (isinstance(value, dict) and
             (key in base) and
@@ -506,7 +549,15 @@ def resource_extract(resource_name, outfile, params={}):
 def uri_leaf(uri):
     """
     Get the "leaf" - fragment id or last segment - of a URI. Useful e.g. for
-    getting a term from a "namespace like" URI."""
+    getting a term from a "namespace like" URI.
+
+    >>> uri_leaf("http://purl.org/dc/terms/title")
+    'title'
+    >>> uri_leaf("http://www.w3.org/2004/02/skos/core#Concept")
+    'Concept'
+    >>> uri_leaf("http://www.w3.org/2004/02/skos/core#") # returns None
+    
+    """
     for char in ('#', '/', ':'):
         if uri.endswith(char):
             break
@@ -522,16 +573,17 @@ def uri_leaf(uri):
 
 @contextmanager
 def logtime(method, format="The operation took %(elapsed).3f sec", values={}):
-    """
-    context mgr that logs elapsed time. use like so::
+    """A context manager that uses the supplied method and format string
+    to log the elapsed time::
     
         with util.logtime(log.debug,
                           "Basefile %(basefile)s took %(elapsed).3f s",
                           {'basefile':'foo'}):
             do_stuff_that_takes_some_time()
 
-    results in a call like log.debug("Basefile foo took 1.324 s")
-"""
+    This results in a call like log.debug("Basefile foo took 1.324 s").
+
+    """
     start = time.time()
     yield
     values['elapsed'] = time.time() - start
@@ -547,8 +599,8 @@ def c_locale(category=locale.LC_TIME):
     locale.
 
     >>> with c_locale():
-    ...     datetime.strptime("August 2013", "%B %Y")
-
+    ...     datetime.datetime.strptime("August 2013", "%B %Y")
+    datetime.datetime(2013, 8, 1, 0, 0)
     """
 
     oldlocale = locale.getlocale(category)
@@ -594,13 +646,13 @@ def title_sortkey(s):
     """Transform a document title into a key useful for sorting and partitioning documents.
 
     >>> title_sortkey("The 'viewstate' property")
-    viewstateproperty
+    'viewstateproperty'
 
     """
     s = s.lower()
     if s.startswith("the "):
         s = s[4:]
-    # filter away starting non-word characters (but not digits)
-    s = re.sub("^\W+", "", s)
+    # filter away all non-word characters (but not digits)
+    s = re.sub("\W+", "", s)
     # remove spaces
     return "".join(s.split())
