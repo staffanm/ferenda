@@ -606,15 +606,15 @@ def setup_logger(level='INFO', filename=None):
         loglevel = loglevels[level]
 
     l = logging.getLogger()  # get the root logger
-
     # if l.handlers == []:
     if filename:
+        util.ensure_dir(filename)
         h = logging.FileHandler(filename)
     else:
         h = logging.StreamHandler()
     for existing_handler in l.handlers:
         if h.__class__ == existing_handler.__class__:
-            # print("A %s already existed, not adding a new one" % h)
+            # print("    A %r already existed" % h)
             return l
 
     h.setLevel(loglevel)
@@ -632,6 +632,18 @@ def setup_logger(level='INFO', filename=None):
 
     return l
 
+
+def shutdown_logger():
+    """Shuts down the configured logger. In particular, closes any
+    FileHandlers, which is needed on win32."""
+    
+    l = logging.getLogger()  # get the root logger
+    for existing_handler in list(l.handlers):
+        if isinstance(existing_handler, logging.FileHandler):
+            existing_handler.close()
+        l.removeHandler(existing_handler)
+
+    
 
 def run(argv):
     """Runs a particular action for either a particular class or all

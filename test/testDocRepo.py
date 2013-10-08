@@ -916,7 +916,7 @@ class Repo(RepoTester):
         self.repo.relate_dependencies("root", repos)
         # 4. Assert that
         #  4.1 self.repo.store.dependencies_path contains parsed_path('root')
-        dependencyfile = self.repo.store.parsed_path('root') + "\n"
+        dependencyfile = self.repo.store.parsed_path('root') + os.linesep
         self.assertEqual(util.readfile(self.repo.store.dependencies_path("res-a")),
                          dependencyfile)
 
@@ -1004,7 +1004,6 @@ class Generate(RepoTester):
             self.repo.generate("1")
         
         t = etree.parse(self.repo.store.generated_path("1"))
-
         # find top node .annotations,
         anode = t.find(".//aside[@class='annotations']")
         annotations = anode.findall("a")

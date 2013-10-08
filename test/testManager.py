@@ -451,9 +451,11 @@ class Testrepo2(Testrepo):
         sys.path.append(self.tempdir)
 
     def tearDown(self):
+        manager.shutdown_logger()
         os.chdir(self.orig_cwd)
         shutil.rmtree(self.tempdir)
         sys.path.remove(self.tempdir)
+
 
     # functionality used by most test methods
     def _enable_repos(self):
