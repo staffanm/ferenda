@@ -100,10 +100,10 @@ def robust_remove(filename):
 def relurl(url, starturl):
     """Works like :py:func:`os.path.relpath`, but for urls
 
-    >>> relurl("http://example.org/other/index.html", "http://example.org/main/index.html")
-    '../other/index.html'
-    >>> relurl("http://other.org/foo.html", "http://example.org/bar.html")
-    'http://other.org/foo.html'
+    >>> relurl("http://example.org/other/index.html", "http://example.org/main/index.html") == '../other/index.html'
+    True
+    >>> relurl("http://other.org/foo.html", "http://example.org/bar.html") == 'http://other.org/foo.html'
+    True
 
     """
     urlseg = urlsplit(url)
@@ -148,10 +148,10 @@ def split_numalpha(s):
     numerically even though they might not be fully convertable to
     integers
 
-    >>> split_numalpha('10 a §')
-    ['', 10, ' a §']
-    >>> sorted(['2 §', '10 §', '1 §'], key=split_numalpha)
-    ['1 §', '2 §', '10 §']
+    >>> split_numalpha('10 a §') == ['', 10, ' a §']
+    True
+    >>> sorted(['2 §', '10 §', '1 §'], key=split_numalpha) == ['1 §', '2 §', '10 §']
+    True
 
     """
     res = []
@@ -219,8 +219,8 @@ def runcmd(cmdline, require_success=False, cwd=None):
 def normalize_space(string):
     """Normalize all whitespace in string so that only a single space between words is ever used, and that the string neither starts with nor ends with whitespace.
 
-    >>> normalize_space(" This is  a long \\n string\\n")
-    'This is a long string'
+    >>> normalize_space(" This is  a long \\n string\\n") == 'This is a long string'
+    True
     """
     return ' '.join(string.split())
 
@@ -375,8 +375,8 @@ def link_or_copy(src, dst):
 def ucfirst(string):
     """Returns string with first character uppercased but otherwise unchanged.
 
-    >>> ucfirst("iPhone")
-    'IPhone'
+    >>> ucfirst("iPhone") == 'IPhone'
+    True
     """
     l = len(string)
     if l == 0:
@@ -393,8 +393,8 @@ def ucfirst(string):
 def rfc_3339_timestamp(dt):
     """Converts a datetime object to a RFC 3339-style date
 
-    >>> rfc_3339_timestamp(datetime.datetime(2013, 7, 2, 21, 20, 25))
-    '2013-07-02T21:20:25-00:00'
+    >>> rfc_3339_timestamp(datetime.datetime(2013, 7, 2, 21, 20, 25)) == '2013-07-02T21:20:25-00:00'
+    True
     """
     if dt.tzinfo is None:
         suffix = "-00:00"
@@ -452,14 +452,14 @@ def extract_text(html, start, end, decode_entities=True, strip_tags=True):
     """Given *html*, a string of HTML content, and two substrings (*start* and *end*) present in this string, return all text between the substrings, optionally decoding any HTML entities and removing HTML tags.
 
     >>> extract_text("<body><div><b>Hello</b> <i>World</i>&trade;</div></body>",
-    ...              "<div>", "</div>")
-    'Hello World™'
+    ...              "<div>", "</div>") == 'Hello World™'
+    True
     >>> extract_text("<body><div><b>Hello</b> <i>World</i>&trade;</div></body>",
-    ...              "<div>", "</div>", decode_entities=False)
-    'Hello World&trade;'
+    ...              "<div>", "</div>", decode_entities=False) == 'Hello World&trade;'
+    True
     >>> extract_text("<body><div><b>Hello</b> <i>World</i>&trade;</div></body>",
-    ...              "<div>", "</div>", strip_tags=False)
-    '<b>Hello</b> <i>World</i>™'
+    ...              "<div>", "</div>", strip_tags=False) == '<b>Hello</b> <i>World</i>™'
+    True
 
     
     """
@@ -467,9 +467,9 @@ def extract_text(html, start, end, decode_entities=True, strip_tags=True):
     endidx = html.rindex(end)
     text = html[startidx + len(start):endidx]
     if decode_entities:
-        from html.entities import name2codepoint
+        from six.moves import html_entities
         entities = re.compile("&(\w+?);")
-        text = entities.sub(lambda m: chr(name2codepoint[m.group(1)]), text)
+        text = entities.sub(lambda m: six.unichr(html_entities.name2codepoint[m.group(1)]), text)
     if strip_tags:
         # http://stackoverflow.com/a/1732454
         tags = re.compile("</?\w+>")
@@ -551,10 +551,10 @@ def uri_leaf(uri):
     Get the "leaf" - fragment id or last segment - of a URI. Useful e.g. for
     getting a term from a "namespace like" URI.
 
-    >>> uri_leaf("http://purl.org/dc/terms/title")
-    'title'
-    >>> uri_leaf("http://www.w3.org/2004/02/skos/core#Concept")
-    'Concept'
+    >>> uri_leaf("http://purl.org/dc/terms/title") == 'title'
+    True
+    >>> uri_leaf("http://www.w3.org/2004/02/skos/core#Concept") == 'Concept'
+    True
     >>> uri_leaf("http://www.w3.org/2004/02/skos/core#") # returns None
     
     """
@@ -645,8 +645,8 @@ def from_roman(s):
 def title_sortkey(s):
     """Transform a document title into a key useful for sorting and partitioning documents.
 
-    >>> title_sortkey("The 'viewstate' property")
-    'viewstateproperty'
+    >>> title_sortkey("The 'viewstate' property") == 'viewstateproperty'
+    True
 
     """
     s = s.lower()
