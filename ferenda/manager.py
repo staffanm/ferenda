@@ -591,7 +591,9 @@ loglevels = {'DEBUG': logging.DEBUG,
              'CRITICAL': logging.CRITICAL}
 
 
-def setup_logger(level='INFO', filename=None):
+def setup_logger(level='INFO', filename=None,
+                 logformat="%(asctime)s %(name)s %(levelname)s %(message)s",
+                 datefmt="%H:%M:%S"):
     """Sets up the logging facilities and creates the module-global log
        object as a root logger.
 
@@ -619,9 +621,7 @@ def setup_logger(level='INFO', filename=None):
 
     h.setLevel(loglevel)
     h.setFormatter(
-        logging.Formatter(
-            "%(asctime)s %(name)s %(levelname)s %(message)s",
-            datefmt="%H:%M:%S"))
+        logging.Formatter(logformat, datefmt=datefmt))
     l.addHandler(h)
     l.setLevel(loglevel)
 
@@ -762,7 +762,6 @@ def enable(classname):
     :returns: The short-form alias for the class
     :rtype: str
     """
-
     cls = _load_class(classname)  # eg ferenda.DocumentRepository
                                  # throws error if unsuccessful
     cfg = configparser.ConfigParser()
@@ -777,59 +776,71 @@ def enable(classname):
     log.info("Enabled class %s (alias '%s')" % (classname, alias))
     return alias
 
-
-def setup(force=False, verbose=False, unattended=False, argv=None):
-    """Creates a project, complete with configuration file and
-    ferenda-build tool. Takes no parameters, but expects ``sys.argv``
-    to contain the path to the project being created.
-
-    Checks to see that all required python modules and command line
-    utilities are present. Also checks which triple store(s) are
-    available and selects the best one (in order of preference:
-    Sesame, Fuseki, RDFLib+Sleepycat, RDFLib+SQLite).
-
+def runsetup():
+    """Runs :func:`setup` and exits with a non-zero status if setup
+    failed in any way
+    
     .. note::
 
        The ``ferenda-setup`` script that gets installed with ferenda is
        a tiny wrapper around this function.
 
     """
+    # very basic cmd line handling
+    force = ('--force' in sys.argv)
+    verbose = ('--verbose' in sys.argv)
+    unattended = ('--unattended' in sys.argv)
+    if not setup(sys.argv, force, verbose, unattended):
+        sys.exit(-1)
+        
+
+def setup(argv=None, force=False, verbose=False, unattended=False):
+    """Creates a project, complete with configuration file and
+    ferenda-build tool.
+    
+    Checks to see that all required python modules and command line
+    utilities are present. Also checks which triple store(s) are
+    available and selects the best one (in order of preference:
+    Sesame, Fuseki, RDFLib+Sleepycat, RDFLib+SQLite).
+    """
+    log = setup_logger(logformat="%(message)s")
+
     if not argv:
         argv = sys.argv
     if len(argv) < 2:
-        print(("Usage: %s [project-directory]" % argv[0]))
+        log.error("Usage: %s [project-directory]" % argv[0])
         return False
     projdir = argv[1]
     if os.path.exists(projdir) and not force:
-        print(("Project directory %s already exists" % projdir))
+        log.error("Project directory %s already exists" % projdir)
         return False
     sitename = os.path.basename(projdir)
 
-    ok = _preflight_check(verbose)
+    ok = _preflight_check(log, verbose)
     if not ok and not force:
         if unattended:
             answer = "n"
         else:
-            print("There were some errors when checking your environment. Proceed anyway? (y/N)")
+            log.info("There were some errors when checking your environment. Proceed anyway? (y/N)")
             answer = input()
         if answer != "y":
-            sys.exit(1)
+            return False
 
     # The template ini file needs values for triple store
     # configuration. Find out the best triple store we can use.
-    storetype, storelocation, storerepository = _select_triplestore(sitename, verbose)
-    print("Selected %s as triplestore" % storetype)
+    storetype, storelocation, storerepository = _select_triplestore(sitename, log, verbose)
+    log.info("Selected %s as triplestore" % storetype)
     if not storetype:
         if unattended:
             answer = "n"
         else:
-            print("Cannot find a useable triple store. Proceed anyway? (y/N)")
+            log.info("Cannot find a useable triple store. Proceed anyway? (y/N)")
             answer = input()
         if answer != "y":
-            sys.exit(1)
+            return False
 
-    indextype, indexlocation = _select_fulltextindex(verbose)
-    print("Selected %s as search engine" % indextype)
+    indextype, indexlocation = _select_fulltextindex(log, verbose)
+    log.info("Selected %s as search engine" % indextype)
 
     if not os.path.exists(projdir):
         os.makedirs(projdir)
@@ -845,11 +856,12 @@ def setup(force=False, verbose=False, unattended=False, argv=None):
     util.resource_extract('res/scripts/ferenda.template.ini', configfile,
                           locals())
 
-    print("Project created in %s" % projdir)
+    log.info("Project created in %s" % projdir)
 
     # step 3: create WSGI app
     wsgifile = projdir + os.sep + "wsgi.py"
     util.resource_extract('res/scripts/wsgi.py', wsgifile)
+    shutdown_logger()
     return True
 
 
@@ -1339,7 +1351,7 @@ def _filepath_to_urlpath(path, keep_segments=2):
     return urlpath.replace(os.sep, "/")
 
 
-def _preflight_check(verbose=False):
+def _preflight_check(log, verbose=False):
     """Perform a check of needed modules and binaries."""
     pythonver = (2, 6, 0)
 
@@ -1364,12 +1376,12 @@ def _preflight_check(verbose=False):
     # 1: Check python ver
     success = True
     if sys.version_info < pythonver:
-        print("ERROR: ferenda requires Python %s or higher, you have %s" %
+        log.error("ERROR: ferenda requires Python %s or higher, you have %s" %
               (".".join(pythonver), sys.version.split()[0]))
         success = False
     else:
         if verbose:
-            print("Python version %s OK" % sys.version.split()[0])
+            log.info("Python version %s OK" % sys.version.split()[0])
 
     # 2: Check modules -- TODO: Do we really need to do this?
     for (mod, ver, required) in modules:
@@ -1379,26 +1391,26 @@ def _preflight_check(verbose=False):
             if isinstance(version, tuple):
                 version = ".".join([str(x) for x in version])
             if not hasattr(m, '__version__'):
-                print(
-                    "WARNING: Module %s has no version information, it might be older than required" % mod)
+                log.warning("Module %s has no version information,"
+                            "it might be older than required" % mod)
             elif version < ver:  # FIXME: use util.numcmp?
                 if required:
-                    print("ERROR: Module %s has version %s, need %s" %
+                    log.error("Module %s has version %s, need %s" %
                           (mod, version, ver))
                     success = False
                 else:
-                    print(
-                        "WARNING: Module %s has version %s, would like to hav %s" %
+                    log.warning(
+                        "Module %s has version %s, would like to have %s" %
                         (mod, version, ver))
             else:
                 if verbose:
                     print("Module %s OK" % mod)
         except ImportError:
             if required:
-                print("ERROR: Missing module %s" % mod)
+                log.error("Missing module %s" % mod)
                 success = False
             else:
-                print("WARNING: Missing (non-essential) module %s" % mod)
+                log.warning("Missing (non-essential) module %s" % mod)
 
     # 3: Check binaries
     for (cmd, arg) in binaries:
@@ -1407,20 +1419,20 @@ def _preflight_check(verbose=False):
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
             if ret == 127:
-                print("ERROR: Binary %s failed to execute")
+                log.error("Binary %s failed to execute" % cmd)
                 success = False
             else:
                 if verbose:
-                    print("Binary %s OK" % cmd)
+                    log.info("Binary %s OK" % cmd)
         except OSError as e:
-            print("ERROR: Binary %s failed: %s" % (cmd, e))
+            log.error("Binary %s failed: %s" % (cmd, e))
             success = False
     if success:
-        print("Prerequisites ok")
+        log.info("Prerequisites ok")
     return success
 
 
-def _select_triplestore(sitename, verbose=False):
+def _select_triplestore(sitename, log, verbose=False):
     # Try triplestores in order: Fuseki, Sesame, Sleepycat, SQLite,
     # and return configuration for the first triplestore that works.
 
@@ -1431,7 +1443,7 @@ def _select_triplestore(sitename, verbose=False):
         resp = requests.get(triplestore + "/ds/data?default")
         resp.raise_for_status()
         if verbose:
-            print("Fuseki server responding at %s" % triplestore)
+            log.info("Fuseki server responding at %s" % triplestore)
         # TODO: Find out how to create a new datastore in Fuseki
         # programatically so we can use
         # http://localhost:3030/$SITENAME instead
@@ -1439,7 +1451,7 @@ def _select_triplestore(sitename, verbose=False):
     except (requests.exceptions.HTTPError,
             requests.exceptions.ConnectionError) as e:
         if verbose:
-            print("... Fuseki not available at %s: %s" % (triplestore, e))
+            log.info("... Fuseki not available at %s: %s" % (triplestore, e))
         pass
 
     # 2. Sesame
@@ -1450,11 +1462,11 @@ def _select_triplestore(sitename, verbose=False):
         resp.raise_for_status()
         workbench = triplestore.replace('openrdf-sesame', 'openrdf-workbench')
         if verbose:
-            print("Sesame server responding at %s (%s)" % (triplestore, resp.text))
+            log.info("Sesame server responding at %s (%s)" % (triplestore, resp.text))
         # TODO: It is possible, if you put the exactly right triples
         # in the SYSTEM repository, to create a new repo
         # programmatically.
-        print("""You still need to create a repository at %(workbench)s ->
+        log.info("""You still need to create a repository at %(workbench)s ->
 New repository. The following settings are recommended:
 
     Type: Native Java store
@@ -1466,35 +1478,35 @@ New repository. The following settings are recommended:
     except (requests.exceptions.HTTPError,
             requests.exceptions.ConnectionError) as e:
         if verbose:
-            print("... Sesame not available at %s: %s" % (triplestore, e))
+            log.info("... Sesame not available at %s: %s" % (triplestore, e))
         pass
 
     # 3. RDFLib + SQLite
     try:
         t = TripleStore.connect("SQLITE", "test.sqlite", "ferenda")
         if verbose:
-            print("SQLite-backed RDFLib triplestore seems to work")
+            log.info("SQLite-backed RDFLib triplestore seems to work")
         return ('SQLITE', 'data/ferenda.sqlite', 'ferenda')
     except ImportError as e:
         if verbose:
-            print("...SQLite not available: %s" % e)
+            log.info("...SQLite not available: %s" % e)
 
     # 4. RDFLib + Sleepycat
     try:
         t = TripleStore.connect("SLEEPYCAT", "test.db", "ferenda")
         # No boom?
         if verbose:
-            print("Sleepycat-backed RDFLib triplestore seems to work")
+            log.info("Sleepycat-backed RDFLib triplestore seems to work")
         return ('SLEEPYCAT', 'data/ferenda.db', 'ferenda')
     except ImportError as e:
         if verbose:
-            print("...Sleepycat not available: %s" % e)
+            log.info("...Sleepycat not available: %s" % e)
 
-    print("No usable triplestores, the actions 'relate', 'generate' and 'toc' won't work")
+    log.info("No usable triplestores, the actions 'relate', 'generate' and 'toc' won't work")
     return (None, None, None)
 
 
-def _select_fulltextindex(verbose=False):
+def _select_fulltextindex(log, verbose=False):
     # 1. Elasticsearch
     try:
         fulltextindex = os.environ.get('FERENDA_FULLTEXTINDEX_LOCATION',
@@ -1502,12 +1514,12 @@ def _select_fulltextindex(verbose=False):
         resp = requests.get(fulltextindex)
         resp.raise_for_status()
         if verbose:
-            print("Elasticsearch server responding at %s" % triplestore)
+            log.info("Elasticsearch server responding at %s" % triplestore)
         return('ELASTICSEARCH', fulltextindex)
     except (requests.exceptions.HTTPError,
             requests.exceptions.ConnectionError) as e:
         if verbose:
-            print("... Elasticsearch not available at %s: %s" %
+            log.info("... Elasticsearch not available at %s: %s" %
                   (fulltextindex, e))
         pass
     # 2. Whoosh (just assume that it works)

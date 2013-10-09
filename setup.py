@@ -58,7 +58,7 @@ setup(name='ferenda',
       install_requires=install_requires,
       tests_require=tests_require,
       entry_points = {
-        'console_scripts':['ferenda-setup = ferenda.manager:setup']
+        'console_scripts':['ferenda-setup = ferenda.manager:runsetup']
         },
       packages=find_packages(exclude=('test', 'docs')),
       # package_dir = {'ferenda':'ferenda'},

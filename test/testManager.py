@@ -338,7 +338,11 @@ class=testManager.staticmockclass2
 class Setup(RepoTester):
 
     def test_setup(self):
-        # FIXME: patch requests.get to selectively return 404
+        # restart the log system since setup() will do that otherwise
+        manager.shutdown_logger()
+        manager.setup_logger('CRITICAL')
+
+        # FIXME: patch requests.get to selectively return 404 or 200
         res = manager.setup(force=True, verbose=False, unattended=True,
                             argv=['ferenda-build.py',
                                   self.datadir+os.sep+'myproject'])
@@ -618,6 +622,9 @@ class Testrepo2(Testrepo):
 
 import doctest
 from ferenda import manager
+def shutup_logger(dt):
+    manager.setup_logger('CRITICAL')
+
 def load_tests(loader,tests,ignore):
-    tests.addTests(doctest.DocTestSuite(manager))
+    tests.addTests(doctest.DocTestSuite(manager, setUp=shutup_logger))
     return tests
