@@ -11,16 +11,16 @@ from __future__ import unicode_literals
 import sys
 try:
     from collections import OrderedDict
-except ImportError:
+except ImportError: # pragma: no cover
     # if on python 2.6
     from ordereddict import OrderedDict
 
-if sys.version_info < (2,7,0):
+if sys.version_info < (2,7,0): # pragma: no cover
     import unittest2 as unittest
-else:
+else: 
     import unittest
 
 try:
     from unittest.mock import Mock, patch, call
-except ImportError:
+except ImportError: # pragma: no cover
     from mock import Mock, patch, call

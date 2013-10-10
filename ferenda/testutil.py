@@ -245,6 +245,8 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
     """The location of test files to create tests from. Must be overridden
        when creating a testcase class"""
 
+    datadir = None
+
     def setUp(self):
         self.datadir = tempfile.mkdtemp()
         self.repo = self.repoclass(datadir=self.datadir,
