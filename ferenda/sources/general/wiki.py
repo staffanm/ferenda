@@ -13,7 +13,7 @@ from lxml import etree
 # mine
 from ferenda import DocumentRepository
 from ferenda import util
-from ferenda.legalref import LegalRef, Link
+# from ferenda.legalref import LegalRef, Link
 
 # FIXME: Need to dynamically set this namespace (by inspecting the root?)
 # as it varies with MW version

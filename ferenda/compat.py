@@ -21,6 +21,6 @@ else:
     import unittest
 
 try:
-    from unittest.mock import Mock, patch, call
+    from unittest.mock import Mock, MagicMock, patch, call
 except ImportError: # pragma: no cover
-    from mock import Mock, patch, call
+    from mock import Mock, MagicMock, patch, call

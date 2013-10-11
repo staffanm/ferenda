@@ -365,7 +365,7 @@ def link_or_copy(src, dst):
         # The semantics of symlink are not identical to copy. The
         # source must be relative to the dstination, not relative to
         # cwd at creation time.
-        relsrc = os.relpath(src, os.path.dirname(dst))
+        relsrc = os.path.relpath(src, os.path.dirname(dst))
         os.symlink(relsrc, dst)
     else:
         copy_if_different(src, dst)

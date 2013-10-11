@@ -25,7 +25,7 @@ from bs4 import BeautifulSoup
 from ferenda import DocumentStore, Describer, WordReader
 from ferenda.decorators import managedparsing
 from ferenda import util
-from ferenda.legalref import LegalRef, Link
+from ferenda.sources.legal.se.legalref import LegalRef, Link
 from ferenda.elements import Body, Paragraph
 from . import SwedishLegalSource, RPUBL
 

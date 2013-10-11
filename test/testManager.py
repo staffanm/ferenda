@@ -92,6 +92,15 @@ class staticmockclass2(staticmockclass):
         """Frobnicate the bizbaz (alternate implementation)"""
         if arg == "myarg":
             return "yeah!"
+
+class staticmockclass3(staticmockclass):
+    """Yet another (overrides footer())"""
+    alias="staticmock3"
+    def footer(self):
+        return (("About", "http://example.org/about"),
+                ("Legal", "http://example.org/legal"),
+                ("Contact", "http://example.org/contact")
+        )
     
 class API(unittest.TestCase):
     """Test cases for API level methods of the manager modules (functions
@@ -267,11 +276,8 @@ class=testManager.staticmockclass2
             got = manager.makeresources([test],self.tempdir+os.sep+'rsrc', combine=True)
 
         # test7: test the footer() functionality
-        from ferenda.sources.general import Static
-        static = Static()
-        for b in static.store.list_basefiles_for("parse"):
-            static.parse(b)
-        got = manager.makeresources([Static()], self.tempdir+os.sep+'rsrc')
+        test = staticmockclass3()
+        got = manager.makeresources([test], self.tempdir+os.sep+'rsrc')
         tree = ET.parse(self.tempdir+os.sep+got['xml'][0])
         footerlinks=tree.findall("footerlinks/nav/ul/li")
         self.assertTrue(footerlinks)

@@ -157,7 +157,7 @@ class Store(unittest.TestCase):
         self.assertEqual(list(self.store.list_basefiles_for("parse")),
                          basefiles)
 
-    def test_list_basefiles_dir(self):
+    def test_list_basefiles_parse_dir(self):
         files = ["downloaded/123/a/index.html",
                  "downloaded/123/b/index.html",
                  "downloaded/124/a/index.html",
@@ -168,6 +168,19 @@ class Store(unittest.TestCase):
         for f in files:
             util.writefile(self.p(f),"nonempty")
         self.assertEqual(list(self.store.list_basefiles_for("parse")),
+                         basefiles)
+
+    def test_list_basefiles_generate_dir(self):
+        files = ["parsed/123/a/index.xhtml",
+                 "parsed/123/b/index.xhtml",
+                 "parsed/124/a/index.xhtml",
+                 "parsed/124/b/index.xhtml"]
+        basefiles = ["124/b", "124/a", "123/b", "123/a"]
+
+        self.store.storage_policy = "dir"
+        for f in files:
+            util.writefile(self.p(f),"nonempty")
+        self.assertEqual(list(self.store.list_basefiles_for("generate")),
                          basefiles)
 
     def test_list_versions_file(self):

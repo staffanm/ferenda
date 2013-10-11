@@ -29,22 +29,6 @@ class Devel(object):
     """
 
     alias = "devel"
-    # FIXME: manager.py should not strictly require these to be present
-
-    class DummyStore(object):
-
-        def __init__(self, path, **kwargs):
-            pass
-
-        def list_basefiles_for(self, action, basedir=None):
-            return []
-    downloaded_suffix = ".html"
-    storage_policy = "file"
-    documentstore_class = DummyStore
-
-    # Don't document this -- just needed for ferenda.manager compatibility
-    def get_default_options(self):
-        return {}
 
     @decorators.action
     def dumprdf(self, filename, format="turtle"):
@@ -309,34 +293,52 @@ class Devel(object):
             p['triples'] = len(res)
             print(res.serialize(format=format).decode('utf-8'))
 
+
+    # FIXME: These are dummy implementations of methods and class
+    # variables that manager.py expects all docrepos to have. We don't
+    # want to have coverage counting these as missing lines, hence the
+    # pragma: no cover comments.
+
+    class DummyStore(object):
+
+        def __init__(self, path, **kwargs):
+            pass  # pragma: no cover
+
+        def list_basefiles_for(self, action, basedir=None):
+            return []  # pragma: no cover
+
+    documentstore_class = DummyStore
+    downloaded_suffix = ".html"
+    storage_policy = "file"
+
+    def get_default_options(self):
+        return {}  # pragma: no cover
+
     def download(self):
-        pass
+        pass  # pragma: no cover
 
     def parse(self, basefile):
-        pass
+        pass  # pragma: no cover
 
     def relate(self, basefile):
-        pass
+        pass  # pragma: no cover
 
     def generate(self, basefile):
-        pass
+        pass  # pragma: no cover
 
     def toc(self, otherrepos):
-        pass
+        pass  # pragma: no cover
 
     def news(self, otherrepos):
-        pass
+        pass  # pragma: no cover
 
     def status(self):
-        pass
-
-    def list_basefiles_for(self, command):
-        return []
+        pass  # pragma: no cover
 
     @classmethod
     def setup(cls, action, config):
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     def teardown(cls, action, config):
-        pass
+        pass  # pragma: no cover

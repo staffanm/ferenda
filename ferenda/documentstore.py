@@ -217,7 +217,10 @@ class DocumentStore(object):
             suffix = ".rdf"
         elif action == "generate":
             directory = os.path.sep.join((basedir, "parsed"))
-            suffix = ".xhtml"
+            if self.storage_policy == "dir":
+                suffix = "index.xhtml"
+            else:
+                suffix = ".xhtml"
         elif action == "news":
             directory = os.path.sep.join((basedir, "entries"))
             suffix = ".json"

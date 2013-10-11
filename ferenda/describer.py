@@ -77,9 +77,9 @@ class Describer(OrigDescriber):
         """
         values = list(self.getvalues(p))
         if len(values) == 0:
-            raise KeyError("No objects for predicate %s" % p)
+            raise KeyError("No values for predicate %s" % p)
         elif len(values) > 1:
-            raise KeyError("More than one object for predicatee %s" % p)
+            raise KeyError("More than one value for predicate %s" % p)
         return values[0]
 
     def getrel(self, p):
@@ -94,7 +94,7 @@ class Describer(OrigDescriber):
         """
         refs = list(self.getrels(p))
         if len(refs) == 0:
-            raise KeyError("No objects for predicate %s" + p)
+            raise KeyError("No objects for predicate %s" % p)
         elif len(refs) > 1:
-            raise KeyError("More than one object for predicatee %s" + p)
+            raise KeyError("More than one object for predicate %s" % p)
         return refs[0]

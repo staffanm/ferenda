@@ -35,14 +35,14 @@ from . import Trips, RPUBL
 from ferenda import DocumentEntry, DocumentStore
 from ferenda import TextReader, Describer
 from ferenda import decorators
-from ferenda import legaluri
+from ferenda.sources.legal.se import legaluri
 from ferenda import util, LayeredConfig
 from ferenda.elements import CompoundElement
 from ferenda.elements import OrdinalElement
 from ferenda.elements import TemporalElement
 from ferenda.elements import UnicodeElement
 from ferenda.errors import DocumentRemovedError, ParseError
-from ferenda.legalref import LegalRef, LinkSubject
+from ferenda.sources.legal.se.legalref import LegalRef, LinkSubject
 
 E = ElementMaker(namespace="http://www.w3.org/1999/xhtml")
 # Objektmodellen för en författning är uppbyggd av massa byggstenar

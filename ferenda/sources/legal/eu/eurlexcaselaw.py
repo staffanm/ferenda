@@ -7,7 +7,7 @@ import itertools
 from rdflib import Graph
 
 from ferenda import DocumentRepository
-from ferenda.legalref import LegalRef
+from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda.elements import Paragraph
 
 # FIXME: 2008.json, containing a handful of cases, some which should not be fetched, and one continuation link.
