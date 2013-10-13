@@ -2,13 +2,14 @@
 from __future__ import unicode_literals, print_function
 import sys
 import os
+from difflib import unified_diff
+from tempfile import mkstemp
 
 from rdflib import Graph
 
 from ferenda import TextReader, TripleStore
 from ferenda.elements import serialize
-from ferenda import decorators
-from ferenda import util
+from ferenda import decorators, util
 
 
 class Devel(object):
@@ -91,104 +92,95 @@ class Devel(object):
 
     @decorators.action
     def mkpatch(self, alias, basefile, description):
-        """Create a patch file from intermediate files. Before running this
-        tool, you should hand-edit the intermediate file. The tool
-        will first stash away the intermediate file, then re-run
-        :py:meth:`~ferenda.DocumentRepository.parse` in order to get a
-        new intermediate file. It will then calculate the diff between
-        these two versions and save it as a patch file in it's proper
-        place (as determined by ``config.patchdir``), where it will be
-        picked up automatically by
-        :py:meth:`~ferenda.DocumentRepository.patch_if_needed`.
+        """Create a patch file from downloaded or intermediate files. Before
+        running this tool, you should hand-edit the intermediate
+        file. If your docrepo doesn't use intermediate files, you
+        should hand-edit the downloaded file instead. The tool will
+        first stash away the intermediate (or downloaded) file, then
+        re-run :py:meth:`~ferenda.DocumentRepository.parse` (or
+        :py:meth:`~ferenda.DocumentRepository.download_single`) in
+        order to get a new intermediate (or downloaded) file. It will
+        then calculate the diff between these two versions and save it
+        as a patch file in it's proper place (as determined by
+        ``config.patchdir``), where it will be picked up automatically
+        by :py:meth:`~ferenda.DocumentRepository.patch_if_needed`.
 
         :param alias: Docrepo alias
         :type  alias: str
         :param basefile: The basefile for the document to patch
         :type  basefile: str
 
-        .. note::
-
-           This is currently broken.
-
         Example::
 
             ./ferenda-build.py devel mkpatch myrepo basefile1 "Removed sensitive personal information"
 
         """
-        coding = 'utf-8' if sys.stdin.encoding == 'UTF-8' else 'iso-8859-1'
-        myargs = [arg.decode(coding) for arg in sys.argv]
-
-        # ask for description and place it alongside
-
-        # copy the modified file to a safe place
-        file_to_patch = myargs[1].replace("\\", "/")  # normalize
-        tmpfile = mktemp()
-        copy2(file_to_patch, tmpfile)
-
-        # Run SFSParser._extractSFST() (and place the file in the correct location)
-        # or DVParser.word_to_docbook()
-        if "/sfs/intermediate/" in file_to_patch:
-            source = "sfs"
-            basefile = file_to_patch.split("/sfs/intermediate/")[1]
-            import SFS
-            p = SFS.SFSParser()
-            sourcefile = file_to_patch.replace(
-                "/intermediate/", "/downloaded/sfst/").replace(".txt", ".html")
-            print(("source %s, basefile %s, sourcefile %s" % (
-                source, basefile, sourcefile)))
-            plaintext = p._extractSFST([sourcefile])
-            f = codecs.open(file_to_patch, "w", 'iso-8859-1')
-            f.write(plaintext + "\n")
-            f.close()
-            print(("Wrote %s bytes to %s" % (len(plaintext), file_to_patch)))
-
-        elif "/dv/intermediate/docbook/" in file_to_patch:
-            source = "dv"
-            basefile = file_to_patch.split("/dv/intermediate/docbook/")[1]
-            import DV
-            p = DV.DVParser()
-            sourcefile = file_to_patch.replace(
-                "/docbook/", "/word/").replace(".xml", ".doc")
-            print(("source %r, basefile %r, sourcefile %r" % (
-                source, basefile, sourcefile)))
-            os.remove(file_to_patch)
-            p.word_to_docbook(sourcefile, file_to_patch)
-
-        elif "/dv/intermediate/ooxml/" in file_to_patch:
-            source = "dv"
-            basefile = file_to_patch.split("/dv/intermediate/ooxml/")[1]
-            import DV
-            p = DV.DVParser()
-            sourcefile = file_to_patch.replace(
-                "/ooxml/", "/word/").replace(".xml", ".docx")
-            print(("source %r, basefile %r, sourcefile %r" % (
-                source, basefile, sourcefile)))
-            os.remove(file_to_patch)
-            p.word_to_ooxml(sourcefile, file_to_patch)
-
-        # calculate place in patch tree
-        patchfile = "patches/%s/%s.patch" % (
-            source, os.path.splitext(basefile)[0])
-        util.ensure_dir(patchfile)
-
-        # run diff on the original and the modified file, placing the patch right in the patch tree
-        cmd = "diff -u %s %s > %s" % (file_to_patch, tmpfile, patchfile)
-        print(("Running %r" % cmd))
-        (ret, stdout, stderr) = util.runcmd(cmd)
-
-        if os.stat(patchfile).st_size == 0:
-            print("FAIL: Patchfile is empty")
-            os.remove(patchfile)
+        # 1. initialize the docrepo indicated by "alias" (FIXME: This
+        # uses several undocumented APIs)
+        mainconfig = self.config._parent
+        assert mainconfig is not None, "Devel must be initialized with a full set of configuration"
+        repoconfig = getattr(mainconfig, alias)
+        from ferenda import manager
+        repocls = manager._load_class(getattr(repoconfig, 'class'))
+        repo = repocls()
+        repo.config = getattr(mainconfig, alias)
+        repo.store = repo.documentstore_class(
+            repo.config.datadir + os.sep + repo.alias,
+            downloaded_suffix=repo.downloaded_suffix,
+            storage_policy=repo.storage_policy)
+        
+        # 2. find out if there is an intermediate file or downloaded
+        # file for basefile
+        if os.path.exists(repo.store.intermediate_path(basefile)):
+            stage = "intermediate"
+            outfile = repo.store.intermediate_path(basefile)
         else:
-            if sys.platform == "win32":
-                os.system("unix2dos %s" % patchfile)
-            print(("Created patch file %r" % patchfile))
-            print("Please give a description of the patch")
-            patchdesc = sys.stdin.readline().decode('cp850')
-            fp = codecs.open(
-                patchfile.replace(".patch", ".desc"), "w", 'utf-8')
-            fp.write(patchdesc)
-            fp.close()
+            stage = "download"
+            outfile = repo.store.downloaded_path(basefile)
+
+        # 2.1 stash a copy
+        fileno, stash = mkstemp()
+        with os.fdopen(fileno, "w") as fp:
+            fp.write(util.readfile(outfile))
+        
+        # 2.1 if intermediate: stash a copy, run parse(config.force=True)
+        if stage == "intermediate":
+            repo.config.force = True
+            repo.parse(basefile)
+        # 2.2 if only downloaded: stash a copy, run download_single(config.refresh=True)
+        else:
+            repo.config.refresh = True
+            repo.download_single(basefile)
+            
+        # 3. calculate the diff using difflib.
+        outfile_lines = open(outfile).readlines()
+        stash_lines = open(stash).readlines()
+        difflines = list(unified_diff(outfile_lines,
+                                      stash_lines,
+                                      outfile,
+                                      stash))
+        # 4. calculate place of patch using docrepo.store.
+        patchstore = repo.documentstore_class(repo.config.patchdir +
+                                              os.sep + repo.alias)
+        patchpath = patchstore.path(basefile, "patches", ".patch")
+
+        # 3.1 If comment is single-line, append it on the first hunks
+        # @@-control line
+        if description.count("\n") == 0:
+            for idx,line in enumerate(difflines):
+                if line.startswith("@@") and line.endswith("@@\n"):
+                    difflines[idx] = difflines[idx].replace("@@\n",
+                                                            "@@ "+description+"\n")
+                    break
+        else:
+            # 4.2 if comment is not single-line, write the rest
+            # in corresponding .desc file
+            descpath = patchstore.path(basefile, "patches", ".desc")
+            util.writefile(descpath, description)
+            
+        # 4.1 write patch
+        util.writefile(patchpath, "".join(difflines))
+        return patchpath
 
     @decorators.action
     def parsestring(self, string, citationpattern, uriformatter=None):

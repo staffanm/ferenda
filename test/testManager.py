@@ -18,15 +18,10 @@ sys.path.insert(0,os.getcwd())
 pkg_resources.resource_listdir('ferenda','res')
 
 from ferenda.manager import setup_logger; setup_logger('CRITICAL')
-from ferenda.compat import unittest, OrderedDict
+from ferenda.compat import unittest, OrderedDict, Mock, MagicMock, patch, call
 from ferenda.testutil import RepoTester
 
 from six.moves import configparser, reload_module
-try:
-    # assume we're on py3.3 and fall back if not
-    from unittest.mock import Mock, MagicMock, patch, call
-except ImportError:
-    from mock import Mock, MagicMock, patch, call
 
 from lxml import etree as ET
 
