@@ -21,6 +21,7 @@ import lxml.etree as etree
 from lxml.etree import XSLT
 from lxml.builder import ElementMaker
 import rdflib
+import requests.exceptions
 
 # import six
 from ferenda.compat import Mock, patch, call
@@ -42,11 +43,59 @@ from ferenda import util
 from ferenda.elements import serialize, Link
 
 class Repo(RepoTester):
-
     # TODO: Many parts of this class could be divided into subclasses
     # (like Generate, Toc, News, Storage and Archive already has)
 
     # class Repo(RepoTester)
+    def test_init(self):
+        # make sure self.ns is properly initialized
+        class StandardNS(DocumentRepository):
+            namespaces = ('rdf','dct')
+        d = StandardNS()
+        want = {'rdf':
+                rdflib.Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#'),
+                'dct':
+                rdflib.Namespace('http://purl.org/dc/terms/')}
+        self.assertEqual(want, d.ns)
+
+        class OwnNS(DocumentRepository):
+            namespaces = ('rdf',('ex', 'http://example.org/vocab'))
+        d = OwnNS()
+        want = {'rdf':
+                rdflib.Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#'),
+                'ex':
+                rdflib.Namespace('http://example.org/vocab')}
+        self.assertEqual(want, d.ns)
+
+    def test_setup_teardown(self):
+        defaults = {'example':'config',
+                    'setup': None,
+                    'teardown': None}
+
+        # It's possible that this is mock-able
+        class HasSetup(DocumentRepository):
+            @classmethod
+            def parse_all_setup(cls, config):
+                config.setup = "parse"
+        config = LayeredConfig(defaults)
+        HasSetup.setup("parse", config)
+        HasSetup.teardown("parse", config)
+        self.assertEqual(config.setup, "parse")
+        self.assertEqual(config.teardown, None)
+        
+        class HasTeardown(DocumentRepository):
+            relate_all_setup = None
+            
+            @classmethod
+            def relate_all_teardown(cls, config):
+                config.teardown = "relate"
+                
+        config = LayeredConfig(defaults)
+        HasTeardown.setup("relate", config)
+        HasTeardown.teardown("relate", config)
+        self.assertEqual(config.setup, None)
+        self.assertEqual(config.teardown, "relate")
+
     def test_dataset_uri(self):
         repo = DocumentRepository()
         self.assertEqual(repo.dataset_uri(), "http://localhost:8000/dataset/base")
@@ -137,6 +186,16 @@ class Repo(RepoTester):
             self.assertFalse(d.download())
         self.assertFalse(d.download_single.error.called)
         d.download_single.reset_mock()
+
+        # test5: basefile parameter
+        with patch('requests.get',return_value=mockresponse):
+            self.assertFalse(d.download("123/a"))
+
+        # test6: basefile parameter w/o document_url_template
+        d.document_url_template = None
+        with self.assertRaises(ValueError):
+            d.download("123/a")
+        
         
 
     def test_download_single(self):
@@ -238,7 +297,6 @@ class Repo(RepoTester):
                 if headers["If-none-match"] == etag:
                     resp.status_code=304
                     return resp
-
             # Then make sure the response contains appropriate headers
             headers = {}
             if last_modified:
@@ -253,8 +311,13 @@ class Repo(RepoTester):
             # And if needed, slurp content from a specified file
             content = None
             if url_location:
-                with open(url_location,"rb") as fp:
-                    content = fp.read()
+                if os.path.exists(url_location):
+                    with open(url_location,"rb") as fp:
+                        content = fp.read()
+                else:
+                    resp.status_code = 404
+                    resp.raise_for_status.side_effect = requests.exceptions.HTTPError
+                    resp.content = b'<h1>404 not found</h1>'
             resp.content = content
             resp.headers = headers
             return resp
@@ -378,6 +441,30 @@ class Repo(RepoTester):
         self.assertEqual(util.readfile("test/files/base/downloaded/123/a-version2.htm"),
                          util.readfile(self.datadir+"/base/downloaded/example.html"))
         mock_get.reset_mock()
+
+        # test8: 404 Not Found / catch something
+        url_location = "test/files/base/downloaded/non-existent"
+        with self.assertRaises(requests.exceptions.HTTPError):
+            d.download_if_needed("http://example.org/document",
+                                 "example")
+        mock_get.reset_mock()
+
+        # test9: ConnectionError
+        mock_get.side_effect = requests.exceptions.ConnectionError
+        self.assertFalse(d.download_if_needed("http://example.org/document",
+                                              "example",
+                                              sleep=0))
+        self.assertEqual(mock_get.call_count, 5)
+        mock_get.reset_mock()
+
+        # test10: RequestException
+        mock_get.side_effect = requests.exceptions.RequestException
+        with self.assertRaises(requests.exceptions.RequestException):
+            d.download_if_needed("http://example.org/document",
+                                 "example")
+        mock_get.reset_mock()
+
+        
 
 
     def test_remote_url(self):

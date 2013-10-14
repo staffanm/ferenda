@@ -300,7 +300,8 @@ object as single parameter."""
 
         if hasattr(cls, action + "_all_setup"):
             cbl = getattr(cls, action + "_all_setup")
-            return cbl(config)
+            if callable(cbl):
+                return cbl(config)
 
     @classmethod
     def teardown(cls, action, config):
@@ -313,7 +314,8 @@ with the *config* object as single parameter.
 
         if hasattr(cls, action + "_all_teardown"):
             cbl = getattr(cls, action + "_all_teardown")
-            return cbl(config)
+            if callable(cbl):
+                return cbl(config)
 
     def get_archive_version(self, basefile):
         """Get a version identifier for the current version of the
@@ -381,8 +383,20 @@ with the *config* object as single parameter.
 
     def basefile_from_uri(self, uri):
         """The reverse of
-:meth:`~ferenda.DocumentRepository.canonical_uri`. Returns None if the
-uri doesn't map to a basefile in this repo."""
+           :meth:`~ferenda.DocumentRepository.canonical_uri`. Returns
+           None if the uri doesn't map to a basefile in this repo.
+
+        >>> d = DocumentRepository()
+        >>> d.alias == "base"
+        True
+        >>> d.config.url = "http://example.org/"
+        >>> d.basefile_from_uri("http://example.org/res/base/123/a") == "123/a"
+        True
+        >>> d.basefile_from_uri("http://example.org/res/base/123/a#S1") == "123/a"
+        True
+        >>> d.basefile_from_uri("http://example.org/res/other/123/a") # None
+        
+        """
         if uri.startswith(self.config.url + "res/"):
             path = uri[len(self.config.url + "res/"):]
             if "/" in path:
@@ -393,7 +407,9 @@ uri doesn't map to a basefile in this repo."""
                     return basefile
 
     def dataset_params_from_uri(self, uri):
-        """Given a parametrized dataset URI, return the parameter and value used.
+        """Given a parametrized dataset URI, return the parameter and value
+           used (or an empty tuple, if it is a dataset URI handled by
+           this repo, but without any parameters).
 
         >>> d = DocumentRepository()
         >>> d.alias == 'base'
@@ -401,7 +417,9 @@ uri doesn't map to a basefile in this repo."""
         >>> d.config.url = "http://example.org/"
         >>> d.dataset_params_from_uri("http://example.org/dataset/base?title=a") == ('title', 'a')
         True
-        
+        >>> d.dataset_params_from_uri("http://example.org/dataset/base") == ()
+        True
+
         """
 
         wantedprefix = self.config.url + "dataset/" + self.alias
@@ -571,7 +589,7 @@ uri doesn't map to a basefile in this repo."""
                 headers["If-modified-since"] = format_http_date(stamp)
         return headers
 
-    def download_if_needed(self, url, basefile, archive=True, filename=None):
+    def download_if_needed(self, url, basefile, archive=True, filename=None, sleep=1):
         """Downloads a remote resource to a local file. If a different
         version is already in place, archive that old version.
 
@@ -615,13 +633,8 @@ uri doesn't map to a basefile in this repo."""
                 except requests.exceptions.ConnectionError as e:
                     self.log.warning(
                         "Failed to fetch %s: error %s (%s remaining attempts)" % (url, e, remaining_attempts))
-                    # close session in hope that this rectifies things
-                    # -- no it probably causes problems for other
-                    # things
-                    # s = requests.Session()
-                    # s.close()
                     remaining_attempts -= 1
-                    time.sleep(1)
+                    time.sleep(sleep)
 
             if not fetched:
                 self.log.error("Failed to fetch %s, giving up" % url)
@@ -630,7 +643,7 @@ uri doesn't map to a basefile in this repo."""
         except requests.exceptions.RequestException as e:
             self.log.error("Failed to fetch %s: error %s" % (url, e))
             raise e
-
+        
         if response.status_code == 304:
             self.log.debug("%s: 304 Not modified" % url)
             return False  # ie not updated
@@ -1312,11 +1325,11 @@ parsed document path to that documents dependency file."""
                     continue
                 about = resource.get('about')
                 if isinstance(about, bytes):  # happens under py2
-                    about = about.decode()
+                    about = about.decode()    # pragma: no cover
                 desc.about(about)
                 repo = self.alias
                 if isinstance(repo, bytes):  # again, py2
-                    repo = repo.decode()
+                    repo = repo.decode()     # pragma: no cover
                 plaintext = self._extract_plaintext(resource)
                 l = desc.getvalues(dct.title)
                 title = str(l[0]) if l else None

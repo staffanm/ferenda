@@ -20,12 +20,14 @@ class Document(object):
     """
 
     def __init__(self, meta=None, body=None, uri=None, lang=None, basefile=None):
-        if meta:
-            self.meta = meta
-        else:
+        if meta is None:
             self.meta = Graph()
-        if not body:
+        else:
+            self.meta = meta
+        if body is None:
             self.body = []
+        else:
+            self.body = body
         self.uri = uri
         self.lang = lang
         self.basefile = basefile
