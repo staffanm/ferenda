@@ -107,7 +107,7 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
 
     def add_serialized(self, data, format, context=None):
         """Add the serialized RDF statements in the string *data* directly to the repository."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def add_serialized_file(self, filename, format, context=None):
         """Add the serialized RDF statements contained in the file *filename* directly to the repository."""
@@ -117,7 +117,7 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
     def get_serialized(self, format="nt", context=None):
         """Returns a string containing all statements in the store,
         serialized in the selected format. Returns byte string, not unicode array!"""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def get_serialized_file(self, filename, format="nt", context=None):
         """Saves all statements in the store to *filename*."""
@@ -139,7 +139,7 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
         :type  format: str
 
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def construct(self, query):
         """
@@ -148,15 +148,15 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
         :param query: A SPARQL query with all neccessary prefixes defined.
         :type query: str
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def triple_count(self, context=None):
         """Returns the number of triples in the repository."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def clear(self, context=None):
         """Removes all statements from the repository (without removing the repository as such)."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def close(self):
         """Close all connections to the triplestore. Needed if using RDFLib-based triple store, a no-op if using HTTP based stores."""
@@ -268,7 +268,7 @@ class RDFLibStore(TripleStore):
     # returns a string we can pass as store parameter to the ConjunctiveGraph
     # constructor, see __init__
     def _storeid(self):
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def _getcontextgraph(self, context):
         if context:
@@ -513,8 +513,8 @@ class SesameStore(RemoteStore):
         return int(ret.text)
 
     def ping(self):
-        requests.get(self.location + '/protocol')
-        return r.text
+        resp = requests.get(self.location + '/protocol')
+        return resp.text
 
     def initialize_repository(self):
         # For Sesame:
@@ -625,20 +625,20 @@ class FusekiStore(RemoteStore):
                 g.parse(data=named, format=format)
                 return g.serialize(format=format)
 
-    def get_serialized_file(self, filename, format="nt", context=None):
-        ret = super(FusekiStore, self).get_serialized_file(filename, format, context)
-        if context is not None:
-            return ret
-        else:
-            context = "urn:x-arq:UnionGraph"
-            named = super(FusekiStore, self).get_serialized(format, context)
-            if format == "nt":
-                # just append
-                with open(filename, "ab") as fp:
-                    fp.write(named)
-            else:
-                g = Graph()
-                g.parse(filename, format=format)
-                g.parse(data=named, format=format)
-                with open(filename, "wb") as fp:
-                    fp.write(g.serialize(format=format))
+#    def get_serialized_file(self, filename, format="nt", context=None):
+#        ret = super(FusekiStore, self).get_serialized_file(filename, format, context)
+#        if context is not None:
+#            return ret
+#        else:
+#            context = "urn:x-arq:UnionGraph"
+#            named = super(FusekiStore, self).get_serialized(format, context)
+#            if format == "nt":
+#                # just append
+#                with open(filename, "ab") as fp:
+#                    fp.write(named)
+#            else:
+#                g = Graph()
+#                g.parse(filename, format=format)
+#                g.parse(data=named, format=format)
+#                with open(filename, "wb") as fp:
+#                    fp.write(g.serialize(format=format))
