@@ -427,7 +427,7 @@ class RemoteStore(TripleStore):
             if format == "python":
                 return self._sparql_results_to_list(results.text)
             elif format == "json":
-                return results.json
+                return results.json()
             else:
                 return results.text
         except requests.exceptions.HTTPError as e:

@@ -8,6 +8,10 @@ from __future__ import unicode_literals
 # is to mock all http requests/RDFLib calls (neither of which is
 # idempotent), that is sort of unavoidable.
 
+import json
+
+from rdflib import Graph
+
 from ferenda.compat import patch, Mock, unittest
 from ferenda import util
 from ferenda.testutil import FerendaTestCase
@@ -30,6 +34,9 @@ def canned(*responses):
             responsefile = "test/files/triplestore/" + responsefile
             resp.content = util.readfile(responsefile, "rb")
             resp.text = util.readfile(responsefile)
+            if responsefile.endswith(".json"):
+                data = json.loads(util.readfile(responsefile))
+                resp.json = Mock(return_value=data)
         returned.append(True)
         return resp
     return makeresponse
@@ -130,5 +137,40 @@ class UnitTripleStore(unittest.TestCase, FerendaTestCase):
                              format="nt",
                              context="namedgraph")
         self.assertEqual(mock_post.call_count, 2)
+
+    
+    @patch('requests.get', side_effect=canned((200, "select-results.xml"),
+                                              (200, "select-results.json"),
+                                              (200, "select-results.xml")))
+    def test_sesame_select(self, mock_get):
+        store = TripleStore.connect("SESAME", "", "")
+        rf = util.readfile
+        want = rf("test/files/triplestore/select-results.xml")
+        got = store.select("the-query")
+        self.assertEqual(want, got)
+        self.assertEqual(mock_get.call_count, 1)
+
+        want = json.loads(rf("test/files/triplestore/select-results.json"))
+        got = store.select("the-query", format="json")
+        self.assertEqual(want, got)
+        self.assertEqual(mock_get.call_count, 2)
+
+        want = json.loads(rf("test/files/triplestore/select-results-python.json"))
+        got = store.select("the-query", format="python")
+        self.assertEqual(want, got)
+        self.assertEqual(mock_get.call_count, 3)
+
+    
+    @patch('requests.get', side_effect=canned((200, "construct-results.xml")))
+    def test_sesame_construct(self, mock_get):
+        store = TripleStore.connect("SESAME", "", "")
+        rf = util.readfile
+        want = Graph()
+        want.parse(data=rf("test/files/triplestore/construct-results.ttl"),
+                   format="turtle")
+        got = store.construct("the-query")
+        self.assertEqualGraphs(want, got)
+        self.assertEqual(mock_get.call_count, 1)
+        
         
         
