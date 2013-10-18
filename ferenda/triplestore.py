@@ -142,11 +142,12 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
         raise NotImplementedError  # pragma: no cover
 
     def construct(self, query):
-        """
-        Run a SPARQL CONSTRUCT query against the triple store and returns the results as a RDFLib graph
+        """Run a SPARQL CONSTRUCT query against the triple store and returns
+        the results as a RDFLib graph
 
         :param query: A SPARQL query with all neccessary prefixes defined.
         :type query: str
+
         """
         raise NotImplementedError  # pragma: no cover
 
@@ -155,11 +156,14 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
         raise NotImplementedError  # pragma: no cover
 
     def clear(self, context=None):
-        """Removes all statements from the repository (without removing the repository as such)."""
+        """Removes all statements from the repository (without removing the
+        repository as such)."""
         raise NotImplementedError  # pragma: no cover
 
     def close(self):
-        """Close all connections to the triplestore. Needed if using RDFLib-based triple store, a no-op if using HTTP based stores."""
+        """Close all connections to the triplestore. Needed if using
+        RDFLib-based triple store, a no-op if using HTTP based stores."""
+        raise NotImplementedError  # pragma: no cover
 
 
 class RDFLibStore(TripleStore):
@@ -295,9 +299,10 @@ class SQLiteStore(RDFLibStore):
 # -----------------
 # For servers implementing the SPARQL 1.1 Graph Store HTTP Protocol
 # http://www.w3.org/TR/sparql11-http-rdf-update/
-
-
 class RemoteStore(TripleStore):
+
+    def close(self):
+        pass
 
     _contenttype = {"xml": "application/rdf+xml",
                     "sparql": "application/sparql-results+xml",
@@ -341,9 +346,6 @@ class RemoteStore(TripleStore):
             resp = requests.post(self._statements_url(context),
                                  headers=headers,
                                  data=datastream)
-            if resp.status_code >= 400:
-                print("Something went wrong posting to %s" % self._statements_url(context))
-                print(resp.text.encode('latin-1', errors='xmlcharrefreplace'))
             resp.raise_for_status()
 
     def add_serialized_file(self, filename, format, context=None):
@@ -410,11 +412,7 @@ class RemoteStore(TripleStore):
 
     def select(self, query, format="sparql"):
         url = self._endpoint_url()
-        if "?" in url:
-            url += "&"
-        else:
-            url += "?"
-        url += "query=" + quote(query.replace("\n", " ")).replace("/", "%2F")
+        url += "?query=" + quote(query.replace("\n", " ")).replace("/", "%2F")
 
         headers = {}
         if format == "python":
@@ -445,7 +443,7 @@ class RemoteStore(TripleStore):
             result.parse(data=resp.text, format=format)
             return result
         except requests.exceptions.HTTPError as e:
-            raise errors.SparqlError(e.response.text)
+            raise errors.SparqlError(e)
 
     def _sparql_results_to_list(self, results):
         res = []
