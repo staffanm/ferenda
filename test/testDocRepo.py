@@ -541,6 +541,8 @@ class Repo(RepoTester):
         os.unlink(d.store.parsed_path("123/a"))
         os.unlink(d.store.distilled_path("123/a"))
 
+        # test3: parsing of a ill-formatted document without html section
+
     def test_soup_from_basefile(self):
         d = DocumentRepository(datadir=self.datadir)
         util.ensure_dir(d.store.downloaded_path("testbasefile"))
@@ -563,7 +565,6 @@ class Repo(RepoTester):
         os.unlink(d.store.downloaded_path("testbasefile"))
 
     def test_parse_document_from_soup(self):
-        parser = "lxml" if sys.version_info < (3,3) else "html.parser"
         d = DocumentRepository()
         doc = d.make_document("testbasefile")
         # test 1: default selector/filters
@@ -589,7 +590,7 @@ class Repo(RepoTester):
     </div>
   </body>
 </html>"""
-        soup = BeautifulSoup(testdoc,parser)
+        soup = BeautifulSoup(testdoc)
         d.parse_document_from_soup(soup,doc)
         #print("Defaults")
         #print(serialize(doc.body))
@@ -625,6 +626,22 @@ class Repo(RepoTester):
   </P>
 </Div>
 """)
+        # test 3: selector that do not match anything
+        d.parse_content_selector = "article"
+        with self.assertRaises(ParseError):
+            d.parse_document_from_soup(soup,doc)
+
+        # test 4: selector that matches more than one thing
+        d.parse_content_selector = "div"
+        d.parse_document_from_soup(soup,doc)
+
+        self.assertEqual(serialize(doc.body),"""<Div id="header">
+  <H1>
+    <str>Hello</str>
+  </H1>
+</Div>
+""")
+
 
     # class RenderXHTML(RepoTester) # maybe
     def _test_render_xhtml(self, body, want):
@@ -876,12 +893,61 @@ class Repo(RepoTester):
         self._test_render_xhtml(body, want)
 
 
+
+    def test_render_xhtml_head(self):
+        doc = self.repo.make_document('basefile')
+        headmeta = rdflib.Graph().parse(format='n3', data="""
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://localhost:8000/res/base/basefile> a bibo:Document;
+        dct:author <http://localhost:8000/people/fred> ;
+        dct:title "Document title"@en ;
+        dct:title "Document title (untyped)" ;
+        dct:identifier "Doc:1"@en ;
+        dct:issued "2013-10-17"^^xsd:date .
+
+<http://localhost:8000/people/fred> a foaf:Person;
+        foaf:name "Fred Bloggs"@en ;
+        dct:title "This doesn't make any sense" ;
+        dct:issued "2013-10-17"^^xsd:date .
+
+<http://localhost:8000/res/base/other> a bibo:Document;
+        dct:references <http://localhost:8000/res/base/basefile> .
+
+        """)
+        doc.meta += headmeta
+        doc.lang = None
+        
+        outfile = self.datadir + "/test.xhtml"
+        self.repo.render_xhtml(doc, outfile)
+        want = """<html xmlns="http://www.w3.org/1999/xhtml"
+                        xmlns:bibo="http://purl.org/ontology/bibo/"
+                        xmlns:dct="http://purl.org/dc/terms/">
+  <head about="http://localhost:8000/res/base/basefile">
+    <link href="http://localhost:8000/people/fred" rel="dct:author"></link>
+    <meta about="http://localhost:8000/people/fred" content="2013-10-17" datatype="xsd:date" property="dct:issued"></meta>
+    <meta about="http://localhost:8000/people/fred" content="This doesn't make any sense" property="dct:title" xml:lang=""></meta>
+    <link about="http://localhost:8000/people/fred" href="http://xmlns.com/foaf/0.1/Person" rel="rdf:type"></link>
+    <meta about="http://localhost:8000/people/fred" content="Fred Bloggs" property="foaf:name" xml:lang="en"></meta>
+    <meta content="Doc:1" property="dct:identifier" xml:lang="en"></meta>
+    <meta content="2013-10-17" datatype="xsd:date" property="dct:issued"></meta>
+    <link href="http://localhost:8000/res/base/other" rev="dct:references"></link>
+    <title property="dct:title" xml:lang="">Document title (untyped)</title>
+    <title property="dct:title">Document title</title>
+    <link href="http://purl.org/ontology/bibo/Document" rel="rdf:type"></link>
+  </head>      
+  <body about="http://localhost:8000/res/base/basefile"/>
+</html>"""
+        self.assertEqualXML(want, util.readfile(outfile, "rb"))
+        
+
     # FIXME: Move this test to a new test case file (testElements.py or even testElementsHtml.py)
     # class Elements(RepoTester)
     def test_elements_from_soup(self):
         from ferenda.elements import html
-        # see comment in documentrepository.soup_from_basefile
-        parser = "lxml" if sys.version_info < (3,3) else "html.parser"
         soup = BeautifulSoup("""<body>
 <h1>Sample</h1>
 <div class="main">
@@ -896,7 +962,7 @@ class Repo(RepoTester):
 <hr/>
 <a href="/">home</a> - <a href="/about">about</a>
 </div>
-</body>""",parser)
+</body>""")
         body = html.elements_from_soup(soup.body)
         # print("Body: \n%s" % serialize(body))
         result = html.Body([html.H1(["Sample"]),
@@ -916,6 +982,11 @@ class Repo(RepoTester):
 
         
     # class Relate(RepoTester)
+    def test_relate_all_setup(self): pass
+    def test_relate_all_teardown(self): pass
+    def test_relate(self): pass
+    
+    
     def test_relate_fulltext(self):
         d = DocumentRepository(datadir=self.datadir,
                                indexlocation=self.datadir+os.sep+"index") # FIXME: derive from datadir
@@ -1859,8 +1930,36 @@ class Patch(RepoTester):
         result, desc = self.repo.patch_if_needed("123/a", self.sourcedoc)
         self.assertEqual("Editorial edit", desc)
         self.assertEqual(self.targetdoc, result)
-    
 
+    def test_successful_patch_with_desc(self):
+        patchpath = self.patchstore.path("123/a", "patches", ".patch")
+        util.ensure_dir(patchpath)
+        with open(patchpath, "w") as fp:
+            fp.write("""--- basic.txt	2013-06-13 09:16:37.000000000 +0200
++++ changed.txt	2013-06-13 09:16:39.000000000 +0200
+@@ -1,5 +1,5 @@
+ <body>
+-  <h1>Basic document</h1>
++  <h1>Patched document</h1>
+   <p>
+     This is some unchanged text.
+     1: And some more again
+""")
+        descpath = self.patchstore.path("123/a", "patches", ".desc")
+        patchdesc = """This is a longer patch description.
+
+It can span several lines."""
+        with open(descpath, "w") as fp:
+            fp.write(patchdesc)           
+
+        result, desc = self.repo.patch_if_needed("123/a", self.sourcedoc)
+        self.assertEqual(patchdesc, desc)
+
+        # and again, now w/o any description
+        os.unlink(descpath)
+        result, desc = self.repo.patch_if_needed("123/a", self.sourcedoc)
+        self.assertEqual("(No patch description available)", desc)
+        
 
     def test_failed_patch(self):
         with self.patchstore.open("123/a", "patches", ".patch", "w") as fp:
@@ -1885,6 +1984,11 @@ class Patch(RepoTester):
         with self.assertRaises(PatchError):
             result, desc = self.repo.patch_if_needed("123/a", self.sourcedoc)
 
+    def test_invalid_patch(self):
+        with self.patchstore.open("123/a", "patches", ".patch", "w") as fp:
+            fp.write("This is not a valid patch file")
+        with self.assertRaises(PatchError):
+            result, desc = self.repo.patch_if_needed("123/a", self.sourcedoc)
 
     def test_no_patch(self):
         result, desc = self.repo.patch_if_needed("123/a", self.sourcedoc)

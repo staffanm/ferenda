@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import unicode_literals
 """ Patch utility to apply unified diffs
 
     Brute-force line-by-line non-recursive parsing 

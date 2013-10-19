@@ -732,6 +732,10 @@ with the *config* object as single parameter.
         :type  basefile: str
         :returns: The local url
         :rtype: str
+
+        >>> d = DocumentRepository()
+        >>> d.downloaded_url("123/a") == "http://localhost:8000/base/downloaded/123/a.html"
+        True
         """
 
         return self.generic_url(basefile, 'downloaded', self.downloaded_suffix)
@@ -832,17 +836,13 @@ with the *config* object as single parameter.
         # Default language unless we can find out from source doc?
         # Check html/@xml:lang || html/@lang
         root = soup.find('html')
-        if root:
+        try:
+            doc.lang = root['xml:lang']
+        except (KeyError, TypeError):
             try:
-                doc.lang = root['xml:lang']
-            except KeyError:
-                try:
-                    doc.lang = root['lang']
-                except KeyError:
-                    doc.lang = self.lang
-        else:
-            doc.lang = self.lang
-
+                doc.lang = root['lang']
+            except (KeyError, TypeError):
+                doc.lang = self.lang
         try:
             title = soup.find('title').string
         except AttributeError:
