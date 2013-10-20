@@ -1195,6 +1195,7 @@ with the *config* object as single parameter.
                   'context': context,
                   'repository': config.storerepository,
                   'dumpfile': dump})
+        return True
 
     def relate(self, basefile, otherrepos=[]):
         """Runs various indexing operations for the document represented by

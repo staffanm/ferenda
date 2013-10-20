@@ -982,10 +982,49 @@ class Repo(RepoTester):
 
         
     # class Relate(RepoTester)
-    def test_relate_all_setup(self): pass
-    def test_relate_all_teardown(self): pass
-    def test_relate(self): pass
-    
+    @patch('ferenda.documentrepository.TripleStore')
+    def test_relate_all_setup(self, mock_store):
+        # so that list_basefiles_for finds something
+        util.writefile(self.datadir+"/base/distilled/1.rdf", "example")
+        config = LayeredConfig({'datadir': self.datadir,
+                                'url': 'http://localhost:8000/',
+                                'force': False,
+                                'storetype': 'a',
+                                'storelocation': 'b',
+                                'storerepository': 'c'})
+        self.assertTrue(self.repoclass.relate_all_setup(config))
+        self.assertTrue(mock_store.connect.called)
+        self.assertTrue(mock_store.connect.return_value.clear.called)
+        
+        # if triplestore dump is newer than all parsed files, nothing
+        # has happened since last relate --all and thus we shouldn't
+        # work at all (signalled by relate_all_setup returning False.
+        util.writefile(self.datadir+"/base/distilled/dump.nt", "example")
+        self.assertFalse(self.repoclass.relate_all_setup(config))
+
+    @patch('ferenda.documentrepository.TripleStore')
+    def test_relate_all_teardown(self, mock_store):
+        util.writefile(self.datadir+"/base/distilled/dump.nt", "example")
+        config = LayeredConfig({'datadir': self.datadir,
+                                'url': 'http://localhost:8000/',
+                                'force': False,
+                                'storetype': 'a',
+                                'storelocation': 'b',
+                                'storerepository': 'c'})
+        self.assertTrue(self.repoclass.relate_all_teardown(config))
+        self.assertTrue(mock_store.connect.called)
+        self.assertTrue(mock_store.connect.return_value.get_serialized_file.called)
+
+    def test_relate(self):
+        # the helper methods are called separately. this test only
+        # makes sure they are all called:
+        self.repo.relate_triples = Mock()
+        self.repo.relate_dependencies = Mock()
+        self.repo.relate_fulltext = Mock()
+        self.repo.relate("123/a")
+        self.assertTrue(self.repo.relate_triples.called)
+        self.assertTrue(self.repo.relate_dependencies.called)
+        self.assertTrue(self.repo.relate_fulltext.called)
     
     def test_relate_fulltext(self):
         d = DocumentRepository(datadir=self.datadir,
@@ -1072,6 +1111,10 @@ class Repo(RepoTester):
         otherrepo = OtherRepo(datadir=self.datadir)
         repos = [self.repo,otherrepo]
         self.repo.relate_dependencies("root", repos)
+
+        # 3.1 do it again (to test adding to existing files)
+        self.repo.relate_dependencies("root", repos)
+
         # 4. Assert that
         #  4.1 self.repo.store.dependencies_path contains parsed_path('root')
         dependencyfile = self.repo.store.parsed_path('root') + os.linesep
@@ -1085,6 +1128,7 @@ class Repo(RepoTester):
         self.assertEqual(2,
                          len(list(util.list_dirs(self.datadir, '.txt'))))
 
+        
 class Generate(RepoTester):
 
     class TestRepo(DocumentRepository):
