@@ -52,10 +52,9 @@ E = ElementMaker(namespace="http://www.w3.org/1999/xhtml")
 # Link-objekt mellan de vanliga unicodetextobjekten, dels då de kan
 # innehålla en punkt- eller nummerlista.
 #
-# Alla klasser ärver från antingen CompoundElement (som är en list
-# med lite extraegenskaper), UnicodeElement (som är en unicode med
-# lite extraegenskaper) eller MapElement (som är ett dict med lite
-# extraegenskaper).
+# Alla klasser ärver från antingen CompoundElement (som är en list med
+# lite extraegenskaper) eller UnicodeElement (som är en unicode med
+# lite extraegenskaper)
 #
 # De kan även ärva från TemporalElement om det är ett objekt som kan
 # upphävas eller träda ikraft (exv paragrafer och rubriker, men inte

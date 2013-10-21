@@ -82,15 +82,15 @@ class DocEntry(unittest.TestCase):
         d = DocumentEntry()
         self.assertIsNone(d.id) # same for .updated, .published,
                                 # .title, .summary, .url and .content
-        self.assertEqual(d.content, {'src':None, 'type':None, 'markup': None, 'hash':None})
-        self.assertEqual(d.link,   {'href':None, 'type':None, 'length': None, 'hash':None})
+        self.assertEqual(d.content, {})
+        self.assertEqual(d.link,   {})
 
         path = self.repo.store.documententry_path("123/b")
         d = DocumentEntry(path=path)
         self.assertIsNone(d.id) # same for .updated, .published,
                                 # .title, .summary, .url and .content
-        self.assertEqual(d.content, {'src':None, 'type':None, 'markup': None, 'hash':None})
-        self.assertEqual(d.link,   {'href':None, 'type':None, 'length': None, 'hash':None})
+        self.assertEqual(d.content, {})
+        self.assertEqual(d.link,   {})
 
 
     def test_load(self):

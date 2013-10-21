@@ -279,6 +279,7 @@ class DocumentRepository(object):
             'storerepository': 'ferenda',
             'indextype': 'WHOOSH',
             'indexlocation': 'data/whooshindex',
+            'republishsource': False,
             'combineresources': False,
             'cssfiles': ['http://fonts.googleapis.com/css?family=Raleway:200,100',
                              'res/css/normalize.css',
@@ -1424,7 +1425,7 @@ parsed document path to that documents dependency file."""
             annotations = self.store.annotation_path(basefile)
             if os.path.exists(self.store.dependencies_path(basefile)):
                 deptxt = util.readfile(self.store.dependencies_path(basefile))
-                dependencies = deptxt.split("\n")
+                dependencies = deptxt.strip().split("\n")
             else:
                 dependencies = []
             dependencies.extend((infile, annotations))
@@ -1486,7 +1487,7 @@ parsed document path to that documents dependency file."""
         def transform(uri):
             path = None
             if uri == self.config.url:
-                path = "data/index.html"
+                path = self.config.datadir + os.sep + "index.html"
             else:
                 for repo in repos:
                     basefile = repo.basefile_from_uri(uri)
@@ -1540,7 +1541,6 @@ parsed document path to that documents dependency file."""
         :data:`~ferenda.DocumentRepository.sparql_annotations`
 
         """
-
         query_template = self.sparql_annotations
         if os.path.exists(query_template):
             fp = open(query_template, 'rb')
@@ -1578,14 +1578,7 @@ parsed document path to that documents dependency file."""
         """
         fp = BytesIO(graph.serialize(format="xml"))
         intree = etree.parse(fp)
-        stylesheet = "res/xsl/rdfxml-grit.xsl"
-        if os.path.exists(stylesheet):
-            fp = open(stylesheet)
-        # prefix stylesheet with 'res/xsl'?
-        elif pkg_resources.resource_exists('ferenda', stylesheet):
-            fp = pkg_resources.resource_stream('ferenda', stylesheet)
-        else:
-            raise ValueError("Stylesheet %s not found" % stylesheet)
+        fp = pkg_resources.resource_stream('ferenda', "res/xsl/rdfxml-grit.xsl")
         transform = etree.XSLT(etree.parse(fp))
         resulttree = transform(intree)
         res = etree.tostring(resulttree, pretty_print=format)
@@ -1602,14 +1595,7 @@ parsed document path to that documents dependency file."""
         """
         with open(annotation_file, "rb") as fp:
             intree = etree.parse(fp)
-        stylesheet = "res/xsl/grit-grddl.xsl"
-        if os.path.exists(stylesheet):
-            fp = open(stylesheet)
-        # prefix stylesheet with 'res/xsl'?
-        elif pkg_resources.resource_exists('ferenda', stylesheet):
-            fp = pkg_resources.resource_stream('ferenda', stylesheet)
-        else:
-            raise ValueError("Stylesheet %s not found" % stylesheet)
+        fp = pkg_resources.resource_stream('ferenda', "res/xsl/grit-grddl.xsl")
         transform = etree.XSLT(etree.parse(fp))
         resulttree = transform(intree)
         res = etree.tostring(resulttree, pretty_print=format)
@@ -1685,7 +1671,7 @@ parsed document path to that documents dependency file."""
                           params):
             data = self.toc_select(self.dataset_uri())
             params['rowcount'] = len(data)
-        if data:
+        if len(data) > 0:
             criteria = self.toc_criteria(self.toc_predicates())
             pagesets = self.toc_pagesets(data, criteria)
             pagecontent = self.toc_select_for_pages(data, pagesets, criteria)
@@ -2064,11 +2050,11 @@ parsed document path to that documents dependency file."""
         return [NewsCriteria('main', 'New and updated documents')]
 
     def news_entries(self):
-        """Return a generator of all available entries, represented as tuples of (DocumentEntry, rdflib.Graph) objects. The Graph contains all distilled metadata about the document."""
-        republish_original = False
-        # If we just republish eg. the original PDF file and don't
-        # attempt to parse/enrich the document
+        """Return a generator of all available entries, represented as tuples
+        of (DocumentEntry, rdflib.Graph) objects. The Graph contains
+        all distilled metadata about the document.
 
+        """
         directory = os.path.sep.join((self.config.datadir, self.alias, "entries"))
         for basefile in self.store.list_basefiles_for("news"):
             path = self.store.documententry_path(basefile)
@@ -2105,19 +2091,22 @@ parsed document path to that documents dependency file."""
                 pass
 
             # 4: Set links to RDF metadata and document content
-            
-            entry.set_link(self.store.distilled_path(basefile),
-                           self.distilled_url(basefile))
+            if not entry.link:
+                entry.set_link(self.store.distilled_path(basefile),
+                               self.distilled_url(basefile))
 
-            if (republish_original):
-                entry.set_content(self.store.downloaded_path(basefile),
-                                  self.downloaded_url(basefile))
-            else:
-                # the parsed (machine reprocessable) version. The
-                # browser-ready version is referenced with the <link>
-                # element, separate from the set_link <link>
-                entry.set_content(self.store.parsed_path(basefile),
-                                  self.parsed_url(basefile))
+            # If we just republish eg. the original PDF file and don't
+            # attempt to parse/enrich the document
+            if not entry.content:
+                if (self.config.republishsource):
+                    entry.set_content(self.store.downloaded_path(basefile),
+                                      self.downloaded_url(basefile))
+                else:
+                    # the parsed (machine reprocessable) version. The
+                    # browser-ready version is referenced with the <link>
+                    # element, separate from the set_link <link>
+                    entry.set_content(self.store.parsed_path(basefile),
+                                      self.parsed_url(basefile))
             yield entry
 
     def news_write_atom(self, entries, title, basefile, archivesize=1000):
@@ -2172,15 +2161,10 @@ parsed document path to that documents dependency file."""
                                    'hash': entry.link['hash']})
                     entrynodes.append(node)
                 if entry.content and entry.content['markup']:
-                    node = E.content({'type': 'xhtml',
-                                      'href': util.relurl(entry.content['href'],
-                                                          feedurl),
-                                      'type': entry.content['type'],
-                                      'length': entry.content['length'],
-                                      'hash': entry.content['hash']},
+                    node = E.content({'type': 'xhtml'},
                                      etree.XML(entry.content['markup']))
                     entrynodes.append(node)
-                if entry.content and entry.content['src']:
+                elif entry.content and entry.content['src']:
                     node = E.content({'src': util.relurl(entry.content['src'],
                                                          feedurl),
                                       'type': entry.content['type'],

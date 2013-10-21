@@ -20,6 +20,7 @@ from ferenda.testutil import RepoTester
 from ferenda import manager
 from ferenda import DocumentRepository, FulltextIndex
 from ferenda import util
+# del sys.modules['ferenda.elements']
 from ferenda.elements import html
 # tests the wsgi app in-process, ie not with actual HTTP requests, but
 # simulates what make_server().serve_forever() would send and

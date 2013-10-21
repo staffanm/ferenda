@@ -14,15 +14,13 @@ import requests
 from ferenda import PDFDocumentRepository
 from ferenda import util
 from ferenda.decorators import downloadmax
-from ferenda.elements import UnicodeElement, CompoundElement, \
-    MapElement, IntElement, DateElement, PredicateType, \
-    serialize
+from ferenda.elements import UnicodeElement, CompoundElement, serialize
 from . import SwedishLegalSource
 
 
 class ARN(SwedishLegalSource, PDFDocumentRepository):
 
-    """Hanterar referat från Allmäna Reklamationsnämnden, www.arn.se.
+    """Hanterar referat från Allmänna Reklamationsnämnden, www.arn.se.
 
     Modulen hanterar hämtande av referat från ARNs webbplats, omvandlande
     av dessa till XHTML1.1+RDFa, samt transformering till browserfärdig

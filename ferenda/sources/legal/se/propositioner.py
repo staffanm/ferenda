@@ -11,7 +11,6 @@ import requests
 
 from ferenda import util
 from ferenda.elements import UnicodeElement, CompoundElement, \
-    MapElement, IntElement, DateElement, PredicateType, \
     UnicodeSubject, Heading, Preformatted, Paragraph, Section, Link, ListItem, \
     serialize
 from ferenda import CompositeRepository

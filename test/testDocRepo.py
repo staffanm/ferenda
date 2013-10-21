@@ -16,6 +16,7 @@ import tempfile
 import time
 import calendar
 import json
+import copy
 
 import lxml.etree as etree
 from lxml.etree import XSLT
@@ -23,8 +24,8 @@ from lxml.builder import ElementMaker
 import rdflib
 import requests.exceptions
 
-# import six
-from ferenda.compat import Mock, patch, call
+import six
+from ferenda.compat import Mock, MagicMock, patch, call
 from bs4 import BeautifulSoup
 import doctest
 
@@ -32,6 +33,7 @@ from ferenda import DocumentEntry, TocPageset, TocPage, \
     TocCriteria, Describer, LayeredConfig, TripleStore, FulltextIndex
 from ferenda.fulltextindex import WhooshIndex
 from ferenda.errors import *
+
 
 # The main system under test (SUT)
 from ferenda import DocumentRepository
@@ -1128,6 +1130,31 @@ class Repo(RepoTester):
         self.assertEqual(2,
                          len(list(util.list_dirs(self.datadir, '.txt'))))
 
+
+    def test_status(self):
+        # test both status and get_status in one swoop.
+        for basefile in range(1,5):
+            util.writefile(self.repo.store.generated_path(str(basefile)),
+                           "generated %s" % basefile)
+        for basefile in range(1,9):
+            util.writefile(self.repo.store.parsed_path(str(basefile)),
+                           "parsed %s" % basefile)
+        for basefile in range(1,13):
+            util.writefile(self.repo.store.downloaded_path(str(basefile)),
+                           "downloaded %s" % basefile)
+
+        want  = """
+Status for document repository 'base' (ferenda.documentrepository.DocumentRepository)
+ download: 12, 11, 10... (9 more)
+ parse: 8, 7, 6... (5 more) Todo: 12, 11, 10... (1 more)
+ generated: 4, 3, 2... (1 more) Todo: 8, 7, 6... (1 more)
+""".strip()
+        builtins = "__builtin__" if six.PY2 else "builtins"
+        with patch(builtins+".print") as printmock:
+            self.repo.status()
+        got = "\n".join([x[1][0] for x in printmock.mock_calls])
+        self.assertEqual(want,got)
+            
         
 class Generate(RepoTester):
 
@@ -1231,7 +1258,7 @@ class Generate(RepoTester):
         self.assertEqual('A2(part2)',
                          annotations[0].text)
 
-    def _generate_complex(self, xsl=None, staticsite=False):
+    def _generate_complex(self, xsl=None, sparql=None, staticsite=False):
         # Helper func for other tests -- this uses a single
         # semi-complex source doc, runs it through the generic.xsl
         # stylesheet, and then the tests using this helper confirm
@@ -1240,11 +1267,15 @@ class Generate(RepoTester):
             self.repo.config.staticsite = True
         if xsl is not None:
             self.repo.xslt_template = xsl
+
+        if sparql is not None:
+            self.repo.sparql_annotations = sparql
+
         test = """<?xml version='1.0' encoding='utf-8'?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
 <html xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:dct="http://purl.org/dc/terms/" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
   <head about="http://localhost:8000/res/w3c/hr-time">
-    <meta property="dct:editor" content="Jatinder Mann " xml:lang=""/>
+    <meta property="dct:editor" content="Jatinder Mann" xml:lang=""/>
     <meta property="dct:identifier" content="hr-time" xml:lang=""/>
     <meta property="dct:issued" content="2012-12-17" datatype="xsd:date"/>
     <title property="dct:title">High Resolution Time</title>
@@ -1258,6 +1289,9 @@ class Generate(RepoTester):
         content="Abstract">
       <p>Lorem ipsum dolor sit amet</p>
       <p><a href="http://localhost:8000/res/test/something-else">external</a></p>
+      <p><a href="http://localhost:8000/dataset/test">dataset</a></p>
+      <p><a href="http://localhost:8000/dataset/test?title=a">parametrized</a></p>
+      <p><a href="http://localhost:8000/">root</a></p>
     </div>
     <div about="http://localhost:8000/res/w3c/hr-time#PS2"
         typeof="bibo:DocumentPart"
@@ -1393,6 +1427,19 @@ class Generate(RepoTester):
         self.assertEqual("S4.1.1", secs[5].get('id'))
         self.assertEqual("S4.2", secs[6].get('id'))
 
+    def test_custom_sparql(self):
+        # test with a custom SPARQL CONSTRUCT query in the current
+        # directory. construct_annotations should use that one
+        shutil.copy2("ferenda/res/sparql/annotations.rq", "myquery.rq")
+        # should go OK, ie no boom
+        tree = self._generate_complex(sparql="myquery.rq")
+        os.unlink(self.repo.store.generated_path("a"))
+        # but try it with a non-existing file and it should go boom
+        with self.assertRaises(ValueError):
+            tree = self._generate_complex(sparql="nonexistent.rq")
+            
+        
+        
     def test_custom_xsl(self):
         # test with a custom xslt in the current
         # directory. setup_transform_templates should copy this over
@@ -1443,7 +1490,31 @@ class Generate(RepoTester):
         tree = self._generate_complex(staticsite=True)
         link = tree.xpath(".//a[text()='external']")[0]
         self.assertEqual("something-else.html", link.get("href"))
-        
+
+        link = tree.xpath(".//a[text()='dataset']")[0]
+        self.assertEqual("../toc/index.html", link.get("href"))
+
+        link = tree.xpath(".//a[text()='parametrized']")[0]
+        self.assertEqual("../toc/title/a.html", link.get("href"))
+
+        link = tree.xpath(".//a[text()='root']")[0]
+        self.assertEqual("../../index.html", link.get("href"))
+
+    def test_dependency_mgmt(self):
+        with self.repo.store.open_dependencies("a", "w") as fp:
+            fp.write("""data/base/parsed/other.xhtml
+data/base/parsed/foo.xhtml
+""")
+        # even though no dependency file actually existed, they should
+        # have been loaded up in dependencies
+        tree = self._generate_complex()
+
+        # but this time the generated file should be newer than all
+        # dependencies, trigging a skip.
+        tree = self._generate_complex()
+
+        # FIXME: we don't actually verify the that dependencies are
+        # read or skipping is performed.
     
 class TOC(RepoTester):
     results1 = json.load(open("test/files/datasets/results1.json"))
@@ -1497,6 +1568,63 @@ class TOC(RepoTester):
         shutil.copy2("%s/files/base/rsrc/resources.xml"%os.path.dirname(__file__),
                      resources)
 
+    def test_toc(self):
+        # tests the main TOC method, not the helper methods (they are
+        # tested separately)
+
+        # test1: toc_select finds no rows
+        self.repo.toc_select = MagicMock()
+        self.repo.log = Mock()
+        self.repo.toc_criteria = Mock()
+        self.repo.toc_pagesets = Mock()
+        self.repo.toc_select_for_pages = Mock()
+        self.repo.toc_generate_pages = Mock()
+        self.repo.toc_generate_first_page = Mock()
+        self.repo.toc()
+
+        # assert toc_select was properly called, error and info msg
+        # was printed
+        self.assertEqual("http://localhost:8000/dataset/base",
+                         self.repo.toc_select.call_args[0][0])
+        self.assertTrue(self.repo.log.error.called)
+        self.assertTrue(self.repo.log.info.called)
+        # and that the rest of the methods were NOT called
+        self.assertFalse(self.repo.toc_criteria.called)
+        self.assertFalse(self.repo.toc_pagesets.called)
+        self.assertFalse(self.repo.toc_select_for_pages.called)
+        self.assertFalse(self.repo.toc_generate_pages.called)
+
+        # test2: toc_select returns something
+        self.repo.toc_select.return_value = ["fake", "data"]
+        self.repo.toc()
+        # Now all other methods should be called
+        self.assertTrue(self.repo.toc_criteria.called)
+        self.assertTrue(self.repo.toc_pagesets.called)
+        self.assertTrue(self.repo.toc_select_for_pages.called)
+        self.assertTrue(self.repo.toc_generate_pages.called)
+        
+    def test_toc_select(self):
+        self.repo.toc_query = Mock(return_value="Mock query")
+        with patch('ferenda.documentrepository.TripleStore') as mock_ts:
+            self.repo.toc_select()
+            self.assertTrue(mock_ts.connect.called)
+            self.assertEqual(mock_ts.connect.return_value.select.call_args[0][0],
+                             "Mock query")
+            self.assertTrue(mock_ts.connect.return_value.close.called)
+
+    def test_toc_query(self):
+        # NOTE: this is also tested by a doctest
+        want = "PREFIX bibo: <http://purl.org/ontology/bibo/> PREFIX dct: <http://purl.org/dc/terms/> PREFIX foaf: <http://xmlns.com/foaf/0.1/> PREFIX owl: <http://www.w3.org/2002/07/owl#> PREFIX prov: <http://www.w3.org/ns/prov-o/> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX skos: <http://www.w3.org/2004/02/skos/core#> PREFIX xhv: <http://www.w3.org/1999/xhtml/vocab#> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> SELECT DISTINCT ?uri ?title ?issued FROM <http://example.org/ctx/base> WHERE {?uri rdf:type foaf:Document ; dct:title ?title . OPTIONAL { ?uri dct:issued ?issued . }  }"
+        self.assertEqual(want,
+                         self.repo.toc_query("http://example.org/ctx/base"))
+
+        # special Fuseki magic
+        self.repo.config.storetype = "FUSEKI"
+        want = want.replace("<http://example.org/ctx/base>",
+                            "<urn:x-arq:UnionGraph>")
+        self.assertEqual(want,
+                         self.repo.toc_query())
+
     def test_toc_criteria(self):
         dct = self.repo.ns['dct']
         want = self.criteria
@@ -1526,11 +1654,26 @@ class TOC(RepoTester):
         self.assertEqual(got[0], want[0])
         self.assertEqual(got[1], want[1])
 
+        # delete title from one place in self.results1
+        res = copy.deepcopy(self.results1)
+        del res[0]['title']
+        del res[1]['issued']
+        got = self.repo.toc_pagesets(res, self.criteria)
+        self.assertEqual(len(got[1].pages), 5)
+        
     def test_select_for_pages(self):
         got = self.repo.toc_select_for_pages(self.results1, self.pagesets, self.criteria)
         want = self.documentlists
-        self.maxDiff = None
         self.assertEqual(got, want)
+
+        # delete issued from one place in self.results1
+        res = copy.deepcopy(self.results1)
+        del res[1]['issued']
+        # FIXME: this'll go boom!
+        # del res[0]['title']
+        got = self.repo.toc_select_for_pages(res, self.pagesets, self.criteria)
+        self.assertEqual(len(got), 9)
+
 
     def test_generate_page(self):
         path = self.repo.toc_generate_page('title','a', self.documentlists[('title','a')], self.pagesets)
@@ -1659,7 +1802,13 @@ class News(RepoTester):
   </body>
 </html>""" % v)
 
-            
+
+    def test_news(self):
+        # tests the main method, not the helpers (like test_relate and
+        # test_toc above)
+        with patch("ferenda.documentrepository.Transformer"):
+            self.repo.news()
+    
     def test_criteria(self):
         criteria = self.repo.news_criteria()
         self.assertEqual(len(criteria),1)
@@ -1679,6 +1828,43 @@ class News(RepoTester):
         self.assertEqual(len(entries),25)
         self.assertEqual(entries[0].title, "Doc #24")
         self.assertEqual(entries[-1].title, "Doc #0")
+
+    def test_incomplete_entries(self):
+        # make our entries incomplete in various ways
+
+        entry = DocumentEntry(self.repo.store.documententry_path("1"))
+        entry.published = None
+        entry.save()
+
+        # try very hard to remove title from everywhere
+        entry = DocumentEntry(self.repo.store.documententry_path("2"))
+        del entry.title
+        entry.save()
+        g = rdflib.Graph().parse(self.repo.store.distilled_path("2"))
+        g.remove((rdflib.URIRef("http://localhost:8000/res/base/2"),
+                  self.repo.ns['dct'].title,
+                  rdflib.Literal("Doc #2")))
+        with open(self.repo.store.distilled_path("2"), "wb") as fp:
+            g.serialize(fp, format="pretty-xml")
+
+        os.unlink(self.repo.store.distilled_path("3"))
+
+        # entries w/o published date and w/o distilled file should not
+        # be published, but w/o title is OK
+        self.assertEqual(len(list(self.repo.news_entries())),
+                         23)
+
+    def test_republishsource(self):
+        self.repo.config.republishsource = True
+        for basefile in range(25):
+            util.writefile(self.repo.store.downloaded_path(str(basefile)),
+                           "Source content")
+
+        entries = sorted(list(self.repo.news_entries()),
+                         key=attrgetter('updated'), reverse=True)
+        self.assertEqual(entries[0].content['src'],
+                         self.repo.downloaded_url("24"))
+
 
     def test_write_atom(self):
         self.maxDiff = None
@@ -1759,10 +1945,44 @@ class News(RepoTester):
         self.assertEqual(tree.find(NS+"link[@rel='next-archive']").get("href"),
                          "main-archive-2.atom")
 
+        # finally , do it all again without any entries and make sure
+        # it doesn't blow up
+        paths = self.repo.news_write_atom([],
+                                          'New and updated documents',
+                                          'main',
+                                          archivesize=6)
+
+
+    def test_write_atom_inline(self):
+        for basefile in range(25):
+            de = DocumentEntry(self.repo.store.documententry_path(str(basefile)))
+            util.writefile(self.repo.store.parsed_path(str(basefile)),
+                           "<html><p>Document #%s</p></html>" % basefile)
+            de.set_content(self.repo.store.parsed_path(str(basefile)),
+                           self.repo.canonical_uri(str(basefile)),
+                           inline=True)
+            de.save()
+
+        unsorted_entries = self.repo.news_entries()
+        entries = sorted(list(unsorted_entries),
+                         key=lambda x: x.updated, reverse=True)
+        self.repo.news_write_atom(entries,
+                                  'New and updated documents',
+                                  'main',
+                                  archivesize=6)
+        tree = etree.parse('%s/base/feed/main.atom' % self.datadir)
+        NS = "{http://www.w3.org/2005/Atom}"
+        content = tree.find(".//"+NS+"content")
+        self.assertIsNone(content.get("src"))
+        self.assertIsNone(content.get("hash"))
+        self.assertEqual(content.get("type"), "xhtml")
+        self.assertEqualXML(etree.tostring(content[0]),
+                              '<html xmlns="http://www.w3.org/2005/Atom" xmlns:le="http://purl.org/atompub/link-extensions/1.0"><p>Document #24</p></html>')
+                                             
 
     def _check_entry(self, entry, entryid, title, published, updated, contentsrc, linksrc):
-        NS = "{http://www.w3.org/2005/Atom}"
 
+        NS = "{http://www.w3.org/2005/Atom}"
         self.assertEqual(entry.find(NS+"id").text,entryid)
         self.assertEqual(entry.find(NS+"title").text,title)
         self.assertEqual(entry.find(NS+"published").text,
