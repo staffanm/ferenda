@@ -71,7 +71,17 @@ class WSGI(RepoTester): # base class w/o tests
         index = self.datadir+os.sep+"index.html"
         with open(index, "wb") as fp:
             fp.write(b'<h1>index.html</h1>')
-            
+
+        # toc/index.html + toc/title/a.html
+        with self.repo.store.open("index", "toc", ".html", "wb") as fp:
+            fp.write(b'<h1>TOC for base</h1>')
+        with self.repo.store.open("title/a", "toc", ".html", "wb") as fp:
+            fp.write(b'<h1>Title starting with "a"</h1>')
+
+        # distilled/dump.nt
+        with self.repo.store.open("dump", "distilled", ".nt", "wb") as fp:
+            fp.write(g.serialize(format="nt"))
+        
 
     def call_wsgi(self, environ):
         start_response = Mock()
@@ -282,53 +292,66 @@ class ConNeg(WSGI):
         self.assertEqualGraphs(g, got)
 
 
-#     # these test require running relate_all and/or toc. skip them for now
-#     def test_dataset_html(self):
-#         self.env['PATH_INFO'] = "/dataset/base"
-#         status, headers, content = self.call_wsgi(self.env)
-#         # FIXME: compare result to something (base/toc/index.html)
-#         self.assertResponse("200 OK",
-#                             {'Content-Type': 'text/html'},
-#                             None,
-#                             status, headers, None)
-# 
-#     def test_dataset_ntriples(self):
-#         self.env['PATH_INFO'] = "/dataset/base"
-#         self.env['HTTP_ACCEPT'] = 'text/plain'
-#         status, headers, content = self.call_wsgi(self.env)
-#         self.assertResponse("200 OK",
-#                             {'Content-Type': 'text/html'},
-#                             None,
-#                             status, headers, None)
-#         got = Graph()
-#         got.parse(data=content, format="ntriples")
-#         self.assertEqualGraphs(g, got)
-# 
-# 
-#     def test_dataset_turtle(self):
-#         self.env['PATH_INFO'] = "/dataset/base"
-#         self.env['HTTP_ACCEPT'] = 'text/turtle'
-#         status, headers, content = self.call_wsgi(self.env)
-#         self.assertResponse("200 OK",
-#                             {'Content-Type': 'text/turtle'},
-#                             None,
-#                             status, headers, None)
-#         got = Graph()
-#         got.parse(data=content, format="turtle")
-#         self.assertEqualGraphs(g, got)
-# 
-#     def test_dataset_xml(self):
-#         self.env['PATH_INFO'] = "/dataset/base"
-#         self.env['HTTP_ACCEPT'] = 'application/rdf+xml'
-#         status, headers, content = self.call_wsgi(self.env)
-#         self.assertResponse("200 OK",
-#                             {'Content-Type': 'application/rdf+xml'},
-#                             None,
-#                             status, headers, None)
-#         g = self._dataset_graph()
-#         got = Graph()
-#         got.parse(data=content, format="xml")
-#         self.assertEqualGraphs(g, got)
+    def test_dataset_html(self):
+        self.env['PATH_INFO'] = "/dataset/base"
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse("200 OK",
+                            {'Content-Type': 'text/html'},
+                            b'<h1>TOC for base</h1>',
+                            status, headers, content)
+
+    def test_dataset_html_param(self):
+        self.env['PATH_INFO'] = "/dataset/base?title=a"
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse("200 OK",
+                            {'Content-Type': 'text/html'},
+                            b'<h1>Title starting with "a"</h1>',
+                            status, headers, content)
+
+    def test_dataset_ntriples(self):
+        self.env['PATH_INFO'] = "/dataset/base"
+        self.env['HTTP_ACCEPT'] = 'text/plain'
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse("200 OK",
+                            {'Content-Type': 'text/plain'},
+                            None,
+                            status, headers, None)
+        want = Graph()
+        want.parse(source="test/files/base/distilled/123/a.ttl",
+                   format="turtle")
+        got = Graph()
+        got.parse(data=content, format="nt")
+        self.assertEqualGraphs(want, got)
+
+    def test_dataset_turtle(self):
+        self.env['PATH_INFO'] = "/dataset/base"
+        self.env['HTTP_ACCEPT'] = 'text/turtle'
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse("200 OK",
+                            {'Content-Type': 'text/turtle'},
+                            None,
+                            status, headers, None)
+        want = Graph()
+        want.parse(source="test/files/base/distilled/123/a.ttl",
+                   format="turtle")
+        got = Graph()
+        got.parse(data=content, format="turtle")
+        self.assertEqualGraphs(want, got)
+
+    def test_dataset_xml(self):
+        self.env['PATH_INFO'] = "/dataset/base"
+        self.env['HTTP_ACCEPT'] = 'application/rdf+xml'
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse("200 OK",
+                            {'Content-Type': 'application/rdf+xml'},
+                            None,
+                            status, headers, None)
+        want = Graph()
+        want.parse(source="test/files/base/distilled/123/a.ttl",
+                   format="turtle")
+        got = Graph()
+        got.parse(data=content, format="xml")
+        self.assertEqualGraphs(want, got)
 
 
 class Search(WSGI):

@@ -2352,11 +2352,32 @@ parsed document path to that documents dependency file."""
             else:
                 null, res, alias, basefile = segments
 
+            if "?" in alias:
+                alias = alias.split("?")[0]
+
             if (alias == self.alias):
                 # we SHOULD be able to handle this -- maybe provide
                 # apologetic message about this if we can't?
-                uri = request_uri(environ)
+                uri = request_uri(environ).replace("%3F", "?")
                 path = None
+                
+                accept = environ.get('HTTP_ACCEPT', 'text/html')
+                # do proper content-negotiation, but make sure
+                # application/xhtml+xml ISN'T one of the
+                # available options (as modern browsers may
+                # prefer it to text/html, and our
+                # application/xhtml+xml isn't what they want)
+                # -- ie we only serve application/xtml+xml if
+                # a client specifically only asks for
+                # that. Yep, that's a big FIXME.
+                available = ("text/html")  # add to this?
+                preferred = httpheader.acceptable_content_type(accept,
+                                                               available)
+
+                rdfformats = {'application/rdf+xml': 'pretty-xml',
+                              'text/turtle': 'turtle',
+                              'text/plain': 'nt'}
+                
                 if res == "res":
                     if uri.endswith("/data"):
                         data = True
@@ -2365,7 +2386,6 @@ parsed document path to that documents dependency file."""
                         data = False
                     basefile = self.basefile_from_uri(uri)
                     assert basefile, "Couldn't find basefile in uri %s" % uri
-                    accept = environ.get('HTTP_ACCEPT', 'text/html')
 
                     # mapping MIME-type -> callable that retrieves a path
                     pathfunc = None
@@ -2377,25 +2397,11 @@ parsed document path to that documents dependency file."""
                             contenttype = accept
                             pathfunc = pathmap[accept]
                         else:
-                            # do proper content-negotiation, but make sure
-                            # application/xhtml+xml ISN'T one of the
-                            # available options (as modern browsers may
-                            # prefer it to text/html, and our
-                            # application/xhtml+xml isn't what they want)
-                            # -- ie we only serve application/xtml+xml if
-                            # a client specifically only asks for
-                            # that. Yep, that's a big FIXME.
-                            available = ("text/html")  # add to this?
-                            preferred = httpheader.acceptable_content_type(accept, available)
                             if preferred and preferred[0].media_type == "text/html":
                                 contenttype = preferred[0].media_type
                                 pathfunc = self.store.generated_path
 
                     if pathfunc is None:
-                        rdfformats = {'application/rdf+xml': 'pretty-xml',
-                                      'text/turtle': 'turtle',
-                                      'text/plain': 'nt'
-                                      }
                         if accept in rdfformats:
                             contenttype = accept
                             g = Graph()
@@ -2416,14 +2422,26 @@ parsed document path to that documents dependency file."""
                     # FIXME: this reimplements the logic that
                     # calculates basefile/path at the end of
                     # toc_pagesets AND transform_links
-                    params = self.dataset_params_from_uri(uri)
-                    if params:
-                        pseudobasefile = "/".join(params)
-                    else:
-                        pseudobasefile = "index"
-                    path = self.store.path(pseudobasefile, 'toc', '.html')
-                    contenttype = "text/html"
-                    data = None
+                    contenttype = accept
+                    if preferred and preferred[0].media_type == "text/html":
+                        contenttype = preferred[0].media_type
+
+                    if contenttype == "text/html":
+                        params = self.dataset_params_from_uri(uri)
+                        if params:
+                            pseudobasefile = "/".join(params)
+                        else:
+                            pseudobasefile = "index"
+                        path = self.store.path(pseudobasefile, 'toc', '.html')
+                        contenttype = "text/html"
+                    elif contenttype == "text/plain":
+                        path = self.store.path("dump", "distilled", ".nt")
+                    elif contenttype in rdfformats:
+                        g = Graph()
+                        g.parse(self.store.path("dump", "distilled", ".nt"),
+                                format="nt")
+                        data = g.serialize(format=rdfformats[accept])
+
                 if path and os.path.exists(path):
                     return (open(path, 'rb'),
                             os.path.getsize(path),
@@ -2449,9 +2467,9 @@ parsed document path to that documents dependency file."""
         if log.handlers == []:
             if hasattr(logging, 'NullHandler'):
                 log.addHandler(logging.NullHandler())
-            else:
+            else:  # pragma: no cover
                 # py26 compatibility
-                class NullHandler(logging.Handler):
+                class NullHandler(logging.Handler): 
 
                     def emit(self, record):
                         pass

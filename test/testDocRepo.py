@@ -1166,7 +1166,16 @@ Status for document repository 'base' (ferenda.documentrepository.DocumentReposi
             self.repo.status()
         got = "\n".join([x[1][0] for x in printmock.mock_calls])
         self.assertEqual(want,got)
-            
+
+    def test_tabs(self):
+        # base test - if using rdftype of foaf:Document, in that case
+        # we'll use .alias
+        self.assertEqual(self.repo.tabs(),
+                         [("base", "http://localhost:8000/dataset/base")])
+        self.repo.rdf_type = rdflib.Namespace("http://example.org/vocab#Report")
+        self.assertEqual(self.repo.tabs(),
+                         [("Report", "http://localhost:8000/dataset/base")])
+        
         
 class Generate(RepoTester):
 
