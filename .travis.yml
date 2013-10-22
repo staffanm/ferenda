@@ -1,7 +1,7 @@
 language: python
 python:
-  - "2.7"
   - "2.6"
+  - "2.7"
   - "3.2"
   - "3.3"
 before_install:
@@ -12,8 +12,6 @@ install:
   - if [[ ${TRAVIS_PYTHON_VERSION%%.*} == '2' ]]; then pip install --use-mirrors -r requirements.py2.txt; fi
   - if [[ ${TRAVIS_PYTHON_VERSION%%.*} == '3' ]]; then LANG=en_US.UTF-8 pip install --use-mirrors -r requirements.py3.txt; fi
   - pip install coveralls --use-mirrors
-env:
-  - SKIP_FUSEKI_TESTS=1 SKIP_SESAME_TESTS=1 SKIP_SLEEPYCAT_TESTS=1
 script:
   - if [[ $TRAVIS_PYTHON_VERSION == '2.6' ]]; then PYTHONWARNINGS=i coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unittest2 discover test; fi
   - if [[ $TRAVIS_PYTHON_VERSION != '2.6' ]]; then PYTHONWARNINGS=i coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unittest discover test; fi
