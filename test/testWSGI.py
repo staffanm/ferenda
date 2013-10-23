@@ -301,7 +301,8 @@ class ConNeg(WSGI):
                             status, headers, content)
 
     def test_dataset_html_param(self):
-        self.env['PATH_INFO'] = "/dataset/base?title=a"
+        self.env['PATH_INFO'] = "/dataset/base"
+        self.env['QUERY_STRING'] = "title=a"
         status, headers, content = self.call_wsgi(self.env)
         self.assertResponse("200 OK",
                             {'Content-Type': 'text/html'},

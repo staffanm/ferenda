@@ -2358,7 +2358,7 @@ parsed document path to that documents dependency file."""
             if (alias == self.alias):
                 # we SHOULD be able to handle this -- maybe provide
                 # apologetic message about this if we can't?
-                uri = request_uri(environ).replace("%3F", "?")
+                uri = request_uri(environ)
                 path = None
                 
                 accept = environ.get('HTTP_ACCEPT', 'text/html')
