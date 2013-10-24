@@ -2352,9 +2352,6 @@ parsed document path to that documents dependency file."""
             else:
                 null, res, alias, basefile = segments
 
-            if "?" in alias:
-                alias = alias.split("?")[0]
-
             if (alias == self.alias):
                 # we SHOULD be able to handle this -- maybe provide
                 # apologetic message about this if we can't?

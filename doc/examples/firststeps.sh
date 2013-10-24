@@ -65,6 +65,9 @@ Status for document repository 'w3c' (w3cstandards.W3CStandards)
  generated: None.
 # end status
 
+# make sure the basefile we use for examples is available
+$ ./ferenda-build.py w3c download rdfa-core --loglevel=CRITICAL
+ 
 # begin parse
 $ ./ferenda-build.py w3c parse rdfa-core
 14:45:57 w3c INFO rdfa-core: OK (2.051 sec)
@@ -181,3 +184,6 @@ $ ./ferenda-build.py w3c all
 10:45:07 root INFO w3cstandards.W3CStandards news finished in 0.045 sec
 10:45:07 root INFO frontpage: wrote data/index.html (0.012 sec)
 # end all
+
+$ cd ..
+$ rm -r netstandards

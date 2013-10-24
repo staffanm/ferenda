@@ -8,7 +8,7 @@ if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 import codecs
 import re
     
-from ferenda.legalref import LegalRef
+from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda.elements import serialize
 from ferenda.testutil import file_parametrize
 

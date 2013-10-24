@@ -109,7 +109,6 @@ class BasicQuery(object):
         # boosted field), not just in text.
         self.assertEqual(res[0]['identifier'], 'Doc #2') 
         res, pager = self.index.query("section")
-        from pprint import pprint
         self.assertEqual(len(res),3)
         # NOTE: ES scores all three results equally (1.0), so it doesn't
         # neccesarily put section 1 in the top
@@ -232,26 +231,26 @@ custom_dataset = [
 #class CustomizedIndex(unittest.TestCase):
 class CustomizedIndex(object):
 
-    def test_setup():
+    def test_setup(self):
         self.location = mkdtemp()
         self.index = FulltextIndex.connect("WHOOSH", self.location, [DocRepo1(), DocRepo2()])
         # introspecting the schema (particularly if it's derived
         # directly from our definitions, not reverse-engineerded from
         # a Whoosh index on-disk) is useful for eg creating dynamic
         # search forms
-        self.assertEqual(index.schema(),{'uri':Identifier(),
-                                         'repo':Label(),
-                                         'basefile':Label(),
-                                         'title':Text(boost=4),
-                                         'identifier':Label(boost=16),
-                                         'text':Text(),
-                                         'issued':Datetime(),
-                                         'publisher':Label(),
-                                         'abstract': Text(boost=2),
-                                         'category': Keywords(),
-                                         'secret': Boolean(),
-                                         'references': URI(),
-                                         'category': Keywords()})
+        self.assertEqual(self.index.schema(),{'uri':Identifier(),
+                                              'repo':Label(),
+                                              'basefile':Label(),
+                                              'title':Text(boost=4),
+                                              'identifier':Label(boost=16),
+                                              'text':Text(),
+                                              'issued':Datetime(),
+                                              'publisher':Label(),
+                                              'abstract': Text(boost=2),
+                                              'category': Keywords(),
+                                              'secret': Boolean(),
+                                              'references': URI(),
+                                              'category': Keywords()})
         shutil.rmtree(self.location)
 
     

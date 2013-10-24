@@ -136,7 +136,6 @@ class TripleStoreTestCase(FerendaTestCase):
             self.store.graph.close()
         
     def test_construct(self):
-        from pudb import set_trace; set_trace()
         self.loader.add_serialized(
             util.readfile("test/files/datasets/addressbook.ttl"),
             format="turtle")

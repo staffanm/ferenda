@@ -1437,49 +1437,55 @@ def _select_triplestore(sitename, log, verbose=False):
     # and return configuration for the first triplestore that works.
 
     # 1. Fuseki
-    try:
-        triplestore = os.environ.get('FERENDA_TRIPLESTORE_LOCATION',
-                                     'http://localhost:3030')
-        resp = requests.get(triplestore + "/ds/data?default")
-        resp.raise_for_status()
-        if verbose:
-            log.info("Fuseki server responding at %s" % triplestore)
-        # TODO: Find out how to create a new datastore in Fuseki
-        # programatically so we can use
-        # http://localhost:3030/$SITENAME instead
-        return('FUSEKI', triplestore, 'ds')
-    except (requests.exceptions.HTTPError,
-            requests.exceptions.ConnectionError) as e:
-        if verbose:
-            log.info("... Fuseki not available at %s: %s" % (triplestore, e))
-        pass
+    triplestore = os.environ.get('FERENDA_TRIPLESTORE_LOCATION',
+                                 'http://localhost:3030')
+    if triplestore:
+        try:
+            resp = requests.get(triplestore + "/ds/data?default")
+            resp.raise_for_status()
+            if verbose:
+                log.info("Fuseki server responding at %s" % triplestore)
+            # TODO: Find out how to create a new datastore in Fuseki
+            # programatically so we can use
+            # http://localhost:3030/$SITENAME instead
+            return('FUSEKI', triplestore, 'ds')
+        except (requests.exceptions.HTTPError,
+                requests.exceptions.ConnectionError) as e:
+            if verbose:
+                log.info("... Fuseki not available at %s: %s" %
+                         (triplestore, e))
+            pass
 
     # 2. Sesame
-    try:
-        triplestore = os.environ.get('FERENDA_TRIPLESTORE_LOCATION',
-                                     'http://localhost:8080/openrdf-sesame')
-        resp = requests.get(triplestore + '/protocol')
-        resp.raise_for_status()
-        workbench = triplestore.replace('openrdf-sesame', 'openrdf-workbench')
-        if verbose:
-            log.info("Sesame server responding at %s (%s)" % (triplestore, resp.text))
-        # TODO: It is possible, if you put the exactly right triples
-        # in the SYSTEM repository, to create a new repo
-        # programmatically.
-        log.info("""You still need to create a repository at %(workbench)s ->
-New repository. The following settings are recommended:
+    triplestore = os.environ.get('FERENDA_TRIPLESTORE_LOCATION',
+                                 'http://localhost:8080/openrdf-sesame')
+    if triplestore:
+        try:
+            resp = requests.get(triplestore + '/protocol')
+            resp.raise_for_status()
+            workbench = triplestore.replace('openrdf-sesame',
+                                            'openrdf-workbench')
+            if verbose:
+                log.info("Sesame server responding at %s (%s)" %
+                         (triplestore, resp.text))
+            # TODO: It is possible, if you put the exactly right triples
+            # in the SYSTEM repository, to create a new repo
+            # programmatically.
+            log.info("""You still need to create a repository at %(workbench)s ->
+    New repository. The following settings are recommended:
 
-    Type: Native Java store
-    ID: %(sitename)s
-    Title: Ferenda repository for %(sitename)s
-    Triple indexes: spoc,posc,cspo,opsc,psoc
-        """ % locals())
-        return('SESAME', triplestore, sitename)
-    except (requests.exceptions.HTTPError,
-            requests.exceptions.ConnectionError) as e:
-        if verbose:
-            log.info("... Sesame not available at %s: %s" % (triplestore, e))
-        pass
+        Type: Native Java store
+        ID: %(sitename)s
+        Title: Ferenda repository for %(sitename)s
+        Triple indexes: spoc,posc,cspo,opsc,psoc
+            """ % locals())
+            return('SESAME', triplestore, sitename)
+        except (requests.exceptions.HTTPError,
+                requests.exceptions.ConnectionError) as e:
+            if verbose:
+                log.info("... Sesame not available at %s: %s" %
+                         (triplestore, e))
+            pass
 
     # 3. RDFLib + SQLite
     try:
@@ -1508,19 +1514,20 @@ New repository. The following settings are recommended:
 
 def _select_fulltextindex(log, verbose=False):
     # 1. Elasticsearch
-    try:
-        fulltextindex = os.environ.get('FERENDA_FULLTEXTINDEX_LOCATION',
-                                       'http://localhost:9200/')
-        resp = requests.get(fulltextindex)
-        resp.raise_for_status()
-        if verbose:
-            log.info("Elasticsearch server responding at %s" % triplestore)
-        return('ELASTICSEARCH', fulltextindex)
-    except (requests.exceptions.HTTPError,
-            requests.exceptions.ConnectionError) as e:
-        if verbose:
-            log.info("... Elasticsearch not available at %s: %s" %
-                  (fulltextindex, e))
-        pass
+    fulltextindex = os.environ.get('FERENDA_FULLTEXTINDEX_LOCATION',
+                                   'http://localhost:9200/')
+    if fulltextindex:
+        try:
+            resp = requests.get(fulltextindex)
+            resp.raise_for_status()
+            if verbose:
+                log.info("Elasticsearch server responding at %s" % triplestore)
+            return('ELASTICSEARCH', fulltextindex)
+        except (requests.exceptions.HTTPError,
+                requests.exceptions.ConnectionError) as e:
+            if verbose:
+                log.info("... Elasticsearch not available at %s: %s" %
+                      (fulltextindex, e))
+            pass
     # 2. Whoosh (just assume that it works)
     return ("WHOOSH", "data/whooshindex")

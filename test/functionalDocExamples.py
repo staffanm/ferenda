@@ -26,7 +26,7 @@ from itertools import islice
 from six.moves.urllib_parse import urljoin
 import requests
 
-class TestIntegration(unittest.TestCase, FerendaTestCase):
+class Examples(unittest.TestCase, FerendaTestCase):
 
     verbose = False
 
@@ -51,7 +51,15 @@ class TestIntegration(unittest.TestCase, FerendaTestCase):
             # mask things that may differ from run to run
             masks =  [re.compile(r"^()(\d{2}:\d{2}:\d{2})()", re.MULTILINE),
                       re.compile(r"(finished in )(\d.\d+)( sec)"),
-                      re.compile(r"(\()(\d.\d+)( sec\))")]
+                      re.compile(r"(\()(\d.\d+)( sec\))"),
+                      re.compile(r"( INFO )([\w\-]+: downloaded from http://[\w\-\./]+)(/)"),
+                      re.compile(r"( INFO )([\w\-]+)(: OK )"),
+                      re.compile(r"( DEBUG )([\w\-]+: Created [\w\-\./]+)(.xhtml)"),
+                      re.compile(r"( DEBUG )([\w\-]+)(: Starting|: Skipped)"),
+                      re.compile(r"( DEBUG )([\w\-]+: \d+ triples extracted to [\w\-\./]+)(.rdf)"),
+                      re.compile(r"^()([\w\-]+)(.html(|.etag))", re.MULTILINE),
+                      re.compile(r"((?:download|parse): )([\w\-, :\.\(\)]+)()", re.MULTILINE)
+            ]
             for mask in masks:
                 s = mask.sub(r"\1[MASKED]\3", s)
             return s
@@ -106,8 +114,13 @@ class TestIntegration(unittest.TestCase, FerendaTestCase):
                                                stderr=subprocess.STDOUT,
                                                env=env)
                     out, err = process.communicate()
+                    if not out:
+                        out = b''
+                    if not err:
+                        err = b''
                     retcode = process.poll()
-                    self.assertEqual(0, retcode)
+                    self.assertEqual(0, retcode, "STDOUT:\n%s\nSTDERR:\n%s" % (out.decode('utf-8'),
+                                                                               err.decode('utf-8')))
             else:
                 expected += line
         # check that final output was what was expected
@@ -128,7 +141,9 @@ class TestIntegration(unittest.TestCase, FerendaTestCase):
         shutil.copy2("doc/examples/w3cstandards.py", workingdir)
         self._test_shfile("doc/examples/firststeps.sh", workingdir,
                           {'FERENDA_MAXDOWNLOAD': '3',
-                           'PYTHONPATH': os.getcwd()})
+                           'PYTHONPATH': os.getcwd(),
+                           'FERENDA_TRIPLESTORE_LOCATION': '',
+                           'FERENDA_FULLTEXTINDEX_LOCATION': ''})
 
     # FIXME: Both intro-example.py and intro-example.sh ends with a
     # call to runserver, which never returns. We need to mock this

@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 # firststeps-api.py
 import sys
+import shutil
 sys.path.append("doc/examples") # to find w3cstandards.py
 
 # begin download-status
@@ -13,7 +14,7 @@ repo.status()
 # or use repo.get_status() to get all status information in a nested dict
 # end download-status
 
-# make sure the basid we use for examples is available
+# make sure the basefile we use for examples is available
 repo.download("rdfa-core")
 
 # begin parse-force
@@ -49,5 +50,5 @@ repo.toc()
 repo.news()
 manager.frontpage([repo])
 # end final-commands
-
+shutil.rmtree(repo.config.datadir)
 return_value = True
