@@ -22,6 +22,7 @@ from ferenda.testutil import FerendaTestCase
 # imports are scoped when using exec, but this is the only way apart
 # from importing inside of the functions that use the code to work.
 from ferenda import elements, DocumentRepository, DocumentStore, TocCriteria
+from ferenda.decorators import managedparsing
 from bs4 import BeautifulSoup
 import requests
 from six.moves.urllib_parse import urljoin

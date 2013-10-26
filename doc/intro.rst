@@ -103,7 +103,9 @@ This code uses the Ferenda API to create a website containing all(*)
 RFCs and W3C recommended standards.
 
 .. literalinclude:: examples/intro-example.py
-		    
+   :start-after: # begin example		    
+   :end-before: # end example		    
+
 Alternately, using the command line tools and the project framework:
  
 .. literalinclude:: examples/intro-example.sh

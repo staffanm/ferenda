@@ -367,7 +367,7 @@ class DocumentStore(object):
             # urllib.quote in python 2.6 cannot handle unicode values
             # for the safe parameter. FIXME: We should create a shim
             # as ferenda.compat.quote and use that
-            safe = safe.encode('ascii')
+            safe = safe.encode('ascii') # pragma: no cover
 
         return quote(basefile, safe=safe).replace('%', os.sep + '%')
 

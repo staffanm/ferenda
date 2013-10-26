@@ -2064,8 +2064,9 @@ class Archive(RepoTester):
                        "This is the original document, generated")
         # archive it
         version = self.repo.get_archive_version("123/a")
-        self.repo.store.archive("123/a",version)
         self.assertEqual(version, "1") # what algorithm do the default use? len(self.archived_versions)?
+
+        self.repo.store.archive("123/a",version)
 
         eq = self.assertEqual
         # make sure archived files ended up in the right places
@@ -2082,7 +2083,26 @@ class Archive(RepoTester):
         self.assertFalse(os.path.exists(self.repo.store.parsed_path("123/a")))
         self.assertFalse(os.path.exists(self.repo.store.distilled_path("123/a")))
         self.assertFalse(os.path.exists(self.repo.store.generated_path("123/a")))
-        
+
+        # Then do it again (with the same version id) and verify that
+        # we can't archive twice to the same id
+        with self.assertRaises(ArchivingError):
+            util.writefile(self.repo.store.downloaded_path("123/a"),
+                           "This is the original document, downloaded")
+            util.writefile(self.repo.store.parsed_path("123/a"),
+                           "This is the original document, parsed")
+            util.writefile(self.repo.store.distilled_path("123/a"),
+                           "This is the original document, distilled")
+            util.writefile(self.repo.store.generated_path("123/a"),
+                           "This is the original document, generated")
+            self.repo.store.archive("123/a",version)
+  
+
+
+    def test_archive_dir(self):
+        self.repo.store.storage_policy = "dir"
+        self.test_archive()
+
     def test_download_and_archive(self):
         # print("test_download_and_archive: cwd", os.getcwd())
         def my_get(url,**kwargs):

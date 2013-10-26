@@ -1414,7 +1414,7 @@ parsed document path to that documents dependency file."""
         :type  basefile: str
         :returns: None
         """
-        with util.logtime(self.log.info, "%(basefile)s OK (%(elapsed).3f sec)",
+        with util.logtime(self.log.info, "%(basefile)s: OK (%(elapsed).3f sec)",
                           {'basefile': basefile}):
             # This dependency management could be abstracted away like
             # the parseifneeded decorator does for parse(). But unlike
@@ -2232,9 +2232,9 @@ parsed document path to that documents dependency file."""
                 % (self.dataset_uri(), self.alias, qname,
                    len(list(self.store.list_basefiles_for("_postgenerate")))))
 
-    # @manager.action
     def status(self, basefile=None, samplesize=3):
         """Prints out some basic status information about this repository."""
+
         print("Status for document repository '%s' (%s)" %
               (self.alias, getattr(self.config, 'class')))
         s = self.get_status()

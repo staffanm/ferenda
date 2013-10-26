@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
+import shutil, os
+if os.path.exists("netstandards"):
+    shutil.rmtree("netstandards")
+
+# begin example
 from ferenda.sources.tech import RFC, W3Standards
 from ferenda.manager import makeresources, frontpage, runserver, setup_logger
 from ferenda.errors import DocumentRemovedError, ParseError, FSMStateError
@@ -55,4 +60,8 @@ frontpage(docrepos,path="netstandards/exampledata/index.html")
 
 # Start WSGI app at http://localhost:8000/ with navigation,
 # document viewing, search and API
-runserver(docrepos, port=8000, documentroot="netstandards/exampledata")
+# runserver(docrepos, port=8000, documentroot="netstandards/exampledata")
+
+# end example
+shutil.rmtree("netstandards")
+return_value = True
