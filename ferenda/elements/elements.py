@@ -21,12 +21,15 @@ import datetime
 import re
 import sys
 import logging
+import ast
 import xml.etree.cElementTree as ET
+
 from lxml.builder import ElementMaker
 from operator import itemgetter
 
 import six
 from six import text_type as str
+from six import binary_type as bytes
 from rdflib import Graph, Namespace, Literal, URIRef
 import pyparsing
 
@@ -129,25 +132,27 @@ class AbstractElement(object):
         for stdattr in ('class', 'id', 'dir', 'lang', 'src', 'href', 'name', 'alt', 'role'):
             if hasattr(self,stdattr):
                 attrs[stdattr] = getattr(self,stdattr)
-        return E(self.tagname, attrs, str(self))
+        return E(self.tagname, attrs) 
 
-
-class UnicodeElement(AbstractElement, six.text_type):
+class UnicodeElement(AbstractElement, str):
     """Based on :py:class:`str`, but can also have other
 properties (such as ordinal label, date of enactment, etc)."""
 
     # immutable objects (like strings, unicode, etc) must provide a __new__ method
     def __new__(cls, arg='', *args, **kwargs):
-        if not isinstance(arg, six.text_type):
-            if sys.version_info < (3,0,0):
-                raise TypeError("%r is not unicode" % arg)
-            else:
-                raise TypeError("%r is not str" % arg)
+        if not isinstance(arg, str):
+            raise TypeError("%r is not a str" % arg)
         # obj = str.__new__(cls, arg)
-        obj = six.text_type.__new__(cls,arg)
+        obj = str.__new__(cls,arg)
         object.__setattr__(obj, '__initialized', False)
         return obj
 
+    def as_xhtml(self, uri=None):
+        res = super(UnicodeElement, self).as_xhtml(uri)
+        if self:
+            res.text = str(self)
+        return res
+        
 
 class CompoundElement(AbstractElement, list):
     """Based on :py:class:`list` and contains other :py:class:`AbstractElement` objects, but can also have properties of it's own."""
@@ -390,7 +395,7 @@ class Link(UnicodeElement):
     """A unicode string with also has a ``.uri`` attribute"""
     tagname = 'a'
     def __repr__(self):
-        return 'Link(\'%s\',uri=%r)' % (six.text_type.__repr__(self), self.uri)
+        return 'Link(\'%s\',uri=%r)' % (str.__repr__(self), self.uri)
 
     def as_xhtml(self, uri):
         element = super(Link, self).as_xhtml(uri)
@@ -492,6 +497,95 @@ class UnorderedList(CompoundElement):
 class ListItem(CompoundElement, OrdinalElement):
     tagname = 'li'
 
+
+def __serializeNode(node, serialize_hidden_attrs=False):
+    # print "serializing: %r" % node
+
+    # Special handling of pyparsing.ParseResults -- deserializing of
+    # these won't work (easily)
+    if isinstance(node, pyparsing.ParseResults):
+        return ET.XML(node.asXML())
+
+    # We use type() instead of isinstance() because we want to
+    # serialize str derived types using their correct class names
+    if type(node) == str:
+        nodename = "str"
+    elif type(node) == bytes:
+        nodename = "bytes"
+    else:
+        nodename = node.__class__.__name__
+    e = ET.Element(nodename)
+    if hasattr(node, '__dict__'):
+        for key in [x for x in list(node.__dict__.keys()) if serialize_hidden_attrs or not x.startswith('_')]:
+            val = node.__dict__[key]
+            if (isinstance(val, (str,bytes))):
+                e.set(key, val)
+            else:
+                e.set(key, repr(val))
+
+    if isinstance(node, str):
+        if node:
+            e.text = str(node)
+    elif isinstance(node, bytes):
+        if node:
+            e.text = node.decode()
+    elif isinstance(node, int):
+        e.text = str(node)
+    elif isinstance(node, list):
+        for x in node:
+            e.append(__serializeNode(x))
+    else:
+        e.text = repr(node)
+        # raise TypeError("Can't serialize %r (%r)" % (type(node), node))
+    return e
+
+def __deserializeNode(elem, caller_globals):
+    # print "element %r, attrs %r" % (elem.tag, elem.attrib)
+    # kwargs = elem.attrib
+
+    # specialcasing first -- class objects for these native objects
+    # can't be created by the"caller_globals[elem.tag]" call below
+    if elem.tag == 'int':
+        i = 0
+        cls = i.__class__
+    elif elem.tag == 'str':
+        i = ''
+        cls = i.__class__
+    elif elem.tag == 'bytes':
+        i = b''
+        cls = i.__class__
+    elif elem.tag == 'dict':
+        i = {}
+        cls = i.__class__
+    else:
+        # print "creating cls for %s" % elem.tag
+        cls = caller_globals[elem.tag]
+
+    if str == cls or str in cls.__bases__:
+        c = cls(elem.text, **elem.attrib)
+
+    elif bytes == cls or bytes in cls.__bases__:
+        c = cls(elem.text.encode(), **elem.attrib)
+
+    elif int == cls or int in cls.__bases__:
+        c = cls(int(elem.text), **elem.attrib)
+
+    elif dict == cls or dict in cls.__bases__:
+        c = cls(ast.literal_eval(elem.text), **elem.attrib)
+
+    elif datetime.date == cls or datetime.date in cls.__bases__:
+        m = re.match(r'[\w\.]+\((\d+), (\d+), (\d+)\)', elem.text)
+        c = cls(int(m.group(1)), int(m.group(2)), int(m.group(3)), **elem.attrib)
+
+    else:
+        c = cls(**elem.attrib)
+        for subelem in elem:
+            # print "Recursing"
+            c.append(__deserializeNode(subelem, caller_globals))
+
+    return c
+
+# in-place prettyprint formatter
 # http://infix.se/2007/02/06/gentlemen-_indentElement-your-xml
 def _indentTree(elem, level=0):
     i = "\n" + level * "  "
@@ -507,108 +601,6 @@ def _indentTree(elem, level=0):
     else:
         if level and (not elem.tail or not elem.tail.strip()):
             elem.tail = i
-
-
-def __serializeNode(node, serialize_hidden_attrs=False):
-    # print "serializing: %r" % node
-
-    # Special handling of pyparsing.ParseResults -- deserializing of
-    # these won't work (easily)
-    if isinstance(node, pyparsing.ParseResults):
-        return ET.XML(node.asXML())
-
-    # We use type() instead of isinstance() because we want to
-    # serialize str derived types using their correct class names
-    if type(node) == six.text_type:
-        nodename = "str"
-    elif type(node) == six.binary_type:
-        nodename = "bytes"
-    else:
-        nodename = node.__class__.__name__
-    e = ET.Element(nodename)
-    if hasattr(node, '__dict__'):
-        for key in [x for x in list(node.__dict__.keys()) if serialize_hidden_attrs or not x.startswith('_')]:
-            val = node.__dict__[key]
-            if (isinstance(val, (six.text_type,six.binary_type))):
-                e.set(key, val)
-            else:
-                e.set(key, repr(val))
-
-    if isinstance(node, (six.text_type,six.binary_type)):
-        if node:
-            e.text = node
-    elif isinstance(node, int):
-        e.text = str(node)
-    elif isinstance(node, list):
-        for x in node:
-            e.append(__serializeNode(x))
-    elif isinstance(node, dict):
-        for x in list(node.keys()):
-            k = ET.Element("Key")
-            k.append(__serializeNode(x))
-            e.append(k)
-
-            v = ET.Element("Value")
-            v.append(__serializeNode(node[x]))
-            e.append(v)
-    else:
-        e.text = repr(node)
-        # raise TypeError("Can't serialize %r (%r)" % (type(node), node))
-    return e
-
-def __deserializeNode(elem, caller_globals):
-    # print "element %r, attrs %r" % (elem.tag, elem.attrib)
-    #kwargs = elem.attrib specialcasing first -- classobjects for
-    # these native objects can't be created by the"caller_globals[elem.tag]" call below
-    if elem.tag == 'int':
-        i = 0
-        classobj = i.__class__
-    elif elem.tag == 'str':
-        i = ''
-        classobj = i.__class__
-
-#    flake8 craps out on byte literals?!
-#    elif elem.tag == 'bytes':
-#        i = b''
-#        classobj = i.__class__
-    elif elem.tag == 'unicode':
-        raise ValueError("Cannot deserialize 'unicode' (should be str?)")
-    else:
-        # print "creating classobj for %s" % elem.tag
-        classobj = caller_globals[elem.tag]
-
-    testclass = classobj(**elem.attrib)
-
-    if isinstance(testclass, str):
-        c = classobj(str(elem.text), **elem.attrib)
-    elif isinstance(classobj(**elem.attrib), int):
-        c = classobj(int(elem.text), **elem.attrib)
-
-    elif isinstance(testclass, str):
-        if elem.text:
-            c = classobj(str(elem.text), **elem.attrib)
-        else:
-            c = classobj(**elem.attrib)
-
-    elif isinstance(testclass, datetime.date):
-        m = re.match(r'\w+\((\d+), (\d+), (\d+)\)', elem.text)
-        basedate = datetime.date(
-            int(m.group(1)), int(m.group(2)), int(m.group(3)))
-        c = classobj(basedate, **elem.attrib)
-
-    elif isinstance(testclass, dict):
-        c = classobj(**elem.attrib)
-        # FIXME: implement this
-
-    else:
-        c = classobj(**elem.attrib)
-        for subelem in elem:
-            # print "Recursing"
-            c.append(__deserializeNode(subelem, caller_globals))
-
-    return c
-
-# in-place prettyprint formatter
 
 
 def _indentElement(elem, level=0):

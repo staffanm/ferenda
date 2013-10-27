@@ -153,6 +153,13 @@ class Store(unittest.TestCase):
         self.assertEqual(self.store.pathfrag_to_basefile("123/a"), "123/a")
         self.assertEqual(self.store.pathfrag_to_basefile("123/%3Aa"), "123:a")
 
+        try:
+            # make sure the pathfrag method works as expected even when os.sep is not "/"
+            realsep = os.sep
+            os.sep = "\\"
+            self.assertEqual(self.store.pathfrag_to_basefile("123\\a"), "123/a")
+        finally:
+            os.sep = realsep
 
     def test_list_basefiles_file(self):
         files = ["downloaded/123/a.html",

@@ -540,15 +540,17 @@ class DocumentStore(object):
         return self.path(basefile, 'generated', '.html',
                          version, attachment)
 
-    def open_generated(self, basefile, mode="r", version=None, attachment=None):
-        """Opens files for reading and writing,
-        c.f. :meth:`~ferenda.DocumentStore.open`. The parameters are
-        the same as for
-        :meth:`~ferenda.DocumentStore.generated_path`.
-
-        """
-        filename = self.generated_path(basefile, version, attachment)
-        return self._open(filename, mode)
+# Removed this method until I find a reason to use it
+#
+#    def open_generated(self, basefile, mode="r", version=None, attachment=None):
+#        """Opens files for reading and writing,
+#        c.f. :meth:`~ferenda.DocumentStore.open`. The parameters are
+#        the same as for
+#        :meth:`~ferenda.DocumentStore.generated_path`.
+#
+#        """
+#        filename = self.generated_path(basefile, version, attachment)
+#        return self._open(filename, mode)
 
     def annotation_path(self, basefile, version=None):
         """Get the full path for the annotation file for the given
