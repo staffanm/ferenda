@@ -51,19 +51,19 @@ class FulltextIndex(object):
 
     def exists(self):
         """Whether the fulltext index exists."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def create(self, schema, repos):
         """Creates a fulltext index using the provided default schema."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def destroy(self):
         """Destroys the index, if created."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def open(self):
         """Opens the index so that it can be queried."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def schema(self):
         """Returns the schema that actually is in use. A schema is a dict
@@ -71,7 +71,7 @@ class FulltextIndex(object):
            subclass of
            :py:class:`ferenda.fulltextindex.IndexedType`
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def update(self, uri, repo, basefile, title, identifier, text, **kwargs):
         """Insert (or update) a resource in the fulltext index. A resource may
@@ -104,19 +104,19 @@ class FulltextIndex(object):
            :meth:`~ferenda.FulltextIndex.close` for that.
 
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def commit(self):
         """Commit all pending updates to the fulltext index."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def close(self):
         """Commits all pending updates and closes the index."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def doccount(self):
         """Returns the number of currently indexed (non-deleted) documents."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def query(self, q, **kwargs):
         """Perform a free text query against the full text index, optionally
@@ -137,7 +137,7 @@ class FulltextIndex(object):
            simple full text queries are possible.
 
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
 
 class IndexedType(object):

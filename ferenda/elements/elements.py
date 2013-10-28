@@ -274,8 +274,11 @@ class CompoundElement(AbstractElement, list):
             }
             for sub_pred, sub_obj in graph.predicate_objects(subject=obj):
                 children.append(self._span(obj, sub_pred, sub_obj, graph))
-        else:
-            raise ValueError("Type %s not supported as object" % type(obj))
+
+        # Theoretical, obj could be a BNode, but that should never happen. If
+        # it does, just silently ignore it.
+        # else:
+        #     raise ValueError("Type %s not supported as object" % type(obj))
 
         return E('span', attrs, *children)
 
@@ -283,7 +286,7 @@ class CompoundElement(AbstractElement, list):
 
 # Abstract classes intendet to use with multiple inheritance, which
 # adds common properties
-class TemporalElement(object):
+class TemporalElement(AbstractElement):
     """A TemporalElement has a number of temporal properties
     (``entryintoforce``, ``expires``) which states the temporal frame
     of the object.
@@ -293,7 +296,7 @@ class TemporalElement(object):
 
     >>> class TemporalHeading(UnicodeElement, TemporalElement):
     ...     pass
-    >>> c = TemporalHeading(["This heading has a start and a end date"])
+    >>> c = TemporalHeading("This heading has a start and a end date")
     >>> c.entryintoforce = datetime.date(2013,1,1)
     >>> c.expires = datetime.date(2013,12,31)
     >>> c.in_effect(datetime.date(2013,7,1))
@@ -302,18 +305,16 @@ class TemporalElement(object):
     False
 
     """
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self.entryintoforce = None
         self.expires = None
+        super(TemporalElement, self).__init__(*args, **kwargs)
 
-        
     def in_effect(self, date=None):
-        """Returns True if the object is in effect at *date* (or today, if date is not provided)."""
-        if not date:
-            date = datetime.date.today()
+        """Returns True if the object is in effect at *date*."""
         return (date >= self.entryintoforce) and (date <= self.expires)
 
-class PredicateElement(object):
+class PredicateElement(AbstractElement):
     """Inheriting from this gives the subclass a ``predicate`` attribute,
     which describes the RDF predicate to which the class is the RDF
     subject (eg. if you want to model the title of a document, you
@@ -345,7 +346,7 @@ class PredicateElement(object):
         super(PredicateElement, self).__init__(*args, **kwargs)
 
 
-class OrdinalElement(object):
+class OrdinalElement(AbstractElement):
     """A OrdinalElement has a explicit ordinal number. The ordinal does
     not need to be strictly numerical, but can be eg. '6 a' (which is
     larger than 6, but smaller than 7). Classes inherited from this
@@ -356,9 +357,9 @@ class OrdinalElement(object):
 
     >>> class OrdinalHeading(UnicodeElement, OrdinalElement):
     ...     pass
-    >>> a = OrdinalHeading(["First"], ordinal="1")
-    >>> b = OrdinalHeading(["Second"], ordinal="2")
-    >>> c = OrdinalHeading(["In-between"], ordinal="1 a")
+    >>> a = OrdinalHeading("First", ordinal="1")
+    >>> b = OrdinalHeading("Second", ordinal="2")
+    >>> c = OrdinalHeading("In-between", ordinal="1 a")
     >>> a < b
     True
     >>> a < c
@@ -368,15 +369,15 @@ class OrdinalElement(object):
 
     """
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self.ordinal = None
+        super(OrdinalElement, self).__init__(*args, **kwargs)
 
-    # FIXME: do a proper mostly-numerical compariom using util.numcmp
     def __lt__(self, other):
-        return self.ordinal < other.ordinal
+        return util.numcmp(self.ordinal, other.ordinal) < 0
 
     def __le__(self, other):
-        return self.ordinal <= other.ordinal
+        return util.numcmp(self.ordinal, other.ordinal) <= 0
 
     def __eq__(self, other):
         return self.ordinal == other.ordinal
@@ -385,17 +386,18 @@ class OrdinalElement(object):
         return self.ordinal != other.ordinal
 
     def __gt__(self, other):
-        return self.ordinal > other.ordinal
+        return util.numcmp(self.ordinal, other.ordinal) > 0
 
     def __ge__(self, other):
-        return self.ordinal == other.ordinal
+        return util.numcmp(self.ordinal, other.ordinal) >= 0
 
 
 class Link(UnicodeElement): 
     """A unicode string with also has a ``.uri`` attribute"""
     tagname = 'a'
+
     def __repr__(self):
-        return 'Link(\'%s\',uri=%r)' % (str.__repr__(self), self.uri)
+        return 'Link(\'%s\', uri=%s)' % (self, self.uri)
 
     def as_xhtml(self, uri):
         element = super(Link, self).as_xhtml(uri)
@@ -589,7 +591,7 @@ def __deserializeNode(elem, caller_globals):
 # http://infix.se/2007/02/06/gentlemen-_indentElement-your-xml
 def _indentTree(elem, level=0):
     i = "\n" + level * "  "
-    if len(elem):
+    if len(elem) > 0:
         if not elem.text or not elem.text.strip():
             elem.text = i + "  "
         for e in elem:
@@ -598,9 +600,10 @@ def _indentTree(elem, level=0):
                 e.tail = i + "  "
         if not e.tail or not e.tail.strip():
             e.tail = i
-    else:
-        if level and (not elem.tail or not elem.tail.strip()):
-            elem.tail = i
+# This should never happen
+#    else:
+#        if level and (not elem.tail or not elem.tail.strip()):
+#            elem.tail = i
 
 
 def _indentElement(elem, level=0):
@@ -615,3 +618,5 @@ def _indentElement(elem, level=0):
     else:
         if level and (not elem.tail or not elem.tail.strip()):
             elem.tail = i
+
+

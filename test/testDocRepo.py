@@ -769,6 +769,11 @@ class Repo(RepoTester):
         dct:creator "Fred Bloggs"@en-GB;
         dct:issued "2013-05-10"^^xsd:date;
         owl:sameAs <http://example.org/s2> .
+
+<http://example.org/s2> dct:title "Same same but different" .
+       
+<http://localhost:8000/res/base/unlrelated> dct:title "Unrelated document" .
+        
         """)
         
         body = el.Body([el.Heading(['Toplevel heading'], level=1),
@@ -815,8 +820,12 @@ class Repo(RepoTester):
         content="Second section"
         property="dct:title"
         typeof="bibo:DocumentPart">
-      <span rel="owl:sameAs"
-            href="http://example.org/s2"/>
+      <span href="http://example.org/s2"
+            rel="owl:sameAs">
+        <span content="Same same but different"
+              property="dct:title"
+              xml:lang=""/>
+      </span>
       <span content="2"
             property="bibo:chapter"
             xml:lang=""/>

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import unicode_literals, print_function
 import collections
 import inspect
 
@@ -98,8 +98,7 @@ class FSMParser():
         :type initialconstructor: callable
         :returns: A document object tree.
         """
-        if self.debug:
-            self._debug("Starting parse")
+        self._debug("Starting parse")
         self.reader = Peekable(chunks)
         self._state_stack = [self.initial_state]
         return self.initial_constructor(self)
@@ -117,7 +116,6 @@ class FSMParser():
         except StopIteration:
             self._debug("We're done!")
             return None
-        ret = None
 
         applicable_tmp = [x[1] for x in self.transitions.keys() if x[0] == self._state_stack[-1]]
         # Create correct sorting of applicable_recognizers
@@ -129,26 +127,21 @@ class FSMParser():
         self._debug("Testing %r against %s (state %r) " %
                     (chunk, [x.__name__ for x in applicable_recognizers],
                      self._state_stack[-1]))
-        for recognizer in self.recognizers:
-            if recognizer in applicable_recognizers and recognizer(self):
-                ret = recognizer
-                if ret:
-                    self._debug("%r -> %s" % (chunk, ret.__name__))
-                else:
-                    self._debug("No recognizer for %r" % (chunk))
-                return ret
+        for recognizer in applicable_recognizers:
+            if recognizer(self):
+                self._debug("%r -> %s" % (chunk, recognizer.__name__))
+                return recognizer
         raise FSMStateError("No recognizer match for %r" % chunk)
 
     def transition(self, currentstate, symbol):
         """Internal function used by make_children()"""
-        if (currentstate, symbol) in self.transitions:
-            t = self.transitions[(currentstate, symbol)]
-            if callable(t):
-                return t(symbol, self._state_stack)
-            else:
-                return t
+        assert (currentstate, symbol) in self.transitions, "(%r, %r) should be in self.transitions" % (currentstate, symbol)
+
+        t = self.transitions[(currentstate, symbol)]
+        if callable(t):
+            return t(symbol, self._state_stack)
         else:
-            raise FSMStateError("Can't transition from %s with %s" % (currentstate, symbol))
+            return t
 
     def make_child(self, constructor, childstate):
         """Internal function used by make_children(), which calls one
@@ -211,6 +204,8 @@ class FSMParser():
             else:
                 # special weird hack - set the state we'll be
                 # returning to by manipulating self._state_stack
+                # FIXME: we have no regular test case for this path,
+                # but integrationRFC excercises it
                 if newstate:
                     self._debug("Changing the state we'll return to (self._state_stack[-2])")
                     self._debug("  (from %r to %r)" % (self._state_stack[-2], newstate))
@@ -230,10 +225,7 @@ class Peekable(six.Iterator):
 
     def _fillcache(self):
         while len(self._cache) < 1:
-            try:
-                self._cache.append(six.advance_iterator(self._iterable))
-            except IOError:  # more?
-                raise StopIteration
+            self._cache.append(six.advance_iterator(self._iterable))
 
     def __next__(self):
         self._fillcache()

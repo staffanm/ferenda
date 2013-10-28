@@ -450,7 +450,7 @@ def _str(s, encoding="ascii"):
 
     """
     if sys.version_info < (2, 7, 0):
-        return s.encode("ascii")
+        return s.encode("ascii")  # pragma: no cover
     else:
         return s
 
@@ -469,7 +469,7 @@ def _wsgi_search(environ, start_response, args):
     querystring = OrderedDict(parse_qsl(environ['QUERY_STRING']))
     query = querystring['q']
     if not isinstance(query, str):  # happens on py26
-        query = query.decode("utf-8")
+        query = query.decode("utf-8")  # pragma: no cover
     pagenum = int(querystring.get('p', '1'))
     res, pager = idx.query(query, pagenum=pagenum)
     if pager['totalresults'] == 1:
