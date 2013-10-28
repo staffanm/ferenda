@@ -102,13 +102,6 @@ class LayeredConfig(object):
         self._parent = None
         self._sectionkey = None
 
-    def _has(self, name):
-        try:
-            getattr(self, name)
-            return True
-        except ValueError:
-            return False
-
     @staticmethod
     def write(config):
         """Write changed properties to inifile (if provided at initialization)."""

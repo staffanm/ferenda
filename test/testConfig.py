@@ -55,6 +55,7 @@ lastrun = 2012-09-18 15:41:00
         self.assertIs(type(cfg.forceparse),bool)
         self.assertEqual(cfg.jsfiles,['default.js','modernizr.js'])
         self.assertIs(type(cfg.jsfiles),list)
+
         
     def test_defaults_subsections(self):
         # this tests the following datatypes:
@@ -112,7 +113,10 @@ jsfiles = ['default.js','modernizr.js']
         self.assertEqual(cfg.jsfiles,"['default.js','modernizr.js']")
         self.assertIs(type(cfg.jsfiles),str)
 
+        cfg = LayeredConfig(inifile="nonexistent.ini")
+        self.assertEqual([], list(cfg))
 
+        
     def test_inifile_subsections(self):
         cfg = LayeredConfig(inifile="ferenda.ini")
 
@@ -249,6 +253,7 @@ jsfiles = ['default.js','modernizr.js']
         subconfig = getattr(cfg, 'mymodule')
         self.assertIs(type(subconfig.forceparse), bool)
         self.assertEqual(subconfig.forceparse, False)
+        
 
     def test_layered(self):
         defaults = {'loglevel':'ERROR'}
@@ -259,6 +264,9 @@ jsfiles = ['default.js','modernizr.js']
         self.assertEqual(cfg.loglevel, 'INFO')
         cfg = LayeredConfig(defaults=defaults,inifile="ferenda.ini",commandline=cmdline)
         self.assertEqual(cfg.loglevel, 'DEBUG')
+        self.assertEqual(['loglevel', 'datadir', 'processes', 'loglevel', 'forceparse', 'jsfiles', 'loglevel'], list(cfg))
+
+
 
     def test_layered_subsections(self):
         defaults = {'force':False,
@@ -276,6 +284,10 @@ jsfiles = ['default.js','modernizr.js']
         self.assertEqual(cfg.mymodule.force, True)
         self.assertEqual(cfg.mymodule.datadir, 'thatdata')
         self.assertEqual(cfg.mymodule.loglevel, 'INFO')
+
+        # FIXME: Maybe repeated keys aren't good usability?
+        self.assertEqual(['loglevel', 'datadir', 'force', 'datadir', 'force'], list(cfg.mymodule))
+
 
 
     def test_modified(self):
@@ -297,7 +309,9 @@ jsfiles = ['default.js','modernizr.js']
     def test_write_configfile(self):
         cfg = LayeredConfig(inifile="ferenda.ini")
         cfg.mymodule.lastrun = datetime(2013,9,18,15,41,0)
-        LayeredConfig.write(cfg)
+        # calling write for any submodule will force a write of the
+        # entire config file
+        LayeredConfig.write(cfg.mymodule)
         want = """[__root__]
 datadir = mydata
 processes = 4
