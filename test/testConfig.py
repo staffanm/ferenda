@@ -5,7 +5,7 @@ import sys
 import os
 from datetime import datetime
 import doctest
-from ferenda.compat import unittest
+from ferenda.compat import unittest, OrderedDict
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
 import six
@@ -243,6 +243,14 @@ jsfiles = ['default.js','modernizr.js']
         self.assertEqual(cfg.mymodule.lastrun,datetime(2012,9,18,15,41,0))
         self.assertIs(type(cfg.mymodule.lastrun),datetime)
 
+        # make sure this auto-typing isn't run for bools
+        types = {'logfile': True}
+        cmdline = ["--logfile=out.log"]
+        cfg = LayeredConfig(defaults=types,commandline=cmdline)
+        self.assertEqual(cfg.logfile, "out.log")
+        
+        
+
 
     def test_typed_commandline_cascade(self):
         # the test here is that _load_commandline must use _type_value property.
@@ -264,14 +272,14 @@ jsfiles = ['default.js','modernizr.js']
         self.assertEqual(cfg.loglevel, 'INFO')
         cfg = LayeredConfig(defaults=defaults,inifile="ferenda.ini",commandline=cmdline)
         self.assertEqual(cfg.loglevel, 'DEBUG')
-        self.assertEqual(['loglevel', 'datadir', 'processes', 'loglevel', 'forceparse', 'jsfiles', 'loglevel'], list(cfg))
+        self.assertEqual(['loglevel', 'datadir', 'processes', 'forceparse', 'jsfiles'], list(cfg))
 
 
 
     def test_layered_subsections(self):
-        defaults = {'force':False,
-                    'datadir':'thisdata',
-                    'loglevel':'INFO'}
+        defaults = OrderedDict((('force',False),
+                                ('datadir','thisdata'),
+                                ('loglevel','INFO')))
         cmdline=['--mymodule-datadir=thatdata','--mymodule-force'] # 
         cfg = LayeredConfig(defaults=defaults,commandline=cmdline,cascade=True)
         self.assertEqual(cfg.mymodule.force, True)
@@ -285,8 +293,8 @@ jsfiles = ['default.js','modernizr.js']
         self.assertEqual(cfg.mymodule.datadir, 'thatdata')
         self.assertEqual(cfg.mymodule.loglevel, 'INFO')
 
-        # FIXME: Maybe repeated keys aren't good usability?
-        self.assertEqual(['loglevel', 'datadir', 'force', 'datadir', 'force'], list(cfg.mymodule))
+
+        self.assertEqual(['force', 'datadir', 'loglevel'], list(cfg.mymodule))
 
 
 

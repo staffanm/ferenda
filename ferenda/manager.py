@@ -10,7 +10,7 @@ tool, you don't need to directly call any of these methods --
 else, for you.
 
 """
-from __future__ import unicode_literals
+from __future__ import unicode_literals, print_function
 # system
 import os
 import stat
@@ -1123,7 +1123,7 @@ def _enabled_classes(inifile=None):
 def _print_usage():
     """Prints out general usage information for the ``ferenda-build.py`` tool."""
     # general info, enabled classes
-    executable = sys.argv[0]
+    executable = sys.argv[0] 
     print("""Usage: %(executable)s [class-or-alias] [action] <arguments> <options>
    e.g. '%(executable)s ferenda.sources.EurlexCaselaw enable'
         '%(executable)s ecj parse 62008J0042'

@@ -36,6 +36,10 @@ class TestPeekable(unittest.TestCase):
         with self.assertRaises(StopIteration):
             self.assertEqual(pk.next())
 
+        # test __iter__
+        pk = Peekable(range(4))
+        self.assertEqual([0,1,2,3], list(pk))
+
 
 class Parse(unittest.TestCase):
     def run_test_file(self, filename, debug=False):
@@ -274,12 +278,12 @@ class Parse(unittest.TestCase):
                            ("body", is_state_a): (make_state_a, "state-a"),
                            ("state-a", is_state_b): (make_state_b, "state-b"),
                            ("state-b", is_state_c): (make_state_c, "state-c"),
-                           ("state-c", is_section): (False, "after-state-c"),
-                           ("after-state-c", is_section): (make_section, "section"),
+                           ("state-c", is_section): (False, None),
                            ("section", is_paragraph): (make_paragraph, None),
                            ("section", is_subsection): (make_subsection, "subsection"),
                            ("subsection", is_paragraph): (make_paragraph,None),
                            ("subsection", is_subsection): (False,None),
+                           ("subsection", is_state_a): (False,"body"), 
                            ("subsection", is_subsubsection): (make_subsubsection,"subsubsection"),
                            ("subsubsection", is_paragraph): (make_paragraph,None),
                            ("subsubsection", is_section): (False, None),

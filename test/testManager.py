@@ -21,6 +21,7 @@ from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 from ferenda.compat import unittest, OrderedDict, Mock, MagicMock, patch, call
 from ferenda.testutil import RepoTester
 
+import six
 from six.moves import configparser, reload_module
 
 from lxml import etree as ET
@@ -365,6 +366,9 @@ class Run(unittest.TestCase):
         util.writefile("ferenda.ini", """[__root__]
 loglevel=WARNING
 datadir = %s
+url = http://localhost:8000
+searchendpoint = /search/
+apiendpoint = /api/
         """ % self.tempdir)
 
         # 2. dump 2 example docrepo classes to example.py
@@ -620,6 +624,42 @@ class Testrepo2(Testrepo):
         self._enable_repos()
         got = manager.run(['test2', 'callstore'])
         self.assertEqual("CustomStore OK", got)
+
+    def test_named_logfile(self):
+        self._enable_repos()
+        self.assertFalse(os.path.exists("out.log"))
+        argv = ["test","mymethod","myarg","--logfile=out.log"]
+        manager.run(argv)
+        self.assertTrue(os.path.exists("out.log"))
+        os.unlink("out.log")
+
+    def test_print_usage(self):
+        builtins = "__builtin__" if six.PY2 else "builtins"
+        self._enable_repos()
+        with patch(builtins+'.print') as printmock:
+            manager.run([])
+
+        executable = sys.argv[0]
+        got = "\n".join([x[1][0] for x in printmock.mock_calls])
+        got = got.replace(executable, "[EXEC]")
+        want = """Usage: [EXEC] [class-or-alias] [action] <arguments> <options>
+   e.g. '[EXEC] ferenda.sources.EurlexCaselaw enable'
+        '[EXEC] ecj parse 62008J0042'
+        '[EXEC] all generate'
+Available modules:
+ * test: [Undocumented]
+ * test2: [Undocumented]"""
+        self.assertEqual(got, want)
+        
+    def test_runserver(self):
+        self._enable_repos()
+        m = Mock()
+        with patch('ferenda.manager.make_server', return_value=m) as m2:
+            manager.run(["all", "runserver"])
+            self.assertTrue(m2.called)
+            self.assertTrue(m.serve_forever.called)
+        
+        
 
 import doctest
 from ferenda import manager

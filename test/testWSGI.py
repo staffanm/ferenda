@@ -20,8 +20,8 @@ from ferenda.testutil import RepoTester
 from ferenda import manager
 from ferenda import DocumentRepository, FulltextIndex
 from ferenda import util
-# del sys.modules['ferenda.elements']
 from ferenda.elements import html
+
 # tests the wsgi app in-process, ie not with actual HTTP requests, but
 # simulates what make_server().serve_forever() would send and
 # recieve. Should be simple enough, yet reasonably realistic, for
@@ -384,13 +384,14 @@ class Search(WSGI):
     def test_search_multiple(self):
         self.env['QUERY_STRING'] = "q=part"
         res = ([{'title':'Introduction',
+                 'identifier': '123/a¶1',
                  'uri':'http://example.org/base/123/a#S1',
                  'text': html.P(['This is ',
                                  html.Strong(['part'], **{'class':'match'}),
                                  ' of document-',
                                  html.Strong(['part'], **{'class':'match'}),
                             ' section 1</p>'])},
-                {'title':'Definitions and Abbreviations',
+                {#'title':'Definitions and Abbreviations',
                  'uri':'http://example.org/base/123/a#S2',
                  'text':html.P(['second main document ',
                                 html.Strong(['part'], **{'class':'match'})])},

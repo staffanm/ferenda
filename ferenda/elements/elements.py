@@ -506,7 +506,8 @@ def __serializeNode(node, serialize_hidden_attrs=False):
     # Special handling of pyparsing.ParseResults -- deserializing of
     # these won't work (easily)
     if isinstance(node, pyparsing.ParseResults):
-        return ET.XML(node.asXML())
+        xml = util.parseresults_as_xml(node)
+        return ET.XML(xml)
 
     # We use type() instead of isinstance() because we want to
     # serialize str derived types using their correct class names

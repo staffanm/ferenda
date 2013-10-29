@@ -17,9 +17,12 @@ import sys
 import time
 from contextlib import contextmanager
 from email.utils import parsedate_tz
+from ast import literal_eval
 
 import six
 from six.moves.urllib_parse import urlsplit, urlunsplit
+from six import text_type as str
+
 
 from . import errors
 
@@ -656,3 +659,32 @@ def title_sortkey(s):
     s = re.sub("\W+", "", s)
     # remove spaces
     return "".join(s.split())
+
+
+def parseresults_as_xml(parseres, depth=0):
+    # workaround for a buggy pyparsing.ParseResults.asXML which relies
+    # on having dict.items() (not) returning items in a particular
+    # order. We can't access res.__tocdict which really holds what
+    # we're after, so we do the insane procedure of first getting a
+    # repr string representation of the contents (luckily
+    # pyparsing.ParseResults.__repr__ returns a string representation
+    # of __tocdict), then parsing that with ast.literal_eval)
+    #
+    # Note that this is not a complete as_xml implementation, but it
+    # works for the ParseResult objects we're dealing with right now
+    # -- this'll be updated as we go along.
+    rep = repr(parseres)
+    tocdict = literal_eval(rep)[1]
+    res = "\n"
+    for k, v in sorted(tocdict.items(), key=lambda i: i[1][0][1]):
+        if k == parseres.getName():
+            continue
+        
+        if isinstance(v[0][0], str):
+            res += "%s<%s>%s</%s>\n" % ("  "*(depth+1),k,v[0][0],k)
+        elif v[0][0][1] == {}:
+            res += "%s<%s>%s</%s>\n" % ("  "*(depth+1),k,v[0][0][0][0],k)
+        # else: call parseresults_as_xml again somehow -- but we don't
+        # have any 3-level grammar productions to test with
+        
+    return "%s<%s>%s</%s>\n" % ("  "*depth, parseres.getName(), res, parseres.getName())

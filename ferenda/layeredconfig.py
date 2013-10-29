@@ -4,6 +4,7 @@ import os
 import datetime
 import ast
 import logging
+import itertools
 from ferenda.compat import OrderedDict
 from six.moves import configparser
 from six import text_type as str
@@ -114,14 +115,17 @@ class LayeredConfig(object):
 
     def __iter__(self):
         l = []
-        # l.extend(self._subsections.keys())
-        l.extend(self._commandline.keys())
-        l.extend(self._inifile.keys())
-        l.extend(self._defaults.keys())
+        iterables = [self._commandline.keys(),
+                     self._inifile.keys(),
+                     self._defaults.keys()]
+
         if self._cascade and self._parent:
-            l.extend(list(self._parent))
-        for k in l:
-            yield k
+            iterables.append(self._parent)
+        
+        for k in itertools.chain(*iterables):
+            if k not in l:
+                l.append(k)
+                yield k
 
     def __getattribute__(self, name):
         if name.startswith("_") or name == "write":
@@ -257,8 +261,14 @@ class LayeredConfig(object):
            string value to the correct type IF we know the correct
            type."""
         def boolconvert(value):
-            return value == "True"
-
+            # not all bools should be converted, see test_typed_commandline
+            if value == "True":
+                return True
+            elif value == "False":
+                return False
+            else:
+                return value
+            
         def listconvert(value):
             # this function is called with both string represenations
             # of entire lists and simple (unquoted) strings. The
