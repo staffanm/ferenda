@@ -559,8 +559,8 @@ def _wsgi_static(environ, start_response, args):
             fullpath = fullpath + "index.html"
         if os.path.exists(fullpath):
             ext = os.path.splitext(fullpath)[1]
-            if not mimetypes.inited:
-                mimetypes.init()
+            # if not mimetypes.inited:
+            #     mimetypes.init()
             mimetype = mimetypes.types_map.get(ext, 'text/plain')
             status = "200 OK"
             length = os.path.getsize(fullpath)
@@ -881,7 +881,9 @@ overridden by the config file or command line arguments."""
                 'combineresources': False,
                 'staticsite': False,
                 'sitename': 'MySite',
-                'sitedescription': 'Just another Ferenda site'}
+                'sitedescription': 'Just another Ferenda site',
+                'cssfiles': list,
+                'jsfiles': list}
     config = LayeredConfig(defaults, filename, argv, cascade=True)
     return config
 
@@ -905,31 +907,22 @@ def _classes_from_classname(enabled, classname):
 
 
 def _setup_makeresources_args(config):
-    """Given a config object, returns a dict with some of those configuration options, but suitable as arguments for :py:func:`ferenda.Manager.makeresources`. 
+    """Given a config object, returns a dict with some of those
+    configuration options, but suitable as arguments for
+    :py:func:`ferenda.Manager.makeresources`.
     
-    :param config: An initialized config object with data from a ferenda.ini file
+    :param config: An initialized config object with data from a ferenda.ini
+                   file
     :type config: ferenda.LayeredConfig
     :returns: A subset of the same configuration options
     :rtype: dict
+
     """
-    # our config file stores the cssfiles and jsfiles parameters as string
-    def getlist(config, key):
-        if hasattr(config, key):
-            if isinstance(getattr(config, key), six.text_type):
-                return literal_eval(getattr(config, key))
-            else:
-                return getattr(config, key)
-        else:
-            return []
-
-    cssfiles = getlist(config, 'cssfiles')
-    jsfiles = getlist(config, 'jsfiles')
-
     return {'resourcedir': config.datadir + os.sep + 'rsrc',
             'combine':     config.combineresources,
             'staticsite':  config.staticsite,
-            'cssfiles':    cssfiles,
-            'jsfiles':     jsfiles,
+            'cssfiles':    config.cssfiles,
+            'jsfiles':     config.jsfiles,
             'sitename':    config.sitename,
             'sitedescription': config.sitedescription}
 
@@ -1036,18 +1029,18 @@ def _run_class(enabled, argv):
                         if hasattr(e, 'dummyfile'):
                             if not os.path.exists(e.dummyfile):
                                 util.writefile(e.dummyfile, "")
+                            res.append(None) # is what
+                                             # DocumentRepository.parse
+                                             # returns when
+                                             # everyting's ok
                         else:
                             errmsg = str(e)
-                            if not errmsg:
-                                errmsg = repr(e)
                             log.error("%s of %s failed: %s" %
                                       (command, basefile, errmsg))
                             res.append(sys.exc_info())
 
                     except Exception as e:
                         errmsg = str(e)
-                        if not errmsg:
-                            errmsg = repr(e)
                         log.error("%s of %s failed: %s" %
                                   (command, basefile, errmsg))
                         res.append(sys.exc_info())
@@ -1074,19 +1067,6 @@ def _instantiate_class(cls, configfile="ferenda.ini", argv=[]):
         classcfg.datadir + os.sep + inst.alias,
         downloaded_suffix=inst.downloaded_suffix,
         storage_policy=inst.storage_policy)
-    # FIXME: this is a quick hack for controlling trace loggers for
-    # ferenda.sources.legal.se.SFS. Must think abt how to generalize
-    # this.
-    if hasattr(inst, 'trace'):
-        for tracelog in inst.trace:
-            try:
-
-                loglevel = getattr(inst.config.trace, tracelog)
-                log = logging.getLogger(inst.alias + "." + tracelog)
-                log.setLevel(loglevels.get(loglevel, 'DEBUG'))
-            except AttributeError:
-                logging.getLogger(
-                    inst.alias + "." + tracelog).propagate = False
     return inst
 
 
@@ -1165,13 +1145,8 @@ def _print_class_usage(cls):
     :param cls: The class object to print usage information for
     :type  cls: class
     """
+    print("Valid actions are:")
     actions = _list_class_usage(cls)
-    if actions:
-        print("Valid actions are:")
-    else:
-        print(
-            "No valid actions in this class (%s). Did you forget the @action decorator?" %
-            cls.__name__)
     for action, desc in actions.items():
         print(" * %s: %s" % (action, desc))
 

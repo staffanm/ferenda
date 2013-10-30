@@ -23,6 +23,7 @@ from ferenda.testutil import RepoTester
 
 import six
 from six.moves import configparser, reload_module
+builtins = "__builtin__" if six.PY2 else "builtins"
 
 from lxml import etree as ET
 
@@ -116,7 +117,7 @@ class API(unittest.TestCase):
         # classes alias properties. This is intended.
         util.writefile("ferenda.ini", """[__root__]
 datadir = %s
-loglevel = CRITICAL           
+loglevel = CRITICAL
 [test]
 class=testManager.staticmockclass
 [test2]
@@ -339,16 +340,63 @@ class=testManager.staticmockclass2
 
 class Setup(RepoTester):
 
-    def test_setup(self):
+    @patch('ferenda.manager.setup_logger')
+    def test_setup(self, mockprint):
         # restart the log system since setup() will do that otherwise
         manager.shutdown_logger()
         manager.setup_logger('CRITICAL')
-
-        # FIXME: patch requests.get to selectively return 404 or 200
+        projdir = self.datadir+os.sep+'myproject'
+        argv= ['ferenda-build.py', projdir]
+        
+        # test1: normal, setup succeeds
         res = manager.setup(force=True, verbose=False, unattended=True,
-                            argv=['ferenda-build.py',
-                                  self.datadir+os.sep+'myproject'])
+                            argv=argv)
         self.assertTrue(res)
+        self.assertTrue(os.path.exists(projdir))
+
+        # test2: directory exists, setup fails
+        res = manager.setup(verbose=False, unattended=True,
+                            argv=argv)
+        self.assertFalse(res)
+        shutil.rmtree(projdir)
+        
+        # test2: no argv, rely on sys.argv, assert False
+        with patch('ferenda.manager.sys.argv'):
+            self.assertFalse(manager.setup())
+            self.assertFalse(os.path.exists(projdir))
+
+        # test3: preflight fails
+        with patch('ferenda.manager._preflight_check', return_value=False):
+            self.assertFalse(manager.setup(unattended=True, argv=argv))
+            self.assertFalse(os.path.exists(projdir))
+
+            with patch('ferenda.manager.input', return_value="n") as input_mock:
+                self.assertFalse(manager.setup(unattended=False, argv=argv))
+                self.assertFalse(os.path.exists(projdir))
+                self.assertTrue(input_mock.called)
+
+        # test4: select_triplestore fails
+        with patch('ferenda.manager._preflight_check', return_value=True):
+            with patch('ferenda.manager._select_triplestore', return_value=(False, None, None)):
+                self.assertFalse(manager.setup(unattended=True, argv=argv))
+                self.assertFalse(os.path.exists(projdir))
+
+                with patch('ferenda.manager.input', return_value="n") as input_mock:
+                    self.assertFalse(manager.setup(unattended=False, argv=argv))
+                    self.assertFalse(os.path.exists(projdir))
+                    self.assertTrue(input_mock.called)
+
+
+    def test_runsetup(self):
+        with patch('ferenda.manager.sys.exit') as mockexit:
+            with patch('ferenda.manager.setup', return_value=True):
+                manager.runsetup()
+                self.assertFalse(mockexit.called)
+                mockexit.reset_mock()
+            with patch('ferenda.manager.setup', return_value=False):
+                manager.runsetup()
+                self.assertTrue(mockexit.called)
+                
 
 class Run(unittest.TestCase):
     """Tests manager interface using only the run() entry point used by ferenda-build.py"""
@@ -369,12 +417,14 @@ datadir = %s
 url = http://localhost:8000
 searchendpoint = /search/
 apiendpoint = /api/
+cssfiles = ['test.css', 'other.css']        
+jsfiles = ['test.js']
         """ % self.tempdir)
 
         # 2. dump 2 example docrepo classes to example.py
         # FIXME: should we add self.tempdir to sys.path also (and remove it in teardown)?
         util.writefile(self.modulename+".py", """# Test code
-from ferenda import DocumentRepository, DocumentStore, decorators
+from ferenda import DocumentRepository, DocumentStore, decorators, errors
 
 class Teststore(DocumentStore):
     def list_basefiles_for(cls,action):
@@ -406,6 +456,17 @@ class Testrepo(DocumentRepository):
     def mymethod(self, arg):
         if arg == "myarg":
             return "ok!"
+
+    @decorators.action
+    def errmethod(self, arg):
+        if arg == "arg1":
+            raise Exception("General error")
+        elif arg == "myarg":
+            raise errors.DocumentRemovedError("Document was removed")
+        elif arg == "arg2":
+            e = errors.DocumentRemovedError("Document was removed")
+            e.dummyfile = "dummyfile.txt"
+            raise e
 
     def download(self):
         return "%s download ok (magic=%s)" % (self.alias, self.config.magic)
@@ -457,6 +518,7 @@ class Testrepo2(Testrepo):
         
         util.writefile(self.tempdir+"/test.js", "// test.js code goes here")
         util.writefile(self.tempdir+"/test.css", "/* test.css code goes here */")
+        util.writefile(self.tempdir+"/other.css", "/* other.css code goes here */")
         sys.path.append(self.tempdir)
 
     def tearDown(self):
@@ -466,7 +528,12 @@ class Testrepo2(Testrepo):
         sys.path.remove(self.tempdir)
 
 
-    # functionality used by most test methods
+    def test_noconfig(self):
+        os.unlink("ferenda.ini")
+        with self.assertRaises(errors.ConfigurationError):
+            manager.run(["test", "mymethod", "myarg"])
+        
+    # functionality used by most test methods except test_noconfig
     def _enable_repos(self):
 
         # 3. run('example.Testrepo', 'enable')
@@ -502,10 +569,43 @@ class Testrepo2(Testrepo):
         self._enable_repos()
 
     def test_run_single(self):
+        # test1: run standard (custom) method
         self._enable_repos()
         argv = ["test","mymethod","myarg"]
         self.assertEqual(manager.run(argv),
                          "ok!")
+        # test2: specify invalid alias
+        argv[0] = "invalid"
+
+        with patch('ferenda.manager.setup_logger'):
+            self.assertEqual(manager.run(argv), None)
+
+        with patch(builtins+'.print') as printmock:
+            with patch('ferenda.manager.setup_logger'):
+                # test3: specify invalid method
+                argv = ["test", "invalid"]
+                self.assertEqual(manager.run(argv), None)
+
+                # test4: specify no method
+                argv = ["test"]
+                self.assertEqual(manager.run(argv), None)
+
+    def test_run_single_errors(self):
+        self._enable_repos()
+        argv = ["test", "errmethod", "--all"]
+        with patch('ferenda.manager.setup_logger'):
+            with patch(builtins+'.print') as printmock:
+                res = manager.run(argv)
+        self.assertEqual(res[0][0], Exception)
+        self.assertEqual(res[1][0], errors.DocumentRemovedError)
+        self.assertEqual(res[2], None)
+        self.assertTrue(os.path.exists("dummyfile.txt"))
+        
+    def test_run_single_all(self):
+        self._enable_repos()
+        argv = ["test","mymethod","--all"]
+        with patch("example.Testrepo.setup", return_value=False):
+            self.assertEqual(manager.run(argv), [])
 
     def test_run_all(self):
         self._enable_repos()
@@ -513,6 +613,40 @@ class Testrepo2(Testrepo):
         self.assertEqual(manager.run(argv),
                          ["ok!", "yeah!"])
 
+    def test_run_single_allmethods(self):
+        self._enable_repos()
+        argv = ["test","all"]
+        s = os.sep
+        self.maxDiff = None
+        want = OrderedDict(
+            [('download', OrderedDict([('test','test download ok (magic=less)'),
+                                   ])),
+             ('parse', OrderedDict([('test', ['test parse arg1',
+                                              'test parse myarg',
+                                              'test parse arg2']),
+                                ])),
+             ('relate', OrderedDict([('test', ['test relate arg1',
+                                               'test relate myarg',
+                                               'test relate arg2']),
+                                 ])),
+             ('makeresources', {'css':[s.join(['rsrc', 'css','test.css']),
+                                       s.join(['rsrc', 'css','other.css'])],
+                                'js':[s.join(['rsrc', 'js','test.js'])],
+                                'xml':[s.join(['rsrc', 'resources.xml'])]}),
+             ('generate', OrderedDict([('test', ['test generate arg1',
+                                                 'test generate myarg',
+                                                 'test generate arg2']),
+                                   ])),
+             ('toc', OrderedDict([('test','test toc ok'),
+                              ])),
+             ('news', OrderedDict([('test','test news ok'),
+                               ])),
+            ('frontpage', True)])
+
+        self.assertEqual(manager.run(argv),
+                         want)
+        
+        
     def test_run_all_all(self):
         self._enable_repos()
         argv = ["all", "mymethod", "--all"]
@@ -565,7 +699,8 @@ class Testrepo2(Testrepo):
                                      ('test2', ['test2 relate arg1',
                                                 'test2 relate myarg',
                                                 'test2 relate arg2'])])),
-             ('makeresources', {'css':[s.join(['rsrc', 'css','test.css'])],
+             ('makeresources', {'css':[s.join(['rsrc', 'css','test.css']),
+                                       s.join(['rsrc', 'css','other.css'])],
                                 'js':[s.join(['rsrc', 'js','test.js'])],
                                 'xml':[s.join(['rsrc', 'resources.xml'])]}),
              ('generate', OrderedDict([('test', ['test generate arg1',
@@ -591,10 +726,10 @@ class Testrepo2(Testrepo):
         #    (remove rsrc)
         # 4. run('all', 'makeresources', '--combine')
         # 5. verify that single css and js file is created
-
         self._enable_repos()
         s = os.sep
-        want = {'css':[s.join(['rsrc', 'css','test.css'])],
+        want = {'css':[s.join(['rsrc', 'css','test.css']),
+                       s.join(['rsrc', 'css','other.css'])],
                 'js':[s.join(['rsrc', 'js','test.js'])],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }

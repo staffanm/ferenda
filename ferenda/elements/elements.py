@@ -296,19 +296,22 @@ class TemporalElement(AbstractElement):
 
     >>> class TemporalHeading(UnicodeElement, TemporalElement):
     ...     pass
-    >>> c = TemporalHeading("This heading has a start and a end date")
-    >>> c.entryintoforce = datetime.date(2013,1,1)
-    >>> c.expires = datetime.date(2013,12,31)
+    >>> c = TemporalHeading("This heading has a start and a end date",
+    ...                      entryintoforce=datetime.date(2013,1,1),
+    ...                      expires=datetime.date(2013,12,31))
     >>> c.in_effect(datetime.date(2013,7,1))
     True
     >>> c.in_effect(datetime.date(2014,7,1))
     False
 
     """
-    def __init__(self, *args, **kwargs):
-        self.entryintoforce = None
-        self.expires = None
-        super(TemporalElement, self).__init__(*args, **kwargs)
+    # can't initialize these 2 fields, since they get serialized, and
+    # this clashes with test case files.
+    
+#     def __init__(self, *args, **kwargs):
+#         self.entryintoforce = None
+#         self.expires = None
+#         super(TemporalElement, self).__init__(*args, **kwargs)
 
     def in_effect(self, date=None):
         """Returns True if the object is in effect at *date*."""

@@ -90,9 +90,6 @@ class Main(unittest.TestCase):
         self.assertFalse(x.in_effect(date(2012,7,1)))
         self.assertTrue(x.in_effect(date(2013,7,1)))
         self.assertFalse(x.in_effect(date(2014,7,1)))
-        y = TemporalString("Hello") # test setting props after init
-        y.entryintoforce = date(2013,1,1)
-        y.expires = date(2014,1,1)
                                                         
     def test_ordinal(self):
         class OrdinalString(UnicodeElement, OrdinalElement): pass
