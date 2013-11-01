@@ -9,7 +9,8 @@ from __future__ import unicode_literals
 # idempotent), that is sort of unavoidable.
 
 import json, re, os, sqlite3
-from tempfile import mkstemp
+from tempfile import mkstemp, mkdtemp
+import shutil
 
 import pyparsing
 from rdflib import Graph, URIRef, RDFS, Literal
@@ -116,22 +117,26 @@ class Main(unittest.TestCase, FerendaTestCase):
         # Test 1: imagine that server has data in the default graph
         # and in one named graph
         rf = util.readfile
-        store = TripleStore.connect("FUSEKI", "", "")
-        # test 1.1: Get everything, assert that the result is a combo
-        store.get_serialized_file("out.nt") # no ctx, will result in 2 gets
-        self.assertEqual(mock_get.call_count, 2)
-        self.assertEqual(rf("test/files/triplestore/combinedgraph.nt"),
-                         rf("out.nt"))
-        # test 1.2: Get only namedgraph, assert that only that is returned
-        store.get_serialized_file("out.nt", context="namedgraph") # 1 get
-        self.assertEqual(rf("test/files/triplestore/namedgraph.nt"),
-                         rf("out.nt"))
-        self.assertEqual(mock_get.call_count, 3)
-        # test 1.3: Get everything in a different format
-        store.get_serialized_file("out.ttl", format="turtle") # results in 2 gets
-        self.assertEqualGraphs("test/files/triplestore/combinedgraph.ttl",
-                              "out.ttl")
-        self.assertEqual(mock_get.call_count, 5)
+        tmp = mkdtemp()
+        try:
+            store = TripleStore.connect("FUSEKI", "", "")
+            # test 1.1: Get everything, assert that the result is a combo
+            store.get_serialized_file(tmp+"/out.nt") # no ctx, will result in 2 gets
+            self.assertEqual(mock_get.call_count, 2)
+            self.assertEqual(rf("test/files/triplestore/combinedgraph.nt"),
+                             rf(tmp+"/out.nt"))
+            # test 1.2: Get only namedgraph, assert that only that is returned
+            store.get_serialized_file(tmp+"/out.nt", context="namedgraph") # 1 get
+            self.assertEqual(rf("test/files/triplestore/namedgraph.nt"),
+                             rf(tmp+"/out.nt"))
+            self.assertEqual(mock_get.call_count, 3)
+            # test 1.3: Get everything in a different format
+            store.get_serialized_file(tmp+"/out.ttl", format="turtle") # results in 2 gets
+            self.assertEqualGraphs("test/files/triplestore/combinedgraph.ttl",
+                                  tmp+"/out.ttl")
+            self.assertEqual(mock_get.call_count, 5)
+        finally:
+            shutil.rmtree(tmp)
                 
     @patch('requests.get', side_effect=canned(("200", "namedgraph.nt"),))
     def test_fuseki_get_serialized(self, mock_get):

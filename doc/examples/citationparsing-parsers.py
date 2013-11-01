@@ -6,7 +6,8 @@ from ferenda.elements.html import elements_from_soup
 from bs4 import BeautifulSoup
 
 doc = Mock()
-doc.body = elements_from_soup(BeautifulSoup(open("doc/examples/citationparsing-before.xhtml").read()).body)
+filedir = os.path.dirname(__file__) 
+doc.body = elements_from_soup(BeautifulSoup(open(filedir+"/../doc/examples/citationparsing-before.xhtml").read()).body)
 
 # begin
 from pyparsing import Word, nums

@@ -12,7 +12,6 @@ import six
 from ferenda import util
 from ferenda.compat import unittest, patch
 from ferenda.testutil import FerendaTestCase
-
 # This testcase tests those examples in the documentation that are
 # more unit-like and can run without downloading stuff from the
 # net. More integration-like tests are in integrationTestExamples (and
@@ -23,6 +22,8 @@ from ferenda.testutil import FerendaTestCase
 # from importing inside of the functions that use the code to work.
 from ferenda import elements, DocumentRepository, DocumentStore, TocCriteria
 from ferenda.decorators import managedparsing
+import ferenda.citationpatterns
+import ferenda.uriformats
 from bs4 import BeautifulSoup
 import requests
 from six.moves.urllib_parse import urljoin
@@ -39,42 +40,51 @@ class TestExamples(unittest.TestCase, FerendaTestCase):
             comparator = self.assertEqual
         comparator(want, got)
 
+    def setUp(self):
+        self.tempdir = tempfile.mkdtemp()
+        self.orig_cwd = os.getcwd()
+        os.chdir(self.tempdir)
+        
+    def tearDown(self):
+        os.chdir(self.orig_cwd)
+        shutil.rmtree(self.tempdir)
+
     def test_elementclasses(self):
         # setup w3standards.py -- modify sys.path?
-        self._test_pyfile("doc/examples/elementclasses.py",
-                          util.readfile("doc/examples/elementclasses-part.xhtml", "rb"),
+        self._test_pyfile(self.orig_cwd + "/doc/examples/elementclasses.py",
+                          util.readfile(self.orig_cwd + "/doc/examples/elementclasses-part.xhtml", "rb"),
                           self.assertEqualXML)
 
     def test_fsmparser_example(self):
-        self._test_pyfile("doc/examples/fsmparser-example.py",
-                          util.readfile("doc/examples/fsmparser-result.xml"),
+        self._test_pyfile(self.orig_cwd + "/doc/examples/fsmparser-example.py",
+                          util.readfile(self.orig_cwd + "/doc/examples/fsmparser-result.xml"),
                           self.assertEqualXML)
 
     def test_keyconcepts_attachments(self):
         with patch('requests.get'):
-            self._test_pyfile("doc/examples/keyconcepts-attachments.py")
+            self._test_pyfile(self.orig_cwd + "/doc/examples/keyconcepts-attachments.py")
 
     def test_keyconcepts_file(self):
-        self._test_pyfile("doc/examples/keyconcepts-file.py")
+        self._test_pyfile(self.orig_cwd + "/doc/examples/keyconcepts-file.py")
 
     def test_metadata(self):
-        self._test_pyfile("doc/examples/metadata.py",
-                          util.readfile("doc/examples/metadata-result.xml"),
+        self._test_pyfile(self.orig_cwd + "/doc/examples/metadata.py",
+                          util.readfile(self.orig_cwd + "/doc/examples/metadata-result.xml"),
                           self.assertEqualXML)
 
     def test_citationparsing_urls(self):
-        self._test_pyfile("doc/examples/citationparsing-urls.py")
+        self._test_pyfile(self.orig_cwd + "/doc/examples/citationparsing-urls.py")
         
     def test_citationparsing_parsers(self):
-        self._test_pyfile("doc/examples/citationparsing-parsers.py",
-                          util.readfile("doc/examples/citationparsing-after.xhtml"),
+        self._test_pyfile(self.orig_cwd + "/doc/examples/citationparsing-parsers.py",
+                          util.readfile(self.orig_cwd + "/doc/examples/citationparsing-after.xhtml"),
                           self.assertEqualXML)
         
     def test_citationparsing_custom(self):
-        self._test_pyfile("doc/examples/citationparsing-custom.py")
+        self._test_pyfile(self.orig_cwd + "/doc/examples/citationparsing-custom.py")
 
     def test_composite(self):
-        self._test_pyfile("doc/examples/patents.py")
+        self._test_pyfile(self.orig_cwd + "/doc/examples/patents.py")
 
     def test_toc(self):
-        self._test_pyfile("doc/examples/toc.py")
+        self._test_pyfile(self.orig_cwd + "/doc/examples/toc.py")

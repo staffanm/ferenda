@@ -1460,9 +1460,10 @@ class Generate(RepoTester):
     def test_custom_sparql(self):
         # test with a custom SPARQL CONSTRUCT query in the current
         # directory. construct_annotations should use that one
-        shutil.copy2("ferenda/res/sparql/annotations.rq", "myquery.rq")
+        queryfile = self.datadir + os.sep + "myquery.rq"
+        shutil.copy2("ferenda/res/sparql/annotations.rq", queryfile)
         # should go OK, ie no boom
-        tree = self._generate_complex(sparql="myquery.rq")
+        tree = self._generate_complex(sparql=queryfile)
         os.unlink(self.repo.store.generated_path("a"))
         # but try it with a non-existing file and it should go boom
         with self.assertRaises(ValueError):
@@ -1474,7 +1475,8 @@ class Generate(RepoTester):
         # test with a custom xslt in the current
         # directory. setup_transform_templates should copy this over
         # all the stuff in res/xsl to a temp directory, then do stuff.
-        with open("mystyle.xsl", "w") as fp:
+        xslfile = self.datadir + os.sep + "mystyle.xsl"
+        with open(xslfile, "w") as fp:
             # note that mystyle.xsl must depend on the systemwide base.xsl
             fp.write("""<?xml version="1.0" encoding="utf-8"?>
 <xsl:stylesheet version="1.0"
@@ -1512,7 +1514,7 @@ class Generate(RepoTester):
   <xsl:template match="@*|node()" mode="toc"/>
   
 </xsl:stylesheet>""")
-        tree = self._generate_complex("mystyle.xsl")
+        tree = self._generate_complex(xslfile)
         divs = tree.findall(".//p[@class='div']")
         self.assertEqual(4,len(divs))
         
@@ -1838,7 +1840,7 @@ class News(RepoTester):
         # test_toc above)
         with patch("ferenda.documentrepository.Transformer"):
             self.repo.news()
-    
+
     def test_criteria(self):
         criteria = self.repo.news_criteria()
         self.assertEqual(len(criteria),1)
@@ -2027,6 +2029,32 @@ class News(RepoTester):
         self.assertEqual(link.get("href"), linksrc)
         self.assertEqual(link.get("type"),'application/rdf+xml')
 
+    def test_custom_criteria(self):
+        # only include entries whose title is an odd number of characters
+        # sort them by length of title
+        from ferenda import NewsCriteria
+        c = NewsCriteria("custom", "Custom criteria",
+                         selector = lambda x: len(x.title) % 2,
+                         key = lambda x: len(x.title))
+        allentries = []
+        for i in range(1,6):
+            e = DocumentEntry()
+            # "A", "AB", "ABC", "ABCD", "ABCDE"
+            e.title = "".join([chr(x) for x in range(65,65+i)])
+            allentries.append(e)
+
+        # this is a simplified version of the logic in DocumentRepository.news
+        for entry in allentries:
+            if c.selector(entry):
+                c.entries.append(entry)
+        sortedentries  = sorted(c.entries, key=c.key, reverse=True)
+
+        self.assertEqual(['ABCDE', 'ABC', 'A'],
+                         [e.title for e in sortedentries])
+        
+
+    
+            
 
 class Storage(RepoTester):
 

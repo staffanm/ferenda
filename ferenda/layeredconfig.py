@@ -5,6 +5,7 @@ import datetime
 import ast
 import logging
 import itertools
+import tempfile
 from ferenda.compat import OrderedDict
 from six.moves import configparser
 from six import text_type as str
@@ -66,10 +67,12 @@ class LayeredConfig(object):
        Example::
 
            >>> defaults = {'parameter': 'foo', 'other': 'default'}
-           >>> with open("test.ini", "w") as fp:
+           >>> dir = tempfile.mkdtemp()
+           >>> inifile = dir + os.sep + "test.ini"
+           >>> with open(inifile, "w") as fp:
            ...     res = fp.write("[__root__]\\nparameter = bar")
            >>> argv = ['--parameter=baz']
-           >>> conf = LayeredConfig(defaults, "test.ini", argv)
+           >>> conf = LayeredConfig(defaults, inifile, argv)
            >>> conf.parameter == 'baz'
            True
            >>> conf.other == 'default'
@@ -77,11 +80,12 @@ class LayeredConfig(object):
            >>> conf.parameter = 'changed'
            >>> conf.other = 'also changed'
            >>> LayeredConfig.write(conf)
-           >>> with open("test.ini") as fp:
+           >>> with open(inifile) as fp:
            ...     res = fp.read()
            >>> res == '[__root__]\\nparameter = changed\\nother = also changed\\n\\n'
            True
-
+           >>> os.unlink(inifile)
+           >>> os.rmdir(dir)
     """
 
     def __init__(self, defaults=None, inifile=None, commandline=None, cascade=False):

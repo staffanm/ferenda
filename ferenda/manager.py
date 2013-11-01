@@ -20,6 +20,8 @@ import inspect
 import logging
 import json
 import mimetypes
+import shutil
+import tempfile
 from ast import literal_eval
 from datetime import datetime
 import xml.etree.cElementTree as ET
@@ -1464,17 +1466,22 @@ def _select_triplestore(sitename, log, verbose=False):
 
     # 3. RDFLib + SQLite
     try:
-        t = TripleStore.connect("SQLITE", "test.sqlite", "ferenda")
+        tmp = tempfile.mkdtemp()
+        
+        t = TripleStore.connect("SQLITE", tmp+os.sep+"test.sqlite", "ferenda")
         if verbose:
             log.info("SQLite-backed RDFLib triplestore seems to work")
         return ('SQLITE', 'data/ferenda.sqlite', 'ferenda')
     except ImportError as e:
         if verbose:
             log.info("...SQLite not available: %s" % e)
+    finally:
+        shutil.rmtree(tmp)
 
     # 4. RDFLib + Sleepycat
     try:
-        t = TripleStore.connect("SLEEPYCAT", "test.db", "ferenda")
+        tmp = tempfile.mkdtemp()
+        t = TripleStore.connect("SLEEPYCAT", tmp+os.sep+"test.db", "ferenda")
         # No boom?
         if verbose:
             log.info("Sleepycat-backed RDFLib triplestore seems to work")
@@ -1482,6 +1489,8 @@ def _select_triplestore(sitename, log, verbose=False):
     except ImportError as e:
         if verbose:
             log.info("...Sleepycat not available: %s" % e)
+    finally:
+        shutil.rmtree(tmp)
 
     log.info("No usable triplestores, the actions 'relate', 'generate' and 'toc' won't work")
     return (None, None, None)

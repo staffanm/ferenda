@@ -5,6 +5,7 @@ class Test(object):
     store = DocumentStore(datadir="data/base")
 
     def do(self, basefile):
+        util.ensure_dir(self.store.downloaded_path(basefile))
 # begin path
         path = self.store.downloaded_path(basefile)
         with open(path, mode="wb") as fp:

@@ -458,7 +458,7 @@ class DocumentStore(object):
         """
         return self.path(basefile, 'entries', '.json', version)
 
-    def intermediate_path(self, basefile, version=None):
+    def intermediate_path(self, basefile, version=None, attachment=None):
         """Get the full path for the main intermediate file for the given
         basefile (and optionally archived version).
 
@@ -466,10 +466,12 @@ class DocumentStore(object):
         :type  basefile: str
         :param  version: Optional. The archived version id
         :type   version: str
+        :param attachment: Optional. Any associated file created or retained
+                           in the intermediate step
         :returns: The full filesystem path
         :rtype:   str
         """
-        return self.path(basefile, 'intermediate', '.xml', version)
+        return self.path(basefile, 'intermediate', '.xml', version, attachment)
 
     def parsed_path(self, basefile, version=None, attachment=None):
         """Get the full path for the parsed file for the given

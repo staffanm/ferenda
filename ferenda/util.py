@@ -22,6 +22,7 @@ from ast import literal_eval
 import six
 from six.moves.urllib_parse import urlsplit, urlunsplit
 from six import text_type as str
+from six import binary_type as bytes
 
 
 from . import errors
@@ -76,14 +77,7 @@ def robust_rename(old, new):
     # print "robust_rename: %s -> %s" % (old,new)
     ensure_dir(new)
     if os.path.exists(new):
-        # try:
         os.unlink(new)
-        # except WindowsError:
-        #    print "Caught WindowsError, sleeping"
-        #    import time
-        #    time.sleep(1)
-        #    os.unlink(new)
-    # os.rename may fail across file systems
     try:
         shutil.move(old, new)
     except IOError:
@@ -175,7 +169,9 @@ def split_numalpha(s):
 # util.Process
 
 
-def runcmd(cmdline, require_success=False, cwd=None):
+def runcmd(cmdline, require_success=False, cwd=None,
+           cmdline_encoding=None,
+           output_encoding="utf-8"):
     """Run a shell command, wait for it to finish and return the results.
 
     :param cmdline: The full command line (will be passed through a shell)
@@ -186,29 +182,18 @@ def runcmd(cmdline, require_success=False, cwd=None):
     :returns: The returncode, all stdout output, all stderr output
     :rtype: tuple
     """
-    cmdline_needs_encoding = False  # not needed on mac, maybe on other platforms?
-    if isinstance(cmdline, str) and cmdline_needs_encoding:
-        # FIXME: How do we detect the proper encoding? Using
-        # sys.stdout.encoding gives 'cp850' on windows, which is not
-        # what xsltproc expects
-        coding = 'utf-8' if sys.stdin.encoding == 'UTF-8' else 'iso-8859-1'
-        cmdline = cmdline.encode(coding)
+    if cmdline_encoding:
+        cmdline = cmdline.encode(cmdline_encoding)
 
     p = subprocess.Popen(
         cmdline, cwd=cwd, shell=True,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     (stdout, stderr) = p.communicate()
     ret = p.returncode
-    # print "runcmd '%s...': %s, '%s...', '%s...'" % (cmdline[:15], ret, stdout[:15], stderr[:15])
-    if sys.stdout.encoding:
-        enc = sys.stdout.encoding
-    else:
-        enc = locale.getpreferredencoding()
 
-    if isinstance(stdout, str):
-        stdout = stdout.decode(enc)
-    if isinstance(stderr, str):
-        stderr = stderr.decode(enc)
+    if output_encoding:
+        stdout = stdout.decode(output_encoding)
+        stderr = stderr.decode(output_encoding)
 
     if (require_success and ret != 0):
         # FIXME: ExternalCommandError should have fields for cmd and
@@ -302,7 +287,7 @@ def replace_if_different(src, dst, archivefile=None):
         # print "old file %s didn't exist" % dst
         robust_rename(src, dst)
         return True
-    elif not filecmp.cmp(src, dst):
+    elif not filecmp.cmp(src, dst, shallow=False):
         # print "old file %s different from new file %s" % (dst,src)
         if archivefile:
             robust_rename(dst, archivefile)
@@ -332,11 +317,13 @@ doesn't require that the directory of *dst* exists beforehand.
     if not os.path.exists(dest):
         ensure_dir(dest)
         shutil.copy2(src, dest)
+        return True
     elif not filecmp.cmp(src, dest):
         os.unlink(dest)
         shutil.copy2(src, dest)
+        return True
     else:
-        pass
+        return False
 
 # util.File
 
@@ -478,15 +465,6 @@ def extract_text(html, start, end, decode_entities=True, strip_tags=True):
         tags = re.compile("</?\w+>")
         text = tags.sub('', text)
     return text
-
-
-# util.string
-def md5sum(filename):
-    """Returns the md5sum of the contents of *filename*."""
-    c = hashlib.md5()
-    with open(filename, 'rb') as fp:
-        c.update(fp.read())
-    return c.hexdigest()
 
 
 def merge_dict_recursive(base, other):

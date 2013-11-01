@@ -39,7 +39,7 @@ class PDFDocumentRepository(DocumentRepository):
 
         d = Describer(doc.meta, doc.uri)
         d.rdftype(self.rdf_type)
-        d.value(self.ns['prov']['wasGeneratedBy'], self.qualified_class_name())
+        d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
 
         return doc
 
