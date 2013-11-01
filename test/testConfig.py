@@ -255,12 +255,17 @@ jsfiles = ['default.js','modernizr.js']
     def test_typed_commandline_cascade(self):
         # the test here is that _load_commandline must use _type_value property.
         defaults = {'forceparse':True,
+                    'lastdownload':datetime,
                     'mymodule': {}}
         cmdline = ['--mymodule-forceparse=False']
         cfg = LayeredConfig(defaults=defaults, commandline=cmdline, cascade=True)
         subconfig = getattr(cfg, 'mymodule')
         self.assertIs(type(subconfig.forceparse), bool)
         self.assertEqual(subconfig.forceparse, False)
+        # test typed config values that have no actual value
+        
+        self.assertEqual(cfg.lastdownload, None)
+        self.assertEqual(subconfig.lastdownload, None)
         
 
     def test_layered(self):

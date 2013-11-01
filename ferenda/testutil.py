@@ -84,7 +84,7 @@ this class, ie::
             if len(in_second) > 0:
                 msg = "%s unexpected triples were found\n" % len(in_second) + msg
             msg = "%r != %r\n" % (want, got) + msg
-            self.fail(msg)
+            return self.fail(msg)
 
     def assertAlmostEqualDatetime(self, datetime1, datetime2, delta=1):
         """Assert that two datetime objects are reasonably equal.
@@ -191,7 +191,7 @@ this class, ie::
             got_lines = [x + "\n" for x in c14nize(got_tree).split("\n")]
             diff = unified_diff(want_lines, got_lines, "want.xml", "got.xml")
             msg = "".join(diff) + "\n\nERRORS:" + "\n".join(errors)
-            raise AssertionError(msg)
+            return self.fail(msg)
 
     def assertEqualDirs(self, want, got, suffix=None, filterdir="entries"):
         """Assert that two directory trees contains identical files

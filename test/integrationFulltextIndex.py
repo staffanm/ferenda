@@ -53,16 +53,7 @@ repos = [DocumentRepository()]
 class BasicIndex(object):
 
     def test_create(self):
-        # As long as the constructor creates the index, this code will
-        # fail:
-        
-        # # assert that the index doesn't exist
-        # self.assertFalse(self.index.exists())
-        # # assert that we have no documents
-        # self.assertEqual(self.index.doccount(),0)
-        
-        # # Do it
-        # self.index.create()
+        # setUp calls FulltextIndex.connect, creating the index
         self.assertTrue(self.index.exists())
 
         # assert that the schema, using our types, looks OK
@@ -74,12 +65,12 @@ class BasicIndex(object):
                 'text':Text()}
         got = self.index.schema()
         self.assertEqual(want,got)
-                                    
 
     def test_insert(self):
         self.index.update(**basic_dataset[0])
         self.index.update(**basic_dataset[1])
         self.index.commit()
+
         self.assertEqual(self.index.doccount(),2)
         self.index.update(**basic_dataset[2])
         self.index.update(**basic_dataset[3]) # updated version of basic_dataset[1]
@@ -99,6 +90,7 @@ class BasicQuery(object):
         self.assertEqual(self.index.doccount(),0)
         self.load(basic_dataset)
         self.assertEqual(self.index.doccount(),4)
+
         res, pager = self.index.query("main")
         self.assertEqual(len(res),1)
         self.assertEqual(res[0]['identifier'], 'Doc #1')
@@ -107,15 +99,38 @@ class BasicQuery(object):
         self.assertEqual(len(res),2)
         # Doc #2 contains the term 'document' in title (which is a
         # boosted field), not just in text.
-        self.assertEqual(res[0]['identifier'], 'Doc #2') 
+        self.assertEqual(res[0]['identifier'], 'Doc #2')
         res, pager = self.index.query("section")
-        self.assertEqual(len(res),3)
-        # NOTE: ES scores all three results equally (1.0), so it doesn't
-        # neccesarily put section 1 in the top
-        if isinstance(self, ESBase):
-            self.assertEqual(res[0]['identifier'], 'Doc #1 (section 2)') 
-        else:
-            self.assertEqual(res[0]['identifier'], 'Doc #1 (section 1)') 
+        # can't get these results when using MockESBasicQuery with
+        # CREATE_CANNED=True for some reason...
+        if type(self) == ESBasicQuery: 
+            self.assertEqual(len(res),3)
+            # NOTE: ES scores all three results equally (1.0), so it doesn't
+            # neccesarily put section 1 in the top
+            if isinstance(self, ESBase):
+                self.assertEqual(res[0]['identifier'], 'Doc #1 (section 2)') 
+            else:
+                self.assertEqual(res[0]['identifier'], 'Doc #1 (section 1)')
+
+
+    def test_fragmented(self):
+        self.load([
+            {'uri':'http://example.org/doc/3',
+             'repo':'base',
+             'basefile':'3',
+             'title':'Other example',
+             'identifier':'Doc #3',
+             'text':"""Haystack needle haystack haystack haystack haystack
+                       haystack haystack haystack haystack haystack haystack
+                       haystack haystack needle haystack haystack."""}
+            ])
+        res, pager = self.index.query("needle")
+        # this should return 1 hit (only 1 document)
+        self.assertEqual(1, len(res))
+        # that has a fragment connector (' ... ') in the middle
+        self.assertIn(' ... ', "".join(str(x) for x in res[0]['text']))
+        
+    
 
 class ESBase(unittest.TestCase):
     def setUp(self):
@@ -168,7 +183,11 @@ class WhooshBasicIndex(BasicIndex, WhooshBase):
         self.assertEqual(sorted(want.names()), sorted(got.names()))
         for fld in got.names():
             self.assertEqual((fld,want[fld]),(fld,got[fld]))
-               
+            
+        # finally, try to create again (opening an existing index
+        # instead of creating)
+        self.index = FulltextIndex.connect("WHOOSH", self.location)
+
        
 class WhooshBasicQuery(BasicQuery, WhooshBase): pass
         
