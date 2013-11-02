@@ -25,7 +25,7 @@ import tempfile
 from ast import literal_eval
 from datetime import datetime
 import xml.etree.cElementTree as ET
-from ferenda.compat import OrderedDict
+from ferenda.compat import OrderedDict, MagicMock
 from wsgiref.simple_server import make_server
 from wsgiref.util import FileWrapper
 
@@ -1354,7 +1354,8 @@ def _preflight_check(log, verbose=False):
     success = True
     if sys.version_info < pythonver:
         log.error("ERROR: ferenda requires Python %s or higher, you have %s" %
-              (".".join(pythonver), sys.version.split()[0]))
+                  (".".join([str(x) for x in pythonver]),
+                   sys.version.split()[0]))
         success = False
     else:
         if verbose:
@@ -1367,6 +1368,7 @@ def _preflight_check(log, verbose=False):
             version = getattr(m, '__version__', None)
             if isinstance(version, tuple):
                 version = ".".join([str(x) for x in version])
+            # print("version of %s is %s" % (mod, version))
             if not hasattr(m, '__version__'):
                 log.warning("Module %s has no version information,"
                             "it might be older than required" % mod)
@@ -1381,13 +1383,17 @@ def _preflight_check(log, verbose=False):
                         (mod, version, ver))
             else:
                 if verbose:
-                    print("Module %s OK" % mod)
+                    log.info("Module %s OK" % mod)
         except ImportError:
             if required:
                 log.error("Missing module %s" % mod)
                 success = False
             else:
                 log.warning("Missing (non-essential) module %s" % mod)
+
+    # a thing needed by testManager.Setup.test_preflight
+    if isinstance(__import__, MagicMock) and __import__.side_effect is not None:
+        __import__.side_effect = None
 
     # 3: Check binaries
     for (cmd, arg) in binaries:
@@ -1505,7 +1511,7 @@ def _select_fulltextindex(log, verbose=False):
             resp = requests.get(fulltextindex)
             resp.raise_for_status()
             if verbose:
-                log.info("Elasticsearch server responding at %s" % triplestore)
+                log.info("Elasticsearch server responding at %s" % fulltextindex)
             return('ELASTICSEARCH', fulltextindex)
         except (requests.exceptions.HTTPError,
                 requests.exceptions.ConnectionError) as e:

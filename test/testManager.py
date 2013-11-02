@@ -26,6 +26,7 @@ from six.moves import configparser, reload_module
 builtins = "__builtin__" if six.PY2 else "builtins"
 
 from lxml import etree as ET
+import requests.exceptions
 
 from ferenda import manager, decorators, util, errors
 from ferenda import DocumentRepository, LayeredConfig, DocumentStore
@@ -386,6 +387,98 @@ class Setup(RepoTester):
                     self.assertFalse(os.path.exists(projdir))
                     self.assertTrue(input_mock.called)
 
+    def test_preflight(self):
+        log = Mock()
+        
+        # test 1: python too old
+
+        with patch('ferenda.manager.sys') as sysmock:
+            sysmock.version_info = (2,5,6,'final',0)
+            sysmock.version = sys.version
+            self.assertFalse(manager._preflight_check(log, verbose=True))
+            self.assertTrue(log.error.called)
+            log.error.reset_mock()
+
+        # test 2: modules are old / or missing
+        with patch(builtins + '.__import__') as importmock:
+            setattr(importmock.return_value, '__version__', '0.0.1')
+            self.assertFalse(manager._preflight_check(log, verbose=True))
+            self.assertTrue(log.error.called)
+            log.error.reset_mock()
+
+            importmock.side_effect = ImportError
+            self.assertFalse(manager._preflight_check(log, verbose=True))
+            self.assertTrue(log.error.called)
+            log.error.reset_mock()
+
+        # test 3: binaries are nonexistent or errors
+        with patch('ferenda.manager.subprocess.call') as callmock:
+            callmock.return_value = 127
+            self.assertFalse(manager._preflight_check(log, verbose=True))
+            self.assertTrue(log.error.called)
+            log.error.reset_mock()
+
+            callmock.side_effect = OSError
+            self.assertFalse(manager._preflight_check(log, verbose=True))
+            self.assertTrue(log.error.called)
+            log.error.reset_mock()
+            
+    def test_select_triplestore(self):
+        log = Mock()
+        # first manipulate requests.get to give the impression that
+        # fuseki or sesame either is or isn't available
+        with patch('ferenda.manager.requests.get') as mock_get:
+            r = manager._select_triplestore("sitename", log, verbose=True)
+            self.assertEqual("FUSEKI", r[0])
+            
+            mock_get.side_effect = requests.exceptions.HTTPError
+            r = manager._select_triplestore("sitename", log, verbose=True)
+            self.assertNotEqual("FUSEKI", r[0])
+
+            def get_sesame(url):
+                if not 'openrdf-sesame' in url:
+                    raise requests.exceptions.HTTPError
+                resp = Mock()
+                resp.text = "ok"
+                return resp
+
+            mock_get.side_effect = get_sesame
+            r = manager._select_triplestore("sitename", log, verbose=True)
+            self.assertEqual("SESAME", r[0])
+
+            mock_get.side_effect = requests.exceptions.HTTPError
+            r = manager._select_triplestore("sitename", log, verbose=True)
+            self.assertNotEqual("SESAME", r[0])
+
+            # all request.get calls still raises HTTP error
+            with patch('ferenda.manager.TripleStore.connect') as mock_connect:
+                r = manager._select_triplestore("sitename", log, verbose=True)
+                self.assertEqual("SQLITE", r[0])
+                def connectfail(storetype, location, repository):
+                    if storetype == "SQLITE":
+                        raise ImportError("BOOM")
+                mock_connect.side_effect = connectfail
+                r = manager._select_triplestore("sitename", log, verbose=True)
+                self.assertNotEqual("SQLITE", r[0])
+
+                r = manager._select_triplestore("sitename", log, verbose=True)
+                self.assertEqual("SLEEPYCAT", r[0])
+                mock_connect.side_effect = ImportError
+                r = manager._select_triplestore("sitename", log, verbose=True)
+                self.assertEqual(None, r[0])
+                
+    def test_select_fulltextindex(self):
+        log = Mock()
+        # first manipulate requests.get to give the impression that
+        # elasticsearch either is or isn't available
+        with patch('ferenda.manager.requests.get') as mock_get:
+            r = manager._select_fulltextindex(log, verbose=True)
+            self.assertEqual("ELASTICSEARCH", r[0])
+            mock_get.side_effect = requests.exceptions.HTTPError
+
+            r = manager._select_fulltextindex(log, verbose=True)
+            self.assertEqual("WHOOSH", r[0])
+            
 
     def test_runsetup(self):
         with patch('ferenda.manager.sys.exit') as mockexit:
