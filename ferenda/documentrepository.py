@@ -1506,7 +1506,11 @@ parsed document path to that documents dependency file."""
                         pseudobasefile = "index"
                     path = repo.store.path(pseudobasefile, 'toc', '.html')
             if path:
-                return os.path.relpath(path, basedir)
+                relpath = os.path.relpath(path, basedir)
+                if os.sep == "\\":
+                    relpath = relpath.replace(os.sep, "/")
+                return relpath
+
             else:
                 return uri
         return transform

@@ -320,6 +320,7 @@ class WhooshIndex(FulltextIndex):
     def commit(self):
         if self._writer:
             self._writer.commit()
+            self._writer.close()
             if not isinstance(self._writer, whoosh.writing.BufferedWriter):
                 # A bufferedWriter can be used again after commit(), a regular writer cannot
                 self._writer = None

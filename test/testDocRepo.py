@@ -2291,8 +2291,8 @@ class Patch(RepoTester):
         patchdesc = """This is a longer patch description.
 
 It can span several lines."""
-        with open(descpath, "w") as fp:
-            fp.write(patchdesc)           
+        with open(descpath, "wb") as fp:
+            fp.write(patchdesc.encode())           
 
         result, desc = self.repo.patch_if_needed("123/a", self.sourcedoc)
         self.assertEqual(patchdesc, desc)

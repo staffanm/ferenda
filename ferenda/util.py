@@ -351,14 +351,15 @@ def link_or_copy(src, dst):
     ensure_dir(dst)
     if os.path.lexists(dst):
         os.unlink(dst)
-    if os.symlink:
+    if sys.platform == 'win32':
+        # windows python have no working sumlink
+        copy_if_different(src, dst)
+    else:
         # The semantics of symlink are not identical to copy. The
         # source must be relative to the dstination, not relative to
         # cwd at creation time.
         relsrc = os.path.relpath(src, os.path.dirname(dst))
         os.symlink(relsrc, dst)
-    else:
-        copy_if_different(src, dst)
 
 
 # util.string

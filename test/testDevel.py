@@ -62,16 +62,16 @@ class Main(unittest.TestCase):
         downloaded_path = store.downloaded_path(basefile)
         def my_download_single(self):
             # this function simulates downloading
-            with open(downloaded_path, "w") as fp:
+            with open(downloaded_path, "wb") as fp:
                 fp.write("""This is a file.
 It has been downloaded.
-""")
+""".encode())
         
         repo = DocumentRepository(datadir=tempdir)
-        with repo.store.open_downloaded(basefile, "w") as fp:
+        with repo.store.open_downloaded(basefile, "wb") as fp:
             fp.write("""This is a file.
 It has been patched.
-""")
+""".encode())
 
         d = Devel()
         globalconf = LayeredConfig({'datadir':tempdir,
@@ -93,10 +93,10 @@ It has been patched.
         self.assertIn("+It has been patched.", patchcontent)
 
         # test 2: Same, but with a multi-line desc
-        with repo.store.open_downloaded(basefile, "w") as fp:
+        with repo.store.open_downloaded(basefile, "wb") as fp:
             fp.write("""This is a file.
 It has been patched.
-""")
+""".encode())
         longdesc = """A longer comment
 spanning
 several lines"""
@@ -114,17 +114,17 @@ several lines"""
         # test 3: If intermediate file exists, patch that one
         intermediate_path = store.intermediate_path(basefile)
         util.ensure_dir(intermediate_path)
-        with open(intermediate_path, "w") as fp:
+        with open(intermediate_path, "wb") as fp:
             fp.write("""This is a intermediate file.
 It has been patched.
-""")
+""".encode())
         intermediate_path = store.intermediate_path(basefile)
         def my_parse(self, basefile=None):
             # this function simulates downloading
-            with open(intermediate_path, "w") as fp:
+            with open(intermediate_path, "wb") as fp:
                 fp.write("""This is a intermediate file.
 It has been processed.
-""")
+""".encode())
         with patch('ferenda.DocumentRepository.parse') as mock:
             mock.side_effect = my_parse
             patchpath = d.mkpatch("base", basefile, "Example patch")
@@ -152,7 +152,7 @@ class Parser(object):
     def parse(self, source):
         res = Body()
         for chunk in source:
-            res.append(Paragraph([str(len(chunk))]))
+            res.append(Paragraph([str(len(chunk.strip()))]))
         return res
         """)
 
@@ -182,7 +182,7 @@ And another.
     <str>22</str>
   </Paragraph>
   <Paragraph>
-    <str>13</str>
+    <str>12</str>
   </Paragraph>
 </Body>
         """.strip()+"\n"
@@ -192,13 +192,13 @@ And another.
         
     def test_construct(self):
         uri = "http://example.org/doc"
-        with open("testconstructtemplate.rq", "w") as fp:
+        with open("testconstructtemplate.rq", "wb") as fp:
             fp.write("""PREFIX dct: <http://purl.org/dc/terms/>
 
 CONSTRUCT { ?s ?p ?o . }
 WHERE { ?s ?p ?o .
         <%(uri)s> ?p ?o . }
-""")            
+""".encode())            
         g = Graph()
         g.bind("dct", str(DCT))
         g.add((URIRef(uri),
@@ -240,12 +240,12 @@ WHERE { ?s ?p ?o .
 
     def test_select(self):
         uri = "http://example.org/doc"
-        with open("testselecttemplate.rq", "w") as fp:
+        with open("testselecttemplate.rq", "wb") as fp:
             fp.write("""PREFIX dct: <http://purl.org/dc/terms/>
 
 SELECT ?p ?o
 WHERE { <%(uri)s> ?p ?o . }
-""")
+""".encode())
 
         result = """
 [
