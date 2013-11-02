@@ -35,14 +35,14 @@ from . import Trips, RPUBL
 from ferenda import DocumentEntry, DocumentStore
 from ferenda import TextReader, Describer
 from ferenda import decorators
-from ferenda import legaluri
+from ferenda.sources.legal.se import legaluri
 from ferenda import util, LayeredConfig
 from ferenda.elements import CompoundElement
 from ferenda.elements import OrdinalElement
 from ferenda.elements import TemporalElement
 from ferenda.elements import UnicodeElement
 from ferenda.errors import DocumentRemovedError, ParseError
-from ferenda.legalref import LegalRef, LinkSubject
+from ferenda.sources.legal.se.legalref import LegalRef, LinkSubject
 
 E = ElementMaker(namespace="http://www.w3.org/1999/xhtml")
 # Objektmodellen för en författning är uppbyggd av massa byggstenar
@@ -52,10 +52,9 @@ E = ElementMaker(namespace="http://www.w3.org/1999/xhtml")
 # Link-objekt mellan de vanliga unicodetextobjekten, dels då de kan
 # innehålla en punkt- eller nummerlista.
 #
-# Alla klasser ärver från antingen CompoundElement (som är en list
-# med lite extraegenskaper), UnicodeElement (som är en unicode med
-# lite extraegenskaper) eller MapElement (som är ett dict med lite
-# extraegenskaper).
+# Alla klasser ärver från antingen CompoundElement (som är en list med
+# lite extraegenskaper) eller UnicodeElement (som är en unicode med
+# lite extraegenskaper)
 #
 # De kan även ärva från TemporalElement om det är ett objekt som kan
 # upphävas eller träda ikraft (exv paragrafer och rubriker, men inte

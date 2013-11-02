@@ -1,0 +1,43 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix ex: <http://example.org/books/> .
+
+# From http://en.wikipedia.org/wiki/List_of_best-selling_books
+
+ex:A_Tale_of_Two_Cities a bibo:Book;
+    dct:title "A Tale of Two Cities";
+    dct:creator "Charles Dickens";
+    dct:issued "1859-04-30"^^xsd:date;
+    dct:publisher "Chapman & Hall" .
+
+ex:The_Lord_of_the_Rings a bibo:Book;
+    dct:title "The Lord of the Rings";
+    dct:creator "J. R. R. Tolkien";
+    dct:issued "1954-07-29"^^xsd:date;
+    dct:publisher "George Allen & Unwin" .
+
+ex:The_Little_Prince a bibo:Book;
+    dct:title "The Little Prince";
+    dct:creator "Antoine de Saint-Exupéry";
+    dct:issued "1943-01-01"^^xsd:date;
+    dct:publisher "Reynal & Hitchcock" .
+
+ex:The_Hobbit a bibo:Book;
+    dct:title "The Hobbit";
+    dct:creator "J. R. R. Tolkien";
+    dct:issued "1937-09-21"^^xsd:date;
+    dct:publisher "George Allen & Unwin" .
+
+ex:Dream_of_the_Red_Chamber a bibo:Book;
+    dct:title "Dream of the Red Chamber";
+    dct:creator "Cao Xueqin";
+    dct:issued "1791-01-01"^^xsd:date;
+    dct:publisher "Cheng Weiyuan & Gao E" .
+
+ex:And_Then_There_Were_None a bibo:Book;
+    dct:title "And Then There Were None";
+    dct:creator "Agatha Christie";
+    dct:issued "1939-11-06"^^xsd:date;
+    dct:publisher "Collins Crime Club" .

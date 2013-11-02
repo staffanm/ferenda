@@ -121,6 +121,9 @@ indextype         Any of the supported types: 'WHOOSH' or    'WHOOSH'
                   'ELASTICSEARCH'. See
 		  :ref:`external-fulltext`.
 indexlocation     The location of the fulltext index         'data/whooshindex'
+republishsource   Whether the Atom files should contain      False
+                  links to the original, unparsed, source
+		  documents
 combineresources  Whether to combine and minify all css and  False
                   js files into a single file each
 cssfiles          A list of all required css files           ['http://fonts.googleapis.com/css?family=Raleway:200,100',

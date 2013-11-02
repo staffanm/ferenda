@@ -97,18 +97,15 @@ class DocumentEntry(object):
             self.title = None
             self.summary = None
             self.url = None
-            self.content = None
             if path:
                 self._path = path
+            # Content src="...": A link to the actual document, or the
+            # content inline (Source or refined version?)
+            self.content = {}
+            # Link rel="alternate": The metadata for this document (and
+            # included resources)
+            self.link = {}
 
-        # Content src="...": A link to the actual document, or the
-        # content inline (Source or refined version?)
-        self.content = {'src': None, 'type': None, 'markup': None,
-                        'hash': None}
-
-        # Link rel="alternate": The metadata for this document (and
-        # included resources)
-        self.link = {'href': None, 'type': None, 'length': None, 'hash': None}
 
     def __repr__(self):
         return '<%s id=%s>' % (self.__class__.__name__, self.id)
@@ -148,10 +145,17 @@ with.
             mimetype = self.guess_type(filename)
         self.content['type'] = mimetype
         if inline:
+            # there's a difference between actual mimetype and
+            # mimetype-as-type-in-atom.
+            if mimetype == "application/html+xml":
+                mimetype = "xhtml"
             assert mimetype == 'xhtml', "Can't inline non-xhtml content"
             with open(filename) as fp:
                 self.content['markup'] = fp.read()
+            self.content['src'] = None
+            self.content['hash'] = None
         else:
+            self.content['markup'] = None
             self.content['src'] = url
             self.content['hash'] = "md5:%s" % self.calculate_md5(filename)
 

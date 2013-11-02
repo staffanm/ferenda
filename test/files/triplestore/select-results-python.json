@@ -1,0 +1,8 @@
+[
+    {"issued": "1939-11-06",
+     "uri": "http://example.org/books/And_Then_There_Were_None",
+     "title": "And Then There Were None"},
+    {"issued": "1859-04-30",
+     "uri": "http://example.org/books/A_Tale_of_Two_Cities",
+     "title": "A Tale of Two Cities"}
+]

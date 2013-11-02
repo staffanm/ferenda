@@ -1,20 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import sys, os
-from ferenda.compat import unittest
+import sys, os, datetime
+from ferenda.compat import unittest, Mock, MagicMock, patch
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-
-try:
-    # assume we're on py3.3 and fall back if not
-    from unittest.mock import Mock, MagicMock, patch
-except ImportError:
-    from mock import Mock, MagicMock, patch
 
 from ferenda import DocumentRepository, Document
 from ferenda.errors import DocumentRemovedError, ParseError
 # SUT
-from ferenda.decorators import timed, parseifneeded, render, handleerror, makedocument
+from ferenda.decorators import timed, parseifneeded, render, handleerror, makedocument, recordlastdownload, downloadmax
 
 class Decorators(unittest.TestCase):
 
@@ -99,8 +93,10 @@ class Decorators(unittest.TestCase):
 
         mockrepo.store.distilled_path.return_value = "distilled_path.xhtml"
         mockrepo.get_globals.return_value = {'symbol table':'fake'}
-        mockdoc.meta = MagicMock()
-        mockdoc.body = []
+        mockdoc.meta = MagicMock() # need Magicmock which supports magic funcs like __iter__
+        bodypart = MagicMock()
+        bodypart.meta  = MagicMock()
+        mockdoc.body = [bodypart]
         mockdoc.meta.__iter__.return_value = []
         mockdoc.uri = "http://example.org/doc"
         with patch('ferenda.util.ensure_dir', return_value=True):
@@ -192,3 +188,36 @@ class Decorators(unittest.TestCase):
         doc = testfunc(DocumentRepository(),"base/file")
         self.assertIsInstance(doc,Document)
         self.assertEqual(doc.basefile, "base/file")
+
+    def test_recordlastdownload(self):
+        @recordlastdownload
+        def testfunc(repo):
+            pass
+        mockrepo = Mock()
+        with patch('ferenda.decorators.LayeredConfig.write') as mockconf:
+            testfunc(mockrepo)
+            # check that config.lastdownload has been set to a datetime
+            self.assertIsInstance(mockrepo.config.lastdownload,
+                                  datetime.datetime)
+            # and that LayeredConfig.write has been called
+            self.assertTrue(mockconf.called)
+        
+    def test_downloadmax(self):
+        @downloadmax
+        def testfunc(repo, source):
+            for x in range(100):
+                yield x
+        mockrepo = Mock()
+        mockrepo.config.downloadmax = None
+        self.assertEqual(100, len(list(testfunc(mockrepo, None))))
+        
+        os.environ["FERENDA_DOWNLOADMAX"] = "10"
+        self.assertEqual(10, len(list(testfunc(mockrepo, None))))
+        
+        del os.environ["FERENDA_DOWNLOADMAX"]
+        mockrepo.config.downloadmax = 20
+        self.assertEqual(20, len(list(testfunc(mockrepo, None))))
+        
+            
+            
+

@@ -10,6 +10,8 @@ import shutil
 import os
 from datetime import datetime
 
+import six
+
 from ferenda import DocumentRepository, util
 
 # SUT
@@ -24,14 +26,14 @@ class DocEntry(unittest.TestCase):
     "src": null, 
     "type": null
   }, 
-  "id": null, 
+  "id": "http://example.org/123/a", 
   "link": {
     "hash": null, 
     "href": null, 
     "length": null, 
     "type": null
   }, 
-  "orig_checked": "2013-03-27T20:46:37.925528", 
+  "orig_checked": "2013-03-27T20:46:37", 
   "orig_updated": null, 
   "orig_url": "http://source.example.org/doc/123/a", 
   "published": null, 
@@ -48,14 +50,14 @@ class DocEntry(unittest.TestCase):
     "src": null, 
     "type": "xhtml"
   }, 
-  "id": null, 
+  "id": "http://example.org/123/a", 
   "link": {
     "hash": null, 
     "href": null, 
     "length": null, 
     "type": null
   }, 
-  "orig_checked": "2013-03-27T20:46:37.925528", 
+  "orig_checked": "2013-03-27T20:46:37", 
   "orig_updated": "2013-03-27T20:59:42.325067", 
   "orig_url": "http://source.example.org/doc/123/a", 
   "published": null, 
@@ -80,15 +82,16 @@ class DocEntry(unittest.TestCase):
         d = DocumentEntry()
         self.assertIsNone(d.id) # same for .updated, .published,
                                 # .title, .summary, .url and .content
-        self.assertEqual(d.content, {'src':None, 'type':None, 'markup': None, 'hash':None})
-        self.assertEqual(d.link,   {'href':None, 'type':None, 'length': None, 'hash':None})
+        self.assertEqual(d.content, {})
+        self.assertEqual(d.link,   {})
 
         path = self.repo.store.documententry_path("123/b")
         d = DocumentEntry(path=path)
         self.assertIsNone(d.id) # same for .updated, .published,
                                 # .title, .summary, .url and .content
-        self.assertEqual(d.content, {'src':None, 'type':None, 'markup': None, 'hash':None})
-        self.assertEqual(d.link,   {'href':None, 'type':None, 'length': None, 'hash':None})
+        self.assertEqual(d.content, {})
+        self.assertEqual(d.link,   {})
+
 
     def test_load(self):
         path = self.repo.store.documententry_path("123/a")
@@ -96,19 +99,29 @@ class DocEntry(unittest.TestCase):
         with open(path, "w") as fp:
             fp.write(self.basic_json)
         d = DocumentEntry(path=path)
-        self.assertEqual(d.orig_checked, datetime(2013,3,27,20,46,37,925528))
+        self.assertEqual(d.orig_checked, datetime(2013,3,27,20,46,37))
         self.assertIsNone(d.orig_updated)
         self.assertEqual(d.orig_url,'http://source.example.org/doc/123/a')
+        self.assertEqual(d.id,'http://example.org/123/a')
+        self.assertEqual('<DocumentEntry id=http://example.org/123/a>', repr(d))
  
     def test_save(self):
         path = self.repo.store.documententry_path("123/a")
         d = DocumentEntry()
-        d.orig_checked = datetime(2013,3,27,20,46,37,925528)
+        d.orig_checked = datetime(2013,3,27,20,46,37)
         d.orig_url = 'http://source.example.org/doc/123/a'
         d.save(path=path)
 
         self.maxDiff = None
         self.assertEqual(self.d2u(util.readfile(path)), self.basic_json)
+
+    def test_save(self):
+        path = self.repo.store.documententry_path("123/x")
+        d = DocumentEntry()
+        d.title = six.StringIO("A file-like object, not a string")
+        with self.assertRaises(TypeError):
+            d.save(path=path)
+
 
     def test_modify(self):
         path = self.repo.store.documententry_path("123/a")
@@ -118,6 +131,7 @@ class DocEntry(unittest.TestCase):
 
         d = DocumentEntry(path=path)
         d.orig_updated = datetime(2013, 3, 27, 20, 59, 42, 325067)
+        d.id = "http://example.org/123/a"
         # do this in setUp?
         with open(self.datadir+"/xhtml","w") as f:
             f.write("<div>xhtml fragment</div>")
@@ -184,3 +198,4 @@ class DocEntry(unittest.TestCase):
         self.assertEqual(d.guess_type("test.html"), "text/html")
         self.assertEqual(d.guess_type("test.xhtml"),"application/html+xml")
         self.assertEqual(d.guess_type("test.bin"),  "application/octet-stream")
+

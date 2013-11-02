@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import unicode_literals, print_function
 
 import sys, os
 from ferenda.compat import unittest
@@ -15,19 +15,17 @@ import shutil
 import tempfile
 import time
 import calendar
+import json
+import copy
 
 import lxml.etree as etree
 from lxml.etree import XSLT
 from lxml.builder import ElementMaker
 import rdflib
+import requests.exceptions
 
-# import six
-try:
-    # assume we're on py3.3 and fall back if not
-    from unittest.mock import Mock, MagicMock, patch, call
-except ImportError:
-    from mock import Mock, patch, call
-# from requests.exceptions import HTTPError
+import six
+from ferenda.compat import Mock, MagicMock, patch, call
 from bs4 import BeautifulSoup
 import doctest
 
@@ -35,6 +33,7 @@ from ferenda import DocumentEntry, TocPageset, TocPage, \
     TocCriteria, Describer, LayeredConfig, TripleStore, FulltextIndex
 from ferenda.fulltextindex import WhooshIndex
 from ferenda.errors import *
+
 
 # The main system under test (SUT)
 from ferenda import DocumentRepository
@@ -46,11 +45,59 @@ from ferenda import util
 from ferenda.elements import serialize, Link
 
 class Repo(RepoTester):
-
     # TODO: Many parts of this class could be divided into subclasses
     # (like Generate, Toc, News, Storage and Archive already has)
 
     # class Repo(RepoTester)
+    def test_init(self):
+        # make sure self.ns is properly initialized
+        class StandardNS(DocumentRepository):
+            namespaces = ('rdf','dct')
+        d = StandardNS()
+        want = {'rdf':
+                rdflib.Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#'),
+                'dct':
+                rdflib.Namespace('http://purl.org/dc/terms/')}
+        self.assertEqual(want, d.ns)
+
+        class OwnNS(DocumentRepository):
+            namespaces = ('rdf',('ex', 'http://example.org/vocab'))
+        d = OwnNS()
+        want = {'rdf':
+                rdflib.Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#'),
+                'ex':
+                rdflib.Namespace('http://example.org/vocab')}
+        self.assertEqual(want, d.ns)
+
+    def test_setup_teardown(self):
+        defaults = {'example':'config',
+                    'setup': None,
+                    'teardown': None}
+
+        # It's possible that this is mock-able
+        class HasSetup(DocumentRepository):
+            @classmethod
+            def parse_all_setup(cls, config):
+                config.setup = "parse"
+        config = LayeredConfig(defaults)
+        HasSetup.setup("parse", config)
+        HasSetup.teardown("parse", config)
+        self.assertEqual(config.setup, "parse")
+        self.assertEqual(config.teardown, None)
+        
+        class HasTeardown(DocumentRepository):
+            relate_all_setup = None
+            
+            @classmethod
+            def relate_all_teardown(cls, config):
+                config.teardown = "relate"
+                
+        config = LayeredConfig(defaults)
+        HasTeardown.setup("relate", config)
+        HasTeardown.teardown("relate", config)
+        self.assertEqual(config.setup, None)
+        self.assertEqual(config.teardown, "relate")
+
     def test_dataset_uri(self):
         repo = DocumentRepository()
         self.assertEqual(repo.dataset_uri(), "http://localhost:8000/dataset/base")
@@ -141,6 +188,16 @@ class Repo(RepoTester):
             self.assertFalse(d.download())
         self.assertFalse(d.download_single.error.called)
         d.download_single.reset_mock()
+
+        # test5: basefile parameter
+        with patch('requests.get',return_value=mockresponse):
+            self.assertFalse(d.download("123/a"))
+
+        # test6: basefile parameter w/o document_url_template
+        d.document_url_template = None
+        with self.assertRaises(ValueError):
+            d.download("123/a")
+        
         
 
     def test_download_single(self):
@@ -242,7 +299,6 @@ class Repo(RepoTester):
                 if headers["If-none-match"] == etag:
                     resp.status_code=304
                     return resp
-
             # Then make sure the response contains appropriate headers
             headers = {}
             if last_modified:
@@ -257,8 +313,13 @@ class Repo(RepoTester):
             # And if needed, slurp content from a specified file
             content = None
             if url_location:
-                with open(url_location,"rb") as fp:
-                    content = fp.read()
+                if os.path.exists(url_location):
+                    with open(url_location,"rb") as fp:
+                        content = fp.read()
+                else:
+                    resp.status_code = 404
+                    resp.raise_for_status.side_effect = requests.exceptions.HTTPError
+                    resp.content = b'<h1>404 not found</h1>'
             resp.content = content
             resp.headers = headers
             return resp
@@ -383,6 +444,30 @@ class Repo(RepoTester):
                          util.readfile(self.datadir+"/base/downloaded/example.html"))
         mock_get.reset_mock()
 
+        # test8: 404 Not Found / catch something
+        url_location = "test/files/base/downloaded/non-existent"
+        with self.assertRaises(requests.exceptions.HTTPError):
+            d.download_if_needed("http://example.org/document",
+                                 "example")
+        mock_get.reset_mock()
+
+        # test9: ConnectionError
+        mock_get.side_effect = requests.exceptions.ConnectionError
+        self.assertFalse(d.download_if_needed("http://example.org/document",
+                                              "example",
+                                              sleep=0))
+        self.assertEqual(mock_get.call_count, 5)
+        mock_get.reset_mock()
+
+        # test10: RequestException
+        mock_get.side_effect = requests.exceptions.RequestException
+        with self.assertRaises(requests.exceptions.RequestException):
+            d.download_if_needed("http://example.org/document",
+                                 "example")
+        mock_get.reset_mock()
+
+        
+
 
     def test_remote_url(self):
         d = DocumentRepository()
@@ -458,6 +543,8 @@ class Repo(RepoTester):
         os.unlink(d.store.parsed_path("123/a"))
         os.unlink(d.store.distilled_path("123/a"))
 
+        # test3: parsing of a ill-formatted document without html section
+
     def test_soup_from_basefile(self):
         d = DocumentRepository(datadir=self.datadir)
         util.ensure_dir(d.store.downloaded_path("testbasefile"))
@@ -480,7 +567,6 @@ class Repo(RepoTester):
         os.unlink(d.store.downloaded_path("testbasefile"))
 
     def test_parse_document_from_soup(self):
-        parser = "lxml" if sys.version_info < (3,3) else "html.parser"
         d = DocumentRepository()
         doc = d.make_document("testbasefile")
         # test 1: default selector/filters
@@ -506,7 +592,7 @@ class Repo(RepoTester):
     </div>
   </body>
 </html>"""
-        soup = BeautifulSoup(testdoc,parser)
+        soup = BeautifulSoup(testdoc)
         d.parse_document_from_soup(soup,doc)
         #print("Defaults")
         #print(serialize(doc.body))
@@ -542,6 +628,22 @@ class Repo(RepoTester):
   </P>
 </Div>
 """)
+        # test 3: selector that do not match anything
+        d.parse_content_selector = "article"
+        with self.assertRaises(ParseError):
+            d.parse_document_from_soup(soup,doc)
+
+        # test 4: selector that matches more than one thing
+        d.parse_content_selector = "div"
+        d.parse_document_from_soup(soup,doc)
+
+        self.assertEqual(serialize(doc.body),"""<Div id="header">
+  <H1>
+    <str>Hello</str>
+  </H1>
+</Div>
+""")
+
 
     # class RenderXHTML(RepoTester) # maybe
     def _test_render_xhtml(self, body, want):
@@ -667,6 +769,11 @@ class Repo(RepoTester):
         dct:creator "Fred Bloggs"@en-GB;
         dct:issued "2013-05-10"^^xsd:date;
         owl:sameAs <http://example.org/s2> .
+
+<http://example.org/s2> dct:title "Same same but different" .
+       
+<http://localhost:8000/res/base/unlrelated> dct:title "Unrelated document" .
+        
         """)
         
         body = el.Body([el.Heading(['Toplevel heading'], level=1),
@@ -713,8 +820,12 @@ class Repo(RepoTester):
         content="Second section"
         property="dct:title"
         typeof="bibo:DocumentPart">
-      <span rel="owl:sameAs"
-            href="http://example.org/s2"/>
+      <span href="http://example.org/s2"
+            rel="owl:sameAs">
+        <span content="Same same but different"
+              property="dct:title"
+              xml:lang=""/>
+      </span>
       <span content="2"
             property="bibo:chapter"
             xml:lang=""/>
@@ -793,12 +904,61 @@ class Repo(RepoTester):
         self._test_render_xhtml(body, want)
 
 
+
+    def test_render_xhtml_head(self):
+        doc = self.repo.make_document('basefile')
+        headmeta = rdflib.Graph().parse(format='n3', data="""
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://localhost:8000/res/base/basefile> a bibo:Document;
+        dct:author <http://localhost:8000/people/fred> ;
+        dct:title "Document title"@en ;
+        dct:title "Document title (untyped)" ;
+        dct:identifier "Doc:1"@en ;
+        dct:issued "2013-10-17"^^xsd:date .
+
+<http://localhost:8000/people/fred> a foaf:Person;
+        foaf:name "Fred Bloggs"@en ;
+        dct:title "This doesn't make any sense" ;
+        dct:issued "2013-10-17"^^xsd:date .
+
+<http://localhost:8000/res/base/other> a bibo:Document;
+        dct:references <http://localhost:8000/res/base/basefile> .
+
+        """)
+        doc.meta += headmeta
+        doc.lang = None
+        
+        outfile = self.datadir + "/test.xhtml"
+        self.repo.render_xhtml(doc, outfile)
+        want = """<html xmlns="http://www.w3.org/1999/xhtml"
+                        xmlns:bibo="http://purl.org/ontology/bibo/"
+                        xmlns:dct="http://purl.org/dc/terms/">
+  <head about="http://localhost:8000/res/base/basefile">
+    <link href="http://localhost:8000/people/fred" rel="dct:author"></link>
+    <meta about="http://localhost:8000/people/fred" content="2013-10-17" datatype="xsd:date" property="dct:issued"></meta>
+    <meta about="http://localhost:8000/people/fred" content="This doesn't make any sense" property="dct:title" xml:lang=""></meta>
+    <link about="http://localhost:8000/people/fred" href="http://xmlns.com/foaf/0.1/Person" rel="rdf:type"></link>
+    <meta about="http://localhost:8000/people/fred" content="Fred Bloggs" property="foaf:name" xml:lang="en"></meta>
+    <meta content="Doc:1" property="dct:identifier" xml:lang="en"></meta>
+    <meta content="2013-10-17" datatype="xsd:date" property="dct:issued"></meta>
+    <link href="http://localhost:8000/res/base/other" rev="dct:references"></link>
+    <title property="dct:title" xml:lang="">Document title (untyped)</title>
+    <title property="dct:title">Document title</title>
+    <link href="http://purl.org/ontology/bibo/Document" rel="rdf:type"></link>
+  </head>      
+  <body about="http://localhost:8000/res/base/basefile"/>
+</html>"""
+        self.assertEqualXML(want, util.readfile(outfile, "rb"))
+        
+
     # FIXME: Move this test to a new test case file (testElements.py or even testElementsHtml.py)
     # class Elements(RepoTester)
     def test_elements_from_soup(self):
         from ferenda.elements import html
-        # see comment in documentrepository.soup_from_basefile
-        parser = "lxml" if sys.version_info < (3,3) else "html.parser"
         soup = BeautifulSoup("""<body>
 <h1>Sample</h1>
 <div class="main">
@@ -813,7 +973,7 @@ class Repo(RepoTester):
 <hr/>
 <a href="/">home</a> - <a href="/about">about</a>
 </div>
-</body>""",parser)
+</body>""")
         body = html.elements_from_soup(soup.body)
         # print("Body: \n%s" % serialize(body))
         result = html.Body([html.H1(["Sample"]),
@@ -833,6 +993,50 @@ class Repo(RepoTester):
 
         
     # class Relate(RepoTester)
+    @patch('ferenda.documentrepository.TripleStore')
+    def test_relate_all_setup(self, mock_store):
+        # so that list_basefiles_for finds something
+        util.writefile(self.datadir+"/base/distilled/1.rdf", "example")
+        config = LayeredConfig({'datadir': self.datadir,
+                                'url': 'http://localhost:8000/',
+                                'force': False,
+                                'storetype': 'a',
+                                'storelocation': 'b',
+                                'storerepository': 'c'})
+        self.assertTrue(self.repoclass.relate_all_setup(config))
+        self.assertTrue(mock_store.connect.called)
+        self.assertTrue(mock_store.connect.return_value.clear.called)
+        
+        # if triplestore dump is newer than all parsed files, nothing
+        # has happened since last relate --all and thus we shouldn't
+        # work at all (signalled by relate_all_setup returning False.
+        util.writefile(self.datadir+"/base/distilled/dump.nt", "example")
+        self.assertFalse(self.repoclass.relate_all_setup(config))
+
+    @patch('ferenda.documentrepository.TripleStore')
+    def test_relate_all_teardown(self, mock_store):
+        util.writefile(self.datadir+"/base/distilled/dump.nt", "example")
+        config = LayeredConfig({'datadir': self.datadir,
+                                'url': 'http://localhost:8000/',
+                                'force': False,
+                                'storetype': 'a',
+                                'storelocation': 'b',
+                                'storerepository': 'c'})
+        self.assertTrue(self.repoclass.relate_all_teardown(config))
+        self.assertTrue(mock_store.connect.called)
+        self.assertTrue(mock_store.connect.return_value.get_serialized_file.called)
+
+    def test_relate(self):
+        # the helper methods are called separately. this test only
+        # makes sure they are all called:
+        self.repo.relate_triples = Mock()
+        self.repo.relate_dependencies = Mock()
+        self.repo.relate_fulltext = Mock()
+        self.repo.relate("123/a")
+        self.assertTrue(self.repo.relate_triples.called)
+        self.assertTrue(self.repo.relate_dependencies.called)
+        self.assertTrue(self.repo.relate_fulltext.called)
+    
     def test_relate_fulltext(self):
         d = DocumentRepository(datadir=self.datadir,
                                indexlocation=self.datadir+os.sep+"index") # FIXME: derive from datadir
@@ -918,9 +1122,13 @@ class Repo(RepoTester):
         otherrepo = OtherRepo(datadir=self.datadir)
         repos = [self.repo,otherrepo]
         self.repo.relate_dependencies("root", repos)
+
+        # 3.1 do it again (to test adding to existing files)
+        self.repo.relate_dependencies("root", repos)
+
         # 4. Assert that
         #  4.1 self.repo.store.dependencies_path contains parsed_path('root')
-        dependencyfile = self.repo.store.parsed_path('root') + "\n"
+        dependencyfile = self.repo.store.parsed_path('root') + os.linesep
         self.assertEqual(util.readfile(self.repo.store.dependencies_path("res-a")),
                          dependencyfile)
 
@@ -931,217 +1139,78 @@ class Repo(RepoTester):
         self.assertEqual(2,
                          len(list(util.list_dirs(self.datadir, '.txt'))))
 
+
+    def test_status(self):
+        want  = """
+Status for document repository 'base' (ferenda.documentrepository.DocumentRepository)
+ download: None.
+ parse: None.
+ generated: None.
+""".strip()
+        builtins = "__builtin__" if six.PY2 else "builtins"
+        with patch(builtins+".print") as printmock:
+            self.repo.status()
+        got = "\n".join([x[1][0] for x in printmock.mock_calls])
+        self.assertEqual(want,got)
+
+        # test both status and get_status in one swoop.
+        for basefile in range(1,13):
+            util.writefile(self.repo.store.downloaded_path(str(basefile)),
+                           "downloaded %s" % basefile)
+        for basefile in range(1,9):
+            util.writefile(self.repo.store.parsed_path(str(basefile)),
+                           "parsed %s" % basefile)
+        for basefile in range(1,5):
+            util.writefile(self.repo.store.generated_path(str(basefile)),
+                           "generated %s" % basefile)
+
+        want  = """
+Status for document repository 'base' (ferenda.documentrepository.DocumentRepository)
+ download: 12, 11, 10... (9 more)
+ parse: 8, 7, 6... (5 more) Todo: 12, 11, 10... (1 more)
+ generated: 4, 3, 2... (1 more) Todo: 8, 7, 6... (1 more)
+""".strip()
+        builtins = "__builtin__" if six.PY2 else "builtins"
+        with patch(builtins+".print") as printmock:
+            self.repo.status()
+        got = "\n".join([x[1][0] for x in printmock.mock_calls])
+        self.assertEqual(want,got)
+
+    def test_tabs(self):
+        # base test - if using rdftype of foaf:Document, in that case
+        # we'll use .alias
+        self.assertEqual(self.repo.tabs(),
+                         [("base", "http://localhost:8000/dataset/base")])
+        self.repo.rdf_type = rdflib.Namespace("http://example.org/vocab#Report")
+        self.assertEqual(self.repo.tabs(),
+                         [("Report", "http://localhost:8000/dataset/base")])
+        
+        
 class Generate(RepoTester):
-    repo_a = """
-@prefix dct: <http://purl.org/dc/terms/> .
-@prefix : <http://example.org/repo/a/> .
-
-:1 a :FooDoc;
-   dct:title "The title of Document A 1";
-   dct:identifier "A1" .
-
-:1part a :DocumentPart;
-   dct:isPartOf :1;
-   dct:identifier "A1(part)" .
-
-:2 a :FooDoc;
-   dct:title "The title of Document A 2";
-   dct:identifier "A2";
-   dct:references :1 . 
-
-:2part1 a :DocumentPart;
-   dct:isPartOf :2;
-   dct:identifier "A2(part1)";
-   dct:references :1 . 
-
-:2part2 a :DocumentPart;
-   dct:isPartOf :2;
-   dct:identifier "A2(part2)";
-   dct:references <http://example.org/repo/a/1part> .
-
-:3 a :FooDoc;
-   dct:title "The title of Document A 3";
-   dct:identifier "A3" .
-"""
-    repo_b = """
-@prefix dct: <http://purl.org/dc/terms/> .
-@prefix a: <http://example.org/repo/a/> .
-@prefix : <http://example.org/repo/b/> .
-
-:1 a :BarDoc;
-   dct:title "The title of Document B 1";
-   dct:identifier "B1";
-   dct:references a:1 . 
-
-:1part a a:DocumentPart;
-   dct:isPartOf :1;
-   dct:identifier "B1(part)";
-   dct:references a:1 . 
-
-:2 a :BarDoc;
-   dct:title "The title of Document B 2";
-   dct:identifier "B2" .
-"""
-    # this is the graph we expect when querying for
-    # http://example.org/repo/a/1
-    annotations_a1 = """
-@prefix dct: <http://purl.org/dc/terms/> .
-@prefix : <http://example.org/repo/a/> .
-@prefix b: <http://example.org/repo/b/> .
-
-:1 a :FooDoc;
-   dct:title "The title of Document A 1";
-   dct:identifier "A1" ;
-   dct:isReferencedBy :2,
-                      :2part1,
-                      b:1,
-                      b:1part .
-
-:1part a :DocumentPart;
-    dct:isPartOf :1;
-    dct:identifier "A1(part)";
-    dct:isReferencedBy :2part2 .
-
-:2 a :FooDoc;
-    dct:references :1;
-    dct:title "The title of Document A 2";
-    dct:identifier "A2" .
-
-:2part1 a :DocumentPart;
-    dct:references :1;
-    dct:isPartOf :2;
-    dct:identifier "A2(part1)" .
-
-:2part2 a :DocumentPart;
-    dct:references :1part;
-    dct:isPartOf :2;
-    dct:identifier "A2(part2)" .
-
-b:1 a b:BarDoc;
-    dct:references :1;
-    dct:title "The title of Document B 1";
-    dct:identifier "B1" . 
-
-b:1part a :DocumentPart;
-    dct:isPartOf b:1;
-    dct:references :1;
-    dct:identifier "B1(part)" .
-"""
-
-    annotations_b1 = """
-@prefix dct: <http://purl.org/dc/terms/> .
-@prefix a: <http://example.org/repo/a/> .
-@prefix : <http://example.org/repo/b/> .
-
-:1 a :BarDoc;
-   dct:isReferencedBy :1part;
-   dct:title "The title of Document B 1";
-   dct:identifier "B1";
-   dct:references a:1 . 
-
-:1part a a:DocumentPart;
-   dct:isPartOf :1;
-   dct:identifier "B1(part)";
-   dct:references a:1 . 
-"""
 
     class TestRepo(DocumentRepository):
         alias = "test"
         
         def canonical_uri(self,basefile):
             return "http://example.org/repo/a/%s" % basefile
+
+    repoclass = TestRepo
             
-    
     def setUp(self):
-        self.datadir = tempfile.mkdtemp()
-        self.storetype = None
+        super(Generate, self).setUp() # sets up self.repo, self.datadir
         resources = self.datadir+os.sep+"rsrc"+os.sep+"resources.xml"
         util.ensure_dir(resources)
         shutil.copy2("%s/files/base/rsrc/resources.xml"%os.path.dirname(__file__),
                      resources)
 
-    def tearDown(self):
-        if self.storetype:
-            store = TripleStore.connect(storetype=self.repo.config.storetype,
-                                        location=self.repo.config.storelocation,
-                                        repository=self.repo.config.storerepository)
-            store.clear()
-            if self.repo.config.storetype == "SLEEPYCAT":
-                store.graph.close()
-        shutil.rmtree(self.datadir)
-        
-    def _load_store(self, repo):
-        store = TripleStore.connect(storetype=repo.config.storetype,
-                                    location=repo.config.storelocation,
-                                    repository=repo.config.storerepository)
-        store.add_serialized(self.repo_a, format="turtle")
-        store.add_serialized(self.repo_b, format="turtle")
-        if repo.config.storetype == "SLEEPYCAT":
-            store.graph.close()
-        # return store
-        
-    def _test_construct_annotations(self, repo):
-        want = rdflib.Graph()
-        want.parse(data=self.annotations_a1,format="turtle")
-        got = repo.construct_annotations("http://example.org/repo/a/1")
-        self.assertEqualGraphs(want, got, exact=True)
-
-    def _get_repo(self, storetype=None):
-        params = {'storetype':storetype,
-                  'datadir':self.datadir,
-                  'storerepository':'ferenda'}
-
-        self.storetype = None
-        if storetype == 'SQLITE':
-            params['storelocation'] = self.datadir+"/ferenda.sqlite"
-        elif storetype == 'SLEEPYCAT':
-            params['storelocation'] = self.datadir+"/ferenda.db"
-        elif storetype == 'FUSEKI':
-            params['storelocation'] = 'http://localhost:3030/'
-            params['storerepository'] = 'ds'
-        elif storetype == 'SESAME':
-            params['storelocation'] = 'http://localhost:8080/openrdf-sesame'
-        elif storetype == None:
-            del params['storetype']
-            del params['storerepository']
-            params['storelocation'] = None
-        else:
-            self.fail("Storetype %s not valid" % storetype)
-        return self.TestRepo(**params)
-            
-    def test_construct_annotations_sqlite(self):
-        self.repo = self._get_repo('SQLITE')
-        self._load_store(self.repo)
-        self._test_construct_annotations(self.repo)
-
-    @unittest.skipIf('SKIP_SLEEPYCAT_TESTS' in os.environ,
-                     "Skipping Sleepycat tests")    
-    def test_construct_annotations_sleepycat(self):
-        self.repo = self._get_repo('SLEEPYCAT')
-        self._load_store(self.repo)
-        self._test_construct_annotations(self.repo)
-
-    @unittest.skipIf('SKIP_FUSEKI_TESTS' in os.environ,
-                     "Skipping Fuseki tests")    
-    def test_construct_annotations_fuseki(self):
-        self.repo = self._get_repo('FUSEKI')
-        self._load_store(self.repo)
-        self._test_construct_annotations(self.repo)
-
-    @unittest.skipIf('SKIP_SESAME_TESTS' in os.environ,
-                     "Skipping Sesame tests")    
-    def test_construct_annotations_sesame(self):
-        self.repo = self._get_repo('SESAME')
-        self._load_store(self.repo)
-        self._test_construct_annotations(self.repo)
-
     def test_graph_to_annotation_file(self):
         testgraph = rdflib.Graph()
-        testgraph.parse(data=self.annotations_b1,format="turtle")
+        testgraph.parse(
+            data=util.readfile("test/files/datasets/annotations_b1.ttl"),
+            format="turtle")
         testgraph.bind("a", rdflib.Namespace("http://example.org/repo/a/"))
         testgraph.bind("b", rdflib.Namespace("http://example.org/repo/b/"))
         testgraph.bind("dct", rdflib.Namespace("http://purl.org/dc/terms/"))
-        self.repo = self._get_repo()
         annotations = self.repo.graph_to_annotation_file(testgraph)
         self.maxDiff = None
         want = """<graph xmlns:dct="http://purl.org/dc/terms/"
@@ -1164,7 +1233,7 @@ b:1part a :DocumentPart;
 </graph>"""
         self.assertEqualXML(want,annotations)
 
-    def _test_generated(self):
+    def test_generated(self):
         with self.repo.store.open_parsed("1", "w") as fp:
             fp.write("""<?xml version='1.0' encoding='utf-8'?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
@@ -1183,17 +1252,17 @@ b:1part a :DocumentPart;
 </html>""")
         self.assertEqual("http://example.org/repo/a/1",
                          self.repo.canonical_uri("1"))
-        self.repo.generate("1")
-        
-        # print("-----------------ANNOTATIONS--------------")
-        # with self.repo.store.open_annotation("1") as fp:
-        #     print(fp.read())
-        # print("-----------------GENERATED RESULT--------------")
-        # with self.repo.store.open_generated("1") as fp:
-        #     print(fp.read())
+        g = rdflib.Graph()
+        g.parse(data=util.readfile("test/files/datasets/annotations_a1.ttl"),
+                format="turtle")
+        # Semi-advanced patching: Make sure that the staticmethod
+        # TripleStore.connect returns a mock object, whose construct
+        # method returns our graph
+        config = {'connect.return_value': Mock(**{'construct.return_value': g})}
+        with patch('ferenda.documentrepository.TripleStore', **config):
+            self.repo.generate("1")
         
         t = etree.parse(self.repo.store.generated_path("1"))
-
         # find top node .annotations,
         anode = t.find(".//aside[@class='annotations']")
         annotations = anode.findall("a")
@@ -1219,47 +1288,24 @@ b:1part a :DocumentPart;
         self.assertEqual('A2(part2)',
                          annotations[0].text)
 
-    @unittest.skipIf('SKIP_FUSEKI_TESTS' in os.environ,
-                     "Skipping Fuseki tests")    
-    def test_generate_fuseki(self):
-        self.repo = self._get_repo('FUSEKI')
-        self.store = self._load_store(self.repo)
-        self._test_generated()
-
-    @unittest.skipIf('SKIP_SESAME_TESTS' in os.environ,
-                     "Skipping Sesame tests")    
-    def test_generate_sesame(self):
-        self.repo = self._get_repo('SESAME')
-        self.store = self._load_store(self.repo)
-        self._test_generated()
-
-    @unittest.skipIf('SKIP_SLEEPYCAT_TESTS' in os.environ,
-                     "Skipping Sleepycat tests")    
-    def test_generate_sleepycat(self):
-        self.repo = self._get_repo('SLEEPYCAT')
-        self.store = self._load_store(self.repo)
-        self._test_generated()
-
-    def test_generate_sqlite(self):
-        self.repo = self._get_repo('SQLITE')
-        self.store = self._load_store(self.repo)
-        self._test_generated()
-
-    def _generate_complex(self, xsl=None, staticsite=False):
+    def _generate_complex(self, xsl=None, sparql=None, staticsite=False):
         # Helper func for other tests -- this uses a single
         # semi-complex source doc, runs it through the generic.xsl
         # stylesheet, and then the tests using this helper confirm
         # various aspects of the transformed document
-        self.repo = self._get_repo()
         if staticsite:
             self.repo.config.staticsite = True
         if xsl is not None:
             self.repo.xslt_template = xsl
+
+        if sparql is not None:
+            self.repo.sparql_annotations = sparql
+
         test = """<?xml version='1.0' encoding='utf-8'?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
 <html xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:dct="http://purl.org/dc/terms/" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
   <head about="http://localhost:8000/res/w3c/hr-time">
-    <meta property="dct:editor" content="Jatinder Mann " xml:lang=""/>
+    <meta property="dct:editor" content="Jatinder Mann" xml:lang=""/>
     <meta property="dct:identifier" content="hr-time" xml:lang=""/>
     <meta property="dct:issued" content="2012-12-17" datatype="xsd:date"/>
     <title property="dct:title">High Resolution Time</title>
@@ -1273,6 +1319,9 @@ b:1part a :DocumentPart;
         content="Abstract">
       <p>Lorem ipsum dolor sit amet</p>
       <p><a href="http://localhost:8000/res/test/something-else">external</a></p>
+      <p><a href="http://localhost:8000/dataset/test">dataset</a></p>
+      <p><a href="http://localhost:8000/dataset/test?title=a">parametrized</a></p>
+      <p><a href="http://localhost:8000/">root</a></p>
     </div>
     <div about="http://localhost:8000/res/w3c/hr-time#PS2"
         typeof="bibo:DocumentPart"
@@ -1332,7 +1381,9 @@ b:1part a :DocumentPart;
         """
         with self.repo.store.open_parsed("a", mode="w") as fp:
             fp.write(test)
-        self.repo.generate("a")
+
+        with patch('ferenda.documentrepository.TripleStore'):
+            self.repo.generate("a")
         return etree.parse(self.repo.store.generated_path("a"))
 
     def test_rdfa_removal(self):
@@ -1406,11 +1457,26 @@ b:1part a :DocumentPart;
         self.assertEqual("S4.1.1", secs[5].get('id'))
         self.assertEqual("S4.2", secs[6].get('id'))
 
+    def test_custom_sparql(self):
+        # test with a custom SPARQL CONSTRUCT query in the current
+        # directory. construct_annotations should use that one
+        queryfile = self.datadir + os.sep + "myquery.rq"
+        shutil.copy2("ferenda/res/sparql/annotations.rq", queryfile)
+        # should go OK, ie no boom
+        tree = self._generate_complex(sparql=queryfile)
+        os.unlink(self.repo.store.generated_path("a"))
+        # but try it with a non-existing file and it should go boom
+        with self.assertRaises(ValueError):
+            tree = self._generate_complex(sparql="nonexistent.rq")
+            
+        
+        
     def test_custom_xsl(self):
         # test with a custom xslt in the current
         # directory. setup_transform_templates should copy this over
         # all the stuff in res/xsl to a temp directory, then do stuff.
-        with open("mystyle.xsl", "w") as fp:
+        xslfile = self.datadir + os.sep + "mystyle.xsl"
+        with open(xslfile, "w") as fp:
             # note that mystyle.xsl must depend on the systemwide base.xsl
             fp.write("""<?xml version="1.0" encoding="utf-8"?>
 <xsl:stylesheet version="1.0"
@@ -1448,192 +1514,44 @@ b:1part a :DocumentPart;
   <xsl:template match="@*|node()" mode="toc"/>
   
 </xsl:stylesheet>""")
-        tree = self._generate_complex("mystyle.xsl")
+        tree = self._generate_complex(xslfile)
         divs = tree.findall(".//p[@class='div']")
         self.assertEqual(4,len(divs))
         
     def test_staticsite_url(self):
-        self.repo = self._get_repo()
         tree = self._generate_complex(staticsite=True)
         link = tree.xpath(".//a[text()='external']")[0]
         self.assertEqual("something-else.html", link.get("href"))
-        
-        
 
-class TOCSelect(RepoTester):
-    # General datasets being reused in tests
-    books = """
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-@prefix dct: <http://purl.org/dc/terms/> .
-@prefix bibo: <http://purl.org/ontology/bibo/> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix ex: <http://example.org/books/> .
+        link = tree.xpath(".//a[text()='dataset']")[0]
+        self.assertEqual("../toc/index.html", link.get("href"))
 
-# From http://en.wikipedia.org/wiki/List_of_best-selling_books
+        link = tree.xpath(".//a[text()='parametrized']")[0]
+        self.assertEqual("../toc/title/a.html", link.get("href"))
 
-ex:A_Tale_of_Two_Cities a bibo:Book;
-    dct:title "A Tale of Two Cities";
-    dct:creator "Charles Dickens";
-    dct:issued "1859-04-30"^^xsd:date;
-    dct:publisher "Chapman & Hall" .
+        link = tree.xpath(".//a[text()='root']")[0]
+        self.assertEqual("../../index.html", link.get("href"))
 
-ex:The_Lord_of_the_Rings a bibo:Book;
-    dct:title "The Lord of the Rings";
-    dct:creator "J. R. R. Tolkien";
-    dct:issued "1954-07-29"^^xsd:date;
-    dct:publisher "George Allen & Unwin" .
+    def test_dependency_mgmt(self):
+        with self.repo.store.open_dependencies("a", "w") as fp:
+            fp.write("""data/base/parsed/other.xhtml
+data/base/parsed/foo.xhtml
+""")
+        # even though no dependency file actually existed, they should
+        # have been loaded up in dependencies
+        tree = self._generate_complex()
 
-ex:The_Little_Prince a bibo:Book;
-    dct:title "The Little Prince";
-    dct:creator "Antoine de Saint-Exup\xe9ry";
-    dct:issued "1943-01-01"^^xsd:date;
-    dct:publisher "Reynal & Hitchcock" .
+        # but this time the generated file should be newer than all
+        # dependencies, trigging a skip.
+        tree = self._generate_complex()
 
-ex:The_Hobbit a bibo:Book;
-    dct:title "The Hobbit";
-    dct:creator "J. R. R. Tolkien";
-    dct:issued "1937-09-21"^^xsd:date;
-    dct:publisher "George Allen & Unwin" .
-
-ex:Dream_of_the_Red_Chamber a bibo:Book;
-    dct:title "Dream of the Red Chamber";
-    dct:creator "Cao Xueqin";
-    dct:issued "1791-01-01"^^xsd:date;
-    dct:publisher "Cheng Weiyuan & Gao E" .
-
-ex:And_Then_There_Were_None a bibo:Book;
-    dct:title "And Then There Were None";
-    dct:creator "Agatha Christie";
-    dct:issued "1939-11-06"^^xsd:date;
-    dct:publisher "Collins Crime Club" .
-"""
-    # FIXME: these are typed as bibo:Book since the default toc_select
-    # assumes that all docs in a repo share the same rdf:type. Once
-    # fixed, these should be typed as bibo:AcademicArticle
-    articles = """
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-@prefix dct: <http://purl.org/dc/terms/> .
-@prefix bibo: <http://purl.org/ontology/bibo/> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix ex: <http://example.org/articles/> .
-
-# http://www.the-scientist.com/?articles.view/articleNo/9678/title/The-4-Most-Cited-Papers--Magic-In-These-Methods/
-
-ex:pm14907713 a bibo:Book;
-    dct:title "Protein measurement with the Folin phenol reagent";
-    dct:creator "Oliver H. Lowry",
-                "Nira J. Rosenbrough",
-                "A. Lewis Farr",
-                "R.J. Randall";
-    dct:issued "1951-11-01"^^xsd:date;
-    dct:publisher "Journal of Biological Chemistry" .
+        # FIXME: we don't actually verify the that dependencies are
+        # read or skipping is performed.
     
-ex:pm5432063 a bibo:Book;
-    dct:title "Cleavage of structural proteins during the assembly of the head of bacteriophage T4";
-    dct:creator "Ulrich Karl Laemmli";
-    dct:issued "1970-08-15"^^xsd:date;
-    dct:publisher "Nature" .
-
-ex:pm5806584 a bibo:Book;
-    dct:title "Reliability of molecular weight determinations by dodecyl sulfate-polyacrylamide gel electrophoresis";
-    dct:creator "K. Weber",
-
-    "M. Osborn";
-    dct:issued "1969-08-25"^^xsd:date;
-    dct:publisher "Journal of Biological Chemistry" .
-
-ex:pm942051 a bibo:Book;
-    dct:title "A rapid and sensitive method for the quantitation of microgram quantities of protein utilizing the principle of protein dye-binding";
-    dct:creator "Marion M. Bradford";
-    dct:issued "1976-05-07"^^xsd:date;
-    dct:publisher "Analytical Biochemistry" .
-""" 
-    results1 = [{'uri':'http://example.org/books/A_Tale_of_Two_Cities',
-                 'title': 'A Tale of Two Cities',
-                 'issued': '1859-04-30'},
-                {'uri':'http://example.org/books/The_Lord_of_the_Rings',
-                 'title': 'The Lord of the Rings',
-                 'issued': '1954-07-29'},
-                {'uri':'http://example.org/books/The_Little_Prince',
-                 'title': 'The Little Prince',
-                 'issued': '1943-01-01'},
-                {'uri':'http://example.org/books/The_Hobbit',
-                 'title': 'The Hobbit',
-                 'issued': '1937-09-21'},
-                {'uri':'http://example.org/books/Dream_of_the_Red_Chamber',
-                 'title': 'Dream of the Red Chamber',
-                 'issued': '1791-01-01'},
-                {'uri':'http://example.org/books/And_Then_There_Were_None',
-                 'title': 'And Then There Were None',
-                 'issued': '1939-11-06'}]
-    results2 = [{'uri':'http://example.org/articles/pm14907713',
-                 'title': 'Protein measurement with the Folin phenol reagent',
-                 'issued': '1951-11-01'},
-                {'uri':'http://example.org/articles/pm5432063',
-                 'title': 'Cleavage of structural proteins during the assembly of the head of bacteriophage T4',
-                 'issued': '1970-08-15'},
-                {'uri':'http://example.org/articles/pm5806584',
-                 'title': 'Reliability of molecular weight determinations by dodecyl sulfate-polyacrylamide gel electrophoresis',
-                 'issued': '1969-08-25'},
-                {'uri':'http://example.org/articles/pm942051',
-                 'title': 'A rapid and sensitive method for the quantitation of microgram quantities of protein utilizing the principle of protein dye-binding',
-                 'issued': '1976-05-07'}]
-
-    def setUp(self):
-        super(TOCSelect, self).setUp()
-        # (set up a triple store) and fill it with appropriate data
-        d = DocumentRepository()
-        defaults = d.get_default_options()
-        # FIXME: We really need to subclass at least the toc_select
-        # test to handle the four different possible storetypes. For
-        # now we go with the default type (SQLITE, guaranteed to
-        # always work) but the non-rdflib backends use different code
-        # paths.
-        self.store = TripleStore.connect(storetype=defaults['storetype'],
-                                         location=self.datadir+os.sep+"test.sqlite",
-                                         repository=defaults['storerepository'])
-        self.store.clear()
-        self.store.add_serialized(self.books,format="turtle", context="http://example.org/ctx/base")
-        self.store.add_serialized(self.articles,format="turtle", context="http://example.org/ctx/other")
-
-
-    def tearDown(self):
-        # clear triplestore
-        self.store.clear()
-        del self.store
-        super(TOCSelect, self).tearDown()
-
-    # FIXME: adapt to TripleStore setting so that these tests run with
-    # all supported triplestores
-    def test_toc_select(self):
-        d = DocumentRepository(datadir=self.datadir,
-                               loglevel='CRITICAL',
-                               storelocation=self.datadir+os.sep+"test.sqlite")
-        d.rdf_type = rdflib.URIRef("http://purl.org/ontology/bibo/Book")
-        # make sure only one named graph, not entire store, gets searched
-        got = d.toc_select("http://example.org/ctx/base")
-        self.assertEqual(len(got),6)
-        want = self.results1
-        for row in want:
-            self.assertIn(row, got)
-
-        got = d.toc_select("http://example.org/ctx/other")
-        self.assertEqual(len(got),4)
-        want2 = self.results2
-        for row in want2:
-            self.assertIn(row, got)
-    
-        got = d.toc_select()
-        self.assertEqual(len(got),10)
-        want3 = want+want2
-        for row in want3:
-            self.assertIn(row, got)
-
-        
 class TOC(RepoTester):
-    results1 = TOCSelect.results1
-    results2 = TOCSelect.results2
-    
+    results1 = json.load(open("test/files/datasets/results1.json"))
+    results2 = json.load(open("test/files/datasets/results2.json"))
+
     pagesets = [TocPageset('Sorted by title',[
                 TocPage('a','Documents starting with "a"','title', 'a'),
                 TocPage('d','Documents starting with "d"','title', 'd'),
@@ -1682,6 +1600,63 @@ class TOC(RepoTester):
         shutil.copy2("%s/files/base/rsrc/resources.xml"%os.path.dirname(__file__),
                      resources)
 
+    def test_toc(self):
+        # tests the main TOC method, not the helper methods (they are
+        # tested separately)
+
+        # test1: toc_select finds no rows
+        self.repo.toc_select = MagicMock()
+        self.repo.log = Mock()
+        self.repo.toc_criteria = Mock()
+        self.repo.toc_pagesets = Mock()
+        self.repo.toc_select_for_pages = Mock()
+        self.repo.toc_generate_pages = Mock()
+        self.repo.toc_generate_first_page = Mock()
+        self.repo.toc()
+
+        # assert toc_select was properly called, error and info msg
+        # was printed
+        self.assertEqual("http://localhost:8000/dataset/base",
+                         self.repo.toc_select.call_args[0][0])
+        self.assertTrue(self.repo.log.error.called)
+        self.assertTrue(self.repo.log.info.called)
+        # and that the rest of the methods were NOT called
+        self.assertFalse(self.repo.toc_criteria.called)
+        self.assertFalse(self.repo.toc_pagesets.called)
+        self.assertFalse(self.repo.toc_select_for_pages.called)
+        self.assertFalse(self.repo.toc_generate_pages.called)
+
+        # test2: toc_select returns something
+        self.repo.toc_select.return_value = ["fake", "data"]
+        self.repo.toc()
+        # Now all other methods should be called
+        self.assertTrue(self.repo.toc_criteria.called)
+        self.assertTrue(self.repo.toc_pagesets.called)
+        self.assertTrue(self.repo.toc_select_for_pages.called)
+        self.assertTrue(self.repo.toc_generate_pages.called)
+        
+    def test_toc_select(self):
+        self.repo.toc_query = Mock(return_value="Mock query")
+        with patch('ferenda.documentrepository.TripleStore') as mock_ts:
+            self.repo.toc_select()
+            self.assertTrue(mock_ts.connect.called)
+            self.assertEqual(mock_ts.connect.return_value.select.call_args[0][0],
+                             "Mock query")
+            self.assertTrue(mock_ts.connect.return_value.close.called)
+
+    def test_toc_query(self):
+        # NOTE: this is also tested by a doctest
+        want = "PREFIX bibo: <http://purl.org/ontology/bibo/> PREFIX dct: <http://purl.org/dc/terms/> PREFIX foaf: <http://xmlns.com/foaf/0.1/> PREFIX owl: <http://www.w3.org/2002/07/owl#> PREFIX prov: <http://www.w3.org/ns/prov-o/> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX skos: <http://www.w3.org/2004/02/skos/core#> PREFIX xhv: <http://www.w3.org/1999/xhtml/vocab#> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> SELECT DISTINCT ?uri ?title ?issued FROM <http://example.org/ctx/base> WHERE {?uri rdf:type foaf:Document ; dct:title ?title . OPTIONAL { ?uri dct:issued ?issued . }  }"
+        self.assertEqual(want,
+                         self.repo.toc_query("http://example.org/ctx/base"))
+
+        # special Fuseki magic
+        self.repo.config.storetype = "FUSEKI"
+        want = want.replace("<http://example.org/ctx/base>",
+                            "<urn:x-arq:UnionGraph>")
+        self.assertEqual(want,
+                         self.repo.toc_query())
+
     def test_toc_criteria(self):
         dct = self.repo.ns['dct']
         want = self.criteria
@@ -1711,11 +1686,26 @@ class TOC(RepoTester):
         self.assertEqual(got[0], want[0])
         self.assertEqual(got[1], want[1])
 
+        # delete title from one place in self.results1
+        res = copy.deepcopy(self.results1)
+        del res[0]['title']
+        del res[1]['issued']
+        got = self.repo.toc_pagesets(res, self.criteria)
+        self.assertEqual(len(got[1].pages), 5)
+        
     def test_select_for_pages(self):
         got = self.repo.toc_select_for_pages(self.results1, self.pagesets, self.criteria)
         want = self.documentlists
-        self.maxDiff = None
         self.assertEqual(got, want)
+
+        # delete issued from one place in self.results1
+        res = copy.deepcopy(self.results1)
+        del res[1]['issued']
+        # FIXME: this'll go boom!
+        # del res[0]['title']
+        got = self.repo.toc_select_for_pages(res, self.pagesets, self.criteria)
+        self.assertEqual(len(got), 9)
+
 
     def test_generate_page(self):
         path = self.repo.toc_generate_page('title','a', self.documentlists[('title','a')], self.pagesets)
@@ -1844,7 +1834,13 @@ class News(RepoTester):
   </body>
 </html>""" % v)
 
-            
+
+    def test_news(self):
+        # tests the main method, not the helpers (like test_relate and
+        # test_toc above)
+        with patch("ferenda.documentrepository.Transformer"):
+            self.repo.news()
+
     def test_criteria(self):
         criteria = self.repo.news_criteria()
         self.assertEqual(len(criteria),1)
@@ -1864,6 +1860,43 @@ class News(RepoTester):
         self.assertEqual(len(entries),25)
         self.assertEqual(entries[0].title, "Doc #24")
         self.assertEqual(entries[-1].title, "Doc #0")
+
+    def test_incomplete_entries(self):
+        # make our entries incomplete in various ways
+
+        entry = DocumentEntry(self.repo.store.documententry_path("1"))
+        entry.published = None
+        entry.save()
+
+        # try very hard to remove title from everywhere
+        entry = DocumentEntry(self.repo.store.documententry_path("2"))
+        del entry.title
+        entry.save()
+        g = rdflib.Graph().parse(self.repo.store.distilled_path("2"))
+        g.remove((rdflib.URIRef("http://localhost:8000/res/base/2"),
+                  self.repo.ns['dct'].title,
+                  rdflib.Literal("Doc #2")))
+        with open(self.repo.store.distilled_path("2"), "wb") as fp:
+            g.serialize(fp, format="pretty-xml")
+
+        os.unlink(self.repo.store.distilled_path("3"))
+
+        # entries w/o published date and w/o distilled file should not
+        # be published, but w/o title is OK
+        self.assertEqual(len(list(self.repo.news_entries())),
+                         23)
+
+    def test_republishsource(self):
+        self.repo.config.republishsource = True
+        for basefile in range(25):
+            util.writefile(self.repo.store.downloaded_path(str(basefile)),
+                           "Source content")
+
+        entries = sorted(list(self.repo.news_entries()),
+                         key=attrgetter('updated'), reverse=True)
+        self.assertEqual(entries[0].content['src'],
+                         self.repo.downloaded_url("24"))
+
 
     def test_write_atom(self):
         self.maxDiff = None
@@ -1944,10 +1977,44 @@ class News(RepoTester):
         self.assertEqual(tree.find(NS+"link[@rel='next-archive']").get("href"),
                          "main-archive-2.atom")
 
+        # finally , do it all again without any entries and make sure
+        # it doesn't blow up
+        paths = self.repo.news_write_atom([],
+                                          'New and updated documents',
+                                          'main',
+                                          archivesize=6)
+
+
+    def test_write_atom_inline(self):
+        for basefile in range(25):
+            de = DocumentEntry(self.repo.store.documententry_path(str(basefile)))
+            util.writefile(self.repo.store.parsed_path(str(basefile)),
+                           "<html><p>Document #%s</p></html>" % basefile)
+            de.set_content(self.repo.store.parsed_path(str(basefile)),
+                           self.repo.canonical_uri(str(basefile)),
+                           inline=True)
+            de.save()
+
+        unsorted_entries = self.repo.news_entries()
+        entries = sorted(list(unsorted_entries),
+                         key=lambda x: x.updated, reverse=True)
+        self.repo.news_write_atom(entries,
+                                  'New and updated documents',
+                                  'main',
+                                  archivesize=6)
+        tree = etree.parse('%s/base/feed/main.atom' % self.datadir)
+        NS = "{http://www.w3.org/2005/Atom}"
+        content = tree.find(".//"+NS+"content")
+        self.assertIsNone(content.get("src"))
+        self.assertIsNone(content.get("hash"))
+        self.assertEqual(content.get("type"), "xhtml")
+        self.assertEqualXML(etree.tostring(content[0]),
+                              '<html xmlns="http://www.w3.org/2005/Atom" xmlns:le="http://purl.org/atompub/link-extensions/1.0"><p>Document #24</p></html>')
+                                             
 
     def _check_entry(self, entry, entryid, title, published, updated, contentsrc, linksrc):
-        NS = "{http://www.w3.org/2005/Atom}"
 
+        NS = "{http://www.w3.org/2005/Atom}"
         self.assertEqual(entry.find(NS+"id").text,entryid)
         self.assertEqual(entry.find(NS+"title").text,title)
         self.assertEqual(entry.find(NS+"published").text,
@@ -1962,6 +2029,32 @@ class News(RepoTester):
         self.assertEqual(link.get("href"), linksrc)
         self.assertEqual(link.get("type"),'application/rdf+xml')
 
+    def test_custom_criteria(self):
+        # only include entries whose title is an odd number of characters
+        # sort them by length of title
+        from ferenda import NewsCriteria
+        c = NewsCriteria("custom", "Custom criteria",
+                         selector = lambda x: len(x.title) % 2,
+                         key = lambda x: len(x.title))
+        allentries = []
+        for i in range(1,6):
+            e = DocumentEntry()
+            # "A", "AB", "ABC", "ABCD", "ABCDE"
+            e.title = "".join([chr(x) for x in range(65,65+i)])
+            allentries.append(e)
+
+        # this is a simplified version of the logic in DocumentRepository.news
+        for entry in allentries:
+            if c.selector(entry):
+                c.entries.append(entry)
+        sortedentries  = sorted(c.entries, key=c.key, reverse=True)
+
+        self.assertEqual(['ABCDE', 'ABC', 'A'],
+                         [e.title for e in sortedentries])
+        
+
+    
+            
 
 class Storage(RepoTester):
 
@@ -2008,8 +2101,9 @@ class Archive(RepoTester):
                        "This is the original document, generated")
         # archive it
         version = self.repo.get_archive_version("123/a")
-        self.repo.store.archive("123/a",version)
         self.assertEqual(version, "1") # what algorithm do the default use? len(self.archived_versions)?
+
+        self.repo.store.archive("123/a",version)
 
         eq = self.assertEqual
         # make sure archived files ended up in the right places
@@ -2026,7 +2120,26 @@ class Archive(RepoTester):
         self.assertFalse(os.path.exists(self.repo.store.parsed_path("123/a")))
         self.assertFalse(os.path.exists(self.repo.store.distilled_path("123/a")))
         self.assertFalse(os.path.exists(self.repo.store.generated_path("123/a")))
-        
+
+        # Then do it again (with the same version id) and verify that
+        # we can't archive twice to the same id
+        with self.assertRaises(ArchivingError):
+            util.writefile(self.repo.store.downloaded_path("123/a"),
+                           "This is the original document, downloaded")
+            util.writefile(self.repo.store.parsed_path("123/a"),
+                           "This is the original document, parsed")
+            util.writefile(self.repo.store.distilled_path("123/a"),
+                           "This is the original document, distilled")
+            util.writefile(self.repo.store.generated_path("123/a"),
+                           "This is the original document, generated")
+            self.repo.store.archive("123/a",version)
+  
+
+
+    def test_archive_dir(self):
+        self.repo.store.storage_policy = "dir"
+        self.test_archive()
+
     def test_download_and_archive(self):
         # print("test_download_and_archive: cwd", os.getcwd())
         def my_get(url,**kwargs):
@@ -2159,8 +2272,36 @@ class Patch(RepoTester):
         result, desc = self.repo.patch_if_needed("123/a", self.sourcedoc)
         self.assertEqual("Editorial edit", desc)
         self.assertEqual(self.targetdoc, result)
-    
 
+    def test_successful_patch_with_desc(self):
+        patchpath = self.patchstore.path("123/a", "patches", ".patch")
+        util.ensure_dir(patchpath)
+        with open(patchpath, "w") as fp:
+            fp.write("""--- basic.txt	2013-06-13 09:16:37.000000000 +0200
++++ changed.txt	2013-06-13 09:16:39.000000000 +0200
+@@ -1,5 +1,5 @@
+ <body>
+-  <h1>Basic document</h1>
++  <h1>Patched document</h1>
+   <p>
+     This is some unchanged text.
+     1: And some more again
+""")
+        descpath = self.patchstore.path("123/a", "patches", ".desc")
+        patchdesc = """This is a longer patch description.
+
+It can span several lines."""
+        with open(descpath, "wb") as fp:
+            fp.write(patchdesc.encode())           
+
+        result, desc = self.repo.patch_if_needed("123/a", self.sourcedoc)
+        self.assertEqual(patchdesc, desc)
+
+        # and again, now w/o any description
+        os.unlink(descpath)
+        result, desc = self.repo.patch_if_needed("123/a", self.sourcedoc)
+        self.assertEqual("(No patch description available)", desc)
+        
 
     def test_failed_patch(self):
         with self.patchstore.open("123/a", "patches", ".patch", "w") as fp:
@@ -2185,6 +2326,11 @@ class Patch(RepoTester):
         with self.assertRaises(PatchError):
             result, desc = self.repo.patch_if_needed("123/a", self.sourcedoc)
 
+    def test_invalid_patch(self):
+        with self.patchstore.open("123/a", "patches", ".patch", "w") as fp:
+            fp.write("This is not a valid patch file")
+        with self.assertRaises(PatchError):
+            result, desc = self.repo.patch_if_needed("123/a", self.sourcedoc)
 
     def test_no_patch(self):
         result, desc = self.repo.patch_if_needed("123/a", self.sourcedoc)

@@ -51,19 +51,19 @@ class FulltextIndex(object):
 
     def exists(self):
         """Whether the fulltext index exists."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def create(self, schema, repos):
         """Creates a fulltext index using the provided default schema."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def destroy(self):
         """Destroys the index, if created."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def open(self):
         """Opens the index so that it can be queried."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def schema(self):
         """Returns the schema that actually is in use. A schema is a dict
@@ -71,7 +71,7 @@ class FulltextIndex(object):
            subclass of
            :py:class:`ferenda.fulltextindex.IndexedType`
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def update(self, uri, repo, basefile, title, identifier, text, **kwargs):
         """Insert (or update) a resource in the fulltext index. A resource may
@@ -104,19 +104,19 @@ class FulltextIndex(object):
            :meth:`~ferenda.FulltextIndex.close` for that.
 
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def commit(self):
         """Commit all pending updates to the fulltext index."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def close(self):
         """Commits all pending updates and closes the index."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def doccount(self):
         """Returns the number of currently indexed (non-deleted) documents."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def query(self, q, **kwargs):
         """Perform a free text query against the full text index, optionally
@@ -137,7 +137,7 @@ class FulltextIndex(object):
            simple full text queries are possible.
 
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
 
 class IndexedType(object):
@@ -267,7 +267,6 @@ class WhooshIndex(FulltextIndex):
         super(WhooshIndex, self).__init__(location, repos)
         self._schema = self.get_default_schema()
         self._writer = None
-        self._batchwriter = False
 
     def exists(self):
         return whoosh.index.exists_in(self.location)
@@ -305,10 +304,7 @@ class WhooshIndex(FulltextIndex):
 
     def update(self, uri, repo, basefile, title, identifier, text, **kwargs):
         if not self._writer:
-            if self._batchwriter:
-                self._writer = whoosh.writing.BufferedWriter(self.index, limit=1000)
-            else:
-                self._writer = self.index.writer()
+            self._writer = self.index.writer()
 
         # A whoosh document is not the same as a ferenda document. A
         # ferenda document may be indexed as several (tens, hundreds
@@ -330,9 +326,6 @@ class WhooshIndex(FulltextIndex):
 
     def close(self):
         self.commit()
-        if self._writer:
-            self._writer.close()
-            self._writer = None
 
     def doccount(self):
         return self.index.doc_count()
@@ -363,16 +356,19 @@ class WhooshIndex(FulltextIndex):
             l.append(hit.fields())
         return l
 
-# Base class for a HTTP-based API (eg. ElasticSearch)
-# the base class delegate the formulation of queries, updates etc to concrete subclasses,
-# expected to return a formattted query/payload etc, and be able to decode responses to
-# queries, but the base class handles the actual HTTP call, inc error handling.
+# Base class for a HTTP-based API (eg. ElasticSearch) the base class
+# delegate the formulation of queries, updates etc to concrete
+# subclasses, expected to return a formattted query/payload etc, and
+# be able to decode responses to queries, but the base class handles
+# the actual HTTP call, inc error handling.
 
 
 class RemoteIndex(FulltextIndex):
 
-    def exists(self):
-        pass
+    # The only real implementation of RemoteIndex has its own exists
+    # implementation, no need for a general fallback impl.
+    # def exists(self):
+    #     pass
 
     def create(self, schema, repos):
         relurl, payload = self._create_schema_payload(self.get_default_schema(), repos)

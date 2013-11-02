@@ -18,7 +18,8 @@ install_requires = ['beautifulsoup4 >= 4.3.0',
                     'requests >= 1.2.0',
                     'Whoosh >= 2.4.1',
                     'six >= 1.4.0',
-                    'pyparsing >= 2.0.1']
+                    'pyparsing >= 2.0.1',
+                    'docutils >= 0.11']
 
 if sys.version_info < (3,0,0):
     # not py3 compatible, but not essential either
@@ -57,7 +58,7 @@ setup(name='ferenda',
       install_requires=install_requires,
       tests_require=tests_require,
       entry_points = {
-        'console_scripts':['ferenda-setup = ferenda.manager:setup']
+        'console_scripts':['ferenda-setup = ferenda.manager:runsetup']
         },
       packages=find_packages(exclude=('test', 'docs')),
       # package_dir = {'ferenda':'ferenda'},

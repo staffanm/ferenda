@@ -8,6 +8,7 @@ if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 import six
 
 from ferenda import CitationParser
+from ferenda import util
 import ferenda.citationpatterns
 from ferenda.testutil import file_parametrize
 
@@ -25,7 +26,7 @@ class ParametricBase(unittest.TestCase):
                 got.append(node.strip())
             else:
                 (text,result) = node
-                got.append(result.asXML().strip())
+                got.append(util.parseresults_as_xml(result).strip())
         
         wantfile = os.path.splitext(filename)[0] + ".result"
         if os.path.exists(wantfile):
@@ -44,8 +45,5 @@ class URL(ParametricBase):
 class EULaw(ParametricBase):
     parser = ferenda.citationpatterns.eulaw
 
-if sys.version_info[0:2] == (3,3):
-    file_parametrize(URL, "test/files/citation/url", ".txt", unittest.expectedFailure)
-else:
-    file_parametrize(URL, "test/files/citation/url", ".txt")
+file_parametrize(URL, "test/files/citation/url", ".txt")
 # file_parametrize(URL, "test/files/citation/eulaw", ".txt")

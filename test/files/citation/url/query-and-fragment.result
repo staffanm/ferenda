@@ -10,7 +10,7 @@ A Query:
 . A fragment:
 
 <url>
-  <url>http</url>
+  <scheme>http</scheme>
   <netloc>example.org</netloc>
   <path>/</path>
   <fragment>baz</fragment>

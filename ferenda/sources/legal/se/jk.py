@@ -16,7 +16,7 @@ from . import SwedishLegalSource
 from .swedishlegalsource import Stycke, Sektion
 from ferenda.decorators import downloadmax, recordlastdownload
 from ferenda import util
-from ferenda.legalref import LegalRef, Link
+from ferenda.sources.legal.se.legalref import LegalRef, Link
 
 
 class JK(SwedishLegalSource):

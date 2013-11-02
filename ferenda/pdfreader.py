@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 import os
-import xml.etree.cElementTree as ET
+from lxml import etree
 import logging
 
 from six import text_type as str
@@ -15,13 +15,17 @@ from .elements import OrdinalElement
 class PDFReader(CompoundElement):
 
     """Parses PDF files and makes the content available as a object
-hierarchy. After calling :py:meth:`~ferenda.PDFReader.read`, the PDFReader itself is a list of
-:py:class:`ferenda.pdfreader.Page` objects, which each is a list of
-:py:class:`ferenda.pdfreader.Textbox` objects, which each is a list of :py:class:`ferenda.pdfreader.Textelement` objects.
+    hierarchy. After calling :py:meth:`~ferenda.PDFReader.read`, the
+    PDFReader itself is a list of :py:class:`ferenda.pdfreader.Page`
+    objects, which each is a list of
+    :py:class:`ferenda.pdfreader.Textbox` objects, which each is a
+    list of :py:class:`ferenda.pdfreader.Textelement` objects.
 
     .. note::
 
-       This class depends on the command line tool pdftohtml from `poppler <http://poppler.freedesktop.org/>`_.
+       This class depends on the command line tool pdftohtml from
+       `poppler <http://poppler.freedesktop.org/>`_.
+
     """
 
     def __init__(self):
@@ -29,10 +33,14 @@ hierarchy. After calling :py:meth:`~ferenda.PDFReader.read`, the PDFReader itsel
         self.log = logging.getLogger('pdfreader')
 
     def read(self, pdffile, workdir=None):
-        """Initializes a PDFReader object from an existing PDF file. After initialization, the PDFReader contains a list of :py:class:`~ferenda.pdfreader.Page` objects.
+        """Initializes a PDFReader object from an existing PDF file. After
+        initialization, the PDFReader contains a list of
+        :py:class:`~ferenda.pdfreader.Page` objects.
 
         :param pdffile: The full path to the PDF file
-        :param workdir: A directory where intermediate files (particularly background PNG files) are stored
+        :param workdir: A directory where intermediate files (particularly
+                        background PNG files) are stored
+
         """
 
         self.filename = pdffile
@@ -53,7 +61,6 @@ hierarchy. After calling :py:meth:`~ferenda.PDFReader.read`, the PDFReader itsel
             self.log.debug("Converting: %s" % cmd)
             (returncode, stdout, stderr) = util.runcmd(cmd,
                                                        require_success=True)
-            # print "RET: %s, STDOUT: %s, STDERR: %s" % (returncode,stdout,stderr)
             # we won't need the html files
             for f in os.listdir(workdir):
                 if f.endswith(".html"):
@@ -71,13 +78,7 @@ hierarchy. After calling :py:meth:`~ferenda.PDFReader.read`, the PDFReader itsel
     def _parse_xml(self, xmlfile):
         self.log.debug("Loading %s" % xmlfile)
         assert os.path.exists(xmlfile), "XML %s not found" % xmlfile
-        try:
-            tree = ET.parse(xmlfile)
-        except ET.ParseError as e:
-            self.log.warning("'%s', working around" % e)
-            #fix = PDFXMLFix()
-            # fix.fix(xmlfile)
-            tree = ET.parse(xmlfile)
+        tree = etree.parse(xmlfile)
 
         # for each page element
         for pageelement in tree.getroot():
@@ -106,7 +107,7 @@ hierarchy. After calling :py:meth:`~ferenda.PDFReader.read`, the PDFReader itsel
                     if element.text and element.text.strip() == "" and not element.getchildren():
                         # print "Skipping empty box"
                         continue
-                    attribs = element.attrib
+                    attribs = dict(element.attrib)
                     attribs['fontspec'] = self.fontspec
                     b = Textbox(**attribs)
 

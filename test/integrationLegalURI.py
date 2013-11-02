@@ -5,7 +5,7 @@ import sys, os
 from ferenda.compat import unittest
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
-from ferenda.legaluri import construct,parse
+from ferenda.sources.legal.se.legaluri import construct,parse
 from ferenda.testutil import file_parametrize
 
 class Construct(unittest.TestCase):
@@ -31,7 +31,6 @@ class Parse(unittest.TestCase):
             parts_repr = " ".join(fp.read().split())
         parts = eval(parts_repr,{"__builtins__":None},globals())
         self.assertEqual(parse(uri),parts)
-
 
 file_parametrize(Construct,"test/files/legaluri",".py")
 file_parametrize(Parse,"test/files/legaluri",".txt")

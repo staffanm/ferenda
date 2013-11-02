@@ -5,6 +5,7 @@ import os
 from io import BytesIO
 import tempfile
 import logging
+import re
 
 from rdflib import URIRef
 from rdflib import Graph
@@ -106,7 +107,7 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
 
     def add_serialized(self, data, format, context=None):
         """Add the serialized RDF statements in the string *data* directly to the repository."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def add_serialized_file(self, filename, format, context=None):
         """Add the serialized RDF statements contained in the file *filename* directly to the repository."""
@@ -116,7 +117,7 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
     def get_serialized(self, format="nt", context=None):
         """Returns a string containing all statements in the store,
         serialized in the selected format. Returns byte string, not unicode array!"""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def get_serialized_file(self, filename, format="nt", context=None):
         """Saves all statements in the store to *filename*."""
@@ -125,35 +126,44 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
             fp.write(data)
 
     def select(self, query, format="sparql"):
-        """
-        Run a SPARQL SELECT query against the triple store and returns the results.
+        """Run a SPARQL SELECT query against the triple store and returns the results.
 
         :param query: A SPARQL query with all neccessary prefixes defined.
-        :type query: str
-        :param format: Either one of the standard formats for queries (``"sparql"``, ``"json"`` or ``"binary"``) -- returns whatever ``requests.get().text`` returns -- or the special value ``"python"`` which returns a python list of dicts representing rows and columns.
-        :type format: str
+        :type  query: str
+        :param format: Either one of the standard formats for queries
+                       (``"sparql"``, ``"json"`` or ``"binary"``) --
+                       returns whatever ``requests.get().text``
+                       returns -- or the special value ``"python"``
+                       which returns a python list of dicts
+                       representing rows and columns.
+        :type  format: str
+
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def construct(self, query):
-        """
-        Run a SPARQL CONSTRUCT query against the triple store and returns the results as a RDFLib graph
+        """Run a SPARQL CONSTRUCT query against the triple store and returns
+        the results as a RDFLib graph
 
         :param query: A SPARQL query with all neccessary prefixes defined.
         :type query: str
+
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def triple_count(self, context=None):
         """Returns the number of triples in the repository."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def clear(self, context=None):
-        """Removes all statements from the repository (without removing the repository as such)."""
-        raise NotImplementedError
+        """Removes all statements from the repository (without removing the
+        repository as such)."""
+        raise NotImplementedError  # pragma: no cover
 
     def close(self):
-        """Close all connections to the triplestore. Needed if using RDFLib-based triple store, a no-op if using HTTP based stores."""
+        """Close all connections to the triplestore. Needed if using
+        RDFLib-based triple store, a no-op if using HTTP based stores."""
+        raise NotImplementedError  # pragma: no cover
 
 
 class RDFLibStore(TripleStore):
@@ -196,8 +206,18 @@ class RDFLibStore(TripleStore):
         return len(g)
 
     def select(self, query, format="sparql"):
+        # FIXME: workaround for the fact that rdflib select uses FROM
+        # <%s> differently than Sesame/Fuseki. We remove the 'FROM
+        # <%s>' part from the query and instead get a context graph
+        # for the same URI.
+        re_fromgraph = re.compile(r" FROM <(?P<graphuri>[^>]+)> ")
+        graphuri = None
+        m = re_fromgraph.search(query)
+        if m:
+            graphuri = m.group("graphuri")
+            query = re_fromgraph.sub(" ", query)
         try:
-            res = self.graph.query(query)
+            res = self._getcontextgraph(graphuri).query(query)
         except pyparsing.ParseException as e:
             raise errors.SparqlError(e)
         if format == "sparql":
@@ -252,7 +272,7 @@ class RDFLibStore(TripleStore):
     # returns a string we can pass as store parameter to the ConjunctiveGraph
     # constructor, see __init__
     def _storeid(self):
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def _getcontextgraph(self, context):
         if context:
@@ -279,9 +299,10 @@ class SQLiteStore(RDFLibStore):
 # -----------------
 # For servers implementing the SPARQL 1.1 Graph Store HTTP Protocol
 # http://www.w3.org/TR/sparql11-http-rdf-update/
-
-
 class RemoteStore(TripleStore):
+
+    def close(self):
+        pass
 
     _contenttype = {"xml": "application/rdf+xml",
                     "sparql": "application/sparql-results+xml",
@@ -325,9 +346,6 @@ class RemoteStore(TripleStore):
             resp = requests.post(self._statements_url(context),
                                  headers=headers,
                                  data=datastream)
-            if resp.status_code >= 400:
-                print("Something went wrong posting to %s" % self._statements_url(context))
-                print(resp.text.encode('latin-1', errors='xmlcharrefreplace'))
             resp.raise_for_status()
 
     def add_serialized_file(self, filename, format, context=None):
@@ -394,11 +412,7 @@ class RemoteStore(TripleStore):
 
     def select(self, query, format="sparql"):
         url = self._endpoint_url()
-        if "?" in url:
-            url += "&"
-        else:
-            url += "?"
-        url += "query=" + quote(query.replace("\n", " ")).replace("/", "%2F")
+        url += "?query=" + quote(query.replace("\n", " ")).replace("/", "%2F")
 
         headers = {}
         if format == "python":
@@ -411,7 +425,7 @@ class RemoteStore(TripleStore):
             if format == "python":
                 return self._sparql_results_to_list(results.text)
             elif format == "json":
-                return results.json
+                return results.json()
             else:
                 return results.text
         except requests.exceptions.HTTPError as e:
@@ -429,7 +443,7 @@ class RemoteStore(TripleStore):
             result.parse(data=resp.text, format=format)
             return result
         except requests.exceptions.HTTPError as e:
-            raise errors.SparqlError(e.response.text)
+            raise errors.SparqlError(e)
 
     def _sparql_results_to_list(self, results):
         res = []
@@ -497,8 +511,8 @@ class SesameStore(RemoteStore):
         return int(ret.text)
 
     def ping(self):
-        requests.get(self.location + '/protocol')
-        return r.text
+        resp = requests.get(self.location + '/protocol')
+        return resp.text
 
     def initialize_repository(self):
         # For Sesame:
@@ -609,20 +623,20 @@ class FusekiStore(RemoteStore):
                 g.parse(data=named, format=format)
                 return g.serialize(format=format)
 
-    def get_serialized_file(self, filename, format="nt", context=None):
-        ret = super(FusekiStore, self).get_serialized_file(filename, format, context)
-        if context is not None:
-            return ret
-        else:
-            context = "urn:x-arq:UnionGraph"
-            named = super(FusekiStore, self).get_serialized(format, context)
-            if format == "nt":
-                # just append
-                with open(filename, "ab") as fp:
-                    fp.write(named)
-            else:
-                g = Graph()
-                g.parse(filename, format=format)
-                g.parse(data=named, format=format)
-                with open(filename, "wb") as fp:
-                    fp.write(g.serialize(format=format))
+#    def get_serialized_file(self, filename, format="nt", context=None):
+#        ret = super(FusekiStore, self).get_serialized_file(filename, format, context)
+#        if context is not None:
+#            return ret
+#        else:
+#            context = "urn:x-arq:UnionGraph"
+#            named = super(FusekiStore, self).get_serialized(format, context)
+#            if format == "nt":
+#                # just append
+#                with open(filename, "ab") as fp:
+#                    fp.write(named)
+#            else:
+#                g = Graph()
+#                g.parse(filename, format=format)
+#                g.parse(data=named, format=format)
+#                with open(filename, "wb") as fp:
+#                    fp.write(g.serialize(format=format))

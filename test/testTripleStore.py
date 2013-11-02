@@ -1,424 +1,422 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import sys, os
-from ferenda.compat import unittest
+# the main idea is to just make sure every line of code is run once,
+# not to instantiate all eight different
+# implementations/configurations and run them all. This will make the
+# test code mimick the implementation to some extent, but as the plan
+# is to mock all http requests/RDFLib calls (neither of which is
+# idempotent), that is sort of unavoidable.
 
-
-import time
-import subprocess
-import os
-import tempfile
+import json, re, os, sqlite3
+from tempfile import mkstemp, mkdtemp
 import shutil
-import logging
 
-from six import text_type as str
-from rdflib import Graph
-from rdflib.util import guess_format
-from rdflib.compare import graph_diff, isomorphic
+import pyparsing
+from rdflib import Graph, URIRef, RDFS, Literal
+import requests.exceptions
+
+from ferenda.compat import patch, Mock, unittest
 from ferenda import util, errors
-
-from ferenda.triplestore import TripleStore, SleepycatStore
-
 from ferenda.testutil import FerendaTestCase
 
-class TripleStoreTestCase(FerendaTestCase):
+# SUT
+from ferenda import TripleStore
+
+# we could have a switch in canned() that, if set, actually calls
+# the request.get or post methods and writes the result to the
+# given files.
+def canned(*responses):
+    returned = []
+    def makeresponse(*args, **kwargs):
+        if len(returned) > len(responses):
+            raise IndexError("Ran out of canned responses after %s calls" % len(returned))
+        resp = Mock()
+        resp.status_code = responses[len(returned)][0]
+        responsefile = responses[len(returned)][1]
+        if responsefile:
+            responsefile = "test/files/triplestore/" + responsefile
+            resp.content = util.readfile(responsefile, "rb")
+            resp.text = util.readfile(responsefile)
+            if responsefile.endswith(".json"):
+                data = json.loads(util.readfile(responsefile))
+                resp.json = Mock(return_value=data)
+        returned.append(True)
+        return resp
+    return makeresponse
+        
+class Main(unittest.TestCase, FerendaTestCase):
+
+    @patch('ferenda.triplestore.util.runcmd')
+    def test_curl(self, runcmd_mock):
+        # needs to test add_serialized, add_serialized_file, get_serialized
+        # and get_serialized_file. We'll patch util.runcmd and make sure that
+        # the command line is correct. We should also have util.runcmd return
+        # a non-zero return code once.
+        # our util.runcmd replacement should, for the get_serialized file,
+        # create a suitable temp file
+
+        store = TripleStore.connect("FUSEKI", "", "", curl=True)
+        # 1. add_serialized
+        runcmd_mock.return_value = (0, "", "")
+        store.add_serialized("tripledata", "nt")
+        cmdline = runcmd_mock.call_args[0][0] # first ordered argument
+        # replace the temporary file name
+        cmdline = re.sub('"@[^"]+"', '"@tempfile.nt"', cmdline)
+        self.assertEqual('curl -X POST --data-binary "@tempfile.nt" --header "Content-Type:text/plain;charset=UTF-8" "/?default"', cmdline)
+        runcmd_mock.mock_reset()
+
+        # 2. add_serialized_file
+        runcmd_mock.return_value = (0, "", "")
+        store.add_serialized_file("tempfile.nt", "nt")
+        cmdline = runcmd_mock.call_args[0][0] # first ordered argument
+        self.assertEqual('curl -X POST --data-binary "@tempfile.nt" --header "Content-Type:text/plain;charset=UTF-8" "/?default"', cmdline)
+        runcmd_mock.mock_reset()
+
+        # 3. get_serialized
+        def create_tempfile(*args, **kwargs):
+            filename = re.search('-o "([^"]+)"', args[0]).group(1)
+            with open(filename, "w") as fp:
+                fp.write("tripledata\n")
+            return (0, "", "")
+        runcmd_mock.side_effect = create_tempfile
+        res = store.get_serialized("nt")
+        self.assertEqual(b"tripledata\ntripledata\n", res)
+        cmdline = runcmd_mock.call_args[0][0] # first ordered argument
+        # replace the temporary file name
+        cmdline = re.sub('-o "[^"]+"', '-o "tempfile.nt"', cmdline)
+        # FIXME is this really right?
+        self.assertEqual('curl -o "tempfile.nt" --header "Accept:text/plain" "/?graph=urn:x-arq:UnionGraph"', cmdline)
+        runcmd_mock.side_effect = None
+        runcmd_mock.mock_reset()
+
+        # 4. get_serialized_file
+        store.get_serialized_file("triples.nt", "nt")
+        cmdline = runcmd_mock.call_args[0][0] # first ordered argument
+        self.assertEqual('curl -o "triples.nt" --header "Accept:text/plain" "/?default"', cmdline)
+        runcmd_mock.mock_reset()
+
+        # 5. handle errors
+        with self.assertRaises(errors.TriplestoreError):
+            runcmd_mock.return_value = (1, "", "Internal error")
+            store.get_serialized_file("triples.nt", "nt")
+
+    def test_fuseki_initialize_triplestore(self):
+        store = TripleStore.connect("FUSEKI", "", "")
+        store.initialize_repository()
+
+        store = TripleStore.connect("FUSEKI", "http://localhost/", "mydataset")
+        store.initialize_repository()
+        
+    @patch('requests.get', side_effect=canned(("200", "defaultgraph.nt"),
+                                             ("200", "namedgraph.nt"),
+                                             ("200", "namedgraph.nt"),
+                                             ("200", "defaultgraph.ttl"),
+                                             ("200", "namedgraph.ttl")))
+    def test_fuseki_get_serialized_file(self, mock_get):
+        # Test 1: imagine that server has data in the default graph
+        # and in one named graph
+        rf = util.readfile
+        tmp = mkdtemp()
+        try:
+            store = TripleStore.connect("FUSEKI", "", "")
+            # test 1.1: Get everything, assert that the result is a combo
+            store.get_serialized_file(tmp+"/out.nt") # no ctx, will result in 2 gets
+            self.assertEqual(mock_get.call_count, 2)
+            self.assertEqual(rf("test/files/triplestore/combinedgraph.nt"),
+                             rf(tmp+"/out.nt"))
+            # test 1.2: Get only namedgraph, assert that only that is returned
+            store.get_serialized_file(tmp+"/out.nt", context="namedgraph") # 1 get
+            self.assertEqual(rf("test/files/triplestore/namedgraph.nt"),
+                             rf(tmp+"/out.nt"))
+            self.assertEqual(mock_get.call_count, 3)
+            # test 1.3: Get everything in a different format
+            store.get_serialized_file(tmp+"/out.ttl", format="turtle") # results in 2 gets
+            self.assertEqualGraphs("test/files/triplestore/combinedgraph.ttl",
+                                  tmp+"/out.ttl")
+            self.assertEqual(mock_get.call_count, 5)
+        finally:
+            shutil.rmtree(tmp)
+                
+    @patch('requests.get', side_effect=canned(("200", "namedgraph.nt"),))
+    def test_fuseki_get_serialized(self, mock_get):
+        store = TripleStore.connect("FUSEKI", "", "", curl=False)
+        # test 1: a namedgraph (cases with no context are already run by
+        # test_fuseki_get_serialized_file)
+        want = util.readfile("test/files/triplestore/namedgraph.nt", "rb")
+        got = store.get_serialized(context="namedgraph") # results in single get
+        self.assertEqual(want, got)
+
+    @patch('requests.delete')
+    def test_fuseki_clear(self, mock_delete):
+        store = TripleStore.connect("FUSEKI", "", "")
+        store.clear()
+        self.assertEqual(mock_delete.call_count, 2)            
+
+        with self.assertRaises(errors.TriplestoreError):
+            mock_delete.side_effect = requests.exceptions.ConnectionError("Server error")
+            got = store.clear()
+
+        with self.assertRaises(errors.TriplestoreError):
+            mock_delete.side_effect = requests.exceptions.HTTPError("Server error")
+            got = store.clear()
+
+        mock_delete.side_effect = requests.exceptions.HTTPError("No such graph")
+        got = store.clear("namedgraph")
+
+
+    @patch('requests.get', side_effect=canned(("200", "triplecount-21.xml"),
+                                             ("200", "triplecount-18.xml"),
+                                             ("200", "triplecount-18.xml")))
+    def test_fuseki_triple_count(self, mock_get):
+        store = TripleStore.connect("FUSEKI", "", "")
+        self.assertEqual(39, store.triple_count())
+        self.assertEqual(mock_get.call_count, 2)
+        self.assertEqual(18, store.triple_count(context="namedgraph"))
+        self.assertEqual(mock_get.call_count, 3)
+
+
+    @patch('requests.post', side_effect=canned((204, None),
+                                               (204, None)))
+    def test_fuseki_add_serialized_file(self, mock_post):
+        store = TripleStore.connect("FUSEKI", "", "")
+        store.add_serialized_file("test/files/triplestore/defaultgraph.ttl",
+                                  format="turtle")
+        self.assertEqual(mock_post.call_count, 1)
+
+    @patch('requests.get', side_effect=canned(("200", "ping.txt"),))
+    def test_sesame_ping(self, mock_get):
+        store = TripleStore.connect("SESAME", "", "")
+        self.assertEqual("5", store.ping())
+
+    def test_sesame_initialize_triplestore(self):
+        store = TripleStore.connect("SESAME", "", "")
+        store.initialize_repository()
+
+    @patch('requests.get', side_effect=canned(("200", "combinedgraph.nt"),
+                                              ("200", "namedgraph.nt")))
+    def test_sesame_get_serialized(self, mock_get):
+        store = TripleStore.connect("SESAME", "", "")
+        want = util.readfile("test/files/triplestore/combinedgraph.nt", "rb")
+        got = store.get_serialized() 
+        self.assertEqual(want, got)
+        self.assertEqual(mock_get.call_count, 1)
+
+        want = util.readfile("test/files/triplestore/namedgraph.nt", "rb")
+        got = store.get_serialized(context="namedgraph") # results in single get
+        self.assertEqual(want, got)
+        self.assertEqual(mock_get.call_count, 2)
+
+    @patch('requests.post', side_effect=canned((204, None),
+                                               (204, None)))
+    def test_sesame_add_serialized(self, mock_post):
+        store = TripleStore.connect("SESAME", "", "")
+        rf = util.readfile
+        store.add_serialized(rf("test/files/triplestore/defaultgraph.ttl"),
+                             format="turtle")
+        self.assertEqual(mock_post.call_count, 1)
+
+        store.add_serialized(rf("test/files/triplestore/namedgraph.nt"),
+                             format="nt",
+                             context="namedgraph")
+        self.assertEqual(mock_post.call_count, 2)
+
+   
+    @patch('requests.get', side_effect=canned((200, "select-results.xml"),
+                                              (200, "select-results.json"),
+                                              (200, "select-results.xml")))
+    def test_sesame_select(self, mock_get):
+        store = TripleStore.connect("SESAME", "", "")
+        rf = util.readfile
+        want = rf("test/files/triplestore/select-results.xml")
+        got = store.select("the-query")
+        self.assertEqual(want, got)
+        self.assertEqual(mock_get.call_count, 1)
+
+        want = json.loads(rf("test/files/triplestore/select-results.json"))
+        got = store.select("the-query", format="json")
+        self.assertEqual(want, got)
+        self.assertEqual(mock_get.call_count, 2)
+
+        want = json.loads(rf("test/files/triplestore/select-results-python.json"))
+        got = store.select("the-query", format="python")
+        self.assertEqual(want, got)
+        self.assertEqual(mock_get.call_count, 3)
+
+        with self.assertRaises(errors.TriplestoreError):
+            mock_get.side_effect = requests.exceptions.HTTPError("Server error")
+            got = store.select("the-query", format="python")
+            
+
     
-    # Set this to True if you want module-level text fixtures to
-    # automatically start and stop the triple store's process for you.
-    manage_server = False
-
-    dataset = """<http://localhost/publ/dir/2012:35> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Direktiv> .
-<http://localhost/publ/dir/2012:35> <http://purl.org/dc/terms/identifier> "Dir. 2012:35" .
-<http://localhost/publ/dir/2012:35> <http://purl.org/dc/terms/title> "Ett minskat och f\\u00F6renklat uppgiftsl\\u00E4mnande f\\u00F6r f\\u00F6retagen"@sv .
-<http://localhost/publ/dir/2012:35> <http://purl.org/dc/terms/published> "2012-04-26"^^<http://www.w3.org/2001/XMLSchema#date> .
-<http://localhost/publ/dir/2012:35> <http://www.w3.org/2002/07/owl#sameAs> <http://rinfo.lagrummet.se/publ/dir/2012:35> .
-<http://localhost/publ/dir/2012:35> <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#departement> <http://lagen.nu/org/2008/naringsdepartementet> .
-<http://localhost/publ/dir/2012:35> <http://www.w3.org/ns/prov-o/wasGeneratedBy> "ferenda.sources.Direktiv.DirPolopoly" .
-"""
-    dataset2 = """
-<http://localhost/publ/dir/2012:36> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Direktiv> .
-<http://localhost/publ/dir/2012:36> <http://purl.org/dc/terms/identifier> "Dir. 2012:36" .
-<http://localhost/publ/dir/2012:36> <http://purl.org/dc/terms/title> "Barns s\\u00E4kerhet i f\\u00F6rskolan"@sv .
-"""
-    movies = """
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-@prefix schema: <http://schema.org/> .
-@prefix foaf: <http://xmlns.com/foaf/0.1/> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix a: <http://example.org/actors/> .
-@prefix m: <http://example.org/movies/> .
-
-m:tt0117665 rdf:type schema:Movie;
-    schema:name "Sleepers"@en,
-                "Kardeş Gibiydiler"@tr;
-    schema:actor a:nm0000102,
-                 a:nm0000134,
-                 a:nm0000093;
-    schema:datePublished "1996-10-18"^^xsd:date;
-    owl:sameAs <http://www.imdb.com/title/tt0117665/> .
-
-m:tt0137523 rdf:type schema:Movie;
-    schema:name "Fight Club"@en,
-                "Бойцовский клуб"@ru;
-    schema:actor a:nm0000093,
-                 a:nm0001570;
-    owl:sameAs <http://www.imdb.com/title/tt0137523/> .
-
-m:tt0099685 rdf:type schema:Movie;
-    schema:name "Goodfellas"@en,
-                "Maffiabröder"@sv;
-    schema:actor a:nm0000134,
-                 a:nm0000501,
-                 a:nm0000582;
-    owl:sameAs <http://www.imdb.com/title/tt099685/> .
-"""
-    actors = """
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-@prefix foaf: <http://xmlns.com/foaf/0.1/> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix a: <http://example.org/actors/> .
-
-a:nm0000102 rdf:type foaf:Person;
-    foaf:name "Kevin Bacon";
-    owl:sameAs <http://live.dbpedia.org/resource/Kevin_Bacon> .
-    
-a:nm0000134 rdf:type foaf:Person;
-    foaf:name "Robert De Niro";
-    owl:sameAs <http://live.dbpedia.org/resource/Robert_De_Niro> .
-    
-a:nm0000093 rdf:type foaf:Person;
-    foaf:name "Brad Pitt";
-    owl:sameAs <http://live.dbpedia.org/resource/Brad_Pitt> .
-
-a:nm0001570 rdf:type foaf:Person;
-    foaf:name "Edward Norton";
-    owl:sameAs <http://live.dbpedia.org/resource/Edward_Norton> .
-
-a:nm0000501 rdf:type foaf:Person;
-    foaf:name "Ray Liotta";
-    owl:sameAs <http://live.dbpedia.org/resource/Ray_Liotta> .
-
-a:nm0000582 rdf:type foaf:Person;
-    foaf:name "Joe Pesci";
-    owl:sameAs <http://live.dbpedia.org/resource/Joe_Pesci> .
-"""
-
-    def test_add_serialized(self):
-        # test adding to default graph
-        self.assertEqual(0,self.store.triple_count())
-        self.store.add_serialized(self.dataset,format="nt")
-        self.assertEqual(7,self.store.triple_count())
-
-    def test_add_serialized_named_graph(self):
-        self.test_add_serialized() # set up environment for this case
-        self.store.add_serialized(self.dataset2,format="nt", context="http://example.org/ctx1")
-        self.assertEqual(3,self.store.triple_count(context="http://example.org/ctx1"))
-        self.assertEqual(10,self.store.triple_count())
-
-    def test_add_contexts(self):
-        self.store.add_serialized(self.movies, format="turtle", context="http://example.org/movies")
-        self.assertEqual(21, self.store.triple_count(context="http://example.org/movies"))
-        self.store.add_serialized(self.actors, format="turtle", context="http://example.org/actors")
-        self.assertEqual(18, self.store.triple_count(context="http://example.org/actors"))
-        self.assertEqual(39, self.store.triple_count())
-        dump = self.store.get_serialized(format="nt")
-        self.assertTrue(len(dump) > 10) # to account for any spurious newlines -- real dump should be over 4K
-        self.store.clear(context="http://example.org/movies")
-        self.assertEqual(0, self.store.triple_count("http://example.org/movies"))
-        self.assertEqual(18, self.store.triple_count())
-        self.store.clear(context="http://example.org/actors")
-        self.assertEqual(0, self.store.triple_count())
-        
-    def test_add_serialized_file(self):
-        self.assertEqual(0,self.store.triple_count())
-        tmp1 = tempfile.mktemp()
-        with open(tmp1,"w") as fp:
-            fp.write(self.dataset)
-        tmp2 = tempfile.mktemp()
-        with open(tmp2,"w") as fp:
-            fp.write(self.dataset2)
-
-        # default graph
-        self.store.add_serialized_file(tmp1, format="nt")
-        self.assertEqual(7,self.store.triple_count())
-        # named graph
-        self.store.add_serialized_file(tmp2, format="nt", context="http://example.org/ctx1")
-        self.assertEqual(3,self.store.triple_count(context="http://example.org/ctx1"))
-        self.assertEqual(10,self.store.triple_count())
-
-        os.unlink(tmp1)
-        os.unlink(tmp2)
-
-    def test_roundtrip(self):
-        data = b'<http://example.org/1> <http://purl.org/dc/terms/title> "language literal"@sv .'
-        self.store.add_serialized(data, format="nt")
-        res = self.store.get_serialized(format="nt").strip()
-        self.assertEqual(res, data)
-
-    def test_clear(self):
-        data = """<http://example.org/1> <http://purl.org/dc/terms/title> "language literal"@sv .\n\n"""
-        self.store.add_serialized(data, format="nt")
-        res = self.store.clear()
-        self.assertEqual(0,self.store.triple_count())
-        
-    def test_get_serialized(self):
-        self.loader.add_serialized(self.dataset,format="nt")
-        del self.loader
-        res = self.store.get_serialized(format="nt")
-        self.assertEqualGraphs(Graph().parse(data=self.dataset, format="nt"),
-                               Graph().parse(data=res, format="nt"))
-
-    def test_get_serialized_file(self):
-        want = tempfile.mktemp(suffix=".nt")
-        util.writefile(want, self.dataset)
-        got = tempfile.mktemp(suffix=".nt")
-        self.loader.add_serialized(self.dataset,format="nt")
-        del self.loader
-        self.store.get_serialized_file(got, format="nt")
-        self.assertEqualGraphs(want,got)
-        
-    def test_select(self):
-        self.loader.add_serialized(self.movies,format="turtle", context="http://example.org/movies")
-        self.loader.add_serialized(self.actors,format="turtle", context="http://example.org/actors")
-        del self.loader
-        sq = """PREFIX foaf: <http://xmlns.com/foaf/0.1/>
-                PREFIX owl: <http://www.w3.org/2002/07/owl#>
-
-                SELECT ?name
-                WHERE  { GRAPH <http://example.org/actors> { ?uri foaf:name ?name .
-                        ?uri owl:sameAs <http://live.dbpedia.org/resource/Kevin_Bacon> } }"""
-
-        p = self.store.select(sq,"python")
-        self.assertIsInstance(p[0]['name'], str)
-        self.assertEqual(p,[{'name':'Kevin Bacon'}])
-        if self.store.__class__ == SleepycatStore:
-            self.store.graph.close()
-        
-    def test_construct(self):
-        self.loader.add_serialized("""
-@prefix ab: <http://learningsparql.com/ns/addressbook#> .
-@prefix d: <http://learningsparql.com/ns/data#> .
-
-d:i0432 ab:firstName "Richard" .
-d:i0432 ab:lastName "Mutt" .
-d:i0432 ab:homeTel "(229) 276-5135" .
-d:i0432 ab:email "richard49@hotmail.com" .
-
-d:i9771 ab:firstName "Cindy" .
-d:i9771 ab:lastName "Marshall" .
-d:i9771 ab:homeTel "(245) 646-5488" .
-d:i9771 ab:email "cindym@gmail.com" .
-
-d:i8301 ab:firstName "Craig" .
-d:i8301 ab:lastName "Ellis" .
-d:i8301 ab:email "craigellis@yahoo.com" .
-d:i8301 ab:email "c.ellis@usairwaysgroup.com" .
-""", format="turtle")
-        del self.loader
-
-        sq = """PREFIX ab: <http://learningsparql.com/ns/addressbook#>
-                PREFIX d: <http://learningsparql.com/ns/data#>
-
-                CONSTRUCT { ?person ?p ?o . }
-                WHERE {
-                    ?person ab:firstName "Craig" ; ab:lastName "Ellis" ;
-                ?p ?o . }"""
+    @patch('requests.get', side_effect=canned((200, "construct-results.xml")))
+    def test_sesame_construct(self, mock_get):
+        store = TripleStore.connect("SESAME", "", "")
+        rf = util.readfile
         want = Graph()
-        want.parse(data="""
-@prefix d:<http://learningsparql.com/ns/data#> . 
-@prefix ab:<http://learningsparql.com/ns/addressbook#> .
+        want.parse(data=rf("test/files/triplestore/construct-results.ttl"),
+                   format="turtle")
+        got = store.construct("the-query")
+        self.assertEqualGraphs(want, got)
+        self.assertEqual(mock_get.call_count, 1)
 
-d:i8301
-    ab:email "c.ellis@usairwaysgroup.com",
-             "craigellis@yahoo.com" ;
-    ab:firstName "Craig" ;
-    ab:lastName "Ellis" .
-""", format="turtle")
-        got = self.store.construct(sq)
-        self.assertTrue(isomorphic(want,got))
-        if self.store.__class__ == SleepycatStore:
-            self.store.graph.close()
-
-    def test_invalid_select(self):
-        with self.assertRaises(errors.SparqlError):
-            self.store.select("This is not a valid SPARQL query")
-
-    def test_invalid_construct(self):
-        with self.assertRaises(errors.SparqlError):
-            self.store.construct("This is not a valid SPARQL query")
-
-@unittest.skipIf('SKIP_FUSEKI_TESTS' in os.environ,
-                 "Skipping Fuseki tests")    
-class Fuseki(TripleStoreTestCase, unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        if cls.manage_server:
-            # Note: In order for this to work, the script "fuseki"
-            # must be in PATH, and FUSEKI_HOME must be set to the
-            # directory of that script (which should also contain
-            # fuseki-server.jar)
-            # assume that the config.ttl from the fuseki distribution is
-            # used, creating an updateable in-memory dataset at /ds
-            subprocess.check_call("fuseki start > /dev/null", shell=True)
-            # It seems to take a little while from the moment that `fuseki
-            # start' returns to when the HTTP service actually is up and
-            # running
-            time.sleep(3)
-
-    @classmethod
-    def tearDownClass(cls):
-        if cls.manage_server:
-            subprocess.check_call("fuseki stop > /dev/null", shell=True)
-        pass
-
-    def setUp(self):       
-        self.store = TripleStore.connect("FUSEKI", "http://localhost:3030/", "ds")
-        self.store.clear()
-        self.loader = self.store
-
-
-@unittest.skipIf('SKIP_FUSEKI_TESTS' in os.environ,
-                 "Skipping Fuseki/curl tests")    
-class FusekiCurl(Fuseki):
-    def setUp(self):       
-        self.store = TripleStore.connect("FUSEKI", "http://localhost:3030/", "ds", curl=True)
-        self.store.clear()
-        self.loader = self.store
-
-
-@unittest.skipIf('SKIP_SESAME_TESTS' in os.environ,
-                 "Skipping Sesame tests")    
-class Sesame(TripleStoreTestCase, unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        # start up tomcat/sesame on port 8080
-        if cls.manage_server:
-            subprocess.check_call("catalina.sh start > /dev/null", shell=True)
-            # It seems to take a little while from the moment that
-            # `catalina.sh start' returns to when the HTTP service
-            # actually is up and answering.
-            time.sleep(1)
-
-    @classmethod
-    def tearDownClass(cls):
-        if cls.manage_server:
-            subprocess.check_call("catalina.sh stop > /dev/null", shell=True)
-
-    def setUp(self):
-        self.store = TripleStore.connect("SESAME", "http://localhost:8080/openrdf-sesame", "ferenda")
-        self.store.clear()
-        self.loader = self.store
-
-    def tearDown(self):
-        pass        
-
-
-class SesameCurl(Sesame):
-    def setUp(self):
-        self.store = TripleStore.connect("SESAME", "http://localhost:8080/openrdf-sesame", "ferenda", curl=True)
-        self.store.clear()
-        self.loader = self.store
-
-
-# A mixin class that changes the behaviour of most tests (tests that
-# attempt to modify the store, apart from initial loading of data,
-# should fail as inmemory stores are read-only).
-class Inmemory(object):
-
-    _store = None # the real store object
-
-    # self.store isn't set by the derived setUp methods (only
-    # self.loader). Some property magic to make self.store call
-    # self.getstore if needed
-    @property
-    def store(self):
-        if self._store is None: # happens for the Inmemory tests
-            self._store = self.getstore()
-        return self._store
-
-    @store.setter
-    def store(self, value):
-        self._store = value
-
-    @store.deleter
-    def store(self):
-        del self._store
-
-    def test_add_contexts(self):
         with self.assertRaises(errors.TriplestoreError):
-            super(Inmemory,self).test_add_contexts()
-
-    def test_roundtrip(self):
-        with self.assertRaises(errors.TriplestoreError):
-            super(Inmemory,self).test_roundtrip()
-
-    def test_clear(self):
-        with self.assertRaises(errors.TriplestoreError):
-            super(Inmemory,self).test_clear()
-
-    def test_add_serialized_named_graph(self):
-        with self.assertRaises(errors.TriplestoreError):
-            super(Inmemory,self).test_add_serialized_named_graph()
-
-    def test_add_serialized_file(self):
-        with self.assertRaises(errors.TriplestoreError):
-            super(Inmemory,self).test_add_serialized_file()
-
-    def test_add_serialized(self):
-        with self.assertRaises(errors.TriplestoreError):
-            super(Inmemory,self).test_add_serialized()
+            mock_get.side_effect = requests.exceptions.HTTPError("Server error")
+            got = store.construct("the-query")
         
-class SQLite(TripleStoreTestCase,unittest.TestCase):
+        
+    @patch('requests.get', side_effect=canned(("200", "size-39.txt"),
+                                             ("200", "size-18.txt")))
+    def test_sesame_triple_count(self, mock_get):
+        store = TripleStore.connect("SESAME", "", "")
+        self.assertEqual(39, store.triple_count())
+        self.assertEqual(mock_get.call_count, 1)
+        self.assertEqual(18, store.triple_count(context="namedgraph"))
+        self.assertEqual(mock_get.call_count, 2)
+        
 
-    def setUp(self):
-        self.store = TripleStore.connect("SQLITE", "ferenda.sqlite", "ferenda")
-        self.store.clear()
-        self.loader = self.store
+    @patch('ferenda.triplestore.ConjunctiveGraph')
+    def test_sqlite_init(self, mock_graph):
+        # create a new db that doesnt exist
+        mock_graph.open.return_value = 42
+        store = TripleStore.connect("SQLITE", "", "")
+        self.assertTrue(mock_graph.return_value.open.called)
+        self.assertTrue(mock_graph.return_value.open.call_args[1]['create'])
 
-    def tearDown(self):
-        self.store.close()
-        del self.store
-        os.remove("ferenda.sqlite")
+        # reopen an existing db
+        fd, tmpname = mkstemp()
+        fp = os.fdopen(fd)
+        fp.close()
+        store = TripleStore.connect("SQLITE", tmpname, "")
+        os.unlink(tmpname)
+        self.assertFalse(mock_graph.return_value.open.call_args[1]['create'])
+
+        # make an inmemory db
+        store = TripleStore.connect("SQLITE", "", "", inmemory=True)
+        self.assertTrue(mock_graph.return_value.quads.called)
+        self.assertTrue(mock_graph.return_value.addN.called)
+
+    @patch('ferenda.triplestore.ConjunctiveGraph')
+    def test_sqlite_add_serialized(self, mock_graph):
+        store = TripleStore.connect("SQLITE", "", "")
+        store.add_serialized("tripledata", "nt")
+        self.assertTrue(mock_graph.return_value.parse.called)
+        self.assertTrue(mock_graph.return_value.commit.called)
+        mock_graph.reset_mock()
+        
+        store.add_serialized("tripledata", "nt", "namedgraph")
+        self.assertTrue(mock_graph.return_value.get_context.called)
+        self.assertTrue(mock_graph.return_value.get_context.return_value.parse.called)
+
+        store = TripleStore.connect("SQLITE", "", "", inmemory=True)
+        with self.assertRaises(errors.TriplestoreError):
+            store.add_serialized("tripledata", "nt")
+
+        
+    @patch('ferenda.triplestore.ConjunctiveGraph')
+    def test_sqlite_add_serialized_file(self, mock_graph):
+        store = TripleStore.connect("SQLITE", "", "")
+        fd, tmpname = mkstemp()
+        fp = os.fdopen(fd, "w")
+        fp.write("tripledata")
+        fp.close()
+        store.add_serialized_file(tmpname, "nt")
+        os.unlink(tmpname)
+
+    @patch('ferenda.triplestore.ConjunctiveGraph')
+    def test_sqlite_get_serialized(self, mock_graph):
+        store = TripleStore.connect("SQLITE", "", "")
+        mock_graph.return_value.serialize.return_value = "tripledata"
+        self.assertEqual(store.get_serialized(), "tripledata")
+
+    @patch('ferenda.triplestore.ConjunctiveGraph')
+    def test_sqlite_triple_count(self, mock_graph):
+        store = TripleStore.connect("SQLITE", "", "")
+        self.assertEqual(0, store.triple_count())
+
+    @patch('ferenda.triplestore.ConjunctiveGraph')
+    def test_sqlite_select(self, mock_graph):
+        store = TripleStore.connect("SQLITE", "", "")
+        sq = """SELECT ?p FROM <http://example.org/ctx> WHERE {?s ?p ?o . }"""
+        res = mock_graph.return_value.get_context.return_value.query.return_value
+        want = [{"s": "http://example.org/doc1",
+                 "p": "http://www.w3.org/2000/01/rdf-schema#comment",
+                 "o": "Hello"}]
+        res.bindings = want
+        self.assertEqual(want, store.select(sq, format="python"))
+        mock_graph.reset_mock()
+        store.select(sq, "sparql")
+        mock_graph.return_value.get_context.return_value.query.return_value.serialize.assert_called_with(format="xml")
+        
+        store.select(sq, "json")
+        mock_graph.return_value.get_context.return_value.query.return_value.serialize.assert_called_with(format="json")
+        
+        mock_graph.return_value.get_context.return_value.query.side_effect = pyparsing.ParseException("Syntax error")
+        with self.assertRaises(errors.SparqlError):
+            store.select(sq)
+        
+        
+    @patch('ferenda.triplestore.ConjunctiveGraph')
+    def test_sqlite_construct(self, mock_graph):
+        store = TripleStore.connect("SQLITE", "", "")
+        sq = """CONSTRUCT ?s ?p ?o WHERE {?o ?p ?s . }"""
+        g = Graph()
+        g.add((URIRef("http://example.org/doc1"), RDFS.comment, Literal("Hey")))
+        g.add((URIRef("http://example.org/doc2"), RDFS.comment, Literal("Ho")))
+        res = Mock
+        res.graph = g
+        mock_graph.return_value.query.return_value = res
+        self.assertEqual(g, store.construct(sq))
+    
+        mock_graph.return_value.query.side_effect = pyparsing.ParseException("Syntax error")
+        with self.assertRaises(errors.SparqlError):
+            store.construct(sq)
+
+    
+    @patch('ferenda.triplestore.ConjunctiveGraph')
+    def test_sqlite_clear(self, mock_graph):
+        store = TripleStore.connect("SQLITE", "", "")
+        g = Graph()
+        g.add((URIRef("http://example.org/doc1"), RDFS.comment, Literal("Hey")))
+        g.add((URIRef("http://example.org/doc2"), RDFS.comment, Literal("Ho")))
+        mock_graph.return_value.get_context.return_value = g
+        store.clear("namedgraph")
+        self.assertEqual(2, mock_graph.return_value.remove.call_count)
+        self.assertEqual(1, mock_graph.return_value.commit.call_count)
+        
+    @patch('ferenda.triplestore.ConjunctiveGraph')
+    def test_sqlite_initialize_triplestore(self, mock_graph):
+        store = TripleStore.connect("SQLITE", "", "")
+        store.initialize_repository()
+        self.assertTrue(mock_graph.return_value.open.call_args[1]['create'])
+        
+
+    @patch('ferenda.triplestore.ConjunctiveGraph')
+    def test_sqlite_remove_repository(self, mock_graph):
+        store = TripleStore.connect("SQLITE", "", "")
+        store.remove_repository()
+        self.assertTrue(mock_graph.return_value.destroy.called)
+
+    @patch('ferenda.triplestore.ConjunctiveGraph')
+    def test_sqlite_close(self, mock_graph):
+        # make sure this wierd but harmless sqlite3 exception is
+        # caught
+        mock_graph.return_value.close.side_effect = sqlite3.ProgrammingError("You made a wrong")
+        store = TripleStore.connect("SQLITE", "", "")
+        store.close()
+        
 
 
-class SQLiteInmemory(Inmemory, SQLite):
+    @patch('ferenda.triplestore.ConjunctiveGraph')
+    def test_sleepycat_init(self, mock_graph):
+        store = TripleStore.connect("SLEEPYCAT", "", "")
+        
+    @patch('ferenda.triplestore.ConjunctiveGraph')
+    def test_sleepycat_triple_count(self, mock_graph):
+        store = TripleStore.connect("SLEEPYCAT", "", "")
+        self.assertEqual(0, store.triple_count())
 
-    def setUp(self):
-        self.loader = TripleStore.connect("SQLITE", "ferenda.sqlite", "ferenda")
-        self.loader.clear()
-
-    def getstore(self):
-        return TripleStore.connect("SQLITE", "ferenda.sqlite", "ferenda", inmemory=True)
-
-
-@unittest.skipIf('SKIP_SLEEPYCAT_TESTS' in os.environ,
-                 "Skipping Sleepycat tests")    
-class Sleepycat(TripleStoreTestCase, unittest.TestCase):
-
-    def setUp(self):
-        self.store = TripleStore.connect("SLEEPYCAT", "ferenda.db", "ferenda")
-        self.store.clear()
-        self.loader = self.store
-
-    def tearDown(self):
-        del self.store
-        if hasattr(self,'loader'):
-            del self.loader
-        if os.path.exists("ferenda.db"):
-            shutil.rmtree("ferenda.db")
-
-
-@unittest.skipIf('SKIP_SLEEPYCAT_TESTS' in os.environ,
-                 "Skipping Sleepycat/inmemory tests")    
-class SleepycatInmemory(Inmemory, Sleepycat):
-
-    def setUp(self):
-        self.loader = TripleStore.connect("SLEEPYCAT", "ferenda.db", "ferenda")
-        self.loader.clear()
-        self.store = None
-
-    def getstore(self):
-        return TripleStore.connect("SLEEPYCAT", "ferenda.db", "ferenda", inmemory=True)
-
+    def test_invalid_store(self):
+        with self.assertRaises(ValueError):
+            TripleStore.connect("INVALID", "", "")
+            

@@ -18,8 +18,8 @@ from rdflib import BNode
 
 
 # my own libraries
-from .legalref import LegalRef
-from . import util
+from ferenda.sources.legal.se.legalref import LegalRef
+from ferenda import util
 
 RPUBL = Namespace('http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
 RINFOEX = Namespace("http://lagen.nu/terms#")

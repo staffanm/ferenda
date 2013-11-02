@@ -14,7 +14,7 @@ import requests
 import six
 
 from ferenda import TextReader
-from ferenda.legalref import LegalRef
+from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda import util
 from . import SwedishLegalSource
 

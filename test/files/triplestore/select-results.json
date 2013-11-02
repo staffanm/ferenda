@@ -1,0 +1,21 @@
+{"head":
+ {"vars": ["uri", "title", "issued"]},
+ "results":
+ {"bindings":[
+     {"issued": {"datatype": "http://www.w3.org/2001/XMLSchema#date",
+                  "type": "typed-literal",
+                  "value": "1939-11-06"},
+      "title": {"type": "literal",
+		 "value": "And Then There Were None"},
+      "uri": {"type": "uri",
+               "value": "http://example.org/books/And_Then_There_Were_None"}},
+     {"issued": {"datatype": "http://www.w3.org/2001/XMLSchema#date",
+                  "type": "typed-literal",
+                  "value": "1859-04-30"},
+      "title": {"type": "literal",
+		 "value": "A Tale of Two Cities"},
+      "uri": {"type": "uri",
+               "value": "http://example.org/books/A_Tale_of_Two_Cities"}}
+ ]
+ }
+}

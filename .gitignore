@@ -1,8 +1,8 @@
 *~
 *.pyc
 .DS_Store
+.ropeproject
 /.coverage
-/.ropeproject
 /.tox
 /dist/
 /ferenda.egg-info/

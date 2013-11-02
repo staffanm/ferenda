@@ -15,3 +15,5 @@ ordereddict # not needed for py2.7 +
 mock
 coverage
 # bsddb3
+# pyScss -- doesn't install on py3 until https://github.com/Kronuz/pyScss/issues/67 is released
+docutils

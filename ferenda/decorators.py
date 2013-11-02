@@ -76,8 +76,16 @@ def parseifneeded(f):
 
 def render(f):
     """Handles the serialization of the :py:class:`~ferenda.Document`
-object to XHTML+RDFa and RDF/XML files. Must be used in conjunction
-with :py:func:`~ferenda.decorators.makedocument`."""
+    object to XHTML+RDFa and RDF/XML files. Must be used in
+    conjunction with :py:func:`~ferenda.decorators.makedocument`.
+
+    """
+    # NOTE: The actual rendering is two lines of code. The bulk of
+    # this function validates that the XHTML+RDFa file that we end up
+    # with contains the exact same triples as is present in the doc
+    # object (including both the doc.meta Graph and any other Graph
+    # that might be present on any doc.body object)
+    
     def iterate_graphs(node):
         res = []
         if hasattr(node, 'meta') and node.meta is not None:
@@ -97,12 +105,15 @@ with :py:func:`~ferenda.decorators.makedocument`."""
         # css file + background images + png renderings of text
         self.create_external_resources(doc)
 
-        # Check to see that all metadata contained in doc.meta is
-        # present in the serialized file.
+        # Validate that all triples specified in doc.meta and any
+        # .meta property on any body object is present in the
+        # XHTML+RDFa file.
         distilled_graph = Graph()
 
-        with codecs.open(self.store.parsed_path(doc.basefile), encoding="utf-8") as fp:  # unicode
-            distilled_graph.parse(data=fp.read(), format="rdfa", publicID=doc.uri)
+        with codecs.open(self.store.parsed_path(doc.basefile),
+                         encoding="utf-8") as fp:  # unicode
+            distilled_graph.parse(data=fp.read(), format="rdfa",
+                                  publicID=doc.uri)
         # The act of parsing from RDFa binds a lot of namespaces
         # in the graph in an unneccesary manner. Particularly it
         # binds both 'dc' and 'dcterms' to
@@ -110,15 +121,18 @@ with :py:func:`~ferenda.decorators.makedocument`."""
         # less than predictable. Blow these prefixes away.
         distilled_graph.bind("dc", URIRef("http://purl.org/dc/elements/1.1/"))
         distilled_graph.bind(
-            "dcterms", URIRef("http://example.org/this-prefix-should-not-be-used"))
+            "dcterms",
+            URIRef("http://example.org/this-prefix-should-not-be-used"))
 
         util.ensure_dir(self.store.distilled_path(doc.basefile))
-        with open(self.store.distilled_path(doc.basefile), "wb") as distilled_file:
+        with open(self.store.distilled_path(doc.basefile),
+                  "wb") as distilled_file:
             # print("============distilled===============")
             # print(distilled_graph.serialize(format="turtle").decode('utf-8'))
             distilled_graph.serialize(distilled_file, format="pretty-xml")
         self.log.debug(
-            '%s: %s triples extracted to %s', doc.basefile, len(distilled_graph), self.store.distilled_path(doc.basefile))
+            '%s: %s triples extracted to %s', doc.basefile,
+            len(distilled_graph), self.store.distilled_path(doc.basefile))
 
         for g in iterate_graphs(doc.body):
             doc.meta += g

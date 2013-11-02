@@ -11,6 +11,7 @@ import codecs
 import collections
 import filecmp
 import unicodedata
+import re
 from io import BytesIO
 from difflib import unified_diff
 from ferenda.compat import unittest
@@ -84,7 +85,7 @@ this class, ie::
             if len(in_second) > 0:
                 msg = "%s unexpected triples were found\n" % len(in_second) + msg
             msg = "%r != %r\n" % (want, got) + msg
-            self.fail(msg)
+            return self.fail(msg)
 
     def assertAlmostEqualDatetime(self, datetime1, datetime2, delta=1):
         """Assert that two datetime objects are reasonably equal.
@@ -106,7 +107,7 @@ this class, ie::
                              (datetime1.isoformat(), datetime2.isoformat(),
                               absdiff))
 
-    def assertEqualXML(self, want, got):
+    def assertEqualXML(self, want, got, namespace_aware=True):
         """Assert that two xml trees are canonically identical.
 
         :param want: The XML document as expected, as a string, byte string or ElementTree element
@@ -114,8 +115,14 @@ this class, ie::
         """
         # Adapted from formencode, https://bitbucket.org/ianb/formencode/
         def xml_compare(want, got, reporter):
-            if want.tag != got.tag:
-                reporter("Tags do not match: 'want': %s, 'got': %s" % (want.tag, got.tag))
+            if namespace_aware:
+                wanttag = want.tag
+                gottag = got.tag
+            else:
+                wanttag = want.tag.rsplit("}")[-1]
+                gottag = got.tag.rsplit("}")[-1]
+            if wanttag != gottag:
+                reporter("Tags do not match: 'want': %s, 'got': %s" % (wanttag, gottag))
                 return False
             for name, value in want.attrib.items():
                 if got.attrib.get(name) != value:
@@ -164,8 +171,7 @@ this class, ie::
                 # return etree.parse(fp).getroot()
                 return etree.parse(fp)
             elif isinstance(want, etree._Element):
-                # FIXME: wrap in ElementTree
-                return something
+                return etree.ElementTree(something)
             else:
                 raise ValueError("Can't convert a %s into an ElementTree" % type(something))
 
@@ -185,8 +191,16 @@ this class, ie::
             want_lines = [x + "\n" for x in c14nize(want_tree).split("\n")]
             got_lines = [x + "\n" for x in c14nize(got_tree).split("\n")]
             diff = unified_diff(want_lines, got_lines, "want.xml", "got.xml")
+            # convert '@@ -1,1 +1,1 @@' (which py26 difflib produces)
+            # to '@@ -1 +1 @@' (wich later versions produces)
+            diff = [re.sub(r"@@ -(\d+),\1 \+(\d+),\2 @@", r"@@ -\1 +\2 @@", x)
+                    for x in diff]
+            # remove trailing space for other control lines (py26...)
+            diff = [re.sub(r"((?:\+\+\+|\-\-\- ).*) $", r"\1", x)
+                    for x in diff]
+
             msg = "".join(diff) + "\n\nERRORS:" + "\n".join(errors)
-            raise AssertionError(msg)
+            return self.fail(msg)
 
     def assertEqualDirs(self, want, got, suffix=None, filterdir="entries"):
         """Assert that two directory trees contains identical files
@@ -239,6 +253,8 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
     docroot = '/tmp'
     """The location of test files to create tests from. Must be overridden
        when creating a testcase class"""
+
+    datadir = None
 
     def setUp(self):
         self.datadir = tempfile.mkdtemp()

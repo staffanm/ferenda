@@ -10,7 +10,7 @@ tool, you don't need to directly call any of these methods --
 else, for you.
 
 """
-from __future__ import unicode_literals
+from __future__ import unicode_literals, print_function
 # system
 import os
 import stat
@@ -20,10 +20,12 @@ import inspect
 import logging
 import json
 import mimetypes
+import shutil
+import tempfile
 from ast import literal_eval
 from datetime import datetime
 import xml.etree.cElementTree as ET
-from ferenda.compat import OrderedDict
+from ferenda.compat import OrderedDict, MagicMock
 from wsgiref.simple_server import make_server
 from wsgiref.util import FileWrapper
 
@@ -91,8 +93,6 @@ def makeresources(repos,
 
     # 1. Process all css files specified in the main config
     for cssfile in cssfiles:
-        if cssfile in processed_files:
-            continue
         cssurls.append(_process_file(
             cssfile, cssbuffer, cssdir, "ferenda.ini", combine))
         processed_files.append(cssfile)
@@ -100,8 +100,6 @@ def makeresources(repos,
     # 2. Visit each enabled class and see if it specifies additional
     # css files to read
     for inst in repos:
-        if not hasattr(inst, 'config'):
-            continue
         for cssfile in inst.config.cssfiles:
             if cssfile in processed_files:
                 continue
@@ -132,15 +130,11 @@ def makeresources(repos,
     jsurls = []
     jsdir = resourcedir + os.sep + "js"
     for jsfile in jsfiles:
-        if jsfile in processed_files:
-            continue
         jsurls.append(_process_file(
             jsfile, jsbuffer, jsdir, "ferenda.ini", combine))
         processed_files.append(jsfile)
 
     for inst in repos:
-        if not hasattr(inst, 'config'):
-            continue
         for jsfile in inst.config.jsfiles:
             if jsfile in processed_files:
                 continue
@@ -200,7 +194,7 @@ def makeresources(repos,
         link.attrib['href'] = tab[1]
 
     # FIXME: almost the exact same code as for tabs
-    tabs = ET.SubElement(
+    footer = ET.SubElement(
         ET.SubElement(ET.SubElement(root, "footerlinks"), "nav"), "ul")
 
     sitefooter = []
@@ -215,7 +209,7 @@ def makeresources(repos,
                     sitefooter.append(link)
 
     for text, href in sitefooter:
-        link = ET.SubElement(ET.SubElement(tabs, "li"), "a")
+        link = ET.SubElement(ET.SubElement(footer, "li"), "a")
         link.text = text
         link.attrib['href'] = href
 
@@ -274,9 +268,10 @@ def _process_file(filename, buf, destdir, origin="", combine=False):
     :returns: The URL path of the resulting file, relative to the web root (or None if combine == True)
     :rtype: str
     """
-    mapping = {'.scss': {'transform': _transform_scss,
-                         'suffix': '.css'}
-               }
+    # disabled until pyScss is usable on py3 again
+    # mapping = {'.scss': {'transform': _transform_scss,
+    #                     'suffix': '.css'}
+    #            }
     log = setup_logger()
     # FIXME: extend this through a load-path mechanism?
     if os.path.exists(filename):
@@ -298,10 +293,11 @@ def _process_file(filename, buf, destdir, origin="", combine=False):
         return None
 
     (base, ext) = os.path.splitext(filename)
-    if ext in mapping:
-        outfile = base + mapping[ext]['suffix']
-        mapping[ext]['transform'](filename, outfile)
-        filename = outfile
+    # disabled until pyScss is usable on py3 again
+    # if ext in mapping:
+    #     outfile = base + mapping[ext]['suffix']
+    #     mapping[ext]['transform'](filename, outfile)
+    #     filename = outfile
     if combine:
         log.debug("combining %s into buffer" % filename)
         buf.write(fp.read())
@@ -316,13 +312,12 @@ def _process_file(filename, buf, destdir, origin="", combine=False):
         fp.close()
         return _filepath_to_urlpath(outfile, 2)
 
-
-def _transform_scss(infile, outfile):
-    print(("Transforming %s to %s" % (infile, outfile)))
-    from scss import Scss
-    compiler = Scss()
-    util.writefile(outfile, compiler.compile(util.readfile(infile)))
-
+# disabled until pyScss is usable on py3 again
+# def _transform_scss(infile, outfile):
+#     print(("Transforming %s to %s" % (infile, outfile)))
+#     from scss import Scss
+#     compiler = Scss()
+#     util.writefile(outfile, compiler.compile(util.readfile(infile)))
 
 def frontpage(repos,
               path="data/index.html",
@@ -404,7 +399,7 @@ def runserver(repos,
     :type searchendpoint: str
 
     """
-    print("Serving wsgi app at http://localhost:%s/" % port)
+    setup_logger().info("Serving wsgi app at http://localhost:%s/" % port)
     kwargs = {'port': port,
               'documentroot': documentroot,
               'apiendpoint': apiendpoint,
@@ -457,7 +452,7 @@ def _str(s, encoding="ascii"):
 
     """
     if sys.version_info < (2, 7, 0):
-        return s.encode("ascii")
+        return s.encode("ascii")  # pragma: no cover
     else:
         return s
 
@@ -476,7 +471,7 @@ def _wsgi_search(environ, start_response, args):
     querystring = OrderedDict(parse_qsl(environ['QUERY_STRING']))
     query = querystring['q']
     if not isinstance(query, str):  # happens on py26
-        query = query.decode("utf-8")
+        query = query.decode("utf-8")  # pragma: no cover
     pagenum = int(querystring.get('p', '1'))
     res, pager = idx.query(query, pagenum=pagenum)
     if pager['totalresults'] == 1:
@@ -566,8 +561,8 @@ def _wsgi_static(environ, start_response, args):
             fullpath = fullpath + "index.html"
         if os.path.exists(fullpath):
             ext = os.path.splitext(fullpath)[1]
-            if not mimetypes.inited:
-                mimetypes.init()
+            # if not mimetypes.inited:
+            #     mimetypes.init()
             mimetype = mimetypes.types_map.get(ext, 'text/plain')
             status = "200 OK"
             length = os.path.getsize(fullpath)
@@ -598,7 +593,9 @@ loglevels = {'DEBUG': logging.DEBUG,
              'CRITICAL': logging.CRITICAL}
 
 
-def setup_logger(level='INFO', filename=None):
+def setup_logger(level='INFO', filename=None,
+                 logformat="%(asctime)s %(name)s %(levelname)s %(message)s",
+                 datefmt="%H:%M:%S"):
     """Sets up the logging facilities and creates the module-global log
        object as a root logger.
 
@@ -613,22 +610,20 @@ def setup_logger(level='INFO', filename=None):
         loglevel = loglevels[level]
 
     l = logging.getLogger()  # get the root logger
-
     # if l.handlers == []:
     if filename:
+        util.ensure_dir(filename)
         h = logging.FileHandler(filename)
     else:
         h = logging.StreamHandler()
     for existing_handler in l.handlers:
         if h.__class__ == existing_handler.__class__:
-            # print("A %s already existed, not adding a new one" % h)
+            # print("    A %r already existed" % h)
             return l
 
     h.setLevel(loglevel)
     h.setFormatter(
-        logging.Formatter(
-            "%(asctime)s %(name)s %(levelname)s %(message)s",
-            datefmt="%H:%M:%S"))
+        logging.Formatter(logformat, datefmt=datefmt))
     l.addHandler(h)
     l.setLevel(loglevel)
 
@@ -639,6 +634,18 @@ def setup_logger(level='INFO', filename=None):
 
     return l
 
+
+def shutdown_logger():
+    """Shuts down the configured logger. In particular, closes any
+    FileHandlers, which is needed on win32."""
+    
+    l = logging.getLogger()  # get the root logger
+    for existing_handler in list(l.handlers):
+        if isinstance(existing_handler, logging.FileHandler):
+            existing_handler.close()
+        l.removeHandler(existing_handler)
+
+    
 
 def run(argv):
     """Runs a particular action for either a particular class or all
@@ -757,7 +764,6 @@ def enable(classname):
     :returns: The short-form alias for the class
     :rtype: str
     """
-
     cls = _load_class(classname)  # eg ferenda.DocumentRepository
                                  # throws error if unsuccessful
     cfg = configparser.ConfigParser()
@@ -772,57 +778,71 @@ def enable(classname):
     log.info("Enabled class %s (alias '%s')" % (classname, alias))
     return alias
 
-
-def setup(force=False, verbose=False, unattended=False):
-    """Creates a project, complete with configuration file and
-    ferenda-build tool. Takes no parameters, but expects ``sys.argv``
-    to contain the path to the project being created.
-
-    Checks to see that all required python modules and command line
-    utilities are present. Also checks which triple store(s) are
-    available and selects the best one (in order of preference:
-    Sesame, Fuseki, RDFLib+Sleepycat, RDFLib+SQLite).
-
+def runsetup():
+    """Runs :func:`setup` and exits with a non-zero status if setup
+    failed in any way
+    
     .. note::
 
        The ``ferenda-setup`` script that gets installed with ferenda is
        a tiny wrapper around this function.
 
     """
-    if len(sys.argv) < 2:
-        print(("Usage: %s [project-directory]" % sys.argv[0]))
+    # very basic cmd line handling
+    force = ('--force' in sys.argv)
+    verbose = ('--verbose' in sys.argv)
+    unattended = ('--unattended' in sys.argv)
+    if not setup(sys.argv, force, verbose, unattended):
+        sys.exit(-1)
+        
+
+def setup(argv=None, force=False, verbose=False, unattended=False):
+    """Creates a project, complete with configuration file and
+    ferenda-build tool.
+    
+    Checks to see that all required python modules and command line
+    utilities are present. Also checks which triple store(s) are
+    available and selects the best one (in order of preference:
+    Sesame, Fuseki, RDFLib+Sleepycat, RDFLib+SQLite).
+    """
+    log = setup_logger(logformat="%(message)s")
+
+    if not argv:
+        argv = sys.argv
+    if len(argv) < 2:
+        log.error("Usage: %s [project-directory]" % argv[0])
         return False
-    projdir = sys.argv[1]
+    projdir = argv[1]
     if os.path.exists(projdir) and not force:
-        print(("Project directory %s already exists" % projdir))
+        log.error("Project directory %s already exists" % projdir)
         return False
     sitename = os.path.basename(projdir)
 
-    ok = _preflight_check(verbose)
+    ok = _preflight_check(log, verbose)
     if not ok and not force:
         if unattended:
             answer = "n"
         else:
-            print("There were some errors when checking your environment. Proceed anyway? (y/N)")
+            log.info("There were some errors when checking your environment. Proceed anyway? (y/N)")
             answer = input()
         if answer != "y":
-            sys.exit(1)
+            return False
 
     # The template ini file needs values for triple store
     # configuration. Find out the best triple store we can use.
-    storetype, storelocation, storerepository = _select_triplestore(sitename, verbose)
-    print("Selected %s as triplestore" % storetype)
+    storetype, storelocation, storerepository = _select_triplestore(sitename, log, verbose)
+    log.info("Selected %s as triplestore" % storetype)
     if not storetype:
         if unattended:
             answer = "n"
         else:
-            print("Cannot find a useable triple store. Proceed anyway? (y/N)")
+            log.info("Cannot find a useable triple store. Proceed anyway? (y/N)")
             answer = input()
         if answer != "y":
-            sys.exit(1)
+            return False
 
-    indextype, indexlocation = _select_fulltextindex(verbose)
-    print("Selected %s as search engine" % indextype)
+    indextype, indexlocation = _select_fulltextindex(log, verbose)
+    log.info("Selected %s as search engine" % indextype)
 
     if not os.path.exists(projdir):
         os.makedirs(projdir)
@@ -838,11 +858,13 @@ def setup(force=False, verbose=False, unattended=False):
     util.resource_extract('res/scripts/ferenda.template.ini', configfile,
                           locals())
 
-    print("Project created in %s" % projdir)
+    log.info("Project created in %s" % projdir)
 
     # step 3: create WSGI app
     wsgifile = projdir + os.sep + "wsgi.py"
     util.resource_extract('res/scripts/wsgi.py', wsgifile)
+    shutdown_logger()
+    return True
 
 
 def _load_config(filename, argv=[]):
@@ -861,7 +883,9 @@ overridden by the config file or command line arguments."""
                 'combineresources': False,
                 'staticsite': False,
                 'sitename': 'MySite',
-                'sitedescription': 'Just another Ferenda site'}
+                'sitedescription': 'Just another Ferenda site',
+                'cssfiles': list,
+                'jsfiles': list}
     config = LayeredConfig(defaults, filename, argv, cascade=True)
     return config
 
@@ -885,31 +909,22 @@ def _classes_from_classname(enabled, classname):
 
 
 def _setup_makeresources_args(config):
-    """Given a config object, returns a dict with some of those configuration options, but suitable as arguments for :py:func:`ferenda.Manager.makeresources`. 
+    """Given a config object, returns a dict with some of those
+    configuration options, but suitable as arguments for
+    :py:func:`ferenda.Manager.makeresources`.
     
-    :param config: An initialized config object with data from a ferenda.ini file
+    :param config: An initialized config object with data from a ferenda.ini
+                   file
     :type config: ferenda.LayeredConfig
     :returns: A subset of the same configuration options
     :rtype: dict
+
     """
-    # our config file stores the cssfiles and jsfiles parameters as string
-    def getlist(config, key):
-        if hasattr(config, key):
-            if isinstance(getattr(config, key), six.text_type):
-                return literal_eval(getattr(config, key))
-            else:
-                return getattr(config, key)
-        else:
-            return []
-
-    cssfiles = getlist(config, 'cssfiles')
-    jsfiles = getlist(config, 'jsfiles')
-
     return {'resourcedir': config.datadir + os.sep + 'rsrc',
             'combine':     config.combineresources,
             'staticsite':  config.staticsite,
-            'cssfiles':    cssfiles,
-            'jsfiles':     jsfiles,
+            'cssfiles':    config.cssfiles,
+            'jsfiles':     config.jsfiles,
             'sitename':    config.sitename,
             'sitedescription': config.sitedescription}
 
@@ -1016,18 +1031,18 @@ def _run_class(enabled, argv):
                         if hasattr(e, 'dummyfile'):
                             if not os.path.exists(e.dummyfile):
                                 util.writefile(e.dummyfile, "")
+                            res.append(None) # is what
+                                             # DocumentRepository.parse
+                                             # returns when
+                                             # everyting's ok
                         else:
                             errmsg = str(e)
-                            if not errmsg:
-                                errmsg = repr(e)
                             log.error("%s of %s failed: %s" %
                                       (command, basefile, errmsg))
                             res.append(sys.exc_info())
 
                     except Exception as e:
                         errmsg = str(e)
-                        if not errmsg:
-                            errmsg = repr(e)
                         log.error("%s of %s failed: %s" %
                                   (command, basefile, errmsg))
                         res.append(sys.exc_info())
@@ -1054,19 +1069,6 @@ def _instantiate_class(cls, configfile="ferenda.ini", argv=[]):
         classcfg.datadir + os.sep + inst.alias,
         downloaded_suffix=inst.downloaded_suffix,
         storage_policy=inst.storage_policy)
-    # FIXME: this is a quick hack for controlling trace loggers for
-    # ferenda.sources.legal.se.SFS. Must think abt how to generalize
-    # this.
-    if hasattr(inst, 'trace'):
-        for tracelog in inst.trace:
-            try:
-
-                loglevel = getattr(inst.config.trace, tracelog)
-                log = logging.getLogger(inst.alias + "." + tracelog)
-                log.setLevel(loglevels.get(loglevel, 'DEBUG'))
-            except AttributeError:
-                logging.getLogger(
-                    inst.alias + "." + tracelog).propagate = False
     return inst
 
 
@@ -1103,7 +1105,7 @@ def _enabled_classes(inifile=None):
 def _print_usage():
     """Prints out general usage information for the ``ferenda-build.py`` tool."""
     # general info, enabled classes
-    executable = sys.argv[0]
+    executable = sys.argv[0] 
     print("""Usage: %(executable)s [class-or-alias] [action] <arguments> <options>
    e.g. '%(executable)s ferenda.sources.EurlexCaselaw enable'
         '%(executable)s ecj parse 62008J0042'
@@ -1145,13 +1147,8 @@ def _print_class_usage(cls):
     :param cls: The class object to print usage information for
     :type  cls: class
     """
+    print("Valid actions are:")
     actions = _list_class_usage(cls)
-    if actions:
-        print("Valid actions are:")
-    else:
-        print(
-            "No valid actions in this class (%s). Did you forget the @action decorator?" %
-            cls.__name__)
     for action, desc in actions.items():
         print(" * %s: %s" % (action, desc))
 
@@ -1331,7 +1328,7 @@ def _filepath_to_urlpath(path, keep_segments=2):
     return urlpath.replace(os.sep, "/")
 
 
-def _preflight_check(verbose=False):
+def _preflight_check(log, verbose=False):
     """Perform a check of needed modules and binaries."""
     pythonver = (2, 6, 0)
 
@@ -1356,12 +1353,13 @@ def _preflight_check(verbose=False):
     # 1: Check python ver
     success = True
     if sys.version_info < pythonver:
-        print("ERROR: ferenda requires Python %s or higher, you have %s" %
-              (".".join(pythonver), sys.version.split()[0]))
+        log.error("ERROR: ferenda requires Python %s or higher, you have %s" %
+                  (".".join([str(x) for x in pythonver]),
+                   sys.version.split()[0]))
         success = False
     else:
         if verbose:
-            print("Python version %s OK" % sys.version.split()[0])
+            log.info("Python version %s OK" % sys.version.split()[0])
 
     # 2: Check modules -- TODO: Do we really need to do this?
     for (mod, ver, required) in modules:
@@ -1370,27 +1368,32 @@ def _preflight_check(verbose=False):
             version = getattr(m, '__version__', None)
             if isinstance(version, tuple):
                 version = ".".join([str(x) for x in version])
+            # print("version of %s is %s" % (mod, version))
             if not hasattr(m, '__version__'):
-                print(
-                    "WARNING: Module %s has no version information, it might be older than required" % mod)
+                log.warning("Module %s has no version information,"
+                            "it might be older than required" % mod)
             elif version < ver:  # FIXME: use util.numcmp?
                 if required:
-                    print("ERROR: Module %s has version %s, need %s" %
+                    log.error("Module %s has version %s, need %s" %
                           (mod, version, ver))
                     success = False
                 else:
-                    print(
-                        "WARNING: Module %s has version %s, would like to hav %s" %
+                    log.warning(
+                        "Module %s has version %s, would like to have %s" %
                         (mod, version, ver))
             else:
                 if verbose:
-                    print("Module %s OK" % mod)
+                    log.info("Module %s OK" % mod)
         except ImportError:
             if required:
-                print("ERROR: Missing module %s" % mod)
+                log.error("Missing module %s" % mod)
                 success = False
             else:
-                print("WARNING: Missing (non-essential) module %s" % mod)
+                log.warning("Missing (non-essential) module %s" % mod)
+
+    # a thing needed by testManager.Setup.test_preflight
+    if isinstance(__import__, MagicMock) and __import__.side_effect is not None:
+        __import__.side_effect = None
 
     # 3: Check binaries
     for (cmd, arg) in binaries:
@@ -1399,108 +1402,122 @@ def _preflight_check(verbose=False):
                                   stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE)
             if ret == 127:
-                print("ERROR: Binary %s failed to execute")
+                log.error("Binary %s failed to execute" % cmd)
                 success = False
             else:
                 if verbose:
-                    print("Binary %s OK" % cmd)
+                    log.info("Binary %s OK" % cmd)
         except OSError as e:
-            print("ERROR: Binary %s failed: %s" % (cmd, e))
+            log.error("Binary %s failed: %s" % (cmd, e))
             success = False
     if success:
-        print("Prerequisites ok")
+        log.info("Prerequisites ok")
     return success
 
 
-def _select_triplestore(sitename, verbose=False):
+def _select_triplestore(sitename, log, verbose=False):
     # Try triplestores in order: Fuseki, Sesame, Sleepycat, SQLite,
     # and return configuration for the first triplestore that works.
 
     # 1. Fuseki
-    try:
-        triplestore = os.environ.get('FERENDA_TRIPLESTORE_LOCATION',
-                                     'http://localhost:3030')
-        resp = requests.get(triplestore + "/ds/data?default")
-        resp.raise_for_status()
-        if verbose:
-            print("Fuseki server responding at %s" % triplestore)
-        # TODO: Find out how to create a new datastore in Fuseki
-        # programatically so we can use
-        # http://localhost:3030/$SITENAME instead
-        return('FUSEKI', triplestore, 'ds')
-    except (requests.exceptions.HTTPError,
-            requests.exceptions.ConnectionError) as e:
-        if verbose:
-            print("... Fuseki not available at %s: %s" % (triplestore, e))
-        pass
+    triplestore = os.environ.get('FERENDA_TRIPLESTORE_LOCATION',
+                                 'http://localhost:3030')
+    if triplestore:
+        try:
+            resp = requests.get(triplestore + "/ds/data?default")
+            resp.raise_for_status()
+            if verbose:
+                log.info("Fuseki server responding at %s" % triplestore)
+            # TODO: Find out how to create a new datastore in Fuseki
+            # programatically so we can use
+            # http://localhost:3030/$SITENAME instead
+            return('FUSEKI', triplestore, 'ds')
+        except (requests.exceptions.HTTPError,
+                requests.exceptions.ConnectionError) as e:
+            if verbose:
+                log.info("... Fuseki not available at %s: %s" %
+                         (triplestore, e))
+            pass
 
     # 2. Sesame
-    try:
-        triplestore = os.environ.get('FERENDA_TRIPLESTORE_LOCATION',
-                                     'http://localhost:8080/openrdf-sesame')
-        resp = requests.get(triplestore + '/protocol')
-        resp.raise_for_status()
-        workbench = triplestore.replace('openrdf-sesame', 'openrdf-workbench')
-        if verbose:
-            print("Sesame server responding at %s (%s)" % (triplestore, resp.text))
-        # TODO: It is possible, if you put the exactly right triples
-        # in the SYSTEM repository, to create a new repo
-        # programmatically.
-        print("""You still need to create a repository at %(workbench)s ->
-New repository. The following settings are recommended:
+    triplestore = os.environ.get('FERENDA_TRIPLESTORE_LOCATION',
+                                 'http://localhost:8080/openrdf-sesame')
+    if triplestore:
+        try:
+            resp = requests.get(triplestore + '/protocol')
+            resp.raise_for_status()
+            workbench = triplestore.replace('openrdf-sesame',
+                                            'openrdf-workbench')
+            if verbose:
+                log.info("Sesame server responding at %s (%s)" %
+                         (triplestore, resp.text))
+            # TODO: It is possible, if you put the exactly right triples
+            # in the SYSTEM repository, to create a new repo
+            # programmatically.
+            log.info("""You still need to create a repository at %(workbench)s ->
+    New repository. The following settings are recommended:
 
-    Type: Native Java store
-    ID: %(sitename)s
-    Title: Ferenda repository for %(sitename)s
-    Triple indexes: spoc,posc,cspo,opsc,psoc
-        """ % locals())
-        return('SESAME', triplestore, sitename)
-    except (requests.exceptions.HTTPError,
-            requests.exceptions.ConnectionError) as e:
-        if verbose:
-            print("... Sesame not available at %s: %s" % (triplestore, e))
-        pass
+        Type: Native Java store
+        ID: %(sitename)s
+        Title: Ferenda repository for %(sitename)s
+        Triple indexes: spoc,posc,cspo,opsc,psoc
+            """ % locals())
+            return('SESAME', triplestore, sitename)
+        except (requests.exceptions.HTTPError,
+                requests.exceptions.ConnectionError) as e:
+            if verbose:
+                log.info("... Sesame not available at %s: %s" %
+                         (triplestore, e))
+            pass
 
     # 3. RDFLib + SQLite
     try:
-        t = TripleStore.connect("SQLITE", "test.sqlite", "ferenda")
+        tmp = tempfile.mkdtemp()
+        
+        t = TripleStore.connect("SQLITE", tmp+os.sep+"test.sqlite", "ferenda")
         if verbose:
-            print("SQLite-backed RDFLib triplestore seems to work")
+            log.info("SQLite-backed RDFLib triplestore seems to work")
         return ('SQLITE', 'data/ferenda.sqlite', 'ferenda')
     except ImportError as e:
         if verbose:
-            print("...SQLite not available: %s" % e)
+            log.info("...SQLite not available: %s" % e)
+    finally:
+        shutil.rmtree(tmp)
 
     # 4. RDFLib + Sleepycat
     try:
-        t = TripleStore.connect("SLEEPYCAT", "test.db", "ferenda")
+        tmp = tempfile.mkdtemp()
+        t = TripleStore.connect("SLEEPYCAT", tmp+os.sep+"test.db", "ferenda")
         # No boom?
         if verbose:
-            print("Sleepycat-backed RDFLib triplestore seems to work")
+            log.info("Sleepycat-backed RDFLib triplestore seems to work")
         return ('SLEEPYCAT', 'data/ferenda.db', 'ferenda')
     except ImportError as e:
         if verbose:
-            print("...Sleepycat not available: %s" % e)
+            log.info("...Sleepycat not available: %s" % e)
+    finally:
+        shutil.rmtree(tmp)
 
-    print("No usable triplestores, the actions 'relate', 'generate' and 'toc' won't work")
+    log.info("No usable triplestores, the actions 'relate', 'generate' and 'toc' won't work")
     return (None, None, None)
 
 
-def _select_fulltextindex(verbose=False):
+def _select_fulltextindex(log, verbose=False):
     # 1. Elasticsearch
-    try:
-        fulltextindex = os.environ.get('FERENDA_FULLTEXTINDEX_LOCATION',
-                                       'http://localhost:9200/')
-        resp = requests.get(fulltextindex)
-        resp.raise_for_status()
-        if verbose:
-            print("Elasticsearch server responding at %s" % triplestore)
-        return('ELASTICSEARCH', fulltextindex)
-    except (requests.exceptions.HTTPError,
-            requests.exceptions.ConnectionError) as e:
-        if verbose:
-            print("... Elasticsearch not available at %s: %s" %
-                  (fulltextindex, e))
-        pass
+    fulltextindex = os.environ.get('FERENDA_FULLTEXTINDEX_LOCATION',
+                                   'http://localhost:9200/')
+    if fulltextindex:
+        try:
+            resp = requests.get(fulltextindex)
+            resp.raise_for_status()
+            if verbose:
+                log.info("Elasticsearch server responding at %s" % fulltextindex)
+            return('ELASTICSEARCH', fulltextindex)
+        except (requests.exceptions.HTTPError,
+                requests.exceptions.ConnectionError) as e:
+            if verbose:
+                log.info("... Elasticsearch not available at %s: %s" %
+                      (fulltextindex, e))
+            pass
     # 2. Whoosh (just assume that it works)
     return ("WHOOSH", "data/whooshindex")

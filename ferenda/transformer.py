@@ -211,12 +211,18 @@ class XSLTTransform(TransformerEngine):
     def transform(self, indata, config=None, parameters={}):
         strparams = {}
         if config:
+            # paths to be used with the document() function
+            # must use unix path separators
+            if os.sep == "\\":
+                config = config.replace(os.sep, "/")
             strparams['configurationfile'] = XSLT.strparam(config)
         for key, value in parameters.items():
             if key.endswith("file"):
                 # relativize path of file relative to the XSL file
                 # we'll be using. The mechanism could be clearer...
                 value = os.path.relpath(value, self.templdir)
+                if os.sep == "\\":
+                    value = value.replace(os.sep, "/")
             strparams[key] = XSLT.strparam(value)
         try:
             return self._transformer(indata, **strparams)

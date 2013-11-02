@@ -4,6 +4,8 @@ import os
 import datetime
 import ast
 import logging
+import itertools
+import tempfile
 from ferenda.compat import OrderedDict
 from six.moves import configparser
 from six import text_type as str
@@ -65,10 +67,12 @@ class LayeredConfig(object):
        Example::
 
            >>> defaults = {'parameter': 'foo', 'other': 'default'}
-           >>> with open("test.ini", "w") as fp:
+           >>> dir = tempfile.mkdtemp()
+           >>> inifile = dir + os.sep + "test.ini"
+           >>> with open(inifile, "w") as fp:
            ...     res = fp.write("[__root__]\\nparameter = bar")
            >>> argv = ['--parameter=baz']
-           >>> conf = LayeredConfig(defaults, "test.ini", argv)
+           >>> conf = LayeredConfig(defaults, inifile, argv)
            >>> conf.parameter == 'baz'
            True
            >>> conf.other == 'default'
@@ -76,11 +80,12 @@ class LayeredConfig(object):
            >>> conf.parameter = 'changed'
            >>> conf.other = 'also changed'
            >>> LayeredConfig.write(conf)
-           >>> with open("test.ini") as fp:
+           >>> with open(inifile) as fp:
            ...     res = fp.read()
            >>> res == '[__root__]\\nparameter = changed\\nother = also changed\\n\\n'
            True
-
+           >>> os.unlink(inifile)
+           >>> os.rmdir(dir)
     """
 
     def __init__(self, defaults=None, inifile=None, commandline=None, cascade=False):
@@ -102,13 +107,6 @@ class LayeredConfig(object):
         self._parent = None
         self._sectionkey = None
 
-    def _has(self, name):
-        try:
-            getattr(self, name)
-            return True
-        except ValueError:
-            return False
-
     @staticmethod
     def write(config):
         """Write changed properties to inifile (if provided at initialization)."""
@@ -121,14 +119,17 @@ class LayeredConfig(object):
 
     def __iter__(self):
         l = []
-        # l.extend(self._subsections.keys())
-        l.extend(self._commandline.keys())
-        l.extend(self._inifile.keys())
-        l.extend(self._defaults.keys())
+        iterables = [self._commandline.keys(),
+                     self._inifile.keys(),
+                     self._defaults.keys()]
+
         if self._cascade and self._parent:
-            l.extend(list(self._parent))
-        for k in l:
-            yield k
+            iterables.append(self._parent)
+        
+        for k in itertools.chain(*iterables):
+            if k not in l:
+                l.append(k)
+                yield k
 
     def __getattribute__(self, name):
         if name.startswith("_") or name == "write":
@@ -264,8 +265,14 @@ class LayeredConfig(object):
            string value to the correct type IF we know the correct
            type."""
         def boolconvert(value):
-            return value == "True"
-
+            # not all bools should be converted, see test_typed_commandline
+            if value == "True":
+                return True
+            elif value == "False":
+                return False
+            else:
+                return value
+            
         def listconvert(value):
             # this function is called with both string represenations
             # of entire lists and simple (unquoted) strings. The

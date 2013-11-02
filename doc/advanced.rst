@@ -36,10 +36,12 @@ the ``subrepos`` class property.
    :end-before: # end composite
   
 The CompositeRepository docrepo then acts as a proxy for all of your
-specialized repositories::
+specialized repositories:
 
 .. literalinclude:: examples/composite-repository.sh
-
+   :start-after: # begin example
+   :end-before: # end example
+	      
 Note that ``patents.XMLPatents`` and the other subrepos are never
 registered in ferenda.ini``. They're just called behind-the-scenes by
 ``patents.CompositePatents``.

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import unicode_literals, print_function
 
 from collections import defaultdict
 from datetime import datetime
@@ -279,6 +279,7 @@ class DocumentRepository(object):
             'storerepository': 'ferenda',
             'indextype': 'WHOOSH',
             'indexlocation': 'data/whooshindex',
+            'republishsource': False,
             'combineresources': False,
             'cssfiles': ['http://fonts.googleapis.com/css?family=Raleway:200,100',
                              'res/css/normalize.css',
@@ -300,7 +301,8 @@ object as single parameter."""
 
         if hasattr(cls, action + "_all_setup"):
             cbl = getattr(cls, action + "_all_setup")
-            return cbl(config)
+            if callable(cbl):
+                return cbl(config)
 
     @classmethod
     def teardown(cls, action, config):
@@ -313,7 +315,8 @@ with the *config* object as single parameter.
 
         if hasattr(cls, action + "_all_teardown"):
             cbl = getattr(cls, action + "_all_teardown")
-            return cbl(config)
+            if callable(cbl):
+                return cbl(config)
 
     def get_archive_version(self, basefile):
         """Get a version identifier for the current version of the
@@ -381,8 +384,20 @@ with the *config* object as single parameter.
 
     def basefile_from_uri(self, uri):
         """The reverse of
-:meth:`~ferenda.DocumentRepository.canonical_uri`. Returns None if the
-uri doesn't map to a basefile in this repo."""
+           :meth:`~ferenda.DocumentRepository.canonical_uri`. Returns
+           None if the uri doesn't map to a basefile in this repo.
+
+        >>> d = DocumentRepository()
+        >>> d.alias == "base"
+        True
+        >>> d.config.url = "http://example.org/"
+        >>> d.basefile_from_uri("http://example.org/res/base/123/a") == "123/a"
+        True
+        >>> d.basefile_from_uri("http://example.org/res/base/123/a#S1") == "123/a"
+        True
+        >>> d.basefile_from_uri("http://example.org/res/other/123/a") # None
+        
+        """
         if uri.startswith(self.config.url + "res/"):
             path = uri[len(self.config.url + "res/"):]
             if "/" in path:
@@ -393,7 +408,9 @@ uri doesn't map to a basefile in this repo."""
                     return basefile
 
     def dataset_params_from_uri(self, uri):
-        """Given a parametrized dataset URI, return the parameter and value used.
+        """Given a parametrized dataset URI, return the parameter and value
+           used (or an empty tuple, if it is a dataset URI handled by
+           this repo, but without any parameters).
 
         >>> d = DocumentRepository()
         >>> d.alias == 'base'
@@ -401,7 +418,9 @@ uri doesn't map to a basefile in this repo."""
         >>> d.config.url = "http://example.org/"
         >>> d.dataset_params_from_uri("http://example.org/dataset/base?title=a") == ('title', 'a')
         True
-        
+        >>> d.dataset_params_from_uri("http://example.org/dataset/base") == ()
+        True
+
         """
 
         wantedprefix = self.config.url + "dataset/" + self.alias
@@ -571,7 +590,7 @@ uri doesn't map to a basefile in this repo."""
                 headers["If-modified-since"] = format_http_date(stamp)
         return headers
 
-    def download_if_needed(self, url, basefile, archive=True, filename=None):
+    def download_if_needed(self, url, basefile, archive=True, filename=None, sleep=1):
         """Downloads a remote resource to a local file. If a different
         version is already in place, archive that old version.
 
@@ -615,13 +634,8 @@ uri doesn't map to a basefile in this repo."""
                 except requests.exceptions.ConnectionError as e:
                     self.log.warning(
                         "Failed to fetch %s: error %s (%s remaining attempts)" % (url, e, remaining_attempts))
-                    # close session in hope that this rectifies things
-                    # -- no it probably causes problems for other
-                    # things
-                    # s = requests.Session()
-                    # s.close()
                     remaining_attempts -= 1
-                    time.sleep(1)
+                    time.sleep(sleep)
 
             if not fetched:
                 self.log.error("Failed to fetch %s, giving up" % url)
@@ -630,7 +644,7 @@ uri doesn't map to a basefile in this repo."""
         except requests.exceptions.RequestException as e:
             self.log.error("Failed to fetch %s: error %s" % (url, e))
             raise e
-
+        
         if response.status_code == 304:
             self.log.debug("%s: 304 Not modified" % url)
             return False  # ie not updated
@@ -719,6 +733,10 @@ uri doesn't map to a basefile in this repo."""
         :type  basefile: str
         :returns: The local url
         :rtype: str
+
+        >>> d = DocumentRepository()
+        >>> d.downloaded_url("123/a") == "http://localhost:8000/base/downloaded/123/a.html"
+        True
         """
 
         return self.generic_url(basefile, 'downloaded', self.downloaded_suffix)
@@ -819,17 +837,13 @@ uri doesn't map to a basefile in this repo."""
         # Default language unless we can find out from source doc?
         # Check html/@xml:lang || html/@lang
         root = soup.find('html')
-        if root:
+        try:
+            doc.lang = root['xml:lang']
+        except (KeyError, TypeError):
             try:
-                doc.lang = root['xml:lang']
-            except KeyError:
-                try:
-                    doc.lang = root['lang']
-                except KeyError:
-                    doc.lang = self.lang
-        else:
-            doc.lang = self.lang
-
+                doc.lang = root['lang']
+            except (KeyError, TypeError):
+                doc.lang = self.lang
         try:
             title = soup.find('title').string
         except AttributeError:
@@ -1182,6 +1196,7 @@ uri doesn't map to a basefile in this repo."""
                   'context': context,
                   'repository': config.storerepository,
                   'dumpfile': dump})
+        return True
 
     def relate(self, basefile, otherrepos=[]):
         """Runs various indexing operations for the document represented by
@@ -1312,11 +1327,11 @@ parsed document path to that documents dependency file."""
                     continue
                 about = resource.get('about')
                 if isinstance(about, bytes):  # happens under py2
-                    about = about.decode()
+                    about = about.decode()    # pragma: no cover
                 desc.about(about)
                 repo = self.alias
                 if isinstance(repo, bytes):  # again, py2
-                    repo = repo.decode()
+                    repo = repo.decode()     # pragma: no cover
                 plaintext = self._extract_plaintext(resource)
                 l = desc.getvalues(dct.title)
                 title = str(l[0]) if l else None
@@ -1399,7 +1414,7 @@ parsed document path to that documents dependency file."""
         :type  basefile: str
         :returns: None
         """
-        with util.logtime(self.log.info, "%(basefile)s OK (%(elapsed).3f sec)",
+        with util.logtime(self.log.info, "%(basefile)s: OK (%(elapsed).3f sec)",
                           {'basefile': basefile}):
             # This dependency management could be abstracted away like
             # the parseifneeded decorator does for parse(). But unlike
@@ -1410,7 +1425,7 @@ parsed document path to that documents dependency file."""
             annotations = self.store.annotation_path(basefile)
             if os.path.exists(self.store.dependencies_path(basefile)):
                 deptxt = util.readfile(self.store.dependencies_path(basefile))
-                dependencies = deptxt.split("\n")
+                dependencies = deptxt.strip().split("\n")
             else:
                 dependencies = []
             dependencies.extend((infile, annotations))
@@ -1472,7 +1487,7 @@ parsed document path to that documents dependency file."""
         def transform(uri):
             path = None
             if uri == self.config.url:
-                path = "data/index.html"
+                path = self.config.datadir + os.sep + "index.html"
             else:
                 for repo in repos:
                     basefile = repo.basefile_from_uri(uri)
@@ -1491,25 +1506,32 @@ parsed document path to that documents dependency file."""
                         pseudobasefile = "index"
                     path = repo.store.path(pseudobasefile, 'toc', '.html')
             if path:
-                return os.path.relpath(path, basedir)
+                relpath = os.path.relpath(path, basedir)
+                if os.sep == "\\":
+                    relpath = relpath.replace(os.sep, "/")
+                return relpath
+
             else:
                 return uri
         return transform
 
     def prep_annotation_file(self, basefile):
-        """Helper function used by :py:meth:`~ferenda.DocumentRepository.generate` -- prepares a RDF/XML file
-        containing statements that in some way annotates the
-        information found in the document that generate handles, like
-        URI/title of other documents that refers to this one.
+        """Helper function used by
+        :py:meth:`~ferenda.DocumentRepository.generate` -- prepares a
+        RDF/XML file containing statements that in some way annotates
+        the information found in the document that generate handles,
+        like URI/title of other documents that refers to this one.
 
-        :param basefile: The basefile for which to collect annotating statements.
+        :param basefile: The basefile for which to collect annotating
+                         statements.
         :type basefile: str
         :returns: The full path to the prepared RDF/XML file
         :rtype: str
+
         """
         # return self.store.annotation_path(basefile)
         graph = self.construct_annotations(self.canonical_uri(basefile))
-        if graph:
+        if graph and len(graph) > 0:
             with self.store.open_annotation(basefile, "w") as fp:
                 fp.write(self.graph_to_annotation_file(graph))
             return self.store.annotation_path(basefile)
@@ -1523,7 +1545,6 @@ parsed document path to that documents dependency file."""
         :data:`~ferenda.DocumentRepository.sparql_annotations`
 
         """
-
         query_template = self.sparql_annotations
         if os.path.exists(query_template):
             fp = open(query_template, 'rb')
@@ -1561,14 +1582,7 @@ parsed document path to that documents dependency file."""
         """
         fp = BytesIO(graph.serialize(format="xml"))
         intree = etree.parse(fp)
-        stylesheet = "res/xsl/rdfxml-grit.xsl"
-        if os.path.exists(stylesheet):
-            fp = open(stylesheet)
-        # prefix stylesheet with 'res/xsl'?
-        elif pkg_resources.resource_exists('ferenda', stylesheet):
-            fp = pkg_resources.resource_stream('ferenda', stylesheet)
-        else:
-            raise ValueError("Stylesheet %s not found" % stylesheet)
+        fp = pkg_resources.resource_stream('ferenda', "res/xsl/rdfxml-grit.xsl")
         transform = etree.XSLT(etree.parse(fp))
         resulttree = transform(intree)
         res = etree.tostring(resulttree, pretty_print=format)
@@ -1585,14 +1599,7 @@ parsed document path to that documents dependency file."""
         """
         with open(annotation_file, "rb") as fp:
             intree = etree.parse(fp)
-        stylesheet = "res/xsl/grit-grddl.xsl"
-        if os.path.exists(stylesheet):
-            fp = open(stylesheet)
-        # prefix stylesheet with 'res/xsl'?
-        elif pkg_resources.resource_exists('ferenda', stylesheet):
-            fp = pkg_resources.resource_stream('ferenda', stylesheet)
-        else:
-            raise ValueError("Stylesheet %s not found" % stylesheet)
+        fp = pkg_resources.resource_stream('ferenda', "res/xsl/grit-grddl.xsl")
         transform = etree.XSLT(etree.parse(fp))
         resulttree = transform(intree)
         res = etree.tostring(resulttree, pretty_print=format)
@@ -1668,7 +1675,7 @@ parsed document path to that documents dependency file."""
                           params):
             data = self.toc_select(self.dataset_uri())
             params['rowcount'] = len(data)
-        if data:
+        if len(data) > 0:
             criteria = self.toc_criteria(self.toc_predicates())
             pagesets = self.toc_pagesets(data, criteria)
             pagecontent = self.toc_select_for_pages(data, pagesets, criteria)
@@ -1692,21 +1699,8 @@ parsed document path to that documents dependency file."""
                                     self.config.storelocation,
                                     self.config.storerepository)
 
-        if self.config.storetype in ('SQLITE', 'SLEEPYCAT'):
-            sq = self.toc_query()
-            # FIXME: workaround for the fact that rdflib select uses
-            # FROM <%s> differently than Sesame/Fuseki. This
-            # reimplements most of RDFLibStore.select
-            raw_res = store._getcontextgraph(context).query(sq)
-            res = []
-            for r in raw_res.bindings:
-                d = {}
-                for (key, val) in r.items():
-                    d[str(key)] = str(val)
-                res.append(d)
-        else:
-            sq = self.toc_query(context)
-            res = store.select(sq, "python")
+        sq = self.toc_query(context)
+        res = store.select(sq, "python")
         store.close()
         return res
 
@@ -1734,6 +1728,9 @@ parsed document path to that documents dependency file."""
         from_graph = ""
         if context:
             from_graph = "FROM <%s>" % context
+        elif self.config.storetype == "FUSEKI":
+            from_graph = "FROM <urn:x-arq:UnionGraph>"
+
         predicates = self.toc_predicates()
         g = self.make_graph()
         bindings = " ".join(["?" + util.uri_leaf(b) for b in predicates])
@@ -2057,11 +2054,11 @@ parsed document path to that documents dependency file."""
         return [NewsCriteria('main', 'New and updated documents')]
 
     def news_entries(self):
-        """Return a generator of all available entries, represented as tuples of (DocumentEntry, rdflib.Graph) objects. The Graph contains all distilled metadata about the document."""
-        republish_original = False
-        # If we just republish eg. the original PDF file and don't
-        # attempt to parse/enrich the document
+        """Return a generator of all available entries, represented as tuples
+        of (DocumentEntry, rdflib.Graph) objects. The Graph contains
+        all distilled metadata about the document.
 
+        """
         directory = os.path.sep.join((self.config.datadir, self.alias, "entries"))
         for basefile in self.store.list_basefiles_for("news"):
             path = self.store.documententry_path(basefile)
@@ -2098,19 +2095,22 @@ parsed document path to that documents dependency file."""
                 pass
 
             # 4: Set links to RDF metadata and document content
-            
-            entry.set_link(self.store.distilled_path(basefile),
-                           self.distilled_url(basefile))
+            if not entry.link:
+                entry.set_link(self.store.distilled_path(basefile),
+                               self.distilled_url(basefile))
 
-            if (republish_original):
-                entry.set_content(self.store.downloaded_path(basefile),
-                                  self.downloaded_url(basefile))
-            else:
-                # the parsed (machine reprocessable) version. The
-                # browser-ready version is referenced with the <link>
-                # element, separate from the set_link <link>
-                entry.set_content(self.store.parsed_path(basefile),
-                                  self.parsed_url(basefile))
+            # If we just republish eg. the original PDF file and don't
+            # attempt to parse/enrich the document
+            if not entry.content:
+                if (self.config.republishsource):
+                    entry.set_content(self.store.downloaded_path(basefile),
+                                      self.downloaded_url(basefile))
+                else:
+                    # the parsed (machine reprocessable) version. The
+                    # browser-ready version is referenced with the <link>
+                    # element, separate from the set_link <link>
+                    entry.set_content(self.store.parsed_path(basefile),
+                                      self.parsed_url(basefile))
             yield entry
 
     def news_write_atom(self, entries, title, basefile, archivesize=1000):
@@ -2165,15 +2165,10 @@ parsed document path to that documents dependency file."""
                                    'hash': entry.link['hash']})
                     entrynodes.append(node)
                 if entry.content and entry.content['markup']:
-                    node = E.content({'type': 'xhtml',
-                                      'href': util.relurl(entry.content['href'],
-                                                          feedurl),
-                                      'type': entry.content['type'],
-                                      'length': entry.content['length'],
-                                      'hash': entry.content['hash']},
+                    node = E.content({'type': 'xhtml'},
                                      etree.XML(entry.content['markup']))
                     entrynodes.append(node)
-                if entry.content and entry.content['src']:
+                elif entry.content and entry.content['src']:
                     node = E.content({'src': util.relurl(entry.content['src'],
                                                          feedurl),
                                       'type': entry.content['type'],
@@ -2241,9 +2236,9 @@ parsed document path to that documents dependency file."""
                 % (self.dataset_uri(), self.alias, qname,
                    len(list(self.store.list_basefiles_for("_postgenerate")))))
 
-    # @manager.action
     def status(self, basefile=None, samplesize=3):
         """Prints out some basic status information about this repository."""
+
         print("Status for document repository '%s' (%s)" %
               (self.alias, getattr(self.config, 'class')))
         s = self.get_status()
@@ -2366,6 +2361,24 @@ parsed document path to that documents dependency file."""
                 # apologetic message about this if we can't?
                 uri = request_uri(environ)
                 path = None
+                
+                accept = environ.get('HTTP_ACCEPT', 'text/html')
+                # do proper content-negotiation, but make sure
+                # application/xhtml+xml ISN'T one of the
+                # available options (as modern browsers may
+                # prefer it to text/html, and our
+                # application/xhtml+xml isn't what they want)
+                # -- ie we only serve application/xtml+xml if
+                # a client specifically only asks for
+                # that. Yep, that's a big FIXME.
+                available = ("text/html")  # add to this?
+                preferred = httpheader.acceptable_content_type(accept,
+                                                               available)
+
+                rdfformats = {'application/rdf+xml': 'pretty-xml',
+                              'text/turtle': 'turtle',
+                              'text/plain': 'nt'}
+                
                 if res == "res":
                     if uri.endswith("/data"):
                         data = True
@@ -2374,7 +2387,6 @@ parsed document path to that documents dependency file."""
                         data = False
                     basefile = self.basefile_from_uri(uri)
                     assert basefile, "Couldn't find basefile in uri %s" % uri
-                    accept = environ.get('HTTP_ACCEPT', 'text/html')
 
                     # mapping MIME-type -> callable that retrieves a path
                     pathfunc = None
@@ -2386,25 +2398,11 @@ parsed document path to that documents dependency file."""
                             contenttype = accept
                             pathfunc = pathmap[accept]
                         else:
-                            # do proper content-negotiation, but make sure
-                            # application/xhtml+xml ISN'T one of the
-                            # available options (as modern browsers may
-                            # prefer it to text/html, and our
-                            # application/xhtml+xml isn't what they want)
-                            # -- ie we only serve application/xtml+xml if
-                            # a client specifically only asks for
-                            # that. Yep, that's a big FIXME.
-                            available = ("text/html")  # add to this?
-                            preferred = httpheader.acceptable_content_type(accept, available)
                             if preferred and preferred[0].media_type == "text/html":
                                 contenttype = preferred[0].media_type
                                 pathfunc = self.store.generated_path
 
                     if pathfunc is None:
-                        rdfformats = {'application/rdf+xml': 'pretty-xml',
-                                      'text/turtle': 'turtle',
-                                      'text/plain': 'nt'
-                                      }
                         if accept in rdfformats:
                             contenttype = accept
                             g = Graph()
@@ -2425,14 +2423,26 @@ parsed document path to that documents dependency file."""
                     # FIXME: this reimplements the logic that
                     # calculates basefile/path at the end of
                     # toc_pagesets AND transform_links
-                    params = self.dataset_params_from_uri(uri)
-                    if params:
-                        pseudobasefile = "/".join(params)
-                    else:
-                        pseudobasefile = "index"
-                    path = self.store.path(pseudobasefile, 'toc', '.html')
-                    contenttype = "text/html"
-                    data = None
+                    contenttype = accept
+                    if preferred and preferred[0].media_type == "text/html":
+                        contenttype = preferred[0].media_type
+
+                    if contenttype == "text/html":
+                        params = self.dataset_params_from_uri(uri)
+                        if params:
+                            pseudobasefile = "/".join(params)
+                        else:
+                            pseudobasefile = "index"
+                        path = self.store.path(pseudobasefile, 'toc', '.html')
+                        contenttype = "text/html"
+                    elif contenttype == "text/plain":
+                        path = self.store.path("dump", "distilled", ".nt")
+                    elif contenttype in rdfformats:
+                        g = Graph()
+                        g.parse(self.store.path("dump", "distilled", ".nt"),
+                                format="nt")
+                        data = g.serialize(format=rdfformats[accept])
+
                 if path and os.path.exists(path):
                     return (open(path, 'rb'),
                             os.path.getsize(path),
@@ -2458,9 +2468,9 @@ parsed document path to that documents dependency file."""
         if log.handlers == []:
             if hasattr(logging, 'NullHandler'):
                 log.addHandler(logging.NullHandler())
-            else:
+            else:  # pragma: no cover
                 # py26 compatibility
-                class NullHandler(logging.Handler):
+                class NullHandler(logging.Handler): 
 
                     def emit(self, record):
                         pass

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
-
+import shutil
 # begin download1
 import re
 from datetime import datetime, date
@@ -390,19 +390,20 @@ import sys
 manager.setup_logger("DEBUG")
 d = RFCs(downloadmax=5)
 
-# d.download()
-# for basefile in d.store.list_basefiles_for("parse"):
-#     d.parse(basefile)
-# RFCs.setup("relate", LayeredConfig(d.get_default_options()))
-# for basefile in d.store.list_basefiles_for("relate"):
-#     d.relate(basefile)
-# RFCs.teardown("relate", LayeredConfig(d.get_default_options()))
-# manager.makeresources([d])
+d.download()
+for basefile in d.store.list_basefiles_for("parse"):
+    d.parse(basefile)
+RFCs.setup("relate", LayeredConfig(d.get_default_options()))
+for basefile in d.store.list_basefiles_for("relate"):
+    d.relate(basefile)
+RFCs.teardown("relate", LayeredConfig(d.get_default_options()))
+manager.makeresources([d])
 for basefile in d.store.list_basefiles_for("generate"):
    d.generate(basefile)
 d.toc()
 d.news()
 manager.frontpage([d])
+shutil.rmtree("data")
 return_value = True
 
     

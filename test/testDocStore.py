@@ -54,6 +54,13 @@ class Store(unittest.TestCase):
                          self.p("foo/123/a.bar"))
         self.assertEqual(self.store.path("123:a","foo", ".bar"),
                          self.p("foo/123/%3Aa.bar"))
+        realsep  = os.sep
+        try:
+            os.sep = "\\"
+            self.assertEqual(self.store.path("123", "foo", ".bar"),
+                             self.datadir.replace("/", os.sep) + "\\foo\\123.bar")
+        finally:
+            os.sep = realsep
 
 
     def test_path_version(self):
@@ -75,6 +82,7 @@ class Store(unittest.TestCase):
            self.p("archive/foo/123/%3Aa/42/index.bar"))
         eq(self.store.path("123:a","foo", ".bar", version="42:1"),
            self.p("archive/foo/123/%3Aa/42/%3A1/index.bar"))
+            
 
     def test_path_attachment(self):
         eq = self.assertEqual
@@ -145,6 +153,13 @@ class Store(unittest.TestCase):
         self.assertEqual(self.store.pathfrag_to_basefile("123/a"), "123/a")
         self.assertEqual(self.store.pathfrag_to_basefile("123/%3Aa"), "123:a")
 
+        try:
+            # make sure the pathfrag method works as expected even when os.sep is not "/"
+            realsep = os.sep
+            os.sep = "\\"
+            self.assertEqual(self.store.pathfrag_to_basefile("123\\a"), "123/a")
+        finally:
+            os.sep = realsep
 
     def test_list_basefiles_file(self):
         files = ["downloaded/123/a.html",
@@ -157,7 +172,7 @@ class Store(unittest.TestCase):
         self.assertEqual(list(self.store.list_basefiles_for("parse")),
                          basefiles)
 
-    def test_list_basefiles_dir(self):
+    def test_list_basefiles_parse_dir(self):
         files = ["downloaded/123/a/index.html",
                  "downloaded/123/b/index.html",
                  "downloaded/124/a/index.html",
@@ -169,6 +184,34 @@ class Store(unittest.TestCase):
             util.writefile(self.p(f),"nonempty")
         self.assertEqual(list(self.store.list_basefiles_for("parse")),
                          basefiles)
+
+    def test_list_basefiles_generate_dir(self):
+        files = ["parsed/123/a/index.xhtml",
+                 "parsed/123/b/index.xhtml",
+                 "parsed/124/a/index.xhtml",
+                 "parsed/124/b/index.xhtml"]
+        basefiles = ["124/b", "124/a", "123/b", "123/a"]
+
+        self.store.storage_policy = "dir"
+        for f in files:
+            util.writefile(self.p(f),"nonempty")
+        self.assertEqual(list(self.store.list_basefiles_for("generate")),
+                         basefiles)
+
+    def test_list_basefiles_postgenerate_file(self):
+        files = ["generated/123/a.html",
+                 "generated/123/b.html",
+                 "generated/124/a.html",
+                 "generated/124/b.html"]
+        basefiles = ["124/b", "124/a", "123/b", "123/a"]
+        for f in files:
+            util.writefile(self.p(f),"nonempty")
+        self.assertEqual(list(self.store.list_basefiles_for("_postgenerate")),
+                         basefiles)
+
+    def test_list_basefiles_invalid(self):
+        with self.assertRaises(ValueError):
+            list(self.store.list_basefiles_for("invalid_action"))
 
     def test_list_versions_file(self):
         files = ["archive/downloaded/123/a/1.html",
@@ -227,6 +270,7 @@ class Store(unittest.TestCase):
         self.assertEqual(list(self.store.list_attachments("123/a","downloaded",
                                                          "2")),
                          attachments_2)
+
 
 import doctest
 from ferenda import documentstore

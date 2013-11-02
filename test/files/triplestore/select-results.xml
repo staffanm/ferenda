@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<sparql xmlns="http://www.w3.org/2005/sparql-results#">
+  <head>
+    <variable name="uri"/>
+    <variable name="title"/>
+    <variable name="issued"/>
+  </head>
+  <results>
+    <result>
+      <binding name="uri">
+        <uri>http://example.org/books/And_Then_There_Were_None</uri>
+      </binding>
+      <binding name="title">
+        <literal>And Then There Were None</literal>
+      </binding>
+      <binding name="issued">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#date">1939-11-06</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="uri">
+        <uri>http://example.org/books/A_Tale_of_Two_Cities</uri>
+      </binding>
+      <binding name="title">
+        <literal>A Tale of Two Cities</literal>
+      </binding>
+      <binding name="issued">
+        <literal datatype="http://www.w3.org/2001/XMLSchema#date">1859-04-30</literal>
+      </binding>
+    </result>
+  </results>
+</sparql>
+

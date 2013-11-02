@@ -1,0 +1,7 @@
+<http://localhost/publ/dir/2012:35> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Direktiv> .
+<http://localhost/publ/dir/2012:35> <http://purl.org/dc/terms/identifier> "Dir. 2012:35" .
+<http://localhost/publ/dir/2012:35> <http://purl.org/dc/terms/title> "Ett minskat och f\u00F6renklat uppgiftsl\u00E4mnande f\u00F6r f\u00F6retagen"@sv .
+<http://localhost/publ/dir/2012:35> <http://purl.org/dc/terms/published> "2012-04-26"^^<http://www.w3.org/2001/XMLSchema#date> .
+<http://localhost/publ/dir/2012:35> <http://www.w3.org/2002/07/owl#sameAs> <http://rinfo.lagrummet.se/publ/dir/2012:35> .
+<http://localhost/publ/dir/2012:35> <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#departement> <http://lagen.nu/org/2008/naringsdepartementet> .
+<http://localhost/publ/dir/2012:35> <http://www.w3.org/ns/prov-o/wasGeneratedBy> "ferenda.sources.Direktiv.DirPolopoly" .

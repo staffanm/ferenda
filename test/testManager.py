@@ -12,23 +12,21 @@ import pkg_resources
 # NOTE: by inserting cwd (which *should* be the top-level source code
 # dir, with 'ferenda' and 'test' as subdirs) into sys.path as early as
 # possible, we make it possible for pkg_resources to find resources in
-# the 'ferenda' package. We also have to call a resource method
+# the 'ferenda' package even when we change the cwd later on. We also
+# have to call a resource method to make it stick.
 sys.path.insert(0,os.getcwd())
 pkg_resources.resource_listdir('ferenda','res')
 
 from ferenda.manager import setup_logger; setup_logger('CRITICAL')
+from ferenda.compat import unittest, OrderedDict, Mock, MagicMock, patch, call
+from ferenda.testutil import RepoTester
 
-from ferenda.compat import unittest
-from ferenda.compat import OrderedDict
-
+import six
 from six.moves import configparser, reload_module
-try:
-    # assume we're on py3.3 and fall back if not
-    from unittest.mock import Mock, MagicMock, patch, call
-except ImportError:
-    from mock import Mock, MagicMock, patch, call
+builtins = "__builtin__" if six.PY2 else "builtins"
 
 from lxml import etree as ET
+import requests.exceptions
 
 from ferenda import manager, decorators, util, errors
 from ferenda import DocumentRepository, LayeredConfig, DocumentStore
@@ -92,6 +90,15 @@ class staticmockclass2(staticmockclass):
         """Frobnicate the bizbaz (alternate implementation)"""
         if arg == "myarg":
             return "yeah!"
+
+class staticmockclass3(staticmockclass):
+    """Yet another (overrides footer())"""
+    alias="staticmock3"
+    def footer(self):
+        return (("About", "http://example.org/about"),
+                ("Legal", "http://example.org/legal"),
+                ("Contact", "http://example.org/contact")
+        )
     
 class API(unittest.TestCase):
     """Test cases for API level methods of the manager modules (functions
@@ -111,7 +118,7 @@ class API(unittest.TestCase):
         # classes alias properties. This is intended.
         util.writefile("ferenda.ini", """[__root__]
 datadir = %s
-loglevel = CRITICAL           
+loglevel = CRITICAL
 [test]
 class=testManager.staticmockclass
 [test2]
@@ -119,6 +126,7 @@ class=testManager.staticmockclass2
 """%self.tempdir)
         util.writefile(self.tempdir+"/test.js", "// test.js code goes here")
         util.writefile(self.tempdir+"/test.css", "/* test.css code goes here */")
+        util.writefile(self.tempdir+"/transformed.scss", "a { color: red + green; }")
 
     def tearDown(self):
         if os.path.exists("ferenda.ini"):
@@ -188,9 +196,9 @@ class=testManager.staticmockclass2
         self.assertTrue(os.path.exists(self.tempdir+'/rsrc/css/test.css'))
         self.assertTrue(os.path.exists(self.tempdir+'/rsrc/js/test.js'))
         tabs=tree.find("tabs")
-        self.assertTrue(tabs)
+        self.assertTrue(tabs is not None)
         search=tree.find("search")
-        self.assertTrue(search)
+        self.assertTrue(search is not None)
 
         # Test2: combining, resources specified by global config
         # (maybe we should use smaller CSS+JS files? Test takes 2+ seconds...)
@@ -264,7 +272,52 @@ class=testManager.staticmockclass2
         # test6: include one external resource but with combine=True, which is unsupported
         with self.assertRaises(errors.ConfigurationError):
             got = manager.makeresources([test],self.tempdir+os.sep+'rsrc', combine=True)
+
+        # test7: test the footer() functionality
+        test = staticmockclass3()
+        got = manager.makeresources([test], self.tempdir+os.sep+'rsrc')
+        tree = ET.parse(self.tempdir+os.sep+got['xml'][0])
+        footerlinks=tree.findall("footerlinks/nav/ul/li")
+        self.assertTrue(footerlinks)
+        self.assertEqual(3,len(footerlinks))
+
+        # test8: test win32 path generation on all OS:es, including one full URL
+        test = staticmockclass()
+        test.config.cssfiles.append('http://example.org/css/main.css')
+        want = {'css':['rsrc\\css\\test.css',
+                       'http://example.org/css/main.css'],
+                'js':['rsrc\\js\\test.js'],
+                'xml':['rsrc\\resources.xml']}
+        try:
+            realsep = os.sep
+            os.sep = "\\"
+            got = manager.makeresources([test], self.tempdir+os.sep+'rsrc')
+            self.assertEqual(want,got)
+        finally:
+            os.sep = realsep
+            
+        # test9: nonexistent resources should not be included
+        test = staticmockclass()
+        test.config.cssfiles = ['nonexistent.css']
+        want = {'css':[],
+                'js':[s.join(['rsrc', 'js','test.js'])],
+                'xml':[s.join(['rsrc', 'resources.xml'])]
+        }
+        got = manager.makeresources([test], self.tempdir+os.sep+'rsrc')
+        self.assertEqual(want,got)
         
+        # test10: scss files should be transformed to css
+        # disabled until pyScss is usable on py3 again
+        # test = staticmockclass()
+        # test.config.cssfiles[0] = test.config.cssfiles[0].replace("test.css", "transformed.scss")
+        # want = {'css':[s.join(['rsrc', 'css','transformed.css'])],
+        #        'js':[s.join(['rsrc', 'js','test.js'])],
+        #        'xml':[s.join(['rsrc', 'resources.xml'])]
+        # }
+        # from pudb import set_trace; set_trace()
+        # got = manager.makeresources([test], self.tempdir+os.sep+'rsrc')
+        # self.assertEqual(want,got)
+
 
     def test_frontpage(self):
         test = staticmockclass()
@@ -286,6 +339,158 @@ class=testManager.staticmockclass2
         self.assertIn("Contains 3 published documents", divs[0].find("p").text)
 
 
+class Setup(RepoTester):
+
+    @patch('ferenda.manager.setup_logger')
+    def test_setup(self, mockprint):
+        # restart the log system since setup() will do that otherwise
+        manager.shutdown_logger()
+        manager.setup_logger('CRITICAL')
+        projdir = self.datadir+os.sep+'myproject'
+        argv= ['ferenda-build.py', projdir]
+        
+        # test1: normal, setup succeeds
+        res = manager.setup(force=True, verbose=False, unattended=True,
+                            argv=argv)
+        self.assertTrue(res)
+        self.assertTrue(os.path.exists(projdir))
+
+        # test2: directory exists, setup fails
+        res = manager.setup(verbose=False, unattended=True,
+                            argv=argv)
+        self.assertFalse(res)
+        shutil.rmtree(projdir)
+        
+        # test2: no argv, rely on sys.argv, assert False
+        with patch('ferenda.manager.sys.argv'):
+            self.assertFalse(manager.setup())
+            self.assertFalse(os.path.exists(projdir))
+
+        # test3: preflight fails
+        with patch('ferenda.manager._preflight_check', return_value=False):
+            self.assertFalse(manager.setup(unattended=True, argv=argv))
+            self.assertFalse(os.path.exists(projdir))
+
+            with patch('ferenda.manager.input', return_value="n") as input_mock:
+                self.assertFalse(manager.setup(unattended=False, argv=argv))
+                self.assertFalse(os.path.exists(projdir))
+                self.assertTrue(input_mock.called)
+
+        # test4: select_triplestore fails
+        with patch('ferenda.manager._preflight_check', return_value=True):
+            with patch('ferenda.manager._select_triplestore', return_value=(False, None, None)):
+                self.assertFalse(manager.setup(unattended=True, argv=argv))
+                self.assertFalse(os.path.exists(projdir))
+
+                with patch('ferenda.manager.input', return_value="n") as input_mock:
+                    self.assertFalse(manager.setup(unattended=False, argv=argv))
+                    self.assertFalse(os.path.exists(projdir))
+                    self.assertTrue(input_mock.called)
+
+    def test_preflight(self):
+        log = Mock()
+        
+        # test 1: python too old
+
+        with patch('ferenda.manager.sys') as sysmock:
+            sysmock.version_info = (2,5,6,'final',0)
+            sysmock.version = sys.version
+            self.assertFalse(manager._preflight_check(log, verbose=True))
+            self.assertTrue(log.error.called)
+            log.error.reset_mock()
+
+        # test 2: modules are old / or missing
+        with patch(builtins + '.__import__') as importmock:
+            setattr(importmock.return_value, '__version__', '0.0.1')
+            self.assertFalse(manager._preflight_check(log, verbose=True))
+            self.assertTrue(log.error.called)
+            log.error.reset_mock()
+
+            importmock.side_effect = ImportError
+            self.assertFalse(manager._preflight_check(log, verbose=True))
+            self.assertTrue(log.error.called)
+            log.error.reset_mock()
+
+        # test 3: binaries are nonexistent or errors
+        with patch('ferenda.manager.subprocess.call') as callmock:
+            callmock.return_value = 127
+            self.assertFalse(manager._preflight_check(log, verbose=True))
+            self.assertTrue(log.error.called)
+            log.error.reset_mock()
+
+            callmock.side_effect = OSError
+            self.assertFalse(manager._preflight_check(log, verbose=True))
+            self.assertTrue(log.error.called)
+            log.error.reset_mock()
+            
+    def test_select_triplestore(self):
+        log = Mock()
+        # first manipulate requests.get to give the impression that
+        # fuseki or sesame either is or isn't available
+        with patch('ferenda.manager.requests.get') as mock_get:
+            r = manager._select_triplestore("sitename", log, verbose=True)
+            self.assertEqual("FUSEKI", r[0])
+            
+            mock_get.side_effect = requests.exceptions.HTTPError
+            r = manager._select_triplestore("sitename", log, verbose=True)
+            self.assertNotEqual("FUSEKI", r[0])
+
+            def get_sesame(url):
+                if not 'openrdf-sesame' in url:
+                    raise requests.exceptions.HTTPError
+                resp = Mock()
+                resp.text = "ok"
+                return resp
+
+            mock_get.side_effect = get_sesame
+            r = manager._select_triplestore("sitename", log, verbose=True)
+            self.assertEqual("SESAME", r[0])
+
+            mock_get.side_effect = requests.exceptions.HTTPError
+            r = manager._select_triplestore("sitename", log, verbose=True)
+            self.assertNotEqual("SESAME", r[0])
+
+            # all request.get calls still raises HTTP error
+            with patch('ferenda.manager.TripleStore.connect') as mock_connect:
+                r = manager._select_triplestore("sitename", log, verbose=True)
+                self.assertEqual("SQLITE", r[0])
+                def connectfail(storetype, location, repository):
+                    if storetype == "SQLITE":
+                        raise ImportError("BOOM")
+                mock_connect.side_effect = connectfail
+                r = manager._select_triplestore("sitename", log, verbose=True)
+                self.assertNotEqual("SQLITE", r[0])
+
+                r = manager._select_triplestore("sitename", log, verbose=True)
+                self.assertEqual("SLEEPYCAT", r[0])
+                mock_connect.side_effect = ImportError
+                r = manager._select_triplestore("sitename", log, verbose=True)
+                self.assertEqual(None, r[0])
+                
+    def test_select_fulltextindex(self):
+        log = Mock()
+        # first manipulate requests.get to give the impression that
+        # elasticsearch either is or isn't available
+        with patch('ferenda.manager.requests.get') as mock_get:
+            r = manager._select_fulltextindex(log, verbose=True)
+            self.assertEqual("ELASTICSEARCH", r[0])
+            mock_get.side_effect = requests.exceptions.HTTPError
+
+            r = manager._select_fulltextindex(log, verbose=True)
+            self.assertEqual("WHOOSH", r[0])
+            
+
+    def test_runsetup(self):
+        with patch('ferenda.manager.sys.exit') as mockexit:
+            with patch('ferenda.manager.setup', return_value=True):
+                manager.runsetup()
+                self.assertFalse(mockexit.called)
+                mockexit.reset_mock()
+            with patch('ferenda.manager.setup', return_value=False):
+                manager.runsetup()
+                self.assertTrue(mockexit.called)
+                
+
 class Run(unittest.TestCase):
     """Tests manager interface using only the run() entry point used by ferenda-build.py"""
 
@@ -302,12 +507,17 @@ class Run(unittest.TestCase):
         util.writefile("ferenda.ini", """[__root__]
 loglevel=WARNING
 datadir = %s
+url = http://localhost:8000
+searchendpoint = /search/
+apiendpoint = /api/
+cssfiles = ['test.css', 'other.css']        
+jsfiles = ['test.js']
         """ % self.tempdir)
 
         # 2. dump 2 example docrepo classes to example.py
         # FIXME: should we add self.tempdir to sys.path also (and remove it in teardown)?
         util.writefile(self.modulename+".py", """# Test code
-from ferenda import DocumentRepository, DocumentStore, decorators
+from ferenda import DocumentRepository, DocumentStore, decorators, errors
 
 class Teststore(DocumentStore):
     def list_basefiles_for(cls,action):
@@ -339,6 +549,17 @@ class Testrepo(DocumentRepository):
     def mymethod(self, arg):
         if arg == "myarg":
             return "ok!"
+
+    @decorators.action
+    def errmethod(self, arg):
+        if arg == "arg1":
+            raise Exception("General error")
+        elif arg == "myarg":
+            raise errors.DocumentRemovedError("Document was removed")
+        elif arg == "arg2":
+            e = errors.DocumentRemovedError("Document was removed")
+            e.dummyfile = "dummyfile.txt"
+            raise e
 
     def download(self):
         return "%s download ok (magic=%s)" % (self.alias, self.config.magic)
@@ -390,14 +611,22 @@ class Testrepo2(Testrepo):
         
         util.writefile(self.tempdir+"/test.js", "// test.js code goes here")
         util.writefile(self.tempdir+"/test.css", "/* test.css code goes here */")
+        util.writefile(self.tempdir+"/other.css", "/* other.css code goes here */")
         sys.path.append(self.tempdir)
 
     def tearDown(self):
+        manager.shutdown_logger()
         os.chdir(self.orig_cwd)
         shutil.rmtree(self.tempdir)
         sys.path.remove(self.tempdir)
 
-    # functionality used by most test methods
+
+    def test_noconfig(self):
+        os.unlink("ferenda.ini")
+        with self.assertRaises(errors.ConfigurationError):
+            manager.run(["test", "mymethod", "myarg"])
+        
+    # functionality used by most test methods except test_noconfig
     def _enable_repos(self):
 
         # 3. run('example.Testrepo', 'enable')
@@ -433,10 +662,43 @@ class Testrepo2(Testrepo):
         self._enable_repos()
 
     def test_run_single(self):
+        # test1: run standard (custom) method
         self._enable_repos()
         argv = ["test","mymethod","myarg"]
         self.assertEqual(manager.run(argv),
                          "ok!")
+        # test2: specify invalid alias
+        argv[0] = "invalid"
+
+        with patch('ferenda.manager.setup_logger'):
+            self.assertEqual(manager.run(argv), None)
+
+        with patch(builtins+'.print') as printmock:
+            with patch('ferenda.manager.setup_logger'):
+                # test3: specify invalid method
+                argv = ["test", "invalid"]
+                self.assertEqual(manager.run(argv), None)
+
+                # test4: specify no method
+                argv = ["test"]
+                self.assertEqual(manager.run(argv), None)
+
+    def test_run_single_errors(self):
+        self._enable_repos()
+        argv = ["test", "errmethod", "--all"]
+        with patch('ferenda.manager.setup_logger'):
+            with patch(builtins+'.print') as printmock:
+                res = manager.run(argv)
+        self.assertEqual(res[0][0], Exception)
+        self.assertEqual(res[1][0], errors.DocumentRemovedError)
+        self.assertEqual(res[2], None)
+        self.assertTrue(os.path.exists("dummyfile.txt"))
+        
+    def test_run_single_all(self):
+        self._enable_repos()
+        argv = ["test","mymethod","--all"]
+        with patch("example.Testrepo.setup", return_value=False):
+            self.assertEqual(manager.run(argv), [])
 
     def test_run_all(self):
         self._enable_repos()
@@ -444,6 +706,7 @@ class Testrepo2(Testrepo):
         self.assertEqual(manager.run(argv),
                          ["ok!", "yeah!"])
 
+        
     def test_run_all_all(self):
         self._enable_repos()
         argv = ["all", "mymethod", "--all"]
@@ -496,7 +759,8 @@ class Testrepo2(Testrepo):
                                      ('test2', ['test2 relate arg1',
                                                 'test2 relate myarg',
                                                 'test2 relate arg2'])])),
-             ('makeresources', {'css':[s.join(['rsrc', 'css','test.css'])],
+             ('makeresources', {'css':[s.join(['rsrc', 'css','test.css']),
+                                       s.join(['rsrc', 'css','other.css'])],
                                 'js':[s.join(['rsrc', 'js','test.js'])],
                                 'xml':[s.join(['rsrc', 'resources.xml'])]}),
              ('generate', OrderedDict([('test', ['test generate arg1',
@@ -514,6 +778,44 @@ class Testrepo2(Testrepo):
         self.maxDiff = None
         self.assertEqual(want,got)
         
+    # since this method also calls frontpage, it fails on travis in
+    # the same way as test_run_all_allmethods.
+    @unittest.skipIf('TRAVIS' in os.environ,
+                 "Skipping test_run_single_allmethods on travis-ci")    
+    def test_run_single_allmethods(self):
+        self._enable_repos()
+        argv = ["test","all"]
+        s = os.sep
+        self.maxDiff = None
+        want = OrderedDict(
+            [('download', OrderedDict([('test','test download ok (magic=less)'),
+                                   ])),
+             ('parse', OrderedDict([('test', ['test parse arg1',
+                                              'test parse myarg',
+                                              'test parse arg2']),
+                                ])),
+             ('relate', OrderedDict([('test', ['test relate arg1',
+                                               'test relate myarg',
+                                               'test relate arg2']),
+                                 ])),
+             ('makeresources', {'css':[s.join(['rsrc', 'css','test.css']),
+                                       s.join(['rsrc', 'css','other.css'])],
+                                'js':[s.join(['rsrc', 'js','test.js'])],
+                                'xml':[s.join(['rsrc', 'resources.xml'])]}),
+             ('generate', OrderedDict([('test', ['test generate arg1',
+                                                 'test generate myarg',
+                                                 'test generate arg2']),
+                                   ])),
+             ('toc', OrderedDict([('test','test toc ok'),
+                              ])),
+             ('news', OrderedDict([('test','test news ok'),
+                               ])),
+            ('frontpage', True)])
+
+        self.assertEqual(manager.run(argv),
+                         want)
+        
+
 
     def test_run_makeresources(self):
         # 1. setup test_run_enable
@@ -522,10 +824,10 @@ class Testrepo2(Testrepo):
         #    (remove rsrc)
         # 4. run('all', 'makeresources', '--combine')
         # 5. verify that single css and js file is created
-
         self._enable_repos()
         s = os.sep
-        want = {'css':[s.join(['rsrc', 'css','test.css'])],
+        want = {'css':[s.join(['rsrc', 'css','test.css']),
+                       s.join(['rsrc', 'css','other.css'])],
                 'js':[s.join(['rsrc', 'js','test.js'])],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
@@ -556,8 +858,47 @@ class Testrepo2(Testrepo):
         got = manager.run(['test2', 'callstore'])
         self.assertEqual("CustomStore OK", got)
 
+    def test_named_logfile(self):
+        self._enable_repos()
+        self.assertFalse(os.path.exists("out.log"))
+        argv = ["test","mymethod","myarg","--logfile=out.log"]
+        manager.run(argv)
+        self.assertTrue(os.path.exists("out.log"))
+        os.unlink("out.log")
+
+    def test_print_usage(self):
+        builtins = "__builtin__" if six.PY2 else "builtins"
+        self._enable_repos()
+        with patch(builtins+'.print') as printmock:
+            manager.run([])
+
+        executable = sys.argv[0]
+        got = "\n".join([x[1][0] for x in printmock.mock_calls])
+        got = got.replace(executable, "[EXEC]")
+        want = """Usage: [EXEC] [class-or-alias] [action] <arguments> <options>
+   e.g. '[EXEC] ferenda.sources.EurlexCaselaw enable'
+        '[EXEC] ecj parse 62008J0042'
+        '[EXEC] all generate'
+Available modules:
+ * test: [Undocumented]
+ * test2: [Undocumented]"""
+        self.assertEqual(got, want)
+        
+    def test_runserver(self):
+        self._enable_repos()
+        m = Mock()
+        with patch('ferenda.manager.make_server', return_value=m) as m2:
+            manager.run(["all", "runserver"])
+            self.assertTrue(m2.called)
+            self.assertTrue(m.serve_forever.called)
+        
+        
+
 import doctest
 from ferenda import manager
+def shutup_logger(dt):
+    manager.setup_logger('CRITICAL')
+
 def load_tests(loader,tests,ignore):
-    tests.addTests(doctest.DocTestSuite(manager))
+    tests.addTests(doctest.DocTestSuite(manager, setUp=shutup_logger))
     return tests

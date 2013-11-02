@@ -1,24 +1,26 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 import os, sys
-from ferenda.compat import unittest, Mock
+from ferenda.compat import unittest, Mock, patch
 
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
+from ferenda import manager
+manager.setup_logger('CRITICAL')
 
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
 from io import BytesIO
 import shutil
 import codecs
+import json
 
 from rdflib import Graph
 from lxml import etree
 
 from ferenda.testutil import RepoTester
-    
-from ferenda.manager import make_wsgi_app
+from ferenda import manager
 from ferenda import DocumentRepository, FulltextIndex
 from ferenda import util
+from ferenda.elements import html
 
 # tests the wsgi app in-process, ie not with actual HTTP requests, but
 # simulates what make_server().serve_forever() would send and
@@ -27,11 +29,11 @@ from ferenda import util
 class WSGI(RepoTester): # base class w/o tests
     def setUp(self):
         super(WSGI,self).setUp()
-        self.app = make_wsgi_app(port=8000,
-                                 documentroot=self.datadir,
-                                 apiendpoint="/myapi/",
-                                 searchendpoint="/mysearch/",
-                                 repos = [self.repo])
+        self.app = manager.make_wsgi_app(port=8000,
+                                         documentroot=self.datadir,
+                                         apiendpoint="/myapi/",
+                                         searchendpoint="/mysearch/",
+                                         repos = [self.repo])
         self.env = {'HTTP_ACCEPT': 'text/xml, application/xml, application/xhtml+xml, text/html;q=0.9, text/plain;q=0.8, image/png,*/*;q=0.5',
                     'PATH_INFO':   '/',
                     'SERVER_NAME': 'localhost',
@@ -65,6 +67,21 @@ class WSGI(RepoTester): # base class w/o tests
         shutil.copy2("test/files/base/rsrc/resources.xml",
                      resources)
 
+        # index.html
+        index = self.datadir+os.sep+"index.html"
+        with open(index, "wb") as fp:
+            fp.write(b'<h1>index.html</h1>')
+
+        # toc/index.html + toc/title/a.html
+        with self.repo.store.open("index", "toc", ".html", "wb") as fp:
+            fp.write(b'<h1>TOC for base</h1>')
+        with self.repo.store.open("title/a", "toc", ".html", "wb") as fp:
+            fp.write(b'<h1>Title starting with "a"</h1>')
+
+        # distilled/dump.nt
+        with self.repo.store.open("dump", "distilled", ".nt", "wb") as fp:
+            fp.write(g.serialize(format="nt"))
+        
 
     def call_wsgi(self, environ):
         start_response = Mock()
@@ -89,7 +106,67 @@ class WSGI(RepoTester): # base class w/o tests
             self.assertEqual(got_headers[key], value)
         if wanted_content:
             self.assertEqual(wanted_content, got_content)
+
+class Fileserving(WSGI):
+    def test_index_html(self):
+        self.env['PATH_INFO'] = '/'
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse("200 OK",
+                            {'Content-Type': 'text/html'},
+                            b'<h1>index.html</h1>',
+                            status, headers, content)
+
+    def test_not_found(self):
+        self.env['PATH_INFO'] = '/nonexistent'
+        status, headers, content = self.call_wsgi(self.env)
+        msg = '<h1>404</h1>The path /nonexistent not found at %s/nonexistent' % self.datadir
+        self.assertResponse("404 Not Found",
+                            {'Content-Type': 'text/html'},
+                            msg.encode(),
+                            status, headers, content)
+    
+class API(WSGI):
+    def setUp(self):
+       super(API, self).setUp()
+       self.env['PATH_INFO'] = '/myapi/'
+
+    def test_basic(self):
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse("200 OK",
+                            {'Content-Type': 'application/json'},
+                            None,
+                            status, headers, content)
+        resp = json.loads(content.decode())
+        self.assertEqual(self.env, resp)
         
+class Runserver(WSGI):
+    def test_make_wsgi_app_args(self):
+        res = manager.make_wsgi_app(port='8080',
+                                    documentroot=self.datadir,
+                                    apiendpoint='/api-endpoint/',
+                                    searchendpoint='/search-endpoint/',
+                                    repos=[])
+        self.assertTrue(callable(res))
+
+    def test_make_wsgi_app_ini(self):
+        inifile = self.datadir + os.sep + "ferenda.ini"
+        with open(inifile, "w") as fp:
+            fp.write("""[__root__]
+datadir = /dev/null
+url = http://localhost:7777/
+apiendpoint = /myapi/
+searchendpoint = /mysearch/            
+""")
+        res = manager.make_wsgi_app(inifile)
+        self.assertTrue(callable(res))
+    
+    def test_runserver(self):
+        m = Mock()
+        with patch('ferenda.manager.make_server', return_value=m) as m2:
+            manager.runserver([])
+            self.assertTrue(m2.called)
+            self.assertTrue(m.serve_forever.called)
+
 class ConNeg(WSGI):
     def setUp(self):
        super(ConNeg, self).setUp()
@@ -215,96 +292,123 @@ class ConNeg(WSGI):
         self.assertEqualGraphs(g, got)
 
 
-#     # these test require running relate_all and/or toc. skip them for now
-#     def test_dataset_html(self):
-#         self.env['PATH_INFO'] = "/dataset/base"
-#         status, headers, content = self.call_wsgi(self.env)
-#         # FIXME: compare result to something (base/toc/index.html)
-#         self.assertResponse("200 OK",
-#                             {'Content-Type': 'text/html'},
-#                             None,
-#                             status, headers, None)
-# 
-#     def test_dataset_ntriples(self):
-#         self.env['PATH_INFO'] = "/dataset/base"
-#         self.env['HTTP_ACCEPT'] = 'text/plain'
-#         status, headers, content = self.call_wsgi(self.env)
-#         self.assertResponse("200 OK",
-#                             {'Content-Type': 'text/html'},
-#                             None,
-#                             status, headers, None)
-#         got = Graph()
-#         got.parse(data=content, format="ntriples")
-#         self.assertEqualGraphs(g, got)
-# 
-# 
-#     def test_dataset_turtle(self):
-#         self.env['PATH_INFO'] = "/dataset/base"
-#         self.env['HTTP_ACCEPT'] = 'text/turtle'
-#         status, headers, content = self.call_wsgi(self.env)
-#         self.assertResponse("200 OK",
-#                             {'Content-Type': 'text/turtle'},
-#                             None,
-#                             status, headers, None)
-#         got = Graph()
-#         got.parse(data=content, format="turtle")
-#         self.assertEqualGraphs(g, got)
-# 
-#     def test_dataset_xml(self):
-#         self.env['PATH_INFO'] = "/dataset/base"
-#         self.env['HTTP_ACCEPT'] = 'application/rdf+xml'
-#         status, headers, content = self.call_wsgi(self.env)
-#         self.assertResponse("200 OK",
-#                             {'Content-Type': 'application/rdf+xml'},
-#                             None,
-#                             status, headers, None)
-#         g = self._dataset_graph()
-#         got = Graph()
-#         got.parse(data=content, format="xml")
-#         self.assertEqualGraphs(g, got)
-
-
-class Search(object):
-
-    def tearDown(self):
-        super(Search,self).tearDown()
-        idx = FulltextIndex.connect(self.repo.config.indextype,
-                                    self.repo.config.indexlocation)
-        idx.destroy()
-    
-    def _copy_and_distill(self,basefile):
-        util.ensure_dir(self.repo.store.parsed_path(basefile))
-        shutil.copy2("test/files/base/parsed/%s.xhtml" % basefile,
-                     self.repo.store.parsed_path(basefile))
-        distilled_graph = Graph()
-        with codecs.open(self.repo.store.parsed_path(basefile),
-                         encoding="utf-8") as fp: 
-            distilled_graph.parse(data=fp.read(), format="rdfa")
-        
-        util.ensure_dir(self.repo.store.distilled_path(basefile))
-        with open(self.repo.store.distilled_path(basefile),
-                  "wb") as distilled_file:
-            distilled_graph.serialize(distilled_file, format="pretty-xml")
-
-    # So that ESSearch can override the order
-    search_multiple_expect = [
-        {'title':'Introduction',
-         'href':'http://example.org/base/123/a#S1',
-         'body':b'<p>This is <strong class="match">part</strong> of document-<strong class="match">part</strong> section 1</p>'},
-        {'title':'Definitions and Abbreviations',
-         'href':'http://example.org/base/123/a#S2',
-         'body':b'<p>second main document <strong class="match">part</strong></p>'},
-        {'title':'Example',
-         'href':'http://example.org/base/123/a',
-         'body':b'<p>This is <strong class="match">part</strong> of the main document</p>'}
-    ]
-    def test_search_multiple(self):
-        # step 1: make sure parsed content is also related (ie in whoosh db)
-        self.repo.relate("123/a")
-
-        # search for 'part', which occurs in two Whoosh documents (123/a and 123/a#S1)
-        self.env['QUERY_STRING'] = 'q=part'
+    def test_dataset_html(self):
+        self.env['PATH_INFO'] = "/dataset/base"
         status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse("200 OK",
+                            {'Content-Type': 'text/html'},
+                            b'<h1>TOC for base</h1>',
+                            status, headers, content)
+
+    def test_dataset_html_param(self):
+        self.env['PATH_INFO'] = "/dataset/base"
+        self.env['QUERY_STRING'] = "title=a"
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse("200 OK",
+                            {'Content-Type': 'text/html'},
+                            b'<h1>Title starting with "a"</h1>',
+                            status, headers, content)
+
+    def test_dataset_ntriples(self):
+        self.env['PATH_INFO'] = "/dataset/base"
+        self.env['HTTP_ACCEPT'] = 'text/plain'
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse("200 OK",
+                            {'Content-Type': 'text/plain'},
+                            None,
+                            status, headers, None)
+        want = Graph()
+        want.parse(source="test/files/base/distilled/123/a.ttl",
+                   format="turtle")
+        got = Graph()
+        got.parse(data=content, format="nt")
+        self.assertEqualGraphs(want, got)
+
+    def test_dataset_turtle(self):
+        self.env['PATH_INFO'] = "/dataset/base"
+        self.env['HTTP_ACCEPT'] = 'text/turtle'
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse("200 OK",
+                            {'Content-Type': 'text/turtle'},
+                            None,
+                            status, headers, None)
+        want = Graph()
+        want.parse(source="test/files/base/distilled/123/a.ttl",
+                   format="turtle")
+        got = Graph()
+        got.parse(data=content, format="turtle")
+        self.assertEqualGraphs(want, got)
+
+    def test_dataset_xml(self):
+        self.env['PATH_INFO'] = "/dataset/base"
+        self.env['HTTP_ACCEPT'] = 'application/rdf+xml'
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse("200 OK",
+                            {'Content-Type': 'application/rdf+xml'},
+                            None,
+                            status, headers, None)
+        want = Graph()
+        want.parse(source="test/files/base/distilled/123/a.ttl",
+                   format="turtle")
+        got = Graph()
+        got.parse(data=content, format="xml")
+        self.assertEqualGraphs(want, got)
+
+
+class Search(WSGI):
+
+    def setUp(self):
+        super(Search, self).setUp()
+        self.env['PATH_INFO'] = '/mysearch/'
+
+    def test_search_single(self):
+        self.env['QUERY_STRING'] = "q=subsection"
+        res = ([{'title': 'Result #1',
+                 'uri': 'http://example.org',
+                 'text': ['Text that contains the subsection term']}],
+               {'pagenum': 1,
+                'pagecount': 1,
+                'firstresult': 1,
+                'lastresult': 1,
+                'totalresults': 1})
+        
+        config = {'connect.return_value': Mock(**{'query.return_value': res})}
+        with patch('ferenda.manager.FulltextIndex', **config):
+            status, headers, content = self.call_wsgi(self.env)
+        t = etree.fromstring(content)
+        resulthead = t.find(".//article/h1").text
+        self.assertEqual(resulthead, "1 match for 'subsection'")
+
+
+
+    def test_search_multiple(self):
+        self.env['QUERY_STRING'] = "q=part"
+        res = ([{'title':'Introduction',
+                 'identifier': '123/a¶1',
+                 'uri':'http://example.org/base/123/a#S1',
+                 'text': html.P(['This is ',
+                                 html.Strong(['part'], **{'class':'match'}),
+                                 ' of document-',
+                                 html.Strong(['part'], **{'class':'match'}),
+                            ' section 1</p>'])},
+                {#'title':'Definitions and Abbreviations',
+                 'uri':'http://example.org/base/123/a#S2',
+                 'text':html.P(['second main document ',
+                                html.Strong(['part'], **{'class':'match'})])},
+                {'title':'Example',
+                 'uri':'http://example.org/base/123/a',
+                 'text': html.P(['This is ',
+                                 html.Strong(['part'], **{'class':'match'}),
+                                 ' of the main document'])}],
+               {'pagenum': 1,
+                'pagecount': 1,
+                'firstresult': 1,
+                'lastresult': 3,
+                'totalresults': 3})
+        
+        config = {'connect.return_value': Mock(**{'query.return_value': res})}
+        with patch('ferenda.manager.FulltextIndex', **config):
+            status, headers, content = self.call_wsgi(self.env)
         self.assertResponse("200 OK",
                             {'Content-Type': 'text/html; charset=utf-8'},
                             None,
@@ -322,41 +426,45 @@ class Search(object):
         docs = t.findall(".//section[@class='hit']")
         self.assertEqual(len(docs), 3)
         self.assertEqual(docs[0][0].tag, 'h2')
-        expect = self.search_multiple_expect
+        expect = res[0]
         self.assertIn(expect[0]['title'], docs[0][0][0].text)
-        self.assertEqual(expect[0]['href'],  docs[0][0][0].get('href'))
-        self.assertEqual(expect[0]['body'],  etree.tostring(docs[0][1]).strip())
+        self.assertEqual(expect[0]['uri'], docs[0][0][0].get('href'))
+        self.assertEqualXML(expect[0]['text'].as_xhtml(),
+                            docs[0][1],
+                            namespace_aware=False)
 
         self.assertIn(expect[1]['title'], docs[1][0][0].text)
-        self.assertEqual(expect[1]['href'],  docs[1][0][0].get('href'))
-        self.assertEqual(expect[1]['body'],  etree.tostring(docs[1][1]).strip())
-
+        self.assertEqual(expect[1]['uri'], docs[1][0][0].get('href'))
+        self.assertEqualXML(expect[1]['text'].as_xhtml(),
+                            docs[1][1],
+                            namespace_aware=False)
+                         
         self.assertIn(expect[2]['title'], docs[2][0][0].text)
-        self.assertEqual(expect[2]['href'],  docs[2][0][0].get('href'))
-        self.assertEqual(expect[2]['body'],  etree.tostring(docs[2][1]).strip())
+        self.assertEqual(expect[2]['uri'], docs[2][0][0].get('href'))
+        self.assertEqualXML(expect[2]['text'].as_xhtml(),
+                            docs[2][1],
+                            namespace_aware=False)
+                         
 
-    def test_search_single(self):
-        self.repo.relate("123/a")
-        # search for 'subsection', which occurs in a single document
-        # (123/a#S1.1)
-        self.env['QUERY_STRING'] = "q=subsection"
-        status, headers, content = self.call_wsgi(self.env)
-        t = etree.fromstring(content)
-        resulthead = t.find(".//article/h1").text
-        self.assertEqual(resulthead, "1 match for 'subsection'")
-
-
-    highlighted_expect = [
-        {'title':'Example',
-         'href':'http://example.org/base/123/b1',
-         'body':b'<p>sollicitudin justo <strong class="match">needle</strong> tempor ut eu enim ... himenaeos. <strong class="match">Needle</strong> id tincidunt orci</p>'}
-        ]
         
     def test_highlighted_snippet(self):
-        self._copy_and_distill("123/b")
-        self.repo.relate("123/b") # contains one doc with much text and two instances of the sought term
+        res = ([{'title':'Example',
+                 'uri':'http://example.org/base/123/b1',
+                 'text':html.P(['sollicitudin justo ',
+                                html.Strong(['needle'], **{'class':'match'}),
+                                ' tempor ut eu enim ... himenaeos. ',
+                                html.Strong(['Needle'], **{'class':'match'}),
+                                ' id tincidunt orci'])}],
+               {'pagenum': 1,
+                'pagecount': 1,
+                'firstresult': 1,
+                'lastresult': 1,
+                'totalresults': 1})
+
         self.env['QUERY_STRING'] = "q=needle"
-        status, headers, content = self.call_wsgi(self.env)
+        config = {'connect.return_value': Mock(**{'query.return_value': res})}
+        with patch('ferenda.manager.FulltextIndex', **config):
+            status, headers, content = self.call_wsgi(self.env)
         
         self.assertResponse("200 OK",
                             {'Content-Type': 'text/html; charset=utf-8'},
@@ -365,16 +473,32 @@ class Search(object):
         
         t = etree.fromstring(content)
         docs = t.findall(".//section[@class='hit']")
-        self.assertEqual(self.highlighted_expect[0]['body'],
-                         etree.tostring(docs[0][1]).strip())
-
+        self.assertEqualXML(res[0][0]['text'].as_xhtml(),
+                            docs[0][1],
+                            namespace_aware=False)
 
     def test_paged(self):
-        self._copy_and_distill("123/c")
-        # 123/c contains 50 docs, 25 of which contains 'needle'
-        self.repo.relate("123/c") 
+        def mkres(page=1, pagesize=10, total=25):
+            hits = []
+            for i in range((page-1)*pagesize, min(page*pagesize, total)):
+                hits.append(
+                    {'title':'',
+                     'uri':'http://example.org/base/123/c#S%d'% ((i*2)-1),
+                     'text': html.P(['This is a needle document'])})
+            return (hits,
+                    {'pagenum': page,
+                     'pagecount': int(total / pagesize) + 1,
+                     'firstresult': (page - 1) * pagesize + 1,
+                     'lastresult': (page - 1) * pagesize + len(hits),
+                     'totalresults': total})
+                
+            
         self.env['QUERY_STRING'] = "q=needle"
-        status, headers, content = self.call_wsgi(self.env)
+        res = mkres()
+        
+        config = {'connect.return_value': Mock(**{'query.return_value': res})}
+        with patch('ferenda.manager.FulltextIndex', **config):
+            status, headers, content = self.call_wsgi(self.env)
         self.assertResponse("200 OK",
                             {'Content-Type': 'text/html; charset=utf-8'},
                             None,
@@ -400,7 +524,10 @@ class Search(object):
         self.assertEqual('/mysearch/?q=needle&p=2',pager[2].get('href'))
 
         self.env['QUERY_STRING'] = "q=needle&p=2"
-        status, headers, content = self.call_wsgi(self.env)
+        res = mkres(page=2)
+        config = {'connect.return_value': Mock(**{'query.return_value': res})}
+        with patch('ferenda.manager.FulltextIndex', **config):
+            status, headers, content = self.call_wsgi(self.env)
         t = etree.fromstring(content)
         docs = t.findall(".//section[@class='hit']")
         self.assertEqual(10, len(docs)) 
@@ -410,48 +537,13 @@ class Search(object):
         self.assertEqual('/mysearch/?q=needle&p=1',pager[1].get('href'))
 
         self.env['QUERY_STRING'] = "q=needle&p=3"
-        status, headers, content = self.call_wsgi(self.env)
+        res = mkres(page=3)
+        config = {'connect.return_value': Mock(**{'query.return_value': res})}
+        with patch('ferenda.manager.FulltextIndex', **config):
+            status, headers, content = self.call_wsgi(self.env)
         t = etree.fromstring(content)
         docs = t.findall(".//section[@class='hit']")
         self.assertEqual(5, len(docs)) # only 5 remaining docs
         pager = t.find(".//div[@class='pager']")
         self.assertEqual(4,len(pager))
         self.assertEqual('Results 21-25 of 25',pager[0].text)
-
-
-class WhooshSearch(Search, WSGI):
-    def setUp(self):
-        super(WhooshSearch, self).setUp()
-        self.env['PATH_INFO'] = '/mysearch/'
-
-
-@unittest.skipIf('SKIP_ELASTICSEARCH_TESTS' in os.environ,
-                 "Skipping Elasticsearch tests")    
-class ESSearch(Search, WSGI):
-    # FIXME: Can't yet control ordering and fragment construction to
-    # the point where Whoosh and ES act identicallyy. In the meantime,
-    # here's a slightly different ordering of the expected results.
-    search_multiple_expect = [
-        {'title':'Introduction',
-         'href':'http://example.org/base/123/a#S1',
-         'body':b'<p>This is <strong class="match">part</strong> of document-<strong class="match">part</strong> section 1</p>'},
-        {'title':'Definitions and Abbreviations',
-         'href':'http://example.org/base/123/a#S2',
-         'body':b'<p>This is the second main document <strong class="match">part</strong></p>'},
-        {'title':'Example',
-         'href':'http://example.org/base/123/a',
-         'body':b'<p>This is <strong class="match">part</strong> of the main document</p>'}
-    ]
-
-    highlighted_expect = [
-        {'title':'Example',
-         'href':'http://example.org/base/123/b1',
-         'body':b'<p><strong class="match">needle</strong> tempor ut eu enim. Aenean porta ... inceptos himenaeos. <strong class="match">Needle</strong> id</p>'}]
-
-
-    def setUp(self):
-        super(ESSearch, self).setUp()
-        self.repo.config.indexlocation = "http://localhost:9200/ferenda/"
-        self.repo.config.indextype = "ELASTICSEARCH"
-        self.env['PATH_INFO'] = '/mysearch/'
-        

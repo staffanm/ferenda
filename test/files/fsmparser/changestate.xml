@@ -1,0 +1,13 @@
+<Body>
+  <Section ordinal="1" title="This is a section">
+    <Paragraph>
+      <str>And here some text.</str>
+    </Paragraph><Subsection ordinal="1.1" title="This is a subsection">
+      <Paragraph>
+        <str>With more text.</str>
+      </Paragraph>
+    </Subsection><Paragraph id="state-a">
+      <str>State A: This causes a change in the state we'll return TO.</str>
+    </Paragraph>
+  </Section>
+</Body>

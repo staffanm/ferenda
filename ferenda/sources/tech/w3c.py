@@ -224,11 +224,11 @@ class W3Standards(DocumentRepository):
                 date = None
                 try:
                     # 17 December 1996
-                    date = util.strptime(datestr, "%d %B %Y")
+                    date = util.strptime(datestr, "%d %B %Y").date()
                 except ValueError:
                     try:
                         # 17 Dec 1996
-                        date = util.strptime(datestr, "%d %b %Y")
+                        date = util.strptime(datestr, "%d %b %Y").date()
                     except ValueError:
                         self.log.warning("%s: Could not parse datestr %s" %
                                          (doc.basefile, datestr))

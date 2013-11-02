@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import unicode_literals, print_function
 
 import sys, os
 from ferenda.compat import unittest
@@ -7,11 +7,20 @@ if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
 import codecs
 import re
+import tempfile
 
-from ferenda import FSMParser, TextReader
+import six
+
 from ferenda import elements
-from ferenda.fsmparser import Peekable
 from ferenda.testutil import file_parametrize
+from ferenda.compat import patch
+
+# SUT
+from ferenda import FSMParser, TextReader
+from ferenda.fsmparser import Peekable
+from ferenda.errors import FSMStateError
+
+
 
 class TestPeekable(unittest.TestCase):
     def test_peekable(self):
@@ -26,10 +35,14 @@ class TestPeekable(unittest.TestCase):
             self.assertEqual(pk.peek())
         with self.assertRaises(StopIteration):
             self.assertEqual(pk.next())
-            
+
+        # test __iter__
+        pk = Peekable(range(4))
+        self.assertEqual([0,1,2,3], list(pk))
+
 
 class Parse(unittest.TestCase):
-    def parametric_test(self,filename):
+    def run_test_file(self, filename, debug=False):
         # some basic recognizers and constructors to parse a simple
         # structured plaintext format.
         #
@@ -85,7 +98,8 @@ class Parse(unittest.TestCase):
             return parser.reader.peek().startswith("State C:")
         
         def is_paragraph(parser):
-            return True
+            # c.f. test/files/fsmparser/invalid.txt
+            return len(parser.reader.peek()) > 6
 
         # MAGIC
         def sublist_or_parent(symbol,state_stack):
@@ -165,11 +179,15 @@ class Parse(unittest.TestCase):
 
         def make_state_a(parser):
             return elements.Paragraph([parser.reader.next().strip()],id="state-a")
+        # setattr(make_state_a, 'newstate', 'state-a')
+
         def make_state_b(parser):
             return elements.Paragraph([parser.reader.next().strip()],id="state-b")
+        # setattr(make_state_b, 'newstate', 'state-b')
+
         def make_state_c(parser):
             return elements.Paragraph([parser.reader.next().strip()],id="state-c")
-            
+        # setattr(make_state_c, 'newstate', 'state-c')
         
         # HELPERS
         def section_segments_count(s):
@@ -189,12 +207,13 @@ class Parse(unittest.TestCase):
         def analyze_sectionstart(chunk):
             m = re_sectionstart(chunk)
             if m:
-                return (m.group(1).rstrip("."), m.group(2))
+                return (m.group(1).rstrip("."), m.group(2).strip())
             else:
                 return (None,chunk)
 
         def analyze_listitem(chunk):
-            # returns: same as list-style-type in CSS2.1, sans 'georgian', 'armenian' and 'greek', plus 'dashed'
+            # returns: same as list-style-type in CSS2.1, sans
+            # 'georgian', 'armenian' and 'greek', plus 'dashed'
             listtype = ordinal = separator = rest = None
             # match "1. Foo…" or "14) bar…" but not "4 This is a heading"
             m = re.match('^(\d+)([\.\)]) +',chunk)
@@ -259,10 +278,12 @@ class Parse(unittest.TestCase):
                            ("body", is_state_a): (make_state_a, "state-a"),
                            ("state-a", is_state_b): (make_state_b, "state-b"),
                            ("state-b", is_state_c): (make_state_c, "state-c"),
+                           ("state-c", is_section): (False, None),
                            ("section", is_paragraph): (make_paragraph, None),
                            ("section", is_subsection): (make_subsection, "subsection"),
                            ("subsection", is_paragraph): (make_paragraph,None),
                            ("subsection", is_subsection): (False,None),
+                           ("subsection", is_state_a): (False,"body"), 
                            ("subsection", is_subsubsection): (make_subsubsection,"subsubsection"),
                            ("subsubsection", is_paragraph): (make_paragraph,None),
                            ("subsubsection", is_section): (False, None),
@@ -280,14 +301,19 @@ class Parse(unittest.TestCase):
                            ("listitem",is_li_roman):sublist_or_parent, 
                            ("listitem",is_li_decimal):sublist_or_parent, 
                            })
-        resultfilename = filename.replace(".txt",".xml")
-        if not os.path.exists(resultfilename):
-            p.debug = True
-        # p.debug = True
+
+        p.debug = debug
+
         tr=TextReader(filename,encoding="utf-8",linesep=TextReader.UNIX)
         p.initial_state = "body"
         p.initial_constructor = make_body
         b = p.parse(tr.getiterator(tr.readparagraph))
+        return p, b
+
+    def parametric_test(self, filename):
+        resultfilename = filename.replace(".txt",".xml")
+        debug = not os.path.exists(resultfilename)
+        p, b = self.run_test_file(filename, debug)
         self.maxDiff = 4096
         if os.path.exists(resultfilename):
             with codecs.open(resultfilename,encoding="utf-8") as fp:
@@ -297,7 +323,7 @@ class Parse(unittest.TestCase):
                 # re-run the parse but with debugging on
                 print("============DEBUG OUTPUT================")
                 p.debug = True
-                tr.seek(0)
+                tr=TextReader(filename,encoding="utf-8",linesep=TextReader.UNIX)
                 b = p.parse(tr.getiterator(tr.readparagraph))
                 print("===============RESULT===================")
                 print(elements.serialize(b))
@@ -307,5 +333,19 @@ class Parse(unittest.TestCase):
         else:
             print("\nResult:\n"+elements.serialize(b))
             self.fail()
+
+    def test_no_recognizer(self):
+        with self.assertRaises(FSMStateError):
+            self.run_test_file("test/files/fsmparser/no-recognizer.tx")
+
+    def test_no_transition(self):
+        with self.assertRaises(FSMStateError):
+            self.run_test_file("test/files/fsmparser/no-transition.tx")
+
+    def test_debug(self):
+        builtins = "__builtin__" if six.PY2 else "builtins"
+        with patch(builtins+".print") as printmock:
+            self.run_test_file("test/files/fsmparser/basic.txt", debug=True)
+            self.assertTrue(printmock.called)
 
 file_parametrize(Parse,"test/files/fsmparser",".txt")

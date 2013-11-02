@@ -217,7 +217,10 @@ class DocumentStore(object):
             suffix = ".rdf"
         elif action == "generate":
             directory = os.path.sep.join((basedir, "parsed"))
-            suffix = ".xhtml"
+            if self.storage_policy == "dir":
+                suffix = "index.xhtml"
+            else:
+                suffix = ".xhtml"
         elif action == "news":
             directory = os.path.sep.join((basedir, "entries"))
             suffix = ".json"
@@ -364,7 +367,7 @@ class DocumentStore(object):
             # urllib.quote in python 2.6 cannot handle unicode values
             # for the safe parameter. FIXME: We should create a shim
             # as ferenda.compat.quote and use that
-            safe = safe.encode('ascii')
+            safe = safe.encode('ascii') # pragma: no cover
 
         return quote(basefile, safe=safe).replace('%', os.sep + '%')
 
@@ -455,7 +458,7 @@ class DocumentStore(object):
         """
         return self.path(basefile, 'entries', '.json', version)
 
-    def intermediate_path(self, basefile, version=None):
+    def intermediate_path(self, basefile, version=None, attachment=None):
         """Get the full path for the main intermediate file for the given
         basefile (and optionally archived version).
 
@@ -463,10 +466,12 @@ class DocumentStore(object):
         :type  basefile: str
         :param  version: Optional. The archived version id
         :type   version: str
+        :param attachment: Optional. Any associated file created or retained
+                           in the intermediate step
         :returns: The full filesystem path
         :rtype:   str
         """
-        return self.path(basefile, 'intermediate', '.xml', version)
+        return self.path(basefile, 'intermediate', '.xml', version, attachment)
 
     def parsed_path(self, basefile, version=None, attachment=None):
         """Get the full path for the parsed file for the given
@@ -537,15 +542,17 @@ class DocumentStore(object):
         return self.path(basefile, 'generated', '.html',
                          version, attachment)
 
-    def open_generated(self, basefile, mode="r", version=None, attachment=None):
-        """Opens files for reading and writing,
-        c.f. :meth:`~ferenda.DocumentStore.open`. The parameters are
-        the same as for
-        :meth:`~ferenda.DocumentStore.generated_path`.
-
-        """
-        filename = self.generated_path(basefile, version, attachment)
-        return self._open(filename, mode)
+# Removed this method until I find a reason to use it
+#
+#    def open_generated(self, basefile, mode="r", version=None, attachment=None):
+#        """Opens files for reading and writing,
+#        c.f. :meth:`~ferenda.DocumentStore.open`. The parameters are
+#        the same as for
+#        :meth:`~ferenda.DocumentStore.generated_path`.
+#
+#        """
+#        filename = self.generated_path(basefile, version, attachment)
+#        return self._open(filename, mode)
 
     def annotation_path(self, basefile, version=None):
         """Get the full path for the annotation file for the given
