@@ -195,9 +195,9 @@ class=testManager.staticmockclass2
         self.assertTrue(os.path.exists(self.tempdir+'/rsrc/css/test.css'))
         self.assertTrue(os.path.exists(self.tempdir+'/rsrc/js/test.js'))
         tabs=tree.find("tabs")
-        self.assertTrue(tabs)
+        self.assertTrue(tabs is not None)
         search=tree.find("search")
-        self.assertTrue(search)
+        self.assertTrue(search is not None)
 
         # Test2: combining, resources specified by global config
         # (maybe we should use smaller CSS+JS files? Test takes 2+ seconds...)

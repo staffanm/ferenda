@@ -11,6 +11,7 @@ import codecs
 import collections
 import filecmp
 import unicodedata
+import re
 from io import BytesIO
 from difflib import unified_diff
 from ferenda.compat import unittest
@@ -190,6 +191,14 @@ this class, ie::
             want_lines = [x + "\n" for x in c14nize(want_tree).split("\n")]
             got_lines = [x + "\n" for x in c14nize(got_tree).split("\n")]
             diff = unified_diff(want_lines, got_lines, "want.xml", "got.xml")
+            # convert '@@ -1,1 +1,1 @@' (which py26 difflib produces)
+            # to '@@ -1 +1 @@' (wich later versions produces)
+            diff = [re.sub(r"@@ -(\d+),\1 \+(\d+),\2 @@", r"@@ -\1 +\2 @@", x)
+                    for x in diff]
+            # remove trailing space for other control lines (py26...)
+            diff = [re.sub(r"((?:\+\+\+|\-\-\- ).*) $", r"\1", x)
+                    for x in diff]
+
             msg = "".join(diff) + "\n\nERRORS:" + "\n".join(errors)
             return self.fail(msg)
 
