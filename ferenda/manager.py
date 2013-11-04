@@ -1475,6 +1475,7 @@ def _select_triplestore(sitename, log, verbose=False):
         tmp = tempfile.mkdtemp()
         
         t = TripleStore.connect("SQLITE", tmp+os.sep+"test.sqlite", "ferenda")
+        t.close()
         if verbose:
             log.info("SQLite-backed RDFLib triplestore seems to work")
         return ('SQLITE', 'data/ferenda.sqlite', 'ferenda')

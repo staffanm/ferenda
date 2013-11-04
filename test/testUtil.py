@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import tempfile
 import shutil
 import os
+import sys
 
 from ferenda import errors
 from ferenda.compat import unittest, patch
@@ -13,11 +14,16 @@ from ferenda import util
 
 class Main(unittest.TestCase):
 
+    def p(self, path, prepend_datadir=True):
+        if prepend_datadir:
+            path = self.datadir + "/" + path
+        return path.replace('/', '\\') if os.sep == '\\' else path
+
     def setUp(self):
         self.datadir = tempfile.mkdtemp()
-        self.dname = self.datadir + "/foo"
-        self.fname = self.datadir + "/foo/bar.txt"
-        self.fname2 = self.datadir + "/foo/baz.txt"
+        self.dname = self.datadir + os.sep + "foo"
+        self.fname = self.datadir + os.sep + "foo/bar.txt"
+        self.fname2 = self.datadir + os.sep + "foo/baz.txt"
 
     def tearDown(self):
         shutil.rmtree(self.datadir)
@@ -47,7 +53,10 @@ class Main(unittest.TestCase):
     def test_runcmd(self):
         filename = self.dname+os.sep+"räksmörgås.txt"
         util.writefile(filename, "räksmörgås")
-        cmd = "cat"
+        if sys.platform == "win32":
+            cmd = "type"
+        else:
+            cmd = "cat"
         cmdline = "%s %s" % (cmd, filename)
         (retcode, stdout, stderr) = util.runcmd(cmdline)
         self.assertEqual(0, retcode)
@@ -64,16 +73,16 @@ class Main(unittest.TestCase):
                                                     require_success=True)
 
     def test_listdirs(self):
-        util.writefile(self.datadir+"/foo.txt", "Hello")
-        util.writefile(self.datadir+"/bar.txt", "Hello")
-        util.writefile(self.datadir+"/foo/2.txt", "Hello")
-        util.writefile(self.datadir+"/foo/10.txt", "Hello")
+        util.writefile(self.p("foo.txt"), "Hello")
+        util.writefile(self.p("bar.txt"), "Hello")
+        util.writefile(self.p("foo/2.txt"), "Hello")
+        util.writefile(self.p("foo/10.txt"), "Hello")
         util.writefile(self.datadir+"/foo/baz.text", "Hello")
         generator = util.list_dirs(self.datadir, ".txt")
-        self.assertEqual(self.datadir+"/bar.txt", next(generator))
-        self.assertEqual([self.datadir+"/foo.txt",
-                          self.datadir+"/foo/2.txt",
-                          self.datadir+"/foo/10.txt"], list(generator))
+        self.assertEqual(self.p("bar.txt"), next(generator))
+        self.assertEqual([self.p("foo.txt"),
+                          self.p("foo/2.txt"),
+                          self.p("foo/10.txt")], list(generator))
 
     def test_replace_if_different(self):
         # test 1: dst does not exist

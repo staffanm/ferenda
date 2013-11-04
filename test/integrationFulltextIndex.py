@@ -157,7 +157,22 @@ class WhooshBase(unittest.TestCase):
         self.index = FulltextIndex.connect("WHOOSH", self.location, repos)
 
     def tearDown(self):
-        self.index.destroy()
+        self.index.close()
+        try:
+            self.index.destroy()
+        except WindowsError:
+            # this happens on Win32 when doing the following sequence of events:
+            #
+            # i = FulltextIndex.connect("WHOOSH", ...)
+            # i.update(...)
+            # i.commit()
+            # i.update(...)
+            # i.commit()
+            # i.destroy()
+            #
+            # Cannot solve this for now. FIXME:
+            pass
+
 
 
 class WhooshBasicIndex(BasicIndex, WhooshBase): 
