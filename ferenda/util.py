@@ -182,6 +182,9 @@ def runcmd(cmdline, require_success=False, cwd=None,
     :returns: The returncode, all stdout output, all stderr output
     :rtype: tuple
     """
+    if sys.platform == "win32" and six.PY2:
+        cmdline_encoding = "windows-1252"
+        
     if cmdline_encoding:
         cmdline = cmdline.encode(cmdline_encoding)
 

@@ -293,7 +293,6 @@ class WhooshIndex(FulltextIndex):
         return whoosh.index.create_in(self.location, schema)
 
     def destroy(self):
-        # self.index.close() ?!
         shutil.rmtree(self.location)
 
     def schema(self):
@@ -326,6 +325,7 @@ class WhooshIndex(FulltextIndex):
 
     def close(self):
         self.commit()
+        self.index.close()
 
     def doccount(self):
         return self.index.doc_count()

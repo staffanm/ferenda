@@ -76,8 +76,8 @@ class Main(unittest.TestCase, FerendaTestCase):
         # 3. get_serialized
         def create_tempfile(*args, **kwargs):
             filename = re.search('-o "([^"]+)"', args[0]).group(1)
-            with open(filename, "w") as fp:
-                fp.write("tripledata\n")
+            with open(filename, "wb") as fp:
+                fp.write("tripledata\n".encode())
             return (0, "", "")
         runcmd_mock.side_effect = create_tempfile
         res = store.get_serialized("nt")
