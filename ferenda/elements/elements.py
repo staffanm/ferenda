@@ -524,6 +524,8 @@ def __serializeNode(node, serialize_hidden_attrs=False):
     if hasattr(node, '__dict__'):
         for key in [x for x in list(node.__dict__.keys()) if serialize_hidden_attrs or not x.startswith('_')]:
             val = node.__dict__[key]
+            if val is None:
+                continue
             if (isinstance(val, (str,bytes))):
                 e.set(key, val)
             else:

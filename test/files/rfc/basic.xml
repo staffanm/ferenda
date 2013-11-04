@@ -18,11 +18,11 @@ ISSN: 2070-1721                                                H. Kaplan
     <Paragraph>
       <str>This specification defines a new SIP header field, Feature-Caps. The Feature-Caps header field conveys feature-capability indicators that are used to indicate support of features and capabilities for SIP entities that are not represented by the Uniform Resource Identifier (URI) of the Contact header field. Such cases are:</str>
     </Paragraph><UnorderedList type="disc">
-      <ListItem ordinal="None">
+      <ListItem>
         <str>The SIP entity acts as a SIP proxy.</str>
-      </ListItem><ListItem ordinal="None">
+      </ListItem><ListItem>
         <str>The SIP entity acts as a SIP registrar.</str>
-      </ListItem><ListItem ordinal="None">
+      </ListItem><ListItem>
         <str>The SIP entity acts as a Back-to-Back User Agent (B2BUA)
       [RFC3261], where the Contact header field URI represents another
       SIP entity.</str>

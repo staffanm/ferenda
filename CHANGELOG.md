@@ -1,3 +1,10 @@
+2013-11-?? RELEASE 0.1.6
+========================
+
+This release just contains bug fixes. 95 % of the main code base is
+covered through the unit test suite, and the examples featured in the
+documentation is now automatically tested as well.
+
 2013-09-29 RELEASE 0.1.5
 ========================
 

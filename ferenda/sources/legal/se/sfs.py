@@ -1238,7 +1238,7 @@ class SFS(Trips):
 
                 if hasattr(p, 'fragment_label'):
                     elementtype = p.fragment_label
-                    if hasattr(p, 'ordinal'):
+                    if hasattr(p, 'ordinal') and p.ordinal:
                         elementordinal = p.ordinal.replace(" ", "")
                     elif hasattr(p, 'sfsnr'):
                         elementordinal = p.sfsnr
