@@ -5,9 +5,7 @@ import sys
 import os
 import shutil
 
-from ferenda import util
-
-
+from ferenda import util, errors
 
 # SUT
 from ferenda import PDFDocumentRepository
@@ -23,7 +21,20 @@ class Repo(RepoTester):
         util.ensure_dir(self.repo.store.downloaded_path("sample"))
         shutil.copy2("test/files/pdfreader/sample.pdf",
                      self.repo.store.downloaded_path("sample"))
-        self.repo.parse("sample")
+        try:
+            self.repo.parse("sample")
+        except errors.ExternalCommandError:
+            # print("pdftohtml error: retrying")
+            # for systems that don't have pdftohtml, we copy the expected
+            # intermediate files, so that we can test the rest of the logic
+            targetdir = os.path.dirname(self.repo.store.intermediate_path("sample"))
+            # print("working around by copying to %s" % targetdir)
+            if os.path.exists(targetdir):
+                shutil.rmtree(targetdir)
+            shutil.copytree("test/files/pdfreader/intermediate",
+                            targetdir)
+            self.repo.parse("sample")
+            # print("Workaround succeeded")
         p = self.repo.store.datadir
         self.assertTrue(os.path.exists(p+'/intermediate/sample/index001.png'))
         self.assertTrue(os.path.exists(p+'/intermediate/sample/index.pdf'))
