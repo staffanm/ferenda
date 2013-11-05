@@ -184,28 +184,23 @@ returns, i.e. information about documents that refer to this document.
      public release of `rdflib-jsonld
      <http://github.com/RDFLib/rdflib-jsonld>`_ on PyPI.
 
+  
+Dataset resources
+^^^^^^^^^^^^^^^^^
 
-..  
-  Dataset resources
-  ^^^^^^^^^^^^^^^^^
-  
-  .. note::
-  
-     Not implemented... yet!
-  
-  Each docrepo exposes information about the data it contains through
-  it's dataset URI. This is a single URI (controlled by
-  :meth:`~ferenda.DocumentRepository.dataset_uri`) which can be queried
-  in a similar way as the document resources above:
-  
-  * ``curl -H "Accept: application/html" http://localhost/dataset/rfc``
-    returns a HTML view of a Table of Contents for all documents (see
-    :doc:`toc`)
-  * ``curl -H "Accept: text/plain" http://localhost/dataset/rfc``
-    returns ``rfc/distilled/dump.nt`` which contains all RDF statements
-    for all documents in the repository.
-  * ``curl -H "Accept: application/rdf+xml"
-    http://localhost/dataset/rfc`` returns the same, but in RDF/XML
-    format.
-  * ``curl -H "Accept: text/turtle" http://localhost/dataset/rfc``
-    returns the same, but in turtle format.
+Each docrepo exposes information about the data it contains through
+it's dataset URI. This is a single URI (controlled by
+:meth:`~ferenda.DocumentRepository.dataset_uri`) which can be queried
+in a similar way as the document resources above:
+
+* ``curl -H "Accept: application/html" http://localhost/dataset/rfc``
+  returns a HTML view of a Table of Contents for all documents (see
+  :doc:`toc`)
+* ``curl -H "Accept: text/plain" http://localhost/dataset/rfc``
+  returns ``rfc/distilled/dump.nt`` which contains all RDF statements
+  for all documents in the repository.
+* ``curl -H "Accept: application/rdf+xml"
+  http://localhost/dataset/rfc`` returns the same, but in RDF/XML
+  format.
+* ``curl -H "Accept: text/turtle" http://localhost/dataset/rfc``
+  returns the same, but in turtle format.

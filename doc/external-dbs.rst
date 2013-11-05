@@ -20,21 +20,22 @@ and an external fulltext search engine.
 If you're using the project framework, you set the configuration
 values ``storetype`` and ``indextype`` to new values. You'll find that
 the ``ferenda-setup`` tool creates a ``ferenda.ini`` that specifies
-``storetype``, but not ``indextype`` -- you'll have to add that
-yourself.
+``storetype`` and ``indextype``, based on whether it can find Fuseki,
+Sesame and/or ElasticSearch running on their default ports on
+localhost. You still might have to do extra configuration,
+particularly if you're using Sesame as a triple store.
 
-.. note::
+If you setup any of the external databases after running
+``ferenda-setup``, or you want to use some other configuration than
+what ``ferenda-setup`` selected for you, you can still set the
+configuration values in ``ferenda.ini`` by editing the file as
+described below.
 
-   If you had a Sesame or Fuseki server running using their standard
-   configuration when you ran ferenda-setup, you'll notice that
-   ``ferenda-setup`` attempted to configure ``ferenda.ini`` to use one of
-   them. You still might have to do extra configuration, both in the
-   config file as well as the Sesame or Fuseki server.
-
-At the same time, you'll need to change ``storelocation`` and
-``indexlocation`` (and possibly ``storerepository``) to new values as
-well. See examples below.
-
+If you are running any of the external databases, but in a non-default
+location (including remote locations) you can set the environment
+variables ``FERENDA_TRIPLESTORE_LOCATION`` and/or
+``FERENDA_FULLTEXTINDEX_LOCATION`` to the full URL before running
+``ferenda-setup``.
 
 .. _external-triplestore:
 

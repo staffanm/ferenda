@@ -1,9 +1,42 @@
 2013-11-?? RELEASE 0.1.6
 ========================
 
-This release just contains bug fixes. 95 % of the main code base is
-covered through the unit test suite, and the examples featured in the
-documentation is now automatically tested as well.
+This release mainly contains bug fixes and development infrastructure
+changes. 95 % of the main code base is covered through the unit test
+suite, and the examples featured in the documentation is now
+automatically tested as well. Whenever discrepancies between the map
+(documentation) and reality (code) has been found, reality has been
+adjusted to be in accordance with the map.
+
+* The :meth:`ferenda.Devel.mkpatch` command now actually works.
+
+* The `republishsource` configuration parameter is now available, and
+  controls whether your Atom feeds link to the original document file
+  as it was fetched from the source, or to the parsed version. See
+  :ref:`configuration`.
+  
+* The entire RDF dataset for a particular docrepo is now available
+  through the ReST API in various formats using the same content
+  negotiation mechanisms as the documents themselves. See :doc:`wsgi`.
+  
+  
+* The DocumentStore.open_generated method was removed as noone was
+  using it.
+  
+* The (non-documented) modules legalref and legaluri, which were
+  specific to swedish legal references, have been moved into the
+  ferenda.sources.legal.se namespace
+  
+* The (non-documented) feature where CSS files specified in the
+  configuration could be in SCSS format, and automatically
+  compiled/transformed, has been removed, since the library used
+  (pyScss) currently has problems on the Python 3 platform.
+
+* ferenda-setup now auto-configures ``indextype`` (and checks whether
+  ElasticSearch is available, before falling back to Whoosh) in
+  addition to ``storetype``.
+
+in addition to Fuseki and Sesame 
 
 2013-09-29 RELEASE 0.1.5
 ========================
