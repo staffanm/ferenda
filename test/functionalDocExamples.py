@@ -189,6 +189,9 @@ class Examples(unittest.TestCase, FerendaTestCase):
         self._test_pyfile("doc/examples/firststeps-api.py")
         
     def test_firststeps(self):
+        # this test might fail whenever new W3C standards are added,
+        # depending on where rdfa-core ends up alphabetically in
+        # between the other three downloaded documents.
         self.verbose = True
         workingdir = tempfile.mkdtemp()
         shutil.copy2("doc/examples/w3cstandards.py", workingdir)

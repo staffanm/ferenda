@@ -110,11 +110,11 @@ $ ./ferenda-build.py w3c parse --all --loglevel=DEBUG
 13:04:43 w3c DEBUG ttml1: Created data/w3c/parsed/ttml1.xhtml
 13:04:45 w3c DEBUG ttml1: 12 triples extracted to data/w3c/distilled/ttml1.rdf
 13:04:45 w3c INFO ttml1: OK (5.816 sec)
+13:04:45 w3c DEBUG rdfa-core: Skipped
 13:04:45 w3c DEBUG touch-events: Starting
 13:04:45 w3c DEBUG touch-events: Created data/w3c/parsed/touch-events.xhtml
 13:04:45 w3c DEBUG touch-events: 8 triples extracted to data/w3c/distilled/touch-events.rdf
 13:04:45 w3c INFO touch-events: OK (0.486 sec)
-13:04:45 w3c DEBUG rdfa-core: Skipped
 13:04:45 w3c DEBUG geolocation-API: Starting
 13:04:46 w3c DEBUG geolocation-API: Created data/w3c/parsed/geolocation-API.xhtml
 13:04:46 w3c DEBUG geolocation-API: 5 triples extracted to data/w3c/distilled/geolocation-API.rdf

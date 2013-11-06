@@ -92,10 +92,11 @@ def makeresources(repos,
     cssdir = resourcedir + os.sep + "css"
 
     # 1. Process all css files specified in the main config
-    for cssfile in cssfiles:
-        cssurls.append(_process_file(
-            cssfile, cssbuffer, cssdir, "ferenda.ini", combine))
-        processed_files.append(cssfile)
+    if cssfiles:
+        for cssfile in cssfiles:
+            cssurls.append(_process_file(
+                cssfile, cssbuffer, cssdir, "ferenda.ini", combine))
+            processed_files.append(cssfile)
 
     # 2. Visit each enabled class and see if it specifies additional
     # css files to read
@@ -129,10 +130,12 @@ def makeresources(repos,
     jsbuffer = six.BytesIO()
     jsurls = []
     jsdir = resourcedir + os.sep + "js"
-    for jsfile in jsfiles:
-        jsurls.append(_process_file(
-            jsfile, jsbuffer, jsdir, "ferenda.ini", combine))
-        processed_files.append(jsfile)
+
+    if jsfiles:
+        for jsfile in jsfiles:
+            jsurls.append(_process_file(
+                jsfile, jsbuffer, jsdir, "ferenda.ini", combine))
+            processed_files.append(jsfile)
 
     for inst in repos:
         for jsfile in inst.config.jsfiles:

@@ -314,7 +314,6 @@ class=testManager.staticmockclass2
         #        'js':[s.join(['rsrc', 'js','test.js'])],
         #        'xml':[s.join(['rsrc', 'resources.xml'])]
         # }
-        # from pudb import set_trace; set_trace()
         # got = manager.makeresources([test], self.tempdir+os.sep+'rsrc')
         # self.assertEqual(want,got)
 
@@ -815,8 +814,6 @@ class Testrepo2(Testrepo):
         self.assertEqual(manager.run(argv),
                          want)
         
-
-
     def test_run_makeresources(self):
         # 1. setup test_run_enable
         # 2. run('all', 'makeresources')
@@ -833,7 +830,21 @@ class Testrepo2(Testrepo):
         }
         got = manager.run(['all', 'makeresources'])
         self.assertEqual(want,got)
-        
+
+        # 6. alter the ferenda.ini so that it doesn't specify any css/js files
+        util.writefile("ferenda.ini", """[__root__]
+loglevel=WARNING
+datadir = %s
+url = http://localhost:8000
+searchendpoint = /search/
+apiendpoint = /api/
+        """ % self.tempdir)
+        want = {'css':[],
+                'js':[],
+                'xml':[s.join(['rsrc', 'resources.xml'])]
+        }
+        got = manager.run(['all', 'makeresources'])
+        self.assertEqual(want,got)
 
     def test_delayed_config(self):
         # Make sure configuration values gets stored properly in the instance created by run()
