@@ -424,7 +424,8 @@ with the *config* object as single parameter.
         """
 
         wantedprefix = self.config.url + "dataset/" + self.alias
-        if uri.startswith(wantedprefix):
+        if uri == wantedprefix or ("?" in uri and
+                                   uri.startswith(wantedprefix)):
             path = uri[len(wantedprefix) + 1:]
             if "=" in path:
                 return tuple(path.split("=", 1))
@@ -1488,6 +1489,7 @@ parsed document path to that documents dependency file."""
             path = None
             if uri == self.config.url:
                 path = self.config.datadir + os.sep + "index.html"
+                # path = basedir + os.sep + "index.html"
             else:
                 for repo in repos:
                     basefile = repo.basefile_from_uri(uri)
@@ -2009,7 +2011,13 @@ parsed document path to that documents dependency file."""
         # FIXME: This is a naive way of calculating the relative depth
         # of the outfile
         depth = len(outfile[len(self.store.datadir) + 1:].split(os.sep))
-        tree = transformer.transform(self.render_xhtml_tree(doc), depth)
+        repos = [self] + otherrepos
+        if self.config.staticsite:
+            uritransform = self.get_url_transform_func(repos, os.path.dirname(outfile))
+        else:
+            uritransform = None
+        tree = transformer.transform(self.render_xhtml_tree(doc), depth, uritransform=uritransform)
+
         fixed = transformer.t.html5_doctype_workaround(etree.tostring(tree))
 
         with self.store.open(effective_basefile, 'toc', '.html', "wb") as fp:

@@ -1,13 +1,14 @@
 <configuration>
   <sitename>testsite</sitename>
   <sitedescription>Just another Ferenda site</sitedescription>
+  <url>http://localhost:8000/</url>
   <tabs>
     <nav>
       <ul>
         <li>
-          <a href="/foo/">Foo</a>
+          <a href="http://localhost:8000/dataset/base">Foo</a>
         </li><li>
-          <a href="/bar/">Bar</a>
+          <a href="http://localhost:8000/dataset/other">Bar</a>
         </li>
       </ul>
     </nav>

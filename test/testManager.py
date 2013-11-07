@@ -193,6 +193,7 @@ class=testManager.staticmockclass2
         self.assertEqual(javascripts[0].attrib['src'],'rsrc/js/test.js')
         self.assertEqual(tree.find("sitename").text,"MySite")
         self.assertEqual(tree.find("sitedescription").text,"Just another Ferenda site")
+        self.assertEqual(tree.find("url").text,"http://localhost:8000/")
         self.assertTrue(os.path.exists(self.tempdir+'/rsrc/css/test.css'))
         self.assertTrue(os.path.exists(self.tempdir+'/rsrc/js/test.js'))
         tabs=tree.find("tabs")
@@ -327,6 +328,8 @@ class=testManager.staticmockclass2
                                 path=outfile)
         self.assertTrue(res)
         tree = ET.parse(outfile)
+        header = tree.find(".//header/h1/a")
+        self.assertEqual(header.get("href"), 'http://localhost:8000/')
         # FIXME: check that tree contains 2 divs, that they have id
         # staticmock and staticmock2, that the p text is "Handles
         # foaf:Document documents. Contains 3 published documents."
@@ -337,7 +340,25 @@ class=testManager.staticmockclass2
         self.assertIn("Handles foaf:Document", divs[0].find("p").text)
         self.assertIn("Contains 3 published documents", divs[0].find("p").text)
 
+    def test_frontpage_staticsite(self):
+        test = staticmockclass(datadir=self.tempdir)
+        test2 = staticmockclass2(datadir=self.tempdir)
+        outfile = self.tempdir+'/index.html'
+        manager.makeresources([test,test2], self.tempdir+'/rsrc')
+        manager.frontpage([test,test2],
+                          path=outfile,
+                          staticsite=True)
+        t = ET.parse(outfile)
+        header = t.find(".//header/h1/a")
+        self.assertEqual(header.get("href"), 'index.html')
 
+        headernavlinks = t.findall(".//header/nav/ul/li/a")
+        self.assertEqual(headernavlinks[0].get("href"), 'staticmock/toc/index.html')
+        self.assertEqual(headernavlinks[1].get("href"), 'staticmock2/toc/index.html')
+
+        css = t.findall("head/link[@rel='stylesheet']")
+        self.assertRegex(css[0].get('href'), '^rsrc/css')
+        
 class Setup(RepoTester):
 
     @patch('ferenda.manager.setup_logger')

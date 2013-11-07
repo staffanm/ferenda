@@ -144,7 +144,7 @@ class Transformer(object):
 
     def _depth(self, outfiledir, root):
         # NB: root must be a file in the root dir
-        return os.path.relpath(outfiledir, root).count("..") + 1
+        return os.path.relpath(root, outfiledir).count("..")
 
 
 class TransformerEngine(object):

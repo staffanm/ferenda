@@ -1755,6 +1755,29 @@ class TOC(RepoTester):
         header = t.find(".//div[@class='main-container']//h1")
         self.assertEqual(header.text, 'Documents starting with "a"')
 
+    def test_generate_page_staticsite(self):
+        self.repo.config.staticsite = True
+        path = self.repo.toc_generate_page('title','a', 
+                                           self.documentlists[('title','a')], 
+                                           self.pagesets)
+        t = etree.parse(path)
+
+        # TOC link should be relativized
+        navlinks = t.findall(".//nav[@id='toc']//li/a")
+        self.assertEqual('d.html', navlinks[0].get("href"))
+        self.assertEqual('../issued/1791.html', navlinks[3].get("href"))
+
+        header = t.find(".//header/h1/a")
+        # from /base/toc/title/a.html -> /index.html = 3 levels up
+        self.assertEqual('../../../index.html', header.get("href"))
+
+        headernavlinks = t.findall(".//header/nav/ul/li/a")    
+        self.assertEqual('../index.html', headernavlinks[0].get("href"))
+
+        # docs (which in this case use non-base-repo-contained URIs, should be unaffected
+        docs = t.findall(".//ul[@role='main']/li/a")
+        self.assertEqual('http://example.org/books/And_Then_There_Were_None', docs[0].get("href"))
+
     def test_generate_pages(self):
         paths = self.repo.toc_generate_pages(self.documentlists,self.pagesets)
         self.assertEqual(len(paths), 10)

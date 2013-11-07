@@ -66,7 +66,8 @@ def makeresources(repos,
                   jsfiles=[],
                   staticsite=False,
                   sitename="MySite",
-                  sitedescription="Just another Ferenda site"):
+                  sitedescription="Just another Ferenda site",
+                  url="http://localhost:8000/"):
     """Creates the web assets/resources needed for the web app
     (concatenated and minified js/css files, resources.xml used by
     most XSLT stylesheets, etc).
@@ -176,6 +177,8 @@ def makeresources(repos,
     sitename_el.text = sitename
     sitedescription_el = ET.SubElement(root, "sitedescription")
     sitedescription_el.text = sitedescription
+    url_el = ET.SubElement(root, "url")
+    url_el.text = url
 
     tabs = ET.SubElement(
         ET.SubElement(ET.SubElement(root, "tabs"), "nav"), "ul")
@@ -325,7 +328,8 @@ def _process_file(filename, buf, destdir, origin="", combine=False):
 def frontpage(repos,
               path="data/index.html",
               stylesheet="res/xsl/frontpage.xsl",
-              sitename="MySite"):
+              sitename="MySite",
+              staticsite=False):
     """Create a suitable frontpage.
 
     :param repos: The repositories to list on the frontpage, as instantiated and configured docrepo objects
@@ -373,7 +377,11 @@ def frontpage(repos,
         transformer = Transformer('XSLT', stylesheet, ["res/xsl"],
                                   config=conffile,
                                   documentroot=docroot)
-        transformer.transform_file(xhtml_path, path)
+        if staticsite:
+            uritransform = repos[0].get_url_transform_func(repos, os.path.dirname(path))
+        else:
+            uritransform = None
+        transformer.transform_file(xhtml_path, path, uritransform=uritransform)
     return True
 
 
@@ -929,7 +937,9 @@ def _setup_makeresources_args(config):
             'cssfiles':    config.cssfiles,
             'jsfiles':     config.jsfiles,
             'sitename':    config.sitename,
-            'sitedescription': config.sitedescription}
+            'sitedescription': config.sitedescription,
+            'url':         config.url
+    }
 
 
 def _setup_classnames(enabled, classname):
@@ -1316,6 +1326,7 @@ def _setup_frontpage_args(config, argv):
         repos.append(inst)
     return {'sitename': config.sitename,
             'path': config.datadir + "/index.html",
+            'staticsite': config.staticsite,
             'repos': repos}
 
 

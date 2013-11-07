@@ -45,3 +45,11 @@ class Transform(RepoTester):
     # FIXME: We should isolate parts of the tests in
     # testDocRepo.Generate, testDocRepo.TOC and testWSGI.Search that
     # deals with transformation, and bring them here instead.
+
+    def test_depth(self):
+        xsltfile = self.datadir+os.sep+"notused.xslt"
+        util.writefile(xsltfile, '<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"/>')
+        t = Transformer("XSLT", xsltfile, ["res/xsl"], "data")
+        self.assertEqual(0, t._depth("data", "data/index.html"))
+        self.assertEqual(1, t._depth("data/repo", "data/index.html"))
+        self.assertEqual(3, t._depth("data/repo/toc/title", "data/index.html"))
