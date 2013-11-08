@@ -852,7 +852,7 @@ def setup(argv=None, force=False, verbose=False, unattended=False):
         if answer != "y":
             return False
 
-    indextype, indexlocation = _select_fulltextindex(log, verbose)
+    indextype, indexlocation = _select_fulltextindex(log, sitename, verbose)
     log.info("Selected %s as search engine" % indextype)
 
     if not os.path.exists(projdir):
@@ -1517,8 +1517,10 @@ def _select_triplestore(sitename, log, verbose=False):
     return (None, None, None)
 
 
-def _select_fulltextindex(log, verbose=False):
+def _select_fulltextindex(log, sitename, verbose=False):
     # 1. Elasticsearch
+    #
+    # Note that we scan for the root url, but then return root url + sitename
     fulltextindex = os.environ.get('FERENDA_FULLTEXTINDEX_LOCATION',
                                    'http://localhost:9200/')
     if fulltextindex:
@@ -1527,7 +1529,7 @@ def _select_fulltextindex(log, verbose=False):
             resp.raise_for_status()
             if verbose:
                 log.info("Elasticsearch server responding at %s" % fulltextindex)
-            return('ELASTICSEARCH', fulltextindex)
+            return('ELASTICSEARCH', fulltextindex + sitename + "/")
         except (requests.exceptions.HTTPError,
                 requests.exceptions.ConnectionError) as e:
             if verbose:

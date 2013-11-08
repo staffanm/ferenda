@@ -3,6 +3,7 @@
 create some types of ferenda-specific tests easier."""
 from __future__ import unicode_literals
 import os
+import sys
 import tempfile
 import shutil
 import time
@@ -224,6 +225,13 @@ this class, ie::
             self.assertTrue(filecmp.cmp(os.path.join(want, f),
                                         os.path.join(got, f),
                                         shallow=False))
+
+    def assertRegex(self, test, expected_regexp, msg=None):
+        # in older versions of unittest, this method was named assertRegexpMatches
+        if sys.version_info < (3, 2, 0): 
+            return self.assertRegexpMatches(test, expected_regexp, msg)
+        else:
+            return super(FerendaTestCase, self).assertRegex(test, expected_regexp, msg)
 
 
 class RepoTester(unittest.TestCase, FerendaTestCase):

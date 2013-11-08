@@ -61,7 +61,7 @@ Command-line tools
 
 Once you have a large number of documents and metadata about those
 documents, you'll need a RDF triple store, either `Sesame
-<http://www.openrdf.org/>`_ or `Fuseki
+<http://www.openrdf.org/>`_ (at least version 2.7) or `Fuseki
 <http://jena.apache.org/documentation/serving_data/index.html>`_.  For
 document collections small enough to keep all metadata in memory you
 can get by with only rdflib, using either a Sqlite or a Berkely DB

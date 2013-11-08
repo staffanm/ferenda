@@ -175,10 +175,29 @@ d:i8301
         # the same result in the base case.
         uri = "http://example.org/repo/a/1"
         sq = util.readfile("ferenda/res/sparql/annotations.rq") % {'uri': uri}
-        got = self.store.construct(sq)
+        # FIXME: stupid Fuseki workaround
+        if self.storetype == "FUSEKI":
+            got = self.store.construct(sq, uniongraph=False)
+        else:
+            got = self.store.construct(sq)
         want = Graph()
         want.parse(data=util.readfile("test/files/datasets/annotations_a1.ttl"),
                    format="turtle")
+        self.assertEqualGraphs(want, got, exact=True)
+
+    def test_construct_annotations_rfc(self):
+        # print("Not loading, re-using data")
+        self.loader.add_serialized(
+             util.readfile("test/files/datasets/rfc.nt"), format="nt",
+            context="http://localhost:8000/dataset/rfc"
+        )
+
+        uri = "http://localhost:8000/res/rfc/7066"
+        sq = util.readfile("ferenda/res/sparql/rfc-annotations.rq") % {'uri': uri}
+        got = self.store.construct(sq)
+        want = Graph()
+        want.parse(data=util.readfile("test/files/datasets/annotations-rfc.nt"),
+                   format="nt")
         self.assertEqualGraphs(want, got, exact=True)
 
     def test_select_toc(self):
@@ -261,6 +280,7 @@ class Fuseki(TripleStoreTestCase, unittest.TestCase):
 
     def setUp(self):       
         self.store = TripleStore.connect(self.storetype, "http://localhost:3030/", "ds")
+        # print("Not clearing http://localhost:3030/ds")
         self.store.clear()
         self.loader = self.store
 

@@ -6,6 +6,7 @@ from io import BytesIO
 import tempfile
 import logging
 import re
+from xml.sax import SAXParseException
 
 from rdflib import URIRef
 from rdflib import Graph
@@ -13,10 +14,10 @@ from rdflib import URIRef
 from rdflib import ConjunctiveGraph
 import requests
 import requests.exceptions
+import pyparsing
 
 from six import text_type as str
 from six.moves.urllib_parse import quote
-import pyparsing
 
 from ferenda.thirdparty import SQLite
 from ferenda import util, errors
@@ -437,13 +438,18 @@ class RemoteStore(TripleStore):
         try:
             format = "xml"
             headers = {'Accept': self._contenttype[format]}
-            resp = requests.get(url, headers=headers, data=query)
+            resp = requests.get(url, headers=headers)
             resp.raise_for_status()
             result = Graph()
             result.parse(data=resp.text, format=format)
             return result
         except requests.exceptions.HTTPError as e:
             raise errors.SparqlError(e)
+        except SAXParseException as e:
+            # No real error message, most likely a empty string. We'll
+            # return a empty graph for now, which'll trigger a warning
+            # by the caller
+            return result
 
     def _sparql_results_to_list(self, results):
         res = []
@@ -469,6 +475,7 @@ class RemoteStore(TripleStore):
     # context/graph in the query instead.
     def _endpoint_url(self):
         return "%s/%s/query" % (self.location, self.repository)
+        
 
     def _run_curl(self, options):
         if options['method'] == 'GET':
@@ -596,6 +603,17 @@ class FusekiStore(RemoteStore):
             # hence no error handling
             resp.raise_for_status()
 
+    def construct(self, query, uniongraph=True):
+        # This is to work around the default config where Fuseki does
+        # not include all named graphs in the default
+        # graph. Not very pretty...
+        if uniongraph:
+            query = re.sub(r"}\s+WHERE\s+{", "} WHERE { GRAPH <urn:x-arq:UnionGraph> {",
+                           query, flags=re.MULTILINE)
+            query += " }"
+            
+        return super(FusekiStore, self).construct(query)
+            
     def initialize_repository(self):
         # I have no idea how to do this for Fuseki
         pass

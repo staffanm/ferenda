@@ -1721,18 +1721,12 @@ class TOC(RepoTester):
         css = t.findall("head/link[@rel='stylesheet']")
         self.assertEqual(len(css),4) # normalize, main, ferenda, and fonts.googleapis.com
         
-        if sys.version_info < (3, 2, 0): # renamed method in 3.2
-            self.assertRegexpMatches(css[0].get('href'), '^../../../rsrc/css')
-        else:
-            self.assertRegex(css[0].get('href'), '^../../../rsrc/css')
+        self.assertRegex(css[0].get('href'), '^../../../rsrc/css')
         
         # 2.2 JS links, relativized correctly?
         js = t.findall("head/script")
         self.assertEqual(len(js),3) # jquery, modernizr and ferenda
-        if sys.version_info < (3, 2, 0): # renamed method in 3.2
-            self.assertRegexpMatches(js[0].get('src'), '^../../../rsrc/js')
-        else:
-            self.assertRegex(js[0].get('src'), '^../../../rsrc/js')
+        self.assertRegex(js[0].get('src'), '^../../../rsrc/js')
         # 2.3 <nav id="toc"> correct (c.f 1.2)
         navlinks = t.findall(".//nav[@id='toc']//li/a")
         self.assertEqual(len(navlinks),9)

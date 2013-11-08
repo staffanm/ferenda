@@ -19,7 +19,7 @@ pkg_resources.resource_listdir('ferenda','res')
 
 from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 from ferenda.compat import unittest, OrderedDict, Mock, MagicMock, patch, call
-from ferenda.testutil import RepoTester
+from ferenda.testutil import RepoTester, FerendaTestCase
 
 import six
 from six.moves import configparser, reload_module
@@ -100,7 +100,7 @@ class staticmockclass3(staticmockclass):
                 ("Contact", "http://example.org/contact")
         )
     
-class API(unittest.TestCase):
+class API(unittest.TestCase, FerendaTestCase):
     """Test cases for API level methods of the manager modules (functions
        like enable and makeresources, including unit tests of internal
        helpers.
@@ -492,11 +492,12 @@ class Setup(RepoTester):
         # first manipulate requests.get to give the impression that
         # elasticsearch either is or isn't available
         with patch('ferenda.manager.requests.get') as mock_get:
-            r = manager._select_fulltextindex(log, verbose=True)
+            r = manager._select_fulltextindex(log, "mysite", verbose=True)
             self.assertEqual("ELASTICSEARCH", r[0])
+            self.assertEqual("http://localhost:9200/mysite/", r[1])
             mock_get.side_effect = requests.exceptions.HTTPError
 
-            r = manager._select_fulltextindex(log, verbose=True)
+            r = manager._select_fulltextindex(log, "mysite", verbose=True)
             self.assertEqual("WHOOSH", r[0])
             
 

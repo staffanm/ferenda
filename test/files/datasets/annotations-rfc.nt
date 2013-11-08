@@ -1,0 +1,14 @@
+<http://localhost:8000/res/rfc/7066> <http://purl.org/dc/terms/creator> "J. Arkko, Ed." .
+<http://localhost:8000/res/rfc/7066> <http://purl.org/dc/terms/creator> "J. Korhonen, Ed." .
+<http://localhost:8000/res/rfc/7066> <http://purl.org/dc/terms/creator> "S. Krishnan" .
+<http://localhost:8000/res/rfc/7066> <http://purl.org/dc/terms/creator> "T. Savolainen" .
+<http://localhost:8000/res/rfc/7066> <http://purl.org/dc/terms/identifier> "RFC 7066" .
+<http://localhost:8000/res/rfc/7066> <http://purl.org/dc/terms/issn> "2070-1721" . 
+<http://localhost:8000/res/rfc/7066> <http://purl.org/dc/terms/issued> "2013-11-01"^^<http://www.w3.org/2001/XMLSchema#date> .
+<http://localhost:8000/res/rfc/7066> <http://purl.org/dc/terms/publisher> "Internet Engineering Task Force (IETF)" .
+<http://localhost:8000/res/rfc/7066> <http://purl.org/dc/terms/rightsHolder> "Broadcom" .
+<http://localhost:8000/res/rfc/7066> <http://purl.org/dc/terms/rightsHolder> "Ericsson" .
+<http://localhost:8000/res/rfc/7066> <http://purl.org/dc/terms/rightsHolder> "Nokia" . 
+<http://localhost:8000/res/rfc/7066> <http://purl.org/dc/terms/subject> "Informational" .
+<http://localhost:8000/res/rfc/7066> <http://purl.org/dc/terms/title> "IPv6 for Third Generation Partnership Project (3GPP) Cellular Hosts"@en .
+<http://localhost:8000/res/rfc/7066> <http://purl.org/ontology/bibo/shortTitle> "IPv6 for 3GPP Cellular Hosts"@en .
