@@ -1,16 +1,130 @@
 /* custom styles goes here */
+
+/* PART 1: the general header area - should be thin, green and fixed to the viewport */
+
+.header-container {
+    position: fixed;
+    width: 100%;
+    height:46px;
+    border-bottom: 2px;
+}
+
+header.wrapper {
+    margin: 0;
+    width: 100%;
+}
+
+
+header h1, header h2 {
+    margin-left: 60px;
+    margin-top: 6px;
+    margin-bottom: 0;
+    font-weight: 100;
+}
+
+header h1 a {
+    text-decoration: none;
+    color: white;
+}
+
+header h1 {
+    font-size: 20pt;
+}
+header h2 {
+    display: none;
+}
+
+a.navbutton, a.searchbutton {
+    position: absolute;
+    padding: 10px;
+    background: #526B15;
+    top: 0;
+}
+
+a.navbutton {
+    left: 0;
+}
+
+header form {
+    position: absolute;
+    top: 0;
+    right: 0;
+    clear: both;
+}
+
+header form input {
+    margin-right: 50px;
+    margin-top: 8px;
+    font-size: 16pt;
+}
+
+a.searchbutton {
+    right: 0;
+}
+
+header form input {
+    display: none;
+}
+
+header nav ul {
+    display: none;
+    margin-top: 14px;
+}
+
+header nav ul a {
+    margin: 0;
+}
+
+/* PART 1, larger displays */
+
+@media only screen and (min-width: 480px) {
+    .header-container nav a {
+	padding: 7px;
+	float: right;
+	margin-left: 4px;
+    }
+    a.navbutton {
+	display: none;
+    }
+    header nav ul {
+	display: block;
+    }
+}
+
+/* PART 2: The main content area (including document TOC) */
+
+.main-container {
+    padding-top: 50px;
+}
+
+.main {
+    padding: 0;
+}
+
+.wrapper {
+    width: 100%;
+    margin: 2px;
+}
+
+
+
+
+
+
+/*
 @media only screen and (min-width: 768px) {
     .wrapper {
 	width: 1140px;
 	!important
     }
 }
-
+*/
+/* reset some rules from main.css -- we want similar rules, but with
+   other selectors (based on 'article section', not '.main
+   article' */
+/*
 @media only screen and (min-width: 768px) {
 
-    /* reset some rules from main.css -- we want similar rules, but with
-       other selectors (based on 'article section', not '.main
-       article' */
     
     .main > article,
     .main > aside {
@@ -30,57 +144,10 @@
         float: right;
         width: 28%;
     }
+}
+*/
 
 /* header element positioning */
-
-h1.title {
-    font-family: 'Raleway', sans-serif;
-    font-size: 3em;
-    font-weight: 200;
-    margin-bottom:0.2em;
-}
-h1.title a {
-    text-decoration: none;
-    color: white;
-    font-weight: 200;
-}
-h2.title {
-    clear: both;
-    font-family: 'Raleway', sans-serif; 
-    font-size: 1em;
-    font-weight: 100;
-    margin-top:0;
-}
-
-header {
-    position: relative;
-}
-header form {
-    position: absolute;
-    top: 1em;
-    right: 0px;
-    width: 200pt;
-    clear: both;
-}
-header form input {
-    position: absolute;
-    align: right;
-    right: 0px;
-    clear: both;
-}
-
-header nav ul {
-    margin-left: auto;
-    margin-right: 0px;
-}
-
-@media only screen and (min-width: 480px) {
-    .header-container nav a {
-	padding: 7px;
-	float: right;
-    }
-}
-
 
 /* http://colorschemedesigner.com/#2j61ZK-hWpBpB */
 /* general look and feel */
@@ -92,40 +159,48 @@ header nav ul {
 }
 
 .header-container {
-    border-bottom: 20px solid #526B15;
+    border-bottom: 0px solid #526B15;
 }
 
 .header-container nav {
     width: 100%;
 }
+
+nav a {
+    background: #526B15;
+}
+
+/* not on mobile i think
 .header-container nav li a {
     float: left;
     width: 14%;
     text-align: center;
 }
-    
+*/
 nav ul {
     margin-left: 1em;
 }
 body.toc nav ul {
     margin-left: 0;
 }
+
 body.search section.hit h2 {
     font: 12pt/14pt Helvetica, Helvetica Neue, Arial;
     font-weight: bold;
 }
+
+/*  Not mobile
 nav li a {
     background: #526B15;
-    float: none; /* override float: left in main.css */
-    width: 100%; /* override width: 27% in main.css */
-    text-align: left; /* override text-align: center in main.css */
+    float: none; * override float: left in main.css *
+    width: 100%; * override width: 27% in main.css *
+    text-align: left; * override text-align: center in main.css *
     margin-left: 0;
-		    
 }
-
 nav ul li {
     display: list-item;
 }
+*/
 
 .footer-container,
 .main aside {
@@ -156,11 +231,12 @@ aside h2 {
     margin: 0;
 }
 
+/* use this for full-width layouts 
 nav#toc {
     width: 20%;
     float: left;
 }
-
+*/
 nav#toc h1 {
     font-size: 1.2em;
 }
@@ -211,4 +287,10 @@ footer nav ul li a {
     padding: 0;
     margin: 0;
     font-weight: normal;
+}
+
+
+header nav ul {
+    margin-left: auto;
+    margin-right: 0px;
 }
