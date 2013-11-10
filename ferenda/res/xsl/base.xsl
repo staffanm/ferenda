@@ -85,6 +85,7 @@
 	<div class="main-container">
 	  <div class="main wrapper clearfix">
 	    <nav id="toc">
+	      <xsl:copy-of select="$configuration/navbutton/*"/>
 	      <ul>
 		<xsl:apply-templates mode="toc"/>
 	      </ul>

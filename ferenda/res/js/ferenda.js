@@ -7,5 +7,13 @@ $( document ).ready(function() {
     $( "a.searchbutton" ).click(function( event ) {
 	$( "header form input" ).slideToggle("fast");
     });
+    $( "a.tocbutton" ).click(function( event ) {
+	$( "nav#toc ul" ).slideToggle("fast");
+	$( "nav#toc ul li ul").hide();
+    });
+    $( "nav#toc ul li" ).click(function( event ) {
+	$(this).children("ul").toggle()
+    });
+    
 });
 	

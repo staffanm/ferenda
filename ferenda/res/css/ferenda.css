@@ -106,6 +106,24 @@ header nav ul a {
     margin: 2px;
 }
 
+nav#toc {
+    margin-left: 10px;
+}
+
+nav a.tocbutton {
+}
+
+nav#toc > ul {
+    display: none;
+}
+
+nav#toc > ul > li {
+    display: block;
+}
+
+nav#toc a:after {
+    content: " ";
+}
 
 
 
@@ -240,12 +258,13 @@ nav#toc {
 nav#toc h1 {
     font-size: 1.2em;
 }
+/*
 nav#toc > ul > li > p {
     font-family: sans-serif;
     font-weight: bold;
     font-size: 1.5em;
 }
-
+*/
 nav#toc li {
     /* No special styling */
 }
