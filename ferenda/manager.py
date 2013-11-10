@@ -187,7 +187,6 @@ def makeresources(repos,
                            'class': "navbutton"})
     ET.SubElement(l, "img", src="rsrc/img/navmenu.png")
     root.find("tabs/nav").insert(0, l)
-
     
     sitetabs = []
     for inst in repos:
@@ -224,6 +223,12 @@ def makeresources(repos,
         link = ET.SubElement(ET.SubElement(footer, "li"), "a")
         link.text = text
         link.attrib['href'] = href
+
+    tocbutton = ET.SubElement(
+        ET.SubElement(ET.SubElement(root, "tocbutton"),
+                      "a", {'href':'#menu',
+                            'class': 'tocbutton'}),
+        "img", {'src':'rsrc/img/navmenu-small-black.png'})
 
     if not staticsite:
         search = ET.SubElement(

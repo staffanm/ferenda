@@ -113,6 +113,11 @@ nav#toc {
 nav a.tocbutton {
 }
 
+nav#toc a {
+    text-align: left;
+}
+
+
 nav#toc > ul {
     display: none;
 }
