@@ -200,7 +200,8 @@ class XSLTTransform(TransformerEngine):
                 tree = etree.parse(configfile)
                 # adjust the relevant link attribute for some nodes
                 for xpath, attrib in (("stylesheets/link", "href"),
-                                      ("javascripts/script", "src")):
+                                      ("javascripts/script", "src"),
+                                      (".//img", "src")):
                     for node in tree.findall(xpath):
                         # don't adjust absolute links
                         if not (re.match("(https?://|/)", node.get(attrib))):

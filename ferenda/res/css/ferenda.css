@@ -1,16 +1,320 @@
-/* custom styles goes here */
-@media only screen and (min-width: 768px) {
-    .wrapper {
-	width: 1140px;
-	!important
+/* NTS: Media queries screen sizes used:
+   (default): (mobile portrait): site navigation and toc navigation use hamburger foldouts, asides below
+   min-width: 480px (tablet + mobile landscape?): site navigation in tabs
+   min-width: 768px (desktop): search in header always visible, subheading, site navigation in tabs, asides aside
+   min-width: 1140px (fullscreen desctop): toc navigation in leftmost columns
+   print: I
+
+*/
+
+/* this overrides main.css by @verekia */
+
+/* GENERAL/GLOBAL PARTS */
+.header-container,
+.footer-container,
+.main aside {
+    background: #5E8600;
+    font-weight: 100;
+}
+
+.header-container nav {
+    width: 100%;
+}
+
+header nav a {
+    width: 100%;
+    margin: 0;
+}
+
+body {
+    font: 16px/1.5em Helvetica, Helvetica Neue, Arial;
+}
+
+/* PART 1: the general header area - should be thin, green and fixed to the viewport */
+
+.header-container {
+    position: fixed;
+    width: 100%;
+    height:46px;
+    border-bottom: 2px solid #526B15;
+}
+
+header.wrapper {
+    margin: 0;
+    width: 100%;
+}
+
+
+header h1, header h2 {
+    margin-left: 60px;
+    margin-top: 9px;
+    margin-bottom: 0;
+    font-weight: 100;
+}
+
+header h1 a {
+    text-decoration: none;
+    color: white;
+}
+h1.title {
+    float: none;
+}
+header h1 {
+    float: none;
+    font-size: 20pt;
+}
+header h2 {
+    font-size: 10pt;
+    display: none;
+    float: left;
+}
+
+a.navbutton, a.searchbutton {
+    position: absolute;
+    padding: 7px;
+    margin: 3px;
+    background: #526B15;
+    top: 0;
+    border: 1px solid black;
+    border-radius: 5px;
+}
+
+a.navbutton {
+    left: 0;
+    width: 34px;
+}
+
+header form {
+    position: absolute;
+    top: 0;
+    right: 0;
+    clear: both;
+}
+
+header form input {
+    margin-left: 50px;
+    margin-right: auto;
+    margin-top: 8px;
+    font-size: 16pt;
+    width: 70%;
+    display: none;
+}
+
+a.searchbutton {
+    right: 0;
+}
+
+header nav ul {
+    display: none;
+    margin-top: 4px;
+    background: #5E8600;
+    padding: 10px;
+    border-bottom: 2px solid #526B15;
+}
+
+header nav ul li a {
+    margin: 0 0 5px 0;
+    border: 1px solid black;
+    border-radius: 5px;
+    background: #526B15;
+}
+
+
+
+/* PART 1, larger displays */
+
+@media only screen and (min-width: 480px) {
+    /* no need for fixed header positioning */
+    .header-container {
+	position: relative; 
+	height: 86px;
+	border-bottom-width: 10px;
+    }
+    header h1 {
+	margin-left: 10px;
+    }
+    header h2 {
+	display: block;
+	margin-left: 10px;
+    }
+    header nav ul {
+	display: block;
+	position: absolute;
+	right: 0;
+	bottom: 0px;
+	border: none;
+	padding: 0;
+    }
+    .header-container nav ul li a {
+	width: inherit;
+	padding: 5px;
+	margin: 0 5px 0 0;
+	border: none;
+	border-radius: 0px;
+    }
+    .header-container nav ul li:last-child a {
+	margin-right: 10px;
+    }
+
+    a.navbutton, a.searchbutton {
+	display: none;
+    }
+    header form input {
+	margin-right: 10px;
+	width: auto;
+	display: block;
     }
 }
 
+
+@media only screen and (min-width: 768px) {
+    nav#toc {
+    }
+}
+
+
+/* PART 2: The main content area (including document TOC) */
+
+/* if we even have a tocbutton on the frontpage, remove it */
+body.frontpage a.tocbutton {
+    display: none;
+}
+nav#toc a.tocbutton {
+    border: 1px solid black;
+    border-radius: 5px;
+    padding: 7px;
+}
+
+.main-container {
+    padding: 50px 5px 0px 5px;
+}
+
+.main {
+    padding: 0;
+}
+.wrapper {
+    width: 100%;
+    margin: 0;
+}
+.main p {
+    margin: 0.8em 0;
+}
+
+nav#toc {
+    margin-left: 6px;
+    margin-top: 10px;
+}
+
+nav#toc a {
+    display: inline;
+    width: auto;
+    float: none;
+    text-align: left;
+}
+
+nav#toc > ul {
+    display: none;
+    margin-top: 5px;
+}
+
+nav#toc > ul > li {
+    display: block;
+}
+nav#toc > ul > li > ul {
+    display: block; /* js toggles this */
+}
+
+nav#toc a:after {
+    content: " ";
+}
+
+
+.main aside {
+    margin: 0;
+    padding: 5pt;
+    font-size: 80%;
+    line-height: 120%;
+}
+
+@media only screen and (min-width: 480px) {
+    nav#toc a.tocbutton {
+	float: none;
+	width: 100%;
+	display: inline;
+    }
+    a.tocbutton:after {
+	content: " Table of contents";
+    }
+    .main-container {
+	padding: 0px 5px 0px 5px;
+    }
+    /* an article consists of the entire actual text of our document */
+    .main article {
+	width: 100%;
+    }
+    nav#toc {
+	margin-left: 6px;
+    }
+    nav#toc a {
+	margin: 0;
+	padding: 0;
+    }
+}
+
+
+@media only screen and (min-width: 768px) {
+    /* a section-wrapper wraps a section with it's aside (which is not
+       actually a part of the section, only highly related. */
+    .section-wrapper {
+	position: relative;
+    }
+    /* while a section is any addressable part of the same. in this CSS,
+       sections have asides, but articles themselves do not (this is a
+       change from the main.css logic). */
+    .main section {
+	width: 66%
+    }
+    .main aside {
+	float: none;
+	position: absolute;
+	top: 0;
+	right: 0;
+	width: 30%
+    }
+
+    nav#toc {
+	float: none;
+	width: auto;
+    }
+    nav#toc > ul > li > ul {
+	display: none; /* js toggles this */
+    }
+}
+
+
+@media only screen and (min-width: 1140px) {
+    .main article {
+	width: 78%;
+	float: right;
+    }
+    nav#toc {
+	padding-top: 10pt;
+	float: left;
+	width: 20%;
+    }
+    nav#toc > ul {
+	display: block;
+    }
+    nav#toc a.tocbutton {
+	display: none;
+    }    
+}
+/* reset some rules from main.css -- we want similar rules, but with
+   other selectors (based on 'article section', not '.main
+   article' */
+/*
 @media only screen and (min-width: 768px) {
 
-    /* reset some rules from main.css -- we want similar rules, but with
-       other selectors (based on 'article section', not '.main
-       article' */
     
     .main > article,
     .main > aside {
@@ -30,101 +334,21 @@
         float: right;
         width: 28%;
     }
+}
+*/
 
 /* header element positioning */
 
-h1.title {
-    font-family: 'Raleway', sans-serif;
-    font-size: 3em;
-    font-weight: 200;
-    margin-bottom:0.2em;
-}
-h1.title a {
-    text-decoration: none;
-    color: white;
-    font-weight: 200;
-}
-h2.title {
-    clear: both;
-    font-family: 'Raleway', sans-serif; 
-    font-size: 1em;
-    font-weight: 100;
-    margin-top:0;
-}
-
-header {
-    position: relative;
-}
-header form {
-    position: absolute;
-    top: 1em;
-    right: 0px;
-    width: 200pt;
-    clear: both;
-}
-header form input {
-    position: absolute;
-    align: right;
-    right: 0px;
-    clear: both;
-}
-
-header nav ul {
-    margin-left: auto;
-    margin-right: 0px;
-}
-
-@media only screen and (min-width: 480px) {
-    .header-container nav a {
-	padding: 7px;
-	float: right;
-    }
-}
-
-
 /* http://colorschemedesigner.com/#2j61ZK-hWpBpB */
 /* general look and feel */
-.header-container,
-.footer-container,
-.main aside {
-    background: #5E8600;
-    font-weight: 100;
-}
 
-.header-container {
-    border-bottom: 20px solid #526B15;
-}
-
-.header-container nav {
-    width: 100%;
-}
-.header-container nav li a {
-    float: left;
-    width: 14%;
-    text-align: center;
-}
-    
-nav ul {
-    margin-left: 1em;
-}
 body.toc nav ul {
     margin-left: 0;
 }
+
 body.search section.hit h2 {
     font: 12pt/14pt Helvetica, Helvetica Neue, Arial;
     font-weight: bold;
-}
-nav li a {
-    background: #526B15;
-    float: none; /* override float: left in main.css */
-    width: 100%; /* override width: 27% in main.css */
-    text-align: left; /* override text-align: center in main.css */
-    margin-left: 0;
-		    
-}
-
-nav ul li {
-    display: list-item;
 }
 
 .footer-container,
@@ -137,7 +361,8 @@ pre {
     }
 
 h1, h2, h3, h4 {
-    font-family: 'Raleway', sans-serif; 
+    font-family: 'Raleway', sans-serif;
+    line-height: 1.2em;
 }
 
 aside h2 {
@@ -146,36 +371,28 @@ aside h2 {
     margin-top: 0;
 }
 
-.main aside {
-    margin: 0;
-    padding: 5pt;
-    font-size: 80%;
-    line-height: 120%;
-}
-.main p {
-    margin: 0;
-}
 
+/* use this for full-width layouts 
 nav#toc {
     width: 20%;
     float: left;
 }
-
+*/
 nav#toc h1 {
     font-size: 1.2em;
 }
+/*
 nav#toc > ul > li > p {
     font-family: sans-serif;
     font-weight: bold;
     font-size: 1.5em;
 }
-
+*/
 nav#toc li {
     /* No special styling */
 }
 
 nav#toc a {
-    padding: 0;
     background: inherit;
     color: inherit;
     font-weight: normal;
@@ -211,4 +428,10 @@ footer nav ul li a {
     padding: 0;
     margin: 0;
     font-weight: normal;
+}
+
+
+header nav ul {
+    margin-left: auto;
+    margin-right: 0px;
 }

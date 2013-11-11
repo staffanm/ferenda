@@ -417,9 +417,10 @@ class Search(WSGI):
         t = etree.parse(BytesIO(content))
         css = t.findall("head/link[@rel='stylesheet']")
         self.assertEqual(len(css),4) # normalize, main, ferenda, and fonts.googleapis.com
-        self.assertEqual(css[0].get('href'), '../rsrc/css/normalize.css')
+        self.assertEqual('../rsrc/css/normalize-1.1.3.css',
+                         css[0].get('href'))
         js = t.findall("head/script")
-        self.assertEqual(len(js),3) # jquery, modernizr and ferenda
+        self.assertEqual(len(js), 4) # jquery, modernizr, respond and ferenda
         
         resulthead = t.find(".//article/h1").text
         self.assertEqual(resulthead, "3 matches for 'part'")

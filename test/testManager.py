@@ -209,10 +209,11 @@ class=testManager.staticmockclass2
         }
         got = manager.makeresources([test,test2],self.tempdir+os.sep+'rsrc',
                                     combine=True,
-                                    cssfiles=['res/css/normalize.css',
+                                    cssfiles=['res/css/normalize-1.1.3.css',
                                               'res/css/main.css'],
-                                    jsfiles=['res/js/jquery-1.9.0.js',
-                                             'res/js/modernizr-2.6.2-respond-1.1.0.min.js'],
+                                    jsfiles=['res/js/jquery-1.10.2.js',
+                                             'res/js/modernizr-2.6.3.js',
+                                             'res/js/respond-1.3.0.js'],
                                     sitename="Blahonga",
                                     sitedescription="A non-default value")
         self.assertEqual(want,got)
@@ -230,11 +231,12 @@ class=testManager.staticmockclass2
         # check that the combining/minifying indeed saved us some space
         # physical path for these: relative to the location of ferenda/manager.py.
         self.assertLess(os.path.getsize(self.tempdir+'/rsrc/css/combined.css'),
-                        sum([os.path.getsize(x) for x in ("ferenda/res/css/normalize.css",
+                        sum([os.path.getsize(x) for x in ("ferenda/res/css/normalize-1.1.3.css",
                                                           "ferenda/res/css/main.css")]))
         self.assertLess(os.path.getsize(self.tempdir+'/rsrc/js/combined.js'),
-                        sum([os.path.getsize(x) for x in ("ferenda/res/js/jquery-1.9.0.js",
-                                                          "ferenda/res/js/modernizr-2.6.2-respond-1.1.0.min.js")]))
+                        sum([os.path.getsize(x) for x in ("ferenda/res/js/jquery-1.10.2.js",
+                                                          "ferenda/res/js/modernizr-2.6.3.js",
+                                                          "ferenda/res/js/respond-1.3.0.js")]))
         # Test3: No combining, make sure that a non-customized
         # DocumentRepository works
         repo = DocumentRepository()
@@ -242,11 +244,12 @@ class=testManager.staticmockclass2
         repo.config.cssfiles = [x for x in repo.config.cssfiles if not x.startswith("http://")]
         got = manager.makeresources([repo],self.tempdir+os.sep+'rsrc')
         s = os.sep
-        want = {'css':[s.join(['rsrc', 'css','normalize.css']),
+        want = {'css':[s.join(['rsrc', 'css','normalize-1.1.3.css']),
                        s.join(['rsrc', 'css','main.css']),
                        s.join(['rsrc', 'css','ferenda.css'])],
-                'js':[s.join(['rsrc', 'js','jquery-1.9.0.js']),
-                      s.join(['rsrc', 'js','modernizr-2.6.2-respond-1.1.0.min.js']),
+                'js':[s.join(['rsrc', 'js','jquery-1.10.2.js']),
+                      s.join(['rsrc', 'js','modernizr-2.6.3.js']),
+                      s.join(['rsrc', 'js','respond-1.3.0.js']),
                       s.join(['rsrc', 'js','ferenda.js'])],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
                       }

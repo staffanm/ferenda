@@ -183,6 +183,11 @@ def makeresources(repos,
     tabs = ET.SubElement(
         ET.SubElement(ET.SubElement(root, "tabs"), "nav"), "ul")
 
+    l = ET.Element("a", **{'href': "#menu",
+                           'class': "navbutton"})
+    ET.SubElement(l, "img", src="rsrc/img/navmenu.png")
+    root.find("tabs/nav").insert(0, l)
+    
     sitetabs = []
     for inst in repos:
         if hasattr(inst, 'tabs'):
@@ -219,10 +224,20 @@ def makeresources(repos,
         link.text = text
         link.attrib['href'] = href
 
+    tocbutton = ET.SubElement(
+        ET.SubElement(ET.SubElement(root, "tocbutton"),
+                      "a", {'href':'#menu',
+                            'class': 'tocbutton'}),
+        "img", {'src':'rsrc/img/navmenu-small-black.png'})
+
     if not staticsite:
         search = ET.SubElement(
             ET.SubElement(ET.SubElement(root, "search"), "form", action="/search/"), "input", type="search", name="q")
-
+        l = ET.Element("a", **{'href': "#search",
+                               'class': "searchbutton"})
+        ET.SubElement(l, "img", src="rsrc/img/search.png")
+        root.find("search/form").append(l)
+        
     stylesheets = ET.SubElement(root, "stylesheets")
     log.debug("Adding %s stylesheets to resources.xml" % len(res['css']))
     for f in res['css']:
