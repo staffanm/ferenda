@@ -1792,7 +1792,7 @@ class TOC(RepoTester):
         # (NOTE: the first page in the first pageset (by title/a) isn't linked. The second one (by title/d) is).
         self.assertEqual("http://localhost:8000/dataset/base?title=d",
                          tree.find(".//nav[@id='toc']").findall(".//a")[0].get("href"))
-        self.assertEqual("../../rsrc/css/normalize.css",
+        self.assertEqual("../../rsrc/css/normalize-1.1.3.css",
                          tree.find(".//link").get("href"))
                          
         self.assertEqual('Documents starting with "a"',

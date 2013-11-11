@@ -213,7 +213,7 @@ class=testManager.staticmockclass2
                                               'res/css/main.css'],
                                     jsfiles=['res/js/jquery-1.10.2.js',
                                              'res/js/modernizr-2.6.3.js',
-                                             'res/js/respond-1.3.0.min.js'],
+                                             'res/js/respond-1.3.0.js'],
                                     sitename="Blahonga",
                                     sitedescription="A non-default value")
         self.assertEqual(want,got)
@@ -234,9 +234,9 @@ class=testManager.staticmockclass2
                         sum([os.path.getsize(x) for x in ("ferenda/res/css/normalize-1.1.3.css",
                                                           "ferenda/res/css/main.css")]))
         self.assertLess(os.path.getsize(self.tempdir+'/rsrc/js/combined.js'),
-                        sum([os.path.getsize(x) for x in ("ferenda/res/js/jquery-1.10.2.0.js",
+                        sum([os.path.getsize(x) for x in ("ferenda/res/js/jquery-1.10.2.js",
                                                           "ferenda/res/js/modernizr-2.6.3.js",
-                                                          "respond-1.3.0.min.js")]))
+                                                          "ferenda/res/js/respond-1.3.0.js")]))
         # Test3: No combining, make sure that a non-customized
         # DocumentRepository works
         repo = DocumentRepository()
@@ -249,7 +249,7 @@ class=testManager.staticmockclass2
                        s.join(['rsrc', 'css','ferenda.css'])],
                 'js':[s.join(['rsrc', 'js','jquery-1.10.2.js']),
                       s.join(['rsrc', 'js','modernizr-2.6.3.js']),
-                      s.join(['rsrc', 'js','respond-1.3.0.min.js']),
+                      s.join(['rsrc', 'js','respond-1.3.0.js']),
                       s.join(['rsrc', 'js','ferenda.js'])],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
                       }

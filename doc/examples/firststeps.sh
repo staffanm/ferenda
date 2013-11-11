@@ -136,11 +136,12 @@ data/rsrc
 data/rsrc/css
 data/rsrc/css/ferenda.css
 data/rsrc/css/main.css
-data/rsrc/css/normalize.css
+data/rsrc/css/normalize-1.1.3.css
 data/rsrc/js
 data/rsrc/js/ferenda.js
-data/rsrc/js/jquery-1.9.0.js
-data/rsrc/js/modernizr-2.6.2-respond-1.1.0.min.js
+data/rsrc/js/jquery-1.10.2.js
+data/rsrc/js/modernizr-2.6.3.js
+data/rsrc/js/respond-1.3.0.js
 data/rsrc/resources.xml
 # end makeresources
 
