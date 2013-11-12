@@ -19,7 +19,7 @@ from rdflib.util import guess_format
 from rdflib.compare import graph_diff, isomorphic
 from ferenda import util, errors
 
-from ferenda.triplestore import TripleStore, SleepycatStore
+from ferenda.triplestore import TripleStore, SleepycatStore, FusekiStore
 
 from ferenda.testutil import FerendaTestCase
 
@@ -159,8 +159,13 @@ d:i8301
     ab:firstName "Craig" ;
     ab:lastName "Ellis" .
 """, format="turtle")
-        got = self.store.construct(sq)
-        self.assertTrue(isomorphic(want,got))
+        if self.store.__class__ == FusekiStore:
+            got = self.store.construct(sq, uniongraph=False)
+        else:
+            got = self.store.construct(sq)
+
+        # self.assertTrue(isomorphic(want,got))
+        self.assertEqualGraphs(want, got, exact=True)
         if self.store.__class__ == SleepycatStore:
             self.store.graph.close()
 

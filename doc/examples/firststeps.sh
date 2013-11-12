@@ -156,11 +156,12 @@ $ ./ferenda-build.py w3c generate --all
 
 # begin final-commands
 $ ./ferenda-build.py w3c toc
-13:05:01 w3c INFO Created data/w3c/toc/issued/2004.html
+13:05:01 w3c INFO Created data/w3c/toc/issued/1999.html
 13:05:01 w3c INFO Created data/w3c/toc/issued/2013.html
-13:05:01 w3c INFO Created data/w3c/toc/title/g.html
+13:05:01 w3c INFO Created data/w3c/toc/title/c.html
+13:05:02 w3c INFO Created data/w3c/toc/title/p.html
 13:05:02 w3c INFO Created data/w3c/toc/title/r.html
-13:05:02 w3c INFO Created data/w3c/toc/title/t.html
+13:05:02 w3c INFO Created data/w3c/toc/title/w.html
 13:05:02 w3c INFO Created data/w3c/toc/index.html
 13:05:02 root INFO w3c toc finished in 1.739 sec
 $ ./ferenda-build.py w3c news
@@ -187,11 +188,12 @@ $ ./ferenda-build.py w3c all
 13:05:07 w3c INFO rdfa-core: OK (0.000 sec)
 13:05:07 w3c INFO geolocation-API: OK (0.000 sec)
 13:05:07 root INFO w3cstandards.W3CStandards generate finished in 0.006 sec
-13:05:09 w3c INFO Created data/w3c/toc/issued/2004.html
+13:05:09 w3c INFO Created data/w3c/toc/issued/1999.html
 13:05:09 w3c INFO Created data/w3c/toc/issued/2013.html
-13:05:09 w3c INFO Created data/w3c/toc/title/g.html
+13:05:09 w3c INFO Created data/w3c/toc/title/c.html
+13:05:09 w3c INFO Created data/w3c/toc/title/p.html
 13:05:09 w3c INFO Created data/w3c/toc/title/r.html
-13:05:09 w3c INFO Created data/w3c/toc/title/t.html
+13:05:09 w3c INFO Created data/w3c/toc/title/w.html
 13:05:09 w3c INFO Created data/w3c/toc/index.html
 13:05:09 root INFO w3cstandards.W3CStandards toc finished in 1.705 sec
 13:05:09 w3c INFO feed main: 4 entries

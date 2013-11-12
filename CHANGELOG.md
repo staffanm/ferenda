@@ -8,18 +8,13 @@ automatically tested as well. Whenever discrepancies between the map
 (documentation) and reality (code) has been found, reality has been
 adjusted to be in accordance with the map.
 
-* The :meth:`ferenda.Devel.mkpatch` command now actually works.
+The default HTML5 theme has also been updated, and should scale nicely
+from screen widths ranging from mobile phones in portrait mode to
+wide-screen desktops. The various bundled css and js files has been
+upgraded to their most recent versions.
 
-* The `republishsource` configuration parameter is now available, and
-  controls whether your Atom feeds link to the original document file
-  as it was fetched from the source, or to the parsed version. See
-  :ref:`configuration`.
-  
-* The entire RDF dataset for a particular docrepo is now available
-  through the ReST API in various formats using the same content
-  negotiation mechanisms as the documents themselves. See :doc:`wsgi`.
-  
-  
+Backwards-incompatible changes:
+
 * The DocumentStore.open_generated method was removed as noone was
   using it.
   
@@ -32,11 +27,23 @@ adjusted to be in accordance with the map.
   compiled/transformed, has been removed, since the library used
   (pyScss) currently has problems on the Python 3 platform.
 
+New features:
+
+* The :meth:`ferenda.Devel.mkpatch` command now actually works.
+
+* The `republishsource` configuration parameter is now available, and
+  controls whether your Atom feeds link to the original document file
+  as it was fetched from the source, or to the parsed version. See
+  :ref:`configuration`.
+  
+* The entire RDF dataset for a particular docrepo is now available
+  through the ReST API in various formats using the same content
+  negotiation mechanisms as the documents themselves. See :doc:`wsgi`.
+  
 * ferenda-setup now auto-configures ``indextype`` (and checks whether
   ElasticSearch is available, before falling back to Whoosh) in
   addition to ``storetype``.
 
-in addition to Fuseki and Sesame 
 
 2013-09-29 RELEASE 0.1.5
 ========================
