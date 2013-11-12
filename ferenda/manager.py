@@ -1421,7 +1421,9 @@ def _preflight_check(log, verbose=False):
                 log.warning("Missing (non-essential) module %s" % mod)
 
     # a thing needed by testManager.Setup.test_preflight
-    if isinstance(__import__, MagicMock) and __import__.side_effect is not None:
+    if  (MagicMock is not None and
+         isinstance(__import__, MagicMock) and
+         __import__.side_effect is not None):
         __import__.side_effect = None
 
     # 3: Check binaries

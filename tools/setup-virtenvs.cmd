@@ -13,11 +13,11 @@ md virtualenvs
 cd virtualenvs
 virtualenv -p C:\Python26\python.exe --system-site-packages frnd-py26
 frnd-py26\Scripts\activate.bat
-pip install beautifulsoup4 rdflib html5lib rdfextras requests six jsmin whoosh pyparsing==1.5.7 unittest2 ordereddict mock coverage
+pip install beautifulsoup4 rdflib html5lib rdfextras requests six jsmin whoosh pyparsing unittest2 ordereddict mock coverage
 deactivate
 virtualenv -p C:\Python27\python.exe --system-site-packages frnd-py27
 frnd-py27\Scripts\activate.bat
-pip install beautifulsoup4 rdflib html5lib rdfextras requests six jsmin whoosh pyparsing==1.5.7 mock coverage
+pip install beautifulsoup4 rdflib html5lib rdfextras requests six jsmin whoosh pyparsing mock coverage
 deactivate
 virtualenv -p C:\Python32\python.exe --system-site-packages frnd-py32
 frnd-py32\Scripts\activate.bat

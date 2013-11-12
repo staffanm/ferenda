@@ -16,11 +16,19 @@ except ImportError: # pragma: no cover
     from ordereddict import OrderedDict
 
 if sys.version_info < (2,7,0): # pragma: no cover
-    import unittest2 as unittest
+    try:
+        import unittest2 as unittest
+    except ImportError: # pragma: no cover
+        # means unittest2 isn't installed -- which is OK for a non-dev install
+        unittest = None
 else: 
     import unittest
 
 try:
     from unittest.mock import Mock, MagicMock, patch, call
 except ImportError: # pragma: no cover
-    from mock import Mock, MagicMock, patch, call
+    try:
+        from mock import Mock, MagicMock, patch, call
+    except ImportError: # pragma: no cover
+        # this means Mock isn't installed -- which is OK for a non-dev install
+        Mock = MagicMock = patch = call = None

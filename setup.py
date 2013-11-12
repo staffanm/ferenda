@@ -18,13 +18,21 @@ install_requires = ['beautifulsoup4 >= 4.3.0',
                     'requests >= 1.2.0',
                     'Whoosh >= 2.4.1',
                     'six >= 1.4.0',
-                    'pyparsing >= 2.0.1',
                     'docutils >= 0.11']
 
 if sys.version_info < (3,0,0):
     # not py3 compatible, but not essential either
+    install_requires.append('SimpleParse >= 2.1.1')
+    # in reality, python 2 works fine with pyparsing 2.0.1, but since
+    # the rdflib and rdfextras packages insists on <= 1.5.7, we have
+    # to, too, or else the ferenda-setup command line tool (which ties
+    # into setuptools in ways I don't *really* understand) will raise
+    # a pkg_resources.VersionConflict
+    install_requires.append('pyparsing<=1.5.7')
+else:
     install_requires.append('SimpleParse >= 2.1.1') 
-
+    install_requires.append('pyparsing')
+    
 if sys.version_info < (2,7,0):
     install_requires.append('ordereddict >= 1.1')
 
