@@ -19,7 +19,7 @@ RDF-enabled XHTML documents, loads all RDF metadata into a triplestore
 and generates a web site of static HTML5 files that are usable
 offline::
 
-    pip install --extra-index-url https://testpypi.python.org/pypi ferenda
+    pip install ferenda
     ferenda-setup myproject
     cd myproject
     ./ferenda-build.py ferenda.sources.tech.RFC enable
