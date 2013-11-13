@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 import os
-from lxml import etree
 import logging
+import re
 
+from lxml import etree
 from six import text_type as str
 
 from ferenda import util
@@ -32,7 +33,7 @@ class PDFReader(CompoundElement):
         self.fontspec = {}
         self.log = logging.getLogger('pdfreader')
 
-    def read(self, pdffile, workdir=None):
+    def read(self, pdffile, workdir):
         """Initializes a PDFReader object from an existing PDF file. After
         initialization, the PDFReader contains a list of
         :py:class:`~ferenda.pdfreader.Page` objects.
@@ -45,8 +46,6 @@ class PDFReader(CompoundElement):
 
         self.filename = pdffile
         assert os.path.exists(pdffile), "PDF %s not found" % pdffile
-        if not workdir:
-            workdir = os.path.dirname(pdffile)
         basename = os.path.basename(pdffile)
         xmlfile = os.sep.join(
             (workdir, os.path.splitext(basename)[0] + ".xml"))
@@ -76,6 +75,9 @@ class PDFReader(CompoundElement):
     #    pass
 
     def _parse_xml(self, xmlfile):
+        def txt(element_text):
+            return re.sub(r"[\s\xa0]+", " ", str(element_text))
+            
         self.log.debug("Loading %s" % xmlfile)
         assert os.path.exists(xmlfile), "XML %s not found" % xmlfile
         tree = etree.parse(xmlfile)
@@ -91,11 +93,9 @@ class PDFReader(CompoundElement):
                         background=None)
             background = "%s%03d.png" % (
                 os.path.splitext(xmlfile)[0], page.number)
-            if os.path.exists(background):
-                page.background = background
-            else:
-                print(("Did not set %s as background: Doesn't exist" %
-                      background))
+
+            assert os.path.exists(background)
+            page.background = background
 
             # print("Creating page %s" % page.number)
             assert pageelement.tag == "page", "Got <%s>, expected <page>" % page.tag
@@ -112,7 +112,7 @@ class PDFReader(CompoundElement):
                     b = Textbox(**attribs)
 
                     if element.text and element.text.strip():
-                        b.append(Textelement(str(element.text)))
+                        b.append(Textelement(txt(element.text), tag=None))
                     # The below loop could be done recursively to
                     # support arbitrarily deep nesting (if we change
                     # Textelement to be a non-unicode derived type),
@@ -127,29 +127,21 @@ class PDFReader(CompoundElement):
                             #                                                child.tail)
                             assert (len(grandchildren) == 1), "General grandchildren not supported"
                             if child.text:
-                                Textelement(str(child.text), tag=child.tag)
+                                b.append(Textelement(txt(child.text), tag=child.tag))
                             b.append(Textelement(
-                                str(grandchildren[0].text), tag="ib"))
+                                txt(grandchildren[0].text), tag="ib"))
                             if child.tail:
-                                Textelement(str(child.tail), tag=child.tag)
+                                b.append(Textelement(txt(child.tail), tag=None))
                         else:
                             b.append(
-                                Textelement(str(child.text), tag=child.tag))
-                        if child.tail:
-                            b.append(Textelement(str(child.tail)))
+                                Textelement(txt(child.text), tag=child.tag))
                     if element.tail and element.tail.strip():  # can this happen?
-                        b.append(Textelement(str(element.tail)))
+                        b.append(Textelement(txt(element.tail), tag=None))
                     page.append(b)
             # done reading the page
             self.append(page)
         self.log.debug("PDFReader initialized: %d pages, %d fontspecs" %
                        (len(self), len(self.fontspec)))
-
-#    def avg_font_size(self):
-#        pass
-#
-#    def median_font_size(self):
-#        pass
 
     def median_box_width(self, threshold=0):
         """Returns the median box width of all pages."""
@@ -163,56 +155,24 @@ class PDFReader(CompoundElement):
         boxwidths.sort()
         return boxwidths[int(len(boxwidths) / 2)]
 
-#    def common_horizontal_gutters():
-#        pass
-#
-#    def common_vertical_gutters():
-#        pass
-
-
 class Page(CompoundElement, OrdinalElement):
 
     """Represents a Page in a PDF file. Has *width* and *height* properties."""
-
-    def vertical_gutters(self):
-        """
-        Returns the x-coordinates for the start and end of the left and right gutter (the part of the page which contains no text) of the Page.
-
-        .. note::
-
-            This property does not work (returns hardcoded values)
-        """
-        return ((0, 42), (463, 482))
-
-    def horizontal_gutters(self):
-        """
-        Returns the y-coordinates for the start and end of the top and bottom gutter (the part of the page which contains no text) of the Page.
-
-        .. note::
-
-            This property does not work (returns hardcoded values)
-        """
-        return ((0, 42), (463, 482))
 
     # text: can be string, re obj or callable (gets called with the box obj)
     # fontsize: can be int or callable
     # fontname: can be string or callable
     # top,left,bottom,right
     def boundingbox(self, top=0, left=0, bottom=None, right=None):
-        """A generator :py:class:`ferenda.pdfreader.Textbox` objects that fit into the bounding box specified by the parameters."""
+        """A generator of :py:class:`ferenda.pdfreader.Textbox` objects that
+           fit into the bounding box specified by the parameters.
+
+        """
         if not bottom:
             bottom = self.height
         if not right:
             right = self.width
         for box in self:
-            # print u"    Examining [%dx%d][%dx%d] against constraints [%dx%d][%dx%d]"
-            # % (box.top,box.left,box.bottom,box.right, top,left,bottom,right)
-
-            # if (box.top >= top): print "        Top OK"
-            # if (box.left >= left): print "        Left OK"
-            # if (box.bottom <= bottom): print "        Bottom OK"
-            # if (box.right <= right): print "        Right OK"
-
             if (box.top >= top and
                 box.left >= left and
                 box.bottom <= bottom and
@@ -230,6 +190,8 @@ class Page(CompoundElement, OrdinalElement):
         for box in self.boundingbox(top, left, bottom, right):
             box.top = box.top - top
             box.left = box.left - left
+            box.right = box.right - right
+            box.bottom = box.bottom - bottom
             newboxes.append(box)
         self[:] = []
         self.extend(newboxes)
@@ -246,12 +208,9 @@ class Page(CompoundElement, OrdinalElement):
             util.replace_if_different(
                 "%s.new" % self.background, self.background)
 
-    def __unicode__(self):
+    def __str__(self):
         textexcerpt = " ".join([str(x) for x in self])
         return "Page %d (%d x %d): '%s...'" % (self.number, self.width, self.height, str(textexcerpt[:40]))
-
-    def __str__(self):
-        return str(self).encode('ascii')
 
 
 class Textbox(CompoundElement):
@@ -292,7 +251,7 @@ all text in a Textbox has the same font and size.
 
         super(Textbox, self).__init__(*args, **kwargs)
 
-    def __unicode__(self):
+    def __str__(self):
         return "".join(self)
 
     def getfont(self):

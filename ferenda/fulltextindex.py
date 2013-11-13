@@ -451,7 +451,7 @@ class ElasticSearchIndex(RemoteIndex):
             # for the safe parameter (not even empty). FIXME: We
             # should create a shim as ferenda.compat.quote and use
             # that
-            safe = safe.encode('ascii')
+            safe = safe.encode('ascii') # pragma: no cover
 
         relurl = "%s/%s" % (repo, quote(basefile, safe=safe))  # eg type, id
         if "#" in uri:
@@ -512,7 +512,7 @@ class ElasticSearchIndex(RemoteIndex):
         return "", None
 
     def _decode_schema_payload(self, response):
-        raise NotImplementedError
+        raise NotImplementedError # pragma: no cover
 
     # FIXME: For some reason, createing a schema/mapping makes PUTting
     # new documents to the index hang with the folloging error:

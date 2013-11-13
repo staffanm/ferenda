@@ -74,7 +74,7 @@ setup(name='ferenda',
       include_package_data = True,
       zip_safe = False,
       classifiers=[ 
-          'Development Status :: 4 - Beta',
+          'Development Status :: 3 - Alpha',
           'Environment :: Console',
           'Environment :: Web Environment',
           'Intended Audience :: Developers',
@@ -90,6 +90,7 @@ setup(name='ferenda',
           'Topic :: Software Development :: Libraries :: Python Modules',
           'Topic :: Internet :: WWW/HTTP :: WSGI :: Application',
           'Topic :: Text Processing',
+          'Topic :: Text Processing :: Indexing',
           'Topic :: Text Processing :: Markup :: XML'
           ]
       )

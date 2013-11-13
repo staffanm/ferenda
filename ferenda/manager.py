@@ -57,8 +57,6 @@ from ferenda.elements import html
 
 # NOTE: This is part of the published API and must be callable in
 # scenarios without configfile or logger.
-
-
 def makeresources(repos,
                   resourcedir="data/rsrc",
                   combine=False,
@@ -72,7 +70,8 @@ def makeresources(repos,
     (concatenated and minified js/css files, resources.xml used by
     most XSLT stylesheets, etc).
 
-    :param repos: The repositories to create resources for, as instantiated and configured docrepo objects
+    :param repos: The repositories to create resources for, as instantiated
+                  and configured docrepo objects
     :type  repos: list
     :param combine: whether to combine and compact/minify CSS and JS files
     :type  combine: bool
@@ -81,9 +80,10 @@ def makeresources(repos,
     :returns: All created/copied css, js and resources.xml files
     :rtype: dict of lists
     """
-    # NOTE: even though the returned dict of lists of paths should use the appropriate path
-    # separator for the current platform (/ on unix, \ on windows), the resources.xml always
-    # uses the / separator regardless of platform.
+    # NOTE: even though the returned dict of lists of paths should use
+    # the appropriate path separator for the current platform (/ on
+    # unix, \ on windows), the resources.xml always uses the /
+    # separator regardless of platform.
     log = setup_logger()
     res = {}
     processed_files = []
@@ -170,6 +170,7 @@ def makeresources(repos,
     # res/eut/img/foo.png being placed in data/rsrc/img/eut/foo.png
     # Finally, create a resources.xml file containing refs to the css and js
     # files (and also favicon?) that base5.xsl can include.
+
 
     # FIXME: Do this in LXML instead (and remove util.indent_node afterwards)
     root = ET.Element("configuration")

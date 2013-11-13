@@ -38,8 +38,8 @@ Python
 Third-party libraries
     ``beautifulsoup4``, ``rdflib``, ``html5lib``,
     ``lxml``, ``requests``, ``whoosh``, ``pyparsing``, ``jsmin``,
-    ``six`` and their respective requirements. If you've installed
-    ferenda using ``easy_install`` or ``pip`` they should have been
+    ``six`` and their respective requirements. If you install
+    ferenda using ``easy_install`` or ``pip`` they should be 
     installed automatically. If you're working with a clone of the
     source repository you can install them with a simple ``pip
     install -r requirements.py3.txt`` (substitute with
@@ -96,6 +96,18 @@ up an external triple store or a fulltext search engine. See
    distribution is available for Python 3.3, so for the time
    being, you'll have to use python 3.2 on this platform.
 
+Installing
+----------
+
+Installing using `pip
+<http://www.pip-installer.org/en/latest/installing.html>`_ is
+preferred (in fact, it's the only method tested)::
+
+    pip install ferenda  
+
+You should definitely consider installing ferenda in a `virtualenv
+<http://www.virtualenv.org/en/latest/>`_.
+  
 Example
 -------
 
