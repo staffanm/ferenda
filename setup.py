@@ -30,7 +30,6 @@ if sys.version_info < (3,0,0):
     # a pkg_resources.VersionConflict
     install_requires.append('pyparsing<=1.5.7')
 else:
-    install_requires.append('SimpleParse >= 2.1.1') 
     install_requires.append('pyparsing')
     
 if sys.version_info < (2,7,0):
