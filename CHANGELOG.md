@@ -1,4 +1,10 @@
-2013-11-?? RELEASE 0.1.6
+2013-11-13 RELEASE 0.1.6.1
+==========================
+
+This hotfix release corrected an error in setup.py that prevented
+installs when using python 3.
+
+2013-11-13 RELEASE 0.1.6
 ========================
 
 This release mainly contains bug fixes and development infrastructure
