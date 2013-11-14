@@ -260,7 +260,7 @@ class Devel(object):
         print("".join(["# %s\n" % x for x in sq.split("\n")]))
         p = {}
         with util.logtime(print,
-                          "# %(triples)s triples constructed in %(elapsed).1f s",
+                          "# %(triples)s triples constructed in %(elapsed).3fs",
                           p):
             res = ts.construct(sq)
             p['triples'] = len(res)
@@ -280,7 +280,7 @@ class Devel(object):
         print("".join(["# %s\n" % x for x in sq.split("\n")]))
         p = {}
         with util.logtime(print,
-                          "# Selected in %(elapsed).1f s",
+                          "# Selected in %(elapsed).3fs",
                           p):
             res = ts.select(sq, format=format)
             print(res.decode('utf-8'))

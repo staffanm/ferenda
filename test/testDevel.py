@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import sys, os, tempfile
+import sys, os, tempfile, re, shutil
 from tempfile import mkstemp
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
@@ -18,6 +18,10 @@ from ferenda import DocumentRepository, DocumentStore, LayeredConfig, util
 from ferenda import Devel
 
 class Main(unittest.TestCase):
+
+    def mask_time(self, s):
+        return re.sub(r" in \d+\.\d{3}s", " in [MASKED]s", s)
+    
     def test_dumprdf(self):
         fileno, tmpfile = mkstemp()
         fp = os.fdopen(fileno, "w")
@@ -135,9 +139,10 @@ It has been processed.
         self.assertIn("+It has been patched.", patchcontent)
         
     def test_fsmparse(self):
-        # 1. write a new python module containing a class with a staticmethod
-        with open("testparser.py", "w") as fp:
-            fp.write("""
+        try:
+            # 1. write a new python module containing a class with a staticmethod
+            with open("testparser.py", "w") as fp:
+                fp.write("""
 from six import text_type as str
 from ferenda.elements import Body, Paragraph
 
@@ -148,35 +153,37 @@ class Testobject(object):
 
 
 class Parser(object):
-    
+
     def parse(self, source):
         res = Body()
         for chunk in source:
             res.append(Paragraph([str(len(chunk.strip()))]))
         return res
-        """)
-
-        # 2. write a textfile with two paragraphs
-        with open("testparseinput.txt", "w") as fp:
-            fp.write("""This is one paragraph.
+            """)
+            import imp
+            fp, pathname, desc = imp.find_module("testparser")
+            imp.load_module("testparser", fp, pathname, desc)
+            # 2. write a textfile with two paragraphs
+            with open("testparseinput.txt", "w") as fp:
+                fp.write("""This is one paragraph.
 
 And another.
-""")
-        # 3. patch print and call fsmparse
-        d = Devel()
-        printmock = MagicMock()
-        with patch(builtins+'.print', printmock):
-            # 3.1 fsmparse dynamically imports the module and call the method
-            #     with every chunk from the text file
-            # 3.2 fsmparse asserts that the method returned a callable
-            # 3.3 fsmparse calls it with a iterable of text chunks from the
-            #     textfile
-            # 3.4 fsmparse recieves a Element structure and prints a
-            # serialized version 
-            d.fsmparse("testparser.Testobject.get_parser", "testparseinput.txt")
-        self.assertTrue(printmock.called)
-        # 4. check that the expected thing was printed
-        want = """
+    """)
+            # 3. patch print and call fsmparse
+            d = Devel()
+            printmock = MagicMock()
+            with patch(builtins+'.print', printmock):
+                # 3.1 fsmparse dynamically imports the module and call the method
+                #     with every chunk from the text file
+                # 3.2 fsmparse asserts that the method returned a callable
+                # 3.3 fsmparse calls it with a iterable of text chunks from the
+                #     textfile
+                # 3.4 fsmparse recieves a Element structure and prints a
+                # serialized version 
+                d.fsmparse("testparser.Testobject.get_parser", "testparseinput.txt")
+            self.assertTrue(printmock.called)
+            # 4. check that the expected thing was printed
+            want = """
 <Body>
   <Paragraph>
     <str>22</str>
@@ -185,10 +192,14 @@ And another.
     <str>12</str>
   </Paragraph>
 </Body>
-        """.strip()+"\n"
-        printmock.assert_has_calls([call(want)])
-        os.unlink("testparser.py")
-        os.unlink("testparseinput.txt")
+            """.strip()+"\n"
+            printmock.assert_has_calls([call(want)])
+        finally:
+            util.robust_remove("testparser.py")
+            util.robust_remove("testparser.pyc")
+            util.robust_remove("testparseinput.txt")
+            if os.path.exists("__pycache__") and os.path.isdir("__pycache__"):
+                shutil.rmtree("__pycache__")
         
     def test_construct(self):
         uri = "http://example.org/doc"
@@ -231,11 +242,12 @@ WHERE { ?s ?p ?o .
 <http://example.org/doc> dct:title "Document title" .
 
 
-# 1 triples constructed in 0.0 s
+# 1 triples constructed in 0.001s
 """.strip()
         got = "\n".join([x[1][0] for x in printmock.mock_calls])
         self.maxDiff = None
-        self.assertEqual(want, got)
+        self.assertEqual(self.mask_time(want),
+                         self.mask_time(got))
         os.unlink("testconstructtemplate.rq")
 
     def test_select(self):
@@ -285,11 +297,12 @@ WHERE { <%(uri)s> ?p ?o . }
         "o": "Document ID"
     }
 ]
-# Selected in 0.0 s
+# Selected in 0.001s
 """.strip()
         got = "\n".join([x[1][0] for x in printmock.mock_calls])
         self.maxDiff = None
-        self.assertEqual(want, got)
+        self.assertEqual(self.mask_time(want),
+                         self.mask_time(got))
         os.unlink("testselecttemplate.rq")
 
 
