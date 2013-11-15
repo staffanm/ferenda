@@ -21,4 +21,4 @@ from .documentstore import DocumentStore
 from .documentrepository import DocumentRepository
 from .pdfdocumentrepository import PDFDocumentRepository
 from .compositerepository import CompositeRepository
-__version__ = "0.2.0-dev" #gets pulled into setup.py and docs/conf.py
+__version__ = "0.2.0.dev1" #gets pulled into setup.py and docs/conf.py
