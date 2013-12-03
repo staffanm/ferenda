@@ -42,24 +42,61 @@ class CompositeRepository(DocumentRepository):
 
     def get_instance(self, instanceclass, options={}):
         if not instanceclass in self._instances:
-            inst = instanceclass(**options)
-            inst.config = self.config  # FIXME: this'll override **options...
+            if options:
+                inst = instanceclass(**options)
+            else:
+                inst = instanceclass()
+                inst.config = self.config 
             self._instances[instanceclass] = inst
         return self._instances[instanceclass]
 
     def __init__(self, **kwargs):
         self.myoptions = kwargs
         super(CompositeRepository, self).__init__(**kwargs)
-        # FIXME: At this point, self._instances is empty. And we can't
-        # really populate it, because we need access to the config
-        # object that manager._run_class will set after __init__
-        # finishes... The best fix from this class POV would be to
-        # have config be a (special) kwargs parameter, but that
-        # violates the DocumentRepository API...
-        self.store = self.documentstore_class(self.config.datadir + os.sep + self.alias,
-                                              downloaded_suffix=self.downloaded_suffix,
-                                              storage_policy=self.storage_policy,
-                                              docrepo_instances=self._instances)
+        # At this point, self._instances is empty. And we can't really
+        # populate it at this time, because we need access to the
+        # config object that manager._run_class will set after
+        # __init__ finishes, in order to properly initialize all our
+        # subrepos.
+
+        # when using API, we won't need an externally-provided config
+        # object, as whatever is passed in as **kwargs will populate
+        # an internallly-constructed config object. So if that's the
+        # case, let's go ahead and create instances and make a store
+        # right now.
+        if self.myoptions:
+            for c in self.subrepos: # populate self._instances
+                self.get_instance(c, self.myoptions)
+                
+            cls = self.documentstore_class
+            self.store = cls(self.config.datadir + os.sep + self.alias,
+                             downloaded_suffix=self.downloaded_suffix,
+                             storage_policy=self.storage_policy,
+                             docrepo_instances=self._instances)
+        else:
+            # no **kwargs were provided, delay the creation of
+            # self._instances (and self.store) until we have a proper
+            # config object (in the config.setter decorated stuff
+            pass
+            
+
+    @property
+    def config(self):
+        return self._config
+
+    @config.setter
+    def config(self, config):
+        self._config = config
+
+        for c in self.subrepos: # populate self._instances
+            self.get_instance(c)
+
+        cls = self.documentstore_class
+        self.store = cls(self.config.datadir + os.sep + self.alias,
+                         downloaded_suffix=self.downloaded_suffix,
+                         storage_policy=self.storage_policy,
+                         docrepo_instances=self._instances)
+        
 
     def download(self):
         for c in self.subrepos:

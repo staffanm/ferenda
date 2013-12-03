@@ -17,18 +17,19 @@ from rdflib import RDFS
 
 from ferenda import PDFDocumentRepository
 from ferenda import DocumentEntry
+from ferenda import FSMParser
 from ferenda import Describer
 from ferenda import util
-from ferenda.elements import Body
-from ferenda.elements import Paragraph
-from ferenda.elements import Page
+from ferenda.elements import Body, Paragraph, Section, CompoundElement
 from ferenda.pdfreader import PDFReader
 from ferenda.pdfreader import Page
 from ferenda.decorators import recordlastdownload, downloadmax
 from . import SwedishLegalSource
 
+class PreambleSection(CompoundElement): pass
+class Appendix(CompoundElement): pass
 
-class Regeringen(SwedishLegalSource, PDFDocumentRepository):
+class Regeringen(SwedishLegalSource):
     DS = 1
     KOMMITTEDIREKTIV = 2
     LAGRADSREMISS = 3
@@ -63,10 +64,10 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
     @downloadmax
     def download_get_basefiles(self, url):
         done = False
-        pagecnt = 1
+        pagecount = 1
         # existing_cnt = 0
         while not done:
-            self.log.info('Result page #%s (%s)' % (pagecnt, url))
+            self.log.info('Result page #%s (%s)' % (pagecount, url))
             resp = requests.get(url)
             mainsoup = BeautifulSoup(resp.text)
             for link in mainsoup.find_all(href=re.compile("/sb/d/108/a/")):
@@ -109,7 +110,7 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
 
                 yield basefile, urljoin(url, link['href'])
 
-            pagecnt += 1
+            pagecount += 1
             next = mainsoup.find("a", text="Nästa sida")
             if next:
                 url = urljoin(url, next['href'])
@@ -156,14 +157,12 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
             docid = url.split("/")[-1]
             if existed:
                 if updated:
-                    self.log.debug(
-                        "%s existed, but a new ver was downloaded" % filename)
+                    self.log.info("%s: updated from %s" % (basefile, url))
                 else:
-                    self.log.debug(
-                        "%s is unchanged -- checking PDF files" % filename)
+                    self.log.debug("%s: %s is unchanged, checking PDF files" %
+                                   (basefile, filename))
             else:
-                self.log.debug(
-                    "%s did not exist, so it was downloaded" % filename)
+                        self.log.info("%s: downloaded from %s" % (basefile, url))
 
             soup = BeautifulSoup(codecs.open(filename, encoding=self.source_encoding))
             cnt = 0
@@ -208,8 +207,9 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
         entry.save()
 
         return updated or pdfupdated
-
+        
     def parse_metadata_from_soup(self, soup, doc):
+        # print("Regeringen.parse_metadata_from_soup: %s %s (%s)" % (self.__class__.__name__, id(self), len(list(self.config))))
         doc.lang = "sv"
         d = Describer(doc.meta, doc.uri)
         d.rdftype(self.rdf_type)
@@ -345,8 +345,148 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
                 pdffiles.append(pdfbasefile)
         return pdffiles
 
+    def parse_pdf(self, pdffile, intermediatedir):
+        pdf = PDFReader()
+        pdf.read(pdffile, intermediatedir)
+        return pdf
+
+    # this glues together textboxes in a smart way
+    def iter_textboxes(self, pdf):
+        textbox = None
+        # from pudb import set_trace; set_trace()
+        for page in pdf:
+            for nextbox in page:
+                
+                # this does not account for paragraphs that are
+                # separated by vertical space only (ie no leading
+                # indent)
+                if (textbox and
+                    textbox.getfont()['size'] == nextbox.getfont()['size'] and
+                    textbox.getfont()['family'] == nextbox.getfont()['family'] and
+                    ((textbox.top == nextbox.top) or
+                     (textbox.left == nextbox.left))):
+                    textbox += nextbox
+                else:
+                    if textbox:
+                        yield textbox
+                    textbox = nextbox
+        if textbox:
+            yield textbox
+                
+
+
+    @staticmethod
+    def get_parser():
+
+        # page numbers, headings
+        def is_nonessential(parser):
+            chunk = parser.reader.peek()
+            return (chunk.top > 920 or
+                    (chunk.left < 200 and
+                     15 <= len(chunk) <=17))
+
+        def is_preamblesection(parser):
+            chunk = parser.reader.peek()
+            txt = str(chunk)
+            return (chunk.getfont()['size'] == '20')
+
+        def is_section(parser):
+            (ordinal, title) = analyze_sectionstart(parser)
+            if ordinal:
+                return ordinal.count(".") == 0
+
+        def is_subsection(parser):
+            (ordinal, title) = analyze_sectionstart(parser)
+            if ordinal:
+                return ordinal.count(".") == 1
+
+        def is_subsubsection(parser):
+            (ordinal, title) = analyze_sectionstart(parser)
+            if ordinal:
+                return ordinal.count(".") == 2
+
+        def is_appendix(parser):
+            chunk = parser.reader.peek()
+            return (chunk.getfont()['size'] == '20' and chunk.startswith("Bilaga "))
+
+        def is_paragraph(parser):
+            return True
+
+        def make_body(parser):
+            return p.make_children(Body())
+
+        def make_paragraph(parser):
+            return parser.reader.next()
+
+        def make_preamblesection(parser):
+            s = PreambleSection(title=parser.reader.next())
+            return parser.make_children(s)
+
+        def make_appendix(parser):
+            s = Appendix(title=parser.reader.next())
+            return parser.make_children(s)
+
+        # this is used for subsections and subsubsections as well
+        def make_section(parser):
+            ordinal, title = analyze_sectionstart(parser, parser.reader.next())
+            s = Section(ordinal=ordinal, title=title)
+            return parser.make_children(s)
+
+        def skip_nonessential(parser):
+            parser.reader.next()
+            return None
+            
+        re_sectionstart = re.compile("^(\d[\.\d]*) +(.*[^\.])$").match
+        def analyze_sectionstart(parser, textbox=None):
+            if not textbox:
+                textbox = parser.reader.peek()
+            if textbox.getfont()['size'] != '20':
+                return (None, textbox)
+            txt = str(textbox)
+            m = re_sectionstart(txt)
+            if m:
+                ordinal = m.group(1).rstrip(".")
+                title = m.group(2)
+                return (ordinal, title)
+            else:
+                return (None, textbox)
+
+        p = FSMParser()
+
+        p.set_recognizers(is_nonessential,
+                          is_preamblesection,
+                          is_appendix,
+                          is_section,
+                          is_subsection,
+                          is_subsubsection,
+                          is_paragraph)
+        commonstates = ("body","preamblesection","section", "subsection", )
+        p.set_transitions({(commonstates, is_nonessential): (skip_nonessential, None),
+                           (commonstates, is_paragraph): (make_paragraph, None),
+                           ("body", is_preamblesection): (make_preamblesection, "preamblesection"),
+                           ("preamblesection", is_preamblesection): (False, None),
+                           ("preamblesection", is_section): (False, None),
+                           ("body", is_section): (make_section, "section"),
+                           ("section", is_section): (False, None),
+                           ("section", is_subsection): (make_section, "subsection"),
+                           ("subsection", is_subsection): (False, None),
+                           ("subsection", is_section): (False, None),
+                           ("subsection", is_subsubsection): (make_section, "subsubsection"),
+                           ("subsubsection", is_subsubsection): (False, None),
+                           ("subsubsection", is_subsection): (False, None),
+                           ("subsubsection", is_section): (False, None),
+                           ("body", is_appendix): (make_appendix, "appendix"),
+                           (("appendix","subsubsection", "subsection", "section"), is_appendix):
+                           (False, None)
+                           })
+
+        p.initial_state = "body"
+        p.initial_constructor = make_body
+
+        return p
+                
     def parse_pdfs(self, basefile, pdffiles):
-        doc = Body()
+        body = None
         for pdffile in pdffiles:
             # FIXME: downloaded_path must be more fully mocked
             # (support attachments) by testutil.RepoTester. In the
@@ -355,22 +495,20 @@ class Regeringen(SwedishLegalSource, PDFDocumentRepository):
             pdf_path = self.store.downloaded_path(basefile).replace("index.html", pdffile)
             intermediate_path = self.store.intermediate_path(basefile, attachment=pdffile)
             intermediate_dir = os.path.dirname(intermediate_path)
-            try:
-                pdf = self.parse_pdf(pdf_path, intermediate_dir)
-                for page in pdf:
-                    pass
-                    # page.crop(left=50,top=0,bottom=900,right=700)
-                doc.append(pdf)
-            except ValueError:
-                (exc_type, exc_value, exc_trackback) = sys.exc_info()
-                self.log.warning("Ignoring exception %s (%s), skipping PDF %s" %
-                                 (exc_type, exc_value, pdffile))
-        return doc
+            #try:
+            pdf = self.parse_pdf(pdf_path, intermediate_dir)
+            # from pudb import set_trace; set_trace()
+            parser = self.get_parser()
+            parser.debug = True
+            body = parser.parse(self.iter_textboxes(pdf))
+            #except ValueError:
+            #    (exc_type, exc_value, exc_trackback) = sys.exc_info()
+            #    self.log.warning("Ignoring exception %s (%s), skipping PDF %s" %
+            #                     (exc_type, exc_value, pdffile))
+        
+        return body
 
-    def parse_pdf(self, pdffile, intermediatedir):
-        pdf = PDFReader()
-        pdf.read(pdffile, intermediatedir)
-        return pdf
+        
 
     def create_external_resources(self, doc):
         """Optionally create external files that go together with the

@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 import os
 import logging
 import re
+import itertools
 
 from lxml import etree
 from six import text_type as str
@@ -29,6 +30,9 @@ class PDFReader(CompoundElement):
 
     """
 
+    tagname = "div"
+    classname = "pdfreader"
+    
     def __init__(self):
         self.fontspec = {}
         self.log = logging.getLogger('pdfreader')
@@ -159,6 +163,16 @@ class Page(CompoundElement, OrdinalElement):
 
     """Represents a Page in a PDF file. Has *width* and *height* properties."""
 
+    tagname = "div"
+    classname = "pdfpage"
+
+    @property
+    def id(self):
+        # FIXME: this will only work for documents consisting of a
+        # single PDF file, not multiple (see
+        # pdfdocumentrepository.create_external_resources to
+        # understand why)
+        return "page%03d" % self.number
     # text: can be string, re obj or callable (gets called with the box obj)
     # fontsize: can be int or callable
     # fontname: can be string or callable
@@ -224,7 +238,9 @@ may differ in basic formatting (bold and or italics), but otherwise
 all text in a Textbox has the same font and size.
 
     """
-
+    tagname = "p"
+    classname = "textbox"
+    
     def __init__(self, *args, **kwargs):
         assert 'top' in kwargs, "top attribute missing"
         assert 'left' in kwargs, "left attribute missing"
@@ -254,6 +270,21 @@ all text in a Textbox has the same font and size.
     def __str__(self):
         return "".join(self)
 
+    def __add__(self, other):
+        res = Textbox()
+        
+        # add all text elements
+        for e in itertools.chain(self, other):
+            res.append(e)
+        # expand dimensions
+        res.top = min(self.top, other.top)
+        res.left = min(self.left, other.left)
+        res.width = max(self.left + self.width,
+                         other.left + other.width) - res.left
+        res.height = max(self.top + self.height,
+                          other.top + other.height) - res.top
+        return res
+
     def getfont(self):
         """Returns a fontspec dict of all properties of the font used."""
         return self.__fontspec[self.__fontspecid]
@@ -266,6 +297,8 @@ class Textelement(UnicodeElement):
     as a whole is bold (``'b'``) , italic(``'i'`` bold + italic
     (``'bi'``) or regular (``None``).
     """
+    tagname = "span"
+    classname = "textbox"
 
 # The below code fixes a error with incorrectly nested tags often
 # found in pdftohtml generated xml. Main problem is that this relies

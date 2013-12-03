@@ -4,7 +4,7 @@ RPUBL = Namespace('http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
 from .swedishlegalsource import SwedishLegalSource, SwedishLegalStore
 from .regeringen import Regeringen
 from .riksdagen import Riksdagen
-from .trips import Trips
+from .trips import Trips, NoMoreLinks
 from .arn import ARN
 from .direktiv import Direktiv
 from .ds import Ds

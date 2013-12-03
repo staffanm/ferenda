@@ -48,8 +48,8 @@ class SwedishLegalSource(DocumentRepository):
                   ('rpubl', 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#'),
                   ('rinfoex', 'http://lagen.nu/terms#')]
 
-    swedish_ordinal_list = ('första', 'andra', 'tredje', 'fjärde',
-                            'femte', 'sjätte', 'sjunde', 'åttonde',
+    swedish_ordinal_list = ('f\xf6rsta', 'andra', 'tredje', 'fj\xe4rde',
+                            'femte', 'sj\xe4tte', 'sjunde', '\xe5ttonde',
                             'nionde', 'tionde', 'elfte', 'tolfte')
     swedish_ordinal_dict = dict(list(zip(
         swedish_ordinal_list, list(range(1, len(swedish_ordinal_list) + 1)))))
@@ -58,7 +58,10 @@ class SwedishLegalSource(DocumentRepository):
         resource_path = os.path.normpath(
             os.path.dirname(__file__) + "../../../../res/etc/authrec.n3")
         opts = super(SwedishLegalSource, self).get_default_options()
+        # len_before = len(opts)
         opts['authrec'] = resource_path
+        # len_after = len(opts)
+        # print("SwedishLegalSource.get_default_options: %s %s %s (%s -> %s)" % (self.__class__.__name__, id(self), resource_path, len_before, len_after))
         return opts
 
     def _swedish_ordinal(self, s):
@@ -145,9 +148,9 @@ class SwedishLegalSource(DocumentRepository):
                   "oktober": 10,
                   "november": 11,
                   "december": 12,
-                  "år": 12}
-        # strings on the form "vid utgången av december 1999"
-        if datestr.startswith("vid utgången av"):
+                  "\xe5r": 12}
+        # strings on the form "vid utg\xe5ngen av december 1999"
+        if datestr.startswith("vid utg\xe5ngen av"):
             import calendar
             (x, y, z, month, year) = datestr.split()
             month = months[month]
@@ -211,7 +214,7 @@ class SwedishLegalSource(DocumentRepository):
         return (
             {'predicate': self.ns['rpubl']['arsutgava'],
              'binding': 'arsutgava',
-             'label': 'Efter årtal',
+             'label': 'Efter \xe5rtal',
              'sorter': cmp,
              'pages': []},
             {'predicate': self.ns['dct']['title'],

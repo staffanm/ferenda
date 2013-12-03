@@ -51,11 +51,11 @@ class EurlexCaselaw(DocumentRepository):
             list_url = "http://eur-lex.europa.eu/Result.do?T1=V6&T2=%d&T3=&RechType=RECH_naturel" % year
             self.log.debug("Searching for %d" % year)
             res = request.get(list_url)
-            pagecnt = 0
+            pagecount = 0
             done = False
             while not done:
-                pagecnt += 1
-                self.log.debug("Result page #%s" % pagecnt)
+                pagecount += 1
+                self.log.debug("Result page #%s" % pagecount)
                 # Don't parse using BeautifulSoup etc -- just search the whole damn text blob
                 celexnos = self.re_celexno.findall(res.text)
                 # FIXME: support for config.downloadmax

@@ -11,10 +11,11 @@ from ferenda.errors import FSMStateError
 
 class FSMParser():
 
-    """A configurable finite state machine for parsing documents with
-    nested structure. You provide a set of *recognizers*, a set of
-    *constructors*, a *transition table* and a *stream* of document text
-    chunks, and it returns a hierarchical document object structure.
+    """A configurable finite state machine (FSM) for parsing documents
+    with nested structure. You provide a set of *recognizers*, a set
+    of *constructors*, a *transition table* and a *stream* of document
+    text chunks, and it returns a hierarchical document object
+    structure.
 
     See :doc:`../fsmparser`.
 

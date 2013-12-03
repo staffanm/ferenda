@@ -82,8 +82,8 @@ class Riksdagen(SwedishLegalSource):
                 yield (basefile, attachment), doc.dokumentstatus_url_xml.text
             try:
                 url = soup.dokumentlista['nasta_sida']
-                pagecnt += 1
-                self.log.info("Getting page #%d" % pagecnt)
+                pagecount += 1
+                self.log.info("Getting page #%d" % pagecount)
             except KeyError:
                 self.log.info("That was the last page")
                 done = True
@@ -113,14 +113,12 @@ class Riksdagen(SwedishLegalSource):
 
         if existed:
             if updated:
-                self.log.debug(
-                    "%s existed, but downloaded new" % xmlfile)
+                self.log.info("%s: updated from %s" % (basefile, url))
             else:
-                self.log.debug(
-                    "%s is unchanged -- checking files" % xmlfile)
+                self.log.debug("%s: %s is unchanged, checking files" %
+                               (basefile, xmlfile))
         else:
-            self.log.debug(
-                "%s did not exist, so it was downloaded" % xmlfile)
+            self.log.info("%s: downloaded from %s" % (basefile, url))
         fileupdated = False
         r = None
         docsoup = BeautifulSoup(open(xmlfile), features="xml")
@@ -162,13 +160,13 @@ class Riksdagen(SwedishLegalSource):
         d.rdftype(self.rdf_type)
         d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
         self.infer_triples(d, doc.basefile)
-        htmlfile = self.generic_path(doc.basefile, 'downloaded', '.html')
-        pdffile = self.generic_path(doc.basefile, 'downloaded', '.pdf')
+        htmlfile = self.store.path(doc.basefile, 'downloaded', '.html')
+        pdffile = self.store.path(doc.basefile, 'downloaded', '.pdf')
         self.log.debug("Loading soup from %s" % htmlfile)
-        soup = BeautifulSoup.BeautifulSoup(
+        soup = BeautifulSoup(
             codecs.open(
                 htmlfile, encoding='iso-8859-1', errors='replace').read(),
-            convertEntities='html')
+            )
         self.parse_from_soup(soup, doc)
 
     def parse_from_soup(self, soup, doc):

@@ -147,12 +147,12 @@ special-case code, though.)"""
         # 2nd, or 3rd... continue past TOC pages, cover pages etc
         # until the "real" first page is found) NB: FFFS 2007:1 has
         # ten (10) TOC pages!
-        pagecnt = 0
+        pagecount = 0
         for page in reader.getiterator(reader.readpage):
             # replace single newlines with spaces, but keep double
             # newlines
             # page = "\n\n".join([util.normalize_space(x) for x in page.split("\n\n")])
-            pagecnt += 1
+            pagecount += 1
             props = {}
             for (prop, tests) in list(fwdtests.items()):
                 if prop in props:
@@ -166,7 +166,7 @@ special-case code, though.)"""
             if 'rpubl:beslutsdatum' in props:
                 break
             self.log.warning("%s: Couldn't find required props on page %s" %
-                             (basefile, pagecnt))
+                             (basefile, pagecount))
 
         # 2.2 Find some of the properties on the last 'real' page (not
         # counting appendicies)

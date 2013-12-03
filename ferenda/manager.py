@@ -1094,10 +1094,11 @@ def _instantiate_class(cls, configfile="ferenda.ini", argv=[]):
                               argv, cascade=True)
     classcfg = getattr(globalcfg, cls.alias)
     inst.config = classcfg
-    inst.store = inst.documentstore_class(
-        classcfg.datadir + os.sep + inst.alias,
-        downloaded_suffix=inst.downloaded_suffix,
-        storage_policy=inst.storage_policy)
+    # inst.store is magically created after setting inst.config
+    #inst.store = inst.documentstore_class(
+    #    classcfg.datadir + os.sep + inst.alias,
+    #    downloaded_suffix=inst.downloaded_suffix,
+    #    storage_policy=inst.storage_policy)
     return inst
 
 
@@ -1367,7 +1368,7 @@ def _preflight_check(log, verbose=False):
         ('bs4', '4.3.0', True),
         # ('lxml', '3.2.0', True), # has no top level __version__ property
         ('rdflib', '4.0', True),
-        ('html5lib', '1.0b1', True),
+        ('html5lib', '0.99', True),
         ('requests', '1.2.0', True),
         ('six', '1.4.0', True),
         ('jsmin', '2.0.2', True),

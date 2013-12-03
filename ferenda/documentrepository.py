@@ -217,7 +217,8 @@ class DocumentRepository(object):
     sparql_annotations = "res/sparql/annotations.rq"
     """A template SPARQL CONSTRUCT query for document annotations."""
 
-    # FIXME: Sphinx really wants to treat this class as a reference, but cannot resolve it
+    # FIXME: Sphinx really wants to treat this class as a reference,
+    # but cannot resolve it
     documentstore_class = DocumentStore
 #    """Class that implements the :class:`~ferenda.DocumentStore` interface."""
 
@@ -225,8 +226,9 @@ class DocumentRepository(object):
         """See :py:class:`~ferenda.DocumentRepository`."""
         codedefaults = self.get_default_options()
         defaults = util.merge_dict_recursive(codedefaults, kwargs)
-        self.config = LayeredConfig(defaults=defaults)
-        self.store = self.documentstore_class(self.config.datadir + os.sep + self.alias)
+        self._config = LayeredConfig(defaults=defaults)
+        if not hasattr(self, 'store'):
+            self.store = self.documentstore_class(self.config.datadir + os.sep + self.alias)
         # should documentstore have a connection to self, ie
         # self.store = DocumentStore(basedir, self) ?
         self.store.downloaded_suffix = self.downloaded_suffix
@@ -246,6 +248,19 @@ class DocumentRepository(object):
                 prefix = ns
                 # assume that any standalone prefix is well known
                 self.ns[prefix] = Namespace(util.ns[prefix])
+
+    @property
+    def config(self):
+        return self._config
+
+    @config.setter
+    def config(self, config):
+        self._config = config
+        self.store = self.documentstore_class(
+            config.datadir + os.sep + self.alias,
+            downloaded_suffix=self.downloaded_suffix,
+            storage_policy=self.storage_policy)
+
 
     def get_default_options(self):
         """Returns the class' configuration default configuration

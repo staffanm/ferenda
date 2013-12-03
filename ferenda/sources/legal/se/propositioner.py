@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 from lxml import etree
 import requests
 
-from ferenda import util
+from ferenda import util, errors
 from ferenda.elements import UnicodeElement, CompoundElement, \
     Heading, Preformatted, Paragraph, Section, Link, ListItem, \
     serialize
@@ -20,11 +20,11 @@ from ferenda import TextReader
 from ferenda import PDFReader
 from ferenda import DocumentEntry
 from ferenda.decorators import managedparsing
-from . import Trips
+from . import Trips, NoMoreLinks
 from . import Regeringen
 from . import Riksdagen
 from . import RPUBL
-
+from . import SwedishLegalSource
 
 class PropPolo(Regeringen):
     alias = "proppolo"
@@ -205,68 +205,74 @@ class PropTrips(Trips, PDFDocumentRepository):
     # 2007/08 onwards has plaintext, doc and pdf
     @managedparsing
     def parse(self, doc):
-        doc.uri = self.canonical_uri(doc.basefile)
-        d = Describer(doc.meta, doc.uri)
-        d.rdftype(self.rdf_type)
-        d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-        self.infer_triples(d, doc.basefile)
+        try:
+            doc.uri = self.canonical_uri(doc.basefile)
+            d = Describer(doc.meta, doc.uri)
+            d.rdftype(self.rdf_type)
+            d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
+            self.infer_triples(d, doc.basefile)
 
-        # prefer PDF or Word files over the plaintext-containing HTML files
-        # FIXME: PDF or Word files are now stored as attachments
+            # prefer PDF or Word files over the plaintext-containing HTML files
+            # FIXME: PDF or Word files are now stored as attachments
 
-        pdffile = self.generic_path(doc.basefile, 'downloaded', '.pdf')
+            pdffile = self.store.path(doc.basefile, 'downloaded', '.pdf')
 
-        wordfiles = (self.generic_path(doc.basefile, 'downloaded', '.doc'),
-                     self.generic_path(doc.basefile, 'downloaded', '.docx'),
-                     self.generic_path(doc.basefile, 'downloaded', '.wpd'),
-                     self.generic_path(doc.basefile, 'downloaded', '.rtf'))
-        wordfile = None
-        for f in wordfiles:
-            if os.path.exists(f):
-                wordfile = f
+            wordfiles = (self.store.path(doc.basefile, 'downloaded', '.doc'),
+                         self.store.path(doc.basefile, 'downloaded', '.docx'),
+                         self.store.path(doc.basefile, 'downloaded', '.wpd'),
+                         self.store.path(doc.basefile, 'downloaded', '.rtf'))
+            wordfile = None
+            for f in wordfiles:
+                if os.path.exists(f):
+                    wordfile = f
 
-        # if we lack a .pdf file, use Open/LibreOffice to convert any
-        # .wpd or .doc file to .pdf first
-        if (wordfile
-                and not os.path.exists(pdffile)):
-            intermediate_pdf = self.generic_path(
-                doc.basefile, "intermediate", ".pdf")
-            if not os.path.exists(intermediate_pdf):
-                cmdline = "%s --headless -convert-to pdf -outdir '%s' %s" % (self.config.get('soffice', 'soffice'),
-                                                                             os.path.dirname(
-                                                                                 intermediate_pdf),
-                                                                             wordfile)
-                self.log.debug(
-                    "%s: Converting to PDF: %s" % (doc.basefile, cmdline))
-                (ret, stdout, stderr) = util.runcmd(
-                    cmdline, require_success=True)
-            pdffile = intermediate_pdf
+            # if we lack a .pdf file, use Open/LibreOffice to convert any
+            # .wpd or .doc file to .pdf first
+            if (wordfile
+                    and not os.path.exists(pdffile)):
+                intermediate_pdf = self.store.path(
+                    doc.basefile, "intermediate", ".pdf")
+                if not os.path.exists(intermediate_pdf):
+                    cmdline = "%s --headless -convert-to pdf -outdir '%s' %s" % (self.config.get('soffice', 'soffice'),
+                                                                                 os.path.dirname(
+                                                                                     intermediate_pdf),
+                                                                                 wordfile)
+                    self.log.debug(
+                        "%s: Converting to PDF: %s" % (doc.basefile, cmdline))
+                    (ret, stdout, stderr) = util.runcmd(
+                        cmdline, require_success=True)
+                pdffile = intermediate_pdf
 
-        if os.path.exists(pdffile):
-            self.log.debug("%s: Using %s" % (doc.basefile, pdffile))
-            intermediate_dir = os.path.dirname(
-                self.generic_path(doc.basefile, 'intermediate', '.foo'))
-            self.setup_logger('pdfreader', self.config.get('log', 'INFO'))
-            pdfreader = PDFReader()
-            pdfreader.read(pdffile, intermediate_dir)
-            self.parse_from_pdfreader(pdfreader, doc)
-        else:
-            downloaded_path = self.downloaded_path(doc.basefile)
-            intermediate_path = self.generic_path(
-                doc.basefile, 'intermediate', '.txt')
-            self.log.debug("%s: Using %s (%s)" % (doc.basefile,
-                           downloaded_path, intermediate_path))
-            if not os.path.exists(intermediate_path):
-                html = codecs.open(
-                    downloaded_path, encoding="iso-8859-1").read()
-                util.writefile(intermediate_path, util.extract_text(
-                    html, '<pre>', '</pre>'), encoding="utf-8")
-            textreader = TextReader(intermediate_path, encoding="utf-8")
-            self.parse_from_textreader(textreader, doc)
-            # How to represent that one XHTML doc was created from
-            # plaintext, and another from PDF? create a bnode
-            # representing the source prov:wasDerivedFrom and set its
-            # dct:format to correct mime type
+            if os.path.exists(pdffile):
+                self.log.debug("%s: Using %s" % (doc.basefile, pdffile))
+                intermediate_dir = os.path.dirname(
+                    self.store.path(doc.basefile, 'intermediate', '.foo'))
+                self.setup_logger('pdfreader', self.config.get('log', 'INFO'))
+                pdfreader = PDFReader()
+                pdfreader.read(pdffile, intermediate_dir)
+                self.parse_from_pdfreader(pdfreader, doc)
+            else:
+                downloaded_path = self.store.downloaded_path(doc.basefile)
+                intermediate_path = self.store.path(
+                    doc.basefile, 'intermediate', '.txt')
+                self.log.debug("%s: Using %s (%s)" % (doc.basefile,
+                               downloaded_path, intermediate_path))
+                if not os.path.exists(intermediate_path):
+                    html = codecs.open(
+                        downloaded_path, encoding="iso-8859-1").read()
+                    util.writefile(intermediate_path, util.extract_text(
+                        html, '<pre>', '</pre>'), encoding="utf-8")
+                textreader = TextReader(intermediate_path, encoding="utf-8")
+                self.parse_from_textreader(textreader, doc)
+                # How to represent that one XHTML doc was created from
+                # plaintext, and another from PDF? create a bnode
+                # representing the source prov:wasDerivedFrom and set its
+                # dct:format to correct mime type
+        except Exception as e:
+            err = errors.ParseError(str(e))
+            if isinstance(e, FileNotFoundError):
+                err.dummyfile = self.store.parsed_path(doc.basefile)
+            raise err
 
     def parse_from_textreader(self, textreader, doc):
         describer = Describer(doc.meta, doc.uri)
@@ -292,7 +298,7 @@ class PropRiksdagen(Riksdagen):
     document_type = Riksdagen.PROPOSITION
 
 
-class Propositioner(CompositeRepository):
+class Propositioner(CompositeRepository, SwedishLegalSource):
     subrepos = PropPolo, PropTrips, PropRiksdagen
     alias = "prop"
     xslt_template = "paged.xsl"

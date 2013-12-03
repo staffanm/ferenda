@@ -237,7 +237,11 @@ class DV(SwedishLegalSource):
 
     def process_zipfile(self, zipfilename):
         removed = replaced = created = untouched = 0
-        zipf = zipfile.ZipFile(zipfilename, "r")
+        try:
+            zipf = zipfile.ZipFile(zipfilename, "r")
+        except zipfile.BadZipFile as e:
+            self.log.error("%s is not a valid zip file" % zipfilename)
+            # raise e
         for bname in zipf.namelist():
             if not isinstance(bname, str):  # py2
                 # Files in the zip file are encoded using codepage 437
