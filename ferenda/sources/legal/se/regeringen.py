@@ -26,8 +26,25 @@ from ferenda.pdfreader import Page
 from ferenda.decorators import recordlastdownload, downloadmax
 from . import SwedishLegalSource
 
-class PreambleSection(CompoundElement): pass
-class Appendix(CompoundElement): pass
+class PreambleSection(CompoundElement):
+    tagname = "div"
+    classname = "preamblesection"
+    def as_xhtml(self, uri):
+        element = super(PreambleSection, self).as_xhtml(uri)
+        element.set('property', 'dct:title')
+        element.set('content', self.title)
+        element.set('typeof', 'bibo:DocumentPart')
+        return element
+
+class Appendix(CompoundElement): 
+    tagname = "div"
+    classname = "appendix"
+    def as_xhtml(self, uri):
+        element = super(PreambleSection, self).as_xhtml(uri)
+        element.set('property', 'dct:title')
+        element.set('content', self.title)
+        element.set('typeof', 'bibo:DocumentPart')
+        return element
 
 class Regeringen(SwedishLegalSource):
     DS = 1
@@ -353,20 +370,17 @@ class Regeringen(SwedishLegalSource):
     # this glues together textboxes in a smart way
     def iter_textboxes(self, pdf):
         textbox = None
-        # from pudb import set_trace; set_trace()
         for page in pdf:
             for nextbox in page:
-                
-                # this does not account for paragraphs that are
-                # separated by vertical space only (ie no leading
-                # indent)
                 if (textbox and
                     textbox.getfont()['size'] == nextbox.getfont()['size'] and
                     textbox.getfont()['family'] == nextbox.getfont()['family'] and
+                    textbox.top + textbox.width + 5 > nextbox.top and
                     ((textbox.top == nextbox.top) or
                      (textbox.left == nextbox.left))):
                     textbox += nextbox
                 else:
+                    # print("Yielding new: %s %s" % (repr(textbox), repr(nextbox)))
                     if textbox:
                         yield textbox
                     textbox = nextbox
@@ -382,13 +396,16 @@ class Regeringen(SwedishLegalSource):
         def is_nonessential(parser):
             chunk = parser.reader.peek()
             return (chunk.top > 920 or
-                    (chunk.left < 200 and
-                     15 <= len(chunk) <=17))
+                    (chunk.left < 160 and
+                     15 <= len(str(chunk)) <=17))
 
         def is_preamblesection(parser):
             chunk = parser.reader.peek()
-            txt = str(chunk)
-            return (chunk.getfont()['size'] == '20')
+            txt = str(chunk).strip()
+            fontsize = int(chunk.getfont()['size'])
+            return (17 <= fontsize <= 20
+                    and len(txt) > 12
+                    and not txt.endswith("."))
 
         def is_section(parser):
             (ordinal, title) = analyze_sectionstart(parser)
@@ -407,30 +424,36 @@ class Regeringen(SwedishLegalSource):
 
         def is_appendix(parser):
             chunk = parser.reader.peek()
-            return (chunk.getfont()['size'] == '20' and chunk.startswith("Bilaga "))
+            txt = str(chunk).strip()
+            return (chunk.getfont()['size'] == '20' and txt.startswith("Bilaga "))
 
         def is_paragraph(parser):
             return True
 
         def make_body(parser):
             return p.make_children(Body())
+        setattr(make_body, 'newstate', 'body')
 
         def make_paragraph(parser):
             return parser.reader.next()
 
         def make_preamblesection(parser):
-            s = PreambleSection(title=parser.reader.next())
+            s = PreambleSection(title=str(parser.reader.next()))
             return parser.make_children(s)
+        setattr(make_preamblesection, 'newstate', 'preamblesection')
 
         def make_appendix(parser):
-            s = Appendix(title=parser.reader.next())
+            s = Appendix(title=str(parser.reader.next()))
             return parser.make_children(s)
+        setattr(make_appendix, 'newstate', 'appendix')
 
-        # this is used for subsections and subsubsections as well
+        # this is used for subsections and subsubsections as well --
+        # probably wont work due to the newstate property
         def make_section(parser):
             ordinal, title = analyze_sectionstart(parser, parser.reader.next())
             s = Section(ordinal=ordinal, title=title)
             return parser.make_children(s)
+        setattr(make_section, 'newstate', 'section')
 
         def skip_nonessential(parser):
             parser.reader.next()
@@ -440,7 +463,8 @@ class Regeringen(SwedishLegalSource):
         def analyze_sectionstart(parser, textbox=None):
             if not textbox:
                 textbox = parser.reader.peek()
-            if textbox.getfont()['size'] != '20':
+            size = int(textbox.getfont()['size'])
+            if (size > 20 or size < 17):
                 return (None, textbox)
             txt = str(textbox)
             m = re_sectionstart(txt)
@@ -454,11 +478,11 @@ class Regeringen(SwedishLegalSource):
         p = FSMParser()
 
         p.set_recognizers(is_nonessential,
-                          is_preamblesection,
                           is_appendix,
                           is_section,
                           is_subsection,
                           is_subsubsection,
+                          is_preamblesection,
                           is_paragraph)
         commonstates = ("body","preamblesection","section", "subsection", )
         p.set_transitions({(commonstates, is_nonessential): (skip_nonessential, None),
@@ -487,26 +511,25 @@ class Regeringen(SwedishLegalSource):
                 
     def parse_pdfs(self, basefile, pdffiles):
         body = None
+
         for pdffile in pdffiles:
             # FIXME: downloaded_path must be more fully mocked
             # (support attachments) by testutil.RepoTester. In the
             # meantime, we do some path munging ourselves
-
             pdf_path = self.store.downloaded_path(basefile).replace("index.html", pdffile)
             intermediate_path = self.store.intermediate_path(basefile, attachment=pdffile)
             intermediate_dir = os.path.dirname(intermediate_path)
-            #try:
             pdf = self.parse_pdf(pdf_path, intermediate_dir)
-            # from pudb import set_trace; set_trace()
+            for tb in self.iter_textboxes(pdf):
+                x = repr(tb)
+                print(x)
+            return pdf
+
             parser = self.get_parser()
             parser.debug = True
             body = parser.parse(self.iter_textboxes(pdf))
-            #except ValueError:
-            #    (exc_type, exc_value, exc_trackback) = sys.exc_info()
-            #    self.log.warning("Ignoring exception %s (%s), skipping PDF %s" %
-            #                     (exc_type, exc_value, pdffile))
-        
-        return body
+            pdf[:] = body[:]
+        return pdf
 
         
 
@@ -523,33 +546,36 @@ class Regeringen(SwedishLegalSource):
         # 1.2 create static CSS
         fp = open(cssfile, "w")
         # 1.3 create css for fontspecs and pages
-        for pdf in doc.body:
-            assert isinstance(pdf, PDFReader)
-            for spec in list(pdf.fontspec.values()):
-                fp.write(".fontspec%s {font: %spx %s; color: %s;}\n" %
-                         (spec['id'], spec['size'], spec['family'], spec['color']))
+        # for pdf in doc.body:
+        pdf = doc.body
+        assert isinstance(pdf, PDFReader)
+        for spec in list(pdf.fontspec.values()):
+            fp.write(".fontspec%s {font: %spx %s; color: %s;}\n" %
+                     (spec['id'], spec['size'], spec['family'], spec['color']))
 
         # 2 Copy all created png files to their correct locations
         totcnt = 0
         src_base = os.path.dirname(self.store.intermediate_path(doc.basefile))
-        for pdf in doc.body:
-            pdf_src_base = src_base + "/" + os.path.splitext(os.path.basename(pdf.filename))[0]
 
-            cnt = 0
-            for page in pdf:
-                totcnt += 1
-                cnt += 1
-                src = "%s%03d.png" % (pdf_src_base, page.number)
-                # 4 digits, compound docs can be over 1K pages
-                attachment = "%04d.png" % (totcnt)
-                dest = self.store.parsed_path(doc.basefile,
-                                              attachment=attachment)
+        pdf_src_base = src_base + "/" + os.path.splitext(os.path.basename(pdf.filename))[0]
 
-                if util.copy_if_different(src, dest):
-                    self.log.debug("Copied %s to %s" % (src, dest))
+        cnt = 0
+        for page in pdf:
+            totcnt += 1
+            cnt += 1
+            # src = "%s%03d.png" % (pdf_src_base, page.number)
+            src = "%s%03d.png" % (pdf_src_base, cnt)
 
-                fp.write("#page%03d { background: url('%s');}\n" %
-                         (cnt, os.path.basename(dest)))
+            # 4 digits, compound docs can be over 1K pages
+            attachment = "%04d.png" % (totcnt)
+            dest = self.store.parsed_path(doc.basefile,
+                                          attachment=attachment)
+
+            if util.copy_if_different(src, dest):
+                self.log.debug("Copied %s to %s" % (src, dest))
+
+            fp.write("#page%03d { background: url('%s');}\n" %
+                     (cnt, os.path.basename(dest)))
 
     # Not used right now
     def parse_pdf_complex(self, pdffile, intermediatedir):

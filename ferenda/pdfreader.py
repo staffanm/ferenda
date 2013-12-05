@@ -7,6 +7,7 @@ import itertools
 
 from lxml import etree
 from six import text_type as str
+import six
 
 from ferenda import util
 from .elements import UnicodeElement
@@ -270,6 +271,20 @@ all text in a Textbox has the same font and size.
     def __str__(self):
         return "".join(self)
 
+    def __repr__(self):
+        # <Textbox 30x18+278+257 "5.1">
+        # <Textbox 430x14+287+315 "Regeringens förslag: Nä[...]g ska ">
+        s = str(self)
+        if len(s) > 40:
+            s = s[:25] + "[...]" + s[-10:]
+
+        if six.PY2:
+            s = repr(s)
+        return '<%s %sx%s+%s+%s %s@%s "%s">' % (self.__class__.__name__,
+                                               self.width, self.height,
+                                               self.left, self.top,
+                                               self.getfont()['family'], self.getfont()['size'],
+                                               s)
     def __add__(self, other):
         res = Textbox()
         
