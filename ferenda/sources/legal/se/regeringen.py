@@ -370,20 +370,26 @@ class Regeringen(SwedishLegalSource):
     # this glues together textboxes in a smart way
     def iter_textboxes(self, pdf):
         textbox = None
+        prevbox = None
         for page in pdf:
             for nextbox in page:
+                linespacing = int(nextbox.getfont()['size']) / 2
+                parindent = int(nextbox.getfont()['size'])
                 if (textbox and
                     textbox.getfont()['size'] == nextbox.getfont()['size'] and
                     textbox.getfont()['family'] == nextbox.getfont()['family'] and
-                    textbox.top + textbox.width + 5 > nextbox.top and
-                    ((textbox.top == nextbox.top) or
-                     (textbox.left == nextbox.left))):
+                    textbox.top + textbox.height + linespacing > nextbox.top and
+                    ((prevbox.top == nextbox.top) or
+                     (prevbox.left == nextbox.left) or
+                     (parindent * 2 >= (prevbox.left - nextbox.left) >= parindent)
+                     )):
                     textbox += nextbox
                 else:
                     # print("Yielding new: %s %s" % (repr(textbox), repr(nextbox)))
                     if textbox:
                         yield textbox
                     textbox = nextbox
+                prevbox = nextbox
         if textbox:
             yield textbox
                 
@@ -520,6 +526,7 @@ class Regeringen(SwedishLegalSource):
             intermediate_path = self.store.intermediate_path(basefile, attachment=pdffile)
             intermediate_dir = os.path.dirname(intermediate_path)
             pdf = self.parse_pdf(pdf_path, intermediate_dir)
+            
             for tb in self.iter_textboxes(pdf):
                 x = repr(tb)
                 print(x)

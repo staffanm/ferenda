@@ -286,19 +286,35 @@ all text in a Textbox has the same font and size.
                                                self.getfont()['family'], self.getfont()['size'],
                                                s)
     def __add__(self, other):
-        res = Textbox()
+        # expand dimensions
+        top = min(self.top, other.top)
+        left = min(self.left, other.left)
+        width = max(self.left + self.width,
+                        other.left + other.width) - left
+        height = max(self.top + self.height,
+                          other.top + other.height) - top
+
+        res = Textbox(top=top, left=left, width=width, height=height,
+                      font=self.__fontspecid,
+                      fontspec=self.__fontspec)
         
         # add all text elements
         for e in itertools.chain(self, other):
             res.append(e)
-        # expand dimensions
-        res.top = min(self.top, other.top)
-        res.left = min(self.left, other.left)
-        res.width = max(self.left + self.width,
-                         other.left + other.width) - res.left
-        res.height = max(self.top + self.height,
-                          other.top + other.height) - res.top
         return res
+
+    def __iadd__(self, other):
+        for e in other:
+            self.append(e)
+        self.top = min(self.top, other.top)
+        self.left = min(self.left, other.left)
+        self.width = max(self.left + self.width,
+                         other.left + other.width) - self.left
+        self.height = max(self.top + self.height,
+                          other.top + other.height) - self.top
+        return self
+        
+        
 
     def getfont(self):
         """Returns a fontspec dict of all properties of the font used."""
