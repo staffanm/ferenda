@@ -372,6 +372,7 @@ class Regeringen(SwedishLegalSource):
         textbox = None
         prevbox = None
         for page in pdf:
+            yield page # will include all raw textbox objects
             for nextbox in page:
                 linespacing = int(nextbox.getfont()['size']) / 2
                 parindent = int(nextbox.getfont()['size'])
@@ -390,9 +391,12 @@ class Regeringen(SwedishLegalSource):
                         yield textbox
                     textbox = nextbox
                 prevbox = nextbox
-        if textbox:
-            yield textbox
-                
+            # before every new page, flush existing textbox (glueing
+            # textboxes together across pages is harder bc .top can be
+            # anywhere)
+            if textbox:
+                yield textbox
+                textbox = None
 
 
     @staticmethod
@@ -516,20 +520,61 @@ class Regeringen(SwedishLegalSource):
         return p
                 
     def parse_pdfs(self, basefile, pdffiles):
+        
         body = None
 
         for pdffile in pdffiles:
-            # FIXME: downloaded_path must be more fully mocked
-            # (support attachments) by testutil.RepoTester. In the
-            # meantime, we do some path munging ourselves
             pdf_path = self.store.downloaded_path(basefile).replace("index.html", pdffile)
             intermediate_path = self.store.intermediate_path(basefile, attachment=pdffile)
             intermediate_dir = os.path.dirname(intermediate_path)
             pdf = self.parse_pdf(pdf_path, intermediate_dir)
-            
+            # test code - draw a rectangle around every textbox
+            from PyPDF2 import PdfFileWriter, PdfFileReader
+            import StringIO
+            from reportlab.pdfgen import canvas
+            packet = None
+            output = PdfFileWriter()
+            existing_pdf = PdfFileReader(open(pdf_path, "rb"))
+            pageidx = 0
+            sf = 0.666 # scaling factor
+            dirty = False
             for tb in self.iter_textboxes(pdf):
-                x = repr(tb)
-                print(x)
+                if isinstance(tb, Page):
+                    if dirty:
+                        can.save()
+                        packet.seek(0)
+                        new_pdf = PdfFileReader(packet)
+                        print("Getting page %s from existing pdf" % pageidx)
+                        page = existing_pdf.getPage(pageidx)
+                        page.mergePage(new_pdf.getPage(0))
+                        output.addPage(page)
+                        pageidx += 1
+
+                    pagesize=(595.27,841.89) 
+                    packet = StringIO.StringIO()
+                    can = canvas.Canvas(packet, pagesize=pagesize, bottomup=False)
+                    can.setStrokeColorRGB(0.2,0.5,0.3)
+                    can.translate(0,0)
+                else:
+                    dirty = True
+                    x = repr(tb)
+                    print(x)
+                    can.rect(tb.left*sf, tb.top*sf, tb.width*sf, tb.height*sf)
+
+            packet.seek(0)
+            can.save()
+            new_pdf = PdfFileReader(packet)
+            print("Getting last page %s from existing pdf" % pageidx)
+            page = existing_pdf.getPage(pageidx)
+            page.mergePage(new_pdf.getPage(0))
+            output.addPage(page)
+
+            outputfile = pdf_path+".marked.pdf"
+            outputStream = open(outputfile, "wb")
+            output.write(outputStream)
+            outputStream.close()
+            print("wrote %s" % outputfile)
+            
             return pdf
 
             parser = self.get_parser()
