@@ -559,7 +559,6 @@ class Regeringen(SwedishLegalSource):
             # now, an appendix can begin with either the actual
             # headline-like title, or by the sidenote in the
             # margin. Find out which it is, and plan accordingly.
-            # from pudb import set_trace; set_trace()
             done = False
             while not done:
                 chunk = parser.reader.next()
