@@ -449,6 +449,9 @@ class SectionalElement(CompoundElement):
         element = super(SectionalElement, self).as_xhtml(baseuri)
         if not hasattr(self, 'uri') or not hasattr(self, 'meta'):
             element.set('property', 'dct:title')
+            from ferenda.pdfreader import Textbox
+            if isinstance(self.title, Textbox):
+                from pudb import set_trace; set_trace()
             element.set('content', self.title)
             element.set('typeof', 'bibo:DocumentPart')
             element.set('about', newuri)

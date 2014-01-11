@@ -22,7 +22,7 @@ from ferenda import Describer
 from ferenda import util
 from ferenda.elements import Body, Paragraph, Section, CompoundElement
 from ferenda.pdfreader import PDFReader
-from ferenda.pdfreader import Page
+from ferenda.pdfreader import Page, Textbox
 from ferenda.decorators import recordlastdownload, downloadmax
 from . import SwedishLegalSource
 
@@ -36,11 +36,21 @@ class PreambleSection(CompoundElement):
         element.set('typeof', 'bibo:DocumentPart')
         return element
 
+class UnorderedSection(CompoundElement):
+    tagname = "div"
+    classname = "unorderedsection"
+    def as_xhtml(self, uri):
+        element = super(UnorderedSection, self).as_xhtml(uri)
+        element.set('property', 'dct:title')
+        element.set('content', self.title)
+        element.set('typeof', 'bibo:DocumentPart')
+        return element
+
 class Appendix(CompoundElement): 
     tagname = "div"
     classname = "appendix"
     def as_xhtml(self, uri):
-        element = super(PreambleSection, self).as_xhtml(uri)
+        element = super(Appendix, self).as_xhtml(uri)
         element.set('property', 'dct:title')
         element.set('content', self.title)
         element.set('typeof', 'bibo:DocumentPart')
@@ -337,13 +347,73 @@ class Regeringen(SwedishLegalSource):
         # find pdf file names in order
 
     def parse_document_from_soup(self, soup, doc):
+        def _check_differing(describer, predicate, newval):
+            if describer.getvalue(predicate) != newval:
+                self.log.warning("HTML page: %s is %s, document: it's %s" %
+                                 (d.graph.qname(predicate),
+                                  describer.getvalue(predicate),
+                                  newval))
+                # remove old val
+                d.graph.remove((d._current(),
+                                predicate,
+                                d.graph.value(d._current(), predicate)))
+                d.value(predicate, newval)
+
         pdffiles = self.find_pdf_links(soup, doc.basefile)
         if not pdffiles:
             self.log.error(
                 "%s: No PDF documents found, can't parse anything" % doc.basefile)
             return None
-
+            
         doc.body = self.parse_pdfs(doc.basefile, pdffiles)
+
+        # do some post processing. First loop through leading
+        # textboxes and try to find dct:identifier, dct:title and
+        # dct:published (these should already be present in doc.meta,
+        # but the values in the actual document should take
+        # precendence
+        d = Describer(doc.meta, doc.uri)
+        title_found = False
+        for idx, element in enumerate(doc.body):
+            if not isinstance(element, Textbox):
+                continue
+            str_element = str(element)
+            # print("examining %s..." % str_element[:40])
+            # dct:identifier
+            m = self.re_basefile_lax.search(str_element)
+            if m:
+                _check_differing(d, self.ns['dct'].identifier, "Prop. " + m.group(1))
+            # dct:title
+            if element.getfont()['size'] == '20' and not title_found:
+                if " Prop." in str_element:
+                    str_element = str_element.replace(" Prop.", "").strip()
+                _check_differing(d, self.ns['dct'].title, str_element)
+                title_found = True
+            # dct:published
+            if str_element.startswith("Stockholm den"):
+                pubdate = self.parse_swedish_date(str_element[13:])
+                _check_differing(d, self.ns['dct'].published, pubdate)
+
+        # then maybe look for the section named Författningskommentar
+        # (or similar), identify each section and which proposed new
+        # regulation it refers to)
+        for i, element in enumerate(doc.body):
+            if isinstance(element, Section) and (element.title == "Författningskommentar"):
+                for j, subsection in enumerate(element):
+                    law = subsection.title # well, find out the id (URI) from the title -- possibly using legalref
+                    for k, p in enumerate(subsection):
+                        # find out individual paragraphs, create uris for
+                        # them, and annotate the first textbox that might
+                        # contain commentary (ideally, identify set of
+                        # textboxes that comment on a particular
+                        # identifiable section and wrap them in a
+                        # CommentaryOn container)
+                        print("%s,%s,%s: %s" % (i,j,k,repr(p)))
+                
+                
+        # then maybe look for inline references ("Övervägandena finns
+        # i avsnitt 5.1 och 6" using CitationParser)
+                
         return doc
 
     def sanitize_identifier(self, identifier):
@@ -372,7 +442,7 @@ class Regeringen(SwedishLegalSource):
         textbox = None
         prevbox = None
         for page in pdf:
-            yield page # will include all raw textbox objects
+            yield page # will include all raw textbox objects -- should possibly be shallow-cloned
             for nextbox in page:
                 linespacing = int(nextbox.getfont()['size']) / 2
                 parindent = int(nextbox.getfont()['size'])
@@ -401,8 +471,16 @@ class Regeringen(SwedishLegalSource):
 
     @staticmethod
     def get_parser():
+        # a mutable variable, which is accessible from the nested
+        # functions
+        state = {'pageno': 0,
+                 'appendixno': None}
 
-        # page numbers, headings
+        def is_pagebreak(parser):
+            return isinstance(parser.reader.peek(), Page)
+        
+        # page numbers, headings. Note that this does not capture eg
+        # "Prop. 2013/14:34\nBilaga 1"
         def is_nonessential(parser):
             chunk = parser.reader.peek()
             return (chunk.top > 920 or
@@ -426,6 +504,12 @@ class Regeringen(SwedishLegalSource):
             (ordinal, title) = analyze_sectionstart(parser)
             if ordinal:
                 return ordinal.count(".") == 1
+                
+        def is_unorderedsection(parser):
+            # Subsections in "Författningskommentar" sections are
+            # not always numbered. As a backup, check fontsize as well
+            chunk = parser.reader.peek()
+            return parser.reader.peek().getfont()['size'] == '17'
 
         def is_subsubsection(parser):
             (ordinal, title) = analyze_sectionstart(parser)
@@ -435,7 +519,16 @@ class Regeringen(SwedishLegalSource):
         def is_appendix(parser):
             chunk = parser.reader.peek()
             txt = str(chunk).strip()
-            return (chunk.getfont()['size'] == '20' and txt.startswith("Bilaga "))
+            if (chunk.getfont()['size'] == '20' and txt.startswith("Bilaga ")):
+                return True
+            elif chunk.getfont()['size'] == '13' and chunk.left > 620:
+                if len(chunk) > 1 and chunk[1].startswith("Bilaga "):
+                    # note: we need to check wether the appendix
+                    # ordinal ISN'T the same as an appendix number
+                    # we're already dealing with
+                    ordinal = int(re.search("Bilaga (\d)", str(chunk)).group(1))
+                    if ordinal != state['appendixno']:
+                        return True
 
         def is_paragraph(parser):
             return True
@@ -448,12 +541,37 @@ class Regeringen(SwedishLegalSource):
             return parser.reader.next()
 
         def make_preamblesection(parser):
-            s = PreambleSection(title=str(parser.reader.next()))
-            return parser.make_children(s)
+            s = PreambleSection(title=str(parser.reader.next()).strip())
+            if s.title == "Innehållsförteckning":
+                parser.make_children(s) # throw away
+                return None
+            else:
+                return parser.make_children(s)
         setattr(make_preamblesection, 'newstate', 'preamblesection')
 
+
+        def make_unorderedsection(parser):
+            s = UnorderedSection(title=str(parser.reader.next()).strip())
+            return parser.make_children(s)
+        setattr(make_unorderedsection, 'newstate', 'unorderedsection')
+
         def make_appendix(parser):
-            s = Appendix(title=str(parser.reader.next()))
+            # now, an appendix can begin with either the actual
+            # headline-like title, or by the sidenote in the
+            # margin. Find out which it is, and plan accordingly.
+            # from pudb import set_trace; set_trace()
+            done = False
+            while not done:
+                chunk = parser.reader.next()
+                if isinstance(chunk, Page):
+                    continue
+                m = re.search("Bilaga (\d)", str(chunk))
+                if m:
+                    state['appendixno'] = int(m.group(1))
+                if int(chunk.getfont()['size']) >= 17:
+                    done = True
+            s = Appendix(title=str(chunk).strip(),
+                         ordinal=state['appendixno'])
             return parser.make_children(s)
         setattr(make_appendix, 'newstate', 'appendix')
 
@@ -461,11 +579,20 @@ class Regeringen(SwedishLegalSource):
         # probably wont work due to the newstate property
         def make_section(parser):
             ordinal, title = analyze_sectionstart(parser, parser.reader.next())
-            s = Section(ordinal=ordinal, title=title)
+            if ordinal:
+                s = Section(ordinal=ordinal, title=title)
+            else:
+                s = Section(title=str(title))
             return parser.make_children(s)
         setattr(make_section, 'newstate', 'section')
 
         def skip_nonessential(parser):
+            parser.reader.next()
+            return None
+
+        def skip_pagebreak(parser):
+            # increment pageno
+            state['pageno'] += 1
             parser.reader.next()
             return None
             
@@ -481,21 +608,24 @@ class Regeringen(SwedishLegalSource):
             if m:
                 ordinal = m.group(1).rstrip(".")
                 title = m.group(2)
-                return (ordinal, title)
+                return (ordinal, title.strip())
             else:
                 return (None, textbox)
 
         p = FSMParser()
 
-        p.set_recognizers(is_nonessential,
+        p.set_recognizers(is_pagebreak,
+                          is_nonessential,
                           is_appendix,
                           is_section,
                           is_subsection,
                           is_subsubsection,
                           is_preamblesection,
+                          is_unorderedsection,
                           is_paragraph)
-        commonstates = ("body","preamblesection","section", "subsection", )
+        commonstates = ("body","preamblesection","section", "subsection", "unorderedsection", "appendix")
         p.set_transitions({(commonstates, is_nonessential): (skip_nonessential, None),
+                           (commonstates, is_pagebreak): (skip_pagebreak, None),
                            (commonstates, is_paragraph): (make_paragraph, None),
                            ("body", is_preamblesection): (make_preamblesection, "preamblesection"),
                            ("preamblesection", is_preamblesection): (False, None),
@@ -503,6 +633,9 @@ class Regeringen(SwedishLegalSource):
                            ("body", is_section): (make_section, "section"),
                            ("section", is_section): (False, None),
                            ("section", is_subsection): (make_section, "subsection"),
+                           ("section", is_unorderedsection): (make_unorderedsection, "unorderedsection"),
+                           ("unorderedsection", is_section): (False, None),
+                           ("unorderedsection", is_appendix): (False, None),
                            ("subsection", is_subsection): (False, None),
                            ("subsection", is_section): (False, None),
                            ("subsection", is_subsubsection): (make_section, "subsubsection"),
@@ -524,63 +657,68 @@ class Regeringen(SwedishLegalSource):
         body = None
 
         for pdffile in pdffiles:
-            pdf_path = self.store.downloaded_path(basefile).replace("index.html", pdffile)
+            pdf_path = self.store.downloaded_path(basefile, attachment=pdffile)
             intermediate_path = self.store.intermediate_path(basefile, attachment=pdffile)
             intermediate_dir = os.path.dirname(intermediate_path)
             pdf = self.parse_pdf(pdf_path, intermediate_dir)
-            # test code - draw a rectangle around every textbox
-            from PyPDF2 import PdfFileWriter, PdfFileReader
-            import StringIO
-            from reportlab.pdfgen import canvas
-            packet = None
-            output = PdfFileWriter()
-            existing_pdf = PdfFileReader(open(pdf_path, "rb"))
-            pageidx = 0
-            sf = 0.666 # scaling factor
-            dirty = False
-            for tb in self.iter_textboxes(pdf):
-                if isinstance(tb, Page):
-                    if dirty:
-                        can.save()
-                        packet.seek(0)
-                        new_pdf = PdfFileReader(packet)
-                        print("Getting page %s from existing pdf" % pageidx)
-                        page = existing_pdf.getPage(pageidx)
-                        page.mergePage(new_pdf.getPage(0))
-                        output.addPage(page)
-                        pageidx += 1
 
-                    pagesize=(595.27,841.89) 
-                    packet = StringIO.StringIO()
-                    can = canvas.Canvas(packet, pagesize=pagesize, bottomup=False)
-                    can.setStrokeColorRGB(0.2,0.5,0.3)
-                    can.translate(0,0)
-                else:
-                    dirty = True
-                    x = repr(tb)
-                    print(x)
-                    can.rect(tb.left*sf, tb.top*sf, tb.width*sf, tb.height*sf)
+            debug = False
+            if debug:
+                # test code - draw a rectangle around every textbox
+                from PyPDF2 import PdfFileWriter, PdfFileReader
+                import StringIO
+                from reportlab.pdfgen import canvas
+                packet = None
+                output = PdfFileWriter()
+                existing_pdf = PdfFileReader(open(pdf_path, "rb"))
+                pageidx = 0
+                sf = 0.666 # scaling factor
+                dirty = False
+                for tb in self.iter_textboxes(pdf):
+                    if isinstance(tb, Page):
+                        if dirty:
+                            can.save()
+                            packet.seek(0)
+                            new_pdf = PdfFileReader(packet)
+                            print("Getting page %s from existing pdf" % pageidx)
+                            page = existing_pdf.getPage(pageidx)
+                            page.mergePage(new_pdf.getPage(0))
+                            output.addPage(page)
+                            pageidx += 1
 
-            packet.seek(0)
-            can.save()
-            new_pdf = PdfFileReader(packet)
-            print("Getting last page %s from existing pdf" % pageidx)
-            page = existing_pdf.getPage(pageidx)
-            page.mergePage(new_pdf.getPage(0))
-            output.addPage(page)
+                        pagesize=(595.27,841.89) 
+                        packet = StringIO.StringIO()
+                        can = canvas.Canvas(packet, pagesize=pagesize,
+                                            bottomup=False)
+                        can.setStrokeColorRGB(0.2,0.5,0.3)
+                        can.translate(0,0)
+                    else:
+                        dirty = True
+                        x = repr(tb)
+                        print(x)
+                        can.rect(tb.left*sf, tb.top*sf,
+                                 tb.width*sf, tb.height*sf)
 
-            outputfile = pdf_path+".marked.pdf"
-            outputStream = open(outputfile, "wb")
-            output.write(outputStream)
-            outputStream.close()
-            print("wrote %s" % outputfile)
-            
-            return pdf
+                packet.seek(0)
+                can.save()
+                new_pdf = PdfFileReader(packet)
+                print("Getting last page %s from existing pdf" % pageidx)
+                page = existing_pdf.getPage(pageidx)
+                page.mergePage(new_pdf.getPage(0))
+                output.addPage(page)
 
-            parser = self.get_parser()
-            parser.debug = True
-            body = parser.parse(self.iter_textboxes(pdf))
-            pdf[:] = body[:]
+                outputfile = pdf_path+".marked.pdf"
+                outputStream = open(outputfile, "wb")
+                output.write(outputStream)
+                outputStream.close()
+                print("wrote %s" % outputfile)
+                return pdf
+            else: # not debug
+                parser = self.get_parser()
+                parser.debug = True
+                body = parser.parse(self.iter_textboxes(pdf))
+                pdf[:] = body[:]
+
         return pdf
 
         

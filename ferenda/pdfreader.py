@@ -140,6 +140,8 @@ class PDFReader(CompoundElement):
                         else:
                             b.append(
                                 Textelement(txt(child.text), tag=child.tag))
+                            if child.tail:
+                                b.append(Textelement(txt(child.tail), tag=None))
                     if element.tail and element.tail.strip():  # can this happen?
                         b.append(Textelement(txt(element.tail), tag=None))
                     page.append(b)
@@ -322,14 +324,19 @@ all text in a Textbox has the same font and size.
 
 
 class Textelement(UnicodeElement):
-
     """Represent a single part of text where each letter has the exact
     same formatting. The ``tag`` property specifies whether the text
     as a whole is bold (``'b'``) , italic(``'i'`` bold + italic
     (``'bi'``) or regular (``None``).
     """
-    tagname = "span"
-    classname = "textbox"
+
+    def _get_tagname(self):
+        if self.tag:
+            return self.tag
+        else:
+            return "span"
+
+    tagname = property(_get_tagname)
 
 # The below code fixes a error with incorrectly nested tags often
 # found in pdftohtml generated xml. Main problem is that this relies
