@@ -446,6 +446,13 @@ class SectionalElement(CompoundElement):
             newuri = self.uri
         else:
             newuri = baseuri + "#S%s" % self.ordinal
+        # Addressable subelements (ie. elements which has an uri) are
+        # expected to be able to construct that URI from the base uri
+        # of the entire document (plus it's own internal state). Even
+        # though we construct a new uri here for a particular
+        # subelement, we don't pass it along as the uri parameter for
+        # its own subelements -- these can construct their entire URI
+        # themselves.
         element = super(SectionalElement, self).as_xhtml(baseuri)
         if not hasattr(self, 'uri') or not hasattr(self, 'meta'):
             element.set('property', 'dct:title')

@@ -20,7 +20,7 @@ from ferenda import DocumentEntry
 from ferenda import FSMParser
 from ferenda import Describer
 from ferenda import util
-from ferenda.elements import Body, Paragraph, Section, CompoundElement
+from ferenda.elements import Body, Paragraph, Section, CompoundElement, SectionalElement
 from ferenda.pdfreader import PDFReader
 from ferenda.pdfreader import Page, Textbox
 from ferenda.decorators import recordlastdownload, downloadmax
@@ -29,7 +29,12 @@ from . import SwedishLegalSource
 class PreambleSection(CompoundElement):
     tagname = "div"
     classname = "preamblesection"
+    counter = 0
+    uri = None
     def as_xhtml(self, uri):
+        if not self.uri:
+            self.__class__.counter += 1
+            self.uri = uri + "#PS%s" % self.__class__.counter
         element = super(PreambleSection, self).as_xhtml(uri)
         element.set('property', 'dct:title')
         element.set('content', self.title)
@@ -39,22 +44,27 @@ class PreambleSection(CompoundElement):
 class UnorderedSection(CompoundElement):
     tagname = "div"
     classname = "unorderedsection"
+    counter = 0
+    uri = None
     def as_xhtml(self, uri):
+        if not self.uri:
+            self.__class__.counter += 1
+            # note that this becomes a document-global running counter
+            self.uri = uri + "#US%s" % self.__class__.counter
         element = super(UnorderedSection, self).as_xhtml(uri)
         element.set('property', 'dct:title')
         element.set('content', self.title)
         element.set('typeof', 'bibo:DocumentPart')
         return element
 
-class Appendix(CompoundElement): 
+class Appendix(SectionalElement): 
     tagname = "div"
     classname = "appendix"
     def as_xhtml(self, uri):
-        element = super(Appendix, self).as_xhtml(uri)
-        element.set('property', 'dct:title')
-        element.set('content', self.title)
-        element.set('typeof', 'bibo:DocumentPart')
-        return element
+        if not self.uri:
+            self.uri = uri + "#B%s" % self.ordinal
+
+        return super(Appendix, self).as_xhtml(uri)
 
 class Regeringen(SwedishLegalSource):
     DS = 1
@@ -349,7 +359,7 @@ class Regeringen(SwedishLegalSource):
     def parse_document_from_soup(self, soup, doc):
         def _check_differing(describer, predicate, newval):
             if describer.getvalue(predicate) != newval:
-                self.log.warning("HTML page: %s is %s, document: it's %s" %
+                self.log.warning("HTML page: %s is %r, document: it's %r" %
                                  (d.graph.qname(predicate),
                                   describer.getvalue(predicate),
                                   newval))
@@ -358,6 +368,10 @@ class Regeringen(SwedishLegalSource):
                                 predicate,
                                 d.graph.value(d._current(), predicate)))
                 d.value(predicate, newval)
+
+        # reset global state
+        PreambleSection.counter = 0
+        UnorderedSection.counter = 0
 
         pdffiles = self.find_pdf_links(soup, doc.basefile)
         if not pdffiles:
@@ -377,7 +391,7 @@ class Regeringen(SwedishLegalSource):
         for idx, element in enumerate(doc.body):
             if not isinstance(element, Textbox):
                 continue
-            str_element = str(element)
+            str_element = str(element).strip()
             # print("examining %s..." % str_element[:40])
             # dct:identifier
             m = self.re_basefile_lax.search(str_element)
@@ -408,7 +422,8 @@ class Regeringen(SwedishLegalSource):
                         # textboxes that comment on a particular
                         # identifiable section and wrap them in a
                         # CommentaryOn container)
-                        print("%s,%s,%s: %s" % (i,j,k,repr(p)))
+                        pass
+                        # print("%s,%s,%s: %s" % (i,j,k,repr(p)))
                 
                 
         # then maybe look for inline references ("Övervägandena finns
@@ -450,7 +465,7 @@ class Regeringen(SwedishLegalSource):
                     textbox.getfont()['size'] == nextbox.getfont()['size'] and
                     textbox.getfont()['family'] == nextbox.getfont()['family'] and
                     textbox.top + textbox.height + linespacing > nextbox.top and
-                    ((prevbox.top == nextbox.top) or
+                    ((prevbox.top + prevbox.height == nextbox.top + nextbox.height) or # compare baseline, not topline
                      (prevbox.left == nextbox.left) or
                      (parindent * 2 >= (prevbox.left - nextbox.left) >= parindent)
                      )):
@@ -475,25 +490,34 @@ class Regeringen(SwedishLegalSource):
         # functions
         state = {'pageno': 0,
                  'appendixno': None}
-
+        metrics = {'footer': 920,
+                   'leftmargin': 160,
+                   'rightmargin': 628,
+                   'headingsize': 20,
+                   'subheadingsize': 17,
+                   'subsubheadingsize': 15,
+                   'textsize': 13}
+                   
         def is_pagebreak(parser):
             return isinstance(parser.reader.peek(), Page)
         
-        # page numbers, headings. Note that this does not capture eg
-        # "Prop. 2013/14:34\nBilaga 1"
+        # page numbers, headings.
         def is_nonessential(parser):
             chunk = parser.reader.peek()
-            return (chunk.top > 920 or
-                    (chunk.left < 160 and
-                     15 <= len(str(chunk)) <=17))
-
+            if chunk.top > metrics['footer']:
+                return True  # page numbers
+            if (int(chunk.getfont()['size']) <= metrics['textsize'] and
+                    (chunk.left < metrics['leftmargin'] or chunk.left > metrics['rightmargin']) and
+                (15 <= len(str(chunk)) <= 29)): # matches both "Prop. 2013/14:1" and "Prop. 1999/2000:123 Bilaga 12"
+                return True
+                
         def is_preamblesection(parser):
             chunk = parser.reader.peek()
             txt = str(chunk).strip()
             fontsize = int(chunk.getfont()['size'])
-            return (17 <= fontsize <= 20
-                    and len(txt) > 12
-                    and not txt.endswith("."))
+            return (metrics['subheadingsize'] <= fontsize <= metrics['headingsize']
+                    and txt in ('Propositionens huvudsakliga innehåll',
+                                'Innehållsförteckning'))
 
         def is_section(parser):
             (ordinal, title) = analyze_sectionstart(parser)
@@ -509,7 +533,7 @@ class Regeringen(SwedishLegalSource):
             # Subsections in "Författningskommentar" sections are
             # not always numbered. As a backup, check fontsize as well
             chunk = parser.reader.peek()
-            return parser.reader.peek().getfont()['size'] == '17'
+            return int(chunk.getfont()['size']) == metrics['subheadingsize']
 
         def is_subsubsection(parser):
             (ordinal, title) = analyze_sectionstart(parser)
@@ -519,9 +543,11 @@ class Regeringen(SwedishLegalSource):
         def is_appendix(parser):
             chunk = parser.reader.peek()
             txt = str(chunk).strip()
-            if (chunk.getfont()['size'] == '20' and txt.startswith("Bilaga ")):
+            if (chunk.getfont()['size'] == metrics['headingsize'] and txt.startswith("Bilaga ")):
                 return True
-            elif chunk.getfont()['size'] == '13' and chunk.left > 620:
+            elif (int(chunk.getfont()['size']) == metrics['textsize'] and
+                  (chunk.left < metrics['leftmargin'] or
+                   chunk.left > metrics['rightmargin'])):
                 if len(chunk) > 1 and chunk[1].startswith("Bilaga "):
                     # note: we need to check wether the appendix
                     # ordinal ISN'T the same as an appendix number
@@ -538,6 +564,8 @@ class Regeringen(SwedishLegalSource):
         setattr(make_body, 'newstate', 'body')
 
         def make_paragraph(parser):
+            # if "Regeringen beslutade den 8 april 2010 att" in str(parser.reader.peek()):
+            #     raise ValueError("OK DONE")
             return parser.reader.next()
 
         def make_preamblesection(parser):
@@ -567,10 +595,11 @@ class Regeringen(SwedishLegalSource):
                 m = re.search("Bilaga (\d)", str(chunk))
                 if m:
                     state['appendixno'] = int(m.group(1))
-                if int(chunk.getfont()['size']) >= 17:
+                if int(chunk.getfont()['size']) >= metrics['subheadingsize']:
                     done = True
             s = Appendix(title=str(chunk).strip(),
-                         ordinal=state['appendixno'])
+                         ordinal=str(state['appendixno']),
+                         uri=None)
             return parser.make_children(s)
         setattr(make_appendix, 'newstate', 'appendix')
 
@@ -599,8 +628,7 @@ class Regeringen(SwedishLegalSource):
         def analyze_sectionstart(parser, textbox=None):
             if not textbox:
                 textbox = parser.reader.peek()
-            size = int(textbox.getfont()['size'])
-            if (size > 20 or size < 17):
+            if not (metrics['headingsize'] >= int(textbox.getfont()['size']) >= metrics['subsubheadingsize']):
                 return (None, textbox)
             txt = str(textbox)
             m = re_sectionstart(txt)
@@ -614,17 +642,18 @@ class Regeringen(SwedishLegalSource):
         p = FSMParser()
 
         p.set_recognizers(is_pagebreak,
-                          is_nonessential,
                           is_appendix,
+                          is_nonessential,
                           is_section,
                           is_subsection,
                           is_subsubsection,
                           is_preamblesection,
                           is_unorderedsection,
                           is_paragraph)
-        commonstates = ("body","preamblesection","section", "subsection", "unorderedsection", "appendix")
+        commonstates = ("body","preamblesection","section", "subsection", "unorderedsection", "subsubsection", "appendix")
         p.set_transitions({(commonstates, is_nonessential): (skip_nonessential, None),
                            (commonstates, is_pagebreak): (skip_pagebreak, None),
+                           (commonstates, is_unorderedsection): (make_unorderedsection, None),
                            (commonstates, is_paragraph): (make_paragraph, None),
                            ("body", is_preamblesection): (make_preamblesection, "preamblesection"),
                            ("preamblesection", is_preamblesection): (False, None),
@@ -632,7 +661,7 @@ class Regeringen(SwedishLegalSource):
                            ("body", is_section): (make_section, "section"),
                            ("section", is_section): (False, None),
                            ("section", is_subsection): (make_section, "subsection"),
-                           ("section", is_unorderedsection): (make_unorderedsection, "unorderedsection"),
+#                           ("section", is_unorderedsection): (make_unorderedsection, "unorderedsection"), # covered by commonstates transtions
                            ("unorderedsection", is_section): (False, None),
                            ("unorderedsection", is_appendix): (False, None),
                            ("subsection", is_subsection): (False, None),
@@ -659,6 +688,8 @@ class Regeringen(SwedishLegalSource):
             pdf_path = self.store.downloaded_path(basefile, attachment=pdffile)
             intermediate_path = self.store.intermediate_path(basefile, attachment=pdffile)
             intermediate_dir = os.path.dirname(intermediate_path)
+            # case 1: intermediate path does not exist and that's ok
+            # case 2: intermediate path exists alongside downloaded_path
             pdf = self.parse_pdf(pdf_path, intermediate_dir)
 
             debug = False
@@ -671,7 +702,7 @@ class Regeringen(SwedishLegalSource):
                 output = PdfFileWriter()
                 existing_pdf = PdfFileReader(open(pdf_path, "rb"))
                 pageidx = 0
-                sf = 0.666 # scaling factor
+                sf = 2/3.0 # scaling factor
                 dirty = False
                 for tb in self.iter_textboxes(pdf):
                     if isinstance(tb, Page):
@@ -684,8 +715,8 @@ class Regeringen(SwedishLegalSource):
                             page.mergePage(new_pdf.getPage(0))
                             output.addPage(page)
                             pageidx += 1
-
-                        pagesize=(595.27,841.89) 
+                        pagesize = (tb.width*sf, tb.height*sf)
+                        # print("pagesize %s x %s" % pagesize)
                         packet = StringIO.StringIO()
                         can = canvas.Canvas(packet, pagesize=pagesize,
                                             bottomup=False)
@@ -714,7 +745,8 @@ class Regeringen(SwedishLegalSource):
                 return pdf
             else: # not debug
                 parser = self.get_parser()
-                parser.debug = True
+                if hasattr(self.config, 'debug'):
+                    parser.debug = self.config.debug 
                 body = parser.parse(self.iter_textboxes(pdf))
                 pdf[:] = body[:]
 
@@ -760,8 +792,10 @@ class Regeringen(SwedishLegalSource):
             dest = self.store.parsed_path(doc.basefile,
                                           attachment=attachment)
 
-            if util.copy_if_different(src, dest):
-                self.log.debug("Copied %s to %s" % (src, dest))
+            # If running under RepoTester, the source PNG files may not exist.
+            if os.path.exists(src):
+                if util.copy_if_different(src, dest):
+                    self.log.debug("Copied %s to %s" % (src, dest))
 
             fp.write("#page%03d { background: url('%s');}\n" %
                      (cnt, os.path.basename(dest)))

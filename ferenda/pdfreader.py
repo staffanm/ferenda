@@ -99,10 +99,10 @@ class PDFReader(CompoundElement):
             background = "%s%03d.png" % (
                 os.path.splitext(xmlfile)[0], page.number)
 
-            assert os.path.exists(background)
-            page.background = background
+            # Reasons this file might not exist: We're running under RepoTester.
+            if os.path.exists(background):
+                page.background = background
 
-            # print("Creating page %s" % page.number)
             assert pageelement.tag == "page", "Got <%s>, expected <page>" % page.tag
             for element in pageelement:
                 if element.tag == 'fontspec':
@@ -316,7 +316,16 @@ all text in a Textbox has the same font and size.
                           other.top + other.height) - self.top
         return self
         
-        
+    def as_xhtml(self, uri):
+        element = super(Textbox, self).as_xhtml(uri)
+        # FIXME: we should output these positioned style attributes
+        # only when the resulting document is being serialized in a
+        # positioned fashion. Possibly do some translation from PDF
+        # points (which is what self.top, .left etc is using) and
+        # pixels (which is what the CSS uses)
+        element.set('style', 'top: %spx, left: %spx, height: %spx, width: %spx' % (self.top, self.left, self.height, self.width))
+        return element
+
 
     def getfont(self):
         """Returns a fontspec dict of all properties of the font used."""

@@ -27,10 +27,8 @@ from rdflib.compare import graph_diff
 from rdflib.util import guess_format
 from lxml import etree
 
-from ferenda import DocumentRepository
-from ferenda import TextReader
-from ferenda import elements
-from ferenda import util
+from ferenda import DocumentRepository, DocumentStore, TextReader
+from ferenda import elements, util
 
 
 class FerendaTestCase(object):
@@ -234,6 +232,34 @@ this class, ie::
             return super(FerendaTestCase, self).assertRegex(test, expected_regexp, msg)
 
 
+class RepoTesterStore(object):
+    def __init__(self, origstore, downloaded_file=None):
+        self.origstore = origstore
+        self.downloaded_file = downloaded_file
+
+        self.datadir = origstore.datadir
+        self.downloaded_suffix = origstore.downloaded_suffix
+        self.storage_policy = origstore.storage_policy
+
+
+    def downloaded_path(self, basefile, version=None, attachment=None):
+        if attachment:
+            return os.path.dirname(self.downloaded_file) + os.sep + attachment
+        else:
+            return self.downloaded_file
+
+    def intermediate_path(self, basefile, version=None, attachment=None):
+        p = self.downloaded_file.replace("downloaded", "intermediate").replace(self.downloaded_suffix, ".xml")
+        if attachment:
+            p = os.path.dirname(p) + os.sep + attachment
+        return p
+
+    # To handle any other DocumentStore method, just return whatever
+    # our origstore would.
+    def __getattr__(self, name):
+        return getattr(self.origstore, name)
+
+            
 class RepoTester(unittest.TestCase, FerendaTestCase):
 
     """A unittest.TestCase-based convenience class for creating file-based
@@ -275,7 +301,10 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         shutil.rmtree(self.datadir)
 
     def filename_to_basefile(self, filename):
-        """Converts a test filename to a basefile. Default implementation simply returns a hard-coded basefile.
+        """Converts a test filename to a basefile. Default implementation
+        attempts to find out basefile from the repoclass being tested
+        (or rather it's documentstore), but returns a hard-coded
+        basefile if it fails.
         
         :param filename: The test file
         :type filename: str
@@ -283,7 +312,20 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         :rtype: str
 
         """
-        return "1"
+        try:
+            # Adapted from DocumentStore.list_basefiles_for: Find out a
+            # path fragment from the entire filename path.
+            relfilename = filename[filename.index("test/files/repo"):]
+            directory = os.sep.join(relfilename.split(os.sep)[:5])
+            if self.repo.storage_policy == "file":
+                suffixlen = len(os.path.splitext(filename)[1]) # eg '.pdf'
+            else:
+                suffixlen = len(os.path.basename(filename))+1
+            pathfrag = relfilename[len(directory) + 1:-suffixlen]
+            basefile = self.repo.store.pathfrag_to_basefile(pathfrag)
+            return basefile
+        except:
+            return "1"
 
     def download_test(self, specfile):
         def my_get(url, **kwargs):
@@ -338,48 +380,43 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
                       specfile)
 
     def distill_test(self, downloaded_file, rdf_file, docroot):
+        basefile = self.filename_to_basefile(downloaded_file)
+        origstore = self.repo.store
+        self.repo.store = RepoTesterStore(origstore, downloaded_file)
         try:
-            prefixlen = len(docroot + "/downloaded/")
-            if self.repo.storage_policy == "dir":
-                suffixlen = len(downloaded_file.split(os.sep)[-1]) + 1
-            else:
-                suffixlen = len(os.path.splitext(downloaded_file)[1])
-            pathfrag = downloaded_file[prefixlen:-suffixlen]
-            basefile = self.repo.store.pathfrag_to_basefile(pathfrag)
-        except:
-            basefile = self.filename_to_basefile(downloaded_file)
-        with patch.object(self.repo.documentstore_class, 'downloaded_path',
-                          return_value=downloaded_file):
-            # self.repo.config.fsmdebug = True
             self.repo.parse(basefile)
-        if 'FERENDA_SET_TESTFILES' in os.environ:
-            print("Overwriting %r with result of parse (%r)" % (rdf_file, basefile))
-            g = rdflib.Graph()
-            g.parse(data=util.readfile(self.repo.store.distilled_path(basefile)))
-            util.robust_rename(rdf_file, rdf_file + "~")
-            with open(rdf_file, "wb") as fp:
-                fp.write(g.serialize(format="turtle"))
-            return
-        self.assertEqualGraphs(rdf_file,
-                               self.repo.store.distilled_path(basefile),
-                               exact=False)
+            if 'FERENDA_SET_TESTFILES' in os.environ:
+                print("Overwriting %r with result of parse (%r)" % (rdf_file, basefile))
+                g = rdflib.Graph()
+                g.parse(data=util.readfile(self.repo.store.distilled_path(basefile)))
+                util.robust_rename(rdf_file, rdf_file + "~")
+                with open(rdf_file, "wb") as fp:
+                    fp.write(g.serialize(format="turtle"))
+                return
+            self.assertEqualGraphs(rdf_file,
+                                   self.repo.store.distilled_path(basefile),
+                                   exact=False)
+        finally:
+            self.repo.store = origstore
 
     def parse_test(self, downloaded_file, xhtml_file, docroot):
         # patch method so we control where the downloaded doc is
         # loaded from.
         basefile = self.filename_to_basefile(downloaded_file)
-        # with patch('ferenda.DocumentStore.downloaded_path',
-        #           return_value=downloaded_file):
-        with patch.object(self.repo.documentstore_class, 'downloaded_path',
-                          return_value=downloaded_file):
+        origstore = self.repo.store
+        # make a fakestore
+        self.repo.store = RepoTesterStore(origstore, downloaded_file)
+        try:
             self.repo.parse(basefile)
-        if 'FERENDA_SET_TESTFILES' in os.environ:
-            print("Overwriting %r with result of parse (%r)" % (xhtml_file, basefile))
-            util.robust_rename(xhtml_file, xhtml_file + "~")
-            shutil.copy2(self.repo.store.parsed_path(basefile), xhtml_file)
-            return
-        self.assertEqualXML(util.readfile(xhtml_file),
-                            util.readfile(self.repo.store.parsed_path(basefile)))
+            if 'FERENDA_SET_TESTFILES' in os.environ:
+                print("Overwriting %r with result of parse (%r)" % (xhtml_file, basefile))
+                util.robust_rename(xhtml_file, xhtml_file + "~")
+                shutil.copy2(self.repo.store.parsed_path(basefile), xhtml_file)
+                return
+            self.assertEqualXML(util.readfile(xhtml_file),
+                                util.readfile(self.repo.store.parsed_path(basefile)))
+        finally:
+            self.repo.store = origstore
 
     # for win32 compatibility and simple test case code
     def p(self, path, prepend_datadir=True):
@@ -523,7 +560,6 @@ documentation for that class)."""
         # Test 1: is rdf distilled correctly?
         rdf_file = "%s/distilled/%s.ttl" % (docroot, pathfrag)
         testname = ("test_distill_" + basetest)
-
         wrapper = unittest.expectedFailure if not os.path.exists(rdf_file) else None
         parametrize(cls, cls.distill_test, testname, (downloaded_file, rdf_file, docroot), wrapper)
 

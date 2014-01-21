@@ -3,7 +3,7 @@
 	"file": "resultlist-1.html",
 	"charset": "latin-1"
 	},
-    "http://rkrattsbaser.gov.se/cgi-bin/thw?${HTML}=sfst_lst&${OOHTML}=sfst_dok&${SNHTML}=sfst_err&${MAXPAGE}=101&${BASE}=SFSR&${FORD}=FIND&%C5R=FR%C5N+2009&%C5R=TILL+2013" : {
+    "http://rkrattsbaser.gov.se/cgi-bin/thw?${HTML}=sfst_lst&${OOHTML}=sfst_dok&${SNHTML}=sfst_err&${MAXPAGE}=101&${BASE}=SFSR&${FORD}=FIND&%C5R=FR%C5N+2009&%C5R=TILL+2014" : {
 	"file": "resultlist-3.html",
 	"charset": "latin-1"
 	},

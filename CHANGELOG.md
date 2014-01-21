@@ -1,3 +1,8 @@
+2014-01-?? RELEASE 0.1.7
+========================
+
+Mainly updates to ferenda.sources.legal.se.regeringen.
+
 2013-11-13 RELEASE 0.1.6.1
 ==========================
 
