@@ -657,7 +657,18 @@ def setup_logger(level='INFO', filename=None,
     # turn of some library loggers we're not interested in
     for logname in ['requests.packages.urllib3.connectionpool',
                     'rdflib.plugins.sleepycat']:
-        logging.getLogger(logname).propagate = False
+        log = logging.getLogger(logname)
+        log.propagate = False
+        if log.handlers == []:
+            if hasattr(logging, 'NullHandler'):
+                log.addHandler(logging.NullHandler())
+            else:  # pragma: no cover
+                # py26 compatibility
+                class NullHandler(logging.Handler): 
+
+                    def emit(self, record):
+                        pass
+                log.addHandler(NullHandler())
 
     return l
 

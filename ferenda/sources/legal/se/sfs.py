@@ -320,6 +320,9 @@ class SFS(Trips):
                  "&${MAXPAGE}=%(maxpage)d&${BASE}=%(base)s"
                  "&${FORD}=FIND&%%C5R=FR%%C5N+%(start)s&%%C5R=TILL+%(end)s")
 
+    # need to (re)write this
+    # xslt_template = "res/xsl/sfs.xsl"
+
     download_params = [{'maxpage': 101,
                         'app': app,
                         'base': base,

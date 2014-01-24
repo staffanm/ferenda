@@ -6,7 +6,9 @@ from difflib import unified_diff
 from tempfile import mkstemp
 import inspect
 
-from rdflib import Graph
+from rdflib import Graph, URIRef, RDF
+import six
+from six import text_type as str
 
 from ferenda import TextReader, TripleStore, FulltextIndex
 from ferenda.elements import serialize
@@ -92,6 +94,60 @@ class Devel(object):
 #        sub.debug('Sublog message at DEBUG level')
 
     @decorators.action
+    def csvinventory(self, alias):
+        """Create an inventory of documents, as a CSV file. Only documents
+        that have been parsed and yielded some minimum amount of RDF
+        metadata will be included.
+
+        :param alias: Docrepo alias
+        :type  alias: str
+        """
+        predicates = ['basefile',
+                      'subobjects', # adressable sections
+                      'rdf:type',
+                      'dct:identifier',
+                      'dct:title',
+                      'dct:published',
+                      'prov:wasGeneratedBy',
+                      ]
+        import csv
+        # fp = six.StringIO()
+        writer = csv.DictWriter(sys.stdout, predicates, delimiter=b";")
+        # writer = csv.DictWriter(fp, predicates)
+        repo = self._repo_from_alias(alias)
+        writer.writerow(dict([(p,p) for p in predicates]))
+        for basefile in repo.store.list_basefiles_for("relate"):
+            baseuri = URIRef(repo.canonical_uri(basefile))
+            with repo.store.open_distilled(basefile) as fp:
+                row = {'basefile': basefile}
+                g = Graph().parse(fp, format="xml")
+                for (p, o) in g.predicate_objects(baseuri):
+                    qname = g.qname(p)
+                    if qname in predicates:
+                        if isinstance(o, URIRef):
+                            row[qname] = g.qname(o)
+                        else:
+                            row[qname] = str(o).encode("latin-1")
+                row['subobjects'] = len(list(g.subject_objects(RDF.type)))
+                writer.writerow(row)
+        # print(fp.getvalue())
+
+    def _repo_from_alias(self, alias):
+        #  (FIXME: This uses several undocumented APIs)
+        mainconfig = self.config._parent
+        assert mainconfig is not None, "Devel must be initialized with a full set of configuration"
+        repoconfig = getattr(mainconfig, alias)
+        from ferenda import manager
+        repocls = manager._load_class(getattr(repoconfig, 'class'))
+        repo = repocls()
+        repo.config = getattr(mainconfig, alias)
+        repo.store = repo.documentstore_class(
+            repo.config.datadir + os.sep + repo.alias,
+            downloaded_suffix=repo.downloaded_suffix,
+            storage_policy=repo.storage_policy)
+        return repo
+        
+    @decorators.action
     def mkpatch(self, alias, basefile, description):
         """Create a patch file from downloaded or intermediate files. Before
         running this tool, you should hand-edit the intermediate
@@ -116,19 +172,8 @@ class Devel(object):
             ./ferenda-build.py devel mkpatch myrepo basefile1 "Removed sensitive personal information"
 
         """
-        # 1. initialize the docrepo indicated by "alias" (FIXME: This
-        # uses several undocumented APIs)
-        mainconfig = self.config._parent
-        assert mainconfig is not None, "Devel must be initialized with a full set of configuration"
-        repoconfig = getattr(mainconfig, alias)
-        from ferenda import manager
-        repocls = manager._load_class(getattr(repoconfig, 'class'))
-        repo = repocls()
-        repo.config = getattr(mainconfig, alias)
-        repo.store = repo.documentstore_class(
-            repo.config.datadir + os.sep + repo.alias,
-            downloaded_suffix=repo.downloaded_suffix,
-            storage_policy=repo.storage_policy)
+        # 1. initialize the docrepo indicated by "alias"
+        repo = self._repo_from_alias(alias)
         
         # 2. find out if there is an intermediate file or downloaded
         # file for basefile

@@ -69,7 +69,7 @@ class DocumentStore(object):
             fp = open(filename, mode)
             yield fp
 
-    def path(self, basefile, maindir, suffix, version=None, attachment=None):
+    def path(self, basefile, maindir, suffix, version=None, attachment=None, storage_policy=None):
         """Calculate a full filesystem path for the given parameters.
 
         :param basefile: The basefile of the resource we're calculating a filename for
@@ -80,6 +80,8 @@ class DocumentStore(object):
         :param version: Optional. The archived version id
         :type  version: str
         :param attachment: Optional. Any associated file needed by the main file. 
+        :type  attachment: str
+        :param storage_policy: Optional. Used to override `storage_policy` if needed
         :type  attachment: str
 
         .. note::
@@ -120,6 +122,9 @@ class DocumentStore(object):
         """
         pathfrag = self.basefile_to_pathfrag(basefile)
 
+        if not storage_policy:
+            storage_policy = self.storage_policy
+        
         if version:
             v_pathfrag = self.basefile_to_pathfrag(version)
             segments = [self.datadir,
@@ -127,7 +132,7 @@ class DocumentStore(object):
         else:
             segments = [self.datadir, maindir, pathfrag]
 
-        if self.storage_policy == "dir":
+        if storage_policy == "dir":
             if attachment:
                 for illegal in ':/':
                     if illegal in attachment:
@@ -140,7 +145,7 @@ class DocumentStore(object):
             if attachment != None:
                 raise errors.AttachmentPolicyError(
                     "Can't add attachments (name %s) if "
-                    "self.storage_policy != 'dir'" % attachment)
+                    "storage_policy != 'dir'" % attachment)
             segments[-1] += suffix
 
         unixpath = "/".join(segments)
@@ -209,7 +214,7 @@ class DocumentStore(object):
                 # convention, the main file is called index.html,
                 # index.pdf or whatever.
                 # print("storage_policy dir: %s" % self.storage_policy)
-                suffix = "index" + self.downloaded_suffix
+                suffix = "/index" + self.downloaded_suffix
             else:
                 # print("storage_policy file: %s" % self.storage_policy)
                 suffix = self.downloaded_suffix
@@ -219,7 +224,7 @@ class DocumentStore(object):
         elif action == "generate":
             directory = os.path.sep.join((basedir, "parsed"))
             if self.storage_policy == "dir":
-                suffix = "index.xhtml"
+                suffix = "/index.xhtml"
             else:
                 suffix = ".xhtml"
         elif action == "news":
@@ -245,7 +250,7 @@ class DocumentStore(object):
 
             if os.path.exists(x) and os.path.getsize(x) > 0:
                 # get a pathfrag from full path
-                suffixlen = len(suffix) if self.storage_policy == "file" else len(suffix) + 1
+                suffixlen = len(suffix) 
                 x = x[len(directory) + 1:-suffixlen]
                 yield self.pathfrag_to_basefile(x)
 
@@ -460,7 +465,7 @@ class DocumentStore(object):
         :returns: The full filesystem path
         :rtype:   str
         """
-        return self.path(basefile, 'entries', '.json', version)
+        return self.path(basefile, 'entries', '.json', version, storage_policy="file")
 
     def intermediate_path(self, basefile, version=None, attachment=None):
         """Get the full path for the main intermediate file for the given
@@ -517,7 +522,7 @@ class DocumentStore(object):
         :rtype:   str
         """
         return self.path(basefile, 'distilled', '.rdf',
-                         version)
+                         version, storage_policy="file")
 
     def open_distilled(self, basefile, mode="r", version=None):
         """Opens files for reading and writing,
@@ -570,7 +575,7 @@ class DocumentStore(object):
         :rtype:   str
         """
         return self.path(basefile, 'annotations', '.grit.xml',
-                         version)
+                         version, storage_policy="file")
 
     def open_annotation(self, basefile, mode="r", version=None):
         """Opens files for reading and writing,
@@ -589,7 +594,7 @@ class DocumentStore(object):
         :returns: The full filesystem path
         :rtype:   str
         """
-        return self.path(basefile, 'deps', '.txt')
+        return self.path(basefile, 'deps', '.txt', storage_policy="file")
 
     def open_dependencies(self, basefile, mode="r"):
         """Opens files for reading and writing,
@@ -616,4 +621,4 @@ class DocumentStore(object):
         :rtype:   str
 
         """
-        return self.path(basefile, 'feed', '.atom')
+        return self.path(basefile, 'feed', '.atom', storage_policy="file")

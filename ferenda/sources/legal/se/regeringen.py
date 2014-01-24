@@ -749,7 +749,7 @@ class Regeringen(SwedishLegalSource):
                     parser.debug = self.config.debug 
                 body = parser.parse(self.iter_textboxes(pdf))
                 pdf[:] = body[:]
-
+                pdf.tagname = "body"
         return pdf
 
         
@@ -769,7 +769,7 @@ class Regeringen(SwedishLegalSource):
         # 1.3 create css for fontspecs and pages
         # for pdf in doc.body:
         pdf = doc.body
-        assert isinstance(pdf, PDFReader)
+        assert isinstance(pdf, PDFReader) # this is needed to get fontspecs and other things
         for spec in list(pdf.fontspec.values()):
             fp.write(".fontspec%s {font: %spx %s; color: %s;}\n" %
                      (spec['id'], spec['size'], spec['family'], spec['color']))
