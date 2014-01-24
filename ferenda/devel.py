@@ -103,7 +103,7 @@ class Devel(object):
         :type  alias: str
         """
         predicates = ['basefile',
-                      'subobjects', # adressable sections
+                      'subobjects', # sections that have rdf:type
                       'rdf:type',
                       'dct:identifier',
                       'dct:title',
@@ -111,9 +111,7 @@ class Devel(object):
                       'prov:wasGeneratedBy',
                       ]
         import csv
-        # fp = six.StringIO()
         writer = csv.DictWriter(sys.stdout, predicates, delimiter=b";")
-        # writer = csv.DictWriter(fp, predicates)
         repo = self._repo_from_alias(alias)
         writer.writerow(dict([(p,p) for p in predicates]))
         for basefile in repo.store.list_basefiles_for("relate"):
@@ -130,7 +128,6 @@ class Devel(object):
                             row[qname] = str(o).encode("latin-1")
                 row['subobjects'] = len(list(g.subject_objects(RDF.type)))
                 writer.writerow(row)
-        # print(fp.getvalue())
 
     def _repo_from_alias(self, alias):
         #  (FIXME: This uses several undocumented APIs)

@@ -321,7 +321,7 @@ class Regeringen(SwedishLegalSource):
 
                 if not rel_basefile:
                     self.log.warning(
-                        "Couldn't find rel_basefile (elementid #%s) among %r" % (elementid, infospans))
+                        "%s: Couldn't find rel_basefile (elementid #%s) among %r" % (doc.basefile, elementid, infospans))
                     continue
                 if elementid == "legStep1":
                     subjUri = self.canonical_uri(
@@ -359,8 +359,9 @@ class Regeringen(SwedishLegalSource):
     def parse_document_from_soup(self, soup, doc):
         def _check_differing(describer, predicate, newval):
             if describer.getvalue(predicate) != newval:
-                self.log.warning("HTML page: %s is %r, document: it's %r" %
-                                 (d.graph.qname(predicate),
+                self.log.warning("%s: HTML page: %s is %r, document: it's %r" %
+                                 (doc.basefile,
+                                  d.graph.qname(predicate),
                                   describer.getvalue(predicate),
                                   newval))
                 # remove old val
@@ -399,8 +400,13 @@ class Regeringen(SwedishLegalSource):
                 _check_differing(d, self.ns['dct'].identifier, "Prop. " + m.group(1))
             # dct:title
             if element.getfont()['size'] == '20' and not title_found:
+                # sometimes part of the the dct:identifer (eg " Prop."
+                # or " 2013/14:51") gets mixed up in the title
+                # textbox. Remove those parts if we can find them.
                 if " Prop." in str_element:
                     str_element = str_element.replace(" Prop.", "").strip()
+                if self.re_basefile_lax.search(str_element):
+                    str_element = self.re_basefile_lax.sub("", str_element)
                 _check_differing(d, self.ns['dct'].title, str_element)
                 title_found = True
             # dct:published
@@ -414,16 +420,17 @@ class Regeringen(SwedishLegalSource):
         for i, element in enumerate(doc.body):
             if isinstance(element, Section) and (element.title == "Författningskommentar"):
                 for j, subsection in enumerate(element):
-                    law = subsection.title # well, find out the id (URI) from the title -- possibly using legalref
-                    for k, p in enumerate(subsection):
-                        # find out individual paragraphs, create uris for
-                        # them, and annotate the first textbox that might
-                        # contain commentary (ideally, identify set of
-                        # textboxes that comment on a particular
-                        # identifiable section and wrap them in a
-                        # CommentaryOn container)
-                        pass
-                        # print("%s,%s,%s: %s" % (i,j,k,repr(p)))
+                    if hasattr(subsection, 'title'):
+                        law = subsection.title # well, find out the id (URI) from the title -- possibly using legalref
+                        for k, p in enumerate(subsection):
+                            # find out individual paragraphs, create uris for
+                            # them, and annotate the first textbox that might
+                            # contain commentary (ideally, identify set of
+                            # textboxes that comment on a particular
+                            # identifiable section and wrap them in a
+                            # CommentaryOn container)
+                            pass
+                            # print("%s,%s,%s: %s" % (i,j,k,repr(p)))
                 
                 
         # then maybe look for inline references ("Övervägandena finns
@@ -432,7 +439,12 @@ class Regeringen(SwedishLegalSource):
         return doc
 
     def sanitize_identifier(self, identifier):
-        return identifier
+        try: 
+            (doctype, y1, y2, num) = re.split("[\.:/ ]+", identifier)
+            return "%s. %s/%s:%s" % (doctype, y1, y2, num)
+        except:
+            self.log.warning("Couldn't sanitize identifier %s" % identifier)
+            return identifer
 
     def find_pdf_links(self, soup, basefile):
         pdffiles = []
@@ -485,7 +497,7 @@ class Regeringen(SwedishLegalSource):
 
 
     @staticmethod
-    def get_parser():
+    def get_parser(basefile="0"):
         # a mutable variable, which is accessible from the nested
         # functions
         state = {'pageno': 0,
@@ -608,6 +620,7 @@ class Regeringen(SwedishLegalSource):
         def make_section(parser):
             ordinal, title = analyze_sectionstart(parser, parser.reader.next())
             if ordinal:
+                identifier = "Prop. %s, avsnitt %s" % (basefile, ordinal)
                 s = Section(ordinal=ordinal, title=title)
             else:
                 s = Section(title=str(title))
@@ -744,7 +757,9 @@ class Regeringen(SwedishLegalSource):
                 print("wrote %s" % outputfile)
                 return pdf
             else: # not debug
-                parser = self.get_parser()
+                # FIXME: we should probably initialize the parser with
+                # dct:identifier instead of doc.basefile
+                parser = self.get_parser(basefile)
                 if hasattr(self.config, 'debug'):
                     parser.debug = self.config.debug 
                 body = parser.parse(self.iter_textboxes(pdf))

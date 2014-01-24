@@ -918,7 +918,7 @@ class SFS(Trips):
             soup = bs4.BeautifulSoup(fp.read(), "lxml")
 
         d = OrderedDict()
-        rubrik = soup.body('table')[2].text.strip()
+        rubrik = util.normalize_space(soup.body('table')[2].text)
         changes = soup.body('table')[3:-2]
         for table in changes:
             sfsnr = table.find(text="SFS-nummer:").find_parent(
@@ -939,7 +939,7 @@ class SFS(Trips):
                     key = key[:-1]  # trim ending ":"
                 elif key == '':
                     continue
-                val = row('td')[1].text.replace('\xa0', ' ').strip()
+                val = util.normalize_space(row('td')[1].text.replace('\xa0', ' '))
                 if val == "":
                     continue
                 rowdict[key] = val
@@ -950,7 +950,6 @@ class SFS(Trips):
                 rubrik = None
 
             for key, val in rowdict.items():
-
                 if key == 'SFS-nummer':
                     (arsutgava, lopnummer) = val.split(":")
                     desc.value(self.ns['dct'].identifier, "SFS " + val)

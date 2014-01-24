@@ -170,7 +170,9 @@ class SwedishLegalSource(DocumentRepository):
             # if the identifier is incomplete, eg "2010/11:68" instead
             # of "Prop. 2010/11:68", the following triggers a
             # ValueError, which is handled the same as if no
-            # identifier is available at all.
+            # identifier is available at all. Ideally,
+            # sanitize_identifier should prevent all preventable
+            # occurrences of this.
             (doctype, arsutgava, lopnummer) = re.split("[ :]", identifier)
         except (KeyError, ValueError):
             # Create one from basefile. First guess prefix
@@ -188,7 +190,7 @@ class SwedishLegalSource(DocumentRepository):
             else:
                 raise ValueError("Cannot create dct:identifer for rdf_type %r" % self.rdf_type)
             identifier = "%s%s" % (prefix, basefile)
-
+            
             self.log.warning(
                 "%s: No dct:identifier, assuming %s" % (basefile, identifier))
             d.value(self.ns['dct'].identifier, identifier)
