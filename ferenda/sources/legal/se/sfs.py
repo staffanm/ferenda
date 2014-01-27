@@ -2678,7 +2678,7 @@ class SFS(Trips):
 
                     # If uri is the same as the next one OR uri is the
                     # same as baseuri, use relative form for creating
-                    # dct:identifer
+                    # dct:identifier
                     # print "uri: %s, next_uri: %s, baseuri: %s" %
                     # (uri[35:],next_uri[35:],baseuri[35:])
                     if (uri == next_uri) or (uri == baseuri):

@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 from contextlib import contextmanager
 import shutil
 import os
-import sys
 from tempfile import NamedTemporaryFile
 import filecmp
 
@@ -250,6 +249,7 @@ class DocumentStore(object):
 
             if os.path.exists(x) and os.path.getsize(x) > 0:
                 # get a pathfrag from full path
+                # suffixlen = len(suffix) if self.storage_policy == "file" else len(suffix) + 1
                 suffixlen = len(suffix) 
                 x = x[len(directory) + 1:-suffixlen]
                 yield self.pathfrag_to_basefile(x)
@@ -413,7 +413,9 @@ class DocumentStore(object):
             # should be able to be regenerated at any time?
             src = meth(basefile)
             dest = meth(basefile, version)
-            if self.storage_policy == "dir":
+            if self.storage_policy == "dir" and meth in (self.downloaded_path,
+                                                         self.parsed_path,
+                                                         self.generated_path):
                 src = os.path.dirname(src)
                 dest = os.path.dirname(dest)
             if not os.path.exists(src):

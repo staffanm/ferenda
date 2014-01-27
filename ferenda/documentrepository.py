@@ -646,7 +646,7 @@ with the *config* object as single parameter.
         try:
             while (not fetched) and (remaining_attempts > 0):
                 try:
-                    response = requests.get(url, headers=headers)
+                    response = requests.get(url, headers=headers, timeout=5)
                     fetched = True
                 except requests.exceptions.ConnectionError as e:
                     self.log.warning(

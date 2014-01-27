@@ -136,7 +136,7 @@ class Transformer(object):
         """Accepts two filenames, reads from *infile*, writes to *outfile*."""
         depth = self._depth(os.path.dirname(outfile),
                             self.documentroot+os.sep+"index.html")
-        helpful = True
+        helpful = False
         if helpful:
             import pkg_resources
             xslfile = pkg_resources.resource_filename('ferenda', self.t.orig_template)

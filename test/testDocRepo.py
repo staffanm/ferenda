@@ -278,7 +278,7 @@ class Repo(RepoTester):
     @patch('requests.get')
     def test_download_if_needed(self, mock_get):
 
-        def my_get(url,headers):
+        def my_get(url,headers, timeout=None):
             # observes the scoped variables "last_modified" (should
             # contain a formatted date string according to HTTP rules)
             # and "etag" (opaque string).

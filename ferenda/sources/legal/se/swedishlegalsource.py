@@ -188,7 +188,7 @@ class SwedishLegalSource(DocumentRepository):
             elif self.rdf_type == self.ns['rpubl'].Forordningsmotiv:
                 prefix = "Fm "
             else:
-                raise ValueError("Cannot create dct:identifer for rdf_type %r" % self.rdf_type)
+                raise ValueError("Cannot create dct:identifier for rdf_type %r" % self.rdf_type)
             identifier = "%s%s" % (prefix, basefile)
             
             self.log.warning(

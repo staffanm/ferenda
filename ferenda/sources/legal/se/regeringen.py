@@ -85,6 +85,7 @@ class Regeringen(SwedishLegalSource):
     start_url_template = "http://www.regeringen.se/sb/d/107/a/136/action/showAll/sort/byDate/targetDepartment/archiveDepartment?d=107&action=search&query=&type=advanced&a=136&sort=byDate&docTypes=%(doctype)s"
     downloaded_suffix = ".html"  # override PDFDocumentRepository
     source_encoding = "latin-1"
+    storage_policy = "dir"
 
     @recordlastdownload
     def download(self, basefile=None):
@@ -156,7 +157,7 @@ class Regeringen(SwedishLegalSource):
 
     def remote_url(self, basefile):
         # do a search to find the proper url for the document
-        templ = "http://www.regeringen.se/sb/d/107/a/136?query=s(basefile)&docTypes=s(doctype)&type=advanced&action=search"
+        templ = "http://www.regeringen.se/sb/d/107/a/136?query=%(basefile)s&docTypes=%(doctype)s&type=advanced&action=search"
         url = templ % {'doctype': self.document_type,
                        'basefile': basefile}
         soup = BeautifulSoup(requests.get(url).text)
@@ -439,12 +440,19 @@ class Regeringen(SwedishLegalSource):
         return doc
 
     def sanitize_identifier(self, identifier):
+        pattern = {self.KOMMITTEDIREKTIV: "%s. %s:%s",
+                   self.DS: "%s %s:%s",
+                   self.PROPOSITION: "%s. %s/%s:%s",
+                   self.SKRIVELSE: "%s. %s/%s:%s",
+                   self.SOU: "%s %s:%s",
+                   self.SO: "%s %s:%s"}
+        
         try: 
-            (doctype, y1, y2, num) = re.split("[\.:/ ]+", identifier)
-            return "%s. %s/%s:%s" % (doctype, y1, y2, num)
+            parts = re.split("[\.:/ ]+", identifier)
+            return pattern[self.document_type] % tuple(parts)
         except:
             self.log.warning("Couldn't sanitize identifier %s" % identifier)
-            return identifer
+            return identifier
 
     def find_pdf_links(self, soup, basefile):
         pdffiles = []

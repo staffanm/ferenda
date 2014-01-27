@@ -14,6 +14,14 @@ from ferenda import TextReader, TripleStore, FulltextIndex
 from ferenda.elements import serialize
 from ferenda import decorators, util
 
+class DummyStore(object):
+
+    def __init__(self, path, **kwargs):
+        pass  # pragma: no cover
+
+    def list_basefiles_for(self, action, basedir=None):
+        return []  # pragma: no cover
+
 
 class Devel(object):
 
@@ -333,14 +341,9 @@ class Devel(object):
     # want to have coverage counting these as missing lines, hence the
     # pragma: no cover comments.
 
-    class DummyStore(object):
-
-        def __init__(self, path, **kwargs):
-            pass  # pragma: no cover
-
-        def list_basefiles_for(self, action, basedir=None):
-            return []  # pragma: no cover
-
+    def __init__(self, **kwargs):
+        self.store = DummyStore(None)
+    
     documentstore_class = DummyStore
     downloaded_suffix = ".html"
     storage_policy = "file"
