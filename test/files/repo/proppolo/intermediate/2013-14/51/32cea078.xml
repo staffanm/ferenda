@@ -3,24 +3,24 @@
 
 <pdf2xml producer="poppler" version="0.24.3">
 <page number="1" position="absolute" top="0" left="0" height="1029" width="701">
-	<fontspec id="0" size="12" family="Times" color="#000000"/>
-	<fontspec id="1" size="26" family="Times" color="#000000"/>
-	<fontspec id="2" size="11" family="Times" color="#000000"/>
-	<fontspec id="3" size="20" family="Times" color="#000000"/>
-	<fontspec id="4" size="12" family="Times" color="#000000"/>
-	<fontspec id="5" size="-1" family="Times" color="#000000"/>
-	<fontspec id="6" size="14" family="Times" color="#000000"/>
-	<fontspec id="7" size="18" family="Times" color="#000000"/>
-	<fontspec id="8" size="17" family="Times" color="#000000"/>
-	<fontspec id="9" size="12" family="Times" color="#000000"/>
-	<fontspec id="10" size="12" family="Times" color="#000000"/>
-	<fontspec id="11" size="7" family="Times" color="#000000"/>
-	<fontspec id="12" size="13" family="Times" color="#000000"/>
-	<fontspec id="13" size="5" family="Times" color="#000000"/>
-	<fontspec id="14" size="10" family="Times" color="#000000"/>
-	<fontspec id="15" size="11" family="Times" color="#000000"/>
-	<fontspec id="16" size="7" family="Times" color="#000000"/>
-	<fontspec id="17" size="15" family="Times" color="#000000"/>
+	<fontspec id="0" size="12" family="Times New Roman" color="#000000"/>
+	<fontspec id="1" size="26" family="Times New Roman" color="#000000"/>
+	<fontspec id="2" size="11" family="Times New Roman" color="#000000"/>
+	<fontspec id="3" size="20" family="Times New Roman" color="#000000"/>
+	<fontspec id="4" size="12" family="Times New Roman" color="#000000"/>
+	<fontspec id="5" size="-1" family="Times New Roman" color="#000000"/>
+	<fontspec id="6" size="14" family="Times New Roman" color="#000000"/>
+	<fontspec id="7" size="18" family="Times New Roman" color="#000000"/>
+	<fontspec id="8" size="17" family="Times New Roman" color="#000000"/>
+	<fontspec id="9" size="12" family="Times New Roman" color="#000000"/>
+	<fontspec id="10" size="12" family="Times New Roman" color="#000000"/>
+	<fontspec id="11" size="7" family="Times New Roman" color="#000000"/>
+	<fontspec id="12" size="13" family="Times New Roman" color="#000000"/>
+	<fontspec id="13" size="5" family="Times New Roman" color="#000000"/>
+	<fontspec id="14" size="10" family="Times New Roman" color="#000000"/>
+	<fontspec id="15" size="11" family="Times New Roman" color="#000000"/>
+	<fontspec id="16" size="7" family="Times New Roman" color="#000000"/>
+	<fontspec id="17" size="15" family="Times New Roman" color="#000000"/>
 <text top="927" left="637" width="11" height="13" font="0">1 </text>
 <text top="66" left="77" width="287" height="26" font="1">Regeringens proposition </text>
 <text top="99" left="77" width="137" height="26" font="1">2013/14:51 </text>

@@ -70,7 +70,9 @@ class PDFReader(CompoundElement):
                 if f.endswith(".html"):
                     os.unlink(workdir + os.sep + f)
 
-            cmd = "pdftohtml -nodrm -xml %s" % tmppdffile
+            # Without -fontfullname, all fonts are just reported as
+            # having family="Times"...
+            cmd = "pdftohtml -nodrm -xml -fontfullname %s" % tmppdffile
             self.log.debug("Converting: %s" % cmd)
             (returncode, stdout, stderr) = util.runcmd(cmd,
                                                        require_success=True)
@@ -106,7 +108,11 @@ class PDFReader(CompoundElement):
             assert pageelement.tag == "page", "Got <%s>, expected <page>" % page.tag
             for element in pageelement:
                 if element.tag == 'fontspec':
-                    self.fontspec[element.attrib['id']] = element.attrib
+                    fontid =  element.attrib['id']
+                    self.fontspec[fontid] = element.attrib
+                    if "+" in element.attrib['family']:
+                        self.fontspec[fontid]['family'] = element.attrib['family'].split("+",1)[1]
+                    
                 elif element.tag == 'text':
                     # eliminate "empty" textboxes
                     if element.text and element.text.strip() == "" and not element.getchildren():
@@ -229,6 +235,10 @@ class Page(CompoundElement, OrdinalElement):
         textexcerpt = " ".join([str(x) for x in self])
         return "Page %d (%d x %d): '%s...'" % (self.number, self.width, self.height, str(textexcerpt[:40]))
 
+    def __repr__(self):
+        return '<%s %d (%dx%d): %d textboxes>' % (self.__class__.__name__,
+                                                   self.number, self.width, self.height,
+                                                   len(self))
 
 class Textbox(CompoundElement):
 
@@ -281,7 +291,8 @@ all text in a Textbox has the same font and size.
             s = s[:25] + "[...]" + s[-10:]
 
         if six.PY2:
-            s = repr(s)
+            # s = repr(s)
+            s = s.encode('ascii', 'replace')
         return '<%s %sx%s+%s+%s %s@%s "%s">' % (self.__class__.__name__,
                                                self.width, self.height,
                                                self.left, self.top,

@@ -38,7 +38,9 @@ class FSMParser():
             stack = inspect.stack()
             calling_frame = [x[3] for x in stack][1]
             relative_depth = len(self._state_stack)
-            print("%s[%s(%r)] %s" % (". " * relative_depth, calling_frame, self._state_stack, msg))
+            # print("%s[%s(%r)] %s" % (". " * relative_depth, calling_frame, self._state_stack, msg))
+            state = "/".join(self._state_stack)
+            print("%s/%s(): %s" % (state, calling_frame, msg))
 
     def set_recognizers(self, *args):
         """Set the list of functions (or other callables) used in
@@ -108,8 +110,9 @@ class FSMParser():
         """Internal function used by make_children()"""
         try:
             rawchunk = self.reader.peek()
-            chunk = str(rawchunk)
-            if len(chunk) > 40:
+            # chunk = str(rawchunk)
+            chunk = repr(rawchunk)
+            if len(chunk) > 90:
                 chunk = chunk[:25] + "[...]" + chunk[-10:]
             else:
                 chunk = chunk
@@ -125,14 +128,15 @@ class FSMParser():
             if recognizer in applicable_tmp:
                 applicable_recognizers.append(recognizer)
 
-        self._debug("Testing %r against %s (state %r) " %
-                    (chunk, [x.__name__ for x in applicable_recognizers],
-                     self._state_stack[-1]))
+        applicable_display = ", ".join([x.__name__ for x in applicable_recognizers])
         for recognizer in applicable_recognizers:
             if recognizer(self):
-                self._debug("%r -> %s" % (chunk, recognizer.__name__))
+                self._debug("Tested %r against %s -> %s " %
+                            (chunk, applicable_display,
+                             recognizer.__name__))
+                # self._debug("%r -> %s" % (chunk, recognizer.__name__))
                 return recognizer
-        raise FSMStateError("No recognizer match for %r" % chunk)
+        raise FSMStateError("No recognizer match for %s (tried %s)" % (chunk, applicable_display))
 
     def transition(self, currentstate, symbol):
         """Internal function used by make_children()"""
@@ -150,10 +154,11 @@ class FSMParser():
 
         if not childstate:
             childstate = self._state_stack[-1]
-            self._debug("calling child constructor %s" % constructor.__name__)
+            # self._debug("calling child constructor %s" % constructor.__name__)
         else:
-            self._debug("calling child constructor %s in state %r" %
-                        (constructor.__name__, childstate))
+            # self._debug("calling child constructor %s in state %r" %
+            #             (constructor.__name__, childstate))
+            pass
         self._state_stack.append(childstate)
         ret = constructor(self)
         self._state_stack.pop()  # do something with this?

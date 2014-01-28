@@ -505,18 +505,11 @@ class Regeringen(SwedishLegalSource):
 
 
     @staticmethod
-    def get_parser(basefile="0"):
+    def get_parser(basefile="0", metrics={}):
         # a mutable variable, which is accessible from the nested
         # functions
         state = {'pageno': 0,
                  'appendixno': None}
-        metrics = {'footer': 920,
-                   'leftmargin': 160,
-                   'rightmargin': 628,
-                   'headingsize': 20,
-                   'subheadingsize': 17,
-                   'subsubheadingsize': 15,
-                   'textsize': 13}
                    
         def is_pagebreak(parser):
             return isinstance(parser.reader.peek(), Page)
@@ -535,9 +528,16 @@ class Regeringen(SwedishLegalSource):
             chunk = parser.reader.peek()
             txt = str(chunk).strip()
             fontsize = int(chunk.getfont()['size'])
-            return (metrics['subheadingsize'] <= fontsize <= metrics['headingsize']
-                    and txt in ('Propositionens huvudsakliga innehåll',
-                                'Innehållsförteckning'))
+            if not metrics['subheadingsize'] <= fontsize <= metrics['headingsize']:
+                return False
+
+            for validheading in ('Propositionens huvudsakliga innehåll',
+                                 'Innehållsförteckning',
+                                 'Till statsrådet',
+                                 'Innehåll',
+                                 'Sammanfattning'):
+                if txt.startswith(validheading):
+                    return True
 
         def is_section(parser):
             (ordinal, title) = analyze_sectionstart(parser)
@@ -551,9 +551,10 @@ class Regeringen(SwedishLegalSource):
                 
         def is_unorderedsection(parser):
             # Subsections in "Författningskommentar" sections are
-            # not always numbered. As a backup, check fontsize as well
+            # not always numbered. As a backup, check font size and family as well
             chunk = parser.reader.peek()
-            return int(chunk.getfont()['size']) == metrics['subheadingsize']
+            return (int(chunk.getfont()['size']) == metrics['subheadingsize'] and
+                    chunk.getfont()['family'] == metrics['subheadingfamily'])
 
         def is_subsubsection(parser):
             (ordinal, title) = analyze_sectionstart(parser)
@@ -674,7 +675,7 @@ class Regeringen(SwedishLegalSource):
         commonstates = ("body","preamblesection","section", "subsection", "unorderedsection", "subsubsection", "appendix")
         p.set_transitions({(commonstates, is_nonessential): (skip_nonessential, None),
                            (commonstates, is_pagebreak): (skip_pagebreak, None),
-                           (commonstates, is_unorderedsection): (make_unorderedsection, None),
+                           (commonstates, is_unorderedsection): (make_unorderedsection, "unorderedsection"),
                            (commonstates, is_paragraph): (make_paragraph, None),
                            ("body", is_preamblesection): (make_preamblesection, "preamblesection"),
                            ("preamblesection", is_preamblesection): (False, None),
@@ -682,7 +683,8 @@ class Regeringen(SwedishLegalSource):
                            ("body", is_section): (make_section, "section"),
                            ("section", is_section): (False, None),
                            ("section", is_subsection): (make_section, "subsection"),
-#                           ("section", is_unorderedsection): (make_unorderedsection, "unorderedsection"), # covered by commonstates transtions
+                           ("unorderedsection", is_preamblesection): (False, None),
+                           ("unorderedsection", is_unorderedsection): (False, None),
                            ("unorderedsection", is_section): (False, None),
                            ("unorderedsection", is_appendix): (False, None),
                            ("subsection", is_subsection): (False, None),
@@ -765,9 +767,33 @@ class Regeringen(SwedishLegalSource):
                 print("wrote %s" % outputfile)
                 return pdf
             else: # not debug
+   
                 # FIXME: we should probably initialize the parser with
-                # dct:identifier instead of doc.basefile
-                parser = self.get_parser(basefile)
+                # dct:identifier instead of doc.basefile. Or maybe a metrics
+                # dict.
+
+                if self.document_type == self.PROPOSITION:
+                    metrics = {'footer': 920,
+                               'leftmargin': 160,
+                               'rightmargin': 628,
+                               'headingsize': 20,
+                               'subheadingsize': 17,
+                               'subheadingfamily': 'Times New Roman',
+                               'subsubheadingsize': 15,
+                               'textsize': 13}
+                else:
+                    metrics = {'header': 49, # or rather 49 + 15
+                               'footer': 940,
+                               'leftmargin': 84,
+                               'rightmargin': 813,
+                               'titlesize': 41,
+                               'headingsize': 26,
+                               'subheadingsize': 16,
+                               'subheadingfamily': 'TradeGothic,Bold',
+                               'subsubheadingsize': 14,
+                               'textsize': 14
+                               }
+                parser = self.get_parser(basefile, metrics)
                 if hasattr(self.config, 'debug'):
                     parser.debug = self.config.debug 
                 body = parser.parse(self.iter_textboxes(pdf))
