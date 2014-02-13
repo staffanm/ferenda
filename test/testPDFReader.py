@@ -63,7 +63,7 @@ class Read(unittest.TestCase):
         self.assertEqual({'color': '#000000',
                           'size': '16',
                           'id': '1',
-                          'family': 'BULTXF+Cambria'}, box.getfont())
+                          'family': 'Cambria'}, box.getfont())
                          
 
         # this box should have four text elements

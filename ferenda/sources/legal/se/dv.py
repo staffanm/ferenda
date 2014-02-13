@@ -422,6 +422,7 @@ class DV(SwedishLegalSource):
                                              # FSMParser to detect
                                              # high-level structure of
                                              # the document
+        return True
 
     def parse_ooxml(self, text, basefile):
         soup = BeautifulSoup(text)

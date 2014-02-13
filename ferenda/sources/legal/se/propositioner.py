@@ -13,7 +13,7 @@ from ferenda import util, errors
 from ferenda.elements import UnicodeElement, CompoundElement, \
     Heading, Preformatted, Paragraph, Section, Link, ListItem, \
     serialize
-from ferenda import CompositeRepository
+from ferenda import CompositeRepository, CompositeStore
 from ferenda import PDFDocumentRepository
 from ferenda import Describer
 from ferenda import TextReader
@@ -24,7 +24,7 @@ from . import Trips, NoMoreLinks
 from . import Regeringen
 from . import Riksdagen
 from . import RPUBL
-from . import SwedishLegalSource
+from . import SwedishLegalSource, SwedishLegalStore
 
 class PropPolo(Regeringen):
     alias = "proppolo"
@@ -35,7 +35,8 @@ class PropPolo(Regeringen):
     document_type = Regeringen.PROPOSITION
 
 
-class PropTrips(Trips, PDFDocumentRepository):
+# class PropTrips(Trips, PDFDocumentRepository):
+class PropTrips(Trips):
     alias = "proptrips"
     base = "THWALLAPROP"
     # base = "PROPARKIV0809"
@@ -47,6 +48,8 @@ class PropTrips(Trips, PDFDocumentRepository):
     downloaded_suffix = ".html"
     rdf_type = RPUBL.Proposition
 
+    storage_policy = "dir"
+    
     def download_get_basefiles_page(self, pagetree):
         # feed the lxml tree into beautifulsoup by serializing it to a
         # string -- is there a better way?
@@ -205,25 +208,30 @@ class PropTrips(Trips, PDFDocumentRepository):
     @managedparsing
     def parse(self, doc):
         try:
-            doc.uri = self.canonical_uri(doc.basefile)
-            d = Describer(doc.meta, doc.uri)
-            d.rdftype(self.rdf_type)
-            d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-            self.infer_triples(d, doc.basefile)
 
             # prefer PDF or Word files over the plaintext-containing HTML files
             # FIXME: PDF or Word files are now stored as attachments
-
+            htmlfile = self.store.downloaded_path(doc.basefile)
+            
             pdffile = self.store.path(doc.basefile, 'downloaded', '.pdf')
-
+            
             wordfiles = (self.store.path(doc.basefile, 'downloaded', '.doc'),
                          self.store.path(doc.basefile, 'downloaded', '.docx'),
                          self.store.path(doc.basefile, 'downloaded', '.wpd'),
                          self.store.path(doc.basefile, 'downloaded', '.rtf'))
+
+            # check if ANY of these exist
+            if not filter(None, [os.path.exists(f) for f in wordfiles + (htmlfile, pdffile)]):
+                raise errors.NoDownloadedFileError("File '%s' (or any .pdf/.doc/.docx/.wpd/.rdf variant) not found" % htmlfile)
+            
             wordfile = None
             for f in wordfiles:
                 if os.path.exists(f):
                     wordfile = f
+            
+            doc.uri = self.canonical_uri(doc.basefile)
+            d = Describer(doc.meta, doc.uri)
+            d.rdftype(self.rdf_type)
 
             # if we lack a .pdf file, use Open/LibreOffice to convert any
             # .wpd or .doc file to .pdf first
@@ -267,9 +275,13 @@ class PropTrips(Trips, PDFDocumentRepository):
                 # plaintext, and another from PDF? create a bnode
                 # representing the source prov:wasDerivedFrom and set its
                 # dct:format to correct mime type
+
+            d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
+            self.infer_triples(d, doc.basefile)
+            return True
         except Exception as e:
             err = errors.ParseError(str(e))
-            if isinstance(e, FileNotFoundError):
+            if isinstance(e, IOError):
                 err.dummyfile = self.store.parsed_path(doc.basefile)
             raise err
 
@@ -296,6 +308,10 @@ class PropRiksdagen(Riksdagen):
     rdf_type = RPUBL.Proposition
     document_type = Riksdagen.PROPOSITION
 
+# inherit list_basefiles_for from CompositeStore, basefile_to_pathfrag
+# from SwedishLegalStore)
+class PropositionerStore(CompositeStore, SwedishLegalStore):
+    pass
 
 class Propositioner(CompositeRepository, SwedishLegalSource):
     subrepos = PropPolo, PropTrips, PropRiksdagen
@@ -303,6 +319,6 @@ class Propositioner(CompositeRepository, SwedishLegalSource):
     xslt_template = "paged.xsl"
     storage_policy = "dir"
     rdf_type = RPUBL.Proposition
-
+    documentstore_class = PropositionerStore
     def tabs(self, primary=False):
         return [('Förarbeten', self.dataset_uri())]

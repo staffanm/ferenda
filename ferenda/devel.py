@@ -133,7 +133,7 @@ class Devel(object):
                         if isinstance(o, URIRef):
                             row[qname] = g.qname(o)
                         else:
-                            row[qname] = str(o).encode("latin-1")
+                            row[qname] = str(o).encode("latin-1", errors="replace")
                 row['subobjects'] = len(list(g.subject_objects(RDF.type)))
                 writer.writerow(row)
 

@@ -109,7 +109,6 @@ def render(f):
         # .meta property on any body object is present in the
         # XHTML+RDFa file.
         distilled_graph = Graph()
-
         with codecs.open(self.store.parsed_path(doc.basefile),
                          encoding="utf-8") as fp:  # unicode
             distilled_graph.parse(data=fp.read(), format="rdfa",

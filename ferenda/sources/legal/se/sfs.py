@@ -886,6 +886,7 @@ class SFS(Trips):
                 rp.append(obs[uri])
 
         doc.body.append(reg)
+        return True
 
     def _forfattningstyp(self, forfattningsrubrik):
         if (forfattningsrubrik.startswith('Lag ') or

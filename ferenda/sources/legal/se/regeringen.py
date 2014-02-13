@@ -25,46 +25,8 @@ from ferenda.pdfreader import PDFReader
 from ferenda.pdfreader import Page, Textbox
 from ferenda.decorators import recordlastdownload, downloadmax
 from . import SwedishLegalSource
+from .swedishlegalsource import offtryck_parser, offtryck_textboxiter, PreambleSection, UnorderedSection
 
-class PreambleSection(CompoundElement):
-    tagname = "div"
-    classname = "preamblesection"
-    counter = 0
-    uri = None
-    def as_xhtml(self, uri):
-        if not self.uri:
-            self.__class__.counter += 1
-            self.uri = uri + "#PS%s" % self.__class__.counter
-        element = super(PreambleSection, self).as_xhtml(uri)
-        element.set('property', 'dct:title')
-        element.set('content', self.title)
-        element.set('typeof', 'bibo:DocumentPart')
-        return element
-
-class UnorderedSection(CompoundElement):
-    tagname = "div"
-    classname = "unorderedsection"
-    counter = 0
-    uri = None
-    def as_xhtml(self, uri):
-        if not self.uri:
-            self.__class__.counter += 1
-            # note that this becomes a document-global running counter
-            self.uri = uri + "#US%s" % self.__class__.counter
-        element = super(UnorderedSection, self).as_xhtml(uri)
-        element.set('property', 'dct:title')
-        element.set('content', self.title)
-        element.set('typeof', 'bibo:DocumentPart')
-        return element
-
-class Appendix(SectionalElement): 
-    tagname = "div"
-    classname = "appendix"
-    def as_xhtml(self, uri):
-        if not self.uri:
-            self.uri = uri + "#B%s" % self.ordinal
-
-        return super(Appendix, self).as_xhtml(uri)
 
 class Regeringen(SwedishLegalSource):
     DS = 1
@@ -448,7 +410,7 @@ class Regeringen(SwedishLegalSource):
                    self.SO: "%s %s:%s"}
         
         try: 
-            parts = re.split("[\.:/ ]+", identifier)
+            parts = re.split("[\.:/ ]+", identifier.strip())
             return pattern[self.document_type] % tuple(parts)
         except:
             self.log.warning("Couldn't sanitize identifier %s" % identifier)
@@ -472,241 +434,9 @@ class Regeringen(SwedishLegalSource):
         pdf.read(pdffile, intermediatedir)
         return pdf
 
-    # this glues together textboxes in a smart way
-    def iter_textboxes(self, pdf):
-        textbox = None
-        prevbox = None
-        for page in pdf:
-            yield page # will include all raw textbox objects -- should possibly be shallow-cloned
-            for nextbox in page:
-                linespacing = int(nextbox.getfont()['size']) / 2
-                parindent = int(nextbox.getfont()['size'])
-                if (textbox and
-                    textbox.getfont()['size'] == nextbox.getfont()['size'] and
-                    textbox.getfont()['family'] == nextbox.getfont()['family'] and
-                    textbox.top + textbox.height + linespacing > nextbox.top and
-                    ((prevbox.top + prevbox.height == nextbox.top + nextbox.height) or # compare baseline, not topline
-                     (prevbox.left == nextbox.left) or
-                     (parindent * 2 >= (prevbox.left - nextbox.left) >= parindent)
-                     )):
-                    textbox += nextbox
-                else:
-                    # print("Yielding new: %s %s" % (repr(textbox), repr(nextbox)))
-                    if textbox:
-                        yield textbox
-                    textbox = nextbox
-                prevbox = nextbox
-            # before every new page, flush existing textbox (glueing
-            # textboxes together across pages is harder bc .top can be
-            # anywhere)
-            if textbox:
-                yield textbox
-                textbox = None
-
-
-    @staticmethod
-    def get_parser(basefile="0", metrics={}):
-        # a mutable variable, which is accessible from the nested
-        # functions
-        state = {'pageno': 0,
-                 'appendixno': None}
-                   
-        def is_pagebreak(parser):
-            return isinstance(parser.reader.peek(), Page)
-        
-        # page numbers, headings.
-        def is_nonessential(parser):
-            chunk = parser.reader.peek()
-            if chunk.top > metrics['footer']:
-                return True  # page numbers
-            if (int(chunk.getfont()['size']) <= metrics['textsize'] and
-                    (chunk.left < metrics['leftmargin'] or chunk.left > metrics['rightmargin']) and
-                (15 <= len(str(chunk)) <= 29)): # matches both "Prop. 2013/14:1" and "Prop. 1999/2000:123 Bilaga 12"
-                return True
-                
-        def is_preamblesection(parser):
-            chunk = parser.reader.peek()
-            txt = str(chunk).strip()
-            fontsize = int(chunk.getfont()['size'])
-            if not metrics['subheadingsize'] <= fontsize <= metrics['headingsize']:
-                return False
-
-            for validheading in ('Propositionens huvudsakliga innehåll',
-                                 'Innehållsförteckning',
-                                 'Till statsrådet',
-                                 'Innehåll',
-                                 'Sammanfattning'):
-                if txt.startswith(validheading):
-                    return True
-
-        def is_section(parser):
-            (ordinal, title) = analyze_sectionstart(parser)
-            if ordinal:
-                return ordinal.count(".") == 0
-
-        def is_subsection(parser):
-            (ordinal, title) = analyze_sectionstart(parser)
-            if ordinal:
-                return ordinal.count(".") == 1
-                
-        def is_unorderedsection(parser):
-            # Subsections in "Författningskommentar" sections are
-            # not always numbered. As a backup, check font size and family as well
-            chunk = parser.reader.peek()
-            return (int(chunk.getfont()['size']) == metrics['subheadingsize'] and
-                    chunk.getfont()['family'] == metrics['subheadingfamily'])
-
-        def is_subsubsection(parser):
-            (ordinal, title) = analyze_sectionstart(parser)
-            if ordinal:
-                return ordinal.count(".") == 2
-
-        def is_appendix(parser):
-            chunk = parser.reader.peek()
-            txt = str(chunk).strip()
-            if (chunk.getfont()['size'] == metrics['headingsize'] and txt.startswith("Bilaga ")):
-                return True
-            elif (int(chunk.getfont()['size']) == metrics['textsize'] and
-                  (chunk.left < metrics['leftmargin'] or
-                   chunk.left > metrics['rightmargin'])):
-                if len(chunk) > 1 and chunk[1].startswith("Bilaga "):
-                    # note: we need to check wether the appendix
-                    # ordinal ISN'T the same as an appendix number
-                    # we're already dealing with
-                    ordinal = int(re.search("Bilaga (\d)", str(chunk)).group(1))
-                    if ordinal != state['appendixno']:
-                        return True
-
-        def is_paragraph(parser):
-            return True
-
-        def make_body(parser):
-            return p.make_children(Body())
-        setattr(make_body, 'newstate', 'body')
-
-        def make_paragraph(parser):
-            # if "Regeringen beslutade den 8 april 2010 att" in str(parser.reader.peek()):
-            #     raise ValueError("OK DONE")
-            return parser.reader.next()
-
-        def make_preamblesection(parser):
-            s = PreambleSection(title=str(parser.reader.next()).strip())
-            if s.title == "Innehållsförteckning":
-                parser.make_children(s) # throw away
-                return None
-            else:
-                return parser.make_children(s)
-        setattr(make_preamblesection, 'newstate', 'preamblesection')
-
-
-        def make_unorderedsection(parser):
-            s = UnorderedSection(title=str(parser.reader.next()).strip())
-            return parser.make_children(s)
-        setattr(make_unorderedsection, 'newstate', 'unorderedsection')
-
-        def make_appendix(parser):
-            # now, an appendix can begin with either the actual
-            # headline-like title, or by the sidenote in the
-            # margin. Find out which it is, and plan accordingly.
-            done = False
-            while not done:
-                chunk = parser.reader.next()
-                if isinstance(chunk, Page):
-                    continue
-                m = re.search("Bilaga (\d)", str(chunk))
-                if m:
-                    state['appendixno'] = int(m.group(1))
-                if int(chunk.getfont()['size']) >= metrics['subheadingsize']:
-                    done = True
-            s = Appendix(title=str(chunk).strip(),
-                         ordinal=str(state['appendixno']),
-                         uri=None)
-            return parser.make_children(s)
-        setattr(make_appendix, 'newstate', 'appendix')
-
-        # this is used for subsections and subsubsections as well --
-        # probably wont work due to the newstate property
-        def make_section(parser):
-            ordinal, title = analyze_sectionstart(parser, parser.reader.next())
-            if ordinal:
-                identifier = "Prop. %s, avsnitt %s" % (basefile, ordinal)
-                s = Section(ordinal=ordinal, title=title)
-            else:
-                s = Section(title=str(title))
-            return parser.make_children(s)
-        setattr(make_section, 'newstate', 'section')
-
-        def skip_nonessential(parser):
-            parser.reader.next()
-            return None
-
-        def skip_pagebreak(parser):
-            # increment pageno
-            state['pageno'] += 1
-            parser.reader.next()
-            return None
-            
-        re_sectionstart = re.compile("^(\d[\.\d]*) +(.*[^\.])$").match
-        def analyze_sectionstart(parser, textbox=None):
-            if not textbox:
-                textbox = parser.reader.peek()
-            if not (metrics['headingsize'] >= int(textbox.getfont()['size']) >= metrics['subsubheadingsize']):
-                return (None, textbox)
-            txt = str(textbox)
-            m = re_sectionstart(txt)
-            if m:
-                ordinal = m.group(1).rstrip(".")
-                title = m.group(2)
-                return (ordinal, title.strip())
-            else:
-                return (None, textbox)
-
-        p = FSMParser()
-
-        p.set_recognizers(is_pagebreak,
-                          is_appendix,
-                          is_nonessential,
-                          is_section,
-                          is_subsection,
-                          is_subsubsection,
-                          is_preamblesection,
-                          is_unorderedsection,
-                          is_paragraph)
-        commonstates = ("body","preamblesection","section", "subsection", "unorderedsection", "subsubsection", "appendix")
-        p.set_transitions({(commonstates, is_nonessential): (skip_nonessential, None),
-                           (commonstates, is_pagebreak): (skip_pagebreak, None),
-                           (commonstates, is_unorderedsection): (make_unorderedsection, "unorderedsection"),
-                           (commonstates, is_paragraph): (make_paragraph, None),
-                           ("body", is_preamblesection): (make_preamblesection, "preamblesection"),
-                           ("preamblesection", is_preamblesection): (False, None),
-                           ("preamblesection", is_section): (False, None),
-                           ("body", is_section): (make_section, "section"),
-                           ("section", is_section): (False, None),
-                           ("section", is_subsection): (make_section, "subsection"),
-                           ("unorderedsection", is_preamblesection): (False, None),
-                           ("unorderedsection", is_unorderedsection): (False, None),
-                           ("unorderedsection", is_section): (False, None),
-                           ("unorderedsection", is_appendix): (False, None),
-                           ("subsection", is_subsection): (False, None),
-                           ("subsection", is_section): (False, None),
-                           ("subsection", is_subsubsection): (make_section, "subsubsection"),
-                           ("subsubsection", is_subsubsection): (False, None),
-                           ("subsubsection", is_subsection): (False, None),
-                           ("subsubsection", is_section): (False, None),
-                           ("body", is_appendix): (make_appendix, "appendix"),
-                           (("appendix","subsubsection", "subsection", "section"), is_appendix):
-                           (False, None)
-                           })
-
-        p.initial_state = "body"
-        p.initial_constructor = make_body
-
-        return p
                 
     def parse_pdfs(self, basefile, pdffiles):
-        
         body = None
-
         for pdffile in pdffiles:
             pdf_path = self.store.downloaded_path(basefile, attachment=pdffile)
             intermediate_path = self.store.intermediate_path(basefile, attachment=pdffile)
@@ -727,7 +457,7 @@ class Regeringen(SwedishLegalSource):
                 pageidx = 0
                 sf = 2/3.0 # scaling factor
                 dirty = False
-                for tb in self.iter_textboxes(pdf):
+                for tb in offtryck_textboxiter(pdf):
                     if isinstance(tb, Page):
                         if dirty:
                             can.save()
@@ -767,41 +497,21 @@ class Regeringen(SwedishLegalSource):
                 print("wrote %s" % outputfile)
                 return pdf
             else: # not debug
-   
-                # FIXME: we should probably initialize the parser with
-                # dct:identifier instead of doc.basefile. Or maybe a metrics
-                # dict.
-
                 if self.document_type == self.PROPOSITION:
-                    metrics = {'footer': 920,
-                               'leftmargin': 160,
-                               'rightmargin': 628,
-                               'headingsize': 20,
-                               'subheadingsize': 17,
-                               'subheadingfamily': 'Times New Roman',
-                               'subsubheadingsize': 15,
-                               'textsize': 13}
+                    preset = 'proposition'
+                elif self.document_type == self.SOU:
+                    preset = 'sou'
                 else:
-                    metrics = {'header': 49, # or rather 49 + 15
-                               'footer': 940,
-                               'leftmargin': 84,
-                               'rightmargin': 813,
-                               'titlesize': 41,
-                               'headingsize': 26,
-                               'subheadingsize': 16,
-                               'subheadingfamily': 'TradeGothic,Bold',
-                               'subsubheadingsize': 14,
-                               'textsize': 14
-                               }
-                parser = self.get_parser(basefile, metrics)
+                    preset = 'default'
+                parser = offtryck_parser(preset=preset)
+                # self.config.debug = True
                 if hasattr(self.config, 'debug'):
                     parser.debug = self.config.debug 
-                body = parser.parse(self.iter_textboxes(pdf))
+                body = parser.parse(offtryck_textboxiter(pdf))
                 pdf[:] = body[:]
                 pdf.tagname = "body"
         return pdf
 
-        
 
     def create_external_resources(self, doc):
         """Optionally create external files that go together with the

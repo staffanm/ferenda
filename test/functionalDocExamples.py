@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import unicode_literals, print_function
 
 import sys
 import os
@@ -143,8 +143,8 @@ class Examples(unittest.TestCase, FerendaTestCase):
                     # available for a non-installed ferenda source checkout
                     if self.verbose:
                         print("Running '%s'" % cmdline,
-                              end=" ... ",
-                              flush=True)
+                              end=" ... ")
+                        sys.stdout.flush()
                     if cmdline.startswith("ferenda-setup"):
                         cmdline = cmdline.replace("ferenda-setup",
                                                   ferenda_setup)

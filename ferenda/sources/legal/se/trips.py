@@ -118,3 +118,8 @@ class Trips(SwedishLegalSource):
         return self.document_url_template % {'basefile': quote(basefile),
                                              'app': self.app,
                                              'base': self.base}
+    def canonical_uri(self, basefile):
+        seg = {'dir': 'dir',
+               'prop': 'prop',
+               'sfst': 'sfs'}
+        return self.config.url + "res/%s/%s" % (seg[self.app], basefile)

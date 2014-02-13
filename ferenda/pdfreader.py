@@ -136,11 +136,13 @@ class PDFReader(CompoundElement):
                             # print "Grandchildren handling: %s '%s' '%s'" % (len(grandchildren),
                             #                                                child.text,
                             #                                                child.tail)
-                            assert (len(grandchildren) == 1), "General grandchildren not supported"
+                            # Handle '<text><i><b>Fordonsår</b>            <b>Faktor</b> </i></text>'
+                            # assert (len(grandchildren) == 1), "General grandchildren not supported"
+                            
                             if child.text:
                                 b.append(Textelement(txt(child.text), tag=child.tag))
                             b.append(Textelement(
-                                txt(grandchildren[0].text), tag="ib"))
+                                txt(" ".join([x.text for x in grandchildren])), tag="ib"))
                             if child.tail:
                                 b.append(Textelement(txt(child.tail), tag=None))
                         else:

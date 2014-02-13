@@ -39,10 +39,14 @@ class DocumentRemovedError(Exception):
 
 
 class PatchError(ParseError):
+    """Raised if a patch cannot be applied by
+:py:meth:`~ferenda.DocumentRepository.patch_if_needed`."""
 
-    """Raised if a patch cannot be applied by :py:meth:`~ferenda.DocumentRepository.patch_if_needed`."""
-
-
+class NoDownloadedFileError(ParseError):
+    """Raised on an attempt to parse a basefile for which there doesn't
+exist a downloaded file.""" 
+    
+    
 class AttachmentNameError(ValueError):
 
     """Raised whenever an invalid attachment name is used with any method

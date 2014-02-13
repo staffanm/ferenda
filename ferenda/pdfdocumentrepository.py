@@ -22,7 +22,8 @@ class PDFDocumentRepository(DocumentRepository):
     def parse(self, doc):
         reader = self.pdfreader_from_basefile(doc.basefile)
         self.parse_from_pdfreader(reader, doc)
-        return doc
+        # return doc
+        return True
 
     def pdfreader_from_basefile(self, basefile):
         pdffile = self.store.downloaded_path(basefile)

@@ -321,9 +321,10 @@ class DocumentStore(object):
         """
 
         basedir = self.datadir
-        pathfrag = self.pathfrag_to_basefile(basefile)
+        # pathfrag = self.pathfrag_to_basefile(basefile) # that can't be right?
+        pathfrag = self.basefile_to_pathfrag(basefile)
         if version:
-            v_pathfrag = self.pathfrag_to_basefile(version)
+            v_pathfrag = self.basefile_to_pathfrag(version)
             directory = os.sep.join((basedir, "archive", action, pathfrag, v_pathfrag))
         else:
             directory = os.sep.join((basedir, action, pathfrag))

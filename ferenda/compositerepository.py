@@ -23,7 +23,6 @@ class CompositeStore(DocumentStore):
             basedir = self.datadir
         if action == "parse":
             documents = set()
-            # assert self.docrepo_instances, "No docrepos are defined!"
             for cls, inst in self.docrepo_instances.items():
                 for basefile in inst.store.list_basefiles_for("parse"):
                     if basefile not in documents:
@@ -115,10 +114,13 @@ class CompositeRepository(DocumentRepository):
             for c in self.subrepos:
                 inst = self.get_instance(c, self.myoptions)
                 try:
-                    # each parse method should be smart about whether to re-parse
-                    # or not (i.e. use the @managedparsing decorator)
+                    # each parse method should be smart about whether
+                    # to re-parse or not (i.e. use the @managedparsing
+                    # decorator)
                     ret = inst.parse(basefile)
-                except errors.ParseError:  # or others
+
+                except Exception as e: # Any error thrown (errors.ParseError or something else) means we try next subrepo
+                    self.log.debug("%s: parse with %s failed: %s" % (basefile, inst.qualified_class_name(), str(e)))
                     ret = False
                 if ret:
                     break

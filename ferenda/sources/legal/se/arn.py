@@ -110,6 +110,7 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
         # find out if we have a .pdf or a .doc (possibly .wpd?)
         type = self.guess_type
         self.parse_from_pdf(self, doc, "...")
+        return True
 
     def parse_from_pdf(self, pdfreader, doc):
         pass

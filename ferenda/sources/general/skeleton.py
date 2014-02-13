@@ -132,6 +132,7 @@ class Skeleton(DocumentRepository):
                         fp.write(skel.serialize(format="pretty-xml"))
 
                     self.log.info("Created skel for %s" % o)
+        return True
 
     # FIXME: Move this to SwedishLegalSource -- also unify
     # triples_from_uri with SwedishLegalSource.infer_triples(basefile)

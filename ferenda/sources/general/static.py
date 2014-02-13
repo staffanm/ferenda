@@ -102,6 +102,7 @@ class Static(DocumentRepository):
             doc.meta.add((URIRef(doc.uri), self.ns['dct'].title, Literal(str(root[0]), doc.lang)))
             root.pop(0)
         doc.body = root
+        return True
 
     # converts a tree of docutils.nodes into ferenda.elements
     def _transform(self, node, stack):

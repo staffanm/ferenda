@@ -811,6 +811,7 @@ with the *config* object as single parameter.
         soup = self.soup_from_basefile(doc.basefile, self.source_encoding)
         self.parse_metadata_from_soup(soup, doc)
         self.parse_document_from_soup(soup, doc)
+        return True  # Signals that everything is OK
 
     def soup_from_basefile(self, basefile, encoding='utf-8', parser='lxml'):
         """
@@ -827,6 +828,8 @@ with the *config* object as single parameter.
            Helper function. You probably don't need to override it.
         """
         filename = self.store.downloaded_path(basefile)
+        if not os.path.exists(filename):
+            raise errors.NoDownloadedFileError("File '%s' not found" % filename)
         with codecs.open(filename, encoding=encoding, errors='replace') as fp:
             soup = bs4.BeautifulSoup(fp.read(), parser)
         return soup

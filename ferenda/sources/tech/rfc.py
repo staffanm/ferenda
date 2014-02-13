@@ -490,6 +490,7 @@ class RFC(DocumentRepository):
         # self.decorate_bodyparts(doc.body,doc.uri)
         if self.config.fsmdebug:
             print(serialize(doc.body))
+        return True
 
     def cleanup_body(self, part):
         shorttitle = None

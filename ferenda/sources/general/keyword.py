@@ -135,7 +135,6 @@ class Keyword(DocumentRepository):
         with self.store.open_downloaded(doc.basefile) as fp:
             termsets = fp.readlines()
 
-        # FIXME: translate this to ferenda.elements, set doc.body to it
         root = etree.Element("html")
         root.set("xml:base", baseuri)
         root.set("xmlns", 'http://www.w3.org/2002/06/xhtml2/')
@@ -160,7 +159,10 @@ class Keyword(DocumentRepository):
             a.attrib['href'] = 'http://sv.wikipedia.org/'
             a.text = 'svenska Wikipedia'
 
-        return etree.tostring(root, encoding='utf-8')
+        # FIXME: translate this to ferenda.elements, set doc.body to it
+        doc.body = etree.tostring(root, encoding='utf-8')
+        return True
+        
 
     re_tagstrip = re.compile(r'<[^>]*>')
 

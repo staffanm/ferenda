@@ -10,7 +10,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from ferenda.describer import Describer
-from ferenda import util
+from ferenda import util, errors
 from ferenda.decorators import managedparsing, downloadmax
 from . import SwedishLegalSource
 from ferenda.elements import Paragraph
@@ -154,23 +154,31 @@ class Riksdagen(SwedishLegalSource):
 
     @managedparsing
     def parse(self, doc):
-        doc.uri = self.canonical_uri(doc.basefile)
-        self.log.debug("Set URI to %s (from %s)" % (doc.uri, doc.basefile))
-        d = Describer(doc.meta, doc.uri)
-        d.rdftype(self.rdf_type)
-        d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-        self.infer_triples(d, doc.basefile)
+        filename = self.store.downloaded_path(doc.basefile)
+        if not os.path.exists(filename):
+            raise errors.NoDownloadedFileError("File '%s' not found" % filename)
         htmlfile = self.store.path(doc.basefile, 'downloaded', '.html')
+        # note that we never use the PDF file -- it would usually be
+        # the same as the PDF available from eg PropPolo
         pdffile = self.store.path(doc.basefile, 'downloaded', '.pdf')
         self.log.debug("Loading soup from %s" % htmlfile)
         soup = BeautifulSoup(
             codecs.open(
                 htmlfile, encoding='iso-8859-1', errors='replace').read(),
             )
+        doc.uri = self.canonical_uri(doc.basefile)
+        self.log.debug("Set URI to %s (from %s)" % (doc.uri, doc.basefile))
+        d = Describer(doc.meta, doc.uri)
+        d.rdftype(self.rdf_type)
+        d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
+        xsoup = BeautifulSoup(open(self.store.downloaded_path(doc.basefile)).read(), "xml")
+        d.value(self.ns['dct'].title, xsoup.dokument.titel.text, lang="sv")
         self.parse_from_soup(soup, doc)
+        self.infer_triples(d, doc.basefile)
+        return True
 
     def parse_from_soup(self, soup, doc):
-        for block in soup.findAll(['div', 'p']):
+        for block in soup.findAll(['div', 'p', 'span']):
             t = util.normalize_space(''.join(block.findAll(text=True)))
             block.extract()  # to avoid seeing it again
             if t:
@@ -179,4 +187,4 @@ class Riksdagen(SwedishLegalSource):
     def canonical_uri(self, basefile):
         seg = {self.ns['rpubl'].Proposition: "prop",
                self.ns['rpubl'].Skrivelse: "skr"}
-        return self.config.url + "publ/%s/%s" % (seg[self.rdf_type], basefile)
+        return self.config.url + "res/%s/%s" % (seg[self.rdf_type], basefile)
