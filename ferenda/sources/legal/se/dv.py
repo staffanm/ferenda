@@ -128,6 +128,7 @@ class DV(SwedishLegalSource):
     rdf_type = RPUBL.Rattsfallsreferat
     documentstore_class = DVStore
     namespaces = ('rdf',  # always needed
+                  'xsi',  # XML Schema/RDFa validation
                   'dct',  # title, identifier, etc
                   'xsd',  # datatypes
                   'owl',  # : sameAs

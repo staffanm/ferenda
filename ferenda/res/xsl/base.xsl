@@ -20,6 +20,9 @@
 	      encoding='utf-8'
 	      indent="yes"/>
 
+
+
+
   <xsl:template match="/">
     <!-- this is a ugly workaround required to get the proper html5
          doctype *and* the pre-rootnode conditional IE comments needed

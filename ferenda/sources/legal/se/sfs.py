@@ -156,7 +156,7 @@ class UpphavtKapitel(UnicodeElement, OrdinalElement):
 
 class Kapitel(CompoundElement, OrdinalElement):
     fragment_label = "K"
-    dagname = "div"
+    tagname = "div"
     typeof = "rpubl:Kapitel"  # FIXME: This is qname string, not
                              # rdflib.URIRef (which would be better),
                              # since as_xhtml doesn't have access to
@@ -2821,13 +2821,16 @@ class SFS(Trips):
 
     @classmethod
     def relate_all_setup(cls, config):
-        cls._build_mini_rdf()
+        cls._build_mini_rdf(config)
 
     @classmethod
     def _build_mini_rdf(cls, config):
         # the resulting file contains one triple for each law text
         # that has comments (should this be in Wiki.py instead?
         termdir = os.path.sep.join([config.datadir, 'wiki', 'parsed', 'SFS'])
+        if not os.path.exists(termdir):
+            # self.log.warning("termdir %s doesn't exists, is the Wiki repo enabled?")
+            return 
         minixmlfile = os.path.sep.join(
             [config.datadir, cls.alias, 'parsed', 'rdf-mini.xml'])
         files = list(util.list_dirs(termdir, ".xht2"))

@@ -167,6 +167,7 @@ class Riksdagen(SwedishLegalSource):
                 htmlfile, encoding='iso-8859-1', errors='replace').read(),
             )
         doc.uri = self.canonical_uri(doc.basefile)
+        doc.lang = "sv"
         self.log.debug("Set URI to %s (from %s)" % (doc.uri, doc.basefile))
         d = Describer(doc.meta, doc.uri)
         d.rdftype(self.rdf_type)

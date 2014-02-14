@@ -21,6 +21,10 @@ It's a generic template for paged content (assumes a bunch of <div class="pdfpag
   <xsl:template name="metarobots"><xsl:comment>Robot metatag goes here</xsl:comment></xsl:template>
   <xsl:template name="linkalternate"><xsl:comment>Alternate link(s)</xsl:comment></xsl:template>
   <xsl:template name="headmetadata"><xsl:comment>headmetadata?</xsl:comment></xsl:template>
+  <xsl:template name="bodyclass">generic</xsl:template>
+  <xsl:template name="pagetitle">
+    <h1><xsl:value-of select="../xhtml:head/xhtml:title"/></h1>
+  </xsl:template>
       
 
   <xsl:template match="xhtml:a">
@@ -56,6 +60,9 @@ It's a generic template for paged content (assumes a bunch of <div class="pdfpag
   <xsl:template match="xhtml:div[@class='pdfpage']" mode="toc">
     <li><a href="#{@id}"><xsl:value-of select="@id"/></a></li>
   </xsl:template>
+
+  <!-- toc handling (do nothing) -->
+  <xsl:template match="@*|node()" mode="toc"/>
   
 </xsl:stylesheet>
 

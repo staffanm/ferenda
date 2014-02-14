@@ -16,21 +16,18 @@ hierarchies to and from strings.
 
 """
 from __future__ import unicode_literals
-
-import datetime
-import re
-import sys
-import logging
+from operator import itemgetter
 import ast
+import datetime
+import json
+import logging
+import re
 import xml.etree.cElementTree as ET
 
 from lxml.builder import ElementMaker
-from operator import itemgetter
-
-import six
-from six import text_type as str
-from six import binary_type as bytes
 from rdflib import Graph, Namespace, Literal, URIRef
+from six import binary_type as bytes
+from six import text_type as str
 import pyparsing
 
 from ferenda import util
@@ -42,14 +39,20 @@ log = logging.getLogger(__name__)
 E = ElementMaker(namespace="http://www.w3.org/1999/xhtml",
                  nsmap={None: "http://www.w3.org/1999/xhtml"})
 
-def serialize(root):
+def serialize(root, format="xml"):
     """Given any :py:class:`~ferenda.elements.AbstractElement` *root*
     object, returns a XML serialization of *root*, recursively.
 
     """
-    t = __serializeNode(root)
-    _indentTree(t)
-    return ET.tostring(t, 'utf-8').decode('utf-8') + "\n"
+    from pudb import set_trace; set_trace()
+    t = __serializeNode(root, format=format)
+    if format == "xml":
+        _indentTree(t)
+        return ET.tostring(t, 'utf-8').decode('utf-8') + "\n"
+    elif format == "json":
+        return json.dumps(t, indent=4)
+    else:
+        raise ValueError("Invalid serialization format: %s" % format)
 
 
 def deserialize(xmlstr, caller_globals):
@@ -510,14 +513,17 @@ class ListItem(CompoundElement, OrdinalElement):
     tagname = 'li'
 
 
-def __serializeNode(node, serialize_hidden_attrs=False):
+def __serializeNode(node, serialize_hidden_attrs=False, format="xml"):
     # print "serializing: %r" % node
 
     # Special handling of pyparsing.ParseResults -- deserializing of
     # these won't work (easily)
     if isinstance(node, pyparsing.ParseResults):
-        xml = util.parseresults_as_xml(node)
-        return ET.XML(xml)
+        if format == "xml":
+            xml = util.parseresults_as_xml(node)
+            return ET.XML(xml)
+        elif format == "json":
+            raise ValueError("Cannot format a pyparsing.ParseResults object as JSON")
 
     # We use type() instead of isinstance() because we want to
     # serialize str derived types using their correct class names
@@ -527,31 +533,57 @@ def __serializeNode(node, serialize_hidden_attrs=False):
         nodename = "bytes"
     else:
         nodename = node.__class__.__name__
-    e = ET.Element(nodename)
+    
+    if node.__class__.__module__ in ("__main__", "__builtin__"):
+        fullnodename = nodename
+    else:
+        fullnodename = node.__class__.__module__ + "." + nodename
+        
+
+    if format == "xml":
+        e = ET.Element(nodename)
+    elif format == "json":
+        e = {'@type': fullnodename,
+             '@content':[]}
+
+    ret = None
+    if format == "xml":
+        addchild = e.append
+        setkey = e.set
+    elif format == "json":
+        addchild = e['@content'].append
+        setkey = e.__setitem__
+        
     if hasattr(node, '__dict__'):
         for key in [x for x in list(node.__dict__.keys()) if serialize_hidden_attrs or not x.startswith('_')]:
             val = node.__dict__[key]
             if val is None:
                 continue
             if (isinstance(val, (str,bytes))):
-                e.set(key, val)
+                setkey(key, val)
             else:
-                e.set(key, repr(val))
+                setkey(key, repr(val))
 
-    if isinstance(node, str):
-        if node:
-            e.text = str(node)
-    elif isinstance(node, bytes):
-        if node:
-            e.text = node.decode()
+                
+    if isinstance(node, (str, bytes)):
+        if isinstance(node, bytes):
+            node = node.decode()
+        if format == "xml":
+            e.text = node
+        elif format == "json":
+            return node
     elif isinstance(node, int):
-        e.text = str(node)
+        if format=="xml":
+            node = str(node)
+            e.text = node
+        elif format == "json":
+            return node
+
     elif isinstance(node, list):
         for x in node:
-            e.append(__serializeNode(x))
+            addchild(__serializeNode(x, format=format))
     else:
         e.text = repr(node)
-        # raise TypeError("Can't serialize %r (%r)" % (type(node), node))
     return e
 
 def __deserializeNode(elem, caller_globals):

@@ -89,7 +89,7 @@ class SwedishLegalStore(DocumentStore):
 class SwedishLegalSource(DocumentRepository):
     documentstore_class = SwedishLegalStore
     namespaces = ['rdf', 'rdfs', 'xsd', 'dct', 'skos', 'foaf',
-                  'xhv', 'owl', 'prov', 'bibo',
+                  'xhv', 'xsi', 'owl', 'prov', 'bibo',
                   ('rpubl', 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#'),
                   ('rinfoex', 'http://lagen.nu/terms#')]
 
