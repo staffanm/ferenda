@@ -33,7 +33,11 @@ class Repo(RepoTester):
                 shutil.rmtree(targetdir)
             shutil.copytree("test/files/pdfreader/intermediate",
                             targetdir)
-            self.repo.parse("sample")
+            try:
+                self.repo.parse("sample")
+            except errors.ExternalCommandError as e:
+                print("ExternalCommandError on rerun.\n    targetdir: %s\n    %s exists: %s\n    message: %s" %
+                      (targetdir, targetdir+"/index.xml", os.path.exists(targetdir+"/index.xml"), e))
             # print("Workaround succeeded: %s" % os.path.exists(targetdir+"/index.xml"))
         
         p = self.repo.store.datadir

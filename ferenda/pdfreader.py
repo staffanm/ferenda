@@ -82,6 +82,8 @@ class PDFReader(CompoundElement):
             # support the fullfontname flag) it still uses returncode
             # 0! Only way to know if it failed is to inspect stderr
             if stderr:
+                print("pdfreader: Probable flag failure.\n    pdffile: %s\n    xmlfile: %s (%s)" %
+                      (pdffile, xmlfile, os.path.exists(xmlfile)))
                 raise errors.ExternalCommandError(stderr)
         return self._parse_xml(xmlfile)
 
