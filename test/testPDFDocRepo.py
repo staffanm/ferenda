@@ -33,6 +33,10 @@ class Repo(RepoTester):
                 shutil.rmtree(targetdir)
             shutil.copytree("test/files/pdfreader/intermediate",
                             targetdir)
+            # make really sure  the xml file has a newer timestamp than the PDF
+            from time import sleep
+            sleep(0.01)
+            os.utime(targetdir+"/index.xml")
             try:
                 self.repo.parse("sample")
             except errors.ExternalCommandError as e:
