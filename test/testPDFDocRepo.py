@@ -36,7 +36,7 @@ class Repo(RepoTester):
             # make really sure  the xml file has a newer timestamp than the PDF
             from time import sleep
             sleep(0.01)
-            os.utime(targetdir+"/index.xml")
+            os.utime(targetdir+"/index.xml", None)
             try:
                 self.repo.parse("sample")
             except errors.ExternalCommandError as e:
