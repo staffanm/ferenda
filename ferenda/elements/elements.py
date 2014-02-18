@@ -22,7 +22,9 @@ import datetime
 import json
 import logging
 import re
+import inspect
 import xml.etree.cElementTree as ET
+import sys
 
 from lxml.builder import ElementMaker
 from rdflib import Graph, Namespace, Literal, URIRef
@@ -44,18 +46,21 @@ def serialize(root, format="xml"):
     object, returns a XML serialization of *root*, recursively.
 
     """
-    from pudb import set_trace; set_trace()
-    t = __serializeNode(root, format=format)
     if format == "xml":
+        t = __serialize_xml(root)
         _indentTree(t)
         return ET.tostring(t, 'utf-8').decode('utf-8') + "\n"
     elif format == "json":
-        return json.dumps(t, indent=4)
+        t = __serialize_json(root)
+        r = json.dumps(t, indent=4)
+        if isinstance(r, bytes): 
+            r = r.decode() # should be pure ascii since ensure_ascii is True
+        return r
     else:
         raise ValueError("Invalid serialization format: %s" % format)
 
 
-def deserialize(xmlstr, caller_globals):
+def deserialize(xmlstr, format="xml", caller_globals=None):
     """Given a XML string created by :py:func:`serialize`, returns a
     object tree of :py:class:`AbstractElement` derived objects that is
     identical to the initial object structure.
@@ -70,10 +75,16 @@ def deserialize(xmlstr, caller_globals):
     # print "Callee globals()"
     # print repr(globals().keys())
     # print repr(locals().keys())
-    if (isinstance(xmlstr, str)):
-        xmlstr = xmlstr.encode('utf-8')
-    t = ET.fromstring(xmlstr)
-    return  __deserializeNode(t, caller_globals)
+    if format == "xml":
+        if (isinstance(xmlstr, str)):
+            xmlstr = xmlstr.encode('utf-8')
+        t = ET.fromstring(xmlstr)
+        return  __deserialize_xml(t, caller_globals)
+    elif format=="json":
+        root = json.loads(xmlstr)
+        t = __deserialize_json(root)
+        return t
+        
 
 
 class AbstractElement(object):
@@ -513,17 +524,126 @@ class ListItem(CompoundElement, OrdinalElement):
     tagname = 'li'
 
 
-def __serializeNode(node, serialize_hidden_attrs=False, format="xml"):
+def __serialize_json(node):
+    depth = len(inspect.stack()) - 15
+    # some native datatypes should be returned as-is, ie not wrapped
+    # in a dict. Note that types derived from these gets handled
+    # differently 
+    if type(node) in (str, int, bool):
+        return node
+    # lists and dicts gets returned as-is, but the values in those
+    # containers are transformed if need be
+    elif type(node) == list:
+        return [__serialize_json(x) for x in node]
+    elif type(node) == dict:
+        return dict([(k, __serialize_json(v)) for k,v in node.items()])
+    else:
+        if node.__class__.__module__ in ('builtins', '__builtin__'):
+            typename = node.__class__.__name__
+        else:
+            typename = node.__class__.__module__ + "." + node.__class__.__name__
+
+        e = {'@class': typename}
+        if hasattr(node, '__dict__'):
+            for key in [x for x in list(node.__dict__.keys()) if not x.startswith('_')]:
+                val = node.__dict__[key]
+                if val is None:
+                    continue
+                e[key] = __serialize_json(val)
+        if isinstance(node, list) or isinstance(node, tuple):
+            # convert derived list to plain list
+            e['@content'] = __serialize_json(list(node))
+        elif isinstance(node, dict):
+            # convert derived dict to plain dict
+            e['@content'] = __serialize_json(dict(node))
+        elif isinstance(node, bytes):
+            # assume that all bytestrings are ascii only. When this
+            # assumption does not hold, convert them into something
+            # like base64.
+            e['@content'] = node.decode()
+        elif isinstance(node, pyparsing.ParseResults):
+            e['name'] = node.getName()
+            e['@content'] = repr(node)
+        elif isinstance(node, Graph):
+            i = node.identifier
+            e['@content'] = node.serialize().decode('utf-8') # default compact RDF/XML
+            e['identifier'] = {'@class': i.__class__.__module__ + "." + i.__class__.__name__,
+                               '@content': str(i)}
+        else:
+            # if hasattr(node, '__json__'): ...
+            e['@content'] = repr(node)
+        return e
+
+def __deserialize_json(node):
+    nodetype = None
+    if hasattr(node, 'get'):
+        nodetype = node.get("@class")
+    # 1. get the appropriate class object
+    if nodetype:
+        try:
+            modulename, classname = nodetype.rsplit(".", 1)
+            __import__(modulename)
+            m = sys.modules[modulename]
+            for name, cls in inspect.getmembers(m, inspect.isclass):
+                if name == classname:
+                    break # setting cls to what we want
+        except ValueError: # "need more than 1 value to unpack": we have a builtin type like str, int, bool
+            cls = {'str':str,
+                   'int':int,
+                   'bool':bool,
+                   'bytes':bytes}[nodetype]
+        content = node['@content']
+    else:
+        # native objects (int, str, bool, list, dict (which is
+        # distinguishable from complex/derived objects by the absence
+        # of '@type'))
+        cls = node.__class__
+        content = node
+
+    # 2. get any possible attributes
+    attribs = {}
+    if hasattr(node, 'items'):
+        attribs = dict([(k,__deserialize_json(v)) for k, v in node.items() if not k.startswith("@")])
+
+
+    # 3. initialize the class
+    if issubclass(cls, list):
+        o = cls([__deserialize_json(x) for x in content], **attribs)
+    elif issubclass(cls, dict):
+        o = cls([(k, __deserialize_json(v)) for k,v in content.items()], **attribs)
+    elif issubclass(cls, bytes):
+        # assume only ascii
+        o = cls(content.encode(), **attribs)
+    elif issubclass(cls, datetime.date):
+        m = re.match(r'[\w\.]+\((\d+), (\d+), (\d+)\)', content)
+        o = cls(int(m.group(1)), int(m.group(2)), int(m.group(3)), **attribs)
+    elif issubclass(cls, pyparsing.ParseResults):
+        # attempt to reconstruct a pyparsing.ParseResult object from
+        # its repr() serialization. It's not 100 %, but good enough to
+        # be usable.
+        tocdict = ast.literal_eval(content)
+        o = cls([])
+        parent = None
+        accumNames = {}
+        name = node['name']
+        o.__setstate__((tocdict[0], (tocdict[1], parent, accumNames, name)))
+    elif issubclass(cls, Graph):
+        # first create the graph identifier (BNode or URIRef object)
+        i = __deserialize_json(node['identifier'])
+        o = cls(identifier=i).parse(data=content)
+    else:
+        o = cls(content, **attribs)
+    return o
+
+
+def __serialize_xml(node, serialize_hidden_attrs=False):
     # print "serializing: %r" % node
 
     # Special handling of pyparsing.ParseResults -- deserializing of
     # these won't work (easily)
     if isinstance(node, pyparsing.ParseResults):
-        if format == "xml":
-            xml = util.parseresults_as_xml(node)
-            return ET.XML(xml)
-        elif format == "json":
-            raise ValueError("Cannot format a pyparsing.ParseResults object as JSON")
+        xml = util.parseresults_as_xml(node)
+        return ET.XML(xml)
 
     # We use type() instead of isinstance() because we want to
     # serialize str derived types using their correct class names
@@ -533,60 +653,34 @@ def __serializeNode(node, serialize_hidden_attrs=False, format="xml"):
         nodename = "bytes"
     else:
         nodename = node.__class__.__name__
-    
-    if node.__class__.__module__ in ("__main__", "__builtin__"):
-        fullnodename = nodename
-    else:
-        fullnodename = node.__class__.__module__ + "." + nodename
-        
-
-    if format == "xml":
-        e = ET.Element(nodename)
-    elif format == "json":
-        e = {'@type': fullnodename,
-             '@content':[]}
-
-    ret = None
-    if format == "xml":
-        addchild = e.append
-        setkey = e.set
-    elif format == "json":
-        addchild = e['@content'].append
-        setkey = e.__setitem__
-        
+    e = ET.Element(nodename)
     if hasattr(node, '__dict__'):
         for key in [x for x in list(node.__dict__.keys()) if serialize_hidden_attrs or not x.startswith('_')]:
             val = node.__dict__[key]
             if val is None:
                 continue
             if (isinstance(val, (str,bytes))):
-                setkey(key, val)
+                e.set(key, val)
             else:
-                setkey(key, repr(val))
+                e.set(key, repr(val))
 
-                
-    if isinstance(node, (str, bytes)):
-        if isinstance(node, bytes):
-            node = node.decode()
-        if format == "xml":
-            e.text = node
-        elif format == "json":
-            return node
+    if isinstance(node, str):
+        if node:
+            e.text = str(node)
+    elif isinstance(node, bytes):
+        if node:
+            e.text = node.decode()
     elif isinstance(node, int):
-        if format=="xml":
-            node = str(node)
-            e.text = node
-        elif format == "json":
-            return node
-
+        e.text = str(node)
     elif isinstance(node, list):
         for x in node:
-            addchild(__serializeNode(x, format=format))
+            e.append(__serialize_xml(x))
     else:
         e.text = repr(node)
+        # raise TypeError("Can't serialize %r (%r)" % (type(node), node))
     return e
 
-def __deserializeNode(elem, caller_globals):
+def __deserialize_xml(elem, caller_globals):
     # print "element %r, attrs %r" % (elem.tag, elem.attrib)
     # kwargs = elem.attrib
 
@@ -628,7 +722,7 @@ def __deserializeNode(elem, caller_globals):
         c = cls(**elem.attrib)
         for subelem in elem:
             # print "Recursing"
-            c.append(__deserializeNode(subelem, caller_globals))
+            c.append(__deserialize_xml(subelem, caller_globals))
 
     return c
 

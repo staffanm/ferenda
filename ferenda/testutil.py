@@ -290,6 +290,9 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
 
     datadir = None
 
+    # this should be the only setting of maxDiff we need
+    maxDiff = None
+
     def setUp(self):
         self.datadir = tempfile.mkdtemp()
         self.repo = self.repoclass(datadir=self.datadir,

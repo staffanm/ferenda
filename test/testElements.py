@@ -6,18 +6,20 @@ from datetime import date
 from six import text_type as str
 from lxml import etree
 from bs4 import BeautifulSoup
-
+from rdflib import Graph
 from ferenda.compat import unittest
 
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 from ferenda.manager import setup_logger; setup_logger('CRITICAL')
-
+from ferenda.citationpatterns import url as urlparser
+from ferenda import util
 # SUT
 from ferenda.elements import serialize, deserialize, AbstractElement, UnicodeElement, CompoundElement, TemporalElement, OrdinalElement, PredicateElement, Body, Section, Paragraph, Link, html
 
 class Main(unittest.TestCase):
 
     def test_serialize_roundtrip(self):
+
         # Create a elements object tree
         tree = Body([Section([Paragraph(["Hello"]),
                               Paragraph(["World"])],
@@ -31,10 +33,37 @@ class Main(unittest.TestCase):
                              ordinal=2,
                              title="Native types")
                  ])
+        # roundtrip using the default XML format 
         serialized = serialize(tree)
         self.assertIsInstance(serialized, str)
-        newtree = deserialize(serialized, globals())
+        newtree = deserialize(serialized, caller_globals=globals())
         self.assertEqual(tree, newtree)
+
+        # make another section with special (but commonly used) types
+        # and try to roundtrip them. The XML serialization format does
+        # not support this.
+        graph = Graph().parse(data="""@prefix dct: <http://purl.org/dc/terms/> .
+
+<http://example.org/1> dct:title "Hello world"@en .
+""", format="turtle")
+        parseresult = urlparser.parseString("http://example.org/1")
+        tree.append(Section([parseresult,
+                             graph],
+                            meta=graph))
+        
+        # roundtrip using JSON (which uses fully qualified classnames,
+        # so we don't need to pass globals() into deserialize()
+        serialized = serialize(tree, format="json")
+        self.assertIsInstance(serialized, str)
+        newtree = deserialize(serialized, format="json")
+
+        # two pyparsing.ParseResult objects cannot be directly
+        # compared (they don't implement __eq__), therefore we compare
+        # their XML representations
+        tree[2][0] = util.parseresults_as_xml(tree[2][0])
+        newtree[2][0] = util.parseresults_as_xml(newtree[2][0])
+        self.assertEqual(tree, newtree)
+        
 
     def test_serialize_pyparsing(self):
         # these objects can't be roundtripped

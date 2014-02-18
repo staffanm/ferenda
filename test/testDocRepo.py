@@ -668,6 +668,9 @@ class Repo(RepoTester):
         want = """<html xmlns="http://www.w3.org/1999/xhtml"
                         xmlns:bibo="http://purl.org/ontology/bibo/"
                         xmlns:dct="http://purl.org/dc/terms/"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        version="XHTML+RDFa 1.1"
+                        xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd"        
                         xml:lang="en">
   <head about="http://localhost:8000/res/base/basefile"/>
   <body about="http://localhost:8000/res/base/basefile">
@@ -722,6 +725,9 @@ class Repo(RepoTester):
         want = """<html xmlns="http://www.w3.org/1999/xhtml"
                         xmlns:bibo="http://purl.org/ontology/bibo/"
                         xmlns:dct="http://purl.org/dc/terms/"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        version="XHTML+RDFa 1.1"
+                        xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd"        
                         xml:lang="en">
   <head about="http://localhost:8000/res/base/basefile"/>
   <body about="http://localhost:8000/res/base/basefile">
@@ -791,6 +797,9 @@ class Repo(RepoTester):
                         xmlns:bibo="http://purl.org/ontology/bibo/"
                         xmlns:owl="http://www.w3.org/2002/07/owl#"
                         xmlns:dct="http://purl.org/dc/terms/"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        version="XHTML+RDFa 1.1"
+                        xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd"        
                         xml:lang="en">
   <head about="http://localhost:8000/res/base/basefile"/>
   <body about="http://localhost:8000/res/base/basefile">
@@ -871,6 +880,9 @@ class Repo(RepoTester):
         want = """<html xmlns="http://www.w3.org/1999/xhtml"
                         xmlns:bibo="http://purl.org/ontology/bibo/"
                         xmlns:dct="http://purl.org/dc/terms/"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        version="XHTML+RDFa 1.1"
+                        xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd"        
                         xml:lang="en">
   <head about="http://localhost:8000/res/base/basefile"/>
   <body about="http://localhost:8000/res/base/basefile">
@@ -897,6 +909,9 @@ class Repo(RepoTester):
         want = """<html xmlns="http://www.w3.org/1999/xhtml"
                         xmlns:bibo="http://purl.org/ontology/bibo/"
                         xmlns:dct="http://purl.org/dc/terms/"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        version="XHTML+RDFa 1.1"
+                        xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd"        
                         xml:lang="en">
   <head about="http://localhost:8000/res/base/basefile"/>
   <body about="http://localhost:8000/res/base/basefile">Toplevel heading</body>
@@ -936,6 +951,9 @@ class Repo(RepoTester):
         self.repo.render_xhtml(doc, outfile)
         want = """<html xmlns="http://www.w3.org/1999/xhtml"
                         xmlns:bibo="http://purl.org/ontology/bibo/"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        version="XHTML+RDFa 1.1"
+                        xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd"        
                         xmlns:dct="http://purl.org/dc/terms/">
   <head about="http://localhost:8000/res/base/basefile">
     <link href="http://localhost:8000/people/fred" rel="dct:author"></link>
@@ -1646,7 +1664,7 @@ class TOC(RepoTester):
 
     def test_toc_query(self):
         # NOTE: this is also tested by a doctest
-        want = "PREFIX bibo: <http://purl.org/ontology/bibo/> PREFIX dct: <http://purl.org/dc/terms/> PREFIX foaf: <http://xmlns.com/foaf/0.1/> PREFIX owl: <http://www.w3.org/2002/07/owl#> PREFIX prov: <http://www.w3.org/ns/prov-o/> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX skos: <http://www.w3.org/2004/02/skos/core#> PREFIX xhv: <http://www.w3.org/1999/xhtml/vocab#> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> SELECT DISTINCT ?uri ?title ?issued FROM <http://example.org/ctx/base> WHERE {?uri rdf:type foaf:Document ; dct:title ?title . OPTIONAL { ?uri dct:issued ?issued . }  }"
+        want = "PREFIX bibo: <http://purl.org/ontology/bibo/> PREFIX dct: <http://purl.org/dc/terms/> PREFIX foaf: <http://xmlns.com/foaf/0.1/> PREFIX owl: <http://www.w3.org/2002/07/owl#> PREFIX prov: <http://www.w3.org/ns/prov-o/> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX skos: <http://www.w3.org/2004/02/skos/core#> PREFIX xhv: <http://www.w3.org/1999/xhtml/vocab#> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> PREFIX xsi: <http://www.w3.org/2001/XMLSchema-instance> SELECT DISTINCT ?uri ?title ?issued FROM <http://example.org/ctx/base> WHERE {?uri rdf:type foaf:Document ; dct:title ?title . OPTIONAL { ?uri dct:issued ?issued . }  }"
         self.assertEqual(want,
                          self.repo.toc_query("http://example.org/ctx/base"))
 
