@@ -55,7 +55,9 @@ class PDFReader(CompoundElement):
         xmlfile = os.sep.join(
             (workdir, os.path.splitext(basename)[0] + ".xml"))
 
+        print("looking for xml file at %s" % xmlfile)
         if not util.outfile_is_newer([pdffile], xmlfile):
+            print("%s did not exist, running pdftohtml" % xmlfile)
             tmppdffile = os.sep.join([workdir, basename])
             util.copy_if_different(pdffile, tmppdffile)
             # two pass coding: First use -c (complex) to extract
