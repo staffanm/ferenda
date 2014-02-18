@@ -9,7 +9,7 @@ from lxml import etree
 from six import text_type as str
 import six
 
-from ferenda import util
+from ferenda import util, errors
 from .elements import UnicodeElement
 from .elements import CompoundElement
 from .elements import OrdinalElement
@@ -72,10 +72,15 @@ class PDFReader(CompoundElement):
 
             # Without -fontfullname, all fonts are just reported as
             # having family="Times"...
-            cmd = "pdftohtml -nodrm -xml -fontfullname %s" % tmppdffile
+            cmd = "pdftohtml -nodrm -xml -fontfullnamex %s" % tmppdffile
             self.log.debug("Converting: %s" % cmd)
             (returncode, stdout, stderr) = util.runcmd(cmd,
                                                        require_success=True)
+            # if pdftohtml fails (if it's an old version that doesn't
+            # support the fullfontname flag) it still uses returncode
+            # 0! Only way to know if it failed is to inspect stderr
+            if stderr:
+                raise errors.ExternalCommandError(stderr)
         return self._parse_xml(xmlfile)
 
     # def set_background_path():

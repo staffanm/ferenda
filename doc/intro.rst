@@ -50,7 +50,7 @@ Command-line tools
    your ``$PATH``:
 
    * :py:class:`~ferenda.PDFReader` requires ``pdftotext`` and
-     ``pdftohtml`` (from `poppler <http://poppler.freedesktop.org/>`_)
+     ``pdftohtml`` (from `poppler <http://poppler.freedesktop.org/>`_, version 0.21 or newer)
      and ``convert`` (from `ImageMagick
      <http://www.imagemagick.org/>`_)
    * :py:class:`~ferenda.WordReader` requires `antiword
