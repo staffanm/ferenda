@@ -408,7 +408,8 @@ class DocumentStore(object):
         """
 
         for meth in (self.downloaded_path, self.documententry_path,
-                     self.parsed_path, self.distilled_path,
+                     self.parsed_path, self.serialized_path,
+                     self.distilled_path,
                      self.annotation_path, self.generated_path):
             # FIXME: what about intermediate? Ignore them as they
             # should be able to be regenerated at any time?
@@ -458,7 +459,7 @@ class DocumentStore(object):
         return self._open(filename, mode)
 
     def documententry_path(self, basefile, version=None):
-        """Get the full path for the documententry file for the given
+        """Get the full path for the documententry JSON file for the given
         basefile (and optionally archived version).
 
         :param basefile: The basefile for which to calculate the path
@@ -486,7 +487,7 @@ class DocumentStore(object):
         return self.path(basefile, 'intermediate', '.xml', version, attachment)
 
     def parsed_path(self, basefile, version=None, attachment=None):
-        """Get the full path for the parsed file for the given
+        """Get the full path for the parsed XHTML file for the given
         basefile.
 
         :param basefile: The basefile for which to calculate the path
@@ -511,6 +512,30 @@ class DocumentStore(object):
 
         """
         filename = self.parsed_path(basefile, version, attachment)
+        return self._open(filename, mode)
+
+    def serialized_path(self, basefile, version=None, attachment=None):
+        """Get the full path for the serialized JSON file for the given
+        basefile.
+
+        :param basefile: The basefile for which to calculate the path
+        :type  basefile: str
+        :param  version: Optional. The archived version id
+        :type   version: str
+        :returns: The full filesystem path
+        :rtype:   str
+        """
+        return self.path(basefile, 'serialized', '.json',
+                         version, storage_policy="file")
+
+    def open_serialized(self, basefile, mode="r", version=None):
+        """Opens files for reading and writing,
+        c.f. :meth:`~ferenda.DocumentStore.open`. The parameters are
+        the same as for
+        :meth:`~ferenda.DocumentStore.serialized_path`.
+
+        """
+        filename = self.serialized_path(basefile, version)
         return self._open(filename, mode)
 
     def distilled_path(self, basefile, version=None):

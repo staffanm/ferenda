@@ -525,7 +525,6 @@ class ListItem(CompoundElement, OrdinalElement):
 
 
 def __serialize_json(node):
-    depth = len(inspect.stack()) - 15
     # some native datatypes should be returned as-is, ie not wrapped
     # in a dict. Note that types derived from these gets handled
     # differently 
@@ -548,6 +547,8 @@ def __serialize_json(node):
             for key in [x for x in list(node.__dict__.keys()) if not x.startswith('_')]:
                 val = node.__dict__[key]
                 if val is None:
+                    continue
+                elif isinstance(val, logging.Logger):
                     continue
                 e[key] = __serialize_json(val)
         if isinstance(node, list) or isinstance(node, tuple):

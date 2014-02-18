@@ -280,6 +280,7 @@ class DocumentRepository(object):
             'patchdir': 'patches',
             'force': False,
             'parseforce': False,
+            'serializejson': False,
             'generateforce': False,
             'fsmdebug': False,
             'refresh': False,
@@ -1012,6 +1013,17 @@ with the *config* object as single parameter.
         :type  doc: ferenda.Document
         """
 
+    def render_json(self, doc, outfile=None):
+        """Renders the parsed object structure as a JSON document
+        
+        :param doc: The document to render
+        :type  doc: ferenda.Document
+        :param outfile: The file name for the JSON document
+        :type  outfile: str
+        :returns: The JSON document
+        :rtype: str
+        """
+        
     def render_xhtml(self, doc, outfile=None):
         """Renders the parsed object structure as a XHTML file with
         RDFa attributes (also returns the same XHTML as a string).
