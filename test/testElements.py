@@ -63,7 +63,19 @@ class Main(unittest.TestCase):
         tree[2][0] = util.parseresults_as_xml(tree[2][0])
         newtree[2][0] = util.parseresults_as_xml(newtree[2][0])
         self.assertEqual(tree, newtree)
-        
+
+    def test_json_roundtrip(self):
+        # a more realistic roundtrip example with some hairy parts
+        from ferenda import PDFDocumentRepository, PDFReader
+        d = PDFDocumentRepository()
+        doc = d.make_document("sample")
+        reader = PDFReader()
+        reader.read("test/files/pdfreader/intermediate/index.pdf",
+                    "test/files/pdfreader/intermediate")
+        d.parse_from_pdfreader(reader, doc)
+        jsondoc = serialize(doc, format="json")
+        newdoc = deserialize(jsondoc, format="json")
+        self.assertEqual(doc, newdoc)
 
     def test_serialize_pyparsing(self):
         # these objects can't be roundtripped

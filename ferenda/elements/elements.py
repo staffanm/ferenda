@@ -52,9 +52,7 @@ def serialize(root, format="xml"):
         return ET.tostring(t, 'utf-8').decode('utf-8') + "\n"
     elif format == "json":
         t = __serialize_json(root)
-        r = json.dumps(t, indent=4)
-        if isinstance(r, bytes): 
-            r = r.decode() # should be pure ascii since ensure_ascii is True
+        r = json.dumps(t, indent=4, ensure_ascii=False, sort_keys=True)
         return r
     else:
         raise ValueError("Invalid serialization format: %s" % format)
@@ -527,9 +525,12 @@ class ListItem(CompoundElement, OrdinalElement):
 def __serialize_json(node):
     # some native datatypes should be returned as-is, ie not wrapped
     # in a dict. Note that types derived from these gets handled
-    # differently 
+    # differently
     if type(node) in (str, int, bool):
         return node
+    # NOTE: this transforms bytes into str's (even though on py2 these will be labeled as "str")
+    # elif type(node) == bytes: 
+    #     return node.decode()
     # lists and dicts gets returned as-is, but the values in those
     # containers are transformed if need be
     elif type(node) == list:
@@ -538,7 +539,12 @@ def __serialize_json(node):
         return dict([(k, __serialize_json(v)) for k,v in node.items()])
     else:
         if node.__class__.__module__ in ('builtins', '__builtin__'):
-            typename = node.__class__.__name__
+            if type(node) == str:  # py2 workaround -- we want a str to be known as 'str' always, but py2 thinks they're called 'unicode'...
+                typename = "str"
+            elif type(node) == bytes:
+                typename = "bytes"
+            else:
+                typename = node.__class__.__name__
         else:
             typename = node.__class__.__module__ + "." + node.__class__.__name__
 
@@ -562,6 +568,8 @@ def __serialize_json(node):
             # assumption does not hold, convert them into something
             # like base64.
             e['@content'] = node.decode()
+        elif isinstance(node, str):
+            e['@content'] = str(node)
         elif isinstance(node, pyparsing.ParseResults):
             e['name'] = node.getName()
             e['@content'] = repr(node)
@@ -575,7 +583,10 @@ def __serialize_json(node):
             e['@content'] = repr(node)
         return e
 
+_state = {'fontspec': None}
 def __deserialize_json(node):
+    from ferenda.pdfreader import PDFReader, Textbox
+    from ferenda import Document
     nodetype = None
     if hasattr(node, 'get'):
         nodetype = node.get("@class")
@@ -606,9 +617,20 @@ def __deserialize_json(node):
     if hasattr(node, 'items'):
         attribs = dict([(k,__deserialize_json(v)) for k, v in node.items() if not k.startswith("@")])
 
+    # hack for deserializing pdfreader objects -- store the current
+    # fontspecs dict as soon as we see it, we'll be needing it every
+    # time we create a pdfreader.Textbox
+
+
+    if issubclass(cls, PDFReader):
+        _state['fontspec'] =  attribs['fontspec']
 
     # 3. initialize the class
+
+    
     if issubclass(cls, list):
+        if issubclass(cls, Textbox):
+            attribs['fontspec'] = _state['fontspec']
         o = cls([__deserialize_json(x) for x in content], **attribs)
     elif issubclass(cls, dict):
         o = cls([(k, __deserialize_json(v)) for k,v in content.items()], **attribs)
@@ -632,6 +654,8 @@ def __deserialize_json(node):
         # first create the graph identifier (BNode or URIRef object)
         i = __deserialize_json(node['identifier'])
         o = cls(identifier=i).parse(data=content)
+    elif issubclass(cls, Document):
+        o = cls(**attribs) # no actual content, only attributes/properties
     else:
         o = cls(content, **attribs)
     return o

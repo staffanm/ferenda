@@ -101,8 +101,9 @@ def render(f):
         ret = f(self, doc)
         # now render thath doc data as files (JSON, XHTML, RDF/XML)
         if self.config.serializejson == True:
-            with self.store.open_serialized(doc.basefile, "w") as fp:
-                fp.write(serialize(doc, format="json"))
+            with self.store.open_serialized(doc.basefile, "wb") as fp:
+                r = serialize(doc, format="json") # should be a (unicode) str
+                fp.write(r.encode('utf-8'))
             self.log.debug("%s: Created %s" % (doc.basefile, self.store.serialized_path(doc.basefile)))
 
         updated = self.render_xhtml(doc, self.store.parsed_path(doc.basefile))

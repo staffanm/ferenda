@@ -1,4 +1,4 @@
-.. -*- coding: iso-8859-1 -*-
+.. -*- coding: utf-8 -*-
 
 Ferenda is a python library and framework for transforming
 unstructured document collections into structured Linked Data. It
@@ -54,7 +54,7 @@ authors, included in accordance with their respective licenses:
 * `patch <https://code.google.com/p/python-patch/>`_ by Anatoly
   Techtonik, MIT
 * `Grit XSLT stylesheets <http://code.google.com/p/oort/wiki/Grit>`_
-  by Niklas Lindström, BSD
+  by Niklas LindstrÃ¶m, BSD
 * `httpheader <http://deron.meranda.us/python/httpheader/>`_ by Deron
   Meranda, LGPL
 * `normalize.css <http://git.io/normalize>`_, MIT

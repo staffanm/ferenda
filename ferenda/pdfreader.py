@@ -7,6 +7,7 @@ import itertools
 
 from lxml import etree
 from six import text_type as str
+# from six import binary_type as bytes
 import six
 
 from ferenda import util, errors
@@ -33,10 +34,14 @@ class PDFReader(CompoundElement):
 
     tagname = "div"
     classname = "pdfreader"
-    
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self.fontspec = {}
         self.log = logging.getLogger('pdfreader')
+        if 'filename' in kwargs:
+            self.filename = kwargs['filename']
+        else:
+            self.filename = None
+        # super(PDFReader, self).__init__(*args, **kwargs)
 
     def read(self, pdffile, workdir):
         """Initializes a PDFReader object from an existing PDF file. After
@@ -118,7 +123,8 @@ class PDFReader(CompoundElement):
             for element in pageelement:
                 if element.tag == 'fontspec':
                     fontid =  element.attrib['id']
-                    self.fontspec[fontid] = element.attrib
+                    # make sure we always deal with a basic dict (not lxml.etree._Attrib) where all keys are str object (not bytes)
+                    self.fontspec[fontid] = dict([(k,str(v)) for k,v in element.attrib.items()])
                     if "+" in element.attrib['family']:
                         self.fontspec[fontid]['family'] = element.attrib['family'].split("+",1)[1]
                     
@@ -127,6 +133,7 @@ class PDFReader(CompoundElement):
                     if element.text and element.text.strip() == "" and not element.getchildren():
                         # print "Skipping empty box"
                         continue
+
                     attribs = dict(element.attrib)
                     attribs['fontspec'] = self.fontspec
                     b = Textbox(**attribs)
@@ -270,7 +277,7 @@ all text in a Textbox has the same font and size.
         assert 'left' in kwargs, "left attribute missing"
         assert 'width' in kwargs, "width attribute missing"
         assert 'height' in kwargs, "height attribute missing"
-        assert 'font' in kwargs, "font attribute missing"
+        assert 'font' in kwargs, "font id attribute missing"
 
         self.top = int(kwargs['top'])
         self.left = int(kwargs['left'])
@@ -279,8 +286,11 @@ all text in a Textbox has the same font and size.
         self.right = self.left + self.width
         self.bottom = self.top + self.height
 
-        self.__fontspecid = kwargs['font']
-        self.__fontspec = kwargs['fontspec']
+        # self.__fontspecid = kwargs['font']
+        self.font = kwargs['font']
+        if 'fontspec' not in kwargs:
+            from pudb import set_trace; set_trace()
+        self.__fontspec = kwargs['fontspec'] 
 
         del kwargs['top']
         del kwargs['left']
@@ -319,17 +329,33 @@ all text in a Textbox has the same font and size.
                           other.top + other.height) - top
 
         res = Textbox(top=top, left=left, width=width, height=height,
-                      font=self.__fontspecid,
+                      font=self.font,
                       fontspec=self.__fontspec)
         
         # add all text elements
+        c = Textelement(tag=None)
         for e in itertools.chain(self, other):
-            res.append(e)
+            if e.tag != c.tag:
+                res.append(c)
+                c = Textelement(tag=e.tag)
+            else:
+                c = c + e
+        res.append(c)
         return res
 
+
     def __iadd__(self, other):
+        if len(self):
+            c = self.pop()
+        else:
+            c = Textelement(tag=None)
         for e in other:
-            self.append(e)
+            if e.tag != c.tag:
+                self.append(c)
+                c = Textelement(tag=e.tag)
+            else:
+                c = c + e
+        self.append(c)
         self.top = min(self.top, other.top)
         self.left = min(self.left, other.left)
         self.width = max(self.left + self.width,
@@ -351,7 +377,7 @@ all text in a Textbox has the same font and size.
 
     def getfont(self):
         """Returns a fontspec dict of all properties of the font used."""
-        return self.__fontspec[self.__fontspecid]
+        return self.__fontspec[self.font]
 
 
 class Textelement(UnicodeElement):
@@ -360,7 +386,7 @@ class Textelement(UnicodeElement):
     as a whole is bold (``'b'``) , italic(``'i'`` bold + italic
     (``'bi'``) or regular (``None``).
     """
-
+    
     def _get_tagname(self):
         if self.tag:
             return self.tag
@@ -368,6 +394,10 @@ class Textelement(UnicodeElement):
             return "span"
 
     tagname = property(_get_tagname)
+
+    def __add__(self, other):
+        return Textelement(str(self) + str(other), tag = self.tag)
+    
 
 # The below code fixes a error with incorrectly nested tags often
 # found in pdftohtml generated xml. Main problem is that this relies
