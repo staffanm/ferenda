@@ -119,7 +119,16 @@ class Devel(object):
                       'prov:wasGeneratedBy',
                       ]
         import csv
-        writer = csv.DictWriter(sys.stdout, predicates, delimiter=b";")
+        if six.PY2:
+            delimiter = b';'
+            out = sys.stdout
+        else:
+            import codecs
+            delimiter = ';'
+            out = codecs.getwriter("latin-1")(sys.stdout.detach())
+            out.errors = "replace"
+        
+        writer = csv.DictWriter(out, predicates, delimiter=delimiter)
         repo = self._repo_from_alias(alias)
         writer.writerow(dict([(p,p) for p in predicates]))
         for basefile in repo.store.list_basefiles_for("relate"):
@@ -133,7 +142,14 @@ class Devel(object):
                         if isinstance(o, URIRef):
                             row[qname] = g.qname(o)
                         else:
-                            row[qname] = str(o).encode("latin-1", errors="replace")
+                            # it seems py2 CSV modue expects latin-1
+                            # encoded bytestrings (for non-ascii
+                            # values), while py3 CSV expects unicode
+                            # (sensibly)
+                            fld = str(o)
+                            if six.PY2:
+                                fld = fld.encode("latin-1", errors="replace")
+                            row[qname] = fld
                 row['subobjects'] = len(list(g.subject_objects(RDF.type)))
                 writer.writerow(row)
 
