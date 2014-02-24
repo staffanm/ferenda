@@ -782,7 +782,11 @@ def run(argv):
                 for alias, classname in enabled.items():
                     argv_copy = list(argv)
                     argv_copy[0] = alias
-                    ret.append(_run_class(enabled, argv_copy))
+                    try:
+                        ret.append(_run_class(enabled, argv_copy))
+                    except Exception as e:
+                        (alias, command, args) = _filter_argv(argv_copy)
+                        log.error("%s %s failed: %s" % (command, alias, e))
                 return ret
             else:
                 return _run_class(enabled, argv)

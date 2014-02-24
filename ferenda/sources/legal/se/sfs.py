@@ -558,7 +558,7 @@ class SFS(Trips):
         return updated
 
     # FIXME: This doesn't work at all
-    def get_archive_version(self, basefile, sfst_tempfile):
+    def get_archive_version_nonworking(self, basefile, sfst_tempfile):
         sfst_file = self.store.downloaded_path(basefile)
         # FIXME: Implement get_archive_version
         if os.path.exists(sfst_file):

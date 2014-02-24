@@ -44,11 +44,14 @@ class Regeringen(SwedishLegalSource):
 
     document_type = None  # subclasses must override
     start_url = None
-    start_url_template = "http://www.regeringen.se/sb/d/107/a/136/action/showAll/sort/byDate/targetDepartment/archiveDepartment?d=107&action=search&query=&type=advanced&a=136&sort=byDate&docTypes=%(doctype)s"
+    start_url_template = "http://www.regeringen.se/sb/d/107/a/136/action/showAll/sort/byDate/targetDepartment/archiveDepartment?d=107&action=search&queryLogic=1&sortOrder=1&query=&type=advanced&a=136&sort=byDate&docTypes=%(doctype)s"
     downloaded_suffix = ".html"  # override PDFDocumentRepository
     source_encoding = "latin-1"
     storage_policy = "dir"
 
+
+    session = None
+    
     @recordlastdownload
     def download(self, basefile=None):
         if basefile:
@@ -58,6 +61,7 @@ class Regeringen(SwedishLegalSource):
         #     FIXME: use this to create a time-filtered start_url
         start_url = self.start_url_template % {'doctype': self.document_type}
         self.log.info("Starting at %s" % start_url)
+        self.session = requests.session()
         for basefile, url in self.download_get_basefiles(start_url):
             self.download_single(basefile, url)
 
@@ -68,7 +72,8 @@ class Regeringen(SwedishLegalSource):
         # existing_cnt = 0
         while not done:
             self.log.info('Result page #%s (%s)' % (pagecount, url))
-            resp = requests.get(url)
+            # resp = requests.get(url)
+            resp = self.session.get(url)
             mainsoup = BeautifulSoup(resp.text)
             for link in mainsoup.find_all(href=re.compile("/sb/d/108/a/")):
                 desc = link.find_next_sibling("span", "info").get_text(strip=True)

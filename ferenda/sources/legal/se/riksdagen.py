@@ -9,12 +9,13 @@ import codecs
 import requests
 from bs4 import BeautifulSoup
 
-from ferenda.describer import Describer
+
+from . import SwedishLegalSource
+from .swedishlegalsource import offtryck_parser, offtryck_textboxiter, PreambleSection, UnorderedSection
 from ferenda import util, errors
 from ferenda.decorators import managedparsing, downloadmax
-from . import SwedishLegalSource
+from ferenda.describer import Describer
 from ferenda.elements import Paragraph
-
 
 class Riksdagen(SwedishLegalSource):
     BILAGA = "bilaga"
@@ -48,6 +49,7 @@ class Riksdagen(SwedishLegalSource):
     # add typ=prop or whatever
     downloaded_suffix = ".xml"
     storage_policy = "dir"
+
     document_type = None
     start_url = None
     start_url_template = "http://data.riksdagen.se/dokumentlista/?sz=100&sort=d&utformat=xml&typ=%(doctype)s"
@@ -130,7 +132,7 @@ class Riksdagen(SwedishLegalSource):
             r = self.download_if_needed(htmlurl, basefile, filename=htmlfile)
         elif docsoup.find('dokument_url_text'):
             texturl = docsoup.find('dokument_url_text').text
-            htmlfile = self.store.downloaded_path(basefile, attachment=docname + ".txt")
+            textfile = self.store.downloaded_path(basefile, attachment=docname + ".txt")
             self.log.debug("   Downloading to %s" % htmlfile)
             r = self.download_if_needed(texturl, basefile, filename=textfile)
         fileupdated = fileupdated or r
@@ -161,11 +163,17 @@ class Riksdagen(SwedishLegalSource):
         # note that we never use the PDF file -- it would usually be
         # the same as the PDF available from eg PropPolo
         pdffile = self.store.path(doc.basefile, 'downloaded', '.pdf')
-        self.log.debug("Loading soup from %s" % htmlfile)
-        soup = BeautifulSoup(
-            codecs.open(
-                htmlfile, encoding='iso-8859-1', errors='replace').read(),
-            )
+        if os.path.exists(pdffile):
+            parser = offtryck_parser(preset='proposition')
+            parser = offtryck_parser(preset=preset)
+            doc.body = parser.parse(offtryck_textboxiter(pdf))
+
+        else:
+            self.log.debug("Loading soup from %s" % htmlfile)
+            soup = BeautifulSoup(
+                codecs.open(
+                    htmlfile, encoding='iso-8859-1', errors='replace').read(),
+                )
         doc.uri = self.canonical_uri(doc.basefile)
         doc.lang = "sv"
         self.log.debug("Set URI to %s (from %s)" % (doc.uri, doc.basefile))
@@ -174,6 +182,8 @@ class Riksdagen(SwedishLegalSource):
         d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
         xsoup = BeautifulSoup(open(self.store.downloaded_path(doc.basefile)).read(), "xml")
         d.value(self.ns['dct'].title, xsoup.dokument.titel.text, lang="sv")
+        d.value(self.ns['dct'].published, util.strptime(xsoup.dokument.publicerad.text,
+                                                        "%Y-%m-%d %H:%M:%S").date())
         self.parse_from_soup(soup, doc)
         self.infer_triples(d, doc.basefile)
         return True

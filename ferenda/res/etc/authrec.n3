@@ -63,6 +63,7 @@
 <http://lagen.nu/org/2008/patentbesvarsratten> rdfs:label "Patentbesvärsrätten" .
 <http://lagen.nu/org/2008/rattshjalpsnamnden> rdfs:label "Rättshjälpsnämnden" .
 <http://lagen.nu/org/2008/miljooverdomstolen> rdfs:label "Miljööverdomstolen" .
+<http://lagen.nu/org/2011/mark-och-miljooverdomstolen> rdfs:label "Mark- och Miljööverdomstolen" .
 <http://lagen.nu/org/2008/migrationsoverdomstolen> rdfs:label "Migrationsöverdomstolen" .
 <http://lagen.nu/org/2008/domstolsverket> rdfs:label "Domstolsverket" .
 

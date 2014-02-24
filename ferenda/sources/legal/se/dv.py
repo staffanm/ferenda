@@ -165,6 +165,7 @@ class DV(SwedishLegalSource):
                                   self.config.ftpuser,
                                   self.config.ftppassword)
             else:
+                self.log.warning("Config variable ftpuser not set, downloading from secondary source (https://lagen.nu/dv/downloaded/) instead")
                 self.download_www("", recurse)
         except MaxDownloadsReached:  # ok we're done!
             pass
@@ -188,7 +189,9 @@ class DV(SwedishLegalSource):
                 basefile = os.path.splitext(filename)[0]
                 if dirname:
                     basefile = dirname + "/" + basefile
-                localpath = self.store.downloaded_path(basefile)
+                # localpath = self.store.downloaded_path(basefile)
+                from pudb import set_trace; set_trace()
+                localpath = self.store.path(basefile, 'downloaded/zips', '.zip')
                 if os.path.exists(localpath) and not self.config.force:
                     pass  # we already got this
                 else:
@@ -216,25 +219,28 @@ class DV(SwedishLegalSource):
                 if dirname:
                     basefile = dirname + basefile
 
-                localpath = self.store.downloaded_path(basefile)
+                # localpath = self.store.downloaded_path(basefile)
+                localpath = self.store.path(basefile, 'downloaded/zips', '.zip')
                 if os.path.exists(localpath) and not self.config.force:
                     pass  # we already got this
                 else:
                     absolute_url = urljoin(url, link)
                     self.log.debug('Fetching %s to %s' % (link, localpath))
                     resp = requests.get(absolute_url)
-                    with self.store.open_downloaded(basefile, "wb") as fp:
+                    with self.store._open(localpath, "wb") as fp:
                         fp.write(resp.content)
                     self.process_zipfile(localpath)
 
     # eg. HDO_T3467-96.doc or HDO_T3467-96_1.doc
-    re_malnr = re.compile(r'([^_]*)_([^_\.]*)_?(\d*)(\.docx?)')
+    re_malnr = re.compile(r'([^_]*)_([^_\.]*)()_?(\d*)(\.docx?)')
     # eg. HDO_T3467-96_BYTUT_2010-03-17.doc or
-    #     HDO_T3467-96_BYTUT_2010-03-17_1.doc
+    #     HDO_T3467-96_BYTUT_2010-03-17_1.doc or
+    #     HDO_T254-89_1_BYTUT_2009-04-28.doc (which is sort of the
+    #     same as the above but the "_1" goes in a different place)
     re_bytut_malnr = re.compile(
-        r'([^_]*)_([^_\.]*)_BYTUT_\d+-\d+-\d+_?(\d*)(\.docx?)')
+        r'([^_]*)_([^_\.]*)_?(\d*)_BYTUT_\d+-\d+-\d+_?(\d*)(\.docx?)')
     re_tabort_malnr = re.compile(
-        r'([^_]*)_([^_\.]*)_TABORT_\d+-\d+-\d+_?(\d*)(\.docx?)')
+        r'([^_]*)_([^_\.]*)_?(\d*)_TABORT_\d+-\d+-\d+_?(\d*)(\.docx?)')
 
     def process_zipfile(self, zipfilename):
         removed = replaced = created = untouched = 0
@@ -243,6 +249,7 @@ class DV(SwedishLegalSource):
         except zipfile.BadZipFile as e:
             self.log.error("%s is not a valid zip file" % zipfilename)
             # raise e
+            return
         for bname in zipf.namelist():
             if not isinstance(bname, str):  # py2
                 # Files in the zip file are encoded using codepage 437
@@ -259,12 +266,14 @@ class DV(SwedishLegalSource):
             else:
                 m = self.re_malnr.match(name)
             if m:
-                (court, malnr, referatnr, suffix) = (
-                    m.group(1), m.group(2), m.group(3), m.group(4))
+                (court, malnr, opt_referatnr, referatnr, suffix) = (
+                    m.group(1), m.group(2), m.group(3), m.group(4), m.group(5))
                 assert ((suffix == ".doc") or (suffix == ".docx")
                         ), "Unknown suffix %s in %r" % (suffix, name)
                 if referatnr:
                     basefile = "%s/%s_%s" % (court, malnr, referatnr)
+                elif opt_referatnr:
+                    basefile = "%s/%s_%s" % (court, malnr, opt_referatnr)
                 else:
                     basefile = "%s/%s" % (court, malnr)
 
@@ -307,9 +316,9 @@ class DV(SwedishLegalSource):
                     if self.config.downloadmax and self.downloadcount >= self.config.downloadmax:
                         raise MaxDownloadsReached()
             else:
-                self.log.warning('Kunde inte tolka filnamnet %r i %s' %
+                self.log.warning('Could not interpret filename %r i %s' %
                                 (name, os.path.relpath(zipfilename)))
-        self.log.debug('Processade %s, skapade %s,  bytte ut %s, tog bort %s, lät bli %s filer' %
+        self.log.debug('Processed %s, created %s, replaced %s, removed %s, untouched %s files' %
                        (os.path.relpath(zipfilename), created, replaced, removed, untouched))
 
     re_NJAref = re.compile(r'(NJA \d{4} s\. \d+) \(alt. (NJA \d{4}:\d+)\)')
@@ -363,28 +372,29 @@ class DV(SwedishLegalSource):
 
     # This is information you can get from RDL, but we hardcode it for
     # now.
-    slugs = {'Arbetsdomstolen': 'ad',
-             'Domstolsverket': 'dv',
-             'Göta hovrätt': 'hgo',
-             'Högsta domstolen': 'hd',
-             'Högsta förvaltningsdomstolen': 'hfd',
-             'Hovrätten för Nedre Norrland': 'hnn',
-             'Hovrätten för Övre Norrland': 'hon',
-             'Hovrätten för Västra Sverige': 'hvs',
-             'Hovrätten över Skåne och Blekinge': 'hsb',
-             'Justitiekanslern': 'jk',
-             'Kammarrätten i Göteborg': 'kgg',
-             'Kammarrätten i Jönköping': 'kjo',
-             'Kammarrätten i Stockholm': 'kst',
-             'Kammarrätten i Sundsvall': 'ksu',
-             'Marknadsdomstolen': 'md',
-             'Migrationsöverdomstolen': 'mig',
-             'Miljööverdomstolen': 'mod',
-             'Patentbesvärsrätten': 'pbr',
-             'Rättshjälpsnämnden': 'rhn',
-             'regr': 'Regeringsrätten',
-             'Statens ansvarsnämnd': 'san',
-             'Svea hovrätt': 'hsv'}
+    slugs = {'arbetsdomstolen': 'ad',
+             'domstolsverket': 'dv',
+             'göta hovrätt': 'hgo',
+             'högsta domstolen': 'hd',
+             'högsta förvaltningsdomstolen': 'hfd',
+             'hovrätten för nedre norrland': 'hnn',
+             'hovrätten för övre norrland': 'hon',
+             'hovrätten för västra sverige': 'hvs',
+             'hovrätten över skåne och blekinge': 'hsb',
+             'justitiekanslern': 'jk',
+             'kammarrätten i göteborg': 'kgg',
+             'kammarrätten i jönköping': 'kjo',
+             'kammarrätten i stockholm': 'kst',
+             'kammarrätten i sundsvall': 'ksu',
+             'marknadsdomstolen': 'md',
+             'migrationsöverdomstolen': 'mig',
+             'miljööverdomstolen': 'mod',
+             'mark- och miljööverdomstolen': 'mod',
+             'patentbesvärsrätten': 'pbr',
+             'rättshjälpsnämnden': 'rhn',
+             'regeringsrätten': 'regr',
+             'statens ansvarsnämnd': 'san',
+             'svea hovrätt': 'hsv'}
 
     @managedparsing
     def parse(self, doc):
@@ -443,9 +453,10 @@ class DV(SwedishLegalSource):
 
         nextfield = firstfield.find_next("w:tc")
         head['Referat'] = nextfield.get_text(strip=True)
-
         # Hitta övriga enkla metadatafält i sidhuvudet
         for key in self.labels:
+            if key in head:
+                continue
             node = soup.find(text=re.compile(key + ':'))
             if not node:
                 # Sometimes these text fields are broken up
@@ -455,7 +466,8 @@ class DV(SwedishLegalSource):
                 if nodes:
                     node = nodes[-1]
                 else:
-                    self.log.warning("%s: Couldn't find field %r" % (basefile, key))
+                    if key not in ('Diarienummer', 'Domsnummer', 'Avdelning'): # not always present
+                        self.log.warning("%s: Couldn't find field %r" % (basefile, key))
                     continue
 
             txt = node.find_next("w:t").find_parent("w:p").get_text(strip=True)
@@ -574,8 +586,10 @@ class DV(SwedishLegalSource):
 
         def dom_to_uri(domstol, malnr, avg):
             baseuri = self.config.url
-            slug = self.slugs[domstol]
-            return "%(baseuri)sres/dv/%(slug)s/%(malnr)s/%(avg)s" % locals()
+            slug = self.slugs[domstol.lower()]
+            # note that malnr can be a separated list. split like we do below
+            first_malnr = re.split("och|,|;|\s", malnr)[0].strip()
+            return "%(baseuri)sres/dv/%(slug)s/%(first_malnr)s/%(avg)s" % locals()
 
         def localize_uri(uri):
             if "publ/rattsfall" in uri:
@@ -587,6 +601,7 @@ class DV(SwedishLegalSource):
 
         def split_nja(value):
             # "NJA 2008 s 567 (NJA 2008:86)"=>("NJA 2008 s 567", "NJA 2008:86")
+            # 'NJA 2011 s. 638(NJA2011:57)' => ("NJA 2011 s 638", "NJA 2001:57")
             return [x[:-1] for x in value.split("(")]
 
         def sokord_uri(value):
@@ -598,7 +613,19 @@ class DV(SwedishLegalSource):
             head["Referat"] = basefile_to_referat(doc.basefile)
 
         # 1. mint uris and create the two Describers we'll use
-        refuri = ref_to_uri(head["Referat"])
+        try:
+            refuri = ref_to_uri(head["Referat"])
+        except AttributeError: # signals that something is wrong with
+                               # the current referat -- attempt to
+                               # solve if we can
+            if 'ADO/' in doc.basefile or 'MD/' in doc.basefile:
+                head["Referat"] = basefile_to_referat(doc.basefile)
+            else:
+                # do other kinds of data cleaning to head["Referat"]
+                pass
+            refuri = ref_to_uri(head["Referat"])
+            
+            
         refdesc = Describer(doc.meta, refuri)
         domuri = dom_to_uri(head["Domstol"],
                             head["Målnummer"],
@@ -615,13 +642,18 @@ class DV(SwedishLegalSource):
             elif label == "Domstol":
                 domdesc.rel(self.ns['dct'].publisher, self.lookup_resource(value))
             elif label == "Målnummer":
-                domdesc.rel(self.ns['rpubl'].malnummer, value)
+                # occasionally more than one Malnummer is provided
+                # (c.f. AD 1994 nr 107, AD 2005-117, AD 2003-111) in a
+                # comma, semicolo or space separated list. AD 2006-105 even separates with " och "!
+                for v in re.split("och|,|;|\s", value):
+                    if v.strip():
+                        domdesc.value(self.ns['rpubl'].malnummer, v.strip())
             elif label == "Domsnummer":
-                domdesc.rel(self.ns['rpubl'].domsnummer, value)
+                domdesc.value(self.ns['rpubl'].domsnummer, value)
             elif label == "Diarienummer":
-                domdesc.rel(self.ns['rpubl'].diarienummer, value)
+                domdesc.value(self.ns['rpubl'].diarienummer, value)
             elif label == "Avdelning":
-                domdesc.rel(self.ns['rpubl'].avdelning, value)
+                domdesc.value(self.ns['rpubl'].avdelning, value)
             elif label == "Referat":
 
                 for pred, regex in {'rattsfallspublikation': r'([^ ]+)',
@@ -638,8 +670,10 @@ class DV(SwedishLegalSource):
                             refdesc.value(self.ns['rpubl'][pred], m.group(1))
 
                     if value.startswith("NJA"):
+                        from pudb import set_trace; set_trace()
                         realvalue, extra = split_nja(value)
                         ordinal = extra.split(" ")[1]
+                        
                         refdesc.value(self.ns['dct'].bibliographicCitation,
                                       extra)
                         refdesc.rel(self.ns['owl'].sameAs,
