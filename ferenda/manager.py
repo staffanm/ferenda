@@ -1249,6 +1249,8 @@ def _filter_argv(args):
         command = args[1]
     if len(args) > 2:
         for arg in args[2:]:
+            if isinstance(arg, bytes):
+                arg = arg.decode("utf-8") # FIXME: duplicated code of LayeredConfig._load_commandline
             if not arg.startswith("--"):
                 commandargs.append(arg)
     return (alias, command, commandargs)

@@ -207,8 +207,8 @@ class Devel(object):
 
         # 2.1 stash a copy
         fileno, stash = mkstemp()
-        with os.fdopen(fileno, "w") as fp:
-            fp.write(util.readfile(outfile))
+        with os.fdopen(fileno, "wb") as fp:
+            fp.write(util.readfile(outfile, mode="rb"))
         
         # 2.1 if intermediate: stash a copy, run parse(config.force=True)
         if stage == "intermediate":

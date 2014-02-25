@@ -9,6 +9,7 @@ import tempfile
 from ferenda.compat import OrderedDict
 from six.moves import configparser
 from six import text_type as str
+from six import binary_type as bytes
 
 
 class LayeredConfig(object):
@@ -334,6 +335,10 @@ class LayeredConfig(object):
         if not commandline:
             return
         for arg in commandline:
+            if isinstance(arg, bytes):
+                arg = arg.decode("utf-8") # FIXME: Find out proper way
+                                          # of finding the encoding of
+                                          # argv
             if arg.startswith("--"):
                 if "=" in arg:
                     (param, value) = arg.split("=", 1)

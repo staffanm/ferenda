@@ -66,4 +66,5 @@
 <http://lagen.nu/org/2011/mark-och-miljooverdomstolen> rdfs:label "Mark- och Miljööverdomstolen" .
 <http://lagen.nu/org/2008/migrationsoverdomstolen> rdfs:label "Migrationsöverdomstolen" .
 <http://lagen.nu/org/2008/domstolsverket> rdfs:label "Domstolsverket" .
+<http://lagen.nu/org/2011/hogsta-forvaltningsdomstolen> rdfs:label "Högsta förvaltningsdomstolen" .
 

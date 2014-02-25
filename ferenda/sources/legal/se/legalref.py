@@ -467,7 +467,7 @@ class LegalRef:
 
     def unescape_xmlcharref(self, m):
         # print "Changing %r to a %r" % (m.group(0)[2:-1], unichr(int(m.group(0)[2:-1])))
-        return chr(int(m.group(0)[2:-1]))
+        return unichr(int(m.group(0)[2:-1]))
 
     def find_attributes(self, parts, extra={}):
         """recurses through a parse tree and creates a dictionary of
@@ -1206,7 +1206,9 @@ class LegalRef:
                        'MIG': '/publ/rattsfall/mig/',
                        'AD': '/publ/rattsfall/ad/',
                        'MD': '/publ/rattsfall/md/',
-                       'FÖD': '/publ/rattsfall/fod/'}
+                       'FÖD': '/publ/rattsfall/fod/',
+                       'HFD': '/publ/rattsfall/hfd/',
+        }
 
         # res = self.baseuri_attributes['baseuri']
         if 'nja' in attributes:

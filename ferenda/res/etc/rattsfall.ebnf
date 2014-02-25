@@ -4,7 +4,7 @@
 rattsfallref      ::= RattsfallRefID/NJARattsfallRefID
 RattsfallRefID    ::= DomstolRefID, Whitespace, ArRefID, Separator, LopnrRefID
 NJARattsfallRefID ::= NJARefID, Whitespace, ArRefID, NJASeparator, SidnrRefID
-DomstolRefID      ::= 'RÅ'/'AD'/'RH'/'RK'/'MÖD'/'MIG'/'MD'
+DomstolRefID      ::= 'RÅ'/'AD'/'RH'/'RK'/'MÖD'/'MIG'/'MD'/'HFD'
 NJARefID          ::= 'NJA'
 ArRefID           ::= LangtAr
 Separator         ::= ((Whitespace/Hyphen), 'ref'/'nr', Period?, Whitespace?)/(Whitespace?,(Colon/Hyphen),Whitespace?)

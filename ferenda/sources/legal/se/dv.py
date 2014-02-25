@@ -190,7 +190,6 @@ class DV(SwedishLegalSource):
                 if dirname:
                     basefile = dirname + "/" + basefile
                 # localpath = self.store.downloaded_path(basefile)
-                from pudb import set_trace; set_trace()
                 localpath = self.store.path(basefile, 'downloaded/zips', '.zip')
                 if os.path.exists(localpath) and not self.config.force:
                     pass  # we already got this
@@ -424,7 +423,8 @@ class DV(SwedishLegalSource):
             rawhead, rawbody = self.parse_ooxml(patchedtext, doc.basefile)
         else:
             rawhead, rawbody = self.parse_antiword_docbook(patchedtext, doc.basefile)
-        doc.uri = self.polish_metadata(rawhead, doc)
+        sanitized_head = self.sanitize_metadata(rawhead, doc.basefile)
+        doc.uri = self.polish_metadata(sanitized_head, doc)
         if patchdesc:
             doc.meta.add((URIRef(doc.uri),
                           self.ns['ferenda'].patchdescription,
@@ -567,28 +567,128 @@ class DV(SwedishLegalSource):
             head['Litteratur'] = n
         return head, body
 
-    def polish_metadata(self, head, doc):
+    # correct broken/missing metadata
+    def sanitize_metadata(self, head, basefile):
         basefile_regex = re.compile('(?P<type>\w+)/(?P<year>\d+)-(?P<ordinal>\d+)')
+        nja_regex = re.compile("NJA ?(\d+) ?s\.? ?(\d+) ?\( ?(?:NJA|) ?[ :]?(\d+) ?: ?(\d+)")
+        date_regex = re.compile("(\d+)[^\d]+(\d+)[^\d]+(\d+)")
+        referat_regex = re.compile("(?P<type>[A-ZÖ]+)[^\d]*(?P<year>\d+)[^\d]+(?P<ordinal>\d+)")
+        referat_templ = {'ADO': 'AD %(year)s nr %(ordinal)s',
+                         'AD': '%(type)s %(year)s nr %(ordinal)s',
+                         'MDO': 'MD %(year)s:%(ordinal)s',
+                         'NJA': '%(type)s %(year)s s %(ordinal)s',
+                         None: '%(type)s %(year)s:%(ordinal)s'
+        }
 
-        def basefile_to_referat(basefile):
-            templ = {'ADO': 'AD %(year)s nr %(ordinal)s',
-                     'MD': 'MD %(year)s:%(ordinal)s'}
+        # 1. Attempt to fix missing Referat
+        if not head.get("Referat"):
+            # For some courts (MDO, ADO) this is possible
             m = basefile_regex.match(basefile)
+            if m and m.group("type") in ('ADO', 'MDO'):
+                head["Referat"] = referat_templ[m.group("type")] % (m.groupdict())
+
+        # 2. Correct known problems with Domstol not always being correctly specified
+        if "Hovrättenför" in head["Domstol"] or "Hovrättenöver" in head["Domstol"]:
+            head["Domstol"] = head["Domstol"].replace("Hovrätten", "Hovrätten ")
+        try:
+            # if this throws a KeyError, it's not canonically specified
+            self.lookup_resource(head["Domstol"], cutoff=1)
+        except KeyError:
+            # lookup URI with fuzzy matching, then turn back to canonical label
+            head["Domstol"] = self.lookup_label(str(self.lookup_resource(head["Domstol"])))
+
+        # 3. Convert head['Målnummer'] to a list. Occasionally more than one
+        # Malnummer is provided (c.f. AD 1994 nr 107, AD
+        # 2005-117, AD 2003-111) in a comma, semicolo or space
+        # separated list. AD 2006-105 even separates with " och "
+        if head.get("Målnummer"):
+            res = []
+            for v in re.split("och|,|;|\s", head['Målnummer']):
+                if v.strip():
+                    res.append(v.strip())
+            head['Målnummer'] = res
+        
+        # 4. Create a general term for Målnummer or Domsnummer to act
+        # as a local identifier
+        if head.get("Målnummer"):
+            head["_localid"] = head["Målnummer"]
+        else:
+            head["_localid"] = head["Domsnummer"]
+
+
+        # 5. For NJA, Canonicalize the identifier through a very
+        # forgiving regex and split of the alternative identifier
+        # as head['_nja_ordinal']
+        #
+        # "NJA 2008 s 567 (NJA 2008:86)"=>("NJA 2008 s 567", "NJA 2008:86")
+        # "NJA 2011 s. 638(NJA2011:57)" => ("NJA 2011 s 638", "NJA 2001:57")
+        # "NJA 2012 s. 16(2012:2)" => ("NJA 2012 s 16", "NJA 2012:2")
+        if "NJA" in head["Referat"]:
+            m = nja_regex.match(head["Referat"])
             if m:
-                return templ[m.group("type")] % (m.groupdict())
+                head["Referat"] = "NJA %s s %s" % (m.group(1), m.group(2))
+                head["_nja_ordinal"] = "NJA %s:%s" % (m.group(3), m.group(4))
+            else:
+                raise ValueError("Unparseable NJA ref '%s'" % head["Referat"])
+
+        # 6 Canonicalize referats: Fix crap like "AD 2010nr 67",
+        # "AD2011 nr 17", "HFD_2012 ref.58", "RH 2012_121", "RH2010
+        # :180", "MD:2012:5", "MIG2011:14", "-MÖD 2010:32" and many
+        # MANY more
+        m = referat_regex.search(head["Referat"])
+        if m:
+            if m.group("type") in referat_templ:
+                head["Referat"] = referat_templ[m.group("type")] % m.groupdict()
+            else:
+                head["Referat"] = referat_templ[None] % m.groupdict()
+        else:
+            raise ValueError("Unparseable ref '%s'" % head["Referat"])
+
+        # 7. Convert Sökord string to an actual list 
+        res = []
+        if head.get("Sökord"):
+            for s in self.re_delimSplit(head["Sökord"]):
+                s = util.normalize_space(s)
+                if not s:
+                    continue
+                # terms longer than 72 chars are not legitimate
+                # terms. more likely descriptions. If a term has a - in
+                # it, it's probably a separator between a term and a
+                # description
+                while len(s) >= 72 and " - " in s:
+                    h, s = s.split(" - ", 1)
+                    res.append(h)
+                if len(s) < 72:
+                    res.append(s)
+            head["Sökord"] = res
+
+        # 8. Convert Avgörandedatum to a sensible value in the face of irregularities
+        # like '2010-11 30', '2011 03-23' '2011- 01-27' or '2009.08.28'
+        m = date_regex.match(head["Avgörandedatum"])
+        if m:
+            head["Avgörandedatum"] = "%s-%s-%s" % (m.group(1), m.group(2), m.group(3))
+        else:
+            raise ValueError("Unparseable date %s" % head["Avgörandedatum"])
+
+        # 9. Done!
+        return head
+
+    # create nice RDF from the sanitized metadata
+    def polish_metadata(self, head, doc):
 
         def ref_to_uri(ref):
             # FIXME: We'd like to retire legalref and replace it with
             # pyparsing grammars.
             nodes = self.rattsfall_parser.parse(ref)
+            assert isinstance(nodes[0], Link), "Couldn't make URI from ref %s" % ref
             uri = nodes[0].uri
             return localize_uri(uri)
 
         def dom_to_uri(domstol, malnr, avg):
             baseuri = self.config.url
             slug = self.slugs[domstol.lower()]
-            # note that malnr can be a separated list. split like we do below
-            first_malnr = re.split("och|,|;|\s", malnr)[0].strip()
+            # FIXME: maybe we should create multiple urls if we have multiple malnummers?
+            first_malnr = malnr[0]
             return "%(baseuri)sres/dv/%(slug)s/%(first_malnr)s/%(avg)s" % locals()
 
         def localize_uri(uri):
@@ -600,35 +700,19 @@ class DV(SwedishLegalSource):
                                    self.config.url + "res/sfs")
 
         def split_nja(value):
-            # "NJA 2008 s 567 (NJA 2008:86)"=>("NJA 2008 s 567", "NJA 2008:86")
-            # 'NJA 2011 s. 638(NJA2011:57)' => ("NJA 2011 s 638", "NJA 2001:57")
             return [x[:-1] for x in value.split("(")]
 
         def sokord_uri(value):
             return self.config.url + "concept/%s" % util.ucfirst(value).replace(' ', '_')
 
-        # 0. create Referat key if not present
-        if "Referat" not in head:
-            # For some courts (MD, AD, MOD?, MIG?) this is possible
-            head["Referat"] = basefile_to_referat(doc.basefile)
-
         # 1. mint uris and create the two Describers we'll use
-        try:
-            refuri = ref_to_uri(head["Referat"])
-        except AttributeError: # signals that something is wrong with
-                               # the current referat -- attempt to
-                               # solve if we can
-            if 'ADO/' in doc.basefile or 'MD/' in doc.basefile:
-                head["Referat"] = basefile_to_referat(doc.basefile)
-            else:
-                # do other kinds of data cleaning to head["Referat"]
-                pass
-            refuri = ref_to_uri(head["Referat"])
-            
+        refuri = ref_to_uri(head["Referat"])
+
             
         refdesc = Describer(doc.meta, refuri)
+        
         domuri = dom_to_uri(head["Domstol"],
-                            head["Målnummer"],
+                            head["_localid"],
                             head["Avgörandedatum"])
         domdesc = Describer(doc.meta, domuri)
 
@@ -642,12 +726,8 @@ class DV(SwedishLegalSource):
             elif label == "Domstol":
                 domdesc.rel(self.ns['dct'].publisher, self.lookup_resource(value))
             elif label == "Målnummer":
-                # occasionally more than one Malnummer is provided
-                # (c.f. AD 1994 nr 107, AD 2005-117, AD 2003-111) in a
-                # comma, semicolo or space separated list. AD 2006-105 even separates with " och "!
-                for v in re.split("och|,|;|\s", value):
-                    if v.strip():
-                        domdesc.value(self.ns['rpubl'].malnummer, v.strip())
+                for v in value:
+                    domdesc.value(self.ns['rpubl'].malnummer, v)
             elif label == "Domsnummer":
                 domdesc.value(self.ns['rpubl'].domsnummer, value)
             elif label == "Diarienummer":
@@ -655,7 +735,6 @@ class DV(SwedishLegalSource):
             elif label == "Avdelning":
                 domdesc.value(self.ns['rpubl'].avdelning, value)
             elif label == "Referat":
-
                 for pred, regex in {'rattsfallspublikation': r'([^ ]+)',
                                     'arsutgava': r'(\d{4})',
                                     'lopnummer': r'\d{4}(?:\:| nr )(\d+)',
@@ -668,24 +747,16 @@ class DV(SwedishLegalSource):
                             refdesc.rel(self.ns['rpubl'][pred], uri)
                         else:
                             refdesc.value(self.ns['rpubl'][pred], m.group(1))
+                refdesc.value(self.ns['dct'].identifier, value)
 
-                    if value.startswith("NJA"):
-                        from pudb import set_trace; set_trace()
-                        realvalue, extra = split_nja(value)
-                        ordinal = extra.split(" ")[1]
-                        
-                        refdesc.value(self.ns['dct'].bibliographicCitation,
-                                      extra)
-                        refdesc.rel(self.ns['owl'].sameAs,
-                                    self.config.url + "res/dv/nja/" + ordinal)
-                        refdesc.value(self.ns['dct'].identifier, realvalue)
-                    else:
-                        refdesc.value(self.ns['dct'].identifier, value)
+            elif label == "_nja_ordinal":
+                refdesc.value(self.ns['dct'].bibliographicCitation,
+                              value)
+                refdesc.rel(self.ns['owl'].sameAs,
+                            self.config.url + "res/dv/nja/" + value.split(" ")[1])
 
             elif label == "Avgörandedatum":
-                with util.c_locale():
-                    d = datetime.strptime(value, '%Y-%m-%d')
-                domdesc.value(self.ns['rpubl'].avgorandedatum, d)
+                domdesc.value(self.ns['rpubl'].avgorandedatum, self.parse_iso_date(value))
 
             elif label == "Lagrum":
                 for i in value:  # better be list not string
@@ -704,19 +775,8 @@ class DV(SwedishLegalSource):
                 for i in value.split(";"):
                     domdesc.value(self.ns['dct'].relation, util.normalize_space(i))
             elif label == "Sökord":
-                for s in self.re_delimSplit(value):
-                    s = util.normalize_space(s)
-                    if not s:
-                        continue
-                    # terms longer than 72 chars are not legitimate
-                    # terms. more likely descriptions. If a term has a - in
-                    # it, it's probably a separator between a term and a
-                    # description
-                    while len(s) >= 72 and " - " in s:
-                        h, s = s.split(" - ", 1)
-                        domdesc.rel(self.ns['dct'].subject, sokord_uri(h))
-                    if len(s) < 72:
-                        domdesc.rel(self.ns['dct'].subject, sokord_uri(s))
+                for s in value:
+                    domdesc.rel(self.ns['dct'].subject, sokord_uri(s))
 
         # 3. mint some owl:sameAs URIs
         refdesc.rel(self.ns['owl'].sameAs, self.sameas_uri(refuri))
@@ -734,11 +794,6 @@ class DV(SwedishLegalSource):
 
     def format_body(self, paras):
         return Body([Paragraph([x]) for x in paras])
-
-    # FIXME: port to list_basefiles_for("parse")
-    def ParseAll(self):
-        self._do_for_all(intermediate_dir, '.doc', self.Parse)
-        self._do_for_all(intermediate_dir, '.docx', self.Parse)
 
 # FIXME: convert to a CONSTRUCT query, save as res/sparql/dv-annotations.rq
 # Or maybe the default template should take a list of predicates, defaulting

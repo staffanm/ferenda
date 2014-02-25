@@ -128,7 +128,7 @@ class SwedishLegalSource(DocumentRepository):
     def lookup_resource(self, resource_label, cutoff=0.8, warn=True):
         """Given a text label refering to some kind of organization,
         person or other entity, eg. 'Justitiedepartementet Gransk',
-        return a URI for that entity. The text label does not need to
+        return a URIRef for that entity. The text label does not need to
         match exactly byte-for-byte, a fuzziness matching function
         returns any reasonably similar (adjusted by the cutoff
         parameter) entity."""
@@ -147,7 +147,7 @@ class SwedishLegalSource(DocumentRepository):
             if warn:
                 self.log.warning("Assuming that '%s' should be '%s'?" %
                                  (resource_label, fuzz[0]))
-            return self.lookup_resource(fuzz[0])
+            return URIRef(self.lookup_resource(fuzz[0]))
         else:
             self.log.warning("No good match for '%s'" % (resource_label))
             raise KeyError(resource_label)

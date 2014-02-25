@@ -1088,6 +1088,7 @@ with the *config* object as single parameter.
                                             'href': str(obj)}))
                     if not revlink:
                         children[-1].set('about', uri)
+                    # FIXME: May cause infinite recursion for some malformed graphs
                     render_head(g, str(obj), children)
                 elif isinstance(obj, URIRef):
                     if revlink:
