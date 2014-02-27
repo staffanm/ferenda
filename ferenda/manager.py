@@ -1220,6 +1220,8 @@ def _list_class_usage(cls):
     res = OrderedDict()
     for attrname in dir(cls):
         attr = getattr(cls, attrname)
+        if type(attr).__module__.startswith("rdflib."):
+            continue
         if hasattr(attr, "runnable"):
             doc = attr.__doc__
             if doc:

@@ -14,6 +14,7 @@ import re
 import zipfile
 from six import text_type as str
 from six.moves.urllib_parse import urljoin
+import tempfile
 
 # 3rdparty libs
 from rdflib import Namespace, URIRef
@@ -27,6 +28,7 @@ from ferenda.decorators import managedparsing
 from ferenda import util
 from ferenda.sources.legal.se.legalref import LegalRef, Link
 from ferenda.elements import Body, Paragraph
+from ferenda.elements.html import Strong, Em
 from . import SwedishLegalSource, RPUBL
 
 # Objektmodellen för rättsfall:
@@ -101,7 +103,7 @@ class DVStore(DocumentStore):
                 suffix = self.downloaded_suffix
         return self.path(basefile, "downloaded", suffix, version, attachment)
 
-    def intermediate_path(self, basefile):
+    def intermediate_path(self, basefile, version=None, attachment=None):
         return self.path(basefile, "intermediate", ".xml")
 
     def list_basefiles_for(self, action, basedir=None):
@@ -241,14 +243,22 @@ class DV(SwedishLegalSource):
     re_tabort_malnr = re.compile(
         r'([^_]*)_([^_\.]*)_?(\d*)_TABORT_\d+-\d+-\d+_?(\d*)(\.docx?)')
 
+    # temporary helper
+    def process_all_zipfiles(self):
+        self.downloadcount = 0
+        zippath = self.store.path('', 'downloaded/zips', '')
+        for zipfile in util.list_dirs(zippath, suffix=".zip"):
+            self.log.info("%s: Processing..." % zipfile)
+            self.process_zipfile(zipfile)
+
     def process_zipfile(self, zipfilename):
+        """Extract a named zipfile into appropriate documents"""
         removed = replaced = created = untouched = 0
         try:
             zipf = zipfile.ZipFile(zipfilename, "r")
         except zipfile.BadZipFile as e:
-            self.log.error("%s is not a valid zip file" % zipfilename)
-            # raise e
-            return
+            self.log.error("%s is not a valid zip file: %s" % (zipfilename,e))
+            return 
         for bname in zipf.namelist():
             if not isinstance(bname, str):  # py2
                 # Files in the zip file are encoded using codepage 437
@@ -256,38 +266,52 @@ class DV(SwedishLegalSource):
             else:
                 name = bname
             if "_notis_" in name:
-                continue
-            name = os.path.split(name)[1]
-            if 'BYTUT' in name:
-                m = self.re_bytut_malnr.match(name)
-            elif 'TABORT' in name:
-                m = self.re_tabort_malnr.match(name)
+                base, suffix = os.path.splitext(name)
+                segments = base.split("_")
+                coll, year = segments[0], segments[1]
+                # Extract this doc as a temp file -- we won't be
+                # creating an actual permanent file, but let
+                # extract_notis extract individual parts of this file
+                # to individual basefiles
+                fp = tempfile.NamedTemporaryFile("wb", suffix=suffix, delete=False)
+                fp.write(zipf.read(bname))
+                tempname = fp.name
+                r = self.extract_notis(tempname, year, coll)
+                created += r[0]
+                untouched += r[1]
+                os.unlink(tempname)
             else:
-                m = self.re_malnr.match(name)
-            if m:
-                (court, malnr, opt_referatnr, referatnr, suffix) = (
-                    m.group(1), m.group(2), m.group(3), m.group(4), m.group(5))
-                assert ((suffix == ".doc") or (suffix == ".docx")
-                        ), "Unknown suffix %s in %r" % (suffix, name)
-                if referatnr:
-                    basefile = "%s/%s_%s" % (court, malnr, referatnr)
-                elif opt_referatnr:
-                    basefile = "%s/%s_%s" % (court, malnr, opt_referatnr)
+                continue
+                name = os.path.split(name)[1]
+                if 'BYTUT' in name:
+                    m = self.re_bytut_malnr.match(name)
+                elif 'TABORT' in name:
+                    m = self.re_tabort_malnr.match(name)
                 else:
-                    basefile = "%s/%s" % (court, malnr)
-
-                outfile = self.store.path(basefile, 'downloaded', suffix)
-
-                if "TABORT" in name:
-                    self.log.info("%s: Removing" % basefile)
-                    if not os.path.exists(outfile):
-                        self.log.warning("%s: %s doesn't exist" % (basefile,
-                                                                   outfile))
+                    m = self.re_malnr.match(name)
+                if m:
+                    (court, malnr, opt_referatnr, referatnr, suffix) = (
+                        m.group(1), m.group(2), m.group(3), m.group(4), m.group(5))
+                    assert ((suffix == ".doc") or (suffix == ".docx")
+                            ), "Unknown suffix %s in %r" % (suffix, name)
+                    if referatnr:
+                        basefile = "%s/%s_%s" % (court, malnr, referatnr)
+                    elif opt_referatnr:
+                        basefile = "%s/%s_%s" % (court, malnr, opt_referatnr)
                     else:
-                        os.unlink(outfile)
-                    removed += 1
-                else:
-                    if "BYTUT" in name:
+                        basefile = "%s/%s" % (court, malnr)
+
+                    outfile = self.store.path(basefile, 'downloaded', suffix)
+
+                    if "TABORT" in name:
+                        self.log.info("%s: Removing" % basefile)
+                        if not os.path.exists(outfile):
+                            self.log.warning("%s: %s doesn't exist" % (basefile,
+                                                                       outfile))
+                        else:
+                            os.unlink(outfile)
+                        removed += 1
+                    elif "BYTUT" in name:
                         self.log.info("%s: Replacing with new" % basefile)
                         if not os.path.exists(outfile):
                             self.log.warning("%s: %s doesn't exist" %
@@ -314,15 +338,75 @@ class DV(SwedishLegalSource):
                     self.downloadcount += 1
                     if self.config.downloadmax and self.downloadcount >= self.config.downloadmax:
                         raise MaxDownloadsReached()
-            else:
-                self.log.warning('Could not interpret filename %r i %s' %
-                                (name, os.path.relpath(zipfilename)))
+                else:
+                    self.log.warning('Could not interpret filename %r i %s' %
+                                     (name, os.path.relpath(zipfilename)))
         self.log.debug('Processed %s, created %s, replaced %s, removed %s, untouched %s files' %
                        (os.path.relpath(zipfilename), created, replaced, removed, untouched))
 
-    re_NJAref = re.compile(r'(NJA \d{4} s\. \d+) \(alt. (NJA \d{4}:\d+)\)')
-    re_delimSplit = re.compile("[;,] ?").split
 
+    def extract_notis(self, docfile, year, coll="HDO"):
+        # Given a word document containing a set of "notisfall" from
+        # either HD or HFD (earlier RegR), spit out a intermediate XML
+        # file for each notis.
+        if coll == "HDO":
+            re_notisstart = re.compile("(?P<day>Den \d+:[ae]. |)(?P<ordinal>\d+)\. ?\((?P<malnr>\w \d+-\d+)\)", flags=re.UNICODE)
+            re_avdstart = re.compile("(Januari|Februari|Mars|April|Maj|Juni|Juli|Augusti|September|Oktober|November|December)$")
+        else: # REG / HFD
+            re_notisstart = re.compile("[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)")
+            re_avdstart = None
+        created = untouched = 0
+        intermediatefile = os.path.splitext(docfile)[0] + ".xml"
+        r = WordReader()
+        intermediatefile, filetype = r.read(docfile, intermediatefile)
+        soup = BeautifulSoup(util.readfile(intermediatefile))
+        if filetype == "docx":
+            iterator = soup.find_all("w:p")
+        else:
+            iterator = soup.find_all("para")
+        fp = None
+        avd_p = None
+        for p in iterator:
+            t = p.get_text().strip()
+            # print("...examining %s" % t[:50])
+            if re_avdstart:
+                # keep track of current month, store that in avd_p
+                m = re_avdstart.match(t)
+                if m:
+                    # print("   new month %s" % t)
+                    avd_p = p
+                    continue
+
+            m = re_notisstart.match(t)
+            if m:
+                ordinal = m.group("ordinal")
+                basefile = "%(coll)s/%(year)s_not_%(ordinal)s" % locals()
+                self.log.info("%s: Extracting from %s file" % (basefile, filetype))
+                created += 1
+                downloaded_path = self.store.path(basefile, 'downloaded', '.'+filetype)
+                with self.store._open(downloaded_path, "w"): 
+                    pass # just create an empty placeholder file
+                if fp:
+                    fp.write("</body>\n")
+                    fp.close()
+                fp = open(self.store.intermediate_path(basefile), "w")
+                fp.write("<body>\n")
+                if avd_p:
+                    fp.write(repr(avd_p))
+            if fp:
+                # print("    writing %s" % t.strip()[:40])
+                fp.write(repr(p))
+                fp.write("\n")
+        # print("    finishing")
+        if fp: # should always be the case
+            fp.write("</body>\n")
+            fp.close()
+        else:
+            self.log.error("%s/%s: No notis were extracted (%s)" %
+                           (coll,year,docfile))
+        return created, untouched
+
+    re_delimSplit = re.compile("[;,] ?").split
     labels = {'Rubrik': DCT.description,
               'Domstol': DCT['creator'],  # konvertera till auktoritetspost
               'Målnummer': RPUBL['malnummer'],
@@ -401,6 +485,7 @@ class DV(SwedishLegalSource):
         self.lagrum_parser = LegalRef(LegalRef.LAGRUM)
         self.rattsfall_parser = LegalRef(LegalRef.RATTSFALL)
         docfile = self.store.downloaded_path(doc.basefile)
+
         intermediatefile = self.store.intermediate_path(doc.basefile)
         r = WordReader()
         intermediatefile, filetype = r.read(docfile, intermediatefile)
@@ -419,7 +504,9 @@ class DV(SwedishLegalSource):
         # parse_antiword_docbook(). This might require some other tool
         # than antiword for old .doc files, as this throws away a LOT
         # of info.
-        if filetype == "docx":
+        if "not" in doc.basefile:
+            rawhead, rawbody = self.parse_not(patchedtext, doc.basefile, filetype)
+        elif filetype == "docx":
             rawhead, rawbody = self.parse_ooxml(patchedtext, doc.basefile)
         else:
             rawhead, rawbody = self.parse_antiword_docbook(patchedtext, doc.basefile)
@@ -435,6 +522,102 @@ class DV(SwedishLegalSource):
                                              # the document
         return True
 
+
+    def parse_not(self, text, basefile, filetype):
+        basefile_regex = re.compile("(?P<type>\w+)/(?P<year>\d+)_not_(?P<ordinal>\d+)")
+        referat_templ = {'REG': 'RÅ %(year)s not %(ordinal)s',
+                         'NJA': 'NJA %(year)s not %(ordinal)s',
+                         'HFD': 'HFD %(year)s not %(ordinal)s'}
+
+        head = {}
+        body = Body()
+
+        m = basefile_regex.match(basefile).groupdict()
+        head["Referat"] = referat_templ[m['type']] % m
+        
+        soup = BeautifulSoup(text, "xml")
+        if filetype == "docx":
+            iterator = soup.find_all("w:p")
+            # keep in sync w extract_notis
+            re_notisstart = re.compile("(?P<avgdatum>Den \d+:[ae]. |)(?P<ordinal>\d+)\. ?\((?P<malnr>\w \d+-\d+)\)", flags=re.UNICODE)
+            re_malnr = re_notisstart
+            # headers consist of the first two chunks (month, then
+            # date+ordinal+malnr)
+            header = iterator.pop(0), iterator[0] # need to re-read the second chunk later
+        else:
+            iterator = soup.find_all("para")
+            # keep in sync like above
+            re_notisstart = re.compile("[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)")
+            re_malnr = re.compile(r"\bD:(?P<malnr>\d+\-\d+)")
+            re_avgdatum = re.compile(r"\bA:(?P<avgdatum>\d+\-\d+\-\d+)")
+            re_sokord = re.compile("Uppslagsord: (?P<sokord>.*)", flags=re.DOTALL)
+            re_lagrum = re.compile("Lagrum: ?(?P<lagrum>.*)", flags=re.DOTALL)
+            # headers consists of the first five or six
+            # chunks. Doesn't end until "^Not \d+."
+            header = []
+            done = False
+            while not done:
+                if re.match("Not \d+\. ", iterator[0].get_text()):
+                    done = True
+                else:
+                    tmp = iterator.pop(0)
+                    if tmp.get_text().strip():
+                        # REG specialcase 
+                        if header and header[-1].get_text() == "Lagrum:":
+                            header[-1].append(list(tmp.children)[0])
+                        else:
+                            header.append(tmp)
+            
+        if "HDO" in basefile:
+            head['Domstol'] = "Högsta domstolen"
+        elif "HFD" in basefile:
+            head['Domstol'] = "Högsta förvaltningsdomstolen"
+        elif "REG" in basefile:
+            head['Domstol'] = "Regeringsrätten"
+        else:
+            raise ValueError("Unsupported: %s" % basefile)
+        for node in header:
+            t = node.get_text()
+            # if not malnr, avgdatum found, look for those
+            for fld, key, rex in (('Målnummer', 'malnr', re_malnr),
+                                  ('Avgörandedatum', 'avgdatum', re_avgdatum),
+                                  ('Lagrum', 'lagrum', re_lagrum),
+                                  ('Sökord', 'sokord', re_sokord)):
+                m = rex.search(t)
+                if m and m.group(key):
+                    head[fld] = m.group(key)
+
+        # Do a basic conversion of the rest (bodytext) to Element objects
+        for node in iterator:
+            p = Paragraph()
+            if filetype == "doc": # docbook tree - simple
+                for part in node:
+                    if part.name:
+                        t = part.get_text().strip()
+                        if not t:
+                            continue
+                    if part.name == "emphasis":
+                        if part.get("role") == "bold":
+                            p.append(Strong([t]))
+                        else:
+                            p.append(Em([t]))
+                    else:
+                        p.append(part)
+            else: # OOXML - hairy, but we only care about bold/italic
+                for part in node.find_all("w:r"):
+                    if part.name:
+                        t = part.get_text().strip()
+                        if not t:
+                            continue
+                    if part.find("w:rPr").find("w:b"):
+                        p.append(Strong([t]))
+                    elif part.find("w:rPr").find("w:i"):
+                        p.append(Em([t]))
+                    else:
+                        p.append(part)
+            body.append(p)
+        return head, body
+        
     def parse_ooxml(self, text, basefile):
         soup = BeautifulSoup(text)
         for instrtext in soup.find_all("w:instrtext"):
@@ -493,7 +676,7 @@ class DV(SwedishLegalSource):
         body = []
         for p in soup.find(text=re.compile('EFERAT')).find_parent('w:tr').find_next_sibling('w:tr').find_all('w:p'):
             ptext = ''
-            for e in p.findAll("w:t"):
+            for e in p.find_all("w:t"):
                 ptext += e.string
             body.append(ptext)
 
@@ -530,7 +713,7 @@ class DV(SwedishLegalSource):
             head['Referat'] = parts[1]
         else:
             # alternativ står de på första raden i en informaltable
-            row = soup.find("informaltable").tgroup.tbody.row.findAll('entry')
+            row = soup.find("informaltable").tgroup.tbody.row.find_all('entry')
             head['Domstol'] = row[0].get_text(strip=True)
             head['Referat'] = row[1].get_text(strip=True)
 
@@ -635,14 +818,15 @@ class DV(SwedishLegalSource):
         # "AD2011 nr 17", "HFD_2012 ref.58", "RH 2012_121", "RH2010
         # :180", "MD:2012:5", "MIG2011:14", "-MÖD 2010:32" and many
         # MANY more
-        m = referat_regex.search(head["Referat"])
-        if m:
-            if m.group("type") in referat_templ:
-                head["Referat"] = referat_templ[m.group("type")] % m.groupdict()
+        if " not " not in head["Referat"]: # notiser always have OK Referat
+            m = referat_regex.search(head["Referat"])
+            if m:
+                if m.group("type") in referat_templ:
+                    head["Referat"] = referat_templ[m.group("type")] % m.groupdict()
+                else:
+                    head["Referat"] = referat_templ[None] % m.groupdict()
             else:
-                head["Referat"] = referat_templ[None] % m.groupdict()
-        else:
-            raise ValueError("Unparseable ref '%s'" % head["Referat"])
+                raise ValueError("Unparseable ref '%s'" % head["Referat"])
 
         # 7. Convert Sökord string to an actual list 
         res = []

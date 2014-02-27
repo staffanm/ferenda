@@ -486,6 +486,16 @@ class DocumentStore(object):
         """
         return self.path(basefile, 'intermediate', '.xml', version, attachment)
 
+    def open_intermediate(self, basefile, mode="r", version=None, attachment=None):
+        """Opens files for reading and writing,
+        c.f. :meth:`~ferenda.DocumentStore.open`. The parameters are
+        the same as for
+        :meth:`~ferenda.DocumentStore.intermediate_path`.
+        """
+        from pudb import set_trace; set_trace()
+        filename = self.intermediate_path(basefile, version, attachment)
+        return self._open(filename, mode)
+
     def parsed_path(self, basefile, version=None, attachment=None):
         """Get the full path for the parsed XHTML file for the given
         basefile.
