@@ -247,16 +247,18 @@ class DV(SwedishLegalSource):
     def process_all_zipfiles(self):
         self.downloadcount = 0
         zippath = self.store.path('', 'downloaded/zips', '')
-        for zipfile in util.list_dirs(zippath, suffix=".zip"):
-            self.log.info("%s: Processing..." % zipfile)
-            self.process_zipfile(zipfile)
+        for zipfilename in util.list_dirs(zippath, suffix=".zip"):
+            self.log.info("%s: Processing..." % zipfilename)
+            self.process_zipfile(zipfilename)
 
     def process_zipfile(self, zipfilename):
         """Extract a named zipfile into appropriate documents"""
         removed = replaced = created = untouched = 0
+        if not hasattr(self, 'downloadcount'):
+            self.downloadcount = 0
         try:
             zipf = zipfile.ZipFile(zipfilename, "r")
-        except zipfile.BadZipFile as e:
+        except zipfile.BadZipfile as e:
             self.log.error("%s is not a valid zip file: %s" % (zipfilename,e))
             return 
         for bname in zipf.namelist():
@@ -274,14 +276,15 @@ class DV(SwedishLegalSource):
                 # extract_notis extract individual parts of this file
                 # to individual basefiles
                 fp = tempfile.NamedTemporaryFile("wb", suffix=suffix, delete=False)
-                fp.write(zipf.read(bname))
+                filebytes = zipf.read(bname)
+                fp.write(filebytes)
+                fp.close()
                 tempname = fp.name
                 r = self.extract_notis(tempname, year, coll)
                 created += r[0]
                 untouched += r[1]
                 os.unlink(tempname)
             else:
-                continue
                 name = os.path.split(name)[1]
                 if 'BYTUT' in name:
                     m = self.re_bytut_malnr.match(name)
@@ -353,7 +356,7 @@ class DV(SwedishLegalSource):
             re_notisstart = re.compile("(?P<day>Den \d+:[ae]. |)(?P<ordinal>\d+)\. ?\((?P<malnr>\w \d+-\d+)\)", flags=re.UNICODE)
             re_avdstart = re.compile("(Januari|Februari|Mars|April|Maj|Juni|Juli|Augusti|September|Oktober|November|December)$")
         else: # REG / HFD
-            re_notisstart = re.compile("[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)")
+            re_notisstart = re.compile("[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)", flags=re.UNICODE)
             re_avdstart = None
         created = untouched = 0
         intermediatefile = os.path.splitext(docfile)[0] + ".xml"
@@ -526,30 +529,41 @@ class DV(SwedishLegalSource):
     def parse_not(self, text, basefile, filetype):
         basefile_regex = re.compile("(?P<type>\w+)/(?P<year>\d+)_not_(?P<ordinal>\d+)")
         referat_templ = {'REG': 'RÅ %(year)s not %(ordinal)s',
-                         'NJA': 'NJA %(year)s not %(ordinal)s',
+                         'HDO': 'NJA %(year)s not %(ordinal)s',
                          'HFD': 'HFD %(year)s not %(ordinal)s'}
 
         head = {}
         body = Body()
 
         m = basefile_regex.match(basefile).groupdict()
-        head["Referat"] = referat_templ[m['type']] % m
+        coll = m['type']
+        head["Referat"] = referat_templ[coll] % m
         
         soup = BeautifulSoup(text, "xml")
         if filetype == "docx":
-            iterator = soup.find_all("w:p")
+            ptag = "p"
+        else:
+            ptag = "para"
+
+        iterator = soup.find_all(ptag)
+        if coll == "HDO":
             # keep in sync w extract_notis
-            re_notisstart = re.compile("(?P<avgdatum>Den \d+:[ae]. |)(?P<ordinal>\d+)\. ?\((?P<malnr>\w \d+-\d+)\)", flags=re.UNICODE)
-            re_malnr = re_notisstart
+            re_notisstart = re.compile("(?:Den (?P<avgdatum>\d+):[ae]. |)(?P<ordinal>\d+)\. ?\((?P<malnr>\w \d+-\d+)\)", flags=re.UNICODE)
+            re_avgdatum = re_malnr = re_notisstart
+            re_lagrum = re_sokord = None
             # headers consist of the first two chunks (month, then
             # date+ordinal+malnr)
-            header = iterator.pop(0), iterator[0] # need to re-read the second chunk later
+            header = iterator.pop(0), iterator[0] # need to re-read
+                                                  # the second chunk
+                                                  # later
+            curryear = m['year']
+            currmonth = self.swedish_months[header[0].get_text().lower()]
         else:
             iterator = soup.find_all("para")
             # keep in sync like above
             re_notisstart = re.compile("[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)")
             re_malnr = re.compile(r"\bD:(?P<malnr>\d+\-\d+)")
-            re_avgdatum = re.compile(r"\bA:(?P<avgdatum>\d+\-\d+\-\d+)")
+            re_avgdatum = re.compile(r"\b[AD]:(?P<avgdatum>\d+\-\d+\-\d+)")
             re_sokord = re.compile("Uppslagsord: (?P<sokord>.*)", flags=re.DOTALL)
             re_lagrum = re.compile("Lagrum: ?(?P<lagrum>.*)", flags=re.DOTALL)
             # headers consists of the first five or six
@@ -568,14 +582,14 @@ class DV(SwedishLegalSource):
                         else:
                             header.append(tmp)
             
-        if "HDO" in basefile:
+        if coll == "HDO":
             head['Domstol'] = "Högsta domstolen"
-        elif "HFD" in basefile:
+        elif coll == "HFD":
             head['Domstol'] = "Högsta förvaltningsdomstolen"
-        elif "REG" in basefile:
+        elif coll == "REG":
             head['Domstol'] = "Regeringsrätten"
         else:
-            raise ValueError("Unsupported: %s" % basefile)
+            raise ValueError("Unsupported: %s" % coll)
         for node in header:
             t = node.get_text()
             # if not malnr, avgdatum found, look for those
@@ -583,9 +597,16 @@ class DV(SwedishLegalSource):
                                   ('Avgörandedatum', 'avgdatum', re_avgdatum),
                                   ('Lagrum', 'lagrum', re_lagrum),
                                   ('Sökord', 'sokord', re_sokord)):
+                if not rex: continue
                 m = rex.search(t)
                 if m and m.group(key):
-                    head[fld] = m.group(key)
+                    if fld in ('Lagrum'): # Sökord is split by sanitize_metadata
+                        head[fld] = self.re_delimSplit(m.group(key))
+                    else:
+                        head[fld] = m.group(key)
+
+        if coll == "HDO" and 'Avgörandedatum' in head:
+            head['Avgörandedatum'] = "%s-%02d-%02d" % (curryear, currmonth, int(head['Avgörandedatum']))
 
         # Do a basic conversion of the rest (bodytext) to Element objects
         for node in iterator:
@@ -602,7 +623,7 @@ class DV(SwedishLegalSource):
                         else:
                             p.append(Em([t]))
                     else:
-                        p.append(part)
+                        p.append(str(part))
             else: # OOXML - hairy, but we only care about bold/italic
                 for part in node.find_all("w:r"):
                     if part.name:
@@ -614,7 +635,7 @@ class DV(SwedishLegalSource):
                     elif part.find("w:rPr").find("w:i"):
                         p.append(Em([t]))
                     else:
-                        p.append(part)
+                        p.append(str(part))
             body.append(p)
         return head, body
         
@@ -783,13 +804,18 @@ class DV(SwedishLegalSource):
         # 3. Convert head['Målnummer'] to a list. Occasionally more than one
         # Malnummer is provided (c.f. AD 1994 nr 107, AD
         # 2005-117, AD 2003-111) in a comma, semicolo or space
-        # separated list. AD 2006-105 even separates with " och "
+        # separated list. AD 2006-105 even separates with " och ".
+        #
+        # HOWEVER, "Ö 2475-12" must not be converted to ["Ö2475-12"], not ['Ö', '2475-12']
         if head.get("Målnummer"):
-            res = []
-            for v in re.split("och|,|;|\s", head['Målnummer']):
-                if v.strip():
-                    res.append(v.strip())
-            head['Målnummer'] = res
+            if head["Målnummer"][:2] in ('Ö ', 'B ', 'T '):
+                head["Målnummer"] = [head["Målnummer"].replace(" ", "")]
+            else:
+                res = []
+                for v in re.split("och|,|;|\s", head['Målnummer']):
+                    if v.strip():
+                        res.append(v.strip())
+                head['Målnummer'] = res
         
         # 4. Create a general term for Målnummer or Domsnummer to act
         # as a local identifier
@@ -806,7 +832,7 @@ class DV(SwedishLegalSource):
         # "NJA 2008 s 567 (NJA 2008:86)"=>("NJA 2008 s 567", "NJA 2008:86")
         # "NJA 2011 s. 638(NJA2011:57)" => ("NJA 2011 s 638", "NJA 2001:57")
         # "NJA 2012 s. 16(2012:2)" => ("NJA 2012 s 16", "NJA 2012:2")
-        if "NJA" in head["Referat"]:
+        if "NJA" in head["Referat"] and " not " not in head["Referat"]:
             m = nja_regex.match(head["Referat"])
             if m:
                 head["Referat"] = "NJA %s s %s" % (m.group(1), m.group(2))
@@ -846,11 +872,19 @@ class DV(SwedishLegalSource):
                     res.append(s)
             head["Sökord"] = res
 
-        # 8. Convert Avgörandedatum to a sensible value in the face of irregularities
-        # like '2010-11 30', '2011 03-23' '2011- 01-27' or '2009.08.28'
+        # 8. Convert Avgörandedatum to a sensible value in the face of
+        # irregularities like '2010-11 30', '2011 03-23' '2011-
+        # 01-27', '2009.08.28' or '07-12-28'
         m = date_regex.match(head["Avgörandedatum"])
         if m:
-            head["Avgörandedatum"] = "%s-%s-%s" % (m.group(1), m.group(2), m.group(3))
+            if len(m.group(1)) < 4:
+                if int(m.group(1) <= 80): # '80-01-01' => '1980-01-01',
+                    year = '19' + m.group(1) 
+                else:                     # '79-01-01' => '2079-01-01',
+                    year = '20' + m.group(1) 
+            else:
+                year = m.group(1)
+            head["Avgörandedatum"] = "%s-%s-%s" % (year, m.group(2), m.group(3))
         else:
             raise ValueError("Unparseable date %s" % head["Avgörandedatum"])
 
@@ -921,7 +955,7 @@ class DV(SwedishLegalSource):
             elif label == "Referat":
                 for pred, regex in {'rattsfallspublikation': r'([^ ]+)',
                                     'arsutgava': r'(\d{4})',
-                                    'lopnummer': r'\d{4}(?:\:| nr )(\d+)',
+                                    'lopnummer': r'\d{4}(?:\:| nr | not )(\d+)',
                                     'sidnummer': r's.? ?(\d+)'}.items():
                     m = re.search(regex, value)
                     if m:
@@ -968,7 +1002,10 @@ class DV(SwedishLegalSource):
 
         # 4. Add some same-for-everyone properties
         refdesc.rel(self.ns['dct'].publisher, self.lookup_resource('Domstolsverket'))
-        refdesc.rdftype(self.ns['rpubl'].Rattsfallsreferat)
+        if 'not' in head['Referat']:
+            refdesc.rdftype(self.ns['rpubl'].Rattsfallsnotis)
+        else:
+            refdesc.rdftype(self.ns['rpubl'].Rattsfallsreferat)
         domdesc.rdftype(self.ns['rpubl'].VagledandeDomstolsavgorande)
         refdesc.rel(self.ns['rpubl'].referatAvDomstolsavgorande, domuri)
         # 5. assert that we have everything we need

@@ -1222,7 +1222,9 @@ class LegalRef:
         if 'lopnr' in attributes and ":" in attributes['lopnr']:
             (attributes['ar'], attributes['lopnr']) = lopnr.split(":", 1)
 
-        if attributes['domstol'] == 'NJA':
+        if "not" in attributes['rattsfall']:
+            res += "%s/not/%s" % (attributes['ar'], attributes['lopnr'])
+        elif attributes['domstol'] == 'NJA':
             # FIXME: URIs should be based on publikationsordinal, not
             # pagenumber (which this in effect is) - but this requires
             # a big lookup table/database/graph with

@@ -7,8 +7,8 @@ NJARattsfallRefID ::= NJARefID, Whitespace, ArRefID, NJASeparator, SidnrRefID
 DomstolRefID      ::= 'RÅ'/'AD'/'RH'/'RK'/'MÖD'/'MIG'/'MD'/'HFD'
 NJARefID          ::= 'NJA'
 ArRefID           ::= LangtAr
-Separator         ::= ((Whitespace/Hyphen), 'ref'/'nr', Period?, Whitespace?)/(Whitespace?,(Colon/Hyphen),Whitespace?)
-NJASeparator      ::= Whitespace,'s',Period?, Whitespace?
+Separator         ::= ((Whitespace/Hyphen), 'ref'/'nr'/'not', Period?, Whitespace?)/(Whitespace?,(Colon/Hyphen),Whitespace?)
+NJASeparator      ::= Whitespace,'s'/'not',Period?, Whitespace?
 LopnrRefID        ::= number
 
 # ------------ end of rattsfall.ebnf ----------------

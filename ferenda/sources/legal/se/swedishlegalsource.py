@@ -99,6 +99,20 @@ class SwedishLegalSource(DocumentRepository):
     swedish_ordinal_dict = dict(list(zip(
         swedish_ordinal_list, list(range(1, len(swedish_ordinal_list) + 1)))))
 
+    swedish_months = {"januari": 1,
+                      "februari": 2,
+                      "mars": 3,
+                      "april": 4,
+                      "maj": 5,
+                      "juni": 6,
+                      "juli": 7,
+                      "augusti": 8,
+                      "september": 9,
+                      "oktober": 10,
+                      "november": 11,
+                      "december": 12,
+                      "\xe5r": 12}
+
     def get_default_options(self):
         resource_path = os.path.normpath(
             os.path.dirname(__file__) + "../../../../res/etc/authrec.n3")
@@ -181,31 +195,18 @@ class SwedishLegalSource(DocumentRepository):
 
     def parse_swedish_date(self, datestr):
         # assume strings on the form "3 februari 2010"
-        months = {"januari": 1,
-                  "februari": 2,
-                  "mars": 3,
-                  "april": 4,
-                  "maj": 5,
-                  "juni": 6,
-                  "juli": 7,
-                  "augusti": 8,
-                  "september": 9,
-                  "oktober": 10,
-                  "november": 11,
-                  "december": 12,
-                  "\xe5r": 12}
         # strings on the form "vid utg\xe5ngen av december 1999"
         if datestr.startswith("vid utg\xe5ngen av"):
             import calendar
             (x, y, z, month, year) = datestr.split()
-            month = months[month]
+            month = self.swedish_months[month]
             year = int(year)
             day = calendar.monthrange(year, month)[1]
         else:
             # assume strings on the form "3 februari 2010"
             (day, month, year) = datestr.split()
             day = int(day)
-            month = months[month]
+            month = self.swedish_months[month]
             year = int(year)
         return date(year, month, day)
 
