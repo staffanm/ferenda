@@ -492,7 +492,6 @@ class DocumentStore(object):
         the same as for
         :meth:`~ferenda.DocumentStore.intermediate_path`.
         """
-        from pudb import set_trace; set_trace()
         filename = self.intermediate_path(basefile, version, attachment)
         return self._open(filename, mode)
 

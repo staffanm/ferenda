@@ -20,7 +20,7 @@ import tempfile
 from rdflib import Namespace, URIRef
 import requests
 import lxml.html
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 
 # my libs
 from ferenda import DocumentStore, Describer, WordReader
@@ -369,6 +369,7 @@ class DV(SwedishLegalSource):
             iterator = soup.find_all("para")
         fp = None
         avd_p = None
+        day = None
         for p in iterator:
             t = p.get_text().strip()
             # print("...examining %s" % t[:50])
@@ -383,6 +384,20 @@ class DV(SwedishLegalSource):
             m = re_notisstart.match(t)
             if m:
                 ordinal = m.group("ordinal")
+                try:
+                    if m.group("day"):
+                        day = m.group("day")
+                    else:
+                        # inject current day in p's first element (which
+                        # should be a <emphasis role="bold" or equivalent).
+                        subnode = None
+                        for c in p.children:
+                            if isinstance(c, NavigableString):
+                                c.string.replace_with(day + str(c.string))
+                                break
+                except IndexError:
+                    pass
+                            
                 basefile = "%(coll)s/%(year)s_not_%(ordinal)s" % locals()
                 self.log.info("%s: Extracting from %s file" % (basefile, filetype))
                 created += 1
@@ -392,6 +407,7 @@ class DV(SwedishLegalSource):
                 if fp:
                     fp.write("</body>\n")
                     fp.close()
+                util.ensure_dir(self.store.intermediate_path(basefile))
                 fp = open(self.store.intermediate_path(basefile), "w")
                 fp.write("<body>\n")
                 if avd_p:
@@ -400,7 +416,6 @@ class DV(SwedishLegalSource):
                 # print("    writing %s" % t.strip()[:40])
                 fp.write(repr(p))
                 fp.write("\n")
-        # print("    finishing")
         if fp: # should always be the case
             fp.write("</body>\n")
             fp.close()
@@ -557,13 +572,12 @@ class DV(SwedishLegalSource):
                                                   # the second chunk
                                                   # later
             curryear = m['year']
-            currmonth = self.swedish_months[header[0].get_text().lower()]
+            currmonth = self.swedish_months[header[0].get_text().strip().lower()]
         else:
-            iterator = soup.find_all("para")
             # keep in sync like above
             re_notisstart = re.compile("[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)")
-            re_malnr = re.compile(r"\bD:(?P<malnr>\d+\-\d+)")
-            re_avgdatum = re.compile(r"\b[AD]:(?P<avgdatum>\d+\-\d+\-\d+)")
+            re_malnr = re.compile(r"D:(?P<malnr>\d+\-\d+)")
+            re_avgdatum = re.compile(r"[AD]:(?P<avgdatum>\d+\-\d+\-\d+)")
             re_sokord = re.compile("Uppslagsord: (?P<sokord>.*)", flags=re.DOTALL)
             re_lagrum = re.compile("Lagrum: ?(?P<lagrum>.*)", flags=re.DOTALL)
             # headers consists of the first five or six
@@ -821,9 +835,10 @@ class DV(SwedishLegalSource):
         # as a local identifier
         if head.get("Målnummer"):
             head["_localid"] = head["Målnummer"]
-        else:
+        elif head.get("Domsnummer"):
             head["_localid"] = head["Domsnummer"]
-
+        else:
+            raise ValueError("Required key missing")
 
         # 5. For NJA, Canonicalize the identifier through a very
         # forgiving regex and split of the alternative identifier

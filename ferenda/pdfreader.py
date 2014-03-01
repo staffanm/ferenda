@@ -288,8 +288,6 @@ all text in a Textbox has the same font and size.
 
         # self.__fontspecid = kwargs['font']
         self.font = kwargs['font']
-        if 'fontspec' not in kwargs:
-            from pudb import set_trace; set_trace()
         self.__fontspec = kwargs['fontspec'] 
 
         del kwargs['top']

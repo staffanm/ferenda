@@ -1222,7 +1222,8 @@ class LegalRef:
         if 'lopnr' in attributes and ":" in attributes['lopnr']:
             (attributes['ar'], attributes['lopnr']) = lopnr.split(":", 1)
 
-        if "not" in attributes['rattsfall']:
+        rf = attributes['njarattsfall'] if 'njarattsfall' in attributes else attributes['rattsfall']
+        if "not" in rf:
             res += "%s/not/%s" % (attributes['ar'], attributes['lopnr'])
         elif attributes['domstol'] == 'NJA':
             # FIXME: URIs should be based on publikationsordinal, not
