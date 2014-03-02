@@ -25,9 +25,9 @@
         <http://localhost:8000/concept/Ersättning>,
         <http://localhost:8000/concept/Rättshjälp> ;
     dct:title "Bestämmelsen i 27 § andra stycket rättshjälpslagen (1996:1619) om ersättning till rättshjälpsbiträde för arbete som utförts före ansökan om rättshjälp har, till skillnad från motsvarande bestämmelse i 1972 års rättshjälpslag, inte ansetts ge stöd för att begränsa ersättningsrätten till att avse arbete som utförts inom den närmaste månaden före ansökan."@sv ;
-    rpubl:avdelning <http://localhost:8000/res/dv/nja/1> ;
+    rpubl:avdelning "1" ;
     rpubl:avgorandedatum "2007-05-16T00:00:00"^^xsd:dateTime ;
     rpubl:lagrum <http://localhost:8000/res/sfs/1990:998#P27S2> ;
-    rpubl:malnummer <http://localhost:8000/res/dv/nja/Ö4503-04> ;
+    rpubl:malnummer "Ö4503-04" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/hd/Ö4503-04/2007-05-16> .
 

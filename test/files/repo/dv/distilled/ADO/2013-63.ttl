@@ -23,9 +23,9 @@
         <http://localhost:8000/concept/Tillfällig_föräldrapenning> ;
     dct:title "En arbetsgivare har krävt att en arbetstagare som anmält ledighet med tillfällig föräldrapenning ska uppvisa läkarintyg avseende barnets sjukdom. Sedan arbetstagaren motsatt sig detta och har hon tilldelats en varning, bl.a. för olovlig frånvaro den aktuella dagen. Arbetsdomstolen har funnit att arbetstagaren har missgynnats i strid med 16 § föräldraledighetslagen."@sv ;
     rpubl:avgorandedatum "2013-08-21T00:00:00"^^xsd:dateTime ;
-    rpubl:domsnummer <http://localhost:8000/res/dv/ad/2013-63> ;
+    rpubl:domsnummer "2013-63" ;
     rpubl:lagrum <http://localhost:8000/res/sfs/1995:584#P16> ;
-    rpubl:malnummer <http://localhost:8000/res/dv/ad/B-114-2012> ;
+    rpubl:malnummer "B-114-2012" ;
     rpubl:rattsfall <http://localhost:8000/res/dv/ad/2009:56>,
         <http://localhost:8000/res/dv/ad/2011:23>,
         <http://localhost:8000/res/dv/ad/2013:18> ;

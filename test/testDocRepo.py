@@ -17,6 +17,7 @@ import time
 import calendar
 import json
 import copy
+import unicodedata
 
 import lxml.etree as etree
 from lxml.etree import XSLT
@@ -1091,6 +1092,8 @@ class Repo(RepoTester):
                           text='This is the second main document part ',
                           identifier='123(A)\xb62')]
             mock_method.assert_has_calls(calls)
+            # make sure the extra link element in the header did not cause a call
+            self.assertEquals(4, mock_method.call_count)
 
     test_rdf_xml = b"""<?xml version="1.0" encoding="utf-8"?>
 <rdf:RDF
@@ -1154,6 +1157,24 @@ class Repo(RepoTester):
         self.assertEqual(util.readfile(otherrepo.store.dependencies_path("res-b")),
                          dependencyfile)
         #  4.3 no other deps files exists in datadir
+        self.assertEqual(2,
+                         len(list(util.list_dirs(self.datadir, '.txt'))))
+
+        # 5. Finally, create a basefile with a complicated name
+        # (KFD-normalized latin-1 name,which yields characters outside
+        # of latin-1) that relates to res-a
+        bf = unicodedata.normalize("NFD", "räksmörgås")
+        with self.repo.store.open_distilled(bf, 'wb') as fp:
+            fp.write(self.test_rdf_xml)
+        # 5.1 relate it
+        self.repo.relate_dependencies(bf, repos)
+        
+        # 5.2 assert that it has been recorded
+        dependencyline = self.repo.store.parsed_path(bf) + os.linesep
+        self.assertIn(dependencyline,
+                      util.readfile(self.repo.store.dependencies_path("res-a")))
+        self.assertIn(dependencyline,
+                      util.readfile(otherrepo.store.dependencies_path("res-b")))
         self.assertEqual(2,
                          len(list(util.list_dirs(self.datadir, '.txt'))))
 

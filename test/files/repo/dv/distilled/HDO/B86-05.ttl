@@ -31,7 +31,7 @@
         <http://localhost:8000/concept/Rättsvillfarelse>,
         <http://localhost:8000/concept/Smuggling> ;
     dct:title "Bestämmelsen i 8 § smugglingslagen om \"tull, skatt eller annan avgift\" har befunnits tillämplig i fråga om en i EG-förordningen nr (EEG) 1470/2001 föreskriven antidumpningstull. Det har ansetts förenligt med regeringsformens bestämmelser om normgivning och med legalitetsprincipen att straffbestämmelsen såvitt gäller tullplikten fått sitt innehåll utfyllt av föreskrifter i en EG-förordning. Undandragande av pålagor som avses i den nämnda förordningen har bedömts rikta sig mot \"det allmänna\". Även fråga om EG-förordningen utgör en in casu-lagstiftning."@sv ;
-    rpubl:avdelning <http://localhost:8000/res/dv/nja/2> ;
+    rpubl:avdelning "2" ;
     rpubl:avgorandedatum "2007-04-04T00:00:00"^^xsd:dateTime ;
     rpubl:lagrum <http://localhost:8000/res/sfs/1974:152>,
         <http://localhost:8000/res/sfs/1974:152#K10P5>,
@@ -46,6 +46,6 @@
         <http://localhost:8000/res/sfs/2000:1225>,
         <http://localhost:8000/res/sfs/2000:1225#P8>,
         <http://localhost:8000/res/sfs/2000:1281> ;
-    rpubl:malnummer <http://localhost:8000/res/dv/nja/B86-05> ;
+    rpubl:malnummer "B86-05" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/hd/B86-05/2007-04-04> .
 

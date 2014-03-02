@@ -3,12 +3,12 @@
  "https://lagen.nu/dv/downloaded/NJA/NJA_referat_2007.zip": {
      "file": "NJA_referat_2007.zip",
      "charset": null,
-     "expect": "downloaded/NJA/NJA_referat_2007.zip"
+     "expect": "downloaded/zips/NJA/NJA_referat_2007.zip"
  },
  "https://lagen.nu/dv/downloaded/referat_2013-08-23.zip": {
      "file": "referat_2013-08-23.zip",
      "charset": null,
-     "expect": "downloaded/referat_2013-08-23.zip"
+     "expect": "downloaded/zips/referat_2013-08-23.zip"
  },
  "ADO/2013-63": {"expect": "downloaded/ADO/2013-63.docx",
 		 "file": "ADO_2013-63.docx"},

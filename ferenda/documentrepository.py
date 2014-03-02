@@ -1338,8 +1338,8 @@ parsed document path to that documents dependency file."""
                         present = True
         if not present:
             with self.store.open_dependencies(basefile, "ab") as fp:
-                fp.write(dependencyfile.encode("utf-8"))
-                fp.write("\n")
+                fp.write((dependencyfile+"\n").encode("utf-8"))
+
 
         return not present  # return True if we added something, False otherwise
 
@@ -1361,7 +1361,8 @@ parsed document path to that documents dependency file."""
             desc = Describer(g.parse(data=util.readfile(self.store.distilled_path(basefile))))
             dct = self.ns['dct']
 
-            for resource in tree.findall(".//*[@about]"):
+            body = tree.find(".//{http://www.w3.org/1999/xhtml}body")
+            for resource in [body] + body.findall(".//*[@about]"):
                 if resource.tag == "{http://www.w3.org/1999/xhtml}head":
                     continue
                 about = resource.get('about')
