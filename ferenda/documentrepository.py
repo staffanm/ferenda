@@ -1332,11 +1332,14 @@ parsed document path to that documents dependency file."""
         if os.path.exists(self.store.dependencies_path(basefile)):
             with self.store.open_dependencies(basefile) as fp:
                 for line in fp:
+                    if isinstance(line, bytes):
+                       line = line.decode('utf-8') 
                     if line.strip() == dependencyfile:
                         present = True
         if not present:
-            with self.store.open_dependencies(basefile, "a") as fp:
-                fp.write(dependencyfile + "\n")
+            with self.store.open_dependencies(basefile, "ab") as fp:
+                fp.write(dependencyfile.encode("utf-8"))
+                fp.write("\n")
 
         return not present  # return True if we added something, False otherwise
 
@@ -1355,7 +1358,7 @@ parsed document path to that documents dependency file."""
             indexer = self._get_fulltext_indexer()
             tree = etree.parse(self.store.parsed_path(basefile))
             g = Graph()
-            desc = Describer(g.parse(self.store.distilled_path(basefile)))
+            desc = Describer(g.parse(data=util.readfile(self.store.distilled_path(basefile))))
             dct = self.ns['dct']
 
             for resource in tree.findall(".//*[@about]"):

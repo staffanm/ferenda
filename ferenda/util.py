@@ -515,7 +515,7 @@ def resource_extract(resource_name, outfile, params={}):
 # http://stackoverflow.com/a/7142094
 # def print_open_fds():
 #     '''
-#     return the number of open file descriptors for current process
+#     Print the open file descriptors for current process
 #
 #     .. warning: will only work on UNIX-like os-es.
 #     '''

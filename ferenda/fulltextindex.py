@@ -7,6 +7,7 @@ import re
 import shutil
 import sys
 
+import six
 from six.moves.urllib_parse import quote
 import requests
 import requests.exceptions
@@ -446,14 +447,21 @@ class ElasticSearchIndex(RemoteIndex):
 
     def _update_payload(self, uri, repo, basefile, title, identifier, text, **kwargs):
         safe = ''
-        if sys.version_info < (2, 7, 0):
+        if six.PY2:
             # urllib.quote in python 2.6 cannot handle unicode values
-            # for the safe parameter (not even empty). FIXME: We
+            # for the safe parameter (not even empty). urllib.quote in
+            # python 2.7 handles it, but may fail later on. FIXME: We
             # should create a shim as ferenda.compat.quote and use
             # that
             safe = safe.encode('ascii') # pragma: no cover
 
-        relurl = "%s/%s" % (repo, quote(basefile, safe=safe))  # eg type, id
+        # quote (in python 2) only handles characters from 0x0 - 0xFF,
+        # and basefile might contain characters outside of that (eg
+        # u'MO\u0308D/P11463-12', which is MÖD/P11463-12 on a system
+        # which uses unicode normalization form NFD). To be safe,
+        # encodethe string to utf-8 beforehand (Which is what quote on
+        # python 3 does anyways)
+        relurl = "%s/%s" % (repo, quote(basefile.encode("utf-8"), safe=safe))  # eg type, id
         if "#" in uri:
             relurl += uri.split("#", 1)[1]
         payload = {"uri": uri,

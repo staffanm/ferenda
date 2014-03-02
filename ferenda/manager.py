@@ -701,7 +701,6 @@ def run(argv):
                  positional arguments to the specified action).
     """
     config = _load_config(_find_config_file(), argv)
-
     # if logfile is set to True, autogenerate logfile name from
     # current datetime. Otherwise assume logfile is set to the desired
     # file name of the log
