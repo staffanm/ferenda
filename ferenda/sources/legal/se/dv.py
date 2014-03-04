@@ -23,7 +23,7 @@ import lxml.html
 from bs4 import BeautifulSoup, NavigableString
 
 # my libs
-from ferenda import DocumentStore, Describer, WordReader
+from ferenda import DocumentStore, Describer, WordReader, CitationParser
 from ferenda.decorators import managedparsing
 from ferenda import util
 from ferenda.sources.legal.se.legalref import LegalRef, Link
@@ -123,7 +123,26 @@ class DVStore(DocumentStore):
             for x in super(DVStore, self).list_basefiles_for(action, basedir):
                 yield x
 
+# (ab)use the CitationClass, with it's useful parse_recursive method,
+# to use a legalref based parser instead of a set of pyparsing
+# grammars. 
+class DVCitationParser(CitationParser):
+    def __init__(self, legalrefparser):
+        self._legalrefparser = legalrefparser
 
+    def parse_string(self, string):
+        unfiltered = self._legalrefparser.parse(string, predicate="dct:references")
+        # remove those references that we cannot fully resolve (should
+        # be an option in LegalRef, but...
+        filtered = []
+        for node in unfiltered:
+            if isinstance(node, Link) and "sfs/9999:999" in node.uri:
+                filtered.append(str(node))
+            else:
+                filtered.append(node)
+        return filtered
+
+        
 class DV(SwedishLegalSource):
     alias = "dv"
     downloaded_suffix = ".zip"
@@ -327,18 +346,18 @@ class DV(SwedishLegalSource):
                             continue
                         else:
                             created += 1
-                    data = zipf.read(bname)
+                    if not "TABORT" in name:
+                        data = zipf.read(bname)
+                        with self.store.open(basefile, "downloaded", suffix, "wb") as fp:
+                            fp.write(data)
 
-                    with self.store.open(basefile, "downloaded", suffix, "wb") as fp:
-                        fp.write(data)
+                        # Make the unzipped files have correct timestamp
+                        zi = zipf.getinfo(bname)
+                        dt = datetime(*zi.date_time)
+                        ts = mktime(dt.timetuple())
+                        os.utime(outfile, (ts, ts))
 
-                    # Make the unzipped files have correct timestamp
-                    zi = zipf.getinfo(bname)
-                    dt = datetime(*zi.date_time)
-                    ts = mktime(dt.timetuple())
-                    os.utime(outfile, (ts, ts))
-
-                    self.downloadcount += 1
+                        self.downloadcount += 1
                     if self.config.downloadmax and self.downloadcount >= self.config.downloadmax:
                         raise MaxDownloadsReached()
                 else:
@@ -372,12 +391,10 @@ class DV(SwedishLegalSource):
         day = None
         for p in iterator:
             t = p.get_text().strip()
-            # print("...examining %s" % t[:50])
             if re_avdstart:
                 # keep track of current month, store that in avd_p
                 m = re_avdstart.match(t)
                 if m:
-                    # print("   new month %s" % t)
                     avd_p = p
                     continue
 
@@ -413,7 +430,6 @@ class DV(SwedishLegalSource):
                 if avd_p:
                     fp.write(repr(avd_p))
             if fp:
-                # print("    writing %s" % t.strip()[:40])
                 fp.write(repr(p))
                 fp.write("\n")
         if fp: # should always be the case
@@ -499,9 +515,12 @@ class DV(SwedishLegalSource):
 
     @managedparsing
     def parse(self, doc):
-        # FIXME: don't create these if they already exists
-        self.lagrum_parser = LegalRef(LegalRef.LAGRUM)
-        self.rattsfall_parser = LegalRef(LegalRef.RATTSFALL)
+        if not hasattr(self, 'lagrum_parser'):
+            self.lagrum_parser = LegalRef(LegalRef.LAGRUM)
+        if not hasattr(self, 'rattsfall_parser'):
+            self.rattsfall_parser = LegalRef(LegalRef.RATTSFALL)
+        if not hasattr(self, 'ref_parser'):
+            self.ref_parser = LegalRef(LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN)
         docfile = self.store.downloaded_path(doc.basefile)
 
         intermediatefile = self.store.intermediate_path(doc.basefile)
@@ -548,7 +567,8 @@ class DV(SwedishLegalSource):
                          'HFD': 'HFD %(year)s not %(ordinal)s'}
 
         head = {}
-        body = Body()
+        # body = Body()
+        body = []
 
         m = basefile_regex.match(basefile).groupdict()
         coll = m['type']
@@ -563,7 +583,7 @@ class DV(SwedishLegalSource):
         iterator = soup.find_all(ptag)
         if coll == "HDO":
             # keep in sync w extract_notis
-            re_notisstart = re.compile("(?:Den (?P<avgdatum>\d+):[ae]. |)(?P<ordinal>\d+)\. ?\((?P<malnr>\w \d+-\d+)\)", flags=re.UNICODE)
+            re_notisstart = re.compile("(?:Den (?P<avgdatum>\d+):[ae].\s+|)(?P<ordinal>\d+)\. ?\((?P<malnr>\w \d+-\d+)\)", flags=re.UNICODE)
             re_avgdatum = re_malnr = re_notisstart
             re_lagrum = re_sokord = None
             # headers consist of the first two chunks (month, then
@@ -623,34 +643,50 @@ class DV(SwedishLegalSource):
             head['Avgörandedatum'] = "%s-%02d-%02d" % (curryear, currmonth, int(head['Avgörandedatum']))
 
         # Do a basic conversion of the rest (bodytext) to Element objects
+        #
+        # This is generic enough that it could be part of WordReader
         for node in iterator:
-            p = Paragraph()
-            if filetype == "doc": # docbook tree - simple
-                for part in node:
-                    if part.name:
-                        t = part.get_text().strip()
-                        if not t:
-                            continue
-                    if part.name == "emphasis":
-                        if part.get("role") == "bold":
-                            p.append(Strong([t]))
+            line = []
+            if filetype == "doc":
+                subiterator = node
+            elif filetype == "docx":
+                subiterator = node.find_all("r")
+            for part in subiterator:
+                if part.name:  
+                    t = part.get_text()
+                else:
+                    t = str(part)  # convert NavigableString to pure string
+                # if not t.strip():
+                #     continue
+                if filetype == "doc" and part.name == "emphasis": # docbook
+                    if part.get("role") == "bold":
+                        if line and isinstance(line[-1], Strong):
+                            line[-1][-1] += t
                         else:
-                            p.append(Em([t]))
+                            line.append(Strong([t]))
                     else:
-                        p.append(str(part))
-            else: # OOXML - hairy, but we only care about bold/italic
-                for part in node.find_all("w:r"):
-                    if part.name:
-                        t = part.get_text().strip()
-                        if not t:
-                            continue
-                    if part.find("w:rPr").find("w:b"):
-                        p.append(Strong([t]))
-                    elif part.find("w:rPr").find("w:i"):
-                        p.append(Em([t]))
+                        if line and isinstance(line[-1], Em):
+                            line[-1][-1] += t
+                        else:
+                            line.append(Em([t]))
+                elif filetype == "docx" and part.rpr and part.rpr.find(["b", "i"]): # ooxml
+                    if part.rpr.b:
+                        if line and isinstance(line[-1], Strong):
+                            line[-1][-1] += t
+                        else:
+                            line.append(Strong([t]))
+                    elif part.rpr.i:
+                        if line and isinstance(line[-1], Em):
+                            line[-1][-1] += t
+                        else:
+                            line.append(Em([t]))
+                else:
+                    if line and isinstance(line[-1], str):
+                        line[-1] += t
                     else:
-                        p.append(str(part))
-            body.append(p)
+                        line.append(t)
+            if line:
+                body.append(line)
         return head, body
         
     def parse_ooxml(self, text, basefile):
@@ -790,11 +826,11 @@ class DV(SwedishLegalSource):
         basefile_regex = re.compile('(?P<type>\w+)/(?P<year>\d+)-(?P<ordinal>\d+)')
         nja_regex = re.compile("NJA ?(\d+) ?s\.? ?(\d+) ?\( ?(?:NJA|) ?[ :]?(\d+) ?: ?(\d+)")
         date_regex = re.compile("(\d+)[^\d]+(\d+)[^\d]+(\d+)")
-        referat_regex = re.compile("(?P<type>[A-ZÖ]+)[^\d]*(?P<year>\d+)[^\d]+(?P<ordinal>\d+)")
+        referat_regex = re.compile("(?P<type>[A-ZÅÄÖ]+)[^\d]*(?P<year>\d+)[^\d]+(?P<ordinal>\d+)")
         referat_templ = {'ADO': 'AD %(year)s nr %(ordinal)s',
                          'AD': '%(type)s %(year)s nr %(ordinal)s',
                          'MDO': 'MD %(year)s:%(ordinal)s',
-                         'NJA': '%(type)s %(year)s s %(ordinal)s',
+                         'NJA': '%(type)s %(year)s s. %(ordinal)s',
                          None: '%(type)s %(year)s:%(ordinal)s'
         }
 
@@ -976,6 +1012,7 @@ class DV(SwedishLegalSource):
                     if m:
                         if pred == 'rattsfallspublikation':
                             # "NJA" -> "http://lcaolhost:8000/coll/dv/nja"
+                            # "RÅ" -> "http://lcaolhost:8000/coll/dv/rå" <-- FIXME
                             uri = self.config.url + "coll/dv/" + m.group(1).lower()
                             refdesc.rel(self.ns['rpubl'][pred], uri)
                         else:
@@ -985,6 +1022,10 @@ class DV(SwedishLegalSource):
             elif label == "_nja_ordinal":
                 refdesc.value(self.ns['dct'].bibliographicCitation,
                               value)
+                m = re.search(r'\d{4}(?:\:| nr | not )(\d+)', value)
+                if m:
+                    refdesc.value(self.ns['rpubl'].lopnummer, m.group(1))
+
                 refdesc.rel(self.ns['owl'].sameAs,
                             self.config.url + "res/dv/nja/" + value.split(" ")[1])
 
@@ -1028,8 +1069,18 @@ class DV(SwedishLegalSource):
         # 6. done!
         return refuri
 
+
     def format_body(self, paras):
-        return Body([Paragraph([x]) for x in paras])
+        b = Body()
+        for x in paras:
+            if isinstance(x, str):
+                x = [x]
+            b.append(Paragraph(x))
+
+        # find and link references
+        citparser = DVCitationParser(self.ref_parser)
+        b = citparser.parse_recursive(b)
+        return b
 
 # FIXME: convert to a CONSTRUCT query, save as res/sparql/dv-annotations.rq
 # Or maybe the default template should take a list of predicates, defaulting

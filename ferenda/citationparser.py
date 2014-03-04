@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import six
+from six import text_type as str
 
 from ferenda.elements import LinkSubject
-
 
 class CitationParser(object):
 
@@ -77,7 +76,7 @@ class CitationParser(object):
         for grammar in self._grammars:
             res = []
             for node in nodes:
-                if not isinstance(node, six.text_type):
+                if not isinstance(node, str):
                     res.append(node)
                     continue
                 matches = grammar.scanString(node)
@@ -106,9 +105,9 @@ class CitationParser(object):
         :rtype: list"""
 
         res = []
-        if not isinstance(part, six.text_type):
+        if not isinstance(part, str):
             for subpart in part:
-                if isinstance(subpart, six.text_type):
+                if isinstance(subpart, str):
                     res.extend(self.parse_recursive(subpart))
                 else:
                     res.append(self.parse_recursive(subpart))
@@ -123,7 +122,7 @@ class CitationParser(object):
             # splits a string into a list of string and ParseResult objects
             nodes = self.parse_string(part)
             for node in nodes:
-                if isinstance(node, six.text_type):
+                if isinstance(node, str):
                     res.append(node)
                 elif isinstance(node, tuple):
                     (text, parseresult) = node

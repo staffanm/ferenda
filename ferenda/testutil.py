@@ -249,7 +249,7 @@ class RepoTesterStore(object):
             return self.downloaded_file
 
     def intermediate_path(self, basefile, version=None, attachment=None):
-        p = self.downloaded_file.replace("downloaded", "intermediate").replace(self.downloaded_suffix, ".xml")
+        p = os.path.splitext(self.downloaded_file.replace("downloaded", "intermediate"))[0] + ".xml"
         if attachment:
             p = os.path.dirname(p) + os.sep + attachment
         return p
