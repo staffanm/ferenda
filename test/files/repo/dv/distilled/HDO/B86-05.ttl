@@ -10,6 +10,35 @@
     dct:bibliographicCitation "NJA 2007:32" ;
     dct:identifier "NJA 2007 s. 227" ;
     dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
+    dct:references <http://rinfo.lagrummet.se/publ/prop/1980/81:8#s194>,
+        <http://rinfo.lagrummet.se/publ/prop/1982/83:134#s9>,
+        <http://rinfo.lagrummet.se/publ/prop/1993/94:130#s57>,
+        <http://rinfo.lagrummet.se/publ/prop/1994/95:35>,
+        <http://rinfo.lagrummet.se/publ/prop/1999/2000:126#s108>,
+        <http://rinfo.lagrummet.se/publ/prop/1999/2000:126#s272>,
+        <http://rinfo.lagrummet.se/publ/rattsfall/ra/2001/not/42>,
+        <http://rinfo.lagrummet.se/publ/sfs/1964:163>,
+        <http://rinfo.lagrummet.se/publ/sfs/1974:152>,
+        <http://rinfo.lagrummet.se/publ/sfs/1974:153>,
+        <http://rinfo.lagrummet.se/publ/sfs/1976:633>,
+        <http://rinfo.lagrummet.se/publ/sfs/1976:633#P1S3>,
+        <http://rinfo.lagrummet.se/publ/sfs/1978:880>,
+        <http://rinfo.lagrummet.se/publ/sfs/1985:750>,
+        <http://rinfo.lagrummet.se/publ/sfs/1986:436>,
+        <http://rinfo.lagrummet.se/publ/sfs/1986:436#P1>,
+        <http://rinfo.lagrummet.se/publ/sfs/1986:436#P3S2>,
+        <http://rinfo.lagrummet.se/publ/sfs/1986:436#P4>,
+        <http://rinfo.lagrummet.se/publ/sfs/1994:1500>,
+        <http://rinfo.lagrummet.se/publ/sfs/1994:219>,
+        <http://rinfo.lagrummet.se/publ/sfs/1994:89_s._281>,
+        <http://rinfo.lagrummet.se/publ/sfs/1999:1078>,
+        <http://rinfo.lagrummet.se/publ/sfs/2000:1225>,
+        <http://rinfo.lagrummet.se/publ/sfs/2000:1225#P10>,
+        <http://rinfo.lagrummet.se/publ/sfs/2000:1225#P8>,
+        <http://rinfo.lagrummet.se/publ/sfs/2000:1225#P8S1>,
+        <http://rinfo.lagrummet.se/publ/sfs/2000:124_s._66>,
+        <http://rinfo.lagrummet.se/publ/sfs/2000:1281>,
+        <http://rinfo.lagrummet.se/publ/sfs/2000:1281#P1> ;
     rpubl:arsutgava "2007" ;
     rpubl:lopnummer "32" ;
     rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/nja> ;
