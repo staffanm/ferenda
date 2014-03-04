@@ -161,6 +161,7 @@ class DV(SwedishLegalSource):
         opts = super(DV, self).get_default_options()
         opts['ftpuser'] = None
         opts['ftppassword'] = None
+        opts['parsebodyrefs'] = False
         return opts
 
     # FIXME: store.list_basefiles_for("parse") must be fixed to handle two
@@ -519,8 +520,6 @@ class DV(SwedishLegalSource):
             self.lagrum_parser = LegalRef(LegalRef.LAGRUM)
         if not hasattr(self, 'rattsfall_parser'):
             self.rattsfall_parser = LegalRef(LegalRef.RATTSFALL)
-        if not hasattr(self, 'ref_parser'):
-            self.ref_parser = LegalRef(LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN)
         docfile = self.store.downloaded_path(doc.basefile)
 
         intermediatefile = self.store.intermediate_path(doc.basefile)
@@ -1077,9 +1076,17 @@ class DV(SwedishLegalSource):
                 x = [x]
             b.append(Paragraph(x))
 
-        # find and link references
-        citparser = DVCitationParser(self.ref_parser)
-        b = citparser.parse_recursive(b)
+        # find and link references -- this increases processing time
+        # 5-10x, so do it only if requested. For some types (NJA
+        # notiser) we could consider finding references anyway, as
+        # these documents do not have headnotes with fixed fields for
+        # references to statutory law and caselaw -- if we don't parse
+        # body, we don't have nothing.
+        if self.config.parsebodyrefs:
+            if not hasattr(self, 'ref_parser'):
+                self.ref_parser = LegalRef(LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN)
+            citparser = DVCitationParser(self.ref_parser)
+            b = citparser.parse_recursive(b)
         return b
 
 # FIXME: convert to a CONSTRUCT query, save as res/sparql/dv-annotations.rq
