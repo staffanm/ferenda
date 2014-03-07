@@ -152,6 +152,17 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
         """
         raise NotImplementedError  # pragma: no cover
 
+    def update(self, query):
+        """Run a SPARQL UPDATE (or DELETE/DROP/CLEAR) against the
+        triplestore. Returns nothing but may raise an exception if
+        something went wrong.
+
+        :param query: A SPARQL query with all neccessary prefixes defined.
+        :type query: str
+
+        """
+        raise NotImplementedError # pragma: no cover
+
     def triple_count(self, context=None):
         """Returns the number of triples in the repository."""
         raise NotImplementedError  # pragma: no cover
@@ -425,8 +436,11 @@ class RemoteStore(TripleStore):
             results.raise_for_status()
             if format == "python":
                 return self._sparql_results_to_list(results.text)
-            elif format == "json":
-                return results.json()
+            # when using format="json", we should return a json
+            # string, not the decoded data structure (c.f. how the
+            # RDFLib based backends do it).
+            # elif format == "json":
+            #     return results.json()
             else:
                 return results.text
         except requests.exceptions.HTTPError as e:
@@ -451,6 +465,18 @@ class RemoteStore(TripleStore):
             # by the caller
             return result
 
+    def update(self, query):
+        url = self._update_url()
+        # url += "?query=" + quote(query.replace("\n", " ")).replace("/", "%2F")
+        try:
+            resp = requests.post(url, data={'update':query})
+            resp.raise_for_status()
+        except requests.exceptions.ConnectionError as e:
+            raise errors.TriplestoreError(
+                "Triplestore %s not responding: %s" % (url, e))
+        except requests.exceptions.HTTPError as e:
+            raise errors.SparqlError(e)
+
     def _sparql_results_to_list(self, results):
         res = []
         tree = ET.fromstring(results)
@@ -467,9 +493,9 @@ class RemoteStore(TripleStore):
 
     def _statements_url(self, context):
         if context:
-            return "%s/%s?graph=%s" % (self.location, self.repository, context)
+            return "%s/%s/data?graph=%s" % (self.location, self.repository, context)
         else:
-            return "%s/%s?default" % (self.location, self.repository)
+            return "%s/%s/data?default" % (self.location, self.repository)
 
     # this method does not take a context parameter. Restrict to
     # context/graph in the query instead.
@@ -571,9 +597,15 @@ class SesameStore(RemoteStore):
     def _endpoint_url(self):
         return "%s/repositories/%s" % (self.location, self.repository)
 
+    def _update_url(self):
+        return self._endpoint_url()
 
 class FusekiStore(RemoteStore):
 
+    def _update_url(self):
+        return "%s/%s/update" % (self.location, self.repository)
+
+        
     def triple_count(self, context=None):
         # Fuseki doesn't provide a HTTP API for retrieving the size of
         # a repository. We do one or two SPARQL COUNT() queries to
@@ -595,13 +627,15 @@ class FusekiStore(RemoteStore):
             return default + named
 
     def clear(self, context=None):
-        super(FusekiStore, self).clear(context)
         if context is None:
-            url = self._statements_url("urn:x-arq:UnionGraph")
-            resp = requests.delete(url)
-            # if the call to super().clear() went ok, so should this,
-            # hence no error handling
-            resp.raise_for_status()
+            # it used to be the case that we could just DELETE
+            # everything in the magical "urn:x-arq:UnionGraph" graph,
+            # but since fuseki 1.0 this doesn't seem to work. Never
+            # mind, this is just as quick and standards compliant.
+            self.update("CLEAR ALL")
+        else:
+            super(FusekiStore, self).clear(context)
+            
 
     def construct(self, query, uniongraph=True):
         # This is to work around the default config where Fuseki does
@@ -629,20 +663,53 @@ class FusekiStore(RemoteStore):
     def get_serialized(self, format="nt", context=None):
         default = super(FusekiStore, self).get_serialized(format, context)
         if context is not None:
+            if format == "nt":
+                # Fuseki doesn't escape non-ascii the way NTriples 1.0
+                # should be escaped (eg. "ö" => "\u00F6"). Compensate
+                # for this (first convert bytestring to real
+                # unicode). NOTE: In Ntriples 1.1, data should be
+                # encoded in UTF-8 not ascii, and thus this escaping
+                # wont be neccesary, but rdflib 4.1 doesn't seem to
+                # support this yet (assumes that ntriple data is ascii)
+                default = self._nt_encode(default)
             return default
         else:
             context = "urn:x-arq:UnionGraph"
             named = super(FusekiStore, self).get_serialized(format, context)
             if format == "nt":
-                return default + named
+                return self._nt_encode(default + named)
             else:
                 g = Graph()
                 g.parse(data=default, format=format)
                 g.parse(data=named, format=format)
                 return g.serialize(format=format)
 
-#    def get_serialized_file(self, filename, format="nt", context=None):
-#        ret = super(FusekiStore, self).get_serialized_file(filename, format, context)
+    def _nt_encode(self, bytestring):
+        res = ""
+        for char in bytestring.decode("utf-8"):
+            try:
+                char.encode('ascii', 'strict')
+            except UnicodeError:
+                if ord(char) <= 0xFFFF:
+                    res += '\\u%04X' % ord(char)
+                else:
+                    res += '\\U%08X' % ord(char)
+            else:
+                res += char
+        return res.encode() # should not contain any non-ascii chars
+        
+
+    def get_serialized_file(self, filename, format="nt", context=None):
+        ret = super(FusekiStore, self).get_serialized_file(filename, format, context)
+        if format == "nt":
+           # Fuseki will have created an UTF-8 encoded file, we need
+           # to convert it to ascii with \u0000 style escaping to be
+           # compliant with ntriples 1.0 and rdflib
+           escaped = self._nt_encode(util.readfile(filename, "rb"))
+           with open(filename, "wb") as fp:
+               fp.write(escaped)
+        return ret
+       
 #        if context is not None:
 #            return ret
 #        else:

@@ -62,19 +62,19 @@ Command-line tools
 Once you have a large number of documents and metadata about those
 documents, you'll need a RDF triple store, either `Sesame
 <http://www.openrdf.org/>`_ (at least version 2.7) or `Fuseki
-<http://jena.apache.org/documentation/serving_data/index.html>`_.  For
-document collections small enough to keep all metadata in memory you
-can get by with only rdflib, using either a Sqlite or a Berkely DB
-(aka Sleepycat/bsddb) backend. For further information, see
-:ref:`external-triplestore`.
+<http://jena.apache.org/documentation/serving_data/index.html>`_ (at
+least version 1.0).  For document collections small enough to keep all
+metadata in memory you can get by with only rdflib, using either a
+Sqlite or a Berkely DB (aka Sleepycat/bsddb) backend. For further
+information, see :ref:`external-triplestore`.
 
 Similarly, once you have a large collection of text (either many short
 documents, or fewer long documents), you'll need an fulltext search
 engine to use the search feature (enabled by default). For small
 document collections the embedded `whoosh
 <https://bitbucket.org/mchaput/whoosh/wiki/Home>`_ library is
-used. Right now, `ElasticSearch <http://www.elasticsearch.org/>`_ is the only
-supported external fulltext search engine.
+used. Right now, `ElasticSearch <http://www.elasticsearch.org/>`_ is
+the only supported external fulltext search engine.
 
 As a rule of thumb, if your document collection contains over 100 000
 RDF triples or 100 000 words, you should start thinking about setting

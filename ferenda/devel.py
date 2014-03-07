@@ -349,7 +349,15 @@ class Devel(object):
                           "# Selected in %(elapsed).3fs",
                           p):
             res = ts.select(sq, format=format)
+            # res should be a unicode string, not an encoded bytestring
+            # print(res)
+
+            # NO! res must be a bytestring, select should return
+            # whatever is the appropriately encoded version for the
+            # given format.
+            
             print(res.decode('utf-8'))
+
 
 
     # FIXME: These are dummy implementations of methods and class

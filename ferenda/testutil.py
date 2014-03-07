@@ -61,8 +61,13 @@ this class, ie::
             g = rdflib.Graph()
             # we must read the data ourself, providing a non-ascii
             # filename to Graph.parse fails deep in rdflib internals
-            g.parse(data=util.readfile(filename, "rb"),
-                    format=guess_format(filename))
+            format=guess_format(filename)
+            if format == "nt":
+                data = util.readfile(filename, "r", encoding="utf-8")
+            else:
+                data = util.readfile(filename, "rb")
+
+            g.parse(data=data, format=format)
             return g
 
         if not isinstance(want, rdflib.Graph):

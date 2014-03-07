@@ -1593,16 +1593,7 @@ parsed document path to that documents dependency file."""
         :data:`~ferenda.DocumentRepository.sparql_annotations`
 
         """
-        query_template = self.sparql_annotations
-        if os.path.exists(query_template):
-            fp = open(query_template, 'rb')
-        elif pkg_resources.resource_exists('ferenda', query_template):
-            fp = pkg_resources.resource_stream('ferenda', query_template)
-        else:
-            raise ValueError("query template %s not found" % query_template)
-        params = {'uri': uri}
-        sq = fp.read().decode('utf-8') % params
-        fp.close()
+        sq = self.construct_sparql_query(uri)
         if self.config.storelocation:
             kwargs = {}
             if self.config.storetype in ("SQLITE", "SLEEPYCAT"):
@@ -1614,6 +1605,20 @@ parsed document path to that documents dependency file."""
                 res.bind(prefix, uri)
 
             return res
+
+    def construct_sparql_query(self, uri):
+        query_template = self.sparql_annotations
+        if os.path.exists(query_template):
+            fp = open(query_template, 'rb')
+        elif pkg_resources.resource_exists('ferenda', query_template):
+            fp = pkg_resources.resource_stream('ferenda', query_template)
+        else:
+            raise ValueError("query template %s not found" % query_template)
+        params = {'uri': uri}
+        sq = fp.read().decode('utf-8') % params
+        fp.close()
+        return sq
+        
 
     # helper for the prep_annotation_file helper -- it expects a
     # RDFLib graph, and returns a XML string in Grit format

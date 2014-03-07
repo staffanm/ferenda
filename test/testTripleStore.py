@@ -63,14 +63,14 @@ class Main(unittest.TestCase, FerendaTestCase):
         cmdline = runcmd_mock.call_args[0][0] # first ordered argument
         # replace the temporary file name
         cmdline = re.sub('"@[^"]+"', '"@tempfile.nt"', cmdline)
-        self.assertEqual('curl -X POST --data-binary "@tempfile.nt" --header "Content-Type:text/plain;charset=UTF-8" "/?default"', cmdline)
+        self.assertEqual('curl -X POST --data-binary "@tempfile.nt" --header "Content-Type:text/plain;charset=UTF-8" "//data?default"', cmdline)
         runcmd_mock.mock_reset()
 
         # 2. add_serialized_file
         runcmd_mock.return_value = (0, "", "")
         store.add_serialized_file("tempfile.nt", "nt")
         cmdline = runcmd_mock.call_args[0][0] # first ordered argument
-        self.assertEqual('curl -X POST --data-binary "@tempfile.nt" --header "Content-Type:text/plain;charset=UTF-8" "/?default"', cmdline)
+        self.assertEqual('curl -X POST --data-binary "@tempfile.nt" --header "Content-Type:text/plain;charset=UTF-8" "//data?default"', cmdline)
         runcmd_mock.mock_reset()
 
         # 3. get_serialized
@@ -86,14 +86,14 @@ class Main(unittest.TestCase, FerendaTestCase):
         # replace the temporary file name
         cmdline = re.sub('-o "[^"]+"', '-o "tempfile.nt"', cmdline)
         # FIXME is this really right?
-        self.assertEqual('curl -o "tempfile.nt" --header "Accept:text/plain" "/?graph=urn:x-arq:UnionGraph"', cmdline)
+        self.assertEqual('curl -o "tempfile.nt" --header "Accept:text/plain" "//data?graph=urn:x-arq:UnionGraph"', cmdline)
         runcmd_mock.side_effect = None
         runcmd_mock.mock_reset()
 
         # 4. get_serialized_file
-        store.get_serialized_file("triples.nt", "nt")
+        store.get_serialized_file("triples.xml", "xml")
         cmdline = runcmd_mock.call_args[0][0] # first ordered argument
-        self.assertEqual('curl -o "triples.nt" --header "Accept:text/plain" "/?default"', cmdline)
+        self.assertEqual('curl -o "triples.xml" --header "Accept:application/rdf+xml" "//data?default"', cmdline)
         runcmd_mock.mock_reset()
 
         # 5. handle errors
@@ -148,20 +148,21 @@ class Main(unittest.TestCase, FerendaTestCase):
         self.assertEqual(want, got)
 
     @patch('requests.delete')
-    def test_fuseki_clear(self, mock_delete):
+    @patch('requests.post')
+    def test_fuseki_clear(self, mock_post, mock_delete):
         store = TripleStore.connect("FUSEKI", "", "")
         store.clear()
-        self.assertEqual(mock_delete.call_count, 2)            
-
+        self.assertEqual(mock_delete.call_count, 0)
+        self.assertEqual(mock_post.call_count, 1)
         with self.assertRaises(errors.TriplestoreError):
-            mock_delete.side_effect = requests.exceptions.ConnectionError("Server error")
+            mock_post.side_effect = requests.exceptions.ConnectionError("Server error")
             got = store.clear()
 
         with self.assertRaises(errors.TriplestoreError):
-            mock_delete.side_effect = requests.exceptions.HTTPError("Server error")
+            mock_post.side_effect = requests.exceptions.HTTPError("Server error")
             got = store.clear()
 
-        mock_delete.side_effect = requests.exceptions.HTTPError("No such graph")
+        mock_post.side_effect = requests.exceptions.HTTPError("No such graph")
         got = store.clear("namedgraph")
 
 
@@ -233,11 +234,12 @@ class Main(unittest.TestCase, FerendaTestCase):
         self.assertEqual(want, got)
         self.assertEqual(mock_get.call_count, 1)
 
-        want = json.loads(rf("test/files/triplestore/select-results.json"))
+        want = rf("test/files/triplestore/select-results.json")
         got = store.select("the-query", format="json")
-        self.assertEqual(want, got)
+        self.assertEqual(json.loads(want), json.loads(got))
         self.assertEqual(mock_get.call_count, 2)
 
+        # want = json.loads(rf("test/files/triplestore/select-results-python.json"))
         want = json.loads(rf("test/files/triplestore/select-results-python.json"))
         got = store.select("the-query", format="python")
         self.assertEqual(want, got)
