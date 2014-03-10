@@ -1107,12 +1107,7 @@ def _instantiate_class(cls, configfile="ferenda.ini", argv=[]):
                               configfile,
                               argv, cascade=True)
     classcfg = getattr(globalcfg, cls.alias)
-    inst.config = classcfg
-    # inst.store is magically created after setting inst.config
-    #inst.store = inst.documentstore_class(
-    #    classcfg.datadir + os.sep + inst.alias,
-    #    downloaded_suffix=inst.downloaded_suffix,
-    #    storage_policy=inst.storage_policy)
+    inst.config = classcfg # magically creates inst.store
     return inst
 
 

@@ -65,13 +65,6 @@ configuration file values.
 By setting the ``config`` property, you override any parameters provided when
 creating the object.
 
-.. note::
-
-   Because of reasons, after re-setting the ``config`` property, you
-   also need to re-set the ``store`` property. For now, look at the
-   source code for ``_instantiate_class`` in ``ferenda/manager.py`` to
-   learn how it's done. 
-
 These are the normal configuration options:
 
 ================= ========================================== =========

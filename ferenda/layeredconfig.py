@@ -14,11 +14,11 @@ from six import binary_type as bytes
 
 class LayeredConfig(object):
 
-    """Provide unified access to nested configuration parameters. The
-       source Of these configuration parameters can be default
-       settings in code, a config file (using .ini-file style syntax)
-       and command line parameters. Comman line paramerrs override
-       Configuration file parameters, which in turn override default
+    """Provides unified access to a nested set of configuration
+       parameters. The source of these parameters a config file (using
+       .ini-file style syntax), command line parameters, and default
+       settings embedded in code. Command line parameters override
+       configuration file parameters, which in turn override default
        settings in code (hence **Layered** Config).
 
        Configuration parameters are accessed as regular object
@@ -26,14 +26,14 @@ class LayeredConfig(object):
        parameter names should therefore be regular python identifiers
        (i.e. only consist of alphanumerical chars and '_').
 
-       Configuration parameters can be typed (strings, integers,
+       Configuration parameter values can be typed (strings, integers,
        booleans, dates, lists...).  Even though ini-style config files
-       and command line parameters are non-typed, by specifying default
-       settings in code, parameters from a config file or the commamd
-       line can be typed.
+       and command line parameters are by themselves non-typed, by
+       specifying default settings in code, parameters from a config
+       file or the commamd line can be typed.
 
        Configuration parameters can be changed in code. Such changes
-       are persisted to the configuration file by calling
+       can be written to the configuration file by calling
        :py:meth:`~ferenda.LayeredConfig.write`.
 
        :param defaults: A dict with configuration keys and values. If
