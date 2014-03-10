@@ -17,7 +17,7 @@ from six.moves.urllib_parse import urljoin
 import tempfile
 
 # 3rdparty libs
-from rdflib import Namespace, URIRef
+from rdflib import Namespace, URIRef, Graph
 import requests
 import lxml.html
 from bs4 import BeautifulSoup, NavigableString
@@ -156,6 +156,7 @@ class DV(SwedishLegalSource):
                   ('rpubl', 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
                   )
     DCT = Namespace(util.ns['dct'])
+    sparql_annotations = "res/sparql/dv-annotations.rq"
 
     def get_default_options(self):
         opts = super(DV, self).get_default_options()
@@ -164,6 +165,26 @@ class DV(SwedishLegalSource):
         opts['parsebodyrefs'] = False
         return opts
 
+    def canonical_uri(self, basefile):
+        # The canonical URI for HDO/B3811-03 should be
+        # http://localhost:8000/res/dv/nja/2004s510. We can't know
+        # this URI before we parse the document. Once we have, we can
+        # find the first rdf:type = rpubl:Rattsfallsreferat (or
+        # rpubl:Rattsfallsnotis) and get its url.
+        p = self.store.distilled_path(basefile)
+        if not os.path.exists(p):
+            raise ValueError("No distilled file for basefile %s at %s" % (basefile, p))
+
+        with self.store.open_distilled(basefile) as fp:
+            g = Graph().parse(data=fp.read())
+        for uri, rdftype in g.subject_objects(predicate=self.ns["rdf"].type):
+            if rdftype in (self.ns['rpubl'].Rattsfallsreferat, self.ns['rpubl'].Rattsfallsnotis):
+                return str(uri)
+        raise ValueError("Can't find canonical URI for basefile %s in %s" % (basefile, p))
+            
+            
+        
+        
     # FIXME: store.list_basefiles_for("parse") must be fixed to handle two
     # different suffixes. Maybe store.downloaded_path() as well, so that
     # it returns .docx if a .docx file indeed exists, and .doc otherwise.
@@ -835,7 +856,7 @@ class DV(SwedishLegalSource):
 
         # 1. Attempt to fix missing Referat
         if not head.get("Referat"):
-            # For some courts (MDO, ADO) this is possible
+            # For some courts (MDO, ADO) it's possible to reconstruct a missing Referat from the basefile
             m = basefile_regex.match(basefile)
             if m and m.group("type") in ('ADO', 'MDO'):
                 head["Referat"] = referat_templ[m.group("type")] % (m.groupdict())
@@ -955,7 +976,7 @@ class DV(SwedishLegalSource):
         def dom_to_uri(domstol, malnr, avg):
             baseuri = self.config.url
             slug = self.slugs[domstol.lower()]
-            # FIXME: maybe we should create multiple urls if we have multiple malnummers?
+            # FIXME: We should create multiple urls if we have multiple malnummers?
             first_malnr = malnr[0]
             return "%(baseuri)sres/dv/%(slug)s/%(first_malnr)s/%(avg)s" % locals()
 
@@ -985,6 +1006,8 @@ class DV(SwedishLegalSource):
         domdesc = Describer(doc.meta, domuri)
 
         # 2. convert all strings in head to proper RDF
+        #
+        # 
         for label, value in head.items():
             if label == "Rubrik":
                 value = util.normalize_space(value)
@@ -995,6 +1018,10 @@ class DV(SwedishLegalSource):
                 domdesc.rel(self.ns['dct'].publisher, self.lookup_resource(value))
             elif label == "Målnummer":
                 for v in value:
+                    # FIXME: In these cases (multiple målnummer, which
+                    # primarily occurs with AD), we should really
+                    # create separate domdesc objects (there are two
+                    # verdicts, just summarized in one document)
                     domdesc.value(self.ns['rpubl'].malnummer, v)
             elif label == "Domsnummer":
                 domdesc.value(self.ns['rpubl'].domsnummer, value)
@@ -1010,8 +1037,8 @@ class DV(SwedishLegalSource):
                     m = re.search(regex, value)
                     if m:
                         if pred == 'rattsfallspublikation':
-                            # "NJA" -> "http://lcaolhost:8000/coll/dv/nja"
-                            # "RÅ" -> "http://lcaolhost:8000/coll/dv/rå" <-- FIXME
+                            # "NJA" -> "http://localhost:8000/coll/dv/nja"
+                            # "RÅ" -> "http://localhost:8000/coll/dv/rå" <-- FIXME, should be .../dv/ra
                             uri = self.config.url + "coll/dv/" + m.group(1).lower()
                             refdesc.rel(self.ns['rpubl'][pred], uri)
                         else:
@@ -1063,9 +1090,17 @@ class DV(SwedishLegalSource):
             refdesc.rdftype(self.ns['rpubl'].Rattsfallsreferat)
         domdesc.rdftype(self.ns['rpubl'].VagledandeDomstolsavgorande)
         refdesc.rel(self.ns['rpubl'].referatAvDomstolsavgorande, domuri)
-        # 5. assert that we have everything we need
 
-        # 6. done!
+# FIXME: implement this
+#        # 5. Create a meaningful identifier for the verdict itself (ie. "Göta hovrätts dom den 42 september 2340 i mål B 1234-42")
+#        domdesc.value(self.ns['dct'].identifier, dom_to_identifier(head["Domstol"],
+#                                                                   head["_localid"],
+#                                                                   head["Avgörandedatum"])
+#
+        
+        # 6. assert that we have everything we need
+        
+        # 7. done!
         return refuri
 
 
