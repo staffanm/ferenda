@@ -241,3 +241,10 @@ def downloadmax(f):
         for value in generator:
             yield value
     return wrapper
+
+
+def newstate(state):
+    def real_decorator(f):
+        setattr(f, 'newstate', state)
+        return f
+    return real_decorator

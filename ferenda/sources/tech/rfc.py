@@ -239,18 +239,18 @@ class RFC(DocumentRepository):
             return False
 
         def make_body(parser):
-            return p.make_children(Body())
+            return parser.make_children(Body())
         setattr(make_body, 'newstate', 'body')
 
         def make_preamble_section(parser):
             s = PreambleSection(title=parser.reader.next())
-            return p.make_children(s)
+            return parser.make_children(s)
         setattr(make_preamble_section, 'newstate', 'preamble-section')
 
         # used for older rfcs
         def make_abstract(parser):
             s = PreambleSection(title="(Abstract)")
-            return p.make_children(s)
+            return parser.make_children(s)
         setattr(make_abstract, 'newstate', 'preamble-section')
 
         def skip_pagebreak(parser):

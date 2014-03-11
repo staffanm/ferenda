@@ -23,11 +23,12 @@ import lxml.html
 from bs4 import BeautifulSoup, NavigableString
 
 # my libs
-from ferenda import DocumentStore, Describer, WordReader, CitationParser
-from ferenda.decorators import managedparsing
+from ferenda import Document, DocumentStore, Describer, WordReader, CitationParser, FSMParser
+from ferenda.decorators import managedparsing, newstate
 from ferenda import util
 from ferenda.sources.legal.se.legalref import LegalRef, Link
-from ferenda.elements import Body, Paragraph
+from ferenda.elements import Body, Paragraph, CompoundElement, OrdinalElement, Heading
+
 from ferenda.elements.html import Strong, Em
 from . import SwedishLegalSource, RPUBL
 
@@ -142,6 +143,41 @@ class DVCitationParser(CitationParser):
                 filtered.append(node)
         return filtered
 
+
+class OrderedParagraph(Paragraph, OrdinalElement):
+    def as_html(self, baseuri):
+        element = super(Instans, self).as_xhtml(baseuri)
+        element.set('id', self.ordinal)
+
+class DomElement(CompoundElement):
+    tagname = "div"
+    prop = None
+    def _get_classname(self):
+        return self.__class__.__name__.lower()
+    classname = property(_get_classname)
+
+    def as_html(self, baseuri):
+        element = super(Instans, self).as_xhtml(baseuri)
+        if hasattr(self, self.prop):
+            # ie if self.prop = ('ordinal', 'dct:identifier'), then
+            # dct:identifier = self.ordinal
+            element.set('content', getattr(self, self.prop[0]))
+            element.set('property', self.prop[1])
+
+class Delmal(DomElement):
+    prop = ('ordinal', 'dct:identifier')
+    
+class Instans(CompoundElement):
+    prop = ('court', 'dct:creator')
+        
+class Dom(CompoundElement):
+    prop = ('malnr', 'dct:identifier')
+    
+class Domskal(CompoundElement): pass 
+class Domslut(CompoundElement): pass # dct:author <- names of judges
+class Betankande(CompoundElement): pass # dct:author <- referent
+class Skiljaktig(CompoundElement): pass # dct:author <- name
+class Tillagg(CompoundElement): pass # dct:author <- name
         
 class DV(SwedishLegalSource):
     alias = "dv"
@@ -171,6 +207,11 @@ class DV(SwedishLegalSource):
         # this URI before we parse the document. Once we have, we can
         # find the first rdf:type = rpubl:Rattsfallsreferat (or
         # rpubl:Rattsfallsnotis) and get its url.
+        #
+        # FIXME: It would be simpler and faster to read
+        # DocumentEntry(self.store.entry_path(basefile))['id'], but
+        # parse does not yet update the DocumentEntry once it has the
+        # canonical uri/id for the document.
         p = self.store.distilled_path(basefile)
         if not os.path.exists(p):
             raise ValueError("No distilled file for basefile %s at %s" % (basefile, p))
@@ -182,6 +223,15 @@ class DV(SwedishLegalSource):
                 return str(uri)
         raise ValueError("Can't find canonical URI for basefile %s in %s" % (basefile, p))
             
+    def make_document(self, basefile=None):
+        doc = Document()
+        doc.basefile = basefile
+        doc.meta = self.make_graph()
+        doc.lang = self.lang
+        doc.body = Body()
+        doc.uri = None # can't know this yet
+        return doc
+
             
         
         
@@ -1106,11 +1156,15 @@ class DV(SwedishLegalSource):
 
     def format_body(self, paras):
         b = Body()
+        # paras is typically a list of strings, but can be a list of
+        # lists, where the innermost list consists of strings
+        # interspersed with Element objects.
         for x in paras:
             if isinstance(x, str):
                 x = [x]
             b.append(Paragraph(x))
 
+        
         # find and link references -- this increases processing time
         # 5-10x, so do it only if requested. For some types (NJA
         # notiser) we could consider finding references anyway, as
@@ -1122,24 +1176,275 @@ class DV(SwedishLegalSource):
                 self.ref_parser = LegalRef(LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN)
             citparser = DVCitationParser(self.ref_parser)
             b = citparser.parse_recursive(b)
+
+        b = self.structure_body(b)
         return b
 
-# FIXME: convert to a CONSTRUCT query, save as res/sparql/dv-annotations.rq
-# Or maybe the default template should take a list of predicates, defaulting
-# to dct:references, but which we could substitute rpubl:rattsfallshanvisning
-#    annotation_query = """
-# PREFIX dct:<http://purl.org/dc/terms/>
-# PREFIX rpub:<http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
-#
-# SELECT ?uri ?id ?desc
-# WHERE {
-#      ?uri dct:description ?desc .
-#      ?uri dct:identifier ?id .
-#      ?uri rpubl:rattsfallshanvisning <%s>
-#}
-#""" % uri
-#
+    def structure_body(self, paras):
+        #
+        # NJA 2010 s 180 (?)
+        # <Delmal ordinal="I">
+        #    <Instans name="Linköpings tingsrätt">
+        #        (gärningsbeksrivning)
+        #        (domstol meddelar dom)
+        #        <Domslut>
+        #            <p>Tingsrätten dömde M.J. för ...</p>
+        #    <Instans name="Göta hovrätt" beslutsdatum="2009-10-30">
+        #        (ändringar/inställningar)
+        #        (HR anförde i beslut)
+        #        <Domskäl>
+        #           <Rubrik>Bakgrund
+        #           <p>Genom Krs dom den 
+        #           <Rubrik>Hovrättens skäl
+        #        <Domslut title="Hovrättens avgörande">
+        #    <Instans name="Högsta domstolen">
+        #         (ändringar/inställningar)
+        #        <Betänkande föredragande="rev.sekr. Ralf Järtelius">
+        #            <Domskäl>
+        #                <Rubrik>Betänkande
+        #                <P ordinal="1">Genom ett omprövningsbeslut...
+        #                <Rubrik>Bestämmelser om förbud mot dubbel lagföring
+        #                <p ordinal="2">
+        #            <Domslut title="HD:s avgörande">
+        #        <Dom referent="Dag Victor" domare="Göran Lambertz" datum="2010-03-31" malnr="..."> # ?
+        #            <Domskäl>
+        #                <Rubrik>Frågan i målet
+        #                <P ordinal="1">M.J. är i målet åtalad....
+        #                <P ordinal="40">Hovrättens avvisningsbeslut...
+        #            <Domslut title="HD:s avgörande">
+        #                <p>Med undanröjande av hovrättens belsut...
+        #        <Skiljaktighet dissenter="Marianne Lundius, Stefan Lindskog" "i sak">
+        #            <P>Vi är nese med ajurotetn</p>
+        #            <Rubrik>Är det förenligt
+        #            <P ordinal="33">Vid den senaste...
+        #            <P ordianl="53">RÅs överklagande ska alltså lämnas utan bifall
+        #        <Skiljaktighet dissent="Severin Blomstrand" "i motivering">
+        #            <p>I rosenquist-målet....</p>
+        #        <EgenDel tilläggare="Stefan Lindskog">
+        #            <P ordinal="1">Frågan huruvida...
+        #        <EgenDel tilläggare="Göran Lambertz">
+        #            <P ordinal="1">En central fråga...
+        # <Delmal ordinal="II">
+        #     <Instans Lunds tingsrätt 2008-09-30>
+        #         (aå väckte talan gärningsbeskrivning)
+        #         (domstol meddelar dom
+        #         <Domslut>
+        #            <p>Tingsrätten dömde L.W.
+        #     <Instans Hovrätten över Skåne och blekinge>
+        #         (ändring/inställning)
+        #         (domstolen meddelar dom>
+        #         <Domslut rubrik="Hovrättens domslut">
+        #     <Instans Högsta Domstolen>
+        #         <Föredragande Ralf Järtelius>
+        #             <Domskäl rubrk="Skäl">
+        #                 <Rubrik>Bakgrund
+        #                 <P ordinal="1">Genom ett...
+        #             <Domslut rubrik="HD:s agörande
+        #                  <P>HD förklarar att
+        #         <Dom Dag victor och Göran Lambertz>
+        #             <Domskäl rubrik="Skäl">
+        #               <Rubrik>Den dispenserade frågan
+        #               <P rdinal="1">LW är i målet...
+        #             <Domslut rubrik="HD:s avgörande">
+        #                <P>HD förklarar att...
+        #         <Skiljaktig i sak Lundius, Lindskog>
+        #         <Skiljaktig i motivering Blomstrand>
+        #         <EgenDel Lindskog>
+        #         <EgenDel Lambertz>
+        # <EndMeta>
+        #    HD:s beslut meddelade
+        #    Mål nr: B 5498-09 (I), B 2509-09 (II)
+        #    Lagrum: ....
+        #    Rättsfall: ...
+        
+        # MIG 2013:4
+        # <Instans Migrationsdomstol>
+        #    <p>A ansökte
+        #    <p>A överklagade
+        #    <p>I margs 2011 ingav
+        #    <p>A överklagade beslut till Förvaltningsrätten i Stockholm, migrationsdomstolen (2011-10-06, ordförande Hjulstrom) ... # ingen uttrycklig domskäl / domslut
+        # <Instans Migrationsöverdomstolen>
+        #    <p>Migrationsverket överklagade...
+        #    <p>Även A överklagade ...
+        #    <p>Kammarrätten i Stockholm, Migrationsöverdomstolen .... yttrade följande
+        #    <Dom>
+        #        <Domskäl>
+        #            <Rubrik>1. I förhållande till vilket land...
+        #            <Rubrik>a) Utlänningslagens bestämmelser...
+        #        <Domslut>
+        #            <p>Migrationsdomstolens avgörande. Migrationsdomstolen upphäver...
+        #    </Dom>
+        #    <Skiljaktig (i sak eller motivering?) Berselius>
+        #        <p>Av förarbetena...
+        # 
+        
 
+        
+        def is_delmal(parser):
+            chunk = parser.reader.peek()
+            return str(chunk) in ("I", "II", "III")
+
+        def is_instans(parser):
+            chunk = parser.reader.peek()
+            strchunk = str(chunk)
+            return strchunk in ("Linköpings tingsrätt", "Lunds tingsrätt", "Göta hovrätt", "Hovrätten över Skåne och Blekinge", "Högsta domstolen")
+
+        def is_heading(parser):
+            chunk = parser.reader.peek()
+            strchunk = str(chunk)
+            # a heading is reasonably short and does not end with a
+            # period (or other sentence ending typography)
+            return len(strchunk) < 140 and not chunk.endswith(".")
+
+        def is_betankande(parser):
+            strchunk = str(parser.reader.peek())
+            return strchunk == "Målet avgjordes efter föredragning."
+            
+        def is_dom(parser):
+            res = is_domskal(parser)
+            return res
+
+        def is_domskal(parser):
+            strchunk = str(parser.reader.peek())
+            if strchunk == "Skäl":
+                return True
+            if re.match("(Tingsrätten|Hovrätten|HD) \([^)]*\) (meddelade dom|meddelade den|anförde följande i beslut)", strchunk):
+                return True
+
+        def is_domslut(parser):
+            strchunk = str(parser.reader.peek())
+            return strchunk in ("Domslut", "Hovrättens avgörande", "HD:s avgörande")
+            
+        def is_skiljaktig(parser):
+            pass
+
+        def is_tillagg(parser):
+            pass
+
+        def is_endmeta(parser):
+            strchunk = str(parser.reader.peek())
+            return strchunk.startswith("Mål nr: ")
+
+        def is_paragraph(parser):
+            return True
+
+        # FIXME: This and make_paragraph ought to be expressed as
+        # generic functions in the ferenda.fsmparser module
+        @newstate('body')
+        def make_body(parser):
+            return parser.make_children(Body())
+
+        @newstate('delmal')
+        def make_delmal(parser):
+            d = Delmal(ordinal=parser.reader.next(), malnr=None)
+            return parser.make_children(d)
+
+        @newstate('instans')
+        def make_instans(parser):
+            strchunk = str(parser.reader.next())
+            i = Instans(court=strchunk)
+            return parser.make_children(i)
+
+        def make_heading(parser):
+            # a heading is by definition a single line
+            return Heading(parser.reader.next())
+
+        @newstate('betankande')
+        def make_betankande(parser):
+            b = Betankande()
+            b.append(parser.reader.next())
+            return parser.make_children(b)
+
+        @newstate('dom')
+        def make_dom(parser):
+            d = Dom(avgorandedatum=None, malnr=None)
+            return parser.make_children(d)
+
+        @newstate('domskal')
+        def make_domskal(parser):
+            d = Domskal()
+            return parser.make_children(d)
+
+        @newstate('domslut')
+        def make_domslut(parser):
+            d = Domslut()
+            return parser.make_children(d)
+
+        @newstate('skiljaktig')
+        def make_skiljaktig(parser):
+            s = Skiljaktig()
+            return parser.make_children(s)
+
+        @newstate('tillagg')
+        def make_tillagg(parser):
+            t = Tillagg()
+            return parser.make_children(t)
+
+        def make_paragraph(parser):
+            chunk = parser.reader.next()
+            strchunk = str(chunk)
+            if ordered(strchunk):
+                # FIXME: Cut the ordinal from chunk somehow
+                if isinstance(chunk, Paragraph):
+                    p = OrderedParagraph(list(chunk), ordinal=ordered(strchunk))
+                else:
+                    p = OrderedParagraph([chunk], ordinal=ordered(strchunk))
+            else:
+                if isinstance(chunk, Paragraph):
+                    p = chunk
+                else: 
+                    p = Paragraph([chunk])
+            return p
+
+        def ordered(chunk):
+            if re.match("(\d+).", chunk):
+                return chunk.split(".", 1)
+            
+                
+        p = FSMParser()
+        p.set_recognizers(is_delmal,
+                          is_instans,
+                          is_dom,
+                          is_betankande,
+                          is_domskal,
+                          is_domslut,
+                          is_skiljaktig,
+                          is_tillagg,
+                          is_heading,
+                          is_paragraph)
+        commonstates = ("body", "delmal", "instans", "domskal", "domslut", "betankande", "skiljaktig", "tillagg")
+        
+        p.set_transitions({
+            ("body", is_delmal): (make_delmal, "delmal"),
+            ("body", is_instans): (make_instans, "instans"),
+            ("delmal", is_instans): (make_instans, "instans"),
+            ("instans", is_betankande): (make_betankande, "betankande"),
+            ("instans", is_dom): (make_dom, "dom"),
+            ("instans", is_domslut): (make_domslut, "domslut"),
+            ("instans", is_instans): (False, None),
+            ("instans", is_tillagg): (make_tillagg, "tillagg"),
+            ("betankande", is_domskal): (make_domskal, "domskal"),
+            ("betankande", is_domslut): (make_domslut, "domslut"),
+            ("dom", is_domskal): (make_domskal, "domskal"),
+            ("dom", is_domslut): (make_domslut, "domslut"),
+            ("dom", is_instans): (False, None),
+            ("domskal", is_delmal): (False, None), 
+            ("domskal", is_domslut): (False, None),
+            ("domskal", is_instans): (False, None), 
+            ("domslut", is_instans): (False, None),
+            ("domslut", is_domskal): (False, None),
+            ("skiljaktig", is_domslut): (False, None),
+            ("skiljaktig", is_instans): (make_skiljaktig, "skiljaktig"),
+            ("skiljaktig", is_skiljaktig): (False, None),
+            ("skiljaktig", is_tillagg): (False, None),
+            ("tillagg", is_tillagg): (False, None),
+            (commonstates, is_paragraph): (make_paragraph, None),
+                       })
+        p.initial_state = "body"
+        p.initial_constructor = make_body
+        p.debug = True
+        return p.parse(paras)
+        
     # FIXME: port to relate_all_setup / _teardown
     def GenerateMapAll(self):
         mapfile = os.path.sep.join(

@@ -237,7 +237,8 @@ class CompoundElement(AbstractElement, list):
             
         if hasattr(self,'uri') and self.uri and hasattr(self,'meta') and self.meta:
             assert isinstance(self.meta,Graph), "self.meta is %r, not rdflib.Graph" % type(self.meta)
-            # we sort to get a predictable order (by predicate)
+            # we use sorted() to get the triples in a predictable
+            # order (by predicate)
             for (s,p,o) in sorted(self.meta, key=itemgetter(1)):
                 if s != URIRef(self.uri):
                     continue
