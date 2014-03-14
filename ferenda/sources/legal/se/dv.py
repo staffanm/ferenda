@@ -17,9 +17,11 @@ from six.moves.urllib_parse import urljoin
 import tempfile
 
 # 3rdparty libs
+import pkg_resources
 from rdflib import Namespace, URIRef, Graph
 import requests
 import lxml.html
+from lxml import etree
 from bs4 import BeautifulSoup, NavigableString
 
 # my libs
@@ -156,28 +158,31 @@ class DomElement(CompoundElement):
         return self.__class__.__name__.lower()
     classname = property(_get_classname)
 
-    def as_html(self, baseuri):
-        element = super(Instans, self).as_xhtml(baseuri)
-        if hasattr(self, self.prop):
+    def as_xhtml(self, baseuri):
+        element = super(DomElement, self).as_xhtml(baseuri)
+        if self.prop:
             # ie if self.prop = ('ordinal', 'dct:identifier'), then
             # dct:identifier = self.ordinal
-            element.set('content', getattr(self, self.prop[0]))
-            element.set('property', self.prop[1])
+            if hasattr(self, self.prop[0]) and getattr(self, self.prop[0]):
+                element.set('content', getattr(self, self.prop[0]))
+                element.set('property', self.prop[1])
+        return element
 
 class Delmal(DomElement):
     prop = ('ordinal', 'dct:identifier')
     
-class Instans(CompoundElement):
+class Instans(DomElement):
     prop = ('court', 'dct:creator')
         
-class Dom(CompoundElement):
+class Dom(DomElement):
     prop = ('malnr', 'dct:identifier')
     
-class Domskal(CompoundElement): pass 
-class Domslut(CompoundElement): pass # dct:author <- names of judges
-class Betankande(CompoundElement): pass # dct:author <- referent
-class Skiljaktig(CompoundElement): pass # dct:author <- name
-class Tillagg(CompoundElement): pass # dct:author <- name
+class Domskal(DomElement): pass 
+class Domslut(DomElement): pass # dct:author <- names of judges
+class Betankande(DomElement): pass # dct:author <- referent
+class Skiljaktig(DomElement): pass # dct:author <- name
+class Tillagg(DomElement): pass # dct:author <- name
+class Endmeta(DomElement): pass
         
 class DV(SwedishLegalSource):
     alias = "dv"
@@ -198,7 +203,7 @@ class DV(SwedishLegalSource):
         opts = super(DV, self).get_default_options()
         opts['ftpuser'] = None
         opts['ftppassword'] = None
-        opts['parsebodyrefs'] = False
+        opts['parsebodyrefs'] = True
         return opts
 
     def canonical_uri(self, basefile):
@@ -456,8 +461,11 @@ class DV(SwedishLegalSource):
         soup = BeautifulSoup(util.readfile(intermediatefile))
         if filetype == "docx":
             iterator = soup.find_all("w:p")
+            xmlns = ' xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
         else:
             iterator = soup.find_all("para")
+            xmlns = ''
+        basefile = None
         fp = None
         avd_p = None
         day = None
@@ -486,7 +494,8 @@ class DV(SwedishLegalSource):
                                 break
                 except IndexError:
                     pass
-                            
+
+                previous_basefile = basefile
                 basefile = "%(coll)s/%(year)s_not_%(ordinal)s" % locals()
                 self.log.info("%s: Extracting from %s file" % (basefile, filetype))
                 created += 1
@@ -496,17 +505,28 @@ class DV(SwedishLegalSource):
                 if fp:
                     fp.write("</body>\n")
                     fp.close()
+                    if filetype == "docx":
+                        self._simplify_ooxml(self.store.intermediate_path(previous_basefile))
+                        
                 util.ensure_dir(self.store.intermediate_path(basefile))
                 fp = open(self.store.intermediate_path(basefile), "w")
-                fp.write("<body>\n")
+                fp.write('<body%s>' % xmlns)
+                if filetype != "docx":
+                    fp.write("\n")
                 if avd_p:
                     fp.write(repr(avd_p))
             if fp:
                 fp.write(repr(p))
-                fp.write("\n")
+                if filetype != "docx":
+                    fp.write("\n")
         if fp: # should always be the case
             fp.write("</body>\n")
             fp.close()
+            if filetype == "docx":
+                self._simplify_ooxml(self.store.intermediate_path(basefile))
+
+                
+            
         else:
             self.log.error("%s/%s: No notis were extracted (%s)" %
                            (coll,year,docfile))
@@ -596,6 +616,10 @@ class DV(SwedishLegalSource):
         intermediatefile = self.store.intermediate_path(doc.basefile)
         r = WordReader()
         intermediatefile, filetype = r.read(docfile, intermediatefile)
+
+        if filetype == "docx":
+            self._simplify_ooxml(intermediatefile)
+
         with codecs.open(intermediatefile, encoding="utf-8") as fp:
             patchedtext, patchdesc = self.patch_if_needed(doc.basefile,
                                                           fp.read())
@@ -663,7 +687,7 @@ class DV(SwedishLegalSource):
                                                   # later
             curryear = m['year']
             currmonth = self.swedish_months[header[0].get_text().strip().lower()]
-        else:
+        else: # "REG", "HFD"
             # keep in sync like above
             re_notisstart = re.compile("[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)")
             re_malnr = re.compile(r"D:(?P<malnr>\d+\-\d+)")
@@ -1277,7 +1301,17 @@ class DV(SwedishLegalSource):
         #    <Skiljaktig (i sak eller motivering?) Berselius>
         #        <p>Av förarbetena...
         # 
-        
+        courtnames = ["Linköpings tingsrätt",
+                      "Lunds tingsrätt",
+                      "Umeå tingsrätt",
+                      "Stockholms tingsrätt", 
+
+                      "Göta hovrätt",
+                      "Hovrätten över Skåne och Blekinge",
+                      "Hovrätten för Övre Norrland",
+                      "Svea hovrätt",
+
+                      "Högsta domstolen"]
 
         
         def is_delmal(parser):
@@ -1287,14 +1321,24 @@ class DV(SwedishLegalSource):
         def is_instans(parser):
             chunk = parser.reader.peek()
             strchunk = str(chunk)
-            return strchunk in ("Linköpings tingsrätt", "Lunds tingsrätt", "Göta hovrätt", "Hovrätten över Skåne och Blekinge", "Högsta domstolen")
+            if strchunk in courtnames:
+                return True
+            elif re.search('Migrationsverket överklagade migrationsdomstolens beslut', strchunk):
+                return True
+            elif parser._state_stack == ['body']:
+                # if we're at root level, anything starts a new instans
+                return True
+            
 
         def is_heading(parser):
             chunk = parser.reader.peek()
             strchunk = str(chunk)
             # a heading is reasonably short and does not end with a
             # period (or other sentence ending typography)
-            return len(strchunk) < 140 and not chunk.endswith(".")
+            return len(strchunk) < 140 and not (strchunk.endswith(".") or
+                                                strchunk.endswith(":") or
+                                                strchunk.startswith("”"))
+                                            
 
         def is_betankande(parser):
             strchunk = str(parser.reader.peek())
@@ -1308,7 +1352,7 @@ class DV(SwedishLegalSource):
             strchunk = str(parser.reader.peek())
             if strchunk == "Skäl":
                 return True
-            if re.match("(Tingsrätten|Hovrätten|HD) \([^)]*\) (meddelade dom|meddelade den|anförde följande i beslut)", strchunk):
+            if re.match("(Tingsrätten|Hovrätten|HD) \([^)]*\) (meddelade|anförde|fastställde)", strchunk):
                 return True
 
         def is_domslut(parser):
@@ -1316,14 +1360,16 @@ class DV(SwedishLegalSource):
             return strchunk in ("Domslut", "Hovrättens avgörande", "HD:s avgörande")
             
         def is_skiljaktig(parser):
-            pass
+            strchunk = str(parser.reader.peek())
+            return re.match("(Justitie|Kammarrätts)råde[nt] ([^\.]*) var skiljaktig", strchunk)
 
         def is_tillagg(parser):
-            pass
+            strchunk = str(parser.reader.peek())
+            return re.match("Justitieråde[nt] ([^\.]*) (tillade för egen del|gjorde för egen del ett tillägg)", strchunk)
 
         def is_endmeta(parser):
             strchunk = str(parser.reader.peek())
-            return strchunk.startswith("Mål nr: ")
+            return re.match("HD:s (beslut|dom) meddela(de|d|t): den", strchunk)
 
         def is_paragraph(parser):
             return True
@@ -1336,13 +1382,17 @@ class DV(SwedishLegalSource):
 
         @newstate('delmal')
         def make_delmal(parser):
-            d = Delmal(ordinal=parser.reader.next(), malnr=None)
+            d = Delmal(ordinal=str(parser.reader.next()), malnr=None)
             return parser.make_children(d)
 
         @newstate('instans')
         def make_instans(parser):
-            strchunk = str(parser.reader.next())
-            i = Instans(court=strchunk)
+            chunk = parser.reader.next()
+            strchunk = str(chunk)
+            if strchunk in courtnames:
+                i = Instans(court=strchunk)
+            else:
+                i = Instans([chunk])
             return parser.make_children(i)
 
         def make_heading(parser):
@@ -1373,13 +1423,23 @@ class DV(SwedishLegalSource):
         @newstate('skiljaktig')
         def make_skiljaktig(parser):
             s = Skiljaktig()
+            s.append(parser.reader.next())
             return parser.make_children(s)
 
         @newstate('tillagg')
         def make_tillagg(parser):
             t = Tillagg()
+            t.append(parser.reader.next())
             return parser.make_children(t)
 
+        @newstate('endmeta')
+        def make_endmeta(parser):
+            m = Endmeta()
+            m.append(parser.reader.next())
+            return parser.make_children(m)
+            
+        
+            
         def make_paragraph(parser):
             chunk = parser.reader.next()
             strchunk = str(chunk)
@@ -1399,10 +1459,21 @@ class DV(SwedishLegalSource):
         def ordered(chunk):
             if re.match("(\d+).", chunk):
                 return chunk.split(".", 1)
-            
+
+        def transition_domskal(symbol, statestack):
+            if 'betankande' in statestack:
+                # Ugly hack: mangle the statestack so that *next time*
+                # we encounter a is_domskal, we pop the statestack,
+                # but for now we push to it.
+                statestack[statestack.index('betankande')] = "__done__"
+                return make_domskal, "domskal"
+            else:
+                # here's where we pop the stack
+                return False, None
                 
         p = FSMParser()
         p.set_recognizers(is_delmal,
+                          is_endmeta,
                           is_instans,
                           is_dom,
                           is_betankande,
@@ -1417,32 +1488,52 @@ class DV(SwedishLegalSource):
         p.set_transitions({
             ("body", is_delmal): (make_delmal, "delmal"),
             ("body", is_instans): (make_instans, "instans"),
+            ("body", is_endmeta): (make_endmeta, "endmeta"),
             ("delmal", is_instans): (make_instans, "instans"),
+            ("delmal", is_delmal): (False, None),
+            ("delmal", is_endmeta): (False, None),
             ("instans", is_betankande): (make_betankande, "betankande"),
             ("instans", is_dom): (make_dom, "dom"),
             ("instans", is_domslut): (make_domslut, "domslut"),
             ("instans", is_instans): (False, None),
+            ("instans", is_skiljaktig): (make_skiljaktig, "skiljaktig"),
             ("instans", is_tillagg): (make_tillagg, "tillagg"),
-            ("betankande", is_domskal): (make_domskal, "domskal"),
+            ("instans", is_delmal): (False, None),
+            ("instans", is_endmeta): (False, None),
+            ("betankande", is_domskal): transition_domskal, # either (make_domskal, "domskal") or (False, None)
             ("betankande", is_domslut): (make_domslut, "domslut"),
+            ("__done__", is_domskal): (False, None), 
+            ("__done__", is_domslut): (make_domslut, "domslut"),
             ("dom", is_domskal): (make_domskal, "domskal"),
             ("dom", is_domslut): (make_domslut, "domslut"),
             ("dom", is_instans): (False, None),
+            ("dom", is_skiljaktig): (False, None), # Skiljaktig mening is not considered
+                                                   # part of the dom, but rather an appendix
+            ("dom", is_tillagg): (False, None), 
+            ("dom", is_endmeta): (False, None),
             ("domskal", is_delmal): (False, None), 
             ("domskal", is_domslut): (False, None),
             ("domskal", is_instans): (False, None), 
             ("domslut", is_instans): (False, None),
             ("domslut", is_domskal): (False, None),
+            ("domslut", is_skiljaktig): (False, None), 
+            ("domslut", is_tillagg): (False, None),
+            ("domslut", is_endmeta): (False, None),
             ("skiljaktig", is_domslut): (False, None),
-            ("skiljaktig", is_instans): (make_skiljaktig, "skiljaktig"),
+            ("skiljaktig", is_instans): (False, None),
             ("skiljaktig", is_skiljaktig): (False, None),
             ("skiljaktig", is_tillagg): (False, None),
+            ("skiljaktig", is_delmal): (False, None),
             ("tillagg", is_tillagg): (False, None),
+            ("tillagg", is_delmal): (False, None),
+            ("tillagg", is_endmeta): (False, None),
+            ("endmeta", is_paragraph): (make_paragraph, None),
+            (commonstates, is_heading): (make_heading, None),
             (commonstates, is_paragraph): (make_paragraph, None),
                        })
         p.initial_state = "body"
         p.initial_constructor = make_body
-        p.debug = True
+        # p.debug = True
         return p.parse(paras)
         
     # FIXME: port to relate_all_setup / _teardown
@@ -1472,6 +1563,18 @@ class DV(SwedishLegalSource):
         else:
             self.log.warning("could not find xml:base in %s" % infile)
 
+    def _simplify_ooxml(self, filename):
+        # simplify the horrendous mess that is OOXML through simplify-ooxml.xsl
+        with open(filename) as fp:
+            intree = etree.parse(fp)
+        fp = pkg_resources.resource_stream('ferenda', "res/xsl/simplify-ooxml.xsl")
+        transform = etree.XSLT(etree.parse(fp))
+        fp.close()
+        resulttree = transform(intree)
+        with open(filename, "wb") as fp:
+            fp.write(etree.tostring(resulttree, pretty_print=format, encoding="utf-8"))
+        
+            
     # gonna need this for news_criteria()
     pubs = {'http://rinfo.lagrummet.se/ref/rff/nja': 'Högsta domstolen',
             'http://rinfo.lagrummet.se/ref/rff/rh': 'Hovrätterna',

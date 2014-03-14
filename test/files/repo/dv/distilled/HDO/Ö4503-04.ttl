@@ -8,6 +8,9 @@
 
 <http://localhost:8000/res/dv/nja/2007s323> a rpubl:Rattsfallsreferat ;
     dct:bibliographicCitation "NJA 2007:42" ;
+    dct:creator "Hovrätten för Övre Norrland"@en,
+        "Högsta domstolen"@en,
+        "Umeå tingsrätt"@en ;
     dct:identifier "NJA 2007 s. 323" ;
     dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
     dct:references <http://rinfo.lagrummet.se/publ/prop/1978/79:90#s208>,

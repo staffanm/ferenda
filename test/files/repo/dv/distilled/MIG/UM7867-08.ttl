@@ -1,0 +1,42 @@
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://localhost:8000/res/dv/mig/2009:30> a rpubl:Rattsfallsreferat ;
+    dct:identifier "MIG 2009:30" ;
+    dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
+    dct:references <http://rinfo.lagrummet.se/publ/prop/1971:30>,
+        <http://rinfo.lagrummet.se/publ/prop/2004/05:170#s105>,
+        <http://rinfo.lagrummet.se/publ/prop/2004/05:170#s129>,
+        <http://rinfo.lagrummet.se/publ/rattsfall/mig/2006:9>,
+        <http://rinfo.lagrummet.se/publ/sfs/1971:291#P9>,
+        <http://rinfo.lagrummet.se/publ/sfs/2005:716>,
+        <http://rinfo.lagrummet.se/publ/sfs/2005:716#K16P5S2> ;
+    rpubl:arsutgava "2009" ;
+    rpubl:lopnummer "30" ;
+    rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/mig> ;
+    rpubl:referatAvDomstolsavgorande <http://localhost:8000/res/dv/mig/UM7867-08/2009-11-03> ;
+    rpubl:referatrubrik "Behovet av muntlig förhandling är särskilt framträdande i mål som rör avvisning eller utvisning av en utlänning som ansöker om uppehållstillstånd på grund av uppgivet flyktingskap eller såsom skyddsbehövande i övrigt och där en bedömning av trovärdigheten i den lämnade berättelsen har omedelbar betydelse för frågan om uppehållstillstånd. Är innehållet i de åberopade uppgifterna och utlänningens agerande sådant att det framstår som klart att uppgifterna är oförenliga och inte överensstämmer med verkligheten behöver inte någon muntlig förhandling hållas, trots att utlänningen begärt detta."@sv ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/mig/2009:30> .
+
+<http://localhost:8000/res/dv/mig/UM7867-08/2009-11-03> a rpubl:VagledandeDomstolsavgorande ;
+    dct:publisher <http://lagen.nu/org/2008/migrationsoverdomstolen> ;
+    dct:relation "Prop. 1971:30 del 2 s. 537",
+        "Prop. 2004/05:170 s. 105 och 129-131" ;
+    dct:subject <http://localhost:8000/concept/Asyl>,
+        <http://localhost:8000/concept/Europakonventionen>,
+        <http://localhost:8000/concept/Muntlig_förhandling> ;
+    dct:title "Behovet av muntlig förhandling är särskilt framträdande i mål som rör avvisning eller utvisning av en utlänning som ansöker om uppehållstillstånd på grund av uppgivet flyktingskap eller såsom skyddsbehövande i övrigt och där en bedömning av trovärdigheten i den lämnade berättelsen har omedelbar betydelse för frågan om uppehållstillstånd. Är innehållet i de åberopade uppgifterna och utlänningens agerande sådant att det framstår som klart att uppgifterna är oförenliga och inte överensstämmer med verkligheten behöver inte någon muntlig förhandling hållas, trots att utlänningen begärt detta."@sv ;
+    rpubl:avdelning "1" ;
+    rpubl:avgorandedatum "2009-11-03T00:00:00"^^xsd:dateTime ;
+    rpubl:lagrum <http://localhost:8000/res/sfs/1971:291#P9>,
+        <http://localhost:8000/res/sfs/1994:1219>,
+        <http://localhost:8000/res/sfs/2005:716#K16P5> ;
+    rpubl:malnummer "UM7867-08" ;
+    rpubl:rattsfall <http://localhost:8000/res/dv/mig/2006:9> ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/mig/UM7867-08/2009-11-03> .
+

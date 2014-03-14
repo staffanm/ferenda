@@ -9,30 +9,10 @@
 <http://localhost:8000/res/dv/ad/2013:63> a rpubl:Rattsfallsreferat ;
     dct:identifier "AD 2013 nr 63" ;
     dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
-    dct:references <http://rinfo.lagrummet.se/publ/prop/2005/06:185#s122>,
-        <http://rinfo.lagrummet.se/publ/prop/2005/06:185#s81>,
-        <http://rinfo.lagrummet.se/publ/prop/2005/06:185#s82>,
-        <http://rinfo.lagrummet.se/publ/prop/2005/06:185#s83>,
-        <http://rinfo.lagrummet.se/publ/prop/2007/08:94#s26>,
-        <http://rinfo.lagrummet.se/publ/prop/2012/13:1>,
-        <http://rinfo.lagrummet.se/publ/rattsfall/ad/2009:56>,
-        <http://rinfo.lagrummet.se/publ/rattsfall/ad/2011:23>,
-        <http://rinfo.lagrummet.se/publ/rattsfall/ad/2013:18>,
-        <http://rinfo.lagrummet.se/publ/sfs/1942:740#K42P18S1N5>,
-        <http://rinfo.lagrummet.se/publ/sfs/1975:635#P6>,
+    dct:references <http://rinfo.lagrummet.se/publ/sfs/1975:635#P6>,
         <http://rinfo.lagrummet.se/publ/sfs/1995:584>,
-        <http://rinfo.lagrummet.se/publ/sfs/1995:584#P13>,
-        <http://rinfo.lagrummet.se/publ/sfs/1995:584#P13S2>,
         <http://rinfo.lagrummet.se/publ/sfs/1995:584#P16>,
-        <http://rinfo.lagrummet.se/publ/sfs/1995:584#P22>,
-        <http://rinfo.lagrummet.se/publ/sfs/1995:584#P8>,
-        <http://rinfo.lagrummet.se/publ/sfs/1995:584#P8S1N1>,
-        <http://rinfo.lagrummet.se/publ/sfs/1996:1619>,
-        <http://rinfo.lagrummet.se/publ/sfs/2007:612>,
-        <http://rinfo.lagrummet.se/publ/sfs/2007:612#P2>,
-        <http://rinfo.lagrummet.se/publ/sfs/2007:612#P4>,
-        <http://rinfo.lagrummet.se/publ/sfs/2008:567>,
-        <http://rinfo.lagrummet.se/publ/sfs/2010:30> ;
+        <http://rinfo.lagrummet.se/publ/sfs/1995:584#P8S1N1> ;
     rpubl:arsutgava "2013" ;
     rpubl:lopnummer "63" ;
     rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/ad> ;

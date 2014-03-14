@@ -196,7 +196,7 @@ class FSMParser():
             # first find out whether the constructor will call
             # make_child, creating a new stack frame. This is
             # indicated by the callable having the 'newstate'
-            # attribute (now set manually, should be through a
+            # attribute (set by the @ferenda.decorators.newstate
             # decorator)
             if newstate and not hasattr(constructor, 'newstate'):
                 self._debug("Changing top of state stack (%r->%r)" %

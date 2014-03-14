@@ -225,9 +225,11 @@ this class, ie::
         self.maxDiff = None
         self.assertEqual(wantfiles, gotfiles)  # or assertIn?
         for f in gotfiles:
-            self.assertTrue(filecmp.cmp(os.path.join(want, f),
-                                        os.path.join(got, f),
-                                        shallow=False))
+            if not filecmp.cmp(os.path.join(want, f),
+                               os.path.join(got, f),
+                               shallow=False):
+                self.assertEqual(util.readfile(os.path.join(want, f)),
+                                 util.readfile(os.path.join(got, f)))
 
     def assertRegex(self, test, expected_regexp, msg=None):
         # in older versions of unittest, this method was named assertRegexpMatches

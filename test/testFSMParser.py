@@ -14,7 +14,7 @@ import six
 from ferenda import elements
 from ferenda.testutil import file_parametrize
 from ferenda.compat import patch
-
+from ferenda.decorators import newstate
 # SUT
 from ferenda import FSMParser, TextReader
 from ferenda.fsmparser import Peekable
@@ -119,29 +119,29 @@ class Parse(unittest.TestCase):
             return (constructor,newstate)
         
         # CONSTRUCTORS
+        @newstate('body')
         def make_body(parser):
             parser._debug("Hello")
             b = elements.Body()
             return parser.make_children(b)
-        setattr(make_body,'newstate','body')
-        
+
+        @newstate('section')
         def make_section(parser):
             (secnumber, title) = analyze_sectionstart(parser.reader.next())
             s = elements.Section(ordinal=secnumber,title=title)
             return parser.make_children(s)
-        setattr(make_section,'newstate','section')
 
+        @newstate('subsection')
         def make_subsection(parser):
             (secnumber, title) = analyze_sectionstart(parser.reader.next())
             s = elements.Subsection(ordinal=secnumber,title=title)
             return parser.make_children(s)
-        setattr(make_subsection,'newstate','subsection')
 
+        @newstate('subsubsection')
         def make_subsubsection(parser):
             (secnumber, title) = analyze_sectionstart(parser.reader.next())
             s = elements.Subsubsection(ordinal=secnumber,title=title)
             return parser.make_children(s)
-        setattr(make_subsubsection,'newstate','subsubsection')
 
         def make_paragraph(parser):
             return elements.Paragraph([parser.reader.next().strip()])
@@ -157,37 +157,36 @@ class Parse(unittest.TestCase):
 #            return parser.make_children(ul)
 #        setattr(make_unorderedlist,'newstate','unorderedlist')
 
+        @newstate('ol-decimal')
         def make_ol_decimal(parser):
             return make_orderedlist(parser,"decimal","ol-decimal")
-        setattr(make_ol_decimal,'newstate','ol-decimal')
 
+        @newstate('ol-alpha')
         def make_ol_alpha(parser):
             return make_orderedlist(parser,"lower-alpha", "ol-alpha")
-        setattr(make_ol_alpha,'newstate','ol-alpha')
 
+        @newstate('ol-roman')
         def make_ol_roman(parser):
             return make_orderedlist(parser,"lower-roman", "ol-roman")
-        setattr(make_ol_roman,'newstate','ol-romal')
 
+        @newstate('listitem')
         def make_listitem(parser):
             chunk = parser.reader.next()
             (listtype,ordinal,separator,rest) = analyze_listitem(chunk)
             li = elements.ListItem(ordinal=ordinal)
             li.append(rest)
             return parser.make_children(li)
-        setattr(make_listitem,'newstate','listitem')
 
+        # NOTE: no @newstate decorator for these -- we transition from
+        # one state to the next, not push a new state onto the stack
         def make_state_a(parser):
             return elements.Paragraph([parser.reader.next().strip()],id="state-a")
-        # setattr(make_state_a, 'newstate', 'state-a')
 
         def make_state_b(parser):
             return elements.Paragraph([parser.reader.next().strip()],id="state-b")
-        # setattr(make_state_b, 'newstate', 'state-b')
 
         def make_state_c(parser):
             return elements.Paragraph([parser.reader.next().strip()],id="state-c")
-        # setattr(make_state_c, 'newstate', 'state-c')
         
         # HELPERS
         def section_segments_count(s):

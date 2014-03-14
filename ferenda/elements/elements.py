@@ -412,8 +412,8 @@ class Link(UnicodeElement):
     """A unicode string with also has a ``.uri`` attribute"""
     tagname = 'a'
 
-    def __repr__(self):
-        return 'Link(\'%s\', uri=%s)' % (self, self.uri)
+    #def __repr__(self):
+    #    return 'Link(\'%s\', uri=%s)' % (self, self.uri)
 
     def as_xhtml(self, uri):
         element = super(Link, self).as_xhtml(uri)
