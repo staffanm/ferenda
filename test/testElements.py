@@ -162,8 +162,12 @@ class Main(unittest.TestCase):
 
     def test_link(self):
         x = Link("Link text", uri="http://example.org/")
-        self.assertEqual("Link text", str(x))
-        self.assertEqual("Link('Link text', uri=http://example.org/)", repr(x))
+        self.assertEqual(str(x), "Link text")
+        self.assertEqual(repr(x), "Link('Link text', uri=http://example.org/)")
+
+        # y = Link("Räksmörgås", uri="http://example.org/")
+        # self.assertEqual(str(y), "Räksmörgås")
+        # self.assertEqual(repr(y), "Link('Räksmörgås', uri=http://example.org/)")
         
     def test_elements_from_soup(self):
         soup = BeautifulSoup("""<html>

@@ -127,7 +127,7 @@ with.
         d = dict((k, v) for (k, v) in self.__dict__.items() if k[0] != "_")
         util.ensure_dir(path)
         with open(path, "w") as fp:
-            json.dump(d, fp, default=mydefault, indent=2, sort_keys=True)
+            json.dump(d, fp, default=mydefault, indent=2, separators=(', ',': '), sort_keys=True)
     # If inline=True, the contents of filename is included in the Atom
     # entry. Otherwise, it just references it.
     #

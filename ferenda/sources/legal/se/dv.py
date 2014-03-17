@@ -661,16 +661,16 @@ class DV(SwedishLegalSource):
                          'HFD': 'HFD %(year)s not %(ordinal)s'}
 
         head = {}
-        # body = Body()
         body = []
 
         m = basefile_regex.match(basefile).groupdict()
         coll = m['type']
         head["Referat"] = referat_templ[coll] % m
-        
-        soup = BeautifulSoup(text, "xml")
+
+        soup = BeautifulSoup(text)
+
         if filetype == "docx":
-            ptag = "p"
+            ptag = "w:p"
         else:
             ptag = "para"
 
@@ -744,7 +744,7 @@ class DV(SwedishLegalSource):
             if filetype == "doc":
                 subiterator = node
             elif filetype == "docx":
-                subiterator = node.find_all("r")
+                subiterator = node.find_all("w:r")
             for part in subiterator:
                 if part.name:  
                     t = part.get_text()
@@ -763,7 +763,7 @@ class DV(SwedishLegalSource):
                             line[-1][-1] += t
                         else:
                             line.append(Em([t]))
-                elif filetype == "docx" and part.rpr and part.rpr.find(["b", "i"]): # ooxml
+                elif filetype == "docx" and part.find("w:rpr") and part.find("w:rpr").find(["w:b", "w:i"]): # ooxml
                     if part.rpr.b:
                         if line and isinstance(line[-1], Strong):
                             line[-1][-1] += t
@@ -1201,6 +1201,8 @@ class DV(SwedishLegalSource):
             citparser = DVCitationParser(self.ref_parser)
             b = citparser.parse_recursive(b)
 
+        # convert the unstructured list of Paragraphs to a
+        # hierarchical tree of instances, domslut, domskäl, etc
         b = self.structure_body(b)
         return b
 
@@ -1323,12 +1325,17 @@ class DV(SwedishLegalSource):
             strchunk = str(chunk)
             if strchunk in courtnames:
                 return True
-            elif re.search('Migrationsverket överklagade migrationsdomstolens beslut', strchunk):
-                return True
+            # elif re.search('Migrationsverket överklagade migrationsdomstolens beslut', strchunk):
+            #     return True
             elif parser._state_stack == ['body']:
-                # if we're at root level, anything starts a new instans
+                # if we're at root level, *anything* starts a new instans
                 return True
-            
+            else:
+                for sentence in split_sentences(strchunk):
+                    for r in (instans_matchers):
+                        if r.match(sentence):
+                            return True
+            return False
 
         def is_heading(parser):
             chunk = parser.reader.peek()
@@ -1352,16 +1359,16 @@ class DV(SwedishLegalSource):
             strchunk = str(parser.reader.peek())
             if strchunk == "Skäl":
                 return True
-            if re.match("(Tingsrätten|Hovrätten|HD) \([^)]*\) (meddelade|anförde|fastställde)", strchunk):
+            if re.match("(Tingsrätten|Hovrätten|HD|Högsta förvaltningsdomstolen) \([^)]*\) (meddelade|anförde|fastställde|yttrade)", strchunk):
                 return True
 
         def is_domslut(parser):
             strchunk = str(parser.reader.peek())
-            return strchunk in ("Domslut", "Hovrättens avgörande", "HD:s avgörande")
+            return strchunk in ("Domslut", "Hovrättens avgörande", "HD:s avgörande", "Högsta förvaltningsdomstolens avgörande")
             
         def is_skiljaktig(parser):
             strchunk = str(parser.reader.peek())
-            return re.match("(Justitie|Kammarrätts)råde[nt] ([^\.]*) var skiljaktig", strchunk)
+            return re.match("(Justitie|Kammarrätts)råde[nt] ([^\.]*) var (skiljaktig|av skiljaktig mening)", strchunk)
 
         def is_tillagg(parser):
             strchunk = str(parser.reader.peek())
@@ -1385,6 +1392,10 @@ class DV(SwedishLegalSource):
             d = Delmal(ordinal=str(parser.reader.next()), malnr=None)
             return parser.make_children(d)
 
+        rx = (r'(?P<court>Försäkringskassan|Migrationsverket) beslutade (därefter|) den (?P<date>\d+ \w+ \d+) att',
+              r'(A överklagade beslutet till |)(?P<court>(Förvaltningsrätten|Länsrätten|Kammarrätten) i \w+(| län)(|, migrationsdomstolen|, Migrationsöverdomstolen)|Högsta förvaltningsdomstolen) \((?P<date>\d+-\d+\d+)')
+        instans_matchers = [re.compile(x) for x in rx]
+            
         @newstate('instans')
         def make_instans(parser):
             chunk = parser.reader.next()
@@ -1392,8 +1403,26 @@ class DV(SwedishLegalSource):
             if strchunk in courtnames:
                 i = Instans(court=strchunk)
             else:
-                i = Instans([chunk])
+                i = False
+                for sentence in split_sentences(strchunk):
+                    for r in (instans_matchers):
+                        m = r.match(sentence)
+                        if m:
+                            if 'court' in m.groupdict():
+                                i = Instans([chunk], court=m.groupdict()['court'])
+                            break
+                    if i:
+                        break
+                if not i:
+                    i = Instans([chunk])
+                    
             return parser.make_children(i)
+
+        def split_sentences(text):
+            text = util.normalize_space(text)
+            text += " "
+            return text.split(". ")
+                
 
         def make_heading(parser):
             # a heading is by definition a single line

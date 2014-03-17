@@ -30,6 +30,7 @@ from lxml.builder import ElementMaker
 from rdflib import Graph, Namespace, Literal, URIRef
 from six import binary_type as bytes
 from six import text_type as str
+import six
 import pyparsing
 
 from ferenda import util
@@ -412,8 +413,14 @@ class Link(UnicodeElement):
     """A unicode string with also has a ``.uri`` attribute"""
     tagname = 'a'
 
-    #def __repr__(self):
-    #    return 'Link(\'%s\', uri=%s)' % (self, self.uri)
+    # FIXME: can __repr__ on PY2 return unicode data?
+    def __repr__(self):
+        # convoluted way around a UnicodeEncode error on py2 when self contains non-ascii characters
+        if six.PY2:
+            rep = repr(str(self))[2:-1]
+        else:
+            rep = self
+        return 'Link(\'%s\', uri=%s)' % (rep, self.uri)
 
     def as_xhtml(self, uri):
         element = super(Link, self).as_xhtml(uri)
