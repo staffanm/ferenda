@@ -1,11 +1,10 @@
 <?xml version='1.0' encoding='utf-8'?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
-<html xmlns:dct="http://purl.org/dc/terms/" xmlns:skos="http://www.w3.org/2004/02/skos/core#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:xhv="http://www.w3.org/1999/xhtml/vocab#" xmlns:prov="http://www.w3.org/ns/prov-o/" xmlns:foaf="http://xmlns.com/foaf/0.1/" xmlns:owl="http://www.w3.org/2002/07/owl#" xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<html xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:owl="http://www.w3.org/2002/07/owl#" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:dct="http://purl.org/dc/terms/" xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:xhv="http://www.w3.org/1999/xhtml/vocab#" xmlns:foaf="http://xmlns.com/foaf/0.1/" xmlns:skos="http://www.w3.org/2004/02/skos/core#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:prov="http://www.w3.org/ns/prov-o/" xmlns="http://www.w3.org/1999/xhtml" xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd" version="XHTML+RDFa 1.1" xml:lang="en">
   <head about="http://localhost:8000/res/w3c/xslt">
     <meta property="dct:identifier" content="xslt" xml:lang=""/>
-    <meta property="dct:issued" datatype="xsd:date" content="1999-11-16"/>
+    <meta property="dct:issued" content="1999-11-16" datatype="xsd:date"/>
     <title property="dct:title">XSL Transformations (XSLT)</title>
-    <link href="http://purl.org/ontology/bibo/Standard" rel="rdf:type"/>
+    <link rel="rdf:type" href="http://purl.org/ontology/bibo/Standard"/>
   </head>
   <body about="http://localhost:8000/res/w3c/xslt">
     <div class="preamblesection" property="dct:title" content="Abstract" typeof="bibo:DocumentPart" about="http://localhost:8000/res/w3c/xslt#PS1">
@@ -24,21 +23,21 @@ A <a href="#section-References">References</a><br/>
 A.1 Normative References<br/>
 A.2 Other References<br/></div>
     <hr/>
-    <div about="http://localhost:8000/res/w3c/xslt#S1" property="dct:title" content="Introduction" typeof="bibo:DocumentPart" class="section">
+    <div property="dct:title" typeof="bibo:DocumentPart" about="http://localhost:8000/res/w3c/xslt#S1" content="Introduction" class="section">
       <span property="bibo:chapter" content="1" xml:lang=""/>
       <p>This specification defines the syntax and semantics of the XSLT language.</p>
     </div>
-    <div about="http://localhost:8000/res/w3c/xslt#S2" property="dct:title" content="Stylesheet Structure" typeof="bibo:DocumentPart" class="section">
+    <div property="dct:title" typeof="bibo:DocumentPart" about="http://localhost:8000/res/w3c/xslt#S2" content="Stylesheet Structure" class="section">
       <span property="bibo:chapter" content="2" xml:lang=""/>
-      <div about="http://localhost:8000/res/w3c/xslt#S2.1" property="dct:title" content="XSLT Namespace" typeof="bibo:DocumentPart" class="subsection">
+      <div property="dct:title" typeof="bibo:DocumentPart" about="http://localhost:8000/res/w3c/xslt#S2.1" content="XSLT Namespace" class="subsection">
         <span property="bibo:chapter" content="2.1" xml:lang=""/>
         <p>The XSLT namespace has the URI
 <code>http://www.w3.org/1999/XSL/Transform</code>.</p>
       </div>
-      <div about="http://localhost:8000/res/w3c/xslt#S2.6" property="dct:title" content="Combining Stylesheets" typeof="bibo:DocumentPart" class="subsection">
+      <div property="dct:title" typeof="bibo:DocumentPart" about="http://localhost:8000/res/w3c/xslt#S2.6" content="Combining Stylesheets" class="subsection">
         <span property="bibo:chapter" content="2.6" xml:lang=""/>
         <p>XSLT provides two mechanisms to combine stylesheets:</p>
-        <div about="http://localhost:8000/res/w3c/xslt#S2.6.1" property="dct:title" content="Stylesheet Inclusion" typeof="bibo:DocumentPart" class="subsubsection">
+        <div property="dct:title" typeof="bibo:DocumentPart" about="http://localhost:8000/res/w3c/xslt#S2.6.1" content="Stylesheet Inclusion" class="subsubsection">
           <span property="bibo:chapter" content="2.6.1" xml:lang=""/>
           <p class="element-syntax">
             <a name="element-include"/>
@@ -47,7 +46,7 @@ Category: top-level-element --&gt;<br/>
 &lt;xsl:include<br/><b>href</b> = <var>uri-reference</var> /&gt;</code>
           </p>
         </div>
-        <div about="http://localhost:8000/res/w3c/xslt#S2.6.2" property="dct:title" content="Stylesheet Import" typeof="bibo:DocumentPart" class="subsubsection">
+        <div property="dct:title" typeof="bibo:DocumentPart" about="http://localhost:8000/res/w3c/xslt#S2.6.2" content="Stylesheet Import" class="subsubsection">
           <span property="bibo:chapter" content="2.6.2" xml:lang=""/>
           <p class="element-syntax">
             <a name="element-import"/>

@@ -1,18 +1,17 @@
 <?xml version='1.0' encoding='utf-8'?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
-<html xmlns:foaf="http://xmlns.com/foaf/0.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:rfc="http://example.org/ontology/rfc/" xmlns:dct="http://purl.org/dc/terms/" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<html xmlns:rfc="http://example.org/ontology/rfc/" xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:dct="http://purl.org/dc/terms/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:foaf="http://xmlns.com/foaf/0.1/" xmlns="http://www.w3.org/1999/xhtml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd" xml:lang="en" version="XHTML+RDFa 1.1">
   <head about="http://localhost:8000/res/rfc/6931">
-    <link href="http://localhost:8000/res/rfc/4051" rel="rfc:obsoletes"/>
-    <meta content="D. Eastlake 3rd" property="dct:creator" xml:lang=""/>
-    <meta content="RFC 6931" property="dct:identifier" xml:lang=""/>
-    <meta content="2070-1721" property="dct:issn" xml:lang=""/>
+    <link rel="rfc:obsoletes" href="http://localhost:8000/res/rfc/4051"/>
+    <meta xml:lang="" property="dct:creator" content="D. Eastlake 3rd"/>
+    <meta xml:lang="" property="dct:identifier" content="RFC 6931"/>
+    <meta xml:lang="" property="dct:issn" content="2070-1721"/>
     <meta datatype="xsd:date" property="dct:issued" content="2013-04-01"/>
-    <meta content="Internet Engineering Task Force (IETF)" property="dct:publisher" xml:lang=""/>
-    <meta content="Huawei" property="dct:rightsHolder" xml:lang=""/>
-    <meta content="Standards Track" property="dct:subject" xml:lang=""/>
+    <meta xml:lang="" property="dct:publisher" content="Internet Engineering Task Force (IETF)"/>
+    <meta xml:lang="" property="dct:rightsHolder" content="Huawei"/>
+    <meta xml:lang="" property="dct:subject" content="Standards Track"/>
     <title property="dct:title">Additional XML Security Uniform Resource Identifiers (URIs)</title>
-    <meta content="Additional XML Security URIs" property="bibo:shortTitle" xml:lang="en"/>
-    <link href="http://example.org/ontology/rfc/RFC" rel="rdf:type"/>
+    <meta xml:lang="en" property="bibo:shortTitle" content="Additional XML Security URIs"/>
+    <link rel="rdf:type" href="http://example.org/ontology/rfc/RFC"/>
   </head>
   <body about="http://localhost:8000/res/rfc/6931">
     <div class="preamblesection" property="dct:title" content="Abstract" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#PS1">
@@ -28,8 +27,8 @@
       <p>This document is subject to BCP 78 and the IETF Trust's Legal Provisions Relating to IETF Documents (http://trustee.ietf.org/license-info) in effect on the date of publication of this document. Please review these documents carefully, as they describe your rights and restrictions with respect to this document. Code Components extracted from this document must include Simplified BSD License text as described in <a href="#S4" rel="dct:references">Section 4.</a>e of the Trust Legal Provisions and are provided without warranty as described in the Simplified BSD License.</p>
     </div>
     <div class="section" property="dct:title" content="Introduction" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S1">
-      <span content="RFC 6931, section 1" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S1"/>
-      <span content="1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S1"/>
+      <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S1" content="RFC 6931, section 1"/>
+      <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S1" content="1"/>
       <p>XML digital signatures, canonicalization, and encryption have been standardized by the W3C and by the joint IETF/W3C XMLDSIG working group [W3C]. All of these are now W3C Recommendations and some are also RFCs. They are available as follows:</p>
       <pre>   RFC
    Status            W3C REC      Topic
@@ -48,14 +47,14 @@
       <p>Specification in this document of the URI representing an algorithm does not imply endorsement of the algorithm for any particular purpose. A protocol specification, which this is not, generally gives algorithm and implementation requirements for the protocol. Security considerations for algorithms are constantly evolving, as documented elsewhere. This specification simply provides some URIs and relevant formatting for when those URIs are used.</p>
       <p>Note that progressing XML Digital Signature <a href="http://localhost:8000/res/rfc/3275" rel="dct:references">[RFC3275]</a> along the Standards Track required removal of any algorithms from the original version <a href="http://localhost:8000/res/rfc/3075" rel="dct:references">[RFC3075]</a> for which there was not demonstrated interoperability. This required removal of the Minimal Canonicalization algorithm, in which there appears to be continued interest. The URI for Minimal Canonicalization was included in <a href="http://localhost:8000/res/rfc/4051" rel="dct:references">[RFC4051]</a> and is included here.</p>
       <div class="subsection" property="dct:title" content="Terminology" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S1.1">
-        <span content="RFC 6931, section 1.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S1.1"/>
-        <span content="1.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S1.1"/>
+        <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S1.1" content="RFC 6931, section 1.1"/>
+        <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S1.1" content="1.1"/>
         <p>The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in <a href="http://localhost:8000/res/rfc/2119" rel="dct:references">[RFC2119]</a>.</p>
         <p>This document is not intended to change the algorithm implementation requirements of any IETF or W3C document. Use of <a href="http://localhost:8000/res/rfc/2119" rel="dct:references">[RFC2119]</a> terminology is intended to be only such as is already stated or implied by other authoritative documents.</p>
       </div>
       <div class="subsection" property="dct:title" content="Acronyms" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S1.2">
-        <span content="RFC 6931, section 1.2" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S1.2"/>
-        <span content="1.2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S1.2"/>
+        <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S1.2" content="RFC 6931, section 1.2"/>
+        <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S1.2" content="1.2"/>
         <p>The following acronyms are used in this document:</p>
         <p>HMAC - Keyed-Hashing MAC <a href="http://localhost:8000/res/rfc/2104" rel="dct:references">[RFC2104]</a></p>
         <p>IETF - Internet Engineering Task Force &lt;www.ietf.org&gt;</p>
@@ -72,8 +71,8 @@
       </div>
     </div>
     <div class="section" property="dct:title" content="Algorithms" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2">
-      <span content="RFC 6931, section 2" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2"/>
-      <span content="2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2"/>
+      <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2" content="RFC 6931, section 2"/>
+      <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2" content="2"/>
       <p>The URI <a href="http://localhost:8000/res/rfc/3986" rel="dct:references">[RFC3986]</a> that was dropped from the XML Digital Signature standard due to the transition from Proposed Standard to Draft Standard <a href="http://localhost:8000/res/rfc/3275" rel="dct:references">[RFC3275]</a> is included in <a href="#S2.4" rel="dct:references">Section 2.4</a> below with its original</p>
       <pre>      http://www.w3.org/2000/09/xmldsig#</pre>
       <p>prefix so as to avoid changing the XMLDSIG standard's namespace.</p>
@@ -84,12 +83,12 @@
       <p>In addition, for ease of reference, this document includes in the indexes in <a href="#S4" rel="dct:references">Section 4</a> many cryptographic algorithm URIs from several XML security documents using the namespaces with which they are defined in those documents. For example, 2000/09/xmldsig# for some URIs specified in <a href="http://localhost:8000/res/rfc/3275" rel="dct:references">[RFC3275]</a> and 2001/04/xmlenc# for some URIs specified in [XMLENC10].</p>
       <p>See also [XMLSECXREF].</p>
       <div class="subsection" property="dct:title" content="DigestMethod (Hash) Algorithms" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.1">
-        <span content="RFC 6931, section 2.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.1"/>
-        <span content="2.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.1"/>
+        <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.1" content="RFC 6931, section 2.1"/>
+        <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.1" content="2.1"/>
         <p>These algorithms are usable wherever a DigestMethod element occurs.</p>
         <div class="subsubsection" property="dct:title" content="MD5" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.1.1">
-          <span content="RFC 6931, section 2.1.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.1.1"/>
-          <span content="2.1.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.1.1"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.1.1" content="RFC 6931, section 2.1.1"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.1.1" content="2.1.1"/>
           <pre>   Identifier:
       http://www.w3.org/2001/04/xmldsig-more#md5</pre>
           <p>The MD5 algorithm <a href="http://localhost:8000/res/rfc/1321" rel="dct:references">[RFC1321]</a> takes no explicit parameters. An example of an MD5 DigestAlgorithm element is:</p>
@@ -98,8 +97,8 @@
           <p>An MD5 digest is a 128-bit string. The content of the DigestValue element SHALL be the base64 <a href="http://localhost:8000/res/rfc/2045" rel="dct:references">[RFC2045]</a> encoding of this bit string viewed as a 16-octet stream. See <a href="http://localhost:8000/res/rfc/6151" rel="dct:references">[RFC6151]</a> for MD5 security considerations.</p>
         </div>
         <div class="subsubsection" property="dct:title" content="SHA-224" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.1.2">
-          <span content="RFC 6931, section 2.1.2" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.1.2"/>
-          <span content="2.1.2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.1.2"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.1.2" content="RFC 6931, section 2.1.2"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.1.2" content="2.1.2"/>
           <pre>   Identifier:
       http://www.w3.org/2001/04/xmldsig-more#sha224</pre>
           <p>The SHA-224 algorithm [FIPS180-4] <a href="http://localhost:8000/res/rfc/6234" rel="dct:references">[RFC6234]</a> takes no explicit parameters. An example of a SHA-224 DigestAlgorithm element is:</p>
@@ -108,8 +107,8 @@
           <p>A SHA-224 digest is a 224-bit string. The content of the DigestValue element SHALL be the base64 <a href="http://localhost:8000/res/rfc/2045" rel="dct:references">[RFC2045]</a> encoding of this string viewed as a 28-octet stream.</p>
         </div>
         <div class="subsubsection" property="dct:title" content="SHA-384" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.1.3">
-          <span content="RFC 6931, section 2.1.3" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.1.3"/>
-          <span content="2.1.3" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.1.3"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.1.3" content="RFC 6931, section 2.1.3"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.1.3" content="2.1.3"/>
           <pre>   Identifier:
       http://www.w3.org/2001/04/xmldsig-more#sha384</pre>
           <p>The SHA-384 algorithm [FIPS180-4] takes no explicit parameters. An example of a SHA-384 DigestAlgorithm element is:</p>
@@ -118,15 +117,15 @@
           <p>A SHA-384 digest is a 384-bit string. The content of the DigestValue element SHALL be the base64 <a href="http://localhost:8000/res/rfc/2045" rel="dct:references">[RFC2045]</a> encoding of this string viewed as a 48-octet stream.</p>
         </div>
         <div class="subsubsection" property="dct:title" content="Whirlpool" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.1.4">
-          <span content="RFC 6931, section 2.1.4" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.1.4"/>
-          <span content="2.1.4" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.1.4"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.1.4" content="RFC 6931, section 2.1.4"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.1.4" content="2.1.4"/>
           <pre>   Identifier:
       http://www.w3.org/2007/05/xmldsig-more#whirlpool</pre>
           <p>The Whirlpool algorithm [10118-3] takes no explicit parameters. A Whirlpool digest is a 512-bit string. The content of the DigestValue element SHALL be the base64 <a href="http://localhost:8000/res/rfc/2045" rel="dct:references">[RFC2045]</a> encoding of this string viewed as a 64-octet stream.</p>
         </div>
         <div class="subsubsection" property="dct:title" content="New SHA Functions" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.1.5">
-          <span content="RFC 6931, section 2.1.5" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.1.5"/>
-          <span content="2.1.5" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.1.5"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.1.5" content="RFC 6931, section 2.1.5"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.1.5" content="2.1.5"/>
           <pre>   Identifiers:
       http://www.w3.org/2007/05/xmldsig-more#sha3-224
       http://www.w3.org/2007/05/xmldsig-more#sha3-256
@@ -137,13 +136,13 @@
         </div>
       </div>
       <div class="subsection" property="dct:title" content="SignatureMethod MAC Algorithms" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.2">
-        <span content="RFC 6931, section 2.2" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.2"/>
-        <span content="2.2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.2"/>
+        <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.2" content="RFC 6931, section 2.2"/>
+        <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.2" content="2.2"/>
         <p>This section covers SignatureMethod MAC (Message Authentication Code) Algorithms.</p>
         <p>Note: Some text in this section is duplicated from <a href="http://localhost:8000/res/rfc/3275" rel="dct:references">[RFC3275]</a> for the convenience of the reader. <a href="http://localhost:8000/res/rfc/3275" rel="dct:references">RFC 3275 </a>is normative in case of conflict.</p>
         <div class="subsubsection" property="dct:title" content="HMAC-MD5" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.2.1">
-          <span content="RFC 6931, section 2.2.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.2.1"/>
-          <span content="2.2.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.2.1"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.2.1" content="RFC 6931, section 2.2.1"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.2.1" content="2.2.1"/>
           <pre>   Identifier:
       http://www.w3.org/2001/04/xmldsig-more#hmac-md5</pre>
           <p>The HMAC algorithm <a href="http://localhost:8000/res/rfc/2104" rel="dct:references">[RFC2104]</a> takes the truncation length in bits as a parameter; if the parameter is not specified, then all the bits of the hash are output. An example of an HMAC-MD5 SignatureMethod element is as follows:</p>
@@ -165,8 +164,8 @@
           <p>See <a href="http://localhost:8000/res/rfc/6151" rel="dct:references">[RFC6151]</a> for HMAC-MD5 security considerations.</p>
         </div>
         <div class="subsubsection" property="dct:title" content="HMAC SHA Variations" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.2.2">
-          <span content="RFC 6931, section 2.2.2" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.2.2"/>
-          <span content="2.2.2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.2.2"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.2.2" content="RFC 6931, section 2.2.2"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.2.2" content="2.2.2"/>
           <pre>   Identifiers:
       http://www.w3.org/2001/04/xmldsig-more#hmac-sha224
       http://www.w3.org/2001/04/xmldsig-more#hmac-sha256
@@ -175,20 +174,20 @@
           <p>SHA-224, SHA-256, SHA-384, and SHA-512 [FIPS180-4] <a href="http://localhost:8000/res/rfc/6234" rel="dct:references">[RFC6234]</a> can also be used in HMAC as described in <a href="#S2.2.1" rel="dct:references">Section 2.2.1</a> above for HMAC-MD5.</p>
         </div>
         <div class="subsubsection" property="dct:title" content="HMAC-RIPEMD160" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.2.3">
-          <span content="RFC 6931, section 2.2.3" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.2.3"/>
-          <span content="2.2.3" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.2.3"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.2.3" content="RFC 6931, section 2.2.3"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.2.3" content="2.2.3"/>
           <pre>   Identifier:
       http://www.w3.org/2001/04/xmldsig-more#hmac-ripemd160</pre>
           <p>RIPEMD-160 [10118-3] can also be used in HMAC as described in <a href="#S2.2.1" rel="dct:references">Section 2.2.1</a> above for HMAC-MD5.</p>
         </div>
       </div>
       <div class="subsection" property="dct:title" content="SignatureMethod Public-Key Signature Algorithms" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.3">
-        <span content="RFC 6931, section 2.3" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3"/>
-        <span content="2.3" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3"/>
+        <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3" content="RFC 6931, section 2.3"/>
+        <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3" content="2.3"/>
         <p>These algorithms are distinguished from those in <a href="#S2.2" rel="dct:references">Section 2.2</a> above in that they use public-key methods. That is to say, the verification key is different from and not feasibly derivable from the signing key.</p>
         <div class="subsubsection" property="dct:title" content="RSA-MD5" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.3.1">
-          <span content="RFC 6931, section 2.3.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.1"/>
-          <span content="2.3.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.1"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.1" content="RFC 6931, section 2.3.1"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.1" content="2.3.1"/>
           <pre>   Identifier:
       http://www.w3.org/2001/04/xmldsig-more#rsa-md5</pre>
           <p>This implies the PKCS#1 v1.5 padding algorithm described in <a href="http://localhost:8000/res/rfc/3447" rel="dct:references">[RFC3447]</a>. An example of use is</p>
@@ -204,8 +203,8 @@
           <p>See <a href="http://localhost:8000/res/rfc/6151" rel="dct:references">[RFC6151]</a> for MD5 security considerations.</p>
         </div>
         <div class="subsubsection" property="dct:title" content="RSA-SHA256" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.3.2">
-          <span content="RFC 6931, section 2.3.2" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.2"/>
-          <span content="2.3.2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.2"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.2" content="RFC 6931, section 2.3.2"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.2" content="2.3.2"/>
           <pre>   Identifier:
       http://www.w3.org/2001/04/xmldsig-more#rsa-sha256</pre>
           <p>This implies the PKCS#1 v1.5 padding algorithm <a href="http://localhost:8000/res/rfc/3447" rel="dct:references">[RFC3447]</a> as described in <a href="#S2.3.1" rel="dct:references">Section 2.3.1</a>, but with the ASN.1 BER SHA-256 algorithm designator prefix. An example of use is</p>
@@ -214,8 +213,8 @@
    /&gt;</pre>
         </div>
         <div class="subsubsection" property="dct:title" content="RSA-SHA384" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.3.3">
-          <span content="RFC 6931, section 2.3.3" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.3"/>
-          <span content="2.3.3" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.3"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.3" content="RFC 6931, section 2.3.3"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.3" content="2.3.3"/>
           <pre>   Identifier:
       http://www.w3.org/2001/04/xmldsig-more#rsa-sha384</pre>
           <p>This implies the PKCS#1 v1.5 padding algorithm <a href="http://localhost:8000/res/rfc/3447" rel="dct:references">[RFC3447]</a> as described in <a href="#S2.3.1" rel="dct:references">Section 2.3.1</a>, but with the ASN.1 BER SHA-384 algorithm designator prefix. An example of use is</p>
@@ -224,8 +223,8 @@
           <p>Because it takes about the same effort to calculate a SHA-384 message digest as it does a SHA-512 message digest, it is suggested that RSA-SHA512 be used in preference to RSA-SHA384 where possible.</p>
         </div>
         <div class="subsubsection" property="dct:title" content="RSA-SHA512" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.3.4">
-          <span content="RFC 6931, section 2.3.4" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.4"/>
-          <span content="2.3.4" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.4"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.4" content="RFC 6931, section 2.3.4"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.4" content="2.3.4"/>
           <pre>   Identifier:
       http://www.w3.org/2001/04/xmldsig-more#rsa-sha512</pre>
           <p>This implies the PKCS#1 v1.5 padding algorithm <a href="http://localhost:8000/res/rfc/3447" rel="dct:references">[RFC3447]</a> as described in <a href="#S2.3.1" rel="dct:references">Section 2.3.1</a>, but with the ASN.1 BER SHA-512 algorithm designator prefix. An example of use is</p>
@@ -233,8 +232,8 @@
       Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha512" /&gt;</pre>
         </div>
         <div class="subsubsection" property="dct:title" content="RSA-RIPEMD160" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.3.5">
-          <span content="RFC 6931, section 2.3.5" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.5"/>
-          <span content="2.3.5" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.5"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.5" content="RFC 6931, section 2.3.5"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.5" content="2.3.5"/>
           <pre>   Identifier:
       http://www.w3.org/2001/04/xmldsig-more#rsa-ripemd160</pre>
           <p>This implies the PKCS#1 v1.5 padding algorithm <a href="http://localhost:8000/res/rfc/3447" rel="dct:references">[RFC3447]</a> as described in <a href="#S2.3.1" rel="dct:references">Section 2.3.1</a>, but with the ASN.1 BER RIPEMD160 algorithm designator prefix. An example of use is</p>
@@ -243,8 +242,8 @@
    /&gt;</pre>
         </div>
         <div class="subsubsection" property="dct:title" content="ECDSA-SHA*, ECDSA-RIPEMD160, ECDSA-Whirlpool" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.3.6">
-          <span content="RFC 6931, section 2.3.6" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.6"/>
-          <span content="2.3.6" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.6"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.6" content="RFC 6931, section 2.3.6"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.6" content="2.3.6"/>
           <pre>   Identifiers:
       http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha1
       http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha224
@@ -258,8 +257,8 @@
           <p>For an introduction to elliptic curve cryptographic algorithms, see <a href="http://localhost:8000/res/rfc/6090" rel="dct:references">[RFC6090]</a> and note the errata (Errata ID 2773-2777).</p>
         </div>
         <div class="subsubsection" property="dct:title" content="ESIGN-SHA*" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.3.7">
-          <span content="RFC 6931, section 2.3.7" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.7"/>
-          <span content="2.3.7" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.7"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.7" content="RFC 6931, section 2.3.7"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.7" content="2.3.7"/>
           <pre>   Identifiers:
       http://www.w3.org/2001/04/xmldsig-more#esign-sha1
       http://www.w3.org/2001/04/xmldsig-more#esign-sha224
@@ -273,8 +272,8 @@
    /&gt;</pre>
         </div>
         <div class="subsubsection" property="dct:title" content="RSA-Whirlpool" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.3.8">
-          <span content="RFC 6931, section 2.3.8" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.8"/>
-          <span content="2.3.8" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.8"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.8" content="RFC 6931, section 2.3.8"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.8" content="2.3.8"/>
           <pre>   Identifier:
       http://www.w3.org/2007/05/xmldsig-more#rsa-whirlpool</pre>
           <pre>   As in the definition of the RSA-SHA1 algorithm in [XMLDSIG11], the
@@ -292,8 +291,8 @@
    /&gt;</pre>
         </div>
         <div class="subsubsection" property="dct:title" content="RSASSA-PSS with Parameters" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.3.9">
-          <span content="RFC 6931, section 2.3.9" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.9"/>
-          <span content="2.3.9" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.9"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.9" content="RFC 6931, section 2.3.9"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.9" content="2.3.9"/>
           <pre>   Identifiers:
       http://www.w3.org/2007/05/xmldsig-more#rsa-pss
       http://www.w3.org/2007/05/xmldsig-more#MGF1</pre>
@@ -329,8 +328,8 @@
    &lt;/xs:complexType&gt;</pre>
         </div>
         <div class="subsubsection" property="dct:title" content="RSASSA-PSS without Parameters" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.3.10">
-          <span content="RFC 6931, section 2.3.10" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.10"/>
-          <span content="2.3.10" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.10"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.10" content="RFC 6931, section 2.3.10"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.10" content="2.3.10"/>
           <p><a href="http://localhost:8000/res/rfc/3447" rel="dct:references">[RFC3447]</a> currently specifies only one mask generation function MGF1 based on a hash function. Although <a href="http://localhost:8000/res/rfc/3447" rel="dct:references">[RFC3447]</a> allows for parameterization, the default is to use the same hash function as the digest method function. Only this default approach is supported by this section; therefore, the definition of a mask generation function type is not needed yet. The same applies to the trailer field. There is only one value (0xBC) specified in <a href="http://localhost:8000/res/rfc/3447" rel="dct:references">[RFC3447]</a>. Hence, this default parameter must be used for signature generation. The default salt length is the length of the hash function.</p>
           <pre>   Identifiers:
       http://www.w3.org/2007/05/xmldsig-more#sha3-224-rsa-MGF1
@@ -354,8 +353,8 @@
    /&gt;</pre>
         </div>
         <div class="subsubsection" property="dct:title" content="RSA-SHA224" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.3.11">
-          <span content="RFC 6931, section 2.3.11" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.11"/>
-          <span content="2.3.11" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.11"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.3.11" content="RFC 6931, section 2.3.11"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.3.11" content="2.3.11"/>
           <pre>   Identifier:
       http://www.w3.org/2007/05/xmldsig-more#rsa-sha224</pre>
           <p>This implies the PKCS#1 v1.5 padding algorithm <a href="http://localhost:8000/res/rfc/3447" rel="dct:references">[RFC3447]</a> as described in <a href="#S2.3.1" rel="dct:references">Section 2.3.1</a>, but with the ASN.1 BER SHA-224 algorithm designator prefix. An example of use is</p>
@@ -365,19 +364,19 @@
         </div>
       </div>
       <div class="subsection" property="dct:title" content="Minimal Canonicalization" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.4">
-        <span content="RFC 6931, section 2.4" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.4"/>
-        <span content="2.4" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.4"/>
+        <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.4" content="RFC 6931, section 2.4"/>
+        <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.4" content="2.4"/>
         <p>Thus far, two independent interoperable implementations of Minimal Canonicalization have not been announced. Therefore, when XML Digital Signature was advanced along the Standards Track from <a href="http://localhost:8000/res/rfc/3075" rel="dct:references">[RFC3075]</a> to <a href="http://localhost:8000/res/rfc/3275" rel="dct:references">[RFC3275]</a>, Minimal Canonicalization was dropped. However, there is still interest. For its definition, see <a href="http://localhost:8000/res/rfc/3075#S6.5.1" rel="dct:references">Section 6.5.1 of [RFC3075]</a>.</p>
         <pre>   For reference, its identifier remains:
       http://www.w3.org/2000/09/xmldsig#minimal</pre>
       </div>
       <div class="subsection" property="dct:title" content="Transform Algorithms" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.5">
-        <span content="RFC 6931, section 2.5" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.5"/>
-        <span content="2.5" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.5"/>
+        <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.5" content="RFC 6931, section 2.5"/>
+        <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.5" content="2.5"/>
         <p>Note that all CanonicalizationMethod algorithms can also be used as transform algorithms.</p>
         <div class="subsubsection" property="dct:title" content="XPointer" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.5.1">
-          <span content="RFC 6931, section 2.5.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.5.1"/>
-          <span content="2.5.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.5.1"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.5.1" content="RFC 6931, section 2.5.1"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.5.1" content="2.5.1"/>
           <pre>   Identifier:
       http://www.w3.org/2001/04/xmldsig-more#xptr</pre>
           <p>This transform algorithm takes an [XPointer] as an explicit parameter. An example of use is:</p>
@@ -398,12 +397,12 @@
         </div>
       </div>
       <div class="subsection" property="dct:title" content="EncryptionMethod Algorithms" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.6">
-        <span content="RFC 6931, section 2.6" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.6"/>
-        <span content="2.6" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.6"/>
+        <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.6" content="RFC 6931, section 2.6"/>
+        <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.6" content="2.6"/>
         <p>This subsection gives identifiers and information for several EncryptionMethod Algorithms.</p>
         <div class="subsubsection" property="dct:title" content="ARCFOUR Encryption Algorithm" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.6.1">
-          <span content="RFC 6931, section 2.6.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.6.1"/>
-          <span content="2.6.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.6.1"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.6.1" content="RFC 6931, section 2.6.1"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.6.1" content="2.6.1"/>
           <pre>   Identifier:
       http://www.w3.org/2001/04/xmldsig-more#arcfour</pre>
           <p>ARCFOUR is a fast, simple stream encryption algorithm that is compatible with RSA Security's RC4 algorithm [RC4]. An example EncryptionMethod element using ARCFOUR is</p>
@@ -414,8 +413,8 @@
           <p>Note that Arcfour makes use of the generic KeySize parameter specified and defined in [XMLENC11].</p>
         </div>
         <div class="subsubsection" property="dct:title" content="Camellia Block Encryption" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.6.2">
-          <span content="RFC 6931, section 2.6.2" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.6.2"/>
-          <span content="2.6.2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.6.2"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.6.2" content="RFC 6931, section 2.6.2"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.6.2" content="2.6.2"/>
           <pre>   Identifiers:
       http://www.w3.org/2001/04/xmldsig-more#camellia128-cbc
       http://www.w3.org/2001/04/xmldsig-more#camellia192-cbc
@@ -427,8 +426,8 @@
    /&gt;</pre>
         </div>
         <div class="subsubsection" property="dct:title" content="Camellia Key Wrap" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.6.3">
-          <span content="RFC 6931, section 2.6.3" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.6.3"/>
-          <span content="2.6.3" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.6.3"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.6.3" content="RFC 6931, section 2.6.3"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.6.3" content="2.6.3"/>
           <pre>   Identifiers:
       http://www.w3.org/2001/04/xmldsig-more#kw-camellia128
       http://www.w3.org/2001/04/xmldsig-more#kw-camellia192
@@ -442,8 +441,8 @@
    /&gt;</pre>
         </div>
         <div class="subsubsection" property="dct:title" content="PSEC-KEM" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.6.4">
-          <span content="RFC 6931, section 2.6.4" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.6.4"/>
-          <span content="2.6.4" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.6.4"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.6.4" content="RFC 6931, section 2.6.4"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.6.4" content="2.6.4"/>
           <pre>   Identifier:
       http://www.w3.org/2001/04/xmldsig-more#psec-kem</pre>
           <p>The PSEC-KEM algorithm, specified in [18033-2], is a key encapsulation mechanism using elliptic curve encryption.</p>
@@ -462,8 +461,8 @@
           <p>See [18033-2] for information on the parameters above.</p>
         </div>
         <div class="subsubsection" property="dct:title" content="SEED Block Encryption" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.6.5">
-          <span content="RFC 6931, section 2.6.5" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.6.5"/>
-          <span content="2.6.5" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.6.5"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.6.5" content="RFC 6931, section 2.6.5"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.6.5" content="2.6.5"/>
           <pre>   Identifier:
       http://www.w3.org/2007/05/xmldsig-more#seed128-cbc</pre>
           <p>SEED <a href="http://localhost:8000/res/rfc/4269" rel="dct:references">[RFC4269]</a> is a 128-bit block size with 128-bit key sizes. In XML Encryption, SEED can be used in the Cipher Block Chaining (CBC) mode with a 128-bit initialization vector (IV). The resulting cipher text is prefixed by the IV. If included in XML output, it is then base64 encoded.</p>
@@ -472,8 +471,8 @@
       Algorithm="http://www.w3.org/2007/05/xmldsig-more#seed128-cbc" /&gt;</pre>
         </div>
         <div class="subsubsection" property="dct:title" content="SEED Key Wrap" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S2.6.6">
-          <span content="RFC 6931, section 2.6.6" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.6.6"/>
-          <span content="2.6.6" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.6.6"/>
+          <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S2.6.6" content="RFC 6931, section 2.6.6"/>
+          <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S2.6.6" content="2.6.6"/>
           <pre>   Identifier:
       http://www.w3.org/2007/05/xmldsig-more#kw-seed128</pre>
           <p>Key wrapping with SEED is identical to <a href="http://localhost:8000/res/rfc/3394#S2.2.1" rel="dct:references">Section 2.2.1 of [RFC3394]</a> with "AES" replaced by "SEED". The algorithm is specified in <a href="http://localhost:8000/res/rfc/4010" rel="dct:references">[RFC4010]</a>. The implementation of SEED is optional. The default initial value is 0xA6A6A6A6A6A6A6A6.</p>
@@ -486,12 +485,12 @@
       </div>
     </div>
     <div class="section" property="dct:title" content="KeyInfo" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S3">
-      <span content="RFC 6931, section 3" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S3"/>
-      <span content="3" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S3"/>
+      <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S3" content="RFC 6931, section 3"/>
+      <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S3" content="3"/>
       <p>In <a href="#S3.1" rel="dct:references">Section 3.1</a> below a new KeyInfo element child is specified, while in <a href="#S3.2" rel="dct:references">Section 3.2</a> additional KeyInfo Type values for use in RetrievalMethod are specified.</p>
       <div class="subsection" property="dct:title" content="PKCS #7 Bag of Certificates and CRLs" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S3.1">
-        <span content="RFC 6931, section 3.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S3.1"/>
-        <span content="3.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S3.1"/>
+        <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S3.1" content="RFC 6931, section 3.1"/>
+        <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S3.1" content="3.1"/>
         <p>A PKCS #7 <a href="http://localhost:8000/res/rfc/2315" rel="dct:references">[RFC2315]</a> "signedData" can also be used as a bag of certificates and/or certificate revocation lists (CRLs). The PKCS7signedData element is defined to accommodate such structures within KeyInfo. The binary PKCS #7 structure is base64 <a href="http://localhost:8000/res/rfc/2045" rel="dct:references">[RFC2045]</a> encoded. Any signer information present is ignored. The following is an example <a href="http://localhost:8000/res/rfc/3092" rel="dct:references">[RFC3092]</a>, eliding the base64 data:</p>
         <pre>   &lt;foo:PKCS7signedData
       xmlns:foo="http://www.w3.org/2001/04/xmldsig-more"&gt;
@@ -499,8 +498,8 @@
    &lt;/foo:PKCS7signedData&gt;</pre>
       </div>
       <div class="subsection" property="dct:title" content="Additional RetrievalMethod Type Values" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S3.2">
-        <span content="RFC 6931, section 3.2" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S3.2"/>
-        <span content="3.2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S3.2"/>
+        <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S3.2" content="RFC 6931, section 3.2"/>
+        <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S3.2" content="3.2"/>
         <p>The Type attribute of RetrievalMethod is an optional identifier for the type of data to be retrieved. The result of dereferencing a RetrievalMethod reference for all KeyInfo types with an XML structure is an XML element or document with that element as the root. The various "raw" key information types return a binary value. Thus, they require a Type attribute because they are not unambiguously parsable.</p>
         <pre>   Identifiers:
       http://www.w3.org/2001/04/xmldsig-more#KeyName
@@ -514,12 +513,12 @@
       </div>
     </div>
     <div class="section" property="dct:title" content="Indexes" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S4">
-      <span content="RFC 6931, section 4" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S4"/>
-      <span content="4" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S4"/>
+      <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S4" content="RFC 6931, section 4"/>
+      <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S4" content="4"/>
       <p>The following subsections provide an index by URI and by fragment identifier (the portion of the URI after "#") of the algorithm and KeyInfo URIs defined in this document and in the standards (plus the one KeyInfo child element name defined in this document). The "Sec/Doc" column has the section of this document or, if not specified in this document, the document where the item is specified. See also [XMLSECXREF].</p>
       <div class="subsection" property="dct:title" content="Fragment Index" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S4.1">
-        <span content="RFC 6931, section 4.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S4.1"/>
-        <span content="4.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S4.1"/>
+        <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S4.1" content="RFC 6931, section 4.1"/>
+        <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S4.1" content="4.1"/>
         <p>The initial "http://www.w3.org/" part of the URI is not included below. The first six entries have a null fragment identifier or no fragment identifier.</p>
         <pre>   Fragment            URI                                   Sec/Doc
    ---------           ----                                 --------</pre>
@@ -657,8 +656,8 @@
         <p>The initial "http://www.w3.org/" part of the URI is not included above.</p>
       </div>
       <div class="subsection" property="dct:title" content="URI Index" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S4.2">
-        <span content="RFC 6931, section 4.2" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S4.2"/>
-        <span content="4.2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S4.2"/>
+        <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S4.2" content="RFC 6931, section 4.2"/>
+        <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S4.2" content="4.2"/>
         <p>The initial "http://www.w3.org/" part of the URI is not included below.</p>
         <pre>   URI                                 Sec/Doc   Type
    ----                                --------  -----</pre>
@@ -797,25 +796,25 @@
       </div>
     </div>
     <div class="section" property="dct:title" content="Allocation Considerations" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S5">
-      <span content="RFC 6931, section 5" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S5"/>
-      <span content="5" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S5"/>
+      <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S5" content="RFC 6931, section 5"/>
+      <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S5" content="5"/>
       <p>W3C and IANA allocation considerations are given below.</p>
       <div class="subsection" property="dct:title" content="W3C Allocation Considerations" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S5.1">
-        <span content="RFC 6931, section 5.1" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S5.1"/>
-        <span content="5.1" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S5.1"/>
+        <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S5.1" content="RFC 6931, section 5.1"/>
+        <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S5.1" content="5.1"/>
         <p>As it is easy for people to construct their own unique URIs <a href="http://localhost:8000/res/rfc/3986" rel="dct:references">[RFC3986]</a> and, if appropriate, to obtain a URI from the W3C, it is not intended that any additional "http://www.w3.org/2007/05/xmldsig-more#" URIs be created beyond those enumerated in this RFC. (W3C Namespace stability rules prohibit the creation of new URIs under "http://www.w3.org/2000/09/xmldsig#" and URIs under "http://www.w3.org/2001/04/xmldsig-more#" were frozen with the publication of <a href="http://localhost:8000/res/rfc/4051" rel="dct:references">[RFC4051]</a>.)</p>
         <p>An "xmldsig-more" URI does not imply any official W3C or IETF status for these algorithms or identifiers nor does it imply that they are only useful in digital signatures. Currently, dereferencing such URIs may or may not produce a temporary placeholder document. Permission to use these URI prefixes has been given by the W3C.</p>
       </div>
       <div class="subsection" property="dct:title" content="IANA Considerations" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S5.2">
-        <span content="RFC 6931, section 5.2" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S5.2"/>
-        <span content="5.2" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S5.2"/>
+        <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S5.2" content="RFC 6931, section 5.2"/>
+        <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S5.2" content="5.2"/>
         <p>IANA has established a registry entitled "XML Security URIs". The initial contents correspond to <a href="#S4.2" rel="dct:references">Section 4.2</a> of this document with each section number in the "Sec/Doc" column augmented with a reference to this RFC (for example, "2.6.4" means "<a href="http://localhost:8000/res/rfc/6931" rel="dct:references">[RFC6931]</a>, <a href="#S2.6.4" rel="dct:references">Section 2.6.4</a>").</p>
         <p>New entries, including new Types, will be added based on Expert Review <a href="http://localhost:8000/res/rfc/5226" rel="dct:references">[RFC5226]</a>. Criterion for inclusion are (1) documentation sufficient for interoperability of the algorithm or data type and the XML syntax for its representation and use and (2) sufficient importance as normally indicated by inclusion in (2a) an approved W3C Note, Proposed Recommendation, or Recommendation or (2b) an approved IETF Standards Track document. Typically, the registry will reference a W3C or IETF document specifying such XML syntax; that document will either contain a more abstract description of the algorithm or data type or reference another document with a more abstract description.</p>
       </div>
     </div>
     <div class="section" property="dct:title" content="Security Considerations" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S6">
-      <span content="RFC 6931, section 6" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S6"/>
-      <span content="6" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S6"/>
+      <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S6" content="RFC 6931, section 6"/>
+      <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S6" content="6"/>
       <p>This RFC is concerned with documenting the URIs that designate algorithms and some data types used in connection with XML security. The security considerations vary widely with the particular algorithms, and the general security considerations for XML security are outside of the scope of this document but appear in [XMLDSIG11], [XMLENC11], [CANON10], [CANON11], and [GENERIC].</p>
       <p><a href="http://localhost:8000/res/rfc/6151" rel="dct:references">[RFC6151]</a> should be consulted before considering the use of MD5 as a DigestMethod or RSA-MD5 as a SignatureMethod.</p>
       <p>See <a href="http://localhost:8000/res/rfc/6194" rel="dct:references">[RFC6194]</a> for SHA-1 security considerations and <a href="http://localhost:8000/res/rfc/6151" rel="dct:references">[RFC6151]</a> for MD5 security considerations.</p>
@@ -823,8 +822,8 @@
       <p>Implementers should be aware that cryptographic algorithms become weaker with time. As new cryptoanalysis techniques are developed and computing performance improves, the work factor to break a particular cryptographic algorithm will reduce. Therefore, cryptographic implementations should be modular, allowing new algorithms to be readily inserted. That is, implementers should be prepared for the set of mandatory-to-implement algorithms to change over time.</p>
     </div>
     <div class="section" property="dct:title" content="Acknowledgements" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6931#S7">
-      <span content="RFC 6931, section 7" property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S7"/>
-      <span content="7" property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S7"/>
+      <span property="dct:identifier" about="http://localhost:8000/res/rfc/6931#S7" content="RFC 6931, section 7"/>
+      <span property="bibo:chapter" about="http://localhost:8000/res/rfc/6931#S7" content="7"/>
       <p>The contributions to this document by the following people, listed in alphabetic order, are gratefully acknowledged: Benoit Claise, Adrian Farrel, Stephen Farrell, Ernst Giessmann, Frederick Hirsch, Bjoern Hoehrmann, Russ Housley, Satoru Kanno, Charlie Kaufman, Konrad Lanz, HwanJin Lee, Barry Leiba, Peter Lipp, Subramanian Moonesamy, Thomas Roessler, Hanseong Ryu, Peter Saint-Andre, and Sean Turner.</p>
       <p>The following contributors to <a href="http://localhost:8000/res/rfc/4051" rel="dct:references">[RFC4051]</a>, on which this document is based, are gratefully acknowledged: Glenn Adams, Merlin Hughs, Gregor Karlinger, Brian LaMachia, Shiho Moriai, Joseph Reagle, Russ Housley, and Joel Halpern.</p>
       <p>Appendix A. Changes from <a href="http://localhost:8000/res/rfc/4051" rel="dct:references">RFC 4051</a></p>
