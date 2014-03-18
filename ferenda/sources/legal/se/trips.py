@@ -68,8 +68,8 @@ class Trips(SwedishLegalSource):
         for param in params:
             done = False
             url = self.start_url % param
+            pagecount = 1
             while not done:
-                pagecount = 1
                 self.log.info("Starting at %s" % url)
                 resp = requests.get(url)
                 tree = lxml.html.document_fromstring(resp.text)

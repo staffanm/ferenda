@@ -71,11 +71,18 @@ class PDFReader(CompoundElement):
             cmd = "pdftohtml -nodrm -c %s" % tmppdffile
             self.log.debug("Converting: %s" % cmd)
             (returncode, stdout, stderr) = util.runcmd(cmd,
-                                                       require_success=True)
-            # we won't need the html files
+                                                      require_success=True)
+            # we won't need the html files, or the blank PNG files
             for f in os.listdir(workdir):
                 if f.endswith(".html"):
                     os.unlink(workdir + os.sep + f)
+                elif f.endswith(".png"):
+                    # this checks the number of unique colors in the
+                    # bitmap. If there's only one color, we don't need
+                    # the file
+                    (returncode, stdout, stderr) = util.runcmd('convert %s -format "%%k" info:' % (workdir + os.sep + f))
+                    if stdout.strip() == "1":
+                        os.unlink(workdir + os.sep + f)
 
             # Without -fontfullname, all fonts are just reported as
             # having family="Times"...
@@ -115,7 +122,7 @@ class PDFReader(CompoundElement):
             background = "%s%03d.png" % (
                 os.path.splitext(xmlfile)[0], page.number)
 
-            # Reasons this file might not exist: We're running under RepoTester.
+            # Reasons this file might not exist: it was blank and therefore removed, or We're running under RepoTester
             if os.path.exists(background):
                 page.background = background
 
