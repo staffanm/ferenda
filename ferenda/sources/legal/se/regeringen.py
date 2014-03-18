@@ -6,9 +6,9 @@ import sys
 import os
 import re
 import codecs
-from datetime import datetime
+from datetime import datetime, timedelta
 from six import text_type as str
-from six.moves.urllib_parse import urljoin
+from six.moves.urllib_parse import urljoin, urlencode
 
 import requests
 from bs4 import BeautifulSoup
@@ -44,7 +44,17 @@ class Regeringen(SwedishLegalSource):
 
     document_type = None  # subclasses must override
     start_url = None
-    start_url_template = "http://www.regeringen.se/sb/d/107/a/136/action/showAll/sort/byDate/targetDepartment/archiveDepartment?d=107&action=search&queryLogic=1&sortOrder=1&query=&type=advanced&a=136&sort=byDate&docTypes=%(doctype)s"
+    start_url_template = 'http://www.regeringen.se/sb/d/107/a/136/action/showAll/sort/byDate/targetDepartment/archiveDepartment'
+    start_url_template_parameters = {'d': '107',
+                                     'a': '136',
+                                     'action': 'search',
+                                     'bottomQuery': '',
+                                     'dateRange': '1',
+                                     'query': '',
+                                     'queryLogic': '1',
+                                     'sortOrder': '1',
+                                     'sort': 'byDate',
+                                     'type': 'advanced'}
     downloaded_suffix = ".html"  # override PDFDocumentRepository
     source_encoding = "latin-1"
     storage_policy = "dir"
@@ -59,7 +69,25 @@ class Regeringen(SwedishLegalSource):
 
         # if self.config.lastdownloaded:
         #     FIXME: use this to create a time-filtered start_url
-        start_url = self.start_url_template % {'doctype': self.document_type}
+        today = datetime.today()
+        p = dict(self.start_url_template_parameters)
+        p.update({'dateRangeFromDay': today.day, # 18b
+                  'dateRangeFromMonth': today.month, # 3
+                  'dateRangeFromYear': today.year - 1999, # 15
+                  'dateRangeToDay': today.day,
+                  'dateRangeToMonth': today.month,
+                  'dateRangeToYear': today.year - 1998, # 16
+                  'docTypes': self.document_type})
+        if self.config.lastdownload and not self.config.refresh:
+            last = self.config.lastdownload - timedelta(days=1)
+            self.log.debug("Only downloading documents published on or after %s" % last)
+            p.update({'dateRange': '4',
+                      'dateRangeFromDay': last.day,
+                      'dateRangeFromMonth': last.month,
+                      'dateRangeFromYear': last.year - 1998})
+                      
+                      
+        start_url = self.start_url_template + "?" + urlencode(p)
         self.log.info("Starting at %s" % start_url)
         self.session = requests.session()
         for basefile, url in self.download_get_basefiles(start_url):
@@ -116,7 +144,8 @@ class Regeringen(SwedishLegalSource):
                 yield basefile, urljoin(url, link['href'])
 
             pagecount += 1
-            next = mainsoup.find("a", text="Nästa sida")
+            # next = mainsoup.find("a", text="Nästa sida")
+            next = mainsoup.find("a", text=str(pagecount))
             if next:
                 url = urljoin(url, next['href'])
             else:
