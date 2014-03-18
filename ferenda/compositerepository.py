@@ -145,14 +145,15 @@ class CompositeRepository(DocumentRepository):
                           self.store.parsed_path(basefile))
 
         cnt = 0
-        for attachment in instance.store.list_attachments(basefile, "parsed"):
-            cnt += 1
-            src = instance.store.parsed_path(basefile, attachment=attachment)
-            target = self.store.parsed_path(basefile, attachment=attachment)
-            util.link_or_copy(src, target)
-        if cnt:
-            self.log.debug("%s: Linked %s attachments from %s to %s" %
-                           (basefile,
-                            cnt,
-                            os.path.dirname(instance.store.parsed_path(basefile)),
-                            os.path.dirname(self.store.parsed_path(basefile))))
+        if instance.store.storage_policy == "dir":
+            for attachment in instance.store.list_attachments(basefile, "parsed"):
+                cnt += 1
+                src = instance.store.parsed_path(basefile, attachment=attachment)
+                target = self.store.parsed_path(basefile, attachment=attachment)
+                util.link_or_copy(src, target)
+            if cnt:
+                self.log.debug("%s: Linked %s attachments from %s to %s" %
+                               (basefile,
+                                cnt,
+                                os.path.dirname(instance.store.parsed_path(basefile)),
+                                os.path.dirname(self.store.parsed_path(basefile))))

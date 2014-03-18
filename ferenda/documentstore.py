@@ -319,7 +319,9 @@ class DocumentStore(object):
         :returns: All available attachments for the basefile 
         :rtype: generator
         """
-
+        if self.storage_policy != "dir":
+            raise errors.AttachmentPolicyError("Can't list attachments if storage_policy != 'dir'")
+        
         basedir = self.datadir
         # pathfrag = self.pathfrag_to_basefile(basefile) # that can't be right?
         pathfrag = self.basefile_to_pathfrag(basefile)
