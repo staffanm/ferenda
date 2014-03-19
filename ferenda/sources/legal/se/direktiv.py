@@ -13,10 +13,10 @@ from bs4 import BeautifulSoup
 from rdflib import Literal
 import requests
 
-from . import SwedishLegalSource, Trips, Regeringen, RPUBL
+from . import SwedishLegalSource, SwedishLegalStore, Trips, Regeringen, RPUBL
 from ferenda import Describer
 from ferenda import PDFDocumentRepository
-from ferenda import CompositeRepository
+from ferenda import CompositeRepository, CompositeStore
 from ferenda import TextReader
 from ferenda import util
 from ferenda.decorators import downloadmax
@@ -273,9 +273,13 @@ class DirPolopoly(Regeringen):
             identifier = "Dir. " + identifier
         return Literal(identifier)
 
+# inherit list_basefiles_for from CompositeStore, basefile_to_pathfrag
+# from SwedishLegalStore)
+class DirektivStore(CompositeStore, SwedishLegalStore):
+    pass
+
+        
 # Does parsing, generating etc from base files:
-
-
 class Direktiv(CompositeRepository, SwedishLegalSource):
 
     "A composite repository containing ``DirTrips``, ``DirAsp`` and ``DirPolopoly``."""
@@ -285,17 +289,8 @@ class Direktiv(CompositeRepository, SwedishLegalSource):
     xslt_template_toc = "toc.xsl"
     storage_policy = "dir"
     rdf_type = RPUBL.Direktiv
-
-    @classmethod
-    def basefile_from_path(cls, path):
-        seg = path.split(os.sep)
-        seg = seg[seg.index(cls.alias) + 2:-1]
-        seg = [x.replace("-", "/") for x in seg]
-        # print len(seg)
-        assert 2 <= len(seg) <= 3, "list of segments is too long or too short"
-        # print "path: %s, seg: %r, basefile: %s" % (path,seg,":".join(seg))
-        return ":".join(seg)
-
+    documentstore_class = DirektivStore
+    
     @classmethod
     def tabs(cls, primary=False):
         return [['Förarbeten', '/forarb/']]
