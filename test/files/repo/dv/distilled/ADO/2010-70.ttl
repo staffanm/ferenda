@@ -1,0 +1,26 @@
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://localhost:8000/res/dv/ad/2010:70> a rpubl:Rattsfallsreferat ;
+    dct:identifier "AD 2010 nr 70" ;
+    dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
+    rpubl:arsutgava "2010" ;
+    rpubl:lopnummer "70" ;
+    rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/ad> ;
+    rpubl:referatAvDomstolsavgorande <http://localhost:8000/res/dv/ad/B-117-2009/2010-10-13> ;
+    rpubl:referatrubrik "Målet gällde skadestånd. Domen innebar att tingsrättens domslut fastställdes."@sv ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/ad/2010:70> .
+
+<http://localhost:8000/res/dv/ad/B-117-2009/2010-10-13> a rpubl:VagledandeDomstolsavgorande ;
+    dct:publisher <http://lagen.nu/org/2008/arbetsdomstolen> ;
+    dct:title "Målet gällde skadestånd. Domen innebar att tingsrättens domslut fastställdes."@sv ;
+    rpubl:avgorandedatum "2010-10-13T00:00:00"^^xsd:dateTime ;
+    rpubl:domsnummer "2010-70" ;
+    rpubl:malnummer "B-117-2009" ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/ad/B-117-2009/2010-10-13> .
+

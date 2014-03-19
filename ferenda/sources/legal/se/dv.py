@@ -785,10 +785,33 @@ class DV(SwedishLegalSource):
         
     def parse_ooxml(self, text, basefile):
         soup = BeautifulSoup(text)
+
+        # The soup now contains a simplified version of OOXML where
+        # lot's of nonessential tags has been stripped. However, the
+        # central w:p tag often contains unneccessarily splitted
+        # subtags (eg "<w:t>Avgörand</w:t>...<w:t>a</w:t>...
+        # <w:t>tum</w:t>"). Attempt to join these
+        #
+        # FIXME: This could be a part of simplify_ooxml instead.
+        for p in soup.find_all("w:p"):
+            current_r = None
+            for r in p.find_all("w:r"):
+                # find out if formatting instructions (bold, italic)
+                # are identical
+                if current_r and current_r.find("w:rpr") == r.find("w:rpr"):
+                    # ok, merge
+                    ts = list(current_r.find_all("w:t"))
+                    assert len(ts) == 1, "w:r should not contain exactly one w:t"
+                    ns = ts[0].string
+                    ns.replace_with(str(ns) + r.find("w:t").string)
+                    r.decompose()
+                else:
+                    current_r = r
+
         for instrtext in soup.find_all("w:instrtext"):
             instrtext.decompose()
         head = {}
-
+        
         # Högst uppe på varje domslut står domstolsnamnet ("Högsta
         # domstolen") följt av referatnumret ("NJA 1987
         # s. 113").
@@ -810,13 +833,9 @@ class DV(SwedishLegalSource):
                 # Sometimes these text fields are broken up
                 # (eg "<w:t>Avgörand</w:t>...<w:t>a</w:t>...<w:t>tum</w:t>")
                 # Use (ridiculous) fallback method
-                nodes = soup.find_all('w:statustext', attrs={'w:val': key})
-                if nodes:
-                    node = nodes[-1]
-                else:
-                    if key not in ('Diarienummer', 'Domsnummer', 'Avdelning'): # not always present
-                        self.log.warning("%s: Couldn't find field %r" % (basefile, key))
-                    continue
+                if key not in ('Diarienummer', 'Domsnummer', 'Avdelning'): # not always present
+                    self.log.warning("%s: Couldn't find field %r" % (basefile, key))
+                continue
 
             txt = node.find_next("w:t").find_parent("w:p").get_text(strip=True)
             if txt:  # skippa fält med tomma strängen-värden
