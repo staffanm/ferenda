@@ -1207,102 +1207,6 @@ class DV(SwedishLegalSource):
         return b
 
     def structure_body(self, paras):
-        #
-        # NJA 2010 s 180 (?)
-        # <Delmal ordinal="I">
-        #    <Instans name="Linköpings tingsrätt">
-        #        (gärningsbeksrivning)
-        #        (domstol meddelar dom)
-        #        <Domslut>
-        #            <p>Tingsrätten dömde M.J. för ...</p>
-        #    <Instans name="Göta hovrätt" beslutsdatum="2009-10-30">
-        #        (ändringar/inställningar)
-        #        (HR anförde i beslut)
-        #        <Domskäl>
-        #           <Rubrik>Bakgrund
-        #           <p>Genom Krs dom den 
-        #           <Rubrik>Hovrättens skäl
-        #        <Domslut title="Hovrättens avgörande">
-        #    <Instans name="Högsta domstolen">
-        #         (ändringar/inställningar)
-        #        <Betänkande föredragande="rev.sekr. Ralf Järtelius">
-        #            <Domskäl>
-        #                <Rubrik>Betänkande
-        #                <P ordinal="1">Genom ett omprövningsbeslut...
-        #                <Rubrik>Bestämmelser om förbud mot dubbel lagföring
-        #                <p ordinal="2">
-        #            <Domslut title="HD:s avgörande">
-        #        <Dom referent="Dag Victor" domare="Göran Lambertz" datum="2010-03-31" malnr="..."> # ?
-        #            <Domskäl>
-        #                <Rubrik>Frågan i målet
-        #                <P ordinal="1">M.J. är i målet åtalad....
-        #                <P ordinal="40">Hovrättens avvisningsbeslut...
-        #            <Domslut title="HD:s avgörande">
-        #                <p>Med undanröjande av hovrättens belsut...
-        #        <Skiljaktighet dissenter="Marianne Lundius, Stefan Lindskog" "i sak">
-        #            <P>Vi är nese med ajurotetn</p>
-        #            <Rubrik>Är det förenligt
-        #            <P ordinal="33">Vid den senaste...
-        #            <P ordianl="53">RÅs överklagande ska alltså lämnas utan bifall
-        #        <Skiljaktighet dissent="Severin Blomstrand" "i motivering">
-        #            <p>I rosenquist-målet....</p>
-        #        <EgenDel tilläggare="Stefan Lindskog">
-        #            <P ordinal="1">Frågan huruvida...
-        #        <EgenDel tilläggare="Göran Lambertz">
-        #            <P ordinal="1">En central fråga...
-        # <Delmal ordinal="II">
-        #     <Instans Lunds tingsrätt 2008-09-30>
-        #         (aå väckte talan gärningsbeskrivning)
-        #         (domstol meddelar dom
-        #         <Domslut>
-        #            <p>Tingsrätten dömde L.W.
-        #     <Instans Hovrätten över Skåne och blekinge>
-        #         (ändring/inställning)
-        #         (domstolen meddelar dom>
-        #         <Domslut rubrik="Hovrättens domslut">
-        #     <Instans Högsta Domstolen>
-        #         <Föredragande Ralf Järtelius>
-        #             <Domskäl rubrk="Skäl">
-        #                 <Rubrik>Bakgrund
-        #                 <P ordinal="1">Genom ett...
-        #             <Domslut rubrik="HD:s agörande
-        #                  <P>HD förklarar att
-        #         <Dom Dag victor och Göran Lambertz>
-        #             <Domskäl rubrik="Skäl">
-        #               <Rubrik>Den dispenserade frågan
-        #               <P rdinal="1">LW är i målet...
-        #             <Domslut rubrik="HD:s avgörande">
-        #                <P>HD förklarar att...
-        #         <Skiljaktig i sak Lundius, Lindskog>
-        #         <Skiljaktig i motivering Blomstrand>
-        #         <EgenDel Lindskog>
-        #         <EgenDel Lambertz>
-        # <EndMeta>
-        #    HD:s beslut meddelade
-        #    Mål nr: B 5498-09 (I), B 2509-09 (II)
-        #    Lagrum: ....
-        #    Rättsfall: ...
-        
-        # MIG 2013:4
-        # <Instans Migrationsdomstol>
-        #    <p>A ansökte
-        #    <p>A överklagade
-        #    <p>I margs 2011 ingav
-        #    <p>A överklagade beslut till Förvaltningsrätten i Stockholm, migrationsdomstolen (2011-10-06, ordförande Hjulstrom) ... # ingen uttrycklig domskäl / domslut
-        # <Instans Migrationsöverdomstolen>
-        #    <p>Migrationsverket överklagade...
-        #    <p>Även A överklagade ...
-        #    <p>Kammarrätten i Stockholm, Migrationsöverdomstolen .... yttrade följande
-        #    <Dom>
-        #        <Domskäl>
-        #            <Rubrik>1. I förhållande till vilket land...
-        #            <Rubrik>a) Utlänningslagens bestämmelser...
-        #        <Domslut>
-        #            <p>Migrationsdomstolens avgörande. Migrationsdomstolen upphäver...
-        #    </Dom>
-        #    <Skiljaktig (i sak eller motivering?) Berselius>
-        #        <p>Av förarbetena...
-        # 
         courtnames = ["Linköpings tingsrätt",
                       "Lunds tingsrätt",
                       "Umeå tingsrätt",
@@ -1315,6 +1219,10 @@ class DV(SwedishLegalSource):
 
                       "Högsta domstolen"]
 
+        rx = ('(?P<court>Försäkringskassan|Migrationsverket) beslutade (därefter|) den (?P<date>\d+ \w+ \d+) att',
+              '(A överklagade beslutet till |)(?P<court>(Förvaltningsrätten|Länsrätten|Kammarrätten) i \w+(| län)(|, migrationsdomstolen|, Migrationsöverdomstolen)|Högsta förvaltningsdomstolen) \((?P<date>\d+-\d+\d+)')
+        instans_matchers = [re.compile(x, re.UNICODE) for x in rx]
+            
         
         def is_delmal(parser):
             chunk = parser.reader.peek()
@@ -1331,6 +1239,7 @@ class DV(SwedishLegalSource):
                 # if we're at root level, *anything* starts a new instans
                 return True
             else:
+                # from pudb import set_trace; set_trace()
                 for sentence in split_sentences(strchunk):
                     for r in (instans_matchers):
                         if r.match(sentence):
@@ -1392,10 +1301,6 @@ class DV(SwedishLegalSource):
             d = Delmal(ordinal=str(parser.reader.next()), malnr=None)
             return parser.make_children(d)
 
-        rx = (r'(?P<court>Försäkringskassan|Migrationsverket) beslutade (därefter|) den (?P<date>\d+ \w+ \d+) att',
-              r'(A överklagade beslutet till |)(?P<court>(Förvaltningsrätten|Länsrätten|Kammarrätten) i \w+(| län)(|, migrationsdomstolen|, Migrationsöverdomstolen)|Högsta förvaltningsdomstolen) \((?P<date>\d+-\d+\d+)')
-        instans_matchers = [re.compile(x) for x in rx]
-            
         @newstate('instans')
         def make_instans(parser):
             chunk = parser.reader.next()
@@ -1562,7 +1467,7 @@ class DV(SwedishLegalSource):
                        })
         p.initial_state = "body"
         p.initial_constructor = make_body
-        # p.debug = True
+        p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
         return p.parse(paras)
         
     # FIXME: port to relate_all_setup / _teardown

@@ -20,6 +20,7 @@ from ferenda import DocumentEntry
 from ferenda import FSMParser
 from ferenda import Describer
 from ferenda import util
+from ferenda.compat import OrderedDict
 from ferenda.elements import Body, Paragraph, Section, CompoundElement, SectionalElement
 from ferenda.pdfreader import PDFReader
 from ferenda.pdfreader import Page, Textbox
@@ -45,16 +46,16 @@ class Regeringen(SwedishLegalSource):
     document_type = None  # subclasses must override
     start_url = None
     start_url_template = 'http://www.regeringen.se/sb/d/107/a/136/action/showAll/sort/byDate/targetDepartment/archiveDepartment'
-    start_url_template_parameters = {'d': '107',
-                                     'a': '136',
-                                     'action': 'search',
-                                     'bottomQuery': '',
-                                     'dateRange': '1',
-                                     'query': '',
-                                     'queryLogic': '1',
-                                     'sortOrder': '1',
-                                     'sort': 'byDate',
-                                     'type': 'advanced'}
+    start_url_template_parameters = [('d', '107'),
+                                     ('a', '136'),
+                                     ('action', 'search'),
+                                     ('bottomQuery', ''),
+                                     ('dateRange', '1'),
+                                     ('query', ''),
+                                     ('queryLogic', '1'),
+                                     ('sortOrder', '1'),
+                                     ('sort', 'byDate'),
+                                     ('type', 'advanced')]
     downloaded_suffix = ".html"  # override PDFDocumentRepository
     source_encoding = "latin-1"
     storage_policy = "dir"
@@ -70,24 +71,27 @@ class Regeringen(SwedishLegalSource):
         # if self.config.lastdownloaded:
         #     FIXME: use this to create a time-filtered start_url
         today = datetime.today()
-        p = dict(self.start_url_template_parameters)
-        p.update({'dateRangeFromDay': today.day, # 18b
-                  'dateRangeFromMonth': today.month, # 3
-                  'dateRangeFromYear': today.year - 1999, # 15
-                  'dateRangeToDay': today.day,
-                  'dateRangeToMonth': today.month,
-                  'dateRangeToYear': today.year - 1998, # 16
-                  'docTypes': self.document_type})
+        # we use ordereddict and lists of 2-tuples to get a
+        # predictable ordering of parameters when constructing the URL
+        p = OrderedDict(self.start_url_template_parameters)
+        p.update([('dateRangeFromDay', today.day), # 18b
+                  ('dateRangeFromMonth', today.month), # 3
+                  ('dateRangeFromYear', today.year - 1999), # 15
+                  ('dateRangeToDay', today.day),
+                  ('dateRangeToMonth', today.month),
+                  ('dateRangeToYear', today.year - 1998), # 16
+                  ('docTypes', self.document_type)])
         if self.config.lastdownload and not self.config.refresh:
             last = self.config.lastdownload - timedelta(days=1)
-            self.log.debug("Only downloading documents published on or after %s" % last)
-            p.update({'dateRange': '4',
-                      'dateRangeFromDay': last.day,
-                      'dateRangeFromMonth': last.month,
-                      'dateRangeFromYear': last.year - 1998})
+            self.log.debug("Only downloading documents published on or after %s"
+                           % last)
+            p.update([('dateRange', '4'),
+                      ('dateRangeFromDay', last.day),
+                      ('dateRangeFromMonth', last.month),
+                      ('dateRangeFromYear', last.year - 1998)])
                       
                       
-        start_url = self.start_url_template + "?" + urlencode(p)
+        start_url = self.start_url_template + "?" + urlencode(p.items())
         self.log.info("Starting at %s" % start_url)
         self.session = requests.session()
         for basefile, url in self.download_get_basefiles(start_url):

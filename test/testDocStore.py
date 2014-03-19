@@ -239,6 +239,7 @@ class Store(unittest.TestCase):
                          versions)
 
     def test_list_attachments(self):
+        self.store.storage_policy = "dir" # attachments require this
         files = ["downloaded/123/a/index.html",
                  "downloaded/123/a/attachment.html",
                  "downloaded/123/a/appendix.pdf",
@@ -252,6 +253,7 @@ class Store(unittest.TestCase):
                          attachments)
         
     def test_list_attachments_version(self):
+        self.store.storage_policy = "dir" # attachments require this
         files = ["archive/downloaded/123/a/1/index.html",
                  "archive/downloaded/123/a/1/attachment.txt",
                  "archive/downloaded/123/a/2/index.html",

@@ -27,17 +27,18 @@ from rdflib.compare import graph_diff
 from rdflib.util import guess_format
 from lxml import etree
 
-from ferenda import DocumentRepository, DocumentStore, TextReader
+from ferenda import DocumentRepository, TextReader
 from ferenda import elements, util
 
 
 class FerendaTestCase(object):
 
     """Convenience class with extra AssertEqual methods. Note that even
-though this method provides :py:class:`unittest.TestCase`-like assert methods, it
-does not derive from :py:class:`~unittest.TestCase`. When creating a test case that
-makes use of these methods, you need to inherit from both :py:class:`~unittest.TestCase` and
-this class, ie::
+    though this method provides :py:class:`unittest.TestCase`-like
+    assert methods, it does not derive from
+    :py:class:`~unittest.TestCase`. When creating a test case that
+    makes use of these methods, you need to inherit from both
+    :py:class:`~unittest.TestCase` and this class, ie::
 
         class MyTestcase(unittest.TestCase, ferenda.testutil.FerendaTestCase):
             def test_simple(self):
@@ -367,8 +368,9 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             return res
         with codecs.open(specfile, encoding="utf-8") as fp:
             spec = json.load(fp)
-        with patch('requests.get', side_effect=my_get):
-            self.repo.download()
+        with patch('requests.sessions.Session.get', side_effect=my_get):
+            with patch('requests.get', side_effect=my_get):
+                self.repo.download()
 
         # organize a temporary copy of files that we can compare our results to
         wantdir = "%s/%s-want" % (self.datadir, self.repoclass.alias)
