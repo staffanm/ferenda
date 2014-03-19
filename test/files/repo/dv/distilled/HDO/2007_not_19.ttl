@@ -6,7 +6,7 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://localhost:8000/res/sfs/9999:999#K9P9S9> a rpubl:Rattsfallsnotis ;
+<http://localhost:8000/res/dv/nja/2007/not/19> a rpubl:Rattsfallsnotis ;
     dct:identifier "NJA 2007 not 19" ;
     dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
     dct:references <http://rinfo.lagrummet.se/publ/prop/1972:5#s518>,
@@ -22,7 +22,7 @@
     rpubl:lopnummer "19" ;
     rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/nja> ;
     rpubl:referatAvDomstolsavgorande <http://localhost:8000/res/dv/hd/T4459-05/2007-03-22> ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/9999:999#K9P9S9> .
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/nja/2007/not/19> .
 
 <http://localhost:8000/res/dv/hd/T4459-05/2007-03-22> a rpubl:VagledandeDomstolsavgorande ;
     dct:publisher <http://lagen.nu/org/2008/hogsta-domstolen> ;

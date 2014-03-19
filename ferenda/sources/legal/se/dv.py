@@ -445,11 +445,30 @@ class DV(SwedishLegalSource):
 
 
     def extract_notis(self, docfile, year, coll="HDO"):
+        def find_month_in_previous(basefile):
+            # The big word file with all notises might not
+            # start with a month name -- try to find out
+            # current month by examining the previous notis
+            # (belonging to a previous word file)
+
+            self.log.warning("No month specified in %s, attempting to look in previous file" % basefile)
+            # HDO/2009_not_26 -> HDO/2009_not_25
+            tmpfunc = lambda x: str(int(x.group(0)) - 1)
+            prev_basefile = re.sub('\d+$', tmpfunc, basefile)
+            prev_path = self.store.intermediate_path(prev_basefile)
+            if os.path.exists(prev_path):
+                soup = BeautifulSoup(util.readfile(prev_path))
+                tmp = soup.find(["w:p", "para"])
+                if re_avdstart.match(tmp.get_text().strip()):
+                    avd_p = tmp
+            if not avd_p:
+                raise RuntimeError("Cannot find value for month in %s (looked in %s" % (basefile, prev_path))
+
         # Given a word document containing a set of "notisfall" from
         # either HD or HFD (earlier RegR), spit out a intermediate XML
         # file for each notis.
         if coll == "HDO":
-            re_notisstart = re.compile("(?P<day>Den \d+:[ae]. |)(?P<ordinal>\d+)\. ?\((?P<malnr>\w \d+-\d+)\)", flags=re.UNICODE)
+            re_notisstart = re.compile("(?P<day>Den \d+:[ae]. |)(?P<ordinal>\d+)\s*\.\s*\((?P<malnr>\w\s\d+-\d+)\)", flags=re.UNICODE)
             re_avdstart = re.compile("(Januari|Februari|Mars|April|Maj|Juni|Juli|Augusti|September|Oktober|November|December)$")
         else: # REG / HFD
             re_notisstart = re.compile("[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)", flags=re.UNICODE)
@@ -458,13 +477,17 @@ class DV(SwedishLegalSource):
         intermediatefile = os.path.splitext(docfile)[0] + ".xml"
         r = WordReader()
         intermediatefile, filetype = r.read(docfile, intermediatefile)
-        soup = BeautifulSoup(util.readfile(intermediatefile))
         if filetype == "docx":
-            iterator = soup.find_all("w:p")
+            self._simplify_ooxml(intermediatefile, pretty_print=False)
+            soup = BeautifulSoup(util.readfile(intermediatefile))
+            soup = self._merge_ooxml(soup)
+            p_tag = "w:p"
             xmlns = ' xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
         else:
-            iterator = soup.find_all("para")
+            soup = BeautifulSoup(util.readfile(intermediatefile))
+            p_tag = "para"
             xmlns = ''
+        iterator = soup.find_all(p_tag)
         basefile = None
         fp = None
         avd_p = None
@@ -506,13 +529,14 @@ class DV(SwedishLegalSource):
                     fp.write("</body>\n")
                     fp.close()
                     if filetype == "docx":
-                        self._simplify_ooxml(self.store.intermediate_path(previous_basefile))
-                        
+                        self._simplify_ooxml(self.store.intermediate_path(basefile))
                 util.ensure_dir(self.store.intermediate_path(basefile))
                 fp = open(self.store.intermediate_path(basefile), "w")
                 fp.write('<body%s>' % xmlns)
                 if filetype != "docx":
                     fp.write("\n")
+                if coll == "HDO" and not avd_p:
+                    avd_p = find_month_in_previous(basefile)
                 if avd_p:
                     fp.write(repr(avd_p))
             if fp:
@@ -524,9 +548,6 @@ class DV(SwedishLegalSource):
             fp.close()
             if filetype == "docx":
                 self._simplify_ooxml(self.store.intermediate_path(basefile))
-
-                
-            
         else:
             self.log.error("%s/%s: No notis were extracted (%s)" %
                            (coll,year,docfile))
@@ -696,7 +717,7 @@ class DV(SwedishLegalSource):
             header = []
             done = False
             while not done:
-                if re.match("Not \d+\. ", iterator[0].get_text()):
+                if re.match("Not \d+\. ", iterator[0].get_text().strip()):
                     done = True
                 else:
                     tmp = iterator.pop(0)
@@ -1232,7 +1253,6 @@ class DV(SwedishLegalSource):
                 # if we're at root level, *anything* starts a new instans
                 return True
             else:
-                # from pudb import set_trace; set_trace()
                 for sentence in split_sentences(strchunk):
                     for r in (instans_matchers):
                         if r.match(sentence):
@@ -1430,6 +1450,10 @@ class DV(SwedishLegalSource):
             ("betankande", is_domskal): transition_domskal, # either (make_domskal, "domskal") or (False, None)
             ("betankande", is_domslut): (make_domslut, "domslut"),
             ("__done__", is_domskal): (False, None), 
+            ("__done__", is_skiljaktig): (False, None), 
+            ("__done__", is_tillagg): (False, None), 
+            ("__done__", is_delmal): (False, None), 
+            ("__done__", is_endmeta): (False, None), 
             ("__done__", is_domslut): (make_domslut, "domslut"),
             ("dom", is_domskal): (make_domskal, "domskal"),
             ("dom", is_domslut): (make_domslut, "domslut"),
@@ -1490,7 +1514,7 @@ class DV(SwedishLegalSource):
         else:
             self.log.warning("could not find xml:base in %s" % infile)
 
-    def _simplify_ooxml(self, filename):
+    def _simplify_ooxml(self, filename, pretty_print=True):
         # simplify the horrendous mess that is OOXML through simplify-ooxml.xsl
         with open(filename) as fp:
             intree = etree.parse(fp)
@@ -1499,7 +1523,7 @@ class DV(SwedishLegalSource):
         fp.close()
         resulttree = transform(intree)
         with open(filename, "wb") as fp:
-            fp.write(etree.tostring(resulttree, pretty_print=format, encoding="utf-8"))
+            fp.write(etree.tostring(resulttree, pretty_print=pretty_print, encoding="utf-8"))
         
 
     def _merge_ooxml(self, soup):
