@@ -126,7 +126,11 @@ class CompositeRepository(DocumentRepository):
                     break
             if ret:
                 self.copy_parsed(basefile, inst)
-        return ret
+        if ret:
+            return ret
+        else:
+            raise errors.ParseError("No instance of %r was able to parse %s" % (self.subrepos, basefile))
+
 
     def copy_parsed(self, basefile, instance):
         # If the distilled and parsed links are recent, assume that

@@ -50,7 +50,7 @@ digit	     ::= [0-9]
 
 
 # Skiljetecken som hittats i SFST-datat:
-# * \177 is DEL, which is present in 1977:1194, 
+# *  (\177) is DEL, which is present in 1977:1194, 
 # * € is (windows 1252) euro
 # * „ is smart quoutes, subscripted
 # * ‡ is a double-dagger, 
@@ -71,6 +71,6 @@ digit	     ::= [0-9]
 # * ¼, ½, ¾ are fractions (1/4, 1/2, 3/4 - should these be digits?)
 # * × is multiplication sign
 # * Â­ is soft hyphen
-punctuation    ::= [][!"#$%&'()*+,-./:;<=>?@\^_`{}~€‚ƒ„…†‡ˆ‰‹‘’“”•–—˜™›¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿÷Â­]
+punctuation    ::= [][!"#$%&'()*+,-./:;<=>?@\^_`{}~€‚ƒ„…†‡ˆ‰‹‘’“”•–—˜™›¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿÷Â­]
 
 # ------------ end of base.ebnf ----------------

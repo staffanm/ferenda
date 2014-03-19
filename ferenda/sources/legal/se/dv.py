@@ -510,10 +510,12 @@ class DV(SwedishLegalSource):
                     if m.group("day"):
                         day = m.group("day")
                     else:
-                        # inject current day in p's first element (which
-                        # should be a <emphasis role="bold" or equivalent).
+                        # inject current day in the first text node of
+                        # p (which should inside of a <emphasis
+                        # role="bold" or equivalent).
                         subnode = None
-                        for c in p.children:
+                        # FIXME: is this a deprecated method?
+                        for c in p.recursiveChildGenerator():
                             if isinstance(c, NavigableString):
                                 c.string.replace_with(day + str(c.string))
                                 break

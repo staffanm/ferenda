@@ -67,4 +67,5 @@
 <http://lagen.nu/org/2008/migrationsoverdomstolen> rdfs:label "Migrationsöverdomstolen" .
 <http://lagen.nu/org/2008/domstolsverket> rdfs:label "Domstolsverket" .
 <http://lagen.nu/org/2011/hogsta-forvaltningsdomstolen> rdfs:label "Högsta förvaltningsdomstolen" .
+<http://lagen.nu/org/2012/kungen> rdfs:label "H.M. Konungen" .
 

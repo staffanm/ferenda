@@ -43,7 +43,7 @@ class PDFReader(CompoundElement):
             self.filename = None
         # super(PDFReader, self).__init__(*args, **kwargs)
 
-    def read(self, pdffile, workdir):
+    def read(self, pdffile, workdir, images=True):
         """Initializes a PDFReader object from an existing PDF file. After
         initialization, the PDFReader contains a list of
         :py:class:`~ferenda.pdfreader.Page` objects.
@@ -57,32 +57,36 @@ class PDFReader(CompoundElement):
         self.filename = pdffile
         assert os.path.exists(pdffile), "PDF %s not found" % pdffile
         basename = os.path.basename(pdffile)
+        stem = os.path.splitext(basename)[0]
         xmlfile = os.sep.join(
-            (workdir, os.path.splitext(basename)[0] + ".xml"))
+            (workdir, stem + ".xml"))
 
         # print("looking for xml file at %s" % xmlfile)
         if not util.outfile_is_newer([pdffile], xmlfile):
             # print("%s did not exist, running pdftohtml" % xmlfile)
             tmppdffile = os.sep.join([workdir, basename])
             util.copy_if_different(pdffile, tmppdffile)
-            # two pass coding: First use -c (complex) to extract
-            # background pictures, then use -xml to get easy-to-parse
-            # text with bounding boxes.
-            cmd = "pdftohtml -nodrm -c %s" % tmppdffile
-            self.log.debug("Converting: %s" % cmd)
-            (returncode, stdout, stderr) = util.runcmd(cmd,
-                                                      require_success=True)
-            # we won't need the html files, or the blank PNG files
-            for f in os.listdir(workdir):
-                if f.endswith(".html"):
-                    os.unlink(workdir + os.sep + f)
-                elif f.endswith(".png"):
-                    # this checks the number of unique colors in the
-                    # bitmap. If there's only one color, we don't need
-                    # the file
-                    (returncode, stdout, stderr) = util.runcmd('convert %s -format "%%k" info:' % (workdir + os.sep + f))
-                    if stdout.strip() == "1":
+            if images:
+                # two pass coding: First use -c (complex) to extract
+                # background pictures, then use -xml to get easy-to-parse
+                # text with bounding boxes.
+                cmd = "pdftohtml -nodrm -c %s" % tmppdffile
+                self.log.debug("Converting: %s" % cmd)
+                (returncode, stdout, stderr) = util.runcmd(cmd,
+                                                          require_success=True)
+                # we won't need the html files, or the blank PNG files
+                for f in os.listdir(workdir):
+                    if f.startswith(stem) and f.endswith(".html"):
                         os.unlink(workdir + os.sep + f)
+                    elif f.startswith(stem) and f.endswith(".png"):
+                        # this checks the number of unique colors in the
+                        # bitmap. If there's only one color, we don't need
+                        # the file
+                        (returncode, stdout, stderr) = util.runcmd('convert %s -format "%%k" info:' % (workdir + os.sep + f))
+                        if stdout.strip() == "1":
+                            os.unlink(workdir + os.sep + f)
+                        else:
+                            self.log.debug("Keeping non-blank image %s" % f)
 
             # Without -fontfullname, all fonts are just reported as
             # having family="Times"...

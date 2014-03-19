@@ -469,7 +469,9 @@ class Regeringen(SwedishLegalSource):
 
     def parse_pdf(self, pdffile, intermediatedir):
         pdf = PDFReader()
-        pdf.read(pdffile, intermediatedir)
+        # By default, don't create and manage PDF backgrounds files
+        # (takes forever, we don't use them yet)
+        pdf.read(pdffile, intermediatedir, images=self.config.pdfimages)
         return pdf
 
                 

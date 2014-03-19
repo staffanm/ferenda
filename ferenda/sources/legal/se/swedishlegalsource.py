@@ -117,10 +117,8 @@ class SwedishLegalSource(DocumentRepository):
         resource_path = os.path.normpath(
             os.path.dirname(__file__) + "../../../../res/etc/authrec.n3")
         opts = super(SwedishLegalSource, self).get_default_options()
-        # len_before = len(opts)
         opts['authrec'] = resource_path
-        # len_after = len(opts)
-        # print("SwedishLegalSource.get_default_options: %s %s %s (%s -> %s)" % (self.__class__.__name__, id(self), resource_path, len_before, len_after))
+        opts['pdfimages'] = False 
         return opts
 
     def _swedish_ordinal(self, s):

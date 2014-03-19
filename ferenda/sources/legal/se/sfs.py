@@ -270,7 +270,7 @@ class UpphavdForfattning(DocumentRemovedError):
     pass
 
 
-class IdNotFound(ParseError):
+class IdNotFound(DocumentRemovedError):
     pass
 
 DCT = Namespace(util.ns['dct'])
@@ -766,10 +766,9 @@ class SFS(Trips):
         doc.uri = self.canonical_uri(doc.basefile, uppdaterad_tom)
         doc.lang = "sv"
         desc = Describer(doc.meta, doc.uri)
-
         try:
             registry = self.parse_sfsr(sfsr_file, doc.uri)
-        except UpphavdForfattning as e:
+        except (UpphavdForfattning, IdNotFound) as e:
             e.dummyfile = self.store.parsed_path(doc.basefile)
             raise e
 
@@ -792,9 +791,12 @@ class SFS(Trips):
             # extractSFST misslyckades, då det fanns någon post i
             # SFST-databasen (det händer alltför ofta att bara
             # SFSR-databasen är uppdaterad).
-            desc.value(self.ns['dct'].title,
-                       registry.value(URIRef(doc.uri),
-                                      self.ns['dct'].title))
+            # attempt to find out a title from SFSR
+            baseuri = self.canonical_uri(doc.basefile)
+            if baseuri in registry:
+                title = registry[baseuri].value(URIRef(baseuri),
+                                                self.ns['dct'].title)
+                desc.value(self.ns['dct'].title, title)
             desc.rel(self.ns['dct'].publisher,
                      self.lookup_resource("Regeringskansliet"))
 
@@ -832,7 +834,7 @@ class SFS(Trips):
         # 1. if registry contains a single value (ie a
         # Grundforfattning that hasn't been amended yet), we can
         # assume that dct:published == rpubl:utfardandedatum
-        if len(registry) == 1:
+        if len(registry) == 1 and desc.getvalues(self.ns['rpubl'].utfardandedatum):
             published = desc.getvalue(self.ns['rpubl'].utfardandedatum)
         else:
             # 2. if the last post in registry contains a
@@ -854,8 +856,10 @@ class SFS(Trips):
         assert isinstance(published, date)
         desc.value(self.ns['dct'].published, published)
 
-        rinfo_sameas = "http://rinfo.lagrummet.se/publ/sfs/%s/konsolidering/%s" % (
-            doc.basefile, published.strftime("%Y-%m-%d"))
+        # use manual formatting of the published date -- date.strftime
+        # doesn't work with years < 1900 in older versions of python
+        rinfo_sameas = "http://rinfo.lagrummet.se/publ/sfs/%s/konsolidering/%d-%02d-%02d" % (
+            doc.basefile, published.year, published.month, published.day)
         desc.rel(self.ns['owl'].sameAs, rinfo_sameas)
 
         # finally, combine data from the registry with any possible
@@ -918,6 +922,11 @@ class SFS(Trips):
         with codecs.open(filename, encoding="iso-8859-1") as fp:
             soup = bs4.BeautifulSoup(fp.read(), "lxml")
 
+        # do we really have a registry?
+        notfound = soup.find(text="Sökningen gav ingen träff!")
+        if notfound:
+            raise IdNotFound(str(notfound))
+        
         d = OrderedDict()
         rubrik = util.normalize_space(soup.body('table')[2].text)
         changes = soup.body('table')[3:-2]
@@ -1273,7 +1282,7 @@ class SFS(Trips):
             for p in element:
                 if hasattr(p, 'fragment_label'):
                     counters[p.fragment_label] += 1
-                    if hasattr(p, 'ordinal'):
+                    if hasattr(p, 'ordinal') and p.ordinal:
                         counters[p.fragment_label + p.ordinal] += 1
                     subcounters = self._count_elements(p)
                     for k in subcounters:
