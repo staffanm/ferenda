@@ -456,6 +456,7 @@ class DV(SwedishLegalSource):
             tmpfunc = lambda x: str(int(x.group(0)) - 1)
             prev_basefile = re.sub('\d+$', tmpfunc, basefile)
             prev_path = self.store.intermediate_path(prev_basefile)
+            avd_p = None
             if os.path.exists(prev_path):
                 soup = BeautifulSoup(util.readfile(prev_path))
                 tmp = soup.find(["w:p", "para"])
@@ -463,6 +464,7 @@ class DV(SwedishLegalSource):
                     avd_p = tmp
             if not avd_p:
                 raise RuntimeError("Cannot find value for month in %s (looked in %s" % (basefile, prev_path))
+            return avd_p
 
         # Given a word document containing a set of "notisfall" from
         # either HD or HFD (earlier RegR), spit out a intermediate XML
@@ -529,7 +531,7 @@ class DV(SwedishLegalSource):
                     fp.write("</body>\n")
                     fp.close()
                     if filetype == "docx":
-                        self._simplify_ooxml(self.store.intermediate_path(basefile))
+                        self._simplify_ooxml(self.store.intermediate_path(previous_basefile))
                 util.ensure_dir(self.store.intermediate_path(basefile))
                 fp = open(self.store.intermediate_path(basefile), "w")
                 fp.write('<body%s>' % xmlns)
