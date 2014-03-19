@@ -1226,7 +1226,8 @@ class LegalRef:
 
         rf = attributes['njarattsfall'] if 'njarattsfall' in attributes else attributes['rattsfall']
         if "not" in rf:
-            res += "%s/not/%s" % (attributes['ar'], attributes['lopnr'])
+            ordinal = attributes['sidnr'] if 'sidnr' in attributes else attributes['lopnr']
+            res += "%s/not/%s" % (attributes['ar'], ordinal)
         elif attributes['domstol'] == 'NJA':
             # FIXME: URIs should be based on publikationsordinal, not
             # pagenumber (which this in effect is) - but this requires

@@ -647,10 +647,7 @@ class DV(SwedishLegalSource):
             doc.meta.add((URIRef(doc.uri),
                           self.ns['ferenda'].patchdescription,
                           patchdesc))
-        doc.body = self.format_body(rawbody)  # FIXME: Write a
-                                             # FSMParser to detect
-                                             # high-level structure of
-                                             # the document
+        doc.body = self.format_body(rawbody)
         return True
 
 
@@ -668,9 +665,9 @@ class DV(SwedishLegalSource):
         head["Referat"] = referat_templ[coll] % m
 
         soup = BeautifulSoup(text)
-
         if filetype == "docx":
             ptag = "w:p"
+            soup = self._merge_ooxml(soup)
         else:
             ptag = "para"
 
@@ -785,31 +782,8 @@ class DV(SwedishLegalSource):
         
     def parse_ooxml(self, text, basefile):
         soup = BeautifulSoup(text)
+        soup = self._merge_ooxml(soup)
 
-        # The soup now contains a simplified version of OOXML where
-        # lot's of nonessential tags has been stripped. However, the
-        # central w:p tag often contains unneccessarily splitted
-        # subtags (eg "<w:t>Avgörand</w:t>...<w:t>a</w:t>...
-        # <w:t>tum</w:t>"). Attempt to join these
-        #
-        # FIXME: This could be a part of simplify_ooxml instead.
-        for p in soup.find_all("w:p"):
-            current_r = None
-            for r in p.find_all("w:r"):
-                # find out if formatting instructions (bold, italic)
-                # are identical
-                if current_r and current_r.find("w:rpr") == r.find("w:rpr"):
-                    # ok, merge
-                    ts = list(current_r.find_all("w:t"))
-                    assert len(ts) == 1, "w:r should not contain exactly one w:t"
-                    ns = ts[0].string
-                    ns.replace_with(str(ns) + r.find("w:t").string)
-                    r.decompose()
-                else:
-                    current_r = r
-
-        for instrtext in soup.find_all("w:instrtext"):
-            instrtext.decompose()
         head = {}
         
         # Högst uppe på varje domslut står domstolsnamnet ("Högsta
@@ -987,7 +961,7 @@ class DV(SwedishLegalSource):
         elif head.get("Domsnummer"):
             head["_localid"] = head["Domsnummer"]
         else:
-            raise ValueError("Required key missing")
+            raise ValueError("Required key (Målnummer/Domsnummer) missing")
 
         # 5. For NJA, Canonicalize the identifier through a very
         # forgiving regex and split of the alternative identifier
@@ -1527,6 +1501,35 @@ class DV(SwedishLegalSource):
         with open(filename, "wb") as fp:
             fp.write(etree.tostring(resulttree, pretty_print=format, encoding="utf-8"))
         
+
+    def _merge_ooxml(self, soup):
+        # this is a similar step to _simplify_ooxml, but merges w:p
+        # elements in a BeautifulSoup tree. This step probably should
+        # be performed through XSL and be put in _simplify_ooxml as
+        # well.
+                # The soup now contains a simplified version of OOXML where
+        # lot's of nonessential tags has been stripped. However, the
+        # central w:p tag often contains unneccessarily splitted
+        # subtags (eg "<w:t>Avgörand</w:t>...<w:t>a</w:t>...
+        # <w:t>tum</w:t>"). Attempt to join these
+        #
+        # FIXME: This could be a part of simplify_ooxml instead.
+        for p in soup.find_all("w:p"):
+            current_r = None
+            for r in p.find_all("w:r"):
+                # find out if formatting instructions (bold, italic)
+                # are identical
+                if current_r and current_r.find("w:rpr") == r.find("w:rpr"):
+                    # ok, merge
+                    ts = list(current_r.find_all("w:t"))
+                    assert len(ts) == 1, "w:r should not contain exactly one w:t"
+                    ns = ts[0].string
+                    ns.replace_with(str(ns) + r.find("w:t").string)
+                    r.decompose()
+                else:
+                    current_r = r
+        return soup
+    
             
     # gonna need this for news_criteria()
     pubs = {'http://rinfo.lagrummet.se/ref/rff/nja': 'Högsta domstolen',

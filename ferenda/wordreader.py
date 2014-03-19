@@ -9,7 +9,7 @@ import xml.etree.cElementTree as ET
 import zipfile
 from datetime import datetime
 from time import mktime
-
+import codecs
 from ferenda import errors, util
 
 
@@ -50,8 +50,13 @@ class WordReader(object):
                     self.word_to_ooxml(wordfile, intermediatefile)
                     filetype = "docx"
         else:
-            # FIXME: sniff the intermediatefile to see if its a
+            # sniff the intermediatefile to see if its a
             # docbook or a OOXML file
+            if filetype == "doc":
+                with codecs.open(intermediatefile, encoding="utf-8") as fp:
+                    if 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"' in fp.read(1024):
+                        filetype = "docx"
+                        
             pass
         return (intermediatefile, filetype)
 

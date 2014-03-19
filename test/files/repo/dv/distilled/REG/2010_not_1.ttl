@@ -28,7 +28,10 @@
         <http://localhost:8000/concept/Plan-_och_bygglagen>,
         <http://localhost:8000/concept/Rättsprövning_enligt_lagen_(2006:304)_om_rättsprövning_av_vissa_regeringsbeslut> ;
     rpubl:avgorandedatum "2010-01-04T00:00:00"^^xsd:dateTime ;
-    rpubl:lagrum <http://localhost:8000/res/sfs/9999:999#K5> ;
+    rpubl:lagrum <http://localhost:8000/res/sfs/1987:10#K5P29>,
+        <http://localhost:8000/res/sfs/2006:304>,
+        <http://localhost:8000/res/sfs/2006:304#P1>,
+        <http://localhost:8000/res/sfs/2007:845#P4> ;
     rpubl:malnummer "5267-09" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/regr/5267-09/2010-01-04> .
 

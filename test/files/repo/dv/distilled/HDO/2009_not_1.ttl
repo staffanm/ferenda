@@ -1,0 +1,24 @@
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://localhost:8000/res/dv/nja/2009/not/1> a rpubl:Rattsfallsnotis ;
+    dct:identifier "NJA 2009 not 1" ;
+    dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
+    dct:references <http://rinfo.lagrummet.se/publ/rattsfall/nja/1999s715> ;
+    rpubl:arsutgava "2009" ;
+    rpubl:lopnummer "1" ;
+    rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/nja> ;
+    rpubl:referatAvDomstolsavgorande <http://localhost:8000/res/dv/hd/Ö1242-08/2009-01-27> ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/nja/2009/not/1> .
+
+<http://localhost:8000/res/dv/hd/Ö1242-08/2009-01-27> a rpubl:VagledandeDomstolsavgorande ;
+    dct:publisher <http://lagen.nu/org/2008/hogsta-domstolen> ;
+    rpubl:avgorandedatum "2009-01-27T00:00:00"^^xsd:dateTime ;
+    rpubl:malnummer "Ö1242-08" ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/hd/Ö1242-08/2009-01-27> .
+
