@@ -380,11 +380,9 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
         elif (int(chunk.getfont()['size']) == metrics['textsize'] and
               (chunk.left < metrics['leftmargin'] or
                chunk.left > metrics['rightmargin'])):
-            if len(chunk) > 1 and chunk[1].startswith("Bilaga "):
-                # note: we need to check wether the appendix
-                # ordinal ISN'T the same as an appendix number
-                # we're already dealing with
-                ordinal = int(re.search("Bilaga (\d)", str(chunk)).group(1))
+            m = re.search("Bilaga (\d)", str(chunk))
+            if m:
+                ordinal = int(m.group(1))
                 if ordinal != state['appendixno']:
                     return True
 

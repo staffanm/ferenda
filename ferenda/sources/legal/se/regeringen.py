@@ -539,8 +539,10 @@ class Regeringen(SwedishLegalSource):
                     preset = 'default'
                 parser = offtryck_parser(preset=preset)
                 # self.config.debug = True
-                if hasattr(self.config, 'debug'):
-                    parser.debug = self.config.debug 
+                # if hasattr(self.config, 'debug'):
+                #     parser.debug = self.config.debug
+                parser.debug = os.environ.get('FERENDA_FSMDEBUG', False)
+                    
                 body = parser.parse(offtryck_textboxiter(pdf))
                 pdf[:] = body[:]
                 pdf.tagname = "body"
