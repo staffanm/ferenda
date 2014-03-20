@@ -541,6 +541,8 @@ class Regeringen(SwedishLegalSource):
                     preset = 'proposition'
                 elif self.document_type == self.SOU:
                     preset = 'sou'
+                elif self.document_type == self.KOMMITTEDIREKTIV:
+                    preset = 'dir'
                 else:
                     preset = 'default'
                 parser = offtryck_parser(preset=preset)
@@ -548,7 +550,6 @@ class Regeringen(SwedishLegalSource):
                 # if hasattr(self.config, 'debug'):
                 #     parser.debug = self.config.debug
                 parser.debug = os.environ.get('FERENDA_FSMDEBUG', False)
-                    
                 body = parser.parse(offtryck_textboxiter(pdf))
                 pdf[:] = body[:]
                 pdf.tagname = "body"

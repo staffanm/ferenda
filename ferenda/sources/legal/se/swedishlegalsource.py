@@ -283,7 +283,17 @@ class SwedishLegalSource(DocumentRepository):
 
 def offtryck_parser(basefile="0", preset="proposition", metrics={}):
     presets = {'default': {},
+               'dir': {'footer': 920,
+                       'header': 82,
+                       'leftmargin': 105,
+                       'rightmargin': 566,
+                       'headingsize': 14,
+                       'subheadingsize': 14,
+                       'subheadingfamily': 'TimesNewRomanPS-ItalicMT',
+                       'subsubheadingsize': None,
+                       'textsize': 14},
                'proposition': {'footer': 920,
+                               'header': 65, # make sure this is correct
                                'leftmargin': 160,
                                'rightmargin': 628,
                                'headingsize': 20,
@@ -292,6 +302,7 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
                                'subsubheadingsize': 15,
                                'textsize': 13},
                'sou': {'header': 49, # or rather 49 + 15
+                       'header': 65, # make sure this is correct
                        'footer': 940,
                        'leftmargin': 84,
                        'rightmargin': 813,
@@ -318,10 +329,11 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
     # page numbers, headings.
     def is_nonessential(parser):
         chunk = parser.reader.peek()
-        if chunk.top > metrics['footer']:
+        if chunk.top > metrics['footer'] or chunk.bottom < metrics['header']:
             return True  # page numbers
         if (int(chunk.getfont()['size']) <= metrics['textsize'] and
-                (chunk.left < metrics['leftmargin'] or chunk.left > metrics['rightmargin']) and
+                (chunk.left < metrics['leftmargin'] or
+                 chunk.left > metrics['rightmargin']) and
             (15 <= len(str(chunk)) <= 29)): # matches both "Prop. 2013/14:1" and "Prop. 1999/2000:123 Bilaga 12"
             return True
 
@@ -331,7 +343,6 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
 
             
     def is_preamblesection(parser):
-
         chunk = parser.reader.peek()
         if isinstance(chunk, Page):
             return False
