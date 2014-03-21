@@ -3,19 +3,49 @@ from __future__ import unicode_literals
 
 import re
 import os
+from datetime import datetime
+import time
 
 from six import text_type as str
+from six import binary_type as bytes
 
 # 3rd party
 from bs4 import BeautifulSoup
 import requests
+import requests.exceptions
 
 # My own stuff
-from ferenda import PDFDocumentRepository
+from ferenda import PDFDocumentRepository, DocumentStore
 from ferenda import util
-from ferenda.decorators import downloadmax
+from ferenda.decorators import downloadmax, recordlastdownload
 from ferenda.elements import UnicodeElement, CompoundElement, serialize
 from . import SwedishLegalSource
+
+
+class ARNStore(DocumentStore):
+    """Customized DocumentStore."""
+    def basefile_to_pathfrag(self, basefile):
+        return basefile.replace("-", "/")
+
+    def pathfrag_to_basefile(self, pathfrag):
+        return pathfrag.replace("/","-")
+
+    def downloaded_path(self, basefile, version=None, attachment=None, suffix=None):
+        if not suffix:
+            if os.path.exists(self.path(basefile, "downloaded", ".wpd")):
+                suffix = ".wpd"
+            elif os.path.exists(self.path(basefile, "downloaded", ".doc")):
+                suffix = ".doc"
+            elif os.path.exists(self.path(basefile, "downloaded", ".docx")):
+                suffix = ".docx"
+            elif os.path.exists(self.path(basefile, "downloaded", ".rtf")):
+                suffix = ".rtf"
+            elif os.path.exists(self.path(basefile, "downloaded", ".pdf")):
+                suffix = ".pdf"
+            else:
+                suffix = self.downloaded_suffix
+        return self.path(basefile, "downloaded", suffix, version, attachment)
+    
 
 
 class ARN(SwedishLegalSource, PDFDocumentRepository):
@@ -26,20 +56,31 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
     av dessa till XHTML1.1+RDFa, samt transformering till browserfärdig
     HTML5.
     """
+
     alias = "arn"
     xslt_template = "res/xsl/arn.xsl"
     start_url = "http://adokweb.arn.se/digiforms/sessionInitializer?processName=SearchRefCasesProcess"
-
+    documentstore_class = ARNStore
+    
+    @recordlastdownload
     def download(self, basefile=None):
         self.session = requests.Session()
         resp = self.session.get(self.start_url)
         soup = BeautifulSoup(resp.text)
         action = soup.find("form")["action"]
 
+        if self.config.lastdownload:
+            d = self.config.lastdownload
+            datefrom = '%d-%02d-%02d' % (d.year, d.month, d.day)
+            dateto = '%d-01-01' % (d.year+1)
+        else:
+            datefrom = '1992-01-01'
+            dateto = '1993-01-01'
+        
         params = {
             '/root/searchTemplate/decision': 'obegransad',
-            '/root/searchTemplate/decisionDateFrom': '1992-01-01',
-            '/root/searchTemplate/decisionDateTo': '1993-01-01',
+            '/root/searchTemplate/decisionDateFrom': datefrom,
+            '/root/searchTemplate/decisionDateTo': dateto,
             '/root/searchTemplate/department': 'alla',
             '/root/searchTemplate/journalId': '',
             '/root/searchTemplate/searchExpression': '',
@@ -49,25 +90,45 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
         }
 
         for basefile, url in self.download_get_basefiles((action, params)):
-            self.download_single(basefile, url)
+            if (self.config.refresh or
+                    (not os.path.exists(self.store.downloaded_path(basefile)))):
+                self.download_single(basefile, url)
 
     @downloadmax
     def download_get_basefiles(self, args):
         action, params = args
         done = False
+        self.log.debug("Retrieving all results from %s to %s" %
+                       (params['/root/searchTemplate/decisionDateFrom'],
+                        params['/root/searchTemplate/decisionDateTo']))
+        paramcopy = dict(params)
         while not done:
             # First we need to use the files argument to send the POST
             # request as multipart/form-data
             req = requests.Request(
-                "POST", action, cookies=self.session.cookies, files=params).prepare()
-            # Then we need to remove filename and content-type fields
+                "POST", action, cookies=self.session.cookies, files=paramcopy).prepare()
+            # Then we need to remove filename
             # from req.body in an unsupported manner in order not to
             # upset the sensitive server
+            body = req.body
+            if isinstance(body, bytes):
+                body = body.decode() # should be pure ascii
             req.body = re.sub(
-                '; filename="[\w\-\/]+"\r\nContent-Type: [\w\-\/]+', '', req.body).encode()
+                '; filename="[\w\-\/]+"', '', body).encode()
             req.headers['Content-Length'] = str(len(req.body))
             # And finally we have to allow RFC-violating redirects for POST
-            resp = self.session.send(req, allow_redirects=True)
+
+            resp = False
+            remaining_attempts = 5
+            while (not resp) and (remaining_attempts > 0):
+                try:
+                    resp = self.session.send(req, allow_redirects=True)
+                except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+                    self.log.warning(
+                        "Failed to POST %s: error %s (%s remaining attempts)" % (action, e, remaining_attempts))
+                    remaining_attempts -= 1
+                    time.sleep(1)
+                        
             soup = BeautifulSoup(resp.text)
             for link in soup.find_all("input", "standardlink", onclick=re.compile("javascript:window.open")):
                 url = link['onclick'][24:-2]  # remove 'javascript:window.open' call around the url
@@ -75,11 +136,40 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
                 basefile = link.find_parent("table").find_parent(
                     "table").find_all("div", "strongstandardtext")[1].text
                 yield basefile, url
-            if soup.find('Nästa sida'):
-                params = {}
-                action = []
+            if soup.find("input", value="Nästa sida"):
+                self.log.debug("Now retrieving next page in current search")
+                paramcopy = {'_cParam0': "method=nextPage",
+                             '_validate': "none",
+                             '_cmdName': "cmd_process_next"}
             else:
-                done = True
+                fromYear = int(params['/root/searchTemplate/decisionDateFrom'][:4])
+                if fromYear >= datetime.now().year:
+                    done = True
+                else:
+                    # advance one year
+                    params['/root/searchTemplate/decisionDateFrom'] = "%s-01-01" % str(fromYear+1)
+                    params['/root/searchTemplate/decisionDateTo'] = "%s-01-01" % str(fromYear+2)
+                    self.log.debug("Now retrieving all results from %s to %s" %
+                                   (params['/root/searchTemplate/decisionDateFrom'],
+                                    params['/root/searchTemplate/decisionDateTo']))
+                    paramcopy = dict(params)
+                    # restart the search, so that poor digiforms
+                    # doesn't get confused
+
+                    resp = False
+                    remaining_attempts = 5
+                    while (not resp) and (remaining_attempts > 0):
+                        try:
+                            resp = self.session.get(self.start_url)
+                        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+                            self.log.warning(
+                                "Failed to POST %s: error %s (%s remaining attempts)" % (action, e, remaining_attempts))
+                            remaining_attempts -= 1
+                            time.sleep(1)
+
+                    soup = BeautifulSoup(resp.text)
+                    action = soup.find("form")["action"]
+
 
     def download_single(self, basefile, url):
         super(ARN, self).download_single(basefile, url)

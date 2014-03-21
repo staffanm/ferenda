@@ -90,7 +90,9 @@ class PDFReader(CompoundElement):
 
             # Without -fontfullname, all fonts are just reported as
             # having family="Times"...
-            cmd = "pdftohtml -nodrm -xml -fontfullname %s" % tmppdffile
+            imgflag = "-i" if not images else ""
+
+            cmd = "pdftohtml -nodrm -xml -fontfullname %s %s" % (imgflag, tmppdffile)
             self.log.debug("Converting: %s" % cmd)
             (returncode, stdout, stderr) = util.runcmd(cmd,
                                                        require_success=True)
