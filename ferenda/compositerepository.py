@@ -108,15 +108,32 @@ class CompositeRepository(DocumentRepository):
 
     # NOTE: this impl should NOT use the @managedparsing decorator
     def parse(self, basefile):
+        # first, check if we really need to parse. If any subrepo
+        # returns that parseneeded is false and we have parsed file in
+        # the mainrepo, then we're done. This is mainly to avoid the
+        # log message below (to be in line with expected repo
+        # behaviour of not logging anythin at severity INFO if no real
+        # work was done), it does not noticably affect performance
+        force = (self.config.force is True or
+                 self.config.parseforce is True)
+        if not force:
+            for c in self.subrepos:
+                inst = self.get_instance(c, self.myoptions)
+                needed = inst.parseneeded(basefile)
+                if not needed and os.path.exists(self.store.parsed_path(basefile)):
+                    self.log.debug("%s: Skipped" % basefile)
+                    return True # signals everything OK
+
         with util.logtime(self.log.info, "%(basefile)s OK (%(elapsed).3f sec)",
                           {'basefile': basefile}):
             ret = False
+            # from pudb import set_trace; set_trace()
             for c in self.subrepos:
                 inst = self.get_instance(c, self.myoptions)
                 try:
                     # each parse method should be smart about whether
                     # to re-parse or not (i.e. use the @managedparsing
-                    # decorator)
+                    # decorator). 
                     ret = inst.parse(basefile)
 
                 except Exception as e: # Any error thrown (errors.ParseError or something else) means we try next subrepo

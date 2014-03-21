@@ -57,15 +57,12 @@ def parseifneeded(f):
     it should be re-generated."""
     @functools.wraps(f)
     def wrapper(self, doc):
-        # note: We hardcode the use of .downloaded_path, .parsed_path
-        # and the 'parseforce' config option, which means that this
-        # decorator can only be used sensibly with the .parse()
-        # function.
-        infile = self.store.downloaded_path(doc.basefile)
-        outfile = self.store.parsed_path(doc.basefile)
+        # note: We hardcode the use of .parseneeded() and the
+        # 'parseforce' config option, which means that this decorator
+        # can only be used sensibly with the .parse() function.
         force = (self.config.force is True or
                  self.config.parseforce is True)
-        if not force and util.outfile_is_newer([infile], outfile):
+        if not force and not self.parseneeded(doc.basefile):
             self.log.debug("%s: Skipped", doc.basefile)
             return True  # Signals that everything is OK
         else:

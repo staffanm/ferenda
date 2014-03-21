@@ -80,7 +80,7 @@ class DocumentRepository(object):
 #    following principal call chains:
 #
 #    download
-#        do_download
+#        download_get_basefiles
 #            download_single
 #                downloaded_path
 #                download_if_needed
@@ -790,6 +790,12 @@ with the *config* object as single parameter.
            this might change to a instance method.
         """
 
+    def parseneeded(self, basefile):
+        """Returns True iff there is a need to parse the given basefile. If the resulting parsed file exists and is newer than the downloaded file, there is typically no reason to parse the file."""
+        infile = self.store.downloaded_path(basefile)
+        outfile = self.store.parsed_path(basefile)
+        return not util.outfile_is_newer([infile], outfile)
+        
     @decorators.action
     @decorators.managedparsing
     def parse(self, doc):
