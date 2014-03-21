@@ -43,7 +43,7 @@ class PDFReader(CompoundElement):
             self.filename = None
         # super(PDFReader, self).__init__(*args, **kwargs)
 
-    def read(self, pdffile, workdir, images=True):
+    def read(self, pdffile, workdir, images=True, convert_to_pdf=False):
         """Initializes a PDFReader object from an existing PDF file. After
         initialization, the PDFReader contains a list of
         :py:class:`~ferenda.pdfreader.Page` objects.
@@ -53,7 +53,16 @@ class PDFReader(CompoundElement):
                         background PNG files) are stored
 
         """
-
+        if convert_to_pdf:
+            newpdffile = workdir + os.sep + os.path.splitext(os.path.basename(pdffile))[0] + ".pdf"
+            if not os.path.exists(newpdffile):
+                util.ensure_dir(newpdffile)
+                cmdline = "soffice --headless -convert-to pdf -outdir '%s' %s" % (workdir, pdffile)
+                self.log.debug("%s: Converting to PDF: %s" % (pdffile, cmdline))
+                (ret, stdout, stderr) = util.runcmd(
+                    cmdline, require_success=True)
+                pdffile = newpdffile
+        
         self.filename = pdffile
         assert os.path.exists(pdffile), "PDF %s not found" % pdffile
         basename = os.path.basename(pdffile)

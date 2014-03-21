@@ -5,6 +5,7 @@ import re
 import os
 from datetime import datetime
 import time
+import itertools
 
 from six import text_type as str
 from six import binary_type as bytes
@@ -13,11 +14,12 @@ from six import binary_type as bytes
 from bs4 import BeautifulSoup
 import requests
 import requests.exceptions
+from rdflib import URIRef, Literal
 
 # My own stuff
-from ferenda import PDFDocumentRepository, DocumentStore
+from ferenda import PDFDocumentRepository, DocumentStore, PDFReader, WordReader
 from ferenda import util
-from ferenda.decorators import downloadmax, recordlastdownload
+from ferenda.decorators import downloadmax, recordlastdownload, managedparsing
 from ferenda.elements import UnicodeElement, CompoundElement, serialize
 from . import SwedishLegalSource
 
@@ -28,7 +30,7 @@ class ARNStore(DocumentStore):
         return basefile.replace("-", "/")
 
     def pathfrag_to_basefile(self, pathfrag):
-        return pathfrag.replace("/","-")
+        return pathfrag.replace("/","-", 1)
 
     def downloaded_path(self, basefile, version=None, attachment=None, suffix=None):
         if not suffix:
@@ -45,8 +47,23 @@ class ARNStore(DocumentStore):
             else:
                 suffix = self.downloaded_suffix
         return self.path(basefile, "downloaded", suffix, version, attachment)
-    
 
+    def list_basefiles_for(self, action, basedir=None):
+        if not basedir:
+            basedir = self.datadir
+        if action == "parse":
+            d = os.path.sep.join((basedir, "downloaded"))
+            for x in sorted(itertools.chain(util.list_dirs(d, ".wpd"),
+                                            util.list_dirs(d, ".rtf"),
+                                            util.list_dirs(d, ".doc"),
+                                            util.list_dirs(d, ".docx"),
+                                            util.list_dirs(d, ".pdf"))):
+                suffix = "/index"+ os.path.splitext(x)[1]
+                pathfrag = x[len(d) + 1:-len(suffix)]
+                yield self.pathfrag_to_basefile(pathfrag)
+        else:
+            for x in super(ARNStore, self).list_basefiles_for(action, basedir):
+                yield x
 
 class ARN(SwedishLegalSource, PDFDocumentRepository):
 
@@ -69,11 +86,12 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
         soup = BeautifulSoup(resp.text)
         action = soup.find("form")["action"]
 
-        if self.config.lastdownload:
+        if self.config.lastdownload and not self.config.refresh:
             d = self.config.lastdownload
             datefrom = '%d-%02d-%02d' % (d.year, d.month, d.day)
             dateto = '%d-01-01' % (d.year+1)
         else:
+            # only fetch one year at a time
             datefrom = '1992-01-01'
             dateto = '1993-01-01'
         
@@ -195,18 +213,29 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
                     doctype = ".pdf"  # don't do anything
             if doctype != '.pdf':
                 util.robust_rename(d, d.replace(".pdf", doctype))
-
+    @managedparsing
     def parse(self, doc):
-        # find out if we have a .pdf or a .doc (possibly .wpd?)
-        type = self.guess_type
-        self.parse_from_pdf(self, doc, "...")
+        downloaded = self.store.downloaded_path(doc.basefile)
+        filetype = os.path.splitext(downloaded)[1]
+        if filetype == ".pdf":
+            self.parse_from_pdf(doc, downloaded)
+        elif filetype in (".doc", ".docx"):
+            self.parse_from_word(doc, downloaded)
+        else:
+            self.parse_from_pdf(doc, downloaded, filetype=filetype)
         return True
 
-    def parse_from_pdf(self, pdfreader, doc):
-        pass
+    def parse_from_pdf(self, doc, filename, filetype=".pdf"):
+        reader = PDFReader()
+        convert_to_pdf = filetype != ".pdf"
+        workdir = os.path.dirname(self.store.intermediate_path(doc.basefile))
+        reader.read(filename, workdir, images=False, convert_to_pdf=convert_to_pdf)
+        doc.body.append(reader)
+        doc.meta.add(((URIRef(self.canonical_uri(doc.basefile)),
+                       self.ns['dct'].identifier,
+                       Literal(doc.basefile))))
 
-    def parse_from_word(self, wordreader, doc):
-        pass
+    def parse_from_word(self, wordreader, doc, filetype):
+        reader = WordReader()
+        
 
-    def parse_from_wpd(self, wpd, doc):
-        pass

@@ -62,12 +62,13 @@ class PDFDocumentRepository(DocumentRepository):
                 for page in pdf:
                     totcnt += 1
                     cnt += 1
-                    src = self.store.intermediate_path(
-                        doc.basefile, attachment="%s%03d.png" % (pdfbase, page.number))
-                    dest = self.store.parsed_path(
-                        doc.basefile, attachment="%s%03d.png" % (pdfbase, page.number))
-                    if util.copy_if_different(src, dest):
-                        self.log.debug("Copied %s to %s" % (src, dest))
+                    if page.background:
+                        src = self.store.intermediate_path(
+                            doc.basefile, attachment=page.background)
+                        dest = self.store.parsed_path(
+                            doc.basefile, attachment=page.background)
+                        if util.copy_if_different(src, dest):
+                            self.log.debug("Copied %s to %s" % (src, dest))
 
-                    fp.write("#page%03d { background: url('%s');}\n" %
-                             (cnt, os.path.basename(dest)))
+                        fp.write("#page%03d { background: url('%s');}\n" %
+                                 (cnt, os.path.basename(dest)))
