@@ -64,9 +64,9 @@ class PDFDocumentRepository(DocumentRepository):
                     cnt += 1
                     if page.background:
                         src = self.store.intermediate_path(
-                            doc.basefile, attachment=page.background)
+                            doc.basefile, attachment=os.path.basename(page.background))
                         dest = self.store.parsed_path(
-                            doc.basefile, attachment=page.background)
+                            doc.basefile, attachment=os.path.basename(page.background))
                         if util.copy_if_different(src, dest):
                             self.log.debug("Copied %s to %s" % (src, dest))
 

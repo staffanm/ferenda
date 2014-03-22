@@ -38,7 +38,9 @@ class Decorators(unittest.TestCase):
             repo.called = True
 
         mockdoc = Mock()
+        mockdoc.basefile="1234"
         mockrepo = Mock()
+        mockrepo.parseneeded = DocumentRepository().parseneeded
         mockrepo.called = False
         mockrepo.config.force = False
         # test 1: Outfile is newer - the parseifneeded decorator

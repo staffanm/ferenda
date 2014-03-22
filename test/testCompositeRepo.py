@@ -82,7 +82,8 @@ class TestComposite(RepoTester):
                          util.readfile(self.repo.store.distilled_path("1")))
         self.assertEqual(["attach.txt"],
                          list(self.repo.store.list_attachments("1", "parsed")))
-        self.assertFalse(self.repo.parse("2")) # none can handle this
+        with self.assertRaises(errors.ParseError):
+            self.assertFalse(self.repo.parse("2")) # none can handle this
         self.assertTrue(self.repo.parse("3")) # only A can handle this
         self.assertEqual("basefile 3, parsed by a",
                          util.readfile(self.repo.store.parsed_path("3")))
