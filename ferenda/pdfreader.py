@@ -30,6 +30,11 @@ class PDFReader(CompoundElement):
        This class depends on the command line tool pdftohtml from
        `poppler <http://poppler.freedesktop.org/>`_.
 
+       The class can also handle any other type of document (such as
+       Word/OOXML/WordPerfect/RTF) that OpenOffice or LibreOffice
+       handles by first converting it to PDF using the ``soffice``
+       command line tool (which then must be in your ``$PATH``)
+
     """
 
     tagname = "div"
@@ -48,9 +53,17 @@ class PDFReader(CompoundElement):
         initialization, the PDFReader contains a list of
         :py:class:`~ferenda.pdfreader.Page` objects.
 
-        :param pdffile: The full path to the PDF file
+        :param pdffile: The full path to the PDF file (or, if
+                        ``convert_to_pdf``is set, any other document
+                        file)
         :param workdir: A directory where intermediate files (particularly
                         background PNG files) are stored
+        :param convert_to_pdf: If pdffile is any other type of
+                               document other than PDF, attempt to
+                               first convert it to PDF using the
+                               ``soffice`` command line tool (from
+                               OpenOffice/LibreOffice).
+        :type  convert_to_pdf: bool
 
         """
         if convert_to_pdf:
