@@ -11,7 +11,8 @@ import re
 from rdflib import URIRef, RDFS, Graph
 from six import text_type as str
 
-from ferenda import DocumentRepository, DocumentStore, FSMParser
+from ferenda import DocumentRepository, DocumentStore, FSMParser, CitationParser
+from ferenda.sources.legal.se.legalref import LegalRef, Link
 from ferenda.elements import Paragraph, Section, Body, CompoundElement, SectionalElement
 from ferenda.pdfreader import Page
 
@@ -565,3 +566,21 @@ def offtryck_textboxiter(pdfreader):
             yield textbox
             textbox = None
     
+# (ab)use the CitationClass, with it's useful parse_recursive method,
+# to use a legalref based parser instead of a set of pyparsing
+# grammars.
+class SwedishCitationParser(CitationParser):
+    def __init__(self, legalrefparser):
+        self._legalrefparser = legalrefparser
+
+    def parse_string(self, string):
+        unfiltered = self._legalrefparser.parse(string, predicate="dct:references")
+        # remove those references that we cannot fully resolve (should
+        # be an option in LegalRef, but...
+        filtered = []
+        for node in unfiltered:
+            if isinstance(node, Link) and "sfs/9999:999" in node.uri:
+                filtered.append(str(node))
+            else:
+                filtered.append(node)
+        return filtered

@@ -25,14 +25,14 @@ from lxml import etree
 from bs4 import BeautifulSoup, NavigableString
 
 # my libs
-from ferenda import Document, DocumentStore, Describer, WordReader, CitationParser, FSMParser
+from ferenda import Document, DocumentStore, Describer, WordReader, FSMParser
 from ferenda.decorators import managedparsing, newstate
 from ferenda import util
 from ferenda.sources.legal.se.legalref import LegalRef, Link
 from ferenda.elements import Body, Paragraph, CompoundElement, OrdinalElement, Heading
 
 from ferenda.elements.html import Strong, Em
-from . import SwedishLegalSource, RPUBL
+from . import SwedishLegalSource, SwedishCitationParser, RPUBL
 
 # Objektmodellen för rättsfall:
 #
@@ -129,22 +129,6 @@ class DVStore(DocumentStore):
 # (ab)use the CitationClass, with it's useful parse_recursive method,
 # to use a legalref based parser instead of a set of pyparsing
 # grammars. 
-class DVCitationParser(CitationParser):
-    def __init__(self, legalrefparser):
-        self._legalrefparser = legalrefparser
-
-    def parse_string(self, string):
-        unfiltered = self._legalrefparser.parse(string, predicate="dct:references")
-        # remove those references that we cannot fully resolve (should
-        # be an option in LegalRef, but...
-        filtered = []
-        for node in unfiltered:
-            if isinstance(node, Link) and "sfs/9999:999" in node.uri:
-                filtered.append(str(node))
-            else:
-                filtered.append(node)
-        return filtered
-
 
 class OrderedParagraph(Paragraph, OrdinalElement):
     def as_html(self, baseuri):
@@ -1216,7 +1200,7 @@ class DV(SwedishLegalSource):
         if self.config.parsebodyrefs:
             if not hasattr(self, 'ref_parser'):
                 self.ref_parser = LegalRef(LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN)
-            citparser = DVCitationParser(self.ref_parser)
+            citparser = SwedishCitationParser(self.ref_parser)
             b = citparser.parse_recursive(b)
 
         # convert the unstructured list of Paragraphs to a

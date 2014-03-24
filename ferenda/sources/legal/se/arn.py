@@ -21,7 +21,8 @@ from ferenda import PDFDocumentRepository, DocumentStore, PDFReader, WordReader,
 from ferenda import util
 from ferenda.decorators import downloadmax, recordlastdownload, managedparsing
 from ferenda.elements import UnicodeElement, CompoundElement, serialize
-from . import SwedishLegalSource
+from . import SwedishLegalSource, SwedishCitationParser
+from ferenda.sources.legal.se.legalref import LegalRef
 
 
 class ARNStore(DocumentStore):
@@ -53,6 +54,8 @@ class ARNStore(DocumentStore):
             basedir = self.datadir
         if action == "parse":
             d = os.path.sep.join((basedir, "downloaded"))
+            if not os.path.exists(d):
+                return
             for x in sorted(itertools.chain(util.list_dirs(d, ".wpd"),
                                             util.list_dirs(d, ".rtf"),
                                             util.list_dirs(d, ".doc"),
@@ -268,8 +271,38 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
         return True
 
     def parse_from_pdf(self, doc, filename, filetype=".pdf"):
+        # glue together textboxes that are horizontally adjacent
+        def glue(textboxes):
+            textbox = None
+            # prevbox = None
+            linespaceing = 1 # Paragraphs have max 1pt between lines
+            for nextbox in textboxes:
+                # our glue condition: if our currently building
+                # textbox ends just below the top of nextbox, glue
+                # nextbox to textbox
+                if (textbox and
+                    textbox.top + textbox.height + linespaceing >= nextbox.top):
+                    textbox[-1] += " "
+                    textbox += nextbox
+                else:
+                    if textbox:
+                        yield textbox
+                    textbox = nextbox
+            if textbox:
+                yield textbox
+            
         reader = PDFReader()
         convert_to_pdf = filetype != ".pdf"
         workdir = os.path.dirname(self.store.intermediate_path(doc.basefile))
         reader.read(filename, workdir, images=False, convert_to_pdf=convert_to_pdf)
+        for page in reader:
+            x = list(glue(page[:]))
+            page[:] = x[:]
+
+            if not hasattr(self, 'ref_parser'):
+                self.ref_parser = LegalRef(LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN)
+            citparser = SwedishCitationParser(self.ref_parser)
+            page = citparser.parse_recursive(page)
+
         doc.body.append(reader)
+
