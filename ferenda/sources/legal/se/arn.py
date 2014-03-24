@@ -21,7 +21,7 @@ from ferenda import PDFDocumentRepository, DocumentStore, PDFReader, WordReader,
 from ferenda import util
 from ferenda.decorators import downloadmax, recordlastdownload, managedparsing
 from ferenda.elements import UnicodeElement, CompoundElement, serialize
-from . import SwedishLegalSource, SwedishCitationParser
+from . import SwedishLegalSource, SwedishCitationParser, RPUBL
 from ferenda.sources.legal.se.legalref import LegalRef
 
 
@@ -81,6 +81,8 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
     xslt_template = "res/xsl/arn.xsl"
     start_url = "http://adokweb.arn.se/digiforms/sessionInitializer?processName=SearchRefCasesProcess"
     documentstore_class = ARNStore
+    rdf_type = RPUBL.VagledandeMyndighetsavgorande
+    lang = "sv"
     
     @recordlastdownload
     def download(self, basefile=None):
@@ -238,11 +240,12 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
                 return cell.find_parent("td").find_next_sibling("td").get_text().strip()
             else:
                 raise KeyError("Could not find cell key %s" % key)
-        doc.lang="sv"
         downloaded = self.store.downloaded_path(doc.basefile)
         fragment = self.store.downloaded_path(doc.basefile, attachment="fragment.html")
         soup = BeautifulSoup(util.readfile(fragment, encoding="utf-8"))
         desc = Describer(doc.meta, doc.uri)
+        desc.rdftype(self.rdf_type)
+        desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
         desc.value(self.ns['dct'].identifier, "ARN %s" % doc.basefile)
         desc.value(self.ns['rpubl'].arendenummer, nextcell("Änr"))
         desc.value(self.ns['rpubl'].avgorandedatum, nextcell("Avgörande"))

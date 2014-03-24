@@ -113,7 +113,12 @@ class FSMParser():
             # chunk = str(rawchunk)
             chunk = repr(rawchunk)
             if len(chunk) > 90:
-                chunk = chunk[:25] + "[...]" + chunk[-10:]
+                # chunk = chunk[:25] + "[...]" + chunk[-10:]
+                seg = (chunk[:25], chunk[-10:])
+                try:
+                    chunk = "%s [...] %s" % seg
+                except UnicodeDecodeError:
+                    chunk = "%r [...] %r" % seg
             else:
                 chunk = chunk
 
