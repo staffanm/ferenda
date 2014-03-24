@@ -17,7 +17,7 @@ import requests.exceptions
 from rdflib import URIRef, Literal
 
 # My own stuff
-from ferenda import PDFDocumentRepository, DocumentStore, PDFReader, WordReader
+from ferenda import PDFDocumentRepository, DocumentStore, PDFReader, WordReader, Describer
 from ferenda import util
 from ferenda.decorators import downloadmax, recordlastdownload, managedparsing
 from ferenda.elements import UnicodeElement, CompoundElement, serialize
@@ -107,10 +107,10 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
             '_validate': 'page'
         }
 
-        for basefile, url in self.download_get_basefiles((action, params)):
+        for basefile, url, fragment in self.download_get_basefiles((action, params)):
             if (self.config.refresh or
                     (not os.path.exists(self.store.downloaded_path(basefile)))):
-                self.download_single(basefile, url)
+                self.download_single(basefile, url, fragment)
 
     @downloadmax
     def download_get_basefiles(self, args):
@@ -151,9 +151,9 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
             for link in soup.find_all("input", "standardlink", onclick=re.compile("javascript:window.open")):
                 url = link['onclick'][24:-2]  # remove 'javascript:window.open' call around the url
                 # this probably wont break...
-                basefile = link.find_parent("table").find_parent(
-                    "table").find_all("div", "strongstandardtext")[1].text
-                yield basefile, url
+                fragment = link.find_parent("table").find_parent("table")
+                basefile = fragment.find_all("div", "strongstandardtext")[1].text
+                yield basefile, url, fragment
             if soup.find("input", value="Nästa sida"):
                 self.log.debug("Now retrieving next page in current search")
                 paramcopy = {'_cParam0': "method=nextPage",
@@ -188,39 +188,81 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
                     soup = BeautifulSoup(resp.text)
                     action = soup.find("form")["action"]
 
-
-    def download_single(self, basefile, url):
-        super(ARN, self).download_single(basefile, url)
+    
+    def guess_type(self, filename):
+        with open(filename, "rb") as fp:
+            sig = fp.read(4)
+            if sig == b'\xffWPC':
+                doctype = ".wpd"
+            elif sig == b'\xd0\xcf\x11\xe0':
+                doctype = ".doc"
+            elif sig == b'PK\x03\x04':
+                doctype = ".docx"
+            elif sig == b'{\\rt':
+                doctype = ".rtf"
+            elif sig == b'%PDF':
+                doctype = ".pdf"
+            else:
+                self.log.warning(
+                    "%s has unknown signature %r -- don't know what kind of file it is" % (filename, sig))
+                doctype = ".pdf"  # don't do anything
+        return doctype
+        
+                    
+    def download_single(self, basefile, url, fragment):
+        ret = super(ARN, self).download_single(basefile, url)
         # after downloading: see if our PDF in reality was something else
         # FIXME: we should do this prior to .download_if_needed...
-        d = self.store.downloaded_path(basefile)
-        if os.path.exists(d):
-            with open(d, "rb") as fp:
-                sig = fp.read(4)
-                if sig == b'\xffWPC':
-                    doctype = ".wpd"
-                elif sig == b'\xd0\xcf\x11\xe0':
-                    doctype = ".doc"
-                elif sig == b'PK\x03\x04':
-                    doctype = ".docx"
-                elif sig == b'{\\rt':
-                    doctype = ".rtf"
-                elif sig == b'%PDF':
-                    doctype = ".pdf"
-                else:
-                    self.log.warning(
-                        "%s has unknown signature %r -- don't know what kind of file it is" % (d, sig))
-                    doctype = ".pdf"  # don't do anything
-            if doctype != '.pdf':
-                util.robust_rename(d, d.replace(".pdf", doctype))
+        if ret:
+            d = self.store.downloaded_path(basefile)
+            if os.path.exists(d) and not d.endswith(".pdf"):
+                doctype = self.guess_type(d)
+                if doctype != '.pdf':
+                    util.robust_rename(d, d.replace(".pdf", doctype))
+
+            # the HTML fragment from the search result page contains
+            # metadata not available in the main document, so save it
+            # as fragment.html
+            with self.store.open_downloaded(basefile, mode="w", attachment="fragment.html") as fp:
+                fp.write(str(fragment))
+        return ret
+        
     @managedparsing
     def parse(self, doc):
+        def nextcell(key):
+            cell = soup.find(text=key)
+            if cell:
+                return cell.find_parent("td").find_next_sibling("td").get_text().strip()
+            else:
+                raise KeyError("Could not find cell key %s" % key)
+        doc.lang="sv"
         downloaded = self.store.downloaded_path(doc.basefile)
+        fragment = self.store.downloaded_path(doc.basefile, attachment="fragment.html")
+        soup = BeautifulSoup(util.readfile(fragment, encoding="utf-8"))
+        desc = Describer(doc.meta, doc.uri)
+        desc.value(self.ns['dct'].identifier, "ARN %s" % doc.basefile)
+        desc.value(self.ns['rpubl'].arendenummer, nextcell("Änr"))
+        desc.value(self.ns['rpubl'].avgorandedatum, nextcell("Avgörande"))
+        desc.value(self.ns['dct'].subject, nextcell("Avdelning"), lang="sv")
+        title = util.normalize_space(soup.table.find_all("tr")[3].get_text())
+        title = re.sub("Avgörande \d+-\d+-\d+; \d+-\d+\.?", "", title)
+        desc.value(self.ns['dct'].title, title.strip(), lang="sv")
         filetype = os.path.splitext(downloaded)[1]
         if filetype == ".pdf":
-            self.parse_from_pdf(doc, downloaded)
-        elif filetype in (".doc", ".docx"):
-            self.parse_from_word(doc, downloaded)
+            # make sure it really is a PDF
+            doctype = self.guess_type(downloaded)
+            if doctype != ".pdf":
+                util.robust_rename(downloaded,
+                                   downloaded.replace(".pdf", doctype))
+                downloaded = downloaded.replace(".pdf", doctype)
+                filetype = doctype
+
+            self.parse_from_pdf(doc, downloaded, filetype=filetype)
+
+        # for uniformity, we try to treat everything as PDF by
+        # converting, even .doc/.docx documents are converted to PDF
+        # elif filetype in (".doc", ".docx"):
+        # self.parse_from_word(doc, downloaded)
         else:
             self.parse_from_pdf(doc, downloaded, filetype=filetype)
         return True
@@ -231,11 +273,3 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
         workdir = os.path.dirname(self.store.intermediate_path(doc.basefile))
         reader.read(filename, workdir, images=False, convert_to_pdf=convert_to_pdf)
         doc.body.append(reader)
-        doc.meta.add(((URIRef(self.canonical_uri(doc.basefile)),
-                       self.ns['dct'].identifier,
-                       Literal(doc.basefile))))
-
-    def parse_from_word(self, wordreader, doc, filetype):
-        reader = WordReader()
-        
-
