@@ -88,44 +88,47 @@ class PDFReader(CompoundElement):
             # print("%s did not exist, running pdftohtml" % xmlfile)
             tmppdffile = os.sep.join([workdir, basename])
             util.copy_if_different(pdffile, tmppdffile)
-            if images:
-                # two pass coding: First use -c (complex) to extract
-                # background pictures, then use -xml to get easy-to-parse
-                # text with bounding boxes.
-                cmd = "pdftohtml -nodrm -c %s" % tmppdffile
+            try:
+                if images:
+                    # two pass coding: First use -c (complex) to extract
+                    # background pictures, then use -xml to get easy-to-parse
+                    # text with bounding boxes.
+                    cmd = "pdftohtml -nodrm -c %s" % tmppdffile
+                    self.log.debug("Converting: %s" % cmd)
+                    (returncode, stdout, stderr) = util.runcmd(cmd,
+                                                              require_success=True)
+                    # we won't need the html files, or the blank PNG files
+                    for f in os.listdir(workdir):
+                        if f.startswith(stem) and f.endswith(".html"):
+                            os.unlink(workdir + os.sep + f)
+                        elif f.startswith(stem) and f.endswith(".png"):
+                            # this checks the number of unique colors in the
+                            # bitmap. If there's only one color, we don't need
+                            # the file
+                            (returncode, stdout, stderr) = util.runcmd('convert %s -format "%%k" info:' % (workdir + os.sep + f))
+                            if stdout.strip() == "1":
+                                os.unlink(workdir + os.sep + f)
+                            else:
+                                self.log.debug("Keeping non-blank image %s" % f)
+
+                # Without -fontfullname, all fonts are just reported as
+                # having family="Times"...
+                imgflag = "-i" if not images else ""
+
+                cmd = "pdftohtml -nodrm -xml -fontfullname %s %s" % (imgflag, tmppdffile)
                 self.log.debug("Converting: %s" % cmd)
                 (returncode, stdout, stderr) = util.runcmd(cmd,
-                                                          require_success=True)
-                # we won't need the html files, or the blank PNG files
-                for f in os.listdir(workdir):
-                    if f.startswith(stem) and f.endswith(".html"):
-                        os.unlink(workdir + os.sep + f)
-                    elif f.startswith(stem) and f.endswith(".png"):
-                        # this checks the number of unique colors in the
-                        # bitmap. If there's only one color, we don't need
-                        # the file
-                        (returncode, stdout, stderr) = util.runcmd('convert %s -format "%%k" info:' % (workdir + os.sep + f))
-                        if stdout.strip() == "1":
-                            os.unlink(workdir + os.sep + f)
-                        else:
-                            self.log.debug("Keeping non-blank image %s" % f)
-
-            # Without -fontfullname, all fonts are just reported as
-            # having family="Times"...
-            imgflag = "-i" if not images else ""
-
-            cmd = "pdftohtml -nodrm -xml -fontfullname %s %s" % (imgflag, tmppdffile)
-            self.log.debug("Converting: %s" % cmd)
-            (returncode, stdout, stderr) = util.runcmd(cmd,
-                                                       require_success=True)
-            # if pdftohtml fails (if it's an old version that doesn't
-            # support the fullfontname flag) it still uses returncode
-            # 0! Only way to know if it failed is to inspect stderr
-            # and look for if the xml file wasn't created.
-            if stderr and not os.path.exists(xmlfile):
-                # print("pdfreader: Probable flag failure.\n    pdffile: %s\n    xmlfile: %s (%s)" %
-                #      (pdffile, xmlfile, os.path.exists(xmlfile)))
-                raise errors.ExternalCommandError(stderr)
+                                                           require_success=True)
+                # if pdftohtml fails (if it's an old version that doesn't
+                # support the fullfontname flag) it still uses returncode
+                # 0! Only way to know if it failed is to inspect stderr
+                # and look for if the xml file wasn't created.
+                if stderr and not os.path.exists(xmlfile):
+                    # print("pdfreader: Probable flag failure.\n    pdffile: %s\n    xmlfile: %s (%s)" %
+                    #      (pdffile, xmlfile, os.path.exists(xmlfile)))
+                    raise errors.ExternalCommandError(stderr)
+            finally:
+                os.unlink(tmppdffile)
         return self._parse_xml(xmlfile)
 
     # def set_background_path():

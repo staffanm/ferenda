@@ -30,6 +30,39 @@ from . import errors
 # We should reorganize this, maybe in util.File, util.String, and so on...
 
 
+class gYearMonth(datetime.date):
+    def __new__(cls, *args, **kwargs):
+        if len(args) == 1 and isinstance(args[0], str):
+            args = [int(x) for x in args[0].split("-")]
+        assert len(args) == 2, "gYearMonth() only takes 2 arguments (year, month)"
+        assert not kwargs, "Keyword arguments not (yet) supported"
+        kwargs['day'] = 1
+        return super(gYearMonth, cls).__new__(cls, *args, **kwargs)
+
+    def __repr__(self):
+        return "%s.%s(%s, %s)" % (self.__class__.__module__, self.__class__.__name__, self.year, self.month)
+
+    def __str__(self):
+        return "%04d-%02d" % (self.year, self.month)
+
+class gYear(datetime.date):
+    def __new__(cls, *args, **kwargs):
+        if len(args) == 1 and isinstance(args[0], str):
+            args = [int(args[0])]
+        assert len(args) == 1, "gYearMonth() only takes 1 argument (year)"
+        assert not kwargs, "Keyword arguments not (yet) supported"
+        kwargs['day'] = 1
+        kwargs['month'] = 1
+        return super(gYear, cls).__new__(cls, *args, **kwargs)
+
+    def __repr__(self):
+        return "%s.%s(%s)" % (self.__class__.__module__, self.__class__.__name__, self.year)
+
+    def __str__(self):
+        return "%04d-%02d" % (self.year, self.month)
+
+
+
 # util.Namespaces
 # Set up common namespaces and suitable prefixes for them
 ns = {'dc': 'http://purl.org/dc/elements/1.1/',

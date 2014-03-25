@@ -33,6 +33,12 @@ class Read(unittest.TestCase):
                              self.datadir + os.sep + to)
             self.reader.read("test/files/pdfreader/sample.pdf",
                              self.datadir)
+
+        # a temporary copy of the pdf file should not be lying around in workdir
+        self.assertFalse(os.path.exists(self.datadir + os.sep + "sample.pdf"))
+        # but the XML file should be stored for subsequent parses
+        self.assertTrue(os.path.exists(self.datadir + os.sep + "sample.xml"))
+        
         self.assertEqual(len(self.reader), 1)
         # first page, first box
         title = str(self.reader[0][0])

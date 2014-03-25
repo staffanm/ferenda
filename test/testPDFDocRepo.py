@@ -46,7 +46,7 @@ class Repo(RepoTester):
         
         p = self.repo.store.datadir
         self.assertTrue(os.path.exists(p+'/intermediate/sample/index001.png'))
-        self.assertTrue(os.path.exists(p+'/intermediate/sample/index.pdf'))
+        self.assertFalse(os.path.exists(p+'/intermediate/sample/index.pdf'))
         self.assertTrue(os.path.exists(p+'/intermediate/sample/index.xml'))
         self.assertTrue(os.path.exists(p+'/parsed/sample/index001.png'))
         self.assertTrue(os.path.exists(p+'/parsed/sample/index.css'))

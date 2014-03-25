@@ -12,6 +12,7 @@ from rdflib import URIRef, RDFS, Graph
 from six import text_type as str
 
 from ferenda import DocumentRepository, DocumentStore, FSMParser, CitationParser
+from ferenda import util
 from ferenda.sources.legal.se.legalref import LegalRef, Link
 from ferenda.elements import Paragraph, Section, Body, CompoundElement, SectionalElement
 from ferenda.pdfreader import Page
@@ -193,6 +194,17 @@ class SwedishLegalSource(DocumentRepository):
         return datetime.strptime(datestr, "%Y-%m-%d")
 
     def parse_swedish_date(self, datestr):
+        """ Parses a number of common forms of expressing swedish dates with varying precision.
+        >>> parse_swedish_date("3 februari 2010")
+        datetime.date(2010, 2, 3)
+        >>> parse_swedish_date("vid utgången av december 1999")
+        datetime.date(1999, 12, 31)
+        >>> parse_swedish_date("november 1999")
+        ferenda.util.gYearMonth(1999, 11)
+        >>> parse_swedish_date("1998")
+        ferenda.util.gYear(1999)
+        """
+        day = month = year = None
         # assume strings on the form "3 februari 2010"
         # strings on the form "vid utg\xe5ngen av december 1999"
         if datestr.startswith("vid utg\xe5ngen av"):
@@ -203,11 +215,21 @@ class SwedishLegalSource(DocumentRepository):
             day = calendar.monthrange(year, month)[1]
         else:
             # assume strings on the form "3 februari 2010"
-            (day, month, year) = datestr.split()
-            day = int(day)
-            month = self.swedish_months[month]
-            year = int(year)
-        return date(year, month, day)
+            components =  datestr.split()
+            year = int(components[-1])
+            if len(components) >= 2:
+                month = self.swedish_months[components[-2]]
+            if len(components) >= 3:
+                day = int(components[-3])
+
+        # return the best we can
+        if day:
+            return date(year, month, day)
+        if month:
+            return util.gYearMonth(year, month)
+        else:
+            return util.gYear(year)
+
 
     def infer_triples(self, d, basefile):
         try:
@@ -240,7 +262,7 @@ class SwedishLegalSource(DocumentRepository):
                 "%s: No dct:identifier, assuming %s" % (basefile, identifier))
             d.value(self.ns['dct'].identifier, identifier)
 
-        self.log.debug("Identifier %s" % identifier)
+        # self.log.debug("Identifier %s" % identifier)
         (doctype, arsutgava, lopnummer) = re.split("[ :]", identifier)
         d.value(self.ns['rpubl'].arsutgava, arsutgava)
         d.value(self.ns['rpubl'].lopnummer, lopnummer)
@@ -313,6 +335,18 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
                        'subheadingfamily': 'TradeGothic,Bold',
                        'subsubheadingsize': 14,
                        'textsize': 14
+                   },
+               'ds': {'header': 49, # or rather 49 + 15
+                      'header': 65, # make sure this is correct
+                      'footer': 940,
+                      'leftmargin': 84,
+                      'rightmargin': 813,
+                      'titlesize': 41,
+                      'headingsize': 26,
+                      'subheadingsize': 16,
+                      'subheadingfamily': 'TradeGothic,Bold',
+                      'subsubheadingsize': 14,
+                      'textsize': 14
                    }
                }
     if preset:

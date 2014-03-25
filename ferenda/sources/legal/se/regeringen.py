@@ -6,14 +6,14 @@ import sys
 import os
 import re
 import codecs
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from six import text_type as str
 from six.moves.urllib_parse import urljoin, urlencode
 
 import requests
 from bs4 import BeautifulSoup
 from rdflib import URIRef
-from rdflib import RDFS
+from rdflib import RDFS, XSD
 
 from ferenda import PDFDocumentRepository
 from ferenda import DocumentEntry
@@ -270,8 +270,13 @@ class Regeringen(SwedishLegalSource):
                 value = dt.find_next_sibling("dd").get_text(strip=True)
                 if key == "Utgiven:":
                     try:
-                        d.value(self.ns['dct'].published,
-                                self.parse_swedish_date(value))
+                        dateval = self.parse_swedish_date(value)
+                        if type(dateval) == date:
+                            d.value(self.ns['dct'].published, dateval)
+                        else:
+                            datatype = {util.gYearMonth: XSD.gYearMonth,
+                                        util.gYear: XSD.gYear}[type(dateval)]
+                            d.value(self.ns['dct'].published, str(dateval), datatype=datatype)
                     except ValueError as e:
                         self.log.warning(
                             "Could not parse %s as swedish date" % value)
@@ -464,9 +469,18 @@ class Regeringen(SwedishLegalSource):
                 if not m:
                     continue
                 pdfbasefile = m.group(1)
-                pdffiles.append(pdfbasefile)
-        return pdffiles
+                self.log.debug(" Attachment %s: %s" % (pdfbasefile, link.string))
+                pdffiles.append((link.string, pdfbasefile))
+            
+        return self.select_pdfs(pdffiles)
 
+    def select_pdfs(self, pdffiles):
+        """Given a list of (linktext, pdffile) tuples, return only those pdf
+        files we need to parse (by filtering out duplicates etc).
+        """
+        return [x[1] for x in pdffiles]
+    
+        
     def parse_pdf(self, pdffile, intermediatedir):
         pdf = PDFReader()
         # By default, don't create and manage PDF backgrounds files
@@ -541,6 +555,8 @@ class Regeringen(SwedishLegalSource):
                     preset = 'proposition'
                 elif self.document_type == self.SOU:
                     preset = 'sou'
+                elif self.document_type == self.DS:
+                    preset = 'ds'
                 elif self.document_type == self.KOMMITTEDIREKTIV:
                     preset = 'dir'
                 else:
