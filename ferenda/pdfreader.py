@@ -128,7 +128,9 @@ class PDFReader(CompoundElement):
                     #      (pdffile, xmlfile, os.path.exists(xmlfile)))
                     raise errors.ExternalCommandError(stderr)
             finally:
+                print("Trying to unlink %s" % tmppdffile)
                 os.unlink(tmppdffile)
+                print("Unlinked %s" % tmppdffile)
         return self._parse_xml(xmlfile)
 
     # def set_background_path():

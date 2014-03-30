@@ -289,8 +289,9 @@ class Repo(RepoTester):
                 if not expect_if_modified_since:
                     resp.status_code = 400
                     return resp
-                if (util.parse_rfc822_date(headers["If-modified-since"]) > 
-                    util.parse_rfc822_date(last_modified)):
+                if (last_modified and
+                    (util.parse_rfc822_date(headers["If-modified-since"]) > 
+                     util.parse_rfc822_date(last_modified))):
                     resp.status_code=304
                     return resp
             if "If-none-match" in headers:
@@ -387,7 +388,7 @@ class Repo(RepoTester):
         self.assertEqual(etag, util.readfile(self.datadir+"/base/downloaded/example.html.etag"))
         mock_get.reset_mock()
         
-        # test4: file and etag exists, we use if-none-match, we recieve a 304
+        # test4: file and etag exists, we use if-none-match and if-modified_since, we recieve a 304
         last_modified = None
         etag = "this-is-my-etag-v1"
         url_location = "test/files/base/downloaded/123/a-version2.htm"

@@ -33,6 +33,7 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
     alias = "jo"
     start_url = "http://www.jo.se/sv/JO-beslut/Soka-JO-beslut/?query=*&pn=1"
     document_url_regex = "http://www.jo.se/PageFiles/(?P<dummy>\d+)/(?P<basefile>\d+\-\d+).pdf"
+    headnote_url_template = "http://www.jo.se/sv/JO-beslut/Soka-JO-beslut/?query=%(basefile)s&pn=1"
 
     storage_policy = "dir"
     downloaded_suffix = ".pdf" # might need to change
@@ -52,8 +53,8 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
             nextpage = None
             assert "pn=%s" % pagecount in url
             soughtnext = url.replace("pn=%s" % pagecount,
-                                     "pn=%s" % (pagecount + 1)),
-            self.log.info("Getting page #%s" % pagecount)
+                                     "pn=%s" % (pagecount + 1))
+            self.log.debug("Getting page #%s" % pagecount)
             resp = requests.get(url)
             tree = lxml.html.document_fromstring(resp.text)
             tree.make_links_absolute(url, resolve_base_href=True)
@@ -63,38 +64,59 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
                     yield m.group("basefile"), link
                 elif link == soughtnext:
                     nextpage = link
+                    pagecount += 1
             if nextpage:
                 url = nextpage
             else:
                 done = True
 
+    def download_single(self, basefile, url):
+        ret = super(JO, self).download_single(basefile, url)
+        if ret or self.config.refresh:
+            headnote_url = self.headnote_url_template % {'basefile':basefile}
+            resp = requests.get(headnote_url)
+            if "1 totalt antal träffar" in resp.text:
+                with self.store.open_downloaded(basefile, mode="wb", attachment="headnote.html") as fp:
+                    fp.write(resp.content)
+                self.log.debug("%s: downloaded headnote from %s" %
+                               (basefile, headnote_url))
+            else:
+                self.log.warn("Could not find unique headnote for %s at %s" %
+                              (basefile, headnote_url))
+        return ret
+
+        
     @decorators.managedparsing
     def parse(self, doc):
         # cut and pasted from arn.py -- need generalized way of
         # instantiating a filter like this
         def glue(pdfreader):
-            linespaceing = 1 # Paragraphs have max 1pt between lines
             for page in pdfreader:
                 textbox = None
                 for nextbox in page:
+                    linespacing = nextbox.height / 1.5 # allow for large linespacing
+                    
                     # our glue condition: if our currently building
                     # textbox ends just below the top of nextbox, glue
                     # nextbox to textbox
                     if (textbox and
-                        textbox.getfont() == nextbox.getfont() and 
-                        textbox.top + textbox.height + linespaceing >= nextbox.top):
-                        textbox[-1] += " "
+                        textbox.getfont()['size'] == nextbox.getfont()['size'] and 
+                        textbox.top + textbox.height + linespacing >= nextbox.top):
+                        # textbox[-1] += " "
                         textbox += nextbox
                     else:
                         if textbox:
+                            # self.log.debug("Yield %r" % textbox)
                             yield textbox
                         textbox = nextbox
                 if textbox:
+                    # self.log.debug("Yield final %r" % textbox)
                     yield textbox
 
-
+                    
         reader = self.pdfreader_from_basefile(doc.basefile)
-        doc.body = self.structure(doc, glue(reader))
+        iterator = glue(reader)
+        doc.body = self.structure(doc, iterator)
         return True
 
 
@@ -148,17 +170,17 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
             return parser.make_children(Body())
             
         def make_heading(parser):
-            h = Heading(parser.reader.next())
+            h = Heading(str(parser.reader.next()).strip())
             return h
 
         @decorators.newstate("abstract")
         def make_abstract(parser):
-            a = Abstract([parser.reader.next()])
+            a = Abstract([Paragraph(parser.reader.next())])
             return parser.make_children(a)
 
         @decorators.newstate("section")
         def make_section(parser):
-            s = UnorderedSection(title=str(parser.reader.next()))
+            s = UnorderedSection(title=str(parser.reader.next()).strip())
             return parser.make_children(s)
 
         @decorators.newstate("blockquote")
@@ -167,7 +189,7 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
             return parser.make_children(b)
 
         def make_paragraph(parser):
-            p = Paragraph([parser.reader.next()])
+            p = Paragraph(parser.reader.next())
             return p
 
         def make_datum(parser):
@@ -214,7 +236,6 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
                            ("blockquote", is_normal): (False, None)}
         )
         p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
-        from pudb import set_trace; set_trace()
         return p.parse(chunks)
         
                            

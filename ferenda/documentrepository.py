@@ -601,9 +601,14 @@ with the *config* object as single parameter.
     def _addheaders(self, filename=None):
         headers = {"User-agent": self.config.useragent}
         if filename:
+            # we set both if-none-match and if-modified-since if we
+            # can. We've encountered at least one server which sends
+            # ETags but don't return 304 when the appropriate ETag is
+            # returned in a if-none-match header (but return 304 when
+            # if-modified-since is used)
             if os.path.exists(filename + ".etag"):
                 headers["If-none-match"] = util.readfile(filename + ".etag")
-            elif os.path.exists(filename):
+            if os.path.exists(filename):
                 stamp = os.stat(filename).st_mtime
                 headers["If-modified-since"] = format_http_date(stamp)
         return headers
@@ -629,7 +634,7 @@ with the *config* object as single parameter.
         if not filename:
             filename = self.store.downloaded_path(basefile)
         if self.config.conditionalget:
-            # sets if-none-match or if-modified-since (in that order) headers
+            # sets if-none-match and/or if-modified-since headers
             headers = self._addheaders(filename)
         else:
             headers = self._addheaders()
@@ -662,7 +667,6 @@ with the *config* object as single parameter.
         except requests.exceptions.RequestException as e:
             self.log.error("Failed to fetch %s: error %s" % (url, e))
             raise e
-        
         if response.status_code == 304:
             self.log.debug("%s: 304 Not modified" % url)
             return False  # ie not updated
