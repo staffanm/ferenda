@@ -35,6 +35,7 @@ class Read(unittest.TestCase):
                              self.datadir)
 
         # a temporary copy of the pdf file should not be lying around in workdir
+        print("Checking if %s has been unlinked" % (self.datadir + os.sep + "sample.pdf"))
         self.assertFalse(os.path.exists(self.datadir + os.sep + "sample.pdf"))
         # but the XML file should be stored for subsequent parses
         self.assertTrue(os.path.exists(self.datadir + os.sep + "sample.xml"))

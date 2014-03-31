@@ -13,7 +13,7 @@ from rdflib import Literal
 # My own stuff
 from ferenda import decorators
 from ferenda import PDFDocumentRepository, FSMParser, Describer
-from . import SwedishLegalSource
+from . import SwedishLegalSource, RPUBL
 from .swedishlegalsource import UnorderedSection
 from ferenda.elements import CompoundElement, Body, Paragraph, Heading
 from ferenda.elements.html import Span
@@ -39,6 +39,8 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
     start_url = "http://www.jo.se/sv/JO-beslut/Soka-JO-beslut/?query=*&pn=1"
     document_url_regex = "http://www.jo.se/PageFiles/(?P<dummy>\d+)/(?P<basefile>\d+\-\d+)(?P<junk>[,%\d\-]*).pdf"
     headnote_url_template = "http://www.jo.se/sv/JO-beslut/Soka-JO-beslut/?query=%(basefile)s&pn=1"
+
+    rdf_type = RPUBL.VagledandeMyndighetsavgorande
 
     storage_policy = "dir"
     downloaded_suffix = ".pdf" # might need to change
@@ -105,9 +107,22 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
         reader = self.pdfreader_from_basefile(doc.basefile)
         # bloxed = reader.drawboxes("glued.pdf", gluecondition)
         iterator = reader.textboxes(gluecondition)
+        desc = Describer(doc.meta, doc.uri)
         doc.body = self.removemeta(self.structure(doc, iterator),
                                    Describer(doc.meta, doc.uri))
+
+        # add basic metadata
+        desc.rdftype(self.rdf_type)
+        desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
+        desc.value(self.ns['dct'].identifier, "JO dnr %s" % doc.basefile)
+
+        # if the headnote is present, do more (incl replacing title?)
+        if "headnote.html" in list(self.store.list_attachments(doc.basefile, "downloaded")):
+            self.parse_headnote(desc)
         return True
+
+    def parse_headnote(self, desc):
+        pass
         
     def removemeta(self, tree, desc):
         tmp = []

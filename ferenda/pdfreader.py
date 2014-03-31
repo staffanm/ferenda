@@ -129,7 +129,7 @@ class PDFReader(CompoundElement):
                 # print("Trying to unlink %s" % tmppdffile)
                 os.unlink(tmppdffile)
                 assert not os.path.exists(tmppdffile)
-                # print("Unlinked %s" % tmppdffile)
+                print("Unlinked %s" % tmppdffile)
         return self._parse_xml(xmlfile)
 
     def textboxes(self, gluefunc=None, pageobjects=False):
