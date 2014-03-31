@@ -82,7 +82,6 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
     start_url = "http://adokweb.arn.se/digiforms/sessionInitializer?processName=SearchRefCasesProcess"
     documentstore_class = ARNStore
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
-    lang = "sv"
     
     @recordlastdownload
     def download(self, basefile=None):

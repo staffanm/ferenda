@@ -408,7 +408,6 @@ special-case code, though.)"""
         # 5: Done!
         #
         doc.body = body
-        doc.lang = 'sv'
         doc.uri = uri
         return doc
 

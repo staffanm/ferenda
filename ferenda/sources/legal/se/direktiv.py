@@ -50,7 +50,6 @@ class DirTrips(Trips):
         intermediate_path = self.generic_path(basefile, 'intermediate', '.txt')
         downloaded_path = self.downloaded_path(basefile)
         doc.uri = self.canonical_uri(basefile)
-        doc.lang = "sv"
         html = codecs.open(downloaded_path, encoding="iso-8859-1").read()
         header_chunk = util.extract_text(
             html, '<pre>\n   <pre>', '<hr>', strip_tags=False)

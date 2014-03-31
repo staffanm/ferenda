@@ -91,7 +91,7 @@ class Regeringen(SwedishLegalSource):
                       ('dateRangeFromYear', last.year - 1998)])
                       
                       
-        start_url = self.start_url_template + "?" + urlencode(p.items())
+        start_url = self.start_url_template + "?" + urlencode(list(p.items()))
         self.log.info("Starting at %s" % start_url)
         self.session = requests.session()
         for basefile, url in self.download_get_basefiles(start_url):
@@ -247,8 +247,6 @@ class Regeringen(SwedishLegalSource):
         return updated or pdfupdated
         
     def parse_metadata_from_soup(self, soup, doc):
-        # print("Regeringen.parse_metadata_from_soup: %s %s (%s)" % (self.__class__.__name__, id(self), len(list(self.config))))
-        doc.lang = "sv"
         d = Describer(doc.meta, doc.uri)
         d.rdftype(self.rdf_type)
         d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())

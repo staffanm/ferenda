@@ -7,13 +7,16 @@ import re, os
 # 3rd party modules
 import lxml.html
 import requests
+from six import text_type as str
+from rdflib import Literal
 
 # My own stuff
 from ferenda import decorators
-from ferenda import PDFDocumentRepository, FSMParser
+from ferenda import PDFDocumentRepository, FSMParser, Describer
 from . import SwedishLegalSource
 from .swedishlegalsource import UnorderedSection
 from ferenda.elements import CompoundElement, Body, Paragraph, Heading
+from ferenda.elements.html import Span
 
 class Abstract(CompoundElement):
     tagname = "div"
@@ -22,8 +25,10 @@ class Abstract(CompoundElement):
 class Blockquote(CompoundElement):
     tagname = "blockquote"
 
+class Meta(CompoundElement):
+    pass
+    
 class JO(SwedishLegalSource, PDFDocumentRepository):
-
     """Hanterar beslut från Riksdagens Ombudsmän, www.jo.se
 
     Modulen hanterar hämtande av beslut från JOs webbplats i PDF samt
@@ -32,12 +37,14 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
     """
     alias = "jo"
     start_url = "http://www.jo.se/sv/JO-beslut/Soka-JO-beslut/?query=*&pn=1"
-    document_url_regex = "http://www.jo.se/PageFiles/(?P<dummy>\d+)/(?P<basefile>\d+\-\d+).pdf"
+    document_url_regex = "http://www.jo.se/PageFiles/(?P<dummy>\d+)/(?P<basefile>\d+\-\d+)(?P<junk>[,%\d\-]*).pdf"
     headnote_url_template = "http://www.jo.se/sv/JO-beslut/Soka-JO-beslut/?query=%(basefile)s&pn=1"
 
     storage_policy = "dir"
     downloaded_suffix = ".pdf" # might need to change
 
+    @decorators.action
+    @decorators.recordlastdownload
     def download(self, basefile=None):
         for basefile, url in self.download_get_basefiles(self.start_url):
             self.download_single(basefile, url)
@@ -88,39 +95,34 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
         
     @decorators.managedparsing
     def parse(self, doc):
-        # cut and pasted from arn.py -- need generalized way of
-        # instantiating a filter like this
-        def glue(pdfreader):
-            for page in pdfreader:
-                textbox = None
-                for nextbox in page:
-                    linespacing = nextbox.height / 1.5 # allow for large linespacing
-                    
-                    # our glue condition: if our currently building
-                    # textbox ends just below the top of nextbox, glue
-                    # nextbox to textbox
-                    if (textbox and
-                        textbox.getfont()['size'] == nextbox.getfont()['size'] and 
-                        textbox.top + textbox.height + linespacing >= nextbox.top):
-                        # textbox[-1] += " "
-                        textbox += nextbox
-                    else:
-                        if textbox:
-                            # self.log.debug("Yield %r" % textbox)
-                            yield textbox
-                        textbox = nextbox
-                if textbox:
-                    # self.log.debug("Yield final %r" % textbox)
-                    yield textbox
+        # reset global state
+        UnorderedSection.counter = 0
+        def gluecondition(textbox, nextbox, prevbox):
+            linespacing = nextbox.height / 1.5 # allow for large linespacing
+            return (textbox.getfont()['size'] == nextbox.getfont()['size'] and 
+                    textbox.top + textbox.height + linespacing >= nextbox.top)
 
-                    
         reader = self.pdfreader_from_basefile(doc.basefile)
-        iterator = glue(reader)
-        doc.body = self.structure(doc, iterator)
+        # bloxed = reader.drawboxes("glued.pdf", gluecondition)
+        iterator = reader.textboxes(gluecondition)
+        doc.body = self.removemeta(self.structure(doc, iterator),
+                                   Describer(doc.meta, doc.uri))
         return True
-
-
-
+        
+    def removemeta(self, tree, desc):
+        tmp = []
+        for node in tree:
+            if isinstance(node, Meta):
+                for el in node: # should contain a list of RDF Literal objects
+                    desc.value(node.predicate, el)
+            elif isinstance(node, list):
+                tmp.append(self.removemeta(node, desc))
+            else:
+                tmp.append(node)
+        tree[:] = tmp[:]
+        return tree
+            
+                
     def structure(self, doc, chunks):
         def is_heading(parser):
             return parser.reader.peek().getfont()['size'] == '17'
@@ -170,7 +172,9 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
             return parser.make_children(Body())
             
         def make_heading(parser):
-            h = Heading(str(parser.reader.next()).strip())
+            # h = Heading(str(parser.reader.next()).strip())
+            h = Meta([Literal(str(parser.reader.next()).strip(), lang="sv")],
+                     predicate=self.ns['dct'].title)
             return h
 
         @decorators.newstate("abstract")
@@ -193,19 +197,17 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
             return p
 
         def make_datum(parser):
-            p = Paragraph([parser.reader.next()],
-                          predicate="rpubl:avgorandedatum")
-            return p
+            d = [Literal(str(parser.reader.next()).strip(),
+                         datatype=self.ns['xsd'].date)]
+            return Meta(d, predicate=self.ns['rpubl'].avgorandedatum)
 
         def make_dnr(parser):
-            p = Paragraph([parser.reader.next()],
-                          predicate="rpubl:diarienummer")
-            return p
+            ds = [Literal(x) for x in str(parser.reader.next()).strip().split(" ")]
+            return Meta(ds, predicate=self.ns['rpubl'].diarienummer)
 
         def skip_nonessential(parser):
             parser.reader.next() # return nothing
-        
-            
+
         p = FSMParser()
         p.initial_state = "body"
         p.initial_constructor = make_body
@@ -224,21 +226,27 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
                            ("body", is_dnr): (make_dnr, None),
                            ("body", is_abstract): (make_abstract, "abstract"),
                            ("body", is_section): (make_section, "section"),
+                           ("body", is_blockquote): (make_blockquote, "blockquote"),
+                           ("body", is_paragraph): (make_paragraph, None),
                            ("abstract", is_paragraph): (make_paragraph, None),
                            ("abstract", is_section): (False, None),
                            ("section", is_paragraph): (make_paragraph, None),
                            ("section", is_nonessential): (skip_nonessential, None),
                            ("section", is_section): (False, None),
                            ("section", is_blockquote): (make_blockquote, "blockquote"),
+                           ("section", is_datum): (make_datum, None),
+                           ("section", is_dnr): (make_dnr, None),
                            ("blockquote", is_blockquote): (make_paragraph, None),
                            ("blockquote", is_nonessential): (skip_nonessential,  None),
                            ("blockquote", is_section): (False, None),
-                           ("blockquote", is_normal): (False, None)}
-        )
+                           ("blockquote", is_normal): (False, None),
+                           ("blockquote", is_datum): (make_datum, None),
+                           ("blockquote", is_dnr): (make_dnr, None),
+                       })
         p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
         return p.parse(chunks)
-        
-                           
+
+
     def create_external_resources(self, doc):
         pass
 

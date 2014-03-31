@@ -764,7 +764,6 @@ class SFS(Trips):
         uppdaterad_tom = self._find_uppdaterad_tom(doc.basefile, reader=t)
         # now we can set doc.uri for reals
         doc.uri = self.canonical_uri(doc.basefile, uppdaterad_tom)
-        doc.lang = "sv"
         desc = Describer(doc.meta, doc.uri)
         try:
             registry = self.parse_sfsr(sfsr_file, doc.uri)

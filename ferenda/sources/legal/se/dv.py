@@ -216,7 +216,7 @@ class DV(SwedishLegalSource):
         doc = Document()
         doc.basefile = basefile
         doc.meta = self.make_graph()
-        doc.lang = self.lang
+        doc.lang = self.lang 
         doc.body = Body()
         doc.uri = None # can't know this yet
         return doc

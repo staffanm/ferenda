@@ -126,12 +126,116 @@ class PDFReader(CompoundElement):
                 if stderr and not os.path.exists(xmlfile):
                     raise errors.ExternalCommandError(stderr)
             finally:
-                print("Trying to unlink %s" % tmppdffile)
+                # print("Trying to unlink %s" % tmppdffile)
                 os.unlink(tmppdffile)
                 os.sync()
                 assert not os.path.exists(tmppdffile)
-                print("Unlinked %s" % tmppdffile)
+                # print("Unlinked %s" % tmppdffile)
         return self._parse_xml(xmlfile)
+
+    def textboxes(self, gluefunc=None, pageobjects=False):
+        """Return an iterator of the textboxes available.
+
+        ``gluefunc`` should be a callable that is called with
+        (textbox, nextbox, prevbox), and returns True iff nextbox
+        should be appended to textbox.
+
+        If ``pageobjects``, the iterator can return Page objects to
+        signal that pagebreak has ocurred (these Page objects may or
+        may not have Textbox elements).
+        """
+        textbox = None
+        prevbox = None
+        if gluefunc:
+            glue = gluefunc
+        else:
+            glue = self._default_glue
+        for page in self:
+            if pageobjects:
+                yield page
+            for nextbox in page:
+                if not textbox: # MUST glue
+                    textbox = nextbox
+                else:
+                    if glue(textbox, nextbox, prevbox):
+                        textbox += nextbox
+                    else:
+                        yield textbox
+                        textbox = nextbox
+                prevbox = nextbox
+            if textbox:
+                yield textbox
+                textbox = None
+
+    def drawboxes(self, outfile, gluefunc=None):
+        """Create a copy of the parsed PDF file, but with the textboxes
+        created by ``gluefunc`` clearly marked. Returns the name of
+        the created pdf file.
+
+        ..note::
+
+        This requires PyPDF2 and reportlab, which aren't installed by
+        default (and at least reportlab is not py3 compatible).
+
+        """
+        from PyPDF2 import PdfFileWriter, PdfFileReader
+        from reportlab.pdfgen import canvas
+        import StringIO
+
+        packet = None
+        output = PdfFileWriter()
+        existing_pdf = PdfFileReader(open(self.filename, "rb"))
+        pageidx = 0
+        sf = 2/3.0 # scaling factor
+        dirty = False
+        for tb in self.textboxes(gluefunc, pageobjects=True):
+            if isinstance(tb, Page):
+                if dirty:
+                    can.save()
+                    packet.seek(0)
+                    new_pdf = PdfFileReader(packet)
+                    self.log.debug("Getting page %s from existing pdf" % pageidx)
+                    page = existing_pdf.getPage(pageidx)
+                    page.mergePage(new_pdf.getPage(0))
+                    output.addPage(page)
+                    pageidx += 1
+                pagesize = (tb.width*sf, tb.height*sf)
+                # print("pagesize %s x %s" % pagesize)
+                packet = StringIO.StringIO()
+                can = canvas.Canvas(packet, pagesize=pagesize,
+                                    bottomup=False)
+                can.setStrokeColorRGB(0.2,0.5,0.3)
+                can.translate(0,0)
+            else:
+                dirty = True
+                # x = repr(tb)
+                # print(x)
+                can.rect(tb.left*sf, tb.top*sf,
+                         tb.width*sf, tb.height*sf)
+
+        packet.seek(0)
+        can.save()
+        new_pdf = PdfFileReader(packet)
+        self.log.debug("Getting last page %s from existing pdf" % pageidx)
+        page = existing_pdf.getPage(pageidx)
+        page.mergePage(new_pdf.getPage(0))
+        output.addPage(page)
+        outputStream = open(outfile, "wb")
+        output.write(outputStream)
+        outputStream.close()
+        self.log.debug("wrote %s" % outfile)
+        return outfile
+
+    @staticmethod
+    def _default_glue(textbox, nextbox, prevbox):
+        # default logic: if lines are next to each other
+        # horizontally, line up vertically, and have the same
+        # font, then they should be glued
+        linespacing = 1
+        if (textbox.getfont() == nextbox.getfont() and
+            textbox.left == nextbox.left and
+            textbox.top + textbox.height + linespacing >= nextbox.top):
+            return True
 
     def _parse_xml(self, xmlfile):
         def txt(element_text):

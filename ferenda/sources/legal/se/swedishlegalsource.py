@@ -94,6 +94,7 @@ class SwedishLegalSource(DocumentRepository):
                   'xhv', 'xsi', 'owl', 'prov', 'bibo',
                   ('rpubl', 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#'),
                   ('rinfoex', 'http://lagen.nu/terms#')]
+    lang="sv"
 
     swedish_ordinal_list = ('f\xf6rsta', 'andra', 'tredje', 'fj\xe4rde',
                             'femte', 'sj\xe4tte', 'sjunde', '\xe5ttonde',

@@ -26,7 +26,6 @@ class JK(SwedishLegalSource):
     start_url = "http://www.jk.se/Beslut.aspx?query=&type=all&dateFrom=1998-01-01&dateTo=2100-01-01&dnr="
     document_url_regex = "http://www.jk.se/Beslut/(?P<kategori>[\w\-]+)/(?P<basefile>\d+\-\d+\-\d+).aspx"
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
-    lang = "sv"
     
     @recordlastdownload
     def download(self, basefile=None):
