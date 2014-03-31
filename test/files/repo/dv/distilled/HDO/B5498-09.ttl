@@ -8,14 +8,14 @@
 
 <http://localhost:8000/res/dv/nja/2010s168> a rpubl:Rattsfallsreferat ;
     dct:bibliographicCitation "NJA 2010:19" ;
-    dct:creator "Göta hovrätt"@en,
-        "Hovrätten över Skåne och Blekinge"@en,
-        "Högsta domstolen"@en,
-        "Linköpings tingsrätt"@en,
-        "Lunds tingsrätt"@en ;
+    dct:creator "Göta hovrätt"@sv,
+        "Hovrätten över Skåne och Blekinge"@sv,
+        "Högsta domstolen"@sv,
+        "Linköpings tingsrätt"@sv,
+        "Lunds tingsrätt"@sv ;
     dct:identifier "NJA 2010 s. 168",
-        "I"@en,
-        "II"@en ;
+        "I"@sv,
+        "II"@sv ;
     dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
     dct:references <http://rinfo.lagrummet.se/publ/rattsfall/nja/2000s622>,
         <http://rinfo.lagrummet.se/publ/rattsfall/nja/2004s840>,

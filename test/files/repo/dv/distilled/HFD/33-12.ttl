@@ -7,10 +7,10 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://localhost:8000/res/dv/hfd/2013:29> a rpubl:Rattsfallsreferat ;
-    dct:creator "Försäkringskassan"@en,
-        "Förvaltningsrätten i Göteborg"@en,
-        "Högsta förvaltningsdomstolen"@en,
-        "Kammarrätten i Göteborg"@en ;
+    dct:creator "Försäkringskassan"@sv,
+        "Förvaltningsrätten i Göteborg"@sv,
+        "Högsta förvaltningsdomstolen"@sv,
+        "Kammarrätten i Göteborg"@sv ;
     dct:identifier "HFD 2013:29" ;
     dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
     rpubl:arsutgava "2013" ;

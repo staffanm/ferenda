@@ -7,6 +7,8 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://localhost:8000/res/dv/mig/2009:30> a rpubl:Rattsfallsreferat ;
+    dct:creator "Kammarrätten i Stockholm, Migrationsöverdomstolen"@sv,
+        "Länsrätten i Stockholms län, migrationsdomstolen"@sv ;
     dct:identifier "MIG 2009:30" ;
     dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
     dct:references <http://rinfo.lagrummet.se/publ/prop/1971:30>,

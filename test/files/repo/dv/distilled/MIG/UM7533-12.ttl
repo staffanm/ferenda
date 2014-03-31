@@ -7,6 +7,8 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://localhost:8000/res/dv/mig/2013:6> a rpubl:Rattsfallsreferat ;
+    dct:creator "Förvaltningsrätten i Malmö, migrationsdomstolen"@sv,
+        "Kammarrätten i Stockholm, Migrationsöverdomstolen"@sv ;
     dct:identifier "MIG 2013:6" ;
     dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
     dct:references <http://rinfo.lagrummet.se/publ/prop/2004/05:170#s191>,

@@ -7,6 +7,8 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://localhost:8000/res/dv/mig/2013:4> a rpubl:Rattsfallsreferat ;
+    dct:creator "Förvaltningsrätten i Stockholm, migrationsdomstolen"@sv,
+        "Kammarrätten i Stockholm, Migrationsöverdomstolen"@sv ;
     dct:identifier "MIG 2013:4" ;
     dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
     dct:references <http://rinfo.lagrummet.se/publ/prop/2004/05:170#s227>,
@@ -25,7 +27,8 @@
 
 <http://localhost:8000/res/dv/mig/UM8680-11/2013-03-19> a rpubl:VagledandeDomstolsavgorande ;
     dct:publisher <http://lagen.nu/org/2008/migrationsoverdomstolen> ;
-    dct:relation "Prop. 2004/05:170 s. 153, 224 ff." ;
+    dct:relation "Prop. 2004/05:170 s. 153, 224 ff.",
+        "Rådets direktiv 2005/85/EG av den" ;
     dct:subject <http://localhost:8000/concept/Lagakraftvunnet_avlägsnandebeslut>,
         <http://localhost:8000/concept/Ny_omständighet>,
         <http://localhost:8000/concept/Ny_prövning>,
@@ -44,5 +47,6 @@
         <http://localhost:8000/res/sfs/2005:716#K12P22>,
         <http://localhost:8000/res/sfs/2005:716#K12P4> ;
     rpubl:malnummer "UM8680-11" ;
+    rpubl:rattsfall <http://localhost:8000/res/dv/mig/2007/not/2> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/mig/UM8680-11/2013-03-19> .
 
