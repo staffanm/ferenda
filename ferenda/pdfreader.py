@@ -128,7 +128,6 @@ class PDFReader(CompoundElement):
             finally:
                 # print("Trying to unlink %s" % tmppdffile)
                 os.unlink(tmppdffile)
-                os.sync()
                 assert not os.path.exists(tmppdffile)
                 # print("Unlinked %s" % tmppdffile)
         return self._parse_xml(xmlfile)
