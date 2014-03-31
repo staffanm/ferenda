@@ -406,7 +406,7 @@ class Repo(RepoTester):
         last_modified = None
         etag = "this-is-my-etag-v2"
         url_location = "test/files/base/downloaded/123/a-version1.htm"
-        expect_if_modified_since = False
+        expect_if_modified_since = True
         expect_if_none_match = True
         self.assertTrue(d.download_if_needed("http://example.org/document",
                                              "example"))

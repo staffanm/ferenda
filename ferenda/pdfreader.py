@@ -124,17 +124,14 @@ class PDFReader(CompoundElement):
                 # 0! Only way to know if it failed is to inspect stderr
                 # and look for if the xml file wasn't created.
                 if stderr and not os.path.exists(xmlfile):
-                    # print("pdfreader: Probable flag failure.\n    pdffile: %s\n    xmlfile: %s (%s)" %
-                    #      (pdffile, xmlfile, os.path.exists(xmlfile)))
                     raise errors.ExternalCommandError(stderr)
             finally:
                 print("Trying to unlink %s" % tmppdffile)
                 os.unlink(tmppdffile)
+                os.sync()
+                assert not os.path.exists(tmppdffile)
                 print("Unlinked %s" % tmppdffile)
         return self._parse_xml(xmlfile)
-
-    # def set_background_path():
-    #    pass
 
     def _parse_xml(self, xmlfile):
         def txt(element_text):
