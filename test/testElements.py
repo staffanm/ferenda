@@ -70,7 +70,7 @@ class Main(unittest.TestCase):
         d = PDFDocumentRepository()
         doc = d.make_document("sample")
         reader = PDFReader()
-        reader.read("test/files/pdfreader/intermediate/index.pdf",
+        reader.read("test/files/pdfreader/sample.pdf",
                     "test/files/pdfreader/intermediate")
         d.parse_from_pdfreader(reader, doc)
         jsondoc = serialize(doc, format="json")

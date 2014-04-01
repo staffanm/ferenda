@@ -468,15 +468,49 @@ class Regeringen(SwedishLegalSource):
                     continue
                 pdfbasefile = m.group(1)
                 self.log.debug(" Attachment %s: %s" % (pdfbasefile, link.string))
-                pdffiles.append((link.string, pdfbasefile))
+                pdffiles.append((pdfbasefile, link.string))
             
         return self.select_pdfs(pdffiles)
 
+
     def select_pdfs(self, pdffiles):
-        """Given a list of (linktext, pdffile) tuples, return only those pdf
+        """Given a list of (pdffile, linktext) tuples, return only those pdf
         files we need to parse (by filtering out duplicates etc).
         """
-        return [x[1] for x in pdffiles]
+        cleanfiles = []
+
+        # 1. Simplest case: One file obviously contains all of the text
+        for pdffile, linktext in pdffiles:
+            if "hela dokumentet" in linktext or "hela betänkandet" in linktext:
+                return [pdffile] # we're immediately done
+
+        # 2. Filter out obviously extraneous files
+        for pdffile, linktext in pdffiles:
+            if "hela dokumentet" in linktext or "hela betänkandet" in linktext:
+                return [pdffile] # we're immediately done
+            if (linktext.startswith("Sammanfattning ") or
+                linktext.startswith("Remissammanställning") or
+                linktext.startswith("Sammanställning över remiss") or
+                "remissinstanser" in linktext):
+                pass # don't add to cleanfiles
+            else:
+                cleanfiles.append((pdffile,linktext))
+
+        # 3. Attempt to see if we have one complete file + several
+        # files with split-up content
+        linktexts = [x[1] for x in cleanfiles]
+        commonprefix = os.path.commonprefix(linktexts)
+        if commonprefix:
+            for pdffile, linktext in cleanfiles:
+                # strip away the last filetype + size paranthesis
+                linktext = re.sub(" \(pdf [\d\,]+ [kM]B\)", "", linktext)
+                # and if we remove the commonprefix, do we end up with nothing?
+                if linktext.replace(commonprefix, "") == "":
+                    # then this is probably a complete file
+                    return [pdffile]
+
+        # 4. Base case: We return it all
+        return [x[0] for x in cleanfiles]
     
         
     def parse_pdf(self, pdffile, intermediatedir):

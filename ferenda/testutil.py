@@ -249,7 +249,15 @@ class RepoTesterStore(object):
         self.downloaded_suffix = origstore.downloaded_suffix
         self.storage_policy = origstore.storage_policy
 
-
+    def list_attachments(self, basefile, action, version=None):
+        if action=="downloaded":
+            for f in os.listdir(os.path.dirname(self.downloaded_file)):
+                if f != os.path.basename(self.downloaded_file):
+                    yield f
+        else:
+            for x in super(self, RepoTesterStore).list_attachments(basefile, action, version):
+                yield x
+            
     def downloaded_path(self, basefile, version=None, attachment=None):
         if attachment:
             return os.path.dirname(self.downloaded_file) + os.sep + attachment

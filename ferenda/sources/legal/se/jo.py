@@ -261,14 +261,5 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
         p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
         return p.parse(chunks)
 
-
     def create_external_resources(self, doc):
         pass
-
-
-
-
-
-
-
-

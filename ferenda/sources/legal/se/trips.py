@@ -8,8 +8,10 @@ from six.moves.urllib_parse import quote
 
 import requests
 import lxml.html
+from bs4 import BeautifulSoup
 
-from ferenda.decorators import downloadmax
+from ferenda.decorators import downloadmax, recordlastdownload
+from ferenda import util
 from . import SwedishLegalSource
 
 
@@ -26,6 +28,8 @@ class Trips(SwedishLegalSource):
 
     app = None  # komm, dir, prop, sfst
     base = None  # KOMM, DIR, THWALLPROP, SFSR
+
+    source_encoding = "iso-8859-1"
 
     # NOTE: both SFS and direktiv.DirTrips override this -- hard to find a
     # template that works for everyone
@@ -56,7 +60,6 @@ class Trips(SwedishLegalSource):
     #                     'base': base,
     #                     'start': '2009',
     #                     'end': str(datetime.today().year)}]
-
     def download(self, basefile=None):
         if basefile:
             return self.download_single(basefile)
@@ -113,6 +116,13 @@ class Trips(SwedishLegalSource):
         # the wanted documents, instead of the temporary/session id
         # based urls that download_get_basefiles can provide
         return super(Trips, self).download_single(basefile)
+
+    def download_is_different(self, existing, new):
+        # load both existing and new into a BeautifulSoup object, then
+        # compare the first <pre> element
+        existing_soup = BeautifulSoup(util.readfile(existing, encoding=self.source_encoding))
+        new_soup = BeautifulSoup(util.readfile(new, encoding=self.source_encoding))
+        return existing_soup.pre != new_soup.pre
 
     def remote_url(self, basefile):
         return self.document_url_template % {'basefile': quote(basefile),

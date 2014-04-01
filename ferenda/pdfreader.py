@@ -83,10 +83,11 @@ class PDFReader(CompoundElement):
         xmlfile = os.sep.join(
             (workdir, stem + ".xml"))
 
-        # print("looking for xml file at %s" % xmlfile)
+        # the PDF file needs to be copied to workdir for pdftohtml to
+        # function properly
+        tmppdffile = os.sep.join([workdir, basename])
         if not util.outfile_is_newer([pdffile], xmlfile):
             # print("%s did not exist, running pdftohtml" % xmlfile)
-            tmppdffile = os.sep.join([workdir, basename])
             util.copy_if_different(pdffile, tmppdffile)
             try:
                 if images:
@@ -131,8 +132,9 @@ class PDFReader(CompoundElement):
                 assert not os.path.exists(tmppdffile)
                 print("Unlinked %s" % tmppdffile)
         return self._parse_xml(xmlfile)
+        
 
-    def textboxes(self, gluefunc=None, pageobjects=False):
+    def textboxes(self, gluefunc=None, pageobjects=False, keepempty=False):
         """Return an iterator of the textboxes available.
 
         ``gluefunc`` should be a callable that is called with
@@ -142,6 +144,9 @@ class PDFReader(CompoundElement):
         If ``pageobjects``, the iterator can return Page objects to
         signal that pagebreak has ocurred (these Page objects may or
         may not have Textbox elements).
+
+        If ``keepempty``, process and return textboxes that have no
+        text content (these are filtered out by default)
         """
         textbox = None
         prevbox = None
@@ -153,6 +158,8 @@ class PDFReader(CompoundElement):
             if pageobjects:
                 yield page
             for nextbox in page:
+                if not (keepempty or str(nextbox).strip()):
+                    continue
                 if not textbox: # MUST glue
                     textbox = nextbox
                 else:

@@ -8,6 +8,7 @@ import codecs
 from bs4 import BeautifulSoup
 from lxml import etree
 import requests
+from six import text_type as str
 
 from ferenda import util, errors
 from ferenda.elements import UnicodeElement, CompoundElement, \
@@ -19,6 +20,7 @@ from ferenda import Describer
 from ferenda import TextReader
 from ferenda import PDFReader
 from ferenda import DocumentEntry
+from ferenda import LayeredConfig
 from ferenda.decorators import managedparsing
 from . import Trips, NoMoreLinks
 from . import Regeringen
@@ -49,8 +51,35 @@ class PropTrips(Trips):
     rdf_type = RPUBL.Proposition
 
     storage_policy = "dir"
-    
+
+    def get_default_options(self):
+        opts = super(PropTrips, self).get_default_options()
+        opts['lastbase'] = str
+        return opts
+
+    def download(self, basefile=None):
+        if basefile:
+            return super(PropTrips, self).download(basefile)
+        else:
+            if self.config.lastbase and not self.config.refresh:
+                now = datetime.now()
+                maxbase = "PROPARKIV%s%s" % (now.year % 100, (now.year+1) % 100)
+                while self.config.lastbase != maxbase:
+                    self.base = self.config.lastbase  # override "THWALLAPROP" with eg "PROPARKIV0809"
+                    r = super(PropTrips, self).download() # download_get_basefiles_page sets lastbase as it goes along
+            else:
+                r = super(PropTrips, self).download()
+            LayeredConfig.write(self.config)      # assume we have data to write
+            return r
+
+
     def download_get_basefiles_page(self, pagetree):
+        def basefile_to_base(basefile):
+            # 1992/93:23 -> "PROPARKIV9293"
+            # 1999/2000:23 -> "PROPARKIV9900"
+            (y1, y2, idx) = re.split("[:/]", basefile)
+            return "PROPARKIV%02d%02d" % (int(y1) % 100, int(y2) % 100)
+
         # feed the lxml tree into beautifulsoup by serializing it to a
         # string -- is there a better way?
         soup = BeautifulSoup(etree.tostring(pagetree))
@@ -78,6 +107,11 @@ class PropTrips(Trips):
 
             basefile = self.sanitize_basefile(basefile)
 
+            # assume entries are strictly sorted from ancient to
+            # recent. Therefore, as soon as we encounter a new time
+            # period (eg 1998/99) we can update self.config.lastbase
+            self.config.lastbase = basefile_to_base(basefile)
+
             url = td.a['href']
 
             # self.download_single(basefile, refresh=refresh, url=url)
@@ -91,11 +125,12 @@ class PropTrips(Trips):
             # download_get_basefiles and this generator -- instead of
             # yielding just two strings, we yield two tuples with some
             # extra information that download_single will need.
+
             yield (basefile, bilaga), (url, extraurls)
 
         nextpage = None
         for element, attribute, link, pos in pagetree.iterlinks():
-            if element.text == "Fler poster":
+            if element.text and element.text.strip() == "Fler poster":
                 nextpage = link
         raise NoMoreLinks(nextpage)
 

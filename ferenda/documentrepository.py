@@ -679,7 +679,7 @@ with the *config* object as single parameter.
         if not os.path.exists(filename):
             util.robust_rename(tmpfile, filename)
             updated = True
-        elif not filecmp.cmp(tmpfile, filename, shallow=False):
+        elif self.download_is_different(filename, tmpfile):
             if archive:
                 version = self.get_archive_version(basefile)
                 self.store.archive(basefile, version)
@@ -701,6 +701,11 @@ with the *config* object as single parameter.
                 with open(filename + ".etag", "w") as fp:
                     fp.write(response.headers["etag"])
         return updated
+
+    def download_is_different(self, existing, new):
+        """Returns True if the new file is semantically different from the existing file."""
+        return not filecmp.cmp(new, existing, shallow=False)
+
 
     def remote_url(self, basefile):
         """Get the URL of the source document at it's remote location,

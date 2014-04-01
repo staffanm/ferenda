@@ -20,7 +20,7 @@ from rdflib import URIRef, Literal
 from ferenda import PDFDocumentRepository, DocumentStore, PDFReader, WordReader, Describer
 from ferenda import util
 from ferenda.decorators import downloadmax, recordlastdownload, managedparsing
-from ferenda.elements import UnicodeElement, CompoundElement, serialize
+from ferenda.elements import Body, UnicodeElement, CompoundElement, serialize
 from . import SwedishLegalSource, SwedishCitationParser, RPUBL
 from ferenda.sources.legal.se.legalref import LegalRef
 
@@ -273,38 +273,22 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
         return True
 
     def parse_from_pdf(self, doc, filename, filetype=".pdf"):
-        # glue together textboxes that are horizontally adjacent
-        def glue(textboxes):
-            textbox = None
-            # prevbox = None
-            linespaceing = 1 # Paragraphs have max 1pt between lines
-            for nextbox in textboxes:
-                # our glue condition: if our currently building
-                # textbox ends just below the top of nextbox, glue
-                # nextbox to textbox
-                if (textbox and
-                    textbox.top + textbox.height + linespaceing >= nextbox.top):
-                    textbox[-1] += " "
-                    textbox += nextbox
-                else:
-                    if textbox:
-                        yield textbox
-                    textbox = nextbox
-            if textbox:
-                yield textbox
+        def gluecondition(textbox, nextbox, prevbox):
+            linespacing = 7
+            return (textbox.getfont() == nextbox.getfont() and 
+                    textbox.top + textbox.height + linespacing >= nextbox.top)
             
         reader = PDFReader()
         convert_to_pdf = filetype != ".pdf"
         workdir = os.path.dirname(self.store.intermediate_path(doc.basefile))
         reader.read(filename, workdir, images=False, convert_to_pdf=convert_to_pdf)
-        for page in reader:
-            x = list(glue(page[:]))
-            page[:] = x[:]
+        textboxes = reader.textboxes(gluecondition)
+        doc.body = Body(textboxes)
 
-            if not hasattr(self, 'ref_parser'):
-                self.ref_parser = LegalRef(LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN)
-            citparser = SwedishCitationParser(self.ref_parser)
-            page = citparser.parse_recursive(page)
+        if not hasattr(self, 'ref_parser'):
+            self.ref_parser = LegalRef(LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN)
+        citparser = SwedishCitationParser(self.ref_parser)
+        citparser.parse_recursive(doc.body)
 
-        doc.body.append(reader)
-
+    def create_external_resources(self, doc):
+        pass
