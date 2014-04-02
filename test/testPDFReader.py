@@ -8,6 +8,7 @@ import sys, os, tempfile, shutil
 from lxml import etree
 from ferenda.compat import unittest
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
+from bz2 import BZ2File
 
 from ferenda import errors
 # SUT
@@ -107,9 +108,15 @@ class Read(unittest.TestCase):
                              keep_xml="bz2")
         except errors.ExternalCommandError:
             self._copy_sample()
-            # need to bzip2 here
+            # bzip2 our canned sample.xml
+            with open(self.datadir + os.sep + "sample.xml") as rfp:
+                wfp = BZ2File(self.datadir + os.sep + "sample.xml.bz2", "wb")
+                wfp.write(rfp.read())
+                wfp.close()
+            os.unlink(self.datadir + os.sep + "sample.xml")
             self.reader.read("test/files/pdfreader/sample.pdf",
-                             self.datadir)
+                             self.datadir,
+                             keep_xml="bz2")
 
         # a temporary copy of the pdf file should not be lying around in workdir
         self.assertFalse(os.path.exists(self.datadir + os.sep + "sample.pdf"))
