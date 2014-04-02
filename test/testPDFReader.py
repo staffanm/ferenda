@@ -23,12 +23,19 @@ class Read(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.datadir)
 
+
+    def _copy_sample(self):
+        for fname in os.listdir("test/files/pdfreader/intermediate"):
+            to = fname.replace("index", "sample")
+            shutil.copy("test/files/pdfreader/intermediate/%s" % fname,
+                         self.datadir + os.sep + to)
+
     def test_basic(self):
         try:
             self.reader.read("test/files/pdfreader/sample.pdf",
                              self.datadir)
         except errors.ExternalCommandError:
-            self._copy_files()
+            self._copy_sample()
             self.reader.read("test/files/pdfreader/sample.pdf",
                              self.datadir)
 
@@ -93,13 +100,6 @@ class Read(unittest.TestCase):
         # No XML file should exist
         self.assertFalse(os.path.exists(self.datadir + os.sep + "sample.xml"))
         self.assertFalse(os.path.exists(self.datadir + os.sep + "sample.xml.bz2"))
-
-    def _copy_sample(self):
-        for fname in os.listdir("test/files/pdfreader/intermediate"):
-            to = fname.replace("index", "sample")
-            shutil.copy("test/files/pdfreader/intermediate/%s" % fname,
-                         self.datadir + os.sep + to)
-
 
     def test_bz2(self):
         try:
