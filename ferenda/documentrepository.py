@@ -281,6 +281,7 @@ class DocumentRepository(object):
             'force': False,
             'parseforce': False,
             'serializejson': False,
+            'compress': "", # don't compress by default
             'generateforce': False,
             'fsmdebug': False,
             'refresh': False,

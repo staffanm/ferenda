@@ -18,6 +18,11 @@ class PDFDocumentRepository(DocumentRepository):
     storage_policy = "dir"
     downloaded_suffix = ".pdf"
 
+    def get_default_options(self):
+        opts = super(PDFDocumentRepository, self).get_default_options()
+        opts['pdfimages'] = True
+        return opts
+
     @managedparsing
     def parse(self, doc):
         reader = self.pdfreader_from_basefile(doc.basefile)
@@ -32,7 +37,14 @@ class PDFDocumentRepository(DocumentRepository):
 
         intermediate_dir = os.path.dirname(self.store.intermediate_path(basefile))
         pdf = PDFReader()
-        pdf.read(pdffile, intermediate_dir)
+
+        if self.config.compress == "bz2":
+            keep_xml = "bz2"
+        else:
+            keep_xml = True
+        pdf.read(pdffile, intermediate_dir,
+                 images=self.config.pdfimages,
+                 keep_xml=keep_xml)
         return pdf
 
     def parse_from_pdfreader(self, pdfreader, doc):

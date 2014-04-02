@@ -4,6 +4,7 @@ import os
 import logging
 import re
 import itertools
+from bz2 import BZ2File
 
 from lxml import etree
 from six import text_type as str
@@ -48,7 +49,7 @@ class PDFReader(CompoundElement):
             self.filename = None
         # super(PDFReader, self).__init__(*args, **kwargs)
 
-    def read(self, pdffile, workdir, images=True, convert_to_pdf=False):
+    def read(self, pdffile, workdir, images=True, convert_to_pdf=False, keep_xml=True):
         """Initializes a PDFReader object from an existing PDF file. After
         initialization, the PDFReader contains a list of
         :py:class:`~ferenda.pdfreader.Page` objects.
@@ -64,7 +65,12 @@ class PDFReader(CompoundElement):
                                ``soffice`` command line tool (from
                                OpenOffice/LibreOffice).
         :type  convert_to_pdf: bool
-
+        :param keep_xml: If False, remove the intermediate XML
+                         representation of the PDF that gets created
+                         in ``workdir``. If true, keep it around to
+                         speed up subsequent parsing operations. If
+                         set to the special value ``"bz2"``, keep it
+                         but compress it with :py:module:`bz2`.
         """
         if convert_to_pdf:
             newpdffile = workdir + os.sep + os.path.splitext(os.path.basename(pdffile))[0] + ".pdf"
@@ -82,11 +88,14 @@ class PDFReader(CompoundElement):
         stem = os.path.splitext(basename)[0]
         xmlfile = os.sep.join(
             (workdir, stem + ".xml"))
-
+        if keep_xml == "bz2":
+            real_xmlfile = xmlfile + ".bz2"
+        else:
+            real_xmlfile = xmlfile
         # the PDF file needs to be copied to workdir for pdftohtml to
         # function properly
         tmppdffile = os.sep.join([workdir, basename])
-        if not util.outfile_is_newer([pdffile], xmlfile):
+        if not util.outfile_is_newer([pdffile], real_xmlfile):
             # print("%s did not exist, running pdftohtml" % xmlfile)
             util.copy_if_different(pdffile, tmppdffile)
             try:
@@ -126,12 +135,34 @@ class PDFReader(CompoundElement):
                 # and look for if the xml file wasn't created.
                 if stderr and not os.path.exists(xmlfile):
                     raise errors.ExternalCommandError(stderr)
+
+                if keep_xml == "bz2":
+                    with open(xmlfile, mode="rb") as rfp:
+                        # BZ2File supports the with
+                        # statement in py27+, but we
+                        # support py2.6
+                        wfp = BZ2File(real_xmlfile, "wb")
+                        wfp.write(rfp.read())
+                        wfp.close()
+                    os.unlink(xmlfile)
+                else: # keep_xml = True
+                    pass
+
             finally:
                 # print("Trying to unlink %s" % tmppdffile)
                 os.unlink(tmppdffile)
                 assert not os.path.exists(tmppdffile)
-                print("Unlinked %s" % tmppdffile)
-        return self._parse_xml(xmlfile)
+                # print("Unlinked %s" % tmppdffile)
+
+        if keep_xml == "bz2":
+            fp = BZ2File(real_xmlfile)
+        else:
+            fp = open(real_xmlfile)
+        res = self._parse_xml(fp, real_xmlfile)
+        fp.close()
+        if keep_xml == False:
+            os.unlink(xmlfile)
+        return res
         
 
     def textboxes(self, gluefunc=None, pageobjects=False, keepempty=False):
@@ -243,13 +274,13 @@ class PDFReader(CompoundElement):
             textbox.top + textbox.height + linespacing >= nextbox.top):
             return True
 
-    def _parse_xml(self, xmlfile):
+    def _parse_xml(self, xmlfp, xmlfilename):
         def txt(element_text):
             return re.sub(r"[\s\xa0]+", " ", str(element_text))
             
-        self.log.debug("Loading %s" % xmlfile)
-        assert os.path.exists(xmlfile), "XML %s not found" % xmlfile
-        tree = etree.parse(xmlfile)
+        self.log.debug("Loading %s" % xmlfilename)
+        # assert os.path.exists(xmlfilename), "XML %s not found" % xmlfp
+        tree = etree.parse(xmlfp)
 
         # for each page element
         for pageelement in tree.getroot():
@@ -261,7 +292,7 @@ class PDFReader(CompoundElement):
                         height=int(pageelement.attrib['height']),
                         background=None)
             background = "%s%03d.png" % (
-                os.path.splitext(xmlfile)[0], page.number)
+                os.path.splitext(xmlfilename)[0], page.number)
 
             # Reasons this file might not exist: it was blank and therefore removed, or We're running under RepoTester
             if os.path.exists(background):

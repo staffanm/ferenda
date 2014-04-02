@@ -27,15 +27,12 @@ class Read(unittest.TestCase):
             self.reader.read("test/files/pdfreader/sample.pdf",
                              self.datadir)
         except errors.ExternalCommandError:
-            for fname in os.listdir("test/files/pdfreader/intermediate"):
-                to = fname.replace("index", "sample")
-                shutil.copy("test/files/pdfreader/intermediate/%s" % fname,
-                             self.datadir + os.sep + to)
+            self._copy_files()
             self.reader.read("test/files/pdfreader/sample.pdf",
                              self.datadir)
 
         # a temporary copy of the pdf file should not be lying around in workdir
-        print("Checking if %s has been unlinked" % (self.datadir + os.sep + "sample.pdf"))
+        # print("Checking if %s has been unlinked" % (self.datadir + os.sep + "sample.pdf"))
         self.assertFalse(os.path.exists(self.datadir + os.sep + "sample.pdf"))
         # but the XML file should be stored for subsequent parses
         self.assertTrue(os.path.exists(self.datadir + os.sep + "sample.xml"))
@@ -80,4 +77,51 @@ class Read(unittest.TestCase):
         self.assertEqual("ib", box[2].tag)
         self.assertEqual(None, box[3].tag)
         
+    def test_dontkeep(self):
+        self.assertFalse(os.path.exists(self.datadir + os.sep + "sample.xml.bz2"))
+        try:
+            self.reader.read("test/files/pdfreader/sample.pdf",
+                             self.datadir,
+                             keep_xml=False)
+        except errors.ExternalCommandError:
+            self._copy_sample()
+            self.reader.read("test/files/pdfreader/sample.pdf",
+                             self.datadir,
+                             keep_xml=False)
+
+        # No XML file should exist
+        self.assertFalse(os.path.exists(self.datadir + os.sep + "sample.xml"))
+        self.assertFalse(os.path.exists(self.datadir + os.sep + "sample.xml.bz2"))
+
+    def _copy_sample(self):
+        for fname in os.listdir("test/files/pdfreader/intermediate"):
+            to = fname.replace("index", "sample")
+            shutil.copy("test/files/pdfreader/intermediate/%s" % fname,
+                         self.datadir + os.sep + to)
+
+
+    def test_bz2(self):
+        try:
+            self.reader.read("test/files/pdfreader/sample.pdf",
+                             self.datadir,
+                             keep_xml="bz2")
+        except errors.ExternalCommandError:
+            self._copy_sample()
+            # need to bzip2 here
+            self.reader.read("test/files/pdfreader/sample.pdf",
+                             self.datadir)
+
+        # a temporary copy of the pdf file should not be lying around in workdir
+        self.assertFalse(os.path.exists(self.datadir + os.sep + "sample.pdf"))
+        # but the XML file (only in bz2 format) should be stored
+        self.assertTrue(os.path.exists(self.datadir + os.sep + "sample.xml.bz2"))
+        self.assertFalse(os.path.exists(self.datadir + os.sep + "sample.xml"))
+
+        # first page, first box
+        self.assertEqual("Document title ", str(self.reader[0][0]))
+
+        # parsing again should reuse the existing sample.xml.bz2
+        self.reader.read("test/files/pdfreader/sample.pdf",
+                         self.datadir,
+                         keep_xml="bz2")
         
