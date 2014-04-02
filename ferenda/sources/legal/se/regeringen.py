@@ -467,10 +467,10 @@ class Regeringen(SwedishLegalSource):
                 if not m:
                     continue
                 pdfbasefile = m.group(1)
-                self.log.debug(" Attachment %s: %s" % (pdfbasefile, link.string))
                 pdffiles.append((pdfbasefile, link.string))
-            
-        return self.select_pdfs(pdffiles)
+        selected = self.select_pdfs(pdffiles)
+        self.log.debug("selected %s out of %d pdf files" % (", ".join(selected), len(pdffiles)))
+        return selected
 
 
     def select_pdfs(self, pdffiles):
@@ -517,7 +517,11 @@ class Regeringen(SwedishLegalSource):
         pdf = PDFReader()
         # By default, don't create and manage PDF backgrounds files
         # (takes forever, we don't use them yet)
-        pdf.read(pdffile, intermediatedir, images=self.config.pdfimages)
+        if self.config.compress == "bz2":
+            keep_xml = "bz2"
+        else:
+            keep_xml = True
+        pdf.read(pdffile, intermediatedir, images=self.config.pdfimages, keep_xml=keep_xml)
         return pdf
 
                 

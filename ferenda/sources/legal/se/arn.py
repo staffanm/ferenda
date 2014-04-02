@@ -281,7 +281,14 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
         reader = PDFReader()
         convert_to_pdf = filetype != ".pdf"
         workdir = os.path.dirname(self.store.intermediate_path(doc.basefile))
-        reader.read(filename, workdir, images=False, convert_to_pdf=convert_to_pdf)
+        if self.config.compress == "bz2":
+            keep_xml = "bz2"
+        else:
+            keep_xml = True
+        reader.read(filename, workdir,
+                    images=self.config.pdfimages,
+                    convert_to_pdf=convert_to_pdf,
+                    keep_xml=keep_xml)
         textboxes = reader.textboxes(gluecondition)
         doc.body = Body(textboxes)
 
