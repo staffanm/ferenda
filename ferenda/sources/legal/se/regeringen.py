@@ -26,7 +26,7 @@ from ferenda.pdfreader import PDFReader
 from ferenda.pdfreader import Page, Textbox
 from ferenda.decorators import recordlastdownload, downloadmax
 from . import SwedishLegalSource
-from .swedishlegalsource import offtryck_parser, offtryck_textboxiter, PreambleSection, UnorderedSection
+from .swedishlegalsource import offtryck_parser, offtryck_gluefunc, PreambleSection, UnorderedSection
 
 
 class Regeringen(SwedishLegalSource):
@@ -523,6 +523,7 @@ class Regeringen(SwedishLegalSource):
                 
     def parse_pdfs(self, basefile, pdffiles):
         body = None
+        gluefunc = offtryck_gluefunc
         for pdffile in pdffiles:
             pdf_path = self.store.downloaded_path(basefile, attachment=pdffile)
             intermediate_path = self.store.intermediate_path(basefile, attachment=pdffile)
@@ -530,77 +531,26 @@ class Regeringen(SwedishLegalSource):
             # case 1: intermediate path does not exist and that's ok
             # case 2: intermediate path exists alongside downloaded_path
             pdf = self.parse_pdf(pdf_path, intermediate_dir)
-
             debug = False
             if debug:
-                # test code - draw a rectangle around every textbox
-                from PyPDF2 import PdfFileWriter, PdfFileReader
-                import StringIO
-                from reportlab.pdfgen import canvas
-                packet = None
-                output = PdfFileWriter()
-                existing_pdf = PdfFileReader(open(pdf_path, "rb"))
-                pageidx = 0
-                sf = 2/3.0 # scaling factor
-                dirty = False
-                for tb in offtryck_textboxiter(pdf):
-                    if isinstance(tb, Page):
-                        if dirty:
-                            can.save()
-                            packet.seek(0)
-                            new_pdf = PdfFileReader(packet)
-                            print("Getting page %s from existing pdf" % pageidx)
-                            page = existing_pdf.getPage(pageidx)
-                            page.mergePage(new_pdf.getPage(0))
-                            output.addPage(page)
-                            pageidx += 1
-                        pagesize = (tb.width*sf, tb.height*sf)
-                        # print("pagesize %s x %s" % pagesize)
-                        packet = StringIO.StringIO()
-                        can = canvas.Canvas(packet, pagesize=pagesize,
-                                            bottomup=False)
-                        can.setStrokeColorRGB(0.2,0.5,0.3)
-                        can.translate(0,0)
-                    else:
-                        dirty = True
-                        x = repr(tb)
-                        print(x)
-                        can.rect(tb.left*sf, tb.top*sf,
-                                 tb.width*sf, tb.height*sf)
-
-                packet.seek(0)
-                can.save()
-                new_pdf = PdfFileReader(packet)
-                print("Getting last page %s from existing pdf" % pageidx)
-                page = existing_pdf.getPage(pageidx)
-                page.mergePage(new_pdf.getPage(0))
-                output.addPage(page)
-
                 outputfile = pdf_path+".marked.pdf"
-                outputStream = open(outputfile, "wb")
-                output.write(outputStream)
-                outputStream.close()
-                print("wrote %s" % outputfile)
-                return pdf
-            else: # not debug
-                if self.document_type == self.PROPOSITION:
-                    preset = 'proposition'
-                elif self.document_type == self.SOU:
-                    preset = 'sou'
-                elif self.document_type == self.DS:
-                    preset = 'ds'
-                elif self.document_type == self.KOMMITTEDIREKTIV:
-                    preset = 'dir'
-                else:
-                    preset = 'default'
-                parser = offtryck_parser(preset=preset)
-                # self.config.debug = True
-                # if hasattr(self.config, 'debug'):
-                #     parser.debug = self.config.debug
-                parser.debug = os.environ.get('FERENDA_FSMDEBUG', False)
-                body = parser.parse(offtryck_textboxiter(pdf))
-                pdf[:] = body[:]
-                pdf.tagname = "body"
+                pdf.drawboxes(gluefunc, outputfile)
+
+            if self.document_type == self.PROPOSITION:
+                preset = 'proposition'
+            elif self.document_type == self.SOU:
+                preset = 'sou'
+            elif self.document_type == self.DS:
+                preset = 'ds'
+            elif self.document_type == self.KOMMITTEDIREKTIV:
+                preset = 'dir'
+            else:
+                preset = 'default'
+            parser = offtryck_parser(preset=preset)
+            parser.debug = os.environ.get('FERENDA_FSMDEBUG', False)
+            body = parser.parse(pdf.textboxes(gluefunc, pageobjects=True))
+            pdf[:] = body[:]
+            pdf.tagname = "body"
         return pdf
 
 

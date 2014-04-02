@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 
 
 from . import SwedishLegalSource
-from .swedishlegalsource import offtryck_parser, offtryck_textboxiter, PreambleSection, UnorderedSection
+from .swedishlegalsource import offtryck_parser, offtryck_gluefunc, PreambleSection, UnorderedSection
 from ferenda import util, errors
 from ferenda.decorators import managedparsing, downloadmax
 from ferenda.describer import Describer
@@ -160,14 +160,11 @@ class Riksdagen(SwedishLegalSource):
         if not os.path.exists(filename):
             raise errors.NoDownloadedFileError("File '%s' not found" % filename)
         htmlfile = self.store.path(doc.basefile, 'downloaded', '.html')
-        # note that we never use the PDF file -- it would usually be
-        # the same as the PDF available from eg PropPolo
-        pdffile = self.store.path(doc.basefile, 'downloaded', '.pdf')
+        pdffile  = self.store.path(doc.basefile, 'downloaded', '.pdf')
         if os.path.exists(pdffile):
             parser = offtryck_parser(preset='proposition')
-            parser = offtryck_parser(preset=preset)
-            doc.body = parser.parse(offtryck_textboxiter(pdf))
-
+            # parser = offtryck_parser(preset=preset)
+            doc.body = parser.parse(pdf.textboxes(offtryck_gluefunc))
         else:
             self.log.debug("Loading soup from %s" % htmlfile)
             soup = BeautifulSoup(

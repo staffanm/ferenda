@@ -570,36 +570,17 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
     return p
 
 
-
-def offtryck_textboxiter(pdfreader):
-    textbox = None
-    prevbox = None
-    for page in pdfreader:
-        yield page # will include all raw textbox objects -- should possibly be shallow-cloned
-        for nextbox in page:
-            linespacing = int(nextbox.getfont()['size']) / 2
-            parindent = int(nextbox.getfont()['size'])
-            if (textbox and
-                textbox.getfont()['size'] == nextbox.getfont()['size'] and
-                textbox.getfont()['family'] == nextbox.getfont()['family'] and
-                textbox.top + textbox.height + linespacing > nextbox.top and
-                ((prevbox.top + prevbox.height == nextbox.top + nextbox.height) or # compare baseline, not topline
-                 (prevbox.left == nextbox.left) or
-                 (parindent * 2 >= (prevbox.left - nextbox.left) >= parindent)
-                 )):
-                textbox += nextbox
-            else:
-                # print("Yielding new: %s %s" % (repr(textbox), repr(nextbox)))
-                if textbox:
-                    yield textbox
-                textbox = nextbox
-            prevbox = nextbox
-        # before every new page, flush existing textbox (glueing
-        # textboxes together across pages is harder bc .top can be
-        # anywhere)
-        if textbox:
-            yield textbox
-            textbox = None
+def offtryck_gluefunc(textbox, nextbox, prevbox):
+    linespacing = int(nextbox.getfont()['size']) / 2
+    parindent = int(nextbox.getfont()['size'])
+    if (textbox.getfont()['size'] == nextbox.getfont()['size'] and
+        textbox.getfont()['family'] == nextbox.getfont()['family'] and
+        textbox.top + textbox.height + linespacing > nextbox.top and
+        ((prevbox.top + prevbox.height == nextbox.top + nextbox.height) or # compare baseline, not topline
+         (prevbox.left == nextbox.left) or
+         (parindent * 2 >= (prevbox.left - nextbox.left) >= parindent)
+     )):
+     return True
     
 # (ab)use the CitationClass, with it's useful parse_recursive method,
 # to use a legalref based parser instead of a set of pyparsing
