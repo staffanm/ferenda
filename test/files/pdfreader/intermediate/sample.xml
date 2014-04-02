@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pdf2xml SYSTEM "pdf2xml.dtd">
+
+<pdf2xml producer="poppler" version="0.24.5">
+<page number="1" position="absolute" top="0" left="0" height="1263" width="892">
+	<fontspec id="0" size="21" family="GVXOFW+Calibri-Bold" color="#345a8a"/>
+	<fontspec id="1" size="16" family="BULTXF+Cambria" color="#000000"/>
+	<fontspec id="2" size="16" family="TNOHLF+Cambria-Italic" color="#000000"/>
+	<fontspec id="3" size="16" family="YKCCAU+Cambria-BoldItalic" color="#000000"/>
+<text top="146" left="135" width="155" height="29" font="0"><b>Document	  title	  </b></text>
+<text top="178" left="135" width="4" height="21" font="1">	  </text>
+<text top="199" left="135" width="318" height="21" font="1">This	  is	  a	  <i>simple	  <b>document</b></i>	  in	  PDF	  format.	  </text>
+</page>
+</pdf2xml>
