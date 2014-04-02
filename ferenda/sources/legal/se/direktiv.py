@@ -7,6 +7,7 @@ import os
 import re
 import functools
 import codecs
+from datetime import datetime, timedelta
 from six.moves.urllib_parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -19,7 +20,7 @@ from ferenda import PDFDocumentRepository
 from ferenda import CompositeRepository, CompositeStore
 from ferenda import TextReader
 from ferenda import util
-from ferenda.decorators import downloadmax
+from ferenda.decorators import downloadmax, recordlastdownload
 from ferenda.elements import Paragraph
 from ferenda.elements import Heading
 from ferenda.elements import ListItem
@@ -43,6 +44,18 @@ class DirTrips(Trips):
     document_url_template = "http://rkrattsbaser.gov.se/cgi-bin/thw?${APPL}=DIR&${BASE}=DIR&${HTML}=dir_dok&${TRIPSHOW}=format=THW&BET=%(basefile)s"
 
     rdf_type = RPUBL.Direktiv
+
+    @recordlastdownload
+    def download(self, basefile=None):
+        if basefile:
+            return super(PropTrips, self).download(basefile)
+        else:
+            if self.config.lastdownload and not self.config.refresh:
+                startdate = self.config.lastdownload - timedelta(days=30)
+                self.start_url += "&UDAT=%s+till+%s" % (
+                    datetime.strftime(startdate, "%Y-%m-%d"),
+                    datetime.strftime(datetime.now(), "%Y-%m-%d"))
+            super(DirTrips, self).download()
 
     def parse_basefile(self, basefile):
         # create an Document instance with an initialized doc.meta RDFLib graph
@@ -210,7 +223,13 @@ class DirAsp(SwedishLegalSource, PDFDocumentRepository):
         soup = BeautifulSoup(resp.text)
         depts = [opt['value'] for opt in soup.find_all("option", value=True)]
         for basefile, url in self.download_get_basefiles(depts):
-            self.download_single(basefile, url)
+            # since the server doesn't support conditional caching and
+            # direktivs are basically never updated once published, we
+            # avoid even calling download_single if we already have
+            # the doc.
+            if ((not self.config.refresh) and
+                (not os.path.exists(self.store.downloaded_path(basefile)))):
+                self.download_single(basefile, url)
 
     @downloadmax
     def download_get_basefiles(self, depts):

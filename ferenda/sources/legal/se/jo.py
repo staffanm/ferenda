@@ -9,6 +9,7 @@ import lxml.html
 import requests
 from six import text_type as str
 from rdflib import Literal
+from datetime import datetime, timedelta
 
 # My own stuff
 from ferenda import decorators
@@ -48,6 +49,9 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
     @decorators.action
     @decorators.recordlastdownload
     def download(self, basefile=None):
+        if self.config.lastdownload and not self.config.refresh:
+            startdate = self.config.lastdownload - timedelta(days=30)
+            self.start_url += "&from=%s" % datetime.strftime(startdate, "%Y-%m-%d")
         for basefile, url in self.download_get_basefiles(self.start_url):
             self.download_single(basefile, url)
 
@@ -58,6 +62,7 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
         done = False
         url = start_url
         pagecount = 1
+        self.log.debug("Starting at %s" % start_url)
         while not done:
             nextpage = None
             assert "pn=%s" % pagecount in url

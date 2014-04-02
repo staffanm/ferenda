@@ -2,7 +2,7 @@
 from __future__ import unicode_literals
 
 import re, os
-from datetime import datetime
+from datetime import datetime, timedelta
 from six.moves.urllib_parse import urljoin
 
 import requests
@@ -23,13 +23,21 @@ class Sektion(CompoundElement):
 class JK(SwedishLegalSource):
     alias = "jk"
 
-    start_url = "http://www.jk.se/Beslut.aspx?query=&type=all&dateFrom=1998-01-01&dateTo=2100-01-01&dnr="
+    start_url = "http://www.jk.se/Beslut.aspx?query=&type=all&dateFrom=%(date)s&dateTo=2100-01-01&dnr="
     document_url_regex = "http://www.jk.se/Beslut/(?P<kategori>[\w\-]+)/(?P<basefile>\d+\-\d+\-\d+).aspx"
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
     
     @recordlastdownload
     def download(self, basefile=None):
-        for basefile, url in self.download_get_basefiles(self.start_url):
+        if self.config.lastdownload and not self.config.refresh:
+            # allow for 30 day window between decision date and publishing
+            startdate = self.config.lastdownload - timedelta(days=30)
+            start_url = self.start_url % {'date':
+                                          datetime.strftime(startdate, "%Y-%m-%d")}
+        else:
+            start_url = self.start_url % {'date':"1998-01-01"}
+
+        for basefile, url in self.download_get_basefiles(start_url):
             self.download_single(basefile, url)
 
     @downloadmax
@@ -38,19 +46,29 @@ class JK(SwedishLegalSource):
         done = False
         url = start_url
         pagecount = 1
+        self.log.debug("Starting at %s" % start_url)
         while not done:
-            self.log.info("Getting page #%s" % pagecount)
+            self.log.debug("Getting page #%s" % pagecount)
             soup = BeautifulSoup(requests.get(url).text)
             for link in soup.find_all("a", href=document_url_regex):
                 basefile = document_url_regex.search(link["href"]).group("basefile")
                 yield basefile, urljoin(url, link["href"])
 
-            next = soup.find("img", src="/common/images/navigation-pil-grey.png").find_parent("a")
-            if next:
-                url = urljoin(url, next["href"])
+            next = soup.find("img", src="/common/images/navigation-pil-grey.png")
+            if next and next.find_parent("a") and next.find_parent("a").get("href"):
+                url = urljoin(url, next.find_parent("a")["href"])
                 pagecount += 1
             else:
                 done = True
+
+    def download_is_different(self, existing, new):
+        # HTML pages many contain ASP.Net crap (__VIEWSTATE and
+        # __EVENTVALIDATION) that differ from request to request. Only
+        # compare div#mainContent
+        existing_soup = BeautifulSoup(util.readfile(existing, encoding=self.source_encoding))
+        new_soup = BeautifulSoup(util.readfile(new, encoding=self.source_encoding))
+        return (existing_soup.find("div", id="mainContent") !=
+                new_soup.find("div", id="mainContent"))
 
     def parse_metadata_from_soup(self, soup, doc):
         desc = Describer(doc.meta, doc.uri)

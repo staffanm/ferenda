@@ -37,7 +37,6 @@ class PropPolo(Regeringen):
     document_type = Regeringen.PROPOSITION
 
 
-# class PropTrips(Trips, PDFDocumentRepository):
 class PropTrips(Trips):
     alias = "proptrips"
     base = "THWALLAPROP"
@@ -54,9 +53,11 @@ class PropTrips(Trips):
 
     def get_default_options(self):
         opts = super(PropTrips, self).get_default_options()
-        opts['lastbase'] = str
+        opts['lastbase'] = ""
         return opts
 
+    # don't use @recordlastdownload -- download_get_basefiles_page
+    # should set self.config.lastbase instead
     def download(self, basefile=None):
         if basefile:
             return super(PropTrips, self).download(basefile)
@@ -65,7 +66,7 @@ class PropTrips(Trips):
                 now = datetime.now()
                 maxbase = "PROPARKIV%s%s" % (now.year % 100, (now.year+1) % 100)
                 while self.config.lastbase != maxbase:
-                    self.base = self.config.lastbase  # override "THWALLAPROP" with eg "PROPARKIV0809"
+                    self.download_params[0]['base'] = self.config.lastbase  # override "THWALLAPROP" with eg "PROPARKIV0809"
                     r = super(PropTrips, self).download() # download_get_basefiles_page sets lastbase as it goes along
             else:
                 r = super(PropTrips, self).download()
