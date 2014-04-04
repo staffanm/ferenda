@@ -7,6 +7,7 @@ import os
 import codecs
 
 import requests
+import requests.exceptions
 from bs4 import BeautifulSoup
 
 
@@ -66,8 +67,8 @@ class Riksdagen(SwedishLegalSource):
         self.log.info("Starting at %s" % start_url)
         url = start_url
         done = False
+        pagecount = 1
         while not done:
-            pagecount = 1
             resp = requests.get(url)
             soup = BeautifulSoup(resp.text, features="xml")
 
@@ -77,6 +78,12 @@ class Riksdagen(SwedishLegalSource):
                 # TMP: Only retrieve old documents
                 # if doc.rm.text > "1999":
                 #     continue
+                if doc.rm is None or doc.nummer is None:
+                    # this occasionally happens, although not all the
+                    # time for the same document. We can't really
+                    # recover from this easily, so we'll just skip and
+                    # hope that it doesn't occur on next download.
+                    continue
                 basefile = "%s:%s" % (doc.rm.text, doc.nummer.text)
                 attachment = None
                 if doc.tempbeteckning.text:
@@ -141,10 +148,19 @@ class Riksdagen(SwedishLegalSource):
             # self.log.debug("Looking for %s, found %s", dokid, b.dok_id.text)
             if b.dok_id.text != dokid:
                 continue
+            if b.filtyp is None:
+                # apparantly this can happen sometimes? Very intermitently, though.
+                self.log.warning("Couldn't find filtyp for bilaga %s in %s" % (b.dok_id.text, xmlfile))
+                continue
             filetype = "." + b.filtyp.text
             filename = self.store.downloaded_path(basefile, attachment=docname + filetype)
             self.log.debug("   Downloading to %s" % filename)
-            r = self.download_if_needed(b.fil_url.text, basefile, filename=filename)
+            try:
+                r = self.download_if_needed(b.fil_url.text, basefile, filename=filename)
+            except requests.exceptions.HTTPError as e:
+                # occasionally we get a 404 even though we shouldn't. Report and hope it goes better next time.
+                self.log.error("   Failed: %s" % e)
+                continue
             fileupdated = fileupdated or r
             break
 

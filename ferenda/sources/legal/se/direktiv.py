@@ -20,7 +20,7 @@ from ferenda import PDFDocumentRepository
 from ferenda import CompositeRepository, CompositeStore
 from ferenda import TextReader
 from ferenda import util
-from ferenda.decorators import downloadmax, recordlastdownload
+from ferenda.decorators import managedparsing, downloadmax, recordlastdownload
 from ferenda.elements import Paragraph
 from ferenda.elements import Heading
 from ferenda.elements import ListItem
@@ -48,7 +48,7 @@ class DirTrips(Trips):
     @recordlastdownload
     def download(self, basefile=None):
         if basefile:
-            return super(PropTrips, self).download(basefile)
+            return super(DirTrips, self).download(basefile)
         else:
             if self.config.lastdownload and not self.config.refresh:
                 startdate = self.config.lastdownload - timedelta(days=30)
@@ -57,20 +57,20 @@ class DirTrips(Trips):
                     datetime.strftime(datetime.now(), "%Y-%m-%d"))
             super(DirTrips, self).download()
 
-    def parse_basefile(self, basefile):
-        # create an Document instance with an initialized doc.meta RDFLib graph
-        doc = self.make_document()
-        intermediate_path = self.generic_path(basefile, 'intermediate', '.txt')
-        downloaded_path = self.downloaded_path(basefile)
-        doc.uri = self.canonical_uri(basefile)
-        html = codecs.open(downloaded_path, encoding="iso-8859-1").read()
-        header_chunk = util.extract_text(
-            html, '<pre>\n   <pre>', '<hr>', strip_tags=False)
-        self.make_meta(header_chunk, doc.meta, doc.uri, basefile)
-        util.writefile(intermediate_path, util.extract_text(
-            html, '<pre>', '</pre>'), encoding="utf-8")
+    @managedparsing
+    def parse(self, doc):
+        # FIXME: need some way of telling intermediate_path that
+        # suffix should be .txt (preferably w/o overriding
+        # DocumentStore)
+        intermediate_path = self.store.path(doc.basefile, 'intermediate', '.txt')
+        downloaded_path = self.store.downloaded_path(doc.basefile)
+        if not util.outfile_is_newer([downloaded_path], intermediate_path):
+            html = codecs.open(downloaded_path, encoding="iso-8859-1").read()
+            util.writefile(intermediate_path, util.extract_text(
+                html, '<pre>', '</pre>'), encoding="utf-8")
         reader = TextReader(intermediate_path, encoding="utf-8")
-        reader.readparagraph()
+        header_chunk = reader.readparagraph()
+        self.make_meta(header_chunk, doc.meta, doc.uri, doc.basefile)
         self.make_body(reader, doc.body)
 
         # Iterate through body tree and find things to link to (See
@@ -79,10 +79,37 @@ class DirTrips(Trips):
         return doc
 
     def header_lines(self, header_chunk):
-        header = re.compile("([^:]+):\s*<b>([^<]*)</b>")
-        for m in header.finditer(header_chunk):
-            yield [util.normalize_space(x) for x in m.groups()]
-
+        n = util.normalize_space
+        # This is a ridiculously complicated way of extracting
+        # key-value headers when both keys and headers may be
+        # continuated. The below, which relies on HTML tags enclosing
+        # the value, is much simpler.
+        # 
+        # header = re.compile("([^:]+):\s*<b>([^<]*)</b>")
+        # for m in header.finditer(header_chunk):
+        #    yield [util.normalize_space(x) for x in m.groups()]
+        ck = cv = ""
+        for line in header_chunk.split("\n"):
+            if ":" in line:
+                # yield buffer
+                if ck.strip() and cv.strip():
+                    yield(n(ck), n(cv))
+                    ck = ""
+                k, cv = line.split(":", 1)
+                if ck.strip():
+                    ck += k
+                else:
+                    ck = k
+            else:
+                if line.startswith("    "):
+                    cv += line
+                else:
+                    if ck.strip() and cv.strip():
+                        yield(n(ck), n(cv))
+                    ck = line
+                    cv = ""
+        yield(n(ck),n(cv))
+                
     def make_meta(self, chunk, meta, uri, basefile):
         d = Describer(meta, uri)
         dct = self.ns['dct']
@@ -117,18 +144,12 @@ class DirTrips(Trips):
                   'Rubrik': (self.sanitize_rubrik, d.value),
                   'Senast ändrad': (self.parse_iso_date, d.value)
                   }
-
-        # headerlines wraps a TextReader in an iterator that parses
-        # "key:value\n" lines with support for line continuation, eg
-        # "long\nkey:long\nvalue\n"
         for (key, val) in self.header_lines(chunk):
-            if not val:
-                continue
             try:
                 pred = predicates[key]
                 (transformer, setter) = munger[key]
                 setter(pred, transformer(val))
-            except (KeyError, ValueError) as e:
+            except (KeyError, ValueError):
                 self.log.error(
                     "Couldn't munge value '%s' into a proper object for predicate '%s'" % (val, key))
 
@@ -189,7 +210,9 @@ class DirTrips(Trips):
         elif p.startswith("--"):
             return ListItem
         elif (p[0].upper() != p[0]):
-            return Continuation  # magic value
+            return Continuation  # magic value, used to glue together
+                                 # paragraphs that have been
+                                 # inadvertently divided.
         else:
             return Paragraph
 

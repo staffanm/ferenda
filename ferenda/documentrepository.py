@@ -626,11 +626,14 @@ with the *config* object as single parameter.
                          the document, or just delete the previously
                          downloaded file.
         :type   archive: bool
-        :param filename: The filename to download to. If not provided, the filename is derived from the supplied basefile
+        :param filename: The filename to download to. If not provided,
+                         the filename is derived from the supplied
+                         basefile
         :type  filename: str
         :returns:        True if the local file was updated (and archived),
                          False otherwise.
         :rtype:          bool
+
         """
         if not filename:
             filename = self.store.downloaded_path(basefile)

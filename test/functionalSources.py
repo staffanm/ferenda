@@ -15,7 +15,9 @@ from ferenda.sources.general import Keyword, Skeleton, MediaWiki
 from ferenda.sources.tech import RFC, W3Standards, PEP
 from ferenda.sources.legal.eu import EurlexCaselaw, EurlexTreaties
 from ferenda.sources.legal.se import ARN, Direktiv, Ds, DV, JK, JO, Kommitte, MyndFskr, Propositioner, Regeringen, Riksdagen, SFS, SOU, SwedishLegalSource
+# subrepos, normally used through a container CompositeRepository
 from ferenda.sources.legal.se.propositioner import PropPolo
+from ferenda.sources.legal.se.direktiv import DirTrips
 
 class TestSwedishLegalSource(unittest.TestCase):
     def test_parse_swedish_date(self):
@@ -27,7 +29,7 @@ for cls in (Keyword, Skeleton, MediaWiki,
             RFC, W3Standards, PEP,
             EurlexCaselaw, EurlexTreaties,
             ARN, Direktiv, Ds, DV, JK, JO, Kommitte, MyndFskr, Propositioner, Regeringen, Riksdagen, SFS, SOU, SwedishLegalSource,
-            PropPolo):
+            PropPolo, DirTrips):
     # Create a new class, based on RepoTester, on the fly.
     d = {'repoclass': cls,
          'docroot': os.path.dirname(__file__)+"/files/repo/" + cls.alias}
