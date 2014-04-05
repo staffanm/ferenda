@@ -1,15 +1,16 @@
 <?xml version='1.0' encoding='utf-8'?>
-<html xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:foaf="http://xmlns.com/foaf/0.1/" xmlns:dct="http://purl.org/dc/terms/" xmlns:rfc="http://example.org/ontology/rfc/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://www.w3.org/1999/xhtml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd" version="XHTML+RDFa 1.1" xml:lang="en">
+<html xmlns:prov="http://www.w3.org/ns/prov-o/" xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:dct="http://purl.org/dc/terms/" xmlns:foaf="http://xmlns.com/foaf/0.1/" xmlns:rfc="http://example.org/ontology/rfc/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://www.w3.org/1999/xhtml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd" xml:lang="en" version="XHTML+RDFa 1.1">
   <head about="http://localhost:8000/res/rfc/6922">
-    <meta xml:lang="" content="Y. Shafranovich" property="dct:creator"/>
-    <meta xml:lang="" content="RFC 6922" property="dct:identifier"/>
-    <meta xml:lang="" content="2070-1721" property="dct:issn"/>
-    <meta datatype="xsd:date" content="2013-04-01" property="dct:issued"/>
-    <meta xml:lang="" content="Internet Engineering Task Force (IETF)" property="dct:publisher"/>
-    <meta xml:lang="" content="BioFortis, Inc." property="dct:rightsHolder"/>
-    <meta xml:lang="" content="Informational" property="dct:subject"/>
+    <meta content="Y. Shafranovich" xml:lang="" property="dct:creator"/>
+    <meta content="RFC 6922" xml:lang="" property="dct:identifier"/>
+    <meta content="2070-1721" xml:lang="" property="dct:issn"/>
+    <meta content="2013-04" property="dct:issued" datatype="xsd:gYearMonth"/>
+    <meta content="Internet Engineering Task Force (IETF)" xml:lang="" property="dct:publisher"/>
+    <meta content="BioFortis, Inc." xml:lang="" property="dct:rightsHolder"/>
+    <meta content="Informational" xml:lang="" property="dct:subject"/>
     <title property="dct:title">The application/sql Media Type</title>
-    <link rel="rdf:type" href="http://example.org/ontology/rfc/RFC"/>
+    <link href="http://example.org/ontology/rfc/RFC" rel="rdf:type"/>
+    <meta content="ferenda.sources.tech.rfc.RFC" xml:lang="" property="prov:wasGeneratedBy"/>
   </head>
   <body about="http://localhost:8000/res/rfc/6922">
     <div class="preamblesection" property="dct:title" content="Abstract" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6922#PS1">
@@ -25,18 +26,18 @@
       <p>This document is subject to BCP 78 and the IETF Trust's Legal Provisions Relating to IETF Documents (http://trustee.ietf.org/license-info) in effect on the date of publication of this document. Please review these documents carefully, as they describe your rights and restrictions with respect to this document. Code Components extracted from this document must include Simplified BSD License text as described in <a href="#S4" rel="dct:references">Section 4.</a>e of the Trust Legal Provisions and are provided without warranty as described in the Simplified BSD License.</p>
     </div>
     <div class="section" property="dct:title" content="Introduction" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6922#S1">
-      <span about="http://localhost:8000/res/rfc/6922#S1" content="RFC 6922, section 1" property="dct:identifier"/>
-      <span about="http://localhost:8000/res/rfc/6922#S1" content="1" property="bibo:chapter"/>
+      <span content="RFC 6922, section 1" about="http://localhost:8000/res/rfc/6922#S1" property="dct:identifier"/>
+      <span content="1" about="http://localhost:8000/res/rfc/6922#S1" property="bibo:chapter"/>
       <p>The Structured Query Language (SQL) has been in use for over 30 years with various types of database technologies. However, there is no current media type registered for SQL. Therefore, this document seeks to formally register the application/sql media type to be used for SQL with IANA.</p>
     </div>
     <div class="section" property="dct:title" content="Conventions Used in This Document" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6922#S2">
-      <span about="http://localhost:8000/res/rfc/6922#S2" content="RFC 6922, section 2" property="dct:identifier"/>
-      <span about="http://localhost:8000/res/rfc/6922#S2" content="2" property="bibo:chapter"/>
+      <span content="RFC 6922, section 2" about="http://localhost:8000/res/rfc/6922#S2" property="dct:identifier"/>
+      <span content="2" about="http://localhost:8000/res/rfc/6922#S2" property="bibo:chapter"/>
       <p>The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in <a href="http://localhost:8000/res/rfc/2119" rel="dct:references">[RFC2119]</a> when they appear in ALL CAPS. These words may also appear in this document in lowercase as English prose, absent of the normative meanings mentioned above.</p>
     </div>
     <div class="section" property="dct:title" content="Media Type Registration Application" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6922#S3">
-      <span about="http://localhost:8000/res/rfc/6922#S3" content="RFC 6922, section 3" property="dct:identifier"/>
-      <span about="http://localhost:8000/res/rfc/6922#S3" content="3" property="bibo:chapter"/>
+      <span content="RFC 6922, section 3" about="http://localhost:8000/res/rfc/6922#S3" property="dct:identifier"/>
+      <span content="3" about="http://localhost:8000/res/rfc/6922#S3" property="bibo:chapter"/>
       <p>This section provides the media type registration application for this media type (see <a href="http://localhost:8000/res/rfc/6838" rel="dct:references">[RFC6838]</a>, <a href="#S5.6" rel="dct:references">Section 5.6</a>)</p>
       <p>Type name: application</p>
       <p>Subtype name: sql</p>
@@ -99,25 +100,25 @@
       <p>Provisional registration? (standards tree only): N/A</p>
     </div>
     <div class="section" property="dct:title" content="IANA Considerations" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6922#S4">
-      <span about="http://localhost:8000/res/rfc/6922#S4" content="RFC 6922, section 4" property="dct:identifier"/>
-      <span about="http://localhost:8000/res/rfc/6922#S4" content="4" property="bibo:chapter"/>
+      <span content="RFC 6922, section 4" about="http://localhost:8000/res/rfc/6922#S4" property="dct:identifier"/>
+      <span content="4" about="http://localhost:8000/res/rfc/6922#S4" property="bibo:chapter"/>
       <p>IANA has registered "application/sql" in the standards tree of the "Application Media Types" registry, using the application provided in <a href="#S3" rel="dct:references">Section 3</a> of this document.</p>
     </div>
     <div class="section" property="dct:title" content="Security Considerations" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6922#S5">
-      <span about="http://localhost:8000/res/rfc/6922#S5" content="RFC 6922, section 5" property="dct:identifier"/>
-      <span about="http://localhost:8000/res/rfc/6922#S5" content="5" property="bibo:chapter"/>
+      <span content="RFC 6922, section 5" about="http://localhost:8000/res/rfc/6922#S5" property="dct:identifier"/>
+      <span content="5" about="http://localhost:8000/res/rfc/6922#S5" property="bibo:chapter"/>
       <p>See the Security Considerations item in the registration template in <a href="#S3" rel="dct:references">Section 3</a>, above.</p>
     </div>
     <div class="section" property="dct:title" content="Acknowledgments" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6922#S6">
-      <span about="http://localhost:8000/res/rfc/6922#S6" content="RFC 6922, section 6" property="dct:identifier"/>
-      <span about="http://localhost:8000/res/rfc/6922#S6" content="6" property="bibo:chapter"/>
+      <span content="RFC 6922, section 6" about="http://localhost:8000/res/rfc/6922#S6" property="dct:identifier"/>
+      <span content="6" about="http://localhost:8000/res/rfc/6922#S6" property="bibo:chapter"/>
       <p>To LTS, thanks for everything.</p>
       <p>The author would also like to thank all of the folks at xml.resource.org for providing many of the tools used for preparing RFCs and Internet-Drafts.</p>
       <p>A word of thanks to all IETF members who provided feedback on this document.</p>
     </div>
     <div class="section" property="dct:title" content="Normative References" typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6922#S7">
-      <span about="http://localhost:8000/res/rfc/6922#S7" content="RFC 6922, section 7" property="dct:identifier"/>
-      <span about="http://localhost:8000/res/rfc/6922#S7" content="7" property="bibo:chapter"/>
+      <span content="RFC 6922, section 7" about="http://localhost:8000/res/rfc/6922#S7" property="dct:identifier"/>
+      <span content="7" about="http://localhost:8000/res/rfc/6922#S7" property="bibo:chapter"/>
       <pre>   [ISO.9075.2011]  International Organization for Standardization,
                     "ISO/IEC 9075:2011, Information Technology -
                     Database Languages -  Structured Query Language

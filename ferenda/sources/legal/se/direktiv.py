@@ -156,7 +156,10 @@ class DirTrips(Trips):
         d.rel(dct.publisher, self.lookup_resource("Regeringskansliet"))
         d.rel(owl.sameAs, self.sameas_uri(uri))
         self.infer_triples(d, basefile)
-        # print meta.serialize(format="turtle")
+        # finally, we need a dct:issued, and the best we can come up
+        # with is the "Beslut vid regeringssammanträde" date
+        # (rpubl:beslutsdatum), so we copy it.
+        d.value(dct.issued, d.getvalue(rpubl.beslutsdatum))
 
     def sanitize_rubrik(self, rubrik):
         if rubrik == "Utgår":

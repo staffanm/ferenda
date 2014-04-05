@@ -120,7 +120,11 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
         desc.rdftype(self.rdf_type)
         desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
         desc.value(self.ns['dct'].identifier, "JO dnr %s" % doc.basefile)
+        # dct:issued is required, but we only have rpubl.avgorandedatum
+        desc.value(self.ns['dct'].issued,
+                desc.getvalue(self.ns['rpubl'].avgorandedatum))
 
+        
         # if the headnote is present, do more (incl replacing title?)
         if "headnote.html" in list(self.store.list_attachments(doc.basefile, "downloaded")):
             self.parse_headnote(desc)

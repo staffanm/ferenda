@@ -8,14 +8,18 @@ import difflib
 import os
 import re
 
-from rdflib import URIRef, RDFS, Graph
+from rdflib import URIRef, RDF, RDFS, Graph, Namespace
 from six import text_type as str
 
 from ferenda import DocumentRepository, DocumentStore, FSMParser, CitationParser
 from ferenda import util
-from ferenda.sources.legal.se.legalref import LegalRef, Link
+from ferenda.sources.legal.se.legalref import Link
 from ferenda.elements import Paragraph, Section, Body, CompoundElement, SectionalElement
 from ferenda.pdfreader import Page
+
+from . import RPUBL
+DCT = Namespace(util.ns['dct'])
+PROV = Namespace(util.ns['prov'])
 
 class Stycke(Paragraph):
     pass
@@ -95,6 +99,14 @@ class SwedishLegalSource(DocumentRepository):
                   ('rpubl', 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#'),
                   ('rinfoex', 'http://lagen.nu/terms#')]
     lang="sv"
+
+    rdf_type = RPUBL.Rattsinformationsdokument # subclasses override this
+
+    # This is according to the RPUBL vocabulary: All
+    # rpubl:Rattsinformationsdokument should have dct:title,
+    # dct:issued (must be a xsd:date), dct:publisher and
+    # dct:identifier
+    required_predicates = [RDF.type, DCT.title, DCT.issued, DCT.identifier, PROV.wasGeneratedBy]
 
     swedish_ordinal_list = ('f\xf6rsta', 'andra', 'tredje', 'fj\xe4rde',
                             'femte', 'sj\xe4tte', 'sjunde', '\xe5ttonde',

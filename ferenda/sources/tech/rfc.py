@@ -9,7 +9,7 @@ import requests
 import requests.exceptions
 
 import six
-from rdflib import URIRef, Graph
+from rdflib import URIRef, Graph, XSD
 from pyparsing import Word, CaselessLiteral, Optional, nums
 
 from ferenda import DocumentRepository
@@ -69,6 +69,7 @@ class RFC(DocumentRepository):
                   'bibo',  # Standard and DocumentPart classes, chapter prop
                   'xsd',  # datatypes
                   'foaf',  # rfcs are foaf:Documents for now
+                  'prov', # for :wasGeneratedBy
                   ('rfc', 'http://example.org/ontology/rfc/')  # custom (fake) ontology
                   )
     sparql_annotations = "res/sparql/rfc-annotations.rq"
@@ -470,6 +471,7 @@ class RFC(DocumentRepository):
         doc.uri = self.canonical_uri(realid)
         desc = Describer(doc.meta, doc.uri)
         desc.rdftype(self.ns['rfc'].RFC)
+        desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
         desc.value(self.ns['dct'].title, title, lang="en")
         self.parse_header(header, desc)
         if not desc.getvalues(self.ns['dct'].identifier):
@@ -579,9 +581,13 @@ class RFC(DocumentRepository):
             elif re.match("\w+ \d{4}$", line):
                 # NOTE: this requires english locale!
                 with util.c_locale():
+                    # Parses eg "May 2001" - which should not be
+                    # converted to a regular date, as we're missing
+                    # the date information. Use xsd:gYearMonth.
                     dt = datetime.strptime(line, "%B %Y")
-                d = date(dt.year, dt.month, dt.day)
-                desc.value(self.ns['dct'].issued, d)
+                d = util.gYearMonth(dt.year, dt.month)
+                desc.value(self.ns['dct'].issued, str(d),
+                           datatype=XSD.gYearMonth)
             else:
                 # company affiliation - include that separate from
                 # personal author identity

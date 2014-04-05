@@ -270,11 +270,11 @@ class Regeringen(SwedishLegalSource):
                     try:
                         dateval = self.parse_swedish_date(value)
                         if type(dateval) == date:
-                            d.value(self.ns['dct'].published, dateval)
+                            d.value(self.ns['dct'].issued, dateval)
                         else:
                             datatype = {util.gYearMonth: XSD.gYearMonth,
                                         util.gYear: XSD.gYear}[type(dateval)]
-                            d.value(self.ns['dct'].published, str(dateval), datatype=datatype)
+                            d.value(self.ns['dct'].issued, str(dateval), datatype=datatype)
                     except ValueError as e:
                         self.log.warning(
                             "Could not parse %s as swedish date" % value)
@@ -388,7 +388,7 @@ class Regeringen(SwedishLegalSource):
 
         # do some post processing. First loop through leading
         # textboxes and try to find dct:identifier, dct:title and
-        # dct:published (these should already be present in doc.meta,
+        # dct:issued (these should already be present in doc.meta,
         # but the values in the actual document should take
         # precendence
         d = Describer(doc.meta, doc.uri)
@@ -413,10 +413,10 @@ class Regeringen(SwedishLegalSource):
                     str_element = self.re_basefile_lax.sub("", str_element)
                 _check_differing(d, self.ns['dct'].title, str_element)
                 title_found = True
-            # dct:published
+            # dct:issued
             if str_element.startswith("Stockholm den"):
                 pubdate = self.parse_swedish_date(str_element[13:])
-                _check_differing(d, self.ns['dct'].published, pubdate)
+                _check_differing(d, self.ns['dct'].issued, pubdate)
 
         # then maybe look for the section named Författningskommentar
         # (or similar), identify each section and which proposed new

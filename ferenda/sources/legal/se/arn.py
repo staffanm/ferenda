@@ -252,6 +252,9 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
         title = util.normalize_space(soup.table.find_all("tr")[3].get_text())
         title = re.sub("Avgörande \d+-\d+-\d+; \d+-\d+\.?", "", title)
         desc.value(self.ns['dct'].title, title.strip(), lang="sv")
+        # dct:issued is required, but we only have rpubl.avgorandedatum
+        desc.value(self.ns['dct'].issued,
+                desc.getvalue(self.ns['rpubl'].avgorandedatum))
         filetype = os.path.splitext(downloaded)[1]
         if filetype == ".pdf":
             # make sure it really is a PDF

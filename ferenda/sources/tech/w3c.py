@@ -200,6 +200,7 @@ class W3Standards(DocumentRepository):
         doc.lang = self.lang
         d = Describer(doc.meta, doc.uri)
         d.rdftype(self.rdf_type)
+        d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
         dct = self.ns['dct']
 
         # dct:title

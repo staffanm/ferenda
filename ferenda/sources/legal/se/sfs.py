@@ -812,6 +812,7 @@ class SFS(Trips):
         # FIXME: make this part of head metadata
         desc.rev(self.ns['owl'].sameAs, self.canonical_uri(doc.basefile, True))
         desc.rel(self.ns['rpubl'].konsoliderar, self.canonical_uri(doc.basefile))
+        desc.rel(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
         de = DocumentEntry(docentry_file)
         desc.value(self.ns['rinfoex'].senastHamtad, de.orig_updated)
         desc.value(self.ns['rinfoex'].senastKontrollerad, de.orig_checked)
@@ -824,41 +825,41 @@ class SFS(Trips):
         if v:
             desc.value(self.ns['dct'].alternate, v)
 
-        # Finally: the dct:published property for this
+        # Finally: the dct:issued property for this
         # rpubl:KonsolideradGrundforfattning isn't readily
         # available. The true value is only found by parsing PDF files
         # in another docrepo. There are three general ways of finding
         # it out.
-        published = None
+        issued = None
         # 1. if registry contains a single value (ie a
         # Grundforfattning that hasn't been amended yet), we can
-        # assume that dct:published == rpubl:utfardandedatum
+        # assume that dct:issued == rpubl:utfardandedatum
         if len(registry) == 1 and desc.getvalues(self.ns['rpubl'].utfardandedatum):
-            published = desc.getvalue(self.ns['rpubl'].utfardandedatum)
+            issued = desc.getvalue(self.ns['rpubl'].utfardandedatum)
         else:
             # 2. if the last post in registry contains a
             # rpubl:utfardandedatum, assume that this version of the
-            # rpubl:KonsolideradGrundforfattning has the same dct:published date
+            # rpubl:KonsolideradGrundforfattning has the same dct:issued date
             last_post_uri = list(registry.keys())[-1]
             last_post_graph = registry[last_post_uri]
             pub_lit = last_post_graph.value(URIRef(last_post_uri),
                                             self.ns['rpubl'].utfardandedatum)
             if pub_lit:
-                published = pub_lit.toPython()
-        if not published:
+                issued = pub_lit.toPython()
+        if not issued:
             # 3. general fallback: Use the corresponding orig_updated
             # on the DocumentEntry. This is not correct (as it
             # represents the date we fetched the document, not the
             # date the document was made available), but it's as close
             # as we can get.
-            published = de.orig_updated.date()
-        assert isinstance(published, date)
-        desc.value(self.ns['dct'].published, published)
+            issued = de.orig_updated.date()
+        assert isinstance(issued, date)
+        desc.value(self.ns['dct'].issued, issued)
 
-        # use manual formatting of the published date -- date.strftime
+        # use manual formatting of the issued date -- date.strftime
         # doesn't work with years < 1900 in older versions of python
         rinfo_sameas = "http://rinfo.lagrummet.se/publ/sfs/%s/konsolidering/%d-%02d-%02d" % (
-            doc.basefile, published.year, published.month, published.day)
+            doc.basefile, issued.year, issued.month, issued.day)
         desc.rel(self.ns['owl'].sameAs, rinfo_sameas)
 
         # finally, combine data from the registry with any possible

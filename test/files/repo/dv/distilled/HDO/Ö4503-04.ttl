@@ -1,5 +1,6 @@
 @prefix dct: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov-o/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
@@ -28,7 +29,8 @@
     rpubl:referatrubrik "Bestämmelsen i 27 § andra stycket rättshjälpslagen (1996:1619) om ersättning till rättshjälpsbiträde för arbete som utförts före ansökan om rättshjälp har, till skillnad från motsvarande bestämmelse i 1972 års rättshjälpslag, inte ansetts ge stöd för att begränsa ersättningsrätten till att avse arbete som utförts inom den närmaste månaden före ansökan."@sv ;
     rpubl:sidnummer "323" ;
     owl:sameAs <http://localhost:8000/res/dv/nja/2007:42>,
-        <http://rinfo.lagrummet.se/publ/rattsfall/nja/2007s323> .
+        <http://rinfo.lagrummet.se/publ/rattsfall/nja/2007s323> ;
+    prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
 
 <http://localhost:8000/res/dv/hd/Ö4503-04/2007-05-16> a rpubl:VagledandeDomstolsavgorande ;
     dct:publisher <http://lagen.nu/org/2008/hogsta-domstolen> ;

@@ -110,14 +110,15 @@ def render(f):
         # css file + background images + png renderings of text
         self.create_external_resources(doc)
 
-        # Validate that all triples specified in doc.meta and any
-        # .meta property on any body object is present in the
-        # XHTML+RDFa file.
+        # Extract all triples on the XHTML/RDFa data to a separate
+        # RDF/XML file
         distilled_graph = Graph()
         with codecs.open(self.store.parsed_path(doc.basefile),
                          encoding="utf-8") as fp:  # unicode
             distilled_graph.parse(data=fp.read(), format="rdfa",
                                   publicID=doc.uri)
+
+
         # The act of parsing from RDFa binds a lot of namespaces
         # in the graph in an unneccesary manner. Particularly it
         # binds both 'dc' and 'dcterms' to
@@ -138,6 +139,17 @@ def render(f):
             '%s: %s triples extracted to %s', doc.basefile,
             len(distilled_graph), self.store.distilled_path(doc.basefile))
 
+        # Validate that all required triples are present (we check
+        # distilled_graph, but we could just as well check doc.meta)
+        for p in self.required_predicates:
+            x = distilled_graph.value(URIRef(doc.uri), p)
+            if not x:
+                raise ValueError("%s: Metadata is missing a %s triple" %
+                                 (doc.basefile, distilled_graph.qname(p)))
+
+        # Validate that all triples specified in doc.meta and any
+        # .meta property on any body object is present in the
+        # XHTML+RDFa file.
         for g in iterate_graphs(doc.body):
             doc.meta += g
 

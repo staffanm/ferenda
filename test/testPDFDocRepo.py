@@ -17,11 +17,11 @@ from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 class Repo(RepoTester):
     repoclass = PDFDocumentRepository
     def test_parse(self):
-        
         util.ensure_dir(self.repo.store.downloaded_path("sample"))
         shutil.copy2("test/files/pdfreader/sample.pdf",
                      self.repo.store.downloaded_path("sample"))
         try:
+            self.repo.required_predicates = []
             self.repo.parse("sample")
         except errors.ExternalCommandError:
             # print("pdftohtml error: retrying")

@@ -1,5 +1,6 @@
 @prefix dct: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov-o/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix rinfoex: <http://lagen.nu/terms#> .
@@ -33,13 +34,14 @@
     rinfoex:senastKontrollerad "None" ;
     dct:creator <http://lagen.nu/org/2008/justitiedepartementet> ;
     dct:identifier "SFS 2013:460" ;
-    dct:published "2013-05-30"^^xsd:date ;
+    dct:issued "2013-05-30"^^xsd:date ;
     dct:publisher <http://lagen.nu/org/2008/regeringskansliet> ;
     dct:title "Kameraövervakningslag (2013:460)"@sv ;
     rpubl:konsoliderar <https://lagen.nu/sfs/2013:460> ;
     rpubl:konsolideringsunderlag <https://lagen.nu/sfs/2013:460> ;
     rpubl:utfardandedatum "2013-05-30"^^xsd:date ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2013:460/konsolidering/2013-05-30> .
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2013:460/konsolidering/2013-05-30> ;
+    prov:wasGeneratedBy <https://lagen.nu/sfs/2013:460/konsolidering/ferenda.sources.legal.se.sfs.SFS> .
 
 <https://lagen.nu/sfs/2013:460> a rpubl:Forordning ;
     dct:identifier "SFS 2013:460" ;

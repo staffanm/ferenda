@@ -109,7 +109,7 @@ class Read(unittest.TestCase):
         except errors.ExternalCommandError:
             self._copy_sample()
             # bzip2 our canned sample.xml
-            with open(self.datadir + os.sep + "sample.xml") as rfp:
+            with open(self.datadir + os.sep + "sample.xml", "rb") as rfp:
                 wfp = BZ2File(self.datadir + os.sep + "sample.xml.bz2", "wb")
                 wfp.write(rfp.read())
                 wfp.close()

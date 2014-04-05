@@ -11,7 +11,7 @@
 <http://localhost:8000/res/utr/sou/2013:75> a rpubl:Utredning ;
     dct:abstract "E-delegationen har under fyra års tid arbetat för att stärka utvecklingen av e-förvaltning. Detta betänkande ger förslag på hur framtidens e-förvaltning kan organiseras och föras vidare i ett längre perspektiv."@sv ;
     dct:identifier "SOU 2013:75" ;
-    dct:published "2013-10-17"^^xsd:date ;
+    dct:issued "2013-10-17"^^xsd:date ;
     dct:title "Organisering av framtidens e-förvaltning"@sv ;
     rpubl:arsutgava "2013" ;
     rpubl:departement <http://lagen.nu/org/2008/naringsdepartementet> ;

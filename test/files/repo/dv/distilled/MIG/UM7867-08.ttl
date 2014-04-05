@@ -1,5 +1,6 @@
 @prefix dct: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov-o/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
@@ -23,7 +24,8 @@
     rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/mig> ;
     rpubl:referatAvDomstolsavgorande <http://localhost:8000/res/dv/mig/UM7867-08/2009-11-03> ;
     rpubl:referatrubrik "Behovet av muntlig förhandling är särskilt framträdande i mål som rör avvisning eller utvisning av en utlänning som ansöker om uppehållstillstånd på grund av uppgivet flyktingskap eller såsom skyddsbehövande i övrigt och där en bedömning av trovärdigheten i den lämnade berättelsen har omedelbar betydelse för frågan om uppehållstillstånd. Är innehållet i de åberopade uppgifterna och utlänningens agerande sådant att det framstår som klart att uppgifterna är oförenliga och inte överensstämmer med verkligheten behöver inte någon muntlig förhandling hållas, trots att utlänningen begärt detta."@sv ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/mig/2009:30> .
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/mig/2009:30> ;
+    prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
 
 <http://localhost:8000/res/dv/mig/UM7867-08/2009-11-03> a rpubl:VagledandeDomstolsavgorande ;
     dct:publisher <http://lagen.nu/org/2008/migrationsoverdomstolen> ;

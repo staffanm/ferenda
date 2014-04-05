@@ -23,8 +23,7 @@ from lxml import etree
 from lxml.builder import ElementMaker
 import lxml.html
 
-from rdflib import Graph
-from rdflib import Literal, Namespace, URIRef
+from rdflib import Graph, Literal, Namespace, URIRef, RDF
 import bs4
 import requests
 import requests.exceptions
@@ -45,7 +44,9 @@ from ferenda.elements import (AbstractElement, serialize, Body, Nav, Link,
                               UnorderedList, ListItem, Preformatted, Paragraph)
 from ferenda.elements.html import elements_from_soup
 from ferenda.thirdparty import patch, httpheader
-
+# establish two central RDF Namespaces at the top level
+DCT = Namespace(util.ns['dct'])
+PROV = Namespace(util.ns['prov'])
 
 class DocumentRepository(object):
 
@@ -145,10 +146,17 @@ class DocumentRepository(object):
     (prefix, namespace) tuples. All well-known prefixes are available
     in :py:data:`ferenda.util.ns`."""
 
+    required_predicates = [RDF.type, DCT.identifier, PROV.wasGeneratedBy]
+    """A list of RDF predicates that should be present in the outdata. If
+    any of these are missing, a warning is logged.
+
+    """
+
     #
     # download() related class properties
 
     start_url = "http://example.org/"
+
     """The main entry page for the remote web store of documents. May
     be a list of documents, a search form or whatever. If it's
     something more complicated than a simple list of documents, you

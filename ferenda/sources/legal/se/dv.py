@@ -18,7 +18,7 @@ import tempfile
 
 # 3rdparty libs
 import pkg_resources
-from rdflib import Namespace, URIRef, Graph
+from rdflib import Namespace, URIRef, Graph, RDF
 import requests
 import lxml.html
 from lxml import etree
@@ -33,6 +33,8 @@ from ferenda.elements import Body, Paragraph, CompoundElement, OrdinalElement, H
 
 from ferenda.elements.html import Strong, Em
 from . import SwedishLegalSource, SwedishCitationParser, RPUBL
+DCT = Namespace(util.ns['dct'])
+PROV = Namespace(util.ns['prov'])
 
 # Objektmodellen för rättsfall:
 #
@@ -178,8 +180,19 @@ class DV(SwedishLegalSource):
                   'dct',  # title, identifier, etc
                   'xsd',  # datatypes
                   'owl',  # : sameAs
+                  'prov',
                   ('rpubl', 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
                   )
+    # This is very similar to SwedishLegalSource.required_predicates,
+    # only DCT.title has been changed to RPUBL.referatrubrik (and if
+    # our validating function grokked that rpubl:referatrubrik
+    # rdfs:isSubpropertyOf dct:title, we wouldn't need this). Also, we
+    # removed dct:issued because there is no actual way of getting
+    # this data (apart from like the file time stamps).  On further
+    # thinking, we remove RPUBL.referatrubrik as it's not present (or
+    # required) for rpubl:Rattsfallsnotis
+    required_predicates = [RDF.type, DCT.identifier, PROV.wasGeneratedBy]
+    
     DCT = Namespace(util.ns['dct'])
     sparql_annotations = "res/sparql/dv-annotations.rq"
 
@@ -211,7 +224,9 @@ class DV(SwedishLegalSource):
             if rdftype in (self.ns['rpubl'].Rattsfallsreferat, self.ns['rpubl'].Rattsfallsnotis):
                 return str(uri)
         raise ValueError("Can't find canonical URI for basefile %s in %s" % (basefile, p))
-            
+
+    # we override make_document to avoid having it calling
+    # canonical_uri prematurely
     def make_document(self, basefile=None):
         doc = Document()
         doc.basefile = basefile
@@ -221,9 +236,6 @@ class DV(SwedishLegalSource):
         doc.uri = None # can't know this yet
         return doc
 
-            
-        
-        
     # FIXME: store.list_basefiles_for("parse") must be fixed to handle two
     # different suffixes. Maybe store.downloaded_path() as well, so that
     # it returns .docx if a .docx file indeed exists, and .doc otherwise.
@@ -1166,7 +1178,7 @@ class DV(SwedishLegalSource):
             refdesc.rdftype(self.ns['rpubl'].Rattsfallsreferat)
         domdesc.rdftype(self.ns['rpubl'].VagledandeDomstolsavgorande)
         refdesc.rel(self.ns['rpubl'].referatAvDomstolsavgorande, domuri)
-
+        refdesc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
 # FIXME: implement this
 #        # 5. Create a meaningful identifier for the verdict itself (ie. "Göta hovrätts dom den 42 september 2340 i mål B 1234-42")
 #        domdesc.value(self.ns['dct'].identifier, dom_to_identifier(head["Domstol"],

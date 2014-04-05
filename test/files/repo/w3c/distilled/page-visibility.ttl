@@ -1,45 +1,47 @@
 @prefix bibo: <http://purl.org/ontology/bibo/> .
-@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix prov: <http://www.w3.org/ns/prov-o/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://localhost:8000/res/w3c/page-visibility> a bibo:Standard;
-    dcterms:identifier "page-visibility" ;
-    dcterms:issued "2013-05-14"^^xsd:date ;
-    dcterms:title "Page Visibility"@en .
+<http://localhost:8000/res/w3c/page-visibility> a bibo:Standard ;
+    dct:identifier "page-visibility" ;
+    dct:issued "2013-05-14"^^xsd:date ;
+    dct:title "Page Visibility"@en ;
+    prov:wasGeneratedBy "ferenda.sources.tech.w3c.W3Standards" .
 
 <http://localhost:8000/res/w3c/page-visibility#PS1> a bibo:DocumentPart ;
-    dcterms:title "Abstract"@en .
+    dct:title "Abstract"@en .
 
 <http://localhost:8000/res/w3c/page-visibility#PS2> a bibo:DocumentPart ;
-    dcterms:title "Status of this document"@en .
+    dct:title "Status of this document"@en .
 
 <http://localhost:8000/res/w3c/page-visibility#PS3> a bibo:DocumentPart ;
-    dcterms:title "Table of Contents"@en .
+    dct:title "Table of Contents"@en .
 
 <http://localhost:8000/res/w3c/page-visibility#S1> a bibo:DocumentPart ;
-    dcterms:title "Introduction"@en ;
+    dct:title "Introduction"@en ;
     bibo:chapter "1" .
 
 <http://localhost:8000/res/w3c/page-visibility#S2> a bibo:DocumentPart ;
-    dcterms:title "Conformance requirements"@en ;
+    dct:title "Conformance requirements"@en ;
     bibo:chapter "2" .
 
 <http://localhost:8000/res/w3c/page-visibility#S3> a bibo:DocumentPart ;
-    dcterms:title "Terminology"@en ;
+    dct:title "Terminology"@en ;
     bibo:chapter "3" .
 
 <http://localhost:8000/res/w3c/page-visibility#S4> a bibo:DocumentPart ;
-    dcterms:title "Page Visibility"@en ;
+    dct:title "Page Visibility"@en ;
     bibo:chapter "4" .
 
 <http://localhost:8000/res/w3c/page-visibility#S4.1> a bibo:DocumentPart ;
-    dcterms:title "Introduction"@en ;
+    dct:title "Introduction"@en ;
     bibo:chapter "4.1" .
 
 <http://localhost:8000/res/w3c/page-visibility#S4.2> a bibo:DocumentPart ;
-    dcterms:title "Extensions to the Document interface"@en ;
+    dct:title "Extensions to the Document interface"@en ;
     bibo:chapter "4.2" .
 

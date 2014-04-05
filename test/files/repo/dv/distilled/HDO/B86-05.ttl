@@ -1,5 +1,6 @@
 @prefix dct: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov-o/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
@@ -23,7 +24,8 @@
     rpubl:referatrubrik "Bestämmelsen i 8 § smugglingslagen om \"tull, skatt eller annan avgift\" har befunnits tillämplig i fråga om en i EG-förordningen nr (EEG) 1470/2001 föreskriven antidumpningstull. Det har ansetts förenligt med regeringsformens bestämmelser om normgivning och med legalitetsprincipen att straffbestämmelsen såvitt gäller tullplikten fått sitt innehåll utfyllt av föreskrifter i en EG-förordning. Undandragande av pålagor som avses i den nämnda förordningen har bedömts rikta sig mot \"det allmänna\". Även fråga om EG-förordningen utgör en in casu-lagstiftning."@sv ;
     rpubl:sidnummer "227" ;
     owl:sameAs <http://localhost:8000/res/dv/nja/2007:32>,
-        <http://rinfo.lagrummet.se/publ/rattsfall/nja/2007s227> .
+        <http://rinfo.lagrummet.se/publ/rattsfall/nja/2007s227> ;
+    prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
 
 <http://localhost:8000/res/dv/hd/B86-05/2007-04-04> a rpubl:VagledandeDomstolsavgorande ;
     dct:publisher <http://lagen.nu/org/2008/hogsta-domstolen> ;

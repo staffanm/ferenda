@@ -1,5 +1,6 @@
 @prefix dct: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov-o/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
@@ -18,7 +19,8 @@
     rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/ad> ;
     rpubl:referatAvDomstolsavgorande <http://localhost:8000/res/dv/ad/B-114-2012/2013-08-21> ;
     rpubl:referatrubrik "En arbetsgivare har krävt att en arbetstagare som anmält ledighet med tillfällig föräldrapenning ska uppvisa läkarintyg avseende barnets sjukdom. Sedan arbetstagaren motsatt sig detta och har hon tilldelats en varning, bl.a. för olovlig frånvaro den aktuella dagen. Arbetsdomstolen har funnit att arbetstagaren har missgynnats i strid med 16 § föräldraledighetslagen."@sv ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/ad/2013:63> .
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/ad/2013:63> ;
+    prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
 
 <http://localhost:8000/res/dv/ad/B-114-2012/2013-08-21> a rpubl:VagledandeDomstolsavgorande ;
     dct:publisher <http://lagen.nu/org/2008/arbetsdomstolen> ;
