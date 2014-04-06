@@ -146,7 +146,7 @@ class DocumentRepository(object):
     (prefix, namespace) tuples. All well-known prefixes are available
     in :py:data:`ferenda.util.ns`."""
 
-    required_predicates = [RDF.type, DCT.identifier, PROV.wasGeneratedBy]
+    required_predicates = [RDF.type]
     """A list of RDF predicates that should be present in the outdata. If
     any of these are missing, a warning is logged.
 

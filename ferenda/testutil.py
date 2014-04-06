@@ -15,6 +15,7 @@ import unicodedata
 import re
 from io import BytesIO
 from difflib import unified_diff
+from datetime import datetime
 from ferenda.compat import unittest
 from ferenda.compat import Mock, patch
 

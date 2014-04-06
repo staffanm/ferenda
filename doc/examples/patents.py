@@ -21,7 +21,7 @@ class XMLPatents(DocumentRepository):
 
     @managedparsing
     def parse(self,doc):
-        transform_patent_xml_to_xhtml(doc)
+        return self.transform_patent_xml_to_xhtml(doc)
 
 class HTMLPatents(DocumentRepository):
     alias = "pathtml"
@@ -31,7 +31,7 @@ class HTMLPatents(DocumentRepository):
 
     @managedparsing
     def parse(self,doc):
-        analyze_tagsoup(doc)
+        return self.analyze_tagsoup(doc)
 
 class ScannedPatents(DocumentRepository):
     alias = "patscan"
@@ -43,9 +43,18 @@ class ScannedPatents(DocumentRepository):
 
     @managedparsing
     def parse(self,doc):
-        ocr_and_structure(doc)
+        x = self.ocr_and_structure(doc)
+        return True
+
 # end subrepos
 
+    # stuff needed to get the above (and a call to parse()) to
+    # actually work
+    def ocr_and_structure(self, doc):
+        return True # A-OK!
+    def parseneeded(self, basefile):
+        return True
+    required_predicates = []
 # begin composite
 class CompositePatents(CompositeRepository):
     alias = "pat"
@@ -65,4 +74,6 @@ class CompositePatents(CompositeRepository):
 # end composite
 
 d = CompositePatents()
+d.parse("5723765")
+d.generate("5723765")
 return_value = True

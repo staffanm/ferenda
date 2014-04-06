@@ -50,7 +50,7 @@ class Examples(unittest.TestCase, FerendaTestCase):
         masks = [
             re.compile(r"^(\d{2}:\d{2}:\d{2})", re.MULTILINE), # looks like a HH:MM:SS time
             re.compile(r"finished in (\d+\.\d+) sec"),
-            re.compile(r"\((\d.\d+) sec\)"),
+            re.compile(r"\((\d+.\d+) sec\)"),
             re.compile(r" INFO ([\w\-]+): downloaded from http"),
             re.compile(r": downloaded from (http://[\w\.\-/]+)"),
             re.compile(r" INFO ([\w\-]+): OK "),
