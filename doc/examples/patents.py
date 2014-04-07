@@ -70,9 +70,12 @@ class CompositePatents(CompositeRepository):
         # TIFFs. If your parse() method can make these parsed
         # documents sufficiently alike and generic, you might not need
         # to implement this method at all.
-        do_the_work(basefile)
+        self.do_the_work(basefile)
 # end composite
+    def do_the_work(self, basefile): pass
 
+# w/o this, d.subrepos is (None, None, None) ?!
+CompositePatents.subrepos = XMLPatents, HTMLPatents, ScannedPatents
 d = CompositePatents()
 d.parse("5723765")
 d.generate("5723765")
