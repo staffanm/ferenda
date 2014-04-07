@@ -13,6 +13,7 @@ from six.moves.urllib_parse import urljoin
 from bs4 import BeautifulSoup
 from rdflib import Literal
 import requests
+from six import text_type as str
 
 from . import SwedishLegalSource, SwedishLegalStore, Trips, Regeringen, RPUBL
 from ferenda import Describer
@@ -90,7 +91,7 @@ class DirTrips(Trips):
         #    yield [util.normalize_space(x) for x in m.groups()]
         ck = cv = ""
         for line in header_chunk.split("\n"):
-            if ":" in line:
+            if ": " in line:
                 # yield buffer
                 if ck.strip() and cv.strip():
                     yield(n(ck), n(cv))
