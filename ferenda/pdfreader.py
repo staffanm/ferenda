@@ -346,6 +346,7 @@ class PDFReader(CompoundElement):
             # support the fullfontname flag) it still uses returncode
             # 0! Only way to know if it failed is to inspect stderr
             # and look for if the xml file wasn't created.
+            xmlfile = os.path.splitext(tmppdffile)[0] + ".xml"
             if stderr and not os.path.exists(xmlfile):
                 raise errors.ExternalCommandError(stderr)
 
@@ -378,12 +379,11 @@ class PDFReader(CompoundElement):
                               font=None)
                 for element in boxelement.findall(".//{http://www.w3.org/1999/xhtml}span[@class='ocrx_word']"):
                     dim = dimensions(element.get("title"))
+                    t = "".join(element.itertext()) + element.tail
                     if element.getchildren():  # probably a <em> or <strong> element
-                        t = "".join(element.itertext()) + element.tail
                         tag = {'{http://www.w3.org/1999/xhtml}em': 'i',
                                '{http://www.w3.org/1999/xhtml}strong': 'b'}[element.getchildren()[0].tag]
                     else:
-                        t = element.text + element.tail
                         tag = None
                     text = Textelement(t,
                                        tag=tag,

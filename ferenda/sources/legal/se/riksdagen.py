@@ -17,6 +17,7 @@ from ferenda import util, errors
 from ferenda.decorators import managedparsing, downloadmax
 from ferenda.describer import Describer
 from ferenda.elements import Paragraph
+from ferenda import PDFReader
 
 class Riksdagen(SwedishLegalSource):
     BILAGA = "bilaga"
@@ -177,9 +178,20 @@ class Riksdagen(SwedishLegalSource):
             raise errors.NoDownloadedFileError("File '%s' not found" % filename)
         htmlfile = self.store.path(doc.basefile, 'downloaded', '.html')
         pdffile  = self.store.path(doc.basefile, 'downloaded', '.pdf')
+
+        intermediate_path = self.store.intermediate_path(doc.basefile,
+                                                         attachment=os.path.basename(pdffile))
+        intermediate_dir = os.path.dirname(intermediate_path)
+
         if os.path.exists(pdffile):
             parser = offtryck_parser(preset='proposition')
             # parser = offtryck_parser(preset=preset)
+            pdf = PDFReader()
+            pdf.read(pdffile, workdir=intermediate_dir, images=False, keep_xml="bz2")
+            if pdf.is_empty():
+                self.log.debug("%s: %s contains no text, performing OCR" % (doc.basefile, pdffile))
+                from pudb import set_trace; set_trace()
+                pdf.read(pdffile, workdir=intermediate_dir, ocr_lang="swe", keep_xml="bz2")
             doc.body = parser.parse(pdf.textboxes(offtryck_gluefunc))
         else:
             self.log.debug("Loading soup from %s" % htmlfile)
