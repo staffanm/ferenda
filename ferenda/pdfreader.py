@@ -1,9 +1,11 @@
+
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 import os
 import logging
 import re
 import itertools
+from glob import glob
 from bz2 import BZ2File
 
 from lxml import etree
@@ -34,7 +36,14 @@ class PDFReader(CompoundElement):
        The class can also handle any other type of document (such as
        Word/OOXML/WordPerfect/RTF) that OpenOffice or LibreOffice
        handles by first converting it to PDF using the ``soffice``
-       command line tool (which then must be in your ``$PATH``)
+       command line tool (which then must be in your ``$PATH``).
+
+       If the PDF contains only scanned pages (without any OCR
+       information), the pages can be run through the ``tesseract``
+       command line tool (which, again, needs to be in your
+       ``$PATH``). You need to provide the main language of the
+       document as the ``ocr_lang`` parameter, and you need to have
+       installed the tesseract language files for that language.
 
     """
 
@@ -49,7 +58,7 @@ class PDFReader(CompoundElement):
             self.filename = None
         # super(PDFReader, self).__init__(*args, **kwargs)
 
-    def read(self, pdffile, workdir, images=True, convert_to_pdf=False, keep_xml=True):
+    def read(self, pdffile, workdir, images=True, convert_to_pdf=False, keep_xml=True, ocr_lang=None):
         """Initializes a PDFReader object from an existing PDF file. After
         initialization, the PDFReader contains a list of
         :py:class:`~ferenda.pdfreader.Page` objects.
@@ -71,7 +80,20 @@ class PDFReader(CompoundElement):
                          speed up subsequent parsing operations. If
                          set to the special value ``"bz2"``, keep it
                          but compress it with :py:module:`bz2`.
+        :type  keep_xml: bool
+        :param ocr_lang: If provided, PDFReader will extract scanned
+                         images from the PDF file, and run an OCR
+                         program on it, using the ``ocr_lang``
+                         language heuristics. (Note that this is not
+                         neccessarily an IETF language tag like "sv"
+                         or "en-GB", but rather whatever the
+                         underlying ``tesseract`` program uses).
+        :param ocr_lang: str
+
         """
+        # start by removing all pages left behind by a previous read
+        self[:] = []
+        
         if convert_to_pdf:
             newpdffile = workdir + os.sep + os.path.splitext(os.path.basename(pdffile))[0] + ".pdf"
             if not os.path.exists(newpdffile):
@@ -86,84 +108,58 @@ class PDFReader(CompoundElement):
         assert os.path.exists(pdffile), "PDF %s not found" % pdffile
         basename = os.path.basename(pdffile)
         stem = os.path.splitext(basename)[0]
-        xmlfile = os.sep.join(
-            (workdir, stem + ".xml"))
-        if keep_xml == "bz2":
-            real_xmlfile = xmlfile + ".bz2"
+
+        if ocr_lang:
+            suffix = ".hocr.html"
+            converter = self._tesseract
+            converter_extra = {'lang': ocr_lang}
+            parser = self._parse_hocr
         else:
-            real_xmlfile = xmlfile
-        # the PDF file needs to be copied to workdir for pdftohtml to
-        # function properly
+            suffix = ".xml"
+            converter = self._pdftohtml
+            converter_extra = {'images': images}
+            parser = self._parse_xml
+
+        convertedfile = os.sep.join([workdir, stem + suffix])
+        if keep_xml == "bz2":
+            real_convertedfile = convertedfile + ".bz2"
+        else:
+            real_convertedfile = convertedfile
+
+        
         tmppdffile = os.sep.join([workdir, basename])
-        if not util.outfile_is_newer([pdffile], real_xmlfile):
-            # print("%s did not exist, running pdftohtml" % xmlfile)
+        # copying the pdffile to the workdir is only needed if we use self._pdftohtml
+
+        if not util.outfile_is_newer([pdffile], real_convertedfile):
             util.copy_if_different(pdffile, tmppdffile)
-            try:
-                if images:
-                    # two pass coding: First use -c (complex) to extract
-                    # background pictures, then use -xml to get easy-to-parse
-                    # text with bounding boxes.
-                    cmd = "pdftohtml -nodrm -c %s" % tmppdffile
-                    self.log.debug("Converting: %s" % cmd)
-                    (returncode, stdout, stderr) = util.runcmd(cmd,
-                                                              require_success=True)
-                    # we won't need the html files, or the blank PNG files
-                    for f in os.listdir(workdir):
-                        if f.startswith(stem) and f.endswith(".html"):
-                            os.unlink(workdir + os.sep + f)
-                        elif f.startswith(stem) and f.endswith(".png"):
-                            # this checks the number of unique colors in the
-                            # bitmap. If there's only one color, we don't need
-                            # the file
-                            (returncode, stdout, stderr) = util.runcmd('convert %s -format "%%k" info:' % (workdir + os.sep + f))
-                            if stdout.strip() == "1":
-                                os.unlink(workdir + os.sep + f)
-                            else:
-                                self.log.debug("Keeping non-blank image %s" % f)
-
-                # Without -fontfullname, all fonts are just reported as
-                # having family="Times"...
-                imgflag = "-i" if not images else ""
-
-                cmd = "pdftohtml -nodrm -xml -fontfullname %s %s" % (imgflag, tmppdffile)
-                self.log.debug("Converting: %s" % cmd)
-                (returncode, stdout, stderr) = util.runcmd(cmd,
-                                                           require_success=True)
-                # if pdftohtml fails (if it's an old version that doesn't
-                # support the fullfontname flag) it still uses returncode
-                # 0! Only way to know if it failed is to inspect stderr
-                # and look for if the xml file wasn't created.
-                if stderr and not os.path.exists(xmlfile):
-                    raise errors.ExternalCommandError(stderr)
-
-                if keep_xml == "bz2":
-                    with open(xmlfile, mode="rb") as rfp:
-                        # BZ2File supports the with
-                        # statement in py27+, but we
-                        # support py2.6
-                        wfp = BZ2File(real_xmlfile, "wb")
-                        wfp.write(rfp.read())
-                        wfp.close()
-                    os.unlink(xmlfile)
-                else: # keep_xml = True
-                    pass
-
-            finally:
-                # print("Trying to unlink %s" % tmppdffile)
-                os.unlink(tmppdffile)
-                assert not os.path.exists(tmppdffile)
-                # print("Unlinked %s" % tmppdffile)
+            # this is the expensive operation
+            res = converter(tmppdffile, workdir, **converter_extra)
+            if keep_xml == "bz2":
+                with open(convertedfile, mode="rb") as rfp:
+                    # BZ2File supports the with
+                    # statement in py27+, but we
+                    # support py2.6
+                    wfp = BZ2File(real_convertedfile, "wb")
+                    wfp.write(rfp.read())
+                    wfp.close()
+                os.unlink(convertedfile)
+            else: # keep_xml = True
+                pass
 
         if keep_xml == "bz2":
-            fp = BZ2File(real_xmlfile)
+            fp = BZ2File(real_convertedfile)
         else:
-            fp = open(real_xmlfile)
-        res = self._parse_xml(fp, real_xmlfile)
+            fp = open(real_convertedfile)
+
+        res = parser(fp, real_convertedfile)
+
         fp.close()
         if keep_xml == False:
-            os.unlink(xmlfile)
+            os.unlink(convertedfile)
         return res
-        
+
+    def is_empty(self):
+        return 0 == sum([len(x) for x in self])
 
     def textboxes(self, gluefunc=None, pageobjects=False, keepempty=False):
         """Return an iterator of the textboxes available.
@@ -274,6 +270,136 @@ class PDFReader(CompoundElement):
             textbox.top + textbox.height + linespacing >= nextbox.top):
             return True
 
+
+    def _tesseract(self, tmppdffile, workdir, lang):
+        root = os.path.splitext(os.path.basename(tmppdffile))[0]
+
+        # step 1: find the number of pages
+        cmd = "pdfinfo %s" % tmppdffile
+        (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
+        m = re.search("Pages:\s+(\d+)", stdout)
+        number_of_pages = int(m.group(1))
+        self.log.debug("%(root)s.pdf has %(number_of_pages)s pages" % locals())
+
+        # step 2: extract the images (should be one per page), 10
+        # pages at a time (pdfimages flakes out on larger loads)
+        for i in range(int(number_of_pages / 10) + 1):
+            frompage = (i * 10) + 1
+            topage = min((i + 1) * 10, number_of_pages)
+            cmd = "pdfimages -p -f %(frompage)s -l %(topage)s %(tmppdffile)s %(workdir)s/%(root)s" % locals()
+            self.log.debug("- running "+cmd)
+            (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
+
+        # Step 3: combine all the pbm file into a giant compressed multipage tif
+        cmd = "convert %(workdir)s/%(root)s-*.pbm -compress Zip %(workdir)s/%(root)s.tif" % locals()
+        self.log.debug("running " + cmd)
+        (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
+
+        # Step 4: OCR the giant tif file to create a .hocr.html file
+        # Note that -psm 1 (automatic page segmentation with
+        # orientation and script detection) requires the installation
+        # of tesseract-ocr-3.01.osd.tar.gz
+        cmd = "tesseract %(workdir)s/%(root)s.tif %(workdir)s/%(root)s.hocr -l %(lang)s -psm 1 hocr" % locals()
+        self.log.debug("running " + cmd)
+        (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
+
+        # Step 5: Cleanup (the .tif file can stay)
+        os.unlink(tmppdffile)
+        for f in glob("%(workdir)s/%(root)s-*.pbm" % locals()):
+            os.unlink(f)
+            
+
+    def _pdftohtml(self, tmppdffile, workdir, images):
+        root = os.path.splitext(os.path.basename(tmppdffile))[0]
+        try:
+            if images:
+                # two pass coding: First use -c (complex) to extract
+                # background pictures, then use -xml to get easy-to-parse
+                # text with bounding boxes.
+                cmd = "pdftohtml -nodrm -c %s" % tmppdffile
+                self.log.debug("Converting: %s" % cmd)
+                (returncode, stdout, stderr) = util.runcmd(cmd,
+                                                          require_success=True)
+                # we won't need the html files, or the blank PNG files
+                for f in os.listdir(workdir):
+                    if f.startswith(root) and f.endswith(".html"):
+                        os.unlink(workdir + os.sep + f)
+                    elif f.startswith(root) and f.endswith(".png"):
+                        # this checks the number of unique colors in the
+                        # bitmap. If there's only one color, we don't need
+                        # the file
+                        (returncode, stdout, stderr) = util.runcmd('convert %s -format "%%k" info:' % (workdir + os.sep + f))
+                        if stdout.strip() == "1":
+                            os.unlink(workdir + os.sep + f)
+                        else:
+                            self.log.debug("Keeping non-blank image %s" % f)
+
+            # Without -fontfullname, all fonts are just reported as
+            # having family="Times"...
+            imgflag = "-i" if not images else ""
+
+            cmd = "pdftohtml -nodrm -xml -fontfullname %s %s" % (imgflag, tmppdffile)
+            self.log.debug("Converting: %s" % cmd)
+            (returncode, stdout, stderr) = util.runcmd(cmd,
+                                                       require_success=True)
+            # if pdftohtml fails (if it's an old version that doesn't
+            # support the fullfontname flag) it still uses returncode
+            # 0! Only way to know if it failed is to inspect stderr
+            # and look for if the xml file wasn't created.
+            if stderr and not os.path.exists(xmlfile):
+                raise errors.ExternalCommandError(stderr)
+
+
+        finally:
+            os.unlink(tmppdffile)
+            assert not os.path.exists(tmppdffile)
+
+    re_dimensions = re.compile("bbox (?P<left>\d+) (?P<top>\d+) (?P<right>\d+) (?P<bottom>\d+)").search
+    def _parse_hocr(self, fp, filename):
+        def dimensions(s):
+            m = self.re_dimensions(s)
+            return m.groupdict()
+        tree = etree.parse(fp)
+        for pageelement in tree.findall("//{http://www.w3.org/1999/xhtml}div[@class='ocr_page']"):
+            dim = dimensions(pageelement.get('title'))
+            page = Page(number=int(pageelement.get('id')[5:]),
+                        width=int(dim['right']) - int(dim['left']),
+                        height=int(dim['bottom']) - int(dim['top']),
+                        background=None)
+            # we discard elements at the ocr_carea (content area?)
+            # level, we're only concerned with paragraph-level
+            # elements
+            for boxelement in pageelement.findall(".//{http://www.w3.org/1999/xhtml}p[@class='ocr_par']"):
+                dim = dimensions(boxelement.get('title'))
+                box = Textbox(top=int(dim['top']),
+                              left=int(dim['left']),
+                              width=int(dim['right']) - int(dim['left']),
+                              height=int(dim['bottom']) - int(dim['top']),
+                              font=None)
+                for element in boxelement.findall(".//{http://www.w3.org/1999/xhtml}span[@class='ocrx_word']"):
+                    dim = dimensions(element.get("title"))
+                    if element.getchildren():  # probably a <em> or <strong> element
+                        t = "".join(element.itertext()) + element.tail
+                        tag = {'{http://www.w3.org/1999/xhtml}em': 'i',
+                               '{http://www.w3.org/1999/xhtml}strong': 'b'}[element.getchildren()[0].tag]
+                    else:
+                        t = element.text + element.tail
+                        tag = None
+                    text = Textelement(t,
+                                       tag=tag,
+                                       top=int(dim['top']),
+                                       left=int(dim['left']),
+                                       width=int(dim['right']) - int(dim['left']),
+                                       height=int(dim['bottom']) - int(dim['top']),                    )
+                    box.append(text)
+                page.append(box)
+            self.append(page)
+        self.log.debug("PDFReader initialized: %d pages" %
+                       (len(self)))
+            
+            
+        
+
     def _parse_xml(self, xmlfp, xmlfilename):
         def txt(element_text):
             return re.sub(r"[\s\xa0]+", " ", str(element_text))
@@ -302,7 +428,9 @@ class PDFReader(CompoundElement):
             for element in pageelement:
                 if element.tag == 'fontspec':
                     fontid =  element.attrib['id']
-                    # make sure we always deal with a basic dict (not lxml.etree._Attrib) where all keys are str object (not bytes)
+                    # make sure we always deal with a basic dict (not
+                    # lxml.etree._Attrib) where all keys are str
+                    # object (not bytes)
                     self.fontspec[fontid] = dict([(k,str(v)) for k,v in element.attrib.items()])
                     if "+" in element.attrib['family']:
                         self.fontspec[fontid]['family'] = element.attrib['family'].split("+",1)[1]
@@ -467,14 +595,15 @@ all text in a Textbox has the same font and size.
 
         # self.__fontspecid = kwargs['font']
         self.font = kwargs['font']
-        self.__fontspec = kwargs['fontspec'] 
+        if 'fontspec' in kwargs:
+            self.__fontspec = kwargs['fontspec'] 
+            del kwargs['fontspec']
 
         del kwargs['top']
         del kwargs['left']
         del kwargs['width']
         del kwargs['height']
         del kwargs['font']
-        del kwargs['fontspec']
 
         super(Textbox, self).__init__(*args, **kwargs)
 
@@ -491,11 +620,16 @@ all text in a Textbox has the same font and size.
         if six.PY2:
             # s = repr(s)
             s = s.encode('ascii', 'replace')
-        return '<%s %sx%s+%s+%s %s@%s "%s">' % (self.__class__.__name__,
-                                               self.width, self.height,
-                                               self.left, self.top,
-                                               self.getfont()['family'], self.getfont()['size'],
-                                               s)
+        if self.getfont():
+            fontinfo = "%s@%s " % (self.getfont()['family'],
+                                  self.getfont()['size'])
+        else:
+            fontinfo = ""
+        return '<%s %sx%s+%s+%s %s"%s">' % (self.__class__.__name__,
+                                            self.width, self.height,
+                                            self.left, self.top,
+                                            fontinfo,
+                                            s)
     def __add__(self, other):
         # expand dimensions
         top = min(self.top, other.top)
@@ -554,7 +688,10 @@ all text in a Textbox has the same font and size.
 
     def getfont(self):
         """Returns a fontspec dict of all properties of the font used."""
-        return self.__fontspec[self.font]
+        if self.font:
+            return self.__fontspec[self.font]
+        else:
+            return {}
 
 
 class Textelement(UnicodeElement):

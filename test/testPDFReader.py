@@ -10,7 +10,7 @@ from ferenda.compat import unittest
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 from bz2 import BZ2File
 
-from ferenda import errors
+from ferenda import errors, util
 # SUT
 from ferenda import PDFReader
 
@@ -26,9 +26,9 @@ class Read(unittest.TestCase):
 
     def _copy_sample(self):
         for fname in os.listdir("test/files/pdfreader/intermediate"):
-            to = fname.replace("index", "sample")
+            # to = fname.replace("index", "sample") # why?
             shutil.copy("test/files/pdfreader/intermediate/%s" % fname,
-                         self.datadir + os.sep + to)
+                         self.datadir + os.sep + fname)
 
     def test_basic(self):
         try:
@@ -44,7 +44,10 @@ class Read(unittest.TestCase):
         self.assertFalse(os.path.exists(self.datadir + os.sep + "sample.pdf"))
         # but the XML file should be stored for subsequent parses
         self.assertTrue(os.path.exists(self.datadir + os.sep + "sample.xml"))
-        
+
+        # The PDF contained actual textboxes
+        self.assertFalse(self.reader.is_empty())
+
         self.assertEqual(len(self.reader), 1)
         # first page, first box
         title = str(self.reader[0][0])
@@ -131,4 +134,54 @@ class Read(unittest.TestCase):
         self.reader.read("test/files/pdfreader/sample.pdf",
                          self.datadir,
                          keep_xml="bz2")
+
+    def test_convert(self):
+        # how to test this when soffice isnt available and on $PATH?
+        pass
+
+    def test_ocr(self):
+        try:
+            self.reader.read("test/files/pdfreader/scanned.pdf",
+                             self.datadir,
+                             ocr_lang="swe")
+        except errors.ExternalCommandError:
+            self._copy_sample()
+            self.reader.read("test/files/pdfreader/scanned.pdf",
+                             self.datadir,
+                             ocr_lang="swe")
+
+        # assert that a hOCR file has been created
+        self.assertTrue(os.path.exists(self.datadir + os.sep + "scanned.hocr.html"))
+
+        # assert that we have two pages
+        self.assertEqual(2, len(self.reader))
+
+        # assert that first element in the first textbox in the first
+        # page corresponds to the first bbox
+        self.assertEqual("Regeringens ", str(self.reader[0][0][0]))
+        self.assertEqual(159, self.reader[0][0][0].top)
+        self.assertEqual(129, self.reader[0][0][0].left)
+        self.assertEqual(72, self.reader[0][0][0].height)
+        self.assertEqual(400, self.reader[0][0][0].width)
+
+        # assert that the third textbox (which has mostly normal text)
+        # is rendered correctly (note that we have a couple of OCR errors).
+        self.assertEqual("Regeringen föreslår riksdagen att anta de förslag som har tagits. upp i bifogade utdrag ur regeringsprotokollet den 31 oktober l99l.", util.normalize_space(str(self.reader[0][3])))
+
+    def test_fallback_ocr(self):
+        # self._copy_sample()
+        # from pudb import set_trace; set_trace()
+        self.reader.read("test/files/pdfreader/scanned-ecma-99.pdf",
+                         self.datadir,
+                         images=False)
+        self.assertTrue(self.reader.is_empty())
+        self.reader.read("test/files/pdfreader/scanned-ecma-99.pdf",
+                         self.datadir,
+                         ocr_lang="eng")
+        self.assertFalse(self.reader.is_empty())
+        self.assertEqual(2, len(self.reader))
+        self.assertEqual("EUROPEAN COMPUTER MANUFACTURERS ASSOCIATION",
+                         util.normalize_space(str(self.reader[0][1])))
+        
+
         
