@@ -1,7 +1,105 @@
-2014-01-?? RELEASE 0.1.7
+2014-04-?? RELEASE 0.1.7
 ========================
 
-Mainly updates to ferenda.sources.legal.se.regeringen.
+Setting DocumentStore.config now updates the associated DocumentStore
+object with the config.datadir parameter
+
+CompositeRepository.parse now raises ParseError if no subrepository
+is able to parse the given basefile.
+
+CompositeRepository.parse no longer requires that all subrepos have
+storage_policy == "dir".
+
+New method DocumentRepository.parseneeded returns True iff parsing of
+the document is needed (logic moved from
+ferenda.decorators.parseifneeded)
+
+ferenda.decorators.render (by default called when calling
+DocumentRepository.parse()) now serialize the entire document to JSON,
+which later can be loaded to recreate the entire document object tree. Controlled by config parameter serializejson.
+
+ferenda.decorators.render now validates that required triples are
+present in the output (Which triples are needed is controlled by
+DocumentRepository.required_predicates).
+
+ferenda.decorators now has a new newstate decorator, used in
+ferenda.FSMParser
+
+ferenda.Devel now has a new csvinventory action
+
+.required_predicates
+
+New compress parameter (Can either be empty or "bz2") controls whether
+intermediate files are compressed to save space.
+
+DocumentRepository.download_if_needed now sets both the If-None-match
+and If-modified-since HTTP headers.
+
+New method DocumentRepository.download_is_different is used to control
+whether a newly downloaded resource is semantically different from a
+previously downloaded resource (to avoid having each ASP.Net VIEWSTATE
+change result in an archived document).
+
+.parseneeded
+
+
+DocumentRepository.render_xhtml now creates RDFa 1.1
+
+New method DocumentRepository.construct_sparql_query allows for more
+complex overrides than just setting the sparql_annotations class
+attribute.
+
+DocumentStore.path now takes an extra storage_policy parameter.
+
+DocumentStore now stores multiple basefiles in a single directory even
+when storage_policy == "dir" for all methods that cannot handle
+attachments (like distilled_path, documententry_path etc)
+
+
+New methods DocumentStore.open_intermediate, .serialized_path and
+open_serialized
+
+Elements.serialize and .deserialize now takes a format parameter,
+which can be either "xml" (default) or "json". The "json" format
+allows for full roundtripping of all documents.
+
+New excepttion ferenda.errors.NoDownloadedFileError.
+
+PDFReader now handles any word processing format that
+OpenOffice/LibreOffice can handle, by first using soffice to convert
+it to a PDF. It also handles PDFs that consists entirely of scanned
+pages without text information, by first running the images through
+the tesseract OCR engine. Finally, a new keep_xml parameter allows for
+either removing the intermediate XML files or compressing them using
+bz2 to save space.
+
+New method PDFReader.is_empty
+
+New method PDFReader.textboxes iterates through all textboxes on all
+pages. The user can provide a glue function to automatically
+concatenate textboxes that should be considered part of the same
+paragraph (or other meaningful unit of text).
+
+New debug method PDFReader.drawboxes can use the same glue function,
+and creates a new pdf with all the resulting textboxes marked
+up. (Requires PyPDF2 and reportlab, which makes this particular
+feature Python 2-only).
+
+PDFReader.Textbox objects can now be added to each other to form
+larger Textbox objects.
+
+All of the Swedish legal source docrepos (under
+ferenda.sources.legal.se) have been overhauled and now mostly work.
+
+ferenda.Transformer now optionally logs the equivalent xsltproc
+command line when transforming using XSLT.
+
+new method TripleStore.update, performs SPARQL
+UPDATE/DELETE/DROP/CLEAR queries.
+
+ferenda.util has new gYearMonth and gYear classes that subclass
+datetime.date, but are useful when handling RDF literals that should
+have the datatype xsd:gYearMonth (or xsd:gYear)
 
 2013-11-13 RELEASE 0.1.6.1
 ==========================
@@ -28,11 +126,11 @@ Backwards-incompatible changes:
 
 * The DocumentStore.open_generated method was removed as noone was
   using it.
-  
+
 * The (non-documented) modules legalref and legaluri, which were
   specific to swedish legal references, have been moved into the
   ferenda.sources.legal.se namespace
-  
+
 * The (non-documented) feature where CSS files specified in the
   configuration could be in SCSS format, and automatically
   compiled/transformed, has been removed, since the library used
@@ -46,11 +144,11 @@ New features:
   controls whether your Atom feeds link to the original document file
   as it was fetched from the source, or to the parsed version. See
   :ref:`configuration`.
-  
+
 * The entire RDF dataset for a particular docrepo is now available
   through the ReST API in various formats using the same content
   negotiation mechanisms as the documents themselves. See :doc:`wsgi`.
-  
+
 * ferenda-setup now auto-configures ``indextype`` (and checks whether
   ElasticSearch is available, before falling back to Whoosh) in
   addition to ``storetype``.
@@ -148,7 +246,7 @@ Infrastructural changes:
   and the road has been paved to get alternative implementations that
   connect to other fulltext index servers. ElasticSearch is next up to
   be implemented, but is not done yet.
-  
+
 * General improvement of documentation
 
 2013-08-02 RELEASE 0.1.2

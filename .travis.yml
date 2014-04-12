@@ -5,7 +5,7 @@ python:
   - "3.2"
   - "3.3"
 before_install:
-  - sudo apt-get install -qq python-simpleparse antiword poppler-utils
+  - sudo apt-get install -qq python-simpleparse antiword poppler-utils tesseract-ocr tesseract-ocr-swe tesseract-ocr-osd
 services:
   - elasticsearch
 install:

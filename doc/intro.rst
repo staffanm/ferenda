@@ -52,7 +52,9 @@ Command-line tools
    * :py:class:`~ferenda.PDFReader` requires ``pdftotext`` and
      ``pdftohtml`` (from `poppler <http://poppler.freedesktop.org/>`_, version 0.21 or newer)
      and ``convert`` (from `ImageMagick
-     <http://www.imagemagick.org/>`_)
+     <http://www.imagemagick.org/>`_). The ``convert_to_pdf``
+     parameter requires either OpenOffice or LibreOffice. The
+     ``ocr_lang`` parameter requires ``tesseract``.
    * :py:class:`~ferenda.WordReader` requires `antiword
      <http://www.winfield.demon.nl/>`_ to handle old ``.doc`` files.
    * :py:class:`~ferenda.TripleStore` can perform some operations
