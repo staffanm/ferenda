@@ -27,6 +27,7 @@ from . import Regeringen
 from . import Riksdagen
 from . import RPUBL
 from . import SwedishLegalSource, SwedishLegalStore
+from .swedishlegalsource import offtryck_parser, offtryck_gluefunc
 
 class PropPolo(Regeringen):
     alias = "proppolo"
@@ -40,7 +41,6 @@ class PropPolo(Regeringen):
 class PropTrips(Trips):
     alias = "proptrips"
     base = "THWALLAPROP"
-    # base = "PROPARKIV0809"
     app = "prop"
 
     basefile_regex = "(?P<basefile>\d+/\d+:\d+)$"
@@ -53,7 +53,7 @@ class PropTrips(Trips):
 
     def get_default_options(self):
         opts = super(PropTrips, self).get_default_options()
-        opts['lastbase'] = ""
+        opts['lastbase'] = "THWALLAPROP"
         return opts
 
     # don't use @recordlastdownload -- download_get_basefiles_page
@@ -62,7 +62,9 @@ class PropTrips(Trips):
         if basefile:
             return super(PropTrips, self).download(basefile)
         else:
-            if self.config.lastbase and not self.config.refresh:
+            if (hasattr(self.config, 'lastbase') and
+                self.config.lastbase and
+                not self.config.refresh):
                 now = datetime.now()
                 maxbase = "PROPARKIV%s%s" % (now.year % 100, (now.year+1) % 100)
                 while self.config.lastbase != maxbase:
@@ -150,6 +152,16 @@ class PropTrips(Trips):
 
         filename = self.store.downloaded_path(basefile, attachment=mainattachment)
         created = not os.path.exists(filename)
+
+        # since the server doesn't support conditional caching and
+        # propositioner are basically never updated once published, we
+        # avoid even calling download_if_needed if we already have
+        # the doc.
+        if (os.path.exists(self.store.downloaded_path(basefile))
+            and not self.config.refresh):
+            self.log.debug("%s: already exists" % basefile)
+            return
+        
         if self.download_if_needed(url, basefile, filename=filename):
             if created:
                 self.log.info("%s: downloaded from %s" % (basefile, url))
@@ -290,9 +302,9 @@ class PropTrips(Trips):
                 self.log.debug("%s: Using %s" % (doc.basefile, pdffile))
                 intermediate_dir = os.path.dirname(
                     self.store.path(doc.basefile, 'intermediate', '.foo'))
-                self.setup_logger('pdfreader', self.config.get('log', 'INFO'))
                 pdfreader = PDFReader()
-                pdfreader.read(pdffile, intermediate_dir)
+                keep_xml = "bz2" if self.config.compress == "bz2" else True
+                pdfreader.read(pdffile, intermediate_dir, keep_xml=keep_xml)
                 self.parse_from_pdfreader(pdfreader, doc)
             else:
                 downloaded_path = self.store.downloaded_path(doc.basefile)
@@ -321,6 +333,12 @@ class PropTrips(Trips):
                 err.dummyfile = self.store.parsed_path(doc.basefile)
             raise err
 
+    def parse_from_pdfreader(self, pdfreader, doc):
+        parser = offtryck_parser(preset='proposition')
+        doc.body = parser.parse(pdfreader.textboxes(offtryck_gluefunc))
+        
+
+            
     def parse_from_textreader(self, textreader, doc):
         describer = Describer(doc.meta, doc.uri)
         for p in textreader.getiterator(textreader.readparagraph):

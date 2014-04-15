@@ -25,6 +25,9 @@ class SubrepoA(DocumentRepository):
             return True
         else:
             return False # we don't even have this basefile
+
+    def custom(self):
+        return False
         
 class SubrepoB(DocumentRepository):
     storage_policy = "dir"
@@ -45,10 +48,25 @@ class SubrepoB(DocumentRepository):
         else:
             raise errors.ParseError("No can do!")
 
+    def get_default_options(self):
+        opts = super(SubrepoB, self).get_default_options()
+        opts['customproperty'] = "Hello world!"
+        return opts
+
+    def custom(self):
+        return self.config.customproperty
 
 class CompositeExample(CompositeRepository):
     subrepos = SubrepoB, SubrepoA
     storage_policy = "dir"
+
+    def custom(self):
+        for c in self.subrepos:
+            inst = self.get_instance(c, self.myoptions)
+            ret = inst.custom()
+            if ret:
+                return ret
+        raise RuntimeError("No subrepo could perform custom method")
     
 class TestComposite(RepoTester):
     repoclass = CompositeExample
@@ -102,6 +120,6 @@ class TestComposite(RepoTester):
         self.assertEqual(set(["1", "3"]),
                          set(self.repo.store.list_basefiles_for("generate")))
 
-
-        
-        
+    def test_config(self):
+        got = self.repo.custom()
+        self.assertEqual("Hello world!", got)

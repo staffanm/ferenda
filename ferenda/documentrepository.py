@@ -15,6 +15,7 @@ import re
 import time
 import calendar
 import filecmp
+import socket
 from ferenda.compat import OrderedDict
 
 # 3rd party
@@ -666,7 +667,12 @@ with the *config* object as single parameter.
                 try:
                     response = requests.get(url, headers=headers, timeout=10)
                     fetched = True
-                except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+                # socket.timeout ought to be caught by requests and
+                # repackaged as requests.exceptions.Timeout, but in
+                # one case it wasn't
+                except (requests.exceptions.ConnectionError,
+                        requests.exceptions.Timeout,
+                        socket.timeout) as e:
                     self.log.warning(
                         "Failed to fetch %s: error %s (%s remaining attempts)" % (url, e, remaining_attempts))
                     remaining_attempts -= 1

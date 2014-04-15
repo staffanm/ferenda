@@ -185,12 +185,10 @@ class Riksdagen(SwedishLegalSource):
 
         if os.path.exists(pdffile):
             parser = offtryck_parser(preset='proposition')
-            # parser = offtryck_parser(preset=preset)
             pdf = PDFReader()
             pdf.read(pdffile, workdir=intermediate_dir, images=False, keep_xml="bz2")
             if pdf.is_empty():
                 self.log.debug("%s: %s contains no text, performing OCR" % (doc.basefile, pdffile))
-                from pudb import set_trace; set_trace()
                 pdf.read(pdffile, workdir=intermediate_dir, ocr_lang="swe", keep_xml="bz2")
             doc.body = parser.parse(pdf.textboxes(offtryck_gluefunc))
         else:
@@ -199,6 +197,7 @@ class Riksdagen(SwedishLegalSource):
                 codecs.open(
                     htmlfile, encoding='iso-8859-1', errors='replace').read(),
                 )
+            self.parse_from_soup(soup, doc)
         doc.uri = self.canonical_uri(doc.basefile)
         self.log.debug("Set URI to %s (from %s)" % (doc.uri, doc.basefile))
         d = Describer(doc.meta, doc.uri)
@@ -208,7 +207,6 @@ class Riksdagen(SwedishLegalSource):
         d.value(self.ns['dct'].title, xsoup.dokument.titel.text, lang="sv")
         d.value(self.ns['dct'].issued, util.strptime(xsoup.dokument.publicerad.text,
                                                         "%Y-%m-%d %H:%M:%S").date())
-        self.parse_from_soup(soup, doc)
         self.infer_triples(d, doc.basefile)
         return True
 

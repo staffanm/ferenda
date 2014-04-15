@@ -283,12 +283,17 @@ class PDFReader(CompoundElement):
 
         # step 2: extract the images (should be one per page), 10
         # pages at a time (pdfimages flakes out on larger loads)
+        existing_pbms = glob("%(workdir)s/%(root)s-*.pbm" % locals())
+        to_int = int
+        existing_pages = set([to_int(x.split("-")[-2]) for x in existing_pbms])
         for i in range(int(number_of_pages / 10) + 1):
             frompage = (i * 10) + 1
             topage = min((i + 1) * 10, number_of_pages)
-            cmd = "pdfimages -p -f %(frompage)s -l %(topage)s %(tmppdffile)s %(workdir)s/%(root)s" % locals()
-            self.log.debug("- running "+cmd)
-            (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
+            wanted_pages = set(range(frompage,topage+1))
+            if frompage <= topage and not wanted_pages.issubset(existing_pages):
+                cmd = "pdfimages -p -f %(frompage)s -l %(topage)s %(tmppdffile)s %(workdir)s/%(root)s" % locals()
+                self.log.debug("- running "+cmd)
+                (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
 
         # Step 3: combine all the pbm file into a giant compressed multipage tif
         cmd = "convert %(workdir)s/%(root)s-*.pbm -compress Zip %(workdir)s/%(root)s.tif" % locals()
@@ -405,8 +410,18 @@ class PDFReader(CompoundElement):
             return re.sub(r"[\s\xa0]+", " ", str(element_text))
             
         self.log.debug("Loading %s" % xmlfilename)
-        # assert os.path.exists(xmlfilename), "XML %s not found" % xmlfp
-        tree = etree.parse(xmlfp)
+
+        try:
+            tree = etree.parse(xmlfp)
+        except etree.XMLSyntaxError as e:
+            self.log.warning("pdftohtml created incorrect markup, trying to fix using BeautifulSoup: %s" % e)
+            xmlfp.seek(0)
+            from bs4 import BeautifulSoup
+            from io import BytesIO
+            soup = BeautifulSoup(xmlfp, "xml")
+            xmlfp = BytesIO(str(soup).encode("utf-8"))
+            tree = etree.parse(xmlfp)
+            self.log.debug("BeautifulSoup workaround successful")
 
         # for each page element
         for pageelement in tree.getroot():

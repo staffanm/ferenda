@@ -133,7 +133,7 @@ class CompositeRepository(DocumentRepository):
                 try:
                     # each parse method should be smart about whether
                     # to re-parse or not (i.e. use the @managedparsing
-                    # decorator). 
+                    # decorator).
                     ret = inst.parse(basefile)
 
                 except Exception as e: # Any error thrown (errors.ParseError or something else) means we try next subrepo
