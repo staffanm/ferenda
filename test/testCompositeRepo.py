@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 import sys, os
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
-from ferenda import DocumentRepository, util, errors
+from ferenda import DocumentRepository, LayeredConfig, util, errors
 from ferenda.testutil import RepoTester
 #SUT
 from ferenda import CompositeRepository
@@ -56,6 +56,7 @@ class SubrepoB(DocumentRepository):
     def custom(self):
         return self.config.customproperty
 
+
 class CompositeExample(CompositeRepository):
     subrepos = SubrepoB, SubrepoA
     storage_policy = "dir"
@@ -68,6 +69,7 @@ class CompositeExample(CompositeRepository):
                 return ret
         raise RuntimeError("No subrepo could perform custom method")
     
+
 class TestComposite(RepoTester):
     repoclass = CompositeExample
  
@@ -88,10 +90,10 @@ class TestComposite(RepoTester):
         # uninitialized classes, not objects
         self.assertEqual(set(["3", "2", "1"]),
                          set(self.repo.store.list_basefiles_for("parse")))
-        
-    
+
     def test_parse(self):
-        # we already know list_basefiles_for("parse") will return ["3", "2", "1"]
+        # we already know list_basefiles_for("parse") will return
+        # ["3", "2", "1"]
         self.assertTrue(self.repo.parse("1")) # both A and B can handle this
         # but B should win
         self.assertEqual("basefile 1, parsed by b",
@@ -107,7 +109,8 @@ class TestComposite(RepoTester):
                          util.readfile(self.repo.store.parsed_path("3")))
         self.assertEqual("basefile 3, metadata from a",
                          util.readfile(self.repo.store.distilled_path("3")))
-        self.assertEqual([], # this repo supports attachment, but underlying repo A did not
+        self.assertEqual([], # this repo supports attachment, but
+                             # underlying repo A did not
                          list(self.repo.store.list_attachments("3", "parsed")))
                         
         # in this case, all files should be up-to-date, so no copying
@@ -121,5 +124,13 @@ class TestComposite(RepoTester):
                          set(self.repo.store.list_basefiles_for("generate")))
 
     def test_config(self):
+        # test it with self.repo being initialized with some kwargs parameters
+        self.repo.download()
         got = self.repo.custom()
         self.assertEqual("Hello world!", got)
+
+        # now test with external config object -- this is where it'll fail
+#        self.repo = CompositeExample()
+#        self.repo.config = LayeredConfig({'datadir': self.datadir})
+#        got = self.repo.custom()
+#        self.assertEqual("Hello world!", got)

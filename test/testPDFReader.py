@@ -9,8 +9,8 @@ from lxml import etree
 from ferenda.compat import unittest
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 from bz2 import BZ2File
-
 from ferenda import errors, util
+from six import text_type as str
 # SUT
 from ferenda import PDFReader
 
@@ -171,9 +171,17 @@ class Read(unittest.TestCase):
     def test_fallback_ocr(self):
         # self._copy_sample()
         # from pudb import set_trace; set_trace()
-        self.reader.read("test/files/pdfreader/scanned-ecma-99.pdf",
-                         self.datadir,
-                         images=False)
+
+        try:
+            self.reader.read("test/files/pdfreader/scanned-ecma-99.pdf",
+                             self.datadir,
+                             images=False)
+        except errors.ExternalCommandError:
+            self._copy_sample()
+            self.reader.read("test/files/pdfreader/scanned-ecma-99.pdf",
+                             self.datadir,
+                             images=False)
+
         self.assertTrue(self.reader.is_empty())
         self.reader.read("test/files/pdfreader/scanned-ecma-99.pdf",
                          self.datadir,

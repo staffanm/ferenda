@@ -280,27 +280,37 @@ class PDFReader(CompoundElement):
         m = re.search("Pages:\s+(\d+)", stdout)
         number_of_pages = int(m.group(1))
         self.log.debug("%(root)s.pdf has %(number_of_pages)s pages" % locals())
-
         # step 2: extract the images (should be one per page), 10
         # pages at a time (pdfimages flakes out on larger loads)
-        existing_pbms = glob("%(workdir)s/%(root)s-*.pbm" % locals())
         to_int = int
-        existing_pages = set([to_int(x.split("-")[-2]) for x in existing_pbms])
-        for i in range(int(number_of_pages / 10) + 1):
+        for idx, i in enumerate(range(int(number_of_pages / 10) + 1)):
             frompage = (i * 10) + 1
             topage = min((i + 1) * 10, number_of_pages)
-            wanted_pages = set(range(frompage,topage+1))
-            if frompage <= topage and not wanted_pages.issubset(existing_pages):
-                cmd = "pdfimages -p -f %(frompage)s -l %(topage)s %(tmppdffile)s %(workdir)s/%(root)s" % locals()
-                self.log.debug("- running "+cmd)
-                (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
+            if frompage > topage:
+                continue
+            cmd = "pdfimages -p -f %(frompage)s -l %(topage)s %(tmppdffile)s %(workdir)s/%(root)s" % locals()
+            self.log.debug("- running "+cmd)
+            (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
+            # step 2.1: Combine the recently extracted images and
+            # into a new tif (so that we add 10
+            # pages at a time to the tif, as imagemagick can
+            # create a number of pretty large files for each page,
+            # so converting 200 images will fill 10 G of your temp
+            # space -- which we'd like to avoid)
+            cmd = "convert %(workdir)s/%(root)s-*.pbm -compress Zip %(workdir)s/%(root)s-tmp%(idx)04d.tif" % locals()
+            self.log.debug("- running " + cmd)
+            (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
+            # step 2.2: Remove pbm files now that they're in the .tif
+            for f in glob("%(workdir)s/%(root)s-*.pbm" % locals()):
+                os.unlink(f)
 
-        # Step 3: combine all the pbm file into a giant compressed multipage tif
-        cmd = "convert %(workdir)s/%(root)s-*.pbm -compress Zip %(workdir)s/%(root)s.tif" % locals()
-        self.log.debug("running " + cmd)
+        # Step 3: Combine all the 10-page tifs into a giant tif using tiffcp
+        cmd = "tiffcp -c zip %(workdir)s/%(root)s-tmp*.tif %(workdir)s/%(root)s.tif" % locals()
+        self.log.debug("- running " + cmd)
         (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
-
-        # Step 4: OCR the giant tif file to create a .hocr.html file
+        
+                
+        # Step 3: OCR the giant tif file to create a .hocr.html file
         # Note that -psm 1 (automatic page segmentation with
         # orientation and script detection) requires the installation
         # of tesseract-ocr-3.01.osd.tar.gz
@@ -308,11 +318,10 @@ class PDFReader(CompoundElement):
         self.log.debug("running " + cmd)
         (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
 
-        # Step 5: Cleanup (the .tif file can stay)
+        # Step 5: Cleanup (the main .tif file can stay)
         os.unlink(tmppdffile)
-        for f in glob("%(workdir)s/%(root)s-*.pbm" % locals()):
+        for f in glob("%(workdir)s/%(root)s-tmp*.tif" % locals()):
             os.unlink(f)
-            
 
     def _pdftohtml(self, tmppdffile, workdir, images):
         root = os.path.splitext(os.path.basename(tmppdffile))[0]

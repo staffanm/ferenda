@@ -126,7 +126,6 @@ class CompositeRepository(DocumentRepository):
         with util.logtime(self.log.info, "%(basefile)s OK (%(elapsed).3f sec)",
                           {'basefile': basefile}):
             ret = False
-            # from pudb import set_trace; set_trace()
             for c in self.subrepos:
                 inst = self.get_instance(c, self.myoptions)
                 try:
