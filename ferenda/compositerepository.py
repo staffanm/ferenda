@@ -37,8 +37,6 @@ class CompositeRepository(DocumentRepository):
     subrepos = ()  # list of classes
     documentstore_class = CompositeStore
 
-    _instances = {}
-
     def get_instance(self, instanceclass, options={}):
         if not instanceclass in self._instances:
             if options:
@@ -50,6 +48,7 @@ class CompositeRepository(DocumentRepository):
         return self._instances[instanceclass]
 
     def __init__(self, **kwargs):
+        self._instances = {}
         self.myoptions = kwargs
         super(CompositeRepository, self).__init__(**kwargs)
         # At this point, self._instances is empty. And we can't really
