@@ -532,6 +532,7 @@ class Page(CompoundElement, OrdinalElement):
         # pdfdocumentrepository.create_external_resources to
         # understand why)
         return "page%03d" % self.number
+
     # text: can be string, re obj or callable (gets called with the box obj)
     # fontsize: can be int or callable
     # fontname: can be string or callable

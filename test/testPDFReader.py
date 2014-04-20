@@ -143,6 +143,8 @@ class Read(unittest.TestCase):
 
     def test_ocr(self):
         try:
+            if not os.environ.get("FERENDA_TEST_TESSERACT"):
+                raise errors.ExternalCommandError
             self.reader.read("test/files/pdfreader/scanned.pdf",
                              self.datadir,
                              ocr_lang="swe")
@@ -171,10 +173,12 @@ class Read(unittest.TestCase):
         self.assertEqual("Regeringen föreslår riksdagen att anta de förslag som har tagits. upp i bifogade utdrag ur regeringsprotokollet den 31 oktober l99l.", util.normalize_space(str(self.reader[0][3])))
 
     def test_fallback_ocr(self):
-        # self._copy_sample()
-        # from pudb import set_trace; set_trace()
-
         try:
+            # actually running tesseract takes ages -- for day-to-day
+            # testing we can just as well use the canned hocr.html
+            # files that _copy_sample fixes for us.
+            if not os.environ.get("FERENDA_TEST_TESSERACT"):
+                raise errors.ExternalCommandError
             self.reader.read("test/files/pdfreader/scanned-ecma-99.pdf",
                              self.datadir,
                              images=False)
