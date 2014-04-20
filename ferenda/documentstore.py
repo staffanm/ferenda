@@ -213,7 +213,7 @@ class DocumentStore(object):
                 # convention, the main file is called index.html,
                 # index.pdf or whatever.
                 # print("storage_policy dir: %s" % self.storage_policy)
-                suffix = "/index" + self.downloaded_suffix
+                suffix = os.sep + "index" + self.downloaded_suffix
             else:
                 # print("storage_policy file: %s" % self.storage_policy)
                 suffix = self.downloaded_suffix
@@ -223,7 +223,7 @@ class DocumentStore(object):
         elif action == "generate":
             directory = os.path.sep.join((basedir, "parsed"))
             if self.storage_policy == "dir":
-                suffix = "/index.xhtml"
+                suffix = os.sep + "index.xhtml"
             else:
                 suffix = ".xhtml"
         elif action == "news":
@@ -246,7 +246,6 @@ class DocumentStore(object):
             # ignore empty files placed by download (which may
             # have done that in order to avoid trying to
             # re-download nonexistent resources)
-
             if os.path.exists(x) and os.path.getsize(x) > 0:
                 # get a pathfrag from full path
                 # suffixlen = len(suffix) if self.storage_policy == "file" else len(suffix) + 1

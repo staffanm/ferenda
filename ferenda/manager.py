@@ -1367,9 +1367,11 @@ def _filepath_to_urlpath(path, keep_segments=2):
     """
     # data/repo/rsrc/js/main.js, 3 -> repo/rsrc/js/main.js
     # /var/folders/tmp4q6b1g/rsrc/resources.xml, 1 -> rsrc/resources.xml
-    urlpath = os.sep.join(path.split(os.sep)[-(keep_segments + 1):])
+    # C:\docume~1\owner\locals~1\temp\tmpgbyuk7\rsrc\css\test.css, 2 - rsrc/css/test.css
+    path = path.replace(os.sep, "/")
+    urlpath = "/".join(path.split("/")[-(keep_segments + 1):])
     # print("_filepath_to_urlpath (%s): %s -> %s" % (keep_segments, path, urlpath))
-    return urlpath.replace(os.sep, "/")
+    return urlpath
 
 
 def _preflight_check(log, verbose=False):

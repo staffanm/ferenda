@@ -239,6 +239,8 @@ class XSLTTransform(TransformerEngine):
             # must use unix path separators
             if os.sep == "\\":
                 config = config.replace(os.sep, "/")
+            # print("Tranform: Using config %s. Contents:" % config)
+            # print(util.readfile(config))
             strparams['configurationfile'] = XSLT.strparam(config)
         for key, value in parameters.items():
             if key.endswith("file"):

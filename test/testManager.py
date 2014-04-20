@@ -351,6 +351,9 @@ class=testManager.staticmockclass2
         manager.frontpage([test,test2],
                           path=outfile,
                           staticsite=True)
+        # print("\n============== OUTFILE =====================")
+        # print(util.readfile(outfile))
+        # print("==============================================")
         t = ET.parse(outfile)
         header = t.find(".//header/h1/a")
         self.assertEqual(header.get("href"), 'index.html')

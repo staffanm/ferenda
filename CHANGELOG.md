@@ -16,7 +16,8 @@ ferenda.decorators.parseifneeded)
 
 ferenda.decorators.render (by default called when calling
 DocumentRepository.parse()) now serialize the entire document to JSON,
-which later can be loaded to recreate the entire document object tree. Controlled by config parameter serializejson.
+which later can be loaded to recreate the entire document object
+tree. Controlled by config parameter serializejson.
 
 ferenda.decorators.render now validates that required triples are
 present in the output (Which triples are needed is controlled by

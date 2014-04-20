@@ -1,10 +1,10 @@
-
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 import os
 import logging
 import re
 import itertools
+import codecs
 from glob import glob
 from bz2 import BZ2File
 
@@ -147,9 +147,10 @@ class PDFReader(CompoundElement):
                 pass
 
         if keep_xml == "bz2":
+            # FIXME: explicitly state that encoding is utf-8 (in a py26 compatible manner
             fp = BZ2File(real_convertedfile)
         else:
-            fp = open(real_convertedfile)
+            fp = codecs.open(real_convertedfile, encoding="utf-8")
 
         res = parser(fp, real_convertedfile)
 
@@ -416,7 +417,7 @@ class PDFReader(CompoundElement):
 
     def _parse_xml(self, xmlfp, xmlfilename):
         def txt(element_text):
-            return re.sub(r"[\s\xa0]+", " ", str(element_text))
+            return re.sub(r"[\s\xa0\xc2]+", " ", str(element_text))
             
         self.log.debug("Loading %s" % xmlfilename)
 
@@ -461,7 +462,7 @@ class PDFReader(CompoundElement):
                     
                 elif element.tag == 'text':
                     # eliminate "empty" textboxes
-                    if element.text and element.text.strip() == "" and not element.getchildren():
+                    if element.text and txt(element.text).strip() == "" and not element.getchildren():
                         # print "Skipping empty box"
                         continue
 
@@ -483,7 +484,7 @@ class PDFReader(CompoundElement):
                             # print "Grandchildren handling: %s '%s' '%s'" % (len(grandchildren),
                             #                                                child.text,
                             #                                                child.tail)
-                            # Handle '<text><i><b>Fordonsår</b>            <b>Faktor</b> </i></text>'
+                            # Handle '<text><i><b>FordonsÃ¥r</b>            <b>Faktor</b> </i></text>'
                             # assert (len(grandchildren) == 1), "General grandchildren not supported"
                             
                             if child.text:
@@ -636,7 +637,7 @@ all text in a Textbox has the same font and size.
 
     def __repr__(self):
         # <Textbox 30x18+278+257 "5.1">
-        # <Textbox 430x14+287+315 "Regeringens förslag: Nä[...]g ska ">
+        # <Textbox 430x14+287+315 "Regeringens fÃ¶rslag: NÃ¤[...]g ska ">
         s = str(self)
         if len(s) > 40:
             s = s[:25] + "[...]" + s[-10:]

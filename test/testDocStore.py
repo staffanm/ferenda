@@ -181,7 +181,8 @@ class Store(unittest.TestCase):
 
         self.store.storage_policy = "dir"
         for f in files:
-            util.writefile(self.p(f),"nonempty")
+            p = self.p(f)
+            util.writefile(p,"nonempty")
         self.assertEqual(list(self.store.list_basefiles_for("parse")),
                          basefiles)
 
