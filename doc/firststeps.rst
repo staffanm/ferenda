@@ -100,7 +100,7 @@ configuration file, run the following:
   :end-before: # end enable
 
 This creates a new section in ferenda.ini that just looks like the
-following:
+following::
 
   [w3c]
   class = w3cstandards.W3CStandards

@@ -12,10 +12,9 @@ structure, and republishes content using Linked Data principles.
 
 It works best for large document collections that have some degree of
 internal standardization, such as the laws of a particular country,
-technical standards such as RFCs or ISO standards, or reports
-published in a series by a government or a NGO. It is particularly
-useful for collections that contains explicit references between
-documents, within or across collections.
+technical standards, or reports published in a series. It is
+particularly useful for collections that contains explicit references
+between documents, within or across collections.
 
 It is designed to make it easy to get started with basic downloading,
 parsing and republishing of documents, and then to improve each step
@@ -24,8 +23,9 @@ incrementally.
 Example
 -------
 
-This code uses the Ferenda API to create a website containing all(*)
-RFCs and W3C recommended standards.
+Ferenda can be used either as a library or as a command-line
+tool. This code uses the Ferenda API to create a website containing
+all(*) RFCs and W3C recommended standards.
 
 .. literalinclude:: examples/intro-example.py
    :start-after: # begin example		    
@@ -133,9 +133,9 @@ up an external triple store or a fulltext search engine. See
 Installing
 ----------
 
-Installing using `pip
-<http://www.pip-installer.org/en/latest/installing.html>`_ is
-preferred (in fact, it's the only method tested)::
+Ferenda should preferably be installed with `pip
+<http://www.pip-installer.org/en/latest/installing.html>`_ (in fact,
+it's the only method tested)::
 
     pip install ferenda  
 
@@ -147,7 +147,7 @@ You should definitely consider installing ferenda in a `virtualenv
    If installing on Windows, it's probably easiest to install the lxml
    dependency in binary form (see above), which installs it into the
    system python library path. To make lxml available for your
-   virtualenv, use the ``--syste-site-packages`` command line switch
+   virtualenv, use the ``--system-site-packages`` command line switch
    when creating the virtualenv.
   
 Features
