@@ -77,6 +77,9 @@ patchdir          Directory containing patch files used by   'patches'
 parseforce        Whether to re-parse downloaded files,      False
                   even if resulting XHTML1.1 files exist
 		  and are newer than downloaded files
+compress          Whether to compress intermediate files.     ''
+                  Can be either a empty string (don't
+		  compress) or 'bz2' (compress using bz2).
 serializejson     Whether to serialize document data as a    False
                   JSON document in the parse step.
 generateforce     Whether to re-generate browser-ready       False

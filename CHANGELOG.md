@@ -1,72 +1,81 @@
-2014-04-?? RELEASE 0.1.7
+2014-04-22 RELEASE 0.1.7
 ========================
 
-Setting DocumentStore.config now updates the associated DocumentStore
-object with the config.datadir parameter
+This release mainly updates the swedish legal sources, which now does
+a decent job of downloading and parsing a variety of legal
+information. During the course of that work, a number of changes
+needed to be made to the core of ferenda. The release is still a part
+of the 0.1 series because the REST API isn't done yet (once it's in,
+that will be release 0.2)
+
+Backwards-incompatible changes:
 
 CompositeRepository.parse now raises ParseError if no subrepository
 is able to parse the given basefile.
 
-CompositeRepository.parse no longer requires that all subrepos have
+New features:
+
+ferenda.CompositeRepository.parse no longer requires that all subrepos have
 storage_policy == "dir".
 
-New method DocumentRepository.parseneeded returns True iff parsing of
-the document is needed (logic moved from
-ferenda.decorators.parseifneeded)
+Setting ferenda.DocumentStore.config now updates the associated DocumentStore
+object with the config.datadir parameter
 
-ferenda.decorators.render (by default called when calling
-DocumentRepository.parse()) now serialize the entire document to JSON,
-which later can be loaded to recreate the entire document object
-tree. Controlled by config parameter serializejson.
+New method ferenda.DocumentRepository.construct_sparql_query() allows
+for more complex overrides than just setting the sparql_annotations
+class attribute.
 
-ferenda.decorators.render now validates that required triples are
-present in the output (Which triples are needed is controlled by
-DocumentRepository.required_predicates).
-
-ferenda.decorators now has a new newstate decorator, used in
-ferenda.FSMParser
-
-ferenda.Devel now has a new csvinventory action
-
-.required_predicates
-
-New compress parameter (Can either be empty or "bz2") controls whether
-intermediate files are compressed to save space.
-
-DocumentRepository.download_if_needed now sets both the If-None-match
-and If-modified-since HTTP headers.
-
-New method DocumentRepository.download_is_different is used to control
+New method DocumentRepository.download_is_different() is used to control
 whether a newly downloaded resource is semantically different from a
 previously downloaded resource (to avoid having each ASP.Net VIEWSTATE
 change result in an archived document).
 
-.parseneeded
+New method DocumentRepository.parseneeded(): returns True iff parsing
+of the document is needed (logic moved from
+ferenda.decorators.parseifneeded)
 
+New class variable ferenda.DocumentRepository.required_predicates:
+Controls which predicates that is expected to be in the output data
+from .parse()
 
-DocumentRepository.render_xhtml now creates RDFa 1.1
+The method ferenda.DocumentRepository.download_if_needed() now sets both
+the If-None-match and If-modified-since HTTP headers.
 
-New method DocumentRepository.construct_sparql_query allows for more
-complex overrides than just setting the sparql_annotations class
-attribute.
+The method ferenda.DocumentRepository.render_xhtml() now creates RDFa 1.1
 
-DocumentStore.path now takes an extra storage_policy parameter.
+New 'compress' parameter (Can either be empty or "bz2") controls whether
+intermediate files are compressed to save space.
 
-DocumentStore now stores multiple basefiles in a single directory even
-when storage_policy == "dir" for all methods that cannot handle
-attachments (like distilled_path, documententry_path etc)
+The method ferenda.DocumentStore.path() now takes an extra storage_policy parameter.
 
+The class ferenda.DocumentStore now stores multiple basefiles in a
+single directory even when storage_policy == "dir" for all methods
+that cannot handle attachments (like distilled_path,
+documententry_path etc)
 
-New methods DocumentStore.open_intermediate, .serialized_path and
-open_serialized
+New methods ferenda.DocumentStore.open_intermediate(), .serialized_path() and
+open_serialized()
 
-Elements.serialize and .deserialize now takes a format parameter,
+The decorator @ferenda.decorators.render (by default called when calling
+DocumentRepository.parse()) now serialize the entire document to JSON,
+which later can be loaded to recreate the entire document object
+tree. Controlled by config parameter serializejson.
+
+The decorator @ferenda.decorators.render now validates that required triples (as
+determined by .required_predicates) are present in the output.
+
+New decorator @ferenda.decorators.newstate, used in
+ferenda.FSMParser
+
+The docrepo ferenda.Devel now has a new csvinventory action
+
+The functions ferenda.Elements.serialize() and .deserialize() now takes a format parameter,
 which can be either "xml" (default) or "json". The "json" format
 allows for full roundtripping of all documents.
 
-New excepttion ferenda.errors.NoDownloadedFileError.
+New exception ferenda.errors.NoDownloadedFileError.
 
-PDFReader now handles any word processing format that
+The class ferenda.PDFReader now handles any word processing format that
 OpenOffice/LibreOffice can handle, by first using soffice to convert
 it to a PDF. It also handles PDFs that consists entirely of scanned
 pages without text information, by first running the images through
@@ -74,28 +83,25 @@ the tesseract OCR engine. Finally, a new keep_xml parameter allows for
 either removing the intermediate XML files or compressing them using
 bz2 to save space.
 
-New method PDFReader.is_empty
+New method ferenda.PDFReader.is_empty()
 
-New method PDFReader.textboxes iterates through all textboxes on all
-pages. The user can provide a glue function to automatically
-concatenate textboxes that should be considered part of the same
-paragraph (or other meaningful unit of text).
+New method ferenda.PDFReader.textboxes() iterates through all
+textboxes on all pages. The user can provide a glue function to
+automatically concatenate textboxes that should be considered part of
+the same paragraph (or other meaningful unit of text).
 
-New debug method PDFReader.drawboxes can use the same glue function,
-and creates a new pdf with all the resulting textboxes marked
-up. (Requires PyPDF2 and reportlab, which makes this particular
+New debug method ferenda.PDFReader.drawboxes() can use the same glue
+function, and creates a new pdf with all the resulting textboxes
+marked up. (Requires PyPDF2 and reportlab, which makes this particular
 feature Python 2-only).
 
-PDFReader.Textbox objects can now be added to each other to form
+ferenda.PDFReader.Textbox objects can now be added to each other to form
 larger Textbox objects.
-
-All of the Swedish legal source docrepos (under
-ferenda.sources.legal.se) have been overhauled and now mostly work.
 
 ferenda.Transformer now optionally logs the equivalent xsltproc
 command line when transforming using XSLT.
 
-new method TripleStore.update, performs SPARQL
+new method ferenda.TripleStore.update(), performs SPARQL
 UPDATE/DELETE/DROP/CLEAR queries.
 
 ferenda.util has new gYearMonth and gYear classes that subclass

@@ -64,7 +64,7 @@ class PDFReader(CompoundElement):
         :py:class:`~ferenda.pdfreader.Page` objects.
 
         :param pdffile: The full path to the PDF file (or, if
-                        ``convert_to_pdf``is set, any other document
+                        ``convert_to_pdf`` is set, any other document
                         file)
         :param workdir: A directory where intermediate files (particularly
                         background PNG files) are stored
@@ -79,7 +79,7 @@ class PDFReader(CompoundElement):
                          in ``workdir``. If true, keep it around to
                          speed up subsequent parsing operations. If
                          set to the special value ``"bz2"``, keep it
-                         but compress it with :py:module:`bz2`.
+                         but compress it with :py:mod:`bz2`.
         :type  keep_xml: bool
         :param ocr_lang: If provided, PDFReader will extract scanned
                          images from the PDF file, and run an OCR
@@ -208,8 +208,8 @@ class PDFReader(CompoundElement):
 
         ..note::
 
-        This requires PyPDF2 and reportlab, which aren't installed by
-        default (and at least reportlab is not py3 compatible).
+          This requires PyPDF2 and reportlab, which aren't installed
+          by default (and at least reportlab is not py3 compatible).
 
         """
         from PyPDF2 import PdfFileWriter, PdfFileReader
