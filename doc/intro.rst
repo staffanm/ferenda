@@ -12,15 +12,38 @@ structure, and republishes content using Linked Data principles.
 
 It works best for large document collections that have some degree of
 internal standardization, such as the laws of a particular country,
-technical standards such as RFCs or ISO standards, or reports
-published in a series by a government or a NGO. It is particularly
-useful for collections that contains explicit references between
-documents, within or across collections.
+technical standards, or reports published in a series. It is
+particularly useful for collections that contains explicit references
+between documents, within or across collections.
 
 It is designed to make it easy to get started with basic downloading,
 parsing and republishing of documents, and then to improve each step
 incrementally.
 
+Example
+-------
+
+Ferenda can be used either as a library or as a command-line
+tool. This code uses the Ferenda API to create a website containing
+all(*) RFCs and W3C recommended standards.
+
+.. literalinclude:: examples/intro-example.py
+   :start-after: # begin example		    
+   :end-before: # end example		    
+
+Alternately, using the command line tools and the project framework:
+ 
+.. literalinclude:: examples/intro-example.sh
+
+.. note::
+
+   (*) actually, it only downloads the 50 most recent of
+   each. Downloading, parsing, indexing and re-generating close to
+   7000 RFC documents takes several hours. In order to process all
+   documents, remove the ``downloadmax`` configuration
+   parameter/command line option, and be prepared to wait. You should
+   also set up an external triple store (see :ref:`external-triplestore`) and
+   an external fulltext search engine (see :ref:`external-fulltext`).
 
 Prerequisites
 -------------
@@ -29,8 +52,7 @@ Operating system
     Ferenda is tested and works on Unix, Mac OS and Windows.
 
 Python
-    Version 2.6 or newer required, 3.3 recommended (3.2 for Windows, see
-    below). The code base is
+    Version 2.6 or newer required, 3.4 recommended. The code base is
     primarily developed with python 3, and is heavily dependent on all
     forward compatibility features introduced in Python 2.6. Python
     3.0 and 3.1 is not supported.
@@ -50,11 +72,19 @@ Command-line tools
    your ``$PATH``:
 
    * :py:class:`~ferenda.PDFReader` requires ``pdftotext`` and
-     ``pdftohtml`` (from `poppler <http://poppler.freedesktop.org/>`_, version 0.21 or newer)
-     and ``convert`` (from `ImageMagick
-     <http://www.imagemagick.org/>`_). The ``convert_to_pdf``
-     parameter requires either OpenOffice or LibreOffice. The
-     ``ocr_lang`` parameter requires ``tesseract``.
+     ``pdftohtml`` (from `poppler <http://poppler.freedesktop.org/>`_, version 0.21 or newer).
+
+     * The :py:meth:`~ferenda.pdfreader.Page.crop` method requires
+       ``convert`` (from `ImageMagick <http://www.imagemagick.org/>`_).
+     * The ``convert_to_pdf`` parameter to
+       :py:meth:`~ferenda.PDFReader.read` requires the ``soffice``
+       binary from either OpenOffice or LibreOffice
+     * The ``ocr_lang`` parameter to
+       :py:meth:`~ferenda.PDFReader.read` requires ``tesseract`` (from
+       `tesseract-ocr <https://code.google.com/p/tesseract-ocr/>`_),
+       ``convert`` (see above) and ``tiffcp`` (from `libtiff
+       <http://www.libtiff.org/>`_)
+
    * :py:class:`~ferenda.WordReader` requires `antiword
      <http://www.winfield.demon.nl/>`_ to handle old ``.doc`` files.
    * :py:class:`~ferenda.TripleStore` can perform some operations
@@ -93,47 +123,33 @@ up an external triple store or a fulltext search engine. See
    ``easy_install``/``pip`` as it has requirements of its own and is
    not essential.
 
-   On Windows, we recommend using a binary distribution
-   of ``lxml``. Unfortunately, at the time of writing, no such
-   distribution is available for Python 3.3, so for the time
-   being, you'll have to use python 3.2 on this platform.
+   On Windows, we recommend using a binary distribution of
+   ``lxml``. Unfortunately, at the time of writing, no such official
+   distribution is for Python 3.3 or later. However, the inofficial
+   distributions available at
+   http://www.lfd.uci.edu/~gohlke/pythonlibs/#lxml has been tested
+   with ferenda on python 3.3 and later, and seems to work great.
 
 Installing
 ----------
 
-Installing using `pip
-<http://www.pip-installer.org/en/latest/installing.html>`_ is
-preferred (in fact, it's the only method tested)::
+Ferenda should preferably be installed with `pip
+<http://www.pip-installer.org/en/latest/installing.html>`_ (in fact,
+it's the only method tested)::
 
     pip install ferenda  
 
 You should definitely consider installing ferenda in a `virtualenv
 <http://www.virtualenv.org/en/latest/>`_.
-  
-Example
--------
-
-This code uses the Ferenda API to create a website containing all(*)
-RFCs and W3C recommended standards.
-
-.. literalinclude:: examples/intro-example.py
-   :start-after: # begin example		    
-   :end-before: # end example		    
-
-Alternately, using the command line tools and the project framework:
- 
-.. literalinclude:: examples/intro-example.sh
 
 .. note::
 
-   (*) actually, it only downloads the 50 most recent of
-   each. Downloading, parsing, indexing and re-generating close to
-   7000 RFC documents takes several hours. In order to process all
-   documents, remove the ``downloadmax`` configuration
-   parameter/command line option, and be prepared to wait. You should
-   also set up an external triple store (see :ref:`external-triplestore`) and
-   an external fulltext search engine (see :ref:`external-fulltext`).
-
+   If installing on Windows, it's probably easiest to install the lxml
+   dependency in binary form (see above), which installs it into the
+   system python library path. To make lxml available for your
+   virtualenv, use the ``--system-site-packages`` command line switch
+   when creating the virtualenv.
+  
 Features
 --------
 

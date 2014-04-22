@@ -43,7 +43,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Ferenda'
-copyright = '2012-2013, Staffan Malmgren'
+copyright = '2012-2014, Staffan Malmgren'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

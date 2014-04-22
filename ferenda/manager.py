@@ -714,82 +714,84 @@ def run(argv):
         util.ensure_dir(logfile)
         setup_logger(level=config.loglevel, filename=logfile)
 
-    # reads only ferenda.ini using configparser rather than layeredconfig
-    enabled = _enabled_classes()
-    # returns {'ferenda.sources.docrepo.DocRepo':'base',...}
-    enabled_aliases = dict(reversed(item) for item in enabled.items())
-    if len(argv) < 1:
-        _print_usage()  # also lists enabled modules
-    else:
-        # _filter_argv("ecj", "parse", "62008J0034", "--force=True", "--frobnicate")
-        #    -> ("ecj", "parse", ["62008J0034"])
-        # _filter_argv("ecj", "--frobnicate") -> ("ecj", None, [])
-        (classname, action, args) = _filter_argv(argv)
-        if action == 'enable':
-            try:
-                return enable(classname)
-            except (ImportError, ValueError) as e:
-                log.error(six.text_type(e))
-                return None
-        elif action == 'runserver':
-            args = _setup_runserver_args(config, _find_config_file())
-            # Note: the actual runserver method never returns
-            return runserver(**args)
+    try:
+        # reads only ferenda.ini using configparser rather than layeredconfig
+        enabled = _enabled_classes()
+        # returns {'ferenda.sources.docrepo.DocRepo':'base',...}
+        enabled_aliases = dict(reversed(item) for item in enabled.items())
+        if len(argv) < 1:
+            _print_usage()  # also lists enabled modules
+        else:
+            # _filter_argv("ecj", "parse", "62008J0034", "--force=True", "--frobnicate")
+            #    -> ("ecj", "parse", ["62008J0034"])
+            # _filter_argv("ecj", "--frobnicate") -> ("ecj", None, [])
+            (classname, action, args) = _filter_argv(argv)
+            if action == 'enable':
+                try:
+                    return enable(classname)
+                except (ImportError, ValueError) as e:
+                    log.error(six.text_type(e))
+                    return None
+            elif action == 'runserver':
+                args = _setup_runserver_args(config, _find_config_file())
+                # Note: the actual runserver method never returns
+                return runserver(**args)
 
-        elif action == 'makeresources':
-            repoclasses = _classes_from_classname(enabled, classname)
-            args = _setup_makeresources_args(config)
-            repos = []
-            for cls in repoclasses:
-                inst = _instantiate_class(cls, _find_config_file(), argv)
-                repos.append(inst)
-            return makeresources(repos, **args)
+            elif action == 'makeresources':
+                repoclasses = _classes_from_classname(enabled, classname)
+                args = _setup_makeresources_args(config)
+                repos = []
+                for cls in repoclasses:
+                    inst = _instantiate_class(cls, _find_config_file(), argv)
+                    repos.append(inst)
+                return makeresources(repos, **args)
 
-        elif action == 'frontpage':
-            repoclasses = _classes_from_classname(enabled, classname)
-            args = _setup_frontpage_args(config, argv)
-            return frontpage(**args)
+            elif action == 'frontpage':
+                repoclasses = _classes_from_classname(enabled, classname)
+                args = _setup_frontpage_args(config, argv)
+                return frontpage(**args)
 
-        elif action == 'all':
-            classnames = _setup_classnames(enabled, classname)
-            results = OrderedDict()
-            for action in ("download",
-                           "parse", "relate", "makeresources",
-                           "generate", "toc", "news", "frontpage"):
-                if action in ("makeresources", "frontpage"):
-                    argscopy = list(args)
-                    argscopy.extend(_filter_argv_options(argv))
-                    argscopy.insert(0, action)
-                    argscopy.insert(0, "all")
-                    results[action] = run(argscopy)
-                else:
-                    results[action] = OrderedDict()
-                    for classname in classnames:
-                        alias = enabled_aliases[classname]
+            elif action == 'all':
+                classnames = _setup_classnames(enabled, classname)
+                results = OrderedDict()
+                for action in ("download",
+                               "parse", "relate", "makeresources",
+                               "generate", "toc", "news", "frontpage"):
+                    if action in ("makeresources", "frontpage"):
                         argscopy = list(args)
                         argscopy.extend(_filter_argv_options(argv))
-                        if (action in ("parse", "relate", "generate") and
-                                "--all" not in argscopy):
-                            argscopy.append("--all")
                         argscopy.insert(0, action)
-                        argscopy.insert(0, classname)
-                        results[action][alias] = run(argscopy)
-            return results
-        else:
-            if classname == "all":
-                ret = []
-                for alias, classname in enabled.items():
-                    argv_copy = list(argv)
-                    argv_copy[0] = alias
-                    try:
-                        ret.append(_run_class(enabled, argv_copy))
-                    except Exception as e:
-                        (alias, command, args) = _filter_argv(argv_copy)
-                        log.error("%s %s failed: %s" % (command, alias, e))
-                return ret
+                        argscopy.insert(0, "all")
+                        results[action] = run(argscopy)
+                    else:
+                        results[action] = OrderedDict()
+                        for classname in classnames:
+                            alias = enabled_aliases[classname]
+                            argscopy = list(args)
+                            argscopy.extend(_filter_argv_options(argv))
+                            if (action in ("parse", "relate", "generate") and
+                                    "--all" not in argscopy):
+                                argscopy.append("--all")
+                            argscopy.insert(0, action)
+                            argscopy.insert(0, classname)
+                            results[action][alias] = run(argscopy)
+                return results
             else:
-                return _run_class(enabled, argv)
-
+                if classname == "all":
+                    ret = []
+                    for alias, classname in enabled.items():
+                        argv_copy = list(argv)
+                        argv_copy[0] = alias
+                        try:
+                            ret.append(_run_class(enabled, argv_copy))
+                        except Exception as e:
+                            (alias, command, args) = _filter_argv(argv_copy)
+                            log.error("%s %s failed: %s" % (command, alias, e))
+                    return ret
+                else:
+                    return _run_class(enabled, argv)
+    finally:
+        shutdown_logger()
 
 def enable(classname):
     """Registers a class by creating a section for it in the
