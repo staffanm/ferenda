@@ -297,7 +297,7 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
 
         if not hasattr(self, 'ref_parser'):
             self.ref_parser = LegalRef(LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN)
-        citparser = SwedishCitationParser(self.ref_parser)
+        citparser = SwedishCitationParser(self.ref_parser, self.config.url)
         citparser.parse_recursive(doc.body)
 
     def create_external_resources(self, doc):

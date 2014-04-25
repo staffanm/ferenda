@@ -196,6 +196,43 @@ class DV(SwedishLegalSource):
     DCT = Namespace(util.ns['dct'])
     sparql_annotations = "res/sparql/dv-annotations.rq"
 
+    @classmethod
+    def relate_all_setup(cls, config):
+        # FIXME: If this was an instancemethod, we could use
+        # self.store methods instead
+        parsed_dir = os.path.sep.join([config.datadir, 'dv', 'parsed'])
+        mapfile = os.path.sep.join(
+            [config.datadir, 'dv', 'generated', 'uri.map'])
+        if not util.outfile_is_newer(util.list_dirs(parsed_dir, ".xhtml"), mapfile):
+            re_xmlbase = re.compile('<head about="%(uri)sres/%(alias)s/([^"]+)"' %
+                                    {'uri': config.url,
+                                     'alias': cls.alias})
+            log = cls._setup_logger(cls.alias)
+            log.info("Creating uri.map file")
+            cnt = 0
+            util.robust_remove(mapfile + ".new")
+            util.ensure_dir(mapfile)
+            # FIXME: Not sure utf-8 is the correct codec for us -- it
+            # might be iso-8859-1 (it's to be used by mod_rewrite).
+            with codecs.open(mapfile+".new", "w", encoding="utf-8") as fp:
+                for f in util.list_dirs(parsed_dir, ".xhtml"):
+                    # get basefile from f in the simplest way
+                    basefile = f[len(parsed_dir)+1:-6]
+                    head = codecs.open(f, encoding='utf-8').read(1024)
+                    m = re_xmlbase.search(head)
+                    if m:
+                        fp.write("%s\t%s\n" % (m.group(1), basefile))
+                        cnt += 1
+                    else:
+                        log.warning("%s: Could not find valid head[@about] in %s" % (basefile, f))
+            util.robust_rename(mapfile + ".new", mapfile)
+            log.info("uri.map created, %s entries" % cnt)
+        else:
+            print("Not regenerating uri.map")
+            pass
+        super(cls, DV).relate_all_setup(config)
+
+
     def get_default_options(self):
         opts = super(DV, self).get_default_options()
         opts['ftpuser'] = None
@@ -236,6 +273,29 @@ class DV(SwedishLegalSource):
         doc.uri = None # can't know this yet
         return doc
 
+    # override DocumentRepository.basefile_from_uri to account for the
+    # fact that there is no 1:1 correspondance between basefiles and
+    # uris
+    def basefile_from_uri(self, uri):
+        prefix = self.config.url + "res/" + self.alias + "/"
+        if uri.startswith(prefix):
+            path = uri[len(prefix):]
+            if not hasattr(self, "_basefilemap"):
+                self._basefilemap = {}
+                mapfile = self.store.path("uri", "generated", ".map")
+                with codecs.open(mapfile, encoding="utf-8") as fp:
+                    for line in fp:
+                        uriseg, basefile = line.split("\t")
+                        self._basefilemap[uriseg] = basefile.strip()
+
+            if path in self._basefilemap:
+                return self._basefilemap[path]
+            else:
+                self.log.warning("%s: Could not find corresponding basefile" % uri)
+                return None
+        else:
+            pass # The URI didn't start with our expected prefix, it's not a Rattsfall URI
+            
     # FIXME: store.list_basefiles_for("parse") must be fixed to handle two
     # different suffixes. Maybe store.downloaded_path() as well, so that
     # it returns .docx if a .docx file indeed exists, and .doc otherwise.
@@ -1212,9 +1272,11 @@ class DV(SwedishLegalSource):
         if self.config.parsebodyrefs:
             if not hasattr(self, 'ref_parser'):
                 self.ref_parser = LegalRef(LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN)
-            citparser = SwedishCitationParser(self.ref_parser)
+            citparser = SwedishCitationParser(self.ref_parser, self.config.url)
             b = citparser.parse_recursive(b)
+            
 
+        
         # convert the unstructured list of Paragraphs to a
         # hierarchical tree of instances, domslut, domskäl, etc
         b = self.structure_body(b)
@@ -1486,33 +1548,7 @@ class DV(SwedishLegalSource):
         p.initial_constructor = make_body
         p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
         return p.parse(paras)
-        
-    # FIXME: port to relate_all_setup / _teardown
-    def GenerateMapAll(self):
-        mapfile = os.path.sep.join(
-            [self.baseDir, 'dv', 'generated', 'uri.map'])
-        util.robust_remove(mapfile + ".new")
 
-        parsed_dir = os.path.sep.join([self.baseDir, 'dv', 'parsed'])
-        self._do_for_all(parsed_dir, '.xht2', self.GenerateMap)
-        util.robustRename(mapfile + ".new", mapfile)
-
-    def GenerateMap(self, basefile):
-        start = time()
-        infile = os.path.relpath(self._xmlFileName(basefile))
-        head = codecs.open(infile, encoding='utf-8').read(1024)
-        m = self.re_xmlbase(head)
-        if m:
-            uri = "http://rinfo.lagrummet.se/publ/rattsfall/%s" % m.group(1)
-            mapfile = self.store.path('generated', 'uri.map', '.new')
-            util.ensure_dir(mapfile)
-            f = codecs.open(mapfile, 'a', encoding='iso-8859-1')
-            f.write("%s\t%s\n" % (m.group(1), basefile))
-            f.close()
-            self.log.info("%s ok" % basefile)
-            return
-        else:
-            self.log.warning("could not find xml:base in %s" % infile)
 
     def _simplify_ooxml(self, filename, pretty_print=True):
         # simplify the horrendous mess that is OOXML through simplify-ooxml.xsl
@@ -1524,7 +1560,7 @@ class DV(SwedishLegalSource):
         resulttree = transform(intree)
         with open(filename, "wb") as fp:
             fp.write(etree.tostring(resulttree, pretty_print=pretty_print, encoding="utf-8"))
-        
+
 
     def _merge_ooxml(self, soup):
         # this is a similar step to _simplify_ooxml, but merges w:p

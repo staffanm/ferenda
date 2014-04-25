@@ -14,9 +14,9 @@
         "Svea hovrätt"@sv ;
     dct:identifier "NJA 2007 s. 227" ;
     dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
-    dct:references <http://rinfo.lagrummet.se/publ/sfs/2000:1225>,
-        <http://rinfo.lagrummet.se/publ/sfs/2000:1225#P8>,
-        <http://rinfo.lagrummet.se/publ/sfs/2000:1281> ;
+    dct:references <http://localhost:8000/res/sfs/2000:1225>,
+        <http://localhost:8000/res/sfs/2000:1225#P8>,
+        <http://localhost:8000/res/sfs/2000:1281> ;
     rpubl:arsutgava "2007" ;
     rpubl:lopnummer "32" ;
     rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/nja> ;

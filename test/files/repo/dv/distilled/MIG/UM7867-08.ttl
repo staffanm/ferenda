@@ -12,13 +12,13 @@
         "Länsrätten i Stockholms län, migrationsdomstolen"@sv ;
     dct:identifier "MIG 2009:30" ;
     dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
-    dct:references <http://rinfo.lagrummet.se/publ/prop/1971:30>,
-        <http://rinfo.lagrummet.se/publ/prop/2004/05:170#s105>,
-        <http://rinfo.lagrummet.se/publ/prop/2004/05:170#s129>,
-        <http://rinfo.lagrummet.se/publ/rattsfall/mig/2006:9>,
-        <http://rinfo.lagrummet.se/publ/sfs/1971:291#P9>,
-        <http://rinfo.lagrummet.se/publ/sfs/2005:716>,
-        <http://rinfo.lagrummet.se/publ/sfs/2005:716#K16P5S2> ;
+    dct:references <http://localhost:8000/res/dv/mig/2006:9>,
+        <http://localhost:8000/res/prop/1971:30>,
+        <http://localhost:8000/res/prop/2004/05:170#s105>,
+        <http://localhost:8000/res/prop/2004/05:170#s129>,
+        <http://localhost:8000/res/sfs/1971:291#P9>,
+        <http://localhost:8000/res/sfs/2005:716>,
+        <http://localhost:8000/res/sfs/2005:716#K16P5S2> ;
     rpubl:arsutgava "2009" ;
     rpubl:lopnummer "30" ;
     rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/mig> ;

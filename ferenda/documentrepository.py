@@ -1331,21 +1331,26 @@ parsed document path to that documents dependency file."""
         with util.logtime(self.log.debug,
                           "%(basefile)s: Registered %(deps)s dependencies in %(elapsed).3f sec",
                           values):
-
             with self.store.open_distilled(basefile) as fp:
                 g = Graph().parse(fp, format="xml")
                 for (s, p, o) in g:
                     # for each URIRef in graph
                     if isinstance(o, URIRef):
+                        from pudb import set_trace; set_trace()
+                        # in order to minimize calls to
+                        # basefile_from_uri(), it'd be nice if the
+                        # order of repos was dynamically altered according to MRU (most recently used)
                         for repo in repos:
                             # find out if any docrepo can handle it
                             dep_basefile = repo.basefile_from_uri(str(o))
-                            if dep_basefile and dep_basefile != basefile:
+                            if dep_basefile and ((repo != self) or (dep_basefile != basefile)):
                                 # self.log.debug("basefile %s adds dependency to %s" % (basefile, dep_basefile))
                                 # if so, add to that repo's dependencyfile
-                                repo.add_dependency(dep_basefile,
-                                                    self.store.parsed_path(basefile))
+                                res = repo.add_dependency(dep_basefile,
+                                                          self.store.parsed_path(basefile))
                                 values['deps'] += 1
+                                break
+
         return values['deps']
 
     def add_dependency(self, basefile, dependencyfile):
@@ -1364,7 +1369,11 @@ parsed document path to that documents dependency file."""
         if not present:
             with self.store.open_dependencies(basefile, "ab") as fp:
                 fp.write((dependencyfile+os.linesep).encode("utf-8"))
-
+            self.log.debug("Adding %s to %s (basefile %s in repo %s)" %
+                           (dependencyfile,
+                            self.store.dependencies_path(basefile),
+                            basefile,
+                            self.alias))
 
         return not present  # return True if we added something, False otherwise
 

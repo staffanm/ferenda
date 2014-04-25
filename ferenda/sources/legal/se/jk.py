@@ -110,7 +110,7 @@ class JK(SwedishLegalSource):
                                LegalRef.KORTLAGRUM,
                                LegalRef.RATTSFALL,
                                LegalRef.FORARBETEN)
-        citparser = SwedishCitationParser(self.ref_parser)
+        citparser = SwedishCitationParser(self.ref_parser, self.config.url)
         doc.body = citparser.parse_recursive(body)
 
     @staticmethod

@@ -26,6 +26,7 @@ class CompositeStore(DocumentStore):
             for cls, inst in self.docrepo_instances.items():
                 for basefile in inst.store.list_basefiles_for("parse"):
                     if basefile not in documents:
+                        # print("Adding %s from instance %s" % (basefile, inst))
                         documents.add(basefile)
                         yield basefile
         else:

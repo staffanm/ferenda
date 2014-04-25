@@ -598,8 +598,9 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
 # to use a legalref based parser instead of a set of pyparsing
 # grammars.
 class SwedishCitationParser(CitationParser):
-    def __init__(self, legalrefparser):
+    def __init__(self, legalrefparser, baseurl):
         self._legalrefparser = legalrefparser
+        self._baseurl = baseurl
 
     def parse_string(self, string):
         unfiltered = self._legalrefparser.parse(string, predicate="dct:references")
@@ -610,5 +611,28 @@ class SwedishCitationParser(CitationParser):
             if isinstance(node, Link) and "sfs/9999:999" in node.uri:
                 filtered.append(str(node))
             else:
+                if isinstance(node, Link):
+                    node.uri = self.localize_uri(node.uri)
                 filtered.append(node)
         return filtered
+
+    # a more complete version of DV.polish_metadata.localize_url
+    # (which is used only on metadata fields, not body text)
+    def localize_uri(self, uri):
+        if "publ/rattsfall" in uri:
+            return uri.replace("http://rinfo.lagrummet.se/publ/rattsfall",
+                               self._baseurl + "res/dv")
+        elif "publ/sfs/" in uri:
+            return uri.replace("http://rinfo.lagrummet.se/publ/sfs",
+                               self._baseurl + "res/sfs")
+        elif "publ/prop" in uri:
+            return uri.replace("http://rinfo.lagrummet.se/publ/prop",
+                               self._baseurl + "res/prop")
+        elif "publ/utr/sou" in uri:
+            return uri.replace("http://rinfo.lagrummet.se/publ/utr/sou",
+                               self._baseurl + "res/sou")
+        elif "publ/utr/ds" in uri:
+            return uri.replace("http://rinfo.lagrummet.se/publ/utr/ds",
+                               self._baseurl + "res/ds")
+        else:
+            return uri

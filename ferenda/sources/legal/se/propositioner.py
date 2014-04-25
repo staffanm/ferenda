@@ -29,8 +29,8 @@ from . import RPUBL
 from . import SwedishLegalSource, SwedishLegalStore
 from .swedishlegalsource import offtryck_parser, offtryck_gluefunc
 
-class PropPolo(Regeringen):
-    alias = "proppolo"
+class PropRegeringen(Regeringen):
+    alias = "propregeringen"
     re_basefile_strict = re.compile(r'Prop. (\d{4}/\d{2,4}:\d+)')
     re_basefile_lax = re.compile(
         r'(?:Prop\.?|) ?(\d{4}/\d{2,4}:\d+)', re.IGNORECASE)
@@ -368,7 +368,7 @@ class PropositionerStore(CompositeStore, SwedishLegalStore):
     pass
 
 class Propositioner(CompositeRepository, SwedishLegalSource):
-    subrepos = PropPolo, PropTrips, PropRiksdagen
+    subrepos = PropRegeringen, PropTrips, PropRiksdagen
     alias = "prop"
     xslt_template = "paged.xsl"
     storage_policy = "dir"

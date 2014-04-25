@@ -18,15 +18,15 @@
         "I"@sv,
         "II"@sv ;
     dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
-    dct:references <http://rinfo.lagrummet.se/publ/rattsfall/nja/2000s622>,
-        <http://rinfo.lagrummet.se/publ/rattsfall/nja/2004s840>,
-        <http://rinfo.lagrummet.se/publ/rattsfall/nja/2005s856>,
-        <http://rinfo.lagrummet.se/publ/rattsfall/nja/2006s467>,
-        <http://rinfo.lagrummet.se/publ/rattsfall/nja/2008s946>,
-        <http://rinfo.lagrummet.se/publ/rattsfall/ra/2000:65>,
-        <http://rinfo.lagrummet.se/publ/rattsfall/ra/2009:94>,
-        <http://rinfo.lagrummet.se/publ/sfs/1971:69#P4>,
-        <http://rinfo.lagrummet.se/publ/sfs/1971:69#P5> ;
+    dct:references <http://localhost:8000/res/dv/nja/2000s622>,
+        <http://localhost:8000/res/dv/nja/2004s840>,
+        <http://localhost:8000/res/dv/nja/2005s856>,
+        <http://localhost:8000/res/dv/nja/2006s467>,
+        <http://localhost:8000/res/dv/nja/2008s946>,
+        <http://localhost:8000/res/dv/ra/2000:65>,
+        <http://localhost:8000/res/dv/ra/2009:94>,
+        <http://localhost:8000/res/sfs/1971:69#P4>,
+        <http://localhost:8000/res/sfs/1971:69#P5> ;
     rpubl:arsutgava "2010" ;
     rpubl:lopnummer "19" ;
     rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/nja> ;

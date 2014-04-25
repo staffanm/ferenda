@@ -12,17 +12,17 @@
         "Kammarrätten i Stockholm, Migrationsöverdomstolen"@sv ;
     dct:identifier "MIG 2013:6" ;
     dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
-    dct:references <http://rinfo.lagrummet.se/publ/prop/2004/05:170#s191>,
-        <http://rinfo.lagrummet.se/publ/rattsfall/mig/2007:48>,
-        <http://rinfo.lagrummet.se/publ/rattsfall/mig/2010:23>,
-        <http://rinfo.lagrummet.se/publ/sfs/2005:716>,
-        <http://rinfo.lagrummet.se/publ/sfs/2005:716#K1P10>,
-        <http://rinfo.lagrummet.se/publ/sfs/2005:716#K4P1>,
-        <http://rinfo.lagrummet.se/publ/sfs/2005:716#K4P2>,
-        <http://rinfo.lagrummet.se/publ/sfs/2005:716#K4P2a>,
-        <http://rinfo.lagrummet.se/publ/sfs/2005:716#K5P6>,
-        <http://rinfo.lagrummet.se/publ/sfs/2005:716#K5P6S1>,
-        <http://rinfo.lagrummet.se/publ/sfs/2005:716#K5P9> ;
+    dct:references <http://localhost:8000/res/dv/mig/2007:48>,
+        <http://localhost:8000/res/dv/mig/2010:23>,
+        <http://localhost:8000/res/prop/2004/05:170#s191>,
+        <http://localhost:8000/res/sfs/2005:716>,
+        <http://localhost:8000/res/sfs/2005:716#K1P10>,
+        <http://localhost:8000/res/sfs/2005:716#K4P1>,
+        <http://localhost:8000/res/sfs/2005:716#K4P2>,
+        <http://localhost:8000/res/sfs/2005:716#K4P2a>,
+        <http://localhost:8000/res/sfs/2005:716#K5P6>,
+        <http://localhost:8000/res/sfs/2005:716#K5P6S1>,
+        <http://localhost:8000/res/sfs/2005:716#K5P9> ;
     rpubl:arsutgava "2013" ;
     rpubl:lopnummer "6" ;
     rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/mig> ;

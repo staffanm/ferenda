@@ -10,7 +10,7 @@
 <http://localhost:8000/res/dv/nja/2009/not/1> a rpubl:Rattsfallsnotis ;
     dct:identifier "NJA 2009 not 1" ;
     dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
-    dct:references <http://rinfo.lagrummet.se/publ/rattsfall/nja/1999s715> ;
+    dct:references <http://localhost:8000/res/dv/nja/1999s715> ;
     rpubl:arsutgava "2009" ;
     rpubl:lopnummer "1" ;
     rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/nja> ;

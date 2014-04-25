@@ -853,6 +853,7 @@ class LegalRef:
                     if key == 'law':
                         val = self.normalize_sfsid(val)
                         val = val.replace(" ", "_")
+                        val = val.replace("\xa0", "_") # nonbreakable space
                         res += val
                         addfragment = True
                     else:
@@ -860,6 +861,7 @@ class LegalRef:
                             res += justincase
                             justincase = None
                         val = val.replace(" ", "")
+                        val = val.replace("\xa0", "") # Non-breakable space
                         val = val.replace("\n", "")
                         val = val.replace("\r", "")
                         res += '%s%s' % (keymapping[key], val)
@@ -1130,7 +1132,6 @@ class LegalRef:
         res = 'http://rinfo.lagrummet.se/'
         resolvetobase = True
         addfragment = False
-
         for key, val in list(attributes.items()):
             if key == 'prop':
                 res += "publ/prop/%s" % val

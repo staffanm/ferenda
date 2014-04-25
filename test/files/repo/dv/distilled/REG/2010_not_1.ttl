@@ -10,10 +10,10 @@
 <http://localhost:8000/res/dv/ra/2010/not/1> a rpubl:Rattsfallsnotis ;
     dct:identifier "RÅ 2010 not 1" ;
     dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
-    dct:references <http://rinfo.lagrummet.se/publ/prop/1985/86:1>,
-        <http://rinfo.lagrummet.se/publ/sfs/1987:10#K5P27>,
-        <http://rinfo.lagrummet.se/publ/sfs/2007:845>,
-        <http://rinfo.lagrummet.se/publ/sfs/2007:845#P4> ;
+    dct:references <http://localhost:8000/res/prop/1985/86:1>,
+        <http://localhost:8000/res/sfs/1987:10#K5P27>,
+        <http://localhost:8000/res/sfs/2007:845>,
+        <http://localhost:8000/res/sfs/2007:845#P4> ;
     rpubl:arsutgava "2010" ;
     rpubl:lopnummer "1" ;
     rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/rå> ;

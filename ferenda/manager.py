@@ -164,12 +164,12 @@ def makeresources(repos,
     else:
         res['js'] = jsurls
 
-    # Populate data/rsrc/img/ from files found in config['imgdir'] and
+    # Populate data/rsrc/img/ from files found in config.imgdir and
     # module.imagedir (putting each module's imagedir in a separate
     # subdir, eg EurlexTreaties.imagedir = res/eut/img results in
     # res/eut/img/foo.png being placed in data/rsrc/img/eut/foo.png
-    # Finally, create a resources.xml file containing refs to the css and js
-    # files (and also favicon?) that base5.xsl can include.
+    # Finally, create a resources.xml file containing refs to the css
+    # and js files (and also favicon?) that base5.xsl can include.
 
 
     # FIXME: Do this in LXML instead (and remove util.indent_node afterwards)

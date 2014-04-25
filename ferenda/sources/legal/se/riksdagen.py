@@ -99,6 +99,7 @@ class Riksdagen(SwedishLegalSource):
                 done = True
 
     def download_single(self, basefile, url=None):
+        attachment = None
         if isinstance(basefile, tuple):
             basefile, attachment = basefile
         if attachment:

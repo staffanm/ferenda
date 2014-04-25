@@ -299,10 +299,10 @@ class DirAsp(SwedishLegalSource, PDFDocumentRepository):
         return [['Förarbeten', '/forarb/']]
 
 
-class DirPolopoly(Regeringen):
+class DirRegeringen(Regeringen):
 
     """Downloads Direktiv in PDF format from http://www.regeringen.se/"""
-    alias = "dirpolo"
+    alias = "dirregeringen"
     cssfiles = ['../ferenda/res/css/pdfview.css']
     jsfiles = ['../ferenda/res/js/pdfviewer.js']
     re_basefile_strict = re.compile(r'Dir\. (\d{4}:\d+)')
@@ -327,8 +327,8 @@ class DirektivStore(CompositeStore, SwedishLegalStore):
 # Does parsing, generating etc from base files:
 class Direktiv(CompositeRepository, SwedishLegalSource):
 
-    "A composite repository containing ``DirTrips``, ``DirAsp`` and ``DirPolopoly``."""
-    subrepos = DirPolopoly, DirAsp, DirTrips
+    "A composite repository containing ``DirTrips``, ``DirAsp`` and ``DirRegeringen``."""
+    subrepos = DirRegeringen, DirAsp, DirTrips
     alias = "dir"
     xslt_template = "paged.xsl"
     xslt_template_toc = "toc.xsl"
