@@ -232,7 +232,8 @@ class DV(SwedishLegalSource):
             pass
         super(cls, DV).relate_all_setup(config)
 
-
+    # def relate(self, basefile, otherrepos): pass
+        
     def get_default_options(self):
         opts = super(DV, self).get_default_options()
         opts['ftpuser'] = None

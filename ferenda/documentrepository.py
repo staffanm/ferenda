@@ -1232,31 +1232,35 @@ with the *config* object as single parameter.
 
     @classmethod
     def relate_all_teardown(cls, config):
-        """ 
-        Runs any cleanup action needed after relating all documents in
-        a docrepo. The default implementation does nothing.
+        """Runs any cleanup action needed after relating all documents in a
+        docrepo. The default implementation dumps all RDF data loaded
+        into the triplestore into one giant N-Triples file.
 
         .. note::
 
            Like :py:meth:`~ferenda.DocumentRepository.parse_all_setup`
            this might change to a instance method.
+
         """
         # FIXME: should use dataset_uri(), but that's a instancemethod
+        log = cls._setup_logger(cls.alias)
+
         context = "%sdataset/%s" % (config.url, cls.alias)
-        store = TripleStore.connect(config.storetype,
-                                    config.storelocation,
-                                    config.storerepository)
         docstore = DocumentStore(config.datadir + os.sep + cls.alias)
         dump = docstore.path("dump", "distilled", ".nt")
-        log = cls._setup_logger(cls.alias)
-        util.ensure_dir(dump)
-        store.get_serialized_file(dump, format="nt", context=context)
-        # just to report the number of dumped triples -- may be unneccesary
-        log.info("Dumped %(triplecount)s triples from context %(context)s to %(dumpfile)s" %
-                 {'triplecount': sum(1 for line in open(dump)),
+        values = {'repository': config.storerepository,
                   'context': context,
-                  'repository': config.storerepository,
-                  'dumpfile': dump})
+                  'dumpfile': dump}
+        with util.logtime(log.info,
+                          "Dumped %(triplecount)s triples from context %(context)s to %(dumpfile)s in %(elapsed).3f s",
+                          values):
+            store = TripleStore.connect(config.storetype,
+                                        config.storelocation,
+                                        config.storerepository)
+            util.ensure_dir(dump)
+            store.get_serialized_file(dump, format="nt", context=context)
+            # just to report the number of dumped triples -- may be unneccesary
+            values['triplecount'] = sum(1 for line in open(dump))
         return True
 
     def relate(self, basefile, otherrepos=[]):
@@ -1266,8 +1270,22 @@ with the *config* object as single parameter.
            and put the text of the document into a fulltext index.
 
         """
-        self.relate_triples(basefile)
-
+        # if we're doing a "./ferenda-build repo relate --all", it
+        # might be quicker to preprocess the data we're about to load
+        # into the triplestore, then load it all in one single call
+        # (instead of doing one HTTP call per basefile)
+        #
+        # FIXME: This branch requires that relate_all_setup creates a
+        # distilled/_dump.nt.temp file, which it doesn't (also,
+        # relate_all_teardown should actually load that into the
+        # triplestore)
+        if os.path.exists(self.store.path("_dump", "distilled", ".nt.temp")) and hasattr(self.config, 'all'):
+            data = open(self.store.distilled_path(basefile), "rb").read()
+            g = Graph().parse(data=data)
+            with open(self.store.path("_dump", "distilled", ".nt.temp"), "wab") as fp:
+                fp.write(g.serialize(format="nt"))
+        else:
+            self.relate_triples(basefile)
         # When otherrepos = [], should we still provide self as one repo? Yes.
         if self not in otherrepos:
             otherrepos.append(self)
@@ -1336,7 +1354,6 @@ parsed document path to that documents dependency file."""
                 for (s, p, o) in g:
                     # for each URIRef in graph
                     if isinstance(o, URIRef):
-                        from pudb import set_trace; set_trace()
                         # in order to minimize calls to
                         # basefile_from_uri(), it'd be nice if the
                         # order of repos was dynamically altered according to MRU (most recently used)

@@ -2,7 +2,7 @@
 from __future__ import unicode_literals
 import xml.etree.cElementTree as ET
 import os
-from io import BytesIO
+from io import BytesIO, StringIO
 import tempfile
 import logging
 import re
@@ -678,6 +678,7 @@ class FusekiStore(RemoteStore):
             named = super(FusekiStore, self).get_serialized(format, context)
             if format == "nt":
                 return self._nt_encode(default + named)
+                # return default + named
             else:
                 g = Graph()
                 g.parse(data=default, format=format)
@@ -685,29 +686,32 @@ class FusekiStore(RemoteStore):
                 return g.serialize(format=format)
 
     def _nt_encode(self, bytestring):
-        res = ""
+        buf = StringIO()
         for char in bytestring.decode("utf-8"):
-            try:
-                char.encode('ascii', 'strict')
-            except UnicodeError:
-                if ord(char) <= 0xFFFF:
-                    res += '\\u%04X' % ord(char)
-                else:
-                    res += '\\U%08X' % ord(char)
+            if ord(char) <= 0x7F:
+                buf.write(char)
+            elif ord(char) <= 0xFFFF:
+                buf.write('\\u%04X' % ord(char))
             else:
-                res += char
-        return res.encode() # should not contain any non-ascii chars
+                buf.write('\\U%08X' % ord(char))
+        res = buf.getvalue().encode() # should not contain any non-ascii chars
+        buf.close()
+        return res
         
 
     def get_serialized_file(self, filename, format="nt", context=None):
         ret = super(FusekiStore, self).get_serialized_file(filename, format, context)
-        if format == "nt":
-           # Fuseki will have created an UTF-8 encoded file, we need
-           # to convert it to ascii with \u0000 style escaping to be
-           # compliant with ntriples 1.0 and rdflib
-           escaped = self._nt_encode(util.readfile(filename, "rb"))
-           with open(filename, "wb") as fp:
-               fp.write(escaped)
+        if format == "nt" and self.curl:
+            # if we use curl, Fuseki might have created an UTF-8
+            # encoded file, we need to convert it to ascii with \u0000
+            # style escaping to be compliant with ntriples 1.0 and
+            # rdflib.
+            #
+            # (If we don't use curl, the get_serialized method is
+            # called which already does this escaping)
+            unescaped = util.readfile(filename, "rb")
+            with open(filename, "wb") as fp:
+                fp.write(self._nt_encode(unescaped))
         return ret
        
 #        if context is not None:
