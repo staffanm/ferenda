@@ -491,9 +491,6 @@ class Repo(RepoTester):
         # test1: make sure that default parsing of a document w/o
         # title and lang tags work
         d = DocumentRepository(loglevel="CRITICAL", datadir=self.datadir)
-        config = LayeredConfig(defaults=d.get_default_options(),inifile="ferenda.ini",cascade=True)
-        config.datadir = self.datadir
-        d.config = config
         path = d.store.downloaded_path("123/a")
         util.ensure_dir(path)
         shutil.copy2("test/files/base/downloaded/123/a-version1.htm",path)

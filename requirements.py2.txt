@@ -11,8 +11,10 @@ cssmin
 whoosh
 pyparsing # 2.0.1 is py26+ compatible
 SimpleParse
-unittest2 # not needed for py2.7 +
 ordereddict # not needed for py2.7 +
+future
+arrow
+unittest2 # not needed for py2.7 +
 # sphinx
 mock
 coverage

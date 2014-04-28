@@ -6,14 +6,30 @@ Client code uses this like::
     from ferenda.compat import OrderedDict
     from ferenda.compat import unittest 
     from ferenda.compat import Mock, patch
+    from ferenda.compat import quote
 """
 from __future__ import unicode_literals
+from six import text_type as str
 import sys
 try:
     from collections import OrderedDict
 except ImportError: # pragma: no cover
     # if on python 2.6
     from ordereddict import OrderedDict
+
+try:
+    from urllib.parse import quote
+except ImportError:
+    # urllib.quote in python 2 cannot handle unicode values for the s
+    # parameter (2.6 cannot even handle unicode values for the safe
+    # parameter). We therefore redefine quote with a wrapper.
+    from urllib import quote as _quote
+    def quote(s, safe='/'):
+        if isinstance(s, str):
+            s = s.encode('utf-8')
+        if isinstance(safe, str):
+            safe = safe.encode('ascii')
+        return _quote(s, safe).decode('ascii')
 
 if sys.version_info < (2,7,0): # pragma: no cover
     try:

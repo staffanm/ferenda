@@ -16,10 +16,6 @@ import time
 import calendar
 import filecmp
 import socket
-import inspect
-import difflib
-import functools
-import json
 from ferenda.compat import OrderedDict
 
 # 3rd party
@@ -50,6 +46,8 @@ from ferenda.elements import (Body, Link,
                               UnorderedList, ListItem, Paragraph)
 from ferenda.elements.html import elements_from_soup
 from ferenda.thirdparty import patch, httpheader
+from ferenda.compat import quote
+
 # establish two central RDF Namespaces at the top level
 DCTERMS = Namespace(util.ns['dcterms'])
 PROV = Namespace(util.ns['prov'])
