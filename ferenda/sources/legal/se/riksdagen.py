@@ -113,7 +113,7 @@ class Riksdagen(SwedishLegalSource):
                 return False
 
         xmlfile = self.store.downloaded_path(basefile)
-        if not (self.config.force or not os.path.exists(xmlfile)):
+        if not (self.config.refresh or not os.path.exists(xmlfile)):
             self.log.debug("%s already exists" % (xmlfile))
             return False
 

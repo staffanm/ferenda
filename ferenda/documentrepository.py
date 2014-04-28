@@ -1208,12 +1208,10 @@ with the *config* object as single parameter.
         docstore = DocumentStore(config.datadir + os.sep + cls.alias)
         dump = docstore.path("dump", "distilled", ".nt")
 
-        if not config.force:  # check if we need to work at all
-            distilled = []
-            for basefile in docstore.list_basefiles_for("relate"):
-                distilled.append(docstore.distilled_path(basefile))
-            if util.outfile_is_newer(distilled, dump):
-                return False
+        # check if we need to work at all.
+        xhtmlfiles = (docstore.distilled_path(x) for x in docstore.list_basefiles_for("generate"))
+        if (not config.force and util.outfile_is_newer(xhtmlfiles, dump)):
+            return False # signals to Manager that no work needs to be done
 
         store = TripleStore.connect(config.storetype,
                                     config.storelocation,
@@ -1222,6 +1220,18 @@ with the *config* object as single parameter.
         log.info("Clearing context %s at repository %s" % (
             context, config.storerepository))
         store.clear(context)
+
+        # Bulk upload: We implemented an alternate way of loading the
+        # triplestore, where we didn't POST into the triplestore
+        # once for each basefile, but instead appended everything to a
+        # tempfile which was then bulk loaded into the triplestore at
+        # teardown. However, this was not faster (slightly slower)
+        # and more complex. In order to enable it again, just
+        # uncomment below.
+
+        # create the empty temp NTriples file for appending to:
+        # with docstore._open(docstore.path("_dump", "distilled", ".nt.temp"), "w"):
+        #     pass
 
         # we can't clear the whoosh index in the same way as one index
         # contains documents from all repos. But we need to be able to
@@ -1248,16 +1258,32 @@ with the *config* object as single parameter.
         context = "%sdataset/%s" % (config.url, cls.alias)
         docstore = DocumentStore(config.datadir + os.sep + cls.alias)
         dump = docstore.path("dump", "distilled", ".nt")
+        temp = docstore.path("_dump", "distilled", ".nt.temp")
+        store = TripleStore.connect(config.storetype,
+                                    config.storelocation,
+                                    config.storerepository)
         values = {'repository': config.storerepository,
                   'context': context,
-                  'dumpfile': dump}
+                  'dumpfile': dump,
+                  'tempfile': temp}
+
+        # If using the Bulk upload functionality (see
+        # relate_all_setup), do the actual bulk upload.
+        if os.path.exists(temp):
+            with util.logtime(log.info,
+                              "Loaded %(triplecount)s triples to context %(context)s from %(tempfile)s in %(elapsed).3f s",
+                              values):
+                store.add_serialized_file(temp, format="nt", context=context)
+                # just to report the number of dumped triples -- may be unneccesary
+                values['triplecount'] = sum(1 for line in open(temp))
+                os.unlink(temp)
+
+        # then extract a new dump file (which should have the exact
+        # same contents as the temp file, but this comes directly from
+        # the triplestore
         with util.logtime(log.info,
                           "Dumped %(triplecount)s triples from context %(context)s to %(dumpfile)s in %(elapsed).3f s",
                           values):
-            store = TripleStore.connect(config.storetype,
-                                        config.storelocation,
-                                        config.storerepository)
-            util.ensure_dir(dump)
             store.get_serialized_file(dump, format="nt", context=context)
             # just to report the number of dumped triples -- may be unneccesary
             values['triplecount'] = sum(1 for line in open(dump))
@@ -1270,20 +1296,20 @@ with the *config* object as single parameter.
            and put the text of the document into a fulltext index.
 
         """
-        # if we're doing a "./ferenda-build repo relate --all", it
-        # might be quicker to preprocess the data we're about to load
-        # into the triplestore, then load it all in one single call
-        # (instead of doing one HTTP call per basefile)
-        #
-        # FIXME: This branch requires that relate_all_setup creates a
-        # distilled/_dump.nt.temp file, which it doesn't (also,
-        # relate_all_teardown should actually load that into the
-        # triplestore)
-        if os.path.exists(self.store.path("_dump", "distilled", ".nt.temp")) and hasattr(self.config, 'all'):
-            data = open(self.store.distilled_path(basefile), "rb").read()
-            g = Graph().parse(data=data)
-            with open(self.store.path("_dump", "distilled", ".nt.temp"), "wab") as fp:
-                fp.write(g.serialize(format="nt"))
+        # If using the Bulk upload feature, append to the temporary
+        # file that is to be bulk uploaded (see relate_all_setup)
+        nttemp = self.store.path("_dump", "distilled", ".nt.temp", storage_policy="file")
+        if os.path.exists(nttemp) and hasattr(self.config, 'all'):
+            values = {'basefile': basefile,
+                      'nttemp': nttemp}
+            with util.logtime(self.log.debug,
+                              "%(basefile)s: Added %(triplecount)s triples to %(nttemp)s in %(elapsed).3f s",
+                              values):
+                data = open(self.store.distilled_path(basefile), "rb").read()
+                g = Graph().parse(data=data)
+                with open(nttemp, "ab") as fp:
+                    fp.write(g.serialize(format="nt"))
+                values['triplecount'] = len(g)
         else:
             self.relate_triples(basefile)
         # When otherrepos = [], should we still provide self as one repo? Yes.

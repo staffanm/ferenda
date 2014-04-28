@@ -230,7 +230,7 @@ class DV(SwedishLegalSource):
         else:
             print("Not regenerating uri.map")
             pass
-        super(cls, DV).relate_all_setup(config)
+        return super(cls, DV).relate_all_setup(config)
 
     # def relate(self, basefile, otherrepos): pass
         

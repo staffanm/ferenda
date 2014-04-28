@@ -2822,50 +2822,6 @@ class SFS(Trips):
         else:
             raise ValueError('unknown form %s' % form)
 
-    def CleanupAnnulled(self, basefile):
-        infile = self._xmlFileName(basefile)
-        outfile = self._htmlFileName(basefile)
-        if not os.path.exists(infile):
-            util.robust_remove(outfile)
-
-    @classmethod
-    def relate_all_setup(cls, config):
-        cls._build_mini_rdf(config)
-
-    @classmethod
-    def _build_mini_rdf(cls, config):
-        # the resulting file contains one triple for each law text
-        # that has comments (should this be in Wiki.py instead?
-        termdir = os.path.sep.join([config.datadir, 'wiki', 'parsed', 'SFS'])
-        if not os.path.exists(termdir):
-            # self.log.warning("termdir %s doesn't exists, is the Wiki repo enabled?")
-            return 
-        minixmlfile = os.path.sep.join(
-            [config.datadir, cls.alias, 'parsed', 'rdf-mini.xml'])
-        files = list(util.list_dirs(termdir, ".xht2"))
-        parser = LegalRef(LegalRef.LAGRUM)
-
-        # self.log.info("Making a mini graph")
-        mg = Graph()
-        for key, value in list(util.ns.items()):
-            mg.bind(key, Namespace(value))
-
-        for f in files:
-            basefile = ":".join(os.path.split(os.path.splitext(
-                os.sep.join(os.path.normpath(f).split(os.sep)[-2:]))[0]))
-            # print "Finding out URI for %s" % basefile
-            try:
-                uri = parser.parse(basefile)[0].uri
-            except AttributeError:  # basefile is not interpretable as a SFS no
-                continue
-            mg.add((
-                URIRef(uri), RDF.type, RPUBL['KonsolideradGrundforfattning']))
-
-        # self.log.info("Serializing the minimal graph")
-        f = open(minixmlfile, 'w')
-        f.write(mg.serialize(format="pretty-xml"))
-        f.close()
-
     def _file_to_basefile(self, f):
         """Override of LegalSource._file_to_basefile, with special
         handling of archived versions and two-part documents"""
