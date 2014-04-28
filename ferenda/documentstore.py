@@ -8,11 +8,11 @@ from tempfile import NamedTemporaryFile
 import filecmp
 
 import six
-from six.moves.urllib_parse import quote, unquote
+from six.moves.urllib_parse import unquote
 
 from ferenda import util
 from ferenda import errors
-
+from ferenda.compat import quote
 
 class DocumentStore(object):
 
@@ -371,15 +371,6 @@ class DocumentStore(object):
         :rtype: str
         """
         safe = '/;@&=+,'
-
-        if six.PY2:
-            # urllib.quote in python 2 cannot handle unicode values
-            # for the s parameter (2.6 cannot even handle unicode
-            # values for the safe parameter). FIXME: We should create
-            # a shim as ferenda.compat.quote and use that
-            basefile = basefile.encode('utf-8')
-            safe = safe.encode('ascii') # pragma: no cover
-            
         return quote(basefile, safe=safe).replace('%', os.sep + '%')
 
     def pathfrag_to_basefile(self, pathfrag):

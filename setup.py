@@ -18,7 +18,9 @@ install_requires = ['beautifulsoup4 >= 4.3.0',
                     'requests >= 1.2.0',
                     'Whoosh >= 2.4.1',
                     'six >= 1.4.0',
-                    'docutils >= 0.11']
+                    'docutils >= 0.11',
+                    'future >= 0.11',
+                    'arrow >= 0.4']
 
 if sys.version_info < (3,0,0):
     # not py3 compatible, but not essential either
@@ -31,10 +33,15 @@ if sys.version_info < (3,0,0):
     install_requires.append('pyparsing<=1.5.7')
 else:
     install_requires.append('pyparsing')
-    
+
+# py26 doesn't have 
 if sys.version_info < (2,7,0):
     install_requires.append('ordereddict >= 1.1')
 
+# py32 doesn't support the u'' literal, which the module future
+# uses. uprefix allows us to work around that.
+if sys.version_info[:2] == (3,2):
+    install_requires('uprefix')
 
 tests_require = []
 

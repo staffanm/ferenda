@@ -8,6 +8,9 @@ six
 jsmin
 whoosh
 pyparsing
+future
+uprefix
+arrow
 # sphinx
 mock # not needed for py3.3 +
 coverage
