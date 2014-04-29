@@ -10,7 +10,24 @@ tool, you don't need to directly call any of these methods --
 else, for you.
 
 """
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
+
+from future import standard_library
+with standard_library.hooks():
+    import configparser
+    from io import BytesIO
+
+from future.builtins import input # needed for testManager.Setup.test_setup (which mocks ferenda.manager.input)
+
 # system
 import os
 import stat
@@ -74,16 +91,266 @@ def makeresources(repos,
     :returns: All created/copied css, js and resources.xml files
     :rtype: dict of lists
     """
-    return Resources(repos, resourcedir,
-                     combineresources=combine,
-                     cssfiles=cssfiles,
-                     jsfiles=jsfiles,
-                     imgfiles=imgfiles,
-                     staticsite=staticsite,
-                     legacyapi=legacyapi,
-                     sitename=sitename,
-                     sitedescription=sitedescription,
-                     url=url).make()
+    # NOTE: even though the returned dict of lists of paths should use
+    # the appropriate path separator for the current platform (/ on
+    # unix, \ on windows), the resources.xml always uses the /
+    # separator regardless of platform.
+    log = setup_logger()
+    res = {}
+    processed_files = []
+    # Create minfied combined.css file
+    cssbuffer = BytesIO()
+    cssurls = []
+    cssdir = resourcedir + os.sep + "css"
+
+    # 1. Process all css files specified in the main config
+    if cssfiles:
+        for cssfile in cssfiles:
+            cssurls.append(_process_file(
+                cssfile, cssbuffer, cssdir, "ferenda.ini", combine))
+            processed_files.append(cssfile)
+
+    # 2. Visit each enabled class and see if it specifies additional
+    # css files to read
+    for inst in repos:
+        for cssfile in inst.config.cssfiles:
+            if cssfile in processed_files:
+                continue
+            # FIXME: CSS file path should be interpreted
+            # relative to the module source code file instead
+            # of cwd
+            cssurls.append(_process_file(
+                cssfile, cssbuffer, cssdir, inst.alias, combine))
+            processed_files.append(cssfile)
+    cssurls = list(filter(None, cssurls))
+    if combine:
+        # 3. Minify the result using cssmin
+        css = cssbuffer.getvalue().decode('utf-8')
+        log.debug("Read %s files, CSS is now %s bytes" % (len(
+            cssfiles), len(css)))
+        from .thirdparty import cssmin
+        css = cssmin.cssmin(css)
+        log.debug("After minifying, CSS is now %s bytes" % (len(css)))
+        outcssfile = cssdir + os.sep + 'combined.css'
+        util.writefile(outcssfile, css)
+        res['css'] = [_filepath_to_urlpath(outcssfile, 2)]
+    else:
+        res['css'] = cssurls
+
+    # Create data/rsrc/js/combined.js in a similar way but use slimit to
+    # compress the result
+    jsbuffer = BytesIO()
+    jsurls = []
+    jsdir = resourcedir + os.sep + "js"
+
+    if jsfiles:
+        for jsfile in jsfiles:
+            jsurls.append(_process_file(
+                jsfile, jsbuffer, jsdir, "ferenda.ini", combine))
+            processed_files.append(jsfile)
+
+    for inst in repos:
+        for jsfile in inst.config.jsfiles:
+            if jsfile in processed_files:
+                continue
+            jsurls.append(_process_file(
+                jsfile, jsbuffer, jsdir, inst.alias, combine))
+            processed_files.append(jsfile)
+
+    jsurls = list(filter(None, jsurls))
+    if combine:
+        js = jsbuffer.getvalue().decode('utf-8')
+        log.debug("Read %s files, JS is now %s bytes" % (len(jsfiles),
+                                                         len(js)))
+        # slimit provides better perf, but isn't py3 compatible
+        # import slimit
+        # js = slimit.minify(
+        #     jsbuffer.getvalue(), mangle=True, mangle_toplevel=True)
+        import jsmin
+        js = jsmin.jsmin(js)
+        log.debug("After compression, JS is now %s bytes" % (len(js)))
+        outjsfile = jsdir + os.sep + 'combined.js'
+        util.writefile(outjsfile, js)
+        res['js'] = [_filepath_to_urlpath(outjsfile, 2)]
+    else:
+        res['js'] = jsurls
+
+    # Populate data/rsrc/img/ from files found in config.imgdir and
+    # module.imagedir (putting each module's imagedir in a separate
+    # subdir, eg EurlexTreaties.imagedir = res/eut/img results in
+    # res/eut/img/foo.png being placed in data/rsrc/img/eut/foo.png
+    # Finally, create a resources.xml file containing refs to the css
+    # and js files (and also favicon?) that base5.xsl can include.
+
+
+    # FIXME: Do this in LXML instead (and remove util.indent_node afterwards)
+    root = ET.Element("configuration")
+    sitename_el = ET.SubElement(root, "sitename")
+    sitename_el.text = sitename
+    sitedescription_el = ET.SubElement(root, "sitedescription")
+    sitedescription_el.text = sitedescription
+    url_el = ET.SubElement(root, "url")
+    url_el.text = url
+
+    tabs = ET.SubElement(
+        ET.SubElement(ET.SubElement(root, "tabs"), "nav"), "ul")
+
+    l = ET.Element("a", **{'href': "#menu",
+                           'class': "navbutton"})
+    ET.SubElement(l, "img", src="rsrc/img/navmenu.png")
+    root.find("tabs/nav").insert(0, l)
+    
+    sitetabs = []
+    for inst in repos:
+        if hasattr(inst, 'tabs'):
+            for tab in inst.tabs():
+                if not tab in sitetabs:
+                    (label, url) = tab
+                    alias = inst.alias
+                    log.debug(
+                        "Adding tab %(label)s (%(url)s) from docrepo %(alias)s" % locals())
+                    sitetabs.append(tab)
+
+    for tab in sitetabs:
+        link = ET.SubElement(ET.SubElement(tabs, "li"), "a")
+        link.text = tab[0]
+        link.attrib['href'] = tab[1]
+
+    # FIXME: almost the exact same code as for tabs
+    footer = ET.SubElement(
+        ET.SubElement(ET.SubElement(root, "footerlinks"), "nav"), "ul")
+
+    sitefooter = []
+    for inst in repos:
+        if hasattr(inst, 'footer'):
+            for link in inst.footer():
+                if not link in sitefooter:
+                    (label, url) = link
+                    alias = inst.alias
+                    log.debug(
+                        "Adding footer link %(label)s (%(url)s) from docrepo %(alias)s" % locals())
+                    sitefooter.append(link)
+
+    for text, href in sitefooter:
+        link = ET.SubElement(ET.SubElement(footer, "li"), "a")
+        link.text = text
+        link.attrib['href'] = href
+
+    tocbutton = ET.SubElement(
+        ET.SubElement(ET.SubElement(root, "tocbutton"),
+                      "a", {'href':'#menu',
+                            'class': 'tocbutton'}),
+        "img", {'src':'rsrc/img/navmenu-small-black.png'})
+
+    if not staticsite:
+        search = ET.SubElement(
+            ET.SubElement(ET.SubElement(root, "search"), "form", action="/search/"), "input", type="search", name="q")
+        l = ET.Element("a", **{'href': "#search",
+                               'class': "searchbutton"})
+        ET.SubElement(l, "img", src="rsrc/img/search.png")
+        root.find("search/form").append(l)
+        
+    stylesheets = ET.SubElement(root, "stylesheets")
+    log.debug("Adding %s stylesheets to resources.xml" % len(res['css']))
+    for f in res['css']:
+        stylesheet = ET.SubElement(stylesheets, "link")
+        stylesheet.attrib['rel'] = "stylesheet"
+        stylesheet.attrib['href'] = f
+    log.debug("Adding %s javascripts to resources.xml" % len(res['js']))
+    javascripts = ET.SubElement(root, "javascripts")
+    for f in res['js']:
+        javascript = ET.SubElement(javascripts, "script")
+        javascript.attrib['src'] = f
+        javascript.text = " "
+    util.indent_node(root)
+    tree = ET.ElementTree(root)
+    outxmlfile = resourcedir + os.sep + "resources.xml"
+    util.ensure_dir(outxmlfile)
+    tree.write(outxmlfile, encoding="utf-8")
+    log.debug("Wrote %s" % outxmlfile)
+    # NOTE: If DocumentRepository.generate feels like it, it may
+    # create a temporary copy of resources.xml with js/css paths
+    # modified to be relative to the generated file (which may be 2-3
+    # directories deep) instead of the document root, in order to
+    # support static HTML file generation with arbitrarily deep
+    # directory structure.
+    res['xml'] = [_filepath_to_urlpath(outxmlfile, 1)]
+    if os.sep == "\\":
+        for part in res:
+            result = []
+            for x in res[part]:
+                if x.startswith("http://") or x.startswith("https://"):
+                    result.append(x)
+                else:
+                    result.append(x.replace('/', os.sep))
+            res[part] = result
+    return res
+
+
+def _process_file(filename, buf, destdir, origin="", combine=False):
+    """
+    Helper function to concatenate or copy CSS/JS (optionally
+    processing them with e.g. Scss) or other files to correct place
+    under the web root directory.
+    
+    :param filename: The name (relative to the ferenda package) of the file
+    :param buf: A buffer into which the contents of the file is written (if combine == True)
+    :param destdir: The directory into which the file will be copied (unless combine == True)
+    :param origin: The source of the configuration that specifies this files
+    :param combine: Whether to combine all files into a single one
+    :returns: The URL path of the resulting file, relative to the web root (or None if combine == True)
+    :rtype: str
+    """
+    # disabled until pyScss is usable on py3 again
+    # mapping = {'.scss': {'transform': _transform_scss,
+    #                     'suffix': '.css'}
+    #            }
+    log = setup_logger()
+    # FIXME: extend this through a load-path mechanism?
+    if os.path.exists(filename):
+        log.debug("Process file found %s as a file relative to %s" %
+                  (filename, os.getcwd()))
+        fp = open(filename, "rb")
+    elif pkg_resources.resource_exists('ferenda', filename):
+        log.debug("Found %s as a resource" % filename)
+        fp = pkg_resources.resource_stream('ferenda', filename)
+    elif filename.startswith("http://") or filename.startswith("https://"):
+        if combine:
+            raise errors.ConfigurationError(
+                "makeresources: Can't use combine=True in combination with external js/css URLs (%s)" % filename)
+        log.debug("Using external url %s" % filename)
+        return filename
+    else:
+        log.warning(
+            "file %(filename)s (specified in %(origin)s) doesn't exist" % locals())
+        return None
+
+    (base, ext) = os.path.splitext(filename)
+    # disabled until pyScss is usable on py3 again
+    # if ext in mapping:
+    #     outfile = base + mapping[ext]['suffix']
+    #     mapping[ext]['transform'](filename, outfile)
+    #     filename = outfile
+    if combine:
+        log.debug("combining %s into buffer" % filename)
+        buf.write(fp.read())
+        fp.close()
+        return None
+    else:
+        log.debug("writing %s out to %s" % (filename, destdir))
+        outfile = destdir + os.sep + os.path.basename(filename)
+        util.ensure_dir(outfile)
+        with open(outfile, "wb") as fp2:
+            fp2.write(fp.read())
+        fp.close()
+        return _filepath_to_urlpath(outfile, 2)
+
+# disabled until pyScss is usable on py3 again
+# def _transform_scss(infile, outfile):
+#     print(("Transforming %s to %s" % (infile, outfile)))
+#     from scss import Scss
+#     compiler = Scss()
+#     util.writefile(outfile, compiler.compile(util.readfile(infile)))
 
 def frontpage(repos,
               path="data/index.html",
@@ -218,6 +485,148 @@ def make_wsgi_app(inifile=None, **kwargs):
     return WSGIApp(repos, **args)
 
 
+def _str(s, encoding="ascii"):
+    """If running under python2.6, return byte string version of the
+    argument, otherwise return the argument unchanged.
+
+    Needed since wsgiref under python 2.6 hates unicode.
+
+    """
+    if sys.version_info < (2, 7, 0):
+        return s.encode("ascii")  # pragma: no cover
+    else:
+        return s
+
+
+def _wsgi_search(environ, start_response, args):
+    """WSGI method, called by the wsgi app for requests that matches
+       ``searchendpoint``."""
+    # get the location for the index. Different repos could
+    # technically have different paths here, but that'd be stupid. It
+    # would be bettter if indexlocation was available direct from args
+    # (which requires changing _setup_runserver_args())
+    idx = FulltextIndex.connect(args['repos'][0].config.indextype,
+                                args['repos'][0].config.indexlocation)
+    # FIXME: QUERY_STRING should probably be sanitized before calling
+    # .query() - but in what way?
+    querystring = OrderedDict(parse_qsl(environ['QUERY_STRING']))
+    query = querystring['q']
+    if not isinstance(query, str):  # happens on py26
+        query = query.decode("utf-8")  # pragma: no cover
+    pagenum = int(querystring.get('p', '1'))
+    res, pager = idx.query(query, pagenum=pagenum)
+    if pager['totalresults'] == 1:
+        resulthead = "1 match"
+    else:
+        resulthead = "%s matches" % pager['totalresults']
+    resulthead += " for '%s'" % query  # query will be escaped later
+
+    # Creates simple XHTML result page
+    repo = args['repos'][0]
+    doc = repo.make_document()
+    doc.uri = "http://example.org/"
+    doc.meta.add((URIRef(doc.uri),
+                  Namespace(util.ns['dct']).title,
+                  Literal(resulthead, lang="en")))
+    doc.body = elements.Body()
+    for r in res:
+        if not 'title' in r or r['title'] is None:
+            r['title'] = r['uri']
+        if r.get('identifier', False):
+            r['title'] = r['identifier'] + ": " + r['title']
+        doc.body.append(html.Div(
+            [html.H2([elements.Link(r['title'], uri=r['uri'])]),
+             r['text']], **{'class': 'hit'}))
+
+    pages = [
+        html.P(["Results %(firstresult)s-%(lastresult)s of %(totalresults)s" % pager])]
+    for pagenum in range(pager['pagecount']):
+        if pagenum + 1 == pager['pagenum']:
+            pages.append(html.Span([str(pagenum + 1)], **{'class': 'page'}))
+        else:
+            querystring['p'] = str(pagenum + 1)
+            url = environ['PATH_INFO'] + "?" + urlencode(querystring)
+            pages.append(html.A([str(pagenum + 1)], **{'class': 'page',
+                                                       'href': url}))
+    doc.body.append(html.Div(pages, **{'class': 'pager'}))
+    # Transform that XHTML into HTML5
+    conffile = os.sep.join([args['documentroot'], 'rsrc', 'resources.xml'])
+    transformer = Transformer('XSLT', "res/xsl/search.xsl", ["res/xsl"],
+                              config=conffile)
+    # '/mysearch/' = depth 1
+    depth = len(args['searchendpoint'].split("/")) - 2
+    repo = DocumentRepository()
+    tree = transformer.transform(repo.render_xhtml_tree(doc), depth)
+    data = transformer.t.html5_doctype_workaround(etree.tostring(tree))
+    start_response(_str("200 OK"), [
+        (_str("Content-Type"), _str("text/html; charset=utf-8")),
+        (_str("Content-Length"), _str(str(len(data))))
+    ])
+    return iter([data])
+
+
+def _wsgi_api(environ, start_response, args):
+    """WSGI method, called by the wsgi app for requests that matches
+       ``apiendpoint``."""
+    d = dict((str(key), str(environ[key])) for key in environ.keys())
+
+    data = json.dumps(dict(d), indent=4).encode('utf-8')
+    start_response(_str("200 OK"), [
+        (_str("Content-Type"), _str("application/json")),
+        (_str("Content-Length"), _str(str(len(data))))
+    ])
+    return iter([data])
+
+
+def _wsgi_static(environ, start_response, args):
+    """WSGI method, called by the wsgi app for all other requests not handled
+    by :py:func:`~ferenda.Manager.search` or :py:func:`~ferenda.Manager.api`"""
+
+    fullpath = args['documentroot'] + environ['PATH_INFO']
+    # we should start by asking all repos "do you handle this path"?
+    # default impl is to say yes if 1st seg == self.alias and the rest
+    # can be treated as basefile yielding a existing generated file.
+    # a yes answer contains a FileWrapper around the repo-selected
+    # file and optionally length (but not status, always 200, or
+    # mimetype, always text/html). None means no.
+    fp = None
+    for repo in args['repos']:
+        (fp, length, status, mimetype) = repo.http_handle(environ)  # and args?
+        if fp:
+            status = {200: "200 OK",
+                      406: "406 Not Acceptable"}[status]
+            iterdata = FileWrapper(fp)
+            break
+    if not fp:
+        if os.path.isdir(fullpath):
+            fullpath = fullpath + "index.html"
+        if os.path.exists(fullpath):
+            ext = os.path.splitext(fullpath)[1]
+            # if not mimetypes.inited:
+            #     mimetypes.init()
+            mimetype = mimetypes.types_map.get(ext, 'text/plain')
+            status = "200 OK"
+            length = os.path.getsize(fullpath)
+            fp = open(fullpath, "rb")
+            iterdata = FileWrapper(fp)
+        else:
+            msg = "<h1>404</h1>The path %s not found at %s" % (environ['PATH_INFO'],
+                                                               fullpath)
+            mimetype = "text/html"
+            status = "404 Not Found"
+            length = len(msg.encode('utf-8'))
+            fp = BytesIO(msg.encode('utf-8'))
+            iterdata = FileWrapper(fp)
+    length = str(length)
+    start_response(_str(status), [
+        (_str("Content-Type"), _str(mimetype)),
+        (_str("Content-Length"), _str(length))
+    ])
+    return iterdata
+    # FIXME: How can we make sure fp.close() is called, regardless of
+    # whether it's a real fileobject or a BytesIO object?
+
+
 loglevels = {'DEBUG': logging.DEBUG,
              'INFO': logging.INFO,
              'WARNING': logging.WARNING,
@@ -335,7 +744,7 @@ def run(argv):
                 try:
                     return enable(classname)
                 except (ImportError, ValueError) as e:
-                    log.error(six.text_type(e))
+                    log.error(str(e))
                     return None
             elif action == 'runserver':
                 args = _setup_runserver_args(config, _find_config_file())
@@ -1114,7 +1523,7 @@ def _preflight_check(log, verbose=False):
         ('rdflib', '4.0', True),
         ('html5lib', '0.99', True),
         ('requests', '1.2.0', True),
-        ('six', '1.4.0', True),
+        ('future', '0.11', True),
         ('jsmin', '2.0.2', True),
         ('cssmin', '0.2.0', True),
         ('whoosh', '2.4.1', True),

@@ -3,20 +3,19 @@ from __future__ import unicode_literals, print_function
 
 from collections import defaultdict
 from datetime import datetime
-from tempfile import mkstemp
 from io import BytesIO
+from tempfile import mkstemp
 from wsgiref.handlers import format_date_time as format_http_date
 from wsgiref.util import request_uri
+import calendar
 import codecs
+import filecmp
 import logging
 import logging.handlers
 import os
 import re
-import time
-import calendar
-import filecmp
 import socket
-from ferenda.compat import OrderedDict
+import time
 
 # 3rd party
 from lxml import etree
@@ -47,6 +46,7 @@ from ferenda.elements import (Body, Link,
 from ferenda.elements.html import elements_from_soup
 from ferenda.thirdparty import patch, httpheader
 from ferenda.compat import quote
+from ferenda.compat import OrderedDict
 
 # establish two central RDF Namespaces at the top level
 DCTERMS = Namespace(util.ns['dcterms'])
@@ -526,7 +526,8 @@ with the *config* object as single parameter.
                   the document.
         :rtype:   str
         """
-        return str(len(list(self.store.list_versions(basefile))) + 1)
+        
+        return "%d" % (len(list(self.store.list_versions(basefile))) + 1)
 
     def qualified_class_name(self):
         """The qualified class name of this class

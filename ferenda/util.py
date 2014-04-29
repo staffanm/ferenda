@@ -1,7 +1,19 @@
 # -*- coding: utf-8 -*-
 """General  library of small utility functions."""
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
 
+from ast import literal_eval
+from contextlib import contextmanager
+from email.utils import parsedate_tz
 import codecs
 import datetime
 import filecmp
@@ -13,22 +25,15 @@ import posixpath
 import re
 import shutil
 import subprocess
-import sys
 import time
-from contextlib import contextmanager
-from email.utils import parsedate_tz
-from ast import literal_eval
 
-import six
-from six.moves.urllib_parse import urlsplit, urlunsplit
-from six import text_type as str
-from six import binary_type as bytes
+# 3rd party
 
-
+# mine
 from . import errors
+from .compat import urlsplit, urlunsplit, name2codepoint
 
 # We should reorganize this, maybe in util.File, util.String, and so on...
-
 
 class gYearMonth(datetime.date):
     def __new__(cls, *args, **kwargs):
@@ -217,7 +222,7 @@ def runcmd(cmdline, require_success=False, cwd=None,
     :returns: The returncode, all stdout output, all stderr output
     :rtype: tuple
     """
-    if sys.platform == "win32" and six.PY2:
+    if sys.platform == "win32" and sys.version < (3,):
         cmdline_encoding = "windows-1252"
         
     if cmdline_encoding:
@@ -473,9 +478,8 @@ def extract_text(html, start, end, decode_entities=True, strip_tags=True):
     endidx = html.rindex(end)
     text = html[startidx + len(start):endidx]
     if decode_entities:
-        from six.moves import html_entities
         entities = re.compile("&(\w+?);")
-        text = entities.sub(lambda m: six.unichr(html_entities.name2codepoint[m.group(1)]), text)
+        text = entities.sub(lambda m: chr(name2codepoint[m.group(1)]), text)
     if strip_tags:
         # http://stackoverflow.com/a/1732454
         tags = re.compile("</?\w+>")
@@ -587,8 +591,8 @@ def logtime(method, format="The operation took %(elapsed).3f sec", values={}):
     method(format % values)
 
 # Python docs recommends against this. Eh, what are you going to do?
-
-
+#
+# FIXME: maybe arrow makes this function totally unnecessary?
 @contextmanager
 def c_locale(category=locale.LC_TIME):
     """Temporarily change process locale to the C locale, for use when eg
@@ -601,7 +605,10 @@ def c_locale(category=locale.LC_TIME):
     """
 
     oldlocale = locale.getlocale(category)
-    newlocale = 'C' if six.PY3 else b'C'
+    if sys.version_info < (3,):
+        newlocale = b'C'
+    else:
+        newlocale = 'C'
     locale.setlocale(category, newlocale)
     try:
         yield

@@ -1,6 +1,17 @@
 # -*- coding: utf-8 -*-
-"""These are the exceptions thrown by Ferenda. Any of the python built-in exceptions may be thrown as well, but exceptions in used third-party libraries should be wrapped in one of these."""
-from __future__ import unicode_literals
+"""These are the exceptions thrown by Ferenda. Any of the python
+built-in exceptions may be thrown as well, but exceptions in used
+third-party libraries should be wrapped in one of these."""
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
 
 
 class ParseError(Exception):

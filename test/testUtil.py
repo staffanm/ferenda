@@ -132,6 +132,12 @@ class Main(unittest.TestCase):
         # test 3: dst does exist, is identical
         self.assertFalse(util.copy_if_different(self.fname, self.fname2))
 
+    # repeat of doctest
+    def test_extract_text(self):
+        want = 'Hello World™'
+        got = util.extract_text("<body><div><b>Hello</b> <i>World</i>&trade;</div></body>",
+                                "<div>", "</div>")
+        self.assertEqual(want, got)
 
 from ferenda import util
 import doctest
