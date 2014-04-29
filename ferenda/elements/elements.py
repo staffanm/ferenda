@@ -28,9 +28,6 @@ import sys
 
 from lxml.builder import ElementMaker
 from rdflib import Graph, Namespace, Literal, URIRef
-from six import binary_type as bytes
-from six import text_type as str
-import six
 import pyparsing
 
 from ferenda import util
@@ -416,7 +413,7 @@ class Link(UnicodeElement):
     # FIXME: can __repr__ on PY2 return unicode data?
     def __repr__(self):
         # convoluted way around a UnicodeEncode error on py2 when self contains non-ascii characters
-        if six.PY2:
+        if sys.version_info[0] < 3:
             rep = repr(str(self))[2:-1]
         else:
             rep = self

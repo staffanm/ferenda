@@ -8,7 +8,17 @@ aside from the standards (``download``, ``parse``, ``generate`` et
 al), you should also use :py:func:`~ferenda.decorators.action` so that
 manage.py will be able to call it.
 """
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
+
 from datetime import datetime
 import codecs
 import functools
@@ -16,7 +26,6 @@ import itertools
 import os
 import time
 
-import six
 from rdflib import Graph, URIRef
 
 from ferenda import util
@@ -88,7 +97,7 @@ def render(f):
         if hasattr(node, 'meta') and node.meta is not None:
             res.append(node.meta)
         for subnode in node:
-            if not isinstance(subnode, six.string_types):
+            if not isinstance(subnode, str): # should be basestring on py2
                 res.extend(iterate_graphs(subnode))
         return res
 

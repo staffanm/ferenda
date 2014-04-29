@@ -1,14 +1,21 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
 import sys
-import os
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
+
 from difflib import unified_diff
 from tempfile import mkstemp
 import inspect
+import os
 
 from rdflib import Graph, URIRef, RDF
-import six
-from six import text_type as str
 
 from ferenda import TextReader, TripleStore, FulltextIndex
 from ferenda.elements import serialize
@@ -119,7 +126,7 @@ class Devel(object):
                       'prov:wasGeneratedBy',
                       ]
         import csv
-        if six.PY2:
+        if sys.version_info[0] < 3:
             delimiter = b';'
             out = sys.stdout
         else:
@@ -147,7 +154,7 @@ class Devel(object):
                             # values), while py3 CSV expects unicode
                             # (sensibly)
                             fld = str(o)
-                            if six.PY2:
+                            if sys.version_info[0] < 3:
                                 fld = fld.encode("latin-1", errors="replace")
                             row[qname] = fld
                 row['subobjects'] = len(list(g.subject_objects(RDF.type)))

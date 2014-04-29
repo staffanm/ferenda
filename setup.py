@@ -41,7 +41,7 @@ if sys.version_info < (2,7,0):
 # py32 doesn't support the u'' literal, which the module future
 # uses. uprefix allows us to work around that.
 if sys.version_info[:2] == (3,2):
-    install_requires('uprefix')
+    install_requires.append('uprefix')
 
 tests_require = []
 

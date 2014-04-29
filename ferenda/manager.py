@@ -10,7 +10,24 @@ tool, you don't need to directly call any of these methods --
 else, for you.
 
 """
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
+
+from future import standard_library
+with standard_library.hooks():
+    import configparser
+    from io import BytesIO
+
+from future.builtins import input # needed for testManager.Setup.test_setup (which mocks ferenda.manager.input)
+
 # system
 import os
 import stat
@@ -22,30 +39,23 @@ import json
 import mimetypes
 import shutil
 import tempfile
-from ast import literal_eval
 from datetime import datetime
 import xml.etree.cElementTree as ET
 from ferenda.compat import OrderedDict, MagicMock
 from wsgiref.simple_server import make_server
 from wsgiref.util import FileWrapper
 
-import six
-from six.moves.urllib_parse import urlsplit, parse_qsl, urlencode
-from six.moves import configparser
-input = six.moves.input
-from six import text_type as str
+from ferenda.compat import urlsplit, parse_qsl, urlencode
 
 # 3rd party
 import pkg_resources
 import requests
 import requests.exceptions
 from rdflib import URIRef, Namespace, Literal
-from bs4 import BeautifulSoup
 from lxml import etree
 
 # my modules
 from ferenda import DocumentRepository
-from ferenda import DocumentStore
 from ferenda import FulltextIndex
 from ferenda import LayeredConfig
 from ferenda import Transformer
@@ -88,7 +98,7 @@ def makeresources(repos,
     res = {}
     processed_files = []
     # Create minfied combined.css file
-    cssbuffer = six.BytesIO()
+    cssbuffer = BytesIO()
     cssurls = []
     cssdir = resourcedir + os.sep + "css"
 
@@ -128,7 +138,7 @@ def makeresources(repos,
 
     # Create data/rsrc/js/combined.js in a similar way but use slimit to
     # compress the result
-    jsbuffer = six.BytesIO()
+    jsbuffer = BytesIO()
     jsurls = []
     jsdir = resourcedir + os.sep + "js"
 
@@ -601,7 +611,7 @@ def _wsgi_static(environ, start_response, args):
             mimetype = "text/html"
             status = "404 Not Found"
             length = len(msg.encode('utf-8'))
-            fp = six.BytesIO(msg.encode('utf-8'))
+            fp = BytesIO(msg.encode('utf-8'))
             iterdata = FileWrapper(fp)
     length = str(length)
     start_response(_str(status), [
@@ -730,7 +740,7 @@ def run(argv):
                 try:
                     return enable(classname)
                 except (ImportError, ValueError) as e:
-                    log.error(six.text_type(e))
+                    log.error(str(e))
                     return None
             elif action == 'runserver':
                 args = _setup_runserver_args(config, _find_config_file())
@@ -1387,7 +1397,7 @@ def _preflight_check(log, verbose=False):
         ('rdflib', '4.0', True),
         ('html5lib', '0.99', True),
         ('requests', '1.2.0', True),
-        ('six', '1.4.0', True),
+        ('future', '0.11', True),
         ('jsmin', '2.0.2', True),
         ('whoosh', '2.4.1', True),
         ('pyparsing', '1.5.7', True))

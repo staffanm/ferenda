@@ -1,26 +1,33 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-import xml.etree.cElementTree as ET
-import os
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
+
 from io import BytesIO, StringIO
-import tempfile
-import logging
-import re
 from xml.sax import SAXParseException
+import logging
+import os
+import re
+import tempfile
+import xml.etree.cElementTree as ET
 
 from rdflib import URIRef
 from rdflib import Graph
-from rdflib import URIRef
 from rdflib import ConjunctiveGraph
 import requests
 import requests.exceptions
 import pyparsing
 
-from six import text_type as str
-from six.moves.urllib_parse import quote
-
-from ferenda.thirdparty import SQLite
+from ferenda.thirdparty import SQLite # needed even though not explicitly referenced
 from ferenda import util, errors
+from ferenda.compat import quote
 
 
 class TripleStore(object):
@@ -485,7 +492,6 @@ class RemoteStore(TripleStore):
             for element in row:
                 # print element.tag # should be "binding"
                 key = element.attrib['name']
-                # note: str is really six.text_type, ie str on py3, unicode on py2
                 value = str(element[0].text)
                 d[key] = value
             res.append(d)
