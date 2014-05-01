@@ -1833,7 +1833,8 @@ class TOC(RepoTester):
         # check content of path, particularly that css/js refs
         # and pageset links are correct. Also, that the selected
         # indexpage is indeed the first (eg. title/a)
-        # (NOTE: the first page in the first pageset (by title/a) isn't linked. The second one (by title/d) is).
+        # (NOTE: the first page in the first pageset (by title/a)
+        # isn't linked. The second one (by title/d) is).
         self.assertEqual("http://localhost:8000/dataset/base?title=d",
                          tree.find(".//nav[@id='toc']").findall(".//a")[0].get("href"))
         self.assertEqual("../../rsrc/css/normalize-1.1.3.css",

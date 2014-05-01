@@ -2125,8 +2125,8 @@ parsed document path to that documents dependency file."""
                     sublist.append(ListItem([page.linktext]))
                 else:
                     href = self.dataset_uri(page.binding, page.value)
-                    sublist.append(ListItem([Link(str(page.linktext), href=href)]))
-            nav.append(ListItem([Paragraph(pageset.label), sublist]))
+                    sublist.append(ListItem([Link(page.linktext, href=href)]))
+            nav.append(ListItem([Paragraph([pageset.label]), sublist]))
 
         d.value(self.ns['dct'].title, title)
 

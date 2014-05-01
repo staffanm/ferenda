@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
 import sys
 if sys.version_info[:2] == (3,2): # remove when py32 support ends
     import uprefix
