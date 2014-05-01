@@ -498,11 +498,11 @@ def parametrize(cls, template_method, name, params, wrapper=None):
     def test_method(self):
         template_method(self, *params)
 
-    if sys.version_info[0] <= 3:
+    if sys.version_info[0] >= 3:
         test_method.__name__ = name
     else:
         # py2 compat: name is a unicode object, func.__name__ must be a str(?)
-        test_method.__name__ = bytes(name)
+        test_method.__name__ = bytes(name, "ascii")
     # wrapper is a unittest decorator like skip or expectedFailure
     if wrapper:
         setattr(cls, name, wrapper(test_method))

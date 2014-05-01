@@ -1,11 +1,19 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-import os,sys
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
+
+import os
 import codecs
 from ferenda.compat import unittest
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-
-import six
 
 from ferenda import CitationParser
 from ferenda import util
@@ -22,7 +30,7 @@ class ParametricBase(unittest.TestCase):
         nodes = cp.parse_string(testdata)
         got = []
         for node in nodes:
-            if isinstance(node,six.text_type):
+            if isinstance(node, str):
                 got.append(node.strip())
             else:
                 (text,result) = node

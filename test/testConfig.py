@@ -1,16 +1,24 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
 
 import sys
 import os
+if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
+from ferenda.manager import setup_logger; setup_logger('CRITICAL')
+
 from datetime import datetime
 import doctest
+
 from ferenda.compat import unittest, OrderedDict
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-
-import six
-from six import text_type as str
-
 from ferenda import util
 from ferenda.layeredconfig import LayeredConfig
 
@@ -46,15 +54,15 @@ lastrun = 2012-09-18 15:41:00
                                       })
         
         self.assertEqual(cfg.datadir,'mydata')
-        self.assertIs(type(cfg.datadir),six.text_type)
+        self.assertIsInstance(cfg.datadir, str)
         self.assertEqual(cfg.processes,4)
-        self.assertIs(type(cfg.processes),int)
+        self.assertIsInstance(cfg.processes,int)
         self.assertEqual(cfg.loglevel,'INFO')
-        self.assertIs(type(cfg.loglevel),six.text_type)
+        self.assertIsInstance(cfg.loglevel,str)
         self.assertEqual(cfg.forceparse,True)
-        self.assertIs(type(cfg.forceparse),bool)
+        self.assertIsInstance(cfg.forceparse,bool)
         self.assertEqual(cfg.jsfiles,['default.js','modernizr.js'])
-        self.assertIs(type(cfg.jsfiles),list)
+        self.assertIsInstance(cfg.jsfiles,list)
 
         
     def test_defaults_subsections(self):
@@ -105,13 +113,13 @@ jsfiles = ['default.js','modernizr.js']
 """)
         cfg = LayeredConfig(inifile="ferenda.ini")
         self.assertEqual(cfg.datadir,'mydata')
-        self.assertIs(type(cfg.datadir),str)
+        self.assertIsInstance(cfg.datadir,str)
         self.assertEqual(cfg.processes,'4')
-        self.assertIs(type(cfg.processes),str)
+        self.assertIsInstance(cfg.processes,str)
         self.assertEqual(cfg.forceparse,'True')
-        self.assertIs(type(cfg.forceparse),str)
+        self.assertIsInstance(cfg.forceparse,str)
         self.assertEqual(cfg.jsfiles,"['default.js','modernizr.js']")
-        self.assertIs(type(cfg.jsfiles),str)
+        self.assertIsInstance(cfg.jsfiles,str)
 
         cfg = LayeredConfig(inifile="nonexistent.ini")
         self.assertEqual([], list(cfg))
@@ -147,15 +155,15 @@ jsfiles = ['default.js','modernizr.js']
                    '--implicitboolean']
         cfg = LayeredConfig(commandline=cmdline)
         self.assertEqual(cfg.datadir,'mydata')
-        self.assertIs(type(cfg.datadir),str)
+        self.assertIsInstance(cfg.datadir,str)
         self.assertEqual(cfg.processes,'4')
-        self.assertIs(type(cfg.processes),str)
+        self.assertIsInstance(cfg.processes,str)
         self.assertEqual(cfg.forceparse,'True')
-        self.assertIs(type(cfg.forceparse),str)
+        self.assertIsInstance(cfg.forceparse,str)
         self.assertEqual(cfg.jsfiles,['default.js','modernizr.js'])
-        self.assertIs(type(cfg.jsfiles),list)
+        self.assertIsInstance(cfg.jsfiles,list)
         self.assertTrue(cfg.implicitboolean)
-        self.assertIs(type(cfg.implicitboolean),bool)
+        self.assertIsInstance(cfg.implicitboolean,bool)
         
     def test_commandline_subsections(self):
         cmdline = ['--datadir=mydata',
@@ -340,7 +348,7 @@ lastrun = 2013-09-18 15:41:00
 
 """
         got = util.readfile("ferenda.ini").replace("\r\n","\n")
-        #if not isinstance(got, six.text_type):
+        #if not isinstance(got, str):
         #    got = got.decode("utf-8")
         self.assertEqual(want,got)
 

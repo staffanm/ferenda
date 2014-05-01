@@ -25,34 +25,37 @@ from future import standard_library
 with standard_library.hooks():
     import configparser
     from io import BytesIO
+standard_library.remove_hooks()
 
-from future.builtins import input # needed for testManager.Setup.test_setup (which mocks ferenda.manager.input)
+from future.builtins import input # explicit import needed for
+                                  # testManager.Setup.test_setup
+                                  # (which mocks
+                                  # ferenda.manager.input)
 
 # system
-import os
-import stat
-import subprocess
-import sys
-import inspect
-import logging
-import json
-import mimetypes
-import shutil
-import tempfile
 from datetime import datetime
-import xml.etree.cElementTree as ET
 from ferenda.compat import OrderedDict, MagicMock
 from wsgiref.simple_server import make_server
 from wsgiref.util import FileWrapper
-
-from ferenda.compat import urlsplit, parse_qsl, urlencode
+import codecs
+import inspect
+import json
+import logging
+import mimetypes
+import os
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+import xml.etree.cElementTree as ET
 
 # 3rd party
+from lxml import etree
+from rdflib import URIRef, Namespace, Literal
 import pkg_resources
 import requests
 import requests.exceptions
-from rdflib import URIRef, Namespace, Literal
-from lxml import etree
 
 # my modules
 from ferenda import DocumentRepository
@@ -64,6 +67,7 @@ from ferenda import elements
 from ferenda import errors
 from ferenda import util
 from ferenda.elements import html
+from ferenda.compat import urlsplit, parse_qsl, urlencode
 
 # NOTE: This is part of the published API and must be callable in
 # scenarios without configfile or logger.
@@ -825,7 +829,7 @@ def enable(classname):
     alias = cls.alias
     cfg.add_section(alias)
     cfg.set(alias, "class", classname)
-    with open(configfilename, "w") as fp:
+    with codecs.open(configfilename, "w", encoding="utf-8") as fp:
         cfg.write(fp)
     log = setup_logger()
     log.info("Enabled class %s (alias '%s')" % (classname, alias))

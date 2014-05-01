@@ -28,7 +28,7 @@ except ImportError: # pragma: no cover
     from ordereddict import OrderedDict
 
 try:
-    from urllib.parse import quote, unquote, urlsplit, urlunsplit, parse_qsl, urlencode
+    from urllib.parse import quote, unquote, urlsplit, urlunsplit, parse_qsl, urlencode, urljoin
 except ImportError:
     # urllib.quote in python 2 cannot handle unicode values for the s
     # parameter (2.6 cannot even handle unicode values for the safe
@@ -41,7 +41,7 @@ except ImportError:
             safe = safe.encode('ascii')
         return _quote(s, safe).decode('ascii')
     from urllib import unquote, urlencode
-    from urlparse import urlsplit, urlunsplit, parse_qsl
+    from urlparse import urlsplit, urlunsplit, parse_qsl, urljoin
 
 try:
     from html.entities import name2codepoint

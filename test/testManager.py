@@ -1,5 +1,19 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
+
+from future import standard_library
+with standard_library.hooks():
+    import configparser
+standard_library.remove_hooks()
 
 import os
 import sys
@@ -21,9 +35,7 @@ from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 from ferenda.compat import unittest, OrderedDict, Mock, MagicMock, patch, call
 from ferenda.testutil import RepoTester, FerendaTestCase
 
-import six
-from six.moves import configparser, reload_module
-builtins = "__builtin__" if six.PY2 else "builtins"
+builtins = "__builtin__" if sys.version_info[0] == 2 else "builtins"
 
 from lxml import etree as ET
 import requests.exceptions
@@ -906,7 +918,6 @@ apiendpoint = /api/
         os.unlink("out.log")
 
     def test_print_usage(self):
-        builtins = "__builtin__" if six.PY2 else "builtins"
         self._enable_repos()
         with patch(builtins+'.print') as printmock:
             manager.run([])
