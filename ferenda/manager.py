@@ -25,24 +25,30 @@ from future import standard_library
 with standard_library.hooks():
     import configparser
     from io import BytesIO
+standard_library.remove_hooks()
 
-from future.builtins import input # needed for testManager.Setup.test_setup (which mocks ferenda.manager.input)
+from future.builtins import input # explicit import needed for
+                                  # testManager.Setup.test_setup
+                                  # (which mocks
+                                  # ferenda.manager.input)
 
 # system
-import os
-import stat
-import subprocess
-import sys
-import inspect
-import logging
-import shutil
-import tempfile
 from datetime import datetime
 from ferenda.compat import OrderedDict, MagicMock
 from wsgiref.simple_server import make_server
-import multiprocessing
-from functools import partial, wraps
-from ast import literal_eval
+from wsgiref.util import FileWrapper
+import codecs
+import inspect
+import json
+import logging
+import mimetypes
+import os
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+import xml.etree.cElementTree as ET
 
 import six
 from six.moves.urllib_parse import urlsplit
@@ -63,6 +69,8 @@ from ferenda import WSGIApp
 from ferenda import Resources
 from ferenda import errors
 from ferenda import util
+from ferenda.elements import html
+from ferenda.compat import urlsplit, parse_qsl, urlencode
 
 # NOTE: This is part of the published API and must be callable in
 # scenarios without configfile or logger.
@@ -830,7 +838,7 @@ def enable(classname):
     alias = cls.alias
     cfg.add_section(alias)
     cfg.set(alias, "class", classname)
-    with open(configfilename, "w") as fp:
+    with codecs.open(configfilename, "w", encoding="utf-8") as fp:
         cfg.write(fp)
     log = setup_logger()
     log.info("Enabled class %s (alias '%s')" % (classname, alias))
@@ -1557,7 +1565,7 @@ def _preflight_check(log, verbose=False):
             if not hasattr(m, '__version__'):
                 log.warning("Module %s has no version information,"
                             "it might be older than required" % mod)
-            elif util.numcmp(version, ver) < 0:
+            elif version < ver:  # FIXME: use util.numcmp?
                 if required:
                     log.error("Module %s has version %s, need %s" %
                           (mod, version, ver))

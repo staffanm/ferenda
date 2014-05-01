@@ -15,7 +15,17 @@ The module also contains the convenience functions
 hierarchies to and from strings.
 
 """
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
+
 from operator import itemgetter
 import ast
 import datetime
@@ -742,7 +752,6 @@ def __deserialize_json(node):
 
 def __serialize_xml(node, serialize_hidden_attrs=False):
     # print "serializing: %r" % node
-
     # Special handling of pyparsing.ParseResults -- deserializing of
     # these won't work (easily)
     if isinstance(node, pyparsing.ParseResults):
@@ -751,7 +760,7 @@ def __serialize_xml(node, serialize_hidden_attrs=False):
 
     # We use type() instead of isinstance() because we want to
     # serialize str derived types using their correct class names
-    if type(node) == str:
+    if type(node) == str or node.__class__.__name__ == "unicode":
         nodename = "str"
     elif type(node) == bytes:
         nodename = "bytes"

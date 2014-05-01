@@ -1,11 +1,18 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
 import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
+
 import os
 import datetime
 
-import six
 
 from ferenda.compat import unittest
 from ferenda.compat import Mock, patch
@@ -28,7 +35,7 @@ for cls in (Keyword, Skeleton, MediaWiki,
     d = {'repoclass': cls,
          'docroot': os.path.dirname(__file__)+"/files/repo/" + cls.alias}
     name = 'Test'+cls.__name__
-    if six.PY2:
+    if sys.version_info[0] == 2:
         name = name.encode()
     testcls = type(name, (RepoTester,), d)
     # testcls.filename_to_basefile = lambda x, y: "2"

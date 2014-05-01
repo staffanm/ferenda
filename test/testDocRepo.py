@@ -1,10 +1,17 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
 
-import sys, os
-from ferenda.compat import unittest
+import os
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-
 from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 
 from datetime import datetime,date,timedelta
@@ -838,7 +845,7 @@ Status for document repository 'base' (ferenda.documentrepository.DocumentReposi
  parse: None.
  generated: None.
 """.strip()
-        builtins = "__builtin__" if six.PY2 else "builtins"
+        builtins = "__builtin__" if sys.version_info[0] == 2 else "builtins"
         with patch(builtins+".print") as printmock:
             self.repo.status()
         got = "\n".join([x[1][0] for x in printmock.mock_calls])
@@ -861,7 +868,7 @@ Status for document repository 'base' (ferenda.documentrepository.DocumentReposi
  parse: 8, 7, 6... (5 more) Todo: 12, 11, 10... (1 more)
  generated: 4, 3, 2... (1 more) Todo: 8, 7, 6... (1 more)
 """.strip()
-        builtins = "__builtin__" if six.PY2 else "builtins"
+        builtins = "__builtin__" if sys.version_info[0] == 2 else "builtins"
         with patch(builtins+".print") as printmock:
             self.repo.status()
         got = "\n".join([x[1][0] for x in printmock.mock_calls])

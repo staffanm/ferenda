@@ -1,11 +1,20 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
 
 # NOTE: This unittest requires that the antiword binary is available
 # and calls that, making this not a pure unittest (it also
 # reads word files from disk) but that is just the way it is.
 
-import sys, os, tempfile, shutil
+import os, tempfile, shutil
 from lxml import etree
 from ferenda.compat import unittest
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())

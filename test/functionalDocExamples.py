@@ -1,5 +1,14 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
 
 import sys
 import os
@@ -7,8 +16,6 @@ import subprocess
 import tempfile
 import shutil
 import re
-
-import six
 
 from ferenda import util
 from ferenda.compat import unittest, patch
@@ -23,7 +30,6 @@ from ferenda.decorators import downloadmax
 from bs4 import BeautifulSoup
 from datetime import datetime, date
 from itertools import islice
-from six.moves.urllib_parse import urljoin
 import requests
 
 class Examples(unittest.TestCase, FerendaTestCase):
@@ -37,11 +43,8 @@ class Examples(unittest.TestCase, FerendaTestCase):
             workingdir = os.getcwd()
         oldwd = os.getcwd()
         pycode = compile(util.readfile(pyfile), pyfile, 'exec')
-        os.chdir(workingdir)
-        try:
-            result = six.exec_(pycode, globals(), locals())
-        finally:
-            os.chdir(oldwd)
+        # result = six.exec_(pycode, globals(), locals())
+        result = exec(pycode, globals(), locals())
         # the exec:ed code is expected to set return_value
         got = locals()['return_value']
         if not comparator:

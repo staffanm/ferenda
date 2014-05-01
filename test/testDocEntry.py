@@ -1,7 +1,22 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
 
-import sys, os
+from future import standard_library
+with standard_library.hooks():
+    from io import StringIO
+standard_library.remove_hooks()
+
+
+import os
 from ferenda.compat import unittest
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
@@ -10,14 +25,26 @@ import shutil
 import os
 from datetime import datetime
 
-import six
-
 from ferenda import DocumentRepository, util
 
 # SUT
 from ferenda import DocumentEntry
 
 class DocEntry(unittest.TestCase):
+    empty_json = """{
+  "basefile": null, 
+  "content": {}, 
+  "id": null, 
+  "link": {}, 
+  "orig_checked": "2013-03-27T20:46:37", 
+  "orig_updated": null, 
+  "orig_url": "http://source.example.org/doc/123/a", 
+  "published": null, 
+  "summary": null, 
+  "title": null, 
+  "updated": null, 
+  "url": null
+}"""
     basic_json = """{
   "basefile": null, 
   "content": {
@@ -113,12 +140,13 @@ class DocEntry(unittest.TestCase):
         d.save(path=path)
 
         self.maxDiff = None
-        self.assertEqual(self.d2u(util.readfile(path)), self.basic_json)
+        self.assertEqual(self.empty_json,
+                         self.d2u(util.readfile(path)))
 
-    def test_save(self):
+    def test_save_typeerror(self):
         path = self.repo.store.documententry_path("123/x")
         d = DocumentEntry()
-        d.title = six.StringIO("A file-like object, not a string")
+        d.title = StringIO("A file-like object, not a string")
         with self.assertRaises(TypeError):
             d.save(path=path)
 

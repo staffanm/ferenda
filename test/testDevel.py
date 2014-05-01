@@ -1,13 +1,21 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
 
-import sys, os, tempfile, re, shutil
+import os, tempfile, re, shutil
 from tempfile import mkstemp
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
-import six
 from ferenda.compat import unittest, patch, call,  Mock, MagicMock
-builtins = "__builtin__" if six.PY2 else "builtins"
+builtins = "__builtin__" if sys.version_info[0] == 2 else "builtins"
 
 
 from rdflib import Graph, URIRef, Namespace, Literal
