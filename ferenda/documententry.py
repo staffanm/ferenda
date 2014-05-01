@@ -131,7 +131,14 @@ with.
         d = dict((k, v) for (k, v) in self.__dict__.items() if k[0] != "_")
         util.ensure_dir(path)
         with open(path, "w") as fp:
+<<<<<<< HEAD
             json.dump(d, fp, default=util.json_default_date, indent=2, separators=(', ',': '), sort_keys=True)
+=======
+            # we need to get a (unicode) string by using json.dumps(),
+            # which we then save to a non-binary file handle, in order
+            # to be fully py2/3 compatible.
+            fp.write(json.dumps(d, fp, default=mydefault, indent=2, separators=(', ',': '), sort_keys=True))
+>>>>>>> most tests now pass on py2 (four remaining...)
     # If inline=True, the contents of filename is included in the Atom
     # entry. Otherwise, it just references it.
     #

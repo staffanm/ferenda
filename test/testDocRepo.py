@@ -1468,6 +1468,108 @@ WHERE {
             Facet.year({'dcterms_issued': '2014-14-99'})
         
 
+        # delete issued from one place in self.results1
+        res = copy.deepcopy(self.results1)
+        del res[1]['issued']
+        # FIXME: this'll go boom!
+        # del res[0]['title']
+        got = self.repo.toc_select_for_pages(res, self.pagesets, self.criteria)
+        self.assertEqual(len(got), 9)
+
+
+    def test_generate_page(self):
+        path = self.repo.toc_generate_page('title','a', self.documentlists[('title','a')], self.pagesets)
+        # 2. secondly, test resulting HTML file
+        self.assertTrue(os.path.exists(path))
+        t = etree.parse(path)
+        
+        #with open(path) as fp:
+        #    print(fp.read().decode('utf-8'))
+
+        # Various other tests on a.html
+        # 2.1 CSS links, relativized correctly?
+        css = t.findall("head/link[@rel='stylesheet']")
+        self.assertEqual(len(css),4) # normalize, main, ferenda, and fonts.googleapis.com
+        
+        self.assertRegex(css[0].get('href'), '^../../../rsrc/css')
+        
+        # 2.2 JS links, relativized correctly?
+        js = t.findall("head/script")
+        self.assertEqual(len(js),4) # jquery, modernizr, respond and ferenda
+        self.assertRegex(js[0].get('src'), '^../../../rsrc/js')
+        # 2.3 <nav id="toc"> correct (c.f 1.2)
+        navlinks = t.findall(".//nav[@id='toc']//li/a")
+        self.assertEqual(len(navlinks),9)
+
+        self.assertEqual(navlinks[0].get("href"), 'http://localhost:8000/dataset/base?title=d')
+        self.assertEqual(navlinks[3].get("href"), 'http://localhost:8000/dataset/base?issued=1791')
+        
+        # 2.4 div[@class='main-container']/article (c.f 1.3)
+        docs = t.findall(".//ul[@role='main']/li/a")
+        self.assertEqual(len(docs),2)
+        # "And..." should go before "A Tale..."
+        self.assertEqual(docs[0].text, 'And Then There Were None')
+        self.assertEqual(docs[0].attrib['href'], 'http://example.org/books/And_Then_There_Were_None')
+        
+        # 2.5 <header><h1><a> correct?
+        header = t.find(".//header/h1/a")
+        self.assertEqual(header.text, 'testsite')
+       
+        # 2.6 div[@class='main-container']/h1 correct?
+        header = t.find(".//div[@class='main-container']//h1")
+        self.assertEqual(header.text, 'Documents starting with "a"')
+
+    def test_generate_page_staticsite(self):
+        self.repo.config.staticsite = True
+        path = self.repo.toc_generate_page('title','a', 
+                                           self.documentlists[('title','a')], 
+                                           self.pagesets)
+        t = etree.parse(path)
+
+        # TOC link should be relativized
+        navlinks = t.findall(".//nav[@id='toc']//li/a")
+        self.assertEqual('d.html', navlinks[0].get("href"))
+        self.assertEqual('../issued/1791.html', navlinks[3].get("href"))
+
+        header = t.find(".//header/h1/a")
+        # from /base/toc/title/a.html -> /index.html = 3 levels up
+        self.assertEqual('../../../index.html', header.get("href"))
+
+        headernavlinks = t.findall(".//header/nav/ul/li/a")    
+        self.assertEqual('../index.html', headernavlinks[0].get("href"))
+
+        # docs (which in this case use non-base-repo-contained URIs, should be unaffected
+        docs = t.findall(".//ul[@role='main']/li/a")
+        self.assertEqual('http://example.org/books/And_Then_There_Were_None', docs[0].get("href"))
+
+    def test_generate_pages(self):
+        paths = self.repo.toc_generate_pages(self.documentlists,self.pagesets)
+        self.assertEqual(len(paths), 10)
+        #print("=============%s====================" % paths[0])
+        #with open(paths[0]) as fp:
+        #    print(fp.read())
+        for path in paths:
+            self.assertTrue(os.path.exists(path))
+
+    def test_generate_first_page(self):
+        path = self.repo.toc_generate_first_page(self.documentlists,self.pagesets)
+        self.assertEqual(path, self.p("base/toc/index.html"))
+        self.assertTrue(os.path.exists(path))
+        tree = etree.parse(path)
+        # check content of path, particularly that css/js refs
+        # and pageset links are correct. Also, that the selected
+        # indexpage is indeed the first (eg. title/a)
+        # (NOTE: the first page in the first pageset (by title/a)
+        # isn't linked. The second one (by title/d) is).
+        self.assertEqual("http://localhost:8000/dataset/base?title=d",
+                         tree.find(".//nav[@id='toc']").findall(".//a")[0].get("href"))
+        self.assertEqual("../../rsrc/css/normalize-1.1.3.css",
+                         tree.find(".//link").get("href"))
+                         
+        self.assertEqual('Documents starting with "a"',
+                         tree.find(".//article/h1").text)
+                         
+
 class News(RepoTester):
     def setUp(self):
         super(News, self).setUp()
