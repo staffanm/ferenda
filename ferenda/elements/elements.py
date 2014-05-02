@@ -555,7 +555,15 @@ def __serialize_json(node):
     elif type(node) == list:
         return [__serialize_json(x) for x in node]
     elif type(node) == dict or type(node).__name__ == "dict":
-        return dict([(k, __serialize_json(v)) for k,v in node.items()])
+        # we must make sure we deal with a real builtin dict, not the
+        # future.builtins.types.newdict (the latter lacks a sortable
+        # result from .keys())
+        if sys.version_info[:2] < (2, 7):
+            klass  = __builtins__['dict']
+        else:
+            klass = dict
+        ret =  klass([(k, __serialize_json(v)) for k,v in node.items()])
+        return ret
     else:
         if node.__class__.__module__ in ('builtins', '__builtin__'):
             if type(node) == str:  # py2 workaround -- we want a str to be known as 'str' always, but py2 thinks they're called 'unicode'...
