@@ -35,6 +35,16 @@ except ImportError:
     # parameter). We therefore redefine quote with a wrapper.
     from urllib import quote as _quote
     def quote(s, safe='/'):
+        from future.builtins.types.newstr import newstr
+        if s.__class__.__name__ == "unicode":
+            pass
+        elif isinstance(s, newstr):
+#            # again, revert the 'helpfulness' that future.builtins
+#            # provides -- we need a py2-style string with implicit
+#            # encoding, not the weird newbytes thing (which, when
+#            # iterated, yield a series of ints, not one-byte bytes -- this
+#            # breaks urllib.quote)
+            s = __builtins__['str'](s)
         if isinstance(s, str):
             s = s.encode('utf-8')
         if isinstance(safe, str):

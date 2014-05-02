@@ -810,7 +810,6 @@ class Repo(RepoTester):
         dependencyfile = self.repo.store.parsed_path('root') + os.linesep
         self.assertEqual(util.readfile(self.repo.store.dependencies_path("res-a")),
                          dependencyfile)
-
         #  4.2 otherrepo.store.dependencies_path contains parsed_path('root')
         self.assertEqual(util.readfile(otherrepo.store.dependencies_path("res-b")),
                          dependencyfile)

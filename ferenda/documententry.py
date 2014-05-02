@@ -128,7 +128,14 @@ with.
 
         if not path:
             path = self._path  # better be there
-        d = dict((k, v) for (k, v) in self.__dict__.items() if k[0] != "_")
+        # we must make sure we deal with a real builtin dict, not the
+        # future.builtins.types.newdict (the latter lacks a sortable
+        # result from .keys())
+        if sys.version_info[:2] < (2, 7):
+            klass  = __builtins__['dict']
+        else:
+            klass = dict
+        d = klass((k, v) for (k, v) in self.__dict__.items() if k[0] != "_")
         util.ensure_dir(path)
         with open(path, "w") as fp:
 <<<<<<< HEAD
