@@ -13,9 +13,6 @@ import os
 
 from ferenda.compat import unittest, Mock, patch
 
-from ferenda import manager
-manager.setup_logger('CRITICAL')
-
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
 from io import BytesIO

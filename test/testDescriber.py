@@ -13,7 +13,6 @@ else:
 import datetime
 
 from ferenda.compat import unittest
-
 from rdflib import Graph, Namespace
 
 # SUT

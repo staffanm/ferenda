@@ -20,7 +20,6 @@ from rdflib import Graph
 from ferenda.compat import unittest
 
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 from ferenda.citationpatterns import url as urlparser
 from ferenda import util
 # SUT
@@ -43,7 +42,7 @@ class Main(unittest.TestCase):
                              ordinal=2,
                              title="Native types")
                  ])
-        # roundtrip using the default XML format 
+        # roundtrip using the default XML format
         serialized = serialize(tree)
         self.assertIsInstance(serialized, str)
         newtree = deserialize(serialized, caller_globals=globals())
@@ -174,7 +173,7 @@ class Main(unittest.TestCase):
         x = Link("Link text", uri="http://example.org/")
         self.assertEqual(str(x), "Link text")
         self.assertEqual(repr(x), "Link('Link text', uri=http://example.org/)")
-
+        
         # y = Link("Räksmörgås", uri="http://example.org/")
         # self.assertEqual(str(y), "Räksmörgås")
         # self.assertEqual(repr(y), "Link('Räksmörgås', uri=http://example.org/)")

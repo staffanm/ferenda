@@ -13,7 +13,6 @@ else:
 import sys
 import os
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 
 from datetime import datetime
 import doctest

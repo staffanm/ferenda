@@ -12,8 +12,8 @@ else:
 
 import os
 import codecs
-from ferenda.compat import unittest
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
+from ferenda.compat import unittest
 
 from ferenda import CitationParser
 from ferenda import util
