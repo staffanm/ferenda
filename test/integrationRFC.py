@@ -12,8 +12,6 @@ else:
 
 from ferenda.compat import unittest
 
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
-
 from ferenda.testutil import FerendaTestCase, testparser, file_parametrize
 from ferenda.sources.tech import RFC
 

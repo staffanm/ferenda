@@ -26,6 +26,9 @@ if sys.version_info[:2] == (3,2): # remove when py32 support ends
 else:
     from future.builtins import *
 
+from future.utils import python_2_unicode_compatible
+
+PY2 = sys.version_info[0] == 2
 from operator import itemgetter
 import ast
 import datetime
@@ -193,6 +196,7 @@ class CompoundElement(AbstractElement, list):
         object.__setattr__(obj, '__initialized', False)
         return obj
 
+    @python_2_unicode_compatible
     def __str__(self):
         return self.as_plaintext()
 
@@ -481,11 +485,12 @@ class Link(UnicodeElement):
     """A unicode string with also has a ``.uri`` attribute"""
     tagname = 'a'
 
-    # FIXME: can __repr__ on PY2 return unicode data?
+    @python_2_unicode_compatible
     def __repr__(self):
-        # convoluted way around a UnicodeEncode error on py2 when self contains non-ascii characters
+        # convoluted way around a UnicodeEncode error on py2 when self
+        # contains non-ascii characters
         if sys.version_info[0] < 3:
-            rep = repr(str(self))[2:-1]
+            rep = repr(str(self))[1:-1]
         else:
             rep = self
         return 'Link(\'%s\', uri=%s)' % (rep, self.uri)
@@ -614,23 +619,22 @@ class ListItem(CompoundElement, OrdinalElement):
 def __serialize_json(node):
     # some native datatypes should be returned as-is, ie not wrapped
     # in a dict. Note that types derived from these gets handled
-    # differently
-    if type(node) in (str, int, bool):
+    # differently again, since future redefines str and int on py2,
+    # we'll have to check what the class itself thinks it's named.
+    if (type(node) in (str, int, bool) or
+        (PY2 and node.__class__.__name__ in ("unicode", "int"))):
         return node
-    # NOTE: this transforms bytes into str's (even though on py2 these will be labeled as "str")
-    # elif type(node) == bytes: 
-    #     return node.decode()
     # lists and dicts gets returned as-is, but the values in those
     # containers are transformed if need be
     elif type(node) == list:
         return [__serialize_json(x) for x in node]
-    elif type(node) == dict:
+    elif type(node) == dict or type(node).__name__ == "dict":
         return dict([(k, __serialize_json(v)) for k,v in node.items()])
     else:
         if node.__class__.__module__ in ('builtins', '__builtin__'):
             if type(node) == str:  # py2 workaround -- we want a str to be known as 'str' always, but py2 thinks they're called 'unicode'...
                 typename = "str"
-            elif type(node) == bytes:
+            elif type(node) == bytes or (PY2 and node.__class__.__name__ == "str"):
                 typename = "bytes"
             else:
                 typename = node.__class__.__name__
@@ -762,7 +766,7 @@ def __serialize_xml(node, serialize_hidden_attrs=False):
     # serialize str derived types using their correct class names
     if type(node) == str or node.__class__.__name__ == "unicode":
         nodename = "str"
-    elif type(node) == bytes:
+    elif type(node) == bytes or (PY2 and node.__class__.__name__ == "str"):
         nodename = "bytes"
     else:
         nodename = node.__class__.__name__
@@ -815,16 +819,20 @@ def __deserialize_xml(elem, caller_globals):
         # print "creating cls for %s" % elem.tag
         cls = caller_globals[elem.tag]
 
-    if str == cls or str in cls.__bases__:
+    # since future redefines 'str' to mean
+    # 'future.builtins.types.newstr.newstr', the first comparison
+    # doesn't work on py2, we'll have to look at cls.__name__ directly
+    # (same for ints and dicts below)
+    if str == cls or str in cls.__bases__ or cls.__name__ == "unicode":
         c = cls(elem.text, **elem.attrib)
 
-    elif bytes == cls or bytes in cls.__bases__:
+    elif bytes == cls or bytes in cls.__bases__ or (PY2 and cls.__name__ == "str"):
         c = cls(elem.text.encode(), **elem.attrib)
 
-    elif int == cls or int in cls.__bases__:
+    elif int == cls or int in cls.__bases__ or (PY2 and cls.__name__ == "int"):
         c = cls(int(elem.text), **elem.attrib)
 
-    elif dict == cls or dict in cls.__bases__:
+    elif dict == cls or dict in cls.__bases__ or cls.__name__ == "dict":
         c = cls(ast.literal_eval(elem.text), **elem.attrib)
 
     elif datetime.date == cls or datetime.date in cls.__bases__:

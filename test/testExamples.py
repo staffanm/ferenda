@@ -39,7 +39,7 @@ class TestExamples(unittest.TestCase, FerendaTestCase):
         with open(pyfile, 'rb') as fp:
             pycode = compile(fp.read(), pyfile, 'exec')
         #  result = six.exec_(pycode, globals(), locals())
-        result = exec(pycode, globals(), locals())
+        exec(pycode, globals(), locals())
         # the exec:ed code is expected to set return_value
         got = locals()['return_value']
         if not comparator:

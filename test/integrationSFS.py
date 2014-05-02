@@ -13,8 +13,6 @@ from ferenda.compat import unittest
 
 from six import text_type as str
 
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
-
 import codecs
 from ferenda.sources.legal.se import SFS
 from ferenda.elements import serialize, LinkSubject

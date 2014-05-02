@@ -667,6 +667,7 @@ def setup_logger(level='INFO', filename=None,
         h = logging.StreamHandler()
     for existing_handler in l.handlers:
         if h.__class__ == existing_handler.__class__:
+            existing_handler.setLevel(loglevel)
             # print("    A %r already existed" % h)
             return l
 

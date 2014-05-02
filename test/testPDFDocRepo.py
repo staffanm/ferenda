@@ -20,7 +20,6 @@ from ferenda import PDFDocumentRepository
 from ferenda.testutil import RepoTester
 
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 
 class Repo(RepoTester):
     repoclass = PDFDocumentRepository
