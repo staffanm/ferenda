@@ -1,5 +1,15 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
+
 import os
 import logging
 import re
@@ -9,9 +19,6 @@ from glob import glob
 from bz2 import BZ2File
 
 from lxml import etree
-from six import text_type as str
-# from six import binary_type as bytes
-import six
 
 from ferenda import util, errors
 from .elements import UnicodeElement
@@ -643,8 +650,7 @@ all text in a Textbox has the same font and size.
         if len(s) > 40:
             s = s[:25] + "[...]" + s[-10:]
 
-        if six.PY2:
-            # s = repr(s)
+        if sys.version_info[0] < 3:
             s = s.encode('ascii', 'replace')
         if self.getfont():
             fontinfo = "%s@%s " % (self.getfont()['family'],

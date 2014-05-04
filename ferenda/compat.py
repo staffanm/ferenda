@@ -4,17 +4,60 @@
 Client code uses this like::
 
     from ferenda.compat import OrderedDict
+    from ferenda.compat import quote, unquote, urlsplit, urlunsplit
+    from ferenda.compat import name2codepoint
+    # and for testing
     from ferenda.compat import unittest 
     from ferenda.compat import Mock, patch
 """
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
 import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
+
 try:
     from collections import OrderedDict
 except ImportError: # pragma: no cover
     # if on python 2.6
     from ordereddict import OrderedDict
 
+try:
+    from urllib.parse import quote, unquote, urlsplit, urlunsplit, parse_qsl, urlencode, urljoin
+except ImportError:
+    # urllib.quote in python 2 cannot handle unicode values for the s
+    # parameter (2.6 cannot even handle unicode values for the safe
+    # parameter). We therefore redefine quote with a wrapper.
+    from urllib import quote as _quote
+    def quote(s, safe='/'):
+        from future.builtins.types.newstr import newstr
+        if s.__class__.__name__ == "unicode":
+            pass
+        elif isinstance(s, newstr):
+#            # again, revert the 'helpfulness' that future.builtins
+#            # provides -- we need a py2-style string with implicit
+#            # encoding, not the weird newbytes thing (which, when
+#            # iterated, yield a series of ints, not one-byte bytes -- this
+#            # breaks urllib.quote)
+            s = __builtins__['str'](s)
+        if isinstance(s, str):
+            s = s.encode('utf-8')
+        if isinstance(safe, str):
+            safe = safe.encode('ascii')
+        return _quote(s, safe).decode('ascii')
+    from urllib import unquote, urlencode
+    from urlparse import urlsplit, urlunsplit, parse_qsl, urljoin
+
+try:
+    from html.entities import name2codepoint
+except ImportError:
+    from htmlentitydefs import name2codepoint
+    
 if sys.version_info < (2,7,0): # pragma: no cover
     try:
         import unittest2 as unittest

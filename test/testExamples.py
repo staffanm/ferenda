@@ -1,16 +1,21 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
 import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
+
 import os
-import subprocess
 import tempfile
 import shutil
 
-import six
-
 from ferenda import util
-from ferenda.compat import unittest, patch
+from ferenda.compat import unittest, patch, urljoin
 from ferenda.testutil import FerendaTestCase
 # This testcase tests those examples in the documentation that are
 # more unit-like and can run without downloading stuff from the
@@ -26,14 +31,15 @@ import ferenda.citationpatterns
 import ferenda.uriformats
 from bs4 import BeautifulSoup
 import requests
-from six.moves.urllib_parse import urljoin
+
 XMLPatents = HTMLPatents = ScannedPatents = None
 
 class TestExamples(unittest.TestCase, FerendaTestCase):
     def _test_pyfile(self, pyfile, want=True, comparator=None):
         with open(pyfile, 'rb') as fp:
             pycode = compile(fp.read(), pyfile, 'exec')
-        result = six.exec_(pycode, globals(), locals())
+        #  result = six.exec_(pycode, globals(), locals())
+        exec(pycode, globals(), locals())
         # the exec:ed code is expected to set return_value
         got = locals()['return_value']
         if not comparator:

@@ -1,15 +1,30 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-import os
-import datetime
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
+
+from future import standard_library
+with standard_library.hooks():
+    import configparser
+standard_library.remove_hooks()
+    
 import ast
-import logging
+import codecs
+import datetime
+import inspect
 import itertools
+import logging
+import os
 import tempfile
+
 from ferenda.compat import OrderedDict
-from six.moves import configparser
-from six import text_type as str
-from six import binary_type as bytes
 
 
 class LayeredConfig(object):
@@ -115,7 +130,8 @@ class LayeredConfig(object):
         while root._parent:
             root = root._parent
         if root._inifile_dirty:
-            with open(root._inifilename, "w") as fp:
+            # with open(root._inifilename, "wb") as fp:
+            with codecs.open(root._inifilename, "w", encoding="utf-8") as fp:
                 root._configparser.write(fp)
 
     def __iter__(self):
@@ -241,6 +257,8 @@ class LayeredConfig(object):
             return
 
         self._configparser = configparser.ConfigParser(dict_type=OrderedDict)
+        # with codecs.open(inifilename, encoding="utf-8") as fp:
+        #    self._configparser.readfp(fp)
         self._configparser.read(inifilename)
 
         if self._configparser.has_section('__root__'):
@@ -306,7 +324,7 @@ class LayeredConfig(object):
                     cfg_obj = None
 
         if key in defaults:
-            if type(defaults[key]) == type:
+            if inspect.isclass(defaults[key]):
                 # print("Using class for %s" % key)
                 t = defaults[key]
             else:

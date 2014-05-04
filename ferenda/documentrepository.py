@@ -1,41 +1,42 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
 
 from collections import defaultdict
 from datetime import datetime
-from tempfile import mkstemp
 from io import BytesIO
+from tempfile import mkstemp
 from wsgiref.handlers import format_date_time as format_http_date
 from wsgiref.util import request_uri
+import calendar
 import codecs
+import filecmp
 import logging
 import logging.handlers
 import os
 import re
-import time
-import calendar
-import filecmp
 import socket
-from ferenda.compat import OrderedDict
+import time
 
 # 3rd party
-import pkg_resources
 from lxml import etree
 from lxml.builder import ElementMaker
-import lxml.html
-
 from rdflib import Graph, Literal, Namespace, URIRef, RDF
 import bs4
+import lxml.html
+import pkg_resources
 import requests
 import requests.exceptions
 
-from six import text_type as str
-from six import binary_type as bytes
-
-from six.moves.urllib_parse import quote
-
 # mine
-import ferenda
 from ferenda import util, errors, decorators
 from ferenda import (Describer, LayeredConfig, TripleStore, FulltextIndex,
                      Document, DocumentEntry, NewsCriteria, TocCriteria,
@@ -45,6 +46,9 @@ from ferenda.elements import (AbstractElement, serialize, Body, Nav, Link,
                               UnorderedList, ListItem, Preformatted, Paragraph)
 from ferenda.elements.html import elements_from_soup
 from ferenda.thirdparty import patch, httpheader
+from ferenda.compat import quote
+from ferenda.compat import OrderedDict
+
 # establish two central RDF Namespaces at the top level
 DCT = Namespace(util.ns['dct'])
 PROV = Namespace(util.ns['prov'])
@@ -361,7 +365,8 @@ with the *config* object as single parameter.
                   the document.
         :rtype:   str
         """
-        return str(len(list(self.store.list_versions(basefile))) + 1)
+        
+        return "%d" % (len(list(self.store.list_versions(basefile))) + 1)
 
     def qualified_class_name(self):
         """The qualified class name of this class
@@ -2120,8 +2125,8 @@ parsed document path to that documents dependency file."""
                     sublist.append(ListItem([page.linktext]))
                 else:
                     href = self.dataset_uri(page.binding, page.value)
-                    sublist.append(ListItem([Link(str(page.linktext), href=href)]))
-            nav.append(ListItem([Paragraph(pageset.label), sublist]))
+                    sublist.append(ListItem([Link(page.linktext, href=href)]))
+            nav.append(ListItem([Paragraph([pageset.label]), sublist]))
 
         d.value(self.ns['dct'].title, title)
 
