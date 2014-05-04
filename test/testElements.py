@@ -1,5 +1,15 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
+
 
 import sys, os, tempfile, shutil
 from datetime import date
@@ -10,7 +20,6 @@ from rdflib import Graph
 from ferenda.compat import unittest
 
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 from ferenda.citationpatterns import url as urlparser
 from ferenda import util
 # SUT
@@ -33,7 +42,7 @@ class Main(unittest.TestCase):
                              ordinal=2,
                              title="Native types")
                  ])
-        # roundtrip using the default XML format 
+        # roundtrip using the default XML format
         serialized = serialize(tree)
         self.assertIsInstance(serialized, str)
         newtree = deserialize(serialized, caller_globals=globals())
@@ -164,7 +173,7 @@ class Main(unittest.TestCase):
         x = Link("Link text", uri="http://example.org/")
         self.assertEqual(str(x), "Link text")
         self.assertEqual(repr(x), "Link('Link text', uri=http://example.org/)")
-
+        
         # y = Link("Räksmörgås", uri="http://example.org/")
         # self.assertEqual(str(y), "Räksmörgås")
         # self.assertEqual(repr(y), "Link('Räksmörgås', uri=http://example.org/)")

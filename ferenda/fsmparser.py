@@ -1,13 +1,21 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
+
+from future.utils import implements_iterator
+    
 import collections
 import inspect
 
-import six
-from six import text_type as str
-
 from ferenda.errors import FSMStateError
-
 
 class FSMParser():
 
@@ -225,7 +233,8 @@ class FSMParser():
 
 
 # inspired by recipe 19.18 in the python cookbook. A implementation detail helper for FSMParser.
-class Peekable(six.Iterator):
+@implements_iterator
+class Peekable(object):
 
     def __init__(self, iterable):
         self._iterable = iter(iterable)
@@ -236,7 +245,7 @@ class Peekable(six.Iterator):
 
     def _fillcache(self):
         while len(self._cache) < 1:
-            self._cache.append(six.advance_iterator(self._iterable))
+            self._cache.append(next(self._iterable))
 
     def __next__(self):
         self._fillcache()

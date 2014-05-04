@@ -1,11 +1,19 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
 
-import os
+from datetime import datetime
 import hashlib
 import json
-from datetime import datetime
-
+import os
 
 from ferenda import util
 
@@ -124,10 +132,20 @@ with.
 
         if not path:
             path = self._path  # better be there
-        d = dict((k, v) for (k, v) in self.__dict__.items() if k[0] != "_")
+        # we must make sure we deal with a real builtin dict, not the
+        # future.builtins.types.newdict (the latter lacks a sortable
+        # result from .keys())
+        if sys.version_info[:2] < (2, 7):
+            klass  = __builtins__['dict']
+        else:
+            klass = dict
+        d = klass((k, v) for (k, v) in self.__dict__.items() if k[0] != "_")
         util.ensure_dir(path)
         with open(path, "w") as fp:
-            json.dump(d, fp, default=mydefault, indent=2, separators=(', ',': '), sort_keys=True)
+            # we need to get a (unicode) string by using json.dumps(),
+            # which we then save to a non-binary file handle, in order
+            # to be fully py2/3 compatible.
+            fp.write(json.dumps(d, fp, default=mydefault, indent=2, separators=(', ',': '), sort_keys=True))
     # If inline=True, the contents of filename is included in the Atom
     # entry. Otherwise, it just references it.
     #

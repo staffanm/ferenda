@@ -1,10 +1,18 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
 
 import tempfile
 import shutil
 import os
-import sys
 
 from ferenda import errors
 from ferenda.compat import unittest, patch
@@ -132,6 +140,12 @@ class Main(unittest.TestCase):
         # test 3: dst does exist, is identical
         self.assertFalse(util.copy_if_different(self.fname, self.fname2))
 
+    # repeat of doctest
+    def test_extract_text(self):
+        want = 'Hello World™'
+        got = util.extract_text("<body><div><b>Hello</b> <i>World</i>&trade;</div></body>",
+                                "<div>", "</div>")
+        self.assertEqual(want, got)
 
 from ferenda import util
 import doctest

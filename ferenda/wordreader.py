@@ -1,16 +1,25 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
 
+from datetime import datetime
+from ferenda import errors, util
 from tempfile import mktemp
+from time import mktime
+import codecs
 import logging
 import os
 import textwrap
 import xml.etree.cElementTree as ET
 import zipfile
-from datetime import datetime
-from time import mktime
-import codecs
-from ferenda import errors, util
 
 
 class WordReader(object):

@@ -1,11 +1,17 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
 
-import sys, os
-from ferenda.compat import unittest
+import os
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 
 from datetime import datetime,timedelta
 from operator import itemgetter, attrgetter
@@ -25,7 +31,6 @@ from lxml.builder import ElementMaker
 import rdflib
 import requests.exceptions
 
-import six
 from ferenda.compat import Mock, MagicMock, patch, call
 from bs4 import BeautifulSoup
 import doctest
@@ -488,9 +493,7 @@ class Repo(RepoTester):
         # test1: make sure that default parsing of a document w/o
         # title and lang tags work
         d = DocumentRepository(loglevel="CRITICAL", datadir=self.datadir)
-        d.config = LayeredConfig(defaults=d.get_default_options(),inifile="ferenda.ini",cascade=True)
         path = d.store.downloaded_path("123/a")
-        # print("test_parse: d.store.downloaded_path('123/a') is %s" % path)
         util.ensure_dir(path)
         shutil.copy2("test/files/base/downloaded/123/a-version1.htm",path)
         ret = d.parse("123/a")
@@ -1153,7 +1156,6 @@ class Repo(RepoTester):
         dependencyfile = self.repo.store.parsed_path('root') + os.linesep
         self.assertEqual(util.readfile(self.repo.store.dependencies_path("res-a")),
                          dependencyfile)
-
         #  4.2 otherrepo.store.dependencies_path contains parsed_path('root')
         self.assertEqual(util.readfile(otherrepo.store.dependencies_path("res-b")),
                          dependencyfile)
@@ -1187,7 +1189,7 @@ Status for document repository 'base' (ferenda.documentrepository.DocumentReposi
  parse: None.
  generated: None.
 """.strip()
-        builtins = "__builtin__" if six.PY2 else "builtins"
+        builtins = "__builtin__" if sys.version_info[0] == 2 else "builtins"
         with patch(builtins+".print") as printmock:
             self.repo.status()
         got = "\n".join([x[1][0] for x in printmock.mock_calls])
@@ -1210,7 +1212,7 @@ Status for document repository 'base' (ferenda.documentrepository.DocumentReposi
  parse: 8, 7, 6... (5 more) Todo: 12, 11, 10... (1 more)
  generated: 4, 3, 2... (1 more) Todo: 8, 7, 6... (1 more)
 """.strip()
-        builtins = "__builtin__" if six.PY2 else "builtins"
+        builtins = "__builtin__" if sys.version_info[0] == 2 else "builtins"
         with patch(builtins+".print") as printmock:
             self.repo.status()
         got = "\n".join([x[1][0] for x in printmock.mock_calls])
@@ -1829,7 +1831,8 @@ class TOC(RepoTester):
         # check content of path, particularly that css/js refs
         # and pageset links are correct. Also, that the selected
         # indexpage is indeed the first (eg. title/a)
-        # (NOTE: the first page in the first pageset (by title/a) isn't linked. The second one (by title/d) is).
+        # (NOTE: the first page in the first pageset (by title/a)
+        # isn't linked. The second one (by title/d) is).
         self.assertEqual("http://localhost:8000/dataset/base?title=d",
                          tree.find(".//nav[@id='toc']").findall(".//a")[0].get("href"))
         self.assertEqual("../../rsrc/css/normalize-1.1.3.css",
