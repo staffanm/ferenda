@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <!--[if IE]><![endif]-->
+    <title>RInfo Service UI</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="bootstrap.min.css" />
+    <link rel="stylesheet" href="main.css" />
+    <!--
+    <link rel="glossary" href="/var/terms" type="application/json" />
+    <link rel="prefetch" href="/var/common" type="application/json" />
+    -->
+    <script src="jquery-1.8.3.min.js"></script>
+    <script src="jquery.tmpl.min.js"></script>
+    <script src="bootstrap-modal.js"></script>
+    <script src="main.js"></script>
+    <!--[if lte IE 8]><script src="html5shiv.js"></script><![endif]-->
+  </head>
+  <body>
+    <div class="container">
+      <div class="row">
+        <div id="queryBox" class="span4">
+          <h1><a href="">RInfo Service</a></h1>
+          <form action="/-/publ" id="queryForm" class="form-stacked">
+            <fieldset>
+              <div class="clearfix">
+                <label for="q">Fritext</label>
+                <div class="input">
+                  <input class="span3" id="q" name="q" type="text" />
+                </div>
+              </div>
+              <div class="clearfix">
+                <label for="type">Dokumenttyp</label>
+                <div class="input">
+                  <select id="type" name="type" multiple="multiple">
+                  </select>
+                </div>
+              </div>
+              <div class="clearfix">
+                <label for="publisher">Utgivare</label>
+                <div class="input">
+                  <select id="publisher" name="publisher.iri" multiple="multiple">
+                  </select>
+                </div>
+              </div>
+              <div class="clearfix">
+                <div class="input">
+                  <label for="stats">
+                    <input id="stats" name="_stats" type="checkbox" />
+                    <span>Anpassa urval till s&ouml;kning</span>
+                  </label>
+                </div>
+              </div>
+              <div id="optFields"></div>
+              <div class="actions">
+                <button type="submit" class="btn primary">S&ouml;k</button>
+              </div>
+              <input type="hidden" name="_page" value="0" />
+              <input type="hidden" name="_pageSize" value="10" />
+            </fieldset>
+          </form>
+        </div>
+        <div id="content" class="span12">
+          <div id="resultsView"></div>
+          <div id="errorInfo"></div>
+          <div id="documentView"></div>
+        </div>
+      </div>
+    </div>
+
+    <script id="selectTemplate" type="text/x-jquery-tmpl">
+      <div class="clearfix">
+        <label for="${id}">${label}</label>
+        <div class="input">
+          <select id="${id}" name="${name}" multiple="multiple"></select>
+        </div>
+      </div>
+    </script>
+
+    <script id="resultsTemplate" type="text/x-jquery-tmpl">
+      <h2>S&ouml;kresultat</h2>
+      <p>Din s&ouml;kning p&aring; "<em class="">${queryStr}</em>" gav
+        <strong class="label ${totalResults? 'success' : 'warning'}"
+                >${totalResults}</strong> tr&auml;ffar.</p>
+      {{if totalResults}}
+        <div class="pagination">
+          <ul>
+            <li class="prev ${results.prev? '' : 'disabled'}">
+              <a href="#${results.prev}">&larr; F&ouml;reg&aring;ende</a></li>
+              <li class="active"><a href="#${results.current}">${start} &ndash; ${end} / ${totalResults}</a></li>
+            <li class="next ${results.next? '' : 'disabled'}">
+              <a href="#${results.next}">N&auml;sta &rarr;</a></li>
+          </ul>
+        </div>
+        <table class="zebra-striped">
+          <thead>
+            <tr>
+              <th><a href="#${sortLink(results.current, 'identifier')}" class="sort">Identifierare</a></th>
+              <th>Titel</th>
+              <th><a href="#${sortLink(results.current, 'type')}" data-sort="type" class="sort">Typ</a></th>
+            </tr>
+          </thead>
+          <tbody>
+            {{each results.items}}
+              <tr>
+                <td>
+                  <a href="#${toServiceRef(iri)}">
+                    {{if $value.matches && matches.identifier}}
+                      {{html matches.identifier}}
+                    {{else !$value.identifier}}
+                      ${iri}
+                    {{else}}
+                      ${identifier}
+                    {{/if}}
+                  </a>
+                </td>
+                <td>{{if $value.matches && matches.title}}{{html matches.title}}{{else}}${title}{{/if}}
+                  {{if $value.matches && matches.text}}
+                    <p class="excerpt">
+                      {{each matches.text}}<small>[...]{{html $value}}[...]</small><br />{{/each}}
+                    </p>
+                  {{/if}}
+                </td>
+                <td>${termLabel(type)}</td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      {{/if}}
+    </script>
+
+    <script id="documentTemplate" type="text/x-jquery-tmpl">
+      <h2>${heading}</h2>
+      <div>
+        <h3 class="page-header"><small>Egenskaper</small></h3>
+        {{tmpl({obj: $item.data.properties}) '#dataTemplate'}}
+      </div>
+      <div>
+        <h3 class="page-header"><small>Relationer</small></h3>
+        {{tmpl({obj: $item.data.relations}) '#dataTemplate'}}
+      </div>
+      <div class="well">
+        <h3 class="page-header"><small>Inkommande relationer</small></h3>
+        {{tmpl({obj: $item.data.incoming}) '#dataTemplate'}}
+      </div>
+    </script>
+
+    <script id="dataTemplate" type="text/x-jquery-tmpl">
+      <p>
+        {{if obj.iri}}
+          <a class="svc" href="#${toServiceRef(obj.iri)}">&lt;${obj.iri}&gt;</a>
+          <!--
+          <a class="label info" href="${toServiceRef(obj.iri)}">JSON</a>
+          -->
+        {{/if}}
+        {{if obj.type}}
+          <strong><em>&mdash; ${termLabel(obj.type)}</em></strong>
+        {{/if}}
+      </p>
+      <dl class="data">
+        {{each(key, value) obj}}
+          {{if key !== 'iri' && key !== 'type'}}
+            <dt>${termLabel(key)}</dt>
+            <dd>
+              {{if typeof value === 'string'}}
+                ${value}
+              {{else value.length !== undefined}}
+                <ul>
+                  {{each(i, it) value}}
+                  <li>
+                    {{if typeof it === 'string'}}
+                      ${it}
+                    {{else}}
+                      {{tmpl({obj: it}) '#dataTemplate'}}
+                    {{/if}}
+                  </li>
+                  {{/each}}
+                </ul>
+              {{else}}
+                {{tmpl({obj: value}) '#dataTemplate'}}
+              {{/if}}
+            </dd>
+          {{/if}}
+        {{/each}}
+      </dl>
+    </script>
+
+    <script id="errorTemplate" type="text/x-jquery-tmpl">
+      <div class="alert-message warning">
+        <p>
+          Kunde inte l&auml;sa <code>${serviceRef}</code>
+        </p>
+        <p>
+          <strong>${response.status}:</strong> ${response.statusText}
+        </p>
+      </div>
+    </script>
+
+  </body>
+</html>

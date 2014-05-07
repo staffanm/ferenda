@@ -470,7 +470,81 @@ def make_wsgi_app(inifile=None, **kwargs):
             return _wsgi_static(environ, start_response, args)
     return app
 
+def _wsgi_var(environ, start_response, args):
+    # find out if /var/terms or /var/common was requested
+    path = environ['PATH_INFO']
+    var, tail = path.split("/", 1)
+    context = _make_context_json()
+    # _make_context_json should include all the namespaceses and
+    # prefixes, possibly designate a default @vocab and a default
+    # @language (but how?), map things like "label" => "rdfs:label",
+    # and otherwise describe properties of the rdf properties/classes
+    # being used. Might have to start from static json files
+    # (res/context/dct.json etc) at the beginning...
+    if tail.startswith("terms"):
+        # produce a rdf graph of the terms (classes and properties) in
+        # the vocabs we're using. This should preferably entail
+        # loading the vocabularies (stored as RDF/OWL documents), and
+        # expressing all the things that are owl:*Property, owl:Class,
+        # rdf:Property and rdf:Class. As an intermediate step, we
+        # could have preprocessed rdf graphs (stored in
+        # res/vocab/dct.ttl, res/vocab/bibo.ttl etc) derived from the
+        # vocabularies and pull them in like we pull in namespaces in
+        # self.ns The rdf graph should be rooted in an url (eg
+        # http://localhost:8080/var/terms, and then have each term as
+        # a foaf:topic. Each term should be described with its
+        # rdf:type, rdfs:label (most important!) and possibly
+        # rdfs:comment
+        graph = get_term_graph(use_all_docrepos)
+    elif tail.startswith("common"):
+        # create a graph with foaf:names for all entities (publishers,
+        # publication series etc) that our data mentions.
+        graph = get_common_graph(use_all_docrepos)
+    if want_json:
+        data = graph.serialize(format="json-ld", context=context, indent=4)
+    else:
+        data = graph.serialize(format="xml")
+        
+    start_response(_str("200 OK"), [
+        (_str("Content-Type"), _str("application/json")),
+        (_str("Content-Length"), _str(str(len(data))))
+    ])
+    return iter([data])
+        
+def _wsgi_stats(environ, start_response, args):
+    # find out all dimentions on which we could slice (obviously type,
+    # but perhaps also dct:publisher, dct:subject, dct:issued (grouped
+    # byyear!), prov:wasGeneratedBy -- ie any property that lends
+    # itself naturally to grouping. Should probably have a strong
+    # correlation with toc_predicates and the generated TocCriteria
+    # objects (although grouping on dct:title using the first letter
+    # is somewhat atypical. But maybe!).  For each
+    # dimension/predicate, create a list of observations(buckets)
+    # wherein each possible value is paired with the count of each
+    # value (or transformed value, for things like dct:issued (take
+    # the year part only) or dct:title (take the first significant
+    # letter only)
+    start_response(_str("200 OK"), [
+        (_str("Content-Type"), _str("application/json")),
+        (_str("Content-Length"), _str(str(len(data))))
+    ])
+    return iter([data])
 
+def _wsgi_query(environ, start_response, args):
+    path = environ['PATH_INFO']
+    # given path=/-/publ?q=r%C3%A4tt*&publisher.iri=*%2Fregeringskansliet&_page=0&_pageSize=10
+    # 1. extract {'q':'rätt*',
+    #             'publisher.iri'='*/regeringskansliet',
+    #             '_page':0,
+    #             '_pageSize':10}
+    # 2. call fulltextindex.query(q='rätt*', pagenum=1, pagelen=10, publisher='*/regeringskansliet')
+    # (nb: this presumes that we've indexed more than just basefile, title, identifier, text -- we need to index
+    #  arbitrary parameters, controlled by each repo)
+    #
+    # 3. Convert the result to a json file (see qresults.json)
+    
+
+        
 def _str(s, encoding="ascii"):
     """If running under python2.6, return byte string version of the
     argument, otherwise return the argument unchanged.
@@ -550,7 +624,7 @@ def _wsgi_search(environ, start_response, args):
     ])
     return iter([data])
 
-
+    
 def _wsgi_api(environ, start_response, args):
     """WSGI method, called by the wsgi app for requests that matches
        ``apiendpoint``."""

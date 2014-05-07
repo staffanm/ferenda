@@ -1,0 +1,46 @@
+
+a.sort {
+  color: #404040;
+}
+
+dl.data > dt {
+  float: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 14em;
+}
+
+dl.data > dd {
+  margin-left: 14em;
+  margin-bottom: 0.2em;
+}
+
+dl.data > dd dl.data > dt {
+  width: 10em;
+}
+
+dl.data > dd dl > dd {
+  margin-left: 11em;
+}
+
+dl.data ul {
+  margin-left: 0;
+}
+
+dl.data li {
+  color: #404040;
+}
+
+#resultsView.folded {
+  border: 1px solid #ccc;
+  max-height: 24.4em;
+  overflow: auto;
+  padding: 0.8em;
+}
+
+.match {
+  background-color: #46a546;
+  color: #ffffff;
+  font-style: italic;
+  font-weight: bold;
+}

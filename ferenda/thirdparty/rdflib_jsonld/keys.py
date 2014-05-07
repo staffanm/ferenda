@@ -1,0 +1,15 @@
+from __future__ import unicode_literals
+
+BASE = '@base'
+CONTAINER = '@container'
+CONTEXT = '@context'
+GRAPH = '@graph'
+ID = '@id'
+INDEX = '@index'
+LANG = '@language'
+LIST = '@list'
+REV = '@reverse'
+SET = '@set'
+TYPE = '@type'
+VALUE = '@value'
+VOCAB = '@vocab'

@@ -4,8 +4,10 @@
 
 <http://example.org/base/123/a> a bibo:Standard;
     dct:title "Example"@en;
-    dct:identifier "123(A)" .
-
+    dct:identifier "123(A)";
+    dct:issued "2014-01-04"^^xsd:date;
+    dct:publisher <http://example.org/publisher/A> .
+    
 <http://example.org/base/123/a#S1> a bibo:DocumentPart;
     dct:isPartOf <http://example.org/base/123/a>;
     dct:title "Introduction"@en;

@@ -40,16 +40,22 @@ class WSGI(RepoTester): # base class w/o tests
                     'SERVER_PORT': '8000',
                     'wsgi.url_scheme': 'http'}
 
+        self.put_files_in_place()
+    def ttl_to_rdf_xml(self, inpath, outpath):
+        g = Graph()
+        g.parse(source=open(inpath), format="turtle")
+        with self.repo.store._open(outpath, "wb") as fp:
+            fp.write(g.serialize(format="pretty-xml"))
+        return g
+
+    def put_files_in_place(self):
         # Put files in place: parsed
         util.ensure_dir(self.repo.store.parsed_path("123/a"))
         shutil.copy2("test/files/base/parsed/123/a.xhtml",
                      self.repo.store.parsed_path("123/a"))
 
-        # distilled
-        g = Graph()
-        g.parse(source="test/files/base/distilled/123/a.ttl", format="turtle")
-        with self.repo.store.open_distilled("123/a", "wb") as fp:
-            fp.write(g.serialize(format="pretty-xml"))
+        g = self.ttl_to_rdf_xml("test/files/base/distilled/123/a.ttl",
+                                self.repo.store.distilled_path("123/a"))
 
         # generated
         util.ensure_dir(self.repo.store.generated_path("123/a"))
