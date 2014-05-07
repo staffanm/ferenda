@@ -39,7 +39,9 @@ class BasicAPI(WSGI):
     # we can get conneg right)
     def test_json_context(self):
         self.env['PATH_INFO'] = "/json-ld/context.json"
-        got = json.loads(self.call_wsgi(self.env))
+        from pudb import set_trace; set_trace()
+        status, headers, content = self.call_wsgi(self.env)
+        got = json.loads(content.decode("utf-8"))
         want = {'@context': [
             {"rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
              "rdfs": "http://www.w3.org/2000/01/rdf-schema#",

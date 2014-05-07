@@ -466,11 +466,15 @@ def make_wsgi_app(inifile=None, **kwargs):
             return _wsgi_search(environ, start_response, args)
         elif path.startswith(args['apiendpoint']):
             return _wsgi_api(environ, start_response, args)
+        # don't know if this is sensible -- might prefer that all
+        # these resources are under apiendpoint
+        elif path.startswith("/json-ld/") or path.startswith("/var/"):
+            return _wsgi_api_static(environ, start_response, args)
         else:
             return _wsgi_static(environ, start_response, args)
     return app
 
-def _wsgi_var(environ, start_response, args):
+def _wsgi_app_static(environ, start_response, args):
     # find out if /var/terms or /var/common was requested
     path = environ['PATH_INFO']
     var, tail = path.split("/", 1)
@@ -481,36 +485,118 @@ def _wsgi_var(environ, start_response, args):
     # and otherwise describe properties of the rdf properties/classes
     # being used. Might have to start from static json files
     # (res/context/dct.json etc) at the beginning...
-    if tail.startswith("terms"):
-        # produce a rdf graph of the terms (classes and properties) in
-        # the vocabs we're using. This should preferably entail
-        # loading the vocabularies (stored as RDF/OWL documents), and
-        # expressing all the things that are owl:*Property, owl:Class,
-        # rdf:Property and rdf:Class. As an intermediate step, we
-        # could have preprocessed rdf graphs (stored in
-        # res/vocab/dct.ttl, res/vocab/bibo.ttl etc) derived from the
-        # vocabularies and pull them in like we pull in namespaces in
-        # self.ns The rdf graph should be rooted in an url (eg
-        # http://localhost:8080/var/terms, and then have each term as
-        # a foaf:topic. Each term should be described with its
-        # rdf:type, rdfs:label (most important!) and possibly
-        # rdfs:comment
-        graph = get_term_graph(use_all_docrepos)
-    elif tail.startswith("common"):
-        # create a graph with foaf:names for all entities (publishers,
-        # publication series etc) that our data mentions.
-        graph = get_common_graph(use_all_docrepos)
-    if want_json:
-        data = graph.serialize(format="json-ld", context=context, indent=4)
-    else:
-        data = graph.serialize(format="xml")
+    if var == "var":
+        if tail.startswith("terms"):
+            graph = _wsgi_get_term_graph(args['repos'],
+                                         args['url'] + "/var/terms")
+        elif tail.startswith("common"):
+            graph = _wsgi_get_common_graph(args['repos'],
+                                           args['url'] + "/var/common")
+        if want_json:
+            data = graph.serialize(format="json-ld", context=context, indent=4)
+        else:
+            data = graph.serialize(format="xml")
+    elif var == "json-ld":
+        data = _wsgi_get_context(args['repos'])
         
     start_response(_str("200 OK"), [
         (_str("Content-Type"), _str("application/json")),
         (_str("Content-Length"), _str(str(len(data))))
     ])
     return iter([data])
-        
+
+def _wsgi_get_context(repos):
+    data = {}
+    # step 1: define all prefixes
+    for repo in repos:
+        for (prefix, uri) in repo.ns:
+            if prefix in data:
+                assert data[prefix] == uri, "Conflicting URIs for prefix %s" % prefix
+            else:
+                data[prefix] = uri
+
+    for repo in repos:
+        onto = repo.ns.ontologies
+        for (s,p,o) in onto:
+            # determine if the current subject is a class or property
+            if p in (RDFS.Class, RDFS.Property):  # or any known subtype?
+                qname = onto.qname(p)
+                # define simple term from qname
+                term = qname.split(":")[1]
+                if term in data:
+                    assert data[term] == qname, "Conflicting definitions for term %s" % term
+                else:
+                    # find out if this property (or class?) has a
+                    # rdfs:range, ie if we can assume that all
+                    # instances of this property have a given datatype
+                    # (note that the dcterms ontology at
+                    # http://dublincore.org/2012/06/14/dcterms.ttl
+                    # defines dct:issued and dct:modified as having
+                    # the range rdfs:Literal, where we'd prefer the
+                    # range xsd:date. But you know, sometimes it might
+                    # be a xsd:gYearMonth...)
+                    datatype = None
+                    for o in onto.objects(s, RDFS.range):
+                        datatype = o
+                        break # just take the 1st
+                        
+                    if not datatype:
+                        # step 2: define all classes and
+                        # simple/untyped properties (ie Class ->
+                        # owl:Class, Concept -> skos:Concept, label ->
+                        # rdfs:label
+                        data[term] = qname
+                    else:
+                        # step 3: define typed properties (ie
+                        # "created" -> {"@id": "dc:created", "@type":
+                        # "xsd:dateTime"}, possibly
+
+                        data[term] = {"@id": qname,
+                                      "@type": onto.qname(datatype)}
+    return {"@context": data}
+
+def _wsgi_get_term_graph(repos, rooturi):
+    # produce a rdf graph of the terms (classes and properties) in
+    # the vocabs we're using. This should preferably entail
+    # loading the vocabularies (stored as RDF/OWL documents), and
+    # expressing all the things that are owl:*Property, owl:Class,
+    # rdf:Property and rdf:Class. As an intermediate step, we
+    # could have preprocessed rdf graphs (stored in
+    # res/vocab/dct.ttl, res/vocab/bibo.ttl etc) derived from the
+    # vocabularies and pull them in like we pull in namespaces in
+    # self.ns The rdf graph should be rooted in an url (eg
+    # http://localhost:8080/var/terms, and then have each term as
+    # a foaf:topic. Each term should be described with its
+    # rdf:type, rdfs:label (most important!) and possibly
+    # rdfs:comment
+    root = URIRef(rooturi)
+    g = Graph()
+    for repo in repos:
+        for (s,p,o) in repo.ontologies:
+            if p in (RDF.type, RDFS.label, RDFS.comment):
+                g.add(root, FOAF.topic, s) # unless we've already added it?
+                g.add(s,p,o) # control duplicates somehow
+    return g
+
+def _wsgi_get_common_graph(repos, rooturi):
+    # create a graph with foaf:names for all entities (publishers,
+    # publication series etc) that our data mentions.
+    root = URIRef(rooturi)
+    g = Graph()
+    for repo in repos:
+        for (s,p,o) in repo.commondata: # should work like
+                                        # repo.ontologies, but read
+                                        # one file per repo
+                                        # ("res/rfc.ttl",
+                                        # "res/propregeringen.ttl" in
+                                        # a controlled way)
+            if p in (FOAF.name, SKOS.prefLabel, SKOS.altLabel):
+                g.add(root, FOAF.topic, s)
+                g.add(s,p,o)
+                # try to find a type
+                g.add(s, RDF.type, repo.commondata.value(s, RDF.type))
+    return g
+
 def _wsgi_stats(environ, start_response, args):
     # find out all dimentions on which we could slice (obviously type,
     # but perhaps also dct:publisher, dct:subject, dct:issued (grouped

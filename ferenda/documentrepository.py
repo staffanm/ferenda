@@ -259,6 +259,25 @@ class DocumentRepository(object):
                 self.ns[prefix] = Namespace(util.ns[prefix])
 
     @property
+    def ontologies(self):
+        # in most cases, the user of the Docrepo object won't want to
+        # look at the defined ontologies. But in case one does!
+        if not hasattr(self, '_ontologies'):
+            self._ontologies = Graph()
+            for prefix, uri in self.ns:
+                ontopath = "res/ontologies/%s.ttl" % uri
+            if os.path.exists(ontopath):
+                fp = open(query_template, 'rb')
+            elif pkg_resources.resource_exists('ferenda', ontopath):
+                fp = pkg_resources.resource_stream('ferenda', ontopath)
+            else:
+                pass # warn?
+            if fp:
+                self._ontologies.parse(data=fp.read(), format="turtle")
+                fp.close()
+        return self._ontologies
+
+    @property
     def config(self):
         return self._config
 
