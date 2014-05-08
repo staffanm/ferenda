@@ -39,7 +39,11 @@ from six import text_type as str
 import pkg_resources
 import requests
 import requests.exceptions
-from rdflib import URIRef, Namespace, Literal
+from rdflib import URIRef, Namespace, Literal, RDF, RDFS, OWL, Graph
+from rdflib.namespace import FOAF
+from rdflib.plugin import register, Parser, Serializer
+register('json-ld', Parser, 'ferenda.thirdparty.rdflib_jsonld.parser', 'JsonLDParser')
+register('json-ld', Serializer, 'ferenda.thirdparty.rdflib_jsonld.serializer', 'JsonLDSerializer')
 from bs4 import BeautifulSoup
 from lxml import etree
 
@@ -474,11 +478,11 @@ def make_wsgi_app(inifile=None, **kwargs):
             return _wsgi_static(environ, start_response, args)
     return app
 
-def _wsgi_app_static(environ, start_response, args):
+def _wsgi_api_static(environ, start_response, args):
     # find out if /var/terms or /var/common was requested
     path = environ['PATH_INFO']
-    var, tail = path.split("/", 1)
-    context = _make_context_json()
+    dummy, var, tail = path.split("/", 2)
+    context = _wsgi_get_context(args['repos'])
     # _make_context_json should include all the namespaceses and
     # prefixes, possibly designate a default @vocab and a default
     # @language (but how?), map things like "label" => "rdfs:label",
@@ -486,6 +490,7 @@ def _wsgi_app_static(environ, start_response, args):
     # being used. Might have to start from static json files
     # (res/context/dct.json etc) at the beginning...
     if var == "var":
+        want_json = True # FIXME: do proper conneg
         if tail.startswith("terms"):
             graph = _wsgi_get_term_graph(args['repos'],
                                          args['url'] + "/var/terms")
@@ -493,11 +498,12 @@ def _wsgi_app_static(environ, start_response, args):
             graph = _wsgi_get_common_graph(args['repos'],
                                            args['url'] + "/var/common")
         if want_json:
+            from pudb import set_trace; set_trace()
             data = graph.serialize(format="json-ld", context=context, indent=4)
         else:
             data = graph.serialize(format="xml")
     elif var == "json-ld":
-        data = _wsgi_get_context(args['repos'])
+        data = json.dumps(context).encode("utf-8")
         
     start_response(_str("200 OK"), [
         (_str("Content-Type"), _str("application/json")),
@@ -509,51 +515,56 @@ def _wsgi_get_context(repos):
     data = {}
     # step 1: define all prefixes
     for repo in repos:
-        for (prefix, uri) in repo.ns:
+        for (prefix, uri) in repo.ns.items():
             if prefix in data:
                 assert data[prefix] == uri, "Conflicting URIs for prefix %s" % prefix
             else:
                 data[prefix] = uri
-
-    for repo in repos:
-        onto = repo.ns.ontologies
-        for (s,p,o) in onto:
-            # determine if the current subject is a class or property
-            if p in (RDFS.Class, RDFS.Property):  # or any known subtype?
-                qname = onto.qname(p)
-                # define simple term from qname
-                term = qname.split(":")[1]
-                if term in data:
-                    assert data[term] == qname, "Conflicting definitions for term %s" % term
-                else:
-                    # find out if this property (or class?) has a
-                    # rdfs:range, ie if we can assume that all
-                    # instances of this property have a given datatype
-                    # (note that the dcterms ontology at
-                    # http://dublincore.org/2012/06/14/dcterms.ttl
-                    # defines dct:issued and dct:modified as having
-                    # the range rdfs:Literal, where we'd prefer the
-                    # range xsd:date. But you know, sometimes it might
-                    # be a xsd:gYearMonth...)
-                    datatype = None
-                    for o in onto.objects(s, RDFS.range):
-                        datatype = o
-                        break # just take the 1st
-                        
-                    if not datatype:
-                        # step 2: define all classes and
-                        # simple/untyped properties (ie Class ->
-                        # owl:Class, Concept -> skos:Concept, label ->
-                        # rdfs:label
-                        data[term] = qname
-                    else:
-                        # step 3: define typed properties (ie
-                        # "created" -> {"@id": "dc:created", "@type":
-                        # "xsd:dateTime"}, possibly
-
-                        data[term] = {"@id": qname,
-                                      "@type": onto.qname(datatype)}
     return {"@context": data}
+
+    # the rest of this code was hard to get right and doesn't really
+    # do anything but create an overly long context. JSON-LD
+    # serialization will (proably?) make sure we get ok terse JSON
+#     for repo in repos:
+#         onto = repo.ontologies
+#         for (s,p,o) in onto:
+#             # determine if the current subject is a class or property
+#             if (p == RDF.type and
+#                 o in (RDFS.Class, RDF.Property,
+#                       OWL.DatatypeProperty, OWL.ObjectProperty)): # and others
+#                 qname = onto.qname(s)
+#                 print("%s (%s) is a %s" % (qname, s, onto.qname(o)))
+#                 # define simple term from qname
+#                 term = qname.split(":")[1]
+#                 if term in data:
+#                     assert (data[term] == qname or
+#                             (isinstance(data[term], dict)
+#                              and data[term]['@id'] == qname)), "Conflicting definitions for term %s (previous was %s)" % (qname, data[term])
+#                 else:
+#                     # find out if this property (or class?) has a
+#                     # rdfs:range, ie if we can assume that all
+#                     # instances of this property have a given datatype
+#                     # (note that the dcterms ontology at
+#                     # http://dublincore.org/2012/06/14/dcterms.ttl
+#                     # defines dct:issued and dct:modified as having
+#                     # the range rdfs:Literal, where we'd prefer the
+#                     # range xsd:date. But you know, sometimes it might
+#                     # be a xsd:gYearMonth...)
+#                     datatype = onto.value(s, RDFS.range)
+#                     if not datatype:
+#                         # step 2: define all classes and
+#                         # simple/untyped properties (ie Class ->
+#                         # owl:Class, Concept -> skos:Concept, label ->
+#                         # rdfs:label
+#                         data[term] = qname
+#                     else:
+#                         # step 3: define typed properties (ie
+#                         # "created" -> {"@id": "dc:created", "@type":
+#                         # "xsd:dateTime"}, possibly
+#                         print("... and has datatype %s" % onto.qname(datatype))
+#                         data[term] = {"@id": qname,
+#                                       "@type": onto.qname(datatype)}
+#     return {"@context": data}
 
 def _wsgi_get_term_graph(repos, rooturi):
     # produce a rdf graph of the terms (classes and properties) in
@@ -572,10 +583,13 @@ def _wsgi_get_term_graph(repos, rooturi):
     root = URIRef(rooturi)
     g = Graph()
     for repo in repos:
+        for prefix, uri in repo.ontologies.store.namespaces():
+            if prefix:
+                g.bind(prefix, uri)
         for (s,p,o) in repo.ontologies:
             if p in (RDF.type, RDFS.label, RDFS.comment):
-                g.add(root, FOAF.topic, s) # unless we've already added it?
-                g.add(s,p,o) # control duplicates somehow
+                g.add((root, FOAF.topic, s)) # unless we've already added it?
+                g.add((s,p,o)) # control duplicates somehow
     return g
 
 def _wsgi_get_common_graph(repos, rooturi):
@@ -587,8 +601,8 @@ def _wsgi_get_common_graph(repos, rooturi):
         for (s,p,o) in repo.commondata: # should work like
                                         # repo.ontologies, but read
                                         # one file per repo
-                                        # ("res/rfc.ttl",
-                                        # "res/propregeringen.ttl" in
+                                        # ("res/extra/rfc.ttl",
+                                        #  "res/extra/propregeringen.ttl" in
                                         # a controlled way)
             if p in (FOAF.name, SKOS.prefLabel, SKOS.altLabel):
                 g.add(root, FOAF.topic, s)
@@ -1499,6 +1513,7 @@ def _setup_runserver_args(config, inifilename):
             'documentroot':   relativeroot,
             'apiendpoint':    config.apiendpoint,
             'searchendpoint': config.searchendpoint,
+            'url':            config.url,
             'repos':          repos}
 
 

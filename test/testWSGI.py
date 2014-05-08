@@ -33,6 +33,7 @@ class WSGI(RepoTester): # base class w/o tests
                                          documentroot=self.datadir,
                                          apiendpoint="/myapi/",
                                          searchendpoint="/mysearch/",
+                                         url="http://localhost:8000/",
                                          repos = [self.repo])
         self.env = {'HTTP_ACCEPT': 'text/xml, application/xml, application/xhtml+xml, text/html;q=0.9, text/plain;q=0.8, image/png,*/*;q=0.5',
                     'PATH_INFO':   '/',

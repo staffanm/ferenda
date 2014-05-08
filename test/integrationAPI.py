@@ -39,29 +39,19 @@ class BasicAPI(WSGI):
     # we can get conneg right)
     def test_json_context(self):
         self.env['PATH_INFO'] = "/json-ld/context.json"
-        from pudb import set_trace; set_trace()
         status, headers, content = self.call_wsgi(self.env)
         got = json.loads(content.decode("utf-8"))
-        want = {'@context': [
-            {"rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-             "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
-             "owl": "http://www.w3.org/2002/07/owl#",
-             "skos": "http://www.w3.org/2004/02/skos/core#",
-             "xsd": "http://www.w3.org/2001/XMLSchema#",
-             "xhv": "http://www.w3.org/1999/xhtml/vocab#"},
-            {"Property": "rdf:Property",
-             "Class": "owl:Class",
-             "ObjectProperty": "owl:ObjectProperty",
-             "DatatypeProperty": "owl:DatatypeProperty",
-             "inverseOf": "owl:inverseOf",
-             "label": "rdfs:label",
-             "comment": "rdfs:comment",
-             "seeAlso": "rdfs:seeAlso",
-             "Concept": "skos:Concept",
-             "prefLabel": "skos:prefLabel",
-             "altLabel": "skos:altLabel"}
-            # ... and a lot of other dicts as well
-            ]}
+        want = {'@context': {'bibo': 'http://purl.org/ontology/bibo/',
+                             'dct': 'http://purl.org/dc/terms/',
+                             'foaf': 'http://xmlns.com/foaf/0.1/',
+                             'owl': 'http://www.w3.org/2002/07/owl#',
+                             'prov': 'http://www.w3.org/ns/prov-o/',
+                             'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+                             'rdfs': 'http://www.w3.org/2000/01/rdf-schema#',
+                             'skos': 'http://www.w3.org/2004/02/skos/core#',
+                             'xhv': 'http://www.w3.org/1999/xhtml/vocab#',
+                             'xsd': 'http://www.w3.org/2001/XMLSchema#',
+                             'xsi': 'http://www.w3.org/2001/XMLSchema-instance'}}
         self.assertEqual(want, got)
         
     def test_var_terms(self):

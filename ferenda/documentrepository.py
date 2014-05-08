@@ -264,17 +264,22 @@ class DocumentRepository(object):
         # look at the defined ontologies. But in case one does!
         if not hasattr(self, '_ontologies'):
             self._ontologies = Graph()
-            for prefix, uri in self.ns:
-                ontopath = "res/ontologies/%s.ttl" % uri
-            if os.path.exists(ontopath):
-                fp = open(query_template, 'rb')
-            elif pkg_resources.resource_exists('ferenda', ontopath):
-                fp = pkg_resources.resource_stream('ferenda', ontopath)
-            else:
-                pass # warn?
-            if fp:
-                self._ontologies.parse(data=fp.read(), format="turtle")
-                fp.close()
+            for prefix, uri in self.ns.items():
+                if prefix in ("rdf", "rdfs", "owl"):
+                    continue
+                ontopath = "res/vocab/%s.ttl" % prefix
+                fp = None
+                if os.path.exists(ontopath):
+                    fp = open(query_template, 'rb')
+                elif pkg_resources.resource_exists('ferenda', ontopath):
+                    fp = pkg_resources.resource_stream('ferenda', ontopath)
+                else:
+                    pass # warn?
+                if fp:
+                    print("loading %s" % ontopath)
+                    self._ontologies.parse(data=fp.read(), format="turtle")
+                    self._ontologies.bind(prefix, uri)
+                    fp.close()
         return self._ontologies
 
     @property
