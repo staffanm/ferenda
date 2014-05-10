@@ -39,7 +39,7 @@ from six import text_type as str
 import pkg_resources
 import requests
 import requests.exceptions
-from rdflib import URIRef, Namespace, Literal, RDF, RDFS, OWL, Graph
+from rdflib import URIRef, Namespace, Literal, BNode, Graph, RDF, RDFS, OWL
 from rdflib.namespace import FOAF
 from rdflib.plugin import register, Parser, Serializer
 register('json-ld', Parser, 'ferenda.thirdparty.rdflib_jsonld.parser', 'JsonLDParser')
@@ -479,6 +479,9 @@ def make_wsgi_app(inifile=None, **kwargs):
     return app
 
 def _wsgi_api_static(environ, start_response, args):
+    want_json = True # FIXME: do proper conneg
+    legacy_jsonld_structure = True # FIXME: should be part of args
+    
     # find out if /var/terms or /var/common was requested
     path = environ['PATH_INFO']
     dummy, var, tail = path.split("/", 2)
@@ -490,20 +493,32 @@ def _wsgi_api_static(environ, start_response, args):
     # being used. Might have to start from static json files
     # (res/context/dct.json etc) at the beginning...
     if var == "var":
-        want_json = True # FIXME: do proper conneg
         if tail.startswith("terms"):
-            graph = _wsgi_get_term_graph(args['repos'],
-                                         args['url'] + "/var/terms")
+            rooturi = args['url'] + "var/terms"
+            graph = _wsgi_get_term_graph(args['repos'], rooturi)
         elif tail.startswith("common"):
-            graph = _wsgi_get_common_graph(args['repos'],
-                                           args['url'] + "/var/common")
+            rooturi = args['url'] + "var/common"
+            graph = _wsgi_get_common_graph(args['repos'], rooturi)
         if want_json:
             from pudb import set_trace; set_trace()
-            data = graph.serialize(format="json-ld", context=context, indent=4)
+            data = graph.serialize(format="json-ld",
+                                   context=context,
+                                   indent=4)
+            # we had to provide context to graph.serialize in order to
+            # compactify the results, but we'd like to actually refer
+            # to an external context json file. So we manipulate the
+            # JSON tree.
+            jsondata = json.loads(data.decode("utf-8"))
+            jsondata['@context'] = "/json-ld/context.json"
+            if legacy_jsonld_structure:
+                jsondata = _convert_legacy_jsonld(jsondata, rooturi)
+                from pudb import set_trace; set_trace()
+            data = json.dumps(jsondata, indent=4).encode("utf-8")
         else:
             data = graph.serialize(format="xml")
     elif var == "json-ld":
-        data = json.dumps(context).encode("utf-8")
+        
+        data = json.dumps({'@context': context}).encode("utf-8")
         
     start_response(_str("200 OK"), [
         (_str("Content-Type"), _str("application/json")),
@@ -511,16 +526,47 @@ def _wsgi_api_static(environ, start_response, args):
     ])
     return iter([data])
 
+def _convert_legacy_jsonld(indata, rooturi):
+    # the json structure should be a top node containing only
+    # @context, iri (localhost:8000/var/terms), type (foaf:Document)
+    # and topic - a list of dicts, where each dict looks like:
+    #
+    # {"iri" : "referatserie",
+    #  "comment" : "Anger vilken referatserie som referatet eventuellt tillhör.",
+    #  "label" : "Referatserie",
+    #  "type" : "DatatypeProperty"}
+    out  = {}
+    topics = []
+    for topkey, topval in indata.items():
+        if topkey == "@graph":
+            for subject in topval:
+                if subject['iri'] == rooturi:
+                    for key,value in subject.items():
+                        if key in  ('iri', 'foaf:topic'):
+                            continue
+                        out[key] = value
+                else:
+                    topics.append(subject)
+        else:
+            out[topkey] = topval
+    out['topic'] = topics
+    out['iri']  = rooturi
+    return out
+    
 def _wsgi_get_context(repos):
     data = {}
     # step 1: define all prefixes
     for repo in repos:
-        for (prefix, uri) in repo.ns.items():
+        for (prefix, ns) in repo.ns.items():
             if prefix in data:
-                assert data[prefix] == uri, "Conflicting URIs for prefix %s" % prefix
+                assert data[prefix] == str(ns), "Conflicting URIs for prefix %s" % prefix
             else:
-                data[prefix] = uri
-    return {"@context": data}
+                data[prefix] = str(ns)
+
+    data['iri'] = "@id"
+    data['type'] = "@type"
+    # data["@language"] = "en" # maybe?
+    return data
 
     # the rest of this code was hard to get right and doesn't really
     # do anything but create an overly long context. JSON-LD
@@ -580,16 +626,25 @@ def _wsgi_get_term_graph(repos, rooturi):
     # a foaf:topic. Each term should be described with its
     # rdf:type, rdfs:label (most important!) and possibly
     # rdfs:comment
+    from pudb import set_trace; set_trace()
     root = URIRef(rooturi)
+    context = _wsgi_get_context(repos)
     g = Graph()
+    g.add((root, RDF.type, FOAF.Document))
     for repo in repos:
         for prefix, uri in repo.ontologies.store.namespaces():
             if prefix:
                 g.bind(prefix, uri)
         for (s,p,o) in repo.ontologies:
+            if isinstance(s, BNode):
+                continue
             if p in (RDF.type, RDFS.label, RDFS.comment):
                 g.add((root, FOAF.topic, s)) # unless we've already added it?
+                if isinstance(o, Literal): # remove language typing info
+                    o = Literal(str(o))
                 g.add((s,p,o)) # control duplicates somehow
+                # print(g.serialize(format="json-ld", context=context, indent=4).decode())
+    from pudb import set_trace; set_trace()
     return g
 
 def _wsgi_get_common_graph(repos, rooturi):
