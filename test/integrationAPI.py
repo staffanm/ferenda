@@ -60,23 +60,8 @@ class BasicAPI(WSGI):
         # ignore the status and headers elements of the result tuple,
         # only use the content part
         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
-        want = {"@context": "/json-ld/context.json", # might be different
-                "iri": "http://localhost:8080/var/terms", # also might be diff
-                "topic": [
-                    {"iri": "http://purl.org/dc/terms/title", # unless qualified in context.json
-                     "label": "Title",
-                     "comment": "A name given to the resource.",
-                     "type": "Property"},
-                    {"iri": "http://purl.org/dc/terms/issued",
-                     "label": "Date issued",
-                     "comment": "Date of formal issuance (e.g., publication) of the resource.",
-                     "type": "Property"},
-                    {"iri": "http://purl.org/dc/terms/publisher",
-                     "label": "Publisher",
-                     "comment": "An entity responsible for making the resource available.",
-                     "type": "Property"},
-                    ]
-                }
+        from pudb import set_trace; set_trace()
+        want = json.load(open("test/files/api/var-terms.json"))
         # NB: It might be useful to ALSO provide a RDF Graph version
         # of 'want', and then having the 'got' equivalent being
         # computed using rdflib.Graph().parse(format='json-ld',

@@ -1,0 +1,2969 @@
+{
+    "type": "foaf:Document",
+    "iri": "http://localhost:8000/var/terms",
+    "@context": "/json-ld/context.json",
+    "topic": [
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "A project this person has previously worked on.",
+            "iri": "foaf:pastProject",
+            "rdfs:label": "past project"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "Because prov:qualifiedInfluence is a broad relation, the more specific relations (qualifiedCommunication, qualifiedDelegation, qualifiedEnd, etc.) should be used when applicable.",
+            "iri": "prov:qualifiedInfluence",
+            "rdfs:label": "qualifiedInfluence"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "The prefix of a name",
+            "iri": "bibo:prefixName",
+            "rdfs:label": "prefix name"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A web page is an online document available (at least initially) on the world wide web. A web page is written first and foremost to appear on the web, as distinct from other online resources such as books, manuscripts or audio documents which use the web primarily as a distribution mechanism alongside other more traditional methods such as print.",
+            "iri": "bibo:Webpage",
+            "rdfs:label": "Webpage"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": [
+                "An instance of prov:Derivation provides additional descriptions about the binary prov:wasDerivedFrom relation from some derived prov:Entity to another prov:Entity from which it was derived. For example, :chewed_bubble_gum prov:wasDerivedFrom :unwrapped_bubble_gum; prov:qualifiedDerivation [ a prov:Derivation; prov:entity :unwrapped_bubble_gum; :foo :bar ].",
+                "The more specific forms of prov:Derivation (i.e., prov:Revision, prov:Quotation, prov:PrimarySource) should be asserted if they apply."
+            ],
+            "iri": "prov:Derivation",
+            "rdfs:label": "Derivation"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "Temporal characteristics of the resource.",
+            "iri": "dct:temporal",
+            "rdfs:label": "Temporal Coverage"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:AnnotationProperty"
+            ],
+            "iri": "skos:example",
+            "rdfs:label": "example"
+        },
+        {
+            "type": [
+                "rdfs:Class",
+                "owl:Class"
+            ],
+            "rdfs:comment": "A document.",
+            "iri": "foaf:Document",
+            "rdfs:label": "Document"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty",
+                "owl:InverseFunctionalProperty"
+            ],
+            "rdfs:comment": "A homepage for some thing.",
+            "iri": "foaf:homepage",
+            "rdfs:label": "homepage"
+        },
+        {
+            "type": "rdfs:Datatype",
+            "rdfs:comment": "The set of dates and times constructed according to the W3C Date and Time Formats Specification.",
+            "iri": "dct:W3CDTF",
+            "rdfs:label": "W3C-DTF"
+        },
+        {
+            "type": "rdfs:Datatype",
+            "rdfs:comment": "The set of tags, constructed according to RFC 1766, for the identification of languages.",
+            "iri": "dct:RFC1766",
+            "rdfs:label": "RFC 1766"
+        },
+        {
+            "type": "owl:AnnotationProperty",
+            "rdfs:comment": "Classes and properties used to qualify relationships are annotated with prov:unqualifiedForm to indicate the property used to assert an unqualified provenance relation.",
+            "iri": "prov:unqualifiedForm"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "A section number",
+            "iri": "bibo:section",
+            "rdfs:label": "section"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "If this Entity prov:wasQuotedFrom Entity :e, then it can qualify how using prov:qualifiedQuotation [ a prov:Quotation;  prov:entity :e; :foo :bar ].",
+            "iri": "prov:qualifiedQuotation",
+            "rdfs:label": "qualifiedQuotation"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "An entity responsible for making the resource available.",
+            "iri": "dct:publisher",
+            "rdfs:label": "Publisher"
+        },
+        {
+            "type": [
+                "owl:TransitiveProperty",
+                "owl:ObjectProperty",
+                "rdf:Property"
+            ],
+            "iri": "skos:narrowerTransitive",
+            "rdfs:label": "has narrower transitive"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": [
+                "This property has multiple RDFS domains to suit multiple OWL Profiles. See <a href=\"#owl-profile\">PROV-O OWL Profile</a>.",
+                "The Location of any resource."
+            ],
+            "iri": "prov:atLocation",
+            "rdfs:label": "atLocation"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "A person who translates written document from one language to another.",
+            "iri": "bibo:translator",
+            "rdfs:label": "translator"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "If this Entity prov:wasRevisionOf Entity :e, then it can qualify how it was revised using prov:qualifiedRevision [ a prov:Revision;  prov:entity :e; :foo :bar ].",
+            "iri": "prov:qualifiedRevision",
+            "rdfs:label": "qualifiedRevision"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "An instantaneous event, or event for short, happens in the world and marks a change in the world, in its activities and in its entities. The term 'event' is commonly used in process algebra with a similar meaning. Events represent communications or interactions; they are assumed to be atomic and instantaneous.",
+            "iri": "prov:InstantaneousEvent",
+            "rdfs:label": "InstantaneousEvent"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "The _optional_ Usage involved in an Entity's Derivation.",
+            "iri": "prov:hadUsage",
+            "rdfs:label": "hadUsage"
+        },
+        {
+            "type": "owl:AnnotationProperty",
+            "iri": "prov:aq"
+        },
+        {
+            "type": [
+                "bibo:DocumentStatus",
+                "owl:Thing"
+            ],
+            "rdfs:comment": "Accepted for publication after peer reviewing.",
+            "iri": "http://purl.org/ontology/bibo/status/accepted",
+            "rdfs:label": "accepted"
+        },
+        {
+            "type": "http://purl.org/dc/dcam/VocabularyEncodingScheme",
+            "rdfs:comment": "The set of conceptual resources specified by the Universal Decimal Classification.",
+            "iri": "dct:UDC",
+            "rdfs:label": "UDC"
+        },
+        {
+            "type": [
+                "owl:DatatypeProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "A string expressing what the user is happy for the general public (normally) to know about their current activity.",
+            "iri": "foaf:status",
+            "rdfs:label": "status"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "The resource in which another resource is reproduced.",
+            "iri": "bibo:reproducedIn"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "Indicates a member of a Group",
+            "iri": "foaf:member",
+            "rdfs:label": "member"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": [
+                "AgentInfluence provides additional descriptions of an Agent's binary influence upon any other kind of resource. Instances of AgentInfluence use the prov:agent property to cite the influencing Agent.",
+                "It is not recommended that the type AgentInfluence be asserted without also asserting one of its more specific subclasses."
+            ],
+            "iri": "prov:AgentInfluence",
+            "rdfs:label": "AgentInfluence"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "An unambiguous reference to the resource within a given context.",
+            "iri": "dct:identifier",
+            "rdfs:label": "Identifier"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "The size or duration of the resource.",
+            "iri": "dct:extent",
+            "rdfs:label": "Extent"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A class of entity, defined in terms of progression through an educational or training context, for which the described resource is intended.",
+            "iri": "dct:educationLevel",
+            "rdfs:label": "Audience Education Level"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "A material thing.",
+            "iri": "dct:PhysicalResource",
+            "rdfs:label": "Physical Resource"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A periodical of magazine Articles. A magazine is a publication that is issued periodically, usually bound in a paper cover, and typically contains essays, stories, poems, etc., by many writers, and often photographs and drawings, frequently specializing in a particular subject or area, as hobbies, news, or sports.",
+            "iri": "bibo:Magazine",
+            "rdfs:label": "Magazine"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "An issue number",
+            "iri": "bibo:issue",
+            "rdfs:label": "issue"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "iri": "prov:invalidated",
+            "rdfs:label": "invalidated"
+        },
+        {
+            "type": "http://purl.org/dc/dcam/VocabularyEncodingScheme",
+            "rdfs:comment": "The set of media types specified by the Internet Assigned Numbers Authority.",
+            "iri": "dct:IMT",
+            "rdfs:label": "IMT"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A related resource that is substantially the same as the pre-existing described resource, but in another format.",
+            "iri": "dct:hasFormat",
+            "rdfs:label": "Has Format"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "If this Entity prov:wasAttributedTo Agent :ag, then it can qualify how it was influenced using prov:qualifiedAttribution [ a prov:Attribution;  prov:agent :ag; :foo :bar ].",
+            "iri": "prov:qualifiedAttribution",
+            "rdfs:label": "qualifiedAttribution"
+        },
+        {
+            "type": [
+                "rdfs:Class",
+                "owl:Class"
+            ],
+            "rdfs:comment": "A class of Agents.",
+            "iri": "foaf:Group",
+            "rdfs:label": "Group"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A related resource that requires the described resource to support its function, delivery, or coherence.",
+            "iri": "dct:isRequiredBy",
+            "rdfs:label": "Is Required By"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "An entity responsible for issuing often informally published documents such as press releases, reports, etc.",
+            "iri": "bibo:issuer",
+            "rdfs:label": "issuer"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:DatatypeProperty"
+            ],
+            "rdfs:comment": "A .plan comment, in the tradition of finger and '.plan' files.",
+            "iri": "foaf:plan",
+            "rdfs:label": "plan"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A document that simultaneously contains other documents.",
+            "iri": "bibo:CollectedDocument",
+            "rdfs:label": "Collected Document"
+        },
+        {
+            "type": [
+                "owl:ObjectProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "Narrower concepts are typically rendered as children in a concept hierarchy (tree).",
+            "iri": "skos:narrower",
+            "rdfs:label": "has narrower"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "Starting page number within a continuous page range.",
+            "iri": "bibo:pageStart",
+            "rdfs:label": "page start"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A small reference book, especially one giving instructions.",
+            "iri": "bibo:Manual",
+            "rdfs:label": "Manual"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "Relates a document to another document that is cited\nby the first document as reference, comment, review, quotation or for\nanother purpose.",
+            "iri": "bibo:cites",
+            "rdfs:label": "cites"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A document describing an account or statement describing in detail an event, situation, or the like, usually as the result of observation, inquiry, etc..",
+            "iri": "bibo:Report",
+            "rdfs:label": "Report"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "A string of non-contiguous page spans that locate a Document within a Collection. Example: 23-25, 34, 54-56. For continuous page ranges, use the pageStart and pageEnd properties.",
+            "iri": "bibo:pages",
+            "rdfs:label": "pages"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "A thing depicted in this representation.",
+            "iri": "foaf:depicts",
+            "rdfs:label": "depicts"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "iri": "bibo:shortDescription"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "iri": "bibo:handle"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "The publication status of (typically academic) content.",
+            "iri": "bibo:status",
+            "rdfs:label": "status"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A related resource of which the described resource is a version, edition, or adaptation.",
+            "iri": "dct:isVersionOf",
+            "rdfs:label": "Is Version Of"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A public performance.",
+            "iri": "bibo:Performance",
+            "rdfs:label": "Performance"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "iri": "prov:generated",
+            "rdfs:label": "generated"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A document (noun) is a bounded physical representation of body of information designed with the capacity (and usually intent) to communicate. A document may manifest symbolic, diagrammatic or sensory-representational information.",
+            "iri": "bibo:Document",
+            "rdfs:label": "Document"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "Date of submission of the resource.",
+            "iri": "dct:dateSubmitted",
+            "rdfs:label": "Date Submitted"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "something that is printed or published and distributed, esp. a given number of a periodical",
+            "iri": "bibo:Issue",
+            "rdfs:label": "Issue"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "There exist no prescriptive requirement on the nature of plans, their representation, the actions or steps they consist of, or their intended goals. Since plans may evolve over time, it may become necessary to track their provenance, so plans themselves are entities. Representing the plan explicitly in the provenance can be useful for various tasks: for example, to validate the execution as represented in the provenance record, to manage expectation failures, or to provide explanations.",
+            "iri": "prov:Plan",
+            "rdfs:label": "Plan"
+        },
+        {
+            "type": [
+                "owl:DatatypeProperty",
+                "owl:FunctionalProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "The age in years of some agent.",
+            "iri": "foaf:age",
+            "rdfs:label": "age"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "An chapter number",
+            "iri": "bibo:chapter",
+            "rdfs:label": "chapter"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "A homepage of a school attended by the person.",
+            "iri": "foaf:schoolHomepage",
+            "rdfs:label": "schoolHomepage"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "End is when an activity is deemed to have ended. An end may refer to an entity, known as trigger, that terminated the activity.",
+            "iri": "prov:wasEndedBy",
+            "rdfs:label": "wasEndedBy"
+        },
+        {
+            "type": "owl:AnnotationProperty",
+            "rdfs:comment": "A note by the OWL development team about how this term expresses the PROV-DM concept, or how it should be used in context of semantic web or linked data.",
+            "iri": "prov:editorialNote"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A written or printed communication addressed to a person or organization and usually transmitted by mail.",
+            "iri": "bibo:Letter",
+            "rdfs:label": "Letter"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": [
+                "Because prov:Influence is a broad relation, its most specific subclasses (e.g. prov:Communication, prov:Delegation, prov:End, prov:Revision, etc.) should be used when applicable.",
+                "An instance of prov:Influence provides additional descriptions about the binary prov:wasInfluencedBy relation from some influenced Activity, Entity, or Agent to the influencing Activity, Entity, or Agent. For example, :stomach_ache prov:wasInfluencedBy :spoon; prov:qualifiedInfluence [ a prov:Influence; prov:entity :spoon; :foo :bar ] . Because prov:Influence is a broad relation, the more specific relations (Communication, Delegation, End, etc.) should be used when applicable."
+            ],
+            "iri": "prov:Influence",
+            "rdfs:label": "Influence"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": [
+                "This property has multiple RDFS domains to suit multiple OWL Profiles. See <a href=\"#owl-profile\">PROV-O OWL Profile</a>.",
+                "The _optional_ Role that an Entity assumed in the context of an Activity. For example, :baking prov:used :spoon; prov:qualified [ a prov:Usage; prov:entity :spoon; prov:hadRole roles:mixing_implement ]."
+            ],
+            "iri": "prov:hadRole",
+            "rdfs:label": "hadRole"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A point or period of time associated with an event in the lifecycle of the resource.",
+            "iri": "dct:date",
+            "rdfs:label": "Date"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "Notes or annotations about a resource.",
+            "iri": "bibo:Note",
+            "rdfs:label": "Note"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:AnnotationProperty"
+            ],
+            "rdfs:comment": [
+                "The range of skos:hiddenLabel is the class of RDF plain literals.",
+                "skos:prefLabel, skos:altLabel and skos:hiddenLabel are pairwise disjoint properties."
+            ],
+            "iri": "skos:hiddenLabel",
+            "rdfs:label": "hidden label"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "iri": "prov:hadMember",
+            "rdfs:label": "hadMember"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "Critical or explanatory note for a Document.",
+            "iri": "bibo:annotates",
+            "rdfs:label": "annotates"
+        },
+        {
+            "type": "owl:Class",
+            "iri": "prov:Role",
+            "rdfs:label": "Role"
+        },
+        {
+            "type": "http://purl.org/dc/dcam/VocabularyEncodingScheme",
+            "rdfs:comment": "The set of conceptual resources specified by the Library of Congress Classification.",
+            "iri": "dct:LCC",
+            "rdfs:label": "LCC"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A group of related documents issued at regular intervals.",
+            "iri": "bibo:Periodical",
+            "rdfs:label": "Periodical"
+        },
+        {
+            "type": "http://purl.org/dc/dcam/VocabularyEncodingScheme",
+            "rdfs:comment": "The set of conceptual resources specified by the National Library of Medicine Classification.",
+            "iri": "dct:NLM",
+            "rdfs:label": "NLM"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "A legal document giving official permission to do something with a Resource.",
+            "iri": "dct:LicenseDocument",
+            "rdfs:label": "License Document"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A language of the resource.",
+            "iri": "dct:language",
+            "rdfs:label": "Language"
+        },
+        {
+            "type": [
+                "owl:DatatypeProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "The first name of a person.",
+            "iri": "foaf:firstName",
+            "rdfs:label": "firstName"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "An entity that mediates access to the resource and for whom the resource is intended or useful.",
+            "iri": "dct:mediator",
+            "rdfs:label": "Mediator"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A graphical depiction of geographic features.",
+            "iri": "bibo:Map",
+            "rdfs:label": "Map"
+        },
+        {
+            "type": [
+                "owl:ObjectProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "An agent that  made this thing.",
+            "iri": "foaf:maker",
+            "rdfs:label": "maker"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "iri": "prov:entity",
+            "rdfs:label": "entity"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "A rate at which something recurs.",
+            "iri": "dct:Frequency",
+            "rdfs:label": "Frequency"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "An entity primarily responsible for making the resource.",
+            "iri": "dct:creator",
+            "rdfs:label": "Creator"
+        },
+        {
+            "type": "rdfs:Datatype",
+            "rdfs:comment": "The three-letter alphabetic codes listed in ISO639-2 for the representation of names of languages.",
+            "iri": "dct:ISO639-2",
+            "rdfs:label": "ISO 639-2"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "A plan or course of action by an authority, intended to influence and determine decisions, actions, and other matters.",
+            "iri": "dct:Policy",
+            "rdfs:label": "Policy"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "A legal decision that affirms a ruling.",
+            "iri": "bibo:affirmedBy"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "If this Activity prov:generated Entity :e, then it can qualify how it performed the Generation using prov:qualifiedGeneration [ a prov:Generation;  prov:entity :e; :foo :bar ].",
+            "iri": "prov:qualifiedGeneration",
+            "rdfs:label": "qualifiedGeneration"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "A dimension or extent, or a time taken to play or execute.",
+            "iri": "dct:SizeOrDuration",
+            "rdfs:label": "Size or Duration"
+        },
+        {
+            "type": "rdfs:Datatype",
+            "rdfs:comment": "The set of time intervals defined by their limits according to the DCMI Period Encoding Scheme.",
+            "iri": "dct:Period",
+            "rdfs:label": "DCMI Period"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "A legal decision that reverses a ruling.",
+            "iri": "bibo:reversedBy"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:DatatypeProperty"
+            ],
+            "rdfs:comment": "A Skype ID",
+            "iri": "foaf:skypeID",
+            "rdfs:label": "Skype ID"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "Owner of a document or a collection of documents.",
+            "iri": "bibo:owner",
+            "rdfs:label": "owner"
+        },
+        {
+            "type": [
+                "rdfs:Class",
+                "owl:Class"
+            ],
+            "rdfs:comment": "An agent (eg. person, group, software or physical artifact).",
+            "iri": "foaf:Agent",
+            "rdfs:label": "Agent"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "A method by which resources are added to a collection.",
+            "iri": "dct:MethodOfAccrual",
+            "rdfs:label": "Method of Accrual"
+        },
+        {
+            "type": [
+                "owl:DatatypeProperty",
+                "owl:InverseFunctionalProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "A jabber ID for something.",
+            "iri": "foaf:jabberID",
+            "rdfs:label": "jabber ID"
+        },
+        {
+            "type": [
+                "owl:ObjectProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "Indicates a homepage of the service provide for this online account.",
+            "iri": "foaf:accountServiceHomepage",
+            "rdfs:label": "account service homepage"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "The spatial or temporal topic of the resource, the spatial applicability of the resource, or the jurisdiction under which the resource is relevant.",
+            "iri": "dct:coverage",
+            "rdfs:label": "Coverage"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "iri": "bibo:sici"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:DatatypeProperty",
+                "owl:InverseFunctionalProperty"
+            ],
+            "rdfs:comment": "A Yahoo chat ID",
+            "iri": "foaf:yahooChatID",
+            "rdfs:label": "Yahoo chat ID"
+        },
+        {
+            "type": "owl:Class",
+            "iri": "skos:Collection",
+            "rdfs:label": "Collection"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:DatatypeProperty"
+            ],
+            "rdfs:comment": "A sha1sum hash, in hex.",
+            "iri": "foaf:sha1",
+            "rdfs:label": "sha1sum (hex)"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "If this Activity prov:wasInformedBy Activity :a, then it can qualify how it was influenced using prov:qualifiedCommunication [ a prov:Communication;  prov:activity :a; :foo :bar ].",
+            "iri": "prov:qualifiedCommunication",
+            "rdfs:label": "qualifiedCommunication"
+        },
+        {
+            "type": "rdfs:Datatype",
+            "rdfs:comment": "The set of regions in space defined by their geographic coordinates according to the DCMI Box Encoding Scheme.",
+            "iri": "dct:Box",
+            "rdfs:label": "DCMI Box"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "An agent that is interviewed by another agent.",
+            "iri": "bibo:interviewee",
+            "rdfs:label": "interviewee"
+        },
+        {
+            "type": [
+                "owl:Class",
+                "rdfs:Class"
+            ],
+            "rdfs:comment": "A person.",
+            "iri": "foaf:Person",
+            "rdfs:label": "Person"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "An instance of prov:Association provides additional descriptions about the binary prov:wasAssociatedWith relation from an prov:Activity to some prov:Agent that had some responsiblity for it. For example, :baking prov:wasAssociatedWith :baker; prov:qualifiedAssociation [ a prov:Association; prov:agent :baker; :foo :bar ].",
+            "iri": "prov:Association",
+            "rdfs:label": "Association"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:DatatypeProperty",
+                "owl:InverseFunctionalProperty"
+            ],
+            "rdfs:comment": "An ICQ chat ID",
+            "iri": "foaf:icqChatID",
+            "rdfs:label": "ICQ chat ID"
+        },
+        {
+            "type": [
+                "owl:SymmetricProperty",
+                "owl:ObjectProperty",
+                "rdf:Property"
+            ],
+            "iri": "skos:relatedMatch",
+            "rdfs:label": "has related match"
+        },
+        {
+            "type": [
+                "rdfs:Class",
+                "owl:Class"
+            ],
+            "rdfs:comment": "An online gaming account.",
+            "iri": "foaf:OnlineGamingAccount",
+            "rdfs:label": "Online Gaming Account"
+        },
+        {
+            "type": [
+                "owl:DatatypeProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "A textual geekcode for this person, see http://www.geekcode.com/geek.html",
+            "iri": "foaf:geekcode",
+            "rdfs:label": "geekcode"
+        },
+        {
+            "type": "owl:AnnotationProperty",
+            "iri": "prov:todo"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "An instance of prov:Delegation provides additional descriptions about the binary prov:actedOnBehalfOf relation from a performing prov:Agent to some prov:Agent for whom it was performed. For example, :mixing prov:wasAssociatedWith :toddler . :toddler prov:actedOnBehalfOf :mother; prov:qualifiedDelegation [ a prov:Delegation; prov:entity :mother; :foo :bar ].",
+            "iri": "prov:Delegation",
+            "rdfs:label": "Delegation"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "iri": "bibo:isbn"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "An instance of prov:Revision provides additional descriptions about the binary prov:wasRevisionOf relation from some newer prov:Entity to an earlier prov:Entity. For example, :draft_2 prov:wasRevisionOf :draft_1; prov:qualifiedRevision [ a prov:Revision; prov:entity :draft_1; :foo :bar ].",
+            "iri": "prov:Revision",
+            "rdfs:label": "Revision"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A slide in a slideshow",
+            "iri": "bibo:Slide",
+            "rdfs:label": "Slide"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "The time at which an entity was completely created and is available for use.",
+            "iri": "prov:generatedAtTime",
+            "rdfs:label": "generatedAtTime"
+        },
+        {
+            "type": "owl:AnnotationProperty",
+            "rdfs:comment": "PROV-O does not define all property inverses. The directionalities defined in PROV-O should be given preference over those not defined. However, if users wish to name the inverse of a PROV-O property, the local name given by prov:inverse should be used.",
+            "iri": "prov:inverse"
+        },
+        {
+            "type": "rdfs:Datatype",
+            "rdfs:comment": "The set of three-letter codes listed in ISO 639-3 for the representation of names of languages.",
+            "iri": "dct:ISO639-3",
+            "rdfs:label": "ISO 639-3"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A related resource that references, cites, or otherwise points to the described resource.",
+            "iri": "dct:isReferencedBy",
+            "rdfs:label": "Is Referenced By"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "A Film director.",
+            "iri": "bibo:director",
+            "rdfs:label": "director"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "A person known by this person (indicating some level of reciprocated interaction between the parties).",
+            "iri": "foaf:knows",
+            "rdfs:label": "knows"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "Indicates an account held by this agent.",
+            "iri": "foaf:holdsAccount",
+            "rdfs:label": "account"
+        },
+        {
+            "type": [
+                "owl:Class",
+                "owl:NamedIndividual"
+            ],
+            "iri": "prov:EmptyCollection",
+            "rdfs:label": "EmptyCollection"
+        },
+        {
+            "type": "owl:Class",
+            "iri": "prov:Agent",
+            "rdfs:label": "Agent"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A bill enacted into law.",
+            "iri": "bibo:Statute",
+            "rdfs:label": "Statute"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A group of Webpages accessible on the Web.",
+            "iri": "bibo:Website",
+            "rdfs:label": "Website"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A communication between an agent and one or more specific recipients.",
+            "iri": "bibo:PersonalCommunication",
+            "rdfs:label": "Personal Communication"
+        },
+        {
+            "type": [
+                "bibo:ThesisDegree",
+                "owl:Thing"
+            ],
+            "rdfs:comment": "masters degree in science",
+            "iri": "http://purl.org/ontology/bibo/degrees/ms",
+            "rdfs:label": "M.S."
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "If this Activity prov:wasStartedBy Entity :e1, then it can qualify how it was started using prov:qualifiedStart [ a prov:Start;  prov:entity :e1; :foo :bar ].",
+            "iri": "prov:qualifiedStart",
+            "rdfs:label": "qualifiedStart"
+        },
+        {
+            "type": [
+                "owl:DatatypeProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "A Myers Briggs (MBTI) personality classification.",
+            "iri": "foaf:myersBriggs",
+            "rdfs:label": "myersBriggs"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "iri": "bibo:identifier"
+        },
+        {
+            "type": [
+                "owl:DatatypeProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "The given name of some person.",
+            "iri": "foaf:givenname",
+            "rdfs:label": "Given name"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "An instance of prov:Attribution provides additional descriptions about the binary prov:wasAttributedTo relation from an prov:Entity to some prov:Agent that had some responsible for it. For example, :cake prov:wasAttributedTo :baker; prov:qualifiedAttribution [ a prov:Attribution; prov:entity :baker; :foo :bar ].",
+            "iri": "prov:Attribution",
+            "rdfs:label": "Attribution"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A passage selected from a larger work.",
+            "iri": "bibo:Excerpt",
+            "rdfs:label": "Excerpt"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "iri": "skos:member",
+            "rdfs:label": "has member"
+        },
+        {
+            "type": "owl:AnnotationProperty",
+            "rdfs:comment": "The position that this OWL term should be listed within documentation. The scope of the documentation (e.g., among all terms, among terms within a prov:category, among properties applying to a particular class, etc.) is unspecified.",
+            "iri": "prov:order"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "iri": "bibo:oclcnum"
+        },
+        {
+            "type": [
+                "owl:ObjectProperty",
+                "rdf:Property",
+                "owl:InverseFunctionalProperty"
+            ],
+            "rdfs:comment": "A weblog of some thing (whether person, group, company etc.).",
+            "iri": "foaf:weblog",
+            "rdfs:label": "weblog"
+        },
+        {
+            "type": "http://purl.org/dc/dcam/VocabularyEncodingScheme",
+            "rdfs:comment": "The set of places specified by the Getty Thesaurus of Geographic Names.",
+            "iri": "dct:TGN",
+            "rdfs:label": "TGN"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "An established standard to which the described resource conforms.",
+            "iri": "dct:conformsTo",
+            "rdfs:label": "Conforms To"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A formalized discussion between two or more people.",
+            "iri": "bibo:Interview",
+            "rdfs:label": "Interview"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A written communication addressed to a person or organization and transmitted electronically.",
+            "iri": "bibo:Email",
+            "rdfs:label": "EMail"
+        },
+        {
+            "type": [
+                "owl:AnnotationProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": [
+                "skos:prefLabel, skos:altLabel and skos:hiddenLabel are pairwise disjoint properties.",
+                "The range of skos:altLabel is the class of RDF plain literals."
+            ],
+            "iri": "skos:altLabel",
+            "rdfs:label": "alternative label"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "The thesis degree.",
+            "iri": "bibo:degree",
+            "rdfs:label": "degree"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "This property is for a plain-text rendering of the content of a Document. While the plain-text content of an entire document could be described by this property.",
+            "iri": "bibo:content",
+            "rdfs:label": "content"
+        },
+        {
+            "type": [
+                "owl:Class",
+                "rdfs:Class"
+            ],
+            "rdfs:comment": "An organization.",
+            "iri": "foaf:Organization",
+            "rdfs:label": "Organization"
+        },
+        {
+            "type": "owl:AnnotationProperty",
+            "rdfs:comment": "A definition quoted from PROV-DM or PROV-CONSTRAINTS that describes the concept expressed with this OWL term.",
+            "iri": "prov:definition"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:DatatypeProperty"
+            ],
+            "rdfs:comment": "A checksum for the DNA of some thing. Joke.",
+            "iri": "foaf:dnaChecksum",
+            "rdfs:label": "DNA checksum"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A document that presents authoritative reference information, such as a dictionary or encylopedia .",
+            "iri": "bibo:ReferenceSource",
+            "rdfs:label": "Reference Source"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "An object property to express the accountability of an agent towards another agent. The subordinate agent acted on behalf of the responsible agent in an actual activity. ",
+            "iri": "prov:actedOnBehalfOf",
+            "rdfs:label": "actedOnBehalfOf"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "Relates a translated document to the original document.",
+            "iri": "bibo:translationOf",
+            "rdfs:label": "translation of"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "Note that there are kinds of bundles (e.g. handwritten letters, audio recordings, etc.) that are not expressed in PROV-O, but can be still be described by PROV-O.",
+            "iri": "prov:Bundle",
+            "rdfs:label": "Bundle"
+        },
+        {
+            "type": [
+                "bibo:DocumentStatus",
+                "owl:Thing"
+            ],
+            "rdfs:comment": "Document to be published",
+            "iri": "http://purl.org/ontology/bibo/status/forthcoming",
+            "rdfs:label": "forthcoming"
+        },
+        {
+            "type": "owl:AnnotationProperty",
+            "rdfs:comment": "A reference to the principal section of the PROV-DM document that describes this concept.",
+            "iri": "prov:dm"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": [
+                "It is not recommended that the type ActivityInfluence be asserted without also asserting one of its more specific subclasses.",
+                "ActivityInfluence provides additional descriptions of an Activity's binary influence upon any other kind of resource. Instances of ActivityInfluence use the prov:activity property to cite the influencing Activity."
+            ],
+            "iri": "prov:ActivityInfluence",
+            "rdfs:label": "ActivityInfluence"
+        },
+        {
+            "type": [
+                "owl:AnnotationProperty",
+                "rdf:Property"
+            ],
+            "iri": "skos:scopeNote",
+            "rdfs:label": "scope note"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "The abbreviation of a title.",
+            "iri": "bibo:shortTitle",
+            "rdfs:label": "short title"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "Date of creation of the resource.",
+            "iri": "dct:created",
+            "rdfs:label": "Date Created"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "An instance of prov:Quotation provides additional descriptions about the binary prov:wasQuotedFrom relation from some taken prov:Entity from an earlier, larger prov:Entity. For example, :here_is_looking_at_you_kid prov:wasQuotedFrom :casablanca_script; prov:qualifiedQuotation [ a prov:Quotation; prov:entity :casablanca_script; :foo :bar ].",
+            "iri": "prov:Quotation",
+            "rdfs:label": "Quotation"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "If this Agent prov:actedOnBehalfOf Agent :ag, then it can qualify how with prov:qualifiedResponsibility [ a prov:Responsibility;  prov:agent :ag; :foo :bar ].",
+            "iri": "prov:qualifiedDelegation",
+            "rdfs:label": "qualifiedDelegation"
+        },
+        {
+            "type": [
+                "owl:ObjectProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "A tipjar document for this agent, describing means for payment and reward.",
+            "iri": "foaf:tipjar",
+            "rdfs:label": "tipjar"
+        },
+        {
+            "type": [
+                "owl:ObjectProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "Broader concepts are typically rendered as parents in a concept hierarchy (tree).",
+            "iri": "skos:broader",
+            "rdfs:label": "has broader"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "An instance of prov:Communication provides additional descriptions about the binary prov:wasInformedBy relation from an informed prov:Activity to the prov:Activity that informed it. For example, :you_jumping_off_bridge prov:wasInformedBy :everyone_else_jumping_off_bridge; prov:qualifiedCommunication [ a prov:Communication; prov:activity :everyone_else_jumping_off_bridge; :foo :bar ].",
+            "iri": "prov:Communication",
+            "rdfs:label": "Communication"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "The time at which an activity ended. See also prov:startedAtTime.",
+            "iri": "prov:endedAtTime",
+            "rdfs:label": "endedAtTime"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A related resource that is required by the described resource to support its function, delivery, or coherence.",
+            "iri": "dct:requires",
+            "rdfs:label": "Requires"
+        },
+        {
+            "type": [
+                "owl:DatatypeProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "Title (Mr, Mrs, Ms, Dr. etc)",
+            "iri": "foaf:title",
+            "rdfs:label": "title"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "A location that something is based near, for some broadly human notion of near.",
+            "iri": "foaf:based_near",
+            "rdfs:label": "based near"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "An activity a2 is dependent on or informed by another activity a1, by way of some unspecified entity that is generated by a1 and used by a2.",
+            "iri": "prov:wasInformedBy",
+            "rdfs:label": "wasInformedBy"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "A person having managerial and sometimes policy-making responsibility for the editorial part of a publishing firm or of a newspaper, magazine, or other publication.",
+            "iri": "bibo:editor",
+            "rdfs:label": "editor"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "Spatial characteristics of the resource.",
+            "iri": "dct:spatial",
+            "rdfs:label": "Spatial Coverage"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A chapter of a book.",
+            "iri": "bibo:Chapter",
+            "rdfs:label": "Chapter"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "If this Activity prov:used Entity :e, then it can qualify how it used it using prov:qualifiedUsage [ a prov:Usage; prov:entity :e; :foo :bar ].",
+            "iri": "prov:qualifiedUsage",
+            "rdfs:label": "qualifiedUsage"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "A generic item or document number. Not to be confused with issue number.",
+            "iri": "bibo:number",
+            "rdfs:label": "number"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "A description (often numeric) that locates an item within a containing document or collection.",
+            "iri": "bibo:locator",
+            "rdfs:label": "locator"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "iri": "prov:value",
+            "rdfs:label": "value"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A collection of statutes.",
+            "iri": "bibo:Code",
+            "rdfs:label": "Code"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "Date of formal issuance (e.g., publication) of the resource.",
+            "iri": "dct:issued",
+            "rdfs:label": "Date Issued"
+        },
+        {
+            "type": "rdfs:Datatype",
+            "rdfs:comment": "The set of codes listed in ISO 3166-1 for the representation of names of countries.",
+            "iri": "dct:ISO3166",
+            "rdfs:label": "ISO 3166"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "iri": "bibo:performer",
+            "rdfs:label": "performer"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "An instance of prov:End provides additional descriptions about the binary prov:wasEndedBy relation from some ended prov:Activity to an prov:Entity that ended it. For example, :ball_game prov:wasEndedBy :buzzer; prov:qualifiedEnd [ a prov:End; prov:entity :buzzer; :foo :bar; prov:atTime '2012-03-09T08:05:08-05:00'^^xsd:dateTime ].",
+            "iri": "prov:End",
+            "rdfs:label": "End"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A periodical of documents, usually issued daily or weekly, containing current news, editorials, feature articles, and usually advertising.",
+            "iri": "bibo:Newspaper",
+            "rdfs:label": "Newspaper"
+        },
+        {
+            "type": "http://purl.org/dc/dcam/VocabularyEncodingScheme",
+            "rdfs:comment": "The set of labeled concepts specified by the Library of Congress Subject Headings.",
+            "iri": "dct:LCSH",
+            "rdfs:label": "LCSH"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A legal document; for example, a court decision, a brief, and so forth.",
+            "iri": "bibo:LegalDocument",
+            "rdfs:label": "Legal Document"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A document created to summarize research findings associated with the completion of an academic degree.",
+            "iri": "bibo:Thesis",
+            "rdfs:label": "Thesis"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "An instance or a session in which testimony and arguments are presented, esp. before an official, as a judge in a lawsuit.",
+            "iri": "bibo:Hearing",
+            "rdfs:label": "Hearing"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "An account of the resource.",
+            "iri": "dct:description",
+            "rdfs:label": "Description"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "Universal Resource Identifier of a document",
+            "iri": "bibo:uri",
+            "rdfs:label": "uri"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "If this Entity prov:hadPrimarySource Entity :e, then it can qualify how using prov:qualifiedPrimarySource [ a prov:PrimarySource; prov:entity :e; :foo :bar ].",
+            "iri": "prov:qualifiedPrimarySource",
+            "rdfs:label": "qualifiedPrimarySource"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "An entity is derived from an original entity by copying, or 'quoting', some or all of it.",
+            "iri": "prov:wasQuotedFrom",
+            "rdfs:label": "wasQuotedFrom"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A related resource that is referenced, cited, or otherwise pointed to by the described resource.",
+            "iri": "dct:references",
+            "rdfs:label": "References"
+        },
+        {
+            "type": "http://purl.org/dc/dcam/VocabularyEncodingScheme",
+            "rdfs:comment": "The set of labeled concepts specified by the Medical Subject Headings.",
+            "iri": "dct:MESH",
+            "rdfs:label": "MeSH"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "The time at which an entity was invalidated (i.e., no longer usable).",
+            "iri": "prov:invalidatedAtTime",
+            "rdfs:label": "invalidatedAtTime"
+        },
+        {
+            "type": [
+                "rdfs:Class",
+                "owl:Class"
+            ],
+            "rdfs:comment": "An image.",
+            "iri": "foaf:Image",
+            "rdfs:label": "Image"
+        },
+        {
+            "type": [
+                "dct:AgentClass",
+                "rdfs:Class"
+            ],
+            "rdfs:comment": "A resource that acts or has the power to act.",
+            "iri": "dct:Agent",
+            "rdfs:label": "Agent"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "Information about rights held in and over the resource.",
+            "iri": "dct:rights",
+            "rdfs:label": "Rights"
+        },
+        {
+            "type": "owl:Class",
+            "iri": "prov:Person",
+            "rdfs:label": "Person"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "The name defining a special edition of a document. Normally its a literal value composed of a version number and words.",
+            "iri": "bibo:edition",
+            "rdfs:label": "edition"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "iri": "bibo:upc"
+        },
+        {
+            "type": "owl:Class",
+            "iri": "skos:Concept",
+            "rdfs:label": "Concept"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A document describing a standard",
+            "iri": "bibo:Standard",
+            "rdfs:label": "Standard"
+        },
+        {
+            "type": "owl:Ontology",
+            "iri": "prov:"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty",
+                "owl:SymmetricProperty"
+            ],
+            "rdfs:comment": "skos:related is disjoint with skos:broaderTransitive",
+            "iri": "skos:related",
+            "rdfs:label": "has related"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "Date (often a range) that the resource became or will become available.",
+            "iri": "dct:available",
+            "rdfs:label": "Date Available"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": [
+                "The _optional_ Activity of an Influence, which used, generated, invalidated, or was the responsibility of some Entity. This property is _not_ used by ActivityInfluence (use prov:activity instead).",
+                "This property has multiple RDFS domains to suit multiple OWL Profiles. See <a href=\"#owl-profile\">PROV-O OWL Profile</a>."
+            ],
+            "iri": "prov:hadActivity",
+            "rdfs:label": "hadActivity"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "The number of volumes contained in a collection of documents (usually a series, periodical, etc.).",
+            "iri": "bibo:numVolumes",
+            "rdfs:label": "number of volumes"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "The academic degree of a Thesis",
+            "iri": "bibo:ThesisDegree",
+            "rdfs:label": "Thesis degree"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A document accompanying a legal case.",
+            "iri": "bibo:LegalCaseDocument",
+            "rdfs:label": "Legal Case Document"
+        },
+        {
+            "type": "owl:AnnotationProperty",
+            "iri": "prov:sharesDefinitionWith"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty",
+                "owl:SymmetricProperty"
+            ],
+            "iri": "skos:closeMatch",
+            "rdfs:label": "has close match"
+        },
+        {
+            "type": [
+                "owl:AnnotationProperty",
+                "rdf:Property"
+            ],
+            "iri": "skos:editorialNote",
+            "rdfs:label": "editorial note"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:AnnotationProperty"
+            ],
+            "iri": "skos:note",
+            "rdfs:label": "note"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A legal document giving official permission to do something with the resource.",
+            "iri": "dct:license",
+            "rdfs:label": "License"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "Draft legislation presented for discussion to a legal body.",
+            "iri": "bibo:Bill",
+            "rdfs:label": "Bill"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "iri": "bibo:doi"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "An ordered list of contributors. Normally, this list is seen as a priority list that order contributors by importance.",
+            "iri": "bibo:contributorList",
+            "rdfs:label": "list of contributors"
+        },
+        {
+            "type": [
+                "bibo:DocumentStatus",
+                "owl:Thing"
+            ],
+            "rdfs:comment": "A document that is not peer reviewed",
+            "iri": "http://purl.org/ontology/bibo/status/nonPeerReviewed",
+            "rdfs:label": "non peer reviewed"
+        },
+        {
+            "type": [
+                "owl:InverseFunctionalProperty",
+                "owl:DatatypeProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "The sha1sum of the URI of an Internet mailbox associated with exactly one owner, the  first owner of the mailbox.",
+            "iri": "foaf:mbox_sha1sum",
+            "rdfs:label": "sha1sum of a personal mailbox URI name"
+        },
+        {
+            "type": [
+                "owl:Thing",
+                "bibo:ThesisDegree"
+            ],
+            "rdfs:comment": "masters degree in arts",
+            "iri": "http://purl.org/ontology/bibo/degrees/ma",
+            "rdfs:label": "M.A."
+        },
+        {
+            "type": "owl:AnnotationProperty",
+            "rdfs:comment": "This annotation property links a subproperty of prov:wasInfluencedBy with the subclass of prov:Influence and the qualifying property that are used to qualify it. \n\nExample annotation:\n\n    prov:wasGeneratedBy prov:qualifiedForm prov:qualifiedGeneration, prov:Generation .\n\nThen this unqualified assertion:\n\n    :entity1 prov:wasGeneratedBy :activity1 .\n\ncan be qualified by adding:\n\n   :entity1 prov:qualifiedGeneration :entity1Gen .\n   :entity1Gen \n       a prov:Generation, prov:Influence;\n       prov:activity :activity1;\n       :customValue 1337 .\n\nNote how the value of the unqualified influence (prov:wasGeneratedBy :activity1) is mirrored as the value of the prov:activity (or prov:entity, or prov:agent) property on the influence class.",
+            "iri": "prov:qualifiedForm"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A scholarly academic article, typically published in a journal.",
+            "iri": "bibo:AcademicArticle",
+            "rdfs:label": "Academic Article"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "Date of acceptance of the resource.",
+            "iri": "dct:dateAccepted",
+            "rdfs:label": "Date Accepted"
+        },
+        {
+            "type": [
+                "owl:Thing",
+                "bibo:DocumentStatus"
+            ],
+            "rdfs:comment": "Document drafted",
+            "iri": "http://purl.org/ontology/bibo/status/draft",
+            "rdfs:label": "draft"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:FunctionalProperty",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "The primary topic of some page or document.",
+            "iri": "foaf:primaryTopic",
+            "rdfs:label": "primary topic"
+        },
+        {
+            "type": [
+                "rdfs:Class",
+                "owl:Class"
+            ],
+            "rdfs:comment": "A personal profile RDF document.",
+            "iri": "foaf:PersonalProfileDocument",
+            "rdfs:label": "PersonalProfileDocument"
+        },
+        {
+            "type": [
+                "owl:ObjectProperty",
+                "owl:FunctionalProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "For any resource, every item in the list given as the value of the\n      skos:memberList property is also a value of the skos:member property.",
+            "iri": "skos:memberList",
+            "rdfs:label": "has member list"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "A process that is used to engender knowledge, attitudes, and skills.",
+            "iri": "dct:MethodOfInstruction",
+            "rdfs:label": "Method of Instruction"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "iri": "bibo:gtin14"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A section of a book.",
+            "iri": "bibo:BookSection",
+            "rdfs:label": "Book Section"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "Attribution is the ascribing of an entity to an agent.",
+            "iri": "prov:wasAttributedTo",
+            "rdfs:label": "wasAttributedTo"
+        },
+        {
+            "type": "rdfs:Datatype",
+            "rdfs:comment": "The set of tags constructed according to RFC 5646 for the identification of languages.",
+            "iri": "dct:RFC5646",
+            "rdfs:label": "RFC 5646"
+        },
+        {
+            "type": [
+                "bibo:DocumentStatus",
+                "owl:Thing"
+            ],
+            "rdfs:comment": "Unpublished document",
+            "iri": "http://purl.org/ontology/bibo/status/unpublished",
+            "rdfs:label": "unpublished"
+        },
+        {
+            "type": "owl:AnnotationProperty",
+            "rdfs:comment": "A reference to the principal section of the PROV-DM document that describes this concept.",
+            "iri": "prov:n"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "An instance of prov:PrimarySource provides additional descriptions about the binary prov:hadPrimarySource relation from some secondary prov:Entity to an earlier, primary prov:Entity. For example, :blog prov:hadPrimarySource :newsArticle; prov:qualifiedPrimarySource [ a prov:PrimarySource; prov:entity :newsArticle; :foo :bar ] .",
+            "iri": "prov:PrimarySource",
+            "rdfs:label": "PrimarySource"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "A topic of some page or document.",
+            "iri": "foaf:topic",
+            "rdfs:label": "topic"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "The status of the publication of a document.",
+            "iri": "bibo:DocumentStatus",
+            "rdfs:label": "Document Status"
+        },
+        {
+            "type": [
+                "owl:Thing",
+                "bibo:DocumentStatus"
+            ],
+            "rdfs:comment": "Legal document",
+            "iri": "http://purl.org/ontology/bibo/status/legal",
+            "rdfs:label": "legal"
+        },
+        {
+            "type": [
+                "owl:Thing",
+                "bibo:DocumentStatus"
+            ],
+            "rdfs:comment": "Published document",
+            "iri": "http://purl.org/ontology/bibo/status/published",
+            "rdfs:label": "published"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:DatatypeProperty"
+            ],
+            "rdfs:comment": "The family name of some person.",
+            "iri": "foaf:family_name",
+            "rdfs:label": "family_name"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:AnnotationProperty"
+            ],
+            "iri": "skos:changeNote",
+            "rdfs:label": "change note"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "The policy governing the addition of items to a collection.",
+            "iri": "dct:accrualPolicy",
+            "rdfs:label": "Accrual Policy"
+        },
+        {
+            "type": [
+                "owl:DatatypeProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "The surname of some person.",
+            "iri": "foaf:surname",
+            "rdfs:label": "Surname"
+        },
+        {
+            "type": "owl:AnnotationProperty",
+            "rdfs:comment": "Classify prov-o terms into six components according to prov-dm, including 'agents-responsibility', 'alternate', 'annotations', 'collections', 'derivations', and 'entities-activities'. This classification is used so that readers of prov-o specification can find its correspondence with the prov-dm specification.",
+            "iri": "prov:component"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A related resource that is supplanted, displaced, or superseded by the described resource.",
+            "iri": "dct:replaces",
+            "rdfs:label": "Replaces"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "An audio-visual document; film, video, and so forth.",
+            "iri": "bibo:AudioVisualDocument",
+            "rdfs:label": "audio-visual document"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "The topic of the resource.",
+            "iri": "dct:subject",
+            "rdfs:label": "Subject"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A name given to the resource.",
+            "iri": "dct:title",
+            "rdfs:label": "Title"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A written composition in prose, usually nonfiction, on a specific topic, forming an independent part of a book or other publication, as a newspaper or magazine.",
+            "iri": "bibo:Article",
+            "rdfs:label": "Article"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "A page about a topic of interest to this person.",
+            "iri": "foaf:interest",
+            "rdfs:label": "interest"
+        },
+        {
+            "type": [
+                "owl:ObjectProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "Indicates an account held by this agent.",
+            "iri": "foaf:account",
+            "rdfs:label": "account"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "A media type or extent.",
+            "iri": "dct:MediaTypeOrExtent",
+            "rdfs:label": "Media Type or Extent"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:DatatypeProperty"
+            ],
+            "rdfs:comment": "Indicates the name (identifier) associated with this online account.",
+            "iri": "foaf:accountName",
+            "rdfs:label": "account name"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A related resource that is substantially the same as the described resource, but in another format.",
+            "iri": "dct:isFormatOf",
+            "rdfs:label": "Is Format Of"
+        },
+        {
+            "type": "owl:Class",
+            "iri": "skos:OrderedCollection",
+            "rdfs:label": "Ordered Collection"
+        },
+        {
+            "type": [
+                "owl:ObjectProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "A derived thumbnail image.",
+            "iri": "foaf:thumbnail",
+            "rdfs:label": "thumbnail"
+        },
+        {
+            "type": [
+                "owl:AnnotationProperty",
+                "rdf:Property"
+            ],
+            "iri": "skos:historyNote",
+            "rdfs:label": "history note"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "A depiction of some thing.",
+            "iri": "foaf:depiction",
+            "rdfs:label": "depiction"
+        },
+        {
+            "type": [
+                "owl:AnnotationProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "Indicates the class of individuals that are a member of a Group",
+            "iri": "foaf:membershipClass",
+            "rdfs:label": "membershipClass"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:AnnotationProperty"
+            ],
+            "iri": "skos:definition",
+            "rdfs:label": "definition"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "iri": "bibo:isbn10"
+        },
+        {
+            "type": [
+                "owl:InverseFunctionalProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "A document that this thing is the primary topic of.",
+            "iri": "foaf:isPrimaryTopicOf",
+            "rdfs:label": "is primary topic of"
+        },
+        {
+            "type": "owl:Class",
+            "iri": "bibo:Event"
+        },
+        {
+            "type": [
+                "foaf:Person",
+                "owl:Thing"
+            ],
+            "iri": "bibo:bdarcus"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "iri": "skos:broadMatch",
+            "rdfs:label": "has broader match"
+        },
+        {
+            "type": "rdfs:Datatype",
+            "rdfs:comment": "The set of identifiers constructed according to the generic syntax for Uniform Resource Identifiers as specified by the Internet Engineering Task Force.",
+            "iri": "dct:URI",
+            "rdfs:label": "URI"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A related resource that is included either physically or logically in the described resource.",
+            "iri": "dct:hasPart",
+            "rdfs:label": "Has Part"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A statement of any changes in ownership and custody of the resource since its creation that are significant for its authenticity, integrity, and interpretation.",
+            "iri": "dct:provenance",
+            "rdfs:label": "Provenance"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "iri": "prov:activity",
+            "rdfs:label": "activity"
+        },
+        {
+            "type": [
+                "owl:ObjectProperty",
+                "owl:TransitiveProperty",
+                "rdf:Property"
+            ],
+            "iri": "skos:broaderTransitive",
+            "rdfs:label": "has broader transitive"
+        },
+        {
+            "type": "owl:Class",
+            "iri": "prov:Entity",
+            "rdfs:label": "Entity"
+        },
+        {
+            "type": [
+                "rdfs:Class",
+                "owl:Class"
+            ],
+            "rdfs:comment": "A project (a collective endeavour of some kind).",
+            "iri": "foaf:Project",
+            "rdfs:label": "Project"
+        },
+        {
+            "type": [
+                "owl:ObjectProperty",
+                "rdf:Property"
+            ],
+            "iri": "skos:hasTopConcept",
+            "rdfs:label": "has top concept"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "A basis for comparison; a reference point against which other things can be evaluated.",
+            "iri": "dct:Standard",
+            "rdfs:label": "Standard"
+        },
+        {
+            "type": [
+                "owl:FunctionalProperty",
+                "rdf:Property",
+                "owl:DatatypeProperty"
+            ],
+            "rdfs:comment": "The birthday of this Agent, represented in mm-dd string form, eg. '12-31'.",
+            "iri": "foaf:birthday",
+            "rdfs:label": "birthday"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A related resource that is a version, edition, or adaptation of the described resource.",
+            "iri": "dct:hasVersion",
+            "rdfs:label": "Has Version"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "An excerpted collection of words.",
+            "iri": "bibo:Quote",
+            "rdfs:label": "Quote"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "A legal decision on appeal that takes action on a case (affirming it, reversing it, etc.).",
+            "iri": "bibo:subsequentLegalDecision"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "iri": "bibo:issn"
+        },
+        {
+            "type": "owl:Class",
+            "iri": "prov:SoftwareAgent",
+            "rdfs:label": "SoftwareAgent"
+        },
+        {
+            "type": "owl:AnnotationProperty",
+            "rdfs:comment": "When the prov-o term does not have a definition drawn from prov-dm, and the prov-o editor provides one.",
+            "iri": "prov:editorsDefinition"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "The date on which a legal case is argued before a court. Date is of format xsd:date",
+            "iri": "bibo:argued",
+            "rdfs:label": "date argued"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "An edited book.",
+            "iri": "bibo:EditedBook",
+            "rdfs:label": "Edited Book"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "A statement about the intellectual property rights (IPR) held in or over a Resource, a legal document giving official permission to do something with a resource, or a statement about access rights.",
+            "iri": "dct:RightsStatement",
+            "rdfs:label": "Rights Statement"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A seminar, discussion group, or the like, that emphasizes zxchange of ideas and the demonstration and application of techniques, skills, etc.",
+            "iri": "bibo:Workshop",
+            "rdfs:label": "Workshop"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A bibliographic reference for the resource.",
+            "iri": "dct:bibliographicCitation",
+            "rdfs:label": "Bibliographic Citation"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A collection of legal cases.",
+            "iri": "bibo:CourtReporter",
+            "rdfs:label": "Court Reporter"
+        },
+        {
+            "type": [
+                "owl:Class",
+                "rdfs:Class"
+            ],
+            "rdfs:comment": "An online account.",
+            "iri": "foaf:OnlineAccount",
+            "rdfs:label": "Online Account"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "An audio document; aka record.",
+            "iri": "bibo:AudioDocument",
+            "rdfs:label": "audio document"
+        },
+        {
+            "type": "owl:Class",
+            "iri": "prov:Location",
+            "rdfs:label": "Location"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "a distinct part of a larger document or collected document.",
+            "iri": "bibo:DocumentPart",
+            "rdfs:label": "document part"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A summary of the resource.",
+            "iri": "dct:abstract",
+            "rdfs:label": "Abstract"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "Relates a document to another document that cites the\nfirst document.",
+            "iri": "bibo:citedBy",
+            "rdfs:label": "cited by"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A document containing an authoritative determination (as a decree or judgment) made after consideration of facts or law.",
+            "iri": "bibo:LegalDecision",
+            "rdfs:label": "Decision"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A list of subunits of the resource.",
+            "iri": "dct:tableOfContents",
+            "rdfs:label": "Table Of Contents"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "iri": "bibo:eissn"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": [
+                "Because prov:wasInfluencedBy is a broad relation, its more specific subproperties (e.g. prov:wasInformedBy, prov:actedOnBehalfOf, prov:wasEndedBy, etc.) should be used when applicable.",
+                "This property has multiple RDFS domains to suit multiple OWL Profiles. See <a href=\"#owl-profile\">PROV-O OWL Profile</a>."
+            ],
+            "iri": "prov:wasInfluencedBy",
+            "rdfs:label": "wasInfluencedBy"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:DatatypeProperty"
+            ],
+            "rdfs:comment": "The last name of a person.",
+            "iri": "foaf:lastName",
+            "rdfs:label": "lastName"
+        },
+        {
+            "type": "rdfs:Datatype",
+            "rdfs:comment": "The set of tags constructed according to RFC 3066 for the identification of languages.",
+            "iri": "dct:RFC3066",
+            "rdfs:label": "RFC 3066"
+        },
+        {
+            "type": "http://purl.org/dc/dcam/VocabularyEncodingScheme",
+            "rdfs:comment": "The set of conceptual resources specified by the Dewey Decimal Classification.",
+            "iri": "dct:DDC",
+            "rdfs:label": "DDC"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "Date on which the resource was changed.",
+            "iri": "dct:modified",
+            "rdfs:label": "Date Modified"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "An unpublished Document, which may also be submitted to a publisher for publication.",
+            "iri": "bibo:Manuscript",
+            "rdfs:label": "Manuscript"
+        },
+        {
+            "type": "rdfs:Datatype",
+            "rdfs:comment": "The set of points in space defined by their geographic coordinates according to the DCMI Point Encoding Scheme.",
+            "iri": "dct:Point",
+            "rdfs:label": "DCMI Point"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "An ordered list of editors. Normally, this list is seen as a priority list that order editors by importance.",
+            "iri": "bibo:editorList",
+            "rdfs:label": "list of editors"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "If this Entity prov:wasInvalidatedBy Activity :a, then it can qualify how it was invalidated using prov:qualifiedInvalidation [ a prov:Invalidation;  prov:activity :a; :foo :bar ].",
+            "iri": "prov:qualifiedInvalidation",
+            "rdfs:label": "qualifiedInvalidation"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "The number of pages contained in a document",
+            "iri": "bibo:numPages",
+            "rdfs:label": "number of pages"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "Relates an event to associated documents; for example, conference to a paper.",
+            "iri": "bibo:presents",
+            "rdfs:label": "presented at"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "The material or physical carrier of the resource.",
+            "iri": "dct:medium",
+            "rdfs:label": "Medium"
+        },
+        {
+            "type": "owl:Ontology",
+            "iri": "foaf:"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "iri": "bibo:eanucc13"
+        },
+        {
+            "type": [
+                "owl:Class",
+                "rdfs:Class"
+            ],
+            "rdfs:comment": "An online chat account.",
+            "iri": "foaf:OnlineChatAccount",
+            "rdfs:label": "Online Chat Account"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "An image that can be used to represent some thing (ie. those depictions which are particularly representative of something, eg. one's photo on a homepage).",
+            "iri": "foaf:img",
+            "rdfs:label": "image"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "The organizer of an event; includes conference organizers, but also government agencies or other bodies that are responsible for conducting hearings.",
+            "iri": "bibo:organizer",
+            "rdfs:label": "organizer"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "iri": "bibo:isbn13"
+        },
+        {
+            "type": "owl:Class",
+            "iri": "skos:ConceptScheme",
+            "rdfs:label": "Concept Scheme"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "The _optional_ Plan adopted by an Agent in Association with some Activity. Plan specifications are out of the scope of this specification.",
+            "iri": "prov:hadPlan",
+            "rdfs:label": "hadPlan"
+        },
+        {
+            "type": "owl:Class",
+            "iri": "prov:Organization",
+            "rdfs:label": "Organization"
+        },
+        {
+            "type": [
+                "rdfs:Class",
+                "owl:Class"
+            ],
+            "rdfs:comment": "An online e-commerce account.",
+            "iri": "foaf:OnlineEcommerceAccount",
+            "rdfs:label": "Online E-commerce Account"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "If this Entity prov:wasDerivedFrom Entity :e, then it can qualify how it was derived using prov:qualifiedDerivation [ a prov:Derivation;  prov:entity :e; :foo :bar ].",
+            "iri": "prov:qualifiedDerivation",
+            "rdfs:label": "qualifiedDerivation"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "A work info homepage of some person; a page about their work for some organization.",
+            "iri": "foaf:workInfoHomepage",
+            "rdfs:label": "work info homepage"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "An instance of prov:Usage provides additional descriptions about the binary prov:used relation from some prov:Activity to an prov:Entity that it used. For example, :keynote prov:used :podium; prov:qualifiedUsage [ a prov:Usage; prov:entity :podium; :foo :bar ].",
+            "iri": "prov:Usage",
+            "rdfs:label": "Usage"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "An ordered list of authors. Normally, this list is seen as a priority list that order authors by importance.",
+            "iri": "bibo:authorList",
+            "rdfs:label": "list of authors"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "aka movie.",
+            "iri": "bibo:Film",
+            "rdfs:label": "Film"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty",
+                "owl:InverseFunctionalProperty"
+            ],
+            "rdfs:comment": "A logo representing some thing.",
+            "iri": "foaf:logo",
+            "rdfs:label": "logo"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A related resource from which the described resource is derived.",
+            "iri": "dct:source",
+            "rdfs:label": "Source"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "A book, article, or other documentary resource.",
+            "iri": "dct:BibliographicResource",
+            "rdfs:label": "Bibliographic Resource"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:DatatypeProperty",
+                "owl:FunctionalProperty"
+            ],
+            "rdfs:comment": "The gender of this Agent (typically but not necessarily 'male' or 'female').",
+            "iri": "foaf:gender",
+            "rdfs:label": "gender"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "An instance of prov:Generation provides additional descriptions about the binary prov:wasGeneratedBy relation from a generated prov:Entity to the prov:Activity that generated it. For example, :cake prov:wasGeneratedBy :baking; prov:qualifiedGeneration [ a prov:Generation; prov:activity :baking; :foo :bar ].",
+            "iri": "prov:Generation",
+            "rdfs:label": "Generation"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "The time at which an activity started. See also prov:endedAtTime.",
+            "iri": "prov:startedAtTime",
+            "rdfs:label": "startedAtTime"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "A system of signs, symbols, sounds, gestures, or rules used in communication.",
+            "iri": "dct:LinguisticSystem",
+            "rdfs:label": "Linguistic System"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "iri": "bibo:asin"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A loose, thematic, collection of Documents, often Books.",
+            "iri": "bibo:Series",
+            "rdfs:label": "Series"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "If this Activity prov:wasAssociatedWith Agent :ag, then it can qualify the Association using prov:qualifiedAssociation [ a prov:Association;  prov:agent :ag; :foo :bar ].",
+            "iri": "prov:qualifiedAssociation",
+            "rdfs:label": "qualifiedAssociation"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "The more specific subproperties of prov:wasDerivedFrom (i.e., prov:wasQuotedFrom, prov:wasRevisionOf, prov:hadPrimarySource) should be used when applicable.",
+            "iri": "prov:wasDerivedFrom",
+            "rdfs:label": "wasDerivedFrom"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "A volume number",
+            "iri": "bibo:volume",
+            "rdfs:label": "volume"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "A theme.",
+            "iri": "foaf:theme",
+            "rdfs:label": "theme"
+        },
+        {
+            "type": [
+                "owl:ObjectProperty",
+                "rdf:Property"
+            ],
+            "iri": "skos:inScheme",
+            "rdfs:label": "is in scheme"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "iri": "prov:wasInvalidatedBy",
+            "rdfs:label": "wasInvalidatedBy"
+        },
+        {
+            "type": [
+                "owl:InverseFunctionalProperty",
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "An OpenID for an Agent.",
+            "iri": "foaf:openid",
+            "rdfs:label": "openid"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A meeting for consultation or discussion.",
+            "iri": "bibo:Conference",
+            "rdfs:label": "Conference"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "An entity responsible for making contributions to the resource.",
+            "iri": "dct:contributor",
+            "rdfs:label": "Contributor"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "The method by which items are added to a collection.",
+            "iri": "dct:accrualMethod",
+            "rdfs:label": "Accrual Method"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:DatatypeProperty"
+            ],
+            "rdfs:comment": "The given name of some person.",
+            "iri": "foaf:givenName",
+            "rdfs:label": "Given name"
+        },
+        {
+            "type": "owl:Class",
+            "iri": "prov:Collection",
+            "rdfs:label": "Collection"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A written or printed work of fiction or nonfiction, usually on sheets of paper fastened or bound together within covers.",
+            "iri": "bibo:Book",
+            "rdfs:label": "Book"
+        },
+        {
+            "type": [
+                "owl:TransitiveProperty",
+                "owl:ObjectProperty",
+                "owl:SymmetricProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "skos:exactMatch is disjoint with each of the properties skos:broadMatch and skos:relatedMatch.",
+            "iri": "skos:exactMatch",
+            "rdfs:label": "has exact match"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "If this Activity prov:wasEndedBy Entity :e1, then it can qualify how it was ended using prov:qualifiedEnd [ a prov:End;  prov:entity :e1; :foo :bar ].",
+            "iri": "prov:qualifiedEnd",
+            "rdfs:label": "qualifiedEnd"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A document describing the exclusive right granted by a government to an inventor to manufacture, use, or sell an invention for a certain number of years.",
+            "iri": "bibo:Patent",
+            "rdfs:label": "Patent"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "iri": "prov:influenced",
+            "rdfs:label": "influenced"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "iri": "prov:alternateOf",
+            "rdfs:label": "alternateOf"
+        },
+        {
+            "type": [
+                "owl:Thing",
+                "bibo:DocumentStatus"
+            ],
+            "rdfs:comment": "Rejected for publication after peer reviewing.",
+            "iri": "http://purl.org/ontology/bibo/status/rejected",
+            "rdfs:label": "rejected"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A loose, thematic, collection of Documents, often Books.",
+            "iri": "bibo:MultiVolumeBook",
+            "rdfs:label": "Series"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A periodical of scholarly journal Articles.",
+            "iri": "bibo:Journal",
+            "rdfs:label": "Journal"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "The file format, physical medium, or dimensions of the resource.",
+            "iri": "dct:format",
+            "rdfs:label": "Format"
+        },
+        {
+            "type": "owl:AnnotationProperty",
+            "rdfs:comment": "Classify prov-o terms into three categories, including 'starting-point', 'qualifed', and 'extended'. This classification is used by the prov-o html document to gently introduce prov-o terms to its users. ",
+            "iri": "prov:category"
+        },
+        {
+            "type": [
+                "owl:DatatypeProperty",
+                "rdf:Property"
+            ],
+            "iri": "skos:notation",
+            "rdfs:label": "notation"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": [
+                "EntityInfluence provides additional descriptions of an Entity's binary influence upon any other kind of resource. Instances of EntityInfluence use the prov:entity property to cite the influencing Entity.",
+                "It is not recommended that the type EntityInfluence be asserted without also asserting one of its more specific subclasses."
+            ],
+            "iri": "prov:EntityInfluence",
+            "rdfs:label": "EntityInfluence"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "A summary of the resource.",
+            "iri": "bibo:abstract",
+            "rdfs:label": "abstract"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "An instance of prov:Start provides additional descriptions about the binary prov:wasStartedBy relation from some started prov:Activity to an prov:Entity that started it. For example, :foot_race prov:wasStartedBy :bang; prov:qualifiedStart [ a prov:Start; prov:entity :bang; :foo :bar; prov:atTime '2012-03-09T08:05:08-05:00'^^xsd:dateTime ] .",
+            "iri": "prov:Start",
+            "rdfs:label": "Start"
+        },
+        {
+            "type": [
+                "owl:ObjectProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "The underlying or 'focal' entity associated with some SKOS-described concept.",
+            "iri": "foaf:focus",
+            "rdfs:label": "focus"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "Producer of a document or a collection of documents.",
+            "iri": "bibo:producer",
+            "rdfs:label": "producer"
+        },
+        {
+            "type": [
+                "owl:InverseFunctionalProperty",
+                "owl:ObjectProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "A  personal mailbox, ie. an Internet mailbox associated with exactly one owner, the first owner of this mailbox. This is a 'static inverse functional property', in that  there is (across time and change) at most one individual that ever has any particular value for foaf:mbox.",
+            "iri": "foaf:mbox",
+            "rdfs:label": "personal mailbox"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "iri": "prov:agent",
+            "rdfs:label": "agent"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "A current project this person works on.",
+            "iri": "foaf:currentProject",
+            "rdfs:label": "current project"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "Start is when an activity is deemed to have started. A start may refer to an entity, known as trigger, that initiated the activity.",
+            "iri": "prov:wasStartedBy",
+            "rdfs:label": "wasStartedBy"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "Relates a document to some transcribed original.",
+            "iri": "bibo:transcriptOf",
+            "rdfs:label": "transcript of"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "A thing of interest to this person.",
+            "iri": "foaf:topic_interest",
+            "rdfs:label": "topic_interest"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "Subproperties of prov:influencer are used to cite the object of an unqualified PROV-O triple whose predicate is a subproperty of prov:wasInfluencedBy (e.g. prov:used, prov:wasGeneratedBy). prov:influencer is used much like rdf:object is used.",
+            "iri": "prov:influencer",
+            "rdfs:label": "influencer"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A class of entity for whom the resource is intended or useful.",
+            "iri": "dct:audience",
+            "rdfs:label": "Audience"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "A court associated with a legal document; for example, that which issues a decision.",
+            "iri": "bibo:court",
+            "rdfs:label": "court"
+        },
+        {
+            "type": [
+                "owl:Thing",
+                "bibo:DocumentStatus"
+            ],
+            "rdfs:comment": "The process by which articles are chosen to be included in a refereed journal. An editorial board consisting of experts in the same field as the author review the article and decide if it is authoritative enough for publication.",
+            "iri": "http://purl.org/ontology/bibo/status/peerReviewed",
+            "rdfs:label": "peer reviewed"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "The _optional_ Generation involved in an Entity's Derivation.",
+            "iri": "prov:hadGeneration",
+            "rdfs:label": "hadGeneration"
+        },
+        {
+            "type": "rdfs:Datatype",
+            "rdfs:comment": "The set of tags constructed according to RFC 4646 for the identification of languages.",
+            "iri": "dct:RFC4646",
+            "rdfs:label": "RFC 4646"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "Ending page number within a continuous page range.",
+            "iri": "bibo:pageEnd",
+            "rdfs:label": "page end"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:DatatypeProperty"
+            ],
+            "rdfs:comment": "A short informal nickname characterising an agent (includes login identifiers, IRC and other chat nicknames).",
+            "iri": "foaf:nick",
+            "rdfs:label": "nickname"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "An organization funding a project or person.",
+            "iri": "foaf:fundedBy",
+            "rdfs:label": "funded by"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "iri": "bibo:lccn"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "An alternative name for the resource.",
+            "iri": "dct:alternative",
+            "rdfs:label": "Alternative Title"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "These concept mapping relations mirror semantic relations, and the data model defined below is similar (with the exception of skos:exactMatch) to the data model defined for semantic relations. A distinct vocabulary is provided for concept mapping relations, to provide a convenient way to differentiate links within a concept scheme from links between concept schemes. However, this pattern of usage is not a formal requirement of the SKOS data model, and relies on informal definitions of best practice.",
+            "iri": "skos:mappingRelation",
+            "rdfs:label": "is in mapping relation with"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A personal communication manifested in some document.",
+            "iri": "bibo:PersonalCommunicationDocument",
+            "rdfs:label": "Personal Communication Document"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "Relates a document to an event; for example, a paper to a conference.",
+            "iri": "bibo:presentedAt",
+            "rdfs:label": "presented at"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A written argument submitted to a court.",
+            "iri": "bibo:Brief",
+            "rdfs:label": "Brief"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A collection of Documents or Collections",
+            "iri": "bibo:Collection",
+            "rdfs:label": "Collection"
+        },
+        {
+            "type": "owl:Class",
+            "iri": "prov:Activity",
+            "rdfs:label": "Activity"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A related resource that supplants, displaces, or supersedes the described resource.",
+            "iri": "dct:isReplacedBy",
+            "rdfs:label": "Is Replaced By"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A document that presents visual or diagrammatic information.",
+            "iri": "bibo:Image",
+            "rdfs:label": "Image"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "The extent or range of judicial, law enforcement, or other authority.",
+            "iri": "dct:Jurisdiction",
+            "rdfs:label": "Jurisdiction"
+        },
+        {
+            "type": [
+                "foaf:Person",
+                "owl:Thing"
+            ],
+            "iri": "bibo:fgiasson"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "A page or document about this thing.",
+            "iri": "foaf:page",
+            "rdfs:label": "page"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A related resource in which the described resource is physically or logically included.",
+            "iri": "dct:isPartOf",
+            "rdfs:label": "Is Part Of"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "A spatial region or named place.",
+            "iri": "dct:Location",
+            "rdfs:label": "Location"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "A digital resource format.",
+            "iri": "dct:FileFormat",
+            "rdfs:label": "File Format"
+        },
+        {
+            "type": "owl:Ontology",
+            "iri": "bibo:"
+        },
+        {
+            "type": [
+                "owl:ObjectProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "A phone,  specified using fully qualified tel: URI scheme (refs: http://www.w3.org/Addressing/schemes.html#tel).",
+            "iri": "foaf:phone",
+            "rdfs:label": "phone"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "An agent that receives a communication document.",
+            "iri": "bibo:recipient",
+            "rdfs:label": "recipient"
+        },
+        {
+            "type": "owl:Ontology",
+            "iri": "http://www.w3.org/2004/02/skos/core"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A person or organization owning or managing rights over the resource.",
+            "iri": "dct:rightsHolder",
+            "rdfs:label": "Rights Holder"
+        },
+        {
+            "type": [
+                "owl:DatatypeProperty",
+                "rdf:Property",
+                "owl:InverseFunctionalProperty"
+            ],
+            "rdfs:comment": "An AIM chat ID",
+            "iri": "foaf:aimChatID",
+            "rdfs:label": "AIM chat ID"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "A group of agents.",
+            "iri": "dct:AgentClass",
+            "rdfs:label": "Agent Class"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "The nature or genre of the resource.",
+            "iri": "dct:type",
+            "rdfs:label": "Type"
+        },
+        {
+            "type": [
+                "owl:DatatypeProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "A name for some thing.",
+            "iri": "foaf:name",
+            "rdfs:label": "name"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "The time at which an InstantaneousEvent occurred, in the form of xsd:dateTime.",
+            "iri": "prov:atTime",
+            "rdfs:label": "atTime"
+        },
+        {
+            "type": "http://purl.org/dc/dcam/VocabularyEncodingScheme",
+            "rdfs:comment": "The set of classes specified by the DCMI Type Vocabulary, used to categorize the nature or genre of the resource.",
+            "iri": "dct:DCMIType",
+            "rdfs:label": "DCMI Type Vocabulary"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "An agent that interview another agent.",
+            "iri": "bibo:interviewer",
+            "rdfs:label": "interviewer"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "iri": "skos:topConceptOf",
+            "rdfs:label": "is top concept in scheme"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "Distributor of a document or a collection of documents.",
+            "iri": "bibo:distributor",
+            "rdfs:label": "distributor"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "Relates a review document to a reviewed thing (resource, item, etc.).",
+            "iri": "bibo:reviewOf",
+            "rdfs:label": "review of"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A legal document proposing or enacting a law or a group of laws.",
+            "iri": "bibo:Legislation",
+            "rdfs:label": "Legislation"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "A workplace homepage of some person; the homepage of an organization they work for.",
+            "iri": "foaf:workplaceHomepage",
+            "rdfs:label": "workplace homepage"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "An instance of prov:Invalidation provides additional descriptions about the binary prov:wasInvalidatedBy relation from an invalidated prov:Entity to the prov:Activity that invalidated it. For example, :uncracked_egg prov:wasInvalidatedBy :baking; prov:qualifiedInvalidation [ a prov:Invalidation; prov:activity :baking; :foo :bar ].",
+            "iri": "prov:Invalidation",
+            "rdfs:label": "Invalidation"
+        },
+        {
+            "type": [
+                "owl:ObjectProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "Something that was made by this agent.",
+            "iri": "foaf:made",
+            "rdfs:label": "made"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "An interval of time that is named or defined by its start and end dates.",
+            "iri": "dct:PeriodOfTime",
+            "rdfs:label": "Period of Time"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:DatatypeProperty"
+            ],
+            "rdfs:comment": "The family name of some person.",
+            "iri": "foaf:familyName",
+            "rdfs:label": "familyName"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "A file format or physical medium.",
+            "iri": "dct:MediaType",
+            "rdfs:label": "Media Type"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "A prov:Entity that was used by this prov:Activity. For example, :baking prov:used :spoon, :egg, :oven .",
+            "iri": "prov:used",
+            "rdfs:label": "used"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "iri": "bibo:coden"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A process, used to engender knowledge, attitudes and skills, that the described resource is designed to support.",
+            "iri": "dct:instructionalMethod",
+            "rdfs:label": "Instructional Method"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "iri": "prov:wasGeneratedBy",
+            "rdfs:label": "wasGeneratedBy"
+        },
+        {
+            "type": [
+                "owl:InverseFunctionalProperty",
+                "owl:DatatypeProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": "An MSN chat ID",
+            "iri": "foaf:msnChatID",
+            "rdfs:label": "MSN chat ID"
+        },
+        {
+            "type": [
+                "owl:ObjectProperty",
+                "owl:AnnotationProperty"
+            ],
+            "rdfs:comment": "A revision is a derivation that revises an entity into a revised version.",
+            "iri": "prov:wasRevisionOf",
+            "rdfs:label": "wasRevisionOf"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A presentation of a series of slides, usually presented in front of an audience with written text and images.",
+            "iri": "bibo:Slideshow",
+            "rdfs:label": "Slideshow"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "iri": "bibo:pmid"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "A statement of any changes in ownership and custody of a resource since its creation that are significant for its authenticity, integrity, and interpretation.",
+            "iri": "dct:ProvenanceStatement",
+            "rdfs:label": "Provenance Statement"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "rdfs:comment": "An prov:Agent that had some (unspecified) responsibility for the occurrence of this prov:Activity.",
+            "iri": "prov:wasAssociatedWith",
+            "rdfs:label": "wasAssociatedWith"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "A physical material or carrier.",
+            "iri": "dct:PhysicalMedium",
+            "rdfs:label": "Physical Medium"
+        },
+        {
+            "type": "owl:ObjectProperty",
+            "iri": "prov:hadPrimarySource",
+            "rdfs:label": "hadPrimarySource"
+        },
+        {
+            "type": "owl:DatatypeProperty",
+            "rdfs:comment": "The suffix of a name",
+            "iri": "bibo:suffixName",
+            "rdfs:label": "suffix name"
+        },
+        {
+            "type": [
+                "owl:ObjectProperty",
+                "owl:AnnotationProperty"
+            ],
+            "iri": "prov:specializationOf",
+            "rdfs:label": "specializationOf"
+        },
+        {
+            "type": [
+                "rdfs:Class",
+                "owl:Class"
+            ],
+            "rdfs:comment": "A foaf:LabelProperty is any RDF property with texual values that serve as labels.",
+            "iri": "foaf:LabelProperty",
+            "rdfs:label": "Label Property"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "The frequency with which items are added to a collection.",
+            "iri": "dct:accrualPeriodicity",
+            "rdfs:label": "Accrual Periodicity"
+        },
+        {
+            "type": [
+                "owl:ObjectProperty",
+                "rdf:Property"
+            ],
+            "iri": "skos:narrowMatch",
+            "rdfs:label": "has narrower match"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "A related resource.",
+            "iri": "dct:relation",
+            "rdfs:label": "Relation"
+        },
+        {
+            "type": "rdfs:Class",
+            "rdfs:comment": "A location, period of time, or jurisdiction.",
+            "iri": "dct:LocationPeriodOrJurisdiction",
+            "rdfs:label": "Location, Period, or Jurisdiction"
+        },
+        {
+            "type": [
+                "owl:Thing",
+                "bibo:ThesisDegree"
+            ],
+            "rdfs:comment": "PhD degree",
+            "iri": "http://purl.org/ontology/bibo/degrees/phd",
+            "rdfs:label": "PhD degree"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "Date of copyright.",
+            "iri": "dct:dateCopyrighted",
+            "rdfs:label": "Date Copyrighted"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "Information about who can access the resource or an indication of its security status.",
+            "iri": "dct:accessRights",
+            "rdfs:label": "Access Rights"
+        },
+        {
+            "type": [
+                "owl:AnnotationProperty",
+                "rdf:Property"
+            ],
+            "rdfs:comment": [
+                "skos:prefLabel, skos:altLabel and skos:hiddenLabel are pairwise\n      disjoint properties.",
+                "A resource has no more than one value of skos:prefLabel per language tag.",
+                "The range of skos:prefLabel is the class of RDF plain literals."
+            ],
+            "iri": "skos:prefLabel",
+            "rdfs:label": "preferred label"
+        },
+        {
+            "type": [
+                "owl:ObjectProperty",
+                "rdf:Property"
+            ],
+            "iri": "skos:semanticRelation",
+            "rdfs:label": "is in semantic relation with"
+        },
+        {
+            "type": "owl:Class",
+            "rdfs:comment": "A compilation of documents published from an event, such as a conference.",
+            "iri": "bibo:Proceedings",
+            "rdfs:label": "Proceedings"
+        },
+        {
+            "type": "rdf:Property",
+            "rdfs:comment": "Date (often a range) of validity of a resource.",
+            "iri": "dct:valid",
+            "rdfs:label": "Date Valid"
+        },
+        {
+            "type": [
+                "rdf:Property",
+                "owl:ObjectProperty"
+            ],
+            "rdfs:comment": "A link to the publications of this person.",
+            "iri": "foaf:publications",
+            "rdfs:label": "publications"
+        },
+        {
+            "type": "owl:AnnotationProperty",
+            "rdfs:comment": "A reference to the principal section of the PROV-CONSTRAINTS document that describes this concept.",
+            "iri": "prov:constraints"
+        }
+    ]
+}

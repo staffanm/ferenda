@@ -626,9 +626,7 @@ def _wsgi_get_term_graph(repos, rooturi):
     # a foaf:topic. Each term should be described with its
     # rdf:type, rdfs:label (most important!) and possibly
     # rdfs:comment
-    from pudb import set_trace; set_trace()
     root = URIRef(rooturi)
-    context = _wsgi_get_context(repos)
     g = Graph()
     g.add((root, RDF.type, FOAF.Document))
     for repo in repos:
@@ -644,7 +642,6 @@ def _wsgi_get_term_graph(repos, rooturi):
                     o = Literal(str(o))
                 g.add((s,p,o)) # control duplicates somehow
                 # print(g.serialize(format="json-ld", context=context, indent=4).decode())
-    from pudb import set_trace; set_trace()
     return g
 
 def _wsgi_get_common_graph(repos, rooturi):
