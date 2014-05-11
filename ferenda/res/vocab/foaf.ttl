@@ -1,3 +1,5 @@
+# Automatically transformed from canonical source (http://xmlns.com/foaf/0.1/) at 2014-05-11T13:47:25.329440
+
 @prefix dc: <http://purl.org/dc/elements/1.1/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
@@ -12,7 +14,6 @@ foaf:Agent a rdfs:Class,
         owl:Class ;
     rdfs:label "Agent" ;
     rdfs:comment "An agent (eg. person, group, software or physical artifact)." ;
-    owl:disjointWith foaf:Document ;
     owl:equivalentClass <http://purl.org/dc/terms/Agent> ;
     vs:term_status "stable" .
 
@@ -22,9 +23,9 @@ foaf:Document a rdfs:Class,
     rdfs:comment "A document." ;
     rdfs:isDefinedBy foaf: ;
     owl:disjointWith foaf:Organization,
-        foaf:Person,
         foaf:Project ;
-    vs:term_status "testing" .
+    owl:equivalentClass <http://schema.org/CreativeWork> ;
+    vs:term_status "stable" .
 
 foaf:Group a rdfs:Class,
         owl:Class ;
@@ -38,7 +39,9 @@ foaf:Image a rdfs:Class,
     rdfs:label "Image" ;
     rdfs:comment "An image." ;
     rdfs:isDefinedBy foaf: ;
-    vs:term_status "testing" .
+    rdfs:subClassOf foaf:Document ;
+    owl:equivalentClass <http://schema.org/ImageObject> ;
+    vs:term_status "stable" .
 
 foaf:LabelProperty a rdfs:Class,
         owl:Class ;
@@ -53,7 +56,7 @@ foaf:OnlineAccount a rdfs:Class,
     rdfs:comment "An online account." ;
     rdfs:isDefinedBy foaf: ;
     rdfs:subClassOf owl:Thing ;
-    vs:term_status "unstable" .
+    vs:term_status "testing" .
 
 foaf:OnlineChatAccount a rdfs:Class,
         owl:Class ;
@@ -94,12 +97,12 @@ foaf:Person a rdfs:Class,
     rdfs:label "Person" ;
     rdfs:comment "A person." ;
     rdfs:isDefinedBy foaf: ;
-    rdfs:subClassOf <http://www.w3.org/2000/10/swap/pim/contact#Person>,
-        <http://www.w3.org/2003/01/geo/wgs84_pos#SpatialThing>,
+    rdfs:subClassOf <http://www.w3.org/2003/01/geo/wgs84_pos#SpatialThing>,
         foaf:Agent ;
-    owl:disjointWith foaf:Document,
-        foaf:Organization,
+    owl:disjointWith foaf:Organization,
         foaf:Project ;
+    owl:equivalentClass <http://schema.org/Person>,
+        <http://www.w3.org/2000/10/swap/pim/contact#Person> ;
     vs:term_status "stable" .
 
 foaf:PersonalProfileDocument a rdfs:Class,
@@ -116,15 +119,7 @@ foaf:Project a rdfs:Class,
     rdfs:isDefinedBy foaf: ;
     owl:disjointWith foaf:Document,
         foaf:Person ;
-    vs:term_status "unstable" .
-
-dc:date a owl:AnnotationProperty .
-
-dc:description a owl:AnnotationProperty .
-
-dc:title a owl:AnnotationProperty .
-
-vs:term_status a owl:AnnotationProperty .
+    vs:term_status "testing" .
 
 foaf:account a rdf:Property,
         owl:ObjectProperty ;
@@ -133,7 +128,7 @@ foaf:account a rdf:Property,
     rdfs:domain foaf:Agent ;
     rdfs:isDefinedBy foaf: ;
     rdfs:range foaf:OnlineAccount ;
-    vs:term_status "unstable" .
+    vs:term_status "testing" .
 
 foaf:accountName a rdf:Property,
         owl:DatatypeProperty ;
@@ -142,7 +137,7 @@ foaf:accountName a rdf:Property,
     rdfs:domain foaf:OnlineAccount ;
     rdfs:isDefinedBy foaf: ;
     rdfs:range rdfs:Literal ;
-    vs:term_status "unstable" .
+    vs:term_status "testing" .
 
 foaf:accountServiceHomepage a rdf:Property,
         owl:ObjectProperty ;
@@ -151,7 +146,7 @@ foaf:accountServiceHomepage a rdf:Property,
     rdfs:domain foaf:OnlineAccount ;
     rdfs:isDefinedBy foaf: ;
     rdfs:range foaf:Document ;
-    vs:term_status "unstable" .
+    vs:term_status "testing" .
 
 foaf:age a rdf:Property,
         owl:DatatypeProperty,
@@ -181,7 +176,7 @@ foaf:based_near a rdf:Property,
     rdfs:domain <http://www.w3.org/2003/01/geo/wgs84_pos#SpatialThing> ;
     rdfs:isDefinedBy foaf: ;
     rdfs:range <http://www.w3.org/2003/01/geo/wgs84_pos#SpatialThing> ;
-    vs:term_status "unstable" .
+    vs:term_status "testing" .
 
 foaf:birthday a rdf:Property,
         owl:DatatypeProperty,
@@ -208,7 +203,7 @@ foaf:dnaChecksum a rdf:Property,
     rdfs:comment "A checksum for the DNA of some thing. Joke." ;
     rdfs:isDefinedBy foaf: ;
     rdfs:range rdfs:Literal ;
-    vs:term_status "unstable" .
+    vs:term_status "archaic" .
 
 foaf:familyName a rdf:Property,
         owl:DatatypeProperty ;
@@ -235,6 +230,15 @@ foaf:firstName a rdf:Property,
     rdfs:domain foaf:Person ;
     rdfs:isDefinedBy foaf: ;
     rdfs:range rdfs:Literal ;
+    vs:term_status "testing" .
+
+foaf:focus a rdf:Property,
+        owl:ObjectProperty ;
+    rdfs:label "focus" ;
+    rdfs:comment "The underlying or 'focal' entity associated with some SKOS-described concept." ;
+    rdfs:domain <http://www.w3.org/2004/02/skos/core#Concept> ;
+    rdfs:isDefinedBy foaf: ;
+    rdfs:range owl:Thing ;
     vs:term_status "testing" .
 
 foaf:fundedBy a rdf:Property,
@@ -325,7 +329,7 @@ foaf:interest a rdf:Property,
         owl:ObjectProperty ;
     rdfs:label "interest" ;
     rdfs:comment "A page about a topic of interest to this person." ;
-    rdfs:domain foaf:Person ;
+    rdfs:domain foaf:Agent ;
     rdfs:isDefinedBy foaf: ;
     rdfs:range foaf:Document ;
     vs:term_status "testing" .
@@ -347,7 +351,7 @@ foaf:knows a rdf:Property,
     rdfs:domain foaf:Person ;
     rdfs:isDefinedBy foaf: ;
     rdfs:range foaf:Person ;
-    vs:term_status "testing" .
+    vs:term_status "stable" .
 
 foaf:lastName a rdf:Property,
         owl:DatatypeProperty ;
@@ -356,9 +360,10 @@ foaf:lastName a rdf:Property,
     rdfs:domain foaf:Person ;
     rdfs:isDefinedBy foaf: ;
     rdfs:range rdfs:Literal ;
-    vs:term_status "unstable" .
+    vs:term_status "testing" .
 
 foaf:logo a rdf:Property,
+        owl:InverseFunctionalProperty,
         owl:ObjectProperty ;
     rdfs:label "logo" ;
     rdfs:comment "A logo representing some thing." ;
@@ -442,7 +447,7 @@ foaf:openid a rdf:Property,
     rdfs:isDefinedBy foaf: ;
     rdfs:range foaf:Document ;
     rdfs:subPropertyOf foaf:isPrimaryTopicOf ;
-    vs:term_status "unstable" .
+    vs:term_status "testing" .
 
 foaf:pastProject a rdf:Property,
         owl:ObjectProperty ;
@@ -503,7 +508,7 @@ foaf:skypeID a rdf:Property,
     rdfs:isDefinedBy foaf: ;
     rdfs:range rdfs:Literal ;
     rdfs:subPropertyOf foaf:nick ;
-    vs:term_status "unstable" .
+    vs:term_status "testing" .
 
 foaf:status a rdf:Property,
         owl:DatatypeProperty ;
@@ -521,7 +526,7 @@ foaf:surname a rdf:Property,
     rdfs:domain foaf:Person ;
     rdfs:isDefinedBy foaf: ;
     rdfs:range rdfs:Literal ;
-    vs:term_status "testing" .
+    vs:term_status "archaic" .
 
 foaf:theme a rdf:Property,
         owl:ObjectProperty ;
@@ -556,13 +561,13 @@ foaf:title a rdf:Property,
     rdfs:label "title" ;
     rdfs:comment "Title (Mr, Mrs, Ms, Dr. etc)" ;
     rdfs:isDefinedBy foaf: ;
-    vs:term_status "unstable" .
+    vs:term_status "testing" .
 
 foaf:topic_interest a rdf:Property,
         owl:ObjectProperty ;
-    rdfs:label "interest_topic" ;
+    rdfs:label "topic_interest" ;
     rdfs:comment "A thing of interest to this person." ;
-    rdfs:domain foaf:Person ;
+    rdfs:domain foaf:Agent ;
     rdfs:isDefinedBy foaf: ;
     rdfs:range owl:Thing ;
     vs:term_status "testing" .
@@ -576,7 +581,7 @@ foaf:weblog a rdf:Property,
     rdfs:isDefinedBy foaf: ;
     rdfs:range foaf:Document ;
     rdfs:subPropertyOf foaf:page ;
-    vs:term_status "testing" .
+    vs:term_status "stable" .
 
 foaf:workInfoHomepage a rdf:Property,
         owl:ObjectProperty ;
@@ -606,13 +611,6 @@ foaf:yahooChatID a rdf:Property,
     rdfs:range rdfs:Literal ;
     rdfs:subPropertyOf foaf:nick ;
     vs:term_status "testing" .
-
-wot:assurance a owl:AnnotationProperty .
-
-wot:src_assurance a owl:AnnotationProperty .
-
-<http://www.w3.org/2000/10/swap/pim/contact#Person> a owl:Class ;
-    rdfs:label "Person" .
 
 foaf:depicts a rdf:Property,
         owl:ObjectProperty ;
@@ -654,7 +652,7 @@ foaf:primaryTopic a rdf:Property,
     rdfs:isDefinedBy foaf: ;
     rdfs:range owl:Thing ;
     owl:inverseOf foaf:isPrimaryTopicOf ;
-    vs:term_status "testing" .
+    vs:term_status "stable" .
 
 foaf:topic a rdf:Property,
         owl:ObjectProperty ;
@@ -676,9 +674,6 @@ foaf:depiction a rdf:Property,
     owl:inverseOf foaf:depicts ;
     vs:term_status "testing" .
 
-<http://www.w3.org/2003/01/geo/wgs84_pos#SpatialThing> a owl:Class ;
-    rdfs:label "Spatial Thing" .
-
 foaf:isPrimaryTopicOf a rdf:Property,
         owl:InverseFunctionalProperty ;
     rdfs:label "is primary topic of" ;
@@ -688,7 +683,7 @@ foaf:isPrimaryTopicOf a rdf:Property,
     rdfs:range foaf:Document ;
     rdfs:subPropertyOf foaf:page ;
     owl:inverseOf foaf:primaryTopic ;
-    vs:term_status "testing" .
+    vs:term_status "stable" .
 
 foaf:nick a rdf:Property,
         owl:DatatypeProperty ;
@@ -705,11 +700,7 @@ foaf:page a rdf:Property,
     rdfs:isDefinedBy foaf: ;
     rdfs:range foaf:Document ;
     owl:inverseOf foaf:topic ;
-    vs:term_status "testing" .
-
-rdfs:Class a owl:Class .
-
-owl:Thing rdfs:label "A thing" .
+    vs:term_status "stable" .
 
 foaf: a owl:Ontology ;
     dc:description "The Friend of a Friend (FOAF) RDF vocabulary, described using W3C RDF Schema and the Web Ontology Language." ;
