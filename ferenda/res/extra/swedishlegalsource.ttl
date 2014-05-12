@@ -3,6 +3,10 @@
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix dct: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
 
 <http://lagen.nu/org/2008/regeringskansliet> a foaf:Organization;
     foaf:name "Regeringskansliet"@sv;
@@ -165,7 +169,7 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/utrikesdepartementet> .
 
 <http://lagen.nu/org/2012/landsbygdsdepartementet> a foaf:Organization;
-    foaf:name "Landsbygdsdepartementet@sv;
+    foaf:name "Landsbygdsdepartementet"@sv;
     dct:replaces <http://lagen.nu/org/2008/jordbruksdepartementet>;
     owl:sameAs <http://rinfo.lagrummet.se/org/landsbygdsdepartementet> .
 
@@ -174,7 +178,7 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/marknadsdomstolen> .
 
 <http://lagen.nu/org/2008/hovratten-for-ovre-norrland> a foaf:Organization;
-    foaf:name "Hovrätten för Övre Norrland" @sv;
+    foaf:name "Hovrätten för Övre Norrland"@sv;
     owl:sameAs <http://rinfo.lagrummet.se/org/hovratten-for-ovre-norrland> .
 
 <http://lagen.nu/org/2008/hovratten-for-nedre-norrland> a foaf:Organization;
@@ -247,6 +251,7 @@
 
 <http://lagen.nu/org/2008/domstolsverket> a foaf:Organization;
     foaf:name "Domstolsverket"@sv;
+    foaf:homepage <http://www.domstol.se/>;
     owl:sameAs <http://rinfo.lagrummet.se/org/domstolsverket> .
 
 <http://lagen.nu/org/2011/hogsta-forvaltningsdomstolen> a foaf:Organization;
@@ -260,32 +265,3 @@
 <http://lagen.nu/org/2014/justitiekanslern> a foaf:Organization;
     foaf:name "Justitiekanslern"@sv;
     owl:sameAs <http://rinfo.lagrummet.se/org/justitiekanslern> .
-
-
-
-<http://rinfo.lagrummet.se/serie/ar/bfnarr> a :AllmannaRadSerie;
-    skos:altLabel "bfnar"@sv;
-    skos:prefLabel "Bokföringsnämndens allmänna råd"@sv;
-    dct:publisher <http://rinfo.lagrummet.se/org/bokfoeringsnaemnden> .
-
-<http://rinfo.lagrummet.se/serie/ar/far> a :AllmannaRadSerie;
-    skos:altLabel "far"@sv;
-    skos:prefLabel "Försvarsmaktens allmänna råd"@sv;
-    dct:publisher <http://rinfo.lagrummet.se/org/foersvarsmakten> .
-
-<http://rinfo.lagrummet.se/serie/ar/fkar> a :AllmannaRadSerie;
-    skos:altLabel "fkar"@sv;
-    skos:prefLabel "Försäkringskassans allmänna råd"@sv;
-    dct:publisher <http://rinfo.lagrummet.se/org/foersaekringskassan> .
-
-<http://rinfo.lagrummet.se/serie/ar/nar> a :AllmannaRadSerie;
-    skos:altLabel "nar"@sv;
-    skos:prefLabel "Naturvårdsverkets allmänna råd"@sv;
-    rdfs:comment "Publiceras i NFS fr.o.m. 2000-01-01";
-    dct:publisher <http://rinfo.lagrummet.se/org/naturvaardsverket> .
-
-<http://rinfo.lagrummet.se/serie/ar/nrr> a :AllmannaRadSerie;
-    skos:altLabel "nrr"@sv;
-    skos:prefLabel "Naturvårdsverkets råd och riktlinjer"@sv;
-    dct:publisher <http://rinfo.lagrummet.se/org/naturvaardsverket> .
-
