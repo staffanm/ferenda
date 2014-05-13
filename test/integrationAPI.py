@@ -7,9 +7,6 @@ import os
 import sys
 import shutil
 
-# thirdparty
-# none yet
-
 # mine
 from testWSGI import WSGI  # provides the nice call_wsgi func
 from ferenda import DocumentRepository
@@ -24,16 +21,21 @@ class BasicAPI(WSGI):
         #
         # each document should have a dct:title, a dct:issued and a dct:publisher, which has a URI
         #
-        # basefile	dct:title	dct:issued	dct:publisher
-        # 123/a             "Example"           2014-01-04      <http://example.org/publisher/A>
-        # 123/b            "Example 2"           2013-09-23      <http://example.org/publisher/B>
-        # 123/c         "Of needles and haystacks"      2014-05-06      <http://example.org/publisher/B>
+        # basefile  dct:title	  dct:issued  dct:publisher
+        # 123/a     "Example"     2014-01-04  <http://example.org/publisher/A>
+        # 123/b     "Example 2"   2013-09-23  <http://example.org/publisher/B>
+        # 123/c     "Of needles"  2014-05-06  <http://example.org/publisher/B>
         for i in ('a','b','c'):
             self.ttl_to_rdf_xml("test/files/base/distilled/123/%s.ttl" % i,
                                 self.repo.store.distilled_path("123/%s" % i))
             util.ensure_dir(self.repo.store.parsed_path("123/%s" % i))
             shutil.copy2("test/files/base/parsed/123/%s.xhtml" % i,
                                 self.repo.store.parsed_path("123/%s" % i))
+            self.repo.relate("123/%s" % i)
+            # prepare a base.ttl (or var-common.js) that maps
+            # <http://example.org/publisher/B> to "Publishing house B"
+        self.repo.rdf_type = self.repo.ns['bibo'].Standard
+
     # it's possible that json_context, var_terms and var_common should
     # be created by makeresources and served through wsgi_static (if
     # we can get conneg right)
@@ -60,8 +62,8 @@ class BasicAPI(WSGI):
         # ignore the status and headers elements of the result tuple,
         # only use the content part
         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
-        from pudb import set_trace; set_trace()
         want = json.load(open("test/files/api/var-terms.json"))
+
         # NB: It might be useful to ALSO provide a RDF Graph version
         # of 'want', and then having the 'got' equivalent being
         # computed using rdflib.Graph().parse(format='json-ld',
@@ -73,54 +75,34 @@ class BasicAPI(WSGI):
     def test_var_common(self):
         self.env['PATH_INFO'] = "/var/common"
         self.env['HTTP_ACCEPT'] = 'application/json'
-        got = json.loads(self.call_wsgi(self.env))
-        want = {"@context": "/json-ld/context.json", # might be different
-                "iri": "http://localhost:8080/var/terms", # also might be diff
-                "topic": [
-                    {"iri": "http://example.org/publisher/A",
-                     "name": "Publishing company A",
-                     "type": "Organization",
-                     
-                     
-                     "label": "Title",
-                     "comment": "A name given to the resource.",
-                     "type": "Property"},
-                    {"iri": "http://purl.org/dc/terms/issued",
-                     "label": "Date issued",
-                     "comment": "Date of formal issuance (e.g., publication) of the resource.",
-                     "type": "Property"},
-                    {"iri": "http://purl.org/dc/terms/publisher",
-                     "label": "Publisher",
-                     "comment": "An entity responsible for making the resource available.",
-                     "type": "Property"},
-                    ]
-                }
+        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
+        want = json.load(open("test/files/api/var-common.json"))
         self.assertEqual(want,got)
 
     def test_stats(self):
-        self.env['PATH_INFO'] = "/-/rpubl;stats"
+        self.env['PATH_INFO'] = "/-/publ;stats"
         self.env['HTTP_ACCEPT'] = 'application/json'
-        got = json.loads(self.call_wsgi(self.env))
-        want = {}
+        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
+        want = json.load(open("test/files/api/publ-stats.json"))
         self.assertEqual(want, got)
 
     def test_fulltext_query(self):
         self.env['PATH_INFO'] = "/-/publ?q=r%C3%A4tt*"
         self.env['HTTP_ACCEPT'] = 'application/json'
-        got = json.loads(self.call_wsgi(self.env))
+        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
         want = {}
         self.assertEqual(want, got)
 
     def test_faceted_query(self):
         self.env['PATH_INFO'] = "/-/publ?publisher.iri=*%2Fregeringskansliet"
         self.env['HTTP_ACCEPT'] = 'application/json'
-        got = json.loads(self.call_wsgi(self.env))
+        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
         want = {}
         self.assertEqual(want, got)
 
     def test_complex_query(self):
         self.env['PATH_INFO'] = "/-/publ?q=r%C3%A4tt*&publisher.iri=*%2Fregeringskansliet"
         self.env['HTTP_ACCEPT'] = 'application/json'
-        got = json.loads(self.call_wsgi(self.env))
+        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
         want = {}
         self.assertEqual(want, got)

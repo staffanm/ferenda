@@ -16,6 +16,7 @@ import time
 import calendar
 import filecmp
 import socket
+import inspect
 from ferenda.compat import OrderedDict
 
 # 3rd party
@@ -270,7 +271,7 @@ class DocumentRepository(object):
                 ontopath = "res/vocab/%s.ttl" % prefix
                 fp = None
                 if os.path.exists(ontopath):
-                    fp = open(query_template, 'rb')
+                    fp = open(ontopath, 'rb')
                 elif pkg_resources.resource_exists('ferenda', ontopath):
                     fp = pkg_resources.resource_stream('ferenda', ontopath)
                 else:
@@ -282,6 +283,32 @@ class DocumentRepository(object):
                     fp.close()
         return self._ontologies
 
+    @property
+    def commondata(self):
+        """Provides a RDFLib Graph containing any extra data that is common to
+        documents in this docrepo -- this can be information about
+        different entities that publishes the documents, the printed
+        series in which they're published, and so on. The data is
+        taken from res/extra/[repoalias].ttl.
+        """
+        if not hasattr(self, '_commondata'):
+            self._commondata = Graph()
+            for cls in inspect.getmro(self.__class__):
+                if hasattr(cls, "alias"):
+                    commonpath = "res/extra/%s.ttl" % cls.alias
+                    fp = None
+                    if os.path.exists(commonpath):
+                        fp = open(commonpath, 'rb')
+                    elif pkg_resources.resource_exists('ferenda', commonpath):
+                        fp = pkg_resources.resource_stream('ferenda', commonpath)
+                    else:
+                        pass # warn?
+                    if fp:
+                        print("loading %s" % commonpath)
+                        self._commondata.parse(data=fp.read(), format="turtle")
+                        fp.close()
+        return self._commondata
+        
     @property
     def config(self):
         return self._config
@@ -296,6 +323,7 @@ class DocumentRepository(object):
 
 
     def get_default_options(self):
+
         """Returns the class' configuration default configuration
         properties. These can be overridden by a configution file, or
         by named arguments to
@@ -1875,7 +1903,7 @@ parsed document path to that documents dependency file."""
         Example:
 
         >>> d = DocumentRepository()
-        >>> expected = 'PREFIX bibo: <http://purl.org/ontology/bibo/> PREFIX dct: <http://purl.org/dc/terms/> PREFIX foaf: <http://xmlns.com/foaf/0.1/> PREFIX owl: <http://www.w3.org/2002/07/owl#> PREFIX prov: <http://www.w3.org/ns/prov-o/> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX skos: <http://www.w3.org/2004/02/skos/core#> PREFIX xhv: <http://www.w3.org/1999/xhtml/vocab#> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> PREFIX xsi: <http://www.w3.org/2001/XMLSchema-instance> SELECT DISTINCT ?uri ?title ?issued FROM <http://example.org/ctx/base> WHERE {?uri rdf:type foaf:Document ; dct:title ?title . OPTIONAL { ?uri dct:issued ?issued . }  }'
+        >>> expected = 'PREFIX bibo: <http://purl.org/ontology/bibo/> PREFIX dct: <http://purl.org/dc/terms/> PREFIX foaf: <http://xmlns.com/foaf/0.1/> PREFIX owl: <http://www.w3.org/2002/07/owl#> PREFIX prov: <http://www.w3.org/ns/prov#> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX skos: <http://www.w3.org/2004/02/skos/core#> PREFIX xhv: <http://www.w3.org/1999/xhtml/vocab#> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> PREFIX xsi: <http://www.w3.org/2001/XMLSchema-instance> SELECT DISTINCT ?uri ?title ?publisher ?issued FROM <http://example.org/ctx/base> WHERE {?uri rdf:type foaf:Document ; dct:title ?title . OPTIONAL { ?uri dct:publisher ?publisher . } OPTIONAL { ?uri dct:issued ?issued . }  }'
         >>> d.toc_query("http://example.org/ctx/base") == expected
         True
         """
@@ -1965,6 +1993,7 @@ parsed document path to that documents dependency file."""
         in toc_query."""
 
         return [self.ns['dct'].title,
+                self.ns['dct'].publisher,
                 self.ns['dct'].issued]
 
     def toc_pagesets(self, data, criteria):

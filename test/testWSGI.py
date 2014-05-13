@@ -42,6 +42,7 @@ class WSGI(RepoTester): # base class w/o tests
                     'wsgi.url_scheme': 'http'}
 
         self.put_files_in_place()
+
     def ttl_to_rdf_xml(self, inpath, outpath):
         g = Graph()
         g.parse(source=open(inpath), format="turtle")

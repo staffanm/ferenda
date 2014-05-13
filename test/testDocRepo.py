@@ -1686,7 +1686,7 @@ class TOC(RepoTester):
 
     def test_toc_query(self):
         # NOTE: this is also tested by a doctest
-        want = "PREFIX bibo: <http://purl.org/ontology/bibo/> PREFIX dct: <http://purl.org/dc/terms/> PREFIX foaf: <http://xmlns.com/foaf/0.1/> PREFIX owl: <http://www.w3.org/2002/07/owl#> PREFIX prov: <http://www.w3.org/ns/prov-o/> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX skos: <http://www.w3.org/2004/02/skos/core#> PREFIX xhv: <http://www.w3.org/1999/xhtml/vocab#> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> PREFIX xsi: <http://www.w3.org/2001/XMLSchema-instance> SELECT DISTINCT ?uri ?title ?issued FROM <http://example.org/ctx/base> WHERE {?uri rdf:type foaf:Document ; dct:title ?title . OPTIONAL { ?uri dct:issued ?issued . }  }"
+        want = "PREFIX bibo: <http://purl.org/ontology/bibo/> PREFIX dct: <http://purl.org/dc/terms/> PREFIX foaf: <http://xmlns.com/foaf/0.1/> PREFIX owl: <http://www.w3.org/2002/07/owl#> PREFIX prov: <http://www.w3.org/ns/prov#> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX skos: <http://www.w3.org/2004/02/skos/core#> PREFIX xhv: <http://www.w3.org/1999/xhtml/vocab#> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> PREFIX xsi: <http://www.w3.org/2001/XMLSchema-instance> SELECT DISTINCT ?uri ?title ?publisher ?issued FROM <http://example.org/ctx/base> WHERE {?uri rdf:type foaf:Document ; dct:title ?title . OPTIONAL { ?uri dct:publisher ?publisher . } OPTIONAL { ?uri dct:issued ?issued . }  }"
         self.assertEqual(want,
                          self.repo.toc_query("http://example.org/ctx/base"))
 

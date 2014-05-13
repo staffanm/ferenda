@@ -40,7 +40,7 @@ import pkg_resources
 import requests
 import requests.exceptions
 from rdflib import URIRef, Namespace, Literal, BNode, Graph, RDF, RDFS, OWL
-from rdflib.namespace import FOAF
+from rdflib.namespace import FOAF, SKOS
 from rdflib.plugin import register, Parser, Serializer
 register('json-ld', Parser, 'ferenda.thirdparty.rdflib_jsonld.parser', 'JsonLDParser')
 register('json-ld', Serializer, 'ferenda.thirdparty.rdflib_jsonld.serializer', 'JsonLDSerializer')
@@ -406,10 +406,11 @@ def frontpage(repos,
 
 
 def runserver(repos,
-              port=8000,
+              port=8000, # now that we require url, we don't need this
               documentroot="data",  # relative to cwd
               apiendpoint="/api/",
-              searchendpoint="/search/"):
+              searchendpoint="/search/",
+              url="http://localhost:8000/"):
     """Starts up a internal webserver and runs the WSGI app (see
     :py:func:`make_wsgi_app`) using all the specified document
     repositories. Runs forever (or until interrupted by keyboard).
@@ -465,10 +466,12 @@ def make_wsgi_app(inifile=None, **kwargs):
                        # apiendpoint defined?
 
     def app(environ, start_response):
+        legacyapi = True # FIXME: should be part of args
         path = environ['PATH_INFO']
         if path.startswith(args['searchendpoint']):
             return _wsgi_search(environ, start_response, args)
-        elif path.startswith(args['apiendpoint']):
+        elif (path.startswith(args['apiendpoint']) or
+              (legacyapi and path.startswith("/-/publ"))):
             return _wsgi_api(environ, start_response, args)
         # don't know if this is sensible -- might prefer that all
         # these resources are under apiendpoint
@@ -480,7 +483,7 @@ def make_wsgi_app(inifile=None, **kwargs):
 
 def _wsgi_api_static(environ, start_response, args):
     want_json = True # FIXME: do proper conneg
-    legacy_jsonld_structure = True # FIXME: should be part of args
+    legacyapi = True # FIXME: should be part of args
     
     # find out if /var/terms or /var/common was requested
     path = environ['PATH_INFO']
@@ -500,7 +503,6 @@ def _wsgi_api_static(environ, start_response, args):
             rooturi = args['url'] + "var/common"
             graph = _wsgi_get_common_graph(args['repos'], rooturi)
         if want_json:
-            from pudb import set_trace; set_trace()
             data = graph.serialize(format="json-ld",
                                    context=context,
                                    indent=4)
@@ -510,9 +512,8 @@ def _wsgi_api_static(environ, start_response, args):
             # JSON tree.
             jsondata = json.loads(data.decode("utf-8"))
             jsondata['@context'] = "/json-ld/context.json"
-            if legacy_jsonld_structure:
+            if legacyapi:
                 jsondata = _convert_legacy_jsonld(jsondata, rooturi)
-                from pudb import set_trace; set_trace()
             data = json.dumps(jsondata, indent=4).encode("utf-8")
         else:
             data = graph.serialize(format="xml")
@@ -649,6 +650,9 @@ def _wsgi_get_common_graph(repos, rooturi):
     # publication series etc) that our data mentions.
     root = URIRef(rooturi)
     g = Graph()
+    g.bind("skos", SKOS)
+    g.bind("foaf", FOAF)
+    g.add((root, RDF.type, FOAF.Document))
     for repo in repos:
         for (s,p,o) in repo.commondata: # should work like
                                         # repo.ontologies, but read
@@ -657,13 +661,13 @@ def _wsgi_get_common_graph(repos, rooturi):
                                         #  "res/extra/propregeringen.ttl" in
                                         # a controlled way)
             if p in (FOAF.name, SKOS.prefLabel, SKOS.altLabel):
-                g.add(root, FOAF.topic, s)
-                g.add(s,p,o)
+                g.add((root, FOAF.topic, s))
+                g.add((s,p,o))
                 # try to find a type
-                g.add(s, RDF.type, repo.commondata.value(s, RDF.type))
+                g.add((s, RDF.type, repo.commondata.value(s, RDF.type)))
     return g
 
-def _wsgi_stats(environ, start_response, args):
+def _wsgi_stats(repos, rooturl):
     # find out all dimentions on which we could slice (obviously type,
     # but perhaps also dct:publisher, dct:subject, dct:issued (grouped
     # byyear!), prov:wasGeneratedBy -- ie any property that lends
@@ -676,12 +680,52 @@ def _wsgi_stats(environ, start_response, args):
     # value (or transformed value, for things like dct:issued (take
     # the year part only) or dct:title (take the first significant
     # letter only)
-    start_response(_str("200 OK"), [
-        (_str("Content-Type"), _str("application/json")),
-        (_str("Content-Length"), _str(str(len(data))))
-    ])
-    return iter([data])
-
+    res = {"type": "DataSet",
+           "slices" : []
+    }
+    for repo in repos:
+        data = repo.toc_select(repo.dataset_uri())
+        criteria = repo.toc_criteria(repo.toc_predicates())
+        pagesets = repo.toc_pagesets(data, criteria)
+        selected = repo.toc_select_for_pages(data, pagesets, criteria)
+        for pageset in pagesets:
+            slice = {"dimension": pageset.label, # need to map this to
+                                                 # a rdftype or at
+                                                 # least something that
+                                                 # appears in
+                                                 # /var/terms
+                     "observations": []}
+            for page in pageset.pages:
+                # page.value should be mapped to either "term" (a
+                # ontology-defined term, typically a rdf:type value),
+                # "ref" (a URI which should be present in the
+                # var/common graph with a foaf:name or skos:altLabel
+                # value -- not 100% needed though) or "year" (the
+                # year-part of a date). It'd be nice if the SPA js did
+                # support "value" (defined to be any plain text), but
+                # maybe we can hack "ref" to achieve this goal
+                #
+                # FIXME: There is no clean way of determining at this
+                # time what sort of data page.binding refers to
+                # (rdftype, uriref, literal of type date(time) or
+                # plain literal). We guess based on the binding name.
+                if page.binding in ("issued"):
+                    observation = {"year": page.value}
+                elif page.binding in ("type"):
+                    observation = {"term": page.value}
+                elif page.binding in ("ref"):
+                    observation = {"ref": page.value}
+                else:
+                    # eg page.value = "a", this'll create the url
+                    # "http://localhost:8000/a", which the SPA js will
+                    # try to look up, fail and fall back on the URI
+                    # leaf => "a"
+                    observation = {"ref": rooturl+page.value}
+                observation["count"] = len(selected[(page.binding,page.value)])
+                slice["observations"].append(observation)
+            res["slices"].append(slice)
+    return res
+            
 def _wsgi_query(environ, start_response, args):
     path = environ['PATH_INFO']
     # given path=/-/publ?q=r%C3%A4tt*&publisher.iri=*%2Fregeringskansliet&_page=0&_pageSize=10
@@ -780,7 +824,11 @@ def _wsgi_search(environ, start_response, args):
 def _wsgi_api(environ, start_response, args):
     """WSGI method, called by the wsgi app for requests that matches
        ``apiendpoint``."""
-    d = dict((str(key), str(environ[key])) for key in environ.keys())
+    path = environ['PATH_INFO']
+    if path.endswith(";stats"):
+        d = _wsgi_stats(args["repos"], args["url"])
+    else:
+        d = dict((str(key), str(environ[key])) for key in environ.keys())
 
     data = json.dumps(dict(d), indent=4).encode('utf-8')
     start_response(_str("200 OK"), [

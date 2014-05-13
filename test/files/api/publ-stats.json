@@ -1,0 +1,31 @@
+{
+    "type": "DataSet",
+    "slices": [ {
+	"dimension": "title",
+	"observations": [ {
+	    "count": 2,
+	    "ref": "http://localhost:8000/e"
+	}, {
+	    "count": 1,
+	    "ref": "http://localhost:8000/o"
+	} ]
+    }, {
+	"dimension": "publisher",
+	"observations": [ {
+	    "count": 1,
+	    "ref": "http://example.org/publisher/A"
+	}, {
+	    "count": 2,
+	    "ref": "http://example.org/publisher/B"
+	} ]
+    }, {
+	"dimension": "issued",
+	"observations": [ {
+	    "count": 2, 
+	    "year": "2014"
+	}, {
+	    "count": 1, 
+	    "year": "2013"
+	} ]
+    } ]
+}
