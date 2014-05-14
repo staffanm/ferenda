@@ -43,17 +43,7 @@ class BasicAPI(WSGI):
         self.env['PATH_INFO'] = "/json-ld/context.json"
         status, headers, content = self.call_wsgi(self.env)
         got = json.loads(content.decode("utf-8"))
-        want = {'@context': {'bibo': 'http://purl.org/ontology/bibo/',
-                             'dct': 'http://purl.org/dc/terms/',
-                             'foaf': 'http://xmlns.com/foaf/0.1/',
-                             'owl': 'http://www.w3.org/2002/07/owl#',
-                             'prov': 'http://www.w3.org/ns/prov-o/',
-                             'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
-                             'rdfs': 'http://www.w3.org/2000/01/rdf-schema#',
-                             'skos': 'http://www.w3.org/2004/02/skos/core#',
-                             'xhv': 'http://www.w3.org/1999/xhtml/vocab#',
-                             'xsd': 'http://www.w3.org/2001/XMLSchema#',
-                             'xsi': 'http://www.w3.org/2001/XMLSchema-instance'}}
+        want = json.load(open("test/files/api/jsonld-context.json"))
         self.assertEqual(want, got)
         
     def test_var_terms(self):
@@ -63,7 +53,7 @@ class BasicAPI(WSGI):
         # only use the content part
         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
         want = json.load(open("test/files/api/var-terms.json"))
-
+        
         # NB: It might be useful to ALSO provide a RDF Graph version
         # of 'want', and then having the 'got' equivalent being
         # computed using rdflib.Graph().parse(format='json-ld',

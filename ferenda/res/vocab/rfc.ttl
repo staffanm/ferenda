@@ -6,6 +6,8 @@
 @prefix bibo: <http://purl.org/ontology/bibo/> .
 @prefix : <http://localhost:8000/ontology/rfc#> .
 
+# This is a very experimental ontology
+
 : a owl:Ontology . 
 
 :RFC a owl:Class;
@@ -15,8 +17,21 @@
     rdfs:comment "A publication describing methods, behaviors, research, or innovations applicable to the working of the Internet and Internet-connected systems."@en;
     rdfs:seeAlso <http://www.rfc-editor.org/>
 
-# Other potential classes (subclasses of RFC): :STD, :BCP, :FYI
+# these may be considered a type of document (subclass of RFC), or
+# maybe these are just properties of a document.
 
+:STD a owl:Class;
+    rdfs:subClassOf :RFC;
+    rdfs:label "STD" .
+
+:BCP a owl:Class;
+    rdfs:subClassOf :RFC;
+    rdfs:label "BCP" .
+
+:FYI a owl:Class;
+    rdfs:subClassOf :RFC;
+    rdfs:label "FYI" .
+    
 :updates a owl:DatatypeProperty;
     rdfs:subPropertyOf dct:requires;
     rdfs:label "Updates"@en;

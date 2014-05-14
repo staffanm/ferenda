@@ -28,6 +28,7 @@ import xml.etree.cElementTree as ET
 from ferenda.compat import OrderedDict, MagicMock
 from wsgiref.simple_server import make_server
 from wsgiref.util import FileWrapper
+from wsgiref.util import request_uri
 
 import six
 from six.moves.urllib_parse import urlsplit, parse_qsl, urlencode
@@ -468,6 +469,7 @@ def make_wsgi_app(inifile=None, **kwargs):
     def app(environ, start_response):
         legacyapi = True # FIXME: should be part of args
         path = environ['PATH_INFO']
+        args['url'] = request_uri(environ)
         if path.startswith(args['searchendpoint']):
             return _wsgi_search(environ, start_response, args)
         elif (path.startswith(args['apiendpoint']) or
@@ -547,10 +549,17 @@ def _convert_legacy_jsonld(indata, rooturi):
                             continue
                         out[key] = value
                 else:
+                    for key in subject:
+                        if isinstance(subject[key], list):
+                            # make sure multiple values are sorted for
+                            # the same reason as below
+                            subject[key].sort()
                     topics.append(subject)
         else:
             out[topkey] = topval
-    out['topic'] = topics
+    # make sure the triples are in a predictable order, so we can
+    # compare on the JSON level for testing
+    out['topic'] = sorted(topics, key=lambda x: x['iri'])
     out['iri']  = rooturi
     return out
     
@@ -680,6 +689,9 @@ def _wsgi_stats(repos, rooturl):
     # value (or transformed value, for things like dct:issued (take
     # the year part only) or dct:title (take the first significant
     # letter only)
+
+    legacyapi = True # FIXME: should be part of args
+    
     res = {"type": "DataSet",
            "slices" : []
     }
@@ -689,11 +701,7 @@ def _wsgi_stats(repos, rooturl):
         pagesets = repo.toc_pagesets(data, criteria)
         selected = repo.toc_select_for_pages(data, pagesets, criteria)
         for pageset in pagesets:
-            slice = {"dimension": pageset.label, # need to map this to
-                                                 # a rdftype or at
-                                                 # least something that
-                                                 # appears in
-                                                 # /var/terms
+            slice = {"dimension": util.uri_leaf(str(pageset.predicate)),
                      "observations": []}
             for page in pageset.pages:
                 # page.value should be mapped to either "term" (a
@@ -713,14 +721,17 @@ def _wsgi_stats(repos, rooturl):
                     observation = {"year": page.value}
                 elif page.binding in ("type"):
                     observation = {"term": page.value}
-                elif page.binding in ("ref"):
+                elif page.binding in ("publisher"):
                     observation = {"ref": page.value}
                 else:
-                    # eg page.value = "a", this'll create the url
-                    # "http://localhost:8000/a", which the SPA js will
-                    # try to look up, fail and fall back on the URI
-                    # leaf => "a"
-                    observation = {"ref": rooturl+page.value}
+                    if legacyapi:
+                        # eg page.value = "a", this'll create the url
+                        # "http://localhost:8000/a", which the SPA js will
+                        # try to look up, fail and fall back on the URI
+                        # leaf => "a"
+                        observation = {"ref": rooturl+page.value}
+                    else:
+                        observation = {"value": page.value}
                 observation["count"] = len(selected[(page.binding,page.value)])
                 slice["observations"].append(observation)
             res["slices"].append(slice)

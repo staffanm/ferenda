@@ -28,13 +28,18 @@ class TocCriteria(object):
     :param key: Function that takes a single dict and returns a value
                 that can be used for sorting documents
     :type key: callable
-    :param selector_descending: Whether pagesets constructed by this selector should be sorted in descending (reverse) order
+    :param selector_descending: Whether pagesets constructed by this
+                                selector should be sorted in descending
+                                (reverse) order
     :type  selector_descending: bool
-    :param key_descending: Whether pages selected by this key should be sorted in descending (reverse) order
+    :param key_descending: Whether pages selected by this key should be
+                           sorted in descending (reverse) order
     :type  key_descending: bool
+    :param predicate: The RDFLib predicate (if any) that this selector
+                      is based on
     """
 
-    def __init__(self, binding, label, pagetitle, selector, key, selector_descending=False, key_descending=False):
+    def __init__(self, binding, label, pagetitle, selector, key, selector_descending=False, key_descending=False, predicate=None):
         self.binding = binding
         self.label = label
         self.pagetitle = pagetitle
@@ -42,3 +47,8 @@ class TocCriteria(object):
         self.key = key
         self.selector_descending = selector_descending
         self.key_descending = key_descending
+        self.predicate = predicate
+
+    def __repr__(self):
+        dictrepr = "".join((" %s=%r" % (k, v) for k, v in sorted(self.__dict__.items()) if not callable(v)))
+        return ("<%s%s>" % (self.__class__.__name__, dictrepr))

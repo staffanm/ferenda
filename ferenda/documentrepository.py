@@ -308,6 +308,54 @@ class DocumentRepository(object):
                         self._commondata.parse(data=fp.read(), format="turtle")
                         fp.close()
         return self._commondata
+
+    def lookup_resource(self, label, predicate=FOAF.name, cutoff=0.8, warn=True)
+        """Given a textual identifier (ie. the name for something), lookup the
+        canonical uri for that thing in the RDF graph containing extra
+        data (i.e. the graph that
+        :py:data:`ferenda.DocumentRepository.commondata`
+        provides). The graph should have a foaf:name statement about
+        the url with the sought label as the object.
+
+        Since data is imperfect, the textual label may be spelled or
+        expressed different in different contexts. This method
+        therefore performs fuzzy matching (using
+        :py:func:`difflib.get_close_matches`) using the cutoff
+        parameter determines exactly how fuzzy this matching is.
+
+        If no resource matches the given label, a
+        :py:exception:`KeyError` is raised.
+
+        :param label: The textual label to lookup
+        :type  label: str
+        :param predicate: The RDF predicate to use when looking for the label
+        :type  predicate: rdflib.URIRef
+        :param cutoff: How fuzzy the matching may be (1 = must match
+                       exactly, 0 = anything goes)
+        :type  cutoff: float
+        :param warn: Whether to log a warning when an inexact match is
+                     performed
+        :type  warn: bool
+        :returns: The matching resource
+        :rtype  : rdflib.URIRef
+        """
+
+        resources = []
+        for (resource, label) in self.commondata.subject_objects(predicate):
+            if label == str(label):
+                return resource
+            else:
+                resources[label] = resource
+            
+        fuzz = difflib.get_close_matches(label, resources.keys(), 1, cutoff)
+        if fuzz:
+            if warn:
+                self.log.warning("Assuming that '%s' should be '%s'?" %
+                                 (resource_label, fuzz[0]))
+            return URIRef(resources[fuzz[0]])
+        else:
+            raise KeyError("No good match for '%s'" % label)
+
         
     @property
     def config(self):
@@ -1945,17 +1993,25 @@ parsed document path to that documents dependency file."""
 
         criteria = []
         for predicate in predicates:
-            # make an appropriate selector etc. a proper implementation
-            # would look at the ontology of the predicate, take a look
-            # at the range for that DataProperty and select an
-            # appropriate selector.
-            if predicate == self.ns['dct']['issued']:  # date property
+            # make an appropriate selector etc. a proper
+            # implementation would look at the ontology of the
+            # predicate, take a look at the range for that
+            # DataProperty and select an appropriate selector. (note
+            # that the dct ontology defines the rdfs:range for
+            # dct:issued to be rdfs:Literal, so it won't always help
+            # us).
+            if predicate == self.ns['dct'].issued:  # date property
                 selector = lambda x: x['issued'][:4]
                 key = selector
                 label = 'Sorted by publication year'
                 pagetitle = 'Documents published in %(select)s'
                 selector_descending = True
-
+            elif predicate == self.ns['dct'].publisher: # uriref
+                selector = lambda x: x['publisher']
+                key = selector
+                label = 'Sorted by publisher'
+                pagetitle = 'Documents published by %(select)s'
+                selector_descending = False
             else:
                 # selector and key for proper title sort
                 # (eg. disregarding leading "the", not counting
@@ -1980,7 +2036,8 @@ parsed document path to that documents dependency file."""
                                         pagetitle=pagetitle,
                                         selector=selector,
                                         key=key,
-                                        selector_descending=selector_descending))
+                                        selector_descending=selector_descending,
+                                        predicate=predicate))
         return criteria
 
     def toc_predicates(self):
@@ -1999,7 +2056,8 @@ parsed document path to that documents dependency file."""
     def toc_pagesets(self, data, criteria):
         """Calculate the set of needed TOC pages based on the result rows
 
-        :param data: list of dicts, each dict containing metadata about a single document
+        :param data: list of dicts, each dict containing metadata about
+                     a single document
         :param criteria: list of TocCriteria objects
         :returns: The link text, page title and base file for each needed
                   TOC page, structured by selection criteria.
@@ -2045,7 +2103,9 @@ parsed document path to that documents dependency file."""
 
         res = []
         for criterion in criteria:
-            pageset = TocPageset(label=criterion.label, pages=[])
+            pageset = TocPageset(label=criterion.label,
+                                 predicate=criterion.predicate,
+                                 pages=[])
             selector_values = {}
             selector = criterion.selector
             binding = criterion.binding

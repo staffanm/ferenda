@@ -267,7 +267,11 @@ class RDFLibStore(TripleStore):
 
     def close(self):
         if not self.closed:
-            import sqlite3
+            try:
+                import sqlite3
+            except: # sometimes a TypeError is thrown deep in frozen
+                    # importlib._bootstrap
+                return
             try:
                 self.graph.close(True)
             # 'Cannot operate on a closed database' -- can't figure out why this happens on win32
