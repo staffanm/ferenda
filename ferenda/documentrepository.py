@@ -26,6 +26,7 @@ from lxml.builder import ElementMaker
 import lxml.html
 
 from rdflib import Graph, Literal, Namespace, URIRef, RDF
+from rdflib.namespace import FOAF
 import bs4
 import requests
 import requests.exceptions
@@ -309,7 +310,7 @@ class DocumentRepository(object):
                         fp.close()
         return self._commondata
 
-    def lookup_resource(self, label, predicate=FOAF.name, cutoff=0.8, warn=True)
+    def lookup_resource(self, label, predicate=FOAF.name, cutoff=0.8, warn=True):
         """Given a textual identifier (ie. the name for something), lookup the
         canonical uri for that thing in the RDF graph containing extra
         data (i.e. the graph that
