@@ -269,6 +269,14 @@ def makeresources(repos,
     # support static HTML file generation with arbitrarily deep
     # directory structure.
     res['xml'] = [_filepath_to_urlpath(outxmlfile, 1)]
+
+    # finally create some files needed by the API
+    if not staticsite:
+        r = _create_api_files(repos, resourcedir, url)
+        res.update(r)
+
+    # and finally FINALLY, normalize paths according to os.path.sep
+    # conventions
     if os.sep == "\\":
         for part in res:
             result = []
@@ -278,9 +286,49 @@ def makeresources(repos,
                 else:
                     result.append(x.replace('/', os.sep))
             res[part] = result
+
     return res
 
 
+def _create_api_files(repos, resourcedir, uri):
+    # this should create the following files under resourcedir
+    # api/context.json (aliased to /json-ld/context.json if legacyapi)
+    # api/terms.json (aliased to /var/terms.json if legacyapi)
+    # api/common.json (aliased to /var/common.json if legacyapi)
+    # MAYBE api/ui/  - copied from ferenda/res/ui
+    legacyapi = True
+    files = []
+    context = os.sep.join([resourcedir, "api", "context.json"])
+    if legacyapi:
+        contextpath = "/json-ld/context.json"
+        termspath   = "/var/terms"
+        commonpath  = "/var/common"
+    else:
+        # FIXME: create correct URL path
+        contextpath = "/rsrc/api/context.json"
+        termspath   = "/rsrc/api/terms.json"
+        commonpath  = "/rsrc/api/common.json"
+    util.ensure_dir(context)
+    with open(context, "w") as fp:
+        contextdict = _get_json_context(repos)
+        json.dump({"@context": contextdict}, fp, indent=4, sort_keys=True)
+    files.append(_filepath_to_urlpath(context, 2))
+        
+    common = os.sep.join([resourcedir, "api", "common.json"])
+    terms = os.sep.join([resourcedir, "api", "terms.json"])
+
+    for (filename, func, urlpath) in ((common, _get_common_graph, commonpath),
+                                      (terms,  _get_term_graph,   termspath)):
+        g = func(repos, uri + urlpath[1:])
+        d = json.loads(g.serialize(format="json-ld", context=contextdict,
+                                   indent=4).decode("utf-8"))
+        d['@context'] = contextpath
+        if legacyapi:
+            d = _convert_legacy_jsonld(d, uri + urlpath[1:])
+        with open(filename, "w") as fp:
+                json.dump(d, fp, indent=4, sort_keys=True)
+        files.append(_filepath_to_urlpath(filename, 2))
+    return {'json': files}
 def _process_file(filename, buf, destdir, origin="", combine=False):
     """
     Helper function to concatenate or copy CSS/JS (optionally
@@ -483,52 +531,6 @@ def make_wsgi_app(inifile=None, **kwargs):
             return _wsgi_static(environ, start_response, args)
     return app
 
-def _wsgi_api_static(environ, start_response, args):
-    want_json = True # FIXME: do proper conneg
-    legacyapi = True # FIXME: should be part of args
-    
-    # find out if /var/terms or /var/common was requested
-    path = environ['PATH_INFO']
-    dummy, var, tail = path.split("/", 2)
-    context = _wsgi_get_context(args['repos'])
-    # _make_context_json should include all the namespaceses and
-    # prefixes, possibly designate a default @vocab and a default
-    # @language (but how?), map things like "label" => "rdfs:label",
-    # and otherwise describe properties of the rdf properties/classes
-    # being used. Might have to start from static json files
-    # (res/context/dct.json etc) at the beginning...
-    if var == "var":
-        if tail.startswith("terms"):
-            rooturi = args['url'] + "var/terms"
-            graph = _wsgi_get_term_graph(args['repos'], rooturi)
-        elif tail.startswith("common"):
-            rooturi = args['url'] + "var/common"
-            graph = _wsgi_get_common_graph(args['repos'], rooturi)
-        if want_json:
-            data = graph.serialize(format="json-ld",
-                                   context=context,
-                                   indent=4)
-            # we had to provide context to graph.serialize in order to
-            # compactify the results, but we'd like to actually refer
-            # to an external context json file. So we manipulate the
-            # JSON tree.
-            jsondata = json.loads(data.decode("utf-8"))
-            jsondata['@context'] = "/json-ld/context.json"
-            if legacyapi:
-                jsondata = _convert_legacy_jsonld(jsondata, rooturi)
-            data = json.dumps(jsondata, indent=4).encode("utf-8")
-        else:
-            data = graph.serialize(format="xml")
-    elif var == "json-ld":
-        
-        data = json.dumps({'@context': context}).encode("utf-8")
-        
-    start_response(_str("200 OK"), [
-        (_str("Content-Type"), _str("application/json")),
-        (_str("Content-Length"), _str(str(len(data))))
-    ])
-    return iter([data])
-
 def _convert_legacy_jsonld(indata, rooturi):
     # the json structure should be a top node containing only
     # @context, iri (localhost:8000/var/terms), type (foaf:Document)
@@ -563,7 +565,7 @@ def _convert_legacy_jsonld(indata, rooturi):
     out['iri']  = rooturi
     return out
     
-def _wsgi_get_context(repos):
+def _get_json_context(repos):
     data = {}
     # step 1: define all prefixes
     for repo in repos:
@@ -622,7 +624,7 @@ def _wsgi_get_context(repos):
 #                                       "@type": onto.qname(datatype)}
 #     return {"@context": data}
 
-def _wsgi_get_term_graph(repos, rooturi):
+def _get_term_graph(repos, graphuri):
     # produce a rdf graph of the terms (classes and properties) in
     # the vocabs we're using. This should preferably entail
     # loading the vocabularies (stored as RDF/OWL documents), and
@@ -636,7 +638,7 @@ def _wsgi_get_term_graph(repos, rooturi):
     # a foaf:topic. Each term should be described with its
     # rdf:type, rdfs:label (most important!) and possibly
     # rdfs:comment
-    root = URIRef(rooturi)
+    root = URIRef(graphuri)
     g = Graph()
     g.add((root, RDF.type, FOAF.Document))
     for repo in repos:
@@ -654,10 +656,10 @@ def _wsgi_get_term_graph(repos, rooturi):
                 # print(g.serialize(format="json-ld", context=context, indent=4).decode())
     return g
 
-def _wsgi_get_common_graph(repos, rooturi):
+def _get_common_graph(repos, graphuri):
     # create a graph with foaf:names for all entities (publishers,
     # publication series etc) that our data mentions.
-    root = URIRef(rooturi)
+    root = URIRef(graphuri)
     g = Graph()
     g.bind("skos", SKOS)
     g.bind("foaf", FOAF)

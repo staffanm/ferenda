@@ -29,7 +29,7 @@ class Decorators(unittest.TestCase):
 
         # ...with the correct method and arguments
         self.assertEqual(len(call_args[0]), 3)
-        self.assertEqual(call_args[0][0], '%s: OK (%.3f sec)')
+        self.assertEqual(call_args[0][0], '%s: parse OK (%.3f sec)')
         self.assertEqual(call_args[0][1], "1234")
 
     def test_parseifneeded(self):

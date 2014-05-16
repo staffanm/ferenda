@@ -33,7 +33,13 @@ def timed(f):
         # FIXME: We shouldn't log this if we don't actually do any
         # work. The easiest way is to make sure parseifneeded wraps
         # timed, not the other way round.
-        self.log.info('%s: OK (%.3f sec)', doc.basefile, time.time() - start)
+
+        # ALSO: the addition of "parse" here makes the decorator only
+        # useful for the parse method. It'd be better to have the
+        # decorator take a format string and a method to call to
+        # log. But maybe the util.logtime context manager is better
+        # suited for this usecase?
+        self.log.info('%s: parse OK (%.3f sec)', doc.basefile, time.time() - start)
         return ret
     return wrapper
 

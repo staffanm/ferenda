@@ -1,48 +1,51 @@
 @prefix : <http://localhost:8000/ontology/rfc#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix bibo: <http://purl.org/ontology/bibo/> .
 
-# streams, modelled as publishing groups
+# streams, modelled as publishing groups (dct:publisher)
 
 <http://localhost:8000/ext/ietf> a foaf:Organization;
-     foaf:name "The Internet Engineering Task Force";
+     foaf:name "Internet Engineering Task Force (IETF)";
      skos:altLabel "IETF"; # or foaf:nick
      foaf:homepage <http://www.ietf.org/> .
 
 <http://localhost:8000/ext/iab> a foaf:Organization;
-    foaf:name "Internet Architecture Board";
+    foaf:name "Internet Architecture Board (IAB)";
     skos:altLabel "IAB";
     foaf:homepage <https://www.iab.org/> .
 
 <http://localhost:8000/ext/irtf> a foaf:Organization;
-    foaf:name "Internet Research Task Force";
+    foaf:name "Internet Research Task Force (IRTF)";
     skos:altLabel "IRTF";
     foaf:homepage <https://www.irtf.org/> .
 
 # not an organization, hardly even a group
 <http://localhost:8000/ext/independent> a foaf:Group;
-     foaf:name "Independent submission" .
+     foaf:name "Independent Submission" .
 
 # older?
 <http://localhost:8000/ext/nwg> a foaf:Organization;
      foaf:name "Network Working Group".
 
-# categories
+# Statuses, modelled as categories (dct:subject)
 
-<http://localhost:8000/dataset/rfc/standard> a bibo:Collection
-    bibo:identifier "Standard" .
+<http://localhost:8000/dataset/rfc/standard> a bibo:Collection;
+    bibo:identifier "Standards Track" .
 
-<http://localhost:8000/dataset/rfc/informational> a bibo:Collection
+<http://localhost:8000/dataset/rfc/informational> a bibo:Collection;
     bibo:identifier "Informational" .
 
-<http://localhost:8000/dataset/rfc/experimental> a bibo:Collection
+<http://localhost:8000/dataset/rfc/experimental> a bibo:Collection;
     bibo:identifier "Experimental" .
 
-<http://localhost:8000/dataset/rfc/best-current-practice> a bibo:Collection
-    bibo:identifier "Best current practice" .
+<http://localhost:8000/dataset/rfc/best-current-practice> a bibo:Collection;
+    bibo:identifier "Best Current Practice" .
 
-<http://localhost:8000/dataset/rfc/historic> a bibo:Collection
+<http://localhost:8000/dataset/rfc/historic> a bibo:Collection;
     bibo:identifier "Historic" .
 
-<http://localhost:8000/dataset/rfc/best-current-practice> a bibo:Collection
+<http://localhost:8000/dataset/rfc/unknown> a bibo:Collection;
     bibo:identifier "Unknown" .
 
 

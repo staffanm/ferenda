@@ -15,11 +15,13 @@ from ferenda import util
 class BasicAPI(WSGI):
     # note: self.repo already contains a initialized DocumentRepository
     repos = [DocumentRepository()]
-    
+
+    # is called by WSGI.setUp
     def put_files_in_place(self):
         # create three basic documents (at parsed and distilled)
         #
-        # each document should have a dct:title, a dct:issued and a dct:publisher, which has a URI
+        # each document should have a dct:title, a dct:issued and a
+        # dct:publisher, which has a URI
         #
         # basefile  dct:title	  dct:issued  dct:publisher
         # 123/a     "Example"     2014-01-04  <http://example.org/publisher/A>
@@ -35,39 +37,6 @@ class BasicAPI(WSGI):
             # prepare a base.ttl (or var-common.js) that maps
             # <http://example.org/publisher/B> to "Publishing house B"
         self.repo.rdf_type = self.repo.ns['bibo'].Standard
-
-    # it's possible that json_context, var_terms and var_common should
-    # be created by makeresources and served through wsgi_static (if
-    # we can get conneg right)
-    def test_json_context(self):
-        self.env['PATH_INFO'] = "/json-ld/context.json"
-        status, headers, content = self.call_wsgi(self.env)
-        got = json.loads(content.decode("utf-8"))
-        want = json.load(open("test/files/api/jsonld-context.json"))
-        self.assertEqual(want, got)
-        
-    def test_var_terms(self):
-        self.env['PATH_INFO'] = "/var/terms"
-        self.env['HTTP_ACCEPT'] = 'application/json'
-        # ignore the status and headers elements of the result tuple,
-        # only use the content part
-        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
-        want = json.load(open("test/files/api/var-terms.json"))
-        
-        # NB: It might be useful to ALSO provide a RDF Graph version
-        # of 'want', and then having the 'got' equivalent being
-        # computed using rdflib.Graph().parse(format='json-ld',
-        # context=self.call_wsgi("/json-ld/context.json")). In that
-        # case, ensuring that the got graph contains *at least*
-        # everything in the want graph gets easier.
-        self.assertEqual(want, got)
-
-    def test_var_common(self):
-        self.env['PATH_INFO'] = "/var/common"
-        self.env['HTTP_ACCEPT'] = 'application/json'
-        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
-        want = json.load(open("test/files/api/var-common.json"))
-        self.assertEqual(want,got)
 
     def test_stats(self):
         self.env['PATH_INFO'] = "/-/publ;stats"

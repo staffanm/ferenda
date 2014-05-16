@@ -17,6 +17,7 @@ import calendar
 import filecmp
 import socket
 import inspect
+import difflib
 from ferenda.compat import OrderedDict
 
 # 3rd party
@@ -278,7 +279,7 @@ class DocumentRepository(object):
                 else:
                     pass # warn?
                 if fp:
-                    print("loading %s" % ontopath)
+                    # print("loading %s" % ontopath)
                     self._ontologies.parse(data=fp.read(), format="turtle")
                     self._ontologies.bind(prefix, uri)
                     fp.close()
@@ -305,7 +306,7 @@ class DocumentRepository(object):
                     else:
                         pass # warn?
                     if fp:
-                        print("loading %s" % commonpath)
+                        # print("loading %s" % commonpath)
                         self._commondata.parse(data=fp.read(), format="turtle")
                         fp.close()
         return self._commondata
@@ -341,18 +342,18 @@ class DocumentRepository(object):
         :rtype  : rdflib.URIRef
         """
 
-        resources = []
-        for (resource, label) in self.commondata.subject_objects(predicate):
-            if label == str(label):
+        resources = {}
+        for (resource, candidate_label) in self.commondata.subject_objects(predicate):
+            if label == str(candidate_label):
                 return resource
             else:
-                resources[label] = resource
+                resources[candidate_label] = resource
             
         fuzz = difflib.get_close_matches(label, resources.keys(), 1, cutoff)
         if fuzz:
             if warn:
                 self.log.warning("Assuming that '%s' should be '%s'?" %
-                                 (resource_label, fuzz[0]))
+                                 (label, fuzz[0]))
             return URIRef(resources[fuzz[0]])
         else:
             raise KeyError("No good match for '%s'" % label)
@@ -1397,29 +1398,33 @@ with the *config* object as single parameter.
            and put the text of the document into a fulltext index.
 
         """
-        # If using the Bulk upload feature, append to the temporary
-        # file that is to be bulk uploaded (see relate_all_setup)
-        nttemp = self.store.path("_dump", "distilled", ".nt.temp", storage_policy="file")
-        if os.path.exists(nttemp) and hasattr(self.config, 'all'):
-            values = {'basefile': basefile,
-                      'nttemp': nttemp}
-            with util.logtime(self.log.debug,
-                              "%(basefile)s: Added %(triplecount)s triples to %(nttemp)s in %(elapsed).3f s",
-                              values):
-                data = open(self.store.distilled_path(basefile), "rb").read()
-                g = Graph().parse(data=data)
-                with open(nttemp, "ab") as fp:
-                    fp.write(g.serialize(format="nt"))
-                values['triplecount'] = len(g)
-        else:
-            self.relate_triples(basefile)
-        # When otherrepos = [], should we still provide self as one repo? Yes.
-        if self not in otherrepos:
-            otherrepos.append(self)
+        with util.logtime(self.log.info,
+                          "%(basefile)s: relate OK (%(elapsed).3f s)",
+                          {'basefile': basefile}):
 
-        self.relate_dependencies(basefile, otherrepos)
-        if self.config.fulltextindex:
-            self.relate_fulltext(basefile)
+            # If using the Bulk upload feature, append to the temporary
+            # file that is to be bulk uploaded (see relate_all_setup)
+            nttemp = self.store.path("_dump", "distilled", ".nt.temp", storage_policy="file")
+            if os.path.exists(nttemp) and hasattr(self.config, 'all'):
+                values = {'basefile': basefile,
+                          'nttemp': nttemp}
+                with util.logtime(self.log.debug,
+                                  "%(basefile)s: Added %(triplecount)s triples to %(nttemp)s in %(elapsed).3f s",
+                                  values):
+                    data = open(self.store.distilled_path(basefile), "rb").read()
+                    g = Graph().parse(data=data)
+                    with open(nttemp, "ab") as fp:
+                        fp.write(g.serialize(format="nt"))
+                    values['triplecount'] = len(g)
+            else:
+                self.relate_triples(basefile)
+            # When otherrepos = [], should we still provide self as one repo? Yes.
+            if self not in otherrepos:
+                otherrepos.append(self)
+
+            self.relate_dependencies(basefile, otherrepos)
+            if self.config.fulltextindex:
+                self.relate_fulltext(basefile)
 
     def _get_triplestore(self, **kwargs):
         if not hasattr(self, '_triplestore'):
@@ -1632,7 +1637,7 @@ parsed document path to that documents dependency file."""
         :type  basefile: str
         :returns: None
         """
-        with util.logtime(self.log.info, "%(basefile)s: OK (%(elapsed).3f sec)",
+        with util.logtime(self.log.info, "%(basefile)s: generate OK (%(elapsed).3f sec)",
                           {'basefile': basefile}):
             # This dependency management could be abstracted away like
             # the parseifneeded decorator does for parse(). But unlike

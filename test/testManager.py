@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import json
+import logging
 import os
+import pkg_resources
+import shutil
 import sys
 import tempfile
-import shutil
-import logging
-import pkg_resources
-
 
 # NOTE: by inserting cwd (which *should* be the top-level source code
 # dir, with 'ferenda' and 'test' as subdirs) into sys.path as early as
@@ -40,6 +40,8 @@ class staticmockclass(DocumentRepository):
     alias = "staticmock"
     resourcebase = None
     documentstore_class = staticmockstore
+    namespaces = ('foaf', 'rdfs', 'rdf', 'owl', 'skos')
+    
     @decorators.action
     def mymethod(self, arg):
         """Frobnicate the bizbaz"""
@@ -180,6 +182,9 @@ class=testManager.staticmockclass2
         s = os.sep
         want = {'css':[s.join(['rsrc', 'css','test.css'])],
                 'js':[s.join(['rsrc', 'js','test.js'])],
+                'json': ['rsrc/api/context.json',
+                         'rsrc/api/common.json',
+                         'rsrc/api/terms.json'],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
         got = manager.makeresources([test,test2],self.tempdir+os.sep+'rsrc')
@@ -205,6 +210,9 @@ class=testManager.staticmockclass2
         # (maybe we should use smaller CSS+JS files? Test takes 2+ seconds...)
         want = {'css':[s.join(['rsrc', 'css','combined.css'])],
                 'js':[s.join(['rsrc', 'js','combined.js'])],
+                'json': ['rsrc/api/context.json',
+                         'rsrc/api/common.json',
+                         'rsrc/api/terms.json'],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
         got = manager.makeresources([test,test2],self.tempdir+os.sep+'rsrc',
@@ -251,6 +259,9 @@ class=testManager.staticmockclass2
                       s.join(['rsrc', 'js','modernizr-2.6.3.js']),
                       s.join(['rsrc', 'js','respond-1.3.0.js']),
                       s.join(['rsrc', 'js','ferenda.js'])],
+                'json':[s.join(['rsrc', 'api','context.json']),
+                        s.join(['rsrc', 'api','common.json']),
+                        s.join(['rsrc', 'api','terms.json'])],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
                       }
         self.assertEqual(want,got)
@@ -268,6 +279,9 @@ class=testManager.staticmockclass2
         want = {'css':[s.join(['rsrc', 'css','test.css']),
                        'http://example.org/css/main.css'],
                 'js':[s.join(['rsrc', 'js','test.js'])],
+                'json':[s.join(['rsrc', 'api','context.json']),
+                        s.join(['rsrc', 'api','common.json']),
+                        s.join(['rsrc', 'api','terms.json'])],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
         got = manager.makeresources([test],self.tempdir+os.sep+'rsrc')
@@ -291,6 +305,9 @@ class=testManager.staticmockclass2
         want = {'css':['rsrc\\css\\test.css',
                        'http://example.org/css/main.css'],
                 'js':['rsrc\\js\\test.js'],
+                'json':['rsrc\\api\\context.json',
+                        'rsrc\\api\\common.json',
+                        'rsrc\\api\\terms.json'],
                 'xml':['rsrc\\resources.xml']}
         try:
             realsep = os.sep
@@ -305,6 +322,9 @@ class=testManager.staticmockclass2
         test.config.cssfiles = ['nonexistent.css']
         want = {'css':[],
                 'js':[s.join(['rsrc', 'js','test.js'])],
+                'json':[s.join(['rsrc', 'api','context.json']),
+                        s.join(['rsrc', 'api','common.json']),
+                        s.join(['rsrc', 'api','terms.json'])],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
         got = manager.makeresources([test], self.tempdir+os.sep+'rsrc')
@@ -553,6 +573,7 @@ class Teststore(DocumentStore):
 class Testrepo(DocumentRepository):
     alias = "test"
     documentstore_class = Teststore
+    namespaces = ('foaf', 'rdfs', 'rdf', 'owl', 'skos')
         
     def get_default_options(self):
         opts = super(Testrepo, self).get_default_options()
@@ -789,6 +810,9 @@ class Testrepo2(Testrepo):
              ('makeresources', {'css':[s.join(['rsrc', 'css','test.css']),
                                        s.join(['rsrc', 'css','other.css'])],
                                 'js':[s.join(['rsrc', 'js','test.js'])],
+                                'json': ['rsrc/api/context.json',
+                                         'rsrc/api/common.json',
+                                         'rsrc/api/terms.json'],
                                 'xml':[s.join(['rsrc', 'resources.xml'])]}),
              ('generate', OrderedDict([('test', ['test generate arg1',
                                                  'test generate myarg',
@@ -828,6 +852,9 @@ class Testrepo2(Testrepo):
              ('makeresources', {'css':[s.join(['rsrc', 'css','test.css']),
                                        s.join(['rsrc', 'css','other.css'])],
                                 'js':[s.join(['rsrc', 'js','test.js'])],
+                                'json': ['rsrc/api/context.json',
+                                         'rsrc/api/common.json',
+                                         'rsrc/api/terms.json'],
                                 'xml':[s.join(['rsrc', 'resources.xml'])]}),
              ('generate', OrderedDict([('test', ['test generate arg1',
                                                  'test generate myarg',
@@ -854,6 +881,9 @@ class Testrepo2(Testrepo):
         want = {'css':[s.join(['rsrc', 'css','test.css']),
                        s.join(['rsrc', 'css','other.css'])],
                 'js':[s.join(['rsrc', 'js','test.js'])],
+                'json': ['rsrc/api/context.json',
+                         'rsrc/api/common.json',
+                         'rsrc/api/terms.json'],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
         got = manager.run(['all', 'makeresources'])
@@ -869,6 +899,9 @@ apiendpoint = /api/
         """ % self.tempdir)
         want = {'css':[],
                 'js':[],
+                'json': ['rsrc/api/context.json',
+                         'rsrc/api/common.json',
+                         'rsrc/api/terms.json'],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
         got = manager.run(['all', 'makeresources'])
@@ -930,8 +963,51 @@ Available modules:
             manager.run(["all", "runserver"])
             self.assertTrue(m2.called)
             self.assertTrue(m.serve_forever.called)
+
+# this tests generation of static assets (context.json, terms.json and
+# common.json)
+class BaseAPI(RepoTester):
+
+    def test_files(self):
+        # it'd be better to test _get_context, _get_common_graph and
+        # _get_term_graph in isolation, but _create_api_files contains
+        # common code to serialize the structures to files. Easier to
+        # test all three.
+        #
+        # don't include all default ontologies to cut down on test
+        # time, SKOS+FOAF ought to be enough.
+        self.repo.ns = ({"foaf": "http://xmlns.com/foaf/0.1/",
+                         'rdfs': 'http://www.w3.org/2000/01/rdf-schema#',
+                         'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+                         'owl': 'http://www.w3.org/2002/07/owl#',
+                         'skos': 'http://www.w3.org/2004/02/skos/core#'})
+
+        got = manager._create_api_files([self.repo], self.datadir + "/data/rsrc",
+                                        "http://localhost:8000/")
+        want = {'json': ['rsrc/api/context.json',
+                         'rsrc/api/common.json',
+                         'rsrc/api/terms.json']}
+        self.assertEqual(got, want)
+
+        got  = json.load(open(self.datadir + "/data/rsrc/api/context.json"))
+        want = json.load(open("test/files/api/jsonld-context.json"))
+        self.assertEqual(want, got)
         
-        
+        got  = json.load(open(self.datadir + "/data/rsrc/api/terms.json"))
+        want = json.load(open("test/files/api/var-terms.json"))
+        self.assertEqual(want, got)
+
+        got  = json.load(open(self.datadir + "/data/rsrc/api/common.json"))
+        want = json.load(open("test/files/api/var-common.json"))
+        self.assertEqual(want,got)
+
+class ComplexAPI(RepoTester):
+    def test_files(self):
+        # use three repos (staticmockclass*) that each define their
+        # own ontologies and terms. Make sure these show up in
+        # context, terms and common
+        pass
+
 
 import doctest
 from ferenda import manager

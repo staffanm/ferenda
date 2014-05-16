@@ -530,7 +530,16 @@ class RFC(DocumentRepository):
         left = [x.split("   ", 1)[0].strip() for x in lines]
         right = [x.split("   ", 1)[1].strip() for x in lines if "   " in x]
         # first line of lefthand side is publishing organization (?)
-        desc.value(self.ns['dct'].publisher, left[0])
+        publisher_label = left[0]
+        try:
+            desc.rel(self.ns['dct'].publisher,
+                       self.lookup_resource(publisher_label))
+        except KeyError:
+            self.log.warn("Couldn't look up a proper resource URI for %s" %
+                          publisher_label)
+            desc.value(self.ns['dct'].publisher,
+                       publisher_label)
+            
         # following lefthand side are key-value headers
         for line in left[1:]:
             if line.strip() == "":
@@ -549,7 +558,13 @@ class RFC(DocumentRepository):
                 if value:  # eg RFC 100
                     desc.value(self.ns['dct'].identifier, "RFC %s" % value)
             elif key == "Category":
-                desc.value(self.ns['dct'].subject, value)
+                try:
+                    desc.rel(self.ns['dct'].subject,
+                               self.lookup_resource(value, predicate=self.ns['bibo'].identifier))
+                except KeyError:
+                    self.log.warn("Couldn't look up a proper resource URI for %s" %
+                                  value)
+                    desc.value(self.ns['dct'].subject, value)
             elif key == "ISSN":
                 desc.value(self.ns['dct'].issn, value)
             elif key in ("Updates", "Obsoletes"):
