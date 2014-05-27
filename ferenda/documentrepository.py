@@ -40,6 +40,7 @@ from six.moves.urllib_parse import quote
 # mine
 import ferenda
 from ferenda import util, errors, decorators
+
 from ferenda import (Describer, LayeredConfig, TripleStore, FulltextIndex,
                      Document, DocumentEntry, NewsCriteria, TocCriteria,
                      TocPageset, TocPage, DocumentStore, Transformer)
@@ -1459,7 +1460,9 @@ with the *config* object as single parameter.
 
             idx = FulltextIndex.connect(self.config.indextype,
                                         self.config.indexlocation,
-                                        repos=[])  # FIXME: need a real list of repos
+                                        repos=[])  # FIXME: need a
+                                                   # real list of
+                                                   # repos
             self._fulltextindexer = idx
 
             # The batchwriter functionality seems a litte broken --
@@ -1570,6 +1573,9 @@ parsed document path to that documents dependency file."""
                 values['words'] += len(plaintext.split())
 
             indexer.commit()  # NB: Destroys indexer._writer
+
+    def get_indexed_properties(self):
+        return {}
 
     def _extract_plaintext(self, node):
         # helper to extract any text from a elementtree node,
@@ -2731,3 +2737,4 @@ parsed document path to that documents dependency file."""
                         pass
                 log.addHandler(NullHandler())
         return log
+

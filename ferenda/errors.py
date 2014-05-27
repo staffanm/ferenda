@@ -98,7 +98,11 @@ class TriplestoreError(Exception):
 
 class SparqlError(TriplestoreError):
 
-    """Raised whenever a SPARQL query fails. The Exception should contain whatever error message that the Triple store returned, so the exact formatting may be dependent on which store is used."""
+    """Raised whenever a SPARQL query fails. The Exception should contain
+       whatever error message that the Triple store returned, so the
+       exact formatting may be dependent on which store is used.
+
+    """
 
 
 class IndexingError(Exception):
@@ -109,3 +113,12 @@ class IndexingError(Exception):
 class SearchingError(Exception):
 
     """Raised whenever an attempt to do a full-text search fails."""
+
+class SchemaConflictError(Exception):
+
+    """Raised whenever a fulltext index is opened with repo arguments that
+       result in a different schema than what's currently in
+       use. Workaround this by removing the fulltext index and
+       recreating.
+
+    """

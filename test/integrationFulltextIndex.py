@@ -13,7 +13,7 @@ import whoosh.index
 import whoosh.fields
 
 from ferenda import FulltextIndex, DocumentRepository
-from ferenda.fulltextindex import Identifier, Datetime, Text, Label, Keywords, Boolean, URI, Less, More, Between
+from ferenda.fulltextindex import Identifier, Datetime, Text, Label, Keywords, Boolean, URI, Resource, Less, More, Between
 
 basic_dataset = [
     {'uri':'http://example.org/doc/1',
@@ -103,7 +103,7 @@ class BasicQuery(object):
         res, pager = self.index.query("section")
         # can't get these results when using MockESBasicQuery with
         # CREATE_CANNED=True for some reason...
-        if type(self) == ESBasicQuery: 
+        if type(self) == ESBasicQuery:
             self.assertEqual(len(res),3)
             # NOTE: ES scores all three results equally (1.0), so it doesn't
             # neccesarily put section 1 in the top
@@ -214,7 +214,7 @@ class DocRepo1(DocumentRepository):
     alias = "repo1"
     def get_indexed_properties(self):
         return {'issued':Datetime(),
-                'publisher':Label(),
+                'publisher':Resource(),
                 'abstract': Text(boost=2),
                 'category':Keywords()}
 
@@ -231,8 +231,9 @@ custom_dataset = [
      'uri':'http://example.org/repo1/1',
      'title':'Title of first document in first repo',
      'identifier':'R1 D1',
-     'issued':datetime(2013,2,14,14,6),
-     'publisher': 'Examples & son',
+     'issued':datetime(2013,2,14,14,6), # important to use real datetime object, not string representation
+     'publisher': {'iri': 'http://example.org/publisher/e',
+                   'label': 'Examples & son'},
      'category': ['green', 'standards'],
      'text': 'Long text here'},
     {'repo':'repo1',
@@ -241,7 +242,8 @@ custom_dataset = [
      'title':'Title of second document in first repo',
      'identifier':'R1 D2',
      'issued':datetime(2013,3,4,14,16),
-     'publisher': 'Examples & son',
+     'publisher': {'iri': 'http://example.org/publisher/e',
+                   'label': 'Examples & son'},
      'category': ['suggestions'],
      'text': 'Even longer text here'},
     {'repo':'repo2',
@@ -251,7 +253,8 @@ custom_dataset = [
      'identifier':'R2 D1',
      'secret': False,
      'references':'http://example.org/repo2/2',
-     'category':['green', 'yellow']},
+     'category':['green', 'yellow'],
+     'text': 'Every document must have a text'},
     {'repo':'repo2',
      'basefile':'2',
      'uri':'http://example.org/repo2/2',
@@ -259,12 +262,12 @@ custom_dataset = [
      'identifier':'R2 D2',
      'secret': True,
      'references': None,
-     'category':['yellow', 'red']}
+     'category':['yellow', 'red'],
+     'text': 'Even this one'}
     ]
 
-#class CustomizedIndex(unittest.TestCase):
+# class CustomizedIndex(unittest.TestCase):
 class CustomizedIndex(object):
-
     def test_setup(self):
         self.location = mkdtemp()
         self.index = FulltextIndex.connect("WHOOSH", self.location, [DocRepo1(), DocRepo2()])
@@ -290,39 +293,37 @@ class CustomizedIndex(object):
     
 # class CustomQuery(unittest.TestCase):
 class CustomQuery(object):        
-    def setUp(self):
-        self.location = mkdtemp()
-        self.index = FulltextIndex.connect("WHOOSH", self.location, [DocRepo1(), DocRepo2()])
-        self.load(custom_dataset)
-        
-    def tearDown(self):
-        shutil.rmtree(self.location)
-    
+
     def load(self, data):
         for doc in data:
             self.index.update(**doc)
+            self.index.commit()
 
     def test_boolean(self):
+        self.load(custom_dataset)
         res, pager = self.index.query(secret=True)
         self.assertEqual(len(res),1)
         self.assertEqual(res[0]['identifier'], 'R2 D2')
-        res = self.index.query(secret=False)
+        res, pager = self.index.query(secret=False)
         self.assertEqual(len(res),1)
         self.assertEqual(res[0]['identifier'], 'R2 D1')
     
     def test_keywords(self):
+        self.load(custom_dataset)
         res, pager = self.index.query(category='green')
         self.assertEqual(len(res),2)
         identifiers = set([x['identifier'] for x in res])
         self.assertEqual(identifiers, set(['R1 D1','R2 D1']))
         
     def test_repo_limited_freetext(self):
+        self.load(custom_dataset)
         res, pager = self.index.query('first', repo='repo1')
         self.assertEqual(len(res),2)
         self.assertEqual(res[0]['identifier'], 'R1 D1') # contains the term 'first' twice
         self.assertEqual(res[1]['identifier'], 'R1 D2') #          -""-             once
 
     def test_repo_dateinterval(self):
+        self.load(custom_dataset)
 
         res, pager = self.index.query(issued=Less(datetime(2013,3,1)))
         self.assertEqual(len(res),1)
@@ -335,3 +336,16 @@ class CustomQuery(object):
         self.assertEqual(len(res),2)
         identifiers = set([x['identifier'] for x in res])
         self.assertEqual(identifiers, set(['R1 D1','R1 D2']))
+
+
+class WhooshCustomizedIndex(CustomizedIndex, WhooshBase):
+    pass
+
+class ESCustomizedIndex(CustomizedIndex, ESBase):
+    pass
+
+class WhooshCustomQuery(CustomQuery, WhooshBase):
+    pass
+
+class ESCustomQuery(CustomQuery, ESBase):
+    pass

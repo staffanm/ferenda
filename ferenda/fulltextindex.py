@@ -6,6 +6,7 @@ import math
 import re
 import shutil
 import sys
+from datetime import datetime
 
 import six
 from six.moves.urllib_parse import quote
@@ -17,17 +18,24 @@ from ferenda import util, errors
 
 
 class FulltextIndex(object):
+    """This is the abstract base class for a fulltext index. You use it by
+       calling the static method FulltextIndex.connect, passing a
+       string representing the underlying fulltext engine you wish to
+       use. It returns a subclass on which you then call further
+       methods.
 
+    """
+    
     @staticmethod
     def connect(indextype, location, repos=[]):
-        """Open a fulltext index (creating it if it
-        doesn't already exists).
+        """Open a fulltext index (creating it if it doesn't already exists).
 
         :param location: Type of fulltext index ("WHOOSH" or "ELASTICSEARCH")
         :type  location: str
         :param location: The file path of the fulltext index.
         :type  location: str
-    """
+
+        """
         # create correct subclass and return it
         return {'WHOOSH': WhooshIndex,
                 'ELASTICSEARCH': ElasticSearchIndex}[indextype](location, repos)
@@ -36,11 +44,35 @@ class FulltextIndex(object):
         self.location = location
         if self.exists():
             self.index = self.open()
+            # this idea that there is one, installation-wide, schema,
+            # is wrong and doesn't work nicely with in particular
+            # ES. It might be needed for whoosh, but the base class
+            # shouldn't enforce this. move to Whoosh.
+            
+            # needed_schema = self.make_schema(repos)
+            # existing_schema = self.schema()
+            # if needed_schema != existing_schema:
+            #     # here's where we put clever migration code
+            #     raise errors.SchemaConflictError("The needed schema isn't identical to the existing schema")
         else:
-            self.index = self.create(self.get_default_schema(), repos)
+            # self.index = self.create(self.make_schema(repos))
+            self.index = self.create(repos)
 
     def __del__(self):
         self.close()
+
+    def make_schema(self, repos):
+        s = self.get_default_schema()
+        for repo in repos:
+            for fld, idxtype in repo.get_indexed_properties():
+                if fld in s:
+                    # multiple repos can provide the same indexed
+                    # properties ONLY if the indextype match
+                    if s[fld] != idxtype:
+                        raise errors.SchemaConflictError("Repo %s wanted to add a field named %s, but it was already present with a different IndexType" % (repo, fld))
+                else:
+                    s[fld] = idxtype
+        return s
 
     def get_default_schema(self):
         return {'uri': Identifier(),
@@ -54,8 +86,8 @@ class FulltextIndex(object):
         """Whether the fulltext index exists."""
         raise NotImplementedError  # pragma: no cover
 
-    def create(self, schema, repos):
-        """Creates a fulltext index using the provided default schema."""
+    def create(self, repos):
+        """Creates a fulltext index using the provided schema."""
         raise NotImplementedError  # pragma: no cover
 
     def destroy(self):
@@ -119,7 +151,7 @@ class FulltextIndex(object):
         """Returns the number of currently indexed (non-deleted) documents."""
         raise NotImplementedError  # pragma: no cover
 
-    def query(self, q, **kwargs):
+    def query(self, q=None, pagenum=1, pagelen=10, **kwargs):
         """Perform a free text query against the full text index, optionally
            restricted with parameters for individual fields.
 
@@ -144,7 +176,7 @@ class FulltextIndex(object):
 class IndexedType(object):
 
     """Base class for a fulltext searchengine-independent representation
-       of indeaxed data.  By using IndexType-derived classes to
+       of indexed data.  By using IndexType-derived classes to
        represent the schema, it becomes possible to switch out search
        engines without affecting the rest of the code.
 
@@ -186,6 +218,7 @@ class Label(IndexedType):
 
 
 class Keywords(IndexedType):
+    """Keywords is one OR MORE strings from a controlled vocabulary."""
     pass
 
 
@@ -196,6 +229,14 @@ class Boolean(IndexedType):
 class URI(IndexedType):
     pass
 
+
+class Resource(IndexedType):
+    """A fulltextindex.Resource is a URI that also has a human-readable
+       label.
+
+    """
+    # eg. a particular object/subject with it's own rdfs:label,
+    # foaf:name, skos:prefLabel etc
 
 class SearchModifier(object):
     pass
@@ -264,6 +305,16 @@ class ElementsFormatter(whoosh.highlight.Formatter):
 
 class WhooshIndex(FulltextIndex):
 
+    fieldmapping = ((Identifier(),    whoosh.fields.ID(unique=True, stored=True)),
+                    (Label(),         whoosh.fields.ID(stored=True)),
+                    (Label(boost=16), whoosh.fields.ID(field_boost=16, stored=True)),
+                    (Text(boost=4),   whoosh.fields.TEXT(field_boost=4, stored=True,
+                                                           analyzer=whoosh.analysis.StemmingAnalyzer(
+                                                           ))),
+                    (Text(),          whoosh.fields.TEXT(stored=True,
+                                                           analyzer=whoosh.analysis.StemmingAnalyzer()))
+                    )
+
     def __init__(self, location, repos):
         super(WhooshIndex, self).__init__(location, repos)
         self._schema = self.get_default_schema()
@@ -275,20 +326,16 @@ class WhooshIndex(FulltextIndex):
     def open(self):
         return whoosh.index.open_dir(self.location)
 
-    def create(self, schema, repos):
+    def create(self, repos):
+        schema = self.make_schema(repos)
         # maps our field classes to concrete whoosh field instances
-        mapped_field = {Identifier():   whoosh.fields.ID(unique=True, stored=True),
-                        Label():        whoosh.fields.ID(stored=True),
-                        Label(boost=16): whoosh.fields.ID(field_boost=16, stored=True),
-                        Text(boost=4):  whoosh.fields.TEXT(field_boost=4, stored=True,
-                                                           analyzer=whoosh.analysis.StemmingAnalyzer(
-                                                           )),
-                        Text():         whoosh.fields.TEXT(stored=True,
-                                                           analyzer=whoosh.analysis.StemmingAnalyzer())}
-
+        mapped_field = dict(self.fieldmapping)
+        
         whoosh_fields = {}
         for key, fieldtype in self.get_default_schema().items():
             whoosh_fields[key] = mapped_field[fieldtype]
+
+        # then do something smart with repos.
         schema = whoosh.fields.Schema(**whoosh_fields)
         util.mkdir(self.location)
         return whoosh.index.create_in(self.location, schema)
@@ -297,10 +344,21 @@ class WhooshIndex(FulltextIndex):
         shutil.rmtree(self.location)
 
     def schema(self):
-        # FIXME: This should iterate through self.index (the
-        # underlying whoosh index), convert each field to the
-        # corresponding IndexedType objects.
-        return self._schema
+        used_schema = {}
+
+        for fieldname, field_object in self.index.schema.items():
+            # whoosh.field objects are unhashable (but are
+            # comparable), therefore we need to loop the entire
+            # self.fieldmapping to see what fulltextindex.IndexedType
+            # object to map them to
+            for nativefield, whooshfield in self.fieldmapping:
+                if field_object == whooshfield:
+                    used_schema[fieldname] = nativefield
+                    break
+            if not fieldname in used_schema:
+                raise errors.SchemaConflictError("Field %s (%s) cannot be mapped" % (fieldname, field_object))
+            pass
+        return used_schema
 
     def update(self, uri, repo, basefile, title, identifier, text, **kwargs):
         if not self._writer:
@@ -331,7 +389,7 @@ class WhooshIndex(FulltextIndex):
     def doccount(self):
         return self.index.doc_count()
 
-    def query(self, q, pagenum=1, pagelen=10, **kwargs):
+    def query(self, q=None, pagenum=1, pagelen=10, **kwargs):
         searchfields = ['identifier', 'title', 'text']
         mparser = whoosh.qparser.MultifieldParser(searchfields,
                                                   self.index.schema)
@@ -371,8 +429,9 @@ class RemoteIndex(FulltextIndex):
     # def exists(self):
     #     pass
 
-    def create(self, schema, repos):
-        relurl, payload = self._create_schema_payload(self.get_default_schema(), repos)
+    def create(self, repos):
+        relurl, payload = self._create_schema_payload(repos)
+        # print("\ncreate: PUT %s\n%s\n" % (self.location + relurl, payload))
         res = requests.put(self.location + relurl, payload)
         try:
             res.raise_for_status()
@@ -381,17 +440,19 @@ class RemoteIndex(FulltextIndex):
 
     def schema(self):
         relurl, payload = self._get_schema_payload()
-        res = requests.get(self.location + relurl)  # payload is probably never used
+        res = requests.get(self.location + relurl)  # payload is
+                                                    # probably never
+                                                    # used
         return self._decode_schema(res)
 
     def update(self, uri, repo, basefile, title, identifier, text, **kwargs):
         relurl, payload = self._update_payload(
             uri, repo, basefile, title, identifier, text, **kwargs)
 
+        # print("update: PUT %s\n%s\n" % (self.location + relurl, payload))
         res = requests.put(self.location + relurl, payload)
         try:
             res.raise_for_status()
-            # print(json.dumps(res.json(), indent=4))
         except requests.exceptions.HTTPError as e:
             raise errors.IndexingError(str(e) + ": '%s'" % res.text)
 
@@ -403,10 +464,10 @@ class RemoteIndex(FulltextIndex):
             res = requests.get(self.location + relurl)
         return self._decode_count_result(res)
 
-    def query(self, q, pagenum=1, pagelen=10, **kwargs):
+    def query(self, q=None, pagenum=1, pagelen=10, **kwargs):
         relurl, payload = self._query_payload(q, pagenum, pagelen, **kwargs)
         if payload:
-            # print("POSTing to %s:\n%s" % (relurl, payload))
+            # print("query: POST %s:\n%s" % (self.location + relurl, payload))
             res = requests.post(self.location + relurl, payload)
             # print("Recieved:\n%s" % (json.dumps(res.json(),indent=4)))
         else:
@@ -446,6 +507,11 @@ class ElasticSearchIndex(RemoteIndex):
             return True
 
     def _update_payload(self, uri, repo, basefile, title, identifier, text, **kwargs):
+        def jsondateencoder(obj):
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            else:
+                raise TypeError
         safe = ''
         if six.PY2:
             # urllib.quote in python 2.6 cannot handle unicode values
@@ -470,20 +536,31 @@ class ElasticSearchIndex(RemoteIndex):
                    "identifier": identifier,
                    "text": text}
         payload.update(kwargs)
-        return relurl, json.dumps(payload)
+        return relurl, json.dumps(payload, default=jsondateencoder)
 
     def _query_payload(self, q, pagenum=1, pagelen=10, **kwargs):
-        # relurl = "_search?q=%s&size=%s&from=%s" % (quote(q), pagelen, (pagenum * pagelen) - pagelen)
+
         relurl = "_search?from=%s&size=%s" % ((pagenum - 1) * pagelen, pagelen)
 
-        # FIXME: Only searches in text, not title or identifier. But
-        # can't search on the _all field, because apparently that
-        # field isn't set up to use the my_analyzer we've defined...
-        payload = {'query': {'match': {'text': q}},
+        # 1: Query on all specified fields (primarily to narrow search)
+        match = {}
+        for k, v in kwargs.items():
+            match[k] = v
+
+        # 2: If freetext param given, search on that
+        if q:
+            # FIXME: Only searches in the 'text' field, not 'title' or
+            # 'identifier'. But can't search on the '_all' field,
+            # because apparently that field isn't set up to use the
+            # my_analyzer we've defined...
+            match['text'] = q
+            
+        payload = {'query': {'match': match},
                    'highlight': {'fields': {'text': {}},
                                  'pre_tags': ["<strong class='match'>"],
                                  'post_tags': ["</strong>"],
-                                 'fragment_size': '40'}}
+                                 'fragment_size': '40'}
+        }
         return relurl, json.dumps(payload, indent=4)
 
     def _decode_query_result(self, response, pagenum, pagelen):
@@ -491,10 +568,13 @@ class ElasticSearchIndex(RemoteIndex):
         res = []
         for hit in json['hits']['hits']:
             h = hit['_source']
-            # wrap highlighted field in P, convert to elements
-            hltext = " ... ".join([x.strip() for x in hit['highlight']['text']])
-            soup = BeautifulSoup("<p>%s</p>" % re.sub("\s+", " ", hltext))
-            h['text'] = html.elements_from_soup(soup.html.body.p)
+            if 'highlight' in hit:
+                # wrap highlighted field in P, convert to
+                # elements. FIXME: should work for other fields than
+                # 'text'
+                hltext = " ... ".join([x.strip() for x in hit['highlight']['text']])
+                soup = BeautifulSoup("<p>%s</p>" % re.sub("\s+", " ", hltext))
+                h['text'] = html.elements_from_soup(soup.html.body.p)
             res.append(h)
         pager = {'pagenum': pagenum,
                  'pagecount': int(math.ceil(json['hits']['total'] / float(pagelen))),
@@ -531,8 +611,8 @@ class ElasticSearchIndex(RemoteIndex):
     # def create(self, schema, repos):
     #    pass
 
-    def _create_schema_payload(self, schema, repos):
-        schema = {
+    def _create_schema_payload(self, repos):
+        payload = {
             # cargo cult configuration
             "settings": {"number_of_shards": 1,
                          "analysis": {
@@ -565,15 +645,20 @@ class ElasticSearchIndex(RemoteIndex):
                         Text(boost=4):  {"type": "string", "boost": 4.0, "analyzer": "my_analyzer"},
                         Text():         {"type": "string", "analyzer": "my_analyzer"}}  # text
 
-        es_fields = {}
-        for key, fieldtype in self.get_default_schema().items():
-            if key == "repo":
-                continue  # not really needed for ES, as type == repo.alias
-            es_fields[key] = mapped_field[fieldtype]
+
+
         for repo in repos:
-            schema["mappings"][repo.alias] = {"_source": {"enabled": True},  # so we can get the text back
-                                              "properties": es_fields}
-        return "", json.dumps(schema)
+            es_fields = {}
+            schema = self.get_default_schema()
+            schema.update(repo.get_indexed_properties()) # if same keys used, just overwrite
+            for key, fieldtype in schema.items():
+                if key == "repo":
+                    continue  # not really needed for ES, as type == repo.alias
+                es_fields[key] = mapped_field[fieldtype]
+            # _source enabled so we can get the text back
+            payload["mappings"][repo.alias] = {"_source": {"enabled": True},
+                                               "properties": es_fields}
+        return "", json.dumps(payload)
 
     def _destroy_payload(self):
 

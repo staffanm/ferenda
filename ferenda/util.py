@@ -444,6 +444,7 @@ HTTP-date) to an UTC-localized (naive) datetime.
     return (datetime.datetime(*parsed_date[:7]) -
             datetime.timedelta(seconds=parsed_date[9]))
 
+
 def strptime(datestr, format):
     """Like datetime.strptime, but guaranteed to not be affected by
     current system locale -- all datetime parsing is done using the C
