@@ -172,6 +172,42 @@ class FulltextIndex(object):
         """
         raise NotImplementedError  # pragma: no cover
 
+    # subclasses can override fieldmapping, and have
+    # to_native_field/from_native_field work on their overridden
+    # fieldmapping
+
+    fieldmapping = ()
+    """A tuple of ``(abstractfield, nativefield)`` tuples. Each
+    ``abstractfield`` should be a instance of a IndexedType-derived
+    class. Each ``nativefield`` should be whatever kind of object that
+    is used with the native fullltextindex API.
+
+    The methods :py:meth:`to_native_field` and
+    :py:meth:`from_native_field` uses this tuple of tuples to convert
+    fields.
+
+    """
+
+    def to_native_field(self, fieldobject):
+        """Given a abstract field (an instance of a IndexedType-derived
+        class), convert to the corresponding native type for the
+        fulltextindex in use.
+        """
+    
+        for abstractfield, nativefield in self.fieldmapping:
+            if fieldobject == abstractfield:
+                return nativefield
+        raise errors.SchemaMappingError("Field %s cannot be mapped to a native field" % fieldobject)
+        
+
+    def from_native_field(self, fieldobject):
+        """Given a fulltextindex native type, convert to the corresponding
+        IndexedType object."""
+        for abstractfield, nativefield in self.fieldmapping:
+            if fieldobject == nativefield:
+                return abstractfield
+        raise errors.SchemaMappingError("Native field %s cannot be mapped" % fieldobject)
+
 
 class IndexedType(object):
 
@@ -328,12 +364,9 @@ class WhooshIndex(FulltextIndex):
 
     def create(self, repos):
         schema = self.make_schema(repos)
-        # maps our field classes to concrete whoosh field instances
-        mapped_field = dict(self.fieldmapping)
-        
         whoosh_fields = {}
         for key, fieldtype in self.get_default_schema().items():
-            whoosh_fields[key] = mapped_field[fieldtype]
+            whoosh_fields[key] = self.to_native_field(fieldtype)
 
         # then do something smart with repos.
         schema = whoosh.fields.Schema(**whoosh_fields)
@@ -345,19 +378,8 @@ class WhooshIndex(FulltextIndex):
 
     def schema(self):
         used_schema = {}
-
         for fieldname, field_object in self.index.schema.items():
-            # whoosh.field objects are unhashable (but are
-            # comparable), therefore we need to loop the entire
-            # self.fieldmapping to see what fulltextindex.IndexedType
-            # object to map them to
-            for nativefield, whooshfield in self.fieldmapping:
-                if field_object == whooshfield:
-                    used_schema[fieldname] = nativefield
-                    break
-            if not fieldname in used_schema:
-                raise errors.SchemaConflictError("Field %s (%s) cannot be mapped" % (fieldname, field_object))
-            pass
+            used_schema[fieldname] = self.from_native_field(field_object)
         return used_schema
 
     def update(self, uri, repo, basefile, title, identifier, text, **kwargs):
@@ -431,7 +453,7 @@ class RemoteIndex(FulltextIndex):
 
     def create(self, repos):
         relurl, payload = self._create_schema_payload(repos)
-        # print("\ncreate: PUT %s\n%s\n" % (self.location + relurl, payload))
+        print("\ncreate: PUT %s\n%s\n" % (self.location + relurl, payload))
         res = requests.put(self.location + relurl, payload)
         try:
             res.raise_for_status()
@@ -443,7 +465,10 @@ class RemoteIndex(FulltextIndex):
         res = requests.get(self.location + relurl)  # payload is
                                                     # probably never
                                                     # used
+        print("GET %s" % relurl)
+        print(json.dumps(res.json(), indent=4))
         return self._decode_schema(res)
+
 
     def update(self, uri, repo, basefile, title, identifier, text, **kwargs):
         relurl, payload = self._update_payload(
@@ -495,6 +520,33 @@ class RemoteIndex(FulltextIndex):
 
 class ElasticSearchIndex(RemoteIndex):
 
+    # maps our field classes to concrete ES field properties
+    fieldmapping = ((Identifier(),
+                     {"type": "string", "index": "not_analyzed"}),  # uri
+                    (Label(),
+                     {"type": "string", "index": "not_analyzed"}),  # repo, basefile
+                    (Label(boost=16),
+                     {"type": "string", "boost": 16.0, "analyzer": "my_analyzer"}),# identifier
+                    (Text(boost=4),
+                     {"type": "string", "boost": 4.0, "analyzer": "my_analyzer"}),  # title
+                    (Text(boost=2),
+                     {"type": "string", "boost": 2.0, "analyzer": "my_analyzer"}),  # abstract
+                    (Text(),
+                     {"type": "string", "analyzer": "my_analyzer"}),  # text
+                    (Datetime(),
+                     {"type": "date", "format": "dateOptionalTime"}),
+                    (Boolean(),
+                     {"type": "boolean"}),
+                    (Resource(),
+                     {"properties": {"uri": {"type": "string"},
+                                     "label": {"type": "string"}}}),
+                    (Keywords(),
+                     {"type": "string", "index_name": "keyword"}),
+                    (URI(),
+                     {"type": "string"}),
+                    )
+
+    
     def commit(self):
         r = requests.post(self.location + "_refresh")
         r.raise_for_status()
@@ -592,15 +644,19 @@ class ElasticSearchIndex(RemoteIndex):
         else:
             return response.json()['count']
 
-    # FIXME: This is cheating!
-    def schema(self):
-        return self.get_default_schema()
-
     def _get_schema_payload(self):
-        return "", None
+        return "_mapping", None
 
-    def _decode_schema_payload(self, response):
-        raise NotImplementedError # pragma: no cover
+    def _decode_schema(self, response):
+        indexname = self.location.split("/")[-2]
+        mappings = response.json()[indexname]["mappings"]
+        schema = {}
+        # flatten the existing types (pay no mind to duplicate fields):
+        for typename, mapping in mappings.items():
+            for fieldname, fieldobject in mapping["properties"].items():
+                schema[fieldname] = self.from_native_field(fieldobject)
+        schema["repo"] = 
+        return schema
 
     # FIXME: For some reason, createing a schema/mapping makes PUTting
     # new documents to the index hang with the folloging error:
@@ -635,18 +691,6 @@ class ElasticSearchIndex(RemoteIndex):
             "mappings": {}
         }
 
-        # maps our field classes to concrete ES field properties
-        mapped_field = {Identifier():   {"type": "string", "index": "not_analyzed"},  # uri
-                        # repo, basefile (note: see below)
-                        Label():        {"type": "string", "index": "not_analyzed"},
-                        # identifier
-                        Label(boost=16): {"type": "string", "boost": 16.0, "analyzer": "my_analyzer"},
-                        # title
-                        Text(boost=4):  {"type": "string", "boost": 4.0, "analyzer": "my_analyzer"},
-                        Text():         {"type": "string", "analyzer": "my_analyzer"}}  # text
-
-
-
         for repo in repos:
             es_fields = {}
             schema = self.get_default_schema()
@@ -654,11 +698,11 @@ class ElasticSearchIndex(RemoteIndex):
             for key, fieldtype in schema.items():
                 if key == "repo":
                     continue  # not really needed for ES, as type == repo.alias
-                es_fields[key] = mapped_field[fieldtype]
+                es_fields[key] = self.to_native_field(fieldtype)
             # _source enabled so we can get the text back
             payload["mappings"][repo.alias] = {"_source": {"enabled": True},
                                                "properties": es_fields}
-        return "", json.dumps(payload)
+        return "", json.dumps(payload, indent=4)
 
     def _destroy_payload(self):
 

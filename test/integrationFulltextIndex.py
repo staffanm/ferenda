@@ -15,6 +15,11 @@ import whoosh.fields
 from ferenda import FulltextIndex, DocumentRepository
 from ferenda.fulltextindex import Identifier, Datetime, Text, Label, Keywords, Boolean, URI, Resource, Less, More, Between
 
+#----------------------------------------------------------------
+#
+# Initial testdata and testrepo implementations used by our test cases
+#
+
 basic_dataset = [
     {'uri':'http://example.org/doc/1',
      'repo':'base',
@@ -48,9 +53,72 @@ basic_dataset = [
      'text':'This is the second document (not the first)'}
     ]
 
-repos = [DocumentRepository()]
+custom_dataset = [
+    {'repo':'repo1',
+     'basefile':'1',
+     'uri':'http://example.org/repo1/1',
+     'title':'Title of first document in first repo',
+     'identifier':'R1 D1',
+     'issued':datetime(2013,2,14,14,6), # important to use real datetime object, not string representation
+     'publisher': {'iri': 'http://example.org/publisher/e',
+                   'label': 'Examples & son'},
+     'category': ['green', 'standards'],
+     'text': 'Long text here'},
+    {'repo':'repo1',
+     'basefile':'2',
+     'uri':'http://example.org/repo1/2',
+     'title':'Title of second document in first repo',
+     'identifier':'R1 D2',
+     'issued':datetime(2013,3,4,14,16),
+     'publisher': {'iri': 'http://example.org/publisher/e',
+                   'label': 'Examples & son'},
+     'category': ['suggestions'],
+     'text': 'Even longer text here'},
+    {'repo':'repo2',
+     'basefile':'1',
+     'uri':'http://example.org/repo2/1',
+     'title':'Title of first document in second repo',
+     'identifier':'R2 D1',
+     'secret': False,
+     'references':'http://example.org/repo2/2',
+     'category':['green', 'yellow'],
+     'text': 'Every document must have a text'},
+    {'repo':'repo2',
+     'basefile':'2',
+     'uri':'http://example.org/repo2/2',
+     'title':'Title of second document in second repo',
+     'identifier':'R2 D2',
+     'secret': True,
+     'references': None,
+     'category':['yellow', 'red'],
+     'text': 'Even this one'}
+    ]
+
+class DocRepo1(DocumentRepository):
+    alias = "repo1"
+    def get_indexed_properties(self):
+        return {'issued':Datetime(),
+                'publisher':Resource(),
+                'abstract': Text(boost=2),
+                'category':Keywords()}
+
+class DocRepo2(DocumentRepository):
+    alias = "repo2"
+    def get_indexed_properties(self):
+        return {'secret':Boolean(),   
+                'references': URI(),
+                'category': Keywords()}
+
+#----------------------------------------------------------------
+#
+# The actual test -- note that these do not derive from
+# unittest.TestCase. They are used as one of two superclasses to yield
+# working TestCase classes, but this way allows us to define a test of
+# the API, and then having it run once for each backend configuration.
 
 class BasicIndex(object):
+
+    repos = [DocumentRepository()]
 
     def test_create(self):
         # setUp calls FulltextIndex.connect, creating the index
@@ -79,6 +147,8 @@ class BasicIndex(object):
 
         
 class BasicQuery(object):
+
+    repos = [DocumentRepository()]
 
     def load(self, data):
         # print("loading...")
@@ -131,146 +201,11 @@ class BasicQuery(object):
         self.assertIn(' ... ', "".join(str(x) for x in res[0]['text']))
         
     
+class CustomIndex(object):
 
-class ESBase(unittest.TestCase):
-    def setUp(self):
-        self.location = "http://localhost:9200/ferenda/"
-        self.index = FulltextIndex.connect("ELASTICSEARCH", self.location, repos)
-
-    def tearDown(self):
-        self.index.destroy()
-
-
-@unittest.skipIf('SKIP_ELASTICSEARCH_TESTS' in os.environ,
-                 "Skipping Elasticsearch tests")    
-class ESBasicIndex(BasicIndex, ESBase): pass
-
-
-@unittest.skipIf('SKIP_ELASTICSEARCH_TESTS' in os.environ,
-                 "Skipping Elasticsearch tests")    
-class ESBasicQuery(BasicQuery, ESBase): pass
-
-
-class WhooshBase(unittest.TestCase):
-    def setUp(self):
-        self.location = mkdtemp()
-        self.index = FulltextIndex.connect("WHOOSH", self.location, repos)
-
-    def tearDown(self):
-        self.index.close()
-        try:
-            self.index.destroy()
-        except WindowsError:
-            # this happens on Win32 when doing the following sequence of events:
-            #
-            # i = FulltextIndex.connect("WHOOSH", ...)
-            # i.update(...)
-            # i.commit()
-            # i.update(...)
-            # i.commit()
-            # i.destroy()
-            #
-            # Cannot solve this for now. FIXME:
-            pass
-
-
-
-class WhooshBasicIndex(BasicIndex, WhooshBase): 
-    def test_create(self):
-        # First do the basic tests
-        super(WhooshBasicIndex,self).test_create()
-
-        # then do more low-level tests
-        # 1 assert that some files have been created at the specified location
-        self.assertNotEqual(os.listdir(self.location),[])
-        # 2 assert that it's really a whoosh index
-        self.assertTrue(whoosh.index.exists_in(self.location))
-
-        # 3. assert that the actual schema with whoosh types is, in
-        # fact, correct
-        got = self.index.index.schema
-        want = whoosh.fields.Schema(uri=whoosh.fields.ID(unique=True, stored=True),
-                                    repo=whoosh.fields.ID(stored=True),
-                                    basefile=whoosh.fields.ID(stored=True),
-                                    title=whoosh.fields.TEXT(field_boost=4,stored=True),
-                                    identifier=whoosh.fields.ID(field_boost=16,stored=True),
-                                    text=whoosh.fields.TEXT(stored=True))
-        self.assertEqual(sorted(want.names()), sorted(got.names()))
-        for fld in got.names():
-            self.assertEqual((fld,want[fld]),(fld,got[fld]))
-            
-        # finally, try to create again (opening an existing index
-        # instead of creating)
-        self.index = FulltextIndex.connect("WHOOSH", self.location)
-
-       
-class WhooshBasicQuery(BasicQuery, WhooshBase): pass
-        
-
-# ----------------------------------------------------------------
-# Non-working test classes - TBD!
-
-class DocRepo1(DocumentRepository):
-    alias = "repo1"
-    def get_indexed_properties(self):
-        return {'issued':Datetime(),
-                'publisher':Resource(),
-                'abstract': Text(boost=2),
-                'category':Keywords()}
-
-class DocRepo2(DocumentRepository):
-    alias = "repo2"
-    def get_indexed_properties(self):
-        return {'secret':Boolean(),   
-                'references': URI(),
-                'category': Keywords()}
-
-custom_dataset = [
-    {'repo':'repo1',
-     'basefile':'1',
-     'uri':'http://example.org/repo1/1',
-     'title':'Title of first document in first repo',
-     'identifier':'R1 D1',
-     'issued':datetime(2013,2,14,14,6), # important to use real datetime object, not string representation
-     'publisher': {'iri': 'http://example.org/publisher/e',
-                   'label': 'Examples & son'},
-     'category': ['green', 'standards'],
-     'text': 'Long text here'},
-    {'repo':'repo1',
-     'basefile':'2',
-     'uri':'http://example.org/repo1/2',
-     'title':'Title of second document in first repo',
-     'identifier':'R1 D2',
-     'issued':datetime(2013,3,4,14,16),
-     'publisher': {'iri': 'http://example.org/publisher/e',
-                   'label': 'Examples & son'},
-     'category': ['suggestions'],
-     'text': 'Even longer text here'},
-    {'repo':'repo2',
-     'basefile':'1',
-     'uri':'http://example.org/repo2/1',
-     'title':'Title of first document in second repo',
-     'identifier':'R2 D1',
-     'secret': False,
-     'references':'http://example.org/repo2/2',
-     'category':['green', 'yellow'],
-     'text': 'Every document must have a text'},
-    {'repo':'repo2',
-     'basefile':'2',
-     'uri':'http://example.org/repo2/2',
-     'title':'Title of second document in second repo',
-     'identifier':'R2 D2',
-     'secret': True,
-     'references': None,
-     'category':['yellow', 'red'],
-     'text': 'Even this one'}
-    ]
-
-# class CustomizedIndex(unittest.TestCase):
-class CustomizedIndex(object):
+    repos = [DocRepo1(), DocRepo2()]
+    
     def test_setup(self):
-        self.location = mkdtemp()
-        self.index = FulltextIndex.connect("WHOOSH", self.location, [DocRepo1(), DocRepo2()])
         # introspecting the schema (particularly if it's derived
         # directly from our definitions, not reverse-engineerded from
         # a Whoosh index on-disk) is useful for eg creating dynamic
@@ -291,8 +226,9 @@ class CustomizedIndex(object):
         shutil.rmtree(self.location)
 
     
-# class CustomQuery(unittest.TestCase):
 class CustomQuery(object):        
+
+    repos = [DocRepo1(), DocRepo2()]
 
     def load(self, data):
         for doc in data:
@@ -337,15 +273,90 @@ class CustomQuery(object):
         identifiers = set([x['identifier'] for x in res])
         self.assertEqual(identifiers, set(['R1 D1','R1 D2']))
 
+#----------------------------------------------------------------
+#
+# Additional base classes used together with above testcases to yield
+# working testcase classes
 
-class WhooshCustomizedIndex(CustomizedIndex, WhooshBase):
-    pass
+class ESBase(unittest.TestCase):
+    def setUp(self):
+        self.location = "http://localhost:9200/ferenda/"
+        self.index = FulltextIndex.connect("ELASTICSEARCH", self.location, self.repos)
 
-class ESCustomizedIndex(CustomizedIndex, ESBase):
-    pass
+    def tearDown(self):
+        self.index.destroy()
 
-class WhooshCustomQuery(CustomQuery, WhooshBase):
-    pass
 
-class ESCustomQuery(CustomQuery, ESBase):
-    pass
+class WhooshBase(unittest.TestCase):
+    def setUp(self):
+        self.location = mkdtemp()
+        self.index = FulltextIndex.connect("WHOOSH", self.location, self.repos)
+
+    def tearDown(self):
+        self.index.close()
+        try:
+            self.index.destroy()
+        except WindowsError:
+            # this happens on Win32 when doing the following sequence of events:
+            #
+            # i = FulltextIndex.connect("WHOOSH", ...)
+            # i.update(...)
+            # i.commit()
+            # i.update(...)
+            # i.commit()
+            # i.destroy()
+            #
+            # Cannot solve this for now. FIXME:
+            pass
+
+
+#----------------------------------------------------------------
+#
+# The actual testcase classes -- they use multiple inheritance to gain
+# both the backend-specific configurations (and the declaration as
+# unittest.TestCase classes), and the actual tests. Generally, they
+# can be empty (all the magic happens when the classes derive from two
+# classes)
+
+class WhooshBasicIndex(BasicIndex, WhooshBase): 
+    def test_create(self):
+        # First do the basic tests
+        super(WhooshBasicIndex,self).test_create()
+
+        # then do more low-level tests
+        # 1 assert that some files have been created at the specified location
+        self.assertNotEqual(os.listdir(self.location),[])
+        # 2 assert that it's really a whoosh index
+        self.assertTrue(whoosh.index.exists_in(self.location))
+
+        # 3. assert that the actual schema with whoosh types is, in
+        # fact, correct
+        got = self.index.index.schema
+        want = whoosh.fields.Schema(uri=whoosh.fields.ID(unique=True, stored=True),
+                                    repo=whoosh.fields.ID(stored=True),
+                                    basefile=whoosh.fields.ID(stored=True),
+                                    title=whoosh.fields.TEXT(field_boost=4,stored=True),
+                                    identifier=whoosh.fields.ID(field_boost=16,stored=True),
+                                    text=whoosh.fields.TEXT(stored=True))
+        self.assertEqual(sorted(want.names()), sorted(got.names()))
+        for fld in got.names():
+            self.assertEqual((fld,want[fld]),(fld,got[fld]))
+            
+        # finally, try to create again (opening an existing index
+        # instead of creating)
+        self.index = FulltextIndex.connect("WHOOSH", self.location)
+
+       
+class WhooshBasicQuery(BasicQuery, WhooshBase): pass
+
+class ESBasicIndex(BasicIndex, ESBase): pass
+
+class ESBasicQuery(BasicQuery, ESBase): pass
+
+class WhooshCustomIndex(CustomIndex, WhooshBase): pass
+
+class ESCustomIndex(CustomIndex, ESBase): pass
+
+class WhooshCustomQuery(CustomQuery, WhooshBase): pass
+
+class ESCustomQuery(CustomQuery, ESBase): pass

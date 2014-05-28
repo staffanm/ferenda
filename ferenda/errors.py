@@ -122,3 +122,11 @@ class SchemaConflictError(Exception):
        recreating.
 
     """
+
+class SchemaMappingError(Exception):
+
+    """Raised whenever a given field in a schema cannot be mapped to or
+       from the underlying native field object in an actual
+       fulltextindex store.
+
+    """
