@@ -82,7 +82,7 @@ custom_dataset = [
      'secret': False,
      'references':'http://example.org/repo2/2',
      'category':['green', 'yellow'],
-     'text': 'Every document must have a text'},
+     'text': 'All documents must have texts'},
     {'repo':'repo2',
      'basefile':'2',
      'uri':'http://example.org/repo2/2',
@@ -210,21 +210,34 @@ class CustomIndex(object):
         # directly from our definitions, not reverse-engineerded from
         # a Whoosh index on-disk) is useful for eg creating dynamic
         # search forms
-        self.assertEqual(self.index.schema(),{'uri':Identifier(),
-                                              'repo':Label(),
-                                              'basefile':Label(),
-                                              'title':Text(boost=4),
-                                              'identifier':Label(boost=16),
-                                              'text':Text(),
-                                              'issued':Datetime(),
-                                              'publisher':Label(),
-                                              'abstract': Text(boost=2),
-                                              'category': Keywords(),
-                                              'secret': Boolean(),
-                                              'references': URI(),
-                                              'category': Keywords()})
-        shutil.rmtree(self.location)
+        self.assertEqual({'uri':Identifier(),
+                          'repo':Label(),
+                          'basefile':Label(),
+                          'title':Text(boost=4),
+                          'identifier':Label(boost=16),
+                          'text':Text(),
+                          'issued':Datetime(),
+                          'publisher':Resource(),
+                          'abstract': Text(boost=2),
+                          'category': Keywords(),
+                          'secret': Boolean(),
+                          'references': URI(),
+                          'category': Keywords()}, self.index.schema())
 
+    def test_insert(self):
+        self.index.update(**custom_dataset[0]) # repo1
+        self.index.update(**custom_dataset[2]) # repo2
+        self.index.commit()
+        self.assertEqual(self.index.doccount(),2)
+
+        res, pager = self.index.query(uri="http://example.org/repo1/1")
+        self.assertEqual(len(res), 1)
+        self.assertEqual(custom_dataset[0],res[0])
+
+        res, pager = self.index.query(uri="http://example.org/repo2/1")
+        self.assertEqual(len(res), 1)
+        self.assertEqual(custom_dataset[2],res[0])
+        
     
 class CustomQuery(object):        
 
@@ -280,6 +293,7 @@ class CustomQuery(object):
 
 class ESBase(unittest.TestCase):
     def setUp(self):
+        self.maxDiff = None
         self.location = "http://localhost:9200/ferenda/"
         self.index = FulltextIndex.connect("ELASTICSEARCH", self.location, self.repos)
 

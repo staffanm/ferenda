@@ -64,7 +64,7 @@ class FulltextIndex(object):
     def make_schema(self, repos):
         s = self.get_default_schema()
         for repo in repos:
-            for fld, idxtype in repo.get_indexed_properties():
+            for fld, idxtype in repo.get_indexed_properties().items():
                 if fld in s:
                     # multiple repos can provide the same indexed
                     # properties ONLY if the indextype match
@@ -204,7 +204,11 @@ class FulltextIndex(object):
         """Given a fulltextindex native type, convert to the corresponding
         IndexedType object."""
         for abstractfield, nativefield in self.fieldmapping:
-            if fieldobject == nativefield:
+            # whoosh field objects do not implement __eq__ sanely --
+            # whoosh.fields.ID() == whoosh.fields.DATETIME() is true
+            # -- so we do an extra check on the type as well.
+            if (type(fieldobject) == type(nativefield) and
+                fieldobject == nativefield):
                 return abstractfield
         raise errors.SchemaMappingError("Native field %s cannot be mapped" % fieldobject)
 
@@ -275,19 +279,21 @@ class Resource(IndexedType):
     # foaf:name, skos:prefLabel etc
 
 class SearchModifier(object):
-    pass
-
+    def __init__(self, *values):
+        self.values = values
 
 class Less(SearchModifier):
-    pass
-
+    def __init__(self, max):
+        self.max = max
 
 class More(SearchModifier):
-    pass
-
+    def __init__(self, min):
+        self.min = min
 
 class Between(SearchModifier):
-    pass
+    def __init__(self, min, max):
+        self.min = min
+        self.max = max
 
 
 import whoosh.index
@@ -347,14 +353,22 @@ class WhooshIndex(FulltextIndex):
                     (Text(boost=4),   whoosh.fields.TEXT(field_boost=4, stored=True,
                                                            analyzer=whoosh.analysis.StemmingAnalyzer(
                                                            ))),
+                    (Text(boost=2),   whoosh.fields.TEXT(field_boost=2, stored=True,
+                                                           analyzer=whoosh.analysis.StemmingAnalyzer(
+                                                           ))),
                     (Text(),          whoosh.fields.TEXT(stored=True,
-                                                           analyzer=whoosh.analysis.StemmingAnalyzer()))
+                                                           analyzer=whoosh.analysis.StemmingAnalyzer())),
+                    (Datetime(),      whoosh.fields.DATETIME(stored=True)),
+                    (Boolean(),       whoosh.fields.BOOLEAN(stored=True)),
+                    (URI(),           whoosh.fields.ID(stored=True, field_boost=1.1)),
+                    (Keywords(),      whoosh.fields.KEYWORD(stored=True)),
+                    (Resource(),      whoosh.fields.IDLIST(stored=True, expression="\\|")),
                     )
 
     def __init__(self, location, repos):
-        super(WhooshIndex, self).__init__(location, repos)
-        self._schema = self.get_default_schema()
         self._writer = None
+        super(WhooshIndex, self).__init__(location, repos)
+        # self._schema = self.get_default_schema()
 
     def exists(self):
         return whoosh.index.exists_in(self.location)
@@ -365,10 +379,9 @@ class WhooshIndex(FulltextIndex):
     def create(self, repos):
         schema = self.make_schema(repos)
         whoosh_fields = {}
-        for key, fieldtype in self.get_default_schema().items():
+        for key, fieldtype in schema.items():
             whoosh_fields[key] = self.to_native_field(fieldtype)
 
-        # then do something smart with repos.
         schema = whoosh.fields.Schema(**whoosh_fields)
         util.mkdir(self.location)
         return whoosh.index.create_in(self.location, schema)
@@ -386,9 +399,14 @@ class WhooshIndex(FulltextIndex):
         if not self._writer:
             self._writer = self.index.writer()
 
-        # A whoosh document is not the same as a ferenda document. A
-        # ferenda document may be indexed as several (tens, hundreds
-        # or more) whoosh documents
+        # special-handling of the Resource type -- this is provided as
+        # a dict with 'iri' and 'label' keys, and we smash it into a
+        # pipe-separated tuple
+        for key in kwargs:
+            if isinstance(kwargs[key], dict):
+                kwargs[key] = "%s|%s" % (kwargs[key]['iri'],
+                                         kwargs[key]['label'])
+                
         self._writer.update_document(uri=uri,
                                      repo=repo,
                                      basefile=basefile,
@@ -413,6 +431,7 @@ class WhooshIndex(FulltextIndex):
 
     def query(self, q=None, pagenum=1, pagelen=10, **kwargs):
         searchfields = ['identifier', 'title', 'text']
+        # yeah, magic goes here...
         mparser = whoosh.qparser.MultifieldParser(searchfields,
                                                   self.index.schema)
         query = mparser.parse(q)
@@ -453,7 +472,7 @@ class RemoteIndex(FulltextIndex):
 
     def create(self, repos):
         relurl, payload = self._create_schema_payload(repos)
-        print("\ncreate: PUT %s\n%s\n" % (self.location + relurl, payload))
+        # print("\ncreate: PUT %s\n%s\n" % (self.location + relurl, payload))
         res = requests.put(self.location + relurl, payload)
         try:
             res.raise_for_status()
@@ -465,8 +484,8 @@ class RemoteIndex(FulltextIndex):
         res = requests.get(self.location + relurl)  # payload is
                                                     # probably never
                                                     # used
-        print("GET %s" % relurl)
-        print(json.dumps(res.json(), indent=4))
+        # print("GET %s" % relurl)
+        # print(json.dumps(res.json(), indent=4))
         return self._decode_schema(res)
 
 
@@ -522,7 +541,7 @@ class ElasticSearchIndex(RemoteIndex):
 
     # maps our field classes to concrete ES field properties
     fieldmapping = ((Identifier(),
-                     {"type": "string", "index": "not_analyzed"}),  # uri
+                     {"type": "string", "index": "not_analyzed", "store": True}),  # uri
                     (Label(),
                      {"type": "string", "index": "not_analyzed"}),  # repo, basefile
                     (Label(boost=16),
@@ -547,6 +566,12 @@ class ElasticSearchIndex(RemoteIndex):
                     )
 
     
+    def _jsondateencoder(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        else:
+            raise TypeError
+
     def commit(self):
         r = requests.post(self.location + "_refresh")
         r.raise_for_status()
@@ -559,11 +584,6 @@ class ElasticSearchIndex(RemoteIndex):
             return True
 
     def _update_payload(self, uri, repo, basefile, title, identifier, text, **kwargs):
-        def jsondateencoder(obj):
-            if isinstance(obj, datetime):
-                return obj.isoformat()
-            else:
-                raise TypeError
         safe = ''
         if six.PY2:
             # urllib.quote in python 2.6 cannot handle unicode values
@@ -588,38 +608,86 @@ class ElasticSearchIndex(RemoteIndex):
                    "identifier": identifier,
                    "text": text}
         payload.update(kwargs)
-        return relurl, json.dumps(payload, default=jsondateencoder)
+        return relurl, json.dumps(payload, default=self._jsondateencoder)
 
     def _query_payload(self, q, pagenum=1, pagelen=10, **kwargs):
 
         relurl = "_search?from=%s&size=%s" % ((pagenum - 1) * pagelen, pagelen)
 
-        # 1: Query on all specified fields (primarily to narrow search)
-        match = {}
+        # 1: Filter on all specified fields
+        filterterms = {}
         for k, v in kwargs.items():
-            match[k] = v
+            if isinstance(v, SearchModifier):
+                continue
+            if k == "repo":
+                k = "_type"
+            filterterms[k] = v
 
-        # 2: If freetext param given, search on that
+        # 2: Create filterranges if SearchModifier objects are used
+        filterranges = {}
+        for k, v in kwargs.items():
+            if not isinstance(v, SearchModifier):
+                continue
+            if isinstance(v, Less):
+                filterranges[k] = {"lt": v.max}
+            elif isinstance(v, More):
+                filterranges[k] = {"gt": v.min}
+            elif isinstance(v, Between):
+                filterranges[k] = {"lt": v.max,
+                                   "gt": v.min}
+
+        # 3: If freetext param given, search on that
+        match = {}
         if q:
-            # FIXME: Only searches in the 'text' field, not 'title' or
-            # 'identifier'. But can't search on the '_all' field,
-            # because apparently that field isn't set up to use the
-            # my_analyzer we've defined...
-            match['text'] = q
+            # NOTE: 
+            match['_all'] = q
+
+        if filterterms or filterranges:
+            query = {"filtered":
+                     {"filter": {}
+                      }
+                     }
+            if filterterms:
+                query["filtered"]["filter"]["term"] = filterterms
+            if filterranges:
+                query["filtered"]["filter"]["range"] = filterranges
+            if match:
+                query["filtered"]["query"] = {"match": match}
+        else:
+            query = {"match": match}
             
-        payload = {'query': {'match': match},
+        payload = {'query': query,
                    'highlight': {'fields': {'text': {}},
                                  'pre_tags': ["<strong class='match'>"],
                                  'post_tags': ["</strong>"],
                                  'fragment_size': '40'}
         }
-        return relurl, json.dumps(payload, indent=4)
+        # return relurl, json.dumps(payload, indent=4)
+        return relurl, json.dumps(payload, indent=4, default=self._jsondateencoder)
 
     def _decode_query_result(self, response, pagenum, pagelen):
-        json = response.json()
+        def date_hook(d):
+            # attempt to decode (a subset of) isoformatted datetimes
+            # ("2013-02-14T14:06:00"). Note that this will incorrectly
+            # decode anything that looks like a ISO date, even though
+            # it might be typed as a string. We have no typing
+            # information (at this stage -- we could look at
+            # self.schema() though)
+            for (key, value) in d.items():
+                #if isinstance(value, str) and len(value) != 19:
+                #    return d
+                try:
+                    d[key] = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")
+                except:
+                    pass
+            return d
+            
+        jsonresp = json.loads(response.text, object_hook=date_hook)
+
         res = []
-        for hit in json['hits']['hits']:
+        for hit in jsonresp['hits']['hits']:
             h = hit['_source']
+            h['repo'] = hit['_type']
             if 'highlight' in hit:
                 # wrap highlighted field in P, convert to
                 # elements. FIXME: should work for other fields than
@@ -629,10 +697,10 @@ class ElasticSearchIndex(RemoteIndex):
                 h['text'] = html.elements_from_soup(soup.html.body.p)
             res.append(h)
         pager = {'pagenum': pagenum,
-                 'pagecount': int(math.ceil(json['hits']['total'] / float(pagelen))),
+                 'pagecount': int(math.ceil(jsonresp['hits']['total'] / float(pagelen))),
                  'firstresult': (pagenum - 1) * pagelen + 1,
-                 'lastresult': (pagenum - 1) * pagelen + len(json['hits']['hits']),
-                 'totalresults': json['hits']['total']}
+                 'lastresult': (pagenum - 1) * pagelen + len(jsonresp['hits']['hits']),
+                 'totalresults': jsonresp['hits']['total']}
         return res, pager
 
     def _count_payload(self):
@@ -655,7 +723,7 @@ class ElasticSearchIndex(RemoteIndex):
         for typename, mapping in mappings.items():
             for fieldname, fieldobject in mapping["properties"].items():
                 schema[fieldname] = self.from_native_field(fieldobject)
-        schema["repo"] = 
+        schema["repo"] = self.get_default_schema()['repo']
         return schema
 
     # FIXME: For some reason, createing a schema/mapping makes PUTting
@@ -701,6 +769,7 @@ class ElasticSearchIndex(RemoteIndex):
                 es_fields[key] = self.to_native_field(fieldtype)
             # _source enabled so we can get the text back
             payload["mappings"][repo.alias] = {"_source": {"enabled": True},
+                                               "_all": {"analyzer": "my_analyzer"},
                                                "properties": es_fields}
         return "", json.dumps(payload, indent=4)
 
