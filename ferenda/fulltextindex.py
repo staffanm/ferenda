@@ -6,7 +6,7 @@ import math
 import re
 import shutil
 import sys
-from datetime import datetime
+from datetime import datetime, MAXYEAR, MINYEAR
 
 import six
 from six.moves.urllib_parse import quote
@@ -284,14 +284,17 @@ class SearchModifier(object):
 
 class Less(SearchModifier):
     def __init__(self, max):
+        super(Less, self).__init__(*[max])
         self.max = max
 
 class More(SearchModifier):
     def __init__(self, min):
+        super(More, self).__init__(*[min])
         self.min = min
 
 class Between(SearchModifier):
     def __init__(self, min, max):
+        super(Between, self).__init__(*[min, max])
         self.min = min
         self.max = max
 
@@ -362,7 +365,7 @@ class WhooshIndex(FulltextIndex):
                     (Boolean(),       whoosh.fields.BOOLEAN(stored=True)),
                     (URI(),           whoosh.fields.ID(stored=True, field_boost=1.1)),
                     (Keywords(),      whoosh.fields.KEYWORD(stored=True)),
-                    (Resource(),      whoosh.fields.IDLIST(stored=True, expression="\\|")),
+                    (Resource(),      whoosh.fields.IDLIST(stored=True)),
                     )
 
     def __init__(self, location, repos):
@@ -400,12 +403,12 @@ class WhooshIndex(FulltextIndex):
             self._writer = self.index.writer()
 
         # special-handling of the Resource type -- this is provided as
-        # a dict with 'iri' and 'label' keys, and we smash it into a
-        # pipe-separated tuple
+        # a dict with 'iri' and 'label' keys, and we flatten it to a
+        # 2-element list
         for key in kwargs:
             if isinstance(kwargs[key], dict):
-                kwargs[key] = "%s|%s" % (kwargs[key]['iri'],
-                                         kwargs[key]['label'])
+                kwargs[key] = [kwargs[key]['iri'],
+                               kwargs[key]['label']]
                 
         self._writer.update_document(uri=uri,
                                      repo=repo,
@@ -430,11 +433,57 @@ class WhooshIndex(FulltextIndex):
         return self.index.doc_count()
 
     def query(self, q=None, pagenum=1, pagelen=10, **kwargs):
-        searchfields = ['identifier', 'title', 'text']
-        # yeah, magic goes here...
-        mparser = whoosh.qparser.MultifieldParser(searchfields,
+        # 1: Filter on all specified fields (exact or by using ranges)
+        filter = []
+        for k, v in kwargs.items():
+            if isinstance(v, SearchModifier):
+                # Create a Range query
+                if isinstance(v.values[0], datetime):
+                    cls = whoosh.query.DateRange
+                    max = datetime(MAXYEAR, 12, 31)
+                    min = datetime(MINYEAR, 1, 1)
+                else:
+                    cls = whoosh.query.NumericRange
+                    max = datetime(2**31)
+                    min = datetime(0)
+                if isinstance(v, Less):
+                    start = min
+                    end = v.max
+                elif isinstance(v, More):
+                    start = v.min
+                    end = max
+                elif isinstance(v, Between):
+                    start = v.min
+                    end = v.max
+                filter.append(cls(k, start, end))
+            else:
+                # exact field match
+                # 
+                # Things to handle: Keyword, Boolean, Resource (must
+                # be able to match on iri only)
+                filter.append(whoosh.query.Term(k, v))
+
+        # 3: If freetext param given, query on that
+        freetext = None
+        if q:
+            # yeah, magic goes here...
+            searchfields = []
+            for fldname, fldtype in self.index.schema.items():
+                if isinstance(fldtype, whoosh.fields.TEXT):
+                    searchfields.append(fldname)
+            mparser = whoosh.qparser.MultifieldParser(searchfields,
                                                   self.index.schema)
-        query = mparser.parse(q)
+            freetext = mparser.parse(q)
+
+        if filter:
+            if freetext:
+                filter.append(freetext)
+            query = whoosh.query.And(filter)
+        elif freetext:
+            query = freetext
+        else:
+            raise ValueError("Neither q or kwargs specified")
+
         with self.index.searcher() as searcher:
             page = searcher.search_page(query, pagenum, pagelen)
             res = self._convert_result(page)
@@ -450,10 +499,22 @@ class WhooshIndex(FulltextIndex):
         # list of dicts
         l = []
         hl = whoosh.highlight.Highlighter(formatter=ElementsFormatter())
+        resourcefields = []
+        for key, fldobj in self.schema().items():
+            if isinstance(fldobj, Resource):
+                resourcefields.append(key)
+
         for hit in res:
             fields = hit.fields()
-            fields['text'] = hl.highlight_hit(hit, "text", fields['text'])
-            l.append(hit.fields())
+            highlighted = hl.highlight_hit(hit, "text", fields['text'])
+            if highlighted:
+                fields['text'] = highlighted
+            # de-marschal Resource objects from list to dict
+            for key in resourcefields:
+                if key in fields:
+                    fields[key] = {'iri': fields[key][0],
+                                   'label': fields[key][1]}
+            l.append(fields)
         return l
 
 # Base class for a HTTP-based API (eg. ElasticSearch) the base class
