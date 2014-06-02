@@ -77,6 +77,7 @@ class FulltextIndex(object):
     def get_default_schema(self):
         return {'uri': Identifier(),
                 'repo': Label(),
+                'rdftype': Label(),
                 'basefile': Label(),
                 'title': Text(boost=4),
                 'identifier': Label(boost=16),

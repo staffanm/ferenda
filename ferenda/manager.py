@@ -523,10 +523,6 @@ def make_wsgi_app(inifile=None, **kwargs):
         elif (path.startswith(args['apiendpoint']) or
               (legacyapi and path.startswith("/-/publ"))):
             return _wsgi_api(environ, start_response, args)
-        # don't know if this is sensible -- might prefer that all
-        # these resources are under apiendpoint
-        elif path.startswith("/json-ld/") or path.startswith("/var/"):
-            return _wsgi_api_static(environ, start_response, args)
         else:
             return _wsgi_static(environ, start_response, args)
     return app
@@ -731,7 +727,7 @@ def _wsgi_stats(repos, rooturl):
                         # "http://localhost:8000/a", which the SPA js will
                         # try to look up, fail and fall back on the URI
                         # leaf => "a"
-                        observation = {"ref": rooturl+page.value}
+                        observation = {"ref": rooturl+"/"+page.value}
                     else:
                         observation = {"value": page.value}
                 observation["count"] = len(selected[(page.binding,page.value)])
@@ -855,6 +851,7 @@ def _wsgi_static(environ, start_response, args):
     """WSGI method, called by the wsgi app for all other requests not handled
     by :py:func:`~ferenda.Manager.search` or :py:func:`~ferenda.Manager.api`"""
 
+    legacyapi = True
     fullpath = args['documentroot'] + environ['PATH_INFO']
     # we should start by asking all repos "do you handle this path"?
     # default impl is to say yes if 1st seg == self.alias and the rest
@@ -870,7 +867,16 @@ def _wsgi_static(environ, start_response, args):
                       406: "406 Not Acceptable"}[status]
             iterdata = FileWrapper(fp)
             break
+    # no repo handled the path
     if not fp:
+        if legacyapi: # rewrite the path to some resources. FIXME:
+                      # shouldn't hardcode the "rsrc" path of the path
+            if environ['PATH_INFO'] == "/json-ld/context.json":
+                fullpath = args['documentroot'] + "/rsrc/api/context.json"
+            elif environ['PATH_INFO'] == "/var/terms":
+                fullpath = args['documentroot'] + "/rsrc/api/terms.json"
+            elif environ['PATH_INFO'] == "/var/common":
+                fullpath = args['documentroot'] + "/rsrc/api/common.json"
         if os.path.isdir(fullpath):
             fullpath = fullpath + "index.html"
         if os.path.exists(fullpath):

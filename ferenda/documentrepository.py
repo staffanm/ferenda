@@ -1425,7 +1425,7 @@ with the *config* object as single parameter.
 
             self.relate_dependencies(basefile, otherrepos)
             if self.config.fulltextindex:
-                self.relate_fulltext(basefile)
+                self.relate_fulltext(basefile, otherrepos)
 
     def _get_triplestore(self, **kwargs):
         if not hasattr(self, '_triplestore'):
@@ -1455,14 +1455,12 @@ with the *config* object as single parameter.
             data = open(self.store.distilled_path(basefile), "rb").read()
             ts.add_serialized(data, format="xml", context=self.dataset_uri())
 
-    def _get_fulltext_indexer(self, batchoptimize=False):
+    def _get_fulltext_indexer(self, repos, batchoptimize=False):
         if not hasattr(self, '_fulltextindexer'):
 
             idx = FulltextIndex.connect(self.config.indextype,
                                         self.config.indexlocation,
-                                        repos=[])  # FIXME: need a
-                                                   # real list of
-                                                   # repos
+                                        repos=repos)
             self._fulltextindexer = idx
 
             # The batchwriter functionality seems a litte broken --
@@ -1529,7 +1527,7 @@ parsed document path to that documents dependency file."""
 
         return not present  # return True if we added something, False otherwise
 
-    def relate_fulltext(self, basefile):
+    def relate_fulltext(self, basefile, repos):
         """Index the text of the document into fulltext index.
         
         :param basefile: The basefile for the document to be indexed.
@@ -1541,12 +1539,12 @@ parsed document path to that documents dependency file."""
                   'words': 0}
         with util.logtime(self.log.debug,
                           "%(basefile)s: Added %(resources)s resources (%(words)s words) to fulltext index in %(elapsed).3f s", values):
-            indexer = self._get_fulltext_indexer()
+            indexer = self._get_fulltext_indexer(repos)
             tree = etree.parse(self.store.parsed_path(basefile))
             g = Graph()
             desc = Describer(g.parse(data=util.readfile(self.store.distilled_path(basefile))))
             dct = self.ns['dct']
-
+            RDF = self.ns['rdf']
             body = tree.find(".//{http://www.w3.org/1999/xhtml}body")
             for resource in [body] + body.findall(".//*[@about]"):
                 if resource.tag == "{http://www.w3.org/1999/xhtml}head":
@@ -1563,8 +1561,12 @@ parsed document path to that documents dependency file."""
                 title = str(l[0]) if l else None
                 l = desc.getvalues(dct.identifier)
                 identifier = str(l[0]) if l else None
+                from pudb import set_trace; set_trace()
+                l = desc.getrels(RDF.type)
+                rdftype = str(l[0]) if l else None
                 indexer.update(uri=about,
                                repo=repo,
+                               rdftype=rdftype,
                                basefile=basefile,
                                title=title,
                                identifier=identifier,
