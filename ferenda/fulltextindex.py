@@ -55,7 +55,6 @@ class FulltextIndex(object):
             #     # here's where we put clever migration code
             #     raise errors.SchemaConflictError("The needed schema isn't identical to the existing schema")
         else:
-            # self.index = self.create(self.make_schema(repos))
             self.index = self.create(repos)
 
     def __del__(self):

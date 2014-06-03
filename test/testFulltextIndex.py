@@ -16,7 +16,7 @@ from ferenda.compat import patch, Mock, unittest
 from ferenda.testutil import FerendaTestCase
 
 # SUT
-from ferenda import FulltextIndex
+from ferenda import FulltextIndex, DocumentRepository
 from ferenda import fulltextindex 
 from integrationFulltextIndex import WhooshBasicIndex, WhooshBasicQuery
 from integrationFulltextIndex import BasicIndex, BasicQuery, ESBase
@@ -74,10 +74,10 @@ class MockESBase(ESBase):
         mock_requests.get.side_effect = can
 
         can = canned((200, "create.json"),
-                     create=CREATE_CANNED, method="post")
+                     create=CREATE_CANNED, method="put")
         mock_requests.put.side_effect = can
         self.location = "http://localhost:9200/ferenda/"
-        self.index = FulltextIndex.connect("ELASTICSEARCH", self.location, [])
+        self.index = FulltextIndex.connect("ELASTICSEARCH", self.location, [DocumentRepository()])
 
     @patch('ferenda.fulltextindex.requests')
     def tearDown(self, mock_requests):

@@ -123,9 +123,9 @@ class BasicIndex(object):
     def test_create(self):
         # setUp calls FulltextIndex.connect, creating the index
         self.assertTrue(self.index.exists())
-
         # assert that the schema, using our types, looks OK
         want = {'uri':Identifier(),
+                'rdftype': Label(),
                 'repo':Label(),
                 'basefile':Label(),
                 'title':Text(boost=4),
@@ -349,6 +349,7 @@ class WhooshBasicIndex(BasicIndex, WhooshBase):
         want = whoosh.fields.Schema(uri=whoosh.fields.ID(unique=True, stored=True),
                                     repo=whoosh.fields.ID(stored=True),
                                     basefile=whoosh.fields.ID(stored=True),
+                                    rdftype=whoosh.fields.ID(stored=True),
                                     title=whoosh.fields.TEXT(field_boost=4,stored=True),
                                     identifier=whoosh.fields.ID(field_boost=16,stored=True),
                                     text=whoosh.fields.TEXT(stored=True))

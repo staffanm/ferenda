@@ -1527,7 +1527,7 @@ parsed document path to that documents dependency file."""
 
         return not present  # return True if we added something, False otherwise
 
-    def relate_fulltext(self, basefile, repos):
+    def relate_fulltext(self, basefile, repos=None):
         """Index the text of the document into fulltext index.
         
         :param basefile: The basefile for the document to be indexed.
@@ -1539,6 +1539,8 @@ parsed document path to that documents dependency file."""
                   'words': 0}
         with util.logtime(self.log.debug,
                           "%(basefile)s: Added %(resources)s resources (%(words)s words) to fulltext index in %(elapsed).3f s", values):
+            if repos is None:
+                repos = []
             indexer = self._get_fulltext_indexer(repos)
             tree = etree.parse(self.store.parsed_path(basefile))
             g = Graph()
@@ -1561,7 +1563,6 @@ parsed document path to that documents dependency file."""
                 title = str(l[0]) if l else None
                 l = desc.getvalues(dct.identifier)
                 identifier = str(l[0]) if l else None
-                from pudb import set_trace; set_trace()
                 l = desc.getrels(RDF.type)
                 rdftype = str(l[0]) if l else None
                 indexer.update(uri=about,

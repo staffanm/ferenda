@@ -1076,19 +1076,27 @@ class Repo(RepoTester):
 
         with patch.object(WhooshIndex,'update') as mock_method:
             d.relate_fulltext("123/a")
-            calls = [call(title='Example', basefile='123/a',
+            calls = [call(title='Example',
+                          rdftype='http://purl.org/ontology/bibo/Standard',
+                          basefile='123/a',
                           uri='http://example.org/base/123/a', repo='base',
                           text='This is part of the main document, but not of any sub-resource. This is the tail end of the main document ',
                           identifier='123(A)'),
-                     call(title='Introduction', basefile='123/a',
+                     call(title='Introduction',
+                          rdftype='http://purl.org/ontology/bibo/DocumentPart',
+                          basefile='123/a',
                           uri='http://example.org/base/123/a#S1', repo='base',
                           text='This is part of document-part section 1 ',
                           identifier='123(A)\xb61'),  # \xb6 = Pilcrow 
-                     call(title='Requirements Language', basefile='123/a',
+                     call(title='Requirements Language',
+                          rdftype='http://purl.org/ontology/bibo/DocumentPart',
+                          basefile='123/a',
                           uri='http://example.org/base/123/a#S1.1', repo='base',
                           text='This is the text in subsection 1.1 ',
                           identifier='123(A)\xb61.1'),
-                     call(title='Definitions and Abbreviations', basefile='123/a',
+                     call(title='Definitions and Abbreviations',
+                          rdftype='http://purl.org/ontology/bibo/DocumentPart',
+                          basefile='123/a',
                           uri='http://example.org/base/123/a#S2', repo='base',
                           text='This is the second main document part ',
                           identifier='123(A)\xb62')]

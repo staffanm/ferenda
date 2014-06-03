@@ -693,12 +693,17 @@ def _wsgi_stats(repos, rooturl):
     res = {"type": "DataSet",
            "slices" : []
     }
+    # this is wrong: we should mash together similarly-named
+    # dimensions/criteria from different repos (eg rdf:type,
+    # dct:title, dct:issued)
     for repo in repos:
+        from pudb import set_trace; set_trace()
         data = repo.toc_select(repo.dataset_uri())
         criteria = repo.toc_criteria(repo.toc_predicates())
         pagesets = repo.toc_pagesets(data, criteria)
         selected = repo.toc_select_for_pages(data, pagesets, criteria)
         for pageset in pagesets:
+            from pudb import set_trace; set_trace()
             slice = {"dimension": util.uri_leaf(str(pageset.predicate)),
                      "observations": []}
             for page in pageset.pages:
