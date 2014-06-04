@@ -244,6 +244,9 @@ class W3Standards(DocumentRepository):
                 editor_name = editor_string.split(", ")[0]
                 d.value(dct.editor, editor_name)
 
+        # dct:publisher
+        d.rel(dct.publisher, "http://localhost:8000/ext/w3c")
+
         # assure we got exactly one of each of the required properties
         for required in (dct.title, dct.issued):
             d.getvalue(required)  # throws KeyError if not found (or more than one)

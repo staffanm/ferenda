@@ -611,26 +611,38 @@ class RFC(DocumentRepository):
     def toc_predicates(self):
         return [self.ns['dct'].identifier,
                 self.ns['dct'].title,
+                self.ns['dct'].publisher,
                 self.ns['dct'].issued,
                 self.ns['dct'].subject]
 
     def toc_criteria(self, predicates=None):
         from ferenda import TocCriteria
-
+        DCT = self.ns['dct']
         return [TocCriteria(binding='identifier',
                             label='Sorted by RFC #',
                             pagetitle='RFCs %(select)s--99',
                             selector=lambda x: x['identifier'][4:-2] + "00",  # "RFC 6998" => "69"
                             key=lambda x: int(x['identifier'][4:]),
                             selector_descending=True,
-                            key_descending=True),   # "RFC 6998" => 6998
+                            key_descending=True,
+                            predicate=DCT.identifier),   # "RFC 6998" => 6998
 
                 TocCriteria(binding='title',
                             label='Sorted by title',
                             pagetitle='Documents starting with "%(select)s"',
                             # "The 'view-state'" property => "v"
                             selector=lambda x: util.title_sortkey(x['title'])[0],
-                            key=lambda x: util.title_sortkey(x['title'])),
+                            key=lambda x: util.title_sortkey(x['title']),
+                            predicate=DCT.title),
+
+                TocCriteria(binding='publisher',
+                            label='Sorted by stream',
+                            pagetitle='Documents in the %(select)s stream',
+                            selector=lambda x: x['publisher'],  # Must convert this URI to label (here or in the query)
+                            key=lambda x: x['publisher'],
+                            selector_descending=True,
+                            key_descending=True,
+                            predicate=DCT.publisher),
 
                 TocCriteria(binding='issued',
                             label='Sorted by year',
@@ -638,15 +650,17 @@ class RFC(DocumentRepository):
                             selector=lambda x: x['issued'][:4],  # '2013-08-01' => '2013'
                             key=lambda x: x['issued'],
                             selector_descending=True,
-                            key_descending=True),
+                            key_descending=True,
+                            predicate=DCT.issued),
 
                 TocCriteria(binding='subject',
                             label='Sorted by category',
                             pagetitle='Documents in the %(select)s category',
                             selector=lambda x: x['subject'],
                             key=lambda x: int(x['identifier'][4:]),
-                            key_descending=True
-                            )]
+                            key_descending=True,
+                            predicate=DCT.subject)
+            ]
 
     def toc_item(self, binding, row):
         return [row['identifier'] + ": ",

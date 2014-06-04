@@ -697,15 +697,25 @@ def _wsgi_stats(repos, rooturl):
     # dimensions/criteria from different repos (eg rdf:type,
     # dct:title, dct:issued)
     for repo in repos:
-        from pudb import set_trace; set_trace()
         data = repo.toc_select(repo.dataset_uri())
         criteria = repo.toc_criteria(repo.toc_predicates())
         pagesets = repo.toc_pagesets(data, criteria)
         selected = repo.toc_select_for_pages(data, pagesets, criteria)
         for pageset in pagesets:
-            from pudb import set_trace; set_trace()
-            slice = {"dimension": util.uri_leaf(str(pageset.predicate)),
-                     "observations": []}
+            dimensionlabel = util.uri_leaf(str(pageset.predicate))
+            if not dimensionlabel:
+                dimensionlabel = criteria.binding
+
+            # look for a slice with a identically-named dimensionlabel
+            for slice in res["slices"]:
+                if slice["dimension"] == dimensionlabel:
+                    break
+            else:
+                # not found -- create a new slice and append it to the
+                # final result
+                slice = {"dimension": dimensionlabel,
+                         "observations": []}
+                res["slices"].append(slice)
             for page in pageset.pages:
                 # page.value should be mapped to either "term" (a
                 # ontology-defined term, typically a rdf:type value),
@@ -720,24 +730,35 @@ def _wsgi_stats(repos, rooturl):
                 # time what sort of data page.binding refers to
                 # (rdftype, uriref, literal of type date(time) or
                 # plain literal). We guess based on the binding name.
+                observation_value = page.value
                 if page.binding in ("issued"):
-                    observation = {"year": page.value}
+                    observation_type = "year"
                 elif page.binding in ("type"):
-                    observation = {"term": page.value}
+                    observation_type = "term"
                 elif page.binding in ("publisher"):
-                    observation = {"ref": page.value}
+                    observation_type = "ref"
                 else:
                     if legacyapi:
                         # eg page.value = "a", this'll create the url
                         # "http://localhost:8000/a", which the SPA js will
                         # try to look up, fail and fall back on the URI
                         # leaf => "a"
-                        observation = {"ref": rooturl+"/"+page.value}
+                        observation_type = "ref"
+                        observation_value = rooturl+"/"+page.value
                     else:
-                        observation = {"value": page.value}
-                observation["count"] = len(selected[(page.binding,page.value)])
-                slice["observations"].append(observation)
-            res["slices"].append(slice)
+                        observation_type = "value"
+
+                # find or create a similarly-valued observation
+                for observation in slice["observations"]:
+                    if observation.get(observation_type) == observation_value:
+                        break
+                else:
+                    observation = {observation_type: observation_value,
+                                   "count": 0}
+                    slice["observations"].append(observation)
+
+                observation["count"] += len(selected[(page.binding,page.value)])
+
     return res
             
 def _wsgi_query(environ, start_response, args):

@@ -1,0 +1,8 @@
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<http://localhost:8000/ext/w3c> a foaf:Organization;
+     foaf:name "World Wide Web Consortium";
+     skos:altLabel "W3C"; # or foaf:nick
+     foaf:homepage <http://www.w3c.org/> .
+
