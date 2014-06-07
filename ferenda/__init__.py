@@ -21,5 +21,6 @@ from .documentstore import DocumentStore
 from .documentrepository import DocumentRepository
 from .pdfdocumentrepository import PDFDocumentRepository
 from .compositerepository import CompositeRepository, CompositeStore
+from .facet import Facet
 # when REST API lands, we update to dev2
 __version__ = "0.2.0.dev2" #gets pulled into setup.py and docs/conf.py

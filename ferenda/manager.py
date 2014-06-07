@@ -199,10 +199,10 @@ def makeresources(repos,
         if hasattr(inst, 'tabs'):
             for tab in inst.tabs():
                 if not tab in sitetabs:
-                    (label, url) = tab
+                    (label, taburl) = tab
                     alias = inst.alias
                     log.debug(
-                        "Adding tab %(label)s (%(url)s) from docrepo %(alias)s" % locals())
+                        "Adding tab %(label)s (%(taburl)s) from docrepo %(alias)s" % locals())
                     sitetabs.append(tab)
 
     for tab in sitetabs:
@@ -219,10 +219,10 @@ def makeresources(repos,
         if hasattr(inst, 'footer'):
             for link in inst.footer():
                 if not link in sitefooter:
-                    (label, url) = link
+                    (label, linkurl) = link
                     alias = inst.alias
                     log.debug(
-                        "Adding footer link %(label)s (%(url)s) from docrepo %(alias)s" % locals())
+                        "Adding footer link %(label)s (%(linkurl)s) from docrepo %(alias)s" % locals())
                     sitefooter.append(link)
 
     for text, href in sitefooter:
@@ -329,6 +329,7 @@ def _create_api_files(repos, resourcedir, uri):
                 json.dump(d, fp, indent=4, sort_keys=True)
         files.append(_filepath_to_urlpath(filename, 2))
     return {'json': files}
+
 def _process_file(filename, buf, destdir, origin="", combine=False):
     """
     Helper function to concatenate or copy CSS/JS (optionally
@@ -562,6 +563,7 @@ def _convert_legacy_jsonld(indata, rooturi):
     return out
     
 def _get_json_context(repos):
+    legacyapi = True
     data = {}
     # step 1: define all prefixes
     for repo in repos:
@@ -571,8 +573,15 @@ def _get_json_context(repos):
             else:
                 data[prefix] = str(ns)
 
-    data['iri'] = "@id"
-    data['type'] = "@type"
+    # the legacy api client expects some terms to be available using
+    # shortened forms (eg 'label' instead of 'rdfs:label'), so we must
+    # define this in the context
+    if legacyapi:
+        data['iri'] = "@id"
+        data['type'] = "@type"
+        data['label'] = 'rdfs:label'
+        data['name'] = 'foaf:name'
+        data['altLabel'] = 'skos:altLabel'
     # data["@language"] = "en" # maybe?
     return data
 
@@ -598,8 +607,8 @@ def _get_json_context(repos):
 #                     # find out if this property (or class?) has a
 #                     # rdfs:range, ie if we can assume that all
 #                     # instances of this property have a given datatype
-#                     # (note that the dcterms ontology at
-#                     # http://dublincore.org/2012/06/14/dcterms.ttl
+#                     # (note that the dct ontology at
+#                     # http://dublincore.org/2012/06/14/dct.ttl
 #                     # defines dct:issued and dct:modified as having
 #                     # the range rdfs:Literal, where we'd prefer the
 #                     # range xsd:date. But you know, sometimes it might
@@ -697,6 +706,7 @@ def _wsgi_stats(repos, rooturl):
     # dimensions/criteria from different repos (eg rdf:type,
     # dct:title, dct:issued)
     for repo in repos:
+        qname_graph = repo.make_graph() # only ever used to map URIs to qnames
         data = repo.toc_select(repo.dataset_uri())
         criteria = repo.toc_criteria(repo.toc_predicates())
         pagesets = repo.toc_pagesets(data, criteria)
@@ -735,6 +745,7 @@ def _wsgi_stats(repos, rooturl):
                     observation_type = "year"
                 elif page.binding in ("type"):
                     observation_type = "term"
+                    observation_value = qname_graph.qname(URIRef(page.value))
                 elif page.binding in ("publisher"):
                     observation_type = "ref"
                 else:
@@ -761,19 +772,67 @@ def _wsgi_stats(repos, rooturl):
 
     return res
             
-def _wsgi_query(environ, start_response, args):
-    path = environ['PATH_INFO']
+def _wsgi_query(environ, args):
+    def _elements_to_html(elements):
+        res = ""
+        for e in elements:
+            if isinstance(e, str):
+                res += e
+            else:
+                res += '<em class="match">%s</em>' % str(e)
+        return res
+            
     # given path=/-/publ?q=r%C3%A4tt*&publisher.iri=*%2Fregeringskansliet&_page=0&_pageSize=10
     # 1. extract {'q':'rätt*',
     #             'publisher.iri'='*/regeringskansliet',
     #             '_page':0,
     #             '_pageSize':10}
-    # 2. call fulltextindex.query(q='rätt*', pagenum=1, pagelen=10, publisher='*/regeringskansliet')
-    # (nb: this presumes that we've indexed more than just basefile, title, identifier, text -- we need to index
-    #  arbitrary parameters, controlled by each repo)
-    #
-    # 3. Convert the result to a json file (see qresults.json)
+    param = dict(parse_qsl(environ['QUERY_STRING']))
+    filtered = dict([(k,v) for k,v in param.items() if not (k.startswith("_") or k == "q")])
+
+    # 2. call fulltextindex.query(q='rätt*', pagenum=1, pagelen=10,
+    #                             publisher='*/regeringskansliet')
+    # (nb: this presumes that we've indexed more than just basefile,
+    #  title, identifier, text -- we need to index arbitrary
+    #  parameters, controlled by each repo)
+    idx = FulltextIndex.connect(args['repos'][0].config.indextype,
+                                args['repos'][0].config.indexlocation)
+    q= param['q'] if 'q' in param else None 
+    res, pager = idx.query(q=q,
+                           pagenum=int(param.get('_page', '0'))+1,
+                           pagelen=int(param.get('_pageSize', '10')),
+                           **filtered)
+
+    # 3. Mangle res into the expected JSON structure (see qresults.json)
+    mangled = []
+    for hit in res:
+        mangledhit = {}
+        for k, v in hit.items():
+            if k == "rdftype":
+                mangledhit["type"] = v
+            elif k == "text":
+                mangledhit["matches"] = {"text": _elements_to_html(hit["text"])}
+            elif k in ("basefile", "repo"):
+                pass
+            else:
+                mangledhit[k] = v
+        mangled.append(mangledhit)
+        # rdftype -> type
+        # text -> matches[text]
+        # basefile, repo -> None ?
+        # uri -> iri
     
+    res = {"startIndex": pager['firstresult'] - 1,
+           "itemsPerPage": int(param.get('_pageSize', '10')),
+           "totalResults": pager['totalresults'],
+           "duration": None, # none
+           "current": environ['PATH_INFO'] + "?" + environ['QUERY_STRING'],
+           "items": mangled}
+
+    # 4. add stats, maybe
+    if param.get("_stats") == "on":
+        res["stats"] = _wsgi_stats()
+    return res
 
         
 def _str(s, encoding="ascii"):
@@ -863,9 +922,9 @@ def _wsgi_api(environ, start_response, args):
     if path.endswith(";stats"):
         d = _wsgi_stats(args["repos"], args["url"])
     else:
-        d = dict((str(key), str(environ[key])) for key in environ.keys())
+        d = _wsgi_query(environ, args)
 
-    data = json.dumps(dict(d), indent=4).encode('utf-8')
+    data = json.dumps(dict(d), indent=4, sort_keys=True).encode('utf-8')
     start_response(_str("200 OK"), [
         (_str("Content-Type"), _str("application/json")),
         (_str("Content-Length"), _str(str(len(data))))

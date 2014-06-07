@@ -1,4 +1,4 @@
-@prefix : <http://localhost:8000/ontology/rfc#> .
+@prefix : <http://localhost:8000/ontology/rfc/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .

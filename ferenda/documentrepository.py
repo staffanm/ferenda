@@ -269,7 +269,7 @@ class DocumentRepository(object):
         if not hasattr(self, '_ontologies'):
             self._ontologies = Graph()
             for prefix, uri in self.ns.items():
-                if prefix in ("rdf", "rdfs", "owl"):
+                if prefix in ("rdf", "rdfs", "owl"): # , "foaf", "skos", "dct", "bibo", "prov"):
                     continue
                 ontopath = "res/vocab/%s.ttl" % prefix
                 fp = None
@@ -1572,12 +1572,22 @@ parsed document path to that documents dependency file."""
                                title=title,
                                identifier=identifier,
                                text=plaintext)
+                # publisher Resource
+                # issued datetime
+                # subject Resource
                 values['resources'] += 1
                 values['words'] += len(plaintext.split())
 
             indexer.commit()  # NB: Destroys indexer._writer
 
     def get_indexed_properties(self):
+        """Returns any extra properties that should be indexed by
+        fulltextindex 
+        eg. {"publisher": fulltextindex.Resource,
+             "issued": fulltextindex.Datetime, 
+             "subject": fulltextindex.Label
+            } # or .Resource
+        """
         return {}
 
     def _extract_plaintext(self, node):
@@ -1604,6 +1614,7 @@ parsed document path to that documents dependency file."""
 
     @classmethod
     def generate_all_setup(cls, config):
+
         """ 
         Runs any action needed prior to generating all documents in a
         docrepo. The default implementation does nothing.
@@ -1870,7 +1881,22 @@ parsed document path to that documents dependency file."""
     #
     #
 
+    # NEW WAY
+    # 
     # toc
+    #     toc_select
+    #         toc_query(facets)
+    #     toc_pagesets(facets)
+    #         (facets.selector)
+    #     toc_select_for_pages
+    #         (facets.keys)
+    #         toc_item
+    #     toc_generate_pages
+    #         toc_generate_page
+    #
+    # OLD WAY
+    # 
+    # toc 
     #     toc_select
     #         toc_query
     #              (toc_predicates ?)
@@ -1966,7 +1992,26 @@ parsed document path to that documents dependency file."""
         Example:
 
         >>> d = DocumentRepository()
-        >>> expected = 'PREFIX bibo: <http://purl.org/ontology/bibo/> PREFIX dct: <http://purl.org/dc/terms/> PREFIX foaf: <http://xmlns.com/foaf/0.1/> PREFIX owl: <http://www.w3.org/2002/07/owl#> PREFIX prov: <http://www.w3.org/ns/prov#> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX skos: <http://www.w3.org/2004/02/skos/core#> PREFIX xhv: <http://www.w3.org/1999/xhtml/vocab#> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> PREFIX xsi: <http://www.w3.org/2001/XMLSchema-instance> SELECT DISTINCT ?uri ?title ?publisher ?issued FROM <http://example.org/ctx/base> WHERE {?uri rdf:type foaf:Document ; dct:title ?title . OPTIONAL { ?uri dct:publisher ?publisher . } OPTIONAL { ?uri dct:issued ?issued . }  }'
+        >>> expected = \"""PREFIX bibo: <http://purl.org/ontology/bibo/>
+        ... PREFIX dct: <http://purl.org/dc/terms/>
+        ... PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+        ... PREFIX owl: <http://www.w3.org/2002/07/owl#>
+        ... PREFIX prov: <http://www.w3.org/ns/prov#>
+        ... PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        ... PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        ... PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+        ... PREFIX xhv: <http://www.w3.org/1999/xhtml/vocab#>
+        ... PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+        ... PREFIX xsi: <http://www.w3.org/2001/XMLSchema-instance>
+        ... 
+        ... SELECT DISTINCT ?uri ?type ?title ?publisher ?issued
+        ... FROM <http://example.org/ctx/base>
+        ... WHERE {
+        ...     ?uri rdf:type foaf:Document ; rdf:type ?type .
+        ...     OPTIONAL { ?uri dct:title ?title . }
+        ...     OPTIONAL { ?uri dct:publisher ?publisher . }
+        ...     OPTIONAL { ?uri dct:issued ?issued . }
+        ... }\"""
         >>> d.toc_query("http://example.org/ctx/base") == expected
         True
         """
@@ -1983,13 +2028,18 @@ parsed document path to that documents dependency file."""
                                                      g.qname(predicates[0]),
                                                      util.uri_leaf(predicates[0]))
         optclauses = "".join(
-            ["OPTIONAL { ?uri %s ?%s . } " % (g.qname(b), util.uri_leaf(b)) for b in predicates[1:]])
+            ["    OPTIONAL { ?uri %s ?%s . }\n" % (g.qname(b), util.uri_leaf(b)) for b in predicates[1:]])
 
         # FIXME: The above doctest looks like crap since all
         # registered namespaces in the repo is included. Should only
         # include prefixes actually used
-        prefixes = " ".join(["PREFIX %s: <%s>" % (p, u) for p, u in sorted(self.ns.items())])
-        query = "%s SELECT DISTINCT ?uri %s %s WHERE {%s . %s }" % (
+        prefixes = "".join(["PREFIX %s: <%s>\n" % (p, u) for p, u in sorted(self.ns.items())])
+        query = """%s
+SELECT DISTINCT ?uri %s
+%s
+WHERE {
+    %s .
+%s}""" % (
             prefixes, bindings, from_graph, whereclause, optclauses)
         return query
 
@@ -2026,6 +2076,12 @@ parsed document path to that documents dependency file."""
                 key = selector
                 label = 'Sorted by publisher'
                 pagetitle = 'Documents published by %(select)s'
+                selector_descending = False
+            elif predicate == self.ns['rdf'].type: # uriref
+                selector = lambda x: x['type']
+                key = selector
+                label = 'Sorted by document type'
+                pagetitle = 'Documents of type %(select)s'
                 selector_descending = False
             else:
                 # selector and key for proper title sort
@@ -2064,9 +2120,12 @@ parsed document path to that documents dependency file."""
         Is used by toc_criteria, must match results from sparql query
         in toc_query."""
 
-        return [self.ns['dct'].title,
-                self.ns['dct'].publisher,
-                self.ns['dct'].issued]
+        return [
+            self.ns['rdf'].type,
+            self.ns['dct'].title,
+            self.ns['dct'].publisher,
+            self.ns['dct'].issued
+        ]
 
     def toc_pagesets(self, data, criteria):
         """Calculate the set of needed TOC pages based on the result rows

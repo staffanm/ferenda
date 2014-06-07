@@ -4,7 +4,7 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix dct: <http://purl.org/dc/terms/> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .
-@prefix : <http://localhost:8000/ontology/rfc#> .
+@prefix : <http://localhost:8000/ontology/rfc/> .
 
 : a owl:Ontology . 
 

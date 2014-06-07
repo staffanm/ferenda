@@ -1,4 +1,4 @@
-# Automatically transformed from canonical source (https://raw.githubusercontent.com/rinfo/rdl/develop/resources/base/model/rinfo_publ.n3) at 2014-05-11T20:16:53.807917
+# Automatically transformed from canonical source (https://raw.githubusercontent.com/rinfo/rdl/develop/resources/base/model/rinfo_publ.n3) at 2014-06-05T09:51:33.927200
 
 @prefix : <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .

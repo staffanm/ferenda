@@ -2,11 +2,11 @@
     "type": "foaf:Document",
     "iri": "http://localhost:8000/var/common",
     "@context": "/json-ld/context.json",
-    "topic": [{"iri": "http://github.com/staffanm/#",
-               "skos:altLabel": "sma",
+    "topic": [{"altLabel": "sma",
+	       "iri": "http://github.com/staffanm/#",
                "skos:prefLabel": "Staffan Malmgren",
                "type": "foaf:Person"},
-              {"foaf:name": "Ferenda",
+              {"name": "Ferenda",
                "iri": "http://github.com/staffanm/ferenda",
                "type": "foaf:Project"}]
 }

@@ -39,6 +39,7 @@ class WSGI(RepoTester): # base class w/o tests
                     'PATH_INFO':   '/',
                     'SERVER_NAME': 'localhost',
                     'SERVER_PORT': '8000',
+                    'QUERY_STRING': '',
                     'wsgi.url_scheme': 'http'}
 
         self.put_files_in_place()
@@ -144,8 +145,14 @@ class API(WSGI):
                             {'Content-Type': 'application/json'},
                             None,
                             status, headers, content)
-        resp = json.loads(content.decode())
-        self.assertEqual(self.env, resp)
+        got = json.loads(content.decode())
+        want = {'current': '/myapi/?',
+                  'duration': None,
+                  'items': [],
+                  'itemsPerPage': 10,
+                  'startIndex': -10,
+                  'totalResults': 0}
+        self.assertEqual(want, got)
         
 class Runserver(WSGI):
     def test_make_wsgi_app_args(self):

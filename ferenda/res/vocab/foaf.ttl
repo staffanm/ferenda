@@ -1,4 +1,4 @@
-# Automatically transformed from canonical source (http://xmlns.com/foaf/0.1/) at 2014-05-11T20:16:50.892871
+# Automatically transformed from canonical source (http://xmlns.com/foaf/0.1/) at 2014-06-05T09:51:26.856610
 
 @prefix dc: <http://purl.org/dc/elements/1.1/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .

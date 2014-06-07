@@ -127,12 +127,12 @@ def render(f):
 
         # The act of parsing from RDFa binds a lot of namespaces
         # in the graph in an unneccesary manner. Particularly it
-        # binds both 'dc' and 'dcterms' to
+        # binds both 'dc' and 'dct' to
         # 'http://purl.org/dc/terms/', which makes serialization
         # less than predictable. Blow these prefixes away.
         distilled_graph.bind("dc", URIRef("http://purl.org/dc/elements/1.1/"))
         distilled_graph.bind(
-            "dcterms",
+            "dct",
             URIRef("http://example.org/this-prefix-should-not-be-used"))
 
         util.ensure_dir(self.store.distilled_path(doc.basefile))

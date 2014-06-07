@@ -1,4 +1,4 @@
-# Automatically transformed from canonical source (http://purl.org/ontology/bibo/) at 2014-05-11T20:16:49.422385
+# Automatically transformed from canonical source (http://purl.org/ontology/bibo/) at 2014-06-05T09:51:23.230743
 
 @prefix : <http://purl.org/ontology/bibo/> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .

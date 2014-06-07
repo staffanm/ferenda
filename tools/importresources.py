@@ -5,7 +5,7 @@ sys.path.append(os.getcwd())
 from datetime import datetime
 
 import rdflib
-from rdflib.namespace import SKOS, FOAF, OWL, DCTERMS
+from rdflib.namespace import SKOS, FOAF, OWL, DCT
 
 from ferenda import util
 
@@ -55,7 +55,7 @@ def import_dataset(filename, targetgraph):
             
         for (p, o) in sourcegraph.predicate_objects(subject=sourceuri):
             if not targetgraph.value(targeturi, p): # we don't know the value for this pred
-                if p == DCTERMS.publisher:
+                if p == DCT.publisher:
                     o = URIMAP[o] 
                 print("    Adding: %s %s %s" % (targeturi, sourcegraph.qname(p), o))
                 targetgraph.add((targeturi, p, o))

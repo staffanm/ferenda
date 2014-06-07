@@ -465,8 +465,9 @@ class WhooshIndex(FulltextIndex):
 
         # 3: If freetext param given, query on that
         freetext = None
-        if q:
-            # yeah, magic goes here...
+        if q or not kwargs:
+            if not q:
+                q = "*"
             searchfields = []
             for fldname, fldtype in self.index.schema.items():
                 if isinstance(fldtype, whoosh.fields.TEXT):

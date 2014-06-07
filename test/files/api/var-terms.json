@@ -9,7 +9,7 @@
         {
             "iri": "foaf:Agent",
             "rdfs:comment": "An agent (eg. person, group, software or physical artifact).",
-            "rdfs:label": "Agent",
+            "label": "Agent",
             "type": [
                 "owl:Class",
                 "rdfs:Class"
@@ -18,7 +18,7 @@
         {
             "iri": "foaf:Document",
             "rdfs:comment": "A document.",
-            "rdfs:label": "Document",
+            "label": "Document",
             "type": [
                 "owl:Class",
                 "rdfs:Class"
@@ -27,7 +27,7 @@
         {
             "iri": "foaf:Group",
             "rdfs:comment": "A class of Agents.",
-            "rdfs:label": "Group",
+            "label": "Group",
             "type": [
                 "owl:Class",
                 "rdfs:Class"
@@ -36,7 +36,7 @@
         {
             "iri": "foaf:Image",
             "rdfs:comment": "An image.",
-            "rdfs:label": "Image",
+            "label": "Image",
             "type": [
                 "owl:Class",
                 "rdfs:Class"
@@ -45,7 +45,7 @@
         {
             "iri": "foaf:LabelProperty",
             "rdfs:comment": "A foaf:LabelProperty is any RDF property with texual values that serve as labels.",
-            "rdfs:label": "Label Property",
+            "label": "Label Property",
             "type": [
                 "owl:Class",
                 "rdfs:Class"
@@ -54,7 +54,7 @@
         {
             "iri": "foaf:OnlineAccount",
             "rdfs:comment": "An online account.",
-            "rdfs:label": "Online Account",
+            "label": "Online Account",
             "type": [
                 "owl:Class",
                 "rdfs:Class"
@@ -63,7 +63,7 @@
         {
             "iri": "foaf:OnlineChatAccount",
             "rdfs:comment": "An online chat account.",
-            "rdfs:label": "Online Chat Account",
+            "label": "Online Chat Account",
             "type": [
                 "owl:Class",
                 "rdfs:Class"
@@ -72,7 +72,7 @@
         {
             "iri": "foaf:OnlineEcommerceAccount",
             "rdfs:comment": "An online e-commerce account.",
-            "rdfs:label": "Online E-commerce Account",
+            "label": "Online E-commerce Account",
             "type": [
                 "owl:Class",
                 "rdfs:Class"
@@ -81,7 +81,7 @@
         {
             "iri": "foaf:OnlineGamingAccount",
             "rdfs:comment": "An online gaming account.",
-            "rdfs:label": "Online Gaming Account",
+            "label": "Online Gaming Account",
             "type": [
                 "owl:Class",
                 "rdfs:Class"
@@ -90,7 +90,7 @@
         {
             "iri": "foaf:Organization",
             "rdfs:comment": "An organization.",
-            "rdfs:label": "Organization",
+            "label": "Organization",
             "type": [
                 "owl:Class",
                 "rdfs:Class"
@@ -99,7 +99,7 @@
         {
             "iri": "foaf:Person",
             "rdfs:comment": "A person.",
-            "rdfs:label": "Person",
+            "label": "Person",
             "type": [
                 "owl:Class",
                 "rdfs:Class"
@@ -108,7 +108,7 @@
         {
             "iri": "foaf:PersonalProfileDocument",
             "rdfs:comment": "A personal profile RDF document.",
-            "rdfs:label": "PersonalProfileDocument",
+            "label": "PersonalProfileDocument",
             "type": [
                 "owl:Class",
                 "rdfs:Class"
@@ -117,7 +117,7 @@
         {
             "iri": "foaf:Project",
             "rdfs:comment": "A project (a collective endeavour of some kind).",
-            "rdfs:label": "Project",
+            "label": "Project",
             "type": [
                 "owl:Class",
                 "rdfs:Class"
@@ -126,7 +126,7 @@
         {
             "iri": "foaf:account",
             "rdfs:comment": "Indicates an account held by this agent.",
-            "rdfs:label": "account",
+            "label": "account",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -135,7 +135,7 @@
         {
             "iri": "foaf:accountName",
             "rdfs:comment": "Indicates the name (identifier) associated with this online account.",
-            "rdfs:label": "account name",
+            "label": "account name",
             "type": [
                 "owl:DatatypeProperty",
                 "rdf:Property"
@@ -144,7 +144,7 @@
         {
             "iri": "foaf:accountServiceHomepage",
             "rdfs:comment": "Indicates a homepage of the service provide for this online account.",
-            "rdfs:label": "account service homepage",
+            "label": "account service homepage",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -153,7 +153,7 @@
         {
             "iri": "foaf:age",
             "rdfs:comment": "The age in years of some agent.",
-            "rdfs:label": "age",
+            "label": "age",
             "type": [
                 "owl:DatatypeProperty",
                 "owl:FunctionalProperty",
@@ -163,7 +163,7 @@
         {
             "iri": "foaf:aimChatID",
             "rdfs:comment": "An AIM chat ID",
-            "rdfs:label": "AIM chat ID",
+            "label": "AIM chat ID",
             "type": [
                 "owl:DatatypeProperty",
                 "owl:InverseFunctionalProperty",
@@ -173,7 +173,7 @@
         {
             "iri": "foaf:based_near",
             "rdfs:comment": "A location that something is based near, for some broadly human notion of near.",
-            "rdfs:label": "based near",
+            "label": "based near",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -182,7 +182,7 @@
         {
             "iri": "foaf:birthday",
             "rdfs:comment": "The birthday of this Agent, represented in mm-dd string form, eg. '12-31'.",
-            "rdfs:label": "birthday",
+            "label": "birthday",
             "type": [
                 "owl:DatatypeProperty",
                 "owl:FunctionalProperty",
@@ -192,7 +192,7 @@
         {
             "iri": "foaf:currentProject",
             "rdfs:comment": "A current project this person works on.",
-            "rdfs:label": "current project",
+            "label": "current project",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -201,7 +201,7 @@
         {
             "iri": "foaf:depiction",
             "rdfs:comment": "A depiction of some thing.",
-            "rdfs:label": "depiction",
+            "label": "depiction",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -210,7 +210,7 @@
         {
             "iri": "foaf:depicts",
             "rdfs:comment": "A thing depicted in this representation.",
-            "rdfs:label": "depicts",
+            "label": "depicts",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -219,7 +219,7 @@
         {
             "iri": "foaf:dnaChecksum",
             "rdfs:comment": "A checksum for the DNA of some thing. Joke.",
-            "rdfs:label": "DNA checksum",
+            "label": "DNA checksum",
             "type": [
                 "owl:DatatypeProperty",
                 "rdf:Property"
@@ -228,7 +228,7 @@
         {
             "iri": "foaf:familyName",
             "rdfs:comment": "The family name of some person.",
-            "rdfs:label": "familyName",
+            "label": "familyName",
             "type": [
                 "owl:DatatypeProperty",
                 "rdf:Property"
@@ -237,7 +237,7 @@
         {
             "iri": "foaf:family_name",
             "rdfs:comment": "The family name of some person.",
-            "rdfs:label": "family_name",
+            "label": "family_name",
             "type": [
                 "owl:DatatypeProperty",
                 "rdf:Property"
@@ -246,7 +246,7 @@
         {
             "iri": "foaf:firstName",
             "rdfs:comment": "The first name of a person.",
-            "rdfs:label": "firstName",
+            "label": "firstName",
             "type": [
                 "owl:DatatypeProperty",
                 "rdf:Property"
@@ -255,7 +255,7 @@
         {
             "iri": "foaf:focus",
             "rdfs:comment": "The underlying or 'focal' entity associated with some SKOS-described concept.",
-            "rdfs:label": "focus",
+            "label": "focus",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -264,7 +264,7 @@
         {
             "iri": "foaf:fundedBy",
             "rdfs:comment": "An organization funding a project or person.",
-            "rdfs:label": "funded by",
+            "label": "funded by",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -273,7 +273,7 @@
         {
             "iri": "foaf:geekcode",
             "rdfs:comment": "A textual geekcode for this person, see http://www.geekcode.com/geek.html",
-            "rdfs:label": "geekcode",
+            "label": "geekcode",
             "type": [
                 "owl:DatatypeProperty",
                 "rdf:Property"
@@ -282,7 +282,7 @@
         {
             "iri": "foaf:gender",
             "rdfs:comment": "The gender of this Agent (typically but not necessarily 'male' or 'female').",
-            "rdfs:label": "gender",
+            "label": "gender",
             "type": [
                 "owl:DatatypeProperty",
                 "owl:FunctionalProperty",
@@ -292,7 +292,7 @@
         {
             "iri": "foaf:givenName",
             "rdfs:comment": "The given name of some person.",
-            "rdfs:label": "Given name",
+            "label": "Given name",
             "type": [
                 "owl:DatatypeProperty",
                 "rdf:Property"
@@ -301,7 +301,7 @@
         {
             "iri": "foaf:givenname",
             "rdfs:comment": "The given name of some person.",
-            "rdfs:label": "Given name",
+            "label": "Given name",
             "type": [
                 "owl:DatatypeProperty",
                 "rdf:Property"
@@ -310,7 +310,7 @@
         {
             "iri": "foaf:holdsAccount",
             "rdfs:comment": "Indicates an account held by this agent.",
-            "rdfs:label": "account",
+            "label": "account",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -319,7 +319,7 @@
         {
             "iri": "foaf:homepage",
             "rdfs:comment": "A homepage for some thing.",
-            "rdfs:label": "homepage",
+            "label": "homepage",
             "type": [
                 "owl:InverseFunctionalProperty",
                 "owl:ObjectProperty",
@@ -329,7 +329,7 @@
         {
             "iri": "foaf:icqChatID",
             "rdfs:comment": "An ICQ chat ID",
-            "rdfs:label": "ICQ chat ID",
+            "label": "ICQ chat ID",
             "type": [
                 "owl:DatatypeProperty",
                 "owl:InverseFunctionalProperty",
@@ -339,7 +339,7 @@
         {
             "iri": "foaf:img",
             "rdfs:comment": "An image that can be used to represent some thing (ie. those depictions which are particularly representative of something, eg. one's photo on a homepage).",
-            "rdfs:label": "image",
+            "label": "image",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -348,7 +348,7 @@
         {
             "iri": "foaf:interest",
             "rdfs:comment": "A page about a topic of interest to this person.",
-            "rdfs:label": "interest",
+            "label": "interest",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -357,7 +357,7 @@
         {
             "iri": "foaf:isPrimaryTopicOf",
             "rdfs:comment": "A document that this thing is the primary topic of.",
-            "rdfs:label": "is primary topic of",
+            "label": "is primary topic of",
             "type": [
                 "owl:InverseFunctionalProperty",
                 "rdf:Property"
@@ -366,7 +366,7 @@
         {
             "iri": "foaf:jabberID",
             "rdfs:comment": "A jabber ID for something.",
-            "rdfs:label": "jabber ID",
+            "label": "jabber ID",
             "type": [
                 "owl:DatatypeProperty",
                 "owl:InverseFunctionalProperty",
@@ -376,7 +376,7 @@
         {
             "iri": "foaf:knows",
             "rdfs:comment": "A person known by this person (indicating some level of reciprocated interaction between the parties).",
-            "rdfs:label": "knows",
+            "label": "knows",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -385,7 +385,7 @@
         {
             "iri": "foaf:lastName",
             "rdfs:comment": "The last name of a person.",
-            "rdfs:label": "lastName",
+            "label": "lastName",
             "type": [
                 "owl:DatatypeProperty",
                 "rdf:Property"
@@ -394,7 +394,7 @@
         {
             "iri": "foaf:logo",
             "rdfs:comment": "A logo representing some thing.",
-            "rdfs:label": "logo",
+            "label": "logo",
             "type": [
                 "owl:InverseFunctionalProperty",
                 "owl:ObjectProperty",
@@ -404,7 +404,7 @@
         {
             "iri": "foaf:made",
             "rdfs:comment": "Something that was made by this agent.",
-            "rdfs:label": "made",
+            "label": "made",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -413,7 +413,7 @@
         {
             "iri": "foaf:maker",
             "rdfs:comment": "An agent that  made this thing.",
-            "rdfs:label": "maker",
+            "label": "maker",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -422,7 +422,7 @@
         {
             "iri": "foaf:mbox",
             "rdfs:comment": "A  personal mailbox, ie. an Internet mailbox associated with exactly one owner, the first owner of this mailbox. This is a 'static inverse functional property', in that  there is (across time and change) at most one individual that ever has any particular value for foaf:mbox.",
-            "rdfs:label": "personal mailbox",
+            "label": "personal mailbox",
             "type": [
                 "owl:InverseFunctionalProperty",
                 "owl:ObjectProperty",
@@ -432,7 +432,7 @@
         {
             "iri": "foaf:mbox_sha1sum",
             "rdfs:comment": "The sha1sum of the URI of an Internet mailbox associated with exactly one owner, the  first owner of the mailbox.",
-            "rdfs:label": "sha1sum of a personal mailbox URI name",
+            "label": "sha1sum of a personal mailbox URI name",
             "type": [
                 "owl:DatatypeProperty",
                 "owl:InverseFunctionalProperty",
@@ -442,7 +442,7 @@
         {
             "iri": "foaf:member",
             "rdfs:comment": "Indicates a member of a Group",
-            "rdfs:label": "member",
+            "label": "member",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -451,7 +451,7 @@
         {
             "iri": "foaf:membershipClass",
             "rdfs:comment": "Indicates the class of individuals that are a member of a Group",
-            "rdfs:label": "membershipClass",
+            "label": "membershipClass",
             "type": [
                 "owl:AnnotationProperty",
                 "rdf:Property"
@@ -460,7 +460,7 @@
         {
             "iri": "foaf:msnChatID",
             "rdfs:comment": "An MSN chat ID",
-            "rdfs:label": "MSN chat ID",
+            "label": "MSN chat ID",
             "type": [
                 "owl:DatatypeProperty",
                 "owl:InverseFunctionalProperty",
@@ -470,7 +470,7 @@
         {
             "iri": "foaf:myersBriggs",
             "rdfs:comment": "A Myers Briggs (MBTI) personality classification.",
-            "rdfs:label": "myersBriggs",
+            "label": "myersBriggs",
             "type": [
                 "owl:DatatypeProperty",
                 "rdf:Property"
@@ -479,7 +479,7 @@
         {
             "iri": "foaf:name",
             "rdfs:comment": "A name for some thing.",
-            "rdfs:label": "name",
+            "label": "name",
             "type": [
                 "owl:DatatypeProperty",
                 "rdf:Property"
@@ -488,7 +488,7 @@
         {
             "iri": "foaf:nick",
             "rdfs:comment": "A short informal nickname characterising an agent (includes login identifiers, IRC and other chat nicknames).",
-            "rdfs:label": "nickname",
+            "label": "nickname",
             "type": [
                 "owl:DatatypeProperty",
                 "rdf:Property"
@@ -497,7 +497,7 @@
         {
             "iri": "foaf:openid",
             "rdfs:comment": "An OpenID for an Agent.",
-            "rdfs:label": "openid",
+            "label": "openid",
             "type": [
                 "owl:InverseFunctionalProperty",
                 "owl:ObjectProperty",
@@ -507,7 +507,7 @@
         {
             "iri": "foaf:page",
             "rdfs:comment": "A page or document about this thing.",
-            "rdfs:label": "page",
+            "label": "page",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -516,7 +516,7 @@
         {
             "iri": "foaf:pastProject",
             "rdfs:comment": "A project this person has previously worked on.",
-            "rdfs:label": "past project",
+            "label": "past project",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -525,7 +525,7 @@
         {
             "iri": "foaf:phone",
             "rdfs:comment": "A phone,  specified using fully qualified tel: URI scheme (refs: http://www.w3.org/Addressing/schemes.html#tel).",
-            "rdfs:label": "phone",
+            "label": "phone",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -534,7 +534,7 @@
         {
             "iri": "foaf:plan",
             "rdfs:comment": "A .plan comment, in the tradition of finger and '.plan' files.",
-            "rdfs:label": "plan",
+            "label": "plan",
             "type": [
                 "owl:DatatypeProperty",
                 "rdf:Property"
@@ -543,7 +543,7 @@
         {
             "iri": "foaf:primaryTopic",
             "rdfs:comment": "The primary topic of some page or document.",
-            "rdfs:label": "primary topic",
+            "label": "primary topic",
             "type": [
                 "owl:FunctionalProperty",
                 "owl:ObjectProperty",
@@ -553,7 +553,7 @@
         {
             "iri": "foaf:publications",
             "rdfs:comment": "A link to the publications of this person.",
-            "rdfs:label": "publications",
+            "label": "publications",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -562,7 +562,7 @@
         {
             "iri": "foaf:schoolHomepage",
             "rdfs:comment": "A homepage of a school attended by the person.",
-            "rdfs:label": "schoolHomepage",
+            "label": "schoolHomepage",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -571,7 +571,7 @@
         {
             "iri": "foaf:sha1",
             "rdfs:comment": "A sha1sum hash, in hex.",
-            "rdfs:label": "sha1sum (hex)",
+            "label": "sha1sum (hex)",
             "type": [
                 "owl:DatatypeProperty",
                 "rdf:Property"
@@ -580,7 +580,7 @@
         {
             "iri": "foaf:skypeID",
             "rdfs:comment": "A Skype ID",
-            "rdfs:label": "Skype ID",
+            "label": "Skype ID",
             "type": [
                 "owl:DatatypeProperty",
                 "rdf:Property"
@@ -589,7 +589,7 @@
         {
             "iri": "foaf:status",
             "rdfs:comment": "A string expressing what the user is happy for the general public (normally) to know about their current activity.",
-            "rdfs:label": "status",
+            "label": "status",
             "type": [
                 "owl:DatatypeProperty",
                 "rdf:Property"
@@ -598,7 +598,7 @@
         {
             "iri": "foaf:surname",
             "rdfs:comment": "The surname of some person.",
-            "rdfs:label": "Surname",
+            "label": "Surname",
             "type": [
                 "owl:DatatypeProperty",
                 "rdf:Property"
@@ -607,7 +607,7 @@
         {
             "iri": "foaf:theme",
             "rdfs:comment": "A theme.",
-            "rdfs:label": "theme",
+            "label": "theme",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -616,7 +616,7 @@
         {
             "iri": "foaf:thumbnail",
             "rdfs:comment": "A derived thumbnail image.",
-            "rdfs:label": "thumbnail",
+            "label": "thumbnail",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -625,7 +625,7 @@
         {
             "iri": "foaf:tipjar",
             "rdfs:comment": "A tipjar document for this agent, describing means for payment and reward.",
-            "rdfs:label": "tipjar",
+            "label": "tipjar",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -634,7 +634,7 @@
         {
             "iri": "foaf:title",
             "rdfs:comment": "Title (Mr, Mrs, Ms, Dr. etc)",
-            "rdfs:label": "title",
+            "label": "title",
             "type": [
                 "owl:DatatypeProperty",
                 "rdf:Property"
@@ -643,7 +643,7 @@
         {
             "iri": "foaf:topic",
             "rdfs:comment": "A topic of some page or document.",
-            "rdfs:label": "topic",
+            "label": "topic",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -652,7 +652,7 @@
         {
             "iri": "foaf:topic_interest",
             "rdfs:comment": "A thing of interest to this person.",
-            "rdfs:label": "topic_interest",
+            "label": "topic_interest",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -661,7 +661,7 @@
         {
             "iri": "foaf:weblog",
             "rdfs:comment": "A weblog of some thing (whether person, group, company etc.).",
-            "rdfs:label": "weblog",
+            "label": "weblog",
             "type": [
                 "owl:InverseFunctionalProperty",
                 "owl:ObjectProperty",
@@ -671,7 +671,7 @@
         {
             "iri": "foaf:workInfoHomepage",
             "rdfs:comment": "A work info homepage of some person; a page about their work for some organization.",
-            "rdfs:label": "work info homepage",
+            "label": "work info homepage",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -680,7 +680,7 @@
         {
             "iri": "foaf:workplaceHomepage",
             "rdfs:comment": "A workplace homepage of some person; the homepage of an organization they work for.",
-            "rdfs:label": "workplace homepage",
+            "label": "workplace homepage",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -689,7 +689,7 @@
         {
             "iri": "foaf:yahooChatID",
             "rdfs:comment": "A Yahoo chat ID",
-            "rdfs:label": "Yahoo chat ID",
+            "label": "Yahoo chat ID",
             "type": [
                 "owl:DatatypeProperty",
                 "owl:InverseFunctionalProperty",
@@ -702,22 +702,22 @@
         },
         {
             "iri": "skos:Collection",
-            "rdfs:label": "Collection",
+            "label": "Collection",
             "type": "owl:Class"
         },
         {
             "iri": "skos:Concept",
-            "rdfs:label": "Concept",
+            "label": "Concept",
             "type": "owl:Class"
         },
         {
             "iri": "skos:ConceptScheme",
-            "rdfs:label": "Concept Scheme",
+            "label": "Concept Scheme",
             "type": "owl:Class"
         },
         {
             "iri": "skos:OrderedCollection",
-            "rdfs:label": "Ordered Collection",
+            "label": "Ordered Collection",
             "type": "owl:Class"
         },
         {
@@ -726,7 +726,7 @@
                 "The range of skos:altLabel is the class of RDF plain literals.",
                 "skos:prefLabel, skos:altLabel and skos:hiddenLabel are pairwise disjoint properties."
             ],
-            "rdfs:label": "alternative label",
+            "label": "alternative label",
             "type": [
                 "owl:AnnotationProperty",
                 "rdf:Property"
@@ -734,7 +734,7 @@
         },
         {
             "iri": "skos:broadMatch",
-            "rdfs:label": "has broader match",
+            "label": "has broader match",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -743,7 +743,7 @@
         {
             "iri": "skos:broader",
             "rdfs:comment": "Broader concepts are typically rendered as parents in a concept hierarchy (tree).",
-            "rdfs:label": "has broader",
+            "label": "has broader",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -751,7 +751,7 @@
         },
         {
             "iri": "skos:broaderTransitive",
-            "rdfs:label": "has broader transitive",
+            "label": "has broader transitive",
             "type": [
                 "owl:ObjectProperty",
                 "owl:TransitiveProperty",
@@ -760,7 +760,7 @@
         },
         {
             "iri": "skos:changeNote",
-            "rdfs:label": "change note",
+            "label": "change note",
             "type": [
                 "owl:AnnotationProperty",
                 "rdf:Property"
@@ -768,7 +768,7 @@
         },
         {
             "iri": "skos:closeMatch",
-            "rdfs:label": "has close match",
+            "label": "has close match",
             "type": [
                 "owl:ObjectProperty",
                 "owl:SymmetricProperty",
@@ -777,7 +777,7 @@
         },
         {
             "iri": "skos:definition",
-            "rdfs:label": "definition",
+            "label": "definition",
             "type": [
                 "owl:AnnotationProperty",
                 "rdf:Property"
@@ -785,7 +785,7 @@
         },
         {
             "iri": "skos:editorialNote",
-            "rdfs:label": "editorial note",
+            "label": "editorial note",
             "type": [
                 "owl:AnnotationProperty",
                 "rdf:Property"
@@ -794,7 +794,7 @@
         {
             "iri": "skos:exactMatch",
             "rdfs:comment": "skos:exactMatch is disjoint with each of the properties skos:broadMatch and skos:relatedMatch.",
-            "rdfs:label": "has exact match",
+            "label": "has exact match",
             "type": [
                 "owl:ObjectProperty",
                 "owl:SymmetricProperty",
@@ -804,7 +804,7 @@
         },
         {
             "iri": "skos:example",
-            "rdfs:label": "example",
+            "label": "example",
             "type": [
                 "owl:AnnotationProperty",
                 "rdf:Property"
@@ -812,7 +812,7 @@
         },
         {
             "iri": "skos:hasTopConcept",
-            "rdfs:label": "has top concept",
+            "label": "has top concept",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -824,7 +824,7 @@
                 "The range of skos:hiddenLabel is the class of RDF plain literals.",
                 "skos:prefLabel, skos:altLabel and skos:hiddenLabel are pairwise disjoint properties."
             ],
-            "rdfs:label": "hidden label",
+            "label": "hidden label",
             "type": [
                 "owl:AnnotationProperty",
                 "rdf:Property"
@@ -832,7 +832,7 @@
         },
         {
             "iri": "skos:historyNote",
-            "rdfs:label": "history note",
+            "label": "history note",
             "type": [
                 "owl:AnnotationProperty",
                 "rdf:Property"
@@ -840,7 +840,7 @@
         },
         {
             "iri": "skos:inScheme",
-            "rdfs:label": "is in scheme",
+            "label": "is in scheme",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -849,7 +849,7 @@
         {
             "iri": "skos:mappingRelation",
             "rdfs:comment": "These concept mapping relations mirror semantic relations, and the data model defined below is similar (with the exception of skos:exactMatch) to the data model defined for semantic relations. A distinct vocabulary is provided for concept mapping relations, to provide a convenient way to differentiate links within a concept scheme from links between concept schemes. However, this pattern of usage is not a formal requirement of the SKOS data model, and relies on informal definitions of best practice.",
-            "rdfs:label": "is in mapping relation with",
+            "label": "is in mapping relation with",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -857,7 +857,7 @@
         },
         {
             "iri": "skos:member",
-            "rdfs:label": "has member",
+            "label": "has member",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -866,7 +866,7 @@
         {
             "iri": "skos:memberList",
             "rdfs:comment": "For any resource, every item in the list given as the value of the\n      skos:memberList property is also a value of the skos:member property.",
-            "rdfs:label": "has member list",
+            "label": "has member list",
             "type": [
                 "owl:FunctionalProperty",
                 "owl:ObjectProperty",
@@ -875,7 +875,7 @@
         },
         {
             "iri": "skos:narrowMatch",
-            "rdfs:label": "has narrower match",
+            "label": "has narrower match",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -884,7 +884,7 @@
         {
             "iri": "skos:narrower",
             "rdfs:comment": "Narrower concepts are typically rendered as children in a concept hierarchy (tree).",
-            "rdfs:label": "has narrower",
+            "label": "has narrower",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -892,7 +892,7 @@
         },
         {
             "iri": "skos:narrowerTransitive",
-            "rdfs:label": "has narrower transitive",
+            "label": "has narrower transitive",
             "type": [
                 "owl:ObjectProperty",
                 "owl:TransitiveProperty",
@@ -901,7 +901,7 @@
         },
         {
             "iri": "skos:notation",
-            "rdfs:label": "notation",
+            "label": "notation",
             "type": [
                 "owl:DatatypeProperty",
                 "rdf:Property"
@@ -909,7 +909,7 @@
         },
         {
             "iri": "skos:note",
-            "rdfs:label": "note",
+            "label": "note",
             "type": [
                 "owl:AnnotationProperty",
                 "rdf:Property"
@@ -922,7 +922,7 @@
                 "The range of skos:prefLabel is the class of RDF plain literals.",
                 "skos:prefLabel, skos:altLabel and skos:hiddenLabel are pairwise\n      disjoint properties."
             ],
-            "rdfs:label": "preferred label",
+            "label": "preferred label",
             "type": [
                 "owl:AnnotationProperty",
                 "rdf:Property"
@@ -931,7 +931,7 @@
         {
             "iri": "skos:related",
             "rdfs:comment": "skos:related is disjoint with skos:broaderTransitive",
-            "rdfs:label": "has related",
+            "label": "has related",
             "type": [
                 "owl:ObjectProperty",
                 "owl:SymmetricProperty",
@@ -940,7 +940,7 @@
         },
         {
             "iri": "skos:relatedMatch",
-            "rdfs:label": "has related match",
+            "label": "has related match",
             "type": [
                 "owl:ObjectProperty",
                 "owl:SymmetricProperty",
@@ -949,7 +949,7 @@
         },
         {
             "iri": "skos:scopeNote",
-            "rdfs:label": "scope note",
+            "label": "scope note",
             "type": [
                 "owl:AnnotationProperty",
                 "rdf:Property"
@@ -957,7 +957,7 @@
         },
         {
             "iri": "skos:semanticRelation",
-            "rdfs:label": "is in semantic relation with",
+            "label": "is in semantic relation with",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"
@@ -965,7 +965,7 @@
         },
         {
             "iri": "skos:topConceptOf",
-            "rdfs:label": "is top concept in scheme",
+            "label": "is top concept in scheme",
             "type": [
                 "owl:ObjectProperty",
                 "rdf:Property"

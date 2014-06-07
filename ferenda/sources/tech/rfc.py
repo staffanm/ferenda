@@ -609,7 +609,8 @@ class RFC(DocumentRepository):
                 desc.value(self.ns['dct'].rightsHolder, line)
 
     def toc_predicates(self):
-        return [self.ns['dct'].identifier,
+        return [self.ns['rdf'].type,
+                self.ns['dct'].identifier,
                 self.ns['dct'].title,
                 self.ns['dct'].publisher,
                 self.ns['dct'].issued,
@@ -618,7 +619,15 @@ class RFC(DocumentRepository):
     def toc_criteria(self, predicates=None):
         from ferenda import TocCriteria
         DCT = self.ns['dct']
-        return [TocCriteria(binding='identifier',
+        RDF = self.ns['rdf']
+        return [TocCriteria(binding='type',
+                            label='Sorted by document type',
+                            pagetitle='Documents of type %(select)s',
+                            selector=lambda x: x['type'],
+                            key=lambda x: x['type'],
+                            predicate=RDF.type),
+                
+                TocCriteria(binding='identifier',
                             label='Sorted by RFC #',
                             pagetitle='RFCs %(select)s--99',
                             selector=lambda x: x['identifier'][4:-2] + "00",  # "RFC 6998" => "69"
