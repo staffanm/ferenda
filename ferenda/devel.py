@@ -113,9 +113,9 @@ class Devel(object):
         predicates = ['basefile',
                       'subobjects', # sections that have rdf:type
                       'rdf:type',
-                      'dct:identifier',
-                      'dct:title',
-                      'dct:published',
+                      'dcterms:identifier',
+                      'dcterms:title',
+                      'dcterms:published',
                       'prov:wasGeneratedBy',
                       ]
         import csv

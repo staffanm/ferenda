@@ -20,10 +20,10 @@ class BasicAPI(WSGI):
     def put_files_in_place(self):
         # create three basic documents (at parsed and distilled)
         #
-        # each document should have a dct:title, a dct:issued and a
-        # dct:publisher, which has a URI
+        # each document should have a dcterms:title, a dcterms:issued and a
+        # dcterms:publisher, which has a URI
         #
-        # basefile  dct:title	  dct:issued  dct:publisher
+        # basefile  dcterms:title	  dcterms:issued  dcterms:publisher
         # 123/a     "Example"     2014-01-04  <http://example.org/publisher/A>
         # 123/b     "Example 2"   2013-09-23  <http://example.org/publisher/B>
         # 123/c     "Of needles"  2014-05-06  <http://example.org/publisher/B>

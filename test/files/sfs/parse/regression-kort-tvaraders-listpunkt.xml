@@ -5,7 +5,7 @@
       <NumreradLista>
         <Listelement id="P1S1N6" ordinal="6">
           <str>6. vid annan registreringsanmälan, 800 kronor. </str>
-          <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#L2008:24">Förordning (2008:24).</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#L2008:24">Förordning (2008:24).</LinkSubject>
         </Listelement>
       </NumreradLista>
     </Stycke>

@@ -19,6 +19,6 @@ for node in citparser.parse_string(text):
         (text, match) = node
         uri = formatter.format(match)
         if uri:
-            res.append(Link(uri, text, rel="dct:references"))
+            res.append(Link(uri, text, rel="dcterms:references"))
 # end
 return_value = True

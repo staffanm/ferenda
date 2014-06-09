@@ -34,15 +34,15 @@ class Main(unittest.TestCase):
                     ])
 
         result = Body([Heading(["About ",
-                                LinkSubject("Doc 43/2012", predicate="dct:references",
+                                LinkSubject("Doc 43/2012", predicate="dcterms:references",
                                            uri="http://example.org/docs/2012/43/"),
                                 " and it's interpretation"]),
                        Paragraph(["According to ",
-                                  LinkSubject("Doc 43/2012", predicate="dct:references",
+                                  LinkSubject("Doc 43/2012", predicate="dcterms:references",
                                               uri="http://example.org/docs/2012/43/"),
                                   Footnote(["Available at ",
                                             LinkSubject("http://example.org/xyz", 
-                                                        predicate="dct:references",
+                                                        predicate="dcterms:references",
                                                         uri="http://example.org/xyz")
                                             ]),
                                   " the bizbaz should be frobnicated"])

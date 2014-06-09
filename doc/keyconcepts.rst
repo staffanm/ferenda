@@ -207,13 +207,13 @@ and relation between them.
   rendering the document into XHTML, render_xhtml creates RDFa
   statements based on this property and the ``meta`` property.
 
-* ``dct:identifier``: The *human readable* identifier for a document
+* ``dcterms:identifier``: The *human readable* identifier for a document
   or a part of a document. If the document has an established
   human-readable identifier, such as "RFC 1147" or "2003/98/EC" (The
   EU directive on the re-use of public sector information), the
-  dct:identifier is used for this. Unlike ``basefile`` and ``uri``,
+  dcterms:identifier is used for this. Unlike ``basefile`` and ``uri``,
   this identifier isn't set directly as a property on an
-  object. Instead, you add a triple with ``dct:identifier`` as the
+  object. Instead, you add a triple with ``dcterms:identifier`` as the
   predicate to the object's ``meta`` property, see :doc:`docmetadata`
   and also `DCMI Terms
   <http://dublincore.org/documents/2012/06/14/dcmi-terms/#terms-identifier>`_.

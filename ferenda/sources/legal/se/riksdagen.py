@@ -205,8 +205,8 @@ class Riksdagen(SwedishLegalSource):
         d.rdftype(self.rdf_type)
         d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
         xsoup = BeautifulSoup(open(self.store.downloaded_path(doc.basefile)).read(), "xml")
-        d.value(self.ns['dct'].title, xsoup.dokument.titel.text, lang="sv")
-        d.value(self.ns['dct'].issued, util.strptime(xsoup.dokument.publicerad.text,
+        d.value(self.ns['dcterms'].title, xsoup.dokument.titel.text, lang="sv")
+        d.value(self.ns['dcterms'].issued, util.strptime(xsoup.dokument.publicerad.text,
                                                         "%Y-%m-%d %H:%M:%S").date())
         self.infer_triples(d, doc.basefile)
         return True

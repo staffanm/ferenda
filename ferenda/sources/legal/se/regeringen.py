@@ -256,10 +256,10 @@ class Regeringen(SwedishLegalSource):
 
         content = soup.find(id="content")
         title = content.find("h1").string
-        d.value(self.ns['dct'].title, title, lang=doc.lang)
+        d.value(self.ns['dcterms'].title, title, lang=doc.lang)
         identifier = self.sanitize_identifier(
             content.find("p", "lead").text)  # might need fixing up
-        d.value(self.ns['dct'].identifier, identifier)
+        d.value(self.ns['dcterms'].identifier, identifier)
 
         definitions = content.find("dl", "definitions")
         if definitions:
@@ -270,11 +270,11 @@ class Regeringen(SwedishLegalSource):
                     try:
                         dateval = self.parse_swedish_date(value)
                         if type(dateval) == date:
-                            d.value(self.ns['dct'].issued, dateval)
+                            d.value(self.ns['dcterms'].issued, dateval)
                         else:
                             datatype = {util.gYearMonth: XSD.gYearMonth,
                                         util.gYear: XSD.gYear}[type(dateval)]
-                            d.value(self.ns['dct'].issued, str(dateval), datatype=datatype)
+                            d.value(self.ns['dcterms'].issued, str(dateval), datatype=datatype)
                     except ValueError as e:
                         self.log.warning(
                             "Could not parse %s as swedish date" % value)
@@ -283,7 +283,7 @@ class Regeringen(SwedishLegalSource):
                         d.rel(self.ns['rpubl'].departement,
                               self.lookup_resource(value))
                     else:
-                        d.rel(self.ns['dct'].publisher,
+                        d.rel(self.ns['dcterms'].publisher,
                               self.lookup_resource(value))
 
         if content.find("h2", text="Sammanfattning"):
@@ -291,7 +291,7 @@ class Regeringen(SwedishLegalSource):
             # "\n\n" doesn't seem to survive being stuffed in a rdfa
             # content attribute. Replace with simple space.
             summary = " ".join([x.get_text(strip=True) for x in sums])
-            d.value(self.ns['dct'].abstract,
+            d.value(self.ns['dcterms'].abstract,
                     summary, lang=doc.lang)
 
         # find related documents
@@ -387,8 +387,8 @@ class Regeringen(SwedishLegalSource):
         doc.body = self.parse_pdfs(doc.basefile, pdffiles)
 
         # do some post processing. First loop through leading
-        # textboxes and try to find dct:identifier, dct:title and
-        # dct:issued (these should already be present in doc.meta,
+        # textboxes and try to find dcterms:identifier, dcterms:title and
+        # dcterms:issued (these should already be present in doc.meta,
         # but the values in the actual document should take
         # precendence
         d = Describer(doc.meta, doc.uri)
@@ -398,25 +398,25 @@ class Regeringen(SwedishLegalSource):
                 continue
             str_element = str(element).strip()
             # print("examining %s..." % str_element[:40])
-            # dct:identifier
+            # dcterms:identifier
             m = self.re_basefile_lax.search(str_element)
             if m:
-                _check_differing(d, self.ns['dct'].identifier, "Prop. " + m.group(1))
-            # dct:title
+                _check_differing(d, self.ns['dcterms'].identifier, "Prop. " + m.group(1))
+            # dcterms:title
             if element.getfont()['size'] == '20' and not title_found:
-                # sometimes part of the the dct:identifer (eg " Prop."
+                # sometimes part of the the dcterms:identifer (eg " Prop."
                 # or " 2013/14:51") gets mixed up in the title
                 # textbox. Remove those parts if we can find them.
                 if " Prop." in str_element:
                     str_element = str_element.replace(" Prop.", "").strip()
                 if self.re_basefile_lax.search(str_element):
                     str_element = self.re_basefile_lax.sub("", str_element)
-                _check_differing(d, self.ns['dct'].title, str_element)
+                _check_differing(d, self.ns['dcterms'].title, str_element)
                 title_found = True
-            # dct:issued
+            # dcterms:issued
             if str_element.startswith("Stockholm den"):
                 pubdate = self.parse_swedish_date(str_element[13:])
-                _check_differing(d, self.ns['dct'].issued, pubdate)
+                _check_differing(d, self.ns['dcterms'].issued, pubdate)
 
         # then maybe look for the section named Författningskommentar
         # (or similar), identify each section and which proposed new

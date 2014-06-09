@@ -43,11 +43,11 @@ class RFCs(DocumentRepository):
     # In order to properly handle our RDF data, we need to tell
     # ferenda which namespaces we'll be using. These will be available
     # as rdflib.Namespace objects in the self.ns dict, which means you
-    # can state that something is eg. a dct:title by using
-    # self.ns['dct'].title. See
+    # can state that something is eg. a dcterms:title by using
+    # self.ns['dcterms'].title. See
     # :py:data:`~ferenda.DocumentRepository.namespaces`
     namespaces = ('rdf',  # always needed
-                  'dct',  # title, identifier, etc
+                  'dcterms',  # title, identifier, etc
                   'bibo', # Standard and DocumentPart classes, chapter prop
                   'xsd',  # datatypes
                   'foaf', # rfcs are foaf:Documents for now
@@ -127,15 +127,15 @@ class RFCs(DocumentRepository):
         # Set the rdf:type of the document
         desc.rdftype(self.rdf_type)
 
-        # Set the title we've captured as the dct:title of the document and 
+        # Set the title we've captured as the dcterms:title of the document and 
         # specify that it is in English
-        desc.value(self.ns['dct'].title, util.normalize_space(title), lang="en")
+        desc.value(self.ns['dcterms'].title, util.normalize_space(title), lang="en")
 
-        # Construct the dct:identifier (eg "RFC 6991") for this document from the basefile
-        desc.value(self.ns['dct'].identifier, "RFC " + doc.basefile)
+        # Construct the dcterms:identifier (eg "RFC 6991") for this document from the basefile
+        desc.value(self.ns['dcterms'].identifier, "RFC " + doc.basefile)
   
         # find and convert the publication date in the header to a datetime 
-        # object, and set it as the dct:issued date for the document   
+        # object, and set it as the dcterms:issued date for the document   
         re_date = re.compile("(January|February|March|April|May|June|July|August|September|October|November|December) (\d{4})").search
         # This is a context manager that temporarily sets the system
         # locale to the "C" locale in order to be able to use strptime
@@ -148,17 +148,17 @@ class RFCs(DocumentRepository):
             pubdate = date(dt.year,dt.month,dt.day)
             # Note that using some python types (cf. datetime.date)
             # results in a datatyped RDF literal, ie in this case
-            #   <http://localhost:8000/res/rfc/6994> dct:issued "2013-08-01"^^xsd:date
-            desc.value(self.ns['dct'].issued, pubdate)
+            #   <http://localhost:8000/res/rfc/6994> dcterms:issued "2013-08-01"^^xsd:date
+            desc.value(self.ns['dcterms'].issued, pubdate)
   
         # find any older RFCs that this document updates or obsoletes
         obsoletes = re.search("^Obsoletes: ([\d+, ]+)", header, re.MULTILINE)
         updates = re.search("^Updates: ([\d+, ]+)", header, re.MULTILINE)
 
-        # Find the category of this RFC, store it as dct:subject
+        # Find the category of this RFC, store it as dcterms:subject
         cat_match = re.search("^Category: ([\w ]+?)(  |$)", header, re.MULTILINE)
         if cat_match:
-            desc.value(self.ns['dct'].subject, cat_match.group(1))
+            desc.value(self.ns['dcterms'].subject, cat_match.group(1))
             
         for predicate, matches in ((self.ns['rfc'].updates, updates),
                                    (self.ns['rfc'].obsoletes, obsoletes)):
@@ -286,10 +286,10 @@ class RFCs(DocumentRepository):
 
 # begin toc_predicates
     def toc_predicates(self):
-        return [self.ns['dct'].title,
-                self.ns['dct'].issued,
-                self.ns['dct'].subject,
-                self.ns['dct'].identifier]
+        return [self.ns['dcterms'].title,
+                self.ns['dcterms'].issued,
+                self.ns['dcterms'].subject,
+                self.ns['dcterms'].identifier]
 # end toc_predicates
 
 # begin toc_criteria
@@ -347,7 +347,7 @@ class RFCs(DocumentRepository):
                 graph = Graph()
                 graph.parse(self.store.distilled_path(entry.basefile))
                 desc = Describer(graph, entry.id)
-                return desc.getvalue(self.ns['dct'].subject) == category
+                return desc.getvalue(self.ns['dcterms'].subject) == category
             return selector
             
         return [NewsCriteria('all','All RFCs'),
@@ -370,7 +370,7 @@ class RFCs(DocumentRepository):
             graph = Graph()
             with self.store.open_distilled(entry.basefile) as fp:
                 graph.parse(data=fp.read())
-            data = {'identifier': graph.value(URIRef(entry.id), self.ns['dct'].identifier).toPython(),
+            data = {'identifier': graph.value(URIRef(entry.id), self.ns['dcterms'].identifier).toPython(),
                     'uri': entry.id,
                     'title': entry.title}
             items += '<li>%(identifier)s <a href="%(uri)s">%(title)s</a></li>' % data

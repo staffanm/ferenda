@@ -24,7 +24,7 @@ class Keyword(DocumentRepository):
        themselves aren't related to any document, but to which other
        documents are related. As an example, if a docrepo has
        documents that each contains a set of keywords, and the docrepo
-       parse implementation extracts these keywords as ``dct:subject``
+       parse implementation extracts these keywords as ``dcterms:subject``
        resources, this docrepo creates a document resource for each of
        those keywords. The main content for the keyword may come from
        the :class:`~ferenda.sources.general.MediaWiki` docrepo, and
@@ -49,18 +49,18 @@ class Keyword(DocumentRepository):
         return opts
 
     def download(self):
-        # Get all "term sets" (used dct:subject Objects, wiki pages
+        # Get all "term sets" (used dcterms:subject Objects, wiki pages
         # describing legal concepts, swedish wikipedia pages...)
         terms = defaultdict(dict)
 
-        # 1) Query the triplestore for all dct:subject triples (is this
+        # 1) Query the triplestore for all dcterms:subject triples (is this
         # semantically sensible for a "download" action -- the content
         # isn't really external?) -- term set "subjects" (these come
         # from both court cases and legal definitions in law text)
         sq = """
-        PREFIX dct:<http://purl.org/dc/terms/>
+        PREFIX dcterms:<http://purl.org/dc/terms/>
 
-        SELECT DISTINCT ?subject ?label { {?uri dct:subject ?subject } 
+        SELECT DISTINCT ?subject ?label { {?uri dcterms:subject ?subject } 
                                           OPTIONAL {?subject rdfs:label ?label} }
         """
         store = store = TripleStore(self.config.storetype,
@@ -138,13 +138,13 @@ class Keyword(DocumentRepository):
         root = etree.Element("html")
         root.set("xml:base", baseuri)
         root.set("xmlns", 'http://www.w3.org/2002/06/xhtml2/')
-        root.set("xmlns:dct", util.ns['dct'])
+        root.set("xmlns:dcterms", util.ns['dcterms'])
         head = etree.SubElement(root, "head")
         title = etree.SubElement(head, "title")
         title.text = doc.basefile
         body = etree.SubElement(root, "body")
         heading = etree.SubElement(body, "h")
-        heading.set("property", "dct:title")
+        heading.set("property", "dcterms:title")
         heading.text = doc.basefile
         if 'wikipedia\n' in termsets:
             p = etree.SubElement(body, "p")
@@ -179,7 +179,7 @@ class Keyword(DocumentRepository):
         # Use SPARQL queries to create a rdf graph (to be used by the
         # xslt transform) containing enough information about all
         # cases using this term, as well as the wiki authored
-        # dct:description for this term.
+        # dcterms:description for this term.
 
         # For proper SPARQL escaping, we need to change å to \u00E5
         # etc (there probably is a neater way of doing this).
@@ -193,43 +193,43 @@ class Keyword(DocumentRepository):
         escuri = keyword_to_uri(esckeyword)
 
         sq = """
-PREFIX dct:<http://purl.org/dc/terms/>
+PREFIX dcterms:<http://purl.org/dc/terms/>
 PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
 PREFIX rinfo:<http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#>
 
 SELECT ?desc
-WHERE { ?uri dct:description ?desc . ?uri rdfs:label "%s"@sv }
+WHERE { ?uri dcterms:description ?desc . ?uri rdfs:label "%s"@sv }
 """ % esckeyword
         wikidesc = self._store_select(sq)
         log.debug('%s: Selected %s descriptions (%.3f sec)',
                   basefile, len(wikidesc), time() - start)
 
         sq = """
-PREFIX dct:<http://purl.org/dc/terms/>
+PREFIX dcterms:<http://purl.org/dc/terms/>
 PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
 PREFIX rinfo:<http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#>
 
 SELECT DISTINCT ?uri ?label
 WHERE {
     GRAPH <urn:x-local:sfs> {
-       { ?uri dct:subject <%s> .
-         ?baseuri dct:title ?label .
-         ?uri dct:isPartOf ?x . ?x dct:isPartOf ?baseuri
+       { ?uri dcterms:subject <%s> .
+         ?baseuri dcterms:title ?label .
+         ?uri dcterms:isPartOf ?x . ?x dcterms:isPartOf ?baseuri
        }
        UNION {
-         ?uri dct:subject <%s> .
-         ?baseuri dct:title ?label .
-         ?uri dct:isPartOf ?x . ?x dct:isPartOf ?y . ?y dct:isPartOf ?baseuri
+         ?uri dcterms:subject <%s> .
+         ?baseuri dcterms:title ?label .
+         ?uri dcterms:isPartOf ?x . ?x dcterms:isPartOf ?y . ?y dcterms:isPartOf ?baseuri
        }
        UNION {
-         ?uri dct:subject <%s> .
-         ?baseuri dct:title ?label .
-         ?uri dct:isPartOf ?x . ?x dct:isPartOf ?y . ?x dct:isPartOf ?z . ?z dct:isPartOf ?baseuri
+         ?uri dcterms:subject <%s> .
+         ?baseuri dcterms:title ?label .
+         ?uri dcterms:isPartOf ?x . ?x dcterms:isPartOf ?y . ?x dcterms:isPartOf ?z . ?z dcterms:isPartOf ?baseuri
        }
        UNION {
-         ?uri dct:subject <%s> .
-         ?baseuri dct:title ?label .
-         ?uri dct:isPartOf ?x . ?x dct:isPartOf ?y . ?x dct:isPartOf ?z . ?z dct:isPartOf ?w . ?w dct:isPartOf ?baseuri
+         ?uri dcterms:subject <%s> .
+         ?baseuri dcterms:title ?label .
+         ?uri dcterms:isPartOf ?x . ?x dcterms:isPartOf ?y . ?x dcterms:isPartOf ?z . ?z dcterms:isPartOf ?w . ?w dcterms:isPartOf ?baseuri
        }
     }
 }
@@ -241,7 +241,7 @@ WHERE {
                   basefile, len(legaldefinitioner), time() - start)
 
         sq = """
-PREFIX dct:<http://purl.org/dc/terms/>
+PREFIX dcterms:<http://purl.org/dc/terms/>
 PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
 PREFIX rinfo:<http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#>
 PREFIX rinfoex:<http://lagen.nu/terms#>
@@ -251,21 +251,21 @@ WHERE {
     {
         GRAPH <urn:x-local:dv> {
             {
-                ?uri dct:description ?desc .
-                ?uri dct:identifier ?id .
-                ?uri dct:subject <%s>
+                ?uri dcterms:description ?desc .
+                ?uri dcterms:identifier ?id .
+                ?uri dcterms:subject <%s>
             }
             UNION {
-                ?uri dct:description ?desc .
-                ?uri dct:identifier ?id .
-                ?uri dct:subject "%s"@sv
+                ?uri dcterms:description ?desc .
+                ?uri dcterms:identifier ?id .
+                ?uri dcterms:subject "%s"@sv
             }
         }
     } UNION {
         GRAPH <urn:x-local:arn> {
-                ?uri dct:description ?desc .
+                ?uri dcterms:description ?desc .
                 ?uri rinfoex:arendenummer ?id .
-                ?uri dct:subject "%s"@sv
+                ?uri dcterms:subject "%s"@sv
         }
     }
 }
@@ -286,7 +286,7 @@ WHERE {
         main_node.set("rdf:about", keyword_to_uri(keyword))
 
         for d in wikidesc:
-            desc_node = etree.SubElement(main_node, "dct:description")
+            desc_node = etree.SubElement(main_node, "dcterms:description")
             xhtmlstr = "<xht2:div xmlns:xht2='%s'>%s</xht2:div>" % (
                 util.ns['xht2'], d['desc'])
             xhtmlstr = xhtmlstr.replace(
@@ -294,12 +294,12 @@ WHERE {
             desc_node.append(etree.fromstring(xhtmlstr.encode('utf-8')))
 
         for r in rattsfall:
-            subject_node = etree.SubElement(main_node, "dct:subject")
+            subject_node = etree.SubElement(main_node, "dcterms:subject")
             rattsfall_node = etree.SubElement(subject_node, "rdf:Description")
             rattsfall_node.set("rdf:about", r['uri'])
-            id_node = etree.SubElement(rattsfall_node, "dct:identifier")
+            id_node = etree.SubElement(rattsfall_node, "dcterms:identifier")
             id_node.text = r['id']
-            desc_node = etree.SubElement(rattsfall_node, "dct:description")
+            desc_node = etree.SubElement(rattsfall_node, "dcterms:description")
             desc_node.text = r['desc']
 
         for l in legaldefinitioner:

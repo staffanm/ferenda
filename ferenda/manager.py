@@ -607,9 +607,9 @@ def _get_json_context(repos):
 #                     # find out if this property (or class?) has a
 #                     # rdfs:range, ie if we can assume that all
 #                     # instances of this property have a given datatype
-#                     # (note that the dct ontology at
-#                     # http://dublincore.org/2012/06/14/dct.ttl
-#                     # defines dct:issued and dct:modified as having
+#                     # (note that the dcterms ontology at
+#                     # http://dublincore.org/2012/06/14/dcterms.ttl
+#                     # defines dcterms:issued and dcterms:modified as having
 #                     # the range rdfs:Literal, where we'd prefer the
 #                     # range xsd:date. But you know, sometimes it might
 #                     # be a xsd:gYearMonth...)
@@ -636,7 +636,7 @@ def _get_term_graph(repos, graphuri):
     # expressing all the things that are owl:*Property, owl:Class,
     # rdf:Property and rdf:Class. As an intermediate step, we
     # could have preprocessed rdf graphs (stored in
-    # res/vocab/dct.ttl, res/vocab/bibo.ttl etc) derived from the
+    # res/vocab/dcterms.ttl, res/vocab/bibo.ttl etc) derived from the
     # vocabularies and pull them in like we pull in namespaces in
     # self.ns The rdf graph should be rooted in an url (eg
     # http://localhost:8080/var/terms, and then have each term as
@@ -685,16 +685,16 @@ def _get_common_graph(repos, graphuri):
 
 def _wsgi_stats(repos, rooturl):
     # find out all dimentions on which we could slice (obviously type,
-    # but perhaps also dct:publisher, dct:subject, dct:issued (grouped
+    # but perhaps also dcterms:publisher, dcterms:subject, dcterms:issued (grouped
     # byyear!), prov:wasGeneratedBy -- ie any property that lends
     # itself naturally to grouping. Should probably have a strong
     # correlation with toc_predicates and the generated TocCriteria
-    # objects (although grouping on dct:title using the first letter
+    # objects (although grouping on dcterms:title using the first letter
     # is somewhat atypical. But maybe!).  For each
     # dimension/predicate, create a list of observations(buckets)
     # wherein each possible value is paired with the count of each
-    # value (or transformed value, for things like dct:issued (take
-    # the year part only) or dct:title (take the first significant
+    # value (or transformed value, for things like dcterms:issued (take
+    # the year part only) or dcterms:title (take the first significant
     # letter only)
 
     legacyapi = True # FIXME: should be part of args
@@ -704,7 +704,7 @@ def _wsgi_stats(repos, rooturl):
     }
     # this is wrong: we should mash together similarly-named
     # dimensions/criteria from different repos (eg rdf:type,
-    # dct:title, dct:issued)
+    # dcterms:title, dcterms:issued)
     for repo in repos:
         qname_graph = repo.make_graph() # only ever used to map URIs to qnames
         data = repo.toc_select(repo.dataset_uri())
@@ -876,7 +876,7 @@ def _wsgi_search(environ, start_response, args):
     doc = repo.make_document()
     doc.uri = "http://example.org/"
     doc.meta.add((URIRef(doc.uri),
-                  Namespace(util.ns['dct']).title,
+                  Namespace(util.ns['dcterms']).title,
                   Literal(resulthead, lang="en")))
     doc.body = elements.Body()
     for r in res:

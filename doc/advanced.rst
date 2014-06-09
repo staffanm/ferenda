@@ -105,7 +105,7 @@ Keyword hubs
 
 Ferenda also contains a general docrepo class that lists all keywords
 used by documents in your main docrepos (by default, it looks for all
-``dct:subject`` properties used in any document) and generate
+``dcterms:subject`` properties used in any document) and generate
 documents for each of them. These documents have no content of their
 own, but act as hub pages that list all documents that use a certain
 keyword in one place.

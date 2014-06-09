@@ -1,4 +1,4 @@
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -279,12 +279,12 @@ skos:Concept a owl:Class ;
     skos:definition "An idea or notion; a unit of thought."@en .
 
 <http://www.w3.org/2004/02/skos/core> a owl:Ontology ;
-    dct:contributor "Dave Beckett",
+    dcterms:contributor "Dave Beckett",
         "Nikki Rogers",
         "Participants in W3C's Semantic Web Deployment Working Group." ;
-    dct:creator "Alistair Miles",
+    dcterms:creator "Alistair Miles",
         "Sean Bechhofer" ;
-    dct:description "An RDF vocabulary for describing the basic structure and content of concept schemes such as thesauri, classification schemes, subject heading lists, taxonomies, 'folksonomies', other types of controlled vocabulary, and also concept schemes embedded in glossaries and terminologies."@en ;
-    dct:title "SKOS Vocabulary"@en ;
+    dcterms:description "An RDF vocabulary for describing the basic structure and content of concept schemes such as thesauri, classification schemes, subject heading lists, taxonomies, 'folksonomies', other types of controlled vocabulary, and also concept schemes embedded in glossaries and terminologies."@en ;
+    dcterms:title "SKOS Vocabulary"@en ;
     rdfs:seeAlso <http://www.w3.org/TR/skos-reference/> .
 

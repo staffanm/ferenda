@@ -7,7 +7,7 @@ from datetime import datetime
       xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:schemaLocation="http://www.w3.org/2002/06/xhtml2/ http://www.w3.org/MarkUp/SCHEMA/xhtml2.xsd"
-      xmlns:dct="http://purl.org/dc/terms/"
+      xmlns:dcterms="http://purl.org/dc/terms/"
       xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
       xmlns:rinfoex="http://lagen.nu/terms#"
       xmlns:xi="http://www.w3.org/2001/XInclude"
@@ -29,17 +29,17 @@ from datetime import datetime
 	<meta property="rinfoex:senastHamtad" content="${meta[u'Senast hämtad']}" datatype="xsd:date"/>
       </py:if>
       <py:if test="u'uri' in meta[u'Utgivare']">
-	<link rel="dct:publisher" href="${meta[u'Utgivare'].uri}"/>
+	<link rel="dcterms:publisher" href="${meta[u'Utgivare'].uri}"/>
       </py:if>
       <py:if test="u'uri' in meta[u'Departement/ myndighet']">
-	<link rel="dct:creator" href="${meta[u'Departement/ myndighet'].uri}"/>
+	<link rel="dcterms:creator" href="${meta[u'Departement/ myndighet'].uri}"/>
       </py:if>
       <py:if test="u'Utfärdad' in meta">
 	<meta property="rinfo:utfardandedatum"
 	      content="${meta[u'Utfärdad']}" datatype="xsd:date"/>
       </py:if>
       <py:if test="u'Förkortning' in meta">
-	<meta property="dct:alternate" content="${meta[u'Förkortning']}"/>
+	<meta property="dcterms:alternate" content="${meta[u'Förkortning']}"/>
       </py:if>
       <py:if test="u'Ikraft' in meta">
         <meta property="rinfo:ikrafttradandedatum"
@@ -90,7 +90,7 @@ from datetime import datetime
 	       about="#${kapitel.id}"
 	       property="rinfoex:kapitelnummer"
 	       content="${kapitel.ordinal}">
-	<span rel="dct:isPartOf" href="${meta['xml:base']}"/>
+	<span rel="dcterms:isPartOf" href="${meta['xml:base']}"/>
 	<h class="kapitelrubrik" py:content="kapitel.rubrik">Kapitelrubrik</h>
 	
 	<py:for each="part in kapitel" py:choose="">
@@ -113,7 +113,7 @@ from datetime import datetime
 	       about="#${paragraf.id}"
 	       property="rinfoex:paragrafnummer"
 	       content="${paragraf.ordinal}">
-	<span rel="dct:isPartOf" href="${isPartOf}"/>
+	<span rel="dcterms:isPartOf" href="${isPartOf}"/>
 	<span class="ikrafttradande" py:if="paragraf.ikrafttrader">(Träder i kraft ${paragraf.ikrafttrader})</span>
 	<span class="upphor"         py:if="paragraf.upphor">(Upphör att gälla ${paragraf.upphor})</span>
 	<!--! första stycket måste rendreras tillsammans med
@@ -129,7 +129,7 @@ from datetime import datetime
 	 id="${stycke.id}"
 	 about="#${stycke.id}"
 	 typeof="rinfo:Stycke">
-	<span rel="dct:isPartOf" href="${isPartOf}"/>
+	<span rel="dcterms:isPartOf" href="${isPartOf}"/>
         <span class="paragrafbeteckning" py:if="paragrafnummer">${paragrafnummer} §</span>      
         <py:for each="part in stycke" py:choose=""><div py:when="isinstance(part, NumreradLista)" py:strip="">${render_numreradlista(part, '#'+stycke.id)}</div><div py:when="isinstance(part, Bokstavslista)" py:strip="">${render_bokstavslista(part, '#'+stycke.id)}</div><div py:when="isinstance(part, Strecksatslista)" py:strip="">${render_strecksatslista(part, '#'+stycke.id)}</div><div py:when="isinstance(part, Tabell)" py:strip="">${render_tabell(part)}</div><div py:when="isinstance(part, Link)" py:strip="">${render_link(part)}</div><div py:when="isinstance(part, unicode)" py:strip="">${part}</div><div py:otherwise="" py:strip="">${dispatch_render(part,'Stycke')}</div></py:for>
       </p>
@@ -178,7 +178,7 @@ from datetime import datetime
 	  about="#${listelement.id}"
 	  >
       <!--! for nested lists -->
-      <span rel="dct:isPartOf" href="${isPartOf}"/>
+      <span rel="dcterms:isPartOf" href="${isPartOf}"/>
       <py:for each="part in listelement" py:choose=""><div py:when="isinstance(part, NumreradLista)" py:strip="">${render_numreradlista(part,listelement.id)}</div><div py:when="isinstance(part, Strecksatslista)" py:strip="">${render_strecksatslista(part,listelement.id)}</div><div py:when="isinstance(part, Bokstavslista)" py:strip="">${render_bokstavslista(part,listelement.id)}</div><div py:when="isinstance(part, Link)" py:strip="">${render_link(part)}</div><div py:when="isinstance(part, unicode)" py:strip="">${part}</div><div py:otherwise="" py:strip="">${dispatch_render(part,'Listelement')}</div></py:for>
       </li>
 
@@ -275,7 +275,7 @@ from datetime import datetime
       </section>
       
       <!--! main body -->
-      <h property="dct:title" py:content="meta[u'Rubrik']">Författningsrubrik</h>
+      <h property="dcterms:title" py:content="meta[u'Rubrik']">Författningsrubrik</h>
       ${render_metadata(meta)}
       <p class="ikrafttradande" py:if="body.ikrafttrader">(Träder i kraft ${body.ikrafttrader})</p>
       <section role="main">

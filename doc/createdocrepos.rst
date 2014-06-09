@@ -334,11 +334,11 @@ metadata represented in RDFa form:
 
 .. code-block:: xml
 
-    <div class="section" property="dct:title" content=" Overview"
+    <div class="section" property="dcterms:title" content=" Overview"
          typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6984#S2.">
       <span property="bibo:chapter" content="2."
             about="http://localhost:8000/res/rfc/6984#S2."/>
-      <div class="subsection" property="dct:title" content=" Date, Location, and Participants"
+      <div class="subsection" property="dcterms:title" content=" Date, Location, and Participants"
            typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6984#S2.1.">
         <span property="bibo:chapter" content="2.1."
               about="http://localhost:8000/res/rfc/6984#S2.1."/>
@@ -346,11 +346,11 @@ metadata represented in RDFa form:
           The second ForCES interoperability test meeting was held by the
           IETF ForCES Working Group on February 24-25, 2011...
         </pre>
-        <div class="subsection" property="dct:title" content=" Testbed Configuration"
+        <div class="subsection" property="dcterms:title" content=" Testbed Configuration"
              typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6984#S2.2.">
           <span property="bibo:chapter" content="2.2."
                 about="http://localhost:8000/res/rfc/6984#S2.2."/>
-          <div class="subsubsection" property="dct:title" content=" Participants' Access"
+          <div class="subsubsection" property="dcterms:title" content=" Participants' Access"
                typeof="bibo:DocumentPart" about="http://localhost:8000/res/rfc/6984#S2.2.1.">
             <span content="2.2.1." about="http://localhost:8000/res/rfc/6984#S2.2.1."
                   property="bibo:chapter"/>
@@ -416,10 +416,10 @@ The result of these lines is that the following block of plain text:
 
    <pre>
       The behavior recommended in <a href="#S2.5"
-      rel="dct:references">Section 2.5</a> is in line with generic
+      rel="dcterms:references">Section 2.5</a> is in line with generic
       error treatment during the IKE_SA_INIT exchange, per <a
       href="http://localhost:8000/res/rfc/5996#S2.21.1"
-      rel="dct:references">Section 2.21.1 of [RFC5996]</a>.
+      rel="dcterms:references">Section 2.21.1 of [RFC5996]</a>.
    </pre>
 
 .. note::
@@ -529,7 +529,7 @@ driven by a `SPARQL construct query
 <http://www.w3.org/TR/rdf-sparql-query/#construct>`_. The default
 query fetches metadata about every other document that refers to the
 document (or sections thereof) you're generating, using the
-``dct:references`` predicate. By setting the class variable
+``dcterms:references`` predicate. By setting the class variable
 :data:`~ferenda.DocumentRepository.sparql_annotations` to the file
 name of SPARQL query file of your choice, you can override this query.
 
@@ -559,23 +559,23 @@ Now, when querying the triplestore for metadata about RFC 6021, the
 
 .. code-block:: xml
 
-    <graph xmlns:dct="http://purl.org/dc/terms/"
+    <graph xmlns:dcterms="http://purl.org/dc/terms/"
            xmlns:rfc="http://example.org/ontology/rfc/"
 	   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
       <resource uri="http://localhost:8000/res/rfc/6021">
         <rfc:isObsoletedBy ref="http://localhost:8000/res/rfc/6991"/>
-        <dct:published fmt="datatype">
+        <dcterms:published fmt="datatype">
           <date xmlns="http://www.w3.org/2001/XMLSchema#">2010-10-01</date>
-        </dct:published>
-        <dct:title xml:lang="en">Common YANG Data Types</dct:title>
+        </dcterms:published>
+        <dcterms:title xml:lang="en">Common YANG Data Types</dcterms:title>
       </resource>
       <resource uri="http://localhost:8000/res/rfc/6991">
         <a><rfc:RFC/></a>
         <rfc:obsoletes ref="http://localhost:8000/res/rfc/6021"/>
-        <dct:published fmt="datatype">
+        <dcterms:published fmt="datatype">
           <date xmlns="http://www.w3.org/2001/XMLSchema#">2013-07-01</date>
-        </dct:published>
-        <dct:title xml:lang="en">Common YANG Data Types</dct:title>
+        </dcterms:published>
+        <dcterms:title xml:lang="en">Common YANG Data Types</dcterms:title>
       </resource>
     </graph>    
 
@@ -606,7 +606,7 @@ stylesheet. The default stylesheet uses a site-wide configuration file
 (created by :func:`~ferenda.manager.makeresources`) for things like
 site name and top-level navigation, and lists the document content,
 section by section, alongside of other documents that contains
-references (in the form of ``dct:references``) for each section. The
+references (in the form of ``dcterms:references``) for each section. The
 SPARQL query and the XSLT stylesheet often goes hand in hand -- if
 your stylesheet needs a certain piece of data, the query must be
 adjusted to fetch it. By setting he class variable
@@ -669,8 +669,8 @@ you'll have to override other methods which it calls, primarily
 :meth:`~ferenda.DocumentRepository.toc_predicates`. These
 methods all depend on the metadata you've created by your parse
 implementation, but in the simplest cases it's enough to specify that
-you want one set of pages organized by the ``dct:title`` of each
-document (alphabetically sorted) and another by ``dct:issued``
+you want one set of pages organized by the ``dcterms:title`` of each
+document (alphabetically sorted) and another by ``dcterms:issued``
 (numerically/calendarically sorted). The default implementation does
 exactly this.
 

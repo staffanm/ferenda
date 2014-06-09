@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 
-<http://rinfo.lagrummet.se/publ/rattsfall/nja/1990s331> dct:alternate "Sjöboden" .
+<http://rinfo.lagrummet.se/publ/rattsfall/nja/1990s331> dcterms:alternate "Sjöboden" .

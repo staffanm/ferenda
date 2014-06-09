@@ -35,7 +35,7 @@ class Kommitte(Trips):
 # End result something like this
 #
 # <http://rinfo.lagrummet.se/komm/a/1991:03> a :Kommittebeskrivning
-#         dct:identifier "A 1991:03" ;
+#         dcterms:identifier "A 1991:03" ;
 #         :tillkalladAr "1991" ;
 #         :lopnummer "03";
 #         :kommittestatus "Avslutad";
@@ -45,4 +45,4 @@ class Kommitte(Trips):
 #                           <http://rinfo.lagrummet.se/publ/dir/1992:33> ,
 #         :betankanden <http://rinfo.lagrummet.se/publ/bet/sou/1993:81> .
 #
-# <http://rinfo.lagrummet.se/publ/bet/sou/1993:81> dct:title "Översyn av arbetsmiljölagen";
+# <http://rinfo.lagrummet.se/publ/bet/sou/1993:81> dcterms:title "Översyn av arbetsmiljölagen";

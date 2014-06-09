@@ -42,9 +42,9 @@ class Main(unittest.TestCase):
         # make another section with special (but commonly used) types
         # and try to roundtrip them. The XML serialization format does
         # not support this.
-        graph = Graph().parse(data="""@prefix dct: <http://purl.org/dc/terms/> .
+        graph = Graph().parse(data="""@prefix dcterms: <http://purl.org/dc/terms/> .
 
-<http://example.org/1> dct:title "Hello world"@en .
+<http://example.org/1> dcterms:title "Hello world"@en .
 """, format="turtle")
         parseresult = urlparser.parseString("http://example.org/1")
         tree.append(Section([parseresult,
@@ -149,7 +149,7 @@ class Main(unittest.TestCase):
         class PredicateString(UnicodeElement, PredicateElement): pass
         # known vocabulary used
         x = PredicateString("This is my title", predicate="http://purl.org/dc/terms/title")
-        self.assertEqual("dct:title", x.predicate)
+        self.assertEqual("dcterms:title", x.predicate)
 
         # unknown vocabulary used
         y = PredicateString("This is my title", predicate="http://example.org/vocab/title")

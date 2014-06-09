@@ -1,29 +1,29 @@
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix : <http://example.org/repo/a/> .
 
 :1 a :FooDoc;
-   dct:title "The title of Document A 1";
-   dct:identifier "A1" .
+   dcterms:title "The title of Document A 1";
+   dcterms:identifier "A1" .
 
 :1part a :DocumentPart;
-   dct:isPartOf :1;
-   dct:identifier "A1(part)" .
+   dcterms:isPartOf :1;
+   dcterms:identifier "A1(part)" .
 
 :2 a :FooDoc;
-   dct:title "The title of Document A 2";
-   dct:identifier "A2";
-   dct:references :1 . 
+   dcterms:title "The title of Document A 2";
+   dcterms:identifier "A2";
+   dcterms:references :1 . 
 
 :2part1 a :DocumentPart;
-   dct:isPartOf :2;
-   dct:identifier "A2(part1)";
-   dct:references :1 . 
+   dcterms:isPartOf :2;
+   dcterms:identifier "A2(part1)";
+   dcterms:references :1 . 
 
 :2part2 a :DocumentPart;
-   dct:isPartOf :2;
-   dct:identifier "A2(part2)";
-   dct:references <http://example.org/repo/a/1part> .
+   dcterms:isPartOf :2;
+   dcterms:identifier "A2(part2)";
+   dcterms:references <http://example.org/repo/a/1part> .
 
 :3 a :FooDoc;
-   dct:title "The title of Document A 3";
-   dct:identifier "A3" .
+   dcterms:title "The title of Document A 3";
+   dcterms:identifier "A3" .

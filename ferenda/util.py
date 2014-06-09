@@ -66,7 +66,7 @@ class gYear(datetime.date):
 # util.Namespaces
 # Set up common namespaces and suitable prefixes for them
 ns = {'dc': 'http://purl.org/dc/elements/1.1/',
-      'dct': 'http://purl.org/dc/terms/',
+      'dcterms': 'http://purl.org/dc/terms/',
       'rdfs': 'http://www.w3.org/2000/01/rdf-schema#',
       'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
       'xsi': 'http://www.w3.org/2001/XMLSchema-instance',
@@ -78,7 +78,7 @@ ns = {'dc': 'http://purl.org/dc/elements/1.1/',
       'prov': 'http://www.w3.org/ns/prov#',
       'bibo': 'http://purl.org/ontology/bibo/',
       }
-"""A mapping of well-known prefixes and their corresponding namespaces. Includes ``dc``, ``dct``, ``rdfs``, ``rdf``, ``skos``, ``xsd``, ``foaf``, ``owl``, ``xhv``, ``prov`` and ``bibo``."""
+"""A mapping of well-known prefixes and their corresponding namespaces. Includes ``dc``, ``dcterms``, ``rdfs``, ``rdf``, ``skos``, ``xsd``, ``foaf``, ``owl``, ``xhv``, ``prov`` and ``bibo``."""
 
 # util.File
 

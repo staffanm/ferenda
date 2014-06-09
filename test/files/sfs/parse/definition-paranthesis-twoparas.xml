@@ -2,11 +2,11 @@
   <Paragraf id="P5" ordinal="5">
     <Stycke id="P5S1">
       <str>Från fonden skall lämnas ersättning (</str>
-      <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Författarpenning">författarpenning</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Författarpenning">författarpenning</LinkSubject>
       <str>).</str>
     </Stycke><Stycke id="P5S2">
       <str>Andra stycket skall tillämpas. </str>
-      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#L2003:1116">Förordning (2003:1116).</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#L2003:1116">Förordning (2003:1116).</LinkSubject>
     </Stycke>
   </Paragraf>
 </Forfattning>

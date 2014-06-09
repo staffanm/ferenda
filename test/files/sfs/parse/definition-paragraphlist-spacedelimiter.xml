@@ -4,21 +4,21 @@
       <str>I denna lag avses med</str>
     </Stycke><Stycke id="P2S2">
       <str />
-      <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Behörighetslagen">behörighetslagen</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Behörighetslagen">behörighetslagen</LinkSubject>
       <str> lagen (</str>
-      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1984:542">1984:542</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/1984:542">1984:542</LinkSubject>
       <str>) om behörighet att utöva yrke inom hälso- och sjukvården m.m.,</str>
     </Stycke><Stycke id="P2S3">
       <str />
-      <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Disciplinpåföljdslagen">disciplinpåföljdslagen</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Disciplinpåföljdslagen">disciplinpåföljdslagen</LinkSubject>
       <str> lagen (</str>
-      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1994:954">1994:954</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/1994:954">1994:954</LinkSubject>
       <str>) om disciplinpåföljd m.m. på hälso- och sjukvårdens område,</str>
     </Stycke><Stycke id="P2S4">
       <str />
-      <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Tillsynslagen">tillsynslagen</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Tillsynslagen">tillsynslagen</LinkSubject>
       <str> lagen (</str>
-      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1996:786">1996:786</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/1996:786">1996:786</LinkSubject>
       <str>) om tillsyn över hälso- och sjukvården,</str>
     </Stycke>
   </Paragraf>

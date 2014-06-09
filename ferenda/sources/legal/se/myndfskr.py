@@ -128,9 +128,9 @@ special-case code, though.)"""
         resources.parse(resource_list_file, format="xml")
 
         # 1.3: Define regexps for the data we search for.
-        fwdtests = {'dct:issn': ['^ISSN (\d+\-\d+)$'],
-                    'dct:title': ['((?:Föreskrifter|[\w ]+s (?:föreskrifter|allmänna råd)).*?)\n\n'],
-                    'dct:identifier': ['^([A-ZÅÄÖ-]+FS\s\s?\d{4}:\d+)$'],
+        fwdtests = {'dcterms:issn': ['^ISSN (\d+\-\d+)$'],
+                    'dcterms:title': ['((?:Föreskrifter|[\w ]+s (?:föreskrifter|allmänna råd)).*?)\n\n'],
+                    'dcterms:identifier': ['^([A-ZÅÄÖ-]+FS\s\s?\d{4}:\d+)$'],
                     'rpubl:utkomFranTryck': ['Utkom från\strycket\s+den\s(\d+ \w+ \d{4})'],
                     'rpubl:omtryckAv': ['^(Omtryck)$'],
                     'rpubl:genomforDirektiv': ['Celex (3\d{2,4}\w\d{4})'],
@@ -214,21 +214,21 @@ special-case code, though.)"""
 
         # 3: Clean up data - converting strings to Literals or
         # URIRefs, find legal references, etc
-        if 'dct:identifier' in props:
+        if 'dcterms:identifier' in props:
             (publication, year, ordinal) = re.split('[ :]',
-                                                    props['dct:identifier'])
+                                                    props['dcterms:identifier'])
             # FIXME: Read resources graph instead
             fs = resources.value(predicate=self.ns['skos'].altLabel,
                                  object=Literal(publication, lang='sv'))
             props['rpubl:forfattningssamling'] = fs
             publ = resources.value(subject=fs,
-                                   predicate=self.ns['dct'].publisher)
-            props['dct:publisher'] = publ
+                                   predicate=self.ns['dcterms'].publisher)
+            props['dcterms:publisher'] = publ
 
             props['rpubl:arsutgava'] = Literal(
                 year)  # conversion to int, date not needed
             props['rpubl:lopnummer'] = Literal(ordinal)
-            props['dct:identifier'] = Literal(props['dct:identifier'])
+            props['dcterms:identifier'] = Literal(props['dcterms:identifier'])
 
             # Now we can mint the uri (should be done through LegalURI)
             uri = ("http://rinfo.lagrummet.se/publ/%s/%s:%s" %
@@ -238,7 +238,7 @@ special-case code, though.)"""
             self.log.debug("URI: %s" % uri)
         else:
             self.log.error(
-                "Couldn't find dct:identifier, cannot create URI, giving up")
+                "Couldn't find dcterms:identifier, cannot create URI, giving up")
             return None
 
         tracelog.info("Cleaning rpubl:beslutadAv")
@@ -253,40 +253,40 @@ special-case code, though.)"""
                     "Cannot find URI for rpubl:beslutadAv value %r" % props['rpubl:beslutadAv'])
                 del props['rpubl:beslutadAv']
 
-        tracelog.info("Cleaning dct:issn")
-        if 'dct:issn' in props:
-            props['dct:issn'] = Literal(props['dct:issn'])
+        tracelog.info("Cleaning dcterms:issn")
+        if 'dcterms:issn' in props:
+            props['dcterms:issn'] = Literal(props['dcterms:issn'])
 
-        tracelog.info("Cleaning dct:title")
+        tracelog.info("Cleaning dcterms:title")
 
         # common false positive
-        if 'dct:title' in props and 'denna f\xf6rfattning har beslutats den' in props['dct:title']:
-            del props['dct:title']
+        if 'dcterms:title' in props and 'denna f\xf6rfattning har beslutats den' in props['dcterms:title']:
+            del props['dcterms:title']
 
-        if 'dct:title' in props:
-            tracelog.info("Inspecting dct:title %r" % props['dct:title'])
+        if 'dcterms:title' in props:
+            tracelog.info("Inspecting dcterms:title %r" % props['dcterms:title'])
             # sometimes the title isn't separated with two newlines from the rest of the text
-            if "\nbeslutade den " in props['dct:title']:
-                props['dct:title'] = props[
-                    'dct:title'].split("\nbeslutade den ")[0]
-            props['dct:title'] = Literal(
-                util.normalize_space(props['dct:title']), lang="sv")
+            if "\nbeslutade den " in props['dcterms:title']:
+                props['dcterms:title'] = props[
+                    'dcterms:title'].split("\nbeslutade den ")[0]
+            props['dcterms:title'] = Literal(
+                util.normalize_space(props['dcterms:title']), lang="sv")
 
-            if re.search('^(Föreskrifter|[\w ]+s föreskrifter) om ändring i ', props['dct:title'], re.UNICODE):
-                tracelog.info("Finding rpubl:andrar in dct:title")
+            if re.search('^(Föreskrifter|[\w ]+s föreskrifter) om ändring i ', props['dcterms:title'], re.UNICODE):
+                tracelog.info("Finding rpubl:andrar in dcterms:title")
                 orig = re.search(
-                    '([A-ZÅÄÖ-]+FS \d{4}:\d+)', props['dct:title']).group(0)
+                    '([A-ZÅÄÖ-]+FS \d{4}:\d+)', props['dcterms:title']).group(0)
                 (publication, year, ordinal) = re.split('[ :]', orig)
                 origuri = "http://rinfo.lagrummet.se/publ/%s/%s:%s" % (self.rpubl_uri_transform(publication),
                                                                        year, ordinal)
                 props['rpubl:andrar'] = URIRef(origuri)
                 if 'rpubl:omtryckAv' in props:
                     props['rpubl:omtryckAv'] = URIRef(origuri)
-            if (re.search('^(Föreskrifter|[\w ]+s föreskrifter) om upphävande av', props['dct:title'], re.UNICODE)
+            if (re.search('^(Föreskrifter|[\w ]+s föreskrifter) om upphävande av', props['dcterms:title'], re.UNICODE)
                     and not 'rpubl:upphaver' in props):
-                tracelog.info("Finding rpubl:upphaver in dct:title")
+                tracelog.info("Finding rpubl:upphaver in dcterms:title")
                 props['rpubl:upphaver'] = six.text_type(
-                    props['dct:title'])  # cleaned below
+                    props['dcterms:title'])  # cleaned below
 
         tracelog.info("Cleaning date properties")
         for prop in ('rpubl:utkomFranTryck', 'rpubl:beslutsdatum', 'rpubl:ikrafttradandedatum'):
@@ -347,9 +347,9 @@ special-case code, though.)"""
             del props['rpubl:upphaver']
 
         tracelog.info("Deciding rdf:type")
-        if ('dct:title' in props and
-            "allmänna råd" in props['dct:title'] and
-                not "föreskrifter" in props['dct:title']):
+        if ('dcterms:title' in props and
+            "allmänna råd" in props['dcterms:title'] and
+                not "föreskrifter" in props['dcterms:title']):
             props['rdf:type'] = self.ns['rpubl']['AllmannaRad']
         else:
             props['rdf:type'] = self.ns['rpubl']['Myndighetsforeskrift']
@@ -357,8 +357,8 @@ special-case code, though.)"""
         # 3.5: Check to see that we have all properties that we expect
         # (should maybe be done elsewhere later?)
         tracelog.info("Checking required properties")
-        for prop in ('dct:identifier', 'dct:title', 'rpubl:arsutgava',
-                     'dct:publisher', 'rpubl:beslutadAv', 'rpubl:beslutsdatum',
+        for prop in ('dcterms:identifier', 'dcterms:title', 'rpubl:arsutgava',
+                     'dcterms:publisher', 'rpubl:beslutadAv', 'rpubl:beslutsdatum',
                      'rpubl:forfattningssamling', 'rpubl:ikrafttradandedatum',
                      'rpubl:lopnummer', 'rpubl:utkomFranTryck'):
             if not prop in props:

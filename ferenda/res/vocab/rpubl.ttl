@@ -2,7 +2,7 @@
 
 @prefix : <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix protege: <http://protege.stanford.edu/plugins/owl/protege#> .
@@ -35,7 +35,7 @@ rpubl:allmannaRadText a owl:ObjectProperty ;
     rdfs:domain [ owl:unionOf ( rpubl:AllmannaRad rpubl:Myndighetsforeskrift ) ] ;
     rdfs:isDefinedBy rpubl: ;
     rdfs:range rpubl:AllmannaRadText ;
-    rdfs:subPropertyOf dct:hasPart .
+    rdfs:subPropertyOf dcterms:hasPart .
 
 rpubl:angerKapitelnummer a owl:DatatypeProperty,
         owl:FunctionalProperty ;
@@ -83,7 +83,7 @@ rpubl:ersatter a owl:ObjectProperty ;
     rdfs:comment "Anger något som ersätts av denna resurs, t.ex. en förordning eller en del därav (såsom rubrik, kapitel, lagparagraf)."@sv ;
     rdfs:isDefinedBy rpubl: ;
     rdfs:subPropertyOf rpubl:andrar ;
-    owl:equivalentProperty dct:replaces ;
+    owl:equivalentProperty dcterms:replaces ;
     owl:inverseOf [ rdfs:label "Ersätts av"@sv ] .
 
 rpubl:foredragande a owl:ObjectProperty ;
@@ -99,7 +99,7 @@ rpubl:foreslarAndringAv a owl:ObjectProperty ;
     rdfs:domain rpubl:Forarbete ;
     rdfs:isDefinedBy rpubl: ;
     rdfs:range rpubl:Forfattning ;
-    rdfs:subPropertyOf dct:references ;
+    rdfs:subPropertyOf dcterms:references ;
     owl:inverseOf [ rdfs:label "Föreslås att ändras av"@sv ] .
 
 rpubl:foreslarUtredningAvAndringI a owl:ObjectProperty ;
@@ -108,7 +108,7 @@ rpubl:foreslarUtredningAvAndringI a owl:ObjectProperty ;
     rdfs:domain rpubl:Kommittedirektiv ;
     rdfs:isDefinedBy rpubl: ;
     rdfs:range rpubl:Forfattning ;
-    rdfs:subPropertyOf dct:references ;
+    rdfs:subPropertyOf dcterms:references ;
     owl:inverseOf [ rdfs:label "Föreslås att ändringsutredas av"@sv ] .
 
 rpubl:genomforDirektiv a owl:ObjectProperty ;
@@ -157,7 +157,7 @@ rpubl:kapitel a owl:ObjectProperty ;
     rdfs:domain [ owl:unionOf ( rpubl:FSDokument rpubl:KonsolideradGrundforfattning ) ] ;
     rdfs:isDefinedBy rpubl: ;
     rdfs:range rpubl:Kapitel ;
-    rdfs:subPropertyOf dct:hasPart ;
+    rdfs:subPropertyOf dcterms:hasPart ;
     owl:inverseOf [ rdfs:label "Kapitel i"@sv ] .
 
 rpubl:kompletterarForordning a owl:ObjectProperty ;
@@ -180,7 +180,7 @@ rpubl:omtryckAv a owl:ObjectProperty ;
     rdfs:domain rpubl:FSDokument ;
     rdfs:isDefinedBy rpubl: ;
     rdfs:range rpubl:FSDokument ;
-    rdfs:subPropertyOf dct:isVersionOf ;
+    rdfs:subPropertyOf dcterms:isVersionOf ;
     owl:inverseOf [ rdfs:label "Har omtryck"@sv ] .
 
 rpubl:overgangsbestammelsehanvisning a owl:ObjectProperty ;
@@ -201,7 +201,7 @@ rpubl:paragraf a owl:ObjectProperty ;
     rdfs:domain [ owl:unionOf ( rpubl:FSDokument rpubl:KonsolideradGrundforfattning rpubl:Kapitel ) ] ;
     rdfs:isDefinedBy rpubl: ;
     rdfs:range rpubl:Paragraf ;
-    rdfs:subPropertyOf dct:hasPart ;
+    rdfs:subPropertyOf dcterms:hasPart ;
     owl:inverseOf [ rdfs:label "Paragraf i"@sv ] .
 
 rpubl:radTill a owl:ObjectProperty ;
@@ -210,14 +210,14 @@ rpubl:radTill a owl:ObjectProperty ;
     rdfs:domain [ owl:unionOf ( rpubl:AllmannaRadText rpubl:AllmannaRad ) ] ;
     rdfs:isDefinedBy rpubl: ;
     rdfs:range [ owl:unionOf ( rpubl:Forfattning rpubl:Kapitel rpubl:Paragraf ) ] ;
-    rdfs:subPropertyOf dct:references .
+    rdfs:subPropertyOf dcterms:references .
 
 rpubl:rattelsebeskrivning a rdf:Property ;
     rdfs:label "Rättelsebeskrivning"@sv ;
     rdfs:comment "En beskrivning av innehållet i ett rättelseblad."@sv ;
     rdfs:domain rpubl:Rattelseblad ;
     rdfs:isDefinedBy rpubl: ;
-    rdfs:subPropertyOf dct:description .
+    rdfs:subPropertyOf dcterms:description .
 
 rpubl:rattsfallshanvisning a owl:ObjectProperty ;
     rdfs:label "Rättsfallshänvisning"@sv ;
@@ -231,7 +231,7 @@ rpubl:tillaggTill a owl:ObjectProperty ;
     rdfs:comment "Den kommitté som tilläget riktar sig till."@sv ;
     rdfs:domain rpubl:Kommittedirektiv ;
     rdfs:isDefinedBy rpubl: ;
-    rdfs:subPropertyOf dct:references .
+    rdfs:subPropertyOf dcterms:references .
 
 rpubl:upphaver a owl:ObjectProperty ;
     rdfs:label "Upphäver"@sv ;
@@ -364,13 +364,13 @@ rpubl:bilaga a owl:ObjectProperty ;
     rdfs:comment "En generell bilaga till ett rättsinformationsdokument."@sv ;
     rdfs:domain rpubl:Rattsinformationsdokument ;
     rdfs:isDefinedBy rpubl: ;
-    rdfs:subPropertyOf dct:hasPart ;
+    rdfs:subPropertyOf dcterms:hasPart ;
     owl:inverseOf rpubl:bilagaTill .
 
 rpubl:bilagaTill a owl:ObjectProperty ;
     rdfs:label "Bilaga till"@sv ;
     rdfs:isDefinedBy rpubl: ;
-    rdfs:subPropertyOf dct:isPartOf ;
+    rdfs:subPropertyOf dcterms:isPartOf ;
     owl:inverseOf rpubl:bilaga .
 
 rpubl:departement a owl:ObjectProperty ;
@@ -404,7 +404,7 @@ rpubl:forarbete a owl:ObjectProperty ;
     rdfs:comment "Relaterat förarbete till en författning."@sv ;
     rdfs:domain rpubl:FSDokument ;
     rdfs:isDefinedBy rpubl: ;
-    rdfs:subPropertyOf dct:references ;
+    rdfs:subPropertyOf dcterms:references ;
     owl:inverseOf [ rdfs:label "Förarbete till"@sv ] .
 
 rpubl:giltigaSprak a owl:DatatypeProperty ;
@@ -428,7 +428,7 @@ rpubl:konsoliderar a owl:FunctionalProperty,
     rdfs:domain rpubl:KonsolideradGrundforfattning ;
     rdfs:isDefinedBy rpubl: ;
     rdfs:range rpubl:Forfattning ;
-    rdfs:subPropertyOf dct:isVersionOf ;
+    rdfs:subPropertyOf dcterms:isVersionOf ;
     owl:inverseOf [ rdfs:label "Konsoliderad av"@sv ] .
 
 rpubl:konsolideringsunderlag a owl:ObjectProperty ;
@@ -500,7 +500,7 @@ rpubl:referatrubrik a rdf:Property ;
     rdfs:comment "Beskrivande rubrik för ett rättsfallsreferat."@sv ;
     rdfs:domain rpubl:Rattsfallsreferat ;
     rdfs:isDefinedBy rpubl: ;
-    rdfs:subPropertyOf dct:title .
+    rdfs:subPropertyOf dcterms:title .
 
 rpubl:referatserie a owl:DatatypeProperty,
         owl:FunctionalProperty ;
@@ -621,7 +621,7 @@ rpubl:utgarFran a owl:ObjectProperty ;
     rdfs:domain rpubl:Forarbete ;
     rdfs:isDefinedBy rpubl: ;
     rdfs:range rpubl:Forarbete ;
-    rdfs:subPropertyOf dct:references ;
+    rdfs:subPropertyOf dcterms:references ;
     owl:inverseOf [ rdfs:label "Är utgångspunkt för"@sv ] .
 
 rpubl:utkomFranTryck a owl:DatatypeProperty,
@@ -630,7 +630,7 @@ rpubl:utkomFranTryck a owl:DatatypeProperty,
     rdfs:comment "Datum då dokumentet utkom från trycket."@sv ;
     rdfs:isDefinedBy rpubl: ;
     rdfs:range xsd:date ;
-    rdfs:subPropertyOf dct:issued .
+    rdfs:subPropertyOf dcterms:issued .
 
 rpubl:AllmannaRad a owl:Class ;
     rdfs:label "Allmänna råd"@sv ;
@@ -700,7 +700,7 @@ rpubl:Rattsfallsreferat a owl:Class ;
         [ a owl:Restriction ;
             rdfs:comment "En hänvisning av den typ som förekommer i källförteckningar/bibliografier, exv \"NJA 2009 s. 695\"."@sv ;
             owl:maxCardinality 1 ;
-            owl:onProperty dct:bibliographicCitation ],
+            owl:onProperty dcterms:bibliographicCitation ],
         rpubl:Rattsfallsrapport .
 
 rpubl:Utredningsbetankande a owl:Class ;
@@ -771,7 +771,7 @@ rpubl:publikationssamling a owl:ObjectProperty ;
     protege:abstract "true" ;
     rdfs:comment "Anger medlemsskap i någon form av (rättsinformationsspecifik) publikationssamling, såsom en författningssamling eller utredningsserie."@sv ;
     rdfs:isDefinedBy rpubl: ;
-    rdfs:subPropertyOf dct:isPartOf .
+    rdfs:subPropertyOf dcterms:isPartOf .
 
 rpubl:Kommittedirektiv a owl:Class ;
     rdfs:label "Kommittédirektiv"@sv ;
@@ -873,17 +873,17 @@ rpubl:Rattsinformationsdokument a owl:Class ;
     rdfs:subClassOf [ a owl:Restriction ;
             owl:allValuesFrom rdfs:Literal ;
             owl:minCardinality 1 ;
-            owl:onProperty dct:title ],
+            owl:onProperty dcterms:title ],
         [ a owl:Restriction ;
             owl:allValuesFrom xsd:date ;
             owl:cardinality 1 ;
-            owl:onProperty dct:issued ],
+            owl:onProperty dcterms:issued ],
         [ a owl:Restriction ;
             owl:allValuesFrom foaf:Organization ;
             owl:maxCardinality 1 ;
-            owl:onProperty dct:publisher ],
+            owl:onProperty dcterms:publisher ],
         [ a owl:Restriction ;
-            owl:onProperty dct:identifier ;
+            owl:onProperty dcterms:identifier ;
             owl:someValuesFrom rdfs:Literal ],
         foaf:Document .
 
@@ -930,13 +930,13 @@ rpubl:FSDokument a owl:Class ;
         rpubl:Rattsinformationsdokument .
 
 rpubl: a owl:Ontology ;
-    dct:created "2006-12-05"^^xsd:date ;
-    dct:description """En begreppsmodell som beskriver de dokumenttyper,
+    dcterms:created "2006-12-05"^^xsd:date ;
+    dcterms:description """En begreppsmodell som beskriver de dokumenttyper,
                     egenskaper och andra relaterade ting som ingår i det
                     svenska rättsinformationssystemet."""@sv ;
-    dct:title "Svenska rättsinformationssystemets dokumentmodell"@sv ;
-    dct:updated "2010-05-19"^^xsd:date ;
-    owl:imports dct:,
+    dcterms:title "Svenska rättsinformationssystemets dokumentmodell"@sv ;
+    dcterms:updated "2010-05-19"^^xsd:date ;
+    owl:imports dcterms:,
         skos:,
         foaf: ;
     owl:versionInfo "0.6" .

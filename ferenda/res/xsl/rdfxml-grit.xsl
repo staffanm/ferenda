@@ -2,7 +2,7 @@
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
                 xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
                 xmlns:grddl="http://www.w3.org/2003/g/data-view#"
-		xmlns:dct="http://purl.org/dc/terms/"
+		xmlns:dcterms="http://purl.org/dc/terms/"
                 exclude-result-prefixes="rdf grddl">
 
     <!--
@@ -13,24 +13,24 @@
     <xsl:template name="_description">
         <doas:XSLTStylesheet rdf:about="http://purl.org/oort/impl/xslt/grit/rdfxml-grit.xslt"
                              xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-                             xmlns:dct="http://purl.org/dc/terms/"
+                             xmlns:dcterms="http://purl.org/dc/terms/"
                              xmlns:foaf="http://xmlns.com/foaf/0.1/"
                              xmlns:doas="http://purl.org/net/ns/doas#">
-            <dct:title>Grit XSLT</dct:title>
-            <dct:description xml:lang="en">Transforms RDF/XML to Grit (Grokkable RDF Is Transformable).</dct:description>
-            <dct:created rdf:datatype="http://www.w3.org/2001/XMLSchema#date"
-                         >2009-12-08</dct:created>
-            <dct:modified rdf:datatype="http://www.w3.org/2001/XMLSchema#date"
-                        >2010-03-28</dct:modified>
-            <dct:license rdf:resource="http://usefulinc.com/doap/licenses/bsd"/>
+            <dcterms:title>Grit XSLT</dcterms:title>
+            <dcterms:description xml:lang="en">Transforms RDF/XML to Grit (Grokkable RDF Is Transformable).</dcterms:description>
+            <dcterms:created rdf:datatype="http://www.w3.org/2001/XMLSchema#date"
+                         >2009-12-08</dcterms:created>
+            <dcterms:modified rdf:datatype="http://www.w3.org/2001/XMLSchema#date"
+                        >2010-03-28</dcterms:modified>
+            <dcterms:license rdf:resource="http://usefulinc.com/doap/licenses/bsd"/>
             <foaf:primaryTopic rdf:resource="http://purl.org/oort/def/2009/grit"/>
-            <dct:creator>
+            <dcterms:creator>
                 <foaf:Person rdf:about="http://purl.org/NET/dust/foaf#self">
                     <foaf:name>Niklas Lindström</foaf:name>
                     <foaf:mbox rdf:resource="mailto:lindstream@gmail.com"/>
                 </foaf:Person>
-            </dct:creator>
-            <dct:format>application/xslt+xml</dct:format>
+            </dcterms:creator>
+            <dcterms:format>application/xslt+xml</dcterms:format>
         </doas:XSLTStylesheet>
     </xsl:template>
 

@@ -165,7 +165,7 @@ a[href] {
 }
 
 /* Sättande av variabler som används i sidhuvudet */
-*[property="dct:alternate"] { string-set: titel attr(content); }
+*[property="dcterms:alternate"] { string-set: titel attr(content); }
 *[property="rinfoex:kapitelnummer"] { string-set: kapitelnr attr(content); } 
 *[property="rinfoex:paragrafnummer"] { string-set: paragrafnr attr(content); }
 span.paragrafbeteckning { string-set: altparagraf content(); }

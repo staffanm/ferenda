@@ -48,7 +48,7 @@ class PreambleSection(CompoundElement):
     # well.
     def as_xhtml(self, uri):
         element = super(PreambleSection, self).as_xhtml(uri)
-        element.set('property', 'dct:title')
+        element.set('property', 'dcterms:title')
         element.set('content', self.title)
         element.set('typeof', 'bibo:DocumentPart')
         self.__class__.counter += 1
@@ -65,7 +65,7 @@ class RFC(DocumentRepository):
     document_url_regex = "http://tools.ietf.org/rfc/rfc(?P<basefile>\w+).txt"
     downloaded_suffix = ".txt"
     namespaces = ('rdf',  # always needed
-                  'dct',  # title, identifier, etc (could be replaced by equiv bibo prop?)
+                  'dcterms',  # title, identifier, etc (could be replaced by equiv bibo prop?)
                   'bibo',  # Standard and DocumentPart classes, chapter prop
                   'xsd',  # datatypes
                   'foaf',  # rfcs are foaf:Documents for now
@@ -472,17 +472,17 @@ class RFC(DocumentRepository):
         desc = Describer(doc.meta, doc.uri)
         desc.rdftype(self.ns['rfc'].RFC)
         desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-        desc.value(self.ns['dct'].title, title, lang="en")
+        desc.value(self.ns['dcterms'].title, title, lang="en")
         self.parse_header(header, desc)
-        if not desc.getvalues(self.ns['dct'].identifier):
-            desc.value(self.ns['dct'].identifier, "RFC %s" % doc.basefile)
+        if not desc.getvalues(self.ns['dcterms'].identifier):
+            desc.value(self.ns['dcterms'].identifier, "RFC %s" % doc.basefile)
 
         doc.lang = "en"
 
         # process body - remove the temporary Pagebreak objects, after
         # having extracted the shortTitle found in them
         shorttitle = self.cleanup_body(doc.body)
-        if shorttitle and (desc.getvalue(self.ns['dct'].title) != shorttitle):
+        if shorttitle and (desc.getvalue(self.ns['dcterms'].title) != shorttitle):
             desc.value(self.ns['bibo'].shortTitle, shorttitle, lang="en")
 
         # process body - add good metadata
@@ -532,12 +532,12 @@ class RFC(DocumentRepository):
         # first line of lefthand side is publishing organization (?)
         publisher_label = left[0]
         try:
-            desc.rel(self.ns['dct'].publisher,
+            desc.rel(self.ns['dcterms'].publisher,
                        self.lookup_resource(publisher_label))
         except KeyError:
             self.log.warn("Couldn't look up a proper resource URI for %s" %
                           publisher_label)
-            desc.value(self.ns['dct'].publisher,
+            desc.value(self.ns['dcterms'].publisher,
                        publisher_label)
             
         # following lefthand side are key-value headers
@@ -556,17 +556,17 @@ class RFC(DocumentRepository):
                 # variants
                 value = re.sub("\D", "", value)
                 if value:  # eg RFC 100
-                    desc.value(self.ns['dct'].identifier, "RFC %s" % value)
+                    desc.value(self.ns['dcterms'].identifier, "RFC %s" % value)
             elif key == "Category":
                 try:
-                    desc.rel(self.ns['dct'].subject,
+                    desc.rel(self.ns['dcterms'].subject,
                                self.lookup_resource(value, predicate=self.ns['bibo'].identifier))
                 except KeyError:
                     self.log.warn("Couldn't look up a proper resource URI for %s" %
                                   value)
-                    desc.value(self.ns['dct'].subject, value)
+                    desc.value(self.ns['dcterms'].subject, value)
             elif key == "ISSN":
-                desc.value(self.ns['dct'].issn, value)
+                desc.value(self.ns['dcterms'].issn, value)
             elif key in ("Updates", "Obsoletes"):
                 pred = {'Updates': self.ns['rfc'].updates,
                         'Obsoletes': self.ns['rfc'].obsoletes}[key]
@@ -592,7 +592,7 @@ class RFC(DocumentRepository):
         # followed by '. ' is probably a name
         for line in right:
             if re.match("[A-Z]\. ", line):
-                desc.value(self.ns['dct'].creator, line)
+                desc.value(self.ns['dcterms'].creator, line)
             elif re.match("\w+ \d{4}$", line):
                 # NOTE: this requires english locale!
                 with util.c_locale():
@@ -601,24 +601,24 @@ class RFC(DocumentRepository):
                     # the date information. Use xsd:gYearMonth.
                     dt = datetime.strptime(line, "%B %Y")
                 d = util.gYearMonth(dt.year, dt.month)
-                desc.value(self.ns['dct'].issued, str(d),
+                desc.value(self.ns['dcterms'].issued, str(d),
                            datatype=XSD.gYearMonth)
             else:
                 # company affiliation - include that separate from
                 # personal author identity
-                desc.value(self.ns['dct'].rightsHolder, line)
+                desc.value(self.ns['dcterms'].rightsHolder, line)
 
     def toc_predicates(self):
         return [self.ns['rdf'].type,
-                self.ns['dct'].identifier,
-                self.ns['dct'].title,
-                self.ns['dct'].publisher,
-                self.ns['dct'].issued,
-                self.ns['dct'].subject]
+                self.ns['dcterms'].identifier,
+                self.ns['dcterms'].title,
+                self.ns['dcterms'].publisher,
+                self.ns['dcterms'].issued,
+                self.ns['dcterms'].subject]
 
     def toc_criteria(self, predicates=None):
         from ferenda import TocCriteria
-        DCT = self.ns['dct']
+        DCTERMS = self.ns['dcterms']
         RDF = self.ns['rdf']
         return [TocCriteria(binding='type',
                             label='Sorted by document type',
@@ -634,7 +634,7 @@ class RFC(DocumentRepository):
                             key=lambda x: int(x['identifier'][4:]),
                             selector_descending=True,
                             key_descending=True,
-                            predicate=DCT.identifier),   # "RFC 6998" => 6998
+                            predicate=DCTERMS.identifier),   # "RFC 6998" => 6998
 
                 TocCriteria(binding='title',
                             label='Sorted by title',
@@ -642,7 +642,7 @@ class RFC(DocumentRepository):
                             # "The 'view-state'" property => "v"
                             selector=lambda x: util.title_sortkey(x['title'])[0],
                             key=lambda x: util.title_sortkey(x['title']),
-                            predicate=DCT.title),
+                            predicate=DCTERMS.title),
 
                 TocCriteria(binding='publisher',
                             label='Sorted by stream',
@@ -651,7 +651,7 @@ class RFC(DocumentRepository):
                             key=lambda x: x['publisher'],
                             selector_descending=True,
                             key_descending=True,
-                            predicate=DCT.publisher),
+                            predicate=DCTERMS.publisher),
 
                 TocCriteria(binding='issued',
                             label='Sorted by year',
@@ -660,7 +660,7 @@ class RFC(DocumentRepository):
                             key=lambda x: x['issued'],
                             selector_descending=True,
                             key_descending=True,
-                            predicate=DCT.issued),
+                            predicate=DCTERMS.issued),
 
                 TocCriteria(binding='subject',
                             label='Sorted by category',
@@ -668,7 +668,7 @@ class RFC(DocumentRepository):
                             selector=lambda x: x['subject'],
                             key=lambda x: int(x['identifier'][4:]),
                             key_descending=True,
-                            predicate=DCT.subject)
+                            predicate=DCTERMS.subject)
             ]
 
     def toc_item(self, binding, row):
@@ -687,7 +687,7 @@ class RFC(DocumentRepository):
                 with self.store.open_distilled(entry.basefile) as fp:
                     graph.parse(data=fp.read())
                 desc = Describer(graph, entry.id)
-                return desc.getvalue(self.ns['dct'].subject) == category
+                return desc.getvalue(self.ns['dcterms'].subject) == category
             return selector
 
         return [NewsCriteria('all', 'All RFCs'),
@@ -709,7 +709,7 @@ class RFC(DocumentRepository):
                 graph.parse(data=fp.read())
 
             data = {
-                'identifier': graph.value(URIRef(entry.id), self.ns['dct'].identifier).toPython(),
+                'identifier': graph.value(URIRef(entry.id), self.ns['dcterms'].identifier).toPython(),
                 'uri': entry.id,
                 'title': entry.title}
             items += '<li>%(identifier)s <a href="%(uri)s">%(title)s</a></li>' % data

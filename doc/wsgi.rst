@@ -97,7 +97,7 @@ above.
   not available on the web, for example to specify the publisher of a
   specific document, eg::
     <http://localhost:8000/res/rfc/4711>
-        dct:publisher <http://localhost:8080/things/org/IETF> .
+        dcterms:publisher <http://localhost:8080/things/org/IETF> .
   All n3 files present in the directory ``triples`` will be read and
   used. Eg. create ``triples/org.n3`` with the content::
     <http://localhost:8000/things/org/IETF>

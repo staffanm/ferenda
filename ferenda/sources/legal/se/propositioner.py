@@ -322,7 +322,7 @@ class PropTrips(Trips):
                 # How to represent that one XHTML doc was created from
                 # plaintext, and another from PDF? create a bnode
                 # representing the source prov:wasDerivedFrom and set its
-                # dct:format to correct mime type
+                # dcterms:format to correct mime type
 
             d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
             self.infer_triples(d, doc.basefile)
@@ -352,7 +352,7 @@ class PropTrips(Trips):
                 continue
             elif not doc.body and p.strip().startswith("Titel:"):
                 describer.value(
-                    self.ns['dct'].title, util.normalize_space(p[7:]))
+                    self.ns['dcterms'].title, util.normalize_space(p[7:]))
             else:
                 doc.body.append(Preformatted([p]))
 

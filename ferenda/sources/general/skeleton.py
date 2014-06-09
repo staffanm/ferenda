@@ -51,7 +51,7 @@ class Skeleton(DocumentRepository):
         ns = 'http://www.w3.org/2005/Atom'
         done = False
         biggraph = Graph()
-        biggraph.bind("dct", self.ns['dct'])
+        biggraph.bind("dcterms", self.ns['dcterms'])
         biggraph.bind("rpubl", self.ns['rpubl'])
 
         while not done:
@@ -163,7 +163,7 @@ class Skeleton(DocumentRepository):
                      "arsutgava": self.ns['rpubl']["arsutgava"],
                      "kapitel": self.ns['rpubl']["kapitel"],
                      "paragraf": self.ns['rpubl']["paragraf"],
-                     "identifier": self.ns['dct']["identifier"],
+                     "identifier": self.ns['dcterms']["identifier"],
                      }
 
         patterns = {self.RATTSFALL:

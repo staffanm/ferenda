@@ -2,7 +2,7 @@
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix owl:  <http://www.w3.org/2002/07/owl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .
 @prefix : <http://example.org/ontology/rfc/> .
 
@@ -33,17 +33,17 @@
     rdfs:label "FYI" .
     
 :updates a owl:DatatypeProperty;
-    rdfs:subPropertyOf dct:requires;
+    rdfs:subPropertyOf dcterms:requires;
     rdfs:label "Updates"@en .
     
 
 :obsoletes a owl:DatatypeProperty;
-    rdfs:subPropertyOf dct:replaces;
+    rdfs:subPropertyOf dcterms:replaces;
     rdfs:label "Obsoletes"@en .
 
 # - Should it be ":status", following the terminology of RFC 1796, or "category", '
 #   following what actually is present in the header? 
 # - Should it be a ObjectProperty (ie should it be used with URIs not string literals)?
 :category a owl:DatatypeProperty;
-    rdfs:subPropertyOf dct:subject;
+    rdfs:subPropertyOf dcterms:subject;
     rdfs:label "Category"@en .

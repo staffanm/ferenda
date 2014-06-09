@@ -2,7 +2,7 @@
      about="http://example.org/doc#42"
      typeof="bibo:DocumentPart"
      class="page">
-  <span property="dct:identifier"
+  <span property="dcterms:identifier"
 	content="Doc:4711, p 42"
 	xml:lang=""/>
      This is a part of a document

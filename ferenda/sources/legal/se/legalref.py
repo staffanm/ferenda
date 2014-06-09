@@ -275,8 +275,8 @@ class LegalRef:
                 scriptdir + "/../../../res/etc/kortlagrum.ebnf")
             for p in productions:
                 self.uriformatter[p] = self.sfs_format_uri
-            DCT = Namespace("http://purl.org/dc/terms/")
-            d = self.get_relations(DCT['alternate'])
+            DCTERMS = Namespace("http://purl.org/dc/terms/")
+            d = self.get_relations(DCTERMS['alternate'])
             self.namedlaws.update(d)
             # lawlist = [x.encode(SP_CHARSET) for x in list(d.keys())]
             lawlist = list(d.keys())

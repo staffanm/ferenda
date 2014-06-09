@@ -4,7 +4,7 @@
 		xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
 		xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
-		xmlns:dct="http://purl.org/dc/terms/"
+		xmlns:dcterms="http://purl.org/dc/terms/"
 		xmlns:skos="http://www.w3.org/2008/05/skos#"
 		xmlns:str="http://exslt.org/strings"
 		extension-element-prefixes="str">
@@ -27,7 +27,7 @@
     </xsl:variable>
     <xsl:choose>
       <xsl:when test="contains($uri, '#L')">
-	<span class="andringsnot" rel="dct:references" resource="{$uri}"><xsl:apply-templates/></span>
+	<span class="andringsnot" rel="dcterms:references" resource="{$uri}"><xsl:apply-templates/></span>
       </xsl:when>
       <xsl:when test="$localurl = ''">
 	<xsl:value-of select="."/>
@@ -35,7 +35,7 @@
       <xsl:otherwise>
 	<xsl:variable name="rawtitle">
 	  <xsl:choose>
-	    <xsl:when test="substring($uri, 0, 25) = 'http://lagen.nu/concept/'"><xsl:value-of select="$terms//skos:Concept[@rdf:about=$uri]/dct:description"/></xsl:when>
+	    <xsl:when test="substring($uri, 0, 25) = 'http://lagen.nu/concept/'"><xsl:value-of select="$terms//skos:Concept[@rdf:about=$uri]/dcterms:description"/></xsl:when>
 	      <!-- FIXME: on large documents this increases processing
 		   time exponentially. wonder if there's a faster XSLT way
 		   to get a node with a particular ID? A better way would

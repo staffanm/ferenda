@@ -1,6 +1,6 @@
 # Automatically transformed from sources at 2014-05-12T22:51:42.763901
 
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -11,147 +11,147 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://lagen.nu/dataset/01fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_stockholms_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_stockholms_lan> ;
     rdfs:seeAlso <http://www.ab.lst.se/templates/InformationPage____2227.asp> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/01fs> ;
     skos:altLabel "01FS"@sv ;
     skos:prefLabel "Stockholms läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/03fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_uppsala_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_uppsala_lan> ;
     rdfs:seeAlso <http://www.c.lst.se/templates/DocumentStart.aspx?id=923> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/03fs> ;
     skos:altLabel "03FS"@sv ;
     skos:prefLabel "Uppsala läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/04fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_sodermanlands_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_sodermanlands_lan> ;
     rdfs:seeAlso <http://www.d.lst.se/d/Publikationer_1/lanets+forfattningssamling/> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/04fs> ;
     skos:altLabel "04FS"@sv ;
     skos:prefLabel "Södermanlands läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/05fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_ostergotlands_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_ostergotlands_lan> ;
     rdfs:seeAlso <http://www5.e.lst.se/forfattningar/index.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/05fs> ;
     skos:altLabel "05FS"@sv ;
     skos:prefLabel "Östergötlands läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/06fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_jonkopings_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_jonkopings_lan> ;
     rdfs:seeAlso <http://www.f.lst.se/4.c79809f665b806047fff17217.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/06fs> ;
     skos:altLabel "06FS"@sv ;
     skos:prefLabel "Jönköpings läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/07fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_kronobergs_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_kronobergs_lan> ;
     rdfs:seeAlso <http://www.g.lst.se/g/Publikationer/forfattningar.htm> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/07fs> ;
     skos:altLabel "07FS"@sv ;
     skos:prefLabel "Kronobergs läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/08fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_kalmars_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_kalmars_lan> ;
     rdfs:seeAlso <http://www.h.lst.se/h/Publikationer/index/> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/08fs> ;
     skos:altLabel "08FS"@sv ;
     skos:prefLabel "Kalmars läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/09fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_gotlands_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_gotlands_lan> ;
     rdfs:seeAlso <http://www.i.lst.se/i/Publikationer/forfattningssamling/> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/09fs> ;
     skos:altLabel "09FS"@sv ;
     skos:prefLabel "Gotlands läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/10fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_blekinge_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_blekinge_lan> ;
     rdfs:seeAlso <http://www.k.lst.se/k/Publikationer/index/> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/10fs> ;
     skos:altLabel "10FS"@sv ;
     skos:prefLabel "Blekinge läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/12fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_skane_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_skane_lan> ;
     rdfs:seeAlso <http://www.m.lst.se/index.cfm?page=9D1EDC55-347D-EED3-F2808AC9A454A4FF> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/12fs> ;
     skos:altLabel "12FS"@sv ;
     skos:prefLabel "Skåne läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/13fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_hallands_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_hallands_lan> ;
     rdfs:seeAlso <http://www.n.lst.se/n/Publikationer/forfattningssamling.htm> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/13fs> ;
     skos:altLabel "13FS"@sv ;
     skos:prefLabel "Hallands läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/14fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_vastra_gotalands_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_vastra_gotalands_lan> ;
     rdfs:seeAlso <http://www.o.lst.se/o/Publikationer/Lansstyrelsens_forfattningssamling.htm> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/14fs> ;
     skos:altLabel "14FS"@sv ;
     skos:prefLabel "Västra Götalands läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/17fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_varmlands_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_varmlands_lan> ;
     rdfs:seeAlso <http://www.s.lst.se/s/Publikationer/varmlands_lans_forfattningssamling/> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/17fs> ;
     skos:altLabel "17FS"@sv ;
     skos:prefLabel "Värmlands läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/18fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_orebro_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_orebro_lan> ;
     rdfs:seeAlso <http://www.t.lst.se/t/Publikationer/orebro_lans_forfattningssamling/> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/18fs> ;
     skos:altLabel "18FS"@sv ;
     skos:prefLabel "Örebro läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/19fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_vastmanlands_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_vastmanlands_lan> ;
     rdfs:seeAlso <http://www.u.lst.se/u/Publikationer/Forfattningssamling/> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/19fs> ;
     skos:altLabel "19FS"@sv ;
     skos:prefLabel "Västmanlands läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/20fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_dalarnas_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_dalarnas_lan> ;
     rdfs:seeAlso <http://www.w.lst.se/template/FormList.aspx?id=3588> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/20fs> ;
     skos:altLabel "20FS"@sv ;
     skos:prefLabel "Dalarnas läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/21fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_gavleborgs_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_gavleborgs_lan> ;
     rdfs:seeAlso <http://www.x.lst.se/x/Publikationer/LFF.htm> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/21fs> ;
     skos:altLabel "21FS"@sv ;
     skos:prefLabel "Gävleborgs läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/22fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_vasternorrlands_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_vasternorrlands_lan> ;
     rdfs:seeAlso <http://www.y.lst.se/4.17431b9f544f8dca97fff21900.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/22fs> ;
     skos:altLabel "22FS"@sv ;
     skos:prefLabel "Västernorrlands läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/23fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_jamtlands_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_jamtlands_lan> ;
     rdfs:seeAlso <http://www2.z.lst.se/23FS/zforfattn.php> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/23fs> ;
     skos:altLabel "23FS"@sv ;
     skos:prefLabel "Jämtlands läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/24fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_vasterbottens_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_vasterbottens_lan> ;
     rdfs:seeAlso <http://www.ac.lst.se/publikationer/?z=&BPML=1632> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/24fs> ;
     skos:altLabel "24FS"@sv ;
     skos:prefLabel "Västerbottens läns författningssamling"@sv .
 
 <http://lagen.nu/dataset/25fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lansstyrelsen_norrbottens_lan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lansstyrelsen_norrbottens_lan> ;
     rdfs:seeAlso <http://www.bd.lst.se/oris/startpage.aspx> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/25fs> ;
     skos:altLabel "25FS"@sv ;
@@ -163,13 +163,13 @@
     skos:prefLabel "Arbetsdomstolen"@sv .
 
 <http://lagen.nu/dataset/affs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/arbetsformedlingen> ;
+    dcterms:publisher <http://lagen.nu/org/2014/arbetsformedlingen> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/affs> ;
     skos:altLabel "AFFS"@sv ;
     skos:prefLabel "Arbetsförmedlingens författningssamling"@sv .
 
 <http://lagen.nu/dataset/afs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/arbetsmiljoverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/arbetsmiljoverket> ;
     rdfs:seeAlso <http://www.av.se/lagochratt/index.aspx> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/aafs>,
         <http://rinfo.lagrummet.se/serie/fs/afs> ;
@@ -177,7 +177,7 @@
     skos:prefLabel "Arbetsmiljöverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/agvfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/arbetsgivarverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/arbetsgivarverket> ;
     rdfs:comment "Utnyttjas också av Statens pensionsverk"@sv ;
     rdfs:seeAlso <http://www.arbetsgivarverket.se/publicerat/forfattningar/index.asp> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/agvfs> ;
@@ -185,7 +185,7 @@
     skos:prefLabel "Arbetsgivarverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/amsfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/arbetsmarknadsstyrelsen> ;
+    dcterms:publisher <http://lagen.nu/org/2014/arbetsmarknadsstyrelsen> ;
     rdfs:comment "Har tagits över av arbetsförmedlingens författningssamling (AFFS)"@sv ;
     rdfs:seeAlso <http://www2.ams.se/regelbok/index.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/amsfs> ;
@@ -193,14 +193,14 @@
     skos:prefLabel "Arbetsmarknadsstyrelsens författningssamling"@sv .
 
 <http://lagen.nu/dataset/bffs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/bankinspektionen> ;
+    dcterms:publisher <http://lagen.nu/org/2014/bankinspektionen> ;
     rdfs:comment "Har tagits över av Finansinspektionens författningssamling (FFFS)"@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/bffs> ;
     skos:altLabel "BFFS"@sv ;
     skos:prefLabel "Bankinspektionens och försäkringsinspektionens författningssamling"@sv .
 
 <http://lagen.nu/dataset/bfnar> a rpubl:AllmannaRadSerie ;
-    dct:publisher <http://lagen.nu/org/2014/bokforingsnamnden> ;
+    dcterms:publisher <http://lagen.nu/org/2014/bokforingsnamnden> ;
     rdfs:seeAlso <http://www.bfn.se/index.asp?/redovisning/inledning.asp> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/ar/bfnarr>,
         <http://rinfo.lagrummet.se/serie/fs/bfnar> ;
@@ -208,21 +208,21 @@
     skos:prefLabel "Bokföringsnämndens allmänna råd"@sv .
 
 <http://lagen.nu/dataset/bfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/boverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/boverket> ;
     rdfs:seeAlso <http://www.boverket.se/templates/Page.aspx?id=449> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/bfs> ;
     skos:altLabel "BFS"@sv ;
     skos:prefLabel "Boverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/bolfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/bolagsverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/bolagsverket> ;
     rdfs:seeAlso <http://www.bolagsverket.se/om_bolagsverket/styrdokument/forfattningssamling/index.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/bolfs> ;
     skos:altLabel "BOLFS"@sv ;
     skos:prefLabel "Bolagsverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/bv-fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/banverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/banverket> ;
     rdfs:comment "Har tagits över av Transportstyrelsens författningssamling (TSFS)" ;
     rdfs:seeAlso <http://www.banverket.se/templates/StandardTtH.asp?id=2086> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/bv-fs> ;
@@ -230,14 +230,14 @@
     skos:prefLabel "Banverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/csnfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/centrala_studiestodsnamnden> ;
+    dcterms:publisher <http://lagen.nu/org/2014/centrala_studiestodsnamnden> ;
     rdfs:seeAlso <http://www.csn.se/Avdelningar/OmCSN/LagOchRatt/CSNsForfattningssamling%28CSNFS%29/CSNsForfattningssamling%28CSNFS%29.asp?MenyIdnr=1163> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/csnfs> ;
     skos:altLabel "CSNFS"@sv ;
     skos:prefLabel "Centrala studiestödsnämndens författningssamling"@sv .
 
 <http://lagen.nu/dataset/dfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/djurskyddsmyndigheten> ;
+    dcterms:publisher <http://lagen.nu/org/2014/djurskyddsmyndigheten> ;
     rdfs:comment "Har tagits över av jordbruksverkets författningssamling (SJVFS)"@sv ;
     rdfs:seeAlso <http://www.djurskyddsmyndigheten.se/Steria/templates/Page.aspx?id=482> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/dfs> ;
@@ -245,60 +245,60 @@
     skos:prefLabel "Djurskyddsmyndighetens författningssamling"@sv .
 
 <http://lagen.nu/dataset/difs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/datainspektionen> ;
+    dcterms:publisher <http://lagen.nu/org/2014/datainspektionen> ;
     rdfs:seeAlso <http://www.datainspektionen.se/infobestall/infomaterial/foreskrifter.jsp> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/difs> ;
     skos:altLabel "DIFS"@sv ;
     skos:prefLabel "Datainspektionens författningssamling"@sv .
 
 <http://lagen.nu/dataset/ds> a rpubl:Utredningsserie ;
-    dct:publisher <http://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:publisher <http://lagen.nu/org/2008/regeringskansliet> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/utr/ds> ;
     skos:altLabel "Ds"@sv ;
     skos:prefLabel "Departementsserien"@sv .
 
 <http://lagen.nu/dataset/dvfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
+    dcterms:publisher <http://lagen.nu/org/2008/domstolsverket> ;
     rdfs:seeAlso <http://www.domstol.se/templates/DV_InfoPage____2670.aspx> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/dvfs> ;
     skos:altLabel "DVFS"@sv ;
     skos:prefLabel "Domstolsverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/eifs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/energimarknadsinspektionen> ;
+    dcterms:publisher <http://lagen.nu/org/2014/energimarknadsinspektionen> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/eifs> ;
     skos:altLabel "EIFS"@sv ;
     skos:prefLabel "Energimarknadsinspektionens författningssamling"@sv .
 
 <http://lagen.nu/dataset/elsak-fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/elsakerhetsverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/elsakerhetsverket> ;
     rdfs:seeAlso <http://www.elsakerhetsverket.se/vanstermeny/foreskrifter.4.964130fe7b18648b80001451.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/elsaek-fs> ;
     skos:altLabel "ELSÄK-FS"@sv ;
     skos:prefLabel "Elsäkerhetsverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/emfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/exempelmyndigheten> ;
+    dcterms:publisher <http://lagen.nu/org/2014/exempelmyndigheten> ;
     rdfs:comment "Detta är ett exempel på en fiktiv myndighet som endast är ämnat för test"@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/emfs> ;
     skos:altLabel "EMFS"@sv ;
     skos:prefLabel "Exempelmyndigheten författningssamling"@sv .
 
 <http://lagen.nu/dataset/far> a rpubl:AllmannaRadSerie ;
-    dct:publisher <http://lagen.nu/org/2014/forsvarsmakten> ;
+    dcterms:publisher <http://lagen.nu/org/2014/forsvarsmakten> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/ar/far> ;
     skos:altLabel "far"@sv ;
     skos:prefLabel "Försvarsmaktens allmänna råd"@sv .
 
 <http://lagen.nu/dataset/fffs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2008/finansinspektionen> ;
+    dcterms:publisher <http://lagen.nu/org/2008/finansinspektionen> ;
     rdfs:seeAlso <http://www.fi.se/Templates/FFFSSearchPage____1328.aspx> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/fffs> ;
     skos:altLabel "FFFS"@sv ;
     skos:prefLabel "Finansinspektionens författningssamling"@sv .
 
 <http://lagen.nu/dataset/ffs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/forsvarsmakten> ;
+    dcterms:publisher <http://lagen.nu/org/2014/forsvarsmakten> ;
     rdfs:comment "Utnyttjas också av Fortifikationsverket, Totalförsvarets forskningsinstitut och Försvarets materielverk"@sv ;
     rdfs:seeAlso <http://www.hkv.mil.se/ffs/> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/ffs> ;
@@ -306,27 +306,27 @@
     skos:prefLabel "Försvarsmaktens författningssamling"@sv .
 
 <http://lagen.nu/dataset/fhifs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/statens_folkhalsoinstitut> ;
+    dcterms:publisher <http://lagen.nu/org/2014/statens_folkhalsoinstitut> ;
     rdfs:seeAlso <http://www.fhi.se/templates/Page____4828.aspx> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/fhifs> ;
     skos:altLabel "FHIFS"@sv ;
     skos:prefLabel "Statens folkhälsoinstituts författningssamling"@sv .
 
 <http://lagen.nu/dataset/fifs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/fiskeriverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/fiskeriverket> ;
     rdfs:seeAlso <http://www.fiskeriverket.se/service/fifs.106.1e7cbf241100bb6ff0b80001315.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/fifs> ;
     skos:altLabel "FIFS"@sv ;
     skos:prefLabel "Fiskeriverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/fkar> a rpubl:AllmannaRadSerie ;
-    dct:publisher <http://lagen.nu/org/2008/forsakringskassan> ;
+    dcterms:publisher <http://lagen.nu/org/2008/forsakringskassan> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/ar/fkar> ;
     skos:altLabel "fkar"@sv ;
     skos:prefLabel "Försäkringskassans allmänna råd"@sv .
 
 <http://lagen.nu/dataset/fkfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2008/forsakringskassan> ;
+    dcterms:publisher <http://lagen.nu/org/2008/forsakringskassan> ;
     rdfs:seeAlso <http://lagrummet.forsakringskassan.se/risextern/> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/fkfs> ;
     skos:altLabel "FKFS"@sv ;
@@ -345,43 +345,43 @@
     skos:prefLabel "Högsta förvaltningsdomstolens årsbok"@sv .
 
 <http://lagen.nu/dataset/hsvfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/hogskoleverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/hogskoleverket> ;
     rdfs:seeAlso <http://www.hsv.se/lagochratt/lagarochregler/foreskrifter.4.539a949110f3d5914ec800062619.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/hsvfs> ;
     skos:altLabel "HSVFS"@sv ;
     skos:prefLabel "Högskoleverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/hvmfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/havs-_och_vattenmyndigheten> ;
+    dcterms:publisher <http://lagen.nu/org/2014/havs-_och_vattenmyndigheten> ;
     rdfs:seeAlso <http://www.havochvatten.se/miljopolitik-och-lagar/lagstiftning/svensk-lagstiftning/havs--och-vattenmyndighetens-forfattningssamling.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/hvmfs> ;
     skos:altLabel "HVMFS"@sv ;
     skos:prefLabel "Havs- och vattenmyndighetens författningssamling"@sv .
 
 <http://lagen.nu/dataset/iaffs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/inspektionen_for_arbetsloshetsforsakringen> ;
+    dcterms:publisher <http://lagen.nu/org/2014/inspektionen_for_arbetsloshetsforsakringen> ;
     rdfs:seeAlso <http://www.iaf.se/iaftemplates/ReportList.aspx?id=923> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/iaffs> ;
     skos:altLabel "IAFFS"@sv ;
     skos:prefLabel "Inspektionen för arbetslöshetsförsäkringens författningssamling"@sv .
 
 <http://lagen.nu/dataset/itpsfs> a rpubl:Forfattningssamling ;
-    dct:comment "Har tagits över av Myndigheten för tillväxtpolitiska utvärderingar och analysers författningssamling (MTFS)"@sv ;
-    dct:publisher <http://lagen.nu/org/2014/institutet_for_tillvaxtpolitiska_studier> ;
+    dcterms:comment "Har tagits över av Myndigheten för tillväxtpolitiska utvärderingar och analysers författningssamling (MTFS)"@sv ;
+    dcterms:publisher <http://lagen.nu/org/2014/institutet_for_tillvaxtpolitiska_studier> ;
     rdfs:seeAlso <http://www.itps.se/Listor/Publikationssok.asp?secId=902> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/itpsfs> ;
     skos:altLabel "ITPSFS"@sv ;
     skos:prefLabel "Institutet för tillväxtpolitiska studiers författningssamling"@sv .
 
 <http://lagen.nu/dataset/jvsfs> a rpubl:Forfattningssamling ;
-    dct:comment "Har tagits över av Transportstyrelsens författningssamling (TSFS)"@sv ;
+    dcterms:comment "Har tagits över av Transportstyrelsens författningssamling (TSFS)"@sv ;
     rdfs:seeAlso <http://www.jvs.se/forfattningssamling.htm> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/jvsfs> ;
     skos:altLabel "JvSFS"@sv ;
     skos:prefLabel "Järnvägsstyrelsens författningssamling "@sv .
 
 <http://lagen.nu/dataset/kamfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2008/kammarkollegiet> ;
+    dcterms:publisher <http://lagen.nu/org/2008/kammarkollegiet> ;
     rdfs:comment "Utnyttjas också av Fastighetsmäklarnämnden och Statens institut för kommunikationsanalys (SIKA)."@sv ;
     rdfs:seeAlso <http://www.kammarkollegiet.se/forfattning.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/kamfs> ;
@@ -396,41 +396,41 @@
     skos:prefLabel "Krisberedskapsmyndighetens författningssamling"@sv .
 
 <http://lagen.nu/dataset/kfmfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/kronofogdemyndigheten> ;
+    dcterms:publisher <http://lagen.nu/org/2014/kronofogdemyndigheten> ;
     rdfs:seeAlso <http://www.kronofogden.se/kfmrattsinformation/foreskrifter.4.14db52b102ed4e5fe380003414.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/kfmfs> ;
     skos:altLabel "KFMFS"@sv ;
     skos:prefLabel "Kronofogdemyndighetens författningssamling"@sv .
 
 <http://lagen.nu/dataset/kfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/kommerskollegium> ;
+    dcterms:publisher <http://lagen.nu/org/2014/kommerskollegium> ;
     rdfs:seeAlso <http://www.kommers.se/templates/Standard____492.aspx> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/kfs> ;
     skos:altLabel "KFS"@sv ;
     skos:prefLabel "Kommerskollegiums författningssamling"@sv .
 
 <http://lagen.nu/dataset/kifs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/kemikalieinspektionen> ;
+    dcterms:publisher <http://lagen.nu/org/2014/kemikalieinspektionen> ;
     rdfs:seeAlso <http://www.kemi.se/templates/Page____2910.aspx> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/kifs> ;
     skos:altLabel "KIFS"@sv ;
     skos:prefLabel "Kemikalieinspektionens författningssamling"@sv .
 
 <http://lagen.nu/dataset/kkvfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/konkurrensverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/konkurrensverket> ;
     rdfs:seeAlso <http://www.kkv.se/t/Page____299.aspx> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/kkvfs> ;
     skos:altLabel "KKVFS"@sv ;
     skos:prefLabel "Konkurrensverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/kls> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/statens_jordbruksverk> ;
+    dcterms:publisher <http://lagen.nu/org/2014/statens_jordbruksverk> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/kls> ;
     skos:altLabel "KLS"@sv ;
     skos:prefLabel "Kungliga Lantbruksstyrelsens kungörelser"@sv .
 
 <http://lagen.nu/dataset/kovfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/konsumentverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/konsumentverket> ;
     rdfs:comment "Utnyttjas också av Allmänna reklamationsnämnden."@sv ;
     rdfs:seeAlso <http://www.konsumentverket.se/mallar/ehandel/bestall_resultat.asp?lngCategoryID=416&GroupID=12&odrby=a&odrsort=desc> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/kovfs> ;
@@ -438,7 +438,7 @@
     skos:prefLabel "Konsumentverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/krfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/statens_kulturrad> ;
+    dcterms:publisher <http://lagen.nu/org/2014/statens_kulturrad> ;
     rdfs:comment "Utnyttjas också av Statens ljud- och bildarkiv, Konstnärsnämnden, Kungl. biblioteket, Presstödsnämnden, Riksantikvarieämbetet, Nationalmuseum med Prins Eugens Waldemarsudde, Moderna museet, Styrelsen för Sveriges författarfond, Taltidningsnämnden samt Talboks- och punktskriftsbiblioteket."@sv ;
     rdfs:seeAlso <http://www.kulturradet.se/index.php?pid=904> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/krfs> ;
@@ -446,14 +446,14 @@
     skos:prefLabel "Statens kulturråds författningssamling"@sv .
 
 <http://lagen.nu/dataset/kvfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/kriminalvarden> ;
+    dcterms:publisher <http://lagen.nu/org/2014/kriminalvarden> ;
     rdfs:seeAlso <http://www.kvv.se/templates/KVV_InfoMaterialListing____3464.aspx> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/kvfs> ;
     skos:altLabel "KVFS"@sv ;
     skos:prefLabel "Kriminalvårdens författningssamling"@sv .
 
 <http://lagen.nu/dataset/lbs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/statens_jordbruksverk> ;
+    dcterms:publisher <http://lagen.nu/org/2014/statens_jordbruksverk> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/lbs> ;
     skos:altLabel "LBS"@sv ;
     skos:prefLabel "Lantbruksstyrelsens föreskrifter"@sv .
@@ -473,21 +473,21 @@
     skos:prefLabel "Luftfartsstyrelsens författningssamling "@sv .
 
 <http://lagen.nu/dataset/lifs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lotteriinspektionen> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lotteriinspektionen> ;
     rdfs:seeAlso <http://www.lotteriinsp.se/lott_templates/Page____776.aspx> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/lifs> ;
     skos:altLabel "LIFS"@sv ;
     skos:prefLabel "Lotteriinspektionens författningssamling"@sv .
 
 <http://lagen.nu/dataset/livsfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/livsmedelsverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/livsmedelsverket> ;
     rdfs:seeAlso <http://www.slv.se/templatesSLV/SLV_ExistingLegislation____2038.asp?plus=2038> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/livsfs> ;
     skos:altLabel "LIVSFS"@sv ;
     skos:prefLabel "Livsmedelsverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/lmfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lantmateriet> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lantmateriet> ;
     rdfs:seeAlso <http://www.lantmateriet.se/templates/LMV_Page.aspx?id=2123> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/lmfs> ;
     skos:altLabel "LMFS"@sv ;
@@ -501,13 +501,13 @@
     skos:prefLabel "Lantmäteriverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/lsfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/statens_jordbruksverk> ;
+    dcterms:publisher <http://lagen.nu/org/2014/statens_jordbruksverk> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/lsfs> ;
     skos:altLabel "LSFS"@sv ;
     skos:prefLabel "Lantbruksstyrelsens författningssamling"@sv .
 
 <http://lagen.nu/dataset/lvfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/lakemedelsverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/lakemedelsverket> ;
     rdfs:seeAlso <http://www.lakemedelsverket.se/Tpl/NormalPage____996.aspx> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/lvfs> ;
     skos:altLabel "LVFS"@sv ;
@@ -524,7 +524,7 @@
     skos:prefLabel "Migrationsöverdomstolen"@sv .
 
 <http://lagen.nu/dataset/migrfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/migrationsverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/migrationsverket> ;
     rdfs:seeAlso <http://www.migrationsverket.se/index.jsp?swedish/verket/migrfs.jsp> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/migrfs> ;
     skos:altLabel "MIGRFS"@sv ;
@@ -536,39 +536,39 @@
     skos:prefLabel "Miljööverdomstolen"@sv .
 
 <http://lagen.nu/dataset/mrtvfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/myndigheten_for_radio_och_tv> ;
+    dcterms:publisher <http://lagen.nu/org/2014/myndigheten_for_radio_och_tv> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/mrtvfs> ;
     skos:altLabel "MRTVFS"@sv ;
     skos:prefLabel "Myndigheten för radio och tv:s författningssamling"@sv .
 
 <http://lagen.nu/dataset/msbfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/myndigheten_for_samhallsskydd_och_beredskap> ;
+    dcterms:publisher <http://lagen.nu/org/2014/myndigheten_for_samhallsskydd_och_beredskap> ;
     rdfs:comment "Utnyttjas också av Riksvärderingsnämnden"@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/msbfs> ;
     skos:altLabel "MSBFS"@sv ;
     skos:prefLabel "Myndigheten för samhällsskydd och beredskaps författningssamling"@sv .
 
 <http://lagen.nu/dataset/mtfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/myndigheten_for_tillvaxtpolitiska_utvarderingar_och_analyser> ;
+    dcterms:publisher <http://lagen.nu/org/2014/myndigheten_for_tillvaxtpolitiska_utvarderingar_och_analyser> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/mtfs> ;
     skos:altLabel "MTFS"@sv ;
     skos:prefLabel "Myndigheten för tillväxtpolitiska utvärderingar och analysers författningssamling"@sv .
 
 <http://lagen.nu/dataset/myhfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/myndigheten_for_yrkeshogskolan> ;
+    dcterms:publisher <http://lagen.nu/org/2014/myndigheten_for_yrkeshogskolan> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/myhfs> ;
     skos:altLabel "MYHFS"@sv ;
     skos:prefLabel "Myndigheten för yrkeshögskolans författningssamling"@sv .
 
 <http://lagen.nu/dataset/nar> a rpubl:AllmannaRadSerie ;
-    dct:publisher <http://lagen.nu/org/2014/naturvardsverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/naturvardsverket> ;
     rdfs:comment "Publiceras i NFS fr.o.m. 2000-01-01" ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/ar/nar> ;
     skos:altLabel "nar"@sv ;
     skos:prefLabel "Naturvårdsverkets allmänna råd"@sv .
 
 <http://lagen.nu/dataset/nfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/naturvardsverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/naturvardsverket> ;
     rdfs:comment "Utnyttjas också av Kustbevakningen."@sv ;
     rdfs:seeAlso <http://www.naturvardsverket.se/Start/Lagar-och-styrning/Foreskrifter-och-allmanna-rad/> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/nfs> ;
@@ -581,13 +581,13 @@
     skos:prefLabel "Nytt Juridiskt Arkiv"@sv .
 
 <http://lagen.nu/dataset/nrr> a rpubl:AllmannaRadSerie ;
-    dct:publisher <http://lagen.nu/org/2014/naturvardsverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/naturvardsverket> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/ar/nrr> ;
     skos:altLabel "nrr"@sv ;
     skos:prefLabel "Naturvårdsverkets råd och riktlinjer"@sv .
 
 <http://lagen.nu/dataset/nutfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/verket_for_naringslivsutveckling> ;
+    dcterms:publisher <http://lagen.nu/org/2014/verket_for_naringslivsutveckling> ;
     rdfs:comment "Har övertagits av EIFS, STEMFS och TRVFS"@sv ;
     rdfs:seeAlso <http://www.nutek.se/sb/d/159/a/1021> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/nutfs> ;
@@ -595,19 +595,19 @@
     skos:prefLabel "Verket för näringslivsutvecklings (Nutek) författningssamling"@sv .
 
 <http://lagen.nu/dataset/pfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/pensionsmyndigheten> ;
+    dcterms:publisher <http://lagen.nu/org/2014/pensionsmyndigheten> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/pfs> ;
     skos:altLabel "PFS"@sv ;
     skos:prefLabel "Pensionsmyndighetens författningssamling"@sv .
 
 <http://lagen.nu/dataset/prvfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/patent-_och_registreringsverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/patent-_och_registreringsverket> ;
     rdfs:seeAlso <http://www.prv.se/om_prv/styrdokument/forfattningssamling/start.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/prvfs> ;
     skos:prefLabel "Patent- och registreringsverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/ptfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/post-_och_telestyrelsen> ;
+    dcterms:publisher <http://lagen.nu/org/2014/post-_och_telestyrelsen> ;
     rdfs:seeAlso <http://www.pts.se/Sidor/sida.asp?SectionId=890> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/ptfs> ;
     skos:altLabel "PTFS"@sv ;
@@ -619,21 +619,21 @@
     skos:prefLabel "Regeringsrättens årsbok"@sv .
 
 <http://lagen.nu/dataset/ra-fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/riksarkivet> ;
+    dcterms:publisher <http://lagen.nu/org/2014/riksarkivet> ;
     rdfs:seeAlso <http://www.ra.se/ra/foreskrifter.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/ra-fs> ;
     skos:altLabel "RA-FS"@sv ;
     skos:prefLabel "Riksarkivets författningssamling"@sv .
 
 <http://lagen.nu/dataset/ra-ms> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/riksarkivet> ;
+    dcterms:publisher <http://lagen.nu/org/2014/riksarkivet> ;
     rdfs:seeAlso <http://www.ra.se/ra/foreskrifter.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/ra-ms> ;
     skos:altLabel "RA-MS"@sv ;
     skos:prefLabel "Riksarkivets myndighetsspecifika författningssamling"@sv .
 
 <http://lagen.nu/dataset/rgkfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2008/riksgaldskontoret> ;
+    dcterms:publisher <http://lagen.nu/org/2008/riksgaldskontoret> ;
     rdfs:seeAlso <http://www.rgk.se/scripts/cgiip.exe/cm/pub/showdoc.p?docid=324> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/rgkfs> ;
     skos:altLabel "RGKFS"@sv ;
@@ -650,21 +650,21 @@
     skos:prefLabel "Rättsfall från kammarrätterna"@sv .
 
 <http://lagen.nu/dataset/rnfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/revisorsnamnden> ;
+    dcterms:publisher <http://lagen.nu/org/2014/revisorsnamnden> ;
     rdfs:seeAlso <http://www.revisorsnamnden.se/rattsinfo/ramar/RNFS_ram.htm> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/rnfs> ;
     skos:altLabel "RNFS"@sv ;
     skos:prefLabel "Revisorsnämndens författningssamling"@sv .
 
 <http://lagen.nu/dataset/rpsfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/rikspolisstyrelsen> ;
+    dcterms:publisher <http://lagen.nu/org/2014/rikspolisstyrelsen> ;
     rdfs:seeAlso <http://www.police.se/inter/nodeid=8832&pageversion=1.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/rpsfs> ;
     skos:altLabel "RPSFS"@sv ;
     skos:prefLabel "Rikspolisstyrelsens författningssamling"@sv .
 
 <http://lagen.nu/dataset/rtvfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/radio-_och_tv-verket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/radio-_och_tv-verket> ;
     rdfs:comment "Har övertagits av Myndigheten för radio och tvs författningssamling (MRTVFS)"@sv ;
     rdfs:seeAlso <http://www.rtvv.se/se/blanketter/Om_verket/> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/rtvfs> ;
@@ -672,7 +672,7 @@
     skos:prefLabel "Radio- och TV-verkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/saifs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/sprangamnesinspektionen> ;
+    dcterms:publisher <http://lagen.nu/org/2014/sprangamnesinspektionen> ;
     rdfs:comment "Har övertagits av Myndigheten för samhällsskydd och beredskaps författningssamling (MSBFS)"@sv ;
     rdfs:seeAlso <http://www2.msb.se/shopping/srv_itemlist____13768.aspx> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/saeifs> ;
@@ -680,7 +680,7 @@
     skos:prefLabel "Sprängämnesinspektionens författningssamling"@sv .
 
 <http://lagen.nu/dataset/scb-fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2008/statistiska-centralbyran> ;
+    dcterms:publisher <http://lagen.nu/org/2008/statistiska-centralbyran> ;
     rdfs:comment "Utnyttjas också av Konjunkturinstitutet och Medlingsinstitutet."@sv ;
     rdfs:seeAlso <http://www.scb.se/templates/Listning2____47329.asp> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/scb-fs> ;
@@ -688,27 +688,27 @@
     skos:prefLabel "Statistiska centralbyråns författningssamling"@sv .
 
 <http://lagen.nu/dataset/sfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:publisher <http://lagen.nu/org/2008/regeringskansliet> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/sfs> ;
     skos:altLabel "SFS"@sv ;
     skos:prefLabel "Svensk författningssamling"@sv .
 
 <http://lagen.nu/dataset/sgu-fs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/sveriges_geologiska_undersokning> ;
+    dcterms:publisher <http://lagen.nu/org/2014/sveriges_geologiska_undersokning> ;
     rdfs:seeAlso <http://www.sgu.se/sgu/sv/om_sgu/foreskr_s.htm> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/sgu-fs> ;
     skos:altLabel "SGU-FS"@sv ;
     skos:prefLabel "Sveriges geologiska undersöknings författningssamling"@sv .
 
 <http://lagen.nu/dataset/sjofs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/sjofartsverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/sjofartsverket> ;
     rdfs:comment "Utnyttjas också av Rederinämnden. Har delvis övertagits av Transportstyrelsens författningssamling (TSFS)"@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/sjoefs> ;
     skos:altLabel "SJÖFS"@sv ;
     skos:prefLabel "Sjöfartsverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/sjvfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/statens_jordbruksverk> ;
+    dcterms:publisher <http://lagen.nu/org/2014/statens_jordbruksverk> ;
     rdfs:comment "Utnyttjas också av Centrala försöksdjursnämnden."@sv ;
     rdfs:seeAlso <http://www.sjv.se/startsida/forfattningar.4.7502f61001ea08a0c7fff120602.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/sjvfs> ;
@@ -723,7 +723,7 @@
     skos:prefLabel "Statens kärnkraftinspektions författningssamling"@sv .
 
 <http://lagen.nu/dataset/skolfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/statens_skolverk> ;
+    dcterms:publisher <http://lagen.nu/org/2014/statens_skolverk> ;
     rdfs:comment "Utnyttjas också av Ungdomsstyrelsen, Statens skolinspektion och Specialpedagogiska skolmyndigheten."@sv ;
     rdfs:seeAlso <http://www.skolverket.se/sb/d/580> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/skolfs> ;
@@ -731,29 +731,29 @@
     skos:prefLabel "Statens skolverks författningssamling"@sv .
 
 <http://lagen.nu/dataset/sksfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/skogsstyrelsen> ;
+    dcterms:publisher <http://lagen.nu/org/2014/skogsstyrelsen> ;
     rdfs:seeAlso <http://www.svo.se/minskog/templates/Page.asp?id=11199> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/sksfs> ;
     skos:altLabel "SKSFS"@sv ;
     skos:prefLabel "Skogsstyrelsens författningssamling"@sv .
 
 <http://lagen.nu/dataset/skvfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/skatteverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/skatteverket> ;
     rdfs:seeAlso <http://www.skatteverket.se/rsvlagrum/index.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/skvfs> ;
     skos:altLabel "SKVFS"@sv ;
     skos:prefLabel "Skatteverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/snfs> a rpubl:Forfattningssamling ;
-    dct:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/nfs> ;
-    dct:publisher <http://lagen.nu/org/2014/naturvardsverket> ;
+    dcterms:isReplacedBy <http://rinfo.lagrummet.se/serie/fs/nfs> ;
+    dcterms:publisher <http://lagen.nu/org/2014/naturvardsverket> ;
     rdfs:comment "Har ersatts av NFS (ny beteckning efter myndighetens namnbyte)."@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/snfs> ;
     skos:altLabel "SNFS"@sv ;
     skos:prefLabel "Statens naturvårdsverks författningssamling"@sv .
 
 <http://lagen.nu/dataset/sosfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/socialstyrelsen> ;
+    dcterms:publisher <http://lagen.nu/org/2014/socialstyrelsen> ;
     rdfs:comment "Utnyttjas också av Rättsmedicinalverket, Smittskyddsinstitutet och Myndigheten för handikappolitisk samordning."@sv ;
     rdfs:seeAlso <http://www.sos.se/sosfs/search/search.asp> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/sosfs> ;
@@ -761,7 +761,7 @@
     skos:prefLabel "Socialstyrelsens författningssamling"@sv .
 
 <http://lagen.nu/dataset/sou> a rpubl:Utredningsserie ;
-    dct:publisher <http://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:publisher <http://lagen.nu/org/2008/regeringskansliet> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/utr/sou> ;
     skos:altLabel "SOU"@sv ;
     skos:prefLabel "Statens offentliga utredningar"@sv .
@@ -780,40 +780,40 @@
     skos:prefLabel "Statens strålskyddsinstituts författningssamling"@sv .
 
 <http://lagen.nu/dataset/ssmfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/stralsakerhetsmyndigheten> ;
+    dcterms:publisher <http://lagen.nu/org/2014/stralsakerhetsmyndigheten> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/ssmfs> ;
     skos:altLabel "SSMFS"@sv ;
     skos:prefLabel "Strålsäkerhetsmyndighetens författningssamling"@sv .
 
 <http://lagen.nu/dataset/stafs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/styrelsen_for_ackreditering_och_teknisk_kontroll> ;
+    dcterms:publisher <http://lagen.nu/org/2014/styrelsen_for_ackreditering_och_teknisk_kontroll> ;
     rdfs:seeAlso <http://www.swedac.se/focal/gnh50s.nsf> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/stafs> ;
     skos:altLabel "STAFS"@sv ;
     skos:prefLabel "Styrelsen för ackreditering och teknisk kontrolls (SWEDAC) författningssamling"@sv .
 
 <http://lagen.nu/dataset/stemfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/statens_energimyndighet> ;
+    dcterms:publisher <http://lagen.nu/org/2014/statens_energimyndighet> ;
     rdfs:seeAlso <http://www.energimyndigheten.se/web/biblshop.nsf/frameset.main?ReadForm&Doc=HTTP://WWW.ENERGIMYNDIGHETEN.SE/WEB/BIBLSHOP.NSF/SHOWVIEWS?READFORM&VIEW=WEBTYPSVE&COUNT=999&EXPAND=4> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/stemfs> ;
     skos:altLabel "STEMFS"@sv ;
     skos:prefLabel "Statens energimyndighets författningssamling"@sv .
 
 <http://lagen.nu/dataset/stfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/sametinget> ;
+    dcterms:publisher <http://lagen.nu/org/2014/sametinget> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/stfs> ;
     skos:altLabel "STFS"@sv ;
     skos:prefLabel "Sametingets författningssamling"@sv .
 
 <http://lagen.nu/dataset/svkf> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/affarsverket_svenska_kraftnat> ;
+    dcterms:publisher <http://lagen.nu/org/2014/affarsverket_svenska_kraftnat> ;
     rdfs:seeAlso <http://www.svk.se/web/Page.aspx?id=5319> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/svkfs> ;
     skos:altLabel "SvKF"@sv ;
     skos:prefLabel "Affärsverket svenska kraftnäts författningssamling"@sv .
 
 <http://lagen.nu/dataset/tfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/tullverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/tullverket> ;
     rdfs:comment "Utnyttjas också av Inspektionen för strategiska produkter."@sv ;
     rdfs:seeAlso <http://www.tullverket.se/se/Foretag/forfattningar> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/tfs> ;
@@ -821,66 +821,66 @@
     skos:prefLabel "Tullverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/tlvfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/tandvards-_och_lakemedelsformansverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/tandvards-_och_lakemedelsformansverket> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/tlvfs> ;
     skos:altLabel "TLVFS"@sv ;
     skos:prefLabel "Tandvårds- och läkemedelsförmånsverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/tpvfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/totalforsvarets_pliktverk> ;
+    dcterms:publisher <http://lagen.nu/org/2014/totalforsvarets_pliktverk> ;
     rdfs:seeAlso <http://www.pliktverket.se/sv/Om_Pliktverket/Forfattningar/> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/tpvfs> ;
     skos:altLabel "TPVFS"@sv ;
     skos:prefLabel "Totalförsvarets pliktverks författningssamling"@sv .
 
 <http://lagen.nu/dataset/trmfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/totalforsvarets_rekryteringsmyndighet> ;
+    dcterms:publisher <http://lagen.nu/org/2014/totalforsvarets_rekryteringsmyndighet> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/trmfs> ;
     skos:altLabel "TRMFS"@sv ;
     skos:prefLabel "Totalförsvarets rekryteringsmyndighets författningssamling"@sv .
 
 <http://lagen.nu/dataset/trvfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/trafikverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/trafikverket> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/trvfs> ;
     skos:altLabel "TRVFS"@sv ;
     skos:prefLabel "Trafikverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/tsfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/transportstyrelsen> ;
+    dcterms:publisher <http://lagen.nu/org/2014/transportstyrelsen> ;
     rdfs:comment "Utnyttjas också av Luftfartsverket och Sveriges meteorologiska och hydrologiska institut."@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/tsfs> ;
     skos:altLabel "TSFS"@sv ;
     skos:prefLabel "Transportstyrelsens författningssamling"@sv .
 
 <http://lagen.nu/dataset/tvfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/tillvaxtverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/tillvaxtverket> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/tvfs> ;
     skos:altLabel "TVFS"@sv ;
     skos:prefLabel "Tillväxtverkets författningssamling"@sv .
 
 <http://lagen.nu/dataset/valfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/valmyndigheten> ;
+    dcterms:publisher <http://lagen.nu/org/2014/valmyndigheten> ;
     rdfs:seeAlso <http://www.val.se/valsystemet/lagar/valfs/index.html> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/valfs> ;
     skos:altLabel "VALFS"@sv ;
     skos:prefLabel "Valmyndighetens författningssamling"@sv .
 
 <http://lagen.nu/dataset/vervafs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/verket_for_forvaltningsutveckling> ;
+    dcterms:publisher <http://lagen.nu/org/2014/verket_for_forvaltningsutveckling> ;
     rdfs:seeAlso <http://www.verva.se/web/t/Page____490.aspx> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/vervafs> ;
     skos:altLabel "VERVAFS"@sv ;
     skos:prefLabel "Verket för förvaltningsutvecklings (Verva) författningssamling"@sv .
 
 <http://lagen.nu/dataset/vrfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/vetenskapsradet> ;
+    dcterms:publisher <http://lagen.nu/org/2014/vetenskapsradet> ;
     rdfs:seeAlso <http://www.vr.se> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/vrfs> ;
     skos:altLabel "VRFS"@sv ;
     skos:prefLabel "Vetenskapsrådets författningssamling"@sv .
 
 <http://lagen.nu/dataset/vvfs> a rpubl:Forfattningssamling ;
-    dct:publisher <http://lagen.nu/org/2014/vagverket> ;
+    dcterms:publisher <http://lagen.nu/org/2014/vagverket> ;
     rdfs:comment "Utnyttjas också av Statens geotekniska institut, Statens väg- och transportforskningsinstitut. Har delvis övertagits av Transportstyrelsens författningssamling (TSFS)"@sv ;
     rdfs:seeAlso <http://www.vv.se/templates/page3____1029.aspx> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/fs/vvfs> ;
@@ -1136,7 +1136,7 @@
     foaf:name "H.M. Konungen"@sv .
 
 <http://lagen.nu/org/2012/landsbygdsdepartementet> a foaf:Organization ;
-    dct:replaces <http://lagen.nu/org/2008/jordbruksdepartementet> ;
+    dcterms:replaces <http://lagen.nu/org/2008/jordbruksdepartementet> ;
     owl:sameAs <http://rinfo.lagrummet.se/org/landsbygdsdepartementet> ;
     foaf:name "Landsbygdsdepartementet"@sv .
 

@@ -1,4 +1,4 @@
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov-o/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -12,10 +12,10 @@
 
 <https://lagen.nu/sfs/2013:363#P1S1> a rinfoex:Stycke .
 
-<https://lagen.nu/sfs/2013:363#P1S1N1> dct:references <http://rinfo.lagrummet.se/ext/celex/31991R2092>,
+<https://lagen.nu/sfs/2013:363#P1S1N1> dcterms:references <http://rinfo.lagrummet.se/ext/celex/31991R2092>,
         <http://rinfo.lagrummet.se/ext/celex/32007R0834> .
 
-<https://lagen.nu/sfs/2013:363#P1S1N2> dct:references <http://rinfo.lagrummet.se/ext/celex/32007R0834> .
+<https://lagen.nu/sfs/2013:363#P1S1N2> dcterms:references <http://rinfo.lagrummet.se/ext/celex/32007R0834> .
 
 <https://lagen.nu/sfs/2013:363/konsolidering> owl:sameAs <https://lagen.nu/sfs/2013:363/konsolidering/2013:363> .
 
@@ -25,20 +25,20 @@
 
 <http://rinfo.lagrummet.se/ext/eur-lex/32008R0889> rpubl:celexNummer "32008R0889" .
 
-<http://rinfo.lagrummet.se/publ/bet/2012/13:MJU14> dct:identifier "bet. 2012/13:MJU14" .
+<http://rinfo.lagrummet.se/publ/bet/2012/13:MJU14> dcterms:identifier "bet. 2012/13:MJU14" .
 
-<http://rinfo.lagrummet.se/publ/prop/2012/13:55> dct:identifier "Prop. 2012/13:55" .
+<http://rinfo.lagrummet.se/publ/prop/2012/13:55> dcterms:identifier "Prop. 2012/13:55" .
 
-<http://rinfo.lagrummet.se/publ/rskr/2012/13:210> dct:identifier "rskr. 2012/13:210" .
+<http://rinfo.lagrummet.se/publ/rskr/2012/13:210> dcterms:identifier "rskr. 2012/13:210" .
 
 <https://lagen.nu/sfs/2013:363/konsolidering/2013:363> a rpubl:KonsolideradGrundforfattning ;
     rinfoex:senastHamtad "2013-06-11T18:58:58.242181"^^xsd:dateTime ;
     rinfoex:senastKontrollerad "2013-06-11T18:59:58.242181"^^xsd:dateTime ;
-    dct:creator <http://lagen.nu/org/2012/landsbygdsdepartementet> ;
-    dct:identifier "SFS 2013:363" ;
-    dct:issued "2013-05-23"^^xsd:date ;
-    dct:publisher <http://lagen.nu/org/2008/regeringskansliet> ;
-    dct:title "Lag (2013:363) om kontroll av ekologisk produktion"@sv ;
+    dcterms:creator <http://lagen.nu/org/2012/landsbygdsdepartementet> ;
+    dcterms:identifier "SFS 2013:363" ;
+    dcterms:issued "2013-05-23"^^xsd:date ;
+    dcterms:publisher <http://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "Lag (2013:363) om kontroll av ekologisk produktion"@sv ;
     rpubl:konsoliderar <https://lagen.nu/sfs/2013:363> ;
     rpubl:konsolideringsunderlag <https://lagen.nu/sfs/2013:363> ;
     rpubl:utfardandedatum "2013-05-23"^^xsd:date ;
@@ -46,9 +46,9 @@
     prov:wasGeneratedBy <https://lagen.nu/sfs/2013:363/konsolidering/ferenda.sources.legal.se.sfs.SFS> .
 
 <https://lagen.nu/sfs/2013:363> a rpubl:Lag ;
-    dct:identifier "SFS 2013:363" ;
-    dct:publisher <http://lagen.nu/org/2008/regeringskansliet> ;
-    dct:title "Lag (2013:363) om kontroll av ekologisk produktion"@sv ;
+    dcterms:identifier "SFS 2013:363" ;
+    dcterms:publisher <http://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "Lag (2013:363) om kontroll av ekologisk produktion"@sv ;
     rpubl:arsutgava "2013" ;
     rpubl:beslutadAv <http://lagen.nu/org/2008/regeringskansliet> ;
     rpubl:departement <http://lagen.nu/org/2012/landsbygdsdepartementet> ;

@@ -5,7 +5,7 @@
       <NumreradLista>
         <Listelement id="P2S1N1" ordinal="1">
           <str>1. </str>
-          <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Tekniska_regler">tekniska regler</LinkSubject>
+          <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Tekniska_regler">tekniska regler</LinkSubject>
           <str>:</str>
           <Bokstavslista>
             <Listelement id="P2S1N1Na" ordinal="a">
@@ -21,11 +21,11 @@
       <NumreradLista>
         <Listelement id="P2S2N2" ordinal="2">
           <str>2. </str>
-          <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Tekniska_specifikationer">tekniska specifikationer</LinkSubject>
+          <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Tekniska_specifikationer">tekniska specifikationer</LinkSubject>
           <str>: specifikationer intagna i ett dokument och som fastställer de egenskaper som krävs,</str>
         </Listelement><Listelement id="P2S2N3" ordinal="3">
           <str>3. </str>
-          <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Andra_krav">andra krav</LinkSubject>
+          <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Andra_krav">andra krav</LinkSubject>
           <str>: krav som inte är tekniska specifikationer och som ställs på en vara.</str>
         </Listelement>
       </NumreradLista>

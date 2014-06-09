@@ -130,7 +130,7 @@ class CitationParser(object):
                     uri = self._formatter.format(parseresult)
                     if uri:
                         res.append(LinkSubject(
-                            text, uri=uri, predicate="dct:references"))
+                            text, uri=uri, predicate="dcterms:references"))
                     else:
                         res.append(text)
                 # FIXME: concatenate adjacent str nodes

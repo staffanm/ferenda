@@ -1,4 +1,4 @@
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov-o/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -8,9 +8,9 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://localhost:8000/res/dv/ra/2010/not/1> a rpubl:Rattsfallsnotis ;
-    dct:identifier "RÅ 2010 not 1" ;
-    dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
-    dct:references <http://localhost:8000/res/prop/1985/86:1>,
+    dcterms:identifier "RÅ 2010 not 1" ;
+    dcterms:publisher <http://lagen.nu/org/2008/domstolsverket> ;
+    dcterms:references <http://localhost:8000/res/prop/1985/86:1>,
         <http://localhost:8000/res/sfs/1987:10#K5P27>,
         <http://localhost:8000/res/sfs/2007:845>,
         <http://localhost:8000/res/sfs/2007:845#P4> ;
@@ -22,8 +22,8 @@
     prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
 
 <http://localhost:8000/res/dv/regr/5267-09/2010-01-04> a rpubl:VagledandeDomstolsavgorande ;
-    dct:publisher <http://lagen.nu/org/2008/regeringsratten> ;
-    dct:subject <http://localhost:8000/concept/Avslag_)>,
+    dcterms:publisher <http://lagen.nu/org/2008/regeringsratten> ;
+    dcterms:subject <http://localhost:8000/concept/Avslag_)>,
         <http://localhost:8000/concept/Beslut_att_anta_detaljplan>,
         <http://localhost:8000/concept/Detaljplanefrågor>,
         <http://localhost:8000/concept/Förutsättningar_för_beslut_av_byggnadsnämnden_ansågs_uppfyllda_(avslag)>,

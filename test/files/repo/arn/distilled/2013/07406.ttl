@@ -1,4 +1,4 @@
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix prov: <http://www.w3.org/ns/prov-o/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -7,9 +7,9 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://localhost:8000/res/arn/2013-07406> a rpubl:VagledandeMyndighetsavgorande ;
-    dct:identifier "ARN 2013-07406" ;
-    dct:subject "Resor"@sv ;
-    dct:title "Fråga om köparen fullgjort sin skyldighet att kontrollera riktigheten av utfärdade biljetter samt om resebyrås ansvar för de felaktiga biljetterna."@sv ;
+    dcterms:identifier "ARN 2013-07406" ;
+    dcterms:subject "Resor"@sv ;
+    dcterms:title "Fråga om köparen fullgjort sin skyldighet att kontrollera riktigheten av utfärdade biljetter samt om resebyrås ansvar för de felaktiga biljetterna."@sv ;
     rpubl:arendenummer "2013-07406" ;
     rpubl:avgorandedatum "2013-11-19" ;
     prov:wasGeneratedBy "ferenda.sources.legal.se.arn.ARN" .

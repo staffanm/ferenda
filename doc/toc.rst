@@ -18,7 +18,7 @@ general process has three steps:
 
 It should be noted that you don't need to do anything in order to get
 a very basic TOC. As long as your parse() step has extracted a
-``dct:title`` string and optionally a ``dct:issued`` date for each
+``dcterms:title`` string and optionally a ``dcterms:issued`` date for each
 document, you'll get basic "Sorted by title" and "Sorted by date of
 publication" TOCs for free. But if you've been a
 
@@ -38,7 +38,7 @@ The first, simple, way is to specify a list of rdf predicates that
 you've extracted when parsing your documents. Ferenda has some basic
 knowledge about some common predicates and know how to construct
 sensible TocCriteria objects for them -- ie. if you specify the
-predicate ``dct:issued``, you get a TocCriteria object that groups
+predicate ``dcterms:issued``, you get a TocCriteria object that groups
 documents by year of publication and sorts each group by date of
 publication.
 
@@ -152,8 +152,8 @@ binding (same as used on each TocCriteria object) and a dict (same as
 used on the ``selector`` and ``key`` functions), and is expected to
 return a list of :mod:`~ferenda.elements` objects.
 
-As an example, if you want to group by dct:identifier, but present
-each document with dct:identifier + dct:title:
+As an example, if you want to group by dcterms:identifier, but present
+each document with dcterms:identifier + dcterms:title:
 
 .. literalinclude:: examples/toc.py
    :start-after: # begin item

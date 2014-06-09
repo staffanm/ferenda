@@ -1,6 +1,6 @@
 from rdflib import URIRef, Namespace
 from rdflib.namespace import RDF, RDFS, DC, SKOS
-from rdflib.namespace import DCTERMS as DCT
+from rdflib.namespace import DCTERMS as DCTERMS
 SCHEMA = Namespace("http://schema.org/")
 
 from ferenda import fulltextindex # to get the IndexedType classes
@@ -32,7 +32,7 @@ class Facet(object):
     @staticmethod
     def resourcelabel(row, binding='dcterms_publisher', resourcegraph=None):
         uri = URIRef(row[binding])
-        for pred in (RDFS.label, SKOS.prefLabel, SKOS.altLabel, DCT.title, DCT.alternative):
+        for pred in (RDFS.label, SKOS.prefLabel, SKOS.altLabel, DCTERMS.title, DCTERMS.alternative):
             if resourcegraph.value(uri, pred):
                 return str(resourcegraph.value(uri, pred))
         else:
@@ -49,21 +49,21 @@ class Facet(object):
                     'indextype': fulltextindex.URI(),
                     'toplevel_only': False,
                     'use_for_toc'  : False}, # -> selector etc are irrelevant
-                DCT.title: {
+                DCTERMS.title: {
                     'indextype': fulltextindex.Text(boost=4),
                     'toplevel_only': False,
                     'use_for_toc': True, 
                     'selector': firstletter,
                     'key': titlesortkey,
                 },
-                DCT.identifier: {
+                DCTERMS.identifier: {
                     'indextype': fulltextindex.Label(boost=16),
                     'toplevel_only': False,
                     'use_for_toc': True, 
                     'selector': firstletter,
                     'key': titlesortkey,
                 },
-                DCT.abstract: {
+                DCTERMS.abstract: {
                     'indextype': fulltextindex.Text(boost=2),
                     'toplevel_only': True,
                     'use_for_toc': False
@@ -75,7 +75,7 @@ class Facet(object):
                     'selector': firstletter,
                     'key': titlesortkey,
                 },
-                DCT.publisher:{
+                DCTERMS.publisher:{
                     'indextype': fulltextindex.Resource(),
                     'toplevel_only': True,
                     'use_for_toc': True,
@@ -99,7 +99,7 @@ class Facet(object):
                     'selector': defaultselector, # probably needs changing
                     'key': defaultselector,
                 },
-                DCT.subject: {
+                DCTERMS.subject: {
                     'indextype': fulltextindex.Resources(),  # eg. one or more URIRefs + labels
                     'multiple_values': True,
                     'toplevel_only': True,
@@ -120,7 +120,7 @@ class Facet(object):
     # %(selected)s = The selected value, eg "2014", "A", "O'Reilly and Associates Publishing, inc."
     # %(selected_uri)s = For resource-type values, the underlying URI, eg "http://example.org/ext/publisher/oreilly"
     def __init__(self,
-                 rdftype=DCT.title, # any rdflib.URIRef
+                 rdftype=DCTERMS.title, # any rdflib.URIRef
                  label="Sorted by %(criteria)s", # toclabel
                  pagetitle="Documents where %(criteria)s = %(selected)s",
                  indexingtype=None,   # if not given, determined by rdftype
@@ -166,7 +166,7 @@ class Facet(object):
 
     # There should be a way to construct a SPARQL SELECT query from a list of Facets that retrieve all needed data
     # The needed data should be a simple 2D table, where each Facet is represented by one OR MORE fields 
-    #    (ie a dct:publisher should result in the binding "dcterms_publisher" and "dcterms_publisher_label")
+    #    (ie a dcterms:publisher should result in the binding "dcterms_publisher" and "dcterms_publisher_label")
  
     # There must be a way to get a machine-readable label/identifier for each facet. This is used:
     # - for variable binding in the sparql query
@@ -182,11 +182,11 @@ class Facet(object):
     # - basefile (is not represented either)
 
     # General modeling:
-    # if the rdftype is dct:publisher, dct:creator, dct:subject, the indexingtype SHOULD be fulltextindex.Resource 
+    # if the rdftype is dcterms:publisher, dcterms:creator, dcterms:subject, the indexingtype SHOULD be fulltextindex.Resource 
     #    (ie the triple should be a URIRef, not Literal, and we store both resource IRI and label)
     # if we can only get Literals, use dc:publisher, dc:creator, dc:subject.
 
-    # at least for some facets (dct:subject, dct:creator), multiple
+    # at least for some facets (dcterms:subject, dcterms:creator), multiple
     # values must be permitted. 
    
 
@@ -194,12 +194,12 @@ class Facet(object):
 
 # Facets that occur at all documentlevels
 # - Document or sectional type (rdftype=rdf.type, indexingtype=fulltext.URI(), use_for_toc=False, toplevel_only=False)
-# - Title (rdftype=dct.title, indexingtype=fulltextindex.Text(boost=4), toplevel_only=False)
-# - Identifier (rdftype=dct.identifier, indexingtype=fulltextindex.Label(boost=16), toplevel_only=False, use_for_toc=False) # or True, iff a custom selector method is used (like in RFC.py)
+# - Title (rdftype=dcterms.title, indexingtype=fulltextindex.Text(boost=4), toplevel_only=False)
+# - Identifier (rdftype=dcterms.identifier, indexingtype=fulltextindex.Label(boost=16), toplevel_only=False, use_for_toc=False) # or True, iff a custom selector method is used (like in RFC.py)
 
 # Facets that only occur at document top level
-# - Abstract (rdftype=dct.abstract, indexingtype=fulltextindex.Text(boost=2))
+# - Abstract (rdftype=dcterms.abstract, indexingtype=fulltextindex.Text(boost=2))
 # - Author (rdftype=dc.creator, indexingtype=fulltextindex.Label()) # ie author is modelled as a Literal
-# - Publisher (rdftype=dct.publisher, indexingtype=fulltextindex.Resource()) # publisher is modelled as URIRef, a Literal label is picked from the document or extra/[docrepo].ttl
+# - Publisher (rdftype=dcterms.publisher, indexingtype=fulltextindex.Resource()) # publisher is modelled as URIRef, a Literal label is picked from the document or extra/[docrepo].ttl
 # - Literal publisher (rdftype=dc.publisher, indexingtype=fulltextindex.Label()) # publisher modelled as Literal
-# - Publication date (rdftype=dct.issued, indexingtype=fulltextindex=Datetime())
+# - Publication date (rdftype=dcterms.issued, indexingtype=fulltextindex=Datetime())

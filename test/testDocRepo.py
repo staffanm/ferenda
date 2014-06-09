@@ -53,11 +53,11 @@ class Repo(RepoTester):
     def test_init(self):
         # make sure self.ns is properly initialized
         class StandardNS(DocumentRepository):
-            namespaces = ('rdf','dct')
+            namespaces = ('rdf','dcterms')
         d = StandardNS()
         want = {'rdf':
                 rdflib.Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#'),
-                'dct':
+                'dcterms':
                 rdflib.Namespace('http://purl.org/dc/terms/')}
         self.assertEqual(want, d.ns)
 
@@ -501,8 +501,8 @@ class Repo(RepoTester):
         g.parse(d.store.distilled_path("123/a"))
         
         self.assertEqual(len(g),3)
-        self.assertEqual(desc.getvalue(d.ns['dct'].identifier), "123/a")
-        self.assertEqual(len(desc.getvalues(d.ns['dct'].title)),0)
+        self.assertEqual(desc.getvalue(d.ns['dcterms'].identifier), "123/a")
+        self.assertEqual(len(desc.getvalues(d.ns['dcterms'].title)),0)
 
         t = etree.parse(d.store.parsed_path("123/a"))
         # util.indent_et(t.getroot())
@@ -530,8 +530,8 @@ class Repo(RepoTester):
         g.parse(d.store.distilled_path("123/a"))
         
         self.assertEqual(len(g),4)
-        self.assertEqual(desc.getvalue(d.ns['dct'].identifier), "123/a")
-        self.assertEqual(desc.getvalue(d.ns['dct'].title), "A document")
+        self.assertEqual(desc.getvalue(d.ns['dcterms'].identifier), "123/a")
+        self.assertEqual(desc.getvalue(d.ns['dcterms'].title), "A document")
 
         t = etree.parse(d.store.parsed_path("123/a"))
         # util.indent_et(t.getroot())
@@ -669,7 +669,7 @@ class Repo(RepoTester):
                                    ordinal='2', title='Second section')])
         want = """<html xmlns="http://www.w3.org/1999/xhtml"
                         xmlns:bibo="http://purl.org/ontology/bibo/"
-                        xmlns:dct="http://purl.org/dc/terms/"
+                        xmlns:dcterms="http://purl.org/dc/terms/"
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                         version="XHTML+RDFa 1.1"
                         xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd"        
@@ -680,7 +680,7 @@ class Repo(RepoTester):
     <p>Introductory preamble</p>
     <div content="First section"
          about="http://localhost:8000/res/base/basefile#S1"
-         property="dct:title"
+         property="dcterms:title"
          typeof="bibo:DocumentPart"
          class="section">
       <span content="1" about="http://localhost:8000/res/base/basefile#S1"
@@ -688,7 +688,7 @@ class Repo(RepoTester):
       <p>Some text</p>
       <div content="First subsection"
            about="http://localhost:8000/res/base/basefile#S1.1"
-           property="dct:title"
+           property="dcterms:title"
            typeof="bibo:DocumentPart"
            class="subsection">
         <span content="1.1" about="http://localhost:8000/res/base/basefile#S1.1"
@@ -698,7 +698,7 @@ class Repo(RepoTester):
     </div>
     <div content="Second section"
          about="http://localhost:8000/res/base/basefile#S2"
-         property="dct:title"
+         property="dcterms:title"
          typeof="bibo:DocumentPart"
          class="section">
       <span content="2" about="http://localhost:8000/res/base/basefile#S2"
@@ -726,7 +726,7 @@ class Repo(RepoTester):
                                         html.P(['Even more text'])])])
         want = """<html xmlns="http://www.w3.org/1999/xhtml"
                         xmlns:bibo="http://purl.org/ontology/bibo/"
-                        xmlns:dct="http://purl.org/dc/terms/"
+                        xmlns:dcterms="http://purl.org/dc/terms/"
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                         version="XHTML+RDFa 1.1"
                         xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd"        
@@ -759,28 +759,28 @@ class Repo(RepoTester):
         # with meta + uri attached to some nodes
         g1 = rdflib.Graph().parse(format='n3', data="""
 @prefix bibo: <http://purl.org/ontology/bibo/> .
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 
 <http://localhost:8000/res/base/basefile#S1> a bibo:DocumentPart;
-        dct:title "First section";
+        dcterms:title "First section";
         bibo:chapter "1" .
         """)
         g2 = rdflib.Graph().parse(format='n3', data="""
 @prefix bibo: <http://purl.org/ontology/bibo/> .
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://localhost:8000/res/base/basefile#S2> a bibo:DocumentPart;
-        dct:title "Second section";
+        dcterms:title "Second section";
         bibo:chapter "2";
-        dct:creator "Fred Bloggs"@en-GB;
-        dct:issued "2013-05-10"^^xsd:date;
+        dcterms:creator "Fred Bloggs"@en-GB;
+        dcterms:issued "2013-05-10"^^xsd:date;
         owl:sameAs <http://example.org/s2> .
 
-<http://example.org/s2> dct:title "Same same but different" .
+<http://example.org/s2> dcterms:title "Same same but different" .
        
-<http://localhost:8000/res/base/unlrelated> dct:title "Unrelated document" .
+<http://localhost:8000/res/base/unlrelated> dcterms:title "Unrelated document" .
         
         """)
         
@@ -798,7 +798,7 @@ class Repo(RepoTester):
         want  = """<html xmlns="http://www.w3.org/1999/xhtml"
                         xmlns:bibo="http://purl.org/ontology/bibo/"
                         xmlns:owl="http://www.w3.org/2002/07/owl#"
-                        xmlns:dct="http://purl.org/dc/terms/"
+                        xmlns:dcterms="http://purl.org/dc/terms/"
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                         version="XHTML+RDFa 1.1"
                         xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd"        
@@ -809,7 +809,7 @@ class Repo(RepoTester):
     <p>Introductory preamble</p>
     <div about="http://localhost:8000/res/base/basefile#S1"
          content="First section"
-         property="dct:title"
+         property="dcterms:title"
          typeof="bibo:DocumentPart">
       <span content="1"
             property="bibo:chapter"
@@ -817,7 +817,7 @@ class Repo(RepoTester):
       <p>Some text</p>
       <div about="http://localhost:8000/res/base/basefile#S1.1"
            content="First subsection"
-           property="dct:title"
+           property="dcterms:title"
            typeof="bibo:DocumentPart"
            class="subsection">
         <span about="http://localhost:8000/res/base/basefile#S1.1"
@@ -829,22 +829,22 @@ class Repo(RepoTester):
     <div about="http://localhost:8000/res/base/basefile#S2"
         class="section"
         content="Second section"
-        property="dct:title"
+        property="dcterms:title"
         typeof="bibo:DocumentPart">
       <span href="http://example.org/s2"
             rel="owl:sameAs">
         <span content="Same same but different"
-              property="dct:title"
+              property="dcterms:title"
               xml:lang=""/>
       </span>
       <span content="2"
             property="bibo:chapter"
             xml:lang=""/>
       <span content="2013-05-10"
-            property="dct:issued"
+            property="dcterms:issued"
             datatype="xsd:date"/>
       <span content="Fred Bloggs"
-            property="dct:creator"
+            property="dcterms:creator"
             xml:lang="en-GB"/>
       <p>Even more text</p>
     </div>
@@ -881,7 +881,7 @@ class Repo(RepoTester):
 
         want = """<html xmlns="http://www.w3.org/1999/xhtml"
                         xmlns:bibo="http://purl.org/ontology/bibo/"
-                        xmlns:dct="http://purl.org/dc/terms/"
+                        xmlns:dcterms="http://purl.org/dc/terms/"
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                         version="XHTML+RDFa 1.1"
                         xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd"        
@@ -892,7 +892,7 @@ class Repo(RepoTester):
     <div class="preamble"><span class="preamble-note">Read this first: </span>Introductory preamble</div>
     <div content="First section"
          about="http://localhost:8000/res/base/basefile#S1"
-         property="dct:title"
+         property="dcterms:title"
          typeof="bibo:DocumentPart"
          class="section">
       <span content="1" about="http://localhost:8000/res/base/basefile#S1"
@@ -910,7 +910,7 @@ class Repo(RepoTester):
         body = el.Body(['Toplevel\x1b heading'])
         want = """<html xmlns="http://www.w3.org/1999/xhtml"
                         xmlns:bibo="http://purl.org/ontology/bibo/"
-                        xmlns:dct="http://purl.org/dc/terms/"
+                        xmlns:dcterms="http://purl.org/dc/terms/"
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                         version="XHTML+RDFa 1.1"
                         xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd"        
@@ -926,24 +926,24 @@ class Repo(RepoTester):
         doc = self.repo.make_document('basefile')
         headmeta = rdflib.Graph().parse(format='n3', data="""
 @prefix bibo: <http://purl.org/ontology/bibo/> .
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://localhost:8000/res/base/basefile> a bibo:Document;
-        dct:author <http://localhost:8000/people/fred> ;
-        dct:title "Document title"@en ;
-        dct:title "Document title (untyped)" ;
-        dct:identifier "Doc:1"@en ;
-        dct:issued "2013-10-17"^^xsd:date .
+        dcterms:author <http://localhost:8000/people/fred> ;
+        dcterms:title "Document title"@en ;
+        dcterms:title "Document title (untyped)" ;
+        dcterms:identifier "Doc:1"@en ;
+        dcterms:issued "2013-10-17"^^xsd:date .
 
 <http://localhost:8000/people/fred> a foaf:Person;
         foaf:name "Fred Bloggs"@en ;
-        dct:title "This doesn't make any sense" ;
-        dct:issued "2013-10-17"^^xsd:date .
+        dcterms:title "This doesn't make any sense" ;
+        dcterms:issued "2013-10-17"^^xsd:date .
 
 <http://localhost:8000/res/base/other> a bibo:Document;
-        dct:references <http://localhost:8000/res/base/basefile> .
+        dcterms:references <http://localhost:8000/res/base/basefile> .
 
         """)
         doc.meta += headmeta
@@ -956,18 +956,18 @@ class Repo(RepoTester):
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                         version="XHTML+RDFa 1.1"
                         xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd"        
-                        xmlns:dct="http://purl.org/dc/terms/">
+                        xmlns:dcterms="http://purl.org/dc/terms/">
   <head about="http://localhost:8000/res/base/basefile">
-    <link href="http://localhost:8000/people/fred" rel="dct:author"></link>
-    <meta about="http://localhost:8000/people/fred" content="2013-10-17" datatype="xsd:date" property="dct:issued"></meta>
-    <meta about="http://localhost:8000/people/fred" content="This doesn't make any sense" property="dct:title" xml:lang=""></meta>
+    <link href="http://localhost:8000/people/fred" rel="dcterms:author"></link>
+    <meta about="http://localhost:8000/people/fred" content="2013-10-17" datatype="xsd:date" property="dcterms:issued"></meta>
+    <meta about="http://localhost:8000/people/fred" content="This doesn't make any sense" property="dcterms:title" xml:lang=""></meta>
     <link about="http://localhost:8000/people/fred" href="http://xmlns.com/foaf/0.1/Person" rel="rdf:type"></link>
     <meta about="http://localhost:8000/people/fred" content="Fred Bloggs" property="foaf:name" xml:lang="en"></meta>
-    <meta content="Doc:1" property="dct:identifier" xml:lang="en"></meta>
-    <meta content="2013-10-17" datatype="xsd:date" property="dct:issued"></meta>
-    <link href="http://localhost:8000/res/base/other" rev="dct:references"></link>
-    <title property="dct:title" xml:lang="">Document title (untyped)</title>
-    <title property="dct:title">Document title</title>
+    <meta content="Doc:1" property="dcterms:identifier" xml:lang="en"></meta>
+    <meta content="2013-10-17" datatype="xsd:date" property="dcterms:issued"></meta>
+    <link href="http://localhost:8000/res/base/other" rev="dcterms:references"></link>
+    <title property="dcterms:title" xml:lang="">Document title (untyped)</title>
+    <title property="dcterms:title">Document title</title>
     <link href="http://purl.org/ontology/bibo/Document" rel="rdf:type"></link>
   </head>      
   <body about="http://localhost:8000/res/base/basefile"/>
@@ -1106,13 +1106,13 @@ class Repo(RepoTester):
 
     test_rdf_xml = b"""<?xml version="1.0" encoding="utf-8"?>
 <rdf:RDF
-  xmlns:dct="http://purl.org/dc/terms/"
+  xmlns:dcterms="http://purl.org/dc/terms/"
   xmlns:bibo="http://purl.org/ontology/bibo/"
   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 >
   <bibo:Document rdf:about="http://localhost:8000/res/base/root">
-    <dct:updates rdf:resource="http://localhost:8000/res/base/res-a"/>
-    <dct:references rdf:resource="http://localhost:8000/res/other/res-b"/>
+    <dcterms:updates rdf:resource="http://localhost:8000/res/base/res-a"/>
+    <dcterms:references rdf:resource="http://localhost:8000/res/other/res-b"/>
     <rdf:seeAlso rdf:resource="http://localhost:8000/somewhere/else"/>
   </bibo:Document>
 </rdf:RDF>"""
@@ -1258,25 +1258,25 @@ class Generate(RepoTester):
             format="turtle")
         testgraph.bind("a", rdflib.Namespace("http://example.org/repo/a/"))
         testgraph.bind("b", rdflib.Namespace("http://example.org/repo/b/"))
-        testgraph.bind("dct", rdflib.Namespace("http://purl.org/dc/terms/"))
+        testgraph.bind("dcterms", rdflib.Namespace("http://purl.org/dc/terms/"))
         annotations = self.repo.graph_to_annotation_file(testgraph)
         self.maxDiff = None
-        want = """<graph xmlns:dct="http://purl.org/dc/terms/"
+        want = """<graph xmlns:dcterms="http://purl.org/dc/terms/"
        xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
        xmlns:b="http://example.org/repo/b/"
        xmlns:a="http://example.org/repo/a/">
   <resource uri="http://example.org/repo/b/1">
     <a><b:BarDoc/></a>
-    <dct:identifier>B1</dct:identifier>
-    <dct:isReferencedBy ref="http://example.org/repo/b/1part"/>
-    <dct:references ref="http://example.org/repo/a/1"/>
-    <dct:title>The title of Document B 1</dct:title>
+    <dcterms:identifier>B1</dcterms:identifier>
+    <dcterms:isReferencedBy ref="http://example.org/repo/b/1part"/>
+    <dcterms:references ref="http://example.org/repo/a/1"/>
+    <dcterms:title>The title of Document B 1</dcterms:title>
   </resource>
   <resource uri="http://example.org/repo/b/1part">
     <a><a:DocumentPart/></a>
-    <dct:identifier>B1(part)</dct:identifier>
-    <dct:isPartOf ref="http://example.org/repo/b/1"/>
-    <dct:references ref="http://example.org/repo/a/1"/>
+    <dcterms:identifier>B1(part)</dcterms:identifier>
+    <dcterms:isPartOf ref="http://example.org/repo/b/1"/>
+    <dcterms:references ref="http://example.org/repo/a/1"/>
   </resource>
 </graph>"""
         self.assertEqualXML(want,annotations)
@@ -1285,15 +1285,15 @@ class Generate(RepoTester):
         with self.repo.store.open_parsed("1", "w") as fp:
             fp.write("""<?xml version='1.0' encoding='utf-8'?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
-<html xmlns:a="http://example.org/repo/a/" xmlns:b="http://example.org/repo/b/"  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:dct="http://purl.org/dc/terms/" xmlns="http://www.w3.org/1999/xhtml">
+<html xmlns:a="http://example.org/repo/a/" xmlns:b="http://example.org/repo/b/"  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:dcterms="http://purl.org/dc/terms/" xmlns="http://www.w3.org/1999/xhtml">
   <head about="http://example.org/repo/a/1">
     <link href="http://example.org/repo/a/FooDoc" rel="rdf:type"/>
-    <meta content="A1" property="dct:identifier"/>
-    <title property="dct:title" xml:lang="">The title of Document A 1</title>
+    <meta content="A1" property="dcterms:identifier"/>
+    <title property="dcterms:title" xml:lang="">The title of Document A 1</title>
   </head>
   <body about="http://example.org/repo/a/1">
       <div><p>Main document text</p></div>
-      <div content="A1(part)" about="http://example.org/repo/a/1part" property="dct:identfier" typeof="a:DocumentPart">
+      <div content="A1(part)" about="http://example.org/repo/a/1part" property="dcterms:identfier" typeof="a:DocumentPart">
         <p>Document part text</p>
       </div>
   </body>
@@ -1351,19 +1351,19 @@ class Generate(RepoTester):
 
         test = """<?xml version='1.0' encoding='utf-8'?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
-<html xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:dct="http://purl.org/dc/terms/" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<html xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bibo="http://purl.org/ontology/bibo/" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:dcterms="http://purl.org/dc/terms/" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
   <head about="http://localhost:8000/res/w3c/hr-time">
-    <meta property="dct:editor" content="Jatinder Mann" xml:lang=""/>
-    <meta property="dct:identifier" content="hr-time" xml:lang=""/>
-    <meta property="dct:issued" content="2012-12-17" datatype="xsd:date"/>
-    <title property="dct:title">High Resolution Time</title>
+    <meta property="dcterms:editor" content="Jatinder Mann" xml:lang=""/>
+    <meta property="dcterms:identifier" content="hr-time" xml:lang=""/>
+    <meta property="dcterms:issued" content="2012-12-17" datatype="xsd:date"/>
+    <title property="dcterms:title">High Resolution Time</title>
     <link href="http://purl.org/ontology/bibo/Standard" rel="rdf:type"/>
   </head>
   <body about="http://localhost:8000/res/w3c/hr-time">
     <div about="http://localhost:8000/res/w3c/hr-time#PS1"
         typeof="bibo:DocumentPart"
         class="preamblesection"
-        property="dct:title"
+        property="dcterms:title"
         content="Abstract">
       <p>Lorem ipsum dolor sit amet</p>
       <p><a href="http://localhost:8000/res/test/something-else">external</a></p>
@@ -1374,7 +1374,7 @@ class Generate(RepoTester):
     <div about="http://localhost:8000/res/w3c/hr-time#PS2"
         typeof="bibo:DocumentPart"
         class="preamblesection"
-        property="dct:title"
+        property="dcterms:title"
         content="Status of this document">
       <p>Consectetur adipiscing elit.</p>
       <p>Mauris elit purus, blandit quis ante non</p>
@@ -1382,7 +1382,7 @@ class Generate(RepoTester):
     <div about="http://localhost:8000/res/w3c/hr-time#S1"
         typeof="bibo:DocumentPart"
         class="section"
-        property="dct:title"
+        property="dcterms:title"
         content="Introduction">
       <span property="bibo:chapter" content="1" xml:lang=""/>
       <p>Molestie aliquam nibh.</p>
@@ -1393,20 +1393,20 @@ class Generate(RepoTester):
     <div about="http://localhost:8000/res/w3c/hr-time#S4"
         typeof="bibo:DocumentPart"
         class="section"
-        property="dct:title" 
+        property="dcterms:title" 
         content="High Resolution Time">
       <span property="bibo:chapter" content="4" xml:lang=""/>
       <div about="http://localhost:8000/res/w3c/hr-time#S4.1"
         typeof="bibo:DocumentPart"
         class="subsection" 
-        property="dct:title"
+        property="dcterms:title"
         content="Introduction">
         <span property="bibo:chapter" content="4.1" xml:lang=""/>
         <p>Nullam semper orci justo</p>
         <div about="http://localhost:8000/res/w3c/hr-time#S4.1.1"
           typeof="bibo:DocumentPart"
           class="subsubsection" 
-          property="dct:title"
+          property="dcterms:title"
           content="Background">
           <span property="bibo:chapter" content="4.1.1" xml:lang=""/>
           <p>Sed tempor, ipsum vel iaculis gravida</p>
@@ -1415,7 +1415,7 @@ class Generate(RepoTester):
       <div about="http://localhost:8000/res/w3c/hr-time#S4.2"
         typeof="bibo:DocumentPart"
         class="subsection"
-        property="dct:title"
+        property="dcterms:title"
         content="The DOMHighResTimeStamp Type">
         <span property="bibo:chapter" content="4.2" xml:lang=""/>
         <div class="note">
@@ -1531,7 +1531,7 @@ class Generate(RepoTester):
 		xmlns:xhtml="http://www.w3.org/1999/xhtml"
 		xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
 		xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-		xmlns:dct="http://purl.org/dc/terms/"
+		xmlns:dcterms="http://purl.org/dc/terms/"
 		exclude-result-prefixes="xhtml rdf">
 
   <xsl:include href="base.xsl"/>
@@ -1695,7 +1695,7 @@ class TOC(RepoTester):
     def test_toc_query(self):
         # NOTE: this is also tested by a doctest
         want = """PREFIX bibo: <http://purl.org/ontology/bibo/>
-PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX dcterms: <http://purl.org/dc/terms/>
 PREFIX foaf: <http://xmlns.com/foaf/0.1/>
 PREFIX owl: <http://www.w3.org/2002/07/owl#>
 PREFIX prov: <http://www.w3.org/ns/prov#>
@@ -1710,9 +1710,9 @@ SELECT DISTINCT ?uri ?type ?title ?publisher ?issued
 FROM <http://example.org/ctx/base>
 WHERE {
     ?uri rdf:type foaf:Document ; rdf:type ?type .
-    OPTIONAL { ?uri dct:title ?title . }
-    OPTIONAL { ?uri dct:publisher ?publisher . }
-    OPTIONAL { ?uri dct:issued ?issued . }
+    OPTIONAL { ?uri dcterms:title ?title . }
+    OPTIONAL { ?uri dcterms:publisher ?publisher . }
+    OPTIONAL { ?uri dcterms:issued ?issued . }
 }"""
         self.assertEqual(want,
                          self.repo.toc_query("http://example.org/ctx/base"))
@@ -1725,9 +1725,9 @@ WHERE {
                          self.repo.toc_query())
 
     def test_toc_criteria(self):
-        dct = self.repo.ns['dct']
+        dcterms = self.repo.ns['dcterms']
         want = self.criteria
-        got = self.repo.toc_criteria([dct.title, dct.issued])
+        got = self.repo.toc_criteria([dcterms.title, dcterms.issued])
         
         self.assertEqual(len(want), len(got))
         self.assertEqual(want[0].binding, got[0].binding)
@@ -1884,10 +1884,10 @@ class News(RepoTester):
             de.save(self.repo.store.documententry_path(str(basefile)))
             g = rdflib.Graph()
             desc = Describer(g,self.repo.canonical_uri(basefile))
-            dct = self.repo.ns['dct']
-            desc.value(dct.title,v['title'])
+            dcterms = self.repo.ns['dcterms']
+            desc.value(dcterms.title,v['title'])
             #if basefile % 10 == 0:
-            #    desc.value(dct.abstract,"This is a longer summary of document %s" % basefile)
+            #    desc.value(dcterms.abstract,"This is a longer summary of document %s" % basefile)
                 
             util.ensure_dir(self.repo.store.distilled_path(str(basefile)))
             with open(self.repo.store.distilled_path(str(basefile)), "wb") as fp:
@@ -1958,7 +1958,7 @@ class News(RepoTester):
         entry.save()
         g = rdflib.Graph().parse(self.repo.store.distilled_path("2"))
         g.remove((rdflib.URIRef("http://localhost:8000/res/base/2"),
-                  self.repo.ns['dct'].title,
+                  self.repo.ns['dcterms'].title,
                   rdflib.Literal("Doc #2")))
         with open(self.repo.store.distilled_path("2"), "wb") as fp:
             g.serialize(fp, format="pretty-xml")

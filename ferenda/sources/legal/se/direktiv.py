@@ -113,7 +113,7 @@ class DirTrips(Trips):
                 
     def make_meta(self, chunk, meta, uri, basefile):
         d = Describer(meta, uri)
-        dct = self.ns['dct']
+        dcterms = self.ns['dcterms']
         prov = self.ns['prov']
         owl = self.ns['owl']
         rpubl = RPUBL
@@ -122,13 +122,13 @@ class DirTrips(Trips):
         d.value(prov.wasGeneratedBy, self.qualified_class_name())
 
         # predicates maps key strings to corresponsing RDFLib terms,
-        # e.g. "Rubrik" -> dct:title
-        predicates = {'Dir nr': dct.identifier,
+        # e.g. "Rubrik" -> dcterms:title
+        predicates = {'Dir nr': dcterms.identifier,
                       'Departement': rpubl.departement,
                       'Beslut vid regeringssammanträde':
                       rpubl.beslutsdatum,
-                      'Rubrik': dct.title,
-                      'Senast ändrad': dct.changed
+                      'Rubrik': dcterms.title,
+                      'Senast ändrad': dcterms.changed
                       }
         # munger contains a set of tuples where the first item is a
         # method for converting a plain text into the appropriate
@@ -154,13 +154,13 @@ class DirTrips(Trips):
                 self.log.error(
                     "Couldn't munge value '%s' into a proper object for predicate '%s'" % (val, key))
 
-        d.rel(dct.publisher, self.lookup_resource("Regeringskansliet"))
+        d.rel(dcterms.publisher, self.lookup_resource("Regeringskansliet"))
         d.rel(owl.sameAs, self.sameas_uri(uri))
         self.infer_triples(d, basefile)
-        # finally, we need a dct:issued, and the best we can come up
+        # finally, we need a dcterms:issued, and the best we can come up
         # with is the "Beslut vid regeringssammanträde" date
         # (rpubl:beslutsdatum), so we copy it.
-        d.value(dct.issued, d.getvalue(rpubl.beslutsdatum))
+        d.value(dcterms.issued, d.getvalue(rpubl.beslutsdatum))
 
     def sanitize_rubrik(self, rubrik):
         if rubrik == "Utgår":

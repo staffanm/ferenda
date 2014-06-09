@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 
 <http://lagen.nu/org/2008/regeringskansliet> rdfs:label "Regeringskansliet" .
 <http://lagen.nu/org/2008/justitiedepartementet> rdfs:label "Justitiedepartementet" .
@@ -44,7 +44,7 @@
 <http://lagen.nu/org/2008/utbildningsdepartementet> rdfs:label "Utbildningsdepartementet" .
 <http://lagen.nu/org/2008/utrikesdepartementet> rdfs:label "Utrikesdepartementet" .
 <http://lagen.nu/org/2012/landsbygdsdepartementet> rdfs:label "Landsbygdsdepartementet";
-						   dct:replaces <http://lagen.nu/org/2008/jordbruksdepartementet> .
+						   dcterms:replaces <http://lagen.nu/org/2008/jordbruksdepartementet> .
 
 <http://lagen.nu/org/2008/marknadsdomstolen> rdfs:label "Marknadsdomstolen" .
 <http://lagen.nu/org/2008/hovratten-for-ovre-norrland> rdfs:label "Hovrätten för Övre Norrland" . 

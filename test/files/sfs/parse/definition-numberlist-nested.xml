@@ -5,7 +5,7 @@
       <NumreradLista>
         <Listelement id="P5S1N1" ordinal="1">
           <str>1. </str>
-          <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Penningtvätt">penningtvätt</LinkSubject>
+          <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Penningtvätt">penningtvätt</LinkSubject>
           <str>: sådana åtgärder</str>
           <Bokstavslista>
             <Listelement id="P5S1N1Na" ordinal="a">
@@ -16,7 +16,7 @@
           </Bokstavslista>
         </Listelement><Listelement id="P5S1N8" ordinal="8">
           <str>8. </str>
-          <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Person_i_politiskt_utsatt_ställning">person i politiskt utsatt ställning</LinkSubject>
+          <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Person_i_politiskt_utsatt_ställning">person i politiskt utsatt ställning</LinkSubject>
           <str>: personer som har eller tidigare har haft viktiga offentliga funktioner och sådana personers närmaste familjemedlemmar och kända medarbetare,</str>
         </Listelement>
       </NumreradLista>

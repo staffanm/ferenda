@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rdf:RDF
-   xmlns:dct="http://purl.org/dc/terms/"
+   xmlns:dcterms="http://purl.org/dc/terms/"
    xmlns:foaf="http://xmlns.com/foaf/0.1/"
    xmlns:owl="http://www.w3.org/2002/07/owl#"
    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
@@ -16,21 +16,21 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/fifs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/fiskeriverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/fiskeriverket"/>
     <skos:altLabel xml:lang="sv">FIFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.fiskeriverket.se/service/fifs.106.1e7cbf241100bb6ff0b80001315.html"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Fiskeriverkets författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/valfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/valmyndigheten"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/valmyndigheten"/>
     <skos:altLabel xml:lang="sv">VALFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.val.se/valsystemet/lagar/valfs/index.html"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Valmyndighetens författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/kfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/kommerskollegium"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/kommerskollegium"/>
     <skos:altLabel xml:lang="sv">KFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.kommers.se/templates/Standard____492.aspx"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -59,7 +59,7 @@
     <skos:prefLabel xml:lang="sv">Socialstyrelsens författningssamling</skos:prefLabel>
     <rdfs:seeAlso rdf:resource="http://www.sos.se/sosfs/search/search.asp"/>
     <rdfs:comment xml:lang="sv">Utnyttjas också av Rättsmedicinalverket, Smittskyddsinstitutet och Myndigheten för handikappolitisk samordning.</rdfs:comment>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/socialstyrelsen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/socialstyrelsen"/>
     <skos:altLabel xml:lang="sv">SOSFS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/org/straalsaekerhetsmyndigheten">
@@ -72,7 +72,7 @@
     <skos:prefLabel xml:lang="sv">Nytt Juridiskt Arkiv</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/lbs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/statens_jordbruksverk"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/statens_jordbruksverk"/>
     <skos:altLabel xml:lang="sv">LBS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Lantbruksstyrelsens föreskrifter</skos:prefLabel>
@@ -82,7 +82,7 @@
     <skos:prefLabel xml:lang="sv">Verket för näringslivsutvecklings (Nutek) författningssamling</skos:prefLabel>
     <rdfs:seeAlso rdf:resource="http://www.nutek.se/sb/d/159/a/1021"/>
     <rdfs:comment xml:lang="sv">Har övertagits av EIFS, STEMFS och TRVFS</rdfs:comment>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/verket_foer_naeringslivsutveckling"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/verket_foer_naeringslivsutveckling"/>
     <skos:altLabel xml:lang="sv">NUTFS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/org/statens_jordbruksverk">
@@ -98,7 +98,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/mrtvfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/myndigheten_foer_radio_och_tv"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/myndigheten_foer_radio_och_tv"/>
     <skos:altLabel xml:lang="sv">MRTVFS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Myndigheten för radio och tv:s författningssamling</skos:prefLabel>
@@ -108,7 +108,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/vrfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/vetenskapsraadet"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/vetenskapsraadet"/>
     <skos:altLabel xml:lang="sv">VRFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.vr.se"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -119,7 +119,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/hvmfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/havs-_och_vattenmyndigheten"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/havs-_och_vattenmyndigheten"/>
     <skos:altLabel xml:lang="sv">HVMFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.havochvatten.se/miljopolitik-och-lagar/lagstiftning/svensk-lagstiftning/havs--och-vattenmyndighetens-forfattningssamling.html"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -153,7 +153,7 @@
     <skos:prefLabel xml:lang="sv">Försäkringskassans författningssamling</skos:prefLabel>
     <skos:comment xml:lang="sv">Utnyttjas också av Myndigheten för internationella adoptionsfrågor och Premiepensionsmyndigheten</skos:comment>
     <rdfs:seeAlso rdf:resource="http://lagrummet.forsakringskassan.se/risextern/"/>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/foersaekringskassan"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/foersaekringskassan"/>
     <skos:altLabel xml:lang="sv">FKFS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/org/trafikanalys">
@@ -165,14 +165,14 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/aafs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/aaklagarmyndigheten"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/aaklagarmyndigheten"/>
     <skos:altLabel xml:lang="sv">ÅFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.aklagare.se/Dokument/Foreskrifter-och-riktlinjer/"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Åklagarmyndighetens författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/trmfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/totalfoersvarets_rekryteringsmyndighet"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/totalfoersvarets_rekryteringsmyndighet"/>
     <skos:altLabel xml:lang="sv">TRMFS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Totalförsvarets rekryteringsmyndighets författningssamling</skos:prefLabel>
@@ -182,20 +182,20 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/myhfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/myndigheten_foer_yrkeshoegskolan"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/myndigheten_foer_yrkeshoegskolan"/>
     <skos:altLabel xml:lang="sv">MYHFS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Myndigheten för yrkeshögskolans författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/25fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_norrbottens_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_norrbottens_laen"/>
     <skos:altLabel xml:lang="sv">25FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.bd.lst.se/oris/startpage.aspx"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Norrbottens läns författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/sksfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/skogsstyrelsen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/skogsstyrelsen"/>
     <skos:altLabel xml:lang="sv">SKSFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.svo.se/minskog/templates/Page.asp?id=11199"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -206,7 +206,7 @@
     <skos:prefLabel xml:lang="sv">Sprängämnesinspektionens författningssamling</skos:prefLabel>
     <rdfs:seeAlso rdf:resource="http://www2.msb.se/shopping/srv_itemlist____13768.aspx"/>
     <rdfs:comment xml:lang="sv">Har övertagits av Myndigheten för samhällsskydd och beredskaps författningssamling (MSBFS)</rdfs:comment>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/spraengaemnesinspektionen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/spraengaemnesinspektionen"/>
     <skos:altLabel xml:lang="sv">SÄIFS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/org/statens_folkhaelsoinstitut">
@@ -214,7 +214,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/24fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_vaesterbottens_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_vaesterbottens_laen"/>
     <skos:altLabel xml:lang="sv">24FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.ac.lst.se/publikationer/?z=&amp;BPML=1632"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -224,8 +224,8 @@
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Statens naturvårdsverks författningssamling</skos:prefLabel>
     <rdfs:comment xml:lang="sv">Har ersatts av NFS (ny beteckning efter myndighetens namnbyte).</rdfs:comment>
-    <dct:isReplacedBy rdf:resource="http://rinfo.lagrummet.se/serie/fs/nfs"/>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/naturvaardsverket"/>
+    <dcterms:isReplacedBy rdf:resource="http://rinfo.lagrummet.se/serie/fs/nfs"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/naturvaardsverket"/>
     <skos:altLabel xml:lang="sv">SNFS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/org/fortifikationsverket">
@@ -241,14 +241,14 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/12fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_skaane_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_skaane_laen"/>
     <skos:altLabel xml:lang="sv">12FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.m.lst.se/index.cfm?page=9D1EDC55-347D-EED3-F2808AC9A454A4FF"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Skåne läns författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/difs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/datainspektionen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/datainspektionen"/>
     <skos:altLabel xml:lang="sv">DIFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.datainspektionen.se/infobestall/infomaterial/foreskrifter.jsp"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -279,7 +279,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/bffs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/bankinspektionen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/bankinspektionen"/>
     <skos:altLabel xml:lang="sv">BFFS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Bankinspektionens och försäkringsinspektionens författningssamling</skos:prefLabel>
@@ -294,7 +294,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/kkvfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/konkurrensverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/konkurrensverket"/>
     <skos:altLabel xml:lang="sv">KKVFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.kkv.se/t/Page____299.aspx"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -305,7 +305,7 @@
     <skos:prefLabel xml:lang="sv">Vägverkets författningssamling</skos:prefLabel>
     <rdfs:seeAlso rdf:resource="http://www.vv.se/templates/page3____1029.aspx"/>
     <rdfs:comment xml:lang="sv">Utnyttjas också av Statens geotekniska institut, Statens väg- och transportforskningsinstitut. Har delvis övertagits av Transportstyrelsens författningssamling (TSFS)</rdfs:comment>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/vaegverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/vaegverket"/>
     <skos:altLabel xml:lang="sv">VVFS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/org/centrala_studiestoedsnaemnden">
@@ -317,14 +317,14 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/20fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_dalarnas_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_dalarnas_laen"/>
     <skos:altLabel xml:lang="sv">20FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.w.lst.se/template/FormList.aspx?id=3588"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Dalarnas läns författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/tsfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/transportstyrelsen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/transportstyrelsen"/>
     <skos:altLabel xml:lang="sv">TSFS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Transportstyrelsens författningssamling</skos:prefLabel>
@@ -339,11 +339,11 @@
     <skos:prefLabel xml:lang="sv">Arbetsgivarverkets författningssamling</skos:prefLabel>
     <rdfs:seeAlso rdf:resource="http://www.arbetsgivarverket.se/publicerat/forfattningar/index.asp"/>
     <rdfs:comment xml:lang="sv">Utnyttjas också av Statens pensionsverk</rdfs:comment>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/arbetsgivarverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/arbetsgivarverket"/>
     <skos:altLabel xml:lang="sv">AGVFS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/ssmfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/straalsaekerhetsmyndigheten"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/straalsaekerhetsmyndigheten"/>
     <skos:altLabel xml:lang="sv">SSMFS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Strålsäkerhetsmyndighetens författningssamling</skos:prefLabel>
@@ -351,13 +351,13 @@
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/jvsfs">
     <skos:altLabel xml:lang="sv">JvSFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.jvs.se/forfattningssamling.htm"/>
-    <dct:comment xml:lang="sv">Har tagits över av Transportstyrelsens författningssamling (TSFS)</dct:comment>
+    <dcterms:comment xml:lang="sv">Har tagits över av Transportstyrelsens författningssamling (TSFS)</dcterms:comment>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Järnvägsstyrelsens författningssamling </skos:prefLabel>
     <skos:prefLabel xml:lang="sv">Järnvägsstyrelsens författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/ptfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/post-_och_telestyrelsen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/post-_och_telestyrelsen"/>
     <skos:altLabel xml:lang="sv">PTFS</skos:altLabel>
     <skos:altLabel xml:lang="sv">PRVFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.pts.se/Sidor/sida.asp?SectionId=890"/>
@@ -377,7 +377,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/sgu-fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/sveriges_geologiska_undersoekning"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/sveriges_geologiska_undersoekning"/>
     <skos:altLabel xml:lang="sv">SGU-FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.sgu.se/sgu/sv/om_sgu/foreskr_s.htm"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -391,13 +391,13 @@
     <rdfs:comment xml:lang="sv">Har tagits över av Myndigheten för samhällsskydd och beredskaps författningssamling (MSBFS)</rdfs:comment>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/tvfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/tillvaextverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/tillvaextverket"/>
     <skos:altLabel xml:lang="sv">TVFS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Tillväxtverkets författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/lvfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/laekemedelsverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/laekemedelsverket"/>
     <skos:altLabel xml:lang="sv">LVFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.lakemedelsverket.se/Tpl/NormalPage____996.aspx"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -408,7 +408,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/kfmfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/kronofogdemyndigheten"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/kronofogdemyndigheten"/>
     <skos:altLabel xml:lang="sv">KFMFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.kronofogden.se/kfmrattsinformation/foreskrifter.4.14db52b102ed4e5fe380003414.html"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -423,25 +423,25 @@
     <skos:prefLabel xml:lang="sv">Statens kulturråds författningssamling</skos:prefLabel>
     <rdfs:seeAlso rdf:resource="http://www.kulturradet.se/index.php?pid=904"/>
     <rdfs:comment xml:lang="sv">Utnyttjas också av Statens ljud- och bildarkiv, Konstnärsnämnden, Kungl. biblioteket, Presstödsnämnden, Riksantikvarieämbetet, Nationalmuseum med Prins Eugens Waldemarsudde, Moderna museet, Styrelsen för Sveriges författarfond, Taltidningsnämnden samt Talboks- och punktskriftsbiblioteket.</rdfs:comment>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/statens_kulturraad"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/statens_kulturraad"/>
     <skos:altLabel xml:lang="sv">KRFS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/08fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_kalmars_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_kalmars_laen"/>
     <skos:altLabel xml:lang="sv">08FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.h.lst.se/h/Publikationer/index/"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Kalmars läns författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/10fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_blekinge_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_blekinge_laen"/>
     <skos:altLabel xml:lang="sv">10FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.k.lst.se/k/Publikationer/index/"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Blekinge läns författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/kls">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/statens_jordbruksverk"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/statens_jordbruksverk"/>
     <skos:altLabel xml:lang="sv">KLS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Kungliga Lantbruksstyrelsens kungörelser</skos:prefLabel>
@@ -451,7 +451,7 @@
     <skos:prefLabel xml:lang="sv">Statens skolverks författningssamling</skos:prefLabel>
     <rdfs:seeAlso rdf:resource="http://www.skolverket.se/sb/d/580"/>
     <rdfs:comment xml:lang="sv">Utnyttjas också av Ungdomsstyrelsen, Statens skolinspektion och Specialpedagogiska skolmyndigheten.</rdfs:comment>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/statens_skolverk"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/statens_skolverk"/>
     <skos:altLabel xml:lang="sv">SKOLFS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/org/konkurrensverket">
@@ -471,7 +471,7 @@
     <skos:prefLabel xml:lang="sv">Radio- och TV-verkets författningssamling</skos:prefLabel>
     <rdfs:seeAlso rdf:resource="http://www.rtvv.se/se/blanketter/Om_verket/"/>
     <rdfs:comment xml:lang="sv">Har övertagits av Myndigheten för radio och tvs författningssamling (MRTVFS)</rdfs:comment>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/radio-_och_tv-verket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/radio-_och_tv-verket"/>
     <skos:altLabel xml:lang="sv">RTVFS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/org/foersvarsdepartementet">
@@ -483,11 +483,11 @@
     <skos:prefLabel xml:lang="sv">Naturvårdsverkets författningssamling</skos:prefLabel>
     <rdfs:seeAlso rdf:resource="http://www.naturvardsverket.se/Start/Lagar-och-styrning/Foreskrifter-och-allmanna-rad/"/>
     <rdfs:comment xml:lang="sv">Utnyttjas också av Kustbevakningen.</rdfs:comment>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/naturvaardsverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/naturvaardsverket"/>
     <skos:altLabel xml:lang="sv">NFS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/stemfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/statens_energimyndighet"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/statens_energimyndighet"/>
     <skos:altLabel xml:lang="sv">STEMFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.energimyndigheten.se/web/biblshop.nsf/frameset.main?ReadForm&amp;Doc=HTTP://WWW.ENERGIMYNDIGHETEN.SE/WEB/BIBLSHOP.NSF/SHOWVIEWS?READFORM&amp;VIEW=WEBTYPSVE&amp;COUNT=999&amp;EXPAND=4"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -519,7 +519,7 @@
     <skos:prefLabel xml:lang="sv">Statens jordbruksverks författningssamling</skos:prefLabel>
     <rdfs:seeAlso rdf:resource="http://www.sjv.se/startsida/forfattningar.4.7502f61001ea08a0c7fff120602.html"/>
     <rdfs:comment xml:lang="sv">Utnyttjas också av Centrala försöksdjursnämnden.</rdfs:comment>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/statens_jordbruksverk"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/statens_jordbruksverk"/>
     <skos:altLabel xml:lang="sv">SJVFS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/org/statens_naturvaardsverk">
@@ -527,7 +527,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/dvfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/domstolsverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/domstolsverket"/>
     <skos:altLabel xml:lang="sv">DVFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.domstol.se/templates/DV_InfoPage____2670.aspx"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -542,7 +542,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/rgkfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/riksgaeldskontoret"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/riksgaeldskontoret"/>
     <skos:altLabel xml:lang="sv">RGKFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.rgk.se/scripts/cgiip.exe/cm/pub/showdoc.p?docid=324"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -553,7 +553,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/03fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_uppsala_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_uppsala_laen"/>
     <skos:altLabel xml:lang="sv">03FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.c.lst.se/templates/DocumentStart.aspx?id=923"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -592,7 +592,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/13fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_hallands_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_hallands_laen"/>
     <skos:altLabel xml:lang="sv">13FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.n.lst.se/n/Publikationer/forfattningssamling.htm"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -603,21 +603,21 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/17fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_vaermlands_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_vaermlands_laen"/>
     <skos:altLabel xml:lang="sv">17FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.s.lst.se/s/Publikationer/varmlands_lans_forfattningssamling/"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Värmlands läns författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/21fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_gaevleborgs_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_gaevleborgs_laen"/>
     <skos:altLabel xml:lang="sv">21FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.x.lst.se/x/Publikationer/LFF.htm"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Gävleborgs läns författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/07fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_kronobergs_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_kronobergs_laen"/>
     <skos:altLabel xml:lang="sv">07FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.g.lst.se/g/Publikationer/forfattningar.htm"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -628,7 +628,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/kvfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/kriminalvaarden"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/kriminalvaarden"/>
     <skos:altLabel xml:lang="sv">KVFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.kvv.se/templates/KVV_InfoMaterialListing____3464.aspx"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -647,7 +647,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/trvfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/trafikverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/trafikverket"/>
     <skos:altLabel xml:lang="sv">TRVFS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Trafikverkets författningssamling</skos:prefLabel>
@@ -693,7 +693,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/18fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_oerebro_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_oerebro_laen"/>
     <skos:altLabel xml:lang="sv">18FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.t.lst.se/t/Publikationer/orebro_lans_forfattningssamling/"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -708,7 +708,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/pfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/pensionsmyndigheten"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/pensionsmyndigheten"/>
     <skos:altLabel xml:lang="sv">PFS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Pensionsmyndighetens författningssamling</skos:prefLabel>
@@ -739,14 +739,14 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/ra-fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/riksarkivet"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/riksarkivet"/>
     <skos:altLabel xml:lang="sv">RA-FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.ra.se/ra/foreskrifter.html"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Riksarkivets författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/svkfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/affaersverket_svenska_kraftnaet"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/affaersverket_svenska_kraftnaet"/>
     <skos:altLabel xml:lang="sv">SvKF</skos:altLabel>
     <skos:altLabel xml:lang="sv">SvKFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.svk.se/web/Page.aspx?id=5319"/>
@@ -787,21 +787,21 @@
     <skos:prefLabel xml:lang="sv">Naturvårdsverkets råd och riktlinjer</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/elsaek-fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/elsaekerhetsverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/elsaekerhetsverket"/>
     <skos:altLabel xml:lang="sv">ELSÄK-FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.elsakerhetsverket.se/vanstermeny/foreskrifter.4.964130fe7b18648b80001451.html"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Elsäkerhetsverkets författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/05fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_oestergoetlands_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_oestergoetlands_laen"/>
     <skos:altLabel xml:lang="sv">05FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www5.e.lst.se/forfattningar/index.html"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Östergötlands läns författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/eifs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/energimarknadsinspektionen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/energimarknadsinspektionen"/>
     <skos:altLabel xml:lang="sv">EIFS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Energimarknadsinspektionens författningssamling</skos:prefLabel>
@@ -824,32 +824,32 @@
     <skos:prefLabel xml:lang="sv">Banverkets författningssamling</skos:prefLabel>
     <rdfs:seeAlso rdf:resource="http://www.banverket.se/templates/StandardTtH.asp?id=2086"/>
     <rdfs:comment>Har tagits över av Transportstyrelsens författningssamling (TSFS)</rdfs:comment>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/banverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/banverket"/>
     <skos:altLabel xml:lang="sv">BV-FS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/vervafs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/verva"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/verva"/>
     <skos:altLabel xml:lang="sv">VERVAFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.verva.se/web/t/Page____490.aspx"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Verket för förvaltningsutvecklings (Verva) författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/fffs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/finansinspektionen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/finansinspektionen"/>
     <skos:altLabel xml:lang="sv">FFFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.fi.se/Templates/FFFSSearchPage____1328.aspx"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Finansinspektionens författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/rnfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/revisorsnaemnden"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/revisorsnaemnden"/>
     <skos:altLabel xml:lang="sv">RNFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.revisorsnamnden.se/rattsinfo/ramar/RNFS_ram.htm"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Revisorsnämndens författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/23fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_jaemtlands_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_jaemtlands_laen"/>
     <skos:altLabel xml:lang="sv">23FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www2.z.lst.se/23FS/zforfattn.php"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -865,14 +865,14 @@
     <skos:prefLabel xml:lang="sv">Högsta förvaltningsdomstolens årsbok</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/lifs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lotteriinspektionen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lotteriinspektionen"/>
     <skos:altLabel xml:lang="sv">LIFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.lotteriinsp.se/lott_templates/Page____776.aspx"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Lotteriinspektionens författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/skvfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/skatteverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/skatteverket"/>
     <skos:altLabel xml:lang="sv">SKVFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.skatteverket.se/rsvlagrum/index.html"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -895,7 +895,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/rpsfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/rikspolisstyrelsen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/rikspolisstyrelsen"/>
     <skos:altLabel xml:lang="sv">RPSFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.police.se/inter/nodeid=8832&amp;pageversion=1.html"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -907,7 +907,7 @@
     <rdfs:seeAlso rdf:resource="http://www2.ams.se/regelbok/index.html"/>
     <rdfs:comment xml:lang="sv">Har tagits över av arbetsförmedlingens författningssamling (AFFS)</rdfs:comment>
     <rdfs:comment xml:lang="sv">Har tagits över av Arbetsförmedlingens författningssamling (AFFS)</rdfs:comment>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/arbetsmarknadsstyrelsen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/arbetsmarknadsstyrelsen"/>
     <skos:altLabel xml:lang="sv">AMSFS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/rf/ra">
@@ -916,7 +916,7 @@
     <skos:prefLabel xml:lang="sv">Regeringsrättens årsbok</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/14fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_vaestra_goetalands_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_vaestra_goetalands_laen"/>
     <skos:altLabel xml:lang="sv">14FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.o.lst.se/o/Publikationer/Lansstyrelsens_forfattningssamling.htm"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -927,7 +927,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/09fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_gotlands_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_gotlands_laen"/>
     <skos:altLabel xml:lang="sv">09FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.i.lst.se/i/Publikationer/forfattningssamling/"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -958,7 +958,7 @@
     <skos:prefLabel xml:lang="sv">Tullverkets författningssamling</skos:prefLabel>
     <rdfs:seeAlso rdf:resource="http://www.tullverket.se/se/Foretag/forfattningar"/>
     <rdfs:comment xml:lang="sv">Utnyttjas också av Inspektionen för strategiska produkter.</rdfs:comment>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/tullverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/tullverket"/>
     <skos:altLabel xml:lang="sv">TFS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/org/lansstyrelsen_vaestmanlands_laen">
@@ -966,7 +966,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/stfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/sametinget"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/sametinget"/>
     <skos:altLabel xml:lang="sv">STFS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Sametingets författningssamling</skos:prefLabel>
@@ -980,7 +980,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/tlvfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/tandvaards-_och_laekemedelsfoermaansverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/tandvaards-_och_laekemedelsfoermaansverket"/>
     <skos:altLabel xml:lang="sv">TLVFS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Tandvårds- och läkemedelsförmånsverkets författningssamling</skos:prefLabel>
@@ -1300,7 +1300,7 @@
     <foaf:topic rdf:resource="http://rinfo.lagrummet.se/org/regeringskansliet"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/affs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/arbetsfoermedlingen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/arbetsfoermedlingen"/>
     <skos:altLabel xml:lang="sv">AFFS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Arbetsförmedlingens författningssamling</skos:prefLabel>
@@ -1347,11 +1347,11 @@
     <skos:prefLabel xml:lang="sv">Miljööverdomstolen</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/itpsfs">
-    <dct:comment xml:lang="sv">Har tagits över av Myndigheten för tillväxtpolitiska utvärderingar och analysers författningssamling (MTFS)</dct:comment>
+    <dcterms:comment xml:lang="sv">Har tagits över av Myndigheten för tillväxtpolitiska utvärderingar och analysers författningssamling (MTFS)</dcterms:comment>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Institutet för tillväxtpolitiska studiers författningssamling</skos:prefLabel>
     <rdfs:seeAlso rdf:resource="http://www.itps.se/Listor/Publikationssok.asp?secId=902"/>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/institutet_foer_tillvaextpolitiska_studier"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/institutet_foer_tillvaextpolitiska_studier"/>
     <skos:altLabel xml:lang="sv">ITPSFS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/org/socialstyrelsen">
@@ -1379,7 +1379,7 @@
     <skos:prefLabel xml:lang="sv">Arbetsdomstolen</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/iaffs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/inspektionen_foer_arbetsloeshetsfoersaekringen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/inspektionen_foer_arbetsloeshetsfoersaekringen"/>
     <skos:altLabel xml:lang="sv">IAFFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.iaf.se/iaftemplates/ReportList.aspx?id=923"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -1406,13 +1406,13 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/lsfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/statens_jordbruksverk"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/statens_jordbruksverk"/>
     <skos:altLabel xml:lang="sv">LSFS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Lantbruksstyrelsens författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/migrfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/migrationsverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/migrationsverket"/>
     <skos:altLabel xml:lang="sv">MIGRFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.migrationsverket.se/index.jsp?swedish/verket/migrfs.jsp"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -1423,7 +1423,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/livsfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/livsmedelsverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/livsmedelsverket"/>
     <skos:altLabel xml:lang="sv">LIVSFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.slv.se/templatesSLV/SLV_ExistingLegislation____2038.asp?plus=2038"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -1435,7 +1435,7 @@
     <skos:prefLabel xml:lang="sv">Rättsfall från hovrätterna</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/mtfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/myndigheten_foer_tillvaextpolitiska_utvaerderingar_och_analyser"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/myndigheten_foer_tillvaextpolitiska_utvaerderingar_och_analyser"/>
     <skos:altLabel xml:lang="sv">MTFS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Myndigheten för tillväxtpolitiska utvärderingar och analysers författningssamling</skos:prefLabel>
@@ -1445,7 +1445,7 @@
     <skos:prefLabel xml:lang="sv">Statistiska centralbyråns författningssamling</skos:prefLabel>
     <rdfs:seeAlso rdf:resource="http://www.scb.se/templates/Listning2____47329.asp"/>
     <rdfs:comment xml:lang="sv">Utnyttjas också av Konjunkturinstitutet och Medlingsinstitutet.</rdfs:comment>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/statistiska_centralbyraan"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/statistiska_centralbyraan"/>
     <skos:altLabel xml:lang="sv">SCB-FS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/org/foersaekringskassan">
@@ -1453,7 +1453,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/ra-ms">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/riksarkivet"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/riksarkivet"/>
     <skos:altLabel xml:lang="sv">RA-MS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.ra.se/ra/foreskrifter.html"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -1468,7 +1468,7 @@
     <skos:prefLabel xml:lang="sv">Försvarsmaktens författningssamling</skos:prefLabel>
     <rdfs:seeAlso rdf:resource="http://www.hkv.mil.se/ffs/"/>
     <rdfs:comment xml:lang="sv">Utnyttjas också av Fortifikationsverket, Totalförsvarets forskningsinstitut och Försvarets materielverk</rdfs:comment>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/foersvarsmakten"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/foersvarsmakten"/>
     <skos:altLabel xml:lang="sv">FFS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/org/medlingsinstitutet">
@@ -1480,7 +1480,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/stafs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/styrelsen_foer_ackreditering_och_teknisk_kontroll"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/styrelsen_foer_ackreditering_och_teknisk_kontroll"/>
     <skos:altLabel xml:lang="sv">STAFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.swedac.se/focal/gnh50s.nsf"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -1522,7 +1522,7 @@
     <owl:sameAs rdf:resource="http://rinfo.lagrummet.se/serie/fs/lmfs"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/01fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_stockholms_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_stockholms_laen"/>
     <skos:altLabel xml:lang="sv">01FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.ab.lst.se/templates/InformationPage____2227.asp"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -1565,7 +1565,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/sjoefs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/sjoefartsverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/sjoefartsverket"/>
     <skos:altLabel xml:lang="sv">SJÖFS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Sjöfartsverkets författningssamling</skos:prefLabel>
@@ -1576,7 +1576,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/afs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/arbetsmiljoeverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/arbetsmiljoeverket"/>
     <skos:altLabel xml:lang="sv">AFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.av.se/lagochratt/index.aspx"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -1637,7 +1637,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/sfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/regeringskansliet"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/regeringskansliet"/>
     <skos:altLabel xml:lang="sv">SFS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Svensk författningssamling</skos:prefLabel>
@@ -1655,14 +1655,14 @@
     <skos:prefLabel xml:lang="sv">Statens offentliga utredningar</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/bfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/boverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/boverket"/>
     <skos:altLabel xml:lang="sv">BFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.boverket.se/templates/Page.aspx?id=449"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Boverkets författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/msbfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/myndigheten_foer_samhaellsskydd_och_beredskap"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/myndigheten_foer_samhaellsskydd_och_beredskap"/>
     <skos:altLabel xml:lang="sv">MSBFS</skos:altLabel>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Myndigheten för samhällsskydd och beredskaps författningssamling</skos:prefLabel>
@@ -1677,14 +1677,14 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/lmfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lantmaeteriet"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lantmaeteriet"/>
     <skos:altLabel xml:lang="sv">LMFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.lantmateriet.se/templates/LMV_Page.aspx?id=2123"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Lantmäteriets författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/fhifs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/statens_folkhaelsoinstitut"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/statens_folkhaelsoinstitut"/>
     <skos:altLabel xml:lang="sv">FHIFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.fhi.se/templates/Page____4828.aspx"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -1703,11 +1703,11 @@
     <skos:prefLabel xml:lang="sv">Kammarkollegiets författningssamling</skos:prefLabel>
     <rdfs:seeAlso rdf:resource="http://www.kammarkollegiet.se/forfattning.html"/>
     <rdfs:comment xml:lang="sv">Utnyttjas också av Fastighetsmäklarnämnden och Statens institut för kommunikationsanalys (SIKA).</rdfs:comment>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/kammarkollegiet"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/kammarkollegiet"/>
     <skos:altLabel xml:lang="sv">KAMFS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/csnfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/centrala_studiestoedsnaemnden"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/centrala_studiestoedsnaemnden"/>
     <skos:altLabel xml:lang="sv">CSNFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.csn.se/Avdelningar/OmCSN/LagOchRatt/CSNsForfattningssamling%28CSNFS%29/CSNsForfattningssamling%28CSNFS%29.asp?MenyIdnr=1163"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -1722,7 +1722,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/06fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_joenkoepings_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_joenkoepings_laen"/>
     <skos:altLabel xml:lang="sv">06FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.f.lst.se/4.c79809f665b806047fff17217.html"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -1746,7 +1746,7 @@
     <skos:prefLabel xml:lang="sv">Djurskyddsmyndighetens författningssamling</skos:prefLabel>
     <rdfs:seeAlso rdf:resource="http://www.djurskyddsmyndigheten.se/Steria/templates/Page.aspx?id=482"/>
     <rdfs:comment xml:lang="sv">Har tagits över av jordbruksverkets författningssamling (SJVFS)</rdfs:comment>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/djurskyddsmyndigheten"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/djurskyddsmyndigheten"/>
     <skos:altLabel xml:lang="sv">DFS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/org/sveriges_meterologiska_och_hydrologiska_institut">
@@ -1758,7 +1758,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/19fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_vaestmanlands_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_vaestmanlands_laen"/>
     <skos:altLabel xml:lang="sv">19FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.u.lst.se/u/Publikationer/Forfattningssamling/"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -1809,14 +1809,14 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/tpvfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/totalfoersvarets_pliktverk"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/totalfoersvarets_pliktverk"/>
     <skos:altLabel xml:lang="sv">TPVFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.pliktverket.se/sv/Om_Pliktverket/Forfattningar/"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Totalförsvarets pliktverks författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/bolfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/bolagsverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/bolagsverket"/>
     <skos:altLabel xml:lang="sv">BOLFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.bolagsverket.se/om_bolagsverket/styrdokument/forfattningssamling/index.html"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -1832,7 +1832,7 @@
     <skos:prefLabel xml:lang="sv">Konsumentverkets författningssamling</skos:prefLabel>
     <rdfs:seeAlso rdf:resource="http://www.konsumentverket.se/mallar/ehandel/bestall_resultat.asp?lngCategoryID=416&amp;GroupID=12&amp;odrby=a&amp;odrsort=desc"/>
     <rdfs:comment xml:lang="sv">Utnyttjas också av Allmänna reklamationsnämnden.</rdfs:comment>
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/konsumentverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/konsumentverket"/>
     <skos:altLabel xml:lang="sv">KOVFS</skos:altLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/org/lansstyrelsen_oerebro_laen">
@@ -1852,14 +1852,14 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/kifs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/kemikalieinspektionen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/kemikalieinspektionen"/>
     <skos:altLabel xml:lang="sv">KIFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.kemi.se/templates/Page____2910.aspx"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
     <skos:prefLabel xml:lang="sv">Kemikalieinspektionens författningssamling</skos:prefLabel>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/22fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_vaesternorrlands_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_vaesternorrlands_laen"/>
     <skos:altLabel xml:lang="sv">22FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.y.lst.se/4.17431b9f544f8dca97fff21900.html"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -1870,7 +1870,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/hsvfs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/hoegskoleverket"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/hoegskoleverket"/>
     <skos:altLabel xml:lang="sv">HSVFS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.hsv.se/lagochratt/lagarochregler/foreskrifter.4.539a949110f3d5914ec800062619.html"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>
@@ -1881,7 +1881,7 @@
     <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
   </rdf:Description>
   <rdf:Description rdf:about="http://rinfo.lagrummet.se/serie/fs/04fs">
-    <dct:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_soedermanlands_laen"/>
+    <dcterms:publisher rdf:resource="http://rinfo.lagrummet.se/org/lansstyrelsen_soedermanlands_laen"/>
     <skos:altLabel xml:lang="sv">04FS</skos:altLabel>
     <rdfs:seeAlso rdf:resource="http://www.d.lst.se/d/Publikationer_1/lanets+forfattningssamling/"/>
     <rdf:type rdf:resource="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Forfattningssamling"/>

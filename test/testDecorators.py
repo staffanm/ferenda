@@ -84,9 +84,9 @@ class Decorators(unittest.TestCase):
         with open("parsed_path.xhtml", "w") as fp:
             fp.write("""<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" "http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:dct="http://purl.org/dc/terms/">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:dcterms="http://purl.org/dc/terms/">
   <head about="http://example.org/doc">
-     <title property="dct:title">Document title</title>
+     <title property="dcterms:title">Document title</title>
   </head>
   <body>
      <h1>Hello!</h1>

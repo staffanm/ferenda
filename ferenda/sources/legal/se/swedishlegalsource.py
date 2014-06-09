@@ -18,7 +18,7 @@ from ferenda.elements import Paragraph, Section, Body, CompoundElement, Sectiona
 from ferenda.pdfreader import Page
 
 from . import RPUBL
-DCT = Namespace(util.ns['dct'])
+DCTERMS = Namespace(util.ns['dcterms'])
 PROV = Namespace(util.ns['prov'])
 
 class Stycke(Paragraph):
@@ -39,7 +39,7 @@ class PreambleSection(CompoundElement):
             self.__class__.counter += 1
             self.uri = uri + "#PS%s" % self.__class__.counter
         element = super(PreambleSection, self).as_xhtml(uri)
-        element.set('property', 'dct:title')
+        element.set('property', 'dcterms:title')
         element.set('content', self.title)
         element.set('typeof', 'bibo:DocumentPart')
         return element
@@ -55,7 +55,7 @@ class UnorderedSection(CompoundElement):
             # note that this becomes a document-global running counter
             self.uri = uri + "#US%s" % self.__class__.counter
         element = super(UnorderedSection, self).as_xhtml(uri)
-        element.set('property', 'dct:title')
+        element.set('property', 'dcterms:title')
         element.set('content', self.title)
         element.set('typeof', 'bibo:DocumentPart')
         return element
@@ -94,7 +94,7 @@ class SwedishLegalStore(DocumentStore):
 
 class SwedishLegalSource(DocumentRepository):
     documentstore_class = SwedishLegalStore
-    namespaces = ['rdf', 'rdfs', 'xsd', 'dct', 'skos', 'foaf',
+    namespaces = ['rdf', 'rdfs', 'xsd', 'dcterms', 'skos', 'foaf',
                   'xhv', 'xsi', 'owl', 'prov', 'bibo',
                   ('rpubl', 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#'),
                   ('rinfoex', 'http://lagen.nu/terms#')]
@@ -103,10 +103,10 @@ class SwedishLegalSource(DocumentRepository):
     rdf_type = RPUBL.Rattsinformationsdokument # subclasses override this
 
     # This is according to the RPUBL vocabulary: All
-    # rpubl:Rattsinformationsdokument should have dct:title,
-    # dct:issued (must be a xsd:date), dct:publisher and
-    # dct:identifier
-    required_predicates = [RDF.type, DCT.title, DCT.issued, DCT.identifier, PROV.wasGeneratedBy]
+    # rpubl:Rattsinformationsdokument should have dcterms:title,
+    # dcterms:issued (must be a xsd:date), dcterms:publisher and
+    # dcterms:identifier
+    required_predicates = [RDF.type, DCTERMS.title, DCTERMS.issued, DCTERMS.identifier, PROV.wasGeneratedBy]
 
     swedish_ordinal_list = ('f\xf6rsta', 'andra', 'tredje', 'fj\xe4rde',
                             'femte', 'sj\xe4tte', 'sjunde', '\xe5ttonde',
@@ -246,7 +246,7 @@ class SwedishLegalSource(DocumentRepository):
 
     def infer_triples(self, d, basefile):
         try:
-            identifier = d.getvalue(self.ns['dct'].identifier)
+            identifier = d.getvalue(self.ns['dcterms'].identifier)
             # if the identifier is incomplete, eg "2010/11:68" instead
             # of "Prop. 2010/11:68", the following triggers a
             # ValueError, which is handled the same as if no
@@ -268,12 +268,12 @@ class SwedishLegalSource(DocumentRepository):
             elif self.rdf_type == self.ns['rpubl'].Forordningsmotiv:
                 prefix = "Fm "
             else:
-                raise ValueError("Cannot create dct:identifier for rdf_type %r" % self.rdf_type)
+                raise ValueError("Cannot create dcterms:identifier for rdf_type %r" % self.rdf_type)
             identifier = "%s%s" % (prefix, basefile)
             
             self.log.warning(
-                "%s: No dct:identifier, assuming %s" % (basefile, identifier))
-            d.value(self.ns['dct'].identifier, identifier)
+                "%s: No dcterms:identifier, assuming %s" % (basefile, identifier))
+            d.value(self.ns['dcterms'].identifier, identifier)
 
         # self.log.debug("Identifier %s" % identifier)
         (doctype, arsutgava, lopnummer) = re.split("[ :]", identifier)
@@ -281,12 +281,12 @@ class SwedishLegalSource(DocumentRepository):
         d.value(self.ns['rpubl'].lopnummer, lopnummer)
 
     def toc_query(self):
-        return """PREFIX dct:<http://purl.org/dc/terms/>
+        return """PREFIX dcterms:<http://purl.org/dc/terms/>
                   PREFIX rpubl:<http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
                   SELECT DISTINCT ?uri ?title ?identifier ?arsutgava ?lopnummer ?departement
                   FROM <%s>
-                  WHERE {?uri dct:title ?title;
-                              dct:identifier ?identifier;
+                  WHERE {?uri dcterms:title ?title;
+                              dcterms:identifier ?identifier;
                               rpubl:arsutgava ?arsutgava;
                               rpubl:lopnummer ?lopnummer;
                               rpubl:departement ?departement;
@@ -299,7 +299,7 @@ class SwedishLegalSource(DocumentRepository):
              'label': 'Efter \xe5rtal',
              'sorter': cmp,
              'pages': []},
-            {'predicate': self.ns['dct']['title'],
+            {'predicate': self.ns['dcterms']['title'],
              'binding': 'title',
              'label': 'Efter rubrik',
              'selector': lambda x: x[0].lower(),
@@ -603,7 +603,7 @@ class SwedishCitationParser(CitationParser):
         self._baseurl = baseurl
 
     def parse_string(self, string):
-        unfiltered = self._legalrefparser.parse(string, predicate="dct:references")
+        unfiltered = self._legalrefparser.parse(string, predicate="dcterms:references")
         # remove those references that we cannot fully resolve (should
         # be an option in LegalRef, but...
         filtered = []

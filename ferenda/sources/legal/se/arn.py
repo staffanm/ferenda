@@ -245,15 +245,15 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
         desc = Describer(doc.meta, doc.uri)
         desc.rdftype(self.rdf_type)
         desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-        desc.value(self.ns['dct'].identifier, "ARN %s" % doc.basefile)
+        desc.value(self.ns['dcterms'].identifier, "ARN %s" % doc.basefile)
         desc.value(self.ns['rpubl'].arendenummer, nextcell("Änr"))
         desc.value(self.ns['rpubl'].avgorandedatum, nextcell("Avgörande"))
-        desc.value(self.ns['dct'].subject, nextcell("Avdelning"), lang="sv")
+        desc.value(self.ns['dcterms'].subject, nextcell("Avdelning"), lang="sv")
         title = util.normalize_space(soup.table.find_all("tr")[3].get_text())
         title = re.sub("Avgörande \d+-\d+-\d+; \d+-\d+\.?", "", title)
-        desc.value(self.ns['dct'].title, title.strip(), lang="sv")
-        # dct:issued is required, but we only have rpubl.avgorandedatum
-        desc.value(self.ns['dct'].issued,
+        desc.value(self.ns['dcterms'].title, title.strip(), lang="sv")
+        # dcterms:issued is required, but we only have rpubl.avgorandedatum
+        desc.value(self.ns['dcterms'].issued,
                 desc.getvalue(self.ns['rpubl'].avgorandedatum))
         filetype = os.path.splitext(downloaded)[1]
         if filetype == ".pdf":

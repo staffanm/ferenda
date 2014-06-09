@@ -1,4 +1,4 @@
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov-o/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -8,13 +8,13 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://localhost:8000/res/dv/nja/2007s227> a rpubl:Rattsfallsreferat ;
-    dct:bibliographicCitation "NJA 2007:32" ;
-    dct:creator "Högsta domstolen"@sv,
+    dcterms:bibliographicCitation "NJA 2007:32" ;
+    dcterms:creator "Högsta domstolen"@sv,
         "Stockholms tingsrätt"@sv,
         "Svea hovrätt"@sv ;
-    dct:identifier "NJA 2007 s. 227" ;
-    dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
-    dct:references <http://localhost:8000/res/sfs/2000:1225>,
+    dcterms:identifier "NJA 2007 s. 227" ;
+    dcterms:publisher <http://lagen.nu/org/2008/domstolsverket> ;
+    dcterms:references <http://localhost:8000/res/sfs/2000:1225>,
         <http://localhost:8000/res/sfs/2000:1225#P8>,
         <http://localhost:8000/res/sfs/2000:1281> ;
     rpubl:arsutgava "2007" ;
@@ -28,8 +28,8 @@
     prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
 
 <http://localhost:8000/res/dv/hd/B86-05/2007-04-04> a rpubl:VagledandeDomstolsavgorande ;
-    dct:publisher <http://lagen.nu/org/2008/hogsta-domstolen> ;
-    dct:subject <http://localhost:8000/concept/Antidumpningstull>,
+    dcterms:publisher <http://lagen.nu/org/2008/hogsta-domstolen> ;
+    dcterms:subject <http://localhost:8000/concept/Antidumpningstull>,
         <http://localhost:8000/concept/Det_allmänna>,
         <http://localhost:8000/concept/EG-rätt>,
         <http://localhost:8000/concept/Kungörande>,
@@ -38,7 +38,7 @@
         <http://localhost:8000/concept/Regeringsformen>,
         <http://localhost:8000/concept/Rättsvillfarelse>,
         <http://localhost:8000/concept/Smuggling> ;
-    dct:title "Bestämmelsen i 8 § smugglingslagen om \"tull, skatt eller annan avgift\" har befunnits tillämplig i fråga om en i EG-förordningen nr (EEG) 1470/2001 föreskriven antidumpningstull. Det har ansetts förenligt med regeringsformens bestämmelser om normgivning och med legalitetsprincipen att straffbestämmelsen såvitt gäller tullplikten fått sitt innehåll utfyllt av föreskrifter i en EG-förordning. Undandragande av pålagor som avses i den nämnda förordningen har bedömts rikta sig mot \"det allmänna\". Även fråga om EG-förordningen utgör en in casu-lagstiftning."@sv ;
+    dcterms:title "Bestämmelsen i 8 § smugglingslagen om \"tull, skatt eller annan avgift\" har befunnits tillämplig i fråga om en i EG-förordningen nr (EEG) 1470/2001 föreskriven antidumpningstull. Det har ansetts förenligt med regeringsformens bestämmelser om normgivning och med legalitetsprincipen att straffbestämmelsen såvitt gäller tullplikten fått sitt innehåll utfyllt av föreskrifter i en EG-förordning. Undandragande av pålagor som avses i den nämnda förordningen har bedömts rikta sig mot \"det allmänna\". Även fråga om EG-förordningen utgör en in casu-lagstiftning."@sv ;
     rpubl:avdelning "2" ;
     rpubl:avgorandedatum "2007-04-04T00:00:00"^^xsd:dateTime ;
     rpubl:lagrum <http://localhost:8000/res/sfs/1974:152>,

@@ -38,20 +38,20 @@ class W3CStandards(DocumentRepository):
         from ferenda import Describer
         from ferenda import util
         import re
-        DCT = Namespace("http://purl.org/dc/terms/")
+        DCTERMS = Namespace("http://purl.org/dc/terms/")
         FOAF = Namespace("http://xmlns.com/foaf/0.1/")
         d = Describer(doc.meta, doc.uri)
         d.rdftype(FOAF.Document)
-        d.value(DCT.title, soup.find("title").text, lang=doc.lang)
-        d.value(DCT.abstract, soup.find(True, "abstract"), lang=doc.lang)
+        d.value(DCTERMS.title, soup.find("title").text, lang=doc.lang)
+        d.value(DCTERMS.abstract, soup.find(True, "abstract"), lang=doc.lang)
         # find the issued date -- assume it's the first thing that looks
         # like a date on the form "22 August 2013"
         re_date = re.compile(r'(\d+ \w+ \d{4})')
         datenode = soup.find(text=re_date)
         datestr = re_date.search(datenode).group(1)
-        d.value(DCT.issued, util.strptime(datestr, "%d %B %Y"))
+        d.value(DCTERMS.issued, util.strptime(datestr, "%d %B %Y"))
         editors = soup.find("dt", text=re.compile("Editors?:"))
         for editor in editors.find_next_siblings("dd"):
             editor_name = editor.text.strip().split(", ")[0]
-            d.value(DCT.editor, editor_name)
+            d.value(DCTERMS.editor, editor_name)
 # end metadata

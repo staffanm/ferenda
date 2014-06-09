@@ -2,14 +2,14 @@
   <Paragraf id="P6" ordinal="6" upphor="datetime.datetime(2007, 7, 1, 0, 0)">
     <Stycke id="P6S1">
       <str>Den som anges nedan ansvarar för att sådana anordningar och tecken för anvisning för trafiken som avses i </str>
-      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P1">1 §</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P1">1 §</LinkSubject>
       <str> sätts upp, tas bort, underhålls, och utförs i den omfattning som anges för respektive plats.</str>
     </Stycke>
   </Paragraf>
   <Paragraf id="P6" ikrafttrader="datetime.datetime(2007, 7, 1, 0, 0)" ordinal="6">
     <Stycke id="P6S1">
       <str>Den som anges nedan ansvarar för att sådana anordningar och tecken för anvisning för trafiken som avses i </str>
-      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P1">1 §</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P1">1 §</LinkSubject>
       <str> sätts upp, tas bort, underhålls och utförs i den omfattning som anges för respektive plats.</str>
       <Tabell>
         <Tabellrad>
@@ -34,7 +34,7 @@
             <str>b) På enskild väg inom tättbebyggt område och på sådan väg utom tättbebyggt område där kommunen är väghållare</str>
           </Tabellcell><Tabellcell>
             <str>Hastighetsbegränsningar, föreskrifter enligt </str>
-            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1971:948#P41">41 § väglagen (1971:948)</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/1971:948#P41">41 § väglagen (1971:948)</LinkSubject>
             <str> samt trafiksignaler och andra anordningar för att reglera trafiken och tillgodose trafiksäkerheten när det behövs för att tillgodose ett allmänt behov.</str>
           </Tabellcell>
         </Tabellrad><Tabellrad upphor="datetime.datetime(2007, 7, 1, 0, 0)">
@@ -43,7 +43,7 @@
             <str>c) På alla vägar</str>
           </Tabellcell><Tabellcell>
             <str>Särskilda trafikregler enligt sådana föreskrifter som avses i </str>
-            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P14">10 kap. 14 § trafikförordningen (1998:1276)</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P14">10 kap. 14 § trafikförordningen (1998:1276)</LinkSubject>
             <str> och som meddelats av kommunen.</str>
           </Tabellcell>
         </Tabellrad><Tabellrad upphor="datetime.datetime(2007, 7, 1, 0, 0)">
@@ -67,9 +67,9 @@
             <str>b) På enskild väg inom tättbebyggt område och på sådan väg utom tättbebyggt område där kommunen är väghållare</str>
           </Tabellcell><Tabellcell>
             <str>Hastighetsbegränsningar, föreskrifter enligt </str>
-            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1971:948#P41">41 § väglagen (1971:948)</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/1971:948#P41">41 § väglagen (1971:948)</LinkSubject>
             <str>, andra lokala trafikföreskrifter enligt </str>
-            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P1">10 kap. 1 § trafikförordningen (1998:1276)</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P1">10 kap. 1 § trafikförordningen (1998:1276)</LinkSubject>
             <str> än sådana som endast får meddelas efter medgivande av vägens ägare samt trafiksignaler och andra anordningar för att reglera trafiken och tillgodose trafiksäkerheten när det behövs för att tillgodose ett allmänt behov.</str>
           </Tabellcell>
         </Tabellrad><Tabellrad ikrafttrader="datetime.datetime(2007, 7, 1, 0, 0)">
@@ -78,7 +78,7 @@
             <str>c) På alla vägar</str>
           </Tabellcell><Tabellcell>
             <str>Särskilda trafikregler enligt sådana föreskrifter som avses i </str>
-            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P14">10 kap. 14 § trafikförordningen</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P14">10 kap. 14 § trafikförordningen</LinkSubject>
             <str> och som meddelats av kommunen.</str>
           </Tabellcell>
         </Tabellrad><Tabellrad ikrafttrader="datetime.datetime(2007, 7, 1, 0, 0)">
@@ -102,7 +102,7 @@
             <str>b) På annan enskild väg utom tättbebyggt område än där kommunen är väghållare</str>
           </Tabellcell><Tabellcell>
             <str>Hastighetsbegränsningar, föreskrifter enligt </str>
-            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1971:948#P41">41 § väglagen</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/1971:948#P41">41 § väglagen</LinkSubject>
             <str> samt trafiksignaler och andra anvisningar för att reglera trafiken och tillgodose trafiksäkerheten där det behövs för att tillgodose ett allmänt behov.</str>
           </Tabellcell>
         </Tabellrad><Tabellrad ikrafttrader="datetime.datetime(2007, 7, 1, 0, 0)">
@@ -111,9 +111,9 @@
             <str>b) På annan enskild väg utom tättbebyggt område än där kommunen är väghållare</str>
           </Tabellcell><Tabellcell>
             <str>Hastighetsbegränsningar, föreskrifter enligt </str>
-            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1971:948#P41">41 § väglagen</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/1971:948#P41">41 § väglagen</LinkSubject>
             <str>, andra lokala trafikföreskrifter enligt </str>
-            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P1">10 kap. 1 § trafikförordningen</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P1">10 kap. 1 § trafikförordningen</LinkSubject>
             <str> än sådana som endast får meddelas efter medgivande av vägens ägare samt trafiksignaler och andra anordningar för att reglera trafiken och tillgodose trafiksäkerheten där det behövs för att tillgodose ett allmänt behov.</str>
           </Tabellcell>
         </Tabellrad><Tabellrad>
@@ -129,7 +129,7 @@
             <str>d) På alla vägar</str>
           </Tabellcell><Tabellcell>
             <str>Särskilda trafikregler enligt sådana föreskrifter som avses i </str>
-            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P14">10 kap. 14 § trafikförordningen</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P14">10 kap. 14 § trafikförordningen</LinkSubject>
             <str> och som meddelats av den statliga väghållningsmyndigheten.</str>
           </Tabellcell>
         </Tabellrad><Tabellrad>
@@ -139,7 +139,7 @@
             <str>På allmän skoterled</str>
           </Tabellcell><Tabellcell>
             <str>Markeringar som anges i </str>
-            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1978:594#P9">9 § terrängkörningsförordningen (1978:594)</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/1978:594#P9">9 § terrängkörningsförordningen (1978:594)</LinkSubject>
             <str>.</str>
           </Tabellcell>
         </Tabellrad><Tabellrad>
@@ -153,9 +153,9 @@
         </Tabellrad><Tabellrad>
           <Tabellcell>
             <str>5. Markägare som avses i </str>
-            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1984:318#P2S2">2 § andra stycket</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/1984:318#P2S2">2 § andra stycket</LinkSubject>
             <str> lagen (</str>
-            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1984:318">1984:318</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/1984:318">1984:318</LinkSubject>
             <str>) om kontrollavgift vid olovlig parkering</str>
           </Tabellcell><Tabellcell>
             <str>Inom område där markägaren förbjuder eller ställer upp villkor för parkering och tillkännager förbuden eller villkoren enligt lagen om kontrollavgift vid olovlig parkering</str>
@@ -193,7 +193,7 @@
             <str>På väg och i terräng</str>
           </Tabellcell><Tabellcell>
             <str>Särskilda trafikregler enligt sådana föreskrifter som avses i </str>
-            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P14">10 kap. 14 § trafikförordningen</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P14">10 kap. 14 § trafikförordningen</LinkSubject>
             <str> och som meddelats av polismyndighet.</str>
           </Tabellcell>
         </Tabellrad><Tabellrad>
@@ -203,7 +203,7 @@
             <str>På väg och i terräng</str>
           </Tabellcell><Tabellcell>
             <str>Särskilda trafikregler enligt sådana föreskrifter som avses i </str>
-            <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P14">10 kap. 14 § trafikförordningen</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/1998:1276#K10P14">10 kap. 14 § trafikförordningen</LinkSubject>
             <str> och som meddelats av Tullverket.</str>
           </Tabellcell>
         </Tabellrad><Tabellrad>

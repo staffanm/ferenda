@@ -3,19 +3,19 @@
   <Paragraf id="P19" ordinal="19">
     <Stycke id="P19S1">
       <str>Följande bestämmelser i </str>
-      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/2007:515">myndighetsförordningen (2007:515)</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/2007:515">myndighetsförordningen (2007:515)</LinkSubject>
       <str> ska enbart tillämpas på myndigheten i administrativa ärenden:</str>
     </Stycke><Stycke id="P19S2">
-      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P20">20 §</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P20">20 §</LinkSubject>
       <str> om föredragning,</str>
     </Stycke><Stycke id="P19S3">
-      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P21">21 §</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P21">21 §</LinkSubject>
       <str> om myndighetens beslut,</str>
     </Stycke><Stycke id="P19S4">
-      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P27">27 §</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P27">27 §</LinkSubject>
       <str> om myndighetens rätt att företräda staten vid domstol, och</str>
     </Stycke><Stycke id="P19S5">
-      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P29">29 §</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P29">29 §</LinkSubject>
       <str> om ärendeförteckning.</str>
     </Stycke>
   </Paragraf>

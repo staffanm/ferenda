@@ -4,8 +4,8 @@ from __future__ import unicode_literals
 class TocExample(DocumentRepository):
 # begin predicates
     def toc_predicates(self):
-        return [self.ns['dct'].issued,
-                self.ns['dct'].identifier]
+        return [self.ns['dcterms'].issued,
+                self.ns['dcterms'].identifier]
 # end predicates
 
 # begin criteria

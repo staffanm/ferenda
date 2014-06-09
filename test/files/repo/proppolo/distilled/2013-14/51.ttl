@@ -1,5 +1,5 @@
 @prefix bibo: <http://purl.org/ontology/bibo/> .
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov-o/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -9,10 +9,10 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://localhost:8000/res/prop/2013/14:51> a rpubl:Proposition ;
-    dct:abstract "Propositionen innehåller förslag till skärpningar i den reglering som bland annat rör skydd mot främmande makts underrättelseverksamhet. Det föreslås att ett nytt brott införs i brottsbalken, olovlig underrättelseverksamhet mot Sverige. Brottet tar sikte på otillåten underrättelseverksamhet vars syfte är att komma över uppgifter om förhållanden som det kan skada Sveriges säkerhet att en främmande makt känner till. För straffansvar ska krävas att verksamheten bedrivs hemligen eller med användande av svikliga medel och att gärningsmannens syfte är att gå en främmande makt tillhanda. Straffet föreslås vara fängelse i högst två år eller, om brottet är grovt, fängelse i lägst sex månader och högst fyra år. Det ska finnas samma möjligheter att använda hemliga tvångsmedel för att förebygga, förhindra och utreda det nya brottet som gäller för andra former av olovlig underrättelseverksamhet. Dessutom föreslås att straffbestämmelsen om så kallat flyktingspionage utvidgas till att omfatta verksamhet som bedrivs med användande av otillbörliga medel samt att straffskalan skärps genom att straffminimum höjs från böter till fängelse. Straffskalan för brottet vårdslöshet med hemlig uppgift föreslås också ändras genom att straffmaximum höjs från fängelse i högst sex månader till fängelse i högst ett år. Slutligen innefattar propositionen förslag om vissa språkliga och lagtekniska ändringar i brottsbalken. I aktuella delar föreslås ändringarna få genomslag även i tryckfrihetsförordningens brottskatalog. Ändringarna i brottsbalken och de lagar som reglerar hemliga tvångsmedel föreslås träda i kraft den 1 juli 2014 och ändringarna i tryckfrihetsförordningen den 1 januari 2015."@sv ;
-    dct:identifier "Prop. 2013/14:51" ;
-    dct:issued "2013-11-21"^^xsd:date ;
-    dct:title "Förstärkt skydd mot främmande makts underrättelseverksamhet"@sv ;
+    dcterms:abstract "Propositionen innehåller förslag till skärpningar i den reglering som bland annat rör skydd mot främmande makts underrättelseverksamhet. Det föreslås att ett nytt brott införs i brottsbalken, olovlig underrättelseverksamhet mot Sverige. Brottet tar sikte på otillåten underrättelseverksamhet vars syfte är att komma över uppgifter om förhållanden som det kan skada Sveriges säkerhet att en främmande makt känner till. För straffansvar ska krävas att verksamheten bedrivs hemligen eller med användande av svikliga medel och att gärningsmannens syfte är att gå en främmande makt tillhanda. Straffet föreslås vara fängelse i högst två år eller, om brottet är grovt, fängelse i lägst sex månader och högst fyra år. Det ska finnas samma möjligheter att använda hemliga tvångsmedel för att förebygga, förhindra och utreda det nya brottet som gäller för andra former av olovlig underrättelseverksamhet. Dessutom föreslås att straffbestämmelsen om så kallat flyktingspionage utvidgas till att omfatta verksamhet som bedrivs med användande av otillbörliga medel samt att straffskalan skärps genom att straffminimum höjs från böter till fängelse. Straffskalan för brottet vårdslöshet med hemlig uppgift föreslås också ändras genom att straffmaximum höjs från fängelse i högst sex månader till fängelse i högst ett år. Slutligen innefattar propositionen förslag om vissa språkliga och lagtekniska ändringar i brottsbalken. I aktuella delar föreslås ändringarna få genomslag även i tryckfrihetsförordningens brottskatalog. Ändringarna i brottsbalken och de lagar som reglerar hemliga tvångsmedel föreslås träda i kraft den 1 juli 2014 och ändringarna i tryckfrihetsförordningen den 1 januari 2015."@sv ;
+    dcterms:identifier "Prop. 2013/14:51" ;
+    dcterms:issued "2013-11-21"^^xsd:date ;
+    dcterms:title "Förstärkt skydd mot främmande makts underrättelseverksamhet"@sv ;
     rpubl:arsutgava "2013/14" ;
     rpubl:departement <http://lagen.nu/org/2008/justitiedepartementet> ;
     rpubl:lopnummer "51" ;
@@ -24,25 +24,25 @@
     prov:wasGeneratedBy "ferenda.sources.legal.se.propositioner.PropPolo" .
 
 <http://localhost:8000/res/prop/2013/14:51#PS1> a bibo:DocumentPart ;
-    dct:title "Propositionens huvudsakliga innehåll"@sv .
+    dcterms:title "Propositionens huvudsakliga innehåll"@sv .
 
 <http://localhost:8000/res/prop/2013/14:51#S1> a bibo:DocumentPart ;
-    dct:title "Förslag till riksdagsbeslut"@sv ;
+    dcterms:title "Förslag till riksdagsbeslut"@sv ;
     bibo:chapter "1"@sv .
 
 <http://localhost:8000/res/prop/2013/14:51#S4> a bibo:DocumentPart ;
-    dct:title "Gällande rätt"@sv ;
+    dcterms:title "Gällande rätt"@sv ;
     bibo:chapter "4"@sv .
 
 <http://localhost:8000/res/prop/2013/14:51#S4.1> a bibo:DocumentPart ;
-    dct:title "Begreppet rikets säkerhet"@sv ;
+    dcterms:title "Begreppet rikets säkerhet"@sv ;
     bibo:chapter "4.1"@sv .
 
 <http://localhost:8000/res/prop/2013/14:51#S4.2> a bibo:DocumentPart ;
-    dct:title "Aktuella straffbestämmelser i 19 kap. brottsbalken"@sv ;
+    dcterms:title "Aktuella straffbestämmelser i 19 kap. brottsbalken"@sv ;
     bibo:chapter "4.2"@sv .
 
 <http://localhost:8000/res/prop/2013/14:51#S4.2.1> a bibo:DocumentPart ;
-    dct:title "Spioneri"@sv ;
+    dcterms:title "Spioneri"@sv ;
     bibo:chapter "4.2.1"@sv .
 

@@ -2,13 +2,13 @@
 <xsl:stylesheet version="1.0"
 		xmlns:xhtml="http://www.w3.org/1999/xhtml"
 		xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
-		xmlns:dct="http://purl.org/dc/terms/"
+		xmlns:dcterms="http://purl.org/dc/terms/"
 		xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 		xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
 		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		xml:space="preserve"
-		exclude-result-prefixes="xhtml rdf dct xsd rinfo rinfoex"
+		exclude-result-prefixes="xhtml rdf dcterms xsd rinfo rinfoex"
 		>
   <xsl:param name="value"/>
   <xsl:param name="annotationfile"/>

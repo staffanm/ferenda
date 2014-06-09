@@ -141,7 +141,7 @@ class MediaWiki(DocumentRepository):
         # ferenda.elements tree and sets doc.body to it
         root = etree.Element("html")
         root.set("xmlns", 'http://www.w3.org/2002/06/xhtml2/')
-        root.set("xmlns:dct", util.ns['dct'])
+        root.set("xmlns:dcterms", util.ns['dcterms'])
         root.set("xmlns:rdf", util.ns['rdf'])
         root.set("xmlns:rdfs", util.ns['rdfs'])
         root.set("xmlns:skos", util.ns['skos'])
@@ -158,7 +158,7 @@ class MediaWiki(DocumentRepository):
             heading.text = doc.basefile
 
         main = etree.SubElement(body, "div")
-        main.set("property", "dct:description")
+        main.set("property", "dcterms:description")
         main.set("datatype", "rdf:XMLLiteral")
         current = main
         currenturi = uri
@@ -174,7 +174,7 @@ class MediaWiki(DocumentRepository):
                     h.text = child.text
                     current = etree.SubElement(body, "div")
                     current.set("about", suburi)
-                    current.set("property", "dct:description")
+                    current.set("property", "dcterms:description")
                     current.set("datatype", "rdf:XMLLiteral")
                 except AttributeError:
                     self.log.warning(
@@ -357,7 +357,7 @@ class LinkedWikimarkup(object):
     def hiddenLink(self, m):
         uri = 'http://lagen.nu/concept/%s' % util.ucfirst(
             m.group(1)).replace(' ', '_')
-        return '<a class="hcwl" rel="dct:subject" href="%s"/>' % uri
+        return '<a class="hcwl" rel="dcterms:subject" href="%s"/>' % uri
 
     def imageLink(self, m):
         uri = 'http://wiki.lagen.nu/images/%s' % m.group(1).strip()

@@ -12,7 +12,7 @@
         </Tabellrad><Tabellrad>
           <Tabellcell>
             <str />
-            <LinkSubject predicate="dct:subject" uri="http://lagen.nu/concept/Biobank">Biobank</LinkSubject>
+            <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Biobank">Biobank</LinkSubject>
             <str />
           </Tabellcell><Tabellcell>
             <str>Biologiskt material från en eller flera människor som samlas.</str>

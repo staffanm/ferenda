@@ -5,7 +5,7 @@
       xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:schemaLocation="http://www.w3.org/2002/06/xhtml2/ http://www.w3.org/MarkUp/SCHEMA/xhtml2.xsd"
-      xmlns:dct="http://purl.org/dc/terms/"
+      xmlns:dcterms="http://purl.org/dc/terms/"
       xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
       xmlns:rinfoex="http://lagen.nu/terms#"
       xmlns:xi="http://www.w3.org/2001/XInclude"
@@ -16,7 +16,7 @@
       >
   <xi:include href="base.template.xht2"/>
     <head>
-      <title property="dct:identifier" py:content="doc['meta']['dct:identifier']">Dokumentidentifierare</title>
+      <title property="dcterms:identifier" py:content="doc['meta']['dcterms:identifier']">Dokumentidentifierare</title>
       <!--! base is not valid in xhtml2 - but we need it to set the
       base context for RDFa parsing. Fix this later through pyRDFa
       transforms -->

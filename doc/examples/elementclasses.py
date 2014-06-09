@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 # begin makedoc
 from ferenda.elements import Body, Heading, Paragraph, Footnote
 
-doc = Body([Heading(["About Doc 43/2012 and it's interpretation"],predicate="dct:title"),
+doc = Body([Heading(["About Doc 43/2012 and it's interpretation"],predicate="dcterms:title"),
             Paragraph(["According to Doc 43/2012",
                        Footnote(["Available at http://example.org/xyz"]),
                        " the bizbaz should be frobnicated"])

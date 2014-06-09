@@ -23,7 +23,7 @@ from ferenda import util
 
 RPUBL = Namespace('http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
 RINFOEX = Namespace("http://lagen.nu/terms#")
-DCT = Namespace(util.ns['dct'])
+DCTERMS = Namespace(util.ns['dcterms'])
 
 # Maps keys used by the internal dictionaries that LegalRef
 # constructs, which in turn are modelled after production rule names
@@ -38,7 +38,7 @@ predicate = {"type": RDF.type,
              "section": RINFOEX["paragrafnummer"],
              "piece": RINFOEX["styckenummer"],
              "item": RINFOEX["punktnummer"],
-             "myndighet": DCT["creator"],
+             "myndighet": DCTERMS["creator"],
              "dnr": RPUBL["diarienummer"]}
 
 dictkey = dict([[v, k] for k, v in list(predicate.items())])
@@ -130,7 +130,7 @@ def construct_from_graph(graph):
 
     elif rdftype == RPUBL["Myndighetsavgorande"]:
         return "http://rinfo.lagrummet.se/publ/beslut/%s/%s" % \
-               (_first_obj(graph, bnode, DCT["creator"]),
+               (_first_obj(graph, bnode, DCTERMS["creator"]),
                 _first_obj(graph, bnode, RPUBL["diarienummer"]))
 
     else:

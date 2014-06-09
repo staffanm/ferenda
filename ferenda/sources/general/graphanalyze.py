@@ -38,7 +38,7 @@ except ImportError:
 from ferenda import TripleStore
 from ferenda import util
 
-DCT = Namespace(util.ns['dct'])
+DCTERMS = Namespace(util.ns['dcterms'])
 RINFOEX = Namespace('http://lagen.nu/terms#')
 
 
@@ -65,7 +65,7 @@ class GraphAnalyze(object):
                  'data': pagerank_set}]
 
         g = Graph()
-        g.bind('dct', self.ns['dct'])
+        g.bind('dcterms', self.ns['dcterms'])
         g.bind('rinfoex', self.ns['rinfoex'])
 
         XHT_NS = "{http://www.w3.org/1999/xhtml}"
@@ -83,23 +83,23 @@ class GraphAnalyze(object):
             resultsetcollectionnode = BNode()
             g.add((resultsetcollectionnode, RDF.type, RDF.List))
             rc = Collection(g, resultsetcollectionnode)
-            g.add((articlenode, DCT["relation"], resultsetcollectionnode))
+            g.add((articlenode, DCTERMS["relation"], resultsetcollectionnode))
             for s in sets:
                 resultsetnode = BNode()
                 listnode = BNode()
                 rc.append(resultsetnode)
                 g.add((resultsetnode, RDF.type, RINFOEX[
                       "RelatedContentCollection"]))
-                g.add((resultsetnode, DCT["title"], Literal(s["label"])))
-                g.add((resultsetnode, DCT["hasPart"], listnode))
+                g.add((resultsetnode, DCTERMS["title"], Literal(s["label"])))
+                g.add((resultsetnode, DCTERMS["hasPart"], listnode))
                 c = Collection(g, listnode)
                 g.add((listnode, RDF.type, RDF.List))
                 if article in s['data']:
                     print(("    Set %s" % s['label']))
                     for result in s['data'][article]:
                         resnode = BNode()
-                        g.add((resnode, DCT["references"], Literal(result[0])))
-                        g.add((resnode, DCT["title"], Literal(result[1])))
+                        g.add((resnode, DCTERMS["references"], Literal(result[0])))
+                        g.add((resnode, DCTERMS["title"], Literal(result[1])))
                         c.append(resnode)
                         print(("        %s" % result[1]))
 
@@ -182,7 +182,7 @@ class GraphAnalyze(object):
 
         return """
 PREFIX eurlex:<http://lagen.nu/eurlex#>
-PREFIX dct:<http://purl.org/dc/terms/>
+PREFIX dcterms:<http://purl.org/dc/terms/>
 SELECT DISTINCT ?subj WHERE {
     ?subj ?pred ?obj .
     %s
@@ -210,7 +210,7 @@ SELECT DISTINCT ?subj WHERE {
 
         return """
 PREFIX eurlex:<http://lagen.nu/eurlex#>
-PREFIX dct:<http://purl.org/dc/terms/>
+PREFIX dcterms:<http://purl.org/dc/terms/>
 SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
     ?subj ?pred ?obj .
     ?subj eurlex:celexnum ?celexnum.

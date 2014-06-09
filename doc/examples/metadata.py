@@ -18,7 +18,7 @@ class ExampleDocrepo(DocumentRepository):
 
         # Set up commonly used namespaces
         RDF  = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
-        DCT  = Namespace('http://purl.org/dc/terms/')
+        DCTERMS  = Namespace('http://purl.org/dc/terms/')
         PROV = Namespace('http://www.w3.org/ns/prov-o/')
         # convert doc.uri to a RDFLib URIRef
         docuri = URIRef(doc.uri)
@@ -33,14 +33,14 @@ class ExampleDocrepo(DocumentRepository):
         # Optional - Make a note on what code generated this data
         doc.meta.add((docuri, PROV.wasGeneratedBy, Literal(self.qualified_class_name())))
 
-        # Everything else is also optional, although dct:title is strongly
+        # Everything else is also optional, although dcterms:title is strongly
         # recommended
-        doc.meta.add((docuri, DCT.identifier, Literal(identifier)))
+        doc.meta.add((docuri, DCTERMS.identifier, Literal(identifier)))
         # Note that we specify the language of the title. 
-        doc.meta.add((docuri, DCT.title, Literal(title, lang=doc.lang)))
+        doc.meta.add((docuri, DCTERMS.title, Literal(title, lang=doc.lang)))
         # Multiple values can be set for a specific metadata property
         for author in authors:
-            doc.meta.add((docuri, DCT.author, Literal(author)))
+            doc.meta.add((docuri, DCTERMS.author, Literal(author)))
 # end basic
 
 class DescriberDocrepo(DocumentRepository):
@@ -56,10 +56,10 @@ class DescriberDocrepo(DocumentRepository):
         d = Describer(doc.meta, doc.uri)
         d.rdftype(self.rdf_type)
         d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-        d.value(self.ns['dct'].title, title, lang=doc.lang)
-        d.value(self.ns['dct'].identifier, identifier)
+        d.value(self.ns['dcterms'].title, title, lang=doc.lang)
+        d.value(self.ns['dcterms'].identifier, identifier)
         for author in authors:
-            d.value(self.ns['dct'].author, author)
+            d.value(self.ns['dcterms'].author, author)
 # end simpler
 
 # begin part
@@ -72,10 +72,10 @@ class DescriberDocrepo(DocumentRepository):
                     meta=self.make_graph())
         d = Describer(part.meta, part.uri)
         d.rdftype(self.ns['bibo'].DocumentPart)
-        # the dct:identifier for a document part is often whatever
+        # the dcterms:identifier for a document part is often whatever
         # would be the preferred way to cite that part in another
         # document
-        d.value(self.ns['dct'].identifier, "Doc:4711, p 42")
+        d.value(self.ns['dcterms'].identifier, "Doc:4711, p 42")
 # end part
         from lxml import etree
         return etree.tostring(part.as_xhtml("http://example.org/doc"))

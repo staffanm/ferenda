@@ -33,7 +33,7 @@ from ferenda.elements import Body, Paragraph, CompoundElement, OrdinalElement, H
 
 from ferenda.elements.html import Strong, Em
 from . import SwedishLegalSource, SwedishCitationParser, RPUBL
-DCT = Namespace(util.ns['dct'])
+DCTERMS = Namespace(util.ns['dcterms'])
 PROV = Namespace(util.ns['prov'])
 
 # Objektmodellen för rättsfall:
@@ -49,11 +49,11 @@ PROV = Namespace(util.ns['prov'])
 #     rpubl:sidnummer "695";
 #     rpubl:referatAvDomstolsavgorande <http://localhost:8000/res/dv/hd/t170-08/2009-11-04>;
 #     rpubl:referatrubrik "Överföring av mönsterregistrering..."@sv;
-#     dct:identifier "NJA 1987 s 187";
-#     dct:bibliographicCitation "NJA 1987:68"
+#     dcterms:identifier "NJA 1987 s 187";
+#     dcterms:bibliographicCitation "NJA 1987:68"
 # This shld b owl:sameAs <http://rinfo.lagrummet.se/org/domstolsverket>
-#     dct:publisher <http://localhost:8000/org/domstolsverket>;
-#     dct:issued "2009-11-05"^^xsd:date.
+#     dcterms:publisher <http://localhost:8000/org/domstolsverket>;
+#     dcterms:issued "2009-11-05"^^xsd:date.
 #
 #
 #  <http://localhost:8000/res/dv/hd/t170-08/2009-11-04> a VagledandeDomstolsavgorande;
@@ -67,16 +67,16 @@ PROV = Namespace(util.ns['prov'])
 # rpubl:lagrum <http://localhost:8000/res/sfs/1970:485#P5>;
 # rpubl:lagrum <http://localhost:8000/res/sfs/1970:485#P31>;
 # rpubl:lagrum <http://localhost:8000/res/sfs/1970:485#P32>;
-#     dct:title "Överföring av mönsterregistrering..."@sv;
+#     dcterms:title "Överföring av mönsterregistrering..."@sv;
 # shld be owl:sameAs <http://rinfo.lagrummet.se/org/hoegsta_domstolen>
-#     dct:publisher <http://localhost:8000/org/hoegsta_domstolen>;
-#     dct:issued "2009-11-05"^^xsd:date;
-#     dct:subject <http://localhost:8000/concept/Mönsterrätt>;
-#     dct:subject <http://localhost:8000/concept/Dubbelöverlåtelse>;
-#     dct:subject <http://localhost:8000/concept/Formgivarrätt>;
-#     dct:subject <http://localhost:8000/concept/Godtrosförvärv>;
-#     dct:subject <http://localhost:8000/concept/Formgivning>;
-# litteratur? dct:references t bnodes...
+#     dcterms:publisher <http://localhost:8000/org/hoegsta_domstolen>;
+#     dcterms:issued "2009-11-05"^^xsd:date;
+#     dcterms:subject <http://localhost:8000/concept/Mönsterrätt>;
+#     dcterms:subject <http://localhost:8000/concept/Dubbelöverlåtelse>;
+#     dcterms:subject <http://localhost:8000/concept/Formgivarrätt>;
+#     dcterms:subject <http://localhost:8000/concept/Godtrosförvärv>;
+#     dcterms:subject <http://localhost:8000/concept/Formgivning>;
+# litteratur? dcterms:references t bnodes...
 #
 # uri: http://localhost:8000/res/dv/nja/2009/s_695 # hard to construct from "HDO/T170-08", requires a rdf lookup like .value(pred=RDF.type, object=RPUBL.Rattsfallsreferat)
 # lang: sv
@@ -147,27 +147,27 @@ class DomElement(CompoundElement):
     def as_xhtml(self, baseuri):
         element = super(DomElement, self).as_xhtml(baseuri)
         if self.prop:
-            # ie if self.prop = ('ordinal', 'dct:identifier'), then
-            # dct:identifier = self.ordinal
+            # ie if self.prop = ('ordinal', 'dcterms:identifier'), then
+            # dcterms:identifier = self.ordinal
             if hasattr(self, self.prop[0]) and getattr(self, self.prop[0]):
                 element.set('content', getattr(self, self.prop[0]))
                 element.set('property', self.prop[1])
         return element
 
 class Delmal(DomElement):
-    prop = ('ordinal', 'dct:identifier')
+    prop = ('ordinal', 'dcterms:identifier')
     
 class Instans(DomElement):
-    prop = ('court', 'dct:creator')
+    prop = ('court', 'dcterms:creator')
         
 class Dom(DomElement):
-    prop = ('malnr', 'dct:identifier')
+    prop = ('malnr', 'dcterms:identifier')
     
 class Domskal(DomElement): pass 
-class Domslut(DomElement): pass # dct:author <- names of judges
-class Betankande(DomElement): pass # dct:author <- referent
-class Skiljaktig(DomElement): pass # dct:author <- name
-class Tillagg(DomElement): pass # dct:author <- name
+class Domslut(DomElement): pass # dcterms:author <- names of judges
+class Betankande(DomElement): pass # dcterms:author <- referent
+class Skiljaktig(DomElement): pass # dcterms:author <- name
+class Tillagg(DomElement): pass # dcterms:author <- name
 class Endmeta(DomElement): pass
         
 class DV(SwedishLegalSource):
@@ -177,23 +177,23 @@ class DV(SwedishLegalSource):
     documentstore_class = DVStore
     namespaces = ('rdf',  # always needed
                   'xsi',  # XML Schema/RDFa validation
-                  'dct',  # title, identifier, etc
+                  'dcterms',  # title, identifier, etc
                   'xsd',  # datatypes
                   'owl',  # : sameAs
                   'prov',
                   ('rpubl', 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
                   )
     # This is very similar to SwedishLegalSource.required_predicates,
-    # only DCT.title has been changed to RPUBL.referatrubrik (and if
+    # only DCTERMS.title has been changed to RPUBL.referatrubrik (and if
     # our validating function grokked that rpubl:referatrubrik
-    # rdfs:isSubpropertyOf dct:title, we wouldn't need this). Also, we
-    # removed dct:issued because there is no actual way of getting
+    # rdfs:isSubpropertyOf dcterms:title, we wouldn't need this). Also, we
+    # removed dcterms:issued because there is no actual way of getting
     # this data (apart from like the file time stamps).  On further
     # thinking, we remove RPUBL.referatrubrik as it's not present (or
     # required) for rpubl:Rattsfallsnotis
-    required_predicates = [RDF.type, DCT.identifier, PROV.wasGeneratedBy]
+    required_predicates = [RDF.type, DCTERMS.identifier, PROV.wasGeneratedBy]
     
-    DCT = Namespace(util.ns['dct'])
+    DCTERMS = Namespace(util.ns['dcterms'])
     sparql_annotations = "res/sparql/dv-annotations.rq"
 
     @classmethod
@@ -615,13 +615,13 @@ class DV(SwedishLegalSource):
         return created, untouched
 
     re_delimSplit = re.compile("[;,] ?").split
-    labels = {'Rubrik': DCT.description,
-              'Domstol': DCT['creator'],  # konvertera till auktoritetspost
+    labels = {'Rubrik': DCTERMS.description,
+              'Domstol': DCTERMS['creator'],  # konvertera till auktoritetspost
               'Målnummer': RPUBL['malnummer'],
               'Domsnummer': RPUBL['domsnummer'],
               'Diarienummer': RPUBL['diarienummer'],
               'Avdelning': RPUBL['domstolsavdelning'],
-              'Referat': DCT['identifier'],
+              'Referat': DCTERMS['identifier'],
               'Avgörandedatum': RPUBL['avgorandedatum'],  # konvertera till xsd:date
               }
 
@@ -629,9 +629,9 @@ class DV(SwedishLegalSource):
     # Litteratur/sökord har ingen motsvarighet i RPUBL-vokabulären
     multilabels = {'Lagrum': RPUBL['lagrum'],
                    'Rättsfall': RPUBL['rattsfallshanvisning'],
-                   # dct:references vore bättre, men sådana ska inte ha literalvärden
-                   'Litteratur': DCT['relation'],
-                   'Sökord': DCT['subject']
+                   # dcterms:references vore bättre, men sådana ska inte ha literalvärden
+                   'Litteratur': DCTERMS['relation'],
+                   'Sökord': DCTERMS['subject']
                    }
 
     # Listan härledd från containers.n3/rattsfallsforteckningar.n3 i
@@ -1161,10 +1161,10 @@ class DV(SwedishLegalSource):
             if label == "Rubrik":
                 value = util.normalize_space(value)
                 refdesc.value(self.ns['rpubl'].referatrubrik, value, lang="sv")
-                domdesc.value(self.ns['dct'].title, value, lang="sv")
+                domdesc.value(self.ns['dcterms'].title, value, lang="sv")
 
             elif label == "Domstol":
-                domdesc.rel(self.ns['dct'].publisher, self.lookup_resource(value))
+                domdesc.rel(self.ns['dcterms'].publisher, self.lookup_resource(value))
             elif label == "Målnummer":
                 for v in value:
                     # FIXME: In these cases (multiple målnummer, which
@@ -1192,10 +1192,10 @@ class DV(SwedishLegalSource):
                             refdesc.rel(self.ns['rpubl'][pred], uri)
                         else:
                             refdesc.value(self.ns['rpubl'][pred], m.group(1))
-                refdesc.value(self.ns['dct'].identifier, value)
+                refdesc.value(self.ns['dcterms'].identifier, value)
 
             elif label == "_nja_ordinal":
-                refdesc.value(self.ns['dct'].bibliographicCitation,
+                refdesc.value(self.ns['dcterms'].bibliographicCitation,
                               value)
                 m = re.search(r'\d{4}(?:\:| nr | not )(\d+)', value)
                 if m:
@@ -1222,17 +1222,17 @@ class DV(SwedishLegalSource):
                                         localize_uri(node.uri))
             elif label == "Litteratur":
                 for i in value.split(";"):
-                    domdesc.value(self.ns['dct'].relation, util.normalize_space(i))
+                    domdesc.value(self.ns['dcterms'].relation, util.normalize_space(i))
             elif label == "Sökord":
                 for s in value:
-                    domdesc.rel(self.ns['dct'].subject, sokord_uri(s))
+                    domdesc.rel(self.ns['dcterms'].subject, sokord_uri(s))
 
         # 3. mint some owl:sameAs URIs
         refdesc.rel(self.ns['owl'].sameAs, self.sameas_uri(refuri))
         domdesc.rel(self.ns['owl'].sameAs, self.sameas_uri(domuri))
 
         # 4. Add some same-for-everyone properties
-        refdesc.rel(self.ns['dct'].publisher, self.lookup_resource('Domstolsverket'))
+        refdesc.rel(self.ns['dcterms'].publisher, self.lookup_resource('Domstolsverket'))
         if 'not' in head['Referat']:
             refdesc.rdftype(self.ns['rpubl'].Rattsfallsnotis)
         else:
@@ -1242,7 +1242,7 @@ class DV(SwedishLegalSource):
         refdesc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
 # FIXME: implement this
 #        # 5. Create a meaningful identifier for the verdict itself (ie. "Göta hovrätts dom den 42 september 2340 i mål B 1234-42")
-#        domdesc.value(self.ns['dct'].identifier, dom_to_identifier(head["Domstol"],
+#        domdesc.value(self.ns['dcterms'].identifier, dom_to_identifier(head["Domstol"],
 #                                                                   head["_localid"],
 #                                                                   head["Avgörandedatum"])
 #

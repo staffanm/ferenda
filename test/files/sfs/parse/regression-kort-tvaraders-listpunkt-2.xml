@@ -15,7 +15,7 @@
           <str>5. en underrättelse från domstol, eller</str>
         </Listelement><Listelement id="P3S1N6" ordinal="6">
           <str>6. en underrättelse från en behörig utländsk myndighet enligt ett lagrum i en namngiven lag. </str>
-          <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#L2008:24">Förordning (2008:24).</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#L2008:24">Förordning (2008:24).</LinkSubject>
         </Listelement>
       </NumreradLista>
     </Stycke>

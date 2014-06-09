@@ -11,7 +11,7 @@ builtins = "__builtin__" if six.PY2 else "builtins"
 
 
 from rdflib import Graph, URIRef, Namespace, Literal
-DCT = Namespace("http://purl.org/dc/terms/")
+DCTERMS = Namespace("http://purl.org/dc/terms/")
 from ferenda import DocumentRepository, DocumentStore, LayeredConfig, util
 
 # SUT
@@ -204,16 +204,16 @@ And another.
     def test_construct(self):
         uri = "http://example.org/doc"
         with open("testconstructtemplate.rq", "wb") as fp:
-            fp.write("""PREFIX dct: <http://purl.org/dc/terms/>
+            fp.write("""PREFIX dcterms: <http://purl.org/dc/terms/>
 
 CONSTRUCT { ?s ?p ?o . }
 WHERE { ?s ?p ?o .
         <%(uri)s> ?p ?o . }
 """.encode())            
         g = Graph()
-        g.bind("dct", str(DCT))
+        g.bind("dcterms", str(DCTERMS))
         g.add((URIRef(uri),
-               DCT.title,
+               DCTERMS.title,
                Literal("Document title")))
         config = {'connect.return_value': Mock(**{'construct.return_value': g})}
         printmock = MagicMock()
@@ -226,20 +226,20 @@ WHERE { ?s ?p ?o .
                 d.construct("testconstructtemplate.rq", uri)
         want = """
 # Constructing the following from b, repository c, type a
-# PREFIX dct: <http://purl.org/dc/terms/>
+# PREFIX dcterms: <http://purl.org/dc/terms/>
 # 
 # CONSTRUCT { ?s ?p ?o . }
 # WHERE { ?s ?p ?o .
 #         <http://example.org/doc> ?p ?o . }
 # 
 
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://example.org/doc> dct:title "Document title" .
+<http://example.org/doc> dcterms:title "Document title" .
 
 
 # 1 triples constructed in 0.001s
@@ -253,7 +253,7 @@ WHERE { ?s ?p ?o .
     def test_select(self):
         uri = "http://example.org/doc"
         with open("testselecttemplate.rq", "wb") as fp:
-            fp.write("""PREFIX dct: <http://purl.org/dc/terms/>
+            fp.write("""PREFIX dcterms: <http://purl.org/dc/terms/>
 
 SELECT ?p ?o
 WHERE { <%(uri)s> ?p ?o . }
@@ -281,7 +281,7 @@ WHERE { <%(uri)s> ?p ?o . }
                 d.select("testselecttemplate.rq", uri)
         want = """
 # Constructing the following from b, repository c, type a
-# PREFIX dct: <http://purl.org/dc/terms/>
+# PREFIX dcterms: <http://purl.org/dc/terms/>
 # 
 # SELECT ?p ?o
 # WHERE { <http://example.org/doc> ?p ?o . }

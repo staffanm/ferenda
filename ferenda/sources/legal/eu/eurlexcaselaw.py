@@ -25,7 +25,7 @@ class EurlexCaselaw(DocumentRepository):
     source_encoding = "utf-8"
 
     namespaces = ('rdf',
-                  'dct',
+                  'dcterms',
                   ('eurlex', 'http://lagen.nu/eurlex#'))
 
     # This regexp is specific to caselaw (the leading '6' is for the
@@ -127,7 +127,7 @@ class EurlexCaselaw(DocumentRepository):
         #      - "B-09.03 EEC/EC / State aid / Exceptions to the prohibition of aid"
         #      - "B-09.04 EEC/EC / State aid / Review of aid by the Commission - Rules of procedure"
         # - [Miscellaneous information]
-        #   - dct:author Author: "Court of Justice of the European Communities"
+        #   - dcterms:author Author: "Court of Justice of the European Communities"
         #   - :form Form: "Judgement"
         # - [Procedure]
         #   - :proceduretype - Type of procedure, comma sep:
@@ -319,7 +319,7 @@ class EurlexCaselaw(DocumentRepository):
                     # 'NON-BREAKING HYPHEN' (U+2011) - LegaRef will mangle
                     # this to an ordinary hyphen.
                     subnodes = self.parser.parse(node.string,
-                                                 predicate="dct:references")
+                                                 predicate="dcterms:references")
                     doc.body.append(Paragraph(subnodes))
         else:
             self.log.warning("%s: No fulltext available!" % celexnum)

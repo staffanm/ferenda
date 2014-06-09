@@ -75,9 +75,9 @@ class JK(SwedishLegalSource):
         # 1. static same-for-all metadata
         desc.rdftype(self.rdf_type)
         desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-        desc.rel(self.ns['dct'].publisher, self.lookup_resource("Justitiekanslern"))
+        desc.rel(self.ns['dcterms'].publisher, self.lookup_resource("Justitiekanslern"))
         # 2. document-level metadata
-        desc.value(self.ns['dct'].title,
+        desc.value(self.ns['dcterms'].title,
                    soup.find("h1", "besluttitle").get_text(), lang="sv")
         datestr = soup.find("span", class_="label",
                             text="Beslutsdatum").find_next_sibling("span").get_text()

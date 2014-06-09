@@ -110,7 +110,7 @@ As an example, the class :class:`~ferenda.elements.SectionalElement`
 overrides ``as_xhtml`` to the effect that if you provide
 ``identifier``, ``ordinal`` and ``title`` properties for the object, a
 resource URI is automatically constructed and four RDF triples are
-created (rdf:type, dct:title, dct:identifier, and bibo:chapter):
+created (rdf:type, dcterms:title, dcterms:identifier, and bibo:chapter):
 
 .. literalinclude:: examples/elementclasses.py
    :start-after: # begin as-xhtml

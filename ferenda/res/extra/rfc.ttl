@@ -3,7 +3,7 @@
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .
 
-# streams, modelled as publishing groups (dct:publisher)
+# streams, modelled as publishing groups (dcterms:publisher)
 
 <http://localhost:8000/ext/ietf> a foaf:Organization;
      foaf:name "Internet Engineering Task Force (IETF)";
@@ -28,7 +28,7 @@
 <http://localhost:8000/ext/nwg> a foaf:Organization;
      foaf:name "Network Working Group".
 
-# Statuses, modelled as categories (rfc:category, subtype of dct:subject)
+# Statuses, modelled as categories (rfc:category, subtype of dcterms:subject)
 
 <http://localhost:8000/dataset/rfc/standard> a bibo:Collection;
     bibo:identifier "Standards Track" .

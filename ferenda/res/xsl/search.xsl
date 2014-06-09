@@ -8,10 +8,10 @@ It's a generic template for search result pages.
 		xmlns:xhtml="http://www.w3.org/1999/xhtml"
 		xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
 		xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-		xmlns:dct="http://purl.org/dc/terms/"
+		xmlns:dcterms="http://purl.org/dc/terms/"
 		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
-		exclude-result-prefixes="xhtml rdf dct rinfo rinfoex">
+		exclude-result-prefixes="xhtml rdf dcterms rinfo rinfoex">
 
   <xsl:import href="uri.xsl"/>
   <xsl:include href="base.xsl"/>

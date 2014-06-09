@@ -8,7 +8,7 @@ It's a generic template for any kind of content
 		xmlns:xhtml="http://www.w3.org/1999/xhtml"
 		xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
 		xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-		xmlns:dct="http://purl.org/dc/terms/"
+		xmlns:dcterms="http://purl.org/dc/terms/"
 		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		xml:space="preserve"
@@ -39,9 +39,9 @@ It's a generic template for any kind of content
 	<p>Lorem ipsum dolor sit amet, consectetur adipiscing
 	elit. Quisque imperdiet eget dui nec faucibus. Vestibulum at
 	semper justo.</p>
-	<xsl:for-each select="$annotations/resource[@uri=$uri]/dct:isReferencedBy">
+	<xsl:for-each select="$annotations/resource[@uri=$uri]/dcterms:isReferencedBy">
 	  <xsl:variable name="referencing" select="@ref"/>
-	  <a href="{@ref}"><xsl:value-of select="$annotations/resource[@uri=$referencing]/dct:identifier"/></a>
+	  <a href="{@ref}"><xsl:value-of select="$annotations/resource[@uri=$referencing]/dcterms:identifier"/></a>
 	</xsl:for-each>
       </aside>
     </xsl:if>

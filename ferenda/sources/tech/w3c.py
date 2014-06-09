@@ -63,7 +63,7 @@ class W3Standards(DocumentRepository):
             g = g.parse(self.store.distilled_path(basefile))
             uri = self.canonical_uri(basefile)
             stuff.append((basefile,
-                          g.value(URIRef(uri), self.ns['dct'].issued),
+                          g.value(URIRef(uri), self.ns['dcterms'].issued),
                           len(g),
                           len(list(g.subject_objects(RDF.type)))
                           ))
@@ -201,17 +201,17 @@ class W3Standards(DocumentRepository):
         d = Describer(doc.meta, doc.uri)
         d.rdftype(self.rdf_type)
         d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-        dct = self.ns['dct']
+        dcterms = self.ns['dcterms']
 
-        # dct:title
-        d.value(dct.title, soup.find("title").string, lang=doc.lang)
-        d.value(dct.identifier, doc.basefile)
-        # dct:abstract
+        # dcterms:title
+        d.value(dcterms.title, soup.find("title").string, lang=doc.lang)
+        d.value(dcterms.identifier, doc.basefile)
+        # dcterms:abstract
         abstract = soup.find(_class="abstract")
         if abstract:
-            d.value(dct['abstract'], abstract.string, lang=doc.lang)
+            d.value(dcterms['abstract'], abstract.string, lang=doc.lang)
 
-        # dct:published
+        # dcterms:published
         datehdr = soup.find(lambda x: x.name in ('h2', 'h3')
                             and re.search("W3C\s+Recommendation,?\s+", x.text))
         if datehdr:
@@ -234,21 +234,21 @@ class W3Standards(DocumentRepository):
                         self.log.warning("%s: Could not parse datestr %s" %
                                          (doc.basefile, datestr))
                 if date:
-                    d.value(dct.issued, date)
+                    d.value(dcterms.issued, date)
 
-        # dct:editor
+        # dcterms:editor
         editors = soup.find("dt", text=re.compile("Editors?:"))
         if editors:
             for editor in editors.find_next_siblings("dd"):
                 editor_string = " ".join(x for x in editor.stripped_strings if not "@" in x)
                 editor_name = editor_string.split(", ")[0]
-                d.value(dct.editor, editor_name)
+                d.value(dcterms.editor, editor_name)
 
-        # dct:publisher
-        d.rel(dct.publisher, "http://localhost:8000/ext/w3c")
+        # dcterms:publisher
+        d.rel(dcterms.publisher, "http://localhost:8000/ext/w3c")
 
         # assure we got exactly one of each of the required properties
-        for required in (dct.title, dct.issued):
+        for required in (dcterms.title, dcterms.issued):
             d.getvalue(required)  # throws KeyError if not found (or more than one)
 
     def parse_document_from_soup(self, soup, doc):
@@ -286,9 +286,9 @@ class W3Standards(DocumentRepository):
             part.meta = self.make_graph()
             desc = Describer(part.meta, part.uri)
             desc.rdftype(self.ns['bibo'].DocumentPart)
-            desc.value(self.ns['dct'].title, Literal(part.title, lang="en"))
+            desc.value(self.ns['dcterms'].title, Literal(part.title, lang="en"))
             desc.value(self.ns['bibo'].chapter, part.ordinal)
-            # desc.value(self.ns['dct'].isPartOf, part.parent.uri) # implied
+            # desc.value(self.ns['dcterms'].isPartOf, part.parent.uri) # implied
         for subpart in part:
             self.decorate_bodyparts(subpart, baseuri)
 

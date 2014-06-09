@@ -16,7 +16,7 @@ import shutil
 from lxml import etree
 from rdflib import Graph, Namespace
 from rdflib.namespace import RDF, DC
-from rdflib.namespace import DCTERMS as DCT
+from rdflib.namespace import DCTERMS as DCTERMS
 SCHEMA = Namespace("http://schema.org/")
 
 from ferenda import DocumentRepository, Facet
@@ -577,11 +577,11 @@ class Search(WSGI):
 # different...)
 
 class DocRepo1(DocumentRepository):
-    # this has the default set of facets (rdf:type, dct:title,
-    # dct:publisher, dct:issued) and a number of documents such as
+    # this has the default set of facets (rdf:type, dcterms:title,
+    # dcterms:publisher, dcterms:issued) and a number of documents such as
     # each bucket in the facet has 2-1-1 facet values
     # 
-    #   rdf:type         dct:title       dct:publisher dct:issued
+    #   rdf:type         dcterms:title       dcterms:publisher dcterms:issued
     # A ex:MainType     "A simple doc"   ex:publ1      2012-04-01
     # B ex:MainType     "Other doc"      ex:publ2      2013-06-06
     # C ex:OtherType    "More docs"      ex:publ2      2014-05-06
@@ -593,10 +593,10 @@ class DocRepo2(DocumentRepository):
     alias = "repo2"
     def facets():
         return [Facet(RDF.type),       # fulltextindex.URI
-                Facet(DCT.title),      # fulltextindex.Text(boost=4)
-                Facet(DCT.identifier), # fulltextindex.Label(boost=16)
-                Facet(DCT.issued),     # fulltextindex.Datetime()
-                Facet(DCT.publisher),  # fulltextindex.Resource()
+                Facet(DCTERMS.title),      # fulltextindex.Text(boost=4)
+                Facet(DCTERMS.identifier), # fulltextindex.Label(boost=16)
+                Facet(DCTERMS.issued),     # fulltextindex.Datetime()
+                Facet(DCTERMS.publisher),  # fulltextindex.Resource()
                 Facet(DC.subject),     # fulltextindex.Keywords()
                 Facet(SCHEMA.free)     # fulltextindex.Boolean()
                 ]
@@ -605,7 +605,7 @@ class DocRepo3(DocumentRepository):
     # this repo contains custom facets with custom selectors/keys,
     # unusual predicates like DC.publisher, and non-standard
     # configuration like a title not used for toc (and toplevel only)
-    # or DCT.creator for each subsection, or DCT.publisher w/ multiple=True
+    # or DCTERMS.creator for each subsection, or DCTERMS.publisher w/ multiple=True
     alias = "repo3"
     def my_id_selector(self, row, binding, graph):
         # categorize each ID after the number of characters in it
@@ -616,10 +616,10 @@ class DocRepo3(DocumentRepository):
     
     def facets(self):
         return [Facet(DC.publisher),
-                Facet(DCT.issued, indexingtype=fulltextindex.Label()),
-                Facet(DCT.rightsHolder, indexingtype=fulltextindex.Resources(), multiple_values=True),
-                Facet(DCT.title, toplevel_only=True),
-                Facet(DCT.identifer, selector=self.my_id_selector(), key=self.lexicalkey, label="IDs having %(selected) characters"),
+                Facet(DCTERMS.issued, indexingtype=fulltextindex.Label()),
+                Facet(DCTERMS.rightsHolder, indexingtype=fulltextindex.Resources(), multiple_values=True),
+                Facet(DCTERMS.title, toplevel_only=True),
+                Facet(DCTERMS.identifer, selector=self.my_id_selector(), key=self.lexicalkey, label="IDs having %(selected) characters"),
                 Facet(DC.creator, toplevel_only=False)]
 
 
@@ -650,7 +650,7 @@ class AdvancedAPI(WSGI):
                     distilled_graph.parse(data=fp.read(), format="rdfa",
                                           publicID=repo.canonical_uri(basefile))
                 distilled_graph.bind("dc", URIRef("http://purl.org/dc/elements/1.1/"))
-                distilled_graph.bind("dct", URIRef("http://example.org/this-prefix-should-not-be-used"))
+                distilled_graph.bind("dcterms", URIRef("http://example.org/this-prefix-should-not-be-used"))
                 util.ensure_dir(self.store.distilled_path(doc.basefile))
                 with open(self.store.distilled_path(doc.basefile),
                           "wb") as distilled_file:

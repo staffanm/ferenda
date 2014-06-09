@@ -2,7 +2,7 @@
 
 @prefix dc: <http://purl.org/dc/elements/1.1/> .
 @prefix dcam: <http://purl.org/dc/dcam/> .
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -12,155 +12,155 @@
 
 dc:contributor a rdf:Property ;
     rdfs:label "Contributor"@en ;
-    dct:description "Examples of a Contributor include a person, an organization, or a service. Typically, the name of a Contributor should be used to indicate the entity."@en ;
-    dct:hasVersion <http://dublincore.org/usage/terms/history/#contributor-006> ;
-    dct:issued "1999-07-02"^^xsd:date ;
-    dct:modified "2008-01-14"^^xsd:date ;
+    dcterms:description "Examples of a Contributor include a person, an organization, or a service. Typically, the name of a Contributor should be used to indicate the entity."@en ;
+    dcterms:hasVersion <http://dublincore.org/usage/terms/history/#contributor-006> ;
+    dcterms:issued "1999-07-02"^^xsd:date ;
+    dcterms:modified "2008-01-14"^^xsd:date ;
     rdfs:comment "An entity responsible for making contributions to the resource."@en ;
     rdfs:isDefinedBy dc: ;
-    skos:note "A second property with the same name as this property has been declared in the dct: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
+    skos:note "A second property with the same name as this property has been declared in the dcterms: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
 
 dc:coverage a rdf:Property ;
     rdfs:label "Coverage"@en ;
-    dct:description "Spatial topic and spatial applicability may be a named place or a location specified by its geographic coordinates. Temporal topic may be a named period, date, or date range. A jurisdiction may be a named administrative entity or a geographic place to which the resource applies. Recommended best practice is to use a controlled vocabulary such as the Thesaurus of Geographic Names [TGN]. Where appropriate, named places or time periods can be used in preference to numeric identifiers such as sets of coordinates or date ranges."@en ;
-    dct:hasVersion <http://dublincore.org/usage/terms/history/#coverage-006> ;
-    dct:issued "1999-07-02"^^xsd:date ;
-    dct:modified "2008-01-14"^^xsd:date ;
+    dcterms:description "Spatial topic and spatial applicability may be a named place or a location specified by its geographic coordinates. Temporal topic may be a named period, date, or date range. A jurisdiction may be a named administrative entity or a geographic place to which the resource applies. Recommended best practice is to use a controlled vocabulary such as the Thesaurus of Geographic Names [TGN]. Where appropriate, named places or time periods can be used in preference to numeric identifiers such as sets of coordinates or date ranges."@en ;
+    dcterms:hasVersion <http://dublincore.org/usage/terms/history/#coverage-006> ;
+    dcterms:issued "1999-07-02"^^xsd:date ;
+    dcterms:modified "2008-01-14"^^xsd:date ;
     rdfs:comment "The spatial or temporal topic of the resource, the spatial applicability of the resource, or the jurisdiction under which the resource is relevant."@en ;
     rdfs:isDefinedBy dc: ;
-    skos:note "A second property with the same name as this property has been declared in the dct: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
+    skos:note "A second property with the same name as this property has been declared in the dcterms: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
 
 dc:creator a rdf:Property ;
     rdfs:label "Creator"@en ;
-    dct:description "Examples of a Creator include a person, an organization, or a service. Typically, the name of a Creator should be used to indicate the entity."@en ;
-    dct:hasVersion <http://dublincore.org/usage/terms/history/#creator-006> ;
-    dct:issued "1999-07-02"^^xsd:date ;
-    dct:modified "2008-01-14"^^xsd:date ;
+    dcterms:description "Examples of a Creator include a person, an organization, or a service. Typically, the name of a Creator should be used to indicate the entity."@en ;
+    dcterms:hasVersion <http://dublincore.org/usage/terms/history/#creator-006> ;
+    dcterms:issued "1999-07-02"^^xsd:date ;
+    dcterms:modified "2008-01-14"^^xsd:date ;
     rdfs:comment "An entity primarily responsible for making the resource."@en ;
     rdfs:isDefinedBy dc: ;
-    skos:note "A second property with the same name as this property has been declared in the dct: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
+    skos:note "A second property with the same name as this property has been declared in the dcterms: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
 
 dc:date a rdf:Property ;
     rdfs:label "Date"@en ;
-    dct:description "Date may be used to express temporal information at any level of granularity.  Recommended best practice is to use an encoding scheme, such as the W3CDTF profile of ISO 8601 [W3CDTF]."@en ;
-    dct:hasVersion <http://dublincore.org/usage/terms/history/#date-006> ;
-    dct:issued "1999-07-02"^^xsd:date ;
-    dct:modified "2008-01-14"^^xsd:date ;
+    dcterms:description "Date may be used to express temporal information at any level of granularity.  Recommended best practice is to use an encoding scheme, such as the W3CDTF profile of ISO 8601 [W3CDTF]."@en ;
+    dcterms:hasVersion <http://dublincore.org/usage/terms/history/#date-006> ;
+    dcterms:issued "1999-07-02"^^xsd:date ;
+    dcterms:modified "2008-01-14"^^xsd:date ;
     rdfs:comment "A point or period of time associated with an event in the lifecycle of the resource."@en ;
     rdfs:isDefinedBy dc: ;
-    skos:note "A second property with the same name as this property has been declared in the dct: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
+    skos:note "A second property with the same name as this property has been declared in the dcterms: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
 
 dc:description a rdf:Property ;
     rdfs:label "Description"@en ;
-    dct:description "Description may include but is not limited to: an abstract, a table of contents, a graphical representation, or a free-text account of the resource."@en ;
-    dct:hasVersion <http://dublincore.org/usage/terms/history/#description-006> ;
-    dct:issued "1999-07-02"^^xsd:date ;
-    dct:modified "2008-01-14"^^xsd:date ;
+    dcterms:description "Description may include but is not limited to: an abstract, a table of contents, a graphical representation, or a free-text account of the resource."@en ;
+    dcterms:hasVersion <http://dublincore.org/usage/terms/history/#description-006> ;
+    dcterms:issued "1999-07-02"^^xsd:date ;
+    dcterms:modified "2008-01-14"^^xsd:date ;
     rdfs:comment "An account of the resource."@en ;
     rdfs:isDefinedBy dc: ;
-    skos:note "A second property with the same name as this property has been declared in the dct: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
+    skos:note "A second property with the same name as this property has been declared in the dcterms: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
 
 dc:format a rdf:Property ;
     rdfs:label "Format"@en ;
-    dct:description "Examples of dimensions include size and duration. Recommended best practice is to use a controlled vocabulary such as the list of Internet Media Types [MIME]."@en ;
-    dct:hasVersion <http://dublincore.org/usage/terms/history/#format-007> ;
-    dct:issued "1999-07-02"^^xsd:date ;
-    dct:modified "2008-01-14"^^xsd:date ;
+    dcterms:description "Examples of dimensions include size and duration. Recommended best practice is to use a controlled vocabulary such as the list of Internet Media Types [MIME]."@en ;
+    dcterms:hasVersion <http://dublincore.org/usage/terms/history/#format-007> ;
+    dcterms:issued "1999-07-02"^^xsd:date ;
+    dcterms:modified "2008-01-14"^^xsd:date ;
     rdfs:comment "The file format, physical medium, or dimensions of the resource."@en ;
     rdfs:isDefinedBy dc: ;
-    skos:note "A second property with the same name as this property has been declared in the dct: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
+    skos:note "A second property with the same name as this property has been declared in the dcterms: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
 
 dc:identifier a rdf:Property ;
     rdfs:label "Identifier"@en ;
-    dct:description "Recommended best practice is to identify the resource by means of a string conforming to a formal identification system. "@en ;
-    dct:hasVersion <http://dublincore.org/usage/terms/history/#identifier-006> ;
-    dct:issued "1999-07-02"^^xsd:date ;
-    dct:modified "2008-01-14"^^xsd:date ;
+    dcterms:description "Recommended best practice is to identify the resource by means of a string conforming to a formal identification system. "@en ;
+    dcterms:hasVersion <http://dublincore.org/usage/terms/history/#identifier-006> ;
+    dcterms:issued "1999-07-02"^^xsd:date ;
+    dcterms:modified "2008-01-14"^^xsd:date ;
     rdfs:comment "An unambiguous reference to the resource within a given context."@en ;
     rdfs:isDefinedBy dc: ;
-    skos:note "A second property with the same name as this property has been declared in the dct: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
+    skos:note "A second property with the same name as this property has been declared in the dcterms: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
 
 dc:language a rdf:Property ;
     rdfs:label "Language"@en ;
-    dct:description "Recommended best practice is to use a controlled vocabulary such as RFC 4646 [RFC4646]."@en ;
-    dct:hasVersion <http://dublincore.org/usage/terms/history/#language-007> ;
-    dct:issued "1999-07-02"^^xsd:date ;
-    dct:modified "2008-01-14"^^xsd:date ;
+    dcterms:description "Recommended best practice is to use a controlled vocabulary such as RFC 4646 [RFC4646]."@en ;
+    dcterms:hasVersion <http://dublincore.org/usage/terms/history/#language-007> ;
+    dcterms:issued "1999-07-02"^^xsd:date ;
+    dcterms:modified "2008-01-14"^^xsd:date ;
     rdfs:comment "A language of the resource."@en ;
     rdfs:isDefinedBy dc: ;
     rdfs:seeAlso <http://www.ietf.org/rfc/rfc4646.txt> ;
-    skos:note "A second property with the same name as this property has been declared in the dct: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
+    skos:note "A second property with the same name as this property has been declared in the dcterms: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
 
 dc:publisher a rdf:Property ;
     rdfs:label "Publisher"@en ;
-    dct:description "Examples of a Publisher include a person, an organization, or a service. Typically, the name of a Publisher should be used to indicate the entity."@en ;
-    dct:hasVersion <http://dublincore.org/usage/terms/history/#publisher-006> ;
-    dct:issued "1999-07-02"^^xsd:date ;
-    dct:modified "2008-01-14"^^xsd:date ;
+    dcterms:description "Examples of a Publisher include a person, an organization, or a service. Typically, the name of a Publisher should be used to indicate the entity."@en ;
+    dcterms:hasVersion <http://dublincore.org/usage/terms/history/#publisher-006> ;
+    dcterms:issued "1999-07-02"^^xsd:date ;
+    dcterms:modified "2008-01-14"^^xsd:date ;
     rdfs:comment "An entity responsible for making the resource available."@en ;
     rdfs:isDefinedBy dc: ;
-    skos:note "A second property with the same name as this property has been declared in the dct: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
+    skos:note "A second property with the same name as this property has been declared in the dcterms: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
 
 dc:relation a rdf:Property ;
     rdfs:label "Relation"@en ;
-    dct:description "Recommended best practice is to identify the related resource by means of a string conforming to a formal identification system. "@en ;
-    dct:hasVersion <http://dublincore.org/usage/terms/history/#relation-006> ;
-    dct:issued "1999-07-02"^^xsd:date ;
-    dct:modified "2008-01-14"^^xsd:date ;
+    dcterms:description "Recommended best practice is to identify the related resource by means of a string conforming to a formal identification system. "@en ;
+    dcterms:hasVersion <http://dublincore.org/usage/terms/history/#relation-006> ;
+    dcterms:issued "1999-07-02"^^xsd:date ;
+    dcterms:modified "2008-01-14"^^xsd:date ;
     rdfs:comment "A related resource."@en ;
     rdfs:isDefinedBy dc: ;
-    skos:note "A second property with the same name as this property has been declared in the dct: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
+    skos:note "A second property with the same name as this property has been declared in the dcterms: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
 
 dc:rights a rdf:Property ;
     rdfs:label "Rights"@en ;
-    dct:description "Typically, rights information includes a statement about various property rights associated with the resource, including intellectual property rights."@en ;
-    dct:hasVersion <http://dublincore.org/usage/terms/history/#rights-006> ;
-    dct:issued "1999-07-02"^^xsd:date ;
-    dct:modified "2008-01-14"^^xsd:date ;
+    dcterms:description "Typically, rights information includes a statement about various property rights associated with the resource, including intellectual property rights."@en ;
+    dcterms:hasVersion <http://dublincore.org/usage/terms/history/#rights-006> ;
+    dcterms:issued "1999-07-02"^^xsd:date ;
+    dcterms:modified "2008-01-14"^^xsd:date ;
     rdfs:comment "Information about rights held in and over the resource."@en ;
     rdfs:isDefinedBy dc: ;
-    skos:note "A second property with the same name as this property has been declared in the dct: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
+    skos:note "A second property with the same name as this property has been declared in the dcterms: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
 
 dc:source a rdf:Property ;
     rdfs:label "Source"@en ;
-    dct:description "The described resource may be derived from the related resource in whole or in part. Recommended best practice is to identify the related resource by means of a string conforming to a formal identification system."@en ;
-    dct:hasVersion <http://dublincore.org/usage/terms/history/#source-006> ;
-    dct:issued "1999-07-02"^^xsd:date ;
-    dct:modified "2008-01-14"^^xsd:date ;
+    dcterms:description "The described resource may be derived from the related resource in whole or in part. Recommended best practice is to identify the related resource by means of a string conforming to a formal identification system."@en ;
+    dcterms:hasVersion <http://dublincore.org/usage/terms/history/#source-006> ;
+    dcterms:issued "1999-07-02"^^xsd:date ;
+    dcterms:modified "2008-01-14"^^xsd:date ;
     rdfs:comment "A related resource from which the described resource is derived."@en ;
     rdfs:isDefinedBy dc: ;
-    skos:note "A second property with the same name as this property has been declared in the dct: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
+    skos:note "A second property with the same name as this property has been declared in the dcterms: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
 
 dc:subject a rdf:Property ;
     rdfs:label "Subject"@en ;
-    dct:description "Typically, the subject will be represented using keywords, key phrases, or classification codes. Recommended best practice is to use a controlled vocabulary."@en ;
-    dct:hasVersion <http://dublincore.org/usage/terms/history/#subject-007> ;
-    dct:issued "1999-07-02"^^xsd:date ;
-    dct:modified "2012-06-14"^^xsd:date ;
+    dcterms:description "Typically, the subject will be represented using keywords, key phrases, or classification codes. Recommended best practice is to use a controlled vocabulary."@en ;
+    dcterms:hasVersion <http://dublincore.org/usage/terms/history/#subject-007> ;
+    dcterms:issued "1999-07-02"^^xsd:date ;
+    dcterms:modified "2012-06-14"^^xsd:date ;
     rdfs:comment "The topic of the resource."@en ;
     rdfs:isDefinedBy dc: ;
-    skos:note "A second property with the same name as this property has been declared in the dct: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
+    skos:note "A second property with the same name as this property has been declared in the dcterms: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
 
 dc:title a rdf:Property ;
     rdfs:label "Title"@en ;
-    dct:hasVersion <http://dublincore.org/usage/terms/history/#title-006> ;
-    dct:issued "1999-07-02"^^xsd:date ;
-    dct:modified "2008-01-14"^^xsd:date ;
+    dcterms:hasVersion <http://dublincore.org/usage/terms/history/#title-006> ;
+    dcterms:issued "1999-07-02"^^xsd:date ;
+    dcterms:modified "2008-01-14"^^xsd:date ;
     rdfs:comment "A name given to the resource."@en ;
     rdfs:isDefinedBy dc: ;
-    skos:note "A second property with the same name as this property has been declared in the dct: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
+    skos:note "A second property with the same name as this property has been declared in the dcterms: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
 
 dc:type a rdf:Property ;
     rdfs:label "Type"@en ;
-    dct:description "Recommended best practice is to use a controlled vocabulary such as the DCMI Type Vocabulary [DCMITYPE]. To describe the file format, physical medium, or dimensions of the resource, use the Format element."@en ;
-    dct:hasVersion <http://dublincore.org/usage/terms/history/#type-006> ;
-    dct:issued "1999-07-02"^^xsd:date ;
-    dct:modified "2008-01-14"^^xsd:date ;
+    dcterms:description "Recommended best practice is to use a controlled vocabulary such as the DCMI Type Vocabulary [DCMITYPE]. To describe the file format, physical medium, or dimensions of the resource, use the Format element."@en ;
+    dcterms:hasVersion <http://dublincore.org/usage/terms/history/#type-006> ;
+    dcterms:issued "1999-07-02"^^xsd:date ;
+    dcterms:modified "2008-01-14"^^xsd:date ;
     rdfs:comment "The nature or genre of the resource."@en ;
     rdfs:isDefinedBy dc: ;
-    skos:note "A second property with the same name as this property has been declared in the dct: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
+    skos:note "A second property with the same name as this property has been declared in the dcterms: namespace (http://purl.org/dc/terms/).  See the Introduction to the document \"DCMI Metadata Terms\" (http://dublincore.org/documents/dcmi-terms/) for an explanation."@en .
 
-dc: dct:modified "2012-06-14"^^xsd:date ;
-    dct:publisher <http://purl.org/dc/aboutdcmi#DCMI> ;
-    dct:title "Dublin Core Metadata Element Set, Version 1.1"@en .
+dc: dcterms:modified "2012-06-14"^^xsd:date ;
+    dcterms:publisher <http://purl.org/dc/aboutdcmi#DCMI> ;
+    dcterms:title "Dublin Core Metadata Element Set, Version 1.1"@en .
 

@@ -125,10 +125,10 @@ class EurlexTreaties(DocumentRepository):
         desc = Describer(doc.meta, doc.uri)
         desc.rdftype(self.rdf_type)
         if basefile == "teu":
-            desc.value(self.ns['dct'].title, "Treaty on European Union", lang="en")
+            desc.value(self.ns['dcterms'].title, "Treaty on European Union", lang="en")
         elif basefile == "tfeu":
             desc.value(
-                self.ns['dct'].title, "Treaty on the Functioning of the European Union", lang="en")
+                self.ns['dcterms'].title, "Treaty on the Functioning of the European Union", lang="en")
 
     def parse_document_from_soup(soup, doc):
         if basefile == "teu":

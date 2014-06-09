@@ -1,5 +1,5 @@
 @prefix bibo: <http://purl.org/ontology/bibo/> .
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix prov: <http://www.w3.org/ns/prov-o/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -8,27 +8,27 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://localhost:8000/res/rfc/2757> a rfc:RFC ;
-    dct:creator "G. Montenegro",
+    dcterms:creator "G. Montenegro",
         "S. Dawkins" ;
-    dct:identifier "RFC 2757" ;
-    dct:issued "2000-01"^^xsd:gYearMonth ;
-    dct:publisher "Network Working Group" ;
-    dct:rightsHolder "Nortel Networks",
+    dcterms:identifier "RFC 2757" ;
+    dcterms:issued "2000-01"^^xsd:gYearMonth ;
+    dcterms:publisher "Network Working Group" ;
+    dcterms:rightsHolder "Nortel Networks",
         "Sun Microsystems, Inc." ;
-    dct:subject "Informational" ;
-    dct:title "Long Thin Networks"@en ;
+    dcterms:subject "Informational" ;
+    dcterms:title "Long Thin Networks"@en ;
     prov:wasGeneratedBy "ferenda.sources.tech.rfc.RFC" .
 
 <http://localhost:8000/res/rfc/2757#PS1> a bibo:DocumentPart ;
-    dct:title "Status of this Memo"@en .
+    dcterms:title "Status of this Memo"@en .
 
 <http://localhost:8000/res/rfc/2757#S1> a bibo:DocumentPart ;
-    dct:identifier "RFC 2757, section 1"@en ;
-    dct:title "Introduction"@en ;
+    dcterms:identifier "RFC 2757, section 1"@en ;
+    dcterms:title "Introduction"@en ;
     bibo:chapter "1"@en .
 
 <http://localhost:8000/res/rfc/2757#S1.1> a bibo:DocumentPart ;
-    dct:identifier "RFC 2757, section 1.1"@en ;
-    dct:title "Network Architecture"@en ;
+    dcterms:identifier "RFC 2757, section 1.1"@en ;
+    dcterms:title "Network Architecture"@en ;
     bibo:chapter "1.1"@en .
 

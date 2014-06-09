@@ -1,4 +1,4 @@
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov-o/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -8,11 +8,11 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://localhost:8000/res/dv/mig/2013:4> a rpubl:Rattsfallsreferat ;
-    dct:creator "Förvaltningsrätten i Stockholm, migrationsdomstolen"@sv,
+    dcterms:creator "Förvaltningsrätten i Stockholm, migrationsdomstolen"@sv,
         "Kammarrätten i Stockholm, Migrationsöverdomstolen"@sv ;
-    dct:identifier "MIG 2013:4" ;
-    dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
-    dct:references <http://localhost:8000/res/prop/2004/05:170#s227>,
+    dcterms:identifier "MIG 2013:4" ;
+    dcterms:publisher <http://lagen.nu/org/2008/domstolsverket> ;
+    dcterms:references <http://localhost:8000/res/prop/2004/05:170#s227>,
         <http://localhost:8000/res/sfs/2005:716>,
         <http://localhost:8000/res/sfs/2005:716#K12P19S1>,
         <http://localhost:8000/res/sfs/2005:716#K4>,
@@ -28,10 +28,10 @@
     prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
 
 <http://localhost:8000/res/dv/mig/UM8680-11/2013-03-19> a rpubl:VagledandeDomstolsavgorande ;
-    dct:publisher <http://lagen.nu/org/2008/migrationsoverdomstolen> ;
-    dct:relation "Prop. 2004/05:170 s. 153, 224 ff.",
+    dcterms:publisher <http://lagen.nu/org/2008/migrationsoverdomstolen> ;
+    dcterms:relation "Prop. 2004/05:170 s. 153, 224 ff.",
         "Rådets direktiv 2005/85/EG av den" ;
-    dct:subject <http://localhost:8000/concept/Lagakraftvunnet_avlägsnandebeslut>,
+    dcterms:subject <http://localhost:8000/concept/Lagakraftvunnet_avlägsnandebeslut>,
         <http://localhost:8000/concept/Ny_omständighet>,
         <http://localhost:8000/concept/Ny_prövning>,
         <http://localhost:8000/concept/Nytt_land>,
@@ -40,7 +40,7 @@
         <http://localhost:8000/concept/Uppehållstillstånd_efter_ny_prövning>,
         <http://localhost:8000/concept/Verkställighetshinder>,
         <http://localhost:8000/concept/Verkställighetsstadiet> ;
-    dct:title "En ny prövning enligt 12 kap. 19 § utlänningslagen kan beviljas om det har framkommit uppgifter om att utlänningen är medborgare i annat land än vad den tidigare prövningen har omfattat. En sådan prövning av frågan om uppehållstillstånd kan omfatta skyddsskäl som hänför sig till annat land än det som omfattas av det lagakraftvunna utvisningsbeslutet."@sv ;
+    dcterms:title "En ny prövning enligt 12 kap. 19 § utlänningslagen kan beviljas om det har framkommit uppgifter om att utlänningen är medborgare i annat land än vad den tidigare prövningen har omfattat. En sådan prövning av frågan om uppehållstillstånd kan omfatta skyddsskäl som hänför sig till annat land än det som omfattas av det lagakraftvunna utvisningsbeslutet."@sv ;
     rpubl:avdelning "1" ;
     rpubl:avgorandedatum "2013-03-19T00:00:00"^^xsd:dateTime ;
     rpubl:lagrum <http://localhost:8000/res/sfs/2005:716>,

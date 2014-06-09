@@ -99,7 +99,7 @@ class Static(DocumentRepository):
         stack = []
         root = self._transform(doctree, stack)
         if isinstance(root[0], elements.Title):
-            doc.meta.add((URIRef(doc.uri), self.ns['dct'].title, Literal(str(root[0]), doc.lang)))
+            doc.meta.add((URIRef(doc.uri), self.ns['dcterms'].title, Literal(str(root[0]), doc.lang)))
             root.pop(0)
         doc.body = root
         return True
@@ -149,7 +149,7 @@ class Static(DocumentRepository):
             uri = self.canonical_uri(basefile)
             g = Graph()
             g.parse(self.store.distilled_path(basefile))
-            title = g.value(URIRef(uri), self.ns['dct'].title).toPython()
+            title = g.value(URIRef(uri), self.ns['dcterms'].title).toPython()
             if not title:
                 title = basefile
             res.append((title, uri))

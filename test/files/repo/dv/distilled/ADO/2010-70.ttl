@@ -1,4 +1,4 @@
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov-o/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -8,8 +8,8 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://localhost:8000/res/dv/ad/2010:70> a rpubl:Rattsfallsreferat ;
-    dct:identifier "AD 2010 nr 70" ;
-    dct:publisher <http://lagen.nu/org/2008/domstolsverket> ;
+    dcterms:identifier "AD 2010 nr 70" ;
+    dcterms:publisher <http://lagen.nu/org/2008/domstolsverket> ;
     rpubl:arsutgava "2010" ;
     rpubl:lopnummer "70" ;
     rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/ad> ;
@@ -19,8 +19,8 @@
     prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
 
 <http://localhost:8000/res/dv/ad/B-117-2009/2010-10-13> a rpubl:VagledandeDomstolsavgorande ;
-    dct:publisher <http://lagen.nu/org/2008/arbetsdomstolen> ;
-    dct:title "Målet gällde skadestånd. Domen innebar att tingsrättens domslut fastställdes."@sv ;
+    dcterms:publisher <http://lagen.nu/org/2008/arbetsdomstolen> ;
+    dcterms:title "Målet gällde skadestånd. Domen innebar att tingsrättens domslut fastställdes."@sv ;
     rpubl:avgorandedatum "2010-10-13T00:00:00"^^xsd:dateTime ;
     rpubl:domsnummer "2010-70" ;
     rpubl:malnummer "B-117-2009" ;

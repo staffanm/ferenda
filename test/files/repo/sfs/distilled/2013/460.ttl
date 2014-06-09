@@ -1,4 +1,4 @@
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov-o/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -15,7 +15,7 @@
 <https://lagen.nu/sfs/2013:460#P8> a rpubl:Paragraf .
 
 <https://lagen.nu/sfs/2013:460#P8S1> a rinfoex:Stycke ;
-    dct:references <https://lagen.nu/sfs/2013:460#P10>,
+    dcterms:references <https://lagen.nu/sfs/2013:460#P10>,
         <https://lagen.nu/sfs/2013:460#P12>,
         <https://lagen.nu/sfs/2013:460#P15> .
 
@@ -23,20 +23,20 @@
 
 <http://rinfo.lagrummet.se/ext/eur-lex/31995L0046> rpubl:celexNummer "31995L0046" .
 
-<http://rinfo.lagrummet.se/publ/bet/2012/13:JuU22> dct:identifier "bet. 2012/13:JuU22" .
+<http://rinfo.lagrummet.se/publ/bet/2012/13:JuU22> dcterms:identifier "bet. 2012/13:JuU22" .
 
-<http://rinfo.lagrummet.se/publ/prop/2012/13:115> dct:identifier "Prop. 2012/13:115" .
+<http://rinfo.lagrummet.se/publ/prop/2012/13:115> dcterms:identifier "Prop. 2012/13:115" .
 
-<http://rinfo.lagrummet.se/publ/rskr/2012/13:252> dct:identifier "rskr. 2012/13:252" .
+<http://rinfo.lagrummet.se/publ/rskr/2012/13:252> dcterms:identifier "rskr. 2012/13:252" .
 
 <https://lagen.nu/sfs/2013:460/konsolidering/2013:460> a rpubl:KonsolideradGrundforfattning ;
     rinfoex:senastHamtad "None" ;
     rinfoex:senastKontrollerad "None" ;
-    dct:creator <http://lagen.nu/org/2008/justitiedepartementet> ;
-    dct:identifier "SFS 2013:460" ;
-    dct:issued "2013-05-30"^^xsd:date ;
-    dct:publisher <http://lagen.nu/org/2008/regeringskansliet> ;
-    dct:title "Kameraövervakningslag (2013:460)"@sv ;
+    dcterms:creator <http://lagen.nu/org/2008/justitiedepartementet> ;
+    dcterms:identifier "SFS 2013:460" ;
+    dcterms:issued "2013-05-30"^^xsd:date ;
+    dcterms:publisher <http://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "Kameraövervakningslag (2013:460)"@sv ;
     rpubl:konsoliderar <https://lagen.nu/sfs/2013:460> ;
     rpubl:konsolideringsunderlag <https://lagen.nu/sfs/2013:460> ;
     rpubl:utfardandedatum "2013-05-30"^^xsd:date ;
@@ -44,9 +44,9 @@
     prov:wasGeneratedBy <https://lagen.nu/sfs/2013:460/konsolidering/ferenda.sources.legal.se.sfs.SFS> .
 
 <https://lagen.nu/sfs/2013:460> a rpubl:Forordning ;
-    dct:identifier "SFS 2013:460" ;
-    dct:publisher <http://lagen.nu/org/2008/regeringskansliet> ;
-    dct:title "Kameraövervakningslag (2013:460)"@sv ;
+    dcterms:identifier "SFS 2013:460" ;
+    dcterms:publisher <http://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "Kameraövervakningslag (2013:460)"@sv ;
     rpubl:arsutgava "2013" ;
     rpubl:beslutadAv <http://lagen.nu/org/2008/regeringskansliet> ;
     rpubl:departement <http://lagen.nu/org/2008/justitiedepartementet> ;

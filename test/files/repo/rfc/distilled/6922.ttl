@@ -1,5 +1,5 @@
 @prefix bibo: <http://purl.org/ontology/bibo/> .
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix prov: <http://www.w3.org/ns/prov-o/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -8,66 +8,66 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://localhost:8000/res/rfc/6922> a rfc:RFC ;
-    dct:creator "Y. Shafranovich" ;
-    dct:identifier "RFC 6922" ;
-    dct:issn "2070-1721" ;
-    dct:issued "2013-04"^^xsd:gYearMonth ;
-    dct:publisher "Internet Engineering Task Force (IETF)" ;
-    dct:rightsHolder "BioFortis, Inc." ;
-    dct:subject "Informational" ;
-    dct:title "The application/sql Media Type"@en ;
+    dcterms:creator "Y. Shafranovich" ;
+    dcterms:identifier "RFC 6922" ;
+    dcterms:issn "2070-1721" ;
+    dcterms:issued "2013-04"^^xsd:gYearMonth ;
+    dcterms:publisher "Internet Engineering Task Force (IETF)" ;
+    dcterms:rightsHolder "BioFortis, Inc." ;
+    dcterms:subject "Informational" ;
+    dcterms:title "The application/sql Media Type"@en ;
     prov:wasGeneratedBy "ferenda.sources.tech.rfc.RFC" .
 
 <http://localhost:8000/res/rfc/6922#PS1> a bibo:DocumentPart ;
-    dct:title "Abstract"@en .
+    dcterms:title "Abstract"@en .
 
 <http://localhost:8000/res/rfc/6922#PS2> a bibo:DocumentPart ;
-    dct:references <http://localhost:8000/res/rfc/5741#S2> ;
-    dct:title "Status of This Memo"@en .
+    dcterms:references <http://localhost:8000/res/rfc/5741#S2> ;
+    dcterms:title "Status of This Memo"@en .
 
 <http://localhost:8000/res/rfc/6922#PS3> a bibo:DocumentPart ;
-    dct:references <http://localhost:8000/res/rfc/6922#S4> ;
-    dct:title "Copyright Notice"@en .
+    dcterms:references <http://localhost:8000/res/rfc/6922#S4> ;
+    dcterms:title "Copyright Notice"@en .
 
 <http://localhost:8000/res/rfc/6922#S1> a bibo:DocumentPart ;
-    dct:identifier "RFC 6922, section 1"@en ;
-    dct:title "Introduction"@en ;
+    dcterms:identifier "RFC 6922, section 1"@en ;
+    dcterms:title "Introduction"@en ;
     bibo:chapter "1"@en .
 
 <http://localhost:8000/res/rfc/6922#S2> a bibo:DocumentPart ;
-    dct:identifier "RFC 6922, section 2"@en ;
-    dct:references <http://localhost:8000/res/rfc/2119> ;
-    dct:title "Conventions Used in This Document"@en ;
+    dcterms:identifier "RFC 6922, section 2"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/2119> ;
+    dcterms:title "Conventions Used in This Document"@en ;
     bibo:chapter "2"@en .
 
 <http://localhost:8000/res/rfc/6922#S5> a bibo:DocumentPart ;
-    dct:identifier "RFC 6922, section 5"@en ;
-    dct:references <http://localhost:8000/res/rfc/6922#S3> ;
-    dct:title "Security Considerations"@en ;
+    dcterms:identifier "RFC 6922, section 5"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/6922#S3> ;
+    dcterms:title "Security Considerations"@en ;
     bibo:chapter "5"@en .
 
 <http://localhost:8000/res/rfc/6922#S6> a bibo:DocumentPart ;
-    dct:identifier "RFC 6922, section 6"@en ;
-    dct:title "Acknowledgments"@en ;
+    dcterms:identifier "RFC 6922, section 6"@en ;
+    dcterms:title "Acknowledgments"@en ;
     bibo:chapter "6"@en .
 
 <http://localhost:8000/res/rfc/6922#S7> a bibo:DocumentPart ;
-    dct:identifier "RFC 6922, section 7"@en ;
-    dct:references <http://localhost:8000/res/rfc/2119>,
+    dcterms:identifier "RFC 6922, section 7"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/2119>,
         <http://localhost:8000/res/rfc/6838> ;
-    dct:title "Normative References"@en ;
+    dcterms:title "Normative References"@en ;
     bibo:chapter "7"@en .
 
 <http://localhost:8000/res/rfc/6922#S4> a bibo:DocumentPart ;
-    dct:identifier "RFC 6922, section 4"@en ;
-    dct:references <http://localhost:8000/res/rfc/6922#S3> ;
-    dct:title "IANA Considerations"@en ;
+    dcterms:identifier "RFC 6922, section 4"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/6922#S3> ;
+    dcterms:title "IANA Considerations"@en ;
     bibo:chapter "4"@en .
 
 <http://localhost:8000/res/rfc/6922#S3> a bibo:DocumentPart ;
-    dct:identifier "RFC 6922, section 3"@en ;
-    dct:references <http://localhost:8000/res/rfc/6838>,
+    dcterms:identifier "RFC 6922, section 3"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/6838>,
         <http://localhost:8000/res/rfc/6922#S5.6> ;
-    dct:title "Media Type Registration Application"@en ;
+    dcterms:title "Media Type Registration Application"@en ;
     bibo:chapter "3"@en .
 

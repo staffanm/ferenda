@@ -35,7 +35,7 @@ import pyparsing
 
 from ferenda import util
 
-DCT = Namespace(util.ns['dct'])
+DCTERMS = Namespace(util.ns['dcterms'])
 RDF = Namespace(util.ns['rdf'])
 XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 log = logging.getLogger(__name__)
@@ -245,8 +245,8 @@ class CompoundElement(AbstractElement, list):
                     continue
                 if p == RDF.type:
                     attrs['typeof'] = self.meta.qname(o)
-                    # attrs['rev'] = self.meta.qname(DCT.isPartOf)
-                elif p == DCT.title:
+                    # attrs['rev'] = self.meta.qname(DCTERMS.isPartOf)
+                elif p == DCTERMS.title:
                     attrs['property'] = self.meta.qname(p)
                     attrs['content'] = o.toPython()
                 else:
@@ -432,7 +432,7 @@ class Link(UnicodeElement):
 class LinkSubject(PredicateElement, Link):
     """A unicode string that has both ``predicate`` and ``uri``
     attributes, i.e. a typed link. Note that predicate should be a
-    string that represents a Qname, eg 'dct:references', not a proper
+    string that represents a Qname, eg 'dcterms:references', not a proper
     rdflib object.
 
     """
@@ -475,7 +475,7 @@ class SectionalElement(CompoundElement):
         # themselves.
         element = super(SectionalElement, self).as_xhtml(baseuri)
         if not hasattr(self, 'uri') or not hasattr(self, 'meta'):
-            element.set('property', 'dct:title')
+            element.set('property', 'dcterms:title')
             element.set('content', self.title)
             element.set('typeof', 'bibo:DocumentPart')
             element.set('about', newuri)
@@ -489,7 +489,7 @@ class SectionalElement(CompoundElement):
                 element.insert(0,E('span',attrs))
             if hasattr(self,'identifier'):
                 attrs = {'about': newuri,
-                         'property': 'dct:identifier',
+                         'property': 'dcterms:identifier',
                          'content': self.identifier}
                 element.insert(0,E('span',attrs))
             if element.text: # make sure that naked PCDATA comes after the elements we've inserted

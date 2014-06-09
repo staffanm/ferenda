@@ -1,11 +1,11 @@
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://rinfo.lagrummet.se/publ/elsaek-fs/2010:4> a rpubl:Myndighetsforeskrift;
-    dct:identifier "ELSÄK-FS 2010:4";
-    dct:publisher <http://rinfo.lagrummet.se/org/elsaekerhetsverket>;
-    dct:title "Föreskrifter om ändring i Elsäkerhetsverkets föreskrifter (ELSÄK-FS 2007:2) om behörighet för elinstallatörer"@sv;
+    dcterms:identifier "ELSÄK-FS 2010:4";
+    dcterms:publisher <http://rinfo.lagrummet.se/org/elsaekerhetsverket>;
+    dcterms:title "Föreskrifter om ändring i Elsäkerhetsverkets föreskrifter (ELSÄK-FS 2007:2) om behörighet för elinstallatörer"@sv;
     rpubl:andrar <http://rinfo.lagrummet.se/publ/elsaek-fs/2007:2>;
     rpubl:arsutgava "2010";
     rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/1990:806#P15>,

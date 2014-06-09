@@ -1,5 +1,5 @@
 @prefix bibo: <http://purl.org/ontology/bibo/> .
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix prov: <http://www.w3.org/ns/prov-o/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -9,55 +9,55 @@
 
 <http://localhost:8000/res/rfc/6916> a rfc:RFC ;
     rfc:BCP "182" ;
-    dct:creator "R. Gagliano",
+    dcterms:creator "R. Gagliano",
         "S. Kent",
         "S. Turner" ;
-    dct:identifier "RFC 6916" ;
-    dct:issn "2070-1721" ;
-    dct:issued "2013-04"^^xsd:gYearMonth ;
-    dct:publisher "Internet Engineering Task Force (IETF)" ;
-    dct:rightsHolder "BBN Technologies",
+    dcterms:identifier "RFC 6916" ;
+    dcterms:issn "2070-1721" ;
+    dcterms:issued "2013-04"^^xsd:gYearMonth ;
+    dcterms:publisher "Internet Engineering Task Force (IETF)" ;
+    dcterms:rightsHolder "BBN Technologies",
         "Cisco Systems",
         "IECA, Inc." ;
-    dct:subject "Best Current Practice" ;
-    dct:title "Algorithm Agility Procedure for the Resource Public Key Infrastructure (RPKI)"@en ;
+    dcterms:subject "Best Current Practice" ;
+    dcterms:title "Algorithm Agility Procedure for the Resource Public Key Infrastructure (RPKI)"@en ;
     bibo:shortTitle "RPKI Algorithm Agility"@en ;
     prov:wasGeneratedBy "ferenda.sources.tech.rfc.RFC" .
 
 <http://localhost:8000/res/rfc/6916#PS1> a bibo:DocumentPart ;
-    dct:title "Abstract"@en .
+    dcterms:title "Abstract"@en .
 
 <http://localhost:8000/res/rfc/6916#PS2> a bibo:DocumentPart ;
-    dct:references <http://localhost:8000/res/rfc/5741#S2> ;
-    dct:title "Status of This Memo"@en .
+    dcterms:references <http://localhost:8000/res/rfc/5741#S2> ;
+    dcterms:title "Status of This Memo"@en .
 
 <http://localhost:8000/res/rfc/6916#PS3> a bibo:DocumentPart ;
-    dct:references <http://localhost:8000/res/rfc/6916#S4> ;
-    dct:title "Copyright Notice"@en .
+    dcterms:references <http://localhost:8000/res/rfc/6916#S4> ;
+    dcterms:title "Copyright Notice"@en .
 
 <http://localhost:8000/res/rfc/6916#S1> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 1"@en ;
-    dct:references <http://localhost:8000/res/rfc/6484>,
+    dcterms:identifier "RFC 6916, section 1"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/6484>,
         <http://localhost:8000/res/rfc/6485>,
         <http://localhost:8000/res/rfc/6489>,
         <http://localhost:8000/res/rfc/6916#S4>,
         <http://localhost:8000/res/rfc/6916#S4.1> ;
-    dct:title "Introduction"@en ;
+    dcterms:title "Introduction"@en ;
     bibo:chapter "1"@en .
 
 <http://localhost:8000/res/rfc/6916#S11> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 11"@en ;
-    dct:title "Security Considerations"@en ;
+    dcterms:identifier "RFC 6916, section 11"@en ;
+    dcterms:title "Security Considerations"@en ;
     bibo:chapter "11"@en .
 
 <http://localhost:8000/res/rfc/6916#S12> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 12"@en ;
-    dct:title "Acknowledgements"@en ;
+    dcterms:identifier "RFC 6916, section 12"@en ;
+    dcterms:title "Acknowledgements"@en ;
     bibo:chapter "12"@en .
 
 <http://localhost:8000/res/rfc/6916#S13> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 13"@en ;
-    dct:references <http://localhost:8000/res/rfc/2119>,
+    dcterms:identifier "RFC 6916, section 13"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/2119>,
         <http://localhost:8000/res/rfc/3779>,
         <http://localhost:8000/res/rfc/5280>,
         <http://localhost:8000/res/rfc/6481>,
@@ -68,130 +68,130 @@
         <http://localhost:8000/res/rfc/6490>,
         <http://localhost:8000/res/rfc/6492>,
         <http://localhost:8000/res/rfc/6493> ;
-    dct:title "Normative References"@en ;
+    dcterms:title "Normative References"@en ;
     bibo:chapter "13"@en .
 
 <http://localhost:8000/res/rfc/6916#S2> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 2"@en ;
-    dct:references <http://localhost:8000/res/rfc/2119> ;
-    dct:title "Requirements Notation"@en ;
+    dcterms:identifier "RFC 6916, section 2"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/2119> ;
+    dcterms:title "Requirements Notation"@en ;
     bibo:chapter "2"@en .
 
 <http://localhost:8000/res/rfc/6916#S3> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 3"@en ;
-    dct:references <http://localhost:8000/res/rfc/3779>,
+    dcterms:identifier "RFC 6916, section 3"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/3779>,
         <http://localhost:8000/res/rfc/5280>,
         <http://localhost:8000/res/rfc/6481>,
         <http://localhost:8000/res/rfc/6482> ;
-    dct:title "Terminology"@en ;
+    dcterms:title "Terminology"@en ;
     bibo:chapter "3"@en .
 
 <http://localhost:8000/res/rfc/6916#S4.3> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 4.3"@en ;
-    dct:title "Phase 0"@en ;
+    dcterms:identifier "RFC 6916, section 4.3"@en ;
+    dcterms:title "Phase 0"@en ;
     bibo:chapter "4.3"@en .
 
 <http://localhost:8000/res/rfc/6916#S4.3.1> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 4.3.1"@en ;
-    dct:references <http://localhost:8000/res/rfc/6485> ;
-    dct:title "Milestone 1"@en ;
+    dcterms:identifier "RFC 6916, section 4.3.1"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/6485> ;
+    dcterms:title "Milestone 1"@en ;
     bibo:chapter "4.3.1"@en .
 
 <http://localhost:8000/res/rfc/6916#S4.6> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 4.6"@en ;
-    dct:references <http://localhost:8000/res/rfc/6916#S10>,
+    dcterms:identifier "RFC 6916, section 4.6"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/6916#S10>,
         <http://localhost:8000/res/rfc/6916#S4.2> ;
-    dct:title "Phase 3"@en ;
+    dcterms:title "Phase 3"@en ;
     bibo:chapter "4.6"@en .
 
 <http://localhost:8000/res/rfc/6916#S4.8> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 4.8"@en ;
-    dct:references <http://localhost:8000/res/rfc/6916#S10> ;
-    dct:title "Return to Phase 0"@en ;
+    dcterms:identifier "RFC 6916, section 4.8"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/6916#S10> ;
+    dcterms:title "Return to Phase 0"@en ;
     bibo:chapter "4.8"@en .
 
 <http://localhost:8000/res/rfc/6916#S7> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 7"@en ;
-    dct:references <http://localhost:8000/res/rfc/6916#S5>,
+    dcterms:identifier "RFC 6916, section 7"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/6916#S5>,
         <http://localhost:8000/res/rfc/6916#S8> ;
-    dct:title "Revocation"@en ;
+    dcterms:title "Revocation"@en ;
     bibo:chapter "7"@en .
 
 <http://localhost:8000/res/rfc/6916#S4.4> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 4.4"@en ;
-    dct:references <http://localhost:8000/res/rfc/6916#S10>,
+    dcterms:identifier "RFC 6916, section 4.4"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/6916#S10>,
         <http://localhost:8000/res/rfc/6916#S4.2>,
         <http://localhost:8000/res/rfc/6916#S5> ;
-    dct:title "Phase 1"@en ;
+    dcterms:title "Phase 1"@en ;
     bibo:chapter "4.4"@en .
 
 <http://localhost:8000/res/rfc/6916#S4.5> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 4.5"@en ;
-    dct:references <http://localhost:8000/res/rfc/6916#S10>,
+    dcterms:identifier "RFC 6916, section 4.5"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/6916#S10>,
         <http://localhost:8000/res/rfc/6916#S4.2>,
         <http://localhost:8000/res/rfc/6916#S6>,
         <http://localhost:8000/res/rfc/6916#S9> ;
-    dct:title "Phase 2"@en ;
+    dcterms:title "Phase 2"@en ;
     bibo:chapter "4.5"@en .
 
 <http://localhost:8000/res/rfc/6916#S4.7> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 4.7"@en ;
-    dct:references <http://localhost:8000/res/rfc/6916#S10>,
+    dcterms:identifier "RFC 6916, section 4.7"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/6916#S10>,
         <http://localhost:8000/res/rfc/6916#S6> ;
-    dct:title "Phase 4"@en ;
+    dcterms:title "Phase 4"@en ;
     bibo:chapter "4.7"@en .
 
 <http://localhost:8000/res/rfc/6916#S8> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 8"@en ;
-    dct:references <http://localhost:8000/res/rfc/6489> ;
-    dct:title "Key Rollover"@en ;
+    dcterms:identifier "RFC 6916, section 8"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/6489> ;
+    dcterms:title "Key Rollover"@en ;
     bibo:chapter "8"@en .
 
 <http://localhost:8000/res/rfc/6916#S9> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 9"@en ;
-    dct:references <http://localhost:8000/res/rfc/6481> ;
-    dct:title "Repository Structure"@en ;
+    dcterms:identifier "RFC 6916, section 9"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/6481> ;
+    dcterms:title "Repository Structure"@en ;
     bibo:chapter "9"@en .
 
 <http://localhost:8000/res/rfc/6916#S4> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 4"@en ;
-    dct:references <http://localhost:8000/res/rfc/6485>,
+    dcterms:identifier "RFC 6916, section 4"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/6485>,
         <http://localhost:8000/res/rfc/6916#S4.1> ;
-    dct:title "Key Rollover Steps for Algorithm Migration"@en ;
+    dcterms:title "Key Rollover Steps for Algorithm Migration"@en ;
     bibo:chapter "4"@en .
 
 <http://localhost:8000/res/rfc/6916#S4.1> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 4.1"@en ;
-    dct:references <http://localhost:8000/res/rfc/6490>,
+    dcterms:identifier "RFC 6916, section 4.1"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/6490>,
         <http://localhost:8000/res/rfc/6916#S10> ;
-    dct:title "Milestones Definition"@en ;
+    dcterms:title "Milestones Definition"@en ;
     bibo:chapter "4.1"@en .
 
 <http://localhost:8000/res/rfc/6916#S6> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 6"@en ;
-    dct:references <http://localhost:8000/res/rfc/6493>,
+    dcterms:identifier "RFC 6916, section 6"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/6493>,
         <http://localhost:8000/res/rfc/6916#S4.4>,
         <http://localhost:8000/res/rfc/6916#S4.5>,
         <http://localhost:8000/res/rfc/6916#S4.7> ;
-    dct:title "Validation of Multiple Instances of Signed Products"@en ;
+    dcterms:title "Validation of Multiple Instances of Signed Products"@en ;
     bibo:chapter "6"@en .
 
 <http://localhost:8000/res/rfc/6916#S4.2> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 4.2"@en ;
-    dct:references <http://localhost:8000/res/rfc/6916#S5> ;
-    dct:title "Process Overview"@en ;
+    dcterms:identifier "RFC 6916, section 4.2"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/6916#S5> ;
+    dcterms:title "Process Overview"@en ;
     bibo:chapter "4.2"@en .
 
 <http://localhost:8000/res/rfc/6916#S5> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 5"@en ;
-    dct:references <http://localhost:8000/res/rfc/6492>,
+    dcterms:identifier "RFC 6916, section 5"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/6492>,
         <http://localhost:8000/res/rfc/6492#S3.3.1> ;
-    dct:title "Support for Multiple Algorithms in the RPKI Provisioning Protocol"@en ;
+    dcterms:title "Support for Multiple Algorithms in the RPKI Provisioning Protocol"@en ;
     bibo:chapter "5"@en .
 
 <http://localhost:8000/res/rfc/6916#S10> a bibo:DocumentPart ;
-    dct:identifier "RFC 6916, section 10"@en ;
-    dct:references <http://localhost:8000/res/rfc/6492> ;
-    dct:title "Deprecating an Algorithm Suite"@en ;
+    dcterms:identifier "RFC 6916, section 10"@en ;
+    dcterms:references <http://localhost:8000/res/rfc/6492> ;
+    dcterms:title "Deprecating an Algorithm Suite"@en ;
     bibo:chapter "10"@en .
 

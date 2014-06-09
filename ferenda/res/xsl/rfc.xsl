@@ -3,7 +3,7 @@
 		xmlns:xhtml="http://www.w3.org/1999/xhtml"
 		xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
 		xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-		xmlns:dct="http://purl.org/dc/terms/"
+		xmlns:dcterms="http://purl.org/dc/terms/"
 		xmlns:rfc="http://example.org/ontology/rfc/"
 		xml:space="preserve"
 		exclude-result-prefixes="xhtml rdf">
@@ -71,28 +71,28 @@
        xhtml:div[@about] and pre[1] above, and which creates -->
   <xsl:template name="aside-annotations">
     <xsl:param name="uri"/>
-    <xsl:if test="$annotations/resource[@uri=$uri]/dct:isReferencedBy">
+    <xsl:if test="$annotations/resource[@uri=$uri]/dcterms:isReferencedBy">
       <aside class="annotations">
-	<h2>References to <xsl:value-of select="$annotations/resource[@uri=$uri]/dct:identifier"/></h2>
+	<h2>References to <xsl:value-of select="$annotations/resource[@uri=$uri]/dcterms:identifier"/></h2>
 	<xsl:for-each select="$annotations/resource[@uri=$uri]/rfc:isObsoletedBy">
 	  <xsl:variable name="referencing" select="@ref"/>
 	  Obsoleted by
 	  <a href="{@ref}">
-	    <xsl:value-of select="$annotations/resource[@uri=$referencing]/dct:identifier"/>
+	    <xsl:value-of select="$annotations/resource[@uri=$referencing]/dcterms:identifier"/>
 	  </a><br/>
 	</xsl:for-each>
 	<xsl:for-each select="$annotations/resource[@uri=$uri]/rfc:isUpdatedBy">
 	  <xsl:variable name="referencing" select="@ref"/>
 	  Updated by
 	  <a href="{@ref}">
-	    <xsl:value-of select="$annotations/resource[@uri=$referencing]/dct:identifier"/>
+	    <xsl:value-of select="$annotations/resource[@uri=$referencing]/dcterms:identifier"/>
 	  </a><br/>
 	</xsl:for-each>
-	<xsl:for-each select="$annotations/resource[@uri=$uri]/dct:isReferencedBy">
+	<xsl:for-each select="$annotations/resource[@uri=$uri]/dcterms:isReferencedBy">
 	  <xsl:variable name="referencing" select="@ref"/>
 	  Referenced by
 	  <a href="{@ref}">
-	    <xsl:value-of select="$annotations/resource[@uri=$referencing]/dct:identifier"/>
+	    <xsl:value-of select="$annotations/resource[@uri=$referencing]/dcterms:identifier"/>
 	  </a><br/>
 	</xsl:for-each>
       </aside>

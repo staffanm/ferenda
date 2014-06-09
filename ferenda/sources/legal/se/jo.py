@@ -119,9 +119,9 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
         # add basic metadata
         desc.rdftype(self.rdf_type)
         desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-        desc.value(self.ns['dct'].identifier, "JO dnr %s" % doc.basefile)
-        # dct:issued is required, but we only have rpubl.avgorandedatum
-        desc.value(self.ns['dct'].issued,
+        desc.value(self.ns['dcterms'].identifier, "JO dnr %s" % doc.basefile)
+        # dcterms:issued is required, but we only have rpubl.avgorandedatum
+        desc.value(self.ns['dcterms'].issued,
                 desc.getvalue(self.ns['rpubl'].avgorandedatum))
 
         
@@ -198,7 +198,7 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
         def make_heading(parser):
             # h = Heading(str(parser.reader.next()).strip())
             h = Meta([Literal(str(parser.reader.next()).strip(), lang="sv")],
-                     predicate=self.ns['dct'].title)
+                     predicate=self.ns['dcterms'].title)
             return h
 
         @decorators.newstate("abstract")

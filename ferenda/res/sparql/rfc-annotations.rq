@@ -1,12 +1,12 @@
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX dcterms: <http://purl.org/dc/terms/>
 PREFIX bibo: <http://purl.org/ontology/bibo/>
 PREFIX rfc: <http://example.org/ontology/rfc/>
 
 CONSTRUCT {?s ?p ?o .
            <%(uri)s> rfc:isObsoletedBy ?obsoleter .
 	   <%(uri)s> rfc:isUpdatedBy ?updater .
-	   <%(uri)s> dct:isReferencedBy ?referencer .
+	   <%(uri)s> dcterms:isReferencedBy ?referencer .
 	  }
 WHERE
 {
@@ -16,20 +16,20 @@ WHERE
      FILTER(?s = <%(uri)s> && !isUri(?o))
    }
    UNION
-   # get all metadata (except unrelated dct:references) about
-   #  resources that dct:references the document or any of its
+   # get all metadata (except unrelated dcterms:references) about
+   #  resources that dcterms:references the document or any of its
    #  sub-resources.
-   { ?s dct:references+ <%(uri)s> ;
+   { ?s dcterms:references+ <%(uri)s> ;
         ?p ?o .
      BIND(?s as ?referencer)
-     FILTER(?p != dct:references || strstarts(str(?o), "%(uri)s"))
+     FILTER(?p != dcterms:references || strstarts(str(?o), "%(uri)s"))
    }
    UNION
-   # get all metadata (except dct:references) about any resource that
+   # get all metadata (except dcterms:references) about any resource that
    # rfc:updates or rfc:obsolets the document
    { ?s ?x <%(uri)s> ;
         ?p ?o .
-     FILTER(?x in (rfc:updates, rfc:obsoletes) && ?p != dct:references)
+     FILTER(?x in (rfc:updates, rfc:obsoletes) && ?p != dcterms:references)
    }
    # finally, bind obsoleting and updating resources to new variables for
    # use in the CONSTRUCT clause

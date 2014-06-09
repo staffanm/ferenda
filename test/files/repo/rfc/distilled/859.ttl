@@ -1,5 +1,5 @@
 @prefix bibo: <http://purl.org/ontology/bibo/> .
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix prov: <http://www.w3.org/ns/prov-o/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -9,25 +9,25 @@
 
 <http://localhost:8000/res/rfc/859> a rfc:RFC ;
     rfc:obsoletes <http://localhost:8000/res/rfc/651> ;
-    dct:creator "J. Postel",
+    dcterms:creator "J. Postel",
         "J. Reynolds" ;
-    dct:identifier "RFC 859" ;
-    dct:issued "1983-05"^^xsd:gYearMonth ;
-    dct:publisher "Network Working Group" ;
-    dct:rightsHolder "ISI" ;
-    dct:title "TELNET STATUS OPTION"@en ;
+    dcterms:identifier "RFC 859" ;
+    dcterms:issued "1983-05"^^xsd:gYearMonth ;
+    dcterms:publisher "Network Working Group" ;
+    dcterms:rightsHolder "ISI" ;
+    dcterms:title "TELNET STATUS OPTION"@en ;
     prov:wasGeneratedBy "ferenda.sources.tech.rfc.RFC" .
 
 <http://localhost:8000/res/rfc/859#PS1> a bibo:DocumentPart ;
-    dct:title "(Abstract)"@en .
+    dcterms:title "(Abstract)"@en .
 
 <http://localhost:8000/res/rfc/859#S1> a bibo:DocumentPart ;
-    dct:identifier "RFC 859, section 1"@en ;
-    dct:title "Command Name and Code"@en ;
+    dcterms:identifier "RFC 859, section 1"@en ;
+    dcterms:title "Command Name and Code"@en ;
     bibo:chapter "1"@en .
 
 <http://localhost:8000/res/rfc/859#S2> a bibo:DocumentPart ;
-    dct:identifier "RFC 859, section 2"@en ;
-    dct:title "Command Meanings"@en ;
+    dcterms:identifier "RFC 859, section 2"@en ;
+    dcterms:title "Command Meanings"@en ;
     bibo:chapter "2"@en .
 

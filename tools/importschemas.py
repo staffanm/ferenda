@@ -39,7 +39,7 @@ def import_generic(g, url, prefix):
 def main():
     for prefix, func, url in (
             ("schema", import_schema_org, "http://schema.org/docs/schema_org_rdfa.html"),
-            ("dct", import_generic, "http://purl.org/dc/terms/"),
+            ("dcterms", import_generic, "http://purl.org/dc/terms/"),
             ("dc", import_generic, "http://purl.org/dc/elements/1.1/"),
             ("bibo", import_generic, "http://purl.org/ontology/bibo/"),
             ("foaf", import_generic, "http://xmlns.com/foaf/0.1/"),

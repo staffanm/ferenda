@@ -1,12 +1,12 @@
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://rinfo.lagrummet.se/publ/fffs/2011:39> a rpubl:Myndighetsforeskrift;
-    dct:identifier "FFFS 2011:39";
-    dct:issn "1102-7460";
-    dct:publisher <http://rinfo.lagrummet.se/org/finansinspektionen>;
-    dct:title "Finansinspektionens föreskrifter och allmänna råd om information som gäller försäkring och tjänstepension;"@sv;
+    dcterms:identifier "FFFS 2011:39";
+    dcterms:issn "1102-7460";
+    dcterms:publisher <http://rinfo.lagrummet.se/org/finansinspektionen>;
+    dcterms:title "Finansinspektionens föreskrifter och allmänna råd om information som gäller försäkring och tjänstepension;"@sv;
     rpubl:arsutgava "2011";
     rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2011:257#K7P2>,
         <http://rinfo.lagrummet.se/publ/sfs/2011:257#K7P5>,

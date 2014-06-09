@@ -1,10 +1,10 @@
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://rinfo.lagrummet.se/publ/fffs/1991:16> a rpubl:Myndighetsforeskrift;
-    dct:identifier "FFFS 1991:16";
-    dct:publisher <http://rinfo.lagrummet.se/org/finansinspektionen>;
+    dcterms:identifier "FFFS 1991:16";
+    dcterms:publisher <http://rinfo.lagrummet.se/org/finansinspektionen>;
     rpubl:arsutgava "1991";
     rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/1987:617#K7P6>;
     rpubl:beslutadAv <http://rinfo.lagrummet.se/org/finansinspektionen>;

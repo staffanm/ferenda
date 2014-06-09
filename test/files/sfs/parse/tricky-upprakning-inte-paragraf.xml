@@ -3,17 +3,17 @@
     <Stycke id="P19S1">
       <str>Följande bestämmelser i detta kapitel skall tillämpas på den huvudansvarige:</str>
     </Stycke><Stycke id="P19S2">
-      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P17">17</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P17">17</LinkSubject>
       <str> och </str>
-      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P18">18 §§</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P18">18 §§</LinkSubject>
       <str> om jäv,</str>
     </Stycke><Stycke id="P19S3">
-      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P40">40 §</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P40">40 §</LinkSubject>
       <str> om närvaro vid bolagsstämma och</str>
     </Stycke><Stycke id="P19S4">
-      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P47">47</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P47">47</LinkSubject>
       <str> och </str>
-      <LinkSubject predicate="dct:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P48">48 §§</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P48">48 §§</LinkSubject>
       <str> om registrering.</str>
     </Stycke>
   </Paragraf>

@@ -273,7 +273,7 @@ class UpphavdForfattning(DocumentRemovedError):
 class IdNotFound(DocumentRemovedError):
     pass
 
-DCT = Namespace(util.ns['dct'])
+DCTERMS = Namespace(util.ns['dcterms'])
 XSD = Namespace(util.ns['xsd'])
 RINFOEX = Namespace("http://lagen.nu/terms#")
 
@@ -794,12 +794,12 @@ class SFS(Trips):
             baseuri = self.canonical_uri(doc.basefile)
             if baseuri in registry:
                 title = registry[baseuri].value(URIRef(baseuri),
-                                                self.ns['dct'].title)
-                desc.value(self.ns['dct'].title, title)
-            desc.rel(self.ns['dct'].publisher,
+                                                self.ns['dcterms'].title)
+                desc.value(self.ns['dcterms'].title, title)
+            desc.rel(self.ns['dcterms'].publisher,
                      self.lookup_resource("Regeringskansliet"))
 
-            desc.value(self.ns['dct'].identifier, "SFS " + doc.basefile)
+            desc.value(self.ns['dcterms'].identifier, "SFS " + doc.basefile)
 
             doc.body = Forfattning([Stycke(['Lagtext saknas'],
                                            id='S1')])
@@ -821,11 +821,11 @@ class SFS(Trips):
         g = Graph()
         g.load(self.config.lawabbrevs, format="n3")
         grf_uri = self.canonical_uri(doc.basefile)
-        v = g.value(URIRef(grf_uri), self.ns['dct'].alternate, any=True)
+        v = g.value(URIRef(grf_uri), self.ns['dcterms'].alternate, any=True)
         if v:
-            desc.value(self.ns['dct'].alternate, v)
+            desc.value(self.ns['dcterms'].alternate, v)
 
-        # Finally: the dct:issued property for this
+        # Finally: the dcterms:issued property for this
         # rpubl:KonsolideradGrundforfattning isn't readily
         # available. The true value is only found by parsing PDF files
         # in another docrepo. There are three general ways of finding
@@ -833,13 +833,13 @@ class SFS(Trips):
         issued = None
         # 1. if registry contains a single value (ie a
         # Grundforfattning that hasn't been amended yet), we can
-        # assume that dct:issued == rpubl:utfardandedatum
+        # assume that dcterms:issued == rpubl:utfardandedatum
         if len(registry) == 1 and desc.getvalues(self.ns['rpubl'].utfardandedatum):
             issued = desc.getvalue(self.ns['rpubl'].utfardandedatum)
         else:
             # 2. if the last post in registry contains a
             # rpubl:utfardandedatum, assume that this version of the
-            # rpubl:KonsolideradGrundforfattning has the same dct:issued date
+            # rpubl:KonsolideradGrundforfattning has the same dcterms:issued date
             last_post_uri = list(registry.keys())[-1]
             last_post_graph = registry[last_post_uri]
             pub_lit = last_post_graph.value(URIRef(last_post_uri),
@@ -854,7 +854,7 @@ class SFS(Trips):
             # as we can get.
             issued = de.orig_updated.date()
         assert isinstance(issued, date)
-        desc.value(self.ns['dct'].issued, issued)
+        desc.value(self.ns['dcterms'].issued, issued)
 
         # use manual formatting of the issued date -- date.strftime
         # doesn't work with years < 1900 in older versions of python
@@ -882,7 +882,7 @@ class SFS(Trips):
             reg = Register(rubrik='Ändringar')
 
         for uri, graph in registry.items():
-            identifier = graph.value(URIRef(uri), self.ns['dct'].identifier)
+            identifier = graph.value(URIRef(uri), self.ns['dcterms'].identifier)
             identifier = identifier.replace("SFS ", "L")
             rp = Registerpost(uri=uri, meta=graph, id=identifier)
             reg.append(rp)
@@ -902,11 +902,11 @@ class SFS(Trips):
 
     def _dict_to_graph(self, d, graph, uri):
         mapping = {'SFS nr': self.ns['rpubl'].fsNummer,
-                   'Rubrik': self.ns['dct'].title,
+                   'Rubrik': self.ns['dcterms'].title,
                    'Senast hämtad': self.ns['rinfoex'].senastHamtad,
                    'Utfärdad': self.ns['rpubl'].utfardandedatum,
-                   'Utgivare': self.ns['dct'].publisher,
-                   'Departement/ myndighet': self.ns['dct'].creator
+                   'Utgivare': self.ns['dcterms'].publisher,
+                   'Departement/ myndighet': self.ns['dcterms'].creator
                    }
         desc = Describer(graph, uri)
         for (k, v) in d.items():
@@ -962,7 +962,7 @@ class SFS(Trips):
             for key, val in rowdict.items():
                 if key == 'SFS-nummer':
                     (arsutgava, lopnummer) = val.split(":")
-                    desc.value(self.ns['dct'].identifier, "SFS " + val)
+                    desc.value(self.ns['dcterms'].identifier, "SFS " + val)
                     desc.value(self.ns['rpubl'].arsutgava, arsutgava)
                     desc.value(self.ns['rpubl'].lopnummer, lopnummer)
                     # desc.value("rpubl:lopnummer", lopnummer)
@@ -977,7 +977,7 @@ class SFS(Trips):
                     if not self.id in val:
                         self.log.warning(
                             "%s: Base SFS %s not found in title %r" % (self.id, self.id, val))
-                    desc.value(self.ns['dct'].title, Literal(val, lang="sv"))
+                    desc.value(self.ns['dcterms'].title, Literal(val, lang="sv"))
                     desc.rdftype(self._forfattningstyp(val))
                 elif key == 'Observera':
                     if not self.config.keepexpired:
@@ -1025,7 +1025,7 @@ class SFS(Trips):
                         if hasattr(node, 'uri'):
                             with desc.rel(self.ns['rpubl'].forarbete,
                                           node.uri):
-                                desc.value(self.ns['dct'].identifier,
+                                desc.value(self.ns['dcterms'].identifier,
                                            str(node))
                 elif key == 'CELEX-nr':
                     for celex in re.findall('3\d{2,4}[LR]\d{4}', val):
@@ -1046,7 +1046,7 @@ class SFS(Trips):
 
             # finally, add some properties not directly found in the
             # registry, but which are always present for SFSes, or deducible
-            desc.rel(self.ns['dct'].publisher,
+            desc.rel(self.ns['dcterms'].publisher,
                      self.lookup_resource("Regeringskansliet"))
             desc.rel(self.ns['rpubl'].beslutadAv,
                      self.lookup_resource("Regeringskansliet"))
@@ -1210,7 +1210,7 @@ class SFS(Trips):
                         # instead. Or use another object than LinkSubject.
                         term = util.normalize_space(term)
                         termnode = LinkSubject(term, uri=self._term_to_subject(
-                            term), predicate="dct:subject")
+                            term), predicate="dcterms:subject")
                         find_definitions_recursive = False
                     else:
                         term = None
@@ -1223,7 +1223,7 @@ class SFS(Trips):
                         # normalize and convert some characters
                         s = " ".join(p.split())
                         s = s.replace("\x96", "-")
-                        # Make all links have a dct:references
+                        # Make all links have a dcterms:references
                         # predicate -- not that meaningful for the
                         # XHTML2 code, but needed to get useful RDF
                         # triples in the RDFa output
@@ -1232,7 +1232,7 @@ class SFS(Trips):
                         parsednodes = self.lagrum_parser.parse(s,
                                                                baseuri +
                                                                prefix,
-                                                               "dct:references")
+                                                               "dcterms:references")
                         for n in parsednodes:
                             # py2 compat FIxme
                             if term and isinstance(n, str) and term in n:
@@ -1320,7 +1320,7 @@ class SFS(Trips):
                               for x in line.split(":", 1)]
             # Simple string literals
             if key == 'Rubrik':
-                desc.value(self.ns['dct'].title, Literal(val, lang="sv"))
+                desc.value(self.ns['dcterms'].title, Literal(val, lang="sv"))
             elif key == 'Övrigt':
                 desc.value(self.ns['rdfs'].comment, Literal(val, lang="sv"))
             elif key == 'SFS nr':
@@ -1344,7 +1344,7 @@ class SFS(Trips):
             # urirefs
             elif key == 'Departement/ myndighet':
                 authrec = self.lookup_resource(val)
-                desc.rel(self.ns['dct'].creator, authrec)
+                desc.rel(self.ns['dcterms'].creator, authrec)
             elif (key == 'Ändring införd' and re_sfs(val)):
                 uppdaterad = re_sfs(val).group(1)
                 # not sure we need to add this, since parse_sfsr catches same
@@ -1365,11 +1365,11 @@ class SFS(Trips):
                 self.log.warning(
                     '%s: Obekant nyckel [\'%s\']' % (self.id, key))
 
-        desc.value(self.ns['dct'].identifier, identifier)
-        desc.rel(self.ns['dct'].publisher,
+        desc.value(self.ns['dcterms'].identifier, identifier)
+        desc.rel(self.ns['dcterms'].publisher,
                  self.lookup_resource("Regeringskansliet"))
 
-        if not desc.getvalue(self.ns['dct'].title):
+        if not desc.getvalue(self.ns['dcterms'].title):
             self.log.warning("%s: Rubrik saknas" % self.id)
 
     def makeForfattning(self):
@@ -2463,7 +2463,7 @@ class SFS(Trips):
         stuff = {}
         # 1. all rinfo:Rattsfallsreferat that has baseuri as a
         # rinfo:lagrum, either directly or through a chain of
-        # dct:isPartOf statements
+        # dcterms:isPartOf statements
         start = time()
         rattsfall = self._store_run_query(
             "sparql/sfs_rattsfallsref.sq", uri=baseuri)
@@ -2512,7 +2512,7 @@ class SFS(Trips):
                 filtered.append(r)
         stuff[baseuri]['rattsfall'] = filtered
 
-        # 2. all law sections that has a dct:references that matches this (using dct:isPartOf).
+        # 2. all law sections that has a dcterms:references that matches this (using dcterms:isPartOf).
         start = time()
         start = time()
         inboundlinks = self._store_run_query(
@@ -2557,7 +2557,7 @@ class SFS(Trips):
         stuff[baseuri]['inboundlinks'] = filtered
 
         # pprint (stuff)
-        # 3. all wikientries that dct:description this
+        # 3. all wikientries that dcterms:description this
         start = time()
         #wikidesc = self._store_run_query("sparql/sfs_wikientries_orig.sq",uri=baseuri)
         #self.log.debug('%s: Orig: Selected %d wiki comments (%.3f sec)', basefile, len(wikidesc), time()-start)
@@ -2615,18 +2615,18 @@ class SFS(Trips):
         # <rdf:Description about="http://rinfo.lagrummet.se/publ/sfs/1998:204#P1">
         #     <rinfo:isLagrumFor>
         #       <rdf:Description about="http://rinfo.lagrummet.se/publ/dom/rh/2004:51">
-        #           <dct:identifier>RH 2004:51</dct:identifier>
-        #           <dct:description>Hemsida på Internet. Fråga om...</dct:description>
+        #           <dcterms:identifier>RH 2004:51</dcterms:identifier>
+        #           <dcterms:description>Hemsida på Internet. Fråga om...</dcterms:description>
         #       </rdf:Description>
         #     </rinfo:isLagrumFor>
-        #     <dct:description>Personuppgiftslagens syfte är att skydda...</dct:description>
+        #     <dcterms:description>Personuppgiftslagens syfte är att skydda...</dcterms:description>
         #     <rinfo:isChangedBy>
         #        <rdf:Description about="http://rinfo.lagrummet.se/publ/sfs/2003:104">
-        #           <dct:identifier>SFS 2003:104</dct:identifier>
+        #           <dcterms:identifier>SFS 2003:104</dcterms:identifier>
         #           <rinfo:proposition>
         #             <rdf:Description about="http://rinfo.lagrummet.se/publ/prop/2002/03:123">
-        #               <dct:title>Översyn av personuppgiftslagen</dct:title>
-        #               <dct:identifier>Prop. 2002/03:123</dct:identifier>
+        #               <dcterms:title>Översyn av personuppgiftslagen</dcterms:title>
+        #               <dcterms:identifier>Prop. 2002/03:123</dcterms:identifier>
         #             </rdf:Description>
         #           </rinfo:proposition>
         #        </rdf:Description>
@@ -2653,10 +2653,10 @@ class SFS(Trips):
                     rattsfall_node = etree.SubElement(
                         islagrumfor_node, "rdf:Description")
                     rattsfall_node.set("rdf:about", r['uri'])
-                    id_node = etree.SubElement(rattsfall_node, "dct:identifier")
+                    id_node = etree.SubElement(rattsfall_node, "dcterms:identifier")
                     id_node.text = r['id']
                     desc_node = etree.SubElement(
-                        rattsfall_node, "dct:description")
+                        rattsfall_node, "dcterms:description")
                     desc_node.text = r['desc']
             if 'inboundlinks' in stuff[l]:
                 inbound = stuff[l]['inboundlinks']
@@ -2669,9 +2669,9 @@ class SFS(Trips):
                         (uri, fragment) = (inbound[i]['uri'], None)
 
                     # 1) if the baseuri differs from the previous one,
-                    # create a new dct:references node
+                    # create a new dcterms:references node
                     if uri != prev_uri:
-                        references_node = etree.Element("dct:references")
+                        references_node = etree.Element("dcterms:references")
                         # 1.1) if the baseuri is the same as the uri
                         # for the law we're generating, place it first
                         if uri == baseuri:
@@ -2688,7 +2688,7 @@ class SFS(Trips):
 
                     # If uri is the same as the next one OR uri is the
                     # same as baseuri, use relative form for creating
-                    # dct:identifier
+                    # dcterms:identifier
                     # print "uri: %s, next_uri: %s, baseuri: %s" %
                     # (uri[35:],next_uri[35:],baseuri[35:])
                     if (uri == next_uri) or (uri == baseuri):
@@ -2699,7 +2699,7 @@ class SFS(Trips):
                     inbound_node = etree.SubElement(
                         references_node, "rdf:Description")
                     inbound_node.set("rdf:about", inbound[i]['uri'])
-                    id_node = etree.SubElement(inbound_node, "dct:identifier")
+                    id_node = etree.SubElement(inbound_node, "dcterms:identifier")
                     id_node.text = self.display_title(inbound[i]['uri'], form)
 
                     prev_uri = uri
@@ -2713,7 +2713,7 @@ class SFS(Trips):
                     id_node = etree.SubElement(ischanged_node, "rinfo:fsNummer")
                     id_node.text = r['id']
             if 'desc' in stuff[l]:
-                desc_node = etree.SubElement(lagrum_node, "dct:description")
+                desc_node = etree.SubElement(lagrum_node, "dcterms:description")
                 xhtmlstr = "<xht2:div xmlns:xht2='%s'>%s</xht2:div>" % (
                     util.ns['xht2'], stuff[l]['desc'])
                 xhtmlstr = xhtmlstr.replace(
@@ -2803,8 +2803,8 @@ class SFS(Trips):
             if parts['law'] not in self._document_name_cache:
                 baseuri = legaluri.construct({'type': LegalRef.LAGRUM,
                                               'law': parts['law']})
-                sq = """PREFIX dct:<http://purl.org/dc/terms/>
-                        SELECT ?title WHERE {<%s> dct:title ?title }""" % baseuri
+                sq = """PREFIX dcterms:<http://purl.org/dc/terms/>
+                        SELECT ?title WHERE {<%s> dcterms:title ?title }""" % baseuri
                 changes = self._store_select(sq)
                 if changes:
                     self._document_name_cache[parts[
@@ -2835,7 +2835,7 @@ class SFS(Trips):
         return basefile
 
     def _indexpages_predicates(self):
-        return [util.ns['dct'] + "title",
+        return [util.ns['dcterms'] + "title",
                 util.ns['rinfo'] + 'fsNummer',
                 util.ns['rdf'] + 'type',
                 util.ns['rinfo'] + 'KonsolideradGrundforfattning']
@@ -2845,7 +2845,7 @@ class SFS(Trips):
         pagetitles = {}
         pagelabels = {}
         fsnr_pred = util.ns['rinfo'] + 'fsNummer'
-        title_pred = util.ns['dct'] + 'title'
+        title_pred = util.ns['dcterms'] + 'title'
         type_pred = util.ns['rdf'] + 'type'
         type_obj = util.ns['rinfo'] + 'KonsolideradGrundforfattning'
         year_lbl = 'Ordnade efter utgivningsår'
@@ -2953,7 +2953,7 @@ class SFS(Trips):
 
             if change != bases[0]:
                 for e in ids['L' + change].findall(".//{http://www.w3.org/2002/06/xhtml2/}dd"):
-                    if 'property' in e.attrib and e.attrib['property'] == 'dct:title':
+                    if 'property' in e.attrib and e.attrib['property'] == 'dcterms:title':
                         title = e.text
             else:
                 title = tree.find(

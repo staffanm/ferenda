@@ -10,7 +10,7 @@ import locale
       xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:schemaLocation="http://www.w3.org/2002/06/xhtml2/ http://www.w3.org/MarkUp/SCHEMA/xhtml2.xsd"
-      xmlns:dct="http://purl.org/dc/terms/"
+      xmlns:dcterms="http://purl.org/dc/terms/"
       xmlns:xi="http://www.w3.org/2001/XInclude"
       xml:lang="sv"
       xmlns:py="http://genshi.edgewall.org/"
@@ -32,7 +32,7 @@ import locale
       </py:for>
     </div>
     <div role="main" py:choose="">
-      <h property="dct:title" py:content="title">Defaulttitel</h>
+      <h property="dcterms:title" py:content="title">Defaulttitel</h>
       <py:when test="isinstance(documents[currentcategory][currentpage], list)">
 	<ul>
 	  <py:for each="document in sorted(documents[currentcategory][currentpage], docsorter, key=itemgetter('sortkey'))">

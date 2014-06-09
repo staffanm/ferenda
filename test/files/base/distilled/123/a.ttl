@@ -1,24 +1,24 @@
 @prefix bibo: <http://purl.org/ontology/bibo/> .
-@prefix dct: <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://example.org/base/123/a> a bibo:Standard;
-    dct:title "Example"@en;
-    dct:identifier "123(A)";
-    dct:issued "2014-01-04"^^xsd:date;
-    dct:publisher <http://example.org/publisher/A> .
+    dcterms:title "Example"@en;
+    dcterms:identifier "123(A)";
+    dcterms:issued "2014-01-04"^^xsd:date;
+    dcterms:publisher <http://example.org/publisher/A> .
     
 <http://example.org/base/123/a#S1> a bibo:DocumentPart;
-    dct:isPartOf <http://example.org/base/123/a>;
-    dct:title "Introduction"@en;
-    dct:identifier "123(A)¶1" .
+    dcterms:isPartOf <http://example.org/base/123/a>;
+    dcterms:title "Introduction"@en;
+    dcterms:identifier "123(A)¶1" .
 
 <http://example.org/base/123/a#S1.1> a bibo:DocumentPart;
-    dct:isPartOf <http://example.org/base/123/a#S1>;
-    dct:title "Requirements Language"@en;
-    dct:identifier "123(A)¶1.1" .
+    dcterms:isPartOf <http://example.org/base/123/a#S1>;
+    dcterms:title "Requirements Language"@en;
+    dcterms:identifier "123(A)¶1.1" .
 
 <http://example.org/base/123/a#S2> a bibo:DocumentPart;
-    dct:isPartOf <http://example.org/base/123/a>;
-    dct:title "Definitions and Abbreviations"@en;
-    dct:identifier "123(A)¶2" .
+    dcterms:isPartOf <http://example.org/base/123/a>;
+    dcterms:title "Definitions and Abbreviations"@en;
+    dcterms:identifier "123(A)¶2" .
