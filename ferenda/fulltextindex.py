@@ -278,6 +278,11 @@ class Resource(IndexedType):
     # eg. a particular object/subject with it's own rdfs:label,
     # foaf:name, skos:prefLabel etc
 
+class Resources(IndexedType):
+    """A a list of :py:class:`Resources`"""
+    pass # implement most of list? ferenda.Keywords worked fine without though.
+
+
 class SearchModifier(object):
     def __init__(self, *values):
         self.values = values

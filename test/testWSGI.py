@@ -9,18 +9,20 @@ manager.setup_logger('CRITICAL')
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
 from io import BytesIO
-import shutil
 import codecs
 import json
+import shutil
 
-from rdflib import Graph
 from lxml import etree
+from rdflib import Graph, Namespace
+from rdflib.namespace import RDF, DC
+from rdflib.namespace import DCTERMS as DCT
+SCHEMA = Namespace("http://schema.org/")
 
-from ferenda.testutil import RepoTester
-from ferenda import manager
-from ferenda import DocumentRepository, FulltextIndex
-from ferenda import util
+from ferenda import DocumentRepository, Facet
+from ferenda import manager, util, fulltextindex
 from ferenda.elements import html
+from ferenda.testutil import RepoTester
 
 # tests the wsgi app in-process, ie not with actual HTTP requests, but
 # simulates what make_server().serve_forever() would send and
@@ -150,7 +152,7 @@ class API(WSGI):
                   'duration': None,
                   'items': [],
                   'itemsPerPage': 10,
-                  'startIndex': -10,
+                  'startIndex': -10, # Hmm, probably not correct
                   'totalResults': 0}
         self.assertEqual(want, got)
         
@@ -563,3 +565,99 @@ class Search(WSGI):
         pager = t.find(".//div[@class='pager']")
         self.assertEqual(4,len(pager))
         self.assertEqual('Results 21-25 of 25',pager[0].text)
+
+
+#================================================================
+# AdvancedAPI test case
+#        
+# This advaced API test framework uses three docrepos. Each docrepo is
+# slightly different in what kind of documents it contains and which
+# metadata is stored about each one. (This setup is similar to
+# integrationFulltextIndex and the DocRepo1/DocRepo2 , but, you know,
+# different...)
+
+class DocRepo1(DocumentRepository):
+    # this has the default set of facets (rdf:type, dct:title,
+    # dct:publisher, dct:issued) and a number of documents such as
+    # each bucket in the facet has 2-1-1 facet values
+    # 
+    #   rdf:type         dct:title       dct:publisher dct:issued
+    # A ex:MainType     "A simple doc"   ex:publ1      2012-04-01
+    # B ex:MainType     "Other doc"      ex:publ2      2013-06-06
+    # C ex:OtherType    "More docs"      ex:publ2      2014-05-06
+    # D ex:YetOtherType "Another doc"    ex:publ3      2014-09-23
+    alias = "repo1"
+
+class DocRepo2(DocumentRepository):
+    # this repo contains facets that excercize all kinds of fulltext.IndexedType objects
+    alias = "repo2"
+    def facets():
+        return [Facet(RDF.type),       # fulltextindex.URI
+                Facet(DCT.title),      # fulltextindex.Text(boost=4)
+                Facet(DCT.identifier), # fulltextindex.Label(boost=16)
+                Facet(DCT.issued),     # fulltextindex.Datetime()
+                Facet(DCT.publisher),  # fulltextindex.Resource()
+                Facet(DC.subject),     # fulltextindex.Keywords()
+                Facet(SCHEMA.free)     # fulltextindex.Boolean()
+                ]
+
+class DocRepo3(DocumentRepository):
+    # this repo contains custom facets with custom selectors/keys,
+    # unusual predicates like DC.publisher, and non-standard
+    # configuration like a title not used for toc (and toplevel only)
+    # or DCT.creator for each subsection, or DCT.publisher w/ multiple=True
+    alias = "repo3"
+    def my_id_selector(self, row, binding, graph):
+        # categorize each ID after the number of characters in it
+        return str(len(row[binding]))
+
+    def lexicalkey(self, row, binding): # , graph
+        return "".join(row[binding].lower().split())
+    
+    def facets(self):
+        return [Facet(DC.publisher),
+                Facet(DCT.issued, indexingtype=fulltextindex.Label()),
+                Facet(DCT.rightsHolder, indexingtype=fulltextindex.Resources(), multiple_values=True),
+                Facet(DCT.title, toplevel_only=True),
+                Facet(DCT.identifer, selector=self.my_id_selector(), key=self.lexicalkey, label="IDs having %(selected) characters"),
+                Facet(DC.creator, toplevel_only=False)]
+
+
+class AdvancedAPI(WSGI):
+
+    ts_type = 'FUSEKI'
+    ts_location = 'http://localhost:3030/'
+    ts_repository = 'ds'
+    ft_type = 'ELASTICSEARCH'
+    ft_location = 'http://localhost:9200'
+    ft_repos = (DocRepo1(), DocRepo2(), DocRepo3())
+
+    def put_files_in_place(self):
+        for repoclass in DocRepo1, DocRepo2, DocRepo3:
+            repo = repoclass(datadir = self.datadir)
+            for basefile in "a", "b", "c", "d":
+                util.ensure_dir(repo.store.parsed_path(basefile))
+                # Put files in place: parsed
+                parsed_path = "test/files/testrepos/%s/parsed/%s.xhtml" % (repo.alias, basefile)
+                shutil.copy2(parsed_path, self.repo.store.parsed_path(basefile))
+
+                # FIXME: This distilling code is copied from
+                # decorators.render -- should perhaps move to a
+                # DocumentRepository method like render_xhtml
+                distilled_graph = Graph()
+                with codecs.open(repo.store.parsed_path(basefile),
+                                 encoding="utf-8") as fp:  # unicode
+                    distilled_graph.parse(data=fp.read(), format="rdfa",
+                                          publicID=repo.canonical_uri(basefile))
+                distilled_graph.bind("dc", URIRef("http://purl.org/dc/elements/1.1/"))
+                distilled_graph.bind("dct", URIRef("http://example.org/this-prefix-should-not-be-used"))
+                util.ensure_dir(self.store.distilled_path(doc.basefile))
+                with open(self.store.distilled_path(doc.basefile),
+                          "wb") as distilled_file:
+                    distilled_graph.serialize(distilled_file, format="pretty-xml")
+
+                # finally index all the data into the triplestore/fulltextindex
+                repo.relate(basefile)
+
+    #def test_basic(self):
+    #    pass

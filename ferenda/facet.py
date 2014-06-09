@@ -1,6 +1,7 @@
-from rdflib import URIRef
+from rdflib import URIRef, Namespace
 from rdflib.namespace import RDF, RDFS, DC, SKOS
 from rdflib.namespace import DCTERMS as DCT
+SCHEMA = Namespace("http://schema.org/")
 
 from ferenda import fulltextindex # to get the IndexedType classes
 
@@ -31,7 +32,7 @@ class Facet(object):
     @staticmethod
     def resourcelabel(row, binding='dcterms_publisher', resourcegraph=None):
         uri = URIRef(row[binding])
-        for pred in (rdfs.label, skos.prefLabel, skos.altLabel, dct.title, dct.alternative):
+        for pred in (RDFS.label, SKOS.prefLabel, SKOS.altLabel, DCT.title, DCT.alternative):
             if resourcegraph.value(uri, pred):
                 return str(resourcegraph.value(uri, pred))
         else:
@@ -54,8 +55,6 @@ class Facet(object):
                     'use_for_toc': True, 
                     'selector': firstletter,
                     'key': titlesortkey,
-                    'selector_descending': False,
-                    'key_descending': False
                 },
                 DCT.identifier: {
                     'indextype': fulltextindex.Label(boost=16),
@@ -63,8 +62,6 @@ class Facet(object):
                     'use_for_toc': True, 
                     'selector': firstletter,
                     'key': titlesortkey,
-                    'selector_descending': False,
-                    'key_descending': False
                 },
                 DCT.abstract: {
                     'indextype': fulltextindex.Text(boost=2),
@@ -77,17 +74,13 @@ class Facet(object):
                     'use_for_toc': True,
                     'selector': firstletter,
                     'key': titlesortkey,
-                    'selector_descending': False,
-                    'key_descending': False
                 },
-                DC.publisher:{
+                DCT.publisher:{
                     'indextype': fulltextindex.Resource(),
                     'toplevel_only': True,
                     'use_for_toc': True,
                     'selector': firstletter,
                     'key': sortresource,
-                    'selector_descending': False,
-                    'key_descending': False
                 },
                 DC.issued:{
                     'indextype': fulltextindex.Datetime(),
@@ -97,6 +90,29 @@ class Facet(object):
                     'key': defaultselector,
                     'selector_descending': True,
                     'key_descending': True
+                },
+                DC.subject: {
+                    'indextype': fulltextindex.Keywords(),  # eg. one or more string literals (not URIRefs),
+                    'multiple_values': True,
+                    'toplevel_only': True,
+                    'use_for_toc': True,
+                    'selector': defaultselector, # probably needs changing
+                    'key': defaultselector,
+                },
+                DCT.subject: {
+                    'indextype': fulltextindex.Resources(),  # eg. one or more URIRefs + labels
+                    'multiple_values': True,
+                    'toplevel_only': True,
+                    'use_for_toc': True,
+                    'selector': defaultselector, # probably needs changing
+                    'key': defaultselector,
+                },
+                SCHEMA.free: { # "A flag to signal that the publication is accessible for free."
+                    'indextype': fulltextindex.Boolean(),
+                    'toplevel_only': True,
+                    'use_for_toc': True,
+                    'selector': defaultselector,
+                    'key': defaultselector,
                 }
             }
     # formatting directives for label/pagetitle:
@@ -169,7 +185,9 @@ class Facet(object):
     # if the rdftype is dct:publisher, dct:creator, dct:subject, the indexingtype SHOULD be fulltextindex.Resource 
     #    (ie the triple should be a URIRef, not Literal, and we store both resource IRI and label)
     # if we can only get Literals, use dc:publisher, dc:creator, dc:subject.
-           
+
+    # at least for some facets (dct:subject, dct:creator), multiple
+    # values must be permitted. 
    
 
 # should/must work for
