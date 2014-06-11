@@ -210,19 +210,21 @@ class CustomIndex(object):
         # directly from our definitions, not reverse-engineerded from
         # a Whoosh index on-disk) is useful for eg creating dynamic
         # search forms
-        self.assertEqual({'uri':Identifier(),
-                          'repo':Label(),
-                          'basefile':Label(),
-                          'title':Text(boost=4),
-                          'identifier':Label(boost=16),
-                          'text':Text(),
-                          'issued':Datetime(),
-                          'publisher':Resource(),
-                          'abstract': Text(boost=2),
-                          'category': Keywords(),
-                          'secret': Boolean(),
-                          'references': URI(),
-                          'category': Keywords()}, self.index.schema())
+        self.assertEqual({
+            'abstract': Text(boost=2),
+            'basefile':Label(),
+            'category': Keywords(),
+            'identifier':Label(boost=16),
+            'issued':Datetime(),
+            'publisher':Resource(),
+            'rdftype': Label(),
+            'references': URI(),
+            'repo':Label(),
+            'secret': Boolean(),
+            'text':Text(),
+            'title':Text(boost=4),
+            'uri':Identifier(),
+        }, self.index.schema())
 
     def test_insert(self):
         self.index.update(**custom_dataset[0]) # repo1

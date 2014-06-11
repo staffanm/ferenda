@@ -13,6 +13,7 @@ from .fsmparser import FSMParser
 from .tocpageset import TocPageset
 from .tocpage import TocPage
 from .toccriteria import TocCriteria
+from .facet import Facet
 from .newscriteria import NewsCriteria
 from .transformer import Transformer
 from .document import Document
@@ -21,6 +22,5 @@ from .documentstore import DocumentStore
 from .documentrepository import DocumentRepository
 from .pdfdocumentrepository import PDFDocumentRepository
 from .compositerepository import CompositeRepository, CompositeStore
-from .facet import Facet
 # when REST API lands, we update to dev2
 __version__ = "0.2.0.dev2" #gets pulled into setup.py and docs/conf.py

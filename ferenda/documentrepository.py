@@ -39,11 +39,11 @@ from six.moves.urllib_parse import quote
 
 # mine
 import ferenda
-from ferenda import util, errors, decorators
+from ferenda import util, errors, decorators, fulltextindex
 
 from ferenda import (Describer, LayeredConfig, TripleStore, FulltextIndex,
                      Document, DocumentEntry, NewsCriteria, TocCriteria,
-                     TocPageset, TocPage, DocumentStore, Transformer)
+                     TocPageset, TocPage, DocumentStore, Transformer, Facet)
 from ferenda.elements import (AbstractElement, serialize, Body, Nav, Link,
                               Section, Subsection, Subsubsection, Heading,
                               UnorderedList, ListItem, Preformatted, Paragraph)
@@ -1545,50 +1545,82 @@ parsed document path to that documents dependency file."""
             tree = etree.parse(self.store.parsed_path(basefile))
             g = Graph()
             desc = Describer(g.parse(data=util.readfile(self.store.distilled_path(basefile))))
-            dcterms = self.ns['dcterms']
-            RDF = self.ns['rdf']
+            qname_graph = self.make_graph()
             body = tree.find(".//{http://www.w3.org/1999/xhtml}body")
+            common_graph = self.commondata
             for resource in [body] + body.findall(".//*[@about]"):
                 if resource.tag == "{http://www.w3.org/1999/xhtml}head":
                     continue
                 about = resource.get('about')
                 if isinstance(about, bytes):  # happens under py2
                     about = about.decode()    # pragma: no cover
-                desc.about(about)
+                desc.about(about) 
                 repo = self.alias
                 if isinstance(repo, bytes):  # again, py2
                     repo = repo.decode()     # pragma: no cover
                 plaintext = self._extract_plaintext(resource)
-                l = desc.getvalues(dcterms.title)
-                title = str(l[0]) if l else None
-                l = desc.getvalues(dcterms.identifier)
-                identifier = str(l[0]) if l else None
-                l = desc.getrels(RDF.type)
-                rdftype = str(l[0]) if l else None
+
+                kwargs = {}
+                for facet in self.facets():
+                    if facet.toplevel_only and resource != body:
+                        continue
+                        
+                    # facets don't tell whether their sought subjects
+                    # are URIRefs or Literals. Look for both.
+                    v = desc.getrels(facet.rdftype)
+                    if isinstance(facet.indexingtype,
+                                  (fulltextindex.Resource, fulltextindex.Resources)):
+                        newv = []
+                        for value in v:
+                            # abuse the resourcelabel func a little
+                            label = facet.resourcelabel({None:value}, None, common_graph)
+                            newv.append({'uri': value,
+                                         'label': label})
+                        v = newv
+                    elif not v:
+                        v = desc.getvalues(facet.rdftype)
+                        
+                    if v:
+                        if facet.multiple_values:
+                            v = v
+                        elif len(v) > 1:
+                            self.log.warning("%s (%s/%s) had multiple values for %s but multiple_values was not specified, randomly selecting one" % (about, repo, basefile, facet.rdftype))
+                            v = v[0]
+                        else:
+                            v = v[0]
+                        k = qname_graph.qname(facet.rdftype).replace(":", "_")
+                        kwargs[k] = v
+                    
                 indexer.update(uri=about,
                                repo=repo,
-                               rdftype=rdftype,
                                basefile=basefile,
-                               title=title,
-                               identifier=identifier,
-                               text=plaintext)
-                # publisher Resource
-                # issued datetime
-                # subject Resource
+                               text=plaintext,
+                               **kwargs)
                 values['resources'] += 1
                 values['words'] += len(plaintext.split())
 
             indexer.commit()  # NB: Destroys indexer._writer
 
-    def get_indexed_properties(self):
-        """Returns any extra properties that should be indexed by
-        fulltextindex 
-        eg. {"publisher": fulltextindex.Resource,
-             "issued": fulltextindex.Datetime, 
-             "subject": fulltextindex.Label
-            } # or .Resource
-        """
-        return {}
+#    This was not a good idea
+#
+#    def get_indexed_properties(self):
+#        """Returns any extra properties that should be indexed by
+#        fulltextindex 
+#        eg. {"publisher": fulltextindex.Resource,
+#             "issued": fulltextindex.Datetime, 
+#             "subject": fulltextindex.Label
+#            } # or .Resource
+#        """
+#        return {}
+
+# eventually, this will replace toc_predicates/toc_criteria
+    def facets(self): 
+        return [Facet(RDF.type),           
+                Facet(DCTERMS.title),      
+                Facet(DCTERMS.identifier), 
+                Facet(DCTERMS.issued)
+        ]     
+       
 
     def _extract_plaintext(self, node):
         # helper to extract any text from a elementtree node,

@@ -5,8 +5,7 @@ import json
 import math
 import re
 import shutil
-import sys
-from datetime import datetime, MAXYEAR, MINYEAR
+from datetime import date, datetime, MAXYEAR, MINYEAR
 
 import six
 from six.moves.urllib_parse import quote
@@ -44,16 +43,6 @@ class FulltextIndex(object):
         self.location = location
         if self.exists():
             self.index = self.open()
-            # this idea that there is one, installation-wide, schema,
-            # is wrong and doesn't work nicely with in particular
-            # ES. It might be needed for whoosh, but the base class
-            # shouldn't enforce this. move to Whoosh.
-            
-            # needed_schema = self.make_schema(repos)
-            # existing_schema = self.schema()
-            # if needed_schema != existing_schema:
-            #     # here's where we put clever migration code
-            #     raise errors.SchemaConflictError("The needed schema isn't identical to the existing schema")
         else:
             self.index = self.create(repos)
 
@@ -63,7 +52,23 @@ class FulltextIndex(object):
     def make_schema(self, repos):
         s = self.get_default_schema()
         for repo in repos:
-            for fld, idxtype in repo.get_indexed_properties().items():
+
+            # the .get_indexed_properties method was not a good way
+            # forward.  the new way is to iterate over .facets and
+            # create indextypes from that.
+            
+#            for fld, idxtype in repo.get_indexed_properties().items():
+#                if fld in s:
+#                    # multiple repos can provide the same indexed
+#                    # properties ONLY if the indextype match
+#                    if s[fld] != idxtype:
+#                        raise errors.SchemaConflictError("Repo %s wanted to add a field named %s, but it was already present with a different IndexType" % (repo, fld))
+#                else:
+#                    s[fld] = idxtype
+            g = repo.make_graph() # for qname lookup
+            for facet in repo.facets():
+                fld = g.qname(facet.rdftype).replace(":", "_")
+                idxtype = facet.indexingtype
                 if fld in s:
                     # multiple repos can provide the same indexed
                     # properties ONLY if the indextype match
@@ -76,11 +81,12 @@ class FulltextIndex(object):
     def get_default_schema(self):
         return {'uri': Identifier(),
                 'repo': Label(),
-                'rdftype': Label(),
+                # 'rdftype': Label(),
                 'basefile': Label(),
-                'title': Text(boost=4),
-                'identifier': Label(boost=16),
-                'text': Text()}
+                # 'title': Text(boost=4),
+                # 'identifier': Label(boost=16),
+                'text': Text()
+        }
 
     def exists(self):
         """Whether the fulltext index exists."""
@@ -106,7 +112,7 @@ class FulltextIndex(object):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def update(self, uri, repo, basefile, title, identifier, text, **kwargs):
+    def update(self, uri, repo, basefile, text, **kwargs):
         """Insert (or update) a resource in the fulltext index. A resource may
         be an entire document, but it can also be any part of a
         document that is referenceable (i.e. a document node that has
@@ -403,7 +409,7 @@ class WhooshIndex(FulltextIndex):
             used_schema[fieldname] = self.from_native_field(field_object)
         return used_schema
 
-    def update(self, uri, repo, basefile, title, identifier, text, **kwargs):
+    def update(self, uri, repo, basefile, text, **kwargs):
         if not self._writer:
             self._writer = self.index.writer()
 
@@ -418,8 +424,6 @@ class WhooshIndex(FulltextIndex):
         self._writer.update_document(uri=uri,
                                      repo=repo,
                                      basefile=basefile,
-                                     title=title,
-                                     identifier=identifier,
                                      text=text,
                                      **kwargs)
 
@@ -556,10 +560,9 @@ class RemoteIndex(FulltextIndex):
         return self._decode_schema(res)
 
 
-    def update(self, uri, repo, basefile, title, identifier, text, **kwargs):
+    def update(self, uri, repo, basefile, text, **kwargs):
         relurl, payload = self._update_payload(
-            uri, repo, basefile, title, identifier, text, **kwargs)
-
+            uri, repo, basefile, text, **kwargs)
         # print("update: PUT %s\n%s\n" % (self.location + relurl, payload))
         res = requests.put(self.location + relurl, payload)
         try:
@@ -608,9 +611,9 @@ class ElasticSearchIndex(RemoteIndex):
 
     # maps our field classes to concrete ES field properties
     fieldmapping = ((Identifier(),
-                     {"type": "string", "index": "not_analyzed", "store": True}),  # uri
+                     {"type": "string", "store": True}),  # uri
                     (Label(),
-                     {"type": "string", "index": "not_analyzed"}),  # repo, basefile
+                     {"type": "string"}),  # repo, basefile
                     (Label(boost=16),
                      {"type": "string", "boost": 16.0, "analyzer": "my_analyzer"}),# identifier
                     (Text(boost=4),
@@ -626,6 +629,9 @@ class ElasticSearchIndex(RemoteIndex):
                     (Resource(),
                      {"properties": {"uri": {"type": "string"},
                                      "label": {"type": "string"}}}),
+                    (Resources(),
+                     {"properties": {"uri": {"type": "string"},
+                                     "label": {"type": "string"}}}),
                     (Keywords(),
                      {"type": "string", "index_name": "keyword"}),
                     (URI(),
@@ -634,7 +640,7 @@ class ElasticSearchIndex(RemoteIndex):
 
     
     def _jsondateencoder(self, obj):
-        if isinstance(obj, datetime):
+        if isinstance(obj, (date, datetime)):
             return obj.isoformat()
         else:
             raise TypeError
@@ -650,7 +656,7 @@ class ElasticSearchIndex(RemoteIndex):
         else:
             return True
 
-    def _update_payload(self, uri, repo, basefile, title, identifier, text, **kwargs):
+    def _update_payload(self, uri, repo, basefile, text, **kwargs):
         safe = ''
         if six.PY2:
             # urllib.quote in python 2.6 cannot handle unicode values
@@ -671,8 +677,6 @@ class ElasticSearchIndex(RemoteIndex):
             relurl += uri.split("#", 1)[1]
         payload = {"uri": uri,
                    "basefile": basefile,
-                   "title": title,
-                   "identifier": identifier,
                    "text": text}
         payload.update(kwargs)
         return relurl, json.dumps(payload, default=self._jsondateencoder)
@@ -827,9 +831,14 @@ class ElasticSearchIndex(RemoteIndex):
         }
 
         for repo in repos:
+            g = repo.make_graph() # for qname lookup
             es_fields = {}
             schema = self.get_default_schema()
-            schema.update(repo.get_indexed_properties()) # if same keys used, just overwrite
+            for facet in repo.facets():
+                fld = g.qname(facet.rdftype).replace(":", "_")
+                idxtype = facet.indexingtype
+                schema[fld] = idxtype
+
             for key, fieldtype in schema.items():
                 if key == "repo":
                     continue  # not really needed for ES, as type == repo.alias

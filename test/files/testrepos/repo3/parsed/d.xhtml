@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN"
+"http://www.w3.org/MarkUp/DTD/xhtml-rdfa-1.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+      xmlns:dcterms="http://purl.org/dc/terms/"
+      xmlns:dc="http://purl.org/dc/elements/1.1/"
+      xmlns:schema="http://schema.org/"
+      xmlns:ex="http://example.org/vocab/"
+      xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+      xml:lang="en">
+  <head about="http://example.org/repo3/d">
+    <link rel="rdf:type" href="http://example.org/vocab/MainType"/>
+    <title property="dcterms:title">A doc with unusual metadata</title>
+    <meta property="dcterms:issued" content="June 10th, 2014"/>
+    <meta property="dcterms:identifier" content="3D"/>
+    <link rel="dcterms:rightsHolder" href="http://example.org/vocab/company2"/>
+    <link rel="dcterms:rightsHolder" href="http://example.org/vocab/company3"/> <!-- should not have a label -->
+    <meta property="dc:creator" content="Fred Bloggs"/>
+  </head>
+  <body about="http://example.org/repo3/d">
+    <p>This is part of the main document, but not of any sub-resource.</p>
+    <div about="http://example.org/repo3/d#S1">
+      <span property="dc:creator" content="Some O. Guy"/>
+      <span property="dcterms:identifier" content="3D (1)"/>
+      <span property="dcterms:title" content="This title isn't indexed)"/>
+      <p>This is part of a subdocument, that has some unique properties</p>
+    </div>
+  </body>
+</html>

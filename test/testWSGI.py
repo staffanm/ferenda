@@ -14,12 +14,12 @@ import json
 import shutil
 
 from lxml import etree
-from rdflib import Graph, Namespace
+from rdflib import Graph, Namespace, URIRef
 from rdflib.namespace import RDF, DC
 from rdflib.namespace import DCTERMS as DCTERMS
 SCHEMA = Namespace("http://schema.org/")
 
-from ferenda import DocumentRepository, Facet
+from ferenda import DocumentRepository, Facet, FulltextIndex
 from ferenda import manager, util, fulltextindex
 from ferenda.elements import html
 from ferenda.testutil import RepoTester
@@ -29,14 +29,32 @@ from ferenda.testutil import RepoTester
 # recieve. Should be simple enough, yet reasonably realistic, for
 # testing the API.
 class WSGI(RepoTester): # base class w/o tests
+    storetype = 'SQLITE'
+    storelocation = 'data/ferenda.sqlite'
+    storerepository = 'ferenda'
+    indextype = 'WHOOSH'
+    indexlocation = 'data/whooshindex'
     def setUp(self):
         super(WSGI,self).setUp()
+        self.put_files_in_place()
+        # use self.repo (simple testcases) or self.repos (complex
+        # testcases like AdvancedAPI)?
+        if hasattr(self, 'repos'):
+            repos = self.repos
+        else:
+            repos = [self.repo]
         self.app = manager.make_wsgi_app(port=8000,
                                          documentroot=self.datadir,
                                          apiendpoint="/myapi/",
                                          searchendpoint="/mysearch/",
                                          url="http://localhost:8000/",
-                                         repos = [self.repo])
+                                         repos = repos,
+                                         storetype = self.storetype,
+                                         storelocation = self.storelocation,
+                                         storerepository = self.storerepository,
+                                         indextype = self.indextype,
+                                         indexlocation = self.indexlocation
+        )
         self.env = {'HTTP_ACCEPT': 'text/xml, application/xml, application/xhtml+xml, text/html;q=0.9, text/plain;q=0.8, image/png,*/*;q=0.5',
                     'PATH_INFO':   '/',
                     'SERVER_NAME': 'localhost',
@@ -44,7 +62,6 @@ class WSGI(RepoTester): # base class w/o tests
                     'QUERY_STRING': '',
                     'wsgi.url_scheme': 'http'}
 
-        self.put_files_in_place()
 
     def ttl_to_rdf_xml(self, inpath, outpath):
         g = Graph()
@@ -581,21 +598,29 @@ class DocRepo1(DocumentRepository):
     # dcterms:publisher, dcterms:issued) and a number of documents such as
     # each bucket in the facet has 2-1-1 facet values
     # 
-    #   rdf:type         dcterms:title       dcterms:publisher dcterms:issued
-    # A ex:MainType     "A simple doc"   ex:publ1      2012-04-01
-    # B ex:MainType     "Other doc"      ex:publ2      2013-06-06
-    # C ex:OtherType    "More docs"      ex:publ2      2014-05-06
-    # D ex:YetOtherType "Another doc"    ex:publ3      2014-09-23
+    #   rdf:type         dcterms:title   dcterms:publisher dcterms:issued
+    # A ex:MainType     "A simple doc"   ex:publ1          2012-04-01
+    # B ex:MainType     "Other doc"      ex:publ2          2013-06-06
+    # C ex:OtherType    "More docs"      ex:publ2          2014-05-06
+    # D ex:YetOtherType "Another doc"    ex:publ3          2014-09-23
     alias = "repo1"
 
 class DocRepo2(DocumentRepository):
     # this repo contains facets that excercize all kinds of fulltext.IndexedType objects
     alias = "repo2"
-    def facets():
+    namespaces = ['rdf', 'rdfs', 'xsd', 'xsi', 'dcterms', 'dc', 'schema']
+
+    def is_april_fools(self, row, binding):
+        return (len(row[binding]) == 10 and # Full YYYY-MM-DD string
+                row[binding][5:] == "04-01") # 1st of april
+        # this selector sorts into True/False buckets
+        
+    def facets(self):
         return [Facet(RDF.type),       # fulltextindex.URI
                 Facet(DCTERMS.title),      # fulltextindex.Text(boost=4)
                 Facet(DCTERMS.identifier), # fulltextindex.Label(boost=16)
                 Facet(DCTERMS.issued),     # fulltextindex.Datetime()
+                Facet(DCTERMS.issued, selector=self.is_april_fools),     # fulltextindex.Datetime()
                 Facet(DCTERMS.publisher),  # fulltextindex.Resource()
                 Facet(DC.subject),     # fulltextindex.Keywords()
                 Facet(SCHEMA.free)     # fulltextindex.Boolean()
@@ -607,6 +632,8 @@ class DocRepo3(DocumentRepository):
     # configuration like a title not used for toc (and toplevel only)
     # or DCTERMS.creator for each subsection, or DCTERMS.publisher w/ multiple=True
     alias = "repo3"
+    namespaces = ['rdf', 'rdfs', 'xsd', 'xsi', 'dcterms', 'dc', 'schema']
+
     def my_id_selector(self, row, binding, graph):
         # categorize each ID after the number of characters in it
         return str(len(row[binding]))
@@ -615,31 +642,56 @@ class DocRepo3(DocumentRepository):
         return "".join(row[binding].lower().split())
     
     def facets(self):
+        
+        # note that RDF.type is not one of the facets
         return [Facet(DC.publisher),
                 Facet(DCTERMS.issued, indexingtype=fulltextindex.Label()),
                 Facet(DCTERMS.rightsHolder, indexingtype=fulltextindex.Resources(), multiple_values=True),
                 Facet(DCTERMS.title, toplevel_only=True),
-                Facet(DCTERMS.identifer, selector=self.my_id_selector(), key=self.lexicalkey, label="IDs having %(selected) characters"),
+                Facet(DCTERMS.identifer, selector=self.my_id_selector, key=self.lexicalkey, label="IDs having %(selected) characters"),
                 Facet(DC.creator, toplevel_only=False)]
 
 
 class AdvancedAPI(WSGI):
 
-    ts_type = 'FUSEKI'
-    ts_location = 'http://localhost:3030/'
-    ts_repository = 'ds'
-    ft_type = 'ELASTICSEARCH'
-    ft_location = 'http://localhost:9200'
-    ft_repos = (DocRepo1(), DocRepo2(), DocRepo3())
+    storetype = 'FUSEKI'
+    storelocation = 'http://localhost:3030/'
+    storerepository = 'ds'
+    indextype = 'ELASTICSEARCH'
+    indexlocation = 'http://localhost:9200/ferenda/'
+    # repos = (DocRepo1(), DocRepo2(), DocRepo3())
+
+    def setUp(self):
+        try:
+            # the call to put_files_in_place can fail and leave the
+            # ElasticSearch mapping undeleted -- make sure tearDown
+            # runs in this case
+            return super(AdvancedAPI, self).setUp()
+        except:
+            self.tearDown()
+
+
+    def tearDown(self):
+        FulltextIndex.connect(self.indextype, self.indexlocation).destroy()
 
     def put_files_in_place(self):
+        self.repos = []
         for repoclass in DocRepo1, DocRepo2, DocRepo3:
-            repo = repoclass(datadir = self.datadir)
+            repo = repoclass(datadir=self.datadir,
+                             storetype = self.storetype,
+                             storelocation = self.storelocation,
+                             storerepository = self.storerepository,
+                             indextype = self.indextype,
+                             indexlocation = self.indexlocation
+            )
+            self.repos.append(repo)
+
+        for repo in self.repos:
             for basefile in "a", "b", "c", "d":
                 util.ensure_dir(repo.store.parsed_path(basefile))
                 # Put files in place: parsed
                 parsed_path = "test/files/testrepos/%s/parsed/%s.xhtml" % (repo.alias, basefile)
-                shutil.copy2(parsed_path, self.repo.store.parsed_path(basefile))
+                shutil.copy2(parsed_path, repo.store.parsed_path(basefile))
 
                 # FIXME: This distilling code is copied from
                 # decorators.render -- should perhaps move to a
@@ -651,13 +703,45 @@ class AdvancedAPI(WSGI):
                                           publicID=repo.canonical_uri(basefile))
                 distilled_graph.bind("dc", URIRef("http://purl.org/dc/elements/1.1/"))
                 distilled_graph.bind("dcterms", URIRef("http://example.org/this-prefix-should-not-be-used"))
-                util.ensure_dir(self.store.distilled_path(doc.basefile))
-                with open(self.store.distilled_path(doc.basefile),
+                util.ensure_dir(repo.store.distilled_path(basefile))
+                with open(repo.store.distilled_path(basefile),
                           "wb") as distilled_file:
                     distilled_graph.serialize(distilled_file, format="pretty-xml")
-
+                    # print("#======= %s/%s ========" % (repo.alias, basefile))
+                    # print(distilled_graph.serialize(format="turtle").decode())
                 # finally index all the data into the triplestore/fulltextindex
-                repo.relate(basefile)
+                repo.relate(basefile, self.repos)
 
-    #def test_basic(self):
-    #    pass
+
+    def test_indexing(self):
+        # make sure that a given basefile exists in it and exhibits
+        # all expected fields. Also make sure that subparts of indexes
+        # are properly indexed when they should be (and not when they
+        # shouldn't).
+        self.env['PATH_INFO'] = '/myapi/'
+        self.env['QUERY_STRING'] = 'uri=*/repo1/a'
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse("200 OK",
+                            {'Content-Type': 'application/json'},
+                            json.dumps({'hello': 'world'}),
+                            status, headers, content)
+        pass
+
+    def test_faceting(self):
+        # make sure wsgi_stats deliver documents in the buckets we
+        # expect, and that all buckets are there.
+        pass
+
+    def test_query(self):
+        # make sure we can do queries on default and custom facets and
+        # so on. Also make sure _stats=on works.
+        pass
+
+    def test_toc(self):
+        # make sure that toc generates all pagesets and that each page
+        # contains the correct docs in the correct order (in addiction
+        # to what testDocRepo.TOC tests).
+        pass
+        
+
+

@@ -77,6 +77,7 @@ ns = {'dc': 'http://purl.org/dc/elements/1.1/',
       'xhv': 'http://www.w3.org/1999/xhtml/vocab#',
       'prov': 'http://www.w3.org/ns/prov#',
       'bibo': 'http://purl.org/ontology/bibo/',
+      'schema': 'http://schema.org/',
       }
 """A mapping of well-known prefixes and their corresponding namespaces. Includes ``dc``, ``dcterms``, ``rdfs``, ``rdf``, ``skos``, ``xsd``, ``foaf``, ``owl``, ``xhv``, ``prov`` and ``bibo``."""
 

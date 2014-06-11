@@ -1,3 +1,5 @@
+import logging
+
 from rdflib import URIRef, Namespace
 from rdflib.namespace import RDF, RDFS, DC, SKOS
 from rdflib.namespace import DCTERMS as DCTERMS
@@ -46,44 +48,44 @@ class Facet(object):
     # define a number of default values, used if the user does not
     # explicitly specify indexingtype/selector/key
     defaults = {RDF.type: {
-                    'indextype': fulltextindex.URI(),
+                    'indexingtype': fulltextindex.URI(),
                     'toplevel_only': False,
                     'use_for_toc'  : False}, # -> selector etc are irrelevant
                 DCTERMS.title: {
-                    'indextype': fulltextindex.Text(boost=4),
+                    'indexingtype': fulltextindex.Text(boost=4),
                     'toplevel_only': False,
                     'use_for_toc': True, 
                     'selector': firstletter,
                     'key': titlesortkey,
                 },
                 DCTERMS.identifier: {
-                    'indextype': fulltextindex.Label(boost=16),
+                    'indexingtype': fulltextindex.Label(boost=16),
                     'toplevel_only': False,
                     'use_for_toc': True, 
                     'selector': firstletter,
                     'key': titlesortkey,
                 },
                 DCTERMS.abstract: {
-                    'indextype': fulltextindex.Text(boost=2),
+                    'indexingtype': fulltextindex.Text(boost=2),
                     'toplevel_only': True,
                     'use_for_toc': False
                 },
                 DC.creator:{
-                    'indextype': fulltextindex.Label(),
+                    'indexingtype': fulltextindex.Label(),
                     'toplevel_only': True,
                     'use_for_toc': True,
                     'selector': firstletter,
                     'key': titlesortkey,
                 },
                 DCTERMS.publisher:{
-                    'indextype': fulltextindex.Resource(),
+                    'indexingtype': fulltextindex.Resource(),
                     'toplevel_only': True,
                     'use_for_toc': True,
                     'selector': firstletter,
                     'key': sortresource,
                 },
                 DC.issued:{
-                    'indextype': fulltextindex.Datetime(),
+                    'indexingtype': fulltextindex.Datetime(),
                     'toplevel_only': True,
                     'use_for_toc': True,
                     'selector': year,
@@ -92,23 +94,25 @@ class Facet(object):
                     'key_descending': True
                 },
                 DC.subject: {
-                    'indextype': fulltextindex.Keywords(),  # eg. one or more string literals (not URIRefs),
+                    'indexingtype': fulltextindex.Keywords(),  # eg. one or more string literals (not URIRefs),
                     'multiple_values': True,
                     'toplevel_only': True,
                     'use_for_toc': True,
                     'selector': defaultselector, # probably needs changing
                     'key': defaultselector,
+                    'multiple_values': True
                 },
                 DCTERMS.subject: {
-                    'indextype': fulltextindex.Resources(),  # eg. one or more URIRefs + labels
+                    'indexingtype': fulltextindex.Resources(),  # eg. one or more URIRefs + labels
                     'multiple_values': True,
                     'toplevel_only': True,
                     'use_for_toc': True,
                     'selector': defaultselector, # probably needs changing
                     'key': defaultselector,
+                    'multiple_values': True
                 },
                 SCHEMA.free: { # "A flag to signal that the publication is accessible for free."
-                    'indextype': fulltextindex.Boolean(),
+                    'indexingtype': fulltextindex.Boolean(),
                     'toplevel_only': True,
                     'use_for_toc': True,
                     'selector': defaultselector,
@@ -127,13 +131,16 @@ class Facet(object):
                  selector=None,       # - "" -
                  key=None,            # - "" -
                  toplevel_only=None,  # - "" -
-                 use_for_toc=None     # - "" -
+                 use_for_toc=None,     # - "" -
+                 selector_descending = None,
+                 key_descending = None,
+                 multiple_values = None,
              ):
         
         def _finddefault(provided, rdftype, argumenttype, default):
             if provided is None:
                 if rdftype in self.defaults and argumenttype in self.defaults[rdftype]:
-                    return mapping[rdftype][argumenttype]
+                    return self.defaults[rdftype][argumenttype]
                 else:
                     log = logging.getLogger(__name__)
                     log.warning("Cannot map rdftype %s with argumenttype %s, defaulting to %r" %
@@ -146,16 +153,18 @@ class Facet(object):
         self.label = label
         self.pagetitle = pagetitle
         self.indexingtype        = _finddefault(indexingtype, rdftype, 'indexingtype', fulltextindex.Text())
-        self.selector            = _finddefault(selector, rdftype, 'selector', defaultselector)
-        self.key                 = _finddefault(key, rdftype, 'key', defaultselector)
+        self.selector            = _finddefault(selector, rdftype, 'selector', self.defaultselector)
+        self.key                 = _finddefault(key, rdftype, 'key', self.defaultselector)
         self.toplevel_only       = _finddefault(toplevel_only, rdftype, 'toplevel_only', False)
         self.use_for_toc         = _finddefault(use_for_toc, rdftype, 'use_for_toc', False)
         self.selector_descending = _finddefault(selector_descending, rdftype, 'selector_descending', False)
         self.key_descending      = _finddefault(key_descending, rdftype, 'key_descending', False)
+        self.multiple_values     = _finddefault(multiple_values, rdftype, 'multiple_values', False)
 
     # backwards compatibility shim:
     def as_criteria(self):
-        return TocCriteria(util.uri_leaf(str(self.rdftype)),
+        from ferenda.util import uri_leaf
+        return TocCriteria(uri_leaf(str(self.rdftype)),
                            self.label,
                            self.pagetitle,
                            self.selector, # might need to wrap these functions to handle differing arg lists
