@@ -11,8 +11,9 @@ import shutil
 
 import whoosh.index
 import whoosh.fields
+from rdflib.namespace import RDF, DC, DCTERMS
 
-from ferenda import FulltextIndex, DocumentRepository
+from ferenda import FulltextIndex, DocumentRepository, Facet
 from ferenda.fulltextindex import Identifier, Datetime, Text, Label, Keywords, Boolean, URI, Resource, Less, More, Between
 
 #----------------------------------------------------------------
@@ -24,32 +25,32 @@ basic_dataset = [
     {'uri':'http://example.org/doc/1',
      'repo':'base',
      'basefile':'1',
-     'title':'First example',
-     'identifier':'Doc #1',
+     'dcterms_title':'First example',
+     'dcterms_identifier':'Doc #1',
      'text':'This is the main text of the document (independent sections excluded)'},
     {'uri':'http://example.org/doc/1#s1',
      'repo':'base',
      'basefile':'1',
-     'title':'First sec',
-     'identifier':'Doc #1 (section 1)',
+     'dcterms_title':'First sec',
+     'dcterms_identifier':'Doc #1 (section 1)',
      'text':'This is an independent section, with extra section boost'},
     {'uri':'http://example.org/doc/1#s2',
      'repo':'base',
      'basefile':'1',
-     'title':'Second sec',
-     'identifier':'Doc #1 (section 2)',
+     'dcterms_title':'Second sec',
+     'dcterms_identifier':'Doc #1 (section 2)',
      'text':'This is another independent section'},
     {'uri':'http://example.org/doc/1#s1',
      'repo':'base',
      'basefile':'1',
-     'title':'First section',
-     'identifier':'Doc #1 (section 1)',
+     'dcterms_title':'First section',
+     'dcterms_identifier':'Doc #1 (section 1)',
      'text':'This is an (updated version of a) independent section, with extra section boost'},
     {'uri':'http://example.org/doc/2',
      'repo':'base',
      'basefile':'2',
-     'title':'Second document',
-     'identifier':'Doc #2',
+     'dcterms_title':'Second document',
+     'dcterms_identifier':'Doc #2',
      'text':'This is the second document (not the first)'}
     ]
 
@@ -57,57 +58,69 @@ custom_dataset = [
     {'repo':'repo1',
      'basefile':'1',
      'uri':'http://example.org/repo1/1',
-     'title':'Title of first document in first repo',
-     'identifier':'R1 D1',
-     'issued':datetime(2013,2,14,14,6), # important to use real datetime object, not string representation
-     'publisher': {'iri': 'http://example.org/publisher/e',
+     'dcterms_title':'Title of first document in first repo',
+     'dcterms_identifier':'R1 D1',
+     'dcterms_issued':datetime(2013,2,14,14,6), # important to use real datetime object, not string representation
+     'dcterms_publisher': {'iri': 'http://example.org/publisher/e',
                    'label': 'Examples & son'},
-     'category': ['green', 'standards'],
+     'dc_subject': ['green', 'standards'],
      'text': 'Long text here'},
     {'repo':'repo1',
      'basefile':'2',
      'uri':'http://example.org/repo1/2',
-     'title':'Title of second document in first repo',
-     'identifier':'R1 D2',
-     'issued':datetime(2013,3,4,14,16),
-     'publisher': {'iri': 'http://example.org/publisher/e',
+     'dcterms_title':'Title of second document in first repo',
+     'dcterms_identifier':'R1 D2',
+     'dcterms_issued':datetime(2013,3,4,14,16),
+     'dcterms_publisher': {'iri': 'http://example.org/publisher/e',
                    'label': 'Examples & son'},
-     'category': ['suggestions'],
+     'dc_subject': ['suggestions'],
      'text': 'Even longer text here'},
     {'repo':'repo2',
      'basefile':'1',
      'uri':'http://example.org/repo2/1',
-     'title':'Title of first document in second repo',
-     'identifier':'R2 D1',
-     'secret': False,
-     'references':'http://example.org/repo2/2',
-     'category':['green', 'yellow'],
+     'dcterms_title':'Title of first document in second repo',
+     'dcterms_identifier':'R2 D1',
+     'ex_secret': False,
+     'dcterms_references':'http://example.org/repo2/2',
+     'dc_subject':['green', 'yellow'],
      'text': 'All documents must have texts'},
     {'repo':'repo2',
      'basefile':'2',
      'uri':'http://example.org/repo2/2',
-     'title':'Title of second document in second repo',
-     'identifier':'R2 D2',
-     'secret': True,
-     'references': None,
-     'category':['yellow', 'red'],
+     'dcterms_title':'Title of second document in second repo',
+     'dcterms_identifier':'R2 D2',
+     'ex_secret': True,
+     'dcterms_references': None,
+     'dc_subject':['yellow', 'red'],
      'text': 'Even this one'}
     ]
 
 class DocRepo1(DocumentRepository):
     alias = "repo1"
-    def get_indexed_properties(self):
-        return {'issued':Datetime(),
-                'publisher':Resource(),
-                'abstract': Text(boost=2),
-                'category':Keywords()}
+    namespaces = ['rdf', 'rdfs', 'xsd', 'xsi', 'dc', 'dcterms']
+    def facets(self):
+        return [Facet(RDF.type),           
+                Facet(DCTERMS.title),      
+                Facet(DCTERMS.publisher),
+                Facet(DCTERMS.identifier),
+                Facet(DCTERMS.issued),
+                Facet(DCTERMS.publisher),
+                Facet(DCTERMS.abstract),
+                Facet(DC.subject)]
 
 class DocRepo2(DocumentRepository):
     alias = "repo2"
-    def get_indexed_properties(self):
-        return {'secret':Boolean(),   
-                'references': URI(),
-                'category': Keywords()}
+    namespaces = ['rdf', 'rdfs', 'xsd', 'xsi', 'dc', 'dcterms', ('ex', 'http://example.org/vocab/')]
+    def facets(self):
+        EX = self.ns['ex']
+        return [Facet(RDF.type),           
+                Facet(DCTERMS.title),      
+                Facet(DCTERMS.publisher),
+                Facet(DCTERMS.identifier),
+                Facet(DCTERMS.issued),
+                Facet(EX.secret, indexingtype=Boolean()),
+                Facet(DCTERMS.references),
+                Facet(DC.subject)]
 
 #----------------------------------------------------------------
 #
@@ -124,13 +137,17 @@ class BasicIndex(object):
         # setUp calls FulltextIndex.connect, creating the index
         self.assertTrue(self.index.exists())
         # assert that the schema, using our types, looks OK
-        want = {'uri':Identifier(),
-                'rdftype': Label(),
-                'repo':Label(),
-                'basefile':Label(),
-                'title':Text(boost=4),
-                'identifier':Label(boost=16),
-                'text':Text()}
+        want = {
+            'basefile':Label(),
+            'dcterms_identifier':Label(boost=16),
+            'dcterms_issued': Datetime(),
+            'dcterms_publisher':Resource(),
+            'dcterms_title':Text(boost=4),
+            'rdf_type': URI(),
+            'repo':Label(),
+            'text':Text(),
+            'uri':Identifier()
+        }
         got = self.index.schema()
         self.assertEqual(want,got)
 
@@ -163,13 +180,13 @@ class BasicQuery(object):
 
         res, pager = self.index.query("main")
         self.assertEqual(len(res),1)
-        self.assertEqual(res[0]['identifier'], 'Doc #1')
+        self.assertEqual(res[0]['dcterms_identifier'], 'Doc #1')
         self.assertEqual(res[0]['uri'], 'http://example.org/doc/1')
         res, pager = self.index.query("document")
         self.assertEqual(len(res),2)
         # Doc #2 contains the term 'document' in title (which is a
         # boosted field), not just in text.
-        self.assertEqual(res[0]['identifier'], 'Doc #2')
+        self.assertEqual(res[0]['dcterms_identifier'], 'Doc #2')
         res, pager = self.index.query("section")
         # can't get these results when using MockESBasicQuery with
         # CREATE_CANNED=True for some reason...
@@ -178,9 +195,9 @@ class BasicQuery(object):
             # NOTE: ES scores all three results equally (1.0), so it doesn't
             # neccesarily put section 1 in the top
             if isinstance(self, ESBase):
-                self.assertEqual(res[0]['identifier'], 'Doc #1 (section 2)') 
+                self.assertEqual(res[0]['dcterms_identifier'], 'Doc #1 (section 2)') 
             else:
-                self.assertEqual(res[0]['identifier'], 'Doc #1 (section 1)')
+                self.assertEqual(res[0]['dcterms_identifier'], 'Doc #1 (section 1)')
 
 
     def test_fragmented(self):
@@ -188,8 +205,8 @@ class BasicQuery(object):
             {'uri':'http://example.org/doc/3',
              'repo':'base',
              'basefile':'3',
-             'title':'Other example',
-             'identifier':'Doc #3',
+             'dcterms_title':'Other example',
+             'dcterms_identifier':'Doc #3',
              'text':"""Haystack needle haystack haystack haystack haystack
                        haystack haystack haystack haystack haystack haystack
                        haystack haystack needle haystack haystack."""}
@@ -206,23 +223,21 @@ class CustomIndex(object):
     repos = [DocRepo1(), DocRepo2()]
     
     def test_setup(self):
-        # introspecting the schema (particularly if it's derived
-        # directly from our definitions, not reverse-engineerded from
-        # a Whoosh index on-disk) is useful for eg creating dynamic
+        # introspecting the schema - useful for eg creating dynamic
         # search forms
         self.assertEqual({
-            'abstract': Text(boost=2),
             'basefile':Label(),
-            'category': Keywords(),
-            'identifier':Label(boost=16),
-            'issued':Datetime(),
-            'publisher':Resource(),
-            'rdftype': Label(),
-            'references': URI(),
+            'dc_subject': Keywords(),
+            'dcterms_abstract': Text(boost=2),
+            'dcterms_identifier':Label(boost=16),
+            'dcterms_issued':Datetime(),
+            'dcterms_publisher':Resource(),
+            'dcterms_references': URI(),
+            'dcterms_title':Text(boost=4),
+            'ex_secret': Boolean(),
+            'rdf_type': URI(),
             'repo':Label(),
-            'secret': Boolean(),
             'text':Text(),
-            'title':Text(boost=4),
             'uri':Identifier(),
         }, self.index.schema())
 
@@ -252,40 +267,40 @@ class CustomQuery(object):
 
     def test_boolean(self):
         self.load(custom_dataset)
-        res, pager = self.index.query(secret=True)
+        res, pager = self.index.query(ex_secret=True)
         self.assertEqual(len(res),1)
-        self.assertEqual(res[0]['identifier'], 'R2 D2')
-        res, pager = self.index.query(secret=False)
+        self.assertEqual(res[0]['dcterms_identifier'], 'R2 D2')
+        res, pager = self.index.query(ex_secret=False)
         self.assertEqual(len(res),1)
-        self.assertEqual(res[0]['identifier'], 'R2 D1')
+        self.assertEqual(res[0]['dcterms_identifier'], 'R2 D1')
     
     def test_keywords(self):
         self.load(custom_dataset)
-        res, pager = self.index.query(category='green')
+        res, pager = self.index.query(dc_subject='green')
         self.assertEqual(len(res),2)
-        identifiers = set([x['identifier'] for x in res])
+        identifiers = set([x['dcterms_identifier'] for x in res])
         self.assertEqual(identifiers, set(['R1 D1','R2 D1']))
         
     def test_repo_limited_freetext(self):
         self.load(custom_dataset)
         res, pager = self.index.query('first', repo='repo1')
         self.assertEqual(len(res),2)
-        self.assertEqual(res[0]['identifier'], 'R1 D1') # contains the term 'first' twice
-        self.assertEqual(res[1]['identifier'], 'R1 D2') #          -""-             once
+        self.assertEqual(res[0]['dcterms_identifier'], 'R1 D1') # contains the term 'first' twice
+        self.assertEqual(res[1]['dcterms_identifier'], 'R1 D2') #          -""-             once
 
     def test_repo_dateinterval(self):
         self.load(custom_dataset)
 
-        res, pager = self.index.query(issued=Less(datetime(2013,3,1)))
+        res, pager = self.index.query(dcterms_issued=Less(datetime(2013,3,1)))
         self.assertEqual(len(res),1)
-        self.assertEqual(res[0]['identifier'], 'R1 D1') 
+        self.assertEqual(res[0]['dcterms_identifier'], 'R1 D1') 
 
-        res, pager = self.index.query(issued=More(datetime(2013,3,1)))
-        self.assertEqual(res[0]['identifier'], 'R1 D2') 
+        res, pager = self.index.query(dcterms_issued=More(datetime(2013,3,1)))
+        self.assertEqual(res[0]['dcterms_identifier'], 'R1 D2') 
 
-        res, pager = self.index.query(issued=Between(datetime(2013,2,1),datetime(2013,4,1)))
+        res, pager = self.index.query(dcterms_issued=Between(datetime(2013,2,1),datetime(2013,4,1)))
         self.assertEqual(len(res),2)
-        identifiers = set([x['identifier'] for x in res])
+        identifiers = set([x['dcterms_identifier'] for x in res])
         self.assertEqual(identifiers, set(['R1 D1','R1 D2']))
 
 #----------------------------------------------------------------
@@ -294,6 +309,7 @@ class CustomQuery(object):
 # working testcase classes
 
 class ESBase(unittest.TestCase):
+    maxDiff = None
     def setUp(self):
         self.maxDiff = None
         self.location = "http://localhost:9200/ferenda/"
@@ -304,6 +320,7 @@ class ESBase(unittest.TestCase):
 
 
 class WhooshBase(unittest.TestCase):
+    maxDiff = None
     def setUp(self):
         self.location = mkdtemp()
         self.index = FulltextIndex.connect("WHOOSH", self.location, self.repos)
@@ -348,13 +365,17 @@ class WhooshBasicIndex(BasicIndex, WhooshBase):
         # 3. assert that the actual schema with whoosh types is, in
         # fact, correct
         got = self.index.index.schema
-        want = whoosh.fields.Schema(uri=whoosh.fields.ID(unique=True, stored=True),
-                                    repo=whoosh.fields.ID(stored=True),
-                                    basefile=whoosh.fields.ID(stored=True),
-                                    rdftype=whoosh.fields.ID(stored=True),
-                                    title=whoosh.fields.TEXT(field_boost=4,stored=True),
-                                    identifier=whoosh.fields.ID(field_boost=16,stored=True),
-                                    text=whoosh.fields.TEXT(stored=True))
+        want = whoosh.fields.Schema(
+            basefile=whoosh.fields.ID(stored=True),
+            dcterms_identifier=whoosh.fields.ID(field_boost=16,stored=True),
+            dcterms_issued=whoosh.fields.DATETIME(stored=True),
+            dcterms_publisher=whoosh.fields.IDLIST(stored=True),
+            dcterms_title=whoosh.fields.TEXT(field_boost=4,stored=True),
+            rdf_type=whoosh.fields.ID(stored=True, field_boost=1.1), # corresponds to URI not Label
+            repo=whoosh.fields.ID(stored=True),
+            text=whoosh.fields.TEXT(stored=True),
+            uri=whoosh.fields.ID(unique=True, stored=True)
+        )
         self.assertEqual(sorted(want.names()), sorted(got.names()))
         for fld in got.names():
             self.assertEqual((fld,want[fld]),(fld,got[fld]))

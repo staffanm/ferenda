@@ -604,8 +604,33 @@ class DocRepo1(DocumentRepository):
     # C ex:OtherType    "More docs"      ex:publ2          2014-05-06
     # D ex:YetOtherType "Another doc"    ex:publ3          2014-09-23
     alias = "repo1"
+    @property
+    def commondata(self):
+        return Graph().parse(format="turtle", data="""
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
 
-class DocRepo2(DocumentRepository):
+<http://example.org/vocab/publ1> a foaf:Organization ;
+    rdfs:label "Publishing & sons"@en .
+<http://example.org/vocab/publ2> a foaf:Organization ;
+    skos:prefLabel "Bookprinters and associates"@en .
+<http://example.org/vocab/publ3> a foaf:Organization ;
+    skos:altLabel "BP&A"@en .
+<http://example.org/vocab/publ4> a foaf:Organization ;
+    dcterms:title "A title is not really a name for an org"@en .
+<http://example.org/vocab/company1> a foaf:Organization ;
+    dcterms:alternative "Comp Inc"@en .
+<http://example.org/vocab/company2> a foaf:Organization ;
+    foaf:name "Another company"@en .
+#company3 has no label
+#<http://example.org/vocab/company3> a foaf:Organization ;
+#    foaf:name "A third company"@en .
+        """)
+        
+
+class DocRepo2(DocRepo1):
     # this repo contains facets that excercize all kinds of fulltext.IndexedType objects
     alias = "repo2"
     namespaces = ['rdf', 'rdfs', 'xsd', 'xsi', 'dcterms', 'dc', 'schema']
@@ -626,7 +651,7 @@ class DocRepo2(DocumentRepository):
                 Facet(SCHEMA.free)     # fulltextindex.Boolean()
                 ]
 
-class DocRepo3(DocumentRepository):
+class DocRepo3(DocRepo1):
     # this repo contains custom facets with custom selectors/keys,
     # unusual predicates like DC.publisher, and non-standard
     # configuration like a title not used for toc (and toplevel only)
@@ -640,7 +665,7 @@ class DocRepo3(DocumentRepository):
 
     def lexicalkey(self, row, binding): # , graph
         return "".join(row[binding].lower().split())
-    
+
     def facets(self):
         
         # note that RDF.type is not one of the facets

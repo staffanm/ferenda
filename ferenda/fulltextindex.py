@@ -611,9 +611,9 @@ class ElasticSearchIndex(RemoteIndex):
 
     # maps our field classes to concrete ES field properties
     fieldmapping = ((Identifier(),
-                     {"type": "string", "store": True}),  # uri
+                     {"type": "string", "index": "not_analyzed", "store": True}),  # uri
                     (Label(),
-                     {"type": "string"}),  # repo, basefile
+                     {"type": "string", "index": "not_analyzed", }),  # repo, basefile
                     (Label(boost=16),
                      {"type": "string", "boost": 16.0, "analyzer": "my_analyzer"}),# identifier
                     (Text(boost=4),
@@ -679,10 +679,9 @@ class ElasticSearchIndex(RemoteIndex):
                    "basefile": basefile,
                    "text": text}
         payload.update(kwargs)
-        return relurl, json.dumps(payload, default=self._jsondateencoder)
+        return relurl, json.dumps(payload, default=self._jsondateencoder, indent=4)
 
     def _query_payload(self, q, pagenum=1, pagelen=10, **kwargs):
-
         relurl = "_search?from=%s&size=%s" % ((pagenum - 1) * pagelen, pagelen)
 
         # 1: Filter on all specified fields
@@ -727,13 +726,13 @@ class ElasticSearchIndex(RemoteIndex):
         else:
             query = {"match": match}
             
-        payload = {'query': query,
-                   'highlight': {'fields': {'text': {}},
-                                 'pre_tags': ["<strong class='match'>"],
-                                 'post_tags': ["</strong>"],
-                                 'fragment_size': '40'}
-        }
-        # return relurl, json.dumps(payload, indent=4)
+        payload = {'query': query}
+        if q:
+            payload['highlight'] = {'fields': {'text': {}},
+                                    'pre_tags': ["<strong class='match'>"],
+                                    'post_tags': ["</strong>"],
+                                    'fragment_size': '40'}
+        
         return relurl, json.dumps(payload, indent=4, default=self._jsondateencoder)
 
     def _decode_query_result(self, response, pagenum, pagelen):

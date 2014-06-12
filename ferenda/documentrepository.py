@@ -1617,7 +1617,8 @@ parsed document path to that documents dependency file."""
     def facets(self): 
         return [Facet(RDF.type),           
                 Facet(DCTERMS.title),      
-                Facet(DCTERMS.identifier), 
+                Facet(DCTERMS.publisher),
+                Facet(DCTERMS.identifier),
                 Facet(DCTERMS.issued)
         ]     
        

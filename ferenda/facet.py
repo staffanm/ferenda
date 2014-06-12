@@ -1,8 +1,7 @@
 import logging
 
 from rdflib import URIRef, Namespace
-from rdflib.namespace import RDF, RDFS, DC, SKOS
-from rdflib.namespace import DCTERMS as DCTERMS
+from rdflib.namespace import RDF, RDFS, DC, SKOS, FOAF, DCTERMS
 SCHEMA = Namespace("http://schema.org/")
 
 from ferenda import fulltextindex # to get the IndexedType classes
@@ -34,7 +33,7 @@ class Facet(object):
     @staticmethod
     def resourcelabel(row, binding='dcterms_publisher', resourcegraph=None):
         uri = URIRef(row[binding])
-        for pred in (RDFS.label, SKOS.prefLabel, SKOS.altLabel, DCTERMS.title, DCTERMS.alternative):
+        for pred in (RDFS.label, SKOS.prefLabel, SKOS.altLabel, DCTERMS.title, DCTERMS.alternative, FOAF.name):
             if resourcegraph.value(uri, pred):
                 return str(resourcegraph.value(uri, pred))
         else:
@@ -84,7 +83,11 @@ class Facet(object):
                     'selector': firstletter,
                     'key': sortresource,
                 },
-                DC.issued:{
+                DCTERMS.references:{ # NB: this is a single URI reference w/o label
+                    'indexingtype': fulltextindex.URI(),
+                    'use_for_toc': False,
+                },
+                DCTERMS.issued:{
                     'indexingtype': fulltextindex.Datetime(),
                     'toplevel_only': True,
                     'use_for_toc': True,
@@ -136,15 +139,21 @@ class Facet(object):
                  key_descending = None,
                  multiple_values = None,
              ):
-        
+            
         def _finddefault(provided, rdftype, argumenttype, default):
             if provided is None:
                 if rdftype in self.defaults and argumenttype in self.defaults[rdftype]:
                     return self.defaults[rdftype][argumenttype]
                 else:
-                    log = logging.getLogger(__name__)
-                    log.warning("Cannot map rdftype %s with argumenttype %s, defaulting to %r" %
-                                (rdftype, argumenttype, default))
+                    # since self.defaults doesn't contain meaningless
+                    # defaults (like selector for rdf:type) it's not a
+                    # good UI to warn about this. Might need to add
+                    # more data to self.defaults in order to re-enable
+                    # this.
+
+                    # log = logging.getLogger(__name__)
+                    # log.warning("Cannot map rdftype %s with argumenttype %s, defaulting to %r" %
+                    #             (rdftype, argumenttype, default))
                     return default                
             else:
                 return provided
