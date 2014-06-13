@@ -5,28 +5,37 @@ from __future__ import unicode_literals
 import json
 import os
 import sys
+import codecs
 import shutil
+
+# 3rd party
+from rdflib import Graph, Namespace, URIRef
+from rdflib.namespace import RDF, DC, DCTERMS
+SCHEMA = Namespace("http://schema.org/")
 
 # mine
 from testWSGI import WSGI  # provides the nice call_wsgi func
-from ferenda import DocumentRepository, FulltextIndex
-from ferenda import util
+from ferenda import DocumentRepository, FulltextIndex, Facet
+from ferenda import util, fulltextindex
 
-class BasicAPI(WSGI):
-    # note: self.repo already contains a initialized DocumentRepository
-    repos = [DocumentRepository()]
-
+class BasicAPI(object):
     # is called by WSGI.setUp
     def put_files_in_place(self):
+        self.repos = [DocumentRepository(datadir=self.datadir,
+                                         storetype = self.storetype,
+                                         storelocation = self.storelocation,
+                                         storerepository = self.storerepository,
+                                         indextype = self.indextype,
+                                         indexlocation = self.indexlocation)]
         # create three basic documents (at parsed and distilled)
         #
         # each document should have a dcterms:title, a dcterms:issued and a
         # dcterms:publisher, which has a URI
         #
-        # basefile  dcterms:title	  dcterms:issued  dcterms:publisher
-        # 123/a     "Example"     2014-01-04  <http://example.org/publisher/A>
-        # 123/b     "Example 2"   2013-09-23  <http://example.org/publisher/B>
-        # 123/c     "Of needles"  2014-05-06  <http://example.org/publisher/B>
+        # basefile  dcterms:title  dcterms:issued  dcterms:publisher
+        # 123/a     "Example"      2014-01-04      <http://example.org/publisher/A>
+        # 123/b     "Example 2"    2013-09-23      <http://example.org/publisher/B>
+        # 123/c     "Of needles"   2014-05-06      <http://example.org/publisher/B>
         for i in ('a','b','c'):
             self.ttl_to_rdf_xml("test/files/base/distilled/123/%s.ttl" % i,
                                 self.repo.store.distilled_path("123/%s" % i))
@@ -37,6 +46,7 @@ class BasicAPI(WSGI):
             # prepare a base.ttl (or var-common.js) that maps
             # <http://example.org/publisher/B> to "Publishing house B"
         self.repo.rdf_type = self.repo.ns['bibo'].Standard
+        self.repos[0].rdf_type = self.repo.ns['bibo'].Standard
 
     def test_stats(self):
         self.env['PATH_INFO'] = "/-/publ;stats"
@@ -65,6 +75,32 @@ class BasicAPI(WSGI):
         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
         want = {}
         self.assertEqual(want, got)
+
+# Mixin-style classes that are mixed with BasicAPI 
+class WhooshBase():
+    indextype = 'WHOOSH'
+    indexlocation = 'data/whooshindex' 
+
+class ESBase():
+    indextype = 'ELASTICSEARCH'
+    indexlocation = 'http://localhost:9200/ferenda/'
+
+class SQLiteBase():
+    storetype = 'SQLITE'
+    storelocation = 'data/ferenda.sqlite' # append self.datadir
+    storerepository = 'ferenda'
+
+class FusekiBase():
+    storetype = 'FUSEKI'
+    storelocation = 'http://localhost:3030/'
+    storerepository = 'ds'
+
+# Then the actual testcases are created by combining base classes
+class WhooshSQLiteBasicAPI(BasicAPI, WhooshBase, SQLiteBase, WSGI): pass
+class WhooshFusekiBasicAPI(BasicAPI, WhooshBase, FusekiBase, WSGI): pass
+class ESSQLiteBasicAPI(BasicAPI, ESBase, SQLiteBase, WSGI): pass
+class ESFusekiBasicAPI(BasicAPI, ESBase, FusekiBase, WSGI): pass
+
 
 #================================================================
 # AdvancedAPI test case
@@ -159,7 +195,7 @@ class DocRepo3(DocRepo1):
                 Facet(DC.creator, toplevel_only=False)]
 
 
-class AdvancedAPI(WSGI):
+class AdvancedAPI(object):
 
     storetype = 'FUSEKI'
     storelocation = 'http://localhost:3030/'
@@ -237,18 +273,23 @@ class AdvancedAPI(WSGI):
     def test_faceting(self):
         # make sure wsgi_stats deliver documents in the buckets we
         # expect, and that all buckets are there.
-        pass
+        self.fail("not implemented")
 
     def test_query(self):
         # make sure we can do queries on default and custom facets and
         # so on. Also make sure _stats=on works.
-        pass
+        self.fail("not implemented")
 
     def test_toc(self):
         # make sure that toc generates all pagesets and that each page
         # contains the correct docs in the correct order (in addiction
         # to what testDocRepo.TOC tests).
-        pass
+        self.fail("not implemented")
         
 
+# Then the actual testcases are created by combining base classes
+class WhooshSQLiteAdvancedAPI(AdvancedAPI, WhooshBase, SQLiteBase, WSGI): pass
+class WhooshFusekiAdvancedAPI(AdvancedAPI, WhooshBase, FusekiBase, WSGI): pass
+class ESSQLiteAdvancedAPI(AdvancedAPI, ESBase, SQLiteBase, WSGI): pass
+class ESFusekiAdvancedAPI(AdvancedAPI, ESBase, FusekiBase, WSGI): pass
 

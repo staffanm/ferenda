@@ -2057,6 +2057,13 @@ parsed document path to that documents dependency file."""
         predicates = self.toc_predicates()
         g = self.make_graph()
         bindings = " ".join(["?" + util.uri_leaf(b) for b in predicates])
+        # FIXME: the below whereclause is meant to select only
+        # top-level documents (not documentparts), but does so by
+        # requiring that all top-level documents should have rdf:type
+        # == self.rdf_type which is inflexible. fix this when using
+        # self.facets() instead of self.toc_predicates()
+        # whereclause = "?uri %s ?%s" % (g.qname(predicates[0]),
+        #                                util.uri_leaf(predicates[0]))
         whereclause = "?uri rdf:type %s ; %s ?%s" % (g.qname(self.rdf_type),
                                                      g.qname(predicates[0]),
                                                      util.uri_leaf(predicates[0]))

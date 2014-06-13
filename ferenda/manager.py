@@ -795,8 +795,8 @@ def _wsgi_query(environ, args):
     # (nb: this presumes that we've indexed more than just basefile,
     #  title, identifier, text -- we need to index arbitrary
     #  parameters, controlled by each repo)
-    idx = FulltextIndex.connect(args['repos'][0].config.indextype,
-                                args['repos'][0].config.indexlocation)
+    idx = FulltextIndex.connect(args['indextype'],
+                                args['indexlocation'])
     q= param['q'] if 'q' in param else None 
     res, pager = idx.query(q=q,
                            pagenum=int(param.get('_page', '0'))+1,

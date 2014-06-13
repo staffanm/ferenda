@@ -222,7 +222,7 @@ class RDFLibStore(TripleStore):
         # <%s> differently than Sesame/Fuseki. We remove the 'FROM
         # <%s>' part from the query and instead get a context graph
         # for the same URI.
-        re_fromgraph = re.compile(r" FROM <(?P<graphuri>[^>]+)> ")
+        re_fromgraph = re.compile(r"\sFROM <(?P<graphuri>[^>]+)>\s")
         graphuri = None
         m = re_fromgraph.search(query)
         if m:

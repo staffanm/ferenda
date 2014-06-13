@@ -488,9 +488,10 @@ class Repo(RepoTester):
         # test1: make sure that default parsing of a document w/o
         # title and lang tags work
         d = DocumentRepository(loglevel="CRITICAL", datadir=self.datadir)
-        d.config = LayeredConfig(defaults=d.get_default_options(),inifile="ferenda.ini",cascade=True)
+        config = LayeredConfig(defaults=d.get_default_options(),inifile="ferenda.ini",cascade=True)
+        config.datadir = self.datadir
+        d.config = config
         path = d.store.downloaded_path("123/a")
-        # print("test_parse: d.store.downloaded_path('123/a') is %s" % path)
         util.ensure_dir(path)
         shutil.copy2("test/files/base/downloaded/123/a-version1.htm",path)
         ret = d.parse("123/a")
@@ -505,7 +506,6 @@ class Repo(RepoTester):
         self.assertEqual(len(desc.getvalues(d.ns['dcterms'].title)),0)
 
         t = etree.parse(d.store.parsed_path("123/a"))
-        # util.indent_et(t.getroot())
 
         h = t.getroot()
         self.assertEqual("en", h.get(xmlns+"lang"))

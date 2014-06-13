@@ -29,12 +29,16 @@ from ferenda.testutil import RepoTester
 # testing the API.
 class WSGI(RepoTester): # base class w/o tests
     storetype = 'SQLITE'
-    storelocation = 'data/ferenda.sqlite'
+    storelocation = 'data/ferenda.sqlite' # append self.datadir
     storerepository = 'ferenda'
     indextype = 'WHOOSH'
-    indexlocation = 'data/whooshindex'
+    indexlocation = 'data/whooshindex' # append self.datadir
     def setUp(self):
         super(WSGI,self).setUp()
+        if self.storelocation.startswith("data/"):
+            self.storelocation = self.storelocation.replace("data", self.datadir)
+        if self.indexlocation.startswith("data/"):
+            self.indexlocation = self.indexlocation.replace("data", self.datadir)
         self.put_files_in_place()
         # use self.repo (simple testcases) or self.repos (complex
         # testcases like AdvancedAPI)?
@@ -42,6 +46,8 @@ class WSGI(RepoTester): # base class w/o tests
             repos = self.repos
         else:
             repos = [self.repo]
+            
+        # print("making app: %s %s" % (self.storetype, self.indextype))
         self.app = manager.make_wsgi_app(port=8000,
                                          documentroot=self.datadir,
                                          apiendpoint="/myapi/",

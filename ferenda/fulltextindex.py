@@ -416,12 +416,20 @@ class WhooshIndex(FulltextIndex):
         # special-handling of the Resource type -- this is provided as
         # a dict with 'iri' and 'label' keys, and we flatten it to a
         # 2-element list
+        s = self.schema()
         for key in kwargs:
-            if isinstance(kwargs[key], dict):
-                from pudb import set_trace; set_trace()
+            if isinstance(s[key], Resource):
+            # if isinstance(kwargs[key], dict):
                 kwargs[key] = [kwargs[key]['iri'],
                                kwargs[key]['label']]
-                
+            elif isinstance(s[key], Datetime):
+                if isinstance(kwargs[key], date):
+                    # convert date to datetime
+                    kwargs[key] = datetime(kwargs[key].year,
+                                           kwargs[key].month,
+                                           kwargs[key].day)
+
+
         self._writer.update_document(uri=uri,
                                      repo=repo,
                                      basefile=basefile,
