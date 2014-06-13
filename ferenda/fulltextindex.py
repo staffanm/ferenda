@@ -418,6 +418,7 @@ class WhooshIndex(FulltextIndex):
         # 2-element list
         for key in kwargs:
             if isinstance(kwargs[key], dict):
+                from pudb import set_trace; set_trace()
                 kwargs[key] = [kwargs[key]['iri'],
                                kwargs[key]['label']]
                 

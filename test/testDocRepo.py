@@ -7,7 +7,7 @@ if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
 from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 
-from datetime import datetime,timedelta
+from datetime import datetime,date,timedelta
 from operator import itemgetter, attrgetter
 import codecs
 import collections
@@ -1076,30 +1076,33 @@ class Repo(RepoTester):
 
         with patch.object(WhooshIndex,'update') as mock_method:
             d.relate_fulltext("123/a")
-            calls = [call(title='Example',
-                          rdftype='http://purl.org/ontology/bibo/Standard',
-                          basefile='123/a',
+            calls = [call(basefile='123/a',
                           uri='http://example.org/base/123/a', repo='base',
                           text='This is part of the main document, but not of any sub-resource. This is the tail end of the main document ',
-                          identifier='123(A)'),
-                     call(title='Introduction',
-                          rdftype='http://purl.org/ontology/bibo/DocumentPart',
+                          rdf_type='http://purl.org/ontology/bibo/Standard',
+                          dcterms_title='Example',
+                          dcterms_identifier='123(A)',
+                          dcterms_issued=date(2014,1,4),
+                          dcterms_publisher={'iri':'http://example.org/publisher/A',
+                                             'label':'http://example.org/publisher/A'}),
+                     call(dcterms_title='Introduction',
+                          rdf_type='http://purl.org/ontology/bibo/DocumentPart',
                           basefile='123/a',
                           uri='http://example.org/base/123/a#S1', repo='base',
                           text='This is part of document-part section 1 ',
-                          identifier='123(A)\xb61'),  # \xb6 = Pilcrow 
-                     call(title='Requirements Language',
-                          rdftype='http://purl.org/ontology/bibo/DocumentPart',
+                          dcterms_identifier='123(A)\xb61'),  # \xb6 = Pilcrow 
+                     call(dcterms_title='Requirements Language',
+                          rdf_type='http://purl.org/ontology/bibo/DocumentPart',
                           basefile='123/a',
                           uri='http://example.org/base/123/a#S1.1', repo='base',
                           text='This is the text in subsection 1.1 ',
-                          identifier='123(A)\xb61.1'),
-                     call(title='Definitions and Abbreviations',
-                          rdftype='http://purl.org/ontology/bibo/DocumentPart',
+                          dcterms_identifier='123(A)\xb61.1'),
+                     call(dcterms_title='Definitions and Abbreviations',
+                          rdf_type='http://purl.org/ontology/bibo/DocumentPart',
                           basefile='123/a',
                           uri='http://example.org/base/123/a#S2', repo='base',
                           text='This is the second main document part ',
-                          identifier='123(A)\xb62')]
+                          dcterms_identifier='123(A)\xb62')]
             mock_method.assert_has_calls(calls)
             # make sure the extra link element in the header did not cause a call
             self.assertEquals(4, mock_method.call_count)

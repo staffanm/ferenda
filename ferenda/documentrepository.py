@@ -1574,7 +1574,7 @@ parsed document path to that documents dependency file."""
                         for value in v:
                             # abuse the resourcelabel func a little
                             label = facet.resourcelabel({None:value}, None, common_graph)
-                            newv.append({'uri': value,
+                            newv.append({'iri': value,
                                          'label': label})
                         v = newv
                     elif not v:
