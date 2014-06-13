@@ -33,7 +33,6 @@ class Parse(RepoTester):
         
     
     def parametric_test(self,filename):
-        # from pudb import set_trace; set_trace()
         reader = TextReader(filename,encoding='utf-8')
         doc = self.repo.parse_from_textreader(reader,"[basefile]")
         wantfile = filename.replace(".txt", ".n3")

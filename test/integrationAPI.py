@@ -21,6 +21,7 @@ from ferenda import util, fulltextindex
 class BasicAPI(object):
     # is called by WSGI.setUp
     def put_files_in_place(self):
+        self.repo = None
         self.repos = [DocumentRepository(datadir=self.datadir,
                                          storetype = self.storetype,
                                          storelocation = self.storelocation,
@@ -38,15 +39,16 @@ class BasicAPI(object):
         # 123/c     "Of needles"   2014-05-06      <http://example.org/publisher/B>
         for i in ('a','b','c'):
             self.ttl_to_rdf_xml("test/files/base/distilled/123/%s.ttl" % i,
-                                self.repo.store.distilled_path("123/%s" % i))
-            util.ensure_dir(self.repo.store.parsed_path("123/%s" % i))
+                                self.repos[0].store.distilled_path("123/%s" % i),
+                                self.repos[0].store)
+            util.ensure_dir(self.repos[0].store.parsed_path("123/%s" % i))
             shutil.copy2("test/files/base/parsed/123/%s.xhtml" % i,
-                                self.repo.store.parsed_path("123/%s" % i))
-            self.repo.relate("123/%s" % i)
+                                self.repos[0].store.parsed_path("123/%s" % i))
+            self.repos[0].relate("123/%s" % i)
             # prepare a base.ttl (or var-common.js) that maps
             # <http://example.org/publisher/B> to "Publishing house B"
-        self.repo.rdf_type = self.repo.ns['bibo'].Standard
-        self.repos[0].rdf_type = self.repo.ns['bibo'].Standard
+
+        self.repos[0].rdf_type = self.repos[0].ns['bibo'].Standard
 
     def test_stats(self):
         self.env['PATH_INFO'] = "/-/publ;stats"

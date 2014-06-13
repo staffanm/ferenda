@@ -515,6 +515,7 @@ def make_wsgi_app(inifile=None, **kwargs):
         args = kwargs  # sanity check: is documentroot, searchendpoint and
                        # apiendpoint defined?
 
+    # print("making wsgi app: %s %s" % (args['storetype'], args['indextype']))
     def app(environ, start_response):
         legacyapi = True # FIXME: should be part of args
         path = environ['PATH_INFO']
@@ -698,7 +699,6 @@ def _wsgi_stats(repos, rooturl):
     # letter only)
 
     legacyapi = True # FIXME: should be part of args
-    
     res = {"type": "DataSet",
            "slices" : []
     }
@@ -924,7 +924,8 @@ def _wsgi_api(environ, start_response, args):
     else:
         d = _wsgi_query(environ, args)
 
-    data = json.dumps(dict(d), indent=4, sort_keys=True).encode('utf-8')
+    data = json.dumps(dict(d), indent=4, default=util.json_default_date,
+                      sort_keys=True).encode('utf-8')
     start_response(_str("200 OK"), [
         (_str("Content-Type"), _str("application/json")),
         (_str("Content-Length"), _str(str(len(data))))

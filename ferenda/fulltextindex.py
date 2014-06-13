@@ -647,13 +647,6 @@ class ElasticSearchIndex(RemoteIndex):
                      {"type": "string"}),
                     )
 
-    
-    def _jsondateencoder(self, obj):
-        if isinstance(obj, (date, datetime)):
-            return obj.isoformat()
-        else:
-            raise TypeError
-
     def commit(self):
         r = requests.post(self.location + "_refresh")
         r.raise_for_status()
@@ -688,7 +681,7 @@ class ElasticSearchIndex(RemoteIndex):
                    "basefile": basefile,
                    "text": text}
         payload.update(kwargs)
-        return relurl, json.dumps(payload, default=self._jsondateencoder, indent=4)
+        return relurl, json.dumps(payload, default=util.json_default_date, indent=4)
 
     def _query_payload(self, q, pagenum=1, pagelen=10, **kwargs):
         relurl = "_search?from=%s&size=%s" % ((pagenum - 1) * pagelen, pagelen)
@@ -742,7 +735,7 @@ class ElasticSearchIndex(RemoteIndex):
                                     'post_tags': ["</strong>"],
                                     'fragment_size': '40'}
         
-        return relurl, json.dumps(payload, indent=4, default=self._jsondateencoder)
+        return relurl, json.dumps(payload, indent=4, default=util.json_default_date)
 
     def _decode_query_result(self, response, pagenum, pagelen):
         def date_hook(d):

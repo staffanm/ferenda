@@ -68,10 +68,12 @@ class WSGI(RepoTester): # base class w/o tests
                     'wsgi.url_scheme': 'http'}
 
 
-    def ttl_to_rdf_xml(self, inpath, outpath):
+    def ttl_to_rdf_xml(self, inpath, outpath, store=None):
+        if not store:
+            store = self.repo.store
         g = Graph()
         g.parse(source=open(inpath), format="turtle")
-        with self.repo.store._open(outpath, "wb") as fp:
+        with store._open(outpath, "wb") as fp:
             fp.write(g.serialize(format="pretty-xml"))
         return g
 

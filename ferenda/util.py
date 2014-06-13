@@ -706,3 +706,8 @@ def parseresults_as_xml(parseres, depth=0):
         # have any 3-level grammar productions to test with
         
     return "%s<%s>%s</%s>\n" % ("  "*depth, parseres.getName(), res, parseres.getName())
+
+def json_default_date(obj):
+    if isinstance(obj, (datetime.datetime, datetime.date)):
+        return obj.isoformat()
+    raise TypeError("%r is not JSON serializable" % obj)
