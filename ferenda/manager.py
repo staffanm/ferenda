@@ -705,8 +705,13 @@ def _wsgi_stats(repos, rooturl):
     # this is wrong: we should mash together similarly-named
     # dimensions/criteria from different repos (eg rdf:type,
     # dcterms:title, dcterms:issued)
+    data = []
     for repo in repos:
         qname_graph = repo.make_graph() # only ever used to map URIs to qnames
+        repodata = repo.faceted_data()
+        data.extend(repodata) # assume that no two repos ever have data about the same URI
+
+        # FIXME: continue here...
         data = repo.toc_select(repo.dataset_uri())
         criteria = repo.toc_criteria(repo.toc_predicates())
         pagesets = repo.toc_pagesets(data, criteria)

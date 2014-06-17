@@ -122,7 +122,7 @@ class Facet(object):
     # %(selected)s = The selected value, eg "2014", "A", "O'Reilly and Associates Publishing, inc."
     # %(selected_uri)s = For resource-type values, the underlying URI, eg "http://example.org/ext/publisher/oreilly"
     def __init__(self,
-                 rdftype=DCTERMS.title, # any rdflib.URIRef
+                 rdftype=DCTERMS.title, # any rdflib.URIRef -- should be called 'rdfpredicate'??
                  label="Sorted by %(criteria)s", # toclabel
                  pagetitle="Documents where %(criteria)s = %(selected)s",
                  indexingtype=None,   # if not given, determined by rdftype

@@ -1623,6 +1623,84 @@ parsed document path to that documents dependency file."""
                 Facet(DCTERMS.issued)
         ]     
        
+    def faceted_data(self):
+        return self.facet_select(self.facet_query(self.dataset_uri()))
+
+    def facet_query(self, context):
+        """Constructs a SPARQL SELECT query that fetches all
+        information needed to create faceted data.
+
+        :param context: The context (named graph) to which to limit
+                        the query. 
+        :type  context: str
+        :returns: The SPARQL query
+        :rtype: str
+
+        Example:
+
+        >>> d = DocumentRepository()
+        >>> expected = \"""PREFIX dcterms: <http://purl.org/dc/terms/>
+        ... PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        ... 
+        ... SELECT DISTINCT ?uri ?type ?title ?publisher ?identifier ?issued
+        ... FROM <http://example.org/ctx/base>
+        ... WHERE {
+        ...     ?uri rdf:type foaf:Document ; rdf:type ?type .
+        ...     OPTIONAL { ?uri dcterms:title ?title . }
+        ...     OPTIONAL { ?uri dcterms:publisher ?publisher . }
+        ...     OPTIONAL { ?uri dcterms:identifier ?identifier . }
+        ...     OPTIONAL { ?uri dcterms:issued ?issued . }
+        ... }\"""
+        >>> d.facet_query("http://example.org/ctx/base") == expected
+        True
+        """
+        from_graph = "FROM <%s>" % context
+
+        predicates = [f.rdftype for f in self.facets()]
+        namespaces = [ns for ns in self.ns.values() if [f for f in predicates if f.startswith(ns)]]
+        g = self.make_graph()
+        bindings = " ".join(["?" + util.uri_leaf(b) for b in predicates])
+        # FIXME: the below whereclause is meant to select only
+        # top-level documents (not documentparts), but does so by
+        # requiring that all top-level documents should have rdf:type
+        # == self.rdf_type which is inflexible. 
+        # whereclause = "?uri %s ?%s" % (g.qname(predicates[0]),
+        #                                util.uri_leaf(predicates[0]))
+        whereclause = "?uri rdf:type %s ; %s ?%s" % (g.qname(self.rdf_type),
+                                                     g.qname(predicates[0]),
+                                                     util.uri_leaf(predicates[0]))
+        optclauses = "".join(
+            ["    OPTIONAL { ?uri %s ?%s . }\n" % (g.qname(b), util.uri_leaf(b)) for b in predicates[1:]])
+
+        # FIXME: The above doctest looks like crap since all
+        # registered namespaces in the repo is included. Should only
+        # include prefixes actually used
+        prefixes = "".join(["PREFIX %s: <%s>\n" % (p, u) for p, u in sorted(self.ns.items()) if u in namespaces])
+        query = """%s
+SELECT DISTINCT ?uri %s
+%s
+WHERE {
+    %s .
+%s}""" % (
+            prefixes, bindings, from_graph, whereclause, optclauses)
+        return query
+
+    def faceted_select(self, query):
+        """Select all data from the triple store needed to create faceted data.
+
+        :param context: The context (named graph) to restrict the query to.
+                        If None, search entire triplestore.
+        :type  context: str
+        :returns: The results of the query, as python objects
+        :rtype: set of dicts"""
+
+        store = TripleStore.connect(self.config.storetype,
+                                    self.config.storelocation,
+                                    self.config.storerepository)
+
+        res = store.select(query, "python")
+        store.close()
+        return res
 
     def _extract_plaintext(self, node):
         # helper to extract any text from a elementtree node,

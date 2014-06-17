@@ -1990,6 +1990,25 @@ WHERE {
         self.assertEqual('Documents starting with "a"',
                          tree.find(".//article/h1").text)
                          
+class Faceting(RepoTester):
+
+    def test_query(self):
+        # NOTE: this is also tested by a doctest
+        want = """PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT DISTINCT ?uri ?type ?title ?publisher ?identifier ?issued
+FROM <http://example.org/ctx/base>
+WHERE {
+    ?uri rdf:type foaf:Document ; rdf:type ?type .
+    OPTIONAL { ?uri dcterms:title ?title . }
+    OPTIONAL { ?uri dcterms:publisher ?publisher . }
+    OPTIONAL { ?uri dcterms:identifier ?identifier . }
+    OPTIONAL { ?uri dcterms:issued ?issued . }
+}"""
+        self.assertEqual(want,
+                         self.repo.facet_query("http://example.org/ctx/base"))
+
 
 class News(RepoTester):
     def setUp(self):
