@@ -40,6 +40,8 @@ from ferenda.errors import *
 from ferenda import DocumentRepository
 from ferenda.testutil import RepoTester
 
+# helper classes
+from examplerepos import DocRepo1, DocRepo2, DocRepo3
 
 # various utility functions which occasionally needs patching out
 from ferenda import util
@@ -1046,67 +1048,6 @@ class Repo(RepoTester):
         self.assertTrue(mock_store.connect.called)
         self.assertTrue(mock_store.connect.return_value.get_serialized_file.called)
 
-    def test_relate(self):
-        # the helper methods are called separately. this test only
-        # makes sure they are all called:
-        self.repo.relate_triples = Mock()
-        self.repo.relate_dependencies = Mock()
-        self.repo.relate_fulltext = Mock()
-        self.repo.relate("123/a")
-        self.assertTrue(self.repo.relate_triples.called)
-        self.assertTrue(self.repo.relate_dependencies.called)
-        self.assertTrue(self.repo.relate_fulltext.called)
-    
-    def test_relate_fulltext(self):
-        d = DocumentRepository(datadir=self.datadir,
-                               indexlocation=self.datadir+os.sep+"index") # FIXME: derive from datadir
-        # prepare test document
-        util.ensure_dir(d.store.parsed_path("123/a"))
-        util.ensure_dir(d.store.distilled_path("123/a"))
-        shutil.copy2("%s/files/base/parsed/123/a.xhtml" %
-                     os.path.dirname(__file__),
-                     d.store.parsed_path("123/a"))
-
-        g = rdflib.Graph()
-        with codecs.open("%s/files/base/distilled/123/a.ttl" %
-                         os.path.dirname(__file__),encoding="utf-8") as fp:
-            g.parse(fp,  format="turtle")
-        with open(d.store.distilled_path("123/a"),"wb") as fp:
-            g.serialize(fp,"pretty-xml")
-
-        with patch.object(WhooshIndex,'update') as mock_method:
-            d.relate_fulltext("123/a")
-            calls = [call(basefile='123/a',
-                          uri='http://example.org/base/123/a', repo='base',
-                          text='This is part of the main document, but not of any sub-resource. This is the tail end of the main document ',
-                          rdf_type='http://purl.org/ontology/bibo/Standard',
-                          dcterms_title='Example',
-                          dcterms_identifier='123(A)',
-                          dcterms_issued=date(2014,1,4),
-                          dcterms_publisher={'iri':'http://example.org/publisher/A',
-                                             'label':'http://example.org/publisher/A'}),
-                     call(dcterms_title='Introduction',
-                          rdf_type='http://purl.org/ontology/bibo/DocumentPart',
-                          basefile='123/a',
-                          uri='http://example.org/base/123/a#S1', repo='base',
-                          text='This is part of document-part section 1 ',
-                          dcterms_identifier='123(A)\xb61'),  # \xb6 = Pilcrow 
-                     call(dcterms_title='Requirements Language',
-                          rdf_type='http://purl.org/ontology/bibo/DocumentPart',
-                          basefile='123/a',
-                          uri='http://example.org/base/123/a#S1.1', repo='base',
-                          text='This is the text in subsection 1.1 ',
-                          dcterms_identifier='123(A)\xb61.1'),
-                     call(dcterms_title='Definitions and Abbreviations',
-                          rdf_type='http://purl.org/ontology/bibo/DocumentPart',
-                          basefile='123/a',
-                          uri='http://example.org/base/123/a#S2', repo='base',
-                          text='This is the second main document part ',
-                          dcterms_identifier='123(A)\xb62')]
-            mock_method.assert_has_calls(calls)
-            # make sure the extra link element in the header did not cause a call
-            self.assertEquals(4, mock_method.call_count)
-
     test_rdf_xml = b"""<?xml version="1.0" encoding="utf-8"?>
 <rdf:RDF
   xmlns:dcterms="http://purl.org/dc/terms/"
@@ -1118,7 +1059,19 @@ class Repo(RepoTester):
     <dcterms:references rdf:resource="http://localhost:8000/res/other/res-b"/>
     <rdf:seeAlso rdf:resource="http://localhost:8000/somewhere/else"/>
   </bibo:Document>
-</rdf:RDF>"""
+</rdf:RDF>"""    
+        
+    def test_relate(self):
+        # the helper methods are called separately. this test only
+        # makes sure they are all called:
+        self.repo.relate_triples = Mock()
+        self.repo.relate_dependencies = Mock()
+        self.repo.relate_fulltext = Mock()
+        self.repo.relate("123/a")
+        self.assertTrue(self.repo.relate_triples.called)
+        self.assertTrue(self.repo.relate_dependencies.called)
+        self.assertTrue(self.repo.relate_fulltext.called)
+    
             
     def test_relate_triples(self):
         # dump known triples as rdf/xml (want) to self.repo.store.distilled_path
@@ -1236,7 +1189,176 @@ Status for document repository 'base' (ferenda.documentrepository.DocumentReposi
         self.assertEqual(self.repo.tabs(),
                          [("Report", "http://localhost:8000/dataset/base")])
         
-        
+
+class RelateFulltext(RepoTester):
+    # FIXME: Move assertEqualCalls and put_files_in_place to
+    # RepoTester once debugged
+    def assertEqualCalls(self, want_calls, got_calls):
+        """Replacement for Mock.assert_has_calls that provides more helpful
+        messages as to where exactly a list of calls differ.
+
+        """
+        self.assertEqual(len(want_calls), len(got_calls),
+                         "Number of calls differ (want %s, got %s)" %
+                         (len(want_calls), len(got_calls)))
+        for callidx, want_call in enumerate(want_calls):
+            # maybe use zip + enumerate rather than array indexing?
+            got_call = got_calls[callidx]
+
+            # compare name
+            self.assertEqual(want_call[0], got_call[0],
+                             "Call #%s has wrong name" % callidx)
+
+            # compare each positional argument
+            self.assertEqual(want_call[1], got_call[1],
+                             "Positional args of call #%s differ" % callidx)
+
+            # compare keyword argument dicts
+            self.assertEqual(want_call[2], got_call[2],
+                             "Keyword args of call %s differ" % callidx)
+
+    def put_files_in_place(self, repo, prefix, basefiles,
+                           distill=True, convert=False):
+        for basefile in basefiles:
+            source = "%s/parsed/%s.xhtml" % (prefix, basefile)
+            dest = repo.store.parsed_path(basefile)
+            util.ensure_dir(dest)
+            shutil.copy2(source, dest)
+            util.ensure_dir(repo.store.distilled_path(basefile))
+            if distill:
+                g = rdflib.Graph()
+
+                with codecs.open(dest, encoding="utf-8") as fp:  # unicode
+                    g.parse(data=fp.read(), format="rdfa",
+                                          publicID=repo.canonical_uri(basefile))
+                g.bind("dc", rdflib.URIRef("http://purl.org/dc/elements/1.1/"))
+                g.bind("dcterms", rdflib.URIRef("http://example.org/this-prefix-should-not-be-used"))
+                with open(repo.store.distilled_path(basefile), "wb") as fp:
+                    g.serialize(fp, format="pretty-xml")
+            elif convert:
+                g = rdflib.Graph()
+                ttlsource = "%s/distilled/%s.ttl" % (prefix, basefile)
+                with codecs.open(ttlsource ,encoding="utf-8") as fp:
+                    g.parse(fp, format="turtle")
+                with open(repo.store.distilled_path(basefile),"wb") as fp:
+                    g.serialize(fp,"pretty-xml")                
+
+    # A bunch of testcases that excercise the fulltext indexing
+    # logic. Handles indexing of all types, missing data, unexpected
+    # datatypes and so on.
+    def test_basic(self):
+        d = DocumentRepository(datadir=self.datadir,
+                               indexlocation=self.datadir+os.sep+"index")
+        self.put_files_in_place(d, "test/files/base", ["123/a"],
+                                distill=False,
+                                convert=True)
+
+        with patch.object(WhooshIndex,'update') as mock_method:
+            d.relate_fulltext("123/a")
+            calls = [call(basefile='123/a',
+                          uri='http://example.org/base/123/a', repo='base',
+                          text='This is part of the main document, but not of any sub-resource. This is the tail end of the main document',
+                          rdf_type='http://purl.org/ontology/bibo/Standard',
+                          dcterms_title='Example',
+                          dcterms_identifier='123(A)',
+                          dcterms_issued=date(2014,1,4),
+                          dcterms_publisher={'iri':'http://example.org/publisher/A',
+                                             'label':'http://example.org/publisher/A'}),
+                     call(dcterms_title='Introduction',
+                          rdf_type='http://purl.org/ontology/bibo/DocumentPart',
+                          basefile='123/a',
+                          uri='http://example.org/base/123/a#S1', repo='base',
+                          text='This is part of document-part section 1',
+                          dcterms_identifier='123(A)\xb61'),  # \xb6 = Pilcrow 
+                     call(dcterms_title='Requirements Language',
+                          rdf_type='http://purl.org/ontology/bibo/DocumentPart',
+                          basefile='123/a',
+                          uri='http://example.org/base/123/a#S1.1', repo='base',
+                          text='This is the text in subsection 1.1',
+                          dcterms_identifier='123(A)\xb61.1'),
+                     call(dcterms_title='Definitions and Abbreviations',
+                          rdf_type='http://purl.org/ontology/bibo/DocumentPart',
+                          basefile='123/a',
+                          uri='http://example.org/base/123/a#S2', repo='base',
+                          text='This is the second main document part',
+                          dcterms_identifier='123(A)\xb62')]
+            self.assertEqualCalls(mock_method.mock_calls, calls)
+
+
+            
+            
+    # this tests DocRepo2, which has test data for all commonly
+    # indexed datatypes
+    def test_types(self):
+        repo = DocRepo2(datadir=self.datadir,
+                        indexlocation=self.datadir+os.sep+"index")
+        self.put_files_in_place(repo, "test/files/testrepos/repo2", ["a"])
+        with patch.object(WhooshIndex,'update') as mock_method:
+            repo.relate_fulltext("a")
+
+        want_calls = [call(basefile = 'a',
+                           repo = 'repo2',
+                           uri = 'http://example.org/repo2/a',
+                           text = 'This is part of the main document, but not of any sub-resource.',
+                           dc_subject = ['green', 'yellow'],
+                           dcterms_issued = date(2012, 4, 1),
+                           dcterms_publisher = {'iri': 'http://example.org/vocab/publ1',
+                                                'label': 'Publishing & sons'},
+                           dcterms_title = 'A doc with all datatypes',
+                           rdf_type = 'http://example.org/vocab/MainType',
+                           schema_free =  True)]
+        self.assertEqualCalls(mock_method.mock_calls, want_calls)
+
+    def test_unexpected_type(self):
+        repo = DocRepo3(datadir=self.datadir,
+                        indexlocation=self.datadir+os.sep+"index")
+        self.put_files_in_place(repo, "test/files/testrepos/repo3", ["b"])
+        with patch.object(WhooshIndex,'update') as mock_method:
+            repo.relate_fulltext("b")
+
+        want_calls = [call(basefile='b',
+                           repo='repo3',
+                           uri='http://example.org/repo3/b',
+                           text="A document with common properties, but unusual data types for those properties.",
+                           dc_creator='Fred Bloggs',
+                           dcterms_issued='June 10th, 2014',
+                           dcterms_rightsHolder= [{'iri': 'http://example.org/vocab/company1',
+                                                   'label': 'Comp Inc'},
+                                                  {'iri': 'http://example.org/vocab/company2',
+                                                   'label': 'Another company'}],
+                           dcterms_title='A doc with unusual metadata'
+                       ),
+                      call(basefile='b',
+                           repo='repo3',
+                           uri='http://example.org/repo3/b#S1',
+                           text="This is part of a subdocument, that has some unique properties",
+                           dc_creator=date(2012,4,1))]
+        self.assertEqualCalls(want_calls, mock_method.mock_calls)
+
+
+    def test_missing(self):
+        repo = DocRepo3(datadir=self.datadir,
+                        indexlocation=self.datadir+os.sep+"index")
+        self.put_files_in_place(repo, "test/files/testrepos/repo3", ["c"])
+        with patch.object(WhooshIndex,'update') as mock_method:
+            repo.relate_fulltext("c")
+
+        want_calls = [call(basefile = 'c',
+                           repo = 'repo3',
+                           uri = 'http://example.org/repo3/c',
+                           text = "This document lacks all extra metadata that it's repo's Facet expects to be there.")]
+        self.assertEqualCalls(mock_method.mock_calls, want_calls)
+
+
+#     def test_synthetic(self):
+#         # test the ability to index synthetic data, ie data that is
+#         # processed in some way from how it's present in the XHTML
+#         # data (eg. a date like 2014-04-01 transformed into a boolean
+#         # specifying whether it's 1st of April or not).
+#         #
+#         # Use something in repo2 for this (has a is_april_fools selector)
+#         pass
+
 class Generate(RepoTester):
 
     class TestRepo(DocumentRepository):

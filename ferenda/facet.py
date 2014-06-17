@@ -22,13 +22,8 @@ class Facet(object):
 
     @staticmethod
     def titlesortkey(row, binding='dcterms_title'):
-        title = row[binding].lower()
-        if title.startswith("the "):
-            title = title[4:]
-            # filter away starting non-word characters (but not digits)
-            title = re.sub("^\W+", "", title)
-            # remove whitespace
-            return "".join(title.split())
+        title = row[binding]
+        return util.title_sortkey(title)
 
     @staticmethod
     def resourcelabel(row, binding='dcterms_publisher', resourcegraph=None):
@@ -97,7 +92,7 @@ class Facet(object):
                     'key_descending': True
                 },
                 DC.subject: {
-                    'indexingtype': fulltextindex.Keywords(),  # eg. one or more string literals (not URIRefs),
+                    'indexingtype': fulltextindex.Keyword(),  # eg. one or more string literals (not URIRefs),
                     'multiple_values': True,
                     'toplevel_only': True,
                     'use_for_toc': True,
@@ -106,7 +101,7 @@ class Facet(object):
                     'multiple_values': True
                 },
                 DCTERMS.subject: {
-                    'indexingtype': fulltextindex.Resources(),  # eg. one or more URIRefs + labels
+                    'indexingtype': fulltextindex.Resource(),  # eg. one or more URIRefs + labels
                     'multiple_values': True,
                     'toplevel_only': True,
                     'use_for_toc': True,
@@ -182,6 +177,11 @@ class Facet(object):
                            self.key_descending,
                            self.rdftype)
 
+    def __repr__(self):
+        dictrepr = "".join((" %s=%r" % (k, v) for k, v in sorted(self.__dict__.items()) if not callable(v)))
+        return ("<%s%s>" % (self.__class__.__name__, dictrepr))
+        
+        
     # There should be a way to construct a SPARQL SELECT query from a list of Facets that retrieve all needed data
     # The needed data should be a simple 2D table, where each Facet is represented by one OR MORE fields 
     #    (ie a dcterms:publisher should result in the binding "dcterms_publisher" and "dcterms_publisher_label")

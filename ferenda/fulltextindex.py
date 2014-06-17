@@ -248,6 +248,7 @@ class IndexedType(object):
 
 
 class Identifier(IndexedType):
+    """An identifier is a string, normally in the form of a URI, which uniquely identifies an indexed document."""
     pass
 
 
@@ -263,8 +264,8 @@ class Label(IndexedType):
     pass
 
 
-class Keywords(IndexedType):
-    """Keywords is one OR MORE strings from a controlled vocabulary."""
+class Keyword(IndexedType):
+    """A keyword is a single string from a controlled vocabulary."""
     pass
 
 
@@ -273,6 +274,7 @@ class Boolean(IndexedType):
 
 
 class URI(IndexedType):
+    """Any URI (except the URI that identifies a indexed document -- use Identifier for that)."""
     pass
 
 
@@ -283,10 +285,6 @@ class Resource(IndexedType):
     """
     # eg. a particular object/subject with it's own rdfs:label,
     # foaf:name, skos:prefLabel etc
-
-class Resources(IndexedType):
-    """A a list of :py:class:`Resources`"""
-    pass # implement most of list? ferenda.Keywords worked fine without though.
 
 
 class SearchModifier(object):
@@ -375,7 +373,7 @@ class WhooshIndex(FulltextIndex):
                     (Datetime(),      whoosh.fields.DATETIME(stored=True)),
                     (Boolean(),       whoosh.fields.BOOLEAN(stored=True)),
                     (URI(),           whoosh.fields.ID(stored=True, field_boost=1.1)),
-                    (Keywords(),      whoosh.fields.KEYWORD(stored=True)),
+                    (Keyword(),       whoosh.fields.KEYWORD(stored=True)),
                     (Resource(),      whoosh.fields.IDLIST(stored=True)),
                     )
 
@@ -423,7 +421,8 @@ class WhooshIndex(FulltextIndex):
                 kwargs[key] = [kwargs[key]['iri'],
                                kwargs[key]['label']]
             elif isinstance(s[key], Datetime):
-                if isinstance(kwargs[key], date):
+                if (isinstance(kwargs[key], date) and
+                    not isinstance(kwargs[key], datetime)):
                     # convert date to datetime
                     kwargs[key] = datetime(kwargs[key].year,
                                            kwargs[key].month,
@@ -638,10 +637,7 @@ class ElasticSearchIndex(RemoteIndex):
                     (Resource(),
                      {"properties": {"uri": {"type": "string"},
                                      "label": {"type": "string"}}}),
-                    (Resources(),
-                     {"properties": {"uri": {"type": "string"},
-                                     "label": {"type": "string"}}}),
-                    (Keywords(),
+                    (Keyword(),
                      {"type": "string", "index_name": "keyword"}),
                     (URI(),
                      {"type": "string"}),

@@ -1528,11 +1528,13 @@ parsed document path to that documents dependency file."""
         return not present  # return True if we added something, False otherwise
 
     def relate_fulltext(self, basefile, repos=None):
-        """Index the text of the document into fulltext index.
+        """Index the text of the document into fulltext index. Also indexes
+        all metadata that facets() indicate should be indexed.
         
         :param basefile: The basefile for the document to be indexed.
         :type  basefile: str                        
         :returns: None
+
         """
         values = {'basefile': basefile,
                   'resources': 0,
@@ -1558,7 +1560,7 @@ parsed document path to that documents dependency file."""
                 repo = self.alias
                 if isinstance(repo, bytes):  # again, py2
                     repo = repo.decode()     # pragma: no cover
-                plaintext = self._extract_plaintext(resource)
+                plaintext = util.normalize_space(self._extract_plaintext(resource))
 
                 kwargs = {}
                 for facet in self.facets():
@@ -1568,17 +1570,16 @@ parsed document path to that documents dependency file."""
                     # facets don't tell whether their sought subjects
                     # are URIRefs or Literals. Look for both.
                     v = desc.getrels(facet.rdftype)
-                    if isinstance(facet.indexingtype,
-                                  (fulltextindex.Resource, fulltextindex.Resources)):
+                    if isinstance(facet.indexingtype, fulltextindex.Resource):
                         newv = []
-                        for value in v:
+                        for value in sorted(v):
                             # abuse the resourcelabel func a little
                             label = facet.resourcelabel({None:value}, None, common_graph)
                             newv.append({'iri': value,
                                          'label': label})
                         v = newv
                     elif not v:
-                        v = desc.getvalues(facet.rdftype)
+                        v = sorted(desc.getvalues(facet.rdftype))
                         
                     if v:
                         if facet.multiple_values:

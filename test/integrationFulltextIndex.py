@@ -14,7 +14,7 @@ import whoosh.fields
 from rdflib.namespace import RDF, DC, DCTERMS
 
 from ferenda import FulltextIndex, DocumentRepository, Facet
-from ferenda.fulltextindex import Identifier, Datetime, Text, Label, Keywords, Boolean, URI, Resource, Less, More, Between
+from ferenda.fulltextindex import Identifier, Datetime, Text, Label, Keyword, Boolean, URI, Resource, Less, More, Between
 
 #----------------------------------------------------------------
 #
@@ -227,7 +227,7 @@ class CustomIndex(object):
         # search forms
         self.assertEqual({
             'basefile':Label(),
-            'dc_subject': Keywords(),
+            'dc_subject': Keyword(),
             'dcterms_abstract': Text(boost=2),
             'dcterms_identifier':Label(boost=16),
             'dcterms_issued':Datetime(),
