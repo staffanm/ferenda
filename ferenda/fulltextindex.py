@@ -413,7 +413,7 @@ class WhooshIndex(FulltextIndex):
 
         # special-handling of the Resource type -- this is provided as
         # a dict with 'iri' and 'label' keys, and we flatten it to a
-        # 2-element list
+        # 2-element list (stored in an IDLIST)
         s = self.schema()
         for key in kwargs:
             if isinstance(s[key], Resource):
@@ -623,11 +623,11 @@ class ElasticSearchIndex(RemoteIndex):
                     (Label(),
                      {"type": "string", "index": "not_analyzed", }),  # repo, basefile
                     (Label(boost=16),
-                     {"type": "string", "boost": 16.0, "analyzer": "my_analyzer"}),# identifier
+                     {"type": "string", "boost": 16.0, "index": "not_analyzed", "norms": {"enabled": True}}),# identifier
                     (Text(boost=4),
-                     {"type": "string", "boost": 4.0, "analyzer": "my_analyzer"}),  # title
+                     {"type": "string", "boost": 4.0, "index": "not_analyzed", "norms": {"enabled": True}}),  # title
                     (Text(boost=2),
-                     {"type": "string", "boost": 2.0, "analyzer": "my_analyzer"}),  # abstract
+                     {"type": "string", "boost": 2.0, "index": "not_analyzed", "norms": {"enabled": True}}),  # abstract
                     (Text(),
                      {"type": "string", "analyzer": "my_analyzer"}),  # text
                     (Datetime(),
@@ -635,8 +635,8 @@ class ElasticSearchIndex(RemoteIndex):
                     (Boolean(),
                      {"type": "boolean"}),
                     (Resource(),
-                     {"properties": {"uri": {"type": "string"},
-                                     "label": {"type": "string"}}}),
+                     {"properties": {"iri": {"type": "string", "index": "not_analyzed"},
+                                     "label": {"type": "string", "index": "not_analyzed"}}}),
                     (Keyword(),
                      {"type": "string", "index_name": "keyword"}),
                     (URI(),
@@ -684,12 +684,23 @@ class ElasticSearchIndex(RemoteIndex):
 
         # 1: Filter on all specified fields
         filterterms = {}
+        filterregexps = {}
+        schema = self.schema()
         for k, v in kwargs.items():
             if isinstance(v, SearchModifier):
                 continue
             if k == "repo":
                 k = "_type"
-            filterterms[k] = v
+            elif isinstance(schema[k], Resource):
+                # also map k to "%s.iri" % k if k is Resource
+                k += ".iri"
+                
+            if isinstance(v, str) and "*" in v:
+                # if v contains "*", make it a {'regexp': '.*/foo'} instead of a {'term'}
+                # also transform * to .*
+                filterregexps[k] = v.replace("*", ".*")
+            else:
+                filterterms[k] = v
 
         # 2: Create filterranges if SearchModifier objects are used
         filterranges = {}
@@ -710,13 +721,15 @@ class ElasticSearchIndex(RemoteIndex):
             # NOTE: 
             match['_all'] = q
 
-        if filterterms or filterranges:
+        if filterterms or filterregexps or filterranges:
             query = {"filtered":
                      {"filter": {}
                       }
                      }
             if filterterms:
                 query["filtered"]["filter"]["term"] = filterterms
+            if filterregexps:
+                query["filtered"]["filter"]["regexp"] = filterregexps
             if filterranges:
                 query["filtered"]["filter"]["range"] = filterranges
             if match:
@@ -823,7 +836,6 @@ class ElasticSearchIndex(RemoteIndex):
                              }
                          }
                          },
-            # "mappings": {"_all": {"properties": {"analyzer": "my_analyzer"}}}
             "mappings": {}
         }
 

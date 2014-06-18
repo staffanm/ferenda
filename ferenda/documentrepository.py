@@ -1602,17 +1602,21 @@ parsed document path to that documents dependency file."""
 
             indexer.commit()  # NB: Destroys indexer._writer
 
-#    This was not a good idea
-#
-#    def get_indexed_properties(self):
-#        """Returns any extra properties that should be indexed by
-#        fulltextindex 
-#        eg. {"publisher": fulltextindex.Resource,
-#             "issued": fulltextindex.Datetime, 
-#             "subject": fulltextindex.Label
-#            } # or .Resource
-#        """
-#        return {}
+    def _extract_plaintext(self, node):
+        # helper to extract any text from a elementtree node,
+        # excluding subnodes that are resources themselves (ie they
+        # have an @about node)
+        plaintext = node.text if node.text else ""
+        for subnode in node:
+            if not subnode.get('about'):
+                plaintext += self._extract_plaintext(subnode)
+        if node.tail:
+            plaintext += node.tail
+        # append trailing space for block-level elements (including
+        # <br>, <img> and some others that formally are inline
+        # elements)
+        trailspace = "" if node.tag in ("a" "b", "i", "span") else " "
+        return plaintext.strip() + trailspace
 
 # eventually, this will replace toc_predicates/toc_criteria
     def facets(self): 
@@ -1655,9 +1659,8 @@ parsed document path to that documents dependency file."""
         True
         """
         from_graph = "FROM <%s>" % context
-
         predicates = [f.rdftype for f in self.facets()]
-        namespaces = [ns for ns in self.ns.values() if [f for f in predicates if f.startswith(ns)]]
+        namespaces = [ns for ns in self.ns.values() if [f for f in predicates + [self.rdf_type] if f.startswith(ns)]]
         g = self.make_graph()
         bindings = " ".join(["?" + util.uri_leaf(b) for b in predicates])
         # FIXME: the below whereclause is meant to select only
@@ -1685,7 +1688,7 @@ WHERE {
             prefixes, bindings, from_graph, whereclause, optclauses)
         return query
 
-    def faceted_select(self, query):
+    def facet_select(self, query):
         """Select all data from the triple store needed to create faceted data.
 
         :param context: The context (named graph) to restrict the query to.
@@ -1702,21 +1705,6 @@ WHERE {
         store.close()
         return res
 
-    def _extract_plaintext(self, node):
-        # helper to extract any text from a elementtree node,
-        # excluding subnodes that are resources themselves (ie they
-        # have an @about node)
-        plaintext = node.text if node.text else ""
-        for subnode in node:
-            if not subnode.get('about'):
-                plaintext += self._extract_plaintext(subnode)
-        if node.tail:
-            plaintext += node.tail
-        # append trailing space for block-level elements (including
-        # <br>, <img> and some others that formally are inline
-        # elements)
-        trailspace = "" if node.tag in ("a" "b", "i", "span") else " "
-        return plaintext.strip() + trailspace
     #
     #
     # STEP 4: Generate browser-ready HTML with navigation panels,

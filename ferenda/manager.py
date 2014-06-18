@@ -778,6 +778,7 @@ def _wsgi_stats(repos, rooturl):
     return res
             
 def _wsgi_query(environ, args):
+    legacyapi = True
     def _elements_to_html(elements):
         res = ""
         for e in elements:
@@ -795,6 +796,19 @@ def _wsgi_query(environ, args):
     param = dict(parse_qsl(environ['QUERY_STRING']))
     filtered = dict([(k,v) for k,v in param.items() if not (k.startswith("_") or k == "q")])
 
+    if legacyapi:
+        newfiltered = {}
+        # transform publisher.iri => dcterms_publisher (ie remove
+        # trailing .iri and append a best-guess prefix
+        for k, v in filtered.items():
+            if k.endswith(".iri"):
+                k = k[:-4]
+            if "_" not in k:
+                # best guess: always use the dcterms prefix
+                k = "dcterms_" + k
+            newfiltered[k] = v
+        filtered = newfiltered
+        
     # 2. call fulltextindex.query(q='rätt*', pagenum=1, pagelen=10,
     #                             publisher='*/regeringskansliet')
     # (nb: this presumes that we've indexed more than just basefile,

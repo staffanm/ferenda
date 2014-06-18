@@ -54,6 +54,8 @@ basic_dataset = [
      'text':'This is the second document (not the first)'}
     ]
 
+# FIXME: It'd be neat if this dataset was identical to what could be
+# extracted from files/testrepos/repo2
 custom_dataset = [
     {'repo':'repo1',
      'basefile':'1',
@@ -61,8 +63,8 @@ custom_dataset = [
      'dcterms_title':'Title of first document in first repo',
      'dcterms_identifier':'R1 D1',
      'dcterms_issued':datetime(2013,2,14,14,6), # important to use real datetime object, not string representation
-     'dcterms_publisher': {'iri': 'http://example.org/publisher/e',
-                   'label': 'Examples & son'},
+     'dcterms_publisher': {'iri': 'http://example.org/vocab/publ1',
+                   'label': 'Publishing & sons'},
      'dc_subject': ['green', 'standards'],
      'text': 'Long text here'},
     {'repo':'repo1',
@@ -71,8 +73,8 @@ custom_dataset = [
      'dcterms_title':'Title of second document in first repo',
      'dcterms_identifier':'R1 D2',
      'dcterms_issued':datetime(2013,3,4,14,16),
-     'dcterms_publisher': {'iri': 'http://example.org/publisher/e',
-                   'label': 'Examples & son'},
+     'dcterms_publisher': {'iri': 'http://example.org/vocab/publ2',
+                   'label': 'Bookprinters and associates'},
      'dc_subject': ['suggestions'],
      'text': 'Even longer text here'},
     {'repo':'repo2',
@@ -302,6 +304,13 @@ class CustomQuery(object):
         self.assertEqual(len(res),2)
         identifiers = set([x['dcterms_identifier'] for x in res])
         self.assertEqual(identifiers, set(['R1 D1','R1 D2']))
+
+
+    def test_resource_partial_uri(self):
+        self.load(custom_dataset)
+        res, pager = self.index.query(dcterms_publisher="*/publ1")
+        self.assertEqual(len(res),1)
+        self.assertEqual(res[0]['dcterms_identifier'], 'R1 D1') 
 
 #----------------------------------------------------------------
 #

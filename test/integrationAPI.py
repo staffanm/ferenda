@@ -93,19 +93,52 @@ class BasicAPI(object):
         self.assertEqual(want, got)
 
     def test_faceted_query(self):
-        # self.env['PATH_INFO'] = "/-/publ?publisher.iri=*%2Fregeringskansliet"
-        self.env['QUERY_STRING'] = "publisher.iri=*%2Fregeringskansliet"
+        self.env['QUERY_STRING'] = "dcterms_publisher=*%2Fpublisher%2FA"
         self.env['HTTP_ACCEPT'] = 'application/json'
         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
-        want = {}
+        want = {'current': '/-/publ?dcterms_publisher=*%2Fpublisher%2FA',
+                'duration': None,
+                'items': [{'dcterms_identifier': '123(A)',
+                           'dcterms_issued': '2014-01-04',
+                           'dcterms_publisher': {'iri': 'http://example.org/publisher/A',
+                                                 'label': 'http://example.org/publisher/A'},
+                           'dcterms_title': 'Example',
+                           'matches': {'text': 'This is part of the main document, but '
+                                       'not of any sub-resource. This is the '
+                                       'tail end of the main document'},
+                           'rdf_type': 'http://purl.org/ontology/bibo/Standard',
+                           'uri': 'http://example.org/base/123/a'}],
+                'itemsPerPage': 10,
+                'startIndex': 0,
+                'totalResults': 1}
         self.assertEqual(want, got)
 
+        # using publisher.iri instead of dcterms_publisher is a test
+        # of legacyapi
+        self.env['QUERY_STRING'] = "publisher.iri=*%2Fpublisher%2FA"
+        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
+        want['current'] = "/-/publ?publisher.iri=*%2Fpublisher%2FA" # FIXME: this illustrates the need to construct 'current' dynamically.
+        self.assertEqual(want, got)
+        
+        
     def test_complex_query(self):
-        # self.env['PATH_INFO'] = "/-/publ?q=r%C3%A4tt*&publisher.iri=*%2Fregeringskansliet"
-        self.env['QUERY_STRING'] = "q=r%C3%A4tt*&publisher.iri=*%2Fregeringskansliet"
+        self.env['QUERY_STRING'] = "q=haystack&dcterms_publisher=*%2Fpublisher%2FB"
         self.env['HTTP_ACCEPT'] = 'application/json'
         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
-        want = {}
+        want =  {'current': '/-/publ?q=haystack&dcterms_publisher=*%2Fpublisher%2FB',
+                 'duration': None,
+                 'items': [{'dcterms_identifier': '123(C)',
+                            'dcterms_issued': '2014-05-06',
+                            'dcterms_publisher': {'iri': 'http://example.org/publisher/B',
+                                                  'label': 'http://example.org/publisher/B'},
+                            'dcterms_title': 'Of needles and haystacks',
+                            'matches': {'text': ''},
+                            'rdf_type': 'http://purl.org/ontology/bibo/Standard',
+                            'uri': 'http://example.org/base/123/c'}],
+                 'itemsPerPage': 10,
+                 'startIndex': 0,
+                 'totalResults': 1}
+
         self.assertEqual(want, got)
 
 # Mixin-style classes that are mixed with BasicAPI 
@@ -127,11 +160,18 @@ class FusekiBase():
     storelocation = 'http://localhost:3030/'
     storerepository = 'ds'
 
+class SesameBase():
+    storetype = 'SESAME'
+    storelocation = 'http://localhost:8080/openrdf-sesame'
+    storerepository = 'ferenda'
+
 # Then the actual testcases are created by combining base classes
 class WhooshSQLiteBasicAPI(BasicAPI, WhooshBase, SQLiteBase, WSGI): pass
 class WhooshFusekiBasicAPI(BasicAPI, WhooshBase, FusekiBase, WSGI): pass
+class WhooshSesameBasicAPI(BasicAPI, WhooshBase, SesameBase, WSGI): pass
 class ESSQLiteBasicAPI(BasicAPI, ESBase, SQLiteBase, WSGI): pass
 class ESFusekiBasicAPI(BasicAPI, ESBase, FusekiBase, WSGI): pass
+class ESSesameBasicAPI(BasicAPI, ESBase, SesameBase, WSGI): pass
 
 
 #================================================================
@@ -241,6 +281,8 @@ class AdvancedAPI(object):
 # Then the actual testcases are created by combining base classes
 class WhooshSQLiteAdvancedAPI(AdvancedAPI, WhooshBase, SQLiteBase, WSGI): pass
 class WhooshFusekiAdvancedAPI(AdvancedAPI, WhooshBase, FusekiBase, WSGI): pass
+class WhooshSesameAdvancedAPI(AdvancedAPI, WhooshBase, SesameBase, WSGI): pass
 class ESSQLiteAdvancedAPI(AdvancedAPI, ESBase, SQLiteBase, WSGI): pass
 class ESFusekiAdvancedAPI(AdvancedAPI, ESBase, FusekiBase, WSGI): pass
+class ESSesameAdvancedAPI(AdvancedAPI, ESBase, SesameBase, WSGI): pass
 
