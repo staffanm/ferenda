@@ -473,6 +473,8 @@ class WhooshIndex(FulltextIndex):
                     start = v.min
                     end = v.max
                 filter.append(cls(k, start, end))
+            elif isinstance(v, str) and "*" in v:
+                filter.append(whoosh.query.Wildcard(k, v))
             else:
                 # exact field match
                 # 

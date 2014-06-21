@@ -73,23 +73,28 @@ class BasicAPI(object):
             "items": [
                 {
                     "dcterms_identifier": "123(A)",
-                    "dcterms_issued": "2014-01-04T00:00:00",
+                    "dcterms_issued": "2014-01-04",
                     "dcterms_publisher": {
                         "iri": "http://example.org/publisher/A",
                         "label": "http://example.org/publisher/A"
                     },
                     "dcterms_title": "Example",
                     "matches": {
-                        "text": "This is the <em class=\"match\">tail</em> end of the main document"
+                        "text": "<em class=\"match\">tail</em> end of the main document"
                     },
-            "rdf_type": "http://purl.org/ontology/bibo/Standard",
+                    "rdf_type": "http://purl.org/ontology/bibo/Standard",
                     "uri": "http://example.org/base/123/a"
                 }
-    ],
-    "itemsPerPage": 10,
+            ],
+            "itemsPerPage": 10,
             "startIndex": 0,
             "totalResults": 1
         }
+        # FIXME: Whoosh and ElasticSearch has slightly different ideas
+        # on how to highlight matching snippets.
+        if isinstance(self, WhooshBase):
+            want['items'][0]['matches']['text'] = "This is the <em class=\"match\">tail</em> end of the main document"
+            want['items'][0]['dcterms_issued'] += "T00:00:00"
         self.assertEqual(want, got)
 
     def test_faceted_query(self):
@@ -111,6 +116,11 @@ class BasicAPI(object):
                 'itemsPerPage': 10,
                 'startIndex': 0,
                 'totalResults': 1}
+        # FIXME: Whoosh (and our own fulltextindex.IndexedType
+        # objects) cannot handle a pure date field (always converted
+        # to DateTime). Adjust expectations.
+        if isinstance(self, WhooshBase):
+            want['items'][0]['dcterms_issued'] += "T00:00:00"
         self.assertEqual(want, got)
 
         # using publisher.iri instead of dcterms_publisher is a test
@@ -139,6 +149,9 @@ class BasicAPI(object):
                  'startIndex': 0,
                  'totalResults': 1}
 
+        # FIXME: See above
+        if isinstance(self, WhooshBase):
+            want['items'][0]['dcterms_issued'] += "T00:00:00"
         self.assertEqual(want, got)
 
 # Mixin-style classes that are mixed with BasicAPI 
@@ -255,11 +268,33 @@ class AdvancedAPI(object):
         self.env['PATH_INFO'] = '/myapi/'
         self.env['QUERY_STRING'] = 'uri=*/repo1/a'
         status, headers, content = self.call_wsgi(self.env)
+        got = json.loads(content.decode("utf-8"))
         self.assertResponse("200 OK",
                             {'Content-Type': 'application/json'},
-                            json.dumps({'hello': 'world'}),
+                            None,
                             status, headers, content)
-        pass
+        want = {"current": "/myapi/?uri=*/repo1/a",
+                "duration": None,
+                "items": [
+                    {
+                        "dcterms_issued": "2012-04-01",
+                        "dcterms_publisher": {
+                            "iri": "http://example.org/vocab/publ1",
+                            "label": "Publishing & sons"
+                        },
+                        "dcterms_title": "A simple doc",
+                        "matches": {
+                            "text": "This is part of the main document, but not of any sub-resource."
+                        },
+                        "rdf_type": "http://example.org/vocab/MainType",
+                        "uri": "http://example.org/repo1/a"
+                    }
+                ],
+                "itemsPerPage": 10,
+                "startIndex": 0,
+                "totalResults": 1
+            }
+        self.assertEqual(want, got)
 
     def test_faceting(self):
         # make sure wsgi_stats deliver documents in the buckets we

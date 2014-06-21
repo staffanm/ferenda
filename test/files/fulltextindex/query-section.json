@@ -1,1 +1,19 @@
-{"took":4,"timed_out":false,"_shards":{"total":1,"successful":1,"failed":0},"hits":{"total":2,"max_score":0.68289655,"hits":[{"_index":"ferenda","_type":"base","_id":"1s1","_score":0.68289655, "_source" : {"basefile": "1", "dcterms_identifier": "Doc #1 (section 1)", "text": "This is an (updated version of a) independent section, with extra section boost", "uri": "http://example.org/doc/1#s1", "title": "First section"},"highlight":{"text":[" of a) independent <strong class='match'>section</strong>, with extra <strong class='match'>section</strong> boost"]}},{"_index":"ferenda","_type":"base","_id":"1s2","_score":0.643841, "_source" : {"basefile": "1", "dcterms_identifier": "Doc #1 (section 2)", "text": "This is another independent section", "uri": "http://example.org/doc/1#s2", "title": "Second sec"},"highlight":{"text":["This is another independent <strong class='match'>section</strong>"]}}]}}
+{"took":2,"timed_out":false,"_shards":{"total":1,"successful":1,"failed":0},"hits":{"total":3,"max_score":3.5,"hits":[{"_index":"ferenda","_type":"base","_id":"1s2","_score":3.5, "_source" : {
+    "text": "This is another independent section",
+    "uri": "http://example.org/doc/1#s2",
+    "basefile": "1",
+    "dcterms_identifier": "Doc #1 (section 2)",
+    "dcterms_title": "Second sec"
+},"highlight":{"text":["This is another independent <strong class='match'>section</strong>"]}},{"_index":"ferenda","_type":"base","_id":"1s1","_score":2.6516504, "_source" : {
+    "text": "This is an (updated version of a) independent section, with extra section boost",
+    "uri": "http://example.org/doc/1#s1",
+    "basefile": "1",
+    "dcterms_identifier": "Doc #1 (section 1)",
+    "dcterms_title": "First section"
+},"highlight":{"text":[") independent <strong class='match'>section</strong>, with extra <strong class='match'>section</strong> boost"]}},{"_index":"ferenda","_type":"base","_id":"1","_score":0.15467961, "_source" : {
+    "text": "This is the main text of the document (independent sections excluded)",
+    "uri": "http://example.org/doc/1",
+    "basefile": "1",
+    "dcterms_identifier": "Doc #1",
+    "dcterms_title": "First example"
+},"highlight":{"text":["This is the main text of the document (independent <strong class='match'>sections</strong> excluded)"]}}]}}

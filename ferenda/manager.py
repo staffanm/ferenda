@@ -795,7 +795,6 @@ def _wsgi_query(environ, args):
     #             '_pageSize':10}
     param = dict(parse_qsl(environ['QUERY_STRING']))
     filtered = dict([(k,v) for k,v in param.items() if not (k.startswith("_") or k == "q")])
-
     if legacyapi:
         newfiltered = {}
         # transform publisher.iri => dcterms_publisher (ie remove
@@ -803,7 +802,7 @@ def _wsgi_query(environ, args):
         for k, v in filtered.items():
             if k.endswith(".iri"):
                 k = k[:-4]
-            if "_" not in k:
+            if "_" not in k and k not in ("uri"): 
                 # best guess: always use the dcterms prefix
                 k = "dcterms_" + k
             newfiltered[k] = v

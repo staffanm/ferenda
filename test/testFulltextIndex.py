@@ -23,6 +23,7 @@ from integrationFulltextIndex import BasicIndex, BasicQuery, ESBase
 
 CREATE_CANNED = False
 
+
 # this is copied directly from testTriplestore and should perhaps go
 # into ferenda.testutil
 def canned(*responses, **kwargs):
@@ -145,9 +146,11 @@ class MockESBasicQuery(BasicQuery, MockESBase):
 
         can = canned((200, "count-0.json"),
                      (200, "count-4.json"),
+                     (200, "schema.json"),
+                     (200, "schema.json"),
+                     (200, "schema.json"), # FIXME: This is embarrasing...
                      create=CREATE_CANNED, method="get")
         mock_requests.get.side_effect = can
-
         super(MockESBasicQuery, self).test_basic()
 
     @patch('ferenda.fulltextindex.requests')
