@@ -195,7 +195,17 @@ class DocumentRepository(object):
     # parse() specific class properties
     rdf_type = Namespace(util.ns['foaf']).Document
     """The RDF type of the documents you are handling (expressed as a
-    :py:class:`rdflib.term.URIRef` object)."""
+    :py:class:`rdflib.term.URIRef` object).
+
+    ..note::
+
+      If your repo produces documents of several different types, you
+      can define this as a list (or other iterable) of
+      :py:class:`~rdflib.term.URIRef`
+      objects. :py:meth:`~ferenda.DocumentRepository.faceted_data()`
+      will only find documents that are any of the types.
+
+    """
 
     source_encoding = "utf-8"
     """The character set that the source HTML documents use (if
@@ -1650,18 +1660,29 @@ parsed document path to that documents dependency file."""
         ... SELECT DISTINCT ?uri ?type ?title ?publisher ?identifier ?issued
         ... FROM <http://example.org/ctx/base>
         ... WHERE {
-        ...     ?uri rdf:type foaf:Document ; rdf:type ?type .
+        ...     ?uri rdf:type foaf:Document .
+        ...     OPTIONAL { ?uri rdf:type ?type . }
         ...     OPTIONAL { ?uri dcterms:title ?title . }
         ...     OPTIONAL { ?uri dcterms:publisher ?publisher . }
         ...     OPTIONAL { ?uri dcterms:identifier ?identifier . }
         ...     OPTIONAL { ?uri dcterms:issued ?issued . }
+        ... 
         ... }\"""
         >>> d.facet_query("http://example.org/ctx/base") == expected
         True
         """
         from_graph = "FROM <%s>" % context
         predicates = [f.rdftype for f in self.facets()]
-        namespaces = [ns for ns in self.ns.values() if [f for f in predicates + [self.rdf_type] if f.startswith(ns)]]
+        rdftypes = self.rdf_type
+        # assume that self.rdf_type normally is a list/iterable
+        if isinstance(rdftypes, URIRef): 
+            rdftypes = [rdftypes]
+        else:
+            rdftypes = list(rdftypes)
+        namespaces = [ns for ns in self.ns.values() if [f for f in predicates + rdftypes if f.startswith(ns)]]
+        if self.ns['rdf'] not in namespaces:
+            namespaces.append(self.ns['rdf'])
+
         g = self.make_graph()
         bindings = " ".join(["?" + util.uri_leaf(b) for b in predicates])
         # FIXME: the below whereclause is meant to select only
@@ -1670,23 +1691,31 @@ parsed document path to that documents dependency file."""
         # == self.rdf_type which is inflexible. 
         # whereclause = "?uri %s ?%s" % (g.qname(predicates[0]),
         #                                util.uri_leaf(predicates[0]))
-        whereclause = "?uri rdf:type %s ; %s ?%s" % (g.qname(self.rdf_type),
-                                                     g.qname(predicates[0]),
-                                                     util.uri_leaf(predicates[0]))
+        types = "(" + "|".join([g.qname(x) for x in rdftypes]) + ")"
+        types = g.qname(rdftypes[0])
+        if len(rdftypes) == 1:
+            whereclause = "?uri rdf:type %s" % types
+            filterclause = ""
+        else:
+            whereclause = "?uri rdf:type ?type"
+            filterclause = "    FILTER (?type in (%s)) ." % ", ".join([g.qname(x) for x in rdftypes])
+            
         optclauses = "".join(
-            ["    OPTIONAL { ?uri %s ?%s . }\n" % (g.qname(b), util.uri_leaf(b)) for b in predicates[1:]])
+            ["    OPTIONAL { ?uri %s ?%s . }\n" % (g.qname(b), util.uri_leaf(b)) for b in predicates])[:-1]
 
         # FIXME: The above doctest looks like crap since all
         # registered namespaces in the repo is included. Should only
         # include prefixes actually used
         prefixes = "".join(["PREFIX %s: <%s>\n" % (p, u) for p, u in sorted(self.ns.items()) if u in namespaces])
-        query = """%s
-SELECT DISTINCT ?uri %s
-%s
+            
+        query = """%(prefixes)s
+SELECT DISTINCT ?uri %(bindings)s
+%(from_graph)s
 WHERE {
-    %s .
-%s}""" % (
-            prefixes, bindings, from_graph, whereclause, optclauses)
+    %(whereclause)s .
+%(optclauses)s
+%(filterclause)s
+}""" % locals()
         return query
 
     def facet_select(self, query):

@@ -133,7 +133,7 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
         :type  query: str
         :param format: Either one of the standard formats for queries
                        (``"sparql"``, ``"json"`` or ``"binary"``) --
-                       returns whatever ``requests.get().text``
+                       returns whatever ``requests.get().content``
                        returns -- or the special value ``"python"``
                        which returns a python list of dicts
                        representing rows and columns.
@@ -446,7 +446,7 @@ class RemoteStore(TripleStore):
             # elif format == "json":
             #     return results.json()
             else:
-                return results.text
+                return results.content # not .text -- should return raw bytestring response
         except requests.exceptions.HTTPError as e:
             raise errors.SparqlError(e)
 

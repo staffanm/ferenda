@@ -299,7 +299,18 @@ class AdvancedAPI(object):
     def test_faceting(self):
         # make sure wsgi_stats deliver documents in the buckets we
         # expect, and that all buckets are there.
-        self.fail("not implemented")
+        self.env['PATH_INFO'] = '/myapi/'
+        self.env['PATH_INFO'] = "/-/publ;stats"
+        self.env['HTTP_ACCEPT'] = 'application/json'
+        status, headers, content = self.call_wsgi(self.env)
+        got = json.loads(content.decode("utf-8"))
+        want = {}
+        self.assertResponse("200 OK",
+                            {'Content-Type': 'application/json'},
+                            None,
+                            status, headers, content)
+        self.assertEqual(want, got)
+        
 
     def test_query(self):
         # make sure we can do queries on default and custom facets and

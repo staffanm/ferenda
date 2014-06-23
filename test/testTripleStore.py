@@ -229,17 +229,16 @@ class Main(unittest.TestCase, FerendaTestCase):
     def test_sesame_select(self, mock_get):
         store = TripleStore.connect("SESAME", "", "")
         rf = util.readfile
-        want = rf("test/files/triplestore/select-results.xml")
+        want = rf("test/files/triplestore/select-results.xml").encode()
         got = store.select("the-query")
         self.assertEqual(want, got)
         self.assertEqual(mock_get.call_count, 1)
 
         want = rf("test/files/triplestore/select-results.json")
-        got = store.select("the-query", format="json")
+        got = store.select("the-query", format="json").decode()
         self.assertEqual(json.loads(want), json.loads(got))
         self.assertEqual(mock_get.call_count, 2)
 
-        # want = json.loads(rf("test/files/triplestore/select-results-python.json"))
         want = json.loads(rf("test/files/triplestore/select-results-python.json"))
         got = store.select("the-query", format="python")
         self.assertEqual(want, got)

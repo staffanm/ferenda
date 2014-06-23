@@ -1321,6 +1321,7 @@ class RelateFulltext(RepoTester):
                            uri='http://example.org/repo3/b',
                            text="A document with common properties, but unusual data types for those properties.",
                            dc_creator='Fred Bloggs',
+                           dcterms_identifier='3 stroke B',
                            dcterms_issued='June 10th, 2014',
                            dcterms_rightsHolder= [{'iri': 'http://example.org/vocab/company1',
                                                    'label': 'Comp Inc'},
@@ -1329,6 +1330,7 @@ class RelateFulltext(RepoTester):
                            dcterms_title='A doc with unusual metadata'
                        ),
                       call(basefile='b',
+                           dcterms_identifier='3/B (1)',
                            repo='repo3',
                            uri='http://example.org/repo3/b#S1',
                            text="This is part of a subdocument, that has some unique properties",
@@ -2001,11 +2003,13 @@ PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 SELECT DISTINCT ?uri ?type ?title ?publisher ?identifier ?issued
 FROM <http://example.org/ctx/base>
 WHERE {
-    ?uri rdf:type foaf:Document ; rdf:type ?type .
+    ?uri rdf:type foaf:Document .
+    OPTIONAL { ?uri rdf:type ?type . }
     OPTIONAL { ?uri dcterms:title ?title . }
     OPTIONAL { ?uri dcterms:publisher ?publisher . }
     OPTIONAL { ?uri dcterms:identifier ?identifier . }
     OPTIONAL { ?uri dcterms:issued ?issued . }
+
 }"""
         self.assertEqual(want,
                          self.repo.facet_query("http://example.org/ctx/base"))

@@ -709,10 +709,12 @@ def _wsgi_stats(repos, rooturl):
     for repo in repos:
         qname_graph = repo.make_graph() # only ever used to map URIs to qnames
         repodata = repo.faceted_data()
-        data.extend(repodata) # assume that no two repos ever have data about the same URI
+        data.extend(repodata) # assume that no two repos ever have
+                              # data about the same URI
 
         # FIXME: continue here...
-        data = repo.toc_select(repo.dataset_uri())
+        # data = repo.toc_select(repo.dataset_uri())
+    for repo in repos:
         criteria = repo.toc_criteria(repo.toc_predicates())
         pagesets = repo.toc_pagesets(data, criteria)
         selected = repo.toc_select_for_pages(data, pagesets, criteria)

@@ -404,7 +404,7 @@ class Regeringen(SwedishLegalSource):
                 _check_differing(d, self.ns['dcterms'].identifier, "Prop. " + m.group(1))
             # dcterms:title
             if element.getfont()['size'] == '20' and not title_found:
-                # sometimes part of the the dcterms:identifer (eg " Prop."
+                # sometimes part of the the dcterms:identifier (eg " Prop."
                 # or " 2013/14:51") gets mixed up in the title
                 # textbox. Remove those parts if we can find them.
                 if " Prop." in str_element:

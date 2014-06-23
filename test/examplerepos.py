@@ -1,5 +1,5 @@
 # 3rd party
-from rdflib import Graph, Namespace
+from rdflib import Graph, Namespace, URIRef
 from rdflib.namespace import RDF, DC, DCTERMS
 SCHEMA = Namespace("http://schema.org/")
 
@@ -17,6 +17,12 @@ class DocRepo1(DocumentRepository):
     # C ex:OtherType    "More docs"      ex:publ2          2014-05-06
     # D ex:YetOtherType "Another doc"    ex:publ3          2014-09-23
     alias = "repo1"
+    namespaces = ['rdf', 'rdfs', 'xsd', 'xsi', 'dcterms', 'foaf',
+                  ('ex', 'http://example.org/vocab/')]
+    rdf_type = (URIRef('http://example.org/vocab/MainType'),
+                URIRef('http://example.org/vocab/OtherType'),
+                URIRef('http://example.org/vocab/YetOtherType'))
+                
     @property
     def commondata(self):
         return Graph().parse(format="turtle", data="""
@@ -46,8 +52,9 @@ class DocRepo1(DocumentRepository):
 class DocRepo2(DocRepo1):
     # this repo contains facets that excercize all kinds of fulltext.IndexedType objects
     alias = "repo2"
-    namespaces = ['rdf', 'rdfs', 'xsd', 'xsi', 'dcterms', 'dc', 'schema']
-
+    namespaces = ['rdf', 'rdfs', 'xsd', 'xsi', 'dcterms', 'dc', 'schema', 'foaf',
+                  ('ex', 'http://example.org/vocab/')]
+    rdf_type = URIRef('http://example.org/vocab/MainType')
     def is_april_fools(self, row, binding):
         return (len(row[binding]) == 10 and # Full YYYY-MM-DD string
                 row[binding][5:] == "04-01") # 1st of april
@@ -70,8 +77,9 @@ class DocRepo3(DocRepo1):
     # configuration like a title not used for toc (and toplevel only)
     # or DCTERMS.creator for each subsection, or DCTERMS.publisher w/ multiple=True
     alias = "repo3"
-    namespaces = ['rdf', 'rdfs', 'xsd', 'xsi', 'dcterms', 'dc', 'schema']
-
+    namespaces = ['rdf', 'rdfs', 'xsd', 'xsi', 'dcterms', 'dc', 'schema', 'foaf',
+                      ('ex', 'http://example.org/vocab/')]
+    rdf_type = URIRef('http://example.org/vocab/MainType')
     def my_id_selector(self, row, binding, graph):
         # categorize each ID after the number of characters in it
         return str(len(row[binding]))
@@ -86,6 +94,6 @@ class DocRepo3(DocRepo1):
                 Facet(DCTERMS.issued, indexingtype=fulltextindex.Label()),
                 Facet(DCTERMS.rightsHolder, indexingtype=fulltextindex.Resource(), multiple_values=True),
                 Facet(DCTERMS.title, toplevel_only=True),
-                Facet(DCTERMS.identifer, selector=self.my_id_selector, key=self.lexicalkey, label="IDs having %(selected) characters"),
+                Facet(DCTERMS.identifier, selector=self.my_id_selector, key=self.lexicalkey, label="IDs having %(selected) characters"),
                 Facet(DC.creator, toplevel_only=False)]
 

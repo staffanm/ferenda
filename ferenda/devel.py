@@ -355,7 +355,6 @@ class Devel(object):
             # NO! res must be a bytestring, select should return
             # whatever is the appropriately encoded version for the
             # given format.
-            
             print(res.decode('utf-8'))
 
 
