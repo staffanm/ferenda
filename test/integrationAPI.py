@@ -258,7 +258,7 @@ class AdvancedAPI(object):
                     # print(distilled_graph.serialize(format="turtle").decode())
                 # finally index all the data into the triplestore/fulltextindex
                 repo.relate(basefile, self.repos)
-
+        # print(repo._get_triplestore().get_serialized(format="turtle").decode("utf-8"))
 
     def test_indexing(self):
         # make sure that a given basefile exists in it and exhibits
@@ -299,12 +299,12 @@ class AdvancedAPI(object):
     def test_faceting(self):
         # make sure wsgi_stats deliver documents in the buckets we
         # expect, and that all buckets are there.
-        self.env['PATH_INFO'] = '/myapi/'
-        self.env['PATH_INFO'] = "/-/publ;stats"
+        self.env['PATH_INFO'] = '/myapi/;stats'
+        # self.env['PATH_INFO'] = "/-/publ;stats"
         self.env['HTTP_ACCEPT'] = 'application/json'
         status, headers, content = self.call_wsgi(self.env)
         got = json.loads(content.decode("utf-8"))
-        want = {}
+        want = json.load(open("test/files/api/publ-stats-advanced.json"))
         self.assertResponse("200 OK",
                             {'Content-Type': 'application/json'},
                             None,
@@ -315,13 +315,27 @@ class AdvancedAPI(object):
     def test_query(self):
         # make sure we can do queries on default and custom facets and
         # so on. Also make sure _stats=on works.
-        self.fail("not implemented")
+        self.env['PATH_INFO'] = '/myapi/'
+        self.env['HTTP_ACCEPT'] = 'application/json'
 
-    def test_toc(self):
-        # make sure that toc generates all pagesets and that each page
-        # contains the correct docs in the correct order (in addiction
-        # to what testDocRepo.TOC tests).
-        self.fail("not implemented")
+        # test literal string and bool parameters
+        self.env['QUERY_STRING'] = "dc_subject=red&schema_free=true"
+        from pudb import set_trace; set_trace()
+        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
+        want = json.load(open("test/files/api/query-advanced-parameters.json"))
+        self.assertEqual(want, got)
+
+        # test a custom facet (is_april_fools) and stats for those results
+        self.env['QUERY_STRING'] = "aprilfools=true&_stats=on"
+        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
+        want = json.load(open("test/files/api/query-advanced-customfacet.json"))
+        self.assertEqual(want, got)
+
+        # test date ranges
+        self.env['QUERY_STRING'] = "dcterms_issued.min=2012-04-02&dcterms_issued.max=2012-04-03"
+        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
+        want = json.load(open("test/files/api/query-advanced-range.json"))
+        self.assertEqual(want, got)
         
 
 # Then the actual testcases are created by combining base classes

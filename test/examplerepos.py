@@ -1,3 +1,6 @@
+# builtin
+from datetime import datetime
+
 # 3rd party
 from rdflib import Graph, Namespace, URIRef
 from rdflib.namespace import RDF, DC, DCTERMS
@@ -55,9 +58,9 @@ class DocRepo2(DocRepo1):
     namespaces = ['rdf', 'rdfs', 'xsd', 'xsi', 'dcterms', 'dc', 'schema', 'foaf',
                   ('ex', 'http://example.org/vocab/')]
     rdf_type = URIRef('http://example.org/vocab/MainType')
-    def is_april_fools(self, row, binding):
-        return (len(row[binding]) == 10 and # Full YYYY-MM-DD string
-                row[binding][5:] == "04-01") # 1st of april
+    def is_april_fools(self, row, binding, resource_graph):
+        d = datetime.strptime(row[binding], "%Y-%m-%d")
+        return (d.month == 4 and d.day == 1)
         # this selector sorts into True/False buckets
         
     def facets(self):
@@ -65,7 +68,10 @@ class DocRepo2(DocRepo1):
                 Facet(DCTERMS.title),      # fulltextindex.Text(boost=4)
                 Facet(DCTERMS.identifier), # fulltextindex.Label(boost=16)
                 Facet(DCTERMS.issued),     # fulltextindex.Datetime()
-                Facet(DCTERMS.issued, selector=self.is_april_fools),     # fulltextindex.Datetime()
+                Facet(DCTERMS.issued,
+                      selector=self.is_april_fools,
+                      dimension_type="value",
+                      dimension_label="aprilfools"),     # fulltextindex.Datetime()
                 Facet(DCTERMS.publisher),  # fulltextindex.Resource()
                 Facet(DC.subject),     # fulltextindex.Keywords()
                 Facet(SCHEMA.free)     # fulltextindex.Boolean()

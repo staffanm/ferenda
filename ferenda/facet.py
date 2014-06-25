@@ -1,122 +1,60 @@
 import logging
+from datetime import datetime
 
 from rdflib import URIRef, Namespace
 from rdflib.namespace import RDF, RDFS, DC, SKOS, FOAF, DCTERMS
 SCHEMA = Namespace("http://schema.org/")
 
 from ferenda import fulltextindex # to get the IndexedType classes
+from ferenda import util
 
 class Facet(object):
-    @staticmethod
-    def defaultselector(row, binding):
+    @classmethod
+    def defaultselector(cls, row, binding, resource_graph=None):
         return row[binding]
-      
-    @staticmethod
-    def firstletter(row, binding='dcterms_title'):
-        return titlesortkey(row, binding)[0]
 
-    @staticmethod
-    def year(row, binding='dcterms_issued'):
-        # assume a date(time) on the form 2014-06-05, the year == the first 4 chars
-        return row[binding][:4]
+    @classmethod
+    def year(cls, row, binding='dcterms_issued', resource_graph=None):
+        # assume a date(time) like '2014-06-05'
+        d = datetime.strptime(row[binding], "%Y-%m-%d")
+        return str(d.year)
 
-    @staticmethod
-    def titlesortkey(row, binding='dcterms_title'):
+    @classmethod
+    def booleanvalue(cls, row, binding='schema_free', resource_graph=None):
+        # only 'true' is True, everything else is False
+        return row[binding] == 'true'
+        
+    @classmethod
+    def titlesortkey(cls, row, binding='dcterms_title', resource_graph=None):
         title = row[binding]
         return util.title_sortkey(title)
 
-    @staticmethod
-    def resourcelabel(row, binding='dcterms_publisher', resourcegraph=None):
+    @classmethod
+    def firstletter(cls, row, binding='dcterms_title', resource_graph=None):
+        return cls.titlesortkey(row, binding)[0]
+
+    @classmethod
+    def resourcelabel(cls, row, binding='dcterms_publisher', resource_graph=None):
         uri = URIRef(row[binding])
         for pred in (RDFS.label, SKOS.prefLabel, SKOS.altLabel, DCTERMS.title, DCTERMS.alternative, FOAF.name):
-            if resourcegraph.value(uri, pred):
-                return str(resourcegraph.value(uri, pred))
+            if resource_graph.value(uri, pred):
+                return str(resource_graph.value(uri, pred))
         else:
             return row[binding]
 
-    @staticmethod
-    def sortresource(row, binding='dcterms_publisher', resourcegraph=None):
-        row[binding] = resourcelabel(row, binding, resourcegraph)
-        return titlesortkey(row, binding)
+    @classmethod
+    def sortresource(cls, row, binding='dcterms_publisher', resource_graph=None):
+        row[binding] = cls.resourcelabel(row, binding, resource_graph)
+        return cls.titlesortkey(row, binding)
+
+    @classmethod
+    def qname(cls, row, binding='rdf_type', resource_graph=None):
+        u = URIRef(row[binding])
+        return resource_graph.qname(u)
 
     # define a number of default values, used if the user does not
     # explicitly specify indexingtype/selector/key
-    defaults = {RDF.type: {
-                    'indexingtype': fulltextindex.URI(),
-                    'toplevel_only': False,
-                    'use_for_toc'  : False}, # -> selector etc are irrelevant
-                DCTERMS.title: {
-                    'indexingtype': fulltextindex.Text(boost=4),
-                    'toplevel_only': False,
-                    'use_for_toc': True, 
-                    'selector': firstletter,
-                    'key': titlesortkey,
-                },
-                DCTERMS.identifier: {
-                    'indexingtype': fulltextindex.Label(boost=16),
-                    'toplevel_only': False,
-                    'use_for_toc': True, 
-                    'selector': firstletter,
-                    'key': titlesortkey,
-                },
-                DCTERMS.abstract: {
-                    'indexingtype': fulltextindex.Text(boost=2),
-                    'toplevel_only': True,
-                    'use_for_toc': False
-                },
-                DC.creator:{
-                    'indexingtype': fulltextindex.Label(),
-                    'toplevel_only': True,
-                    'use_for_toc': True,
-                    'selector': firstletter,
-                    'key': titlesortkey,
-                },
-                DCTERMS.publisher:{
-                    'indexingtype': fulltextindex.Resource(),
-                    'toplevel_only': True,
-                    'use_for_toc': True,
-                    'selector': firstletter,
-                    'key': sortresource,
-                },
-                DCTERMS.references:{ # NB: this is a single URI reference w/o label
-                    'indexingtype': fulltextindex.URI(),
-                    'use_for_toc': False,
-                },
-                DCTERMS.issued:{
-                    'indexingtype': fulltextindex.Datetime(),
-                    'toplevel_only': True,
-                    'use_for_toc': True,
-                    'selector': year,
-                    'key': defaultselector,
-                    'selector_descending': True,
-                    'key_descending': True
-                },
-                DC.subject: {
-                    'indexingtype': fulltextindex.Keyword(),  # eg. one or more string literals (not URIRefs),
-                    'multiple_values': True,
-                    'toplevel_only': True,
-                    'use_for_toc': True,
-                    'selector': defaultselector, # probably needs changing
-                    'key': defaultselector,
-                    'multiple_values': True
-                },
-                DCTERMS.subject: {
-                    'indexingtype': fulltextindex.Resource(),  # eg. one or more URIRefs + labels
-                    'multiple_values': True,
-                    'toplevel_only': True,
-                    'use_for_toc': True,
-                    'selector': defaultselector, # probably needs changing
-                    'key': defaultselector,
-                    'multiple_values': True
-                },
-                SCHEMA.free: { # "A flag to signal that the publication is accessible for free."
-                    'indexingtype': fulltextindex.Boolean(),
-                    'toplevel_only': True,
-                    'use_for_toc': True,
-                    'selector': defaultselector,
-                    'key': defaultselector,
-                }
-            }
+    defaults = None
     # formatting directives for label/pagetitle:
     # %(criteria)s = The human-readable criteria for sorting/dividing/faceting, eg "date of publication", "document title" or "publisher"
     # %(selected)s = The selected value, eg "2014", "A", "O'Reilly and Associates Publishing, inc."
@@ -133,6 +71,8 @@ class Facet(object):
                  selector_descending = None,
                  key_descending = None,
                  multiple_values = None,
+                 dimension_type = None,
+                 dimension_label = None
              ):
             
         def _finddefault(provided, rdftype, argumenttype, default):
@@ -164,6 +104,11 @@ class Facet(object):
         self.selector_descending = _finddefault(selector_descending, rdftype, 'selector_descending', False)
         self.key_descending      = _finddefault(key_descending, rdftype, 'key_descending', False)
         self.multiple_values     = _finddefault(multiple_values, rdftype, 'multiple_values', False)
+        self.dimension_type      = _finddefault(dimension_type, rdftype, 'dimension_type', None)
+        # dimension_label should only be provided if an unusual
+        # selector for a rdftype is used (eg is_april_fools() for
+        # dcterms:issued), therefore no rdftype-dependent default.
+        self.dimension_label     = dimension_label
 
     # backwards compatibility shim:
     def as_criteria(self):
@@ -181,43 +126,98 @@ class Facet(object):
         dictrepr = "".join((" %s=%r" % (k, v) for k, v in sorted(self.__dict__.items()) if not callable(v)))
         return ("<%s%s>" % (self.__class__.__name__, dictrepr))
         
+    def __eq__(self, other):
+        # compare only those properties that affects the SET of
+        # selected data using this facet
+        return (self.rdftype == other.rdftype and
+                self.dimension_type == other.dimension_type and
+                self.dimension_label == other.dimension_label and 
+                self.selector == other.selector)
+
         
-    # There should be a way to construct a SPARQL SELECT query from a list of Facets that retrieve all needed data
-    # The needed data should be a simple 2D table, where each Facet is represented by one OR MORE fields 
-    #    (ie a dcterms:publisher should result in the binding "dcterms_publisher" and "dcterms_publisher_label")
- 
-    # There must be a way to get a machine-readable label/identifier for each facet. This is used:
-    # - for variable binding in the sparql query
-    # - for field names in the fulltext index
-    # preferably "dct_title", "rdf_type", etc
+Facet.defaults = {RDF.type: {
+                      'indexingtype': fulltextindex.URI(),
+                      'toplevel_only': False,
+                      'use_for_toc': False,
+                      'selector': Facet.qname,
+                      'dimension_type': "term"},
+                  DCTERMS.title: {
+                      'indexingtype': fulltextindex.Text(boost=4),
+                      'toplevel_only': False,
+                      'use_for_toc': True, 
+                      'selector': Facet.firstletter,
+                      'key': Facet.titlesortkey,
+                      'dimension_type': "value",
+                  },
+                  DCTERMS.identifier: {
+                      'indexingtype': fulltextindex.Label(boost=16),
+                      'toplevel_only': False,
+                      'use_for_toc': True, 
+                      'selector': Facet.firstletter,
+                      'key': Facet.titlesortkey,
+                  },
+                  DCTERMS.abstract: {
+                      'indexingtype': fulltextindex.Text(boost=2),
+                      'toplevel_only': True,
+                      'use_for_toc': False
+                  },
+                  DC.creator:{
+                      'indexingtype': fulltextindex.Label(),
+                      'toplevel_only': True,
+                      'use_for_toc': True,
+                      'selector': Facet.defaultselector,
+                      'key': Facet.titlesortkey,
+                      'dimension_type': "value"
+                  },
+                  DCTERMS.publisher:{
+                      'indexingtype': fulltextindex.Resource(),
+                      'toplevel_only': True,
+                      'use_for_toc': True,
+                      'selector': Facet.defaultselector,
+                      'key': Facet.sortresource,
+                      'dimension_type': 'ref',
+                  },
+                  DCTERMS.references:{ # NB: this is a single URI reference w/o label
+                      'indexingtype': fulltextindex.URI(),
+                      'use_for_toc': False,
+                  },
+                  DCTERMS.issued:{
+                      'indexingtype': fulltextindex.Datetime(),
+                      'toplevel_only': True,
+                      'use_for_toc': True,
+                      'selector': Facet.year,
+                      'key': Facet.defaultselector,
+                      'selector_descending': True,
+                      'key_descending': True,
+                      'dimension_type': "year"
+                  },
+                  DC.subject: {
+                      'indexingtype': fulltextindex.Keyword(),  # eg. one or more string literals (not URIRefs),
+                      'multiple_values': True,
+                      'toplevel_only': True,
+                      'use_for_toc': True,
+                      'selector': Facet.defaultselector, # probably needs changing
+                      'key': Facet.defaultselector,
+                      'multiple_values': True,
+                      'dimension_type': 'value',
+                },
+                DCTERMS.subject: {
+                    'indexingtype': fulltextindex.Resource(),  # eg. one or more URIRefs + labels
+                    'multiple_values': True,
+                    'toplevel_only': True,
+                    'use_for_toc': True,
+                    'selector': Facet.defaultselector, # probably needs changing
+                    'key': Facet.defaultselector,
+                    'multiple_values': True,
+                    'dimension_type': 'value',
+                },
+                SCHEMA.free: { # "A flag to signal that the publication is accessible for free."
+                    'indexingtype': fulltextindex.Boolean(),
+                    'toplevel_only': True,
+                    'use_for_toc': True,
+                    'selector': Facet.booleanvalue,
+                    'key': Facet.defaultselector,
+                    'dimension_type': 'value'
+                }
+            }
 
-    # There should be a way to determine which fields that are to be indexed in the fulltext index. This should be based 
-    #    on the rdftype (determines how we find the content/value of the facet) and the indexingtype (how we store it).
-
-    # The fulltext index stores a number of fields not directly associated with a Facet:
-    # - uri / iri (has corresponding value in the SPARQL SELECT results)
-    # - repo (is not represented in the SPARQL SELECT results)
-    # - basefile (is not represented either)
-
-    # General modeling:
-    # if the rdftype is dcterms:publisher, dcterms:creator, dcterms:subject, the indexingtype SHOULD be fulltextindex.Resource 
-    #    (ie the triple should be a URIRef, not Literal, and we store both resource IRI and label)
-    # if we can only get Literals, use dc:publisher, dc:creator, dc:subject.
-
-    # at least for some facets (dcterms:subject, dcterms:creator), multiple
-    # values must be permitted. 
-   
-
-# should/must work for
-
-# Facets that occur at all documentlevels
-# - Document or sectional type (rdftype=rdf.type, indexingtype=fulltext.URI(), use_for_toc=False, toplevel_only=False)
-# - Title (rdftype=dcterms.title, indexingtype=fulltextindex.Text(boost=4), toplevel_only=False)
-# - Identifier (rdftype=dcterms.identifier, indexingtype=fulltextindex.Label(boost=16), toplevel_only=False, use_for_toc=False) # or True, iff a custom selector method is used (like in RFC.py)
-
-# Facets that only occur at document top level
-# - Abstract (rdftype=dcterms.abstract, indexingtype=fulltextindex.Text(boost=2))
-# - Author (rdftype=dc.creator, indexingtype=fulltextindex.Label()) # ie author is modelled as a Literal
-# - Publisher (rdftype=dcterms.publisher, indexingtype=fulltextindex.Resource()) # publisher is modelled as URIRef, a Literal label is picked from the document or extra/[docrepo].ttl
-# - Literal publisher (rdftype=dc.publisher, indexingtype=fulltextindex.Label()) # publisher modelled as Literal
-# - Publication date (rdftype=dcterms.issued, indexingtype=fulltextindex=Datetime())

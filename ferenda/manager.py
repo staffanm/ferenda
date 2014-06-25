@@ -29,9 +29,10 @@ from ferenda.compat import OrderedDict, MagicMock
 from wsgiref.simple_server import make_server
 from wsgiref.util import FileWrapper
 from wsgiref.util import request_uri
+from operator import itemgetter
 
 import six
-from six.moves.urllib_parse import urlsplit, parse_qsl, urlencode
+from six.moves.urllib_parse import urlsplit, parse_qsl, urlencode, quote
 from six.moves import configparser
 input = six.moves.input
 from six import text_type as str
@@ -58,6 +59,7 @@ from ferenda import TripleStore
 from ferenda import elements
 from ferenda import errors
 from ferenda import util
+from ferenda import fulltextindex
 from ferenda.elements import html
 
 # NOTE: This is part of the published API and must be callable in
@@ -685,98 +687,76 @@ def _get_common_graph(repos, graphuri):
     return g
 
 def _wsgi_stats(repos, rooturl):
-    # find out all dimentions on which we could slice (obviously type,
-    # but perhaps also dcterms:publisher, dcterms:subject, dcterms:issued (grouped
-    # byyear!), prov:wasGeneratedBy -- ie any property that lends
-    # itself naturally to grouping. Should probably have a strong
-    # correlation with toc_predicates and the generated TocCriteria
-    # objects (although grouping on dcterms:title using the first letter
-    # is somewhat atypical. But maybe!).  For each
-    # dimension/predicate, create a list of observations(buckets)
-    # wherein each possible value is paired with the count of each
-    # value (or transformed value, for things like dcterms:issued (take
-    # the year part only) or dcterms:title (take the first significant
-    # letter only)
-
     legacyapi = True # FIXME: should be part of args
     res = {"type": "DataSet",
            "slices" : []
     }
-    # this is wrong: we should mash together similarly-named
-    # dimensions/criteria from different repos (eg rdf:type,
-    # dcterms:title, dcterms:issued)
+    # 1. Fetch all the data we will need from all of the
+    # repositories. While at it, collect all relevant facets,
+    # namespace bindings and commondata as well.
     data = []
+    facets = [] # will contain all unique facets
+    qname_graph = Graph()
+    resource_graph = Graph()
     for repo in repos:
-        qname_graph = repo.make_graph() # only ever used to map URIs to qnames
+        for prefix, ns in repo.make_graph().namespaces():
+            # print("repo %s: binding %s to %s" % (repo.alias, prefix, ns))
+            qname_graph.bind(prefix, ns)
+            resource_graph.bind(prefix, ns)
+        resource_graph += repo.commondata
+        
         repodata = repo.faceted_data()
         data.extend(repodata) # assume that no two repos ever have
                               # data about the same URI
+        for facet in repo.facets():
+            if facet not in facets:
+                facets.append(facet)
 
-        # FIXME: continue here...
-        # data = repo.toc_select(repo.dataset_uri())
-    for repo in repos:
-        criteria = repo.toc_criteria(repo.toc_predicates())
-        pagesets = repo.toc_pagesets(data, criteria)
-        selected = repo.toc_select_for_pages(data, pagesets, criteria)
-        for pageset in pagesets:
-            dimensionlabel = util.uri_leaf(str(pageset.predicate))
-            if not dimensionlabel:
-                dimensionlabel = criteria.binding
+    # 2. For each facet that makes sense (ie those that has .dimension
+    # != None), collect the available observations and the count for
+    # each
+    for facet in facets:
+        
+        if not facet.dimension_type:
+            continue
+        binding = qname_graph.qname(facet.rdftype).replace(":", "_")
+        if facet.dimension_label:
+            dimension_label = facet.dimension_label
+        elif legacyapi:
+            dimension_label = util.uri_leaf(str(facet.rdftype))
+        else:
+            dimension_label = binding
 
-            # look for a slice with a identically-named dimensionlabel
-            for slice in res["slices"]:
-                if slice["dimension"] == dimensionlabel:
-                    break
-            else:
-                # not found -- create a new slice and append it to the
-                # final result
-                slice = {"dimension": dimensionlabel,
-                         "observations": []}
-                res["slices"].append(slice)
-            for page in pageset.pages:
-                # page.value should be mapped to either "term" (a
-                # ontology-defined term, typically a rdf:type value),
-                # "ref" (a URI which should be present in the
-                # var/common graph with a foaf:name or skos:altLabel
-                # value -- not 100% needed though) or "year" (the
-                # year-part of a date). It'd be nice if the SPA js did
-                # support "value" (defined to be any plain text), but
-                # maybe we can hack "ref" to achieve this goal
-                #
-                # FIXME: There is no clean way of determining at this
-                # time what sort of data page.binding refers to
-                # (rdftype, uriref, literal of type date(time) or
-                # plain literal). We guess based on the binding name.
-                observation_value = page.value
-                if page.binding in ("issued"):
-                    observation_type = "year"
-                elif page.binding in ("type"):
-                    observation_type = "term"
-                    observation_value = qname_graph.qname(URIRef(page.value))
-                elif page.binding in ("publisher"):
-                    observation_type = "ref"
-                else:
-                    if legacyapi:
-                        # eg page.value = "a", this'll create the url
-                        # "http://localhost:8000/a", which the SPA js will
-                        # try to look up, fail and fall back on the URI
-                        # leaf => "a"
-                        observation_type = "ref"
-                        observation_value = rooturl+"/"+page.value
-                    else:
-                        observation_type = "value"
+        dimension_type = facet.dimension_type
+        if legacyapi and dimension_type == "value":
+            # legacyapi doesn't support the value type, we must
+            # convert it into ref, and convert all string values to
+            # fake resource ref URIs
+            dimension_type = "ref"
+            transformer = lambda x: ("http://example.org/fake-resource/%s" % x).replace(" ", "_")
+        # elif legacyapi and dimension_type == "term":
+            # # legacyapi expects "Standard" over "bibo:Standard", which is what Facet.qname returns
+            # transformer = lambda x: x.split(":")[1]
+        else:
+            transformer = lambda x: x
 
-                # find or create a similarly-valued observation
-                for observation in slice["observations"]:
-                    if observation.get(observation_type) == observation_value:
-                        break
-                else:
-                    observation = {observation_type: observation_value,
-                                   "count": 0}
-                    slice["observations"].append(observation)
-
-                observation["count"] += len(selected[(page.binding,page.value)])
-
+        observations = {}
+        observed = {} # one file per uri+observation  seen -- avoid
+                      # double-counting
+        for row in data:
+            try:
+                observation = transformer(facet.selector(row, binding, resource_graph))
+                
+                if not observation in observations:
+                    observations[observation] = {dimension_type:observation,
+                                                 "count":0}
+                if (row['uri'], observation) not in observed:
+                    observed[(row['uri'], observation)] = True
+                    observations[observation]["count"] += 1
+            except:
+                pass
+        res["slices"].append({"dimension": dimension_label,
+                              "observations": sorted(observations.values(), key=itemgetter(dimension_type))})
     return res
             
 def _wsgi_query(environ, args):
@@ -809,6 +789,8 @@ def _wsgi_query(environ, args):
                 k = "dcterms_" + k
             newfiltered[k] = v
         filtered = newfiltered
+
+    
         
     # 2. call fulltextindex.query(q='rätt*', pagenum=1, pagelen=10,
     #                             publisher='*/regeringskansliet')
@@ -817,7 +799,19 @@ def _wsgi_query(environ, args):
     #  parameters, controlled by each repo)
     idx = FulltextIndex.connect(args['indextype'],
                                 args['indexlocation'])
-    q= param['q'] if 'q' in param else None 
+
+    # 2.1 some values need to be converted, based upon the
+    # fulltextindex schema. if schema[k] == fulltextindex.Datetime, do
+    # strptime. if schema[k] == fulltextindex.Boolean, convert
+    # 'true'/'false' to True/False.
+    for k, fld in idx.schema().items():
+        if isinstance(fld, fulltextindex.Datetime) and k in filtered:
+            filtered[k] = datetime.strptime(filtered[k], "%Y-%m-%d")
+        elif isinstance(fld, fulltextindex.Boolean) and k in filtered:
+            filtered[k] = (filtered[k] == "true") # only "true" is True
+    
+
+    q = param['q'] if 'q' in param else None
     res, pager = idx.query(q=q,
                            pagenum=int(param.get('_page', '0'))+1,
                            pagelen=int(param.get('_pageSize', '10')),

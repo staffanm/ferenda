@@ -1657,15 +1657,15 @@ parsed document path to that documents dependency file."""
         ... PREFIX foaf: <http://xmlns.com/foaf/0.1/>
         ... PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
         ... 
-        ... SELECT DISTINCT ?uri ?type ?title ?publisher ?identifier ?issued
+        ... SELECT DISTINCT ?uri ?rdf_type ?dcterms_title ?dcterms_publisher ?dcterms_identifier ?dcterms_issued
         ... FROM <http://example.org/ctx/base>
         ... WHERE {
         ...     ?uri rdf:type foaf:Document .
-        ...     OPTIONAL { ?uri rdf:type ?type . }
-        ...     OPTIONAL { ?uri dcterms:title ?title . }
-        ...     OPTIONAL { ?uri dcterms:publisher ?publisher . }
-        ...     OPTIONAL { ?uri dcterms:identifier ?identifier . }
-        ...     OPTIONAL { ?uri dcterms:issued ?issued . }
+        ...     OPTIONAL { ?uri rdf:type ?rdf_type . }
+        ...     OPTIONAL { ?uri dcterms:title ?dcterms_title . }
+        ...     OPTIONAL { ?uri dcterms:publisher ?dcterms_publisher . }
+        ...     OPTIONAL { ?uri dcterms:identifier ?dcterms_identifier . }
+        ...     OPTIONAL { ?uri dcterms:issued ?dcterms_issued . }
         ... 
         ... }\"""
         >>> d.facet_query("http://example.org/ctx/base") == expected
@@ -1684,7 +1684,7 @@ parsed document path to that documents dependency file."""
             namespaces.append(self.ns['rdf'])
 
         g = self.make_graph()
-        bindings = " ".join(["?" + util.uri_leaf(b) for b in predicates])
+        bindings = " ".join(["?" + g.qname(b).replace(":", "_") for b in predicates])
         # FIXME: the below whereclause is meant to select only
         # top-level documents (not documentparts), but does so by
         # requiring that all top-level documents should have rdf:type
@@ -1701,7 +1701,8 @@ parsed document path to that documents dependency file."""
             filterclause = "    FILTER (?type in (%s)) ." % ", ".join([g.qname(x) for x in rdftypes])
             
         optclauses = "".join(
-            ["    OPTIONAL { ?uri %s ?%s . }\n" % (g.qname(b), util.uri_leaf(b)) for b in predicates])[:-1]
+            ["    OPTIONAL { ?uri %s ?%s . }\n" % (g.qname(b), g.qname(b).replace(":", "_")) for b in predicates])[:-1]
+
 
         # FIXME: The above doctest looks like crap since all
         # registered namespaces in the repo is included. Should only
@@ -2134,12 +2135,10 @@ WHERE {
         ... PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
         ... PREFIX xsi: <http://www.w3.org/2001/XMLSchema-instance>
         ... 
-        ... SELECT DISTINCT ?uri ?type ?title ?publisher ?issued
+        ... SELECT DISTINCT ?uri ?title ?issued
         ... FROM <http://example.org/ctx/base>
         ... WHERE {
-        ...     ?uri rdf:type foaf:Document ; rdf:type ?type .
-        ...     OPTIONAL { ?uri dcterms:title ?title . }
-        ...     OPTIONAL { ?uri dcterms:publisher ?publisher . }
+        ...     ?uri rdf:type foaf:Document ; dcterms:title ?title .
         ...     OPTIONAL { ?uri dcterms:issued ?issued . }
         ... }\"""
         >>> d.toc_query("http://example.org/ctx/base") == expected
@@ -2258,9 +2257,7 @@ WHERE {
         in toc_query."""
 
         return [
-            self.ns['rdf'].type,
             self.ns['dcterms'].title,
-            self.ns['dcterms'].publisher,
             self.ns['dcterms'].issued
         ]
 

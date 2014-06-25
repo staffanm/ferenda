@@ -1833,12 +1833,10 @@ PREFIX xhv: <http://www.w3.org/1999/xhtml/vocab#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 PREFIX xsi: <http://www.w3.org/2001/XMLSchema-instance>
 
-SELECT DISTINCT ?uri ?type ?title ?publisher ?issued
+SELECT DISTINCT ?uri ?title ?issued
 FROM <http://example.org/ctx/base>
 WHERE {
-    ?uri rdf:type foaf:Document ; rdf:type ?type .
-    OPTIONAL { ?uri dcterms:title ?title . }
-    OPTIONAL { ?uri dcterms:publisher ?publisher . }
+    ?uri rdf:type foaf:Document ; dcterms:title ?title .
     OPTIONAL { ?uri dcterms:issued ?issued . }
 }"""
         self.assertEqual(want,
@@ -2000,15 +1998,15 @@ class Faceting(RepoTester):
 PREFIX foaf: <http://xmlns.com/foaf/0.1/>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
-SELECT DISTINCT ?uri ?type ?title ?publisher ?identifier ?issued
+SELECT DISTINCT ?uri ?rdf_type ?dcterms_title ?dcterms_publisher ?dcterms_identifier ?dcterms_issued
 FROM <http://example.org/ctx/base>
 WHERE {
     ?uri rdf:type foaf:Document .
-    OPTIONAL { ?uri rdf:type ?type . }
-    OPTIONAL { ?uri dcterms:title ?title . }
-    OPTIONAL { ?uri dcterms:publisher ?publisher . }
-    OPTIONAL { ?uri dcterms:identifier ?identifier . }
-    OPTIONAL { ?uri dcterms:issued ?issued . }
+    OPTIONAL { ?uri rdf:type ?rdf_type . }
+    OPTIONAL { ?uri dcterms:title ?dcterms_title . }
+    OPTIONAL { ?uri dcterms:publisher ?dcterms_publisher . }
+    OPTIONAL { ?uri dcterms:identifier ?dcterms_identifier . }
+    OPTIONAL { ?uri dcterms:issued ?dcterms_issued . }
 
 }"""
         self.assertEqual(want,
