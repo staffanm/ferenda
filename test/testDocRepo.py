@@ -1323,7 +1323,7 @@ class RelateFulltext(RepoTester):
                            text="A document with common properties, but unusual data types for those properties.",
                            dc_creator='Fred Bloggs',
                            dcterms_identifier='3 stroke B',
-                           dcterms_issued='June 10th, 2014',
+                           # dcterms_issued='June 10th, 2014', # removed non-standard DCTERMS.issued property
                            dcterms_rightsHolder= [{'iri': 'http://example.org/vocab/company1',
                                                    'label': 'Comp Inc'},
                                                   {'iri': 'http://example.org/vocab/company2',

@@ -834,7 +834,6 @@ class ElasticSearchIndex(RemoteIndex):
                          },
             "mappings": {}
         }
-
         for repo in repos:
             g = repo.make_graph() # for qname lookup
             es_fields = {}
@@ -846,7 +845,7 @@ class ElasticSearchIndex(RemoteIndex):
                     fld = g.qname(facet.rdftype).replace(":", "_")
                 idxtype = facet.indexingtype
                 schema[fld] = idxtype
-
+            
             for key, fieldtype in schema.items():
                 if key == "repo":
                     continue  # not really needed for ES, as type == repo.alias

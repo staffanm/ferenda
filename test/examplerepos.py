@@ -101,7 +101,10 @@ class DocRepo3(DocRepo1):
         
         # note that RDF.type is not one of the facets
         return [Facet(DC.publisher),
-                Facet(DCTERMS.issued, indexingtype=fulltextindex.Label()),
+                # Having a dcterms_issued of type string conflicts
+                # with other repos havind dcterms_issued of type date
+                # (range queries against the field does not work). Disable for now.
+                # Facet(DCTERMS.issued, indexingtype=fulltextindex.Label()),
                 Facet(DCTERMS.rightsHolder, indexingtype=fulltextindex.Resource(), multiple_values=True),
                 Facet(DCTERMS.title, toplevel_only=True),
                 Facet(DCTERMS.identifier, selector=self.my_id_selector, key=self.lexicalkey, label="IDs having %(selected) characters"),

@@ -327,12 +327,14 @@ class AdvancedAPI(object):
         # test a custom facet (is_april_fools) and stats for those results
         self.env['QUERY_STRING'] = "aprilfools=true&_stats=on"
         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
-        from pudb import set_trace; set_trace()
         want = json.load(open("test/files/api/query-advanced-customfacet.json"))
         self.assertEqual(want, got)
 
-        # test date ranges
-        self.env['QUERY_STRING'] = "dcterms_issued.min=2012-04-02&dcterms_issued.max=2012-04-03"
+        # test date ranges (note: these are exclusive ranges, ie
+        # documents dated exactly 2012-04-01 or 2012-04-03 are not
+        # included in the result set. Maybe this is less than
+        # intuitive?
+        self.env['QUERY_STRING'] = "min-dcterms_issued=2012-04-01&max-dcterms_issued=2012-04-03"
         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
         want = json.load(open("test/files/api/query-advanced-range.json"))
         self.assertEqual(want, got)

@@ -786,7 +786,6 @@ def _wsgi_query(environ, args):
     #             '_pageSize':10}
     param = dict(parse_qsl(environ['QUERY_STRING']))
     filtered = dict([(k,v) for k,v in param.items() if not (k.startswith("_") or k == "q")])
-
     # 2. call fulltextindex.query(q='rätt*', pagenum=1, pagelen=10,
     #                             publisher='*/regeringskansliet')
     # (nb: this presumes that we've indexed more than just basefile,
@@ -806,19 +805,46 @@ def _wsgi_query(environ, args):
         elif isinstance(fld, fulltextindex.Boolean) and k in filtered:
             filtered[k] = (filtered[k] == "true") # only "true" is True
 
+    # 2.2 Range: some parameters have additional parameters, eg
+    # "min-dcterms_issued=2014-01-01&max-dcterms_issued=2014-02-01"
+    newfiltered = {}
+    for k, v in list(filtered.items()):
+        if k.startswith("min-") or k.startswith("max-"):
+            op = k[:4]
+            compliment = k.replace(op, {"min-": "max-",
+                                        "max-": "min-"}[op])
+            k = k[4:]
+            if compliment in filtered:
+                start = filtered["min-"+k]
+                stop = filtered["max-"+k]
+                newfiltered[k] = fulltextindex.Between(datetime.strptime(start, "%Y-%m-%d"),
+                                                    datetime.strptime(stop, "%Y-%m-%d"))
+            else:
+                cls = {"min-": fulltextindex.More,
+                       "max-": fulltextindex.Less}[op]
+                # FIXME: need to handle a greater variety of str->datatype conversions
+                v = datetime.strptime(v, "%Y-%m-%d")
+                newfiltered[k] = cls(v)
+        else:
+            newfiltered[k] = v
+    filtered = newfiltered
 
     if legacyapi:
-        # 2.2 legacyapi requires that parameters do not include
+        # 2.3 legacyapi requires that parameters do not include
         # prefix. Therefore, transform publisher.iri =>
         # dcterms_publisher (ie remove trailing .iri and append a
         # best-guess prefix
+        newfiltered = {}
         for k, v in filtered.items():
             if k.endswith(".iri"):
                 k = k[:-4]
             if k not in schema and "_" not in k and k not in ("uri"): 
                 # best guess: always use the dcterms prefix
-                del filtered[k]
-                filtered["dcterms_" + k] = v
+                newfiltered["dcterms_" + k] = v
+            else:
+                newfiltered[k] = v
+        filtered = newfiltered
+    
     q = param['q'] if 'q' in param else None
 
     # find out if we need to get all results (needed when stats=on) or
