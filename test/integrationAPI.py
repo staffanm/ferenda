@@ -320,7 +320,6 @@ class AdvancedAPI(object):
 
         # test literal string and bool parameters
         self.env['QUERY_STRING'] = "dc_subject=red&schema_free=true"
-        from pudb import set_trace; set_trace()
         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
         want = json.load(open("test/files/api/query-advanced-parameters.json"))
         self.assertEqual(want, got)
@@ -328,6 +327,7 @@ class AdvancedAPI(object):
         # test a custom facet (is_april_fools) and stats for those results
         self.env['QUERY_STRING'] = "aprilfools=true&_stats=on"
         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
+        from pudb import set_trace; set_trace()
         want = json.load(open("test/files/api/query-advanced-customfacet.json"))
         self.assertEqual(want, got)
 

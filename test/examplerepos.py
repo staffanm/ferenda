@@ -1,5 +1,5 @@
 # builtin
-from datetime import datetime
+from datetime import date, datetime
 
 # 3rd party
 from rdflib import Graph, Namespace, URIRef
@@ -59,7 +59,10 @@ class DocRepo2(DocRepo1):
                   ('ex', 'http://example.org/vocab/')]
     rdf_type = URIRef('http://example.org/vocab/MainType')
     def is_april_fools(self, row, binding, resource_graph):
-        d = datetime.strptime(row[binding], "%Y-%m-%d")
+        # during relate_fulltext, row[binding] may be an actual datetime
+        d = row[binding]
+        if not isinstance(d, date):
+            d = datetime.strptime(d, "%Y-%m-%d")
         return (d.month == 4 and d.day == 1)
         # this selector sorts into True/False buckets
         
@@ -69,9 +72,10 @@ class DocRepo2(DocRepo1):
                 Facet(DCTERMS.identifier), # fulltextindex.Label(boost=16)
                 Facet(DCTERMS.issued),     # fulltextindex.Datetime()
                 Facet(DCTERMS.issued,
+                      indexingtype=fulltextindex.Boolean(),
                       selector=self.is_april_fools,
                       dimension_type="value",
-                      dimension_label="aprilfools"),     # fulltextindex.Datetime()
+                      dimension_label="aprilfools"),
                 Facet(DCTERMS.publisher),  # fulltextindex.Resource()
                 Facet(DC.subject),     # fulltextindex.Keywords()
                 Facet(SCHEMA.free)     # fulltextindex.Boolean()

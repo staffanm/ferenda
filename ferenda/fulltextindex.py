@@ -52,22 +52,12 @@ class FulltextIndex(object):
     def make_schema(self, repos):
         s = self.get_default_schema()
         for repo in repos:
-
-            # the .get_indexed_properties method was not a good way
-            # forward.  the new way is to iterate over .facets and
-            # create indextypes from that.
-            
-#            for fld, idxtype in repo.get_indexed_properties().items():
-#                if fld in s:
-#                    # multiple repos can provide the same indexed
-#                    # properties ONLY if the indextype match
-#                    if s[fld] != idxtype:
-#                        raise errors.SchemaConflictError("Repo %s wanted to add a field named %s, but it was already present with a different IndexType" % (repo, fld))
-#                else:
-#                    s[fld] = idxtype
             g = repo.make_graph() # for qname lookup
             for facet in repo.facets():
-                fld = g.qname(facet.rdftype).replace(":", "_")
+                if facet.dimension_label:
+                    fld = facet.dimension_label
+                else:
+                    fld = g.qname(facet.rdftype).replace(":", "_")
                 idxtype = facet.indexingtype
                 if fld in s:
                     # multiple repos can provide the same indexed
@@ -729,7 +719,11 @@ class ElasticSearchIndex(RemoteIndex):
                       }
                      }
             if filterterms:
-                query["filtered"]["filter"]["term"] = filterterms
+                if len(filterterms) > 1:
+                    ts = [{"term": {k: v}} for (k, v) in filterterms.items()]
+                    query["filtered"]["filter"]["bool"] = {"must": ts}
+                else:
+                    query["filtered"]["filter"]["term"] = filterterms
             if filterregexps:
                 query["filtered"]["filter"]["regexp"] = filterregexps
             if filterranges:
@@ -846,7 +840,10 @@ class ElasticSearchIndex(RemoteIndex):
             es_fields = {}
             schema = self.get_default_schema()
             for facet in repo.facets():
-                fld = g.qname(facet.rdftype).replace(":", "_")
+                if facet.dimension_label:
+                    fld = facet.dimension_label
+                else:
+                    fld = g.qname(facet.rdftype).replace(":", "_")
                 idxtype = facet.indexingtype
                 schema[fld] = idxtype
 

@@ -1599,7 +1599,18 @@ parsed document path to that documents dependency file."""
                             v = v[0]
                         else:
                             v = v[0]
-                        k = qname_graph.qname(facet.rdftype).replace(":", "_")
+                        # FIXME: use facet.dimension_label iff present
+                        if facet.dimension_label:
+                            k = facet.dimension_label
+                            # if dimension_label specified, we
+                            # probably have a custom selector and a
+                            # synthesized property. Synthesize the
+                            # value by calling the selector (in a
+                            # roundabout way since selector expects a
+                            # dict and a key)
+                            v = facet.selector({None:v}, None, self.commondata)
+                        else:
+                            k = qname_graph.qname(facet.rdftype).replace(":", "_")
                         kwargs[k] = v
                     
                 indexer.update(uri=about,

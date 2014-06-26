@@ -686,7 +686,7 @@ def _get_common_graph(repos, graphuri):
                 g.add((s, RDF.type, repo.commondata.value(s, RDF.type)))
     return g
 
-def _wsgi_stats(repos, rooturl):
+def _wsgi_stats(repos, rooturl,resultset=()):
     legacyapi = True # FIXME: should be part of args
     res = {"type": "DataSet",
            "slices" : []
@@ -712,6 +712,15 @@ def _wsgi_stats(repos, rooturl):
             if facet not in facets:
                 facets.append(facet)
 
+    # if used in the resultset mode, only calculate stats for those
+    # resources/documents that are in the resultset.
+    if resultset:
+        hits = {}
+        for r in resultset:
+            hits[r['uri']] = True
+        data = [r for r in data if r['uri'] in hits]
+    
+                
     # 2. For each facet that makes sense (ie those that has .dimension
     # != None), collect the available observations and the count for
     # each
@@ -777,21 +786,7 @@ def _wsgi_query(environ, args):
     #             '_pageSize':10}
     param = dict(parse_qsl(environ['QUERY_STRING']))
     filtered = dict([(k,v) for k,v in param.items() if not (k.startswith("_") or k == "q")])
-    if legacyapi:
-        newfiltered = {}
-        # transform publisher.iri => dcterms_publisher (ie remove
-        # trailing .iri and append a best-guess prefix
-        for k, v in filtered.items():
-            if k.endswith(".iri"):
-                k = k[:-4]
-            if "_" not in k and k not in ("uri"): 
-                # best guess: always use the dcterms prefix
-                k = "dcterms_" + k
-            newfiltered[k] = v
-        filtered = newfiltered
 
-    
-        
     # 2. call fulltextindex.query(q='rätt*', pagenum=1, pagelen=10,
     #                             publisher='*/regeringskansliet')
     # (nb: this presumes that we've indexed more than just basefile,
@@ -804,17 +799,40 @@ def _wsgi_query(environ, args):
     # fulltextindex schema. if schema[k] == fulltextindex.Datetime, do
     # strptime. if schema[k] == fulltextindex.Boolean, convert
     # 'true'/'false' to True/False.
-    for k, fld in idx.schema().items():
+    schema = idx.schema()
+    for k, fld in schema.items():
         if isinstance(fld, fulltextindex.Datetime) and k in filtered:
             filtered[k] = datetime.strptime(filtered[k], "%Y-%m-%d")
         elif isinstance(fld, fulltextindex.Boolean) and k in filtered:
             filtered[k] = (filtered[k] == "true") # only "true" is True
-    
 
+
+    if legacyapi:
+        # 2.2 legacyapi requires that parameters do not include
+        # prefix. Therefore, transform publisher.iri =>
+        # dcterms_publisher (ie remove trailing .iri and append a
+        # best-guess prefix
+        for k, v in filtered.items():
+            if k.endswith(".iri"):
+                k = k[:-4]
+            if k not in schema and "_" not in k and k not in ("uri"): 
+                # best guess: always use the dcterms prefix
+                del filtered[k]
+                filtered["dcterms_" + k] = v
     q = param['q'] if 'q' in param else None
+
+    # find out if we need to get all results (needed when stats=on) or
+    # just the first page
+    if param.get("_stats") == "on":
+        pagenum=1
+        pagelen=100000
+    else:
+        pagenum=int(param.get('_page', '0'))+1
+        pagelen=int(param.get('_pageSize', '10'))
+
     res, pager = idx.query(q=q,
-                           pagenum=int(param.get('_page', '0'))+1,
-                           pagelen=int(param.get('_pageSize', '10')),
+                           pagenum=pagenum,
+                           pagelen=pagelen,
                            **filtered)
 
     # 3. Mangle res into the expected JSON structure (see qresults.json)
@@ -827,15 +845,14 @@ def _wsgi_query(environ, args):
             elif k == "text":
                 mangledhit["matches"] = {"text": _elements_to_html(hit["text"])}
             elif k in ("basefile", "repo"):
+                # these fields should not be included in results
                 pass
             else:
+                # FIXME: if legacyapi, we probably need to mangle k
                 mangledhit[k] = v
         mangled.append(mangledhit)
-        # rdftype -> type
-        # text -> matches[text]
-        # basefile, repo -> None ?
-        # uri -> iri
-    
+
+    # 3.1 create container for results
     res = {"startIndex": pager['firstresult'] - 1,
            "itemsPerPage": int(param.get('_pageSize', '10')),
            "totalResults": pager['totalresults'],
@@ -845,7 +862,7 @@ def _wsgi_query(environ, args):
 
     # 4. add stats, maybe
     if param.get("_stats") == "on":
-        res["stats"] = _wsgi_stats()
+        res["statistics"] = _wsgi_stats(args['repos'], args['url'], mangled)
     return res
 
         

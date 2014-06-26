@@ -1296,7 +1296,8 @@ class RelateFulltext(RepoTester):
         with patch.object(WhooshIndex,'update') as mock_method:
             repo.relate_fulltext("a")
 
-        want_calls = [call(basefile = 'a',
+        want_calls = [call(aprilfools=True,
+                           basefile = 'a',
                            repo = 'repo2',
                            uri = 'http://example.org/repo2/a',
                            text = 'This is part of the main document, but not of any sub-resource.',
