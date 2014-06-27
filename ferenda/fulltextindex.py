@@ -26,7 +26,7 @@ class FulltextIndex(object):
     """
     
     @staticmethod
-    def connect(indextype, location, repos=[]):
+    def connect(indextype, location, repos):
         """Open a fulltext index (creating it if it doesn't already exists).
 
         :param location: Type of fulltext index ("WHOOSH" or "ELASTICSEARCH")
@@ -44,6 +44,7 @@ class FulltextIndex(object):
         if self.exists():
             self.index = self.open()
         else:
+            assert repos, "Attempt to create a fulltext index, but no repos were provided, index schema would be empty"
             self.index = self.create(repos)
 
     def __del__(self):
@@ -803,15 +804,6 @@ class ElasticSearchIndex(RemoteIndex):
         schema["repo"] = self.get_default_schema()['repo']
         return schema
 
-    # FIXME: For some reason, createing a schema/mapping makes PUTting
-    # new documents to the index hang with the folloging error:
-    #
-    #    UnavailableShardsException[[ferenda][1] [3] shardIt, [0] active : Timeout waiting for [1m]
-    #
-    # So we skip creating the schema as it isn't neccesary
-    # def create(self, schema, repos):
-    #    pass
-
     def _create_schema_payload(self, repos):
         payload = {
             # cargo cult configuration
@@ -857,5 +849,4 @@ class ElasticSearchIndex(RemoteIndex):
         return "", json.dumps(payload, indent=4)
 
     def _destroy_payload(self):
-
         return "", None

@@ -15,8 +15,13 @@ class Facet(object):
 
     @classmethod
     def year(cls, row, binding='dcterms_issued', resource_graph=None):
-        # assume a date(time) like '2014-06-05'
-        d = datetime.strptime(row[binding], "%Y-%m-%d")
+        datestring = row[binding]
+        # assume a date(time) like '2014-06-05T12:00:00', '2014-06-05'
+        # or even '2014-06'
+        formatstring = {19: "%Y-%m-%dT%h:%m:%s",
+                        10: "%Y-%m-%d",
+                        7: "%Y-%m"}[len(datestring)]
+        d = datetime.strptime(datestring, formatstring)
         return str(d.year)
 
     @classmethod

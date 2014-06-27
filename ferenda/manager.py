@@ -171,14 +171,14 @@ def makeresources(repos,
     else:
         res['js'] = jsurls
 
-    # Populate data/rsrc/img/ from files found in config.imgdir and
-    # module.imagedir (putting each module's imagedir in a separate
-    # subdir, eg EurlexTreaties.imagedir = res/eut/img results in
-    # res/eut/img/foo.png being placed in data/rsrc/img/eut/foo.png
+    # FIXME: Populate data/rsrc/img/ from files found in config.imgdir
+    # and module.imagedir (putting each module's imagedir in a
+    # separate subdir, eg EurlexTreaties.imagedir = res/eut/img
+    # results in res/eut/img/foo.png being placed in
+    # data/rsrc/img/eut/foo.png
+
     # Finally, create a resources.xml file containing refs to the css
     # and js files (and also favicon?) that base5.xsl can include.
-
-
     # FIXME: Do this in LXML instead (and remove util.indent_node afterwards)
     root = ET.Element("configuration")
     sitename_el = ET.SubElement(root, "sitename")
@@ -276,7 +276,11 @@ def makeresources(repos,
     if not staticsite:
         r = _create_api_files(repos, resourcedir, url)
         res.update(r)
+        # this is probably not zip_safe
+        shutil.copytree(pkg_resources.resource_filename("ferenda", "res/ui"),
+                        resourcedir+os.sep+"ui")
 
+        
     # and finally FINALLY, normalize paths according to os.path.sep
     # conventions
     if os.sep == "\\":
@@ -462,7 +466,9 @@ def runserver(repos,
               documentroot="data",  # relative to cwd
               apiendpoint="/api/",
               searchendpoint="/search/",
-              url="http://localhost:8000/"):
+              url="http://localhost:8000/",
+              indextype="WHOOSH",
+              indexlocation="data/whooshindex"):
     """Starts up a internal webserver and runs the WSGI app (see
     :py:func:`make_wsgi_app`) using all the specified document
     repositories. Runs forever (or until interrupted by keyboard).
@@ -488,6 +494,8 @@ def runserver(repos,
               'documentroot': documentroot,
               'apiendpoint': apiendpoint,
               'searchendpoint': searchendpoint,
+              'indextype': indextype,
+              'indexlocation': indexlocation,
               'repos': repos}
     httpd = make_server('', port, make_wsgi_app(None, **kwargs))
     httpd.serve_forever()
@@ -585,52 +593,10 @@ def _get_json_context(repos):
         data['label'] = 'rdfs:label'
         data['name'] = 'foaf:name'
         data['altLabel'] = 'skos:altLabel'
-    # data["@language"] = "en" # maybe?
+        # data["@language"] = "en" # how to set this? majority vote of
+                                   # repos / documents? note that it's
+                                   # only a default.
     return data
-
-    # the rest of this code was hard to get right and doesn't really
-    # do anything but create an overly long context. JSON-LD
-    # serialization will (proably?) make sure we get ok terse JSON
-#     for repo in repos:
-#         onto = repo.ontologies
-#         for (s,p,o) in onto:
-#             # determine if the current subject is a class or property
-#             if (p == RDF.type and
-#                 o in (RDFS.Class, RDF.Property,
-#                       OWL.DatatypeProperty, OWL.ObjectProperty)): # and others
-#                 qname = onto.qname(s)
-#                 print("%s (%s) is a %s" % (qname, s, onto.qname(o)))
-#                 # define simple term from qname
-#                 term = qname.split(":")[1]
-#                 if term in data:
-#                     assert (data[term] == qname or
-#                             (isinstance(data[term], dict)
-#                              and data[term]['@id'] == qname)), "Conflicting definitions for term %s (previous was %s)" % (qname, data[term])
-#                 else:
-#                     # find out if this property (or class?) has a
-#                     # rdfs:range, ie if we can assume that all
-#                     # instances of this property have a given datatype
-#                     # (note that the dcterms ontology at
-#                     # http://dublincore.org/2012/06/14/dcterms.ttl
-#                     # defines dcterms:issued and dcterms:modified as having
-#                     # the range rdfs:Literal, where we'd prefer the
-#                     # range xsd:date. But you know, sometimes it might
-#                     # be a xsd:gYearMonth...)
-#                     datatype = onto.value(s, RDFS.range)
-#                     if not datatype:
-#                         # step 2: define all classes and
-#                         # simple/untyped properties (ie Class ->
-#                         # owl:Class, Concept -> skos:Concept, label ->
-#                         # rdfs:label
-#                         data[term] = qname
-#                     else:
-#                         # step 3: define typed properties (ie
-#                         # "created" -> {"@id": "dc:created", "@type":
-#                         # "xsd:dateTime"}, possibly
-#                         print("... and has datatype %s" % onto.qname(datatype))
-#                         data[term] = {"@id": qname,
-#                                       "@type": onto.qname(datatype)}
-#     return {"@context": data}
 
 def _get_term_graph(repos, graphuri):
     # produce a rdf graph of the terms (classes and properties) in
@@ -687,6 +653,7 @@ def _get_common_graph(repos, graphuri):
     return g
 
 def _wsgi_stats(repos, rooturl,resultset=()):
+    # from pudb import set_trace; set_trace()
     legacyapi = True # FIXME: should be part of args
     res = {"type": "DataSet",
            "slices" : []
@@ -717,7 +684,7 @@ def _wsgi_stats(repos, rooturl,resultset=()):
     if resultset:
         hits = {}
         for r in resultset:
-            hits[r['uri']] = True
+            hits[r['iri']] = True
         data = [r for r in data if r['uri'] in hits]
     
                 
@@ -788,11 +755,9 @@ def _wsgi_query(environ, args):
     filtered = dict([(k,v) for k,v in param.items() if not (k.startswith("_") or k == "q")])
     # 2. call fulltextindex.query(q='rätt*', pagenum=1, pagelen=10,
     #                             publisher='*/regeringskansliet')
-    # (nb: this presumes that we've indexed more than just basefile,
-    #  title, identifier, text -- we need to index arbitrary
-    #  parameters, controlled by each repo)
     idx = FulltextIndex.connect(args['indextype'],
-                                args['indexlocation'])
+                                args['indexlocation'],
+                                args['repos'])
 
     # 2.1 some values need to be converted, based upon the
     # fulltextindex schema. if schema[k] == fulltextindex.Datetime, do
@@ -825,6 +790,9 @@ def _wsgi_query(environ, args):
                 # FIXME: need to handle a greater variety of str->datatype conversions
                 v = datetime.strptime(v, "%Y-%m-%d")
                 newfiltered[k] = cls(v)
+        elif k.startswith("year-"):
+            pass
+            # FIXME: for 2013, interpret as Between(2012-12-31 and 2014-01-01)
         else:
             newfiltered[k] = v
     filtered = newfiltered
@@ -838,9 +806,18 @@ def _wsgi_query(environ, args):
         for k, v in filtered.items():
             if k.endswith(".iri"):
                 k = k[:-4]
+                # the parameter *looks* like it's a ref, but it should
+                # be interpreted as a value -- remove starting */ to
+                # get at actual querystring
+                if v.startswith("*/") and not isinstance(schema[k], fulltextindex.Resource):
+                    v = v[2:]
             if k not in schema and "_" not in k and k not in ("uri"): 
-                # best guess: always use the dcterms prefix
-                newfiltered["dcterms_" + k] = v
+                # best guess: almost always use the dcterms prefix
+                if k in ("type"):
+                    k = "rdf_" + k
+                else:
+                    k = "dcterms_" + k
+                newfiltered[k] = v
             else:
                 newfiltered[k] = v
         filtered = newfiltered
@@ -866,15 +843,18 @@ def _wsgi_query(environ, args):
     for hit in res:
         mangledhit = {}
         for k, v in hit.items():
-            if k == "rdftype":
-                mangledhit["type"] = v
-            elif k == "text":
+            if legacyapi:
+                if "_" in k:
+                    # drop prefix (dcterms_issued -> issued)
+                    k = k.split("_",1)[1]
+                elif k == "uri":
+                    k = "iri"
+            if k == "text":
                 mangledhit["matches"] = {"text": _elements_to_html(hit["text"])}
             elif k in ("basefile", "repo"):
                 # these fields should not be included in results
                 pass
             else:
-                # FIXME: if legacyapi, we probably need to mangle k
                 mangledhit[k] = v
         mangled.append(mangledhit)
 
@@ -889,7 +869,9 @@ def _wsgi_query(environ, args):
     # 4. add stats, maybe
     if param.get("_stats") == "on":
         res["statistics"] = _wsgi_stats(args['repos'], args['url'], mangled)
+
     return res
+
 
         
 def _str(s, encoding="ascii"):
@@ -908,12 +890,8 @@ def _str(s, encoding="ascii"):
 def _wsgi_search(environ, start_response, args):
     """WSGI method, called by the wsgi app for requests that matches
        ``searchendpoint``."""
-    # get the location for the index. Different repos could
-    # technically have different paths here, but that'd be stupid. It
-    # would be bettter if indexlocation was available direct from args
-    # (which requires changing _setup_runserver_args())
-    idx = FulltextIndex.connect(args['repos'][0].config.indextype,
-                                args['repos'][0].config.indexlocation)
+    idx = FulltextIndex.connect(args['indextype'],
+                                args['indexlocation'])
     # FIXME: QUERY_STRING should probably be sanitized before calling
     # .query() - but in what way?
     querystring = OrderedDict(parse_qsl(environ['QUERY_STRING']))
@@ -1776,6 +1754,8 @@ def _setup_runserver_args(config, inifilename):
             'apiendpoint':    config.apiendpoint,
             'searchendpoint': config.searchendpoint,
             'url':            config.url,
+            'indextype':      config.indextype,
+            'indexlocation':  config.indexlocation,
             'repos':          repos}
 
 
