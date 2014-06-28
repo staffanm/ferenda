@@ -1254,7 +1254,7 @@ class RelateFulltext(RepoTester):
                                 convert=True)
 
         with patch.object(WhooshIndex,'update') as mock_method:
-            d.relate_fulltext("123/a")
+            d.relate_fulltext("123/a", [d])
             calls = [call(basefile='123/a',
                           uri='http://example.org/base/123/a', repo='base',
                           text='This is part of the main document, but not of any sub-resource. This is the tail end of the main document',
@@ -1294,7 +1294,7 @@ class RelateFulltext(RepoTester):
                         indexlocation=self.datadir+os.sep+"index")
         self.put_files_in_place(repo, "test/files/testrepos/repo2", ["a"])
         with patch.object(WhooshIndex,'update') as mock_method:
-            repo.relate_fulltext("a")
+            repo.relate_fulltext("a", [repo])
 
         want_calls = [call(aprilfools=True,
                            basefile = 'a',
@@ -1315,7 +1315,7 @@ class RelateFulltext(RepoTester):
                         indexlocation=self.datadir+os.sep+"index")
         self.put_files_in_place(repo, "test/files/testrepos/repo3", ["b"])
         with patch.object(WhooshIndex,'update') as mock_method:
-            repo.relate_fulltext("b")
+            repo.relate_fulltext("b", [repo])
 
         want_calls = [call(basefile='b',
                            repo='repo3',
@@ -1344,7 +1344,7 @@ class RelateFulltext(RepoTester):
                         indexlocation=self.datadir+os.sep+"index")
         self.put_files_in_place(repo, "test/files/testrepos/repo3", ["c"])
         with patch.object(WhooshIndex,'update') as mock_method:
-            repo.relate_fulltext("c")
+            repo.relate_fulltext("c", [repo])
 
         want_calls = [call(basefile = 'c',
                            repo = 'repo3',

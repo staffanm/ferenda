@@ -22,6 +22,10 @@ class BasicAPI(object):
     def setUp(self):
         super(BasicAPI, self).setUp()
         self.env['PATH_INFO'] = '/-/publ' # or /myapi/
+
+    def tearDown(self):
+        FulltextIndex.connect(self.indextype, self.indexlocation,
+                              [DocumentRepository()]).destroy()
         
     # is called by WSGI.setUp
     def put_files_in_place(self):
@@ -72,18 +76,18 @@ class BasicAPI(object):
             "duration": None,
             "items": [
                 {
-                    "dcterms_identifier": "123(A)",
-                    "dcterms_issued": "2014-01-04",
-                    "dcterms_publisher": {
+                    "identifier": "123(A)",
+                    "issued": "2014-01-04",
+                    "publisher": {
                         "iri": "http://example.org/publisher/A",
                         "label": "http://example.org/publisher/A"
                     },
-                    "dcterms_title": "Example",
+                    "title": "Example",
                     "matches": {
                         "text": "<em class=\"match\">tail</em> end of the main document"
                     },
-                    "rdf_type": "http://purl.org/ontology/bibo/Standard",
-                    "uri": "http://example.org/base/123/a"
+                    "type": "http://purl.org/ontology/bibo/Standard",
+                    "iri": "http://example.org/base/123/a"
                 }
             ],
             "itemsPerPage": 10,
@@ -94,7 +98,7 @@ class BasicAPI(object):
         # on how to highlight matching snippets.
         if isinstance(self, WhooshBase):
             want['items'][0]['matches']['text'] = "This is the <em class=\"match\">tail</em> end of the main document"
-            want['items'][0]['dcterms_issued'] += "T00:00:00"
+            want['items'][0]['issued'] += "T00:00:00"
         self.assertEqual(want, got)
 
     def test_faceted_query(self):
@@ -103,16 +107,16 @@ class BasicAPI(object):
         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
         want = {'current': '/-/publ?dcterms_publisher=*%2Fpublisher%2FA',
                 'duration': None,
-                'items': [{'dcterms_identifier': '123(A)',
-                           'dcterms_issued': '2014-01-04',
-                           'dcterms_publisher': {'iri': 'http://example.org/publisher/A',
+                'items': [{'identifier': '123(A)',
+                           'issued': '2014-01-04',
+                           'publisher': {'iri': 'http://example.org/publisher/A',
                                                  'label': 'http://example.org/publisher/A'},
-                           'dcterms_title': 'Example',
+                           'title': 'Example',
                            'matches': {'text': 'This is part of the main document, but '
                                        'not of any sub-resource. This is the '
                                        'tail end of the main document'},
-                           'rdf_type': 'http://purl.org/ontology/bibo/Standard',
-                           'uri': 'http://example.org/base/123/a'}],
+                           'type': 'http://purl.org/ontology/bibo/Standard',
+                           'iri': 'http://example.org/base/123/a'}],
                 'itemsPerPage': 10,
                 'startIndex': 0,
                 'totalResults': 1}
@@ -120,7 +124,7 @@ class BasicAPI(object):
         # objects) cannot handle a pure date field (always converted
         # to DateTime). Adjust expectations.
         if isinstance(self, WhooshBase):
-            want['items'][0]['dcterms_issued'] += "T00:00:00"
+            want['items'][0]['issued'] += "T00:00:00"
         self.assertEqual(want, got)
 
         # using publisher.iri instead of dcterms_publisher is a test
@@ -132,26 +136,26 @@ class BasicAPI(object):
         
         
     def test_complex_query(self):
-        self.env['QUERY_STRING'] = "q=haystack&dcterms_publisher=*%2Fpublisher%2FB"
+        self.env['QUERY_STRING'] = "q=haystack&publisher=*%2Fpublisher%2FB"
         self.env['HTTP_ACCEPT'] = 'application/json'
         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
-        want =  {'current': '/-/publ?q=haystack&dcterms_publisher=*%2Fpublisher%2FB',
+        want =  {'current': '/-/publ?q=haystack&publisher=*%2Fpublisher%2FB',
                  'duration': None,
-                 'items': [{'dcterms_identifier': '123(C)',
-                            'dcterms_issued': '2014-05-06',
-                            'dcterms_publisher': {'iri': 'http://example.org/publisher/B',
+                 'items': [{'identifier': '123(C)',
+                            'issued': '2014-05-06',
+                            'publisher': {'iri': 'http://example.org/publisher/B',
                                                   'label': 'http://example.org/publisher/B'},
-                            'dcterms_title': 'Of needles and haystacks',
+                            'title': 'Of needles and haystacks',
                             'matches': {'text': ''},
-                            'rdf_type': 'http://purl.org/ontology/bibo/Standard',
-                            'uri': 'http://example.org/base/123/c'}],
+                            'type': 'http://purl.org/ontology/bibo/Standard',
+                            'iri': 'http://example.org/base/123/c'}],
                  'itemsPerPage': 10,
                  'startIndex': 0,
                  'totalResults': 1}
 
         # FIXME: See above
         if isinstance(self, WhooshBase):
-            want['items'][0]['dcterms_issued'] += "T00:00:00"
+            want['items'][0]['issued'] += "T00:00:00"
         self.assertEqual(want, got)
 
 # Mixin-style classes that are mixed with BasicAPI 
@@ -219,7 +223,8 @@ class AdvancedAPI(object):
 
 
     def tearDown(self):
-        FulltextIndex.connect(self.indextype, self.indexlocation).destroy()
+        FulltextIndex.connect(self.indextype, self.indexlocation,
+                              [DocumentRepository()]).destroy()
 
     def put_files_in_place(self):
         self.repos = []
@@ -277,17 +282,17 @@ class AdvancedAPI(object):
                 "duration": None,
                 "items": [
                     {
-                        "dcterms_issued": "2012-04-01",
-                        "dcterms_publisher": {
+                        "issued": "2012-04-01",
+                        "publisher": {
                             "iri": "http://example.org/vocab/publ1",
                             "label": "Publishing & sons"
                         },
-                        "dcterms_title": "A simple doc",
+                        "title": "A simple doc",
                         "matches": {
                             "text": "This is part of the main document, but not of any sub-resource."
                         },
-                        "rdf_type": "http://example.org/vocab/MainType",
-                        "uri": "http://example.org/repo1/a"
+                        "type": "http://example.org/vocab/MainType",
+                        "iri": "http://example.org/repo1/a"
                     }
                 ],
                 "itemsPerPage": 10,

@@ -391,7 +391,8 @@ class WhooshBasicIndex(BasicIndex, WhooshBase):
             
         # finally, try to create again (opening an existing index
         # instead of creating)
-        self.index = FulltextIndex.connect("WHOOSH", self.location)
+        # need mock docrepo
+        self.index = FulltextIndex.connect("WHOOSH", self.location, [DocumentRepository()])
 
        
 class WhooshBasicQuery(BasicQuery, WhooshBase): pass

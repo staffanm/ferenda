@@ -277,8 +277,9 @@ def makeresources(repos,
         r = _create_api_files(repos, resourcedir, url)
         res.update(r)
         # this is probably not zip_safe
-        shutil.copytree(pkg_resources.resource_filename("ferenda", "res/ui"),
-                        resourcedir+os.sep+"ui")
+        if not os.path.exists(resourcedir+os.sep+"ui"):
+            shutil.copytree(pkg_resources.resource_filename("ferenda", "res/ui"),
+                            resourcedir+os.sep+"ui")
 
         
     # and finally FINALLY, normalize paths according to os.path.sep
@@ -809,6 +810,17 @@ def _wsgi_query(environ, args):
                 # the parameter *looks* like it's a ref, but it should
                 # be interpreted as a value -- remove starting */ to
                 # get at actual querystring
+
+                # FIXME: in order to lookup k in schema, we may need
+                # to guess its prefix, but we're cut'n pasting the
+                # strategy from below. Unify.
+
+                if k not in schema and "_" not in k and k not in ("uri"):
+                    if k in ("type"):
+                        k = "rdf_" + k
+                    else:
+                        k = "dcterms_" + k
+
                 if v.startswith("*/") and not isinstance(schema[k], fulltextindex.Resource):
                     v = v[2:]
             if k not in schema and "_" not in k and k not in ("uri"): 

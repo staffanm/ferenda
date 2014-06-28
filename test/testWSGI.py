@@ -197,6 +197,8 @@ datadir = /dev/null
 url = http://localhost:7777/
 apiendpoint = /myapi/
 searchendpoint = /mysearch/            
+indextype = WHOOSH
+indexlocation = data/whooshindex        
 """)
         res = manager.make_wsgi_app(inifile)
         self.assertTrue(callable(res))

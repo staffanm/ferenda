@@ -559,6 +559,8 @@ searchendpoint = /search/
 apiendpoint = /api/
 cssfiles = ['test.css', 'other.css']        
 jsfiles = ['test.js']
+indextype = WHOOSH
+indexlocation = data/whooshindex        
         """ % self.tempdir)
 
         # 2. dump 2 example docrepo classes to example.py
