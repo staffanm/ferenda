@@ -276,7 +276,6 @@ def makeresources(repos,
     if not staticsite:
         r = _create_api_files(repos, resourcedir, url)
         res.update(r)
-        from pudb import set_trace; set_trace()
         if not os.path.exists(resourcedir+os.sep+"ui"):
             util.ensure_dir(resourcedir+os.sep+"ui" + os.sep + "dummy.txt")
             for f in pkg_resources.resource_listdir("ferenda", "res/ui"):
@@ -656,7 +655,6 @@ def _get_common_graph(repos, graphuri):
     return g
 
 def _wsgi_stats(repos, rooturl,resultset=()):
-    # from pudb import set_trace; set_trace()
     legacyapi = True # FIXME: should be part of args
     res = {"type": "DataSet",
            "slices" : []
