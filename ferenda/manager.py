@@ -276,11 +276,13 @@ def makeresources(repos,
     if not staticsite:
         r = _create_api_files(repos, resourcedir, url)
         res.update(r)
-        # this is probably not zip_safe
+        from pudb import set_trace; set_trace()
         if not os.path.exists(resourcedir+os.sep+"ui"):
-            shutil.copytree(pkg_resources.resource_filename("ferenda", "res/ui"),
-                            resourcedir+os.sep+"ui")
-
+            util.ensure_dir(resourcedir+os.sep+"ui" + os.sep + "dummy.txt")
+            for f in pkg_resources.resource_listdir("ferenda", "res/ui"):
+                src = pkg_resources.resource_stream("ferenda", "res/ui/" + f)
+                with open(resourcedir+os.sep+"ui" + os.sep + f, "wb") as dest:
+                    dest.write(src.read())
         
     # and finally FINALLY, normalize paths according to os.path.sep
     # conventions
