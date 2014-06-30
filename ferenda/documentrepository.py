@@ -429,7 +429,8 @@ class DocumentRepository(object):
                         'res/js/respond-1.3.0.js',
                         'res/js/ferenda.js'],
             'staticsite': False,
-            'class': self.qualified_class_name()
+            'class': self.qualified_class_name(),
+            'legacyapi': False
         }
 
     @classmethod

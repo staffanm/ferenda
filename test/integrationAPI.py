@@ -21,7 +21,7 @@ from ferenda import util, fulltextindex
 class BasicAPI(object):
     def setUp(self):
         super(BasicAPI, self).setUp()
-        self.env['PATH_INFO'] = '/-/publ' # or /myapi/
+        self.env['PATH_INFO'] = '/myapi/' 
 
     def tearDown(self):
         FulltextIndex.connect(self.indextype, self.indexlocation,
@@ -58,106 +58,82 @@ class BasicAPI(object):
 
         self.repos[0].rdf_type = self.repos[0].ns['bibo'].Standard
 
+    stats_want = json.load(open("test/files/api/basicapi-stats.json"))
     def test_stats(self):
-        self.env['PATH_INFO'] = "/-/publ;stats"
-        self.env['HTTP_ACCEPT'] = 'application/json'
+        self.env['PATH_INFO'] += ";stats"
         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
-        want = json.load(open("test/files/api/publ-stats.json"))
-        self.assertEqual(want, got)
+        self.assertEqual(self.stats_want, got)
 
+#    list_by_type_want = json.load(open("test/files/api/basicapi-list-by-type.json"))
+#    def test_list_by_type(self):
+#        # http://localhost:8080/api/bibo:Standard gives a list of documents
+#        # (equiv to http://localhost:8080/api/?rdf_type=bibo:Standard)
+#        self.env['PATH_INFO'] + "bibo:Standard"
+#        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
+#        self.assertEqual(self.list_by_type_want, got)
+
+    fulltext_query_want = json.load(open("test/files/api/basicapi-fulltext-query.json"))
     def test_fulltext_query(self):
-        # self.env['PATH_INFO'] = "/-/publ?q=r%C3%A4tt*"
         self.env['QUERY_STRING'] = "q=tail"
-        self.env['HTTP_ACCEPT'] = 'application/json'
         res = self.call_wsgi(self.env)[2].decode("utf-8")
         got = json.loads(res)
-        want = {
-            "current": "/-/publ?q=tail",
-            "duration": None,
-            "items": [
-                {
-                    "identifier": "123(A)",
-                    "issued": "2014-01-04",
-                    "publisher": {
-                        "iri": "http://example.org/publisher/A",
-                        "label": "http://example.org/publisher/A"
-                    },
-                    "title": "Example",
-                    "matches": {
-                        "text": "<em class=\"match\">tail</em> end of the main document"
-                    },
-                    "type": "http://purl.org/ontology/bibo/Standard",
-                    "iri": "http://example.org/base/123/a"
-                }
-            ],
-            "itemsPerPage": 10,
-            "startIndex": 0,
-            "totalResults": 1
-        }
         # FIXME: Whoosh and ElasticSearch has slightly different ideas
         # on how to highlight matching snippets.
         if isinstance(self, WhooshBase):
             want['items'][0]['matches']['text'] = "This is the <em class=\"match\">tail</em> end of the main document"
             want['items'][0]['issued'] += "T00:00:00"
-        self.assertEqual(want, got)
+        self.assertEqual(self.fulltext_query_want, got)
 
+    faceted_query = "dcterms_publisher=*%2Fpublisher%2FA"
+    faceted_query_want = json.load(open("test/files/api/basicapi-faceted-query.json"))
     def test_faceted_query(self):
-        self.env['QUERY_STRING'] = "dcterms_publisher=*%2Fpublisher%2FA"
-        self.env['HTTP_ACCEPT'] = 'application/json'
+        self.env['QUERY_STRING'] = self.faceted_query
         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
-        want = {'current': '/-/publ?dcterms_publisher=*%2Fpublisher%2FA',
-                'duration': None,
-                'items': [{'identifier': '123(A)',
-                           'issued': '2014-01-04',
-                           'publisher': {'iri': 'http://example.org/publisher/A',
-                                                 'label': 'http://example.org/publisher/A'},
-                           'title': 'Example',
-                           'matches': {'text': 'This is part of the main document, but '
-                                       'not of any sub-resource. This is the '
-                                       'tail end of the main document'},
-                           'type': 'http://purl.org/ontology/bibo/Standard',
-                           'iri': 'http://example.org/base/123/a'}],
-                'itemsPerPage': 10,
-                'startIndex': 0,
-                'totalResults': 1}
         # FIXME: Whoosh (and our own fulltextindex.IndexedType
         # objects) cannot handle a pure date field (always converted
         # to DateTime). Adjust expectations.
         if isinstance(self, WhooshBase):
-            want['items'][0]['issued'] += "T00:00:00"
-        self.assertEqual(want, got)
+            fld = 'issued' if self.app.config.legacyapi else 'dcterms_issued'
+            want['items'][0][fld] += "T00:00:00"
+        self.assertEqual(self.faceted_query_want, got)
+                                    
+#         # using publisher.iri instead of dcterms_publisher is a test
+#         # of legacyapi
+#         self.env['QUERY_STRING'] = "publisher.iri=*%2Fpublisher%2FA"
+#         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
+#         want['current'] = "/-/publ?publisher.iri=*%2Fpublisher%2FA" # FIXME: this illustrates the need to construct 'current' dynamically.
+#         self.assertEqual(want, got)
+#         
 
-        # using publisher.iri instead of dcterms_publisher is a test
-        # of legacyapi
-        self.env['QUERY_STRING'] = "publisher.iri=*%2Fpublisher%2FA"
-        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
-        want['current'] = "/-/publ?publisher.iri=*%2Fpublisher%2FA" # FIXME: this illustrates the need to construct 'current' dynamically.
-        self.assertEqual(want, got)
-        
-        
+    complex_query = "q=haystack&dcterms_publisher=*%2Fpublisher%2FB"
+    complex_query_want = json.load(open("test/files/api/basicapi-complex-query.json"))
     def test_complex_query(self):
-        self.env['QUERY_STRING'] = "q=haystack&publisher=*%2Fpublisher%2FB"
-        self.env['HTTP_ACCEPT'] = 'application/json'
-        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
-        want =  {'current': '/-/publ?q=haystack&publisher=*%2Fpublisher%2FB',
-                 'duration': None,
-                 'items': [{'identifier': '123(C)',
-                            'issued': '2014-05-06',
-                            'publisher': {'iri': 'http://example.org/publisher/B',
-                                                  'label': 'http://example.org/publisher/B'},
-                            'title': 'Of needles and haystacks',
-                            'matches': {'text': ''},
-                            'type': 'http://purl.org/ontology/bibo/Standard',
-                            'iri': 'http://example.org/base/123/c'}],
-                 'itemsPerPage': 10,
-                 'startIndex': 0,
-                 'totalResults': 1}
+        self.env['QUERY_STRING'] = self.complex_query
+        res = self.call_wsgi(self.env)[2].decode("utf-8")
+        got = json.loads(res)
 
         # FIXME: See above
         if isinstance(self, WhooshBase):
-            want['items'][0]['issued'] += "T00:00:00"
-        self.assertEqual(want, got)
+            fld = 'issued' if self.app.config.legacyapi else 'dcterms_issued'
+            want['items'][0][fld] += "T00:00:00"
+        self.assertEqual(self.complex_query_want, got)
 
+class BasicLegacyAPI(BasicAPI):
+    def setUp(self):
+        super(BasicLegacyAPI, self).setUp()
+        self.app.config.legacyapi = True
+        self.env['PATH_INFO'] = '/-/publ'
+
+    # no fulltext_query is needed, the querystring is identical
+    fulltext_query_want = json.load(open("test/files/api/basicapi-fulltext-query.json"))
+
+    faceted_query = "dcterms_publisher=*%2Fpublisher%2FA"
+    faceted_query_want = json.load(open("test/files/api/basicapi-faceted-query.json"))
+
+    complex_query = "q=haystack&publisher=*%2Fpublisher%2FB"
+    complex_query_want = json.load(open("test/files/api/basicapi-complex-query.legacy.json"))
+    
+    
 # Mixin-style classes that are mixed with BasicAPI 
 class WhooshBase():
     indextype = 'WHOOSH'
@@ -190,6 +166,17 @@ class ESSQLiteBasicAPI(BasicAPI, ESBase, SQLiteBase, WSGI): pass
 class ESFusekiBasicAPI(BasicAPI, ESBase, FusekiBase, WSGI): pass
 class ESSesameBasicAPI(BasicAPI, ESBase, SesameBase, WSGI): pass
 
+# and again with the legacy API handling (it's highly doubtful that a
+# difference in fulltextindex engine or triple store would trigger an
+# error in the legacy API code path but not in the standard API path,
+# but this is an exhaustive test...)
+class WhooshSQLiteBasicLegacyAPI(BasicLegacyAPI, WhooshBase, SQLiteBase, WSGI): pass
+class WhooshFusekiBasicLegacyAPI(BasicLegacyAPI, WhooshBase, FusekiBase, WSGI): pass
+class WhooshSesameBasicLegacyAPI(BasicLegacyAPI, WhooshBase, SesameBase, WSGI): pass
+class ESSQLiteBasicLegacyAPI(BasicLegacyAPI, ESBase, SQLiteBase, WSGI): pass
+class ESFusekiBasicLegacyAPI(BasicLegacyAPI, ESBase, FusekiBase, WSGI): pass
+class ESSesameBasicLegacyAPI(BasicLegacyAPI, ESBase, SesameBase, WSGI): pass
+
 
 #================================================================
 # AdvancedAPI test case
@@ -214,12 +201,13 @@ class AdvancedAPI(object):
 
     def setUp(self):
         try:
-            # the call to put_files_in_place can fail and leave the
-            # ElasticSearch mapping undeleted -- make sure tearDown
-            # runs in this case
+            # the call to put_files_in_place can easily fail and leave
+            # the ElasticSearch mapping undeleted -- make sure
+            # tearDown runs in this case
             return super(AdvancedAPI, self).setUp()
-        except:
+        except Exception as e:
             self.tearDown()
+            raise e
 
 
     def tearDown(self):
@@ -265,86 +253,69 @@ class AdvancedAPI(object):
                 repo.relate(basefile, self.repos)
         # print(repo._get_triplestore().get_serialized(format="turtle").decode("utf-8"))
 
+    indexing_want = json.load(open("test/files/api/advancedapi-indexing.json"))
     def test_indexing(self):
         # make sure that a given basefile exists in it and exhibits
         # all expected fields. Also make sure that subparts of indexes
         # are properly indexed when they should be (and not when they
         # shouldn't).
-        self.env['PATH_INFO'] = '/myapi/'
         self.env['QUERY_STRING'] = 'uri=*/repo1/a'
         status, headers, content = self.call_wsgi(self.env)
         got = json.loads(content.decode("utf-8"))
-        self.assertResponse("200 OK",
-                            {'Content-Type': 'application/json'},
-                            None,
-                            status, headers, content)
-        want = {"current": "/myapi/?uri=*/repo1/a",
-                "duration": None,
-                "items": [
-                    {
-                        "issued": "2012-04-01",
-                        "publisher": {
-                            "iri": "http://example.org/vocab/publ1",
-                            "label": "Publishing & sons"
-                        },
-                        "title": "A simple doc",
-                        "matches": {
-                            "text": "This is part of the main document, but not of any sub-resource."
-                        },
-                        "type": "http://example.org/vocab/MainType",
-                        "iri": "http://example.org/repo1/a"
-                    }
-                ],
-                "itemsPerPage": 10,
-                "startIndex": 0,
-                "totalResults": 1
-            }
-        self.assertEqual(want, got)
+        self.assertEqual(self.indexing_want, got)
 
+    faceting_want = json.load(open("test/files/api/advancedapi-faceting.json"))
     def test_faceting(self):
         # make sure wsgi_stats deliver documents in the buckets we
         # expect, and that all buckets are there.
-        self.env['PATH_INFO'] = '/myapi/;stats'
-        # self.env['PATH_INFO'] = "/-/publ;stats"
-        self.env['HTTP_ACCEPT'] = 'application/json'
+        self.env['PATH_INFO'] += ';stats'
         status, headers, content = self.call_wsgi(self.env)
         got = json.loads(content.decode("utf-8"))
-        want = json.load(open("test/files/api/publ-stats-advanced.json"))
-        self.assertResponse("200 OK",
-                            {'Content-Type': 'application/json'},
-                            None,
-                            status, headers, content)
-        self.assertEqual(want, got)
+        self.assertEqual(self.faceting_want, got)
+        
+    # test literal string and bool parameters
+    query_parameters = "dc_subject=red&schema_free=true"
+    query_parameters_want = json.load(open("test/files/api/advancedapi-query-parameters.json"))
+    def test_query_parameters(self):
+        self.env['QUERY_STRING'] = self.query_parameters
+        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
+        self.assertEqual(self.query_parameters_want, got)
+
+    # test a custom facet (is_april_fools) and stats for those results
+    query_customfacet = "aprilfools=true&_stats=on"
+    query_customfacet_want = json.load(open("test/files/api/advancedapi-query-customfacet.json"))
+    def test_query_customfacet(self):
+        self.env['QUERY_STRING'] = self.query_customfacet
+        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
+        self.assertEqual(self.query_customfacet_want, got)
+
+    # test date ranges (note: these are exclusive ranges, ie documents
+    # dated exactly 2012-04-01 or 2012-04-03 are not included in the
+    # result set. Maybe this is less than intuitive?
+    query_range = "min-dcterms_issued=2012-04-01&max-dcterms_issued=2012-04-03"
+    query_range_want = json.load(open("test/files/api/advancedapi-query-range.json"))
+    def test_query_range(self):
+        self.env['QUERY_STRING'] = self.query_range
+        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
+        self.assertEqual(self.query_range_want, got)
+
+    query_yearselector = "year-dcterms_issued=2013"
+    query_yearselector_want = json.load(open("test/files/api/advancedapi-query-yearselector.json"))
+    def test_query_yearselector(self):
+        self.env['QUERY_STRING'] = self.query_yearselector
+        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
+        self.assertEqual(self.query_yearselector_wantwant, got)
+        
+        
         
 
-    def test_query(self):
-        # make sure we can do queries on default and custom facets and
-        # so on. Also make sure _stats=on works.
-        self.env['PATH_INFO'] = '/myapi/'
-        self.env['HTTP_ACCEPT'] = 'application/json'
+class AdvancedLegacyAPI(AdvancedAPI):
+    def setUp(self):
+        super(AdvancedLegacyAPI, self).setUp()
+        self.app.config.legacyapi = True
+        self.env['PATH_INFO'] = '/-/publ'
 
-        # test literal string and bool parameters
-        self.env['QUERY_STRING'] = "dc_subject=red&schema_free=true"
-        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
-        want = json.load(open("test/files/api/query-advanced-parameters.json"))
-        self.assertEqual(want, got)
-
-        # test a custom facet (is_april_fools) and stats for those results
-        self.env['QUERY_STRING'] = "aprilfools=true&_stats=on"
-        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
-        want = json.load(open("test/files/api/query-advanced-customfacet.json"))
-        self.assertEqual(want, got)
-
-        # test date ranges (note: these are exclusive ranges, ie
-        # documents dated exactly 2012-04-01 or 2012-04-03 are not
-        # included in the result set. Maybe this is less than
-        # intuitive?
-        self.env['QUERY_STRING'] = "min-dcterms_issued=2012-04-01&max-dcterms_issued=2012-04-03"
-        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
-        want = json.load(open("test/files/api/query-advanced-range.json"))
-        self.assertEqual(want, got)
         
-
 # Then the actual testcases are created by combining base classes
 class WhooshSQLiteAdvancedAPI(AdvancedAPI, WhooshBase, SQLiteBase, WSGI): pass
 class WhooshFusekiAdvancedAPI(AdvancedAPI, WhooshBase, FusekiBase, WSGI): pass
@@ -352,4 +323,10 @@ class WhooshSesameAdvancedAPI(AdvancedAPI, WhooshBase, SesameBase, WSGI): pass
 class ESSQLiteAdvancedAPI(AdvancedAPI, ESBase, SQLiteBase, WSGI): pass
 class ESFusekiAdvancedAPI(AdvancedAPI, ESBase, FusekiBase, WSGI): pass
 class ESSesameAdvancedAPI(AdvancedAPI, ESBase, SesameBase, WSGI): pass
+class WhooshSQLiteAdvancedLegacyAPI(AdvancedLegacyAPI, WhooshBase, SQLiteBase, WSGI): pass
+class WhooshFusekiAdvancedLegacyAPI(AdvancedLegacyAPI, WhooshBase, FusekiBase, WSGI): pass
+class WhooshSesameAdvancedLegacyAPI(AdvancedLegacyAPI, WhooshBase, SesameBase, WSGI): pass
+class ESSQLiteAdvancedLegacyAPI(AdvancedLegacyAPI, ESBase, SQLiteBase, WSGI): pass
+class ESFusekiAdvancedLegacyAPI(AdvancedLegacyAPI, ESBase, FusekiBase, WSGI): pass
+class ESSesameAdvancedLegacyAPI(AdvancedLegacyAPI, ESBase, SesameBase, WSGI): pass
 

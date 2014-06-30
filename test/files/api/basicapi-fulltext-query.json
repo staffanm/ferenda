@@ -1,0 +1,23 @@
+{
+    "current": "/-/publ?q=tail",
+    "duration": null,
+    "items": [
+        {
+            "identifier": "123(A)",
+            "issued": "2014-01-04",
+            "publisher": {
+                "iri": "http://example.org/publisher/A",
+                "label": "http://example.org/publisher/A"
+            },
+            "title": "Example",
+            "matches": {
+                "text": "<em class=\"match\">tail</em> end of the main document"
+            },
+            "type": "http://purl.org/ontology/bibo/Standard",
+            "iri": "http://example.org/base/123/a"
+        }
+    ],
+    "itemsPerPage": 10,
+    "startIndex": 0,
+    "totalResults": 1
+}

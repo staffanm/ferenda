@@ -135,6 +135,9 @@ staticsite        Whether to generate static HTML files      False
                   suitable for offline usage (removes
 		  search and uses relative file paths
 		  instead of canonical URIs)
+legacyapi         Whether the REST API should provide a      False
+                  simpler API for legacy clients. See
+		  :ref:`wsgi`.
 ================= ========================================== =========
 
 .. _keyconcept-documentrepository:

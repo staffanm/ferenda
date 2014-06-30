@@ -56,6 +56,7 @@ from ferenda import FulltextIndex
 from ferenda import LayeredConfig
 from ferenda import Transformer
 from ferenda import TripleStore
+from ferenda import WSGIApp
 from ferenda import elements
 from ferenda import errors
 from ferenda import util
@@ -539,7 +540,13 @@ def make_wsgi_app(inifile=None, **kwargs):
             return _wsgi_api(environ, start_response, args)
         else:
             return _wsgi_static(environ, start_response, args)
-    return app
+
+    # if we have an inifile, we should provide that instead of the
+    # **args we've got from _setup_runserver_args()
+    repos = args['repos']
+    del args['repos']
+    return WSGIApp(repos, **args)
+    # return app
 
 def _convert_legacy_jsonld(indata, rooturi):
     # the json structure should be a top node containing only

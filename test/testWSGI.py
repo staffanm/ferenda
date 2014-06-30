@@ -12,6 +12,7 @@ from io import BytesIO
 import codecs
 import json
 import shutil
+import datetime
 
 from lxml import etree
 from rdflib import Graph, Namespace, URIRef
@@ -159,7 +160,8 @@ class Fileserving(WSGI):
                             {'Content-Type': 'text/html'},
                             msg.encode(),
                             status, headers, content)
-    
+
+# most parts of the API are tested with integrationAPI
 class API(WSGI):
     def setUp(self):
        super(API, self).setUp()
@@ -179,6 +181,28 @@ class API(WSGI):
                   'startIndex': -10, # Hmm, probably not correct
                   'totalResults': 0}
         self.assertEqual(want, got)
+
+    def test_parameters(self):
+        # normal api
+        res = ([], {})
+        env['QUERY_STRING'] = "rdf_type=bibo:Standard&dcterms_title=Hello+World&dcterms_issued=2014-06-30&schema_free=true&dc_subject=red&dc_subject=green"
+        config = {'connect.return_value': Mock(**{'query.return_value': res})}
+        want = {'q': None,
+                'dcterms_title': "Hello World",
+                'dcterms_issued': datetime.date(2014,6,30),
+                'schema_free': True,
+                'rdf_type': 'bibo:Standard',
+                'dc_subject': ['red', 'green']}
+        with patch('ferenda.wsgiapp.FulltextIndex', **config):
+            status, headers, content = self.call_wsgi(self.env)
+            connect.query.assert_called_once_with(**want)
+
+        # legacy api
+        env['QUERY_STRING'] = "type=Standard&title=Hello+World&issued=2014-06-30&free=true&subject=red&subject=green"
+        self.app.config.legacyapi = True
+        with patch('ferenda.wsgiapp.FulltextIndex', **config):
+            status, headers, content = self.call_wsgi(self.env)
+            connect.query.assert_called_once_with(**want)
         
 class Runserver(WSGI):
     def test_make_wsgi_app_args(self):
@@ -404,6 +428,7 @@ class Search(WSGI):
         super(Search, self).setUp()
         self.env['PATH_INFO'] = '/mysearch/'
 
+
     def test_search_single(self):
         self.env['QUERY_STRING'] = "q=subsection"
         res = ([{'title': 'Result #1',
@@ -416,12 +441,11 @@ class Search(WSGI):
                 'totalresults': 1})
         
         config = {'connect.return_value': Mock(**{'query.return_value': res})}
-        with patch('ferenda.manager.FulltextIndex', **config):
+        with patch('ferenda.wsgiapp.FulltextIndex', **config):
             status, headers, content = self.call_wsgi(self.env)
         t = etree.fromstring(content)
         resulthead = t.find(".//article/h1").text
-        self.assertEqual(resulthead, "1 match for 'subsection'")
-
+        self.assertEqual("1 match for 'subsection'", resulthead)
 
 
     def test_search_multiple(self):
@@ -450,7 +474,7 @@ class Search(WSGI):
                 'totalresults': 3})
         
         config = {'connect.return_value': Mock(**{'query.return_value': res})}
-        with patch('ferenda.manager.FulltextIndex', **config):
+        with patch('ferenda.wsgiapp.FulltextIndex', **config):
             status, headers, content = self.call_wsgi(self.env)
         self.assertResponse("200 OK",
                             {'Content-Type': 'text/html; charset=utf-8'},
@@ -507,7 +531,7 @@ class Search(WSGI):
 
         self.env['QUERY_STRING'] = "q=needle"
         config = {'connect.return_value': Mock(**{'query.return_value': res})}
-        with patch('ferenda.manager.FulltextIndex', **config):
+        with patch('ferenda.wsgiapp.FulltextIndex', **config):
             status, headers, content = self.call_wsgi(self.env)
         
         self.assertResponse("200 OK",
@@ -541,7 +565,7 @@ class Search(WSGI):
         res = mkres()
         
         config = {'connect.return_value': Mock(**{'query.return_value': res})}
-        with patch('ferenda.manager.FulltextIndex', **config):
+        with patch('ferenda.wsgiapp.FulltextIndex', **config):
             status, headers, content = self.call_wsgi(self.env)
         self.assertResponse("200 OK",
                             {'Content-Type': 'text/html; charset=utf-8'},
@@ -570,7 +594,7 @@ class Search(WSGI):
         self.env['QUERY_STRING'] = "q=needle&p=2"
         res = mkres(page=2)
         config = {'connect.return_value': Mock(**{'query.return_value': res})}
-        with patch('ferenda.manager.FulltextIndex', **config):
+        with patch('ferenda.wsgiapp.FulltextIndex', **config):
             status, headers, content = self.call_wsgi(self.env)
         t = etree.fromstring(content)
         docs = t.findall(".//section[@class='hit']")
@@ -583,7 +607,7 @@ class Search(WSGI):
         self.env['QUERY_STRING'] = "q=needle&p=3"
         res = mkres(page=3)
         config = {'connect.return_value': Mock(**{'query.return_value': res})}
-        with patch('ferenda.manager.FulltextIndex', **config):
+        with patch('ferenda.wsgiapp.FulltextIndex', **config):
             status, headers, content = self.call_wsgi(self.env)
         t = etree.fromstring(content)
         docs = t.findall(".//section[@class='hit']")

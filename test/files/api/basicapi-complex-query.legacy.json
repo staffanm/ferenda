@@ -1,0 +1,13 @@
+{"current": "/-/publ?q=haystack&publisher=*%2Fpublisher%2FB",
+ "duration": null,
+ "items": [{"identifier": "123(C)",
+            "issued": "2014-05-06",
+            "publisher": {"iri": "http://example.org/publisher/B",
+                          "label": "http://example.org/publisher/B"},
+            "title": "Of needles and haystacks",
+            "matches": {"text": ""},
+            "type": "http://purl.org/ontology/bibo/Standard",
+            "iri": "http://example.org/base/123/c"}],
+ "itemsPerPage": 10,
+ "startIndex": 0,
+ "totalResults": 1}

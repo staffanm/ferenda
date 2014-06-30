@@ -1,0 +1,14 @@
+{"current": "/myapi/?q=haystack&dcterms_publisher=*%2Fpublisher%2FB",
+ "duration": null,
+ "items": [{"dcterms_identifier": "123(C)",
+            "dcterms_issued": "2014-05-06",
+            "dcterms_publisher": {"iri": "http://example.org/publisher/B",
+                          "label": "http://example.org/publisher/B"},
+            "dcterms_title": "Of needles and haystacks",
+            "matches": {"text": ""},
+            "rdf_type": "http://purl.org/ontology/bibo/Standard",
+            "iri": "http://example.org/base/123/c"}],
+ "itemsPerPage": 10,
+ "startIndex": 0,
+ "totalResults": 1}
+

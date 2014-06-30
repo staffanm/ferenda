@@ -204,3 +204,14 @@ in a similar way as the document resources above:
   format.
 * ``curl -H "Accept: text/turtle" http://localhost/dataset/rfc``
   returns the same, but in turtle format.
+
+The search API
+^^^^^^^^^^^^^^
+
+FIXME: To be documented.
+
+.. note::
+
+   The configuration option ``legacyapi`` controls whether to use a
+   substantially simpler API in terms of how resources and facets are
+   named. This is too to be documented.

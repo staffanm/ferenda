@@ -1,0 +1,13 @@
+{"current": "/-/publ?dcterms_publisher=*%2Fpublisher%2FA",
+ "duration": null,
+ "items": [{"identifier": "123(A)",
+            "issued": "2014-01-04",
+            "publisher": {"iri": "http://example.org/publisher/A",
+                          "label": "http://example.org/publisher/A"},
+            "title": "Example",
+            "matches": {"text": "This is part of the main document, but not of any sub-resource. This is the tail end of the main document"},
+            "type": "http://purl.org/ontology/bibo/Standard",
+            "iri": "http://example.org/base/123/a"}],
+ "itemsPerPage": 10,
+ "startIndex": 0,
+ "totalResults": 1}
