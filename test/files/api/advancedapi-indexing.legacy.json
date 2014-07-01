@@ -1,0 +1,21 @@
+{"current": "/-/publ?uri=*/repo1/a",
+ "duration": null,
+ "items": [
+     {
+         "issued": "2012-04-01",
+         "publisher": {
+             "iri": "http://example.org/vocab/publ1",
+             "label": "Publishing & sons"
+         },
+         "title": "A simple doc",
+         "matches": {
+             "text": "This is part of the main document, but not of any sub-resource."
+         },
+         "type": "http://example.org/vocab/MainType",
+         "iri": "http://example.org/repo1/a"
+     }
+ ],
+ "itemsPerPage": 10,
+ "startIndex": 0,
+ "totalResults": 1
+}

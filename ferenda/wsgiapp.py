@@ -4,6 +4,7 @@ import json
 from wsgiref.util import FileWrapper
 import mimetypes
 from operator import itemgetter
+from datetime import datetime
 
 import six
 from six.moves.urllib_parse import parse_qsl, urlencode
@@ -282,6 +283,12 @@ class WSGIApp(object):
                     res += '<em class="match">%s</em>' % str(e)
             return res
 
+        def _guess_real_fieldname(k, schema):
+            for fld in schema:
+                if fld.endswith(k):
+                    return fld
+            raise KeyError("Couldn't find anything that endswith(%s) in fulltextindex schema" % k)
+
         # given path=/-/publ?q=r%C3%A4tt*&publisher.iri=*%2Fregeringskansliet&_page=0&_pageSize=10
         # 1. extract {'q':'rätt*',
         #             'publisher.iri'='*/regeringskansliet',
@@ -294,17 +301,7 @@ class WSGIApp(object):
         idx = FulltextIndex.connect(self.config.indextype,
                                     self.config.indexlocation,
                                     self.repos)
-
-        # 2.1 some values need to be converted, based upon the
-        # fulltextindex schema. if schema[k] == fulltextindex.Datetime, do
-        # strptime. if schema[k] == fulltextindex.Boolean, convert
-        # 'true'/'false' to True/False.
         schema = idx.schema()
-        for k, fld in schema.items():
-            if isinstance(fld, fulltextindex.Datetime) and k in filtered:
-                filtered[k] = datetime.strptime(filtered[k], "%Y-%m-%d")
-            elif isinstance(fld, fulltextindex.Boolean) and k in filtered:
-                filtered[k] = (filtered[k] == "true") # only "true" is True
 
         # 2.2 Range: some parameters have additional parameters, eg
         # "min-dcterms_issued=2014-01-01&max-dcterms_issued=2014-02-01"
@@ -349,25 +346,29 @@ class WSGIApp(object):
                     # FIXME: in order to lookup k in schema, we may need
                     # to guess its prefix, but we're cut'n pasting the
                     # strategy from below. Unify.
-
                     if k not in schema and "_" not in k and k not in ("uri"):
-                        if k in ("type"):
-                            k = "rdf_" + k
-                        else:
-                            k = "dcterms_" + k
+                        k = _guess_real_fieldname(k, schema)
 
                     if v.startswith("*/") and not isinstance(schema[k], fulltextindex.Resource):
                         v = v[2:]
-                if k not in schema and "_" not in k and k not in ("uri"): 
-                    # best guess: almost always use the dcterms prefix
-                    if k in ("type"):
-                        k = "rdf_" + k
-                    else:
-                        k = "dcterms_" + k
+                if k not in schema and "_" not in k and k not in ("uri"):
+                    k = _guess_real_fieldname(k, schema)
                     newfiltered[k] = v
                 else:
                     newfiltered[k] = v
             filtered = newfiltered
+
+
+        # 2.1 some values need to be converted, based upon the
+        # fulltextindex schema. if schema[k] == fulltextindex.Datetime, do
+        # strptime. if schema[k] == fulltextindex.Boolean, convert
+        # 'true'/'false' to True/False.
+        for k, fld in schema.items():
+            if isinstance(fld, fulltextindex.Datetime) and k in filtered:
+                filtered[k] = datetime.strptime(filtered[k], "%Y-%m-%d")
+            elif isinstance(fld, fulltextindex.Boolean) and k in filtered:
+                filtered[k] = (filtered[k] == "true") # only "true" is True
+
 
         q = param['q'] if 'q' in param else None
 

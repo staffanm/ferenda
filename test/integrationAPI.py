@@ -71,7 +71,7 @@ class BasicAPI(object):
 #        self.env['PATH_INFO'] + "bibo:Standard"
 #        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
 #        self.assertEqual(self.list_by_type_want, got)
-
+#
     fulltext_query_want = json.load(open("test/files/api/basicapi-fulltext-query.json"))
     def test_fulltext_query(self):
         self.env['QUERY_STRING'] = "q=tail"
@@ -124,11 +124,13 @@ class BasicLegacyAPI(BasicAPI):
         self.app.config.legacyapi = True
         self.env['PATH_INFO'] = '/-/publ'
 
+    stats_want = json.load(open("test/files/api/basicapi-stats.legacy.json"))
+
     # no fulltext_query is needed, the querystring is identical
-    fulltext_query_want = json.load(open("test/files/api/basicapi-fulltext-query.json"))
+    fulltext_query_want = json.load(open("test/files/api/basicapi-fulltext-query.legacy.json"))
 
     faceted_query = "dcterms_publisher=*%2Fpublisher%2FA"
-    faceted_query_want = json.load(open("test/files/api/basicapi-faceted-query.json"))
+    faceted_query_want = json.load(open("test/files/api/basicapi-faceted-query.legacy.json"))
 
     complex_query = "q=haystack&publisher=*%2Fpublisher%2FB"
     complex_query_want = json.load(open("test/files/api/basicapi-complex-query.legacy.json"))
@@ -314,6 +316,16 @@ class AdvancedLegacyAPI(AdvancedAPI):
         super(AdvancedLegacyAPI, self).setUp()
         self.app.config.legacyapi = True
         self.env['PATH_INFO'] = '/-/publ'
+
+    indexing_want = json.load(open("test/files/api/advancedapi-indexing.legacy.json"))
+    faceting_want = json.load(open("test/files/api/advancedapi-faceting.legacy.json"))
+    query_parameters = "subject=red&free=true"
+    query_parameters_want = json.load(open("test/files/api/advancedapi-query-parameters.legacy.json"))
+    query_customfacet_want = json.load(open("test/files/api/advancedapi-query-customfacet.legacy.json"))
+    query_range = "min-issued=2012-04-01&max-issued=2012-04-03"
+    query_range_want = json.load(open("test/files/api/advancedapi-query-range.legacy.json"))
+    query_yearselector = "year-issued=2013"
+    query_yearselector_want = json.load(open("test/files/api/advancedapi-query-yearselector.legacy.json"))
 
         
 # Then the actual testcases are created by combining base classes

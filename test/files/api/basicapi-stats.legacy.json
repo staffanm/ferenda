@@ -5,8 +5,7 @@
 	    "dimension": "type",
             "observations": [
 		{"count": 3,
-		 "term": "bibo:Standard",
-		 "seeAlso": "http://localhost:8000/myapi/?rdf_type=bibo:Standard"}
+		 "term": "bibo:Standard"}
 	    ]
 	},
 	{

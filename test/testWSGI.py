@@ -184,25 +184,49 @@ class API(WSGI):
 
     def test_parameters(self):
         # normal api
-        res = ([], {})
-        env['QUERY_STRING'] = "rdf_type=bibo:Standard&dcterms_title=Hello+World&dcterms_issued=2014-06-30&schema_free=true&dc_subject=red&dc_subject=green"
-        config = {'connect.return_value': Mock(**{'query.return_value': res})}
+        res = ([], {'firstresult': 1,
+                    'totalresults': 0})
+        self.env['QUERY_STRING'] = "rdf_type=bibo:Standard&dcterms_title=Hello+World&dcterms_issued=2014-06-30&schema_free=true"
+        config = {'connect.return_value':
+                  Mock(**{'query.return_value': res,
+                          'schema.return_value': {'dcterms_issued': fulltextindex.Datetime(),
+                                                  'schema_free': fulltextindex.Boolean()}})}
         want = {'q': None,
                 'dcterms_title': "Hello World",
-                'dcterms_issued': datetime.date(2014,6,30),
+                'dcterms_issued': datetime.datetime(2014,6,30,0,0,0),
                 'schema_free': True,
                 'rdf_type': 'bibo:Standard',
-                'dc_subject': ['red', 'green']}
+                'pagenum': 1,
+                'pagelen': 10}
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
             status, headers, content = self.call_wsgi(self.env)
-            connect.query.assert_called_once_with(**want)
+            config['connect.return_value'].query.assert_called_once_with(**want)
 
+    def test_parameters_legacy(self):
         # legacy api
-        env['QUERY_STRING'] = "type=Standard&title=Hello+World&issued=2014-06-30&free=true&subject=red&subject=green"
+        res = ([], {'firstresult': 1,
+                    'totalresults': 0})
+        # FIXME: we leave out free=true (should map to schema_free=True)
+        self.env['QUERY_STRING'] = "type=Standard&title=Hello+World&issued=2014-06-30&schema_free=true"
         self.app.config.legacyapi = True
+        config = {'connect.return_value': 
+                  Mock(**{'query.return_value': res,
+                          'schema.return_value': {'dcterms_issued': fulltextindex.Datetime(),
+                                                  'schema_free': fulltextindex.Boolean(),
+                                                  'dcterms_title': None,
+                                                  'rdf_type': None}})}
+
+        want = {'q': None,
+                'dcterms_title': "Hello World",
+                'dcterms_issued': datetime.datetime(2014,6,30,0,0,0),
+                'schema_free': True,
+                'rdf_type': 'Standard', # should be bibo:Standard or even http://purl.org/ontology/bibo/Standard
+                'pagenum': 1,
+                'pagelen': 10}
+
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
             status, headers, content = self.call_wsgi(self.env)
-            connect.query.assert_called_once_with(**want)
+            config['connect.return_value'].query.assert_called_once_with(**want)
         
 class Runserver(WSGI):
     def test_make_wsgi_app_args(self):
