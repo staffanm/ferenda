@@ -1,7 +1,12 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals, print_function
+
 import os
 import sys
+import json
 
 import six
+from lxml import etree
 from lxml.builder import ElementMaker
 from rdflib import URIRef, Namespace, Literal, BNode, Graph, RDF, RDFS, OWL
 from rdflib.namespace import FOAF, SKOS
@@ -10,18 +15,21 @@ register('json-ld', Parser, 'ferenda.thirdparty.rdflib_jsonld.parser',
          'JsonLDParser')
 register('json-ld', Serializer, 'ferenda.thirdparty.rdflib_jsonld.serializer',
          'JsonLDSerializer')
+import pkg_resources
 
-from ferenda import LayeredConfig
+from ferenda import LayeredConfig, DocumentRepository
 from ferenda import util
-
 
 class Resources(object):
     def __init__(self, repos, resourcedir, **kwargs):
         self.repos = repos
-        defaults = {'resourcedir': resourcedir}
+        self.resourcedir = resourcedir
+        defaults = DocumentRepository().get_default_options()
         defaults.update(kwargs)
         self.config = LayeredConfig(defaults)
-        # possibly setup logger?
+        from ferenda.manager import setup_logger
+        self.log = setup_logger()
+
 
     def make(self,
              css=True,
@@ -29,6 +37,7 @@ class Resources(object):
              img=True,
              xml=True,
              api=True):
+        res = {}
         if css:
             res['css'] = self.make_css()
         if js:
@@ -36,14 +45,15 @@ class Resources(object):
         if img:
             res['img'] = self.make_img()
         if xml:
-            res['xml'] = self.make_resources_xml()
+            res['xml'] = self.make_resources_xml(res['css'], res['js'])
         if api:
             res['api'] = self.make_api_files()
+        return res
 
     def make_css(self):
         from .thirdparty import cssmin
         combinefile = None
-        if self.config.combine:
+        if self.config.combineresources:
             combinefile  = os.sep.join([self.resourcedir, 'css', 'combined.css'])
             
         return self._make_files('cssfiles', combinefile, cssmin.cssmin)
@@ -55,7 +65,7 @@ class Resources(object):
         #     jsbuffer.getvalue(), mangle=True, mangle_toplevel=True)
         import jsmin
         combinefile = None
-        if self.config.combine:
+        if self.config.combineresources:
             combinefile  = os.sep.join([self.resourcedir, 'js', 'combined.js'])
         return self._make_files('cssfiles', combinefile, jsmin.jsmin)
 
@@ -63,23 +73,23 @@ class Resources(object):
         # FIXME: implement this
         return []
 
-    def make_resources_xml(self):
+    def make_resources_xml(self, cssfiles, jsfiles):
         E = ElementMaker() # namespace = None, nsmap={None: ...}
         E.configuration(
-            E.sitename(config.sitename),
-            E.sitedescription(config.sitedescription),
-            E.url(config.url),
+            E.sitename(self.config.sitename),
+            E.sitedescription(self.config.sitedescription),
+            E.url(self.config.url),
             E.tabs(
                 E.nav(
                     E.a({'class': 'navbutton',
                          'href': '#menu'},
                         E.img({'src': 'rsrc/img/navmenu.png'})),
-                    E.ul(self._sitetabs())
+                    E.ul(*self._links('tabs'))
                     )
                 ),
             E.footerlinks(
                 E.nav(
-                    E.ul(self._footerlinks())
+                    E.ul(*self._links('footer'))
                 )
             ),
             E.tocbutton(
@@ -99,27 +109,44 @@ class Resources(object):
                            )
                        )
                 ),
-            E.stylesheets(self._li_wrap(cssfiles, 'link', 'href')),
-            E.javascripts(self._li_wrap(jsfiles, 'script', 'src'))
+            E.stylesheets(*self._li_wrap(cssfiles, 'link', 'href')),
+            E.javascripts(*self._li_wrap(jsfiles, 'script', 'src'))
             )
 
     def _li_wrap(self, items, container, attribute):
-        pass
+        elements = []
+        for item in items:
+            elements.append(etree.Element(container, **{attribute:item}))
+        return elements
+
+    def _links(self, methodname):
+        E = ElementMaker()
+        elements = []
+        for repo in self.repos:
+            for item in getattr(repo, methodname)():
+                    (label, url) = item
+                    alias = repo.alias
+                    self.log.debug(
+                        "Adding %(methodname)s %(label)s (%(url)s) from docrepo %(alias)s" % locals())
+                    elements.append(E.li(
+                        E.a({'href': url},
+                            label)))
+        return elements
         
     def _make_files(self, option, combinefile=None, combinefunc=None):
-        combine = combinefile is not None
+        combineresources = combinefile is not None
         urls = []
         buf = six.BytesIO()
         processed = set()
         # eg. self.config.cssfiles
         for f in getattr(self.config, option):
-            urls.append(self._process_file(f, buf, dir, "ferenda.ini", combine))
+            urls.append(self._process_file(f, buf, self.resourcedir, "ferenda.ini", combineresources))
             processed.add(f)
         for repo in self.repos:
             for f in getattr(repo.config, option):
                 if f in processed:
                     continue
-            urls.append(self._process_file(f, buf, dir, inst.alias, combine))
+            urls.append(self._process_file(f, buf, self.resourcedir, repo.alias, combineresources))
             processed.add(f)
         urls = list(filter(None, urls))
         if combinefile:
@@ -129,41 +156,40 @@ class Resources(object):
         else:
             return urls
 
-    def _process_file(filename, buf, destdir, origin="", combine=False):
+    def _process_file(self, filename, buf, destdir, origin="", combineresources=False):
         """
         Helper function to concatenate or copy CSS/JS (optionally
         processing them with e.g. Scss) or other files to correct place
         under the web root directory.
 
         :param filename: The name (relative to the ferenda package) of the file
-        :param buf: A buffer into which the contents of the file is written (if combine == True)
-        :param destdir: The directory into which the file will be copied (unless combine == True)
+        :param buf: A buffer into which the contents of the file is written (if combineresources == True)
+        :param destdir: The directory into which the file will be copied (unless combineresources == True)
         :param origin: The source of the configuration that specifies this files
-        :param combine: Whether to combine all files into a single one
-        :returns: The URL path of the resulting file, relative to the web root (or None if combine == True)
+        :param combineresources: Whether to combine all files into a single one
+        :returns: The URL path of the resulting file, relative to the web root (or None if combineresources == True)
         :rtype: str
         """
         # disabled until pyScss is usable on py3 again
         # mapping = {'.scss': {'transform': _transform_scss,
         #                     'suffix': '.css'}
         #            }
-        log = setup_logger()
         # FIXME: extend this through a load-path mechanism?
         if os.path.exists(filename):
-            log.debug("Process file found %s as a file relative to %s" %
+            self.log.debug("Process file found %s as a file relative to %s" %
                       (filename, os.getcwd()))
             fp = open(filename, "rb")
         elif pkg_resources.resource_exists('ferenda', filename):
-            log.debug("Found %s as a resource" % filename)
+            self.log.debug("Found %s as a resource" % filename)
             fp = pkg_resources.resource_stream('ferenda', filename)
         elif filename.startswith("http://") or filename.startswith("https://"):
-            if combine:
+            if combineresources:
                 raise errors.ConfigurationError(
-                    "makeresources: Can't use combine=True in combination with external js/css URLs (%s)" % filename)
-            log.debug("Using external url %s" % filename)
+                    "makeresources: Can't use combineresources=True in combination with external js/css URLs (%s)" % filename)
+            self.log.debug("Using external url %s" % filename)
             return filename
         else:
-            log.warning(
+            self.log.warning(
                 "file %(filename)s (specified in %(origin)s) doesn't exist" % locals())
             return None
 
@@ -173,19 +199,19 @@ class Resources(object):
         #     outfile = base + mapping[ext]['suffix']
         #     mapping[ext]['transform'](filename, outfile)
         #     filename = outfile
-        if combine:
-            log.debug("combining %s into buffer" % filename)
+        if combineresources:
+            self.log.debug("combining %s into buffer" % filename)
             buf.write(fp.read())
             fp.close()
             return None
         else:
-            log.debug("writing %s out to %s" % (filename, destdir))
+            self.log.debug("writing %s out to %s" % (filename, destdir))
             outfile = destdir + os.sep + os.path.basename(filename)
             util.ensure_dir(outfile)
             with open(outfile, "wb") as fp2:
                 fp2.write(fp.read())
             fp.close()
-            return _filepath_to_urlpath(outfile, 2)
+            return self._filepath_to_urlpath(outfile, 2)
 
     def make_api_files(self):
         # this should create the following files under resourcedir
@@ -195,7 +221,7 @@ class Resources(object):
         # MAYBE api/ui/  - copied from ferenda/res/ui
         legacyapi = True
         files = []
-        context = os.sep.join([resourcedir, "api", "context.json"])
+        context = os.sep.join([self.resourcedir, "api", "context.json"])
         if legacyapi:
             contextpath = "/json-ld/context.json"
             termspath   = "/var/terms"
@@ -207,27 +233,27 @@ class Resources(object):
             commonpath  = "/rsrc/api/common.json"
         util.ensure_dir(context)
         with open(context, "w") as fp:
-            contextdict = _get_json_context(repos)
+            contextdict = self._get_json_context()
             json.dump({"@context": contextdict}, fp, indent=4, sort_keys=True)
-        files.append(_filepath_to_urlpath(context, 2))
+        files.append(self._filepath_to_urlpath(context, 2))
 
-        common = os.sep.join([resourcedir, "api", "common.json"])
-        terms = os.sep.join([resourcedir, "api", "terms.json"])
+        common = os.sep.join([self.resourcedir, "api", "common.json"])
+        terms = os.sep.join([self.resourcedir, "api", "terms.json"])
 
-        for (filename, func, urlpath) in ((common, _get_common_graph, commonpath),
-                                          (terms,  _get_term_graph,   termspath)):
-            g = func(repos, uri + urlpath[1:])
+        for (filename, func, urlpath) in ((common, self._get_common_graph, commonpath),
+                                          (terms,  self._get_term_graph,   termspath)):
+            g = func(self.config.url + urlpath[1:])
             d = json.loads(g.serialize(format="json-ld", context=contextdict,
                                        indent=4).decode("utf-8"))
             d['@context'] = contextpath
             if legacyapi:
-                d = _convert_legacy_jsonld(d, uri + urlpath[1:])
+                d = self._convert_legacy_jsonld(d, self.config.url + urlpath[1:])
             with open(filename, "w") as fp:
                     json.dump(d, fp, indent=4, sort_keys=True)
-            files.append(_filepath_to_urlpath(filename, 2))
+            files.append(self._filepath_to_urlpath(filename, 2))
         return {'json': files}
         
-    def _convert_legacy_jsonld(indata, rooturi):
+    def _convert_legacy_jsonld(self, indata, rooturi):
         # the json structure should be a top node containing only
         # @context, iri (localhost:8000/var/terms), type (foaf:Document)
         # and topic - a list of dicts, where each dict looks like:
@@ -238,12 +264,22 @@ class Resources(object):
         #  "type" : "DatatypeProperty"}
         out  = {}
         topics = []
+
+        # the property containing the id/uri for the
+        # record may be under @id or iri, depending on
+        # whether self.config.legacyapi was in effect for
+        # _get_json_context()
+        if self.config.legacyapi:
+            idfld = 'iri'
+        else:
+            idfld = '@id'
+
         for topkey, topval in indata.items():
             if topkey == "@graph":
                 for subject in topval:
-                    if subject['iri'] == rooturi:
+                    if subject[idfld] == rooturi:
                         for key,value in subject.items():
-                            if key in  ('iri', 'foaf:topic'):
+                            if key in  (idfld, 'foaf:topic'):
                                 continue
                             out[key] = value
                     else:
@@ -257,7 +293,7 @@ class Resources(object):
                 out[topkey] = topval
         # make sure the triples are in a predictable order, so we can
         # compare on the JSON level for testing
-        out['topic'] = sorted(topics, key=lambda x: x['iri'])
+        out['topic'] = sorted(topics, key=lambda x: x[idfld])
         out['iri']  = rooturi
         return out
 
@@ -285,7 +321,7 @@ class Resources(object):
                                        # only a default.
         return data
 
-    def _get_term_graph(repos, graphuri):
+    def _get_term_graph(self, graphuri):
         # produce a rdf graph of the terms (classes and properties) in
         # the vocabs we're using. This should preferably entail
         # loading the vocabularies (stored as RDF/OWL documents), and
@@ -302,7 +338,7 @@ class Resources(object):
         root = URIRef(graphuri)
         g = Graph()
         g.add((root, RDF.type, FOAF.Document))
-        for repo in repos:
+        for repo in self.repos:
             for prefix, uri in repo.ontologies.store.namespaces():
                 if prefix:
                     g.bind(prefix, uri)
@@ -317,7 +353,7 @@ class Resources(object):
                     # print(g.serialize(format="json-ld", context=context, indent=4).decode())
         return g
 
-    def _get_common_graph(repos, graphuri):
+    def _get_common_graph(self, graphuri):
         # create a graph with foaf:names for all entities (publishers,
         # publication series etc) that our data mentions.
         root = URIRef(graphuri)
@@ -325,7 +361,7 @@ class Resources(object):
         g.bind("skos", SKOS)
         g.bind("foaf", FOAF)
         g.add((root, RDF.type, FOAF.Document))
-        for repo in repos:
+        for repo in self.repos:
             for (s,p,o) in repo.commondata: # should work like
                                             # repo.ontologies, but read
                                             # one file per repo
@@ -339,3 +375,15 @@ class Resources(object):
                     g.add((s, RDF.type, repo.commondata.value(s, RDF.type)))
         return g
 
+    def _filepath_to_urlpath(self, path, keep_segments=2):
+        """
+        :param path: the full or relative filepath to transform into a urlpath
+        :param keep_segments: the number of directory segments to keep (the ending filename is always kept)
+        """
+        # data/repo/rsrc/js/main.js, 3 -> repo/rsrc/js/main.js
+        # /var/folders/tmp4q6b1g/rsrc/resources.xml, 1 -> rsrc/resources.xml
+        # C:\docume~1\owner\locals~1\temp\tmpgbyuk7\rsrc\css\test.css, 2 - rsrc/css/test.css
+        path = path.replace(os.sep, "/")
+        urlpath = "/".join(path.split("/")[-(keep_segments + 1):])
+        # print("_filepath_to_urlpath (%s): %s -> %s" % (keep_segments, path, urlpath))
+        return urlpath

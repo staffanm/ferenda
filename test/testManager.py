@@ -176,6 +176,7 @@ class=testManager.staticmockclass2
 
     def test_makeresources(self):
         # Test1: No combining, resources specified by docrepos
+        from pudb import set_trace; set_trace()
         test = staticmockclass()
         # print("test.get_default_options %r" % test.get_default_options())
         test2 = staticmockclass2()

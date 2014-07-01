@@ -7,7 +7,19 @@ from rdflib.namespace import RDF, DC, DCTERMS
 SCHEMA = Namespace("http://schema.org/")
 
 # mine 
-from ferenda import DocumentRepository, Facet, fulltextindex
+from ferenda import DocumentRepository, DocumentStore, Facet, fulltextindex, decorators
+
+################################################################
+# This module implements six docrepos, that are used all over the test
+# suite.
+#
+# - DocRepo1 - Uses standard facets, has testdata that groups nicely into those facets
+# - DocRepo2 - Defines a couple of extra facets and has testdata for those
+# - DocRepo3 - Has non-standard type definitions/data for facets
+# - staticmockclass - Has no-op implementations of standard methods
+# - staticmockclass2 - Has custom method
+# - staticmockclass3 - Has custom footer() implementation
+
 
 class DocRepo1(DocumentRepository):
     # this has the default set of facets (rdf:type, dcterms:title,
@@ -110,3 +122,76 @@ class DocRepo3(DocRepo1):
                 Facet(DCTERMS.identifier, selector=self.my_id_selector, key=self.lexicalkey, label="IDs having %(selected) characters"),
                 Facet(DC.creator, toplevel_only=False)]
 
+
+
+class staticmockstore(DocumentStore):
+    def list_basefiles_for(cls,action):
+        return ["arg1","myarg","arg2"]
+
+class staticmockclass(DocumentRepository):
+    """Example class for testing"""
+    alias = "staticmock"
+    resourcebase = None
+    documentstore_class = staticmockstore
+    namespaces = ('foaf', 'rdfs', 'rdf', 'owl', 'skos')
+    
+    @decorators.action
+    def mymethod(self, arg):
+        """Frobnicate the bizbaz"""
+        if arg == "myarg":
+            return "ok!"
+
+    def download(self):
+        return "%s download ok" % self.alias
+
+    def parse(self, basefile):
+        return "%s parse %s" % (self.alias, basefile)
+
+    def relate(self, basefile):
+        return "%s relate %s" % (self.alias, basefile)
+
+    def generate(self, basefile): 
+        return "%s generate %s" % (self.alias, basefile)
+
+    def toc(self): 
+        return "%s toc ok" % (self.alias)
+
+    def news(self): 
+        return "%s news ok" % (self.alias)
+
+    def internalmethod(self, arg):
+        pass
+
+    @classmethod
+    def setup(cls, action, config): pass
+    @classmethod
+    def teardown(cls, action, config): pass
+        
+        
+    def get_default_options(self):
+        opts = super(staticmockclass, self).get_default_options()
+        opts.update({'datadir': 'data',
+                     'loglevel': 'DEBUG',
+                     'cssfiles': [self.resourcebase + '/test.css'],
+                     'jsfiles': [self.resourcebase + '/test.js']})
+        return opts
+                    
+    
+    
+class staticmockclass2(staticmockclass):
+    """Another class for testing"""
+    alias="staticmock2"
+    def mymethod(self, arg):
+        """Frobnicate the bizbaz (alternate implementation)"""
+        if arg == "myarg":
+            return "yeah!"
+
+class staticmockclass3(staticmockclass):
+    """Yet another (overrides footer())"""
+    alias="staticmock3"
+    def footer(self):
+        return (("About", "http://example.org/about"),
+                ("Legal", "http://example.org/legal"),
+                ("Contact", "http://example.org/contact")
+        )
+    

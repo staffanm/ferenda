@@ -413,13 +413,7 @@ class DocumentRepository(object):
             'url': 'http://localhost:8000/',
             'fulltextindex': True,
             'useragent': 'ferenda-bot',
-            'storetype': 'SQLITE',
-            'storelocation': 'data/ferenda.sqlite',
-            'storerepository': 'ferenda',
-            'indextype': 'WHOOSH',
-            'indexlocation': 'data/whooshindex',
             'republishsource': False,
-            'combineresources': False,
             'cssfiles': ['http://fonts.googleapis.com/css?family=Raleway:200,100',
                              'res/css/normalize-1.1.3.css',
                              'res/css/main.css',
@@ -428,9 +422,21 @@ class DocumentRepository(object):
                         'res/js/modernizr-2.6.3.js',
                         'res/js/respond-1.3.0.js',
                         'res/js/ferenda.js'],
-            'staticsite': False,
             'class': self.qualified_class_name(),
-            'legacyapi': False
+
+            # FIXME: These only make sense at a global level
+            'storetype': 'SQLITE',
+            'storelocation': 'data/ferenda.sqlite',
+            'storerepository': 'ferenda',
+            'indextype': 'WHOOSH',
+            'indexlocation': 'data/whooshindex',
+            'combineresources': False,
+            'staticsite': False,
+            'legacyapi': False,
+            'sitename': 'MySite',
+            'sitedescription': 'Just another Ferenda site',
+            'apiendpoint': "/api/",
+            'searchendpoint': "/search/",
         }
 
     @classmethod
