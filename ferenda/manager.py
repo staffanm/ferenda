@@ -18,50 +18,33 @@ import subprocess
 import sys
 import inspect
 import logging
-import json
-import mimetypes
 import shutil
 import tempfile
-from ast import literal_eval
 from datetime import datetime
-import xml.etree.cElementTree as ET
 from ferenda.compat import OrderedDict, MagicMock
 from wsgiref.simple_server import make_server
-from wsgiref.util import FileWrapper
-from wsgiref.util import request_uri
-from operator import itemgetter
 
 import six
-from six.moves.urllib_parse import urlsplit, parse_qsl, urlencode, quote
+from six.moves.urllib_parse import urlsplit
 from six.moves import configparser
 input = six.moves.input
 from six import text_type as str
 
 # 3rd party
-import pkg_resources
 import requests
 import requests.exceptions
-from rdflib import URIRef, Namespace, Literal, BNode, Graph, RDF, RDFS, OWL
-from rdflib.namespace import FOAF, SKOS
 from rdflib.plugin import register, Parser, Serializer
 register('json-ld', Parser, 'ferenda.thirdparty.rdflib_jsonld.parser', 'JsonLDParser')
 register('json-ld', Serializer, 'ferenda.thirdparty.rdflib_jsonld.serializer', 'JsonLDSerializer')
-from bs4 import BeautifulSoup
-from lxml import etree
 
 # my modules
-from ferenda import DocumentRepository
-from ferenda import DocumentStore
-from ferenda import FulltextIndex
 from ferenda import LayeredConfig
 from ferenda import Transformer
 from ferenda import TripleStore
 from ferenda import WSGIApp
-from ferenda import elements
+from ferenda import Resources
 from ferenda import errors
 from ferenda import util
-from ferenda import fulltextindex
-from ferenda.elements import html
 
 # NOTE: This is part of the published API and must be callable in
 # scenarios without configfile or logger.
@@ -88,321 +71,14 @@ def makeresources(repos,
     :returns: All created/copied css, js and resources.xml files
     :rtype: dict of lists
     """
-    # NOTE: even though the returned dict of lists of paths should use
-    # the appropriate path separator for the current platform (/ on
-    # unix, \ on windows), the resources.xml always uses the /
-    # separator regardless of platform.
-    log = setup_logger()
-    res = {}
-    processed_files = []
-    # Create minfied combined.css file
-    cssbuffer = six.BytesIO()
-    cssurls = []
-    cssdir = resourcedir + os.sep + "css"
-
-    # 1. Process all css files specified in the main config
-    if cssfiles:
-        for cssfile in cssfiles:
-            cssurls.append(_process_file(
-                cssfile, cssbuffer, cssdir, "ferenda.ini", combine))
-            processed_files.append(cssfile)
-
-    # 2. Visit each enabled class and see if it specifies additional
-    # css files to read
-    for inst in repos:
-        for cssfile in inst.config.cssfiles:
-            if cssfile in processed_files:
-                continue
-            # FIXME: CSS file path should be interpreted
-            # relative to the module source code file instead
-            # of cwd
-            cssurls.append(_process_file(
-                cssfile, cssbuffer, cssdir, inst.alias, combine))
-            processed_files.append(cssfile)
-    cssurls = list(filter(None, cssurls))
-    if combine:
-        # 3. Minify the result using cssmin
-        css = cssbuffer.getvalue().decode('utf-8')
-        log.debug("Read %s files, CSS is now %s bytes" % (len(
-            cssfiles), len(css)))
-        from .thirdparty import cssmin
-        css = cssmin.cssmin(css)
-        log.debug("After minifying, CSS is now %s bytes" % (len(css)))
-        outcssfile = cssdir + os.sep + 'combined.css'
-        util.writefile(outcssfile, css)
-        res['css'] = [_filepath_to_urlpath(outcssfile, 2)]
-    else:
-        res['css'] = cssurls
-
-    # Create data/rsrc/js/combined.js in a similar way but use slimit to
-    # compress the result
-    jsbuffer = six.BytesIO()
-    jsurls = []
-    jsdir = resourcedir + os.sep + "js"
-
-    if jsfiles:
-        for jsfile in jsfiles:
-            jsurls.append(_process_file(
-                jsfile, jsbuffer, jsdir, "ferenda.ini", combine))
-            processed_files.append(jsfile)
-
-    for inst in repos:
-        for jsfile in inst.config.jsfiles:
-            if jsfile in processed_files:
-                continue
-            jsurls.append(_process_file(
-                jsfile, jsbuffer, jsdir, inst.alias, combine))
-            processed_files.append(jsfile)
-
-    jsurls = list(filter(None, jsurls))
-    if combine:
-        js = jsbuffer.getvalue().decode('utf-8')
-        log.debug("Read %s files, JS is now %s bytes" % (len(jsfiles),
-                                                         len(js)))
-        # slimit provides better perf, but isn't py3 compatible
-        # import slimit
-        # js = slimit.minify(
-        #     jsbuffer.getvalue(), mangle=True, mangle_toplevel=True)
-        import jsmin
-        js = jsmin.jsmin(js)
-        log.debug("After compression, JS is now %s bytes" % (len(js)))
-        outjsfile = jsdir + os.sep + 'combined.js'
-        util.writefile(outjsfile, js)
-        res['js'] = [_filepath_to_urlpath(outjsfile, 2)]
-    else:
-        res['js'] = jsurls
-
-    # FIXME: Populate data/rsrc/img/ from files found in config.imgdir
-    # and module.imagedir (putting each module's imagedir in a
-    # separate subdir, eg EurlexTreaties.imagedir = res/eut/img
-    # results in res/eut/img/foo.png being placed in
-    # data/rsrc/img/eut/foo.png
-
-    # Finally, create a resources.xml file containing refs to the css
-    # and js files (and also favicon?) that base5.xsl can include.
-    # FIXME: Do this in LXML instead (and remove util.indent_node afterwards)
-    root = ET.Element("configuration")
-    sitename_el = ET.SubElement(root, "sitename")
-    sitename_el.text = sitename
-    sitedescription_el = ET.SubElement(root, "sitedescription")
-    sitedescription_el.text = sitedescription
-    url_el = ET.SubElement(root, "url")
-    url_el.text = url
-
-    tabs = ET.SubElement(
-        ET.SubElement(ET.SubElement(root, "tabs"), "nav"), "ul")
-
-    l = ET.Element("a", **{'href': "#menu",
-                           'class': "navbutton"})
-    ET.SubElement(l, "img", src="rsrc/img/navmenu.png")
-    root.find("tabs/nav").insert(0, l)
-    
-    sitetabs = []
-    for inst in repos:
-        if hasattr(inst, 'tabs'):
-            for tab in inst.tabs():
-                if not tab in sitetabs:
-                    (label, taburl) = tab
-                    alias = inst.alias
-                    log.debug(
-                        "Adding tab %(label)s (%(taburl)s) from docrepo %(alias)s" % locals())
-                    sitetabs.append(tab)
-
-    for tab in sitetabs:
-        link = ET.SubElement(ET.SubElement(tabs, "li"), "a")
-        link.text = tab[0]
-        link.attrib['href'] = tab[1]
-
-    # FIXME: almost the exact same code as for tabs
-    footer = ET.SubElement(
-        ET.SubElement(ET.SubElement(root, "footerlinks"), "nav"), "ul")
-
-    sitefooter = []
-    for inst in repos:
-        if hasattr(inst, 'footer'):
-            for link in inst.footer():
-                if not link in sitefooter:
-                    (label, linkurl) = link
-                    alias = inst.alias
-                    log.debug(
-                        "Adding footer link %(label)s (%(linkurl)s) from docrepo %(alias)s" % locals())
-                    sitefooter.append(link)
-
-    for text, href in sitefooter:
-        link = ET.SubElement(ET.SubElement(footer, "li"), "a")
-        link.text = text
-        link.attrib['href'] = href
-
-    tocbutton = ET.SubElement(
-        ET.SubElement(ET.SubElement(root, "tocbutton"),
-                      "a", {'href':'#menu',
-                            'class': 'tocbutton'}),
-        "img", {'src':'rsrc/img/navmenu-small-black.png'})
-
-    if not staticsite:
-        search = ET.SubElement(
-            ET.SubElement(ET.SubElement(root, "search"), "form", action="/search/"), "input", type="search", name="q")
-        l = ET.Element("a", **{'href': "#search",
-                               'class': "searchbutton"})
-        ET.SubElement(l, "img", src="rsrc/img/search.png")
-        root.find("search/form").append(l)
-        
-    stylesheets = ET.SubElement(root, "stylesheets")
-    log.debug("Adding %s stylesheets to resources.xml" % len(res['css']))
-    for f in res['css']:
-        stylesheet = ET.SubElement(stylesheets, "link")
-        stylesheet.attrib['rel'] = "stylesheet"
-        stylesheet.attrib['href'] = f
-    log.debug("Adding %s javascripts to resources.xml" % len(res['js']))
-    javascripts = ET.SubElement(root, "javascripts")
-    for f in res['js']:
-        javascript = ET.SubElement(javascripts, "script")
-        javascript.attrib['src'] = f
-        javascript.text = " "
-    util.indent_node(root)
-    tree = ET.ElementTree(root)
-    outxmlfile = resourcedir + os.sep + "resources.xml"
-    util.ensure_dir(outxmlfile)
-    tree.write(outxmlfile, encoding="utf-8")
-    log.debug("Wrote %s" % outxmlfile)
-    # NOTE: If DocumentRepository.generate feels like it, it may
-    # create a temporary copy of resources.xml with js/css paths
-    # modified to be relative to the generated file (which may be 2-3
-    # directories deep) instead of the document root, in order to
-    # support static HTML file generation with arbitrarily deep
-    # directory structure.
-    res['xml'] = [_filepath_to_urlpath(outxmlfile, 1)]
-
-    # finally create some files needed by the API
-    if not staticsite:
-        r = _create_api_files(repos, resourcedir, url)
-        res.update(r)
-        if not os.path.exists(resourcedir+os.sep+"ui"):
-            util.ensure_dir(resourcedir+os.sep+"ui" + os.sep + "dummy.txt")
-            for f in pkg_resources.resource_listdir("ferenda", "res/ui"):
-                src = pkg_resources.resource_stream("ferenda", "res/ui/" + f)
-                with open(resourcedir+os.sep+"ui" + os.sep + f, "wb") as dest:
-                    dest.write(src.read())
-        
-    # and finally FINALLY, normalize paths according to os.path.sep
-    # conventions
-    if os.sep == "\\":
-        for part in res:
-            result = []
-            for x in res[part]:
-                if x.startswith("http://") or x.startswith("https://"):
-                    result.append(x)
-                else:
-                    result.append(x.replace('/', os.sep))
-            res[part] = result
-
-    return res
-
-
-def _create_api_files(repos, resourcedir, uri):
-    # this should create the following files under resourcedir
-    # api/context.json (aliased to /json-ld/context.json if legacyapi)
-    # api/terms.json (aliased to /var/terms.json if legacyapi)
-    # api/common.json (aliased to /var/common.json if legacyapi)
-    # MAYBE api/ui/  - copied from ferenda/res/ui
-    legacyapi = True
-    files = []
-    context = os.sep.join([resourcedir, "api", "context.json"])
-    if legacyapi:
-        contextpath = "/json-ld/context.json"
-        termspath   = "/var/terms"
-        commonpath  = "/var/common"
-    else:
-        # FIXME: create correct URL path
-        contextpath = "/rsrc/api/context.json"
-        termspath   = "/rsrc/api/terms.json"
-        commonpath  = "/rsrc/api/common.json"
-    util.ensure_dir(context)
-    with open(context, "w") as fp:
-        contextdict = _get_json_context(repos)
-        json.dump({"@context": contextdict}, fp, indent=4, sort_keys=True)
-    files.append(_filepath_to_urlpath(context, 2))
-        
-    common = os.sep.join([resourcedir, "api", "common.json"])
-    terms = os.sep.join([resourcedir, "api", "terms.json"])
-
-    for (filename, func, urlpath) in ((common, _get_common_graph, commonpath),
-                                      (terms,  _get_term_graph,   termspath)):
-        g = func(repos, uri + urlpath[1:])
-        d = json.loads(g.serialize(format="json-ld", context=contextdict,
-                                   indent=4).decode("utf-8"))
-        d['@context'] = contextpath
-        if legacyapi:
-            d = _convert_legacy_jsonld(d, uri + urlpath[1:])
-        with open(filename, "w") as fp:
-                json.dump(d, fp, indent=4, sort_keys=True)
-        files.append(_filepath_to_urlpath(filename, 2))
-    return {'json': files}
-
-def _process_file(filename, buf, destdir, origin="", combine=False):
-    """
-    Helper function to concatenate or copy CSS/JS (optionally
-    processing them with e.g. Scss) or other files to correct place
-    under the web root directory.
-    
-    :param filename: The name (relative to the ferenda package) of the file
-    :param buf: A buffer into which the contents of the file is written (if combine == True)
-    :param destdir: The directory into which the file will be copied (unless combine == True)
-    :param origin: The source of the configuration that specifies this files
-    :param combine: Whether to combine all files into a single one
-    :returns: The URL path of the resulting file, relative to the web root (or None if combine == True)
-    :rtype: str
-    """
-    # disabled until pyScss is usable on py3 again
-    # mapping = {'.scss': {'transform': _transform_scss,
-    #                     'suffix': '.css'}
-    #            }
-    log = setup_logger()
-    # FIXME: extend this through a load-path mechanism?
-    if os.path.exists(filename):
-        log.debug("Process file found %s as a file relative to %s" %
-                  (filename, os.getcwd()))
-        fp = open(filename, "rb")
-    elif pkg_resources.resource_exists('ferenda', filename):
-        log.debug("Found %s as a resource" % filename)
-        fp = pkg_resources.resource_stream('ferenda', filename)
-    elif filename.startswith("http://") or filename.startswith("https://"):
-        if combine:
-            raise errors.ConfigurationError(
-                "makeresources: Can't use combine=True in combination with external js/css URLs (%s)" % filename)
-        log.debug("Using external url %s" % filename)
-        return filename
-    else:
-        log.warning(
-            "file %(filename)s (specified in %(origin)s) doesn't exist" % locals())
-        return None
-
-    (base, ext) = os.path.splitext(filename)
-    # disabled until pyScss is usable on py3 again
-    # if ext in mapping:
-    #     outfile = base + mapping[ext]['suffix']
-    #     mapping[ext]['transform'](filename, outfile)
-    #     filename = outfile
-    if combine:
-        log.debug("combining %s into buffer" % filename)
-        buf.write(fp.read())
-        fp.close()
-        return None
-    else:
-        log.debug("writing %s out to %s" % (filename, destdir))
-        outfile = destdir + os.sep + os.path.basename(filename)
-        util.ensure_dir(outfile)
-        with open(outfile, "wb") as fp2:
-            fp2.write(fp.read())
-        fp.close()
-        return _filepath_to_urlpath(outfile, 2)
-
-# disabled until pyScss is usable on py3 again
-# def _transform_scss(infile, outfile):
-#     print(("Transforming %s to %s" % (infile, outfile)))
-#     from scss import Scss
-#     compiler = Scss()
-#     util.writefile(outfile, compiler.compile(util.readfile(infile)))
+    return Resources(repos, resourcedir,
+                     combineresources=combine,
+                     cssfiles=cssfiles,
+                     jsfiles=jsfiles,
+                     staticsite=staticsite,
+                     sitename=sitename,
+                     sitedescription=sitedescription,
+                     url=url).make()
 
 def frontpage(repos,
               path="data/index.html",
@@ -533,120 +209,7 @@ def make_wsgi_app(inifile=None, **kwargs):
     repos = args['repos']
     del args['repos']
     return WSGIApp(repos, **args)
-    # return app
 
-def _convert_legacy_jsonld(indata, rooturi):
-    # the json structure should be a top node containing only
-    # @context, iri (localhost:8000/var/terms), type (foaf:Document)
-    # and topic - a list of dicts, where each dict looks like:
-    #
-    # {"iri" : "referatserie",
-    #  "comment" : "Anger vilken referatserie som referatet eventuellt tillhör.",
-    #  "label" : "Referatserie",
-    #  "type" : "DatatypeProperty"}
-    out  = {}
-    topics = []
-    for topkey, topval in indata.items():
-        if topkey == "@graph":
-            for subject in topval:
-                if subject['iri'] == rooturi:
-                    for key,value in subject.items():
-                        if key in  ('iri', 'foaf:topic'):
-                            continue
-                        out[key] = value
-                else:
-                    for key in subject:
-                        if isinstance(subject[key], list):
-                            # make sure multiple values are sorted for
-                            # the same reason as below
-                            subject[key].sort()
-                    topics.append(subject)
-        else:
-            out[topkey] = topval
-    # make sure the triples are in a predictable order, so we can
-    # compare on the JSON level for testing
-    out['topic'] = sorted(topics, key=lambda x: x['iri'])
-    out['iri']  = rooturi
-    return out
-    
-def _get_json_context(repos):
-    legacyapi = True
-    data = {}
-    # step 1: define all prefixes
-    for repo in repos:
-        for (prefix, ns) in repo.ns.items():
-            if prefix in data:
-                assert data[prefix] == str(ns), "Conflicting URIs for prefix %s" % prefix
-            else:
-                data[prefix] = str(ns)
-
-    # the legacy api client expects some terms to be available using
-    # shortened forms (eg 'label' instead of 'rdfs:label'), so we must
-    # define this in the context
-    if legacyapi:
-        data['iri'] = "@id"
-        data['type'] = "@type"
-        data['label'] = 'rdfs:label'
-        data['name'] = 'foaf:name'
-        data['altLabel'] = 'skos:altLabel'
-        # data["@language"] = "en" # how to set this? majority vote of
-                                   # repos / documents? note that it's
-                                   # only a default.
-    return data
-
-def _get_term_graph(repos, graphuri):
-    # produce a rdf graph of the terms (classes and properties) in
-    # the vocabs we're using. This should preferably entail
-    # loading the vocabularies (stored as RDF/OWL documents), and
-    # expressing all the things that are owl:*Property, owl:Class,
-    # rdf:Property and rdf:Class. As an intermediate step, we
-    # could have preprocessed rdf graphs (stored in
-    # res/vocab/dcterms.ttl, res/vocab/bibo.ttl etc) derived from the
-    # vocabularies and pull them in like we pull in namespaces in
-    # self.ns The rdf graph should be rooted in an url (eg
-    # http://localhost:8080/var/terms, and then have each term as
-    # a foaf:topic. Each term should be described with its
-    # rdf:type, rdfs:label (most important!) and possibly
-    # rdfs:comment
-    root = URIRef(graphuri)
-    g = Graph()
-    g.add((root, RDF.type, FOAF.Document))
-    for repo in repos:
-        for prefix, uri in repo.ontologies.store.namespaces():
-            if prefix:
-                g.bind(prefix, uri)
-        for (s,p,o) in repo.ontologies:
-            if isinstance(s, BNode):
-                continue
-            if p in (RDF.type, RDFS.label, RDFS.comment):
-                g.add((root, FOAF.topic, s)) # unless we've already added it?
-                if isinstance(o, Literal): # remove language typing info
-                    o = Literal(str(o))
-                g.add((s,p,o)) # control duplicates somehow
-                # print(g.serialize(format="json-ld", context=context, indent=4).decode())
-    return g
-
-def _get_common_graph(repos, graphuri):
-    # create a graph with foaf:names for all entities (publishers,
-    # publication series etc) that our data mentions.
-    root = URIRef(graphuri)
-    g = Graph()
-    g.bind("skos", SKOS)
-    g.bind("foaf", FOAF)
-    g.add((root, RDF.type, FOAF.Document))
-    for repo in repos:
-        for (s,p,o) in repo.commondata: # should work like
-                                        # repo.ontologies, but read
-                                        # one file per repo
-                                        # ("res/extra/rfc.ttl",
-                                        #  "res/extra/propregeringen.ttl" in
-                                        # a controlled way)
-            if p in (FOAF.name, SKOS.prefLabel, SKOS.altLabel):
-                g.add((root, FOAF.topic, s))
-                g.add((s,p,o))
-                # try to find a type
-                g.add((s, RDF.type, repo.commondata.value(s, RDF.type)))
-    return g
 
 loglevels = {'DEBUG': logging.DEBUG,
              'INFO': logging.INFO,
@@ -1312,7 +875,6 @@ def _load_class(classname):
             "Classname '%s' should be the fully qualified name of a class (i.e. 'modulename.%s')" %
             (classname, classname))
     # NOTE: Don't remove this line! (or make sure testManager works after you do)
-    # log = logging.getLogger()
     log = setup_logger()
 
     __import__(modulename)

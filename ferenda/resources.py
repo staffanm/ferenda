@@ -2,13 +2,12 @@
 from __future__ import unicode_literals, print_function
 
 import os
-import sys
 import json
 
 import six
 from lxml import etree
 from lxml.builder import ElementMaker
-from rdflib import URIRef, Namespace, Literal, BNode, Graph, RDF, RDFS, OWL
+from rdflib import URIRef, Literal, BNode, Graph, RDF, RDFS
 from rdflib.namespace import FOAF, SKOS
 from rdflib.plugin import register, Parser, Serializer
 register('json-ld', Parser, 'ferenda.thirdparty.rdflib_jsonld.parser',
@@ -18,10 +17,11 @@ register('json-ld', Serializer, 'ferenda.thirdparty.rdflib_jsonld.serializer',
 import pkg_resources
 
 from ferenda import LayeredConfig, DocumentRepository
-from ferenda import util
+from ferenda import util, errors
 
 class Resources(object):
     def __init__(self, repos, resourcedir, **kwargs):
+        # FIXME: document what kwargs could be (particularly 'combineresources')
         self.repos = repos
         self.resourcedir = resourcedir
         defaults = DocumentRepository().get_default_options()
@@ -36,18 +36,33 @@ class Resources(object):
              js=True,
              img=True,
              xml=True,
-             api=True):
+             api=None):
         res = {}
+        if api is None:
+            api = not self.config.staticsite
         if css:
             res['css'] = self.make_css()
         if js:
             res['js'] = self.make_js()
-        if img:
-            res['img'] = self.make_img()
+        # if img:
+        #    res['img'] = self.make_img()
         if xml:
-            res['xml'] = self.make_resources_xml(res['css'], res['js'])
+            res['xml'] = self.make_resources_xml(res.get('css',[]), res.get('js',[]))
         if api:
-            res['api'] = self.make_api_files()
+            res['json'] = self.make_api_files()
+
+        # finally, normalize paths according to os.path.sep
+        # conventions
+        if os.sep == "\\":
+            for part in res:
+                result = []
+                for x in res[part]:
+                    if x.startswith("http://") or x.startswith("https://"):
+                        result.append(x)
+                    else:
+                        result.append(x.replace('/', os.sep))
+                res[part] = result
+        
         return res
 
     def make_css(self):
@@ -55,8 +70,7 @@ class Resources(object):
         combinefile = None
         if self.config.combineresources:
             combinefile  = os.sep.join([self.resourcedir, 'css', 'combined.css'])
-            
-        return self._make_files('cssfiles', combinefile, cssmin.cssmin)
+        return self._make_files('cssfiles', self.resourcedir+os.sep+'css', combinefile, cssmin.cssmin)
 
     def make_js(self):
         # slimit provides better perf, but isn't py3 compatible
@@ -67,7 +81,7 @@ class Resources(object):
         combinefile = None
         if self.config.combineresources:
             combinefile  = os.sep.join([self.resourcedir, 'js', 'combined.js'])
-        return self._make_files('cssfiles', combinefile, jsmin.jsmin)
+        return self._make_files('jsfiles', self.resourcedir+os.sep+'js', combinefile, jsmin.jsmin)
 
     def make_img(self):
         # FIXME: implement this
@@ -75,7 +89,7 @@ class Resources(object):
 
     def make_resources_xml(self, cssfiles, jsfiles):
         E = ElementMaker() # namespace = None, nsmap={None: ...}
-        E.configuration(
+        root = E.configuration(
             E.sitename(self.config.sitename),
             E.sitedescription(self.config.sitedescription),
             E.url(self.config.url),
@@ -98,25 +112,35 @@ class Resources(object):
                     E.img({'src': 'rsrc/img/navmenu-small-black.png'})
                 )
             ), 
-            # if staticsite:
-            E.search(
-                E.form({'action': self.config.searchendpoint,
-                        'type': 'search',
-                        'name': 'q'},
-                       E.a({'href': '#search',
-                            'class': 'searchbutton'},
-                           E.img({'src': 'rsrc/img/search.png'})
-                           )
-                       )
-                ),
-            E.stylesheets(*self._li_wrap(cssfiles, 'link', 'href')),
+            E.stylesheets(*self._li_wrap(cssfiles, 'link', 'href', rel="stylesheet")),
             E.javascripts(*self._li_wrap(jsfiles, 'script', 'src'))
             )
 
-    def _li_wrap(self, items, container, attribute):
+        if not self.config.staticsite:
+            root.append(
+                E.search(
+                    E.form({'action': self.config.searchendpoint,
+                            'type': 'search',
+                            'name': 'q'},
+                           E.a({'href': '#search',
+                                'class': 'searchbutton'},
+                               E.img({'src': 'rsrc/img/search.png'})
+                           )
+                       )
+                )
+            )
+                                    
+        outfile = self.resourcedir + os.sep + "resources.xml"
+        util.writefile(outfile, etree.tostring(root, encoding="utf-8", pretty_print=True).decode("utf-8"))
+        self.log.debug("Wrote %s" % outfile)
+        return [self._filepath_to_urlpath(outfile, 1)]
+
+
+    def _li_wrap(self, items, container, attribute, **kwargs):
         elements = []
         for item in items:
-            elements.append(etree.Element(container, **{attribute:item}))
+            kwargs[attribute] = item
+            elements.append(etree.Element(container, **kwargs))
         return elements
 
     def _links(self, methodname):
@@ -132,31 +156,34 @@ class Resources(object):
                         E.a({'href': url},
                             label)))
         return elements
-        
-    def _make_files(self, option, combinefile=None, combinefunc=None):
-        combineresources = combinefile is not None
+
+    
+    def _make_files(self, option, filedir, combinefile=None, combinefunc=None):
         urls = []
         buf = six.BytesIO()
         processed = set()
         # eg. self.config.cssfiles
-        for f in getattr(self.config, option):
-            urls.append(self._process_file(f, buf, self.resourcedir, "ferenda.ini", combineresources))
-            processed.add(f)
+        if getattr(self.config, option): # it's possible to set eg
+                                         # cssfiles=None when creating
+                                         # the Resources object
+            for f in getattr(self.config, option):
+                urls.append(self._process_file(f, buf, filedir, "ferenda.ini"))
+                processed.add(f)
         for repo in self.repos:
             for f in getattr(repo.config, option):
                 if f in processed:
                     continue
-            urls.append(self._process_file(f, buf, self.resourcedir, repo.alias, combineresources))
-            processed.add(f)
+                urls.append(self._process_file(f, buf, filedir, repo.alias))
+                processed.add(f)
         urls = list(filter(None, urls))
         if combinefile:
-            txt = buf.getvalue.decode('utf-8')
+            txt = buf.getvalue().decode('utf-8')
             util.writefile(combinefile, combinefunc(txt))
-            return self._filepath_to_urlpath(combinefile, 2)
+            return [self._filepath_to_urlpath(combinefile, 2)]
         else:
             return urls
 
-    def _process_file(self, filename, buf, destdir, origin="", combineresources=False):
+    def _process_file(self, filename, buf, destdir, origin=""):
         """
         Helper function to concatenate or copy CSS/JS (optionally
         processing them with e.g. Scss) or other files to correct place
@@ -166,7 +193,6 @@ class Resources(object):
         :param buf: A buffer into which the contents of the file is written (if combineresources == True)
         :param destdir: The directory into which the file will be copied (unless combineresources == True)
         :param origin: The source of the configuration that specifies this files
-        :param combineresources: Whether to combine all files into a single one
         :returns: The URL path of the resulting file, relative to the web root (or None if combineresources == True)
         :rtype: str
         """
@@ -183,7 +209,7 @@ class Resources(object):
             self.log.debug("Found %s as a resource" % filename)
             fp = pkg_resources.resource_stream('ferenda', filename)
         elif filename.startswith("http://") or filename.startswith("https://"):
-            if combineresources:
+            if self.config.combineresources:
                 raise errors.ConfigurationError(
                     "makeresources: Can't use combineresources=True in combination with external js/css URLs (%s)" % filename)
             self.log.debug("Using external url %s" % filename)
@@ -199,7 +225,7 @@ class Resources(object):
         #     outfile = base + mapping[ext]['suffix']
         #     mapping[ext]['transform'](filename, outfile)
         #     filename = outfile
-        if combineresources:
+        if self.config.combineresources:
             self.log.debug("combining %s into buffer" % filename)
             buf.write(fp.read())
             fp.close()
@@ -245,13 +271,16 @@ class Resources(object):
             g = func(self.config.url + urlpath[1:])
             d = json.loads(g.serialize(format="json-ld", context=contextdict,
                                        indent=4).decode("utf-8"))
-            d['@context'] = contextpath
+            # d might not contain a @context (if contextdict == {}, ie
+            # no repos are given)
+            if '@context' in d:
+                d['@context'] = contextpath
             if legacyapi:
                 d = self._convert_legacy_jsonld(d, self.config.url + urlpath[1:])
             with open(filename, "w") as fp:
                     json.dump(d, fp, indent=4, sort_keys=True)
             files.append(self._filepath_to_urlpath(filename, 2))
-        return {'json': files}
+        return files
         
     def _convert_legacy_jsonld(self, indata, rooturi):
         # the json structure should be a top node containing only
@@ -274,27 +303,36 @@ class Resources(object):
         else:
             idfld = '@id'
 
-        for topkey, topval in indata.items():
-            if topkey == "@graph":
-                for subject in topval:
-                    if subject[idfld] == rooturi:
-                        for key,value in subject.items():
-                            if key in  (idfld, 'foaf:topic'):
-                                continue
-                            out[key] = value
-                    else:
-                        for key in subject:
-                            if isinstance(subject[key], list):
-                                # make sure multiple values are sorted for
-                                # the same reason as below
-                                subject[key].sort()
-                        topics.append(subject)
+        # idatata might be a mapping containing a list of mappings
+        # under @graph, or it might just be the actual list.
+        
+        if isinstance(indata, list):
+            topval = indata
+        else:
+            for topkey, topval in indata.items():
+                if topkey == "@graph":
+                    break
+        
+        for subject in topval:
+            if subject[idfld] == rooturi:
+                for key,value in subject.items():
+                    if key in  (idfld, 'foaf:topic'):
+                        continue
+                    out[key] = value
             else:
-                out[topkey] = topval
+                for key in subject:
+                    if isinstance(subject[key], list):
+                        # make sure multiple values are sorted for
+                        # the same reason as below
+                        subject[key].sort()
+                topics.append(subject)
+
         # make sure the triples are in a predictable order, so we can
         # compare on the JSON level for testing
         out['topic'] = sorted(topics, key=lambda x: x[idfld])
         out['iri']  = rooturi
+        if '@context' in indata:
+            out['@context'] = indata['@context']
         return out
 
     def _get_json_context(self):
@@ -309,7 +347,7 @@ class Resources(object):
 
         # the legacy api client expects some terms to be available using
         # shortened forms (eg 'label' instead of 'rdfs:label'), so we must
-        # define this in the context
+        # define them in our context
         if self.config.legacyapi:
             data['iri'] = "@id"
             data['type'] = "@type"
@@ -387,3 +425,7 @@ class Resources(object):
         urlpath = "/".join(path.split("/")[-(keep_segments + 1):])
         # print("_filepath_to_urlpath (%s): %s -> %s" % (keep_segments, path, urlpath))
         return urlpath
+
+
+
+

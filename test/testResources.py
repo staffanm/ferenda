@@ -3,11 +3,13 @@ from __future__ import unicode_literals
 
 import os
 import sys
+import json
 import pkg_resources
 import tempfile
 import shutil
 sys.path.insert(0,os.getcwd())
 pkg_resources.resource_listdir('ferenda','res')
+from lxml import etree as ET
 
 from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 from ferenda import DocumentRepository
@@ -51,7 +53,8 @@ class=testManager.staticmockclass2
         
 
     def test_basic(self):
-        # Test1: No combining, resources specified by docrepos
+        # Test1: No combining, resources specified by docrepos only
+        # (skip the default css/js files)
         s = os.sep
         want = {'css':[s.join(['rsrc', 'css','test.css'])],
                 'js':[s.join(['rsrc', 'js','test.js'])],
@@ -61,7 +64,9 @@ class=testManager.staticmockclass2
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
         got = Resources([staticmockclass(),staticmockclass2()],
-                        self.tempdir+os.sep+'rsrc').make()
+                        self.tempdir+os.sep+'rsrc',
+                        cssfiles=[],
+                        jsfiles=[]).make()
         self.assertEqual(want, got)
         tree = ET.parse(self.tempdir+os.sep+got['xml'][0])
         stylesheets=tree.find("stylesheets").getchildren()
@@ -86,20 +91,17 @@ class=testManager.staticmockclass2
         s = os.sep
         want = {'css':[s.join(['rsrc', 'css','combined.css'])],
                 'js':[s.join(['rsrc', 'js','combined.js'])],
-                'json': ['rsrc/api/context.json',
-                         'rsrc/api/common.json',
-                         'rsrc/api/terms.json'],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
-        got = Resources([test,test2],self.tempdir+os.sep+'rsrc',
-                        combine=True,
+        got = Resources([staticmockclass(),staticmockclass2()],self.tempdir+os.sep+'rsrc',
+                        combineresources=True,
                         cssfiles=['res/css/normalize-1.1.3.css',
                                   'res/css/main.css'],
                         jsfiles=['res/js/jquery-1.10.2.js',
                                  'res/js/modernizr-2.6.3.js',
                                  'res/js/respond-1.3.0.js'],
                         sitename="Blahonga",
-                        sitedescription="A non-default value").make()
+                        sitedescription="A non-default value").make(api=False)
         self.assertEqual(want,got)
         tree = ET.parse(self.tempdir+'/'+got['xml'][0])
         stylesheets=tree.find("stylesheets").getchildren()
@@ -122,14 +124,16 @@ class=testManager.staticmockclass2
                                                           "ferenda/res/js/modernizr-2.6.3.js",
                                                           "ferenda/res/js/respond-1.3.0.js")]))
 
-    def test_custom_docrepo(self):
+    def test_default_docrepo(self):
         # Test3: No combining, make sure that a non-customized
         # DocumentRepository works
         s = os.sep
         repo = DocumentRepository()
         # but remove any external urls -- that's tested separately in Test5
         repo.config.cssfiles = [x for x in repo.config.cssfiles if not x.startswith("http://")]
-        got = Resources([repo],self.tempdir+os.sep+'rsrc').make()
+        got = Resources([repo],self.tempdir+os.sep+'rsrc',
+                        cssfiles=[],
+                        jsfiles=[]).make(api=False)
         s = os.sep
         want = {'css':[s.join(['rsrc', 'css','normalize-1.1.3.css']),
                        s.join(['rsrc', 'css','main.css']),
@@ -138,9 +142,6 @@ class=testManager.staticmockclass2
                       s.join(['rsrc', 'js','modernizr-2.6.3.js']),
                       s.join(['rsrc', 'js','respond-1.3.0.js']),
                       s.join(['rsrc', 'js','ferenda.js'])],
-                'json':[s.join(['rsrc', 'api','context.json']),
-                        s.join(['rsrc', 'api','common.json']),
-                        s.join(['rsrc', 'api','terms.json'])],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
                       }
         self.assertEqual(want,got)
@@ -161,12 +162,11 @@ class=testManager.staticmockclass2
         want = {'css':[s.join(['rsrc', 'css','test.css']),
                        'http://example.org/css/main.css'],
                 'js':[s.join(['rsrc', 'js','test.js'])],
-                'json':[s.join(['rsrc', 'api','context.json']),
-                        s.join(['rsrc', 'api','common.json']),
-                        s.join(['rsrc', 'api','terms.json'])],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
-        got = Resources([test],self.tempdir+os.sep+'rsrc').make()
+        got = Resources([test],self.tempdir+os.sep+'rsrc',
+                        cssfiles=[],
+                        jsfiles=[]).make(api=False)
         self.assertEqual(want,got)
                                     
     def test_external_combine(self):
@@ -174,12 +174,14 @@ class=testManager.staticmockclass2
         test = staticmockclass()
         test.config.cssfiles.append('http://example.org/css/main.css')
         with self.assertRaises(errors.ConfigurationError):
-            got = Resources([test],self.tempdir+os.sep+'rsrc', combine=True).make()
+            got = Resources([test],self.tempdir+os.sep+'rsrc', combineresources=True).make()
 
     def test_footer(self):
-        # test7: test the footer() functionality
-        test = staticmockclass3()
-        got = Resources([test], self.tempdir+os.sep+'rsrc').make()
+        # test7: test the footer() functionality (+ disabling CSS/JS handling)
+        s = os.sep
+        got = Resources([staticmockclass3()], self.tempdir+os.sep+'rsrc').make(css=False, js=False, api=False)
+        want = {'xml':[s.join(['rsrc', 'resources.xml'])]}
+        self.assertEqual(want, got)
         tree = ET.parse(self.tempdir+os.sep+got['xml'][0])
         footerlinks=tree.findall("footerlinks/nav/ul/li")
         self.assertTrue(footerlinks)
@@ -192,14 +194,15 @@ class=testManager.staticmockclass2
         want = {'css':['rsrc\\css\\test.css',
                        'http://example.org/css/main.css'],
                 'js':['rsrc\\js\\test.js'],
-                'json':['rsrc\\api\\context.json',
-                        'rsrc\\api\\common.json',
-                        'rsrc\\api\\terms.json'],
                 'xml':['rsrc\\resources.xml']}
         try:
             realsep = os.sep
             os.sep = "\\"
-            got = Resources([test], self.tempdir+os.sep+'rsrc').make()
+            from ferenda import resources
+            resources.os.sep = "\\"
+            got = Resources([test], self.tempdir+os.sep+'rsrc',
+                            cssfiles=[],
+                            jsfiles=[]).make(api=False)
             self.assertEqual(want,got)
         finally:
             os.sep = realsep
@@ -207,16 +210,15 @@ class=testManager.staticmockclass2
     def test_nonexistent_resource(self):
         # test9: nonexistent resources should not be included
         s = os.sep
-        test = staticmockclass()
+        test = staticmockclass()        
         test.config.cssfiles = ['nonexistent.css']
         want = {'css':[],
                 'js':[s.join(['rsrc', 'js','test.js'])],
-                'json':[s.join(['rsrc', 'api','context.json']),
-                        s.join(['rsrc', 'api','common.json']),
-                        s.join(['rsrc', 'api','terms.json'])],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
-        got = Resources([test], self.tempdir+os.sep+'rsrc').make()
+        got = Resources([test], self.tempdir+os.sep+'rsrc',
+                        cssfiles=[],
+                        jsfiles=[]).make(api=False)
         self.assertEqual(want,got)
 
     # def test_scss_transform(self):
@@ -228,5 +230,49 @@ class=testManager.staticmockclass2
         #        'js':[s.join(['rsrc', 'js','test.js'])],
         #        'xml':[s.join(['rsrc', 'resources.xml'])]
         # }
-        # got = Resources([test], self.tempdir+os.sep+'rsrc').make()
+        # got = Resources([staticmockclass()], self.tempdir+os.sep+'rsrc').make()
         # self.assertEqual(want,got)
+
+# this tests generation of static assets (context.json, terms.json and
+# common.json)
+class BaseAPI(RepoTester):
+
+    def test_files(self):
+        # it'd be better to test _get_context, _get_common_graph and
+        # _get_term_graph in isolation, but _create_api_files contains
+        # common code to serialize the structures to files. Easier to
+        # test all three.
+        #
+        # don't include all default ontologies to cut down on test
+        # time, SKOS+FOAF ought to be enough.
+        self.repo.ns = ({"foaf": "http://xmlns.com/foaf/0.1/",
+                         'rdfs': 'http://www.w3.org/2000/01/rdf-schema#',
+                         'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+                         'owl': 'http://www.w3.org/2002/07/owl#',
+                         'skos': 'http://www.w3.org/2004/02/skos/core#'})
+
+        got = Resources([self.repo], self.datadir + "/data/rsrc",
+                        legacyapi=True).make(css=False, js=False, img=False, xml=False, api=True)
+        want = {'json': ['rsrc/api/context.json',
+                         'rsrc/api/common.json',
+                         'rsrc/api/terms.json']}
+        self.assertEqual(got, want)
+
+        got  = json.load(open(self.datadir + "/data/rsrc/api/context.json"))
+        want = json.load(open("test/files/api/jsonld-context.json"))
+        self.assertEqual(want, got)
+
+        got  = json.load(open(self.datadir + "/data/rsrc/api/terms.json"))
+        want = json.load(open("test/files/api/var-terms.json"))
+        self.assertEqual(want, got)
+
+        got  = json.load(open(self.datadir + "/data/rsrc/api/common.json"))
+        want = json.load(open("test/files/api/var-common.json"))
+        self.assertEqual(want,got)
+
+class ComplexAPI(RepoTester):
+    def test_files(self):
+        # use three repos (staticmockclass*) that each define their
+        # own ontologies and terms. Make sure these show up in
+        # context, terms and common
+        pass

@@ -176,7 +176,6 @@ class=testManager.staticmockclass2
 
     def test_makeresources(self):
         # Test1: No combining, resources specified by docrepos
-        from pudb import set_trace; set_trace()
         test = staticmockclass()
         # print("test.get_default_options %r" % test.get_default_options())
         test2 = staticmockclass2()
@@ -555,7 +554,7 @@ class Run(unittest.TestCase):
         util.writefile("ferenda.ini", """[__root__]
 loglevel=WARNING
 datadir = %s
-url = http://localhost:8000
+url = http://localhost:8000/
 searchendpoint = /search/
 apiendpoint = /api/
 cssfiles = ['test.css', 'other.css']        
@@ -896,7 +895,7 @@ class Testrepo2(Testrepo):
         util.writefile("ferenda.ini", """[__root__]
 loglevel=WARNING
 datadir = %s
-url = http://localhost:8000
+url = http://localhost:8000/
 searchendpoint = /search/
 apiendpoint = /api/
         """ % self.tempdir)
@@ -967,49 +966,6 @@ Available modules:
             self.assertTrue(m2.called)
             self.assertTrue(m.serve_forever.called)
 
-# this tests generation of static assets (context.json, terms.json and
-# common.json)
-class BaseAPI(RepoTester):
-
-    def test_files(self):
-        # it'd be better to test _get_context, _get_common_graph and
-        # _get_term_graph in isolation, but _create_api_files contains
-        # common code to serialize the structures to files. Easier to
-        # test all three.
-        #
-        # don't include all default ontologies to cut down on test
-        # time, SKOS+FOAF ought to be enough.
-        self.repo.ns = ({"foaf": "http://xmlns.com/foaf/0.1/",
-                         'rdfs': 'http://www.w3.org/2000/01/rdf-schema#',
-                         'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
-                         'owl': 'http://www.w3.org/2002/07/owl#',
-                         'skos': 'http://www.w3.org/2004/02/skos/core#'})
-
-        got = manager._create_api_files([self.repo], self.datadir + "/data/rsrc",
-                                        "http://localhost:8000/")
-        want = {'json': ['rsrc/api/context.json',
-                         'rsrc/api/common.json',
-                         'rsrc/api/terms.json']}
-        self.assertEqual(got, want)
-
-        got  = json.load(open(self.datadir + "/data/rsrc/api/context.json"))
-        want = json.load(open("test/files/api/jsonld-context.json"))
-        self.assertEqual(want, got)
-        
-        got  = json.load(open(self.datadir + "/data/rsrc/api/terms.json"))
-        want = json.load(open("test/files/api/var-terms.json"))
-        self.assertEqual(want, got)
-
-        got  = json.load(open(self.datadir + "/data/rsrc/api/common.json"))
-        want = json.load(open("test/files/api/var-common.json"))
-        self.assertEqual(want,got)
-
-class ComplexAPI(RepoTester):
-    def test_files(self):
-        # use three repos (staticmockclass*) that each define their
-        # own ontologies and terms. Make sure these show up in
-        # context, terms and common
-        pass
 
 
 import doctest
