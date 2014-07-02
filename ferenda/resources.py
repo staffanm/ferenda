@@ -308,39 +308,28 @@ class Resources(object):
         wantedlist = None
         if isinstance(indata, list):
             wantedlist = indata
-            was_list = True
         else:
             for topkey, topval in indata.items():
                 if topkey == "@graph":
                     wantedlist = topval
                     break
-            was_list = False        
 
         if not wantedlist:
-            print("Couldn't find list of mappings in %s" % indata)
-            return None
-
-        for subject in wantedlist:
-            # attempt to track down an interment bug that only
-            # manifests on travis...
-            try:
-                x = subject[idfld]
-            except TypeError:
-                print("This wont work: subject=%r, indata=%r, rooturi=%s" % (subject, indata, rooturi))
-
-                
-            if subject[idfld] == rooturi:
-                for key,value in subject.items():
-                    if key in  (idfld, 'foaf:topic'):
-                        continue
-                    out[key] = value
-            else:
-                for key in subject:
-                    if isinstance(subject[key], list):
-                        # make sure multiple values are sorted for
-                        # the same reason as below
-                        subject[key].sort()
-                topics.append(subject)
+            self.log.warning("Couldn't find list of mappings in %s, topics will be empty" % indata)
+        else:
+            for subject in wantedlist:
+                if subject[idfld] == rooturi:
+                    for key,value in subject.items():
+                        if key in  (idfld, 'foaf:topic'):
+                            continue
+                        out[key] = value
+                else:
+                    for key in subject:
+                        if isinstance(subject[key], list):
+                            # make sure multiple values are sorted for
+                            # the same reason as below
+                            subject[key].sort()
+                    topics.append(subject)
 
         # make sure the triples are in a predictable order, so we can
         # compare on the JSON level for testing
