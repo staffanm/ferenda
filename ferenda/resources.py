@@ -317,7 +317,7 @@ class Resources(object):
             try:
                 x = subject[idfld]
             except TypeError:
-                print("This wont work: subject=%r" % subject)
+                print("This wont work: subject=%r, topval=%r" % (subject, topval)
             if subject[idfld] == rooturi:
                 for key,value in subject.items():
                     if key in  (idfld, 'foaf:topic'):
