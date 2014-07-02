@@ -314,7 +314,9 @@ class Resources(object):
                     break
         
         for subject in topval:
-            if isinstance(subject, str):
+            try:
+                x = subject[idfld]
+            except TypeError:
                 print("This wont work: subject=%r" % subject)
             if subject[idfld] == rooturi:
                 for key,value in subject.items():
