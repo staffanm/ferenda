@@ -11,6 +11,7 @@ from datetime import date, datetime
 
 import six
 from six.moves.urllib_parse import parse_qsl, urlencode
+from six import text_type as str
 from rdflib import URIRef, Namespace, Literal, Graph
 from lxml import etree
 

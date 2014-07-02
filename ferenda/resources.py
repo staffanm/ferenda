@@ -314,6 +314,8 @@ class Resources(object):
                     break
         
         for subject in topval:
+            if isinstance(subject, str):
+                print("This wont work: subject=%r" % subject)
             if subject[idfld] == rooturi:
                 for key,value in subject.items():
                     if key in  (idfld, 'foaf:topic'):
