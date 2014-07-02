@@ -7,7 +7,7 @@ import json
 from wsgiref.util import FileWrapper
 import mimetypes
 from operator import itemgetter
-from datetime import datetime
+from datetime import date, datetime
 
 import six
 from six.moves.urllib_parse import parse_qsl, urlencode
@@ -211,7 +211,6 @@ class WSGIApp(object):
                 qname_graph.bind(prefix, ns)
                 resource_graph.bind(prefix, ns)
             resource_graph += repo.commondata
-
             repodata = repo.faceted_data()
             data.extend(repodata) # assume that no two repos ever have
                                   # data about the same URI
@@ -286,27 +285,60 @@ class WSGIApp(object):
                     res += '<em class="match">%s</em>' % str(e)
             return res
 
+        idx = FulltextIndex.connect(self.config.indextype,
+                                    self.config.indexlocation,
+                                    self.repos)
+        schema = idx.schema()
+        q, param, pagenum, pagelen, stats = self.parse_parameters(environ['QUERY_STRING'], schema)
+        res, pager = idx.query(q=q,
+                               pagenum=pagenum,
+                               pagelen=pagelen,
+                               **param)
+
+        # Mangle res into the expected JSON structure (see qresults.json)
+        mangled = []
+        for hit in res:
+            mangledhit = {}
+            for k, v in hit.items():
+                if self.config.legacyapi:
+                    if "_" in k:
+                        # drop prefix (dcterms_issued -> issued)
+                        k = k.split("_",1)[1]
+                if k == "uri":
+                    k = "iri"
+                if k == "text":
+                    mangledhit["matches"] = {"text": _elements_to_html(hit["text"])}
+                elif k in ("basefile", "repo"):
+                    # these fields should not be included in results
+                    pass
+                else:
+                    mangledhit[k] = v
+            mangled.append(mangledhit)
+
+        # 3.1 create container for results
+        res = {"startIndex": pager['firstresult'] - 1,
+               "itemsPerPage": int(param.get('_pageSize', '10')),
+               "totalResults": pager['totalresults'],
+               "duration": None, # none
+               "current": environ['PATH_INFO'] + "?" + environ['QUERY_STRING'],
+               "items": mangled}
+
+        # 4. add stats, maybe
+        if stats:
+            res["statistics"] = self.stats(mangled)
+        return res
+
+
+    def parse_parameters(self, querystring, schema):
         def _guess_real_fieldname(k, schema):
             for fld in schema:
                 if fld.endswith(k):
                     return fld
             raise KeyError("Couldn't find anything that endswith(%s) in fulltextindex schema" % k)
 
-        # given path=/-/publ?q=r%C3%A4tt*&publisher.iri=*%2Fregeringskansliet&_page=0&_pageSize=10
-        # 1. extract {'q':'rätt*',
-        #             'publisher.iri'='*/regeringskansliet',
-        #             '_page':0,
-        #             '_pageSize':10}
-        param = dict(parse_qsl(environ['QUERY_STRING']))
+        param = dict(parse_qsl(querystring))
         filtered = dict([(k,v) for k,v in param.items() if not (k.startswith("_") or k == "q")])
-        # 2. call fulltextindex.query(q='rätt*', pagenum=1, pagelen=10,
-        #                             publisher='*/regeringskansliet')
-        idx = FulltextIndex.connect(self.config.indextype,
-                                    self.config.indexlocation,
-                                    self.repos)
-        schema = idx.schema()
-
-        # 2.2 Range: some parameters have additional parameters, eg
+        # Range: some parameters have additional parameters, eg
         # "min-dcterms_issued=2014-01-01&max-dcterms_issued=2014-02-01"
         newfiltered = {}
         for k, v in list(filtered.items()):
@@ -327,8 +359,11 @@ class WSGIApp(object):
                     v = datetime.strptime(v, "%Y-%m-%d")
                     newfiltered[k] = cls(v)
             elif k.startswith("year-"):
-                pass
-                # FIXME: for 2013, interpret as Between(2012-12-31 and 2014-01-01)
+                # eg for year-dcterms_issued=2013, interpret as
+                # Between(2012-12-31 and 2014-01-01)
+                k = k[5:]
+                newfiltered[k] = fulltextindex.Between(date(int(v)-1, 12, 31),
+                                                       date(int(v)+1, 1, 1))
             else:
                 newfiltered[k] = v
         filtered = newfiltered
@@ -367,10 +402,12 @@ class WSGIApp(object):
         # strptime. if schema[k] == fulltextindex.Boolean, convert
         # 'true'/'false' to True/False.
         for k, fld in schema.items():
-            if isinstance(fld, fulltextindex.Datetime) and k in filtered:
-                filtered[k] = datetime.strptime(filtered[k], "%Y-%m-%d")
-            elif isinstance(fld, fulltextindex.Boolean) and k in filtered:
-                filtered[k] = (filtered[k] == "true") # only "true" is True
+            # NB: Some values might already have been converted previously!
+            if k in filtered and isinstance(filtered[k], str):
+                if isinstance(fld, fulltextindex.Datetime):
+                    filtered[k] = datetime.strptime(filtered[k], "%Y-%m-%d")
+                elif isinstance(fld, fulltextindex.Boolean):
+                    filtered[k] = (filtered[k] == "true") # only "true" is True
 
 
         q = param['q'] if 'q' in param else None
@@ -380,48 +417,14 @@ class WSGIApp(object):
         if param.get("_stats") == "on":
             pagenum=1
             pagelen=100000
+            stats = True
         else:
             pagenum=int(param.get('_page', '0'))+1
             pagelen=int(param.get('_pageSize', '10'))
+            stats = False
 
-        res, pager = idx.query(q=q,
-                               pagenum=pagenum,
-                               pagelen=pagelen,
-                               **filtered)
-
-        # 3. Mangle res into the expected JSON structure (see qresults.json)
-        mangled = []
-        for hit in res:
-            mangledhit = {}
-            for k, v in hit.items():
-                if self.config.legacyapi:
-                    if "_" in k:
-                        # drop prefix (dcterms_issued -> issued)
-                        k = k.split("_",1)[1]
-                if k == "uri":
-                    k = "iri"
-                if k == "text":
-                    mangledhit["matches"] = {"text": _elements_to_html(hit["text"])}
-                elif k in ("basefile", "repo"):
-                    # these fields should not be included in results
-                    pass
-                else:
-                    mangledhit[k] = v
-            mangled.append(mangledhit)
-
-        # 3.1 create container for results
-        res = {"startIndex": pager['firstresult'] - 1,
-               "itemsPerPage": int(param.get('_pageSize', '10')),
-               "totalResults": pager['totalresults'],
-               "duration": None, # none
-               "current": environ['PATH_INFO'] + "?" + environ['QUERY_STRING'],
-               "items": mangled}
-
-        # 4. add stats, maybe
-        if param.get("_stats") == "on":
-            res["statistics"] = self.stats(mangled)
-
-        return res
+        return q, filtered, pagenum, pagelen, stats
+            
 
     def _str(self, s, encoding="ascii"):
         """If running under python2.6, return byte string version of the

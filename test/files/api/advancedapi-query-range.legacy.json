@@ -1,4 +1,4 @@
-{"current": "/-/publ?min-dcterms_issued=2012-04-01&max-dcterms_issued=2012-04-03",
+{"current": "/-/publ?min-issued=2012-04-01&max-issued=2012-04-03",
  "duration": null,
  "items": [{"aprilfools": false,
             "subject": ["red", "yellow"],

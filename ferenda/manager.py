@@ -38,6 +38,7 @@ register('json-ld', Parser, 'ferenda.thirdparty.rdflib_jsonld.parser', 'JsonLDPa
 register('json-ld', Serializer, 'ferenda.thirdparty.rdflib_jsonld.serializer', 'JsonLDSerializer')
 
 # my modules
+from ferenda import DocumentRepository  # needed for a doctest
 from ferenda import LayeredConfig
 from ferenda import Transformer
 from ferenda import TripleStore

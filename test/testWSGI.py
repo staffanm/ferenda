@@ -227,6 +227,48 @@ class API(WSGI):
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
             status, headers, content = self.call_wsgi(self.env)
             config['connect.return_value'].query.assert_called_once_with(**want)
+    # this is the same data that can be extracted from
+    # test/files/base/distilled/
+    fakedata = [{'dcterms_identifier': '123(A)',
+                 'dcterms_issued': '2014-01-04',
+                 'dcterms_publisher': 'http://example.org/publisher/A',
+                 'dcterms_title': 'Example',
+                 'rdf_type': 'http://purl.org/ontology/bibo/Standard',
+                 'uri': 'http://example.org/base/123/a'},
+                {'dcterms_identifier': '123(B)',
+                 'dcterms_issued': '2013-09-23',
+                 'dcterms_publisher': 'http://example.org/publisher/B',
+                 'dcterms_title': 'Example 2',
+                 'rdf_type': 'http://purl.org/ontology/bibo/Standard',
+                 'uri': 'http://example.org/base/123/b'},
+                {'dcterms_identifier': '123(C)',
+                 'dcterms_issued': '2014-05-06',
+                 'dcterms_publisher': 'http://example.org/publisher/B',
+                 'dcterms_title': 'Of needles and haystacks',
+                 'rdf_type': 'http://purl.org/ontology/bibo/Standard',
+                 'uri': 'http://example.org/base/123/c'}]
+
+    def test_stats(self):
+        self.env['PATH_INFO'] += ";stats"
+        self.app.repos[0].faceted_data = Mock(return_value=self.fakedata)
+        status, headers, content = self.call_wsgi(self.env)
+        got = json.loads(content.decode("utf-8"))
+        want = json.load(open("test/files/api/basicapi-stats.json"))
+        self.assertEqual(want, got)
+
+    def test_stats_legacy(self):
+        self.env['PATH_INFO'] += ";stats"
+        self.app.config.legacyapi = True
+        # self.app.repos[0].faceted_data = Mock(return_value=self.fakedata)
+        # status, headers, content = self.call_wsgi(self.env)
+        # got = json.loads(content)
+        # want = json.load(open("test/files/api/basicapi-stats.legacy.json"))
+        # self.assertEqual(want, got)
+
+        
+        
+    
+                  
         
 class Runserver(WSGI):
     def test_make_wsgi_app_args(self):

@@ -2,16 +2,16 @@
  "duration": null,
  "items": [
      {
-         "issued": "2012-04-01",
-         "publisher": {
+         "dcterms_issued": "2012-04-01",
+         "dcterms_publisher": {
              "iri": "http://example.org/vocab/publ1",
              "label": "Publishing & sons"
          },
-         "title": "A simple doc",
+         "dcterms_title": "A simple doc",
          "matches": {
              "text": "This is part of the main document, but not of any sub-resource."
          },
-         "type": "http://example.org/vocab/MainType",
+         "rdf_type": "http://example.org/vocab/MainType",
          "iri": "http://example.org/repo1/a"
      }
  ],

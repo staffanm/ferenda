@@ -1,1 +1,12 @@
-{}
+{"current": "/myapi/?year-dcterms_issued=2013",
+ "duration": null,
+ "items": [{"dcterms_issued": "2013-06-06",
+            "dcterms_publisher": {"iri": "http://example.org/vocab/publ2",
+                                  "label": "Bookprinters and associates"},
+            "dcterms_title": "Other doc",
+            "iri": "http://example.org/repo1/b",
+            "matches": {"text": "This is part of the main document, but not of any sub-resource."},
+            "rdf_type": "http://example.org/vocab/MainType"}],
+ "itemsPerPage": 10,
+ "startIndex": 0,
+ "totalResults": 1}

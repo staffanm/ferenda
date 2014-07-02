@@ -22,7 +22,7 @@ class BasicAPI(object):
     def setUp(self):
         super(BasicAPI, self).setUp()
         self.env['PATH_INFO'] = '/myapi/' 
-
+        
     def tearDown(self):
         FulltextIndex.connect(self.indextype, self.indexlocation,
                               [DocumentRepository()]).destroy()
@@ -58,65 +58,56 @@ class BasicAPI(object):
 
         self.repos[0].rdf_type = self.repos[0].ns['bibo'].Standard
 
+
     stats_want = json.load(open("test/files/api/basicapi-stats.json"))
     def test_stats(self):
         self.env['PATH_INFO'] += ";stats"
         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
         self.assertEqual(self.stats_want, got)
 
-#    list_by_type_want = json.load(open("test/files/api/basicapi-list-by-type.json"))
-#    def test_list_by_type(self):
-#        # http://localhost:8080/api/bibo:Standard gives a list of documents
-#        # (equiv to http://localhost:8080/api/?rdf_type=bibo:Standard)
-#        self.env['PATH_INFO'] + "bibo:Standard"
-#        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
-#        self.assertEqual(self.list_by_type_want, got)
-#
-    fulltext_query_want = json.load(open("test/files/api/basicapi-fulltext-query.json"))
+
+    fulltext_query_want = "test/files/api/basicapi-fulltext-query.json"
     def test_fulltext_query(self):
         self.env['QUERY_STRING'] = "q=tail"
         res = self.call_wsgi(self.env)[2].decode("utf-8")
         got = json.loads(res)
+        want = json.load(open(self.fulltext_query_want))
         # FIXME: Whoosh and ElasticSearch has slightly different ideas
         # on how to highlight matching snippets.
         if isinstance(self, WhooshBase):
             want['items'][0]['matches']['text'] = "This is the <em class=\"match\">tail</em> end of the main document"
-            want['items'][0]['issued'] += "T00:00:00"
-        self.assertEqual(self.fulltext_query_want, got)
+            fld = 'issued' if self.app.config.legacyapi else 'dcterms_issued'
+            want['items'][0][fld] += "T00:00:00"
+        self.assertEqual(want, got)
+
 
     faceted_query = "dcterms_publisher=*%2Fpublisher%2FA"
-    faceted_query_want = json.load(open("test/files/api/basicapi-faceted-query.json"))
+    faceted_query_want = "test/files/api/basicapi-faceted-query.json"
     def test_faceted_query(self):
         self.env['QUERY_STRING'] = self.faceted_query
         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
+        want = json.load(open(self.faceted_query_want))
         # FIXME: Whoosh (and our own fulltextindex.IndexedType
         # objects) cannot handle a pure date field (always converted
         # to DateTime). Adjust expectations.
         if isinstance(self, WhooshBase):
             fld = 'issued' if self.app.config.legacyapi else 'dcterms_issued'
             want['items'][0][fld] += "T00:00:00"
-        self.assertEqual(self.faceted_query_want, got)
-                                    
-#         # using publisher.iri instead of dcterms_publisher is a test
-#         # of legacyapi
-#         self.env['QUERY_STRING'] = "publisher.iri=*%2Fpublisher%2FA"
-#         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
-#         want['current'] = "/-/publ?publisher.iri=*%2Fpublisher%2FA" # FIXME: this illustrates the need to construct 'current' dynamically.
-#         self.assertEqual(want, got)
-#         
+        self.assertEqual(want, got)
+
 
     complex_query = "q=haystack&dcterms_publisher=*%2Fpublisher%2FB"
-    complex_query_want = json.load(open("test/files/api/basicapi-complex-query.json"))
+    complex_query_want = "test/files/api/basicapi-complex-query.json"
     def test_complex_query(self):
         self.env['QUERY_STRING'] = self.complex_query
         res = self.call_wsgi(self.env)[2].decode("utf-8")
         got = json.loads(res)
-
+        want = json.load(open(self.complex_query_want))
         # FIXME: See above
         if isinstance(self, WhooshBase):
             fld = 'issued' if self.app.config.legacyapi else 'dcterms_issued'
             want['items'][0][fld] += "T00:00:00"
-        self.assertEqual(self.complex_query_want, got)
+        self.assertEqual(want, got)
 
 class BasicLegacyAPI(BasicAPI):
     def setUp(self):
@@ -127,13 +118,13 @@ class BasicLegacyAPI(BasicAPI):
     stats_want = json.load(open("test/files/api/basicapi-stats.legacy.json"))
 
     # no fulltext_query is needed, the querystring is identical
-    fulltext_query_want = json.load(open("test/files/api/basicapi-fulltext-query.legacy.json"))
+    fulltext_query_want = "test/files/api/basicapi-fulltext-query.legacy.json"
 
     faceted_query = "dcterms_publisher=*%2Fpublisher%2FA"
-    faceted_query_want = json.load(open("test/files/api/basicapi-faceted-query.legacy.json"))
+    faceted_query_want = "test/files/api/basicapi-faceted-query.legacy.json"
 
     complex_query = "q=haystack&publisher=*%2Fpublisher%2FB"
-    complex_query_want = json.load(open("test/files/api/basicapi-complex-query.legacy.json"))
+    complex_query_want = "test/files/api/basicapi-complex-query.legacy.json"
     
     
 # Mixin-style classes that are mixed with BasicAPI 
@@ -206,7 +197,8 @@ class AdvancedAPI(object):
             # the call to put_files_in_place can easily fail and leave
             # the ElasticSearch mapping undeleted -- make sure
             # tearDown runs in this case
-            return super(AdvancedAPI, self).setUp()
+            super(AdvancedAPI, self).setUp()
+            self.env['PATH_INFO'] = '/myapi/' 
         except Exception as e:
             self.tearDown()
             raise e
@@ -306,10 +298,8 @@ class AdvancedAPI(object):
     def test_query_yearselector(self):
         self.env['QUERY_STRING'] = self.query_yearselector
         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
-        self.assertEqual(self.query_yearselector_wantwant, got)
-        
-        
-        
+        self.assertEqual(self.query_yearselector_want, got)
+
 
 class AdvancedLegacyAPI(AdvancedAPI):
     def setUp(self):
