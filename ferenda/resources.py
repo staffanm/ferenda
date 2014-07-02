@@ -308,16 +308,18 @@ class Resources(object):
         
         if isinstance(indata, list):
             topval = indata
+            was_list = True
         else:
             for topkey, topval in indata.items():
                 if topkey == "@graph":
                     break
+            was_list = False        
         
         for subject in topval:
             try:
                 x = subject[idfld]
             except TypeError:
-                print("This wont work: subject=%r, topval=%r" % (subject, topval)
+                print("This wont work: subject=%r, topval=%r, was_list=%s" % (subject, topval, was_list))
             if subject[idfld] == rooturi:
                 for key,value in subject.items():
                     if key in  (idfld, 'foaf:topic'):
