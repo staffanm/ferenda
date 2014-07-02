@@ -17,11 +17,13 @@ Datatype field classes
 		 
 .. autoclass:: ferenda.fulltextindex.IndexedType
 .. autoclass:: ferenda.fulltextindex.Identifier
+.. autoclass:: ferenda.fulltextindex.Datetime
 .. autoclass:: ferenda.fulltextindex.Text
 .. autoclass:: ferenda.fulltextindex.Label
-.. autoclass:: ferenda.fulltextindex.Keywords
+.. autoclass:: ferenda.fulltextindex.Keyword
 .. autoclass:: ferenda.fulltextindex.Boolean
 .. autoclass:: ferenda.fulltextindex.URI
+.. autoclass:: ferenda.fulltextindex.Resource
 
 
 Search field classes

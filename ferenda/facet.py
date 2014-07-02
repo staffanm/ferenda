@@ -1,6 +1,10 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals, print_function
+
 import logging
 from datetime import datetime
 
+from six import text_type as str
 from rdflib import URIRef, Namespace
 from rdflib.namespace import RDF, RDFS, DC, SKOS, FOAF, DCTERMS
 SCHEMA = Namespace("http://schema.org/")
@@ -76,7 +80,7 @@ class Facet(object):
                  selector_descending = None,
                  key_descending = None,
                  multiple_values = None,
-                 dimension_type = None,
+                 dimension_type = None, # could be determined by indexingtype
                  dimension_label = None
              ):
             

@@ -5,6 +5,7 @@ import os
 import json
 
 import six
+from six import text_type as str
 from lxml import etree
 from lxml.builder import ElementMaker
 from rdflib import URIRef, Literal, BNode, Graph, RDF, RDFS

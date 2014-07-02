@@ -24,9 +24,11 @@ between documents, and publishing the results.
    elementclasses
    fsmparser
    citationparsing
+   facets
    toc
    news
    wsgi
+   restapi
    external-dbs
    advanced
 
@@ -44,7 +46,7 @@ Classes
    api/document
    api/documententry
    api/documentstore
-   api/toccriteria
+   api/facet
    api/tocpage
    api/tocpageset
    api/newscriteria
@@ -61,7 +63,9 @@ Classes
    api/textreader
    api/pdfreader
    api/wordreader
-
+   api/wsgiapp
+   api/resources
+   
 Modules
 -------
 

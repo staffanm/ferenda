@@ -1619,7 +1619,7 @@ parsed document path to that documents dependency file."""
                         else:
                             k = qname_graph.qname(facet.rdftype).replace(":", "_")
                         kwargs[k] = v
-                    
+                from pudb import set_trace; set_trace()
                 indexer.update(uri=about,
                                repo=repo,
                                basefile=basefile,
