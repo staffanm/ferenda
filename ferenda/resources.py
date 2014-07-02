@@ -303,23 +303,32 @@ class Resources(object):
         else:
             idfld = '@id'
 
-        # idatata might be a mapping containing a list of mappings
+        # indata might be a mapping containing a list of mappings
         # under @graph, or it might just be the actual list.
-        
+        wantedlist = None
         if isinstance(indata, list):
-            topval = indata
+            wantedlist = indata
             was_list = True
         else:
             for topkey, topval in indata.items():
                 if topkey == "@graph":
+                    wantedlist = topval
                     break
             was_list = False        
-        
-        for subject in topval:
+
+        if not wantedlist:
+            print("Couldn't find list of mappings in %s" % indata)
+            return None
+
+        for subject in wantedlist:
+            # attempt to track down an interment bug that only
+            # manifests on travis...
             try:
                 x = subject[idfld]
             except TypeError:
-                print("This wont work: subject=%r, topval=%r, was_list=%s" % (subject, topval, was_list))
+                print("This wont work: subject=%r, indata=%r, rooturi=%s" % (subject, indata, rooturi))
+
+                
             if subject[idfld] == rooturi:
                 for key,value in subject.items():
                     if key in  (idfld, 'foaf:topic'):
