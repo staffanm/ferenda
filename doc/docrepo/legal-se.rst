@@ -23,10 +23,10 @@
 
 .. autoclass:: ferenda.sources.legal.se.direktiv.DirAsp
 
-``direktiv.DirPolopoly``
-^^^^^^^^^^^^^^^^^^^^^^^^
+``direktiv.DirRegeringen``
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autoclass:: ferenda.sources.legal.se.direktiv.DirPolopoly
+.. autoclass:: ferenda.sources.legal.se.direktiv.DirRegeringen
 
 ``Ds``
 ------
@@ -99,10 +99,10 @@
 
 .. autoclass:: ferenda.sources.legal.se.Propositioner
 
-``propositioner.PropPolo``
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+``propositioner.PropRegeringen``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. autoclass:: ferenda.sources.legal.se.propositioner.PropPolo
+.. autoclass:: ferenda.sources.legal.se.propositioner.PropRegeringen
 
 ``propositioner.PropTrips``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -174,17 +174,9 @@ returns, i.e. information about documents that refer to this document.
 * ``curl -H "Accept: text/plain"
   http://localhost:8000/res/rfc/4711/data`` returns the same in
   NTriples format
-
-..
-  * ``curl -H "Accept: application/json"
-    http://localhost:8000/res/rfc/4711/data`` returns the same in
-    JSON-LD format.
-  
-  .. note::
-  
-     JSON-LD output is not yet supported, awaiting the first
-     public release of `rdflib-jsonld
-     <http://github.com/RDFLib/rdflib-jsonld>`_ on PyPI.
+* ``curl -H "Accept: application/json"
+  http://localhost:8000/res/rfc/4711/data`` returns the same in
+  JSON-LD format.
 
   
 Dataset resources
@@ -206,14 +198,3 @@ in a similar way as the document resources above:
   format.
 * ``curl -H "Accept: text/turtle" http://localhost/dataset/rfc``
   returns the same, but in turtle format.
-
-The search API
-^^^^^^^^^^^^^^
-
-FIXME: To be documented.
-
-.. note::
-
-   The configuration option ``legacyapi`` controls whether to use a
-   substantially simpler API in terms of how resources and facets are
-   named. This is too to be documented.

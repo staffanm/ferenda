@@ -18,6 +18,11 @@ from lxml import etree
 from rdflib import Graph, Namespace, URIRef
 from rdflib.namespace import RDF, DC, DCTERMS
 SCHEMA = Namespace("http://schema.org/")
+from rdflib.plugin import register, Parser, Serializer
+register('json-ld', Parser, 'ferenda.thirdparty.rdflib_jsonld.parser',
+         'JsonLDParser')
+register('json-ld', Serializer, 'ferenda.thirdparty.rdflib_jsonld.serializer',
+         'JsonLDSerializer')
 
 from ferenda import DocumentRepository, Facet, FulltextIndex
 from ferenda import manager, util, fulltextindex
@@ -364,6 +369,20 @@ class ConNeg(WSGI):
                             status, headers, None)
         got = Graph()
         got.parse(data=content, format="turtle")
+        self.assertEqualGraphs(g, got)
+
+    def test_json(self):
+        # transform test 6: accept: application/json -> RDF statements (in JSON-LD)
+        g = Graph()
+        g.parse(source=self.repo.store.distilled_path("123/a"))
+        self.env['HTTP_ACCEPT'] = 'application/json'
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse("200 OK",
+                            {'Content-Type': 'application/json'},
+                            None,
+                            status, headers, None)
+        got = Graph()
+        got.parse(data=content, format="json-ld")
         self.assertEqualGraphs(g, got)
         
     def test_unacceptable(self):

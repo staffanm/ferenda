@@ -137,7 +137,7 @@ staticsite        Whether to generate static HTML files      False
 		  instead of canonical URIs)
 legacyapi         Whether the REST API should provide a      False
                   simpler API for legacy clients. See
-		  :ref:`wsgi`.
+		  :doc:`wsgi`.
 ================= ========================================== =========
 
 .. _keyconcept-documentrepository:
