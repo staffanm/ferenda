@@ -18,6 +18,7 @@ import filecmp
 import socket
 import inspect
 import difflib
+import functools
 from ferenda.compat import OrderedDict
 
 # 3rd party
@@ -46,11 +47,10 @@ import ferenda
 from ferenda import util, errors, decorators, fulltextindex
 
 from ferenda import (Describer, LayeredConfig, TripleStore, FulltextIndex,
-                     Document, DocumentEntry, NewsCriteria, TocCriteria,
+                     Document, DocumentEntry, NewsCriteria, 
                      TocPageset, TocPage, DocumentStore, Transformer, Facet)
-from ferenda.elements import (AbstractElement, serialize, Body, Nav, Link,
-                              Section, Subsection, Subsubsection, Heading,
-                              UnorderedList, ListItem, Preformatted, Paragraph)
+from ferenda.elements import (Body, Link,
+                              UnorderedList, ListItem, Paragraph)
 from ferenda.elements.html import elements_from_soup
 from ferenda.thirdparty import patch, httpheader
 # establish two central RDF Namespaces at the top level
@@ -103,6 +103,9 @@ class DocumentRepository(object):
 #        render_xhtml
 #
 #    relate
+#        relate_triples
+#        relate_dependencies
+#        relate_fulltext
 #
 #    generate
 #        generated_file
@@ -110,10 +113,15 @@ class DocumentRepository(object):
 #            graph_to_annotation_file
 #
 #    toc
-#        toc_query
-#        toc_criteria
-#            toc_predicates
-#        toc_item
+#        faceted_data
+#            facet_select
+#                facet_query
+#                    dataset_uri
+#                    facets
+#        toc_pagesets
+#            facets
+#        toc_select_for_pages
+#        toc_generate_pages
 #
 #    news
 #        news_selections
@@ -1623,7 +1631,6 @@ parsed document path to that documents dependency file."""
                         else:
                             k = qname_graph.qname(facet.rdftype).replace(":", "_")
                         kwargs[k] = v
-                from pudb import set_trace; set_trace()
                 indexer.update(uri=about,
                                repo=repo,
                                basefile=basefile,
@@ -2032,38 +2039,7 @@ WHERE {
     # STEP 5: Generate HTML pages for a TOC of a all documents, news
     # pages of new/updated documents, and other odds'n ends.
     #
-    #
-
-    # NEW WAY
-    # 
-    # toc
-    #     toc_select
-    #         toc_query(facets)
-    #     toc_pagesets(facets)
-    #         (facets.selector)
-    #     toc_select_for_pages
-    #         (facets.keys)
-    #         toc_item
-    #     toc_generate_pages
-    #         toc_generate_page
-    #
-    # OLD WAY
-    # 
-    # toc 
-    #     toc_select
-    #         toc_query
-    #              (toc_predicates ?)
-    #     toc_criteria
-    #         toc_predicates
-    #         toc_selector
-    #     toc_pagesets
-    #         (selectors)
-    #     toc_select_for_pages   <-- where most of the the magic happens
-    #         (selectors)
-    #         toc_item
-    #     toc_generate_pages
-    #         toc_generate_page
-    #
+    
     def toc(self, otherrepos=[]):
         """Creates a set of pages that together acts as a table of
         contents for all documents in the repository. For smaller
@@ -2077,8 +2053,8 @@ WHERE {
         The default implementation calls
         :py:meth:`~ferenda.DocumentRepository.toc_select` to get all
         data from the triple store,
-        :py:meth:`~ferenda.DocumentRepository.toc_criteria` to find
-        out the criteria for ordering,
+        :py:meth:`~ferenda.DocumentRepository.facets` to find
+        out the facets for ordering,
         :py:meth:`~ferenda.DocumentRepository.toc_pagesets` to
         calculate the total set of TOC html files,
         :py:meth:`~ferenda.DocumentRepository.toc_select_for_pages` to
@@ -2090,272 +2066,100 @@ WHERE {
         ``dcterms:issued`` property). 
 
         You can override any of these methods to customize any part of
-        the toc generation process. Often overriding :py:meth:`~ferenda.DocumentRepository.toc_criteria` to
+        the toc generation process. Often overriding :py:meth:`~ferenda.DocumentRepository.facets` to
         specify other document properties will be sufficient."""
 
         params = {}
         with util.logtime(self.log.debug,
                           "toc: selected %(rowcount)s rows in %(elapsed).3f s",
                           params):
-            data = self.toc_select(self.dataset_uri())
+            data = self.faceted_data()
             params['rowcount'] = len(data)
         if len(data) > 0:
-            criteria = self.toc_criteria(self.toc_predicates())
-            pagesets = self.toc_pagesets(data, criteria)
-            pagecontent = self.toc_select_for_pages(data, pagesets, criteria)
+            facets = self.facets()
+            pagesets = self.toc_pagesets(data, facets)
+            pagecontent = self.toc_select_for_pages(data, pagesets, facets)
             self.toc_generate_pages(pagecontent, pagesets, otherrepos)
             self.toc_generate_first_page(pagecontent, pagesets, otherrepos)
         else:
-            self.log.error("toc_select found 0 results for query, can't generate TOC")
-            self.log.info("(query PROBABLY was '%s')" % self.toc_query())
+            self.log.error("faceted_data found 0 results for query, can't generate TOC")
+            self.log.info("(query PROBABLY was '%s')" %
+                          self.facet_query(self.dataset_uri()))
 
-    def toc_select(self, context=None):
-        """Select all data from the triple store needed to make up all
-        TOC pages.
 
-        :param context: The context (named graph) to restrict the query to.
-                        If None, search entire triplestore.
-        :type  context: str
-        :returns: The results of the query, as python objects
-        :rtype: set of dicts"""
-
-        store = TripleStore.connect(self.config.storetype,
-                                    self.config.storelocation,
-                                    self.config.storerepository)
-
-        sq = self.toc_query(context)
-        res = store.select(sq, "python")
-        store.close()
-        return res
-
-    def toc_query(self, context=None):
-        """Constructs a SPARQL SELECT query that fetches all
-        information needed to construct the complete set of TOC pages
-        in the form of a single list of result rows.
-
-        Override this method if you need to customize the query.
-
-        :param context: The context (named graph) to which to limit
-                        the query. If None, query the entire
-                        triplestore.
-        :type  context: str
-        :returns: The SPARQL query
-        :rtype: str
-
-        Example:
-
-        >>> d = DocumentRepository()
-        >>> expected = \"""PREFIX bibo: <http://purl.org/ontology/bibo/>
-        ... PREFIX dcterms: <http://purl.org/dc/terms/>
-        ... PREFIX foaf: <http://xmlns.com/foaf/0.1/>
-        ... PREFIX owl: <http://www.w3.org/2002/07/owl#>
-        ... PREFIX prov: <http://www.w3.org/ns/prov#>
-        ... PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-        ... PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-        ... PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-        ... PREFIX xhv: <http://www.w3.org/1999/xhtml/vocab#>
-        ... PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-        ... PREFIX xsi: <http://www.w3.org/2001/XMLSchema-instance>
-        ... 
-        ... SELECT DISTINCT ?uri ?title ?issued
-        ... FROM <http://example.org/ctx/base>
-        ... WHERE {
-        ...     ?uri rdf:type foaf:Document ; dcterms:title ?title .
-        ...     OPTIONAL { ?uri dcterms:issued ?issued . }
-        ... }\"""
-        >>> d.toc_query("http://example.org/ctx/base") == expected
-        True
-        """
-        from_graph = ""
-        if context:
-            from_graph = "FROM <%s>" % context
-        elif self.config.storetype == "FUSEKI":
-            from_graph = "FROM <urn:x-arq:UnionGraph>"
-
-        predicates = self.toc_predicates()
-        g = self.make_graph()
-        bindings = " ".join(["?" + util.uri_leaf(b) for b in predicates])
-        # FIXME: the below whereclause is meant to select only
-        # top-level documents (not documentparts), but does so by
-        # requiring that all top-level documents should have rdf:type
-        # == self.rdf_type which is inflexible. fix this when using
-        # self.facets() instead of self.toc_predicates()
-        # whereclause = "?uri %s ?%s" % (g.qname(predicates[0]),
-        #                                util.uri_leaf(predicates[0]))
-        whereclause = "?uri rdf:type %s ; %s ?%s" % (g.qname(self.rdf_type),
-                                                     g.qname(predicates[0]),
-                                                     util.uri_leaf(predicates[0]))
-        optclauses = "".join(
-            ["    OPTIONAL { ?uri %s ?%s . }\n" % (g.qname(b), util.uri_leaf(b)) for b in predicates[1:]])
-
-        # FIXME: The above doctest looks like crap since all
-        # registered namespaces in the repo is included. Should only
-        # include prefixes actually used
-        prefixes = "".join(["PREFIX %s: <%s>\n" % (p, u) for p, u in sorted(self.ns.items())])
-        query = """%s
-SELECT DISTINCT ?uri %s
-%s
-WHERE {
-    %s .
-%s}""" % (
-            prefixes, bindings, from_graph, whereclause, optclauses)
-        return query
-
-    def toc_criteria(self, predicates=None):
-        """Create the criteria used to organize the documents in the
-        repository into different pagesets.
-
-        :param predicates: The :py:class:`~rdflib.term.URIRef` terms to use as base for criteria
-        :type  predicates: list
-        :returns: :py:class:`~ferenda.TocCriteria`
-                  objects, each representing a particular way of organizing the
-                  documents, and each corresponding to a TocPageset object (constructed
-                  by :py:meth:`~ferenda.DocumentRepository.toc_pagesets`)
-        :rtype: list
-        """
-
-        criteria = []
-        for predicate in predicates:
-            # make an appropriate selector etc. a proper
-            # implementation would look at the ontology of the
-            # predicate, take a look at the range for that
-            # DataProperty and select an appropriate selector. (note
-            # that the dcterms ontology defines the rdfs:range for
-            # dcterms:issued to be rdfs:Literal, so it won't always help
-            # us).
-            if predicate == self.ns['dcterms'].issued:  # date property
-                selector = lambda x: x['issued'][:4]
-                key = selector
-                label = 'Sorted by publication year'
-                pagetitle = 'Documents published in %(select)s'
-                selector_descending = True
-            elif predicate == self.ns['dcterms'].publisher: # uriref
-                selector = lambda x: x['publisher']
-                key = selector
-                label = 'Sorted by publisher'
-                pagetitle = 'Documents published by %(select)s'
-                selector_descending = False
-            elif predicate == self.ns['rdf'].type: # uriref
-                selector = lambda x: x['type']
-                key = selector
-                label = 'Sorted by document type'
-                pagetitle = 'Documents of type %(select)s'
-                selector_descending = False
-            else:
-                # selector and key for proper title sort
-                # (eg. disregarding leading "the", not counting
-                # spaces)
-                def sortkey(d):
-                    title = d['title'].lower()
-                    if title.startswith("the "):
-                        title = title[4:]
-                    # filter away starting non-word characters (but not digits)
-                    title = re.sub("^\W+", "", title)
-                    # remove spaces
-                    return "".join(title.split())
-
-                selector = lambda x: sortkey(x)[0]
-                key = sortkey
-                label = label = 'Sorted by ' + util.uri_leaf(predicate)
-                pagetitle = 'Documents starting with "%(select)s"'
-                selector_descending = False
-
-            criteria.append(TocCriteria(binding=util.uri_leaf(predicate).lower(),
-                                        label=label,
-                                        pagetitle=pagetitle,
-                                        selector=selector,
-                                        key=key,
-                                        selector_descending=selector_descending,
-                                        predicate=predicate))
-        return criteria
-
-    def toc_predicates(self):
-        """Return a list of predicates (as
-        :py:class:`~rdflib.term.URIRef` objects that each should be
-        used to organize a table of contents of documents in this
-        docrepo).
-
-        Is used by toc_criteria, must match results from sparql query
-        in toc_query."""
-
-        return [
-            self.ns['dcterms'].title,
-            self.ns['dcterms'].issued
-        ]
-
-    def toc_pagesets(self, data, criteria):
+    def toc_pagesets(self, data, facets):
         """Calculate the set of needed TOC pages based on the result rows
 
         :param data: list of dicts, each dict containing metadata about
                      a single document
-        :param criteria: list of TocCriteria objects
+        :param facets: list of Facet objects
         :returns: The link text, page title and base file for each needed
-                  TOC page, structured by selection criteria.
+                  TOC page, structured by selection facets.
         :rtype: 3-dimensional named tuple
 
         Example:
         
         >>> d = DocumentRepository()
-        >>> rows = [{'uri':'http://ex.org/1','title':'Abc','issued':'2009-04-02'},
-        ...         {'uri':'http://ex.org/2','title':'Abcd','issued':'2010-06-30'},
-        ...         {'uri':'http://ex.org/3','title':'Dfg','issued':'2010-08-01'}]
-        >>> from operator import itemgetter
-        >>> criteria = (TocCriteria(binding='title',
-        ...                         label='By title',
-        ...                         pagetitle='Documents starting with "%(select)s"',
-        ...                         selector=lambda x: x['title'][0].lower(),
-        ...                         key=itemgetter('title')),
-        ...             TocCriteria(binding='issued',
-        ...                         label='By publication year',
-        ...                         pagetitle='Documents published in %(select)s',
-        ...                         selector=lambda x: x['issued'][:4],
-        ...                         key=itemgetter('issued')))
-        >>> # Note: you can get a suitable tuple of TocCriteria
-        >>> # objects by calling toc_criteria() as well
-        >>> pagesets=d.toc_pagesets(rows,criteria)
-        >>> pagesets[0].label == 'By title'
+        >>> from rdflib.namespace import DCTERMS
+        >>> rows = [{'uri':'http://ex.org/1','dcterms_title':'Abc','dcterms_issued':'2009-04-02'},
+        ...         {'uri':'http://ex.org/2','dcterms_title':'Abcd','dcterms_issued':'2010-06-30'},
+        ...         {'uri':'http://ex.org/3','dcterms_title':'Dfg','dcterms_issued':'2010-08-01'}]
+        >>> from rdflib.namespace import DCTERMS
+        >>> facets = [Facet(DCTERMS.title), Facet(DCTERMS.issued)]
+        >>> pagesets=d.toc_pagesets(rows,facets)
+        >>> pagesets[0].label == 'Sorted by title'
         True
-        >>> pagesets[0].pages[0] == TocPage(linktext='a', title='Documents starting with "a"', binding='title', value='a')
+        >>> pagesets[0].pages[0] == TocPage(linktext='a', title='Documents starting with "a"', binding='dcterms_title', value='a')
         True
         >>> pagesets[0].pages[0].linktext == 'a'
         True
         >>> pagesets[0].pages[0].title == 'Documents starting with "a"'
         True
-        >>> pagesets[0].pages[0].binding == 'title'
+        >>> pagesets[0].pages[0].binding == 'dcterms_title'
         True
         >>> pagesets[0].pages[0].value == 'a'
         True
-        >>> pagesets[1].label == 'By publication year'
+        >>> pagesets[1].label == 'Sorted by publication year'
         True
-        >>> pagesets[1].pages[0] == TocPage(linktext='2009', title='Documents published in 2009', binding='issued', value='2009')
+        >>> pagesets[1].pages[0] == TocPage(linktext='2009', title='Documents published in 2009', binding='dcterms_issued', value='2009')
         True
         """
 
+        qname_graph = self.make_graph()
         res = []
-        for criterion in criteria:
-            pageset = TocPageset(label=criterion.label,
-                                 predicate=criterion.predicate,
-                                 pages=[])
+        for facet in facets:
+            if not facet.use_for_toc:
+                continue
             selector_values = {}
-            selector = criterion.selector
-            binding = criterion.binding
+            selector = facet.selector
+            if facet.dimension_label:
+                binding = facet.dimension_label
+                term = facet.dimension_label
+            else:
+                binding = qname_graph.qname(facet.rdftype).replace(":", "_")
+                term = util.uri_leaf(facet.rdftype)
+
+            pageset = TocPageset(label=facet.label % {'term': term},
+                                 predicate=facet.rdftype,
+                                 pages=[])
+
             for row in data:
                 try:
-                    selector_values[selector(row)] = True
-                except KeyError as e:
+                    selector_values[selector(row, binding, self.commondata)] = True
+                except KeyError: # as e:
                     # this will happen a lot on simple selector
                     # functions when handed incomplete data
                     pass
-
-            for value in sorted(list(selector_values.keys()), reverse=criterion.selector_descending):
+            for value in sorted(list(selector_values.keys()), reverse=facet.selector_descending):
                 pageset.pages.append(TocPage(linktext=value,
-                                             title=criterion.pagetitle % {'select': value},
+                                             title=facet.pagetitle % {'term': term,
+                                                                      'selected': value},
                                              binding=binding,
                                              value=value))
             res.append(pageset)
         return res
 
-    def toc_select_for_pages(self, data, pagesets, criteria):
+    def toc_select_for_pages(self, data, pagesets, facets):
         """Go through all data rows (each row representing a document)
         and, for each toc page, select those documents that are to
         appear in a particular page.
@@ -2363,36 +2167,42 @@ WHERE {
         Example:
         
         >>> d = DocumentRepository()
-        >>> rows = [{'uri':'http://ex.org/1','title':'Abc','issued':'2009-04-02'},
-        ...         {'uri':'http://ex.org/2','title':'Abcd','issued':'2010-06-30'},
-        ...         {'uri':'http://ex.org/3','title':'Dfg','issued':'2010-08-01'}]
-        >>> from rdflib import Namespace
-        >>> dcterms = Namespace("http://purl.org/dc/terms/")
-        >>> criteria = d.toc_criteria([dcterms.title,dcterms.issued])
-        >>> pagesets=d.toc_pagesets(rows,criteria)
-        >>> expected={('title','a'):[[Link('Abc',uri='http://ex.org/1')],
-        ...                          [Link('Abcd',uri='http://ex.org/2')]],
-        ...           ('title','d'):[[Link('Dfg',uri='http://ex.org/3')]],
-        ...           ('issued','2009'):[[Link('Abc',uri='http://ex.org/1')]],
-        ...           ('issued','2010'):[[Link('Abcd',uri='http://ex.org/2')],
-        ...                              [Link('Dfg',uri='http://ex.org/3')]]}
-        >>> d.toc_select_for_pages(rows, pagesets, criteria) == expected
+        >>> rows = [{'uri':'http://ex.org/1','dcterms_title':'Abc','dcterms_issued':'2009-04-02'},
+        ...         {'uri':'http://ex.org/2','dcterms_title':'Abcd','dcterms_issued':'2010-06-30'},
+        ...         {'uri':'http://ex.org/3','dcterms_title':'Dfg','dcterms_issued':'2010-08-01'}]
+        >>> from rdflib.namespace import DCTERMS
+        >>> facets = [Facet(DCTERMS.title), Facet(DCTERMS.issued)]
+        >>> pagesets=d.toc_pagesets(rows,facets)
+        >>> expected={('dcterms_title','a'):[[Link('Abc',uri='http://ex.org/1')],
+        ...                                  [Link('Abcd',uri='http://ex.org/2')]],
+        ...           ('dcterms_title','d'):[[Link('Dfg',uri='http://ex.org/3')]],
+        ...           ('dcterms_issued','2009'):[[Link('Abc',uri='http://ex.org/1')]],
+        ...           ('dcterms_issued','2010'):[[Link('Abcd',uri='http://ex.org/2')],
+        ...                                      [Link('Dfg',uri='http://ex.org/3')]]}
+        >>> d.toc_select_for_pages(rows, pagesets, facets) == expected
         True
          
         :param data: List of dicts as returned by :meth:`~ferenda.DocumentRepository.toc_select`
         :param pagesets: Result from :meth:`~ferenda.DocumentRepository.toc_pagesets`
-        :param criteria: Result from :meth:`~ferenda.DocumentRepository.toc_criteria`
+        :param facets: Result from :meth:`~ferenda.DocumentRepository.facets`
         :returns: mapping between toc basefile and documentlist for that basefile
         :rtype: dict
         """
 
         # to 1-dimensional dict (odict?): {(binding,value): [list-of-Elements]}
         res = {}
-        for pageset, criterion in zip(pagesets, criteria):
+        qname_graph = self.make_graph()
+        facets = [f for f in facets if f.use_for_toc]
+        for pageset, facet in zip(pagesets, facets):
             documents = defaultdict(list)
+            if facet.dimension_label:
+                binding = facet.dimension_label
+            else:
+                binding = qname_graph.qname(facet.rdftype).replace(":", "_")
+            
             for row in data:
                 try:
-                    key = criterion.selector(row)
+                    key = facet.selector(row, binding, self.commondata)
                     documents[key].append(row)
                 except KeyError:
                     pass
@@ -2400,17 +2210,20 @@ WHERE {
                 # find appropriate page in pageset and read it's basefile
                 for page in pageset.pages:
                     if page.linktext == key:
+                        keyfunc = functools.partial(facet.key,
+                                                    binding=binding,
+                                                    resource_graph=None)
                         s = sorted(documents[key],
-                                   key=criterion.key,
-                                   reverse=criterion.key_descending)
-                        res[(page.binding, page.value)] = [self.toc_item(criterion.binding, row)
+                                   key=keyfunc,
+                                   reverse=facet.key_descending)
+                        res[(page.binding, page.value)] = [self.toc_item(binding, row)
                                                            for row in s]
         return res
 
     def toc_item(self, binding, row):
         """Returns a formatted version of row, using Element objects"""
         # default impl always just a simple link with title as link text
-        return [Link(row['title'],  # yes, ignore binding
+        return [Link(row['dcterms_title'],  # yes, ignore binding
                      uri=row['uri'])]
 
     # pagecontent -> documentlists?

@@ -20,7 +20,7 @@ from ferenda.testutil import FerendaTestCase
 # imports needed by the scripts. I do not fully understand exactly how
 # imports are scoped when using exec, but this is the only way apart
 # from importing inside of the functions that use the code to work.
-from ferenda import elements, DocumentRepository, DocumentStore, TocCriteria
+from ferenda import elements, DocumentRepository, DocumentStore
 from ferenda.decorators import managedparsing
 import ferenda.citationpatterns
 import ferenda.uriformats
@@ -86,5 +86,3 @@ class TestExamples(unittest.TestCase, FerendaTestCase):
     def test_composite(self):
         self._test_pyfile(self.orig_cwd + "/doc/examples/patents.py")
 
-    def test_toc(self):
-        self._test_pyfile(self.orig_cwd + "/doc/examples/toc.py")

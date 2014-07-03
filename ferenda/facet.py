@@ -35,7 +35,8 @@ class Facet(object):
         
     @classmethod
     def titlesortkey(cls, row, binding='dcterms_title', resource_graph=None):
-        title = row[binding]
+        # ingnore provided binding -- this key func sorts by dcterms:title, period.
+        title = row['dcterms_title']
         return util.title_sortkey(title)
 
     @classmethod
@@ -70,8 +71,8 @@ class Facet(object):
     # %(selected_uri)s = For resource-type values, the underlying URI, eg "http://example.org/ext/publisher/oreilly"
     def __init__(self,
                  rdftype=DCTERMS.title, # any rdflib.URIRef -- should be called 'rdfpredicate'??
-                 label="Sorted by %(criteria)s", # toclabel
-                 pagetitle="Documents where %(criteria)s = %(selected)s",
+                 label=None, # toclabel
+                 pagetitle=None, 
                  indexingtype=None,   # if not given, determined by rdftype
                  selector=None,       # - "" -
                  key=None,            # - "" -
@@ -103,8 +104,8 @@ class Facet(object):
                 return provided
 
         self.rdftype = rdftype
-        self.label = label
-        self.pagetitle = pagetitle
+        self.label = _finddefault(label, rdftype, 'label', "Sorted by %(term)s")
+        self.pagetitle = _finddefault(pagetitle, rdftype, 'pagetitle', "Documents where %(term)s = %(selected)s")
         self.indexingtype        = _finddefault(indexingtype, rdftype, 'indexingtype', fulltextindex.Text())
         self.selector            = _finddefault(selector, rdftype, 'selector', self.defaultselector)
         self.key                 = _finddefault(key, rdftype, 'key', self.defaultselector)
@@ -118,18 +119,6 @@ class Facet(object):
         # selector for a rdftype is used (eg is_april_fools() for
         # dcterms:issued), therefore no rdftype-dependent default.
         self.dimension_label     = dimension_label
-
-    # backwards compatibility shim:
-    def as_criteria(self):
-        from ferenda.util import uri_leaf
-        return TocCriteria(uri_leaf(str(self.rdftype)),
-                           self.label,
-                           self.pagetitle,
-                           self.selector, # might need to wrap these functions to handle differing arg lists
-                           self.key,      # - "" -
-                           self.selector_descending,
-                           self.key_descending,
-                           self.rdftype)
 
     def __repr__(self):
         dictrepr = "".join((" %s=%r" % (k, v) for k, v in sorted(self.__dict__.items()) if not callable(v)))
@@ -157,6 +146,7 @@ Facet.defaults = {RDF.type: {
                       'selector': Facet.firstletter,
                       'key': Facet.titlesortkey,
                       'dimension_type': "value",
+                      'pagetitle': 'Documents starting with "%(selected)s"'
                   },
                   DCTERMS.identifier: {
                       'indexingtype': fulltextindex.Label(boost=16),
@@ -191,13 +181,15 @@ Facet.defaults = {RDF.type: {
                       'use_for_toc': False,
                   },
                   DCTERMS.issued:{
+                      'label': "Sorted by publication year",
+                      'pagetitle': "Documents published in %(selected)s",
                       'indexingtype': fulltextindex.Datetime(),
                       'toplevel_only': True,
                       'use_for_toc': True,
                       'selector': Facet.year,
                       'key': Facet.defaultselector,
-                      'selector_descending': True,
-                      'key_descending': True,
+                      'selector_descending': False,
+                      'key_descending': False,
                       'dimension_type': "year"
                   },
                   DC.subject: {

@@ -31,7 +31,7 @@ from bs4 import BeautifulSoup
 import doctest
 
 from ferenda import DocumentEntry, TocPageset, TocPage, \
-    TocCriteria, Describer, LayeredConfig, TripleStore, FulltextIndex
+    Describer, LayeredConfig, TripleStore, FulltextIndex
 from ferenda.fulltextindex import WhooshIndex
 from ferenda.errors import *
 
@@ -1723,274 +1723,7 @@ data/base/parsed/foo.xhtml
 
         # FIXME: we don't actually verify the that dependencies are
         # read or skipping is performed.
-    
-class TOC(RepoTester):
-    results1 = json.load(open("test/files/datasets/results1.json"))
-    results2 = json.load(open("test/files/datasets/results2.json"))
 
-    pagesets = [TocPageset('Sorted by title',[
-                TocPage('a','Documents starting with "a"','title', 'a'),
-                TocPage('d','Documents starting with "d"','title', 'd'),
-                TocPage('h','Documents starting with "h"','title', 'h'),
-                TocPage('l','Documents starting with "l"','title', 'l')
-                ]),
-                TocPageset('Sorted by publication year',[
-                TocPage('1791','Documents published in 1791','issued', '1791'),
-                TocPage('1859','Documents published in 1859','issued', '1859'),
-                TocPage('1937','Documents published in 1937','issued', '1937'),
-                TocPage('1939','Documents published in 1939','issued', '1939'),
-                TocPage('1943','Documents published in 1943','issued', '1943'),
-                TocPage('1954','Documents published in 1954','issued', '1954')
-                ])]
-    
-    documentlists = {
-        ('issued', '1791'): [[Link("Dream of the Red Chamber",uri='http://example.org/books/Dream_of_the_Red_Chamber')]],
-        ('issued', '1859'): [[Link("A Tale of Two Cities",uri='http://example.org/books/A_Tale_of_Two_Cities')]],
-        ('issued', '1937'): [[Link("The Hobbit",uri='http://example.org/books/The_Hobbit')]],
-        ('issued', '1939'): [[Link("And Then There Were None",uri='http://example.org/books/And_Then_There_Were_None')]], 
-        ('issued', '1943'): [[Link("The Little Prince",uri='http://example.org/books/The_Little_Prince')]],
-        ('issued', '1954'): [[Link("The Lord of the Rings",uri='http://example.org/books/The_Lord_of_the_Rings')]],
-        ('title', 'a'): [[Link("And Then There Were None",uri='http://example.org/books/And_Then_There_Were_None')],
-                    [Link("A Tale of Two Cities",uri='http://example.org/books/A_Tale_of_Two_Cities')]],
-        ('title', 'd'): [[Link("Dream of the Red Chamber",uri='http://example.org/books/Dream_of_the_Red_Chamber')]],
-        ('title', 'h'): [[Link("The Hobbit",uri='http://example.org/books/The_Hobbit')]],
-        ('title', 'l'): [[Link("The Little Prince",uri='http://example.org/books/The_Little_Prince')],
-                    [Link("The Lord of the Rings",uri='http://example.org/books/The_Lord_of_the_Rings')]]
-        }
-
-
-    criteria = [TocCriteria(binding='title',
-                            label='Sorted by title',
-                            pagetitle='Documents starting with "%(select)s"',
-                            selector = lambda x: x['title'][4].lower() if x['title'].lower().startswith("the ") else x['title'][0].lower(),
-                            key = lambda x: "".join((x['title'][4:] if x['title'].lower().startswith("the ") else x['title']).lower().split())),
-                TocCriteria(binding='issued',
-                            label='Sorted by publication year',
-                            pagetitle='Documents published in %(select)s',
-                            selector=lambda x: x['issued'][:4],
-                            key=lambda x: x['issued'][:4])]
-    def setUp(self):
-        super(TOC, self).setUp()
-        resources = self.datadir+os.sep+"rsrc"+os.sep+"resources.xml"
-        util.ensure_dir(resources)
-        shutil.copy2("%s/files/base/rsrc/resources.xml"%os.path.dirname(__file__),
-                     resources)
-
-    def test_toc(self):
-        # tests the main TOC method, not the helper methods (they are
-        # tested separately)
-
-        # test1: toc_select finds no rows
-        self.repo.toc_select = MagicMock()
-        self.repo.log = Mock()
-        self.repo.toc_criteria = Mock()
-        self.repo.toc_pagesets = Mock()
-        self.repo.toc_select_for_pages = Mock()
-        self.repo.toc_generate_pages = Mock()
-        self.repo.toc_generate_first_page = Mock()
-        self.repo.toc()
-
-        # assert toc_select was properly called, error and info msg
-        # was printed
-        self.assertEqual("http://localhost:8000/dataset/base",
-                         self.repo.toc_select.call_args[0][0])
-        self.assertTrue(self.repo.log.error.called)
-        self.assertTrue(self.repo.log.info.called)
-        # and that the rest of the methods were NOT called
-        self.assertFalse(self.repo.toc_criteria.called)
-        self.assertFalse(self.repo.toc_pagesets.called)
-        self.assertFalse(self.repo.toc_select_for_pages.called)
-        self.assertFalse(self.repo.toc_generate_pages.called)
-
-        # test2: toc_select returns something
-        self.repo.toc_select.return_value = ["fake", "data"]
-        self.repo.toc()
-        # Now all other methods should be called
-        self.assertTrue(self.repo.toc_criteria.called)
-        self.assertTrue(self.repo.toc_pagesets.called)
-        self.assertTrue(self.repo.toc_select_for_pages.called)
-        self.assertTrue(self.repo.toc_generate_pages.called)
-        
-    def test_toc_select(self):
-        self.repo.toc_query = Mock(return_value="Mock query")
-        with patch('ferenda.documentrepository.TripleStore') as mock_ts:
-            self.repo.toc_select()
-            self.assertTrue(mock_ts.connect.called)
-            self.assertEqual(mock_ts.connect.return_value.select.call_args[0][0],
-                             "Mock query")
-            self.assertTrue(mock_ts.connect.return_value.close.called)
-
-    def test_toc_query(self):
-        # NOTE: this is also tested by a doctest
-        want = """PREFIX bibo: <http://purl.org/ontology/bibo/>
-PREFIX dcterms: <http://purl.org/dc/terms/>
-PREFIX foaf: <http://xmlns.com/foaf/0.1/>
-PREFIX owl: <http://www.w3.org/2002/07/owl#>
-PREFIX prov: <http://www.w3.org/ns/prov#>
-PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-PREFIX xhv: <http://www.w3.org/1999/xhtml/vocab#>
-PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-PREFIX xsi: <http://www.w3.org/2001/XMLSchema-instance>
-
-SELECT DISTINCT ?uri ?title ?issued
-FROM <http://example.org/ctx/base>
-WHERE {
-    ?uri rdf:type foaf:Document ; dcterms:title ?title .
-    OPTIONAL { ?uri dcterms:issued ?issued . }
-}"""
-        self.assertEqual(want,
-                         self.repo.toc_query("http://example.org/ctx/base"))
-
-        # special Fuseki magic
-        self.repo.config.storetype = "FUSEKI"
-        want = want.replace("<http://example.org/ctx/base>",
-                            "<urn:x-arq:UnionGraph>")
-        self.assertEqual(want,
-                         self.repo.toc_query())
-
-    def test_toc_criteria(self):
-        dcterms = self.repo.ns['dcterms']
-        want = self.criteria
-        got = self.repo.toc_criteria([dcterms.title, dcterms.issued])
-        
-        self.assertEqual(len(want), len(got))
-        self.assertEqual(want[0].binding, got[0].binding)
-        self.assertEqual(want[0].label, got[0].label)
-        self.assertEqual(want[0].pagetitle, got[0].pagetitle)
-        testdict = {'title': 'The data'}
-        self.assertEqual(want[0].selector(testdict), got[0].selector(testdict))
-        self.assertEqual('d', got[0].selector(testdict))
-        self.assertEqual(want[1].binding, got[1].binding)
-        self.assertEqual(want[1].label, got[1].label)
-        self.assertEqual(want[1].pagetitle, got[1].pagetitle)
-        testdict = {'issued': '2009-01-01'}
-        self.assertEqual(want[1].selector(testdict), got[1].selector(testdict))
-        
-    # toc_selector is tested by test_toc_criteria
-    
-    def test_toc_pagesets(self):
-        got = self.repo.toc_pagesets(self.results1, self.criteria)
-        want = self.pagesets
-        self.assertEqual(len(got), 2)
-        self.assertEqual(got[0].label, want[0].label)
-        self.assertEqual(got[0].pages[0], want[0].pages[0])
-        self.assertEqual(got[0], want[0])
-        self.assertEqual(got[1], want[1])
-
-        # delete title from one place in self.results1
-        res = copy.deepcopy(self.results1)
-        del res[0]['title']
-        del res[1]['issued']
-        got = self.repo.toc_pagesets(res, self.criteria)
-        self.assertEqual(len(got[1].pages), 5)
-        
-    def test_select_for_pages(self):
-        got = self.repo.toc_select_for_pages(self.results1, self.pagesets, self.criteria)
-        want = self.documentlists
-        self.assertEqual(got, want)
-
-        # delete issued from one place in self.results1
-        res = copy.deepcopy(self.results1)
-        del res[1]['issued']
-        # FIXME: this'll go boom!
-        # del res[0]['title']
-        got = self.repo.toc_select_for_pages(res, self.pagesets, self.criteria)
-        self.assertEqual(len(got), 9)
-
-
-    def test_generate_page(self):
-        path = self.repo.toc_generate_page('title','a', self.documentlists[('title','a')], self.pagesets)
-        # 2. secondly, test resulting HTML file
-        self.assertTrue(os.path.exists(path))
-        t = etree.parse(path)
-        
-        #with open(path) as fp:
-        #    print(fp.read().decode('utf-8'))
-
-        # Various other tests on a.html
-        # 2.1 CSS links, relativized correctly?
-        css = t.findall("head/link[@rel='stylesheet']")
-        self.assertEqual(len(css),4) # normalize, main, ferenda, and fonts.googleapis.com
-        
-        self.assertRegex(css[0].get('href'), '^../../../rsrc/css')
-        
-        # 2.2 JS links, relativized correctly?
-        js = t.findall("head/script")
-        self.assertEqual(len(js),4) # jquery, modernizr, respond and ferenda
-        self.assertRegex(js[0].get('src'), '^../../../rsrc/js')
-        # 2.3 <nav id="toc"> correct (c.f 1.2)
-        navlinks = t.findall(".//nav[@id='toc']//li/a")
-        self.assertEqual(len(navlinks),9)
-
-        self.assertEqual(navlinks[0].get("href"), 'http://localhost:8000/dataset/base?title=d')
-        self.assertEqual(navlinks[3].get("href"), 'http://localhost:8000/dataset/base?issued=1791')
-        
-        # 2.4 div[@class='main-container']/article (c.f 1.3)
-        docs = t.findall(".//ul[@role='main']/li/a")
-        self.assertEqual(len(docs),2)
-        # "And..." should go before "A Tale..."
-        self.assertEqual(docs[0].text, 'And Then There Were None')
-        self.assertEqual(docs[0].attrib['href'], 'http://example.org/books/And_Then_There_Were_None')
-        
-        # 2.5 <header><h1><a> correct?
-        header = t.find(".//header/h1/a")
-        self.assertEqual(header.text, 'testsite')
-       
-        # 2.6 div[@class='main-container']/h1 correct?
-        header = t.find(".//div[@class='main-container']//h1")
-        self.assertEqual(header.text, 'Documents starting with "a"')
-
-    def test_generate_page_staticsite(self):
-        self.repo.config.staticsite = True
-        path = self.repo.toc_generate_page('title','a', 
-                                           self.documentlists[('title','a')], 
-                                           self.pagesets)
-        t = etree.parse(path)
-
-        # TOC link should be relativized
-        navlinks = t.findall(".//nav[@id='toc']//li/a")
-        self.assertEqual('d.html', navlinks[0].get("href"))
-        self.assertEqual('../issued/1791.html', navlinks[3].get("href"))
-
-        header = t.find(".//header/h1/a")
-        # from /base/toc/title/a.html -> /index.html = 3 levels up
-        self.assertEqual('../../../index.html', header.get("href"))
-
-        headernavlinks = t.findall(".//header/nav/ul/li/a")    
-        self.assertEqual('../index.html', headernavlinks[0].get("href"))
-
-        # docs (which in this case use non-base-repo-contained URIs, should be unaffected
-        docs = t.findall(".//ul[@role='main']/li/a")
-        self.assertEqual('http://example.org/books/And_Then_There_Were_None', docs[0].get("href"))
-
-    def test_generate_pages(self):
-        paths = self.repo.toc_generate_pages(self.documentlists,self.pagesets)
-        self.assertEqual(len(paths), 10)
-        #print("=============%s====================" % paths[0])
-        #with open(paths[0]) as fp:
-        #    print(fp.read())
-        for path in paths:
-            self.assertTrue(os.path.exists(path))
-
-    def test_generate_first_page(self):
-        path = self.repo.toc_generate_first_page(self.documentlists,self.pagesets)
-        self.assertEqual(path, self.p("base/toc/index.html"))
-        self.assertTrue(os.path.exists(path))
-        tree = etree.parse(path)
-        # check content of path, particularly that css/js refs
-        # and pageset links are correct. Also, that the selected
-        # indexpage is indeed the first (eg. title/a)
-        # (NOTE: the first page in the first pageset (by title/a) isn't linked. The second one (by title/d) is).
-        self.assertEqual("http://localhost:8000/dataset/base?title=d",
-                         tree.find(".//nav[@id='toc']").findall(".//a")[0].get("href"))
-        self.assertEqual("../../rsrc/css/normalize-1.1.3.css",
-                         tree.find(".//link").get("href"))
-                         
-        self.assertEqual('Documents starting with "a"',
-                         tree.find(".//article/h1").text)
-                         
 class Faceting(RepoTester):
 
     def test_query(self):
@@ -2013,6 +1746,13 @@ WHERE {
         self.assertEqual(want,
                          self.repo.facet_query("http://example.org/ctx/base"))
 
+    def test_facets(self):
+        # tests that all expected facets are created and have the
+        # expected properties
+        facets = self.repo.facets()
+        self.assertEqual(facets[0].rdftype, rdflib.RDF.type)
+        # and more ...
+        
 
 class News(RepoTester):
     def setUp(self):

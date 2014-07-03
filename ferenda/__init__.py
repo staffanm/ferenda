@@ -12,7 +12,6 @@ from .devel import Devel
 from .fsmparser import FSMParser
 from .tocpageset import TocPageset
 from .tocpage import TocPage
-from .toccriteria import TocCriteria
 from .facet import Facet
 from .newscriteria import NewsCriteria
 from .transformer import Transformer

@@ -47,20 +47,16 @@ To do this, you override
 this:
 
 
-.. literalinclude:: examples/toc.py
-   :start-after: # begin predicates
-   :end-before: # end predicates
+.. note:
 
+   This section used to contain code from examples/toc.py, but that
+   has been removed and will be recreated using Facet objects
 
 The second, more complicated way is to override
 :meth:`~ferenda.DocumentRepository.toc_criteria` and have it return a
 list of instantiated :class:`~ferenda.TocCriteria` objects, like this
 (equivalent to the above example, but with more possibilities for
 customization):
-
-.. literalinclude:: examples/toc.py
-   :start-after: # begin criteria
-   :end-before: # end criteria
 
 The ``label`` and ``pagetitle`` parameters are useful to control the
 headings and labels for the generated pages. They should hopefully be
@@ -154,10 +150,6 @@ return a list of :mod:`~ferenda.elements` objects.
 
 As an example, if you want to group by dcterms:identifier, but present
 each document with dcterms:identifier + dcterms:title:
-
-.. literalinclude:: examples/toc.py
-   :start-after: # begin item
-   :end-before: # end item
 
 The generated TOC pages automatically get a visual representation of
 each calculated TocPageset in the left navigational column.
