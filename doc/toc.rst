@@ -128,7 +128,5 @@ The first page
 The main way in to each docrepos set of TOC pages is through the tabs
 in the main header. That link goes to a special copy of the first page
 in the first pageset. The order of criteria specified by
-:meth:`~ferenda.DocumentRepository.toc_predicates` or
-:meth:`~ferenda.DocumentRepository.toc_criteria` is therefore
-important.
+:meth:`~ferenda.DocumentRepository.facets` is therefore important.
 

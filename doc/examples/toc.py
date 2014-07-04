@@ -21,8 +21,8 @@ class TocExample(DocumentRepository):
 # end item
 
 d = TocExample()
-d.toc_predicates()
-d.toc_criteria()
+d.facets()
+d.faceted_data()
 d.toc_item(None, {'identifier':'x',
                   'title':'y',
                   'uri':'z'})

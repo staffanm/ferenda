@@ -285,8 +285,8 @@ class RFCs(DocumentRepository):
 # end xslt
 
 # begin facets
-    def toc_predicates(self):
-        from ferenda import Describer
+    def facets(self):
+        from ferenda import Facet
         return [Facet(self.ns['dcterms'].title),
                 Facet(self.ns['dcterms'].issued),
                 Facet(self.ns['dcterms'].subject),

@@ -664,13 +664,12 @@ etc used by :meth:`~ferenda.DocumentRepository.generate`.
 
 The default implementation is generic enough to handle most cases, but
 you'll have to override other methods which it calls, primarily
-:meth:`~ferenda.DocumentRepository.toc_query`,
-:meth:`~ferenda.DocumentRepository.toc_criteria` and
-:meth:`~ferenda.DocumentRepository.toc_predicates`. These
-methods all depend on the metadata you've created by your parse
-implementation, but in the simplest cases it's enough to specify that
-you want one set of pages organized by the ``dcterms:title`` of each
-document (alphabetically sorted) and another by ``dcterms:issued``
+:meth:`~ferenda.DocumentRepository.facets`,
+:meth:`~ferenda.DocumentRepository.toc_items`. These methods all
+depend on the metadata you've created by your parse implementation,
+but in the simplest cases it's enough to specify that you want one set
+of pages organized by the ``dcterms:title`` of each document
+(alphabetically sorted) and another by ``dcterms:issued``
 (numerically/calendarically sorted). The default implementation does
 exactly this.
 
