@@ -1,6 +1,6 @@
 @prefix bibo: <http://purl.org/ontology/bibo/> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
-@prefix prov: <http://www.w3.org/ns/prov-o/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix rfc: <http://example.org/ontology/rfc/> .
@@ -15,11 +15,11 @@
     dcterms:identifier "RFC 6912" ;
     dcterms:issn "2070-1721" ;
     dcterms:issued "2013-04"^^xsd:gYearMonth ;
-    dcterms:publisher "Internet Architecture Board (IAB)" ;
+    dcterms:publisher <http://localhost:8000/ext/iab> ;
     dcterms:rightsHolder "Dyn, Inc.",
         "Microsoft",
         "NLnet Labs" ;
-    dcterms:subject "Informational" ;
+    dcterms:subject <http://localhost:8000/dataset/rfc/informational> ;
     dcterms:title "Principles for Unicode Code Point Inclusion in Labels in the DNS"@en ;
     bibo:shortTitle "DNS Zone Code Point Principles"@en ;
     prov:wasGeneratedBy "ferenda.sources.tech.rfc.RFC" .

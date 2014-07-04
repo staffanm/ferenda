@@ -1,5 +1,5 @@
 @prefix dcterms: <http://purl.org/dc/terms/> .
-@prefix prov: <http://www.w3.org/ns/prov-o/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
@@ -8,6 +8,7 @@
 
 <http://localhost:8000/res/jo/1000/2004> a rpubl:VagledandeMyndighetsavgorande ;
     dcterms:identifier "JO dnr 1000/2004" ;
+    dcterms:issued "2004-11-17"^^xsd:date ;
     dcterms:title "Ett ärende om en socialförsäkringsnämndsledamots agerande efter ett sammanträde"@sv ;
     rpubl:avgorandedatum "2004-11-17"^^xsd:date ;
     rpubl:diarienummer "1000-2004" ;

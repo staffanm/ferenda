@@ -1,6 +1,6 @@
 @prefix bibo: <http://purl.org/ontology/bibo/> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
-@prefix prov: <http://www.w3.org/ns/prov-o/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix rfc: <http://example.org/ontology/rfc/> .
@@ -15,11 +15,11 @@
     dcterms:identifier "RFC 6916" ;
     dcterms:issn "2070-1721" ;
     dcterms:issued "2013-04"^^xsd:gYearMonth ;
-    dcterms:publisher "Internet Engineering Task Force (IETF)" ;
+    dcterms:publisher <http://localhost:8000/ext/ietf> ;
     dcterms:rightsHolder "BBN Technologies",
         "Cisco Systems",
         "IECA, Inc." ;
-    dcterms:subject "Best Current Practice" ;
+    dcterms:subject <http://localhost:8000/dataset/rfc/best-current-practice> ;
     dcterms:title "Algorithm Agility Procedure for the Resource Public Key Infrastructure (RPKI)"@en ;
     bibo:shortTitle "RPKI Algorithm Agility"@en ;
     prov:wasGeneratedBy "ferenda.sources.tech.rfc.RFC" .

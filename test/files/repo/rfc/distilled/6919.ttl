@@ -1,6 +1,6 @@
 @prefix bibo: <http://purl.org/ontology/bibo/> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
-@prefix prov: <http://www.w3.org/ns/prov-o/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix rfc: <http://example.org/ontology/rfc/> .
@@ -110,11 +110,11 @@
         "S. Kent" ;
     dcterms:identifier "RFC 6919" ;
     dcterms:issn "2070-1721" ;
-    dcterms:publisher "Independent Submission" ;
+    dcterms:publisher <http://localhost:8000/ext/independent> ;
     dcterms:rightsHolder "1 April 2013",
         "BBN",
         "RTFM, Inc." ;
-    dcterms:subject "Experimental" ;
+    dcterms:subject <http://localhost:8000/dataset/rfc/experimental> ;
     dcterms:title "Further Key Words for Use in RFCs to Indicate Requirement Levels"@en ;
     bibo:shortTitle "Further RFC Key Words"@en ;
     prov:wasGeneratedBy "ferenda.sources.tech.rfc.RFC" .

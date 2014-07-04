@@ -1,6 +1,6 @@
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix prov: <http://www.w3.org/ns/prov-o/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
@@ -10,6 +10,7 @@
 <http://localhost:8000/res/dir/1994:103> a rpubl:Direktiv ;
     dcterms:changed "1994-09-28T00:00:00"^^xsd:dateTime ;
     dcterms:identifier "Dir. 1994:103" ;
+    dcterms:issued "1994-09-15T00:00:00"^^xsd:dateTime ;
     dcterms:publisher <http://lagen.nu/org/2008/regeringskansliet> ;
     dcterms:title "Utredning om den svenska rymdverksamheten"@sv ;
     rpubl:arsutgava "1994" ;
