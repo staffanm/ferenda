@@ -27,7 +27,8 @@ facet          Description of grouping
 rdf:type       Grouped by qname of type
 -------------  -----------------------
 dcterms:title  Grouped by first letter
--------------  -----------------------
+=============  =======================
+
 
 Predefined selectors
 --------------------

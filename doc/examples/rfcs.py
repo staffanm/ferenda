@@ -284,48 +284,14 @@ class RFCs(DocumentRepository):
     xslt_template = "rfc.xsl"
 # end xslt
 
-# begin toc_predicates
+# begin facets
     def toc_predicates(self):
-        return [self.ns['dcterms'].title,
-                self.ns['dcterms'].issued,
-                self.ns['dcterms'].subject,
-                self.ns['dcterms'].identifier]
-# end toc_predicates
-
-# begin toc_criteria
-    def toc_criteria(self, predicates=None):
-        from ferenda import TocCriteria
-
-        return [TocCriteria(binding='identifier',
-                            label='Sorted by RFC #',
-                            pagetitle='RFCs %(select)s--99',
-                            selector=lambda x: x['identifier'][4:-2]+"00",  # "RFC 6998" => "69"
-                            key=lambda x: int(x['identifier'][4:]),
-                            selector_descending=True,
-                            key_descending=True),   # "RFC 6998" => 6998
-
-                TocCriteria(binding='title',
-                            label='Sorted by title',
-                            pagetitle='Documents starting with "%(select)s"',
-                            selector=lambda x: util.title_sortkey(x['title'])[0], # "The 'view-state'" property => "v"
-                            key=lambda x: util.title_sortkey(x['title'])),
-
-                TocCriteria(binding='issued',
-                            label='Sorted by year',
-                            pagetitle='Documents published in %(select)s',
-                            selector = lambda x: x['issued'][:4],  # '2013-08-01' => '2013'
-                            key = lambda x: x['issued'],
-                            selector_descending=True,
-                            key_descending=True), 
-
-                TocCriteria(binding='subject',
-                            label='Sorted by category',
-                            pagetitle='Documents in the %(select)s category',
-                            selector = lambda x: x['subject'],
-                            key = lambda x: int(x['identifier'][4:]),
-                            key_descending=True
-                            )]
-# end toc_criteria
+        from ferenda import Describer
+        return [Facet(self.ns['dcterms'].title),
+                Facet(self.ns['dcterms'].issued),
+                Facet(self.ns['dcterms'].subject),
+                Facet(self.ns['dcterms'].identifier)]
+# end facets
 
 # begin toc_item
     def toc_item(self, binding, row):

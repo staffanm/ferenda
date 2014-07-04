@@ -23,56 +23,49 @@ document, you'll get basic "Sorted by title" and "Sorted by date of
 publication" TOCs for free. But if you've been a
 
 
-Defining criteria for grouping and sorting
+Defining facets for grouping and sorting
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-A criteria in this case is a method for grouping a set into documents
+A facet in this case is a method for grouping a set into documents
 into distinct categories, then sorting the documents, as well as the
 categories themseves.
 
-Each criteria is represented by a TocCriteria object. If you want to
-customize the table of contents, you have to provide a set of these
-objects. You can do this in two different ways.
+Each facet is represented by a :py:class:`~ferenda.Facet` object. If
+you want to customize the table of contents, you have to provide a
+list of these by overriding
+:py:meth:`~ferenda.DocumentRepository.facets`.
 
-The first, simple, way is to specify a list of rdf predicates that
-you've extracted when parsing your documents. Ferenda has some basic
-knowledge about some common predicates and know how to construct
-sensible TocCriteria objects for them -- ie. if you specify the
-predicate ``dcterms:issued``, you get a TocCriteria object that groups
-documents by year of publication and sorts each group by date of
-publication.
-
-To do this, you override
-:meth:`~ferenda.DocumentRepository.toc_predicates` to something like
-this:
+The basic way to do this is to initialize each Facet object with a rdf
+predicate. Ferenda has some basic knowledge about some common
+predicates and know how to construct sensible Facet objects for
+them -- ie. if you specify the predicate ``dcterms:issued``, you get a
+Facet object that groups documents by year of publication and
+sorts each group by date of publication.
 
 
-.. note:
+.. literalinclude:: examples/toc.py
+   :start-after: # begin facets
+   :end-before: # end facets
 
-   This section used to contain code from examples/toc.py, but that
-   has been removed and will be recreated using Facet objects
-
-The second, more complicated way is to override
-:meth:`~ferenda.DocumentRepository.toc_criteria` and have it return a
-list of instantiated :class:`~ferenda.TocCriteria` objects, like this
-(equivalent to the above example, but with more possibilities for
-customization):
+You can customize the behaviour of each Facet by providing extra arguments to
 
 The ``label`` and ``pagetitle`` parameters are useful to control the
 headings and labels for the generated pages. They should hopefully be
 self-explainatory.
 
 The ``selector`` and ``key`` parameters should be functions (or any
-callable -- like the lambda functions above) that accept a dictionary
-of string values. These functions are called once each for each row in
-the result set generated in the next step (see below) with the
-contents of that row. They should each return a single string
-value. The ``selector`` function should return the label of a group
-that the document belongs to, i.e. the initial letter of the title, or
-the year of a publication date. The ``key`` function should return a
-value that will be used for sorting, i.e. for document titles it could
-return the title without any leading "The", lowercased, spaces removed
-etc.
+other callable) that accept a dictionary of string values, one string
+which is generally a key on the dictionary, and one rdflib graph
+containing whatever
+:py:data:`~ferenda.DocumentRepository.commondata`. These functions are
+called once each for each row in the result set generated in the next
+step (see below) with the contents of that row. They should each
+return a single string value. The ``selector`` function should return
+the label of a group that the document belongs to, i.e. the initial
+letter of the title, or the year of a publication date. The ``key``
+function should return a value that will be used for sorting, i.e. for
+document titles it could return the title without any leading "The",
+lowercased, spaces removed etc. See also :doc:`facets`.
 
 Getting information about all documents
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -85,38 +78,9 @@ is a row with a number of properties.
 particular document, in that case, a CONSTRUCT query that retrieves a
 small RDF graph is used).
 
-If you've used :meth:`~ferenda.DocumentRepository.toc_predicates`
-above, a query that selects just those properties is automatically
-constructed by the default implementation of toc_query. If you've
-created your own :meth:`~ferenda.DocumentRepository.toc_criteria`
-implementation, you might need to override this method as well. It
-should return a string containing a valid SPARQL SELECT query.
-
-It's called with the graph/context URI for the docrepo in question,
-which you'll probably want to use in a SELECT FROM <> clause.
-
-.. note::
-
-   It's totally possible to both override
-   :meth:`~ferenda.DocumentRepository.toc_predicates` and
-   :meth:`~ferenda.DocumentRepository.toc_criteria`, and then let the
-   default implementation of toc_query use the information from
-   :meth:`~ferenda.DocumentRepository.toc_predicates` to automatically
-   create a suitable query.
-
-Each :class:`~ferenda.TocCriteria` object is initialized with a
-binding parameter. The value of this parameter must match one of the
-variable bindings specified in the SPARQL query.
-
-.. note:: 
-
-   Note to self: Do we really need the binding parameter to
-   TocCriteria, now that the selector and key functions are provided
-   with the entire dict of variable mappings?
-
-Your selector and key functions expect a dict of string values. The
-keys of this dict must match whatever variable bindings specified in
-the SPARQL query as well.
+Your list of Facet objects returned by
+:meth:`~ferenda.DocumentRepository.facets` is used to automatically
+select all data from the SPARQL store.
 
 Making the TOC pages
 ^^^^^^^^^^^^^^^^^^^^
@@ -143,13 +107,17 @@ The final sub-step transforms each of these :class:`~ferenda.TocPage`
 objects into a HTML5 file. In the process, the method
 :meth:`~ferenda.DocumentRepository.toc_item` is called for every
 single document listed on every single TOC page. This method controls
-how each document is presented when laid out. It's called with a
-binding (same as used on each TocCriteria object) and a dict (same as
-used on the ``selector`` and ``key`` functions), and is expected to
-return a list of :mod:`~ferenda.elements` objects.
+how each document is presented when laid out. It's called with a dict
+and a binding (same as used on the ``selector`` and ``key``
+functions), and is expected to return a list of
+:mod:`~ferenda.elements` objects.
 
 As an example, if you want to group by dcterms:identifier, but present
 each document with dcterms:identifier + dcterms:title:
+
+.. literalinclude:: examples/toc.py
+   :start-after: # begin item
+   :end-before: # end item
 
 The generated TOC pages automatically get a visual representation of
 each calculated TocPageset in the left navigational column.

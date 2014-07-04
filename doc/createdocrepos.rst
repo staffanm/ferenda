@@ -678,27 +678,23 @@ In our case, we wish to create four kinds of sorting: By identifier
 (RFC number), by date of issue, by title and by category. These map
 directly to four kinds of metadata that we've stored about each and
 every document. By overriding
-:meth:`~ferenda.DocumentRepository.toc_predicates` we can specify
-these four *predicates*.
+:meth:`~ferenda.DocumentRepository.facets` we can specify these four
+*facets*, aspects of documents used for grouping and sorting.
 
 .. literalinclude:: examples/rfcs.py
-   :start-after: # begin toc_predicates
-   :end-before: # end toc_predicates
+   :start-after: # begin facets
+   :end-before: # end facets
 
 After running toc with this change, you can see that four sets of
 index pages are created. However, except for publication year, the
 actual partitioning of documents are still done by title. In order to
-correct this, we must create a set of :class:`~ferenda.TocCriteria`
-objects that specify how documents should be ordered for any
-particular criteria, and have
-:meth:`~ferenda.DocumentRepository.toc_criteria` return these.
+correct this, we must create a set of :class:`~ferenda.Facet` objects
+that specify how documents should be ordered for any particular
+criteria, and have :meth:`~ferenda.DocumentRepository.facets` return
+these.
 
-.. literalinclude:: examples/rfcs.py
-   :start-after: # begin toc_criteria
-   :end-before: # end toc_criteria
-
-The above code gives some example of how :class:`~ferenda.TocCriteria`
-objects can be configured. However, a :class:`~ferenda.TocCriteria`
+The above code gives some example of how :class:`~ferenda.Facet`
+objects can be configured. However, a :class:`~ferenda.Facet`
 object does not control how each individual document is listed on a
 toc page. The default formatting just lists the title of the document,
 linked to the document in question. For RFCs, who mainly is referenced
