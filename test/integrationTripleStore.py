@@ -205,7 +205,7 @@ d:i8301
                    format="nt")
         self.assertEqualGraphs(want, got, exact=True)
 
-    def test_select_toc(self):
+    def test_facet_query(self):
         results1 = json.load(open("test/files/datasets/results1.json"))
         results2 = json.load(open("test/files/datasets/results2.json"))
 
@@ -225,25 +225,17 @@ d:i8301
         repo.rdf_type = rdflib.URIRef("http://purl.org/ontology/bibo/Book")
 
         # test 1
-        sq = repo.toc_query("http://example.org/ctx/base")
+        sq = repo.facet_query("http://example.org/ctx/base")
         got = self.store.select(sq, format="python")
         self.assertEqual(len(got), len(results1))
         for row in results1:
             self.assertIn(row, got)
 
         # test 2
-        sq = repo.toc_query("http://example.org/ctx/other")
+        sq = repo.facet_query("http://example.org/ctx/other")
         got = self.store.select(sq, format="python")
         self.assertEqual(len(got), len(results2))
         for row in results2:
-            self.assertIn(row, got)
-
-        # test 3
-        sq = repo.toc_query()
-        got = self.store.select(sq, format="python")
-        want = results1 + results2
-        self.assertEqual(len(got), len(want))
-        for row in want:
             self.assertIn(row, got)
 
         if self.storetype == "SLEEPYCAT":
