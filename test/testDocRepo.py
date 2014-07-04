@@ -31,7 +31,7 @@ from bs4 import BeautifulSoup
 import doctest
 
 from ferenda import DocumentEntry, TocPageset, TocPage, \
-    Describer, LayeredConfig, TripleStore, FulltextIndex
+    Describer, LayeredConfig, TripleStore, FulltextIndex, Facet
 from ferenda.fulltextindex import WhooshIndex
 from ferenda.errors import *
 
@@ -1752,6 +1752,19 @@ WHERE {
         facets = self.repo.facets()
         self.assertEqual(facets[0].rdftype, rdflib.RDF.type)
         # and more ...
+
+
+    def test_year(self):
+        self.assertEqual('2014',
+                         Facet.year({'dcterms_issued': '2014-06-05T12:00:00'}))
+        self.assertEqual('2014',
+                         Facet.year({'dcterms_issued': '2014-06-05'}))
+        self.assertEqual('2014',
+                         Facet.year({'dcterms_issued': '2014-06'}))
+        with self.assertRaises(Exception):
+            Facet.year({'dcterms_issued': 'This is clearly an invalid date'})
+        with self.assertRaises(Exception):
+            Facet.year({'dcterms_issued': '2014-14-99'})
         
 
 class News(RepoTester):

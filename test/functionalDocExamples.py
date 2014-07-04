@@ -32,9 +32,14 @@ class Examples(unittest.TestCase, FerendaTestCase):
 
     # FIXME: copied from testExamples.py -- unittest makes it a lot of
     # work to inherit from other testcases
-    def _test_pyfile(self, pyfile, want=True, comparator=None):
+    def _test_pyfile(self, pyfile, workingdir=None, want=True, comparator=None):
+        if not workingdir:
+            workingdir = os.getcwd()
+        oldwd = os.getcwd()
         pycode = compile(util.readfile(pyfile), pyfile, 'exec')
+        os.chdir(workingdir)
         result = six.exec_(pycode, globals(), locals())
+        os.chdir(oldwd)
         # the exec:ed code is expected to set return_value
         got = locals()['return_value']
         if not comparator:
@@ -186,7 +191,10 @@ class Examples(unittest.TestCase, FerendaTestCase):
     def test_firststeps_api(self):
         from ferenda.manager import setup_logger; setup_logger('CRITICAL')
         # FIXME: consider mocking print() here
-        self._test_pyfile("doc/examples/firststeps-api.py")
+        workingdir = tempfile.mkdtemp()
+        os.environ['FERENDA_HOME'] = os.getcwd()
+        self._test_pyfile("doc/examples/firststeps-api.py", workingdir)
+        shutil.rmtree(workingdir)
         
     def test_firststeps(self):
         # this test might fail whenever new W3C standards are added,
@@ -210,7 +218,9 @@ class Examples(unittest.TestCase, FerendaTestCase):
     # runserver and disable them)
     def test_intro_example_py(self):
         os.environ['FERENDA_DOWNLOADMAX'] = '3'
-        self._test_pyfile("doc/examples/intro-example.py")
+        workingdir = tempfile.mkdtemp()
+        self._test_pyfile("doc/examples/intro-example.py", workingdir)
+        shutil.rmtree(workingdir)
 
     def test_intro_example_sh(self):
         workingdir = tempfile.mkdtemp()
@@ -223,13 +233,13 @@ class Examples(unittest.TestCase, FerendaTestCase):
         shutil.rmtree(workingdir)
 
     def test_rfc(self):
+        workingdir = tempfile.mkdtemp()
         try:
-            shutil.copy("doc/examples/rfc-annotations.rq", "rfc-annotations.rq")
-            shutil.copy("doc/examples/rfc.xsl", "rfc.xsl")
-            self._test_pyfile("doc/examples/rfcs.py")
+            shutil.copy("doc/examples/rfc-annotations.rq", workingdir+"/rfc-annotations.rq")
+            shutil.copy("doc/examples/rfc.xsl", workingdir+"/rfc.xsl")
+            self._test_pyfile("doc/examples/rfcs.py", workingdir)
         finally:
-            os.unlink("rfc-annotations.rq")
-            os.unlink("rfc.xsl")            
+            shutil.rmtree(workingdir)
 
     def test_composite(self):
         workingdir = tempfile.mkdtemp()

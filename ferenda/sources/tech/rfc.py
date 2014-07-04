@@ -13,7 +13,7 @@ from rdflib import URIRef, Graph, XSD
 from pyparsing import Word, CaselessLiteral, Optional, nums
 
 from ferenda import DocumentRepository
-from ferenda import TextReader, Describer, FSMParser, CitationParser, URIFormatter
+from ferenda import TextReader, Describer, FSMParser, CitationParser, URIFormatter, Facet
 from ferenda import util
 from ferenda.decorators import action, recordlastdownload, managedparsing, downloadmax
 from ferenda.elements import Body, Heading, Preformatted, Paragraph, UnorderedList, ListItem, Section, Subsection, Subsubsection, UnicodeElement, CompoundElement, Link, serialize
@@ -608,74 +608,16 @@ class RFC(DocumentRepository):
                 # personal author identity
                 desc.value(self.ns['dcterms'].rightsHolder, line)
 
-# FIXME: Rewrite this using Facets
-# 
-#    def toc_predicates(self):
-#        return [self.ns['rdf'].type,
-#                self.ns['dcterms'].identifier,
-#                self.ns['dcterms'].title,
-#                self.ns['dcterms'].publisher,
-#                self.ns['dcterms'].issued,
-#                self.ns['dcterms'].subject]
-#
-#    def toc_criteria(self, predicates=None):
-#        from ferenda import TocCriteria
-#        DCTERMS = self.ns['dcterms']
-#        RDF = self.ns['rdf']
-#        return [TocCriteria(binding='type',
-#                            label='Sorted by document type',
-#                            pagetitle='Documents of type %(select)s',
-#                            selector=lambda x: x['type'],
-#                            key=lambda x: x['type'],
-#                            predicate=RDF.type),
-#                
-#                TocCriteria(binding='identifier',
-#                            label='Sorted by RFC #',
-#                            pagetitle='RFCs %(select)s--99',
-#                            selector=lambda x: x['identifier'][4:-2] + "00",  # "RFC 6998" => "69"
-#                            key=lambda x: int(x['identifier'][4:]),
-#                            selector_descending=True,
-#                            key_descending=True,
-#                            predicate=DCTERMS.identifier),   # "RFC 6998" => 6998
-#
-#                TocCriteria(binding='title',
-#                            label='Sorted by title',
-#                            pagetitle='Documents starting with "%(select)s"',
-#                            # "The 'view-state'" property => "v"
-#                            selector=lambda x: util.title_sortkey(x['title'])[0],
-#                            key=lambda x: util.title_sortkey(x['title']),
-#                            predicate=DCTERMS.title),
-#
-#                TocCriteria(binding='publisher',
-#                            label='Sorted by stream',
-#                            pagetitle='Documents in the %(select)s stream',
-#                            selector=lambda x: x['publisher'],  # Must convert this URI to label (here or in the query)
-#                            key=lambda x: x['publisher'],
-#                            selector_descending=True,
-#                            key_descending=True,
-#                            predicate=DCTERMS.publisher),
-#
-#                TocCriteria(binding='issued',
-#                            label='Sorted by year',
-#                            pagetitle='Documents published in %(select)s',
-#                            selector=lambda x: x['issued'][:4],  # '2013-08-01' => '2013'
-#                            key=lambda x: x['issued'],
-#                            selector_descending=True,
-#                            key_descending=True,
-#                            predicate=DCTERMS.issued),
-#
-#                TocCriteria(binding='subject',
-#                            label='Sorted by category',
-#                            pagetitle='Documents in the %(select)s category',
-#                            selector=lambda x: x['subject'],
-#                            key=lambda x: int(x['identifier'][4:]),
-#                            key_descending=True,
-#                            predicate=DCTERMS.subject)
-#            ]
-
+    def facets(self):
+        return [Facet(self.ns['rdf'].type),
+                Facet(self.ns['dcterms'].identifier),
+                Facet(self.ns['dcterms'].title),
+                Facet(self.ns['dcterms'].publisher),
+                Facet(self.ns['dcterms'].issued),
+                Facet(self.ns['dcterms'].subject)]
     def toc_item(self, binding, row):
-        return [row['identifier'] + ": ",
-                Link(row['title'],
+        return [row['dcterms_identifier'] + ": ",
+                Link(row['dcterms_title'],
                      uri=row['uri'])]
 
     def news_criteria(self):

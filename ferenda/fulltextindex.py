@@ -5,6 +5,7 @@ import json
 import math
 import re
 import shutil
+import itertools
 from datetime import date, datetime, MAXYEAR, MINYEAR
 
 import six
@@ -371,7 +372,18 @@ class WhooshIndex(FulltextIndex):
     def __init__(self, location, repos):
         self._writer = None
         super(WhooshIndex, self).__init__(location, repos)
-        # self._schema = self.get_default_schema()
+        self._multiple = {}
+        # Initialize self._multiple so that we know which fields may
+        # contain multiple values. FIXME: v. similar to the code in
+        # make_schema
+        for repo in repos:
+            g = repo.make_graph() # for qname lookup
+            for facet in repo.facets():
+                if facet.dimension_label:
+                    fld = facet.dimension_label
+                else:
+                    fld = g.qname(facet.rdftype).replace(":", "_")
+                self._multiple[fld] = facet.multiple_values
 
     def exists(self):
         return whoosh.index.exists_in(self.location)
@@ -402,15 +414,20 @@ class WhooshIndex(FulltextIndex):
         if not self._writer:
             self._writer = self.index.writer()
 
-        # special-handling of the Resource type -- this is provided as
-        # a dict with 'iri' and 'label' keys, and we flatten it to a
-        # 2-element list (stored in an IDLIST)
         s = self.schema()
         for key in kwargs:
+            # special-handling of the Resource type -- this is provided as
+            # a dict with 'iri' and 'label' keys, and we flatten it to a
+            # 2-element list (stored in an IDLIST)
             if isinstance(s[key], Resource):
-            # if isinstance(kwargs[key], dict):
-                kwargs[key] = [kwargs[key]['iri'],
-                               kwargs[key]['label']]
+                # might be multiple values, in which case we create a
+                # n-element list, still stored as IDLIST
+                if isinstance(kwargs[key], list):
+                # or if self._multiple[key]:
+                    kwargs[key] = list(itertools.chain.from_iterable([(x['iri'], x['label'])for x in kwargs[key]]))
+                else:
+                    kwargs[key] = [kwargs[key]['iri'],
+                                   kwargs[key]['label']]
             elif isinstance(s[key], Datetime):
                 if (isinstance(kwargs[key], date) and
                     not isinstance(kwargs[key], datetime)):
@@ -523,8 +540,15 @@ class WhooshIndex(FulltextIndex):
             # de-marschal Resource objects from list to dict
             for key in resourcefields:
                 if key in fields:
-                    fields[key] = {'iri': fields[key][0],
-                                   'label': fields[key][1]}
+                    # need to return a list of dicts if
+                    # multiple_values was specified, and a simple dict
+                    # otherwise... (note that just examining if
+                    # len(fields[key]) == 2 isn't enough)
+                    if self._multiple[key]:
+                        fields[key] = [{'iri': x[0], 'label': x[1]} for x in zip(fields[key][0::2], fields[key][1::2])]
+                    else:
+                        fields[key] = {'iri': fields[key][0],
+                                       'label': fields[key][1]}
             l.append(fields)
         return l
 

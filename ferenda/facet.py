@@ -22,7 +22,7 @@ class Facet(object):
         datestring = row[binding]
         # assume a date(time) like '2014-06-05T12:00:00', '2014-06-05'
         # or even '2014-06'
-        formatstring = {19: "%Y-%m-%dT%h:%m:%s",
+        formatstring = {19: "%Y-%m-%dT%H:%M:%S",
                         10: "%Y-%m-%d",
                         7: "%Y-%m"}[len(datestring)]
         d = datetime.strptime(datestring, formatstring)

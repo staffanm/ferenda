@@ -3,8 +3,9 @@ from __future__ import unicode_literals
 
 # firststeps-api.py
 import sys
+import os
 import shutil
-sys.path.append("doc/examples") # to find w3cstandards.py
+sys.path.append(os.environ['FERENDA_HOME']+"/doc/examples") # to find w3cstandards.py
 
 # begin download-status
 from w3cstandards import W3CStandards

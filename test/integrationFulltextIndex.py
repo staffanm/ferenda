@@ -63,8 +63,8 @@ custom_dataset = [
      'dcterms_title':'Title of first document in first repo',
      'dcterms_identifier':'R1 D1',
      'dcterms_issued':datetime(2013,2,14,14,6), # important to use real datetime object, not string representation
-     'dcterms_publisher': {'iri': 'http://example.org/vocab/publ1',
-                   'label': 'Publishing & sons'},
+     'dcterms_publisher': [{'iri': 'http://example.org/vocab/publ1',
+                   'label': 'Publishing & sons'}],
      'dc_subject': ['green', 'standards'],
      'text': 'Long text here'},
     {'repo':'repo1',
@@ -73,8 +73,10 @@ custom_dataset = [
      'dcterms_title':'Title of second document in first repo',
      'dcterms_identifier':'R1 D2',
      'dcterms_issued':datetime(2013,3,4,14,16),
-     'dcterms_publisher': {'iri': 'http://example.org/vocab/publ2',
-                   'label': 'Bookprinters and associates'},
+     'dcterms_publisher': [{'iri': 'http://example.org/vocab/publ2',
+                            'label': 'Bookprinters and associates'},
+                           {'iri': 'http://example.org/vocab/publ3',
+                            'label': 'Printers intl.'}],
      'dc_subject': ['suggestions'],
      'text': 'Even longer text here'},
     {'repo':'repo2',
@@ -92,7 +94,7 @@ custom_dataset = [
      'dcterms_title':'Title of second document in second repo',
      'dcterms_identifier':'R2 D2',
      'ex_secret': True,
-     'dcterms_references': None,
+     'dcterms_references':'http://example.org/repo2/2',
      'dc_subject':['yellow', 'red'],
      'text': 'Even this one'}
     ]
@@ -117,7 +119,7 @@ class DocRepo2(DocumentRepository):
         EX = self.ns['ex']
         return [Facet(RDF.type),           
                 Facet(DCTERMS.title),      
-                Facet(DCTERMS.publisher),
+                Facet(DCTERMS.publisher, multiple_values=True),
                 Facet(DCTERMS.identifier),
                 Facet(DCTERMS.issued),
                 Facet(EX.secret, indexingtype=Boolean()),
@@ -245,7 +247,7 @@ class CustomIndex(object):
 
     def test_insert(self):
         self.index.update(**custom_dataset[0]) # repo1
-        self.index.update(**custom_dataset[2]) # repo2
+        self.index.update(**custom_dataset[3]) # repo2
         self.index.commit()
         self.assertEqual(self.index.doccount(),2)
 
@@ -253,10 +255,11 @@ class CustomIndex(object):
         self.assertEqual(len(res), 1)
         self.assertEqual(custom_dataset[0],res[0])
 
-        res, pager = self.index.query(uri="http://example.org/repo2/1")
+        res, pager = self.index.query(uri="http://example.org/repo2/2")
         self.assertEqual(len(res), 1)
-        self.assertEqual(custom_dataset[2],res[0])
-        
+        self.assertEqual(custom_dataset[3],res[0])
+
+    
     
 class CustomQuery(object):        
 
