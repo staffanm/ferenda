@@ -38,8 +38,10 @@ class Examples(unittest.TestCase, FerendaTestCase):
         oldwd = os.getcwd()
         pycode = compile(util.readfile(pyfile), pyfile, 'exec')
         os.chdir(workingdir)
-        result = six.exec_(pycode, globals(), locals())
-        os.chdir(oldwd)
+        try:
+            result = six.exec_(pycode, globals(), locals())
+        finally:
+            os.chdir(oldwd)
         # the exec:ed code is expected to set return_value
         got = locals()['return_value']
         if not comparator:
@@ -58,7 +60,7 @@ class Examples(unittest.TestCase, FerendaTestCase):
             re.compile(r"\((\d+.\d+) sec\)"),
             re.compile(r" INFO ([\w\-]+): downloaded from http"),
             re.compile(r": downloaded from (http://[\w\.\-/]+)"),
-            re.compile(r" INFO ([\w\-]+): OK "),
+            re.compile(r" INFO ([\w\-]+): (parse|relate|generate) OK "),
             re.compile(r" DEBUG ([\w\-]+): Created "),
             re.compile(r" INFO Created data/w3c/toc/([\w/]+).html"),
             re.compile(r": Created ([\w\-\./]+).xhtml"),
@@ -85,8 +87,8 @@ class Examples(unittest.TestCase, FerendaTestCase):
                  "[MASKED] w3c INFO [MASKED]: downloaded from [MASKED]\n[MASKED] w3c INFO [MASKED]: downloaded from [MASKED]\n"),
                 ("20:16:44 root INFO w3c download finished in 14.666 sec",
                  "[MASKED] root INFO w3c download finished in [MASKED] sec"),
-                ("14:45:57 w3c INFO rdfa-core: OK (2.051 sec)",
-                 "[MASKED] w3c INFO [MASKED]: OK ([MASKED] sec)"),
+                ("14:45:57 w3c INFO rdfa-core: parse OK (2.051 sec)",
+                 "[MASKED] w3c INFO [MASKED]: parse OK ([MASKED] sec)"),
                 ("15:44:50 w3c DEBUG html-rdfa: Starting",
                  "[MASKED] w3c DEBUG [MASKED]: Starting"),
                 ("15:44:48 w3c DEBUG xhtml-rdfa: Created data/w3c/parsed/xhtml-rfa.xhtml",

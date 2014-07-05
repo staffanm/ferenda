@@ -75,7 +75,7 @@ $ ./ferenda-build.py w3c download rdfa-core --loglevel=CRITICAL
  
 # begin parse
 $ ./ferenda-build.py w3c parse rdfa-core
-13:04:33 w3c INFO rdfa-core: OK (2.033 sec)
+13:04:33 w3c INFO rdfa-core: parse OK (2.033 sec)
 13:04:33 root INFO w3c parse finished in 2.053 sec
 # end parse
 
@@ -100,7 +100,7 @@ $ ./ferenda-build.py w3c parse rdfa-core
 
 # begin parse-force
 $ ./ferenda-build.py w3c parse rdfa-core --force
-13:04:38 w3c INFO rdfa-core: OK (2.024 sec)
+13:04:38 w3c INFO rdfa-core: parse OK (2.024 sec)
 13:04:38 root INFO w3c parse finished in 2.043 sec
 # end parse-force
 
@@ -111,22 +111,26 @@ $ ./ferenda-build.py w3c parse --all --loglevel=DEBUG
 13:04:39 w3c DEBUG ttml1: Starting
 13:04:43 w3c DEBUG ttml1: Created data/w3c/parsed/ttml1.xhtml
 13:04:45 w3c DEBUG ttml1: 12 triples extracted to data/w3c/distilled/ttml1.rdf
-13:04:45 w3c INFO ttml1: OK (5.816 sec)
+13:04:45 w3c INFO ttml1: parse OK (5.816 sec)
 13:04:45 w3c DEBUG touch-events: Starting
 13:04:45 w3c DEBUG touch-events: Created data/w3c/parsed/touch-events.xhtml
 13:04:45 w3c DEBUG touch-events: 8 triples extracted to data/w3c/distilled/touch-events.rdf
-13:04:45 w3c INFO touch-events: OK (0.486 sec)
+13:04:45 w3c INFO touch-events: parse OK (0.486 sec)
 13:04:45 w3c DEBUG geolocation-API: Starting
 13:04:46 w3c DEBUG geolocation-API: Created data/w3c/parsed/geolocation-API.xhtml
 13:04:46 w3c DEBUG geolocation-API: 5 triples extracted to data/w3c/distilled/geolocation-API.rdf
-13:04:46 w3c INFO geolocation-API: OK (0.323 sec)
+13:04:46 w3c INFO geolocation-API: parse OK (0.323 sec)
 13:04:46 root INFO w3c parse finished in 6.662 sec
 # end parse-all
 
 # begin relate-all
 $ ./ferenda-build.py w3c relate --all
 13:04:47 w3c INFO Clearing context http://localhost:8000/dataset/w3c at repository ferenda
-13:04:54 w3c INFO Dumped 34 triples from context http://localhost:8000/dataset/w3c to data/w3c/distilled/dump.nt
+13:04:47 w3c INFO xml-entity-names: relate OK (0.416 sec)
+13:04:47 w3c INFO rdfa-core: relate OK (1.429 sec)
+13:04:47 w3c INFO emotionml: relate OK (1.897 sec)
+13:04:47 w3c INFO MathML3: relate OK (2.494 sec)
+13:04:54 w3c INFO Dumped 34 triples from context http://localhost:8000/dataset/w3c to data/w3c/distilled/dump.nt (0.123 sec)
 13:04:54 root INFO w3c relate finished in 7.655 sec
 # end relate-all
 
@@ -134,6 +138,10 @@ $ ./ferenda-build.py w3c relate --all
 $ ./ferenda-build.py w3c makeresources
 $ find data/rsrc -print
 data/rsrc
+data/rsrc/api
+data/rsrc/api/common.json
+data/rsrc/api/context.json
+data/rsrc/api/terms.json
 data/rsrc/css
 data/rsrc/css/ferenda.css
 data/rsrc/css/main.css
@@ -148,15 +156,18 @@ data/rsrc/resources.xml
 
 # begin generate-all
 $ ./ferenda-build.py w3c generate --all
-13:04:58 w3c INFO ttml1: OK (2.102 sec)
-13:04:59 w3c INFO touch-events: OK (0.112 sec)
-13:04:59 w3c INFO rdfa-core: OK (0.220 sec)
-13:04:59 w3c INFO geolocation-API: OK (0.100 sec)
+13:04:58 w3c INFO ttml1: generate OK (2.102 sec)
+13:04:59 w3c INFO touch-events: generate OK (0.112 sec)
+13:04:59 w3c INFO rdfa-core: generate OK (0.220 sec)
+13:04:59 w3c INFO geolocation-API: generate OK (0.100 sec)
 13:04:59 root INFO w3c generate finished in 2.547 sec
 # end generate-all
 
 # begin final-commands
 $ ./ferenda-build.py w3c toc
+13:05:01 w3c INFO Created data/w3c/toc/issued/2011.html
+13:05:01 w3c INFO Created data/w3c/toc/issued/2013.html
+13:05:01 w3c INFO Created data/w3c/toc/issued/2014.html
 13:05:01 w3c INFO Created data/w3c/toc/issued/2011.html
 13:05:01 w3c INFO Created data/w3c/toc/issued/2013.html
 13:05:01 w3c INFO Created data/w3c/toc/issued/2014.html
@@ -185,11 +196,14 @@ $ ./ferenda-build.py w3c all
 13:05:07 root INFO w3cstandards.W3CStandards parse finished in 0.010 sec
 13:05:07 root INFO w3cstandards.W3CStandards relate: Nothing to do!
 13:05:07 root INFO w3cstandards.W3CStandards relate finished in 0.005 sec
-13:05:07 w3c INFO ttml1: OK (0.000 sec)
-13:05:07 w3c INFO touch-events: OK (0.000 sec)
-13:05:07 w3c INFO rdfa-core: OK (0.000 sec)
-13:05:07 w3c INFO geolocation-API: OK (0.000 sec)
+13:05:07 w3c INFO ttml1: generate OK (0.000 sec)
+13:05:07 w3c INFO touch-events: generate OK (0.000 sec)
+13:05:07 w3c INFO rdfa-core: generate OK (0.000 sec)
+13:05:07 w3c INFO geolocation-API: generate OK (0.000 sec)
 13:05:07 root INFO w3cstandards.W3CStandards generate finished in 0.006 sec
+13:05:01 w3c INFO Created data/w3c/toc/issued/2011.html
+13:05:01 w3c INFO Created data/w3c/toc/issued/2013.html
+13:05:01 w3c INFO Created data/w3c/toc/issued/2014.html
 13:05:01 w3c INFO Created data/w3c/toc/issued/2011.html
 13:05:01 w3c INFO Created data/w3c/toc/issued/2013.html
 13:05:01 w3c INFO Created data/w3c/toc/issued/2014.html

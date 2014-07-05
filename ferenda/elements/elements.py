@@ -235,12 +235,13 @@ class CompoundElement(AbstractElement, list):
         # create extra attributes depending on circumstances
         if hasattr(self,'uri') and self.uri:
             attrs['about'] = self.uri
-            
+
+        
         if hasattr(self,'uri') and self.uri and hasattr(self,'meta') and self.meta:
             assert isinstance(self.meta,Graph), "self.meta is %r, not rdflib.Graph" % type(self.meta)
             # we use sorted() to get the triples in a predictable
-            # order (by predicate)
-            for (s,p,o) in sorted(self.meta, key=itemgetter(1)):
+            # order (by predicate, then subject, then object)
+            for (s,p,o) in sorted(self.meta, key=itemgetter(1,0,2)):
                 if s != URIRef(self.uri):
                     continue
                 if p == RDF.type:
@@ -250,7 +251,11 @@ class CompoundElement(AbstractElement, list):
                     attrs['property'] = self.meta.qname(p)
                     attrs['content'] = o.toPython()
                 else:
+                    # FIXME: Is it sane to reverse the order of
+                    # triples in this way? Maybe we should do a
+                    # children.append instead?
                     children.insert(0, self._span(s,p,o,self.meta))
+
 
         # for each childen that is a string, make sure it doesn't
         # contain any XML illegal characters

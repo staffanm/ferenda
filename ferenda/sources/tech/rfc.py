@@ -631,18 +631,22 @@ class RFC(DocumentRepository):
                 with self.store.open_distilled(entry.basefile) as fp:
                     graph.parse(data=fp.read())
                 desc = Describer(graph, entry.id)
-                return desc.getvalue(self.ns['dcterms'].subject) == category
+                return desc.getrel(self.ns['dcterms'].subject) == category
             return selector
 
         return [NewsCriteria('all', 'All RFCs'),
                 NewsCriteria('informational', 'Informational RFCs',
-                             selector=selector_for("Informational")),
+                             selector=selector_for("http://localhost:8000/dataset/rfc/informational")),
                 NewsCriteria('bcp', 'Best Current Practice RFCs',
-                             selector=selector_for("Best Current Practice")),
+                             selector=selector_for("http://localhost:8000/dataset/rfc/best-current-practice")),
                 NewsCriteria('experimental', 'Experimental RFCs',
-                             selector=selector_for("Experimental")),
+                             selector=selector_for("http://localhost:8000/dataset/rfc/experimental")),
+                NewsCriteria('historic', 'Historic RFCs',
+                             selector=selector_for("http://localhost:8000/dataset/rfc/historic")),
+                NewsCriteria('unknown', 'Unknown',
+                             selector=selector_for("http://localhost:8000/dataset/rfc/unknown")),
                 NewsCriteria('standards', 'Standards Track RFCs',
-                             selector=selector_for("Standards Track"))]
+                             selector=selector_for("http://localhost:8000/dataset/rfc/standard"))]
 
     def frontpage_content(self, primary=False):
         from rdflib import URIRef

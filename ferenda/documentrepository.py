@@ -1403,7 +1403,7 @@ with the *config* object as single parameter.
         # relate_all_setup), do the actual bulk upload.
         if os.path.exists(temp):
             with util.logtime(log.info,
-                              "Loaded %(triplecount)s triples to context %(context)s from %(tempfile)s in %(elapsed).3f s",
+                              "Loaded %(triplecount)s triples to context %(context)s from %(tempfile)s (%(elapsed).3f sec)",
                               values):
                 store.add_serialized_file(temp, format="nt", context=context)
                 # just to report the number of dumped triples -- may be unneccesary
@@ -1414,7 +1414,7 @@ with the *config* object as single parameter.
         # same contents as the temp file, but this comes directly from
         # the triplestore
         with util.logtime(log.info,
-                          "Dumped %(triplecount)s triples from context %(context)s to %(dumpfile)s in %(elapsed).3f s",
+                          "Dumped %(triplecount)s triples from context %(context)s to %(dumpfile)s (%(elapsed).3f sec)",
                           values):
             store.get_serialized_file(dump, format="nt", context=context)
             # just to report the number of dumped triples -- may be unneccesary
@@ -1429,7 +1429,7 @@ with the *config* object as single parameter.
 
         """
         with util.logtime(self.log.info,
-                          "%(basefile)s: relate OK (%(elapsed).3f s)",
+                          "%(basefile)s: relate OK (%(elapsed).3f sec)",
                           {'basefile': basefile}):
 
             # If using the Bulk upload feature, append to the temporary
@@ -1439,7 +1439,7 @@ with the *config* object as single parameter.
                 values = {'basefile': basefile,
                           'nttemp': nttemp}
                 with util.logtime(self.log.debug,
-                                  "%(basefile)s: Added %(triplecount)s triples to %(nttemp)s in %(elapsed).3f s",
+                                  "%(basefile)s: Added %(triplecount)s triples to %(nttemp)s (%(elapsed).3f sec)",
                                   values):
                     data = open(self.store.distilled_path(basefile), "rb").read()
                     g = Graph().parse(data=data)
@@ -1475,7 +1475,7 @@ with the *config* object as single parameter.
         """
         ts = self._get_triplestore()  # init self._triplestore
         with util.logtime(self.log.debug,
-                          "%(basefile)s: Added %(rdffile)s to context %(context)s in %(elapsed).3f sec",
+                          "%(basefile)s: Added %(rdffile)s to context %(context)s (%(elapsed).3f sec)",
                           {'basefile': basefile,
                            'context': self.dataset_uri(),
                            'dataset': self.dataset_uri(),
@@ -1509,7 +1509,7 @@ parsed document path to that documents dependency file."""
         values = {'basefile': basefile,
                   'deps': 0}
         with util.logtime(self.log.debug,
-                          "%(basefile)s: Registered %(deps)s dependencies in %(elapsed).3f sec",
+                          "%(basefile)s: Registered %(deps)s dependencies (%(elapsed).3f sec)",
                           values):
             with self.store.open_distilled(basefile) as fp:
                 g = Graph().parse(fp, format="xml")
@@ -1569,7 +1569,7 @@ parsed document path to that documents dependency file."""
                   'resources': 0,
                   'words': 0}
         with util.logtime(self.log.debug,
-                          "%(basefile)s: Added %(resources)s resources (%(words)s words) to fulltext index in %(elapsed).3f s", values):
+                          "%(basefile)s: Added %(resources)s resources (%(words)s words) to fulltext index  (%(elapsed).3f sec)", values):
             if repos is None:
                 repos = []
             indexer = self._get_fulltext_indexer(repos)
@@ -1848,7 +1848,7 @@ WHERE {
             if (self.config.force or (not
                     util.outfile_is_newer(dependencies, self.store.annotation_path(basefile)))):
                 with util.logtime(self.log.debug,
-                                  "%(basefile)s: prep_annotation_file in %(elapsed).3f sec",
+                                  "%(basefile)s: prep_annotation_file (%(elapsed).3f sec)",
                                   {'basefile': basefile}):
                     # annotation_file should be the same as annotations above?
                     annotation_file = self.prep_annotation_file(basefile)
@@ -1859,7 +1859,7 @@ WHERE {
                 params['annotationfile'] = annotation_file
 
             with util.logtime(self.log.debug,
-                              "%(basefile)s: transform in %(elapsed).3f",
+                              "%(basefile)s: transform (%(elapsed).3f sec)",
                               {'basefile': basefile}):
                 conffile = os.path.abspath(
                     os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
@@ -2071,7 +2071,7 @@ WHERE {
 
         params = {}
         with util.logtime(self.log.debug,
-                          "toc: selected %(rowcount)s rows in %(elapsed).3f s",
+                          "toc: selected %(rowcount)s rows (%(elapsed).3f sec)",
                           params):
             data = self.faceted_data()
             params['rowcount'] = len(data)
@@ -2212,7 +2212,7 @@ WHERE {
                     if page.linktext == key:
                         keyfunc = functools.partial(facet.key,
                                                     binding=binding,
-                                                    resource_graph=None)
+                                                    resource_graph=self.commondata)
                         s = sorted(documents[key],
                                    key=keyfunc,
                                    reverse=facet.key_descending)

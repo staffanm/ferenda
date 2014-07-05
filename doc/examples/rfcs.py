@@ -296,8 +296,8 @@ class RFCs(DocumentRepository):
 # begin toc_item
     def toc_item(self, binding, row):
         from ferenda.elements import Link
-        return [row['identifier'] + ": ",
-                Link(row['title'], 
+        return [row['dcterms_identifier'] + ": ",
+                Link(row['dcterms_title'], 
                      uri=row['uri'])]
 # end toc_item
 
