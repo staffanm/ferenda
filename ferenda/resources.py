@@ -114,7 +114,7 @@ class Resources(object):
                 )
             ), 
             E.stylesheets(*self._li_wrap(cssfiles, 'link', 'href', rel="stylesheet")),
-            E.javascripts(*self._li_wrap(jsfiles, 'script', 'src'))
+            E.javascripts(*self._li_wrap(jsfiles, 'script', 'src', text=" "))
             )
 
         if not self.config.staticsite:
@@ -140,11 +140,13 @@ class Resources(object):
     # FIXME: When creating <script> elements, must take care not to
     # create self-closing tags (like by creating a single space text
     # node)
-    def _li_wrap(self, items, container, attribute, **kwargs):
+    def _li_wrap(self, items, container, attribute, text=None, **kwargs):
         elements = []
         for item in items:
             kwargs[attribute] = item
-            elements.append(etree.Element(container, **kwargs))
+            e = etree.Element(container, **kwargs)
+            e.text = text
+            elements.append(e)
         return elements
 
     def _links(self, methodname):

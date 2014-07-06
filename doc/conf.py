@@ -258,3 +258,14 @@ def add_directive_header(self,sig):
     ModuleLevelDocumenter.add_directive_header(self,sig)
     # omit the rest
 DataDocumenter.add_directive_header = add_directive_header
+
+
+def skip_some_data_attributes(app, what, name, obj, skip, options):
+    if name == "defaults" and what == "class" and isinstance(obj, dict):
+        print("Skipping the attribute %r" % name)
+        return True
+    else:
+        return skip 
+
+def setup(app):
+    app.connect('autodoc-skip-member', skip_some_data_attributes)

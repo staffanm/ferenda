@@ -11,7 +11,7 @@ import json
 import shutil
 
 from lxml import etree
-from rdflib import RDF
+from rdflib import RDF, Graph
 from rdflib.namespace import DCTERMS
 
 from ferenda.compat import Mock, MagicMock
@@ -25,7 +25,7 @@ from ferenda import Facet, TocPageset, TocPage # , DocumentRepository
 class TOC(RepoTester):
     results1 = json.load(open("test/files/datasets/results1.json"))
     results2 = json.load(open("test/files/datasets/results2.json"))
-
+    # results2data = Graph().parse(open("test/files/datasets/results2common.ttl"), format="turtle")
     pagesets = [TocPageset('Sorted by title',[
                 TocPage('a','Documents starting with "a"','dcterms_title', 'a'),
                 TocPage('d','Documents starting with "d"','dcterms_title', 'd'),
@@ -102,7 +102,6 @@ class TOC(RepoTester):
         self.assertTrue(self.repo.toc_pagesets.called)
         self.assertTrue(self.repo.toc_select_for_pages.called)
         self.assertTrue(self.repo.toc_generate_pages.called)
-
 
     def test_toc_pagesets(self):
         got = self.repo.toc_pagesets(self.results1, self.facets)

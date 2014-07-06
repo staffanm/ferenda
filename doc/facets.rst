@@ -18,25 +18,16 @@ data, functions (or other callables) that sorts the data into discrete
 groups, and other parameters that affect eg. the sorting order or if a
 particular facet is used in a particular context.
 
-Predefined facets and default behaviour
-----------------------------------------
-
-=============  =======================
-facet          Description of grouping
-=============  =======================
-rdf:type       Grouped by qname of type
--------------  -----------------------
-dcterms:title  Grouped by first letter
-=============  =======================
-
-
-Predefined selectors
---------------------
-
-
-Combining facets from different docrepos
-----------------------------------------
-
+The grouping is primarily done through a selector function. The
+selector function recieves a dict with some basic information about
+one document, the name of the current facet (binding), and optionally
+some repo-dependent extra data in the form of an RDF graph. It should
+return a single string. The selector is called once (at least) for
+every document in the docrepo, and each resulting group contains those
+documents that the selector returned identical strings for. As a
+simple example, a selector may group documents into years of
+publication by finding the date of the ``dcterms:issued`` property and
+extracting the year part of it.
 
 Contexts where facets are used
 ------------------------------
@@ -56,5 +47,13 @@ published in a certain year, and get results from all docrepos. This
 requires that the defined facets don't clash, eg. that you don't have
 two facets based on ``dcterms:publisher`` where one uses URI
 references and the other uses.
+
+
+Grouping a document in several groups
+-------------------------------------
+
+
+Combining facets from different docrepos
+----------------------------------------
 
 

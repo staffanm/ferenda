@@ -13,12 +13,102 @@ from ferenda import fulltextindex # to get the IndexedType classes
 from ferenda import util
 
 class Facet(object):
+    """Create a facet from the given rdftype and some optional parameters.
+
+    :param rdftype: The type of facet being created
+    :type rdftype: rdflib.term.URIRef
+    :param label: TBW
+    :param pagetitle: TBW
+    :param indexingtype: TBW
+    :param selector: TBW
+    :param key: TBW
+    :param toplevel_only: TBW
+    :param use_for_toc: TBW
+    :param selector_descending: TBW
+    :param key_descending: TBW
+    :param multiple_values: TBW
+    :param dimension_type: TBW
+    :param dimension_label: TBW
+
+    If optional parameters aren't given, then appropriate values are
+    selected if rdfrtype is one of some common rdf properties:
+
+    ===================  ======================================================
+    facet                description
+    ===================  ======================================================
+    rdf:type             Grouped by :py:meth:`~rdflib.graph.Graph.qname` of the
+                         ``rdf:type`` of the document, eg. ``foaf:Document``.
+                         Not used for toc
+    -------------------  ------------------------------------------------------
+    dcterms:title        Grouped by first "sortable" letter, eg for a document
+                         titled "The Little Prince" returns "l". Is used as a
+                         facet for the API, but it's debatable if it's useful
+    -------------------  ------------------------------------------------------
+    dcterms:identifier   Also grouped by first sortable letter. When indexing,
+                         the resulting fulltext index field has a high boost
+                         value, which increases the chances of this document
+                         ranking high when one searches for its identifier.
+    -------------------  ------------------------------------------------------
+    dcterms:abstract     Not used for toc
+    -------------------  ------------------------------------------------------
+    dc:creator           Should be a free-test (string literal) value
+    -------------------  ------------------------------------------------------
+    dcterms:publisher    Should be a URIRef
+    -------------------  ------------------------------------------------------
+    dcterms:references   
+    -------------------  ------------------------------------------------------
+    dcterms:issued       Used for grouping documents published/issued in the
+                         same year
+    -------------------  ------------------------------------------------------
+    dc:subject           A document can have multiple dc:subjects and all are
+                         indexed/processed
+    -------------------  ------------------------------------------------------
+    dcterms:subject      Works like dc:subject, but the value should be a
+                         URIRef
+    -------------------  ------------------------------------------------------
+    schema:free          A boolean value
+    ===================  ======================================================
+
+    This module contains a number of classmethods that can be used as
+    arguments to ``selector`` and ``key``, eg
+
+    >>> from rdflib import Namespace
+    >>> MYVOCAB = Namespace("http://example.org/vocab/")
+    >>> f = Facet(MYVOCAB.enactmentDate, selector=Facet.year)
+    >>> f.selector({'myvocab_enactmentDate': '2014-07-06'},
+    ...            'myvocab_enactmentDate')
+    '2014'
+
+    """
+        
+
     @classmethod
     def defaultselector(cls, row, binding, resource_graph=None):
+
+        """This returns ``row[binding]`` without any transformation.
+    
+        >>> row = {"rdf_type": "http://purl.org/ontology/bibo/Book",
+        ...        "dcterms_title": "A Tale of Two Cities",
+        ...        "dcterms_issued": "1859-04-30",
+        ...        "dcterms_publisher": "http://example.org/chapman_hall",
+        ...        "schema_free": "true"}
+        >>> Facet.defaultselector(row, "dcterms_title")
+        'A Tale of Two Cities'
+        """
         return row[binding]
 
     @classmethod
     def year(cls, row, binding='dcterms_issued', resource_graph=None):
+        """This returns the the year part of ``row[binding]``.
+
+        >>> row = {"rdf_type": "http://purl.org/ontology/bibo/Book",
+        ...        "dcterms_title": "A Tale of Two Cities",
+        ...        "dcterms_issued": "1859-04-30",
+        ...        "dcterms_publisher": "http://example.org/chapman_hall",
+        ...        "schema_free": "true"}
+        >>> Facet.year(row, "dcterms_issued")
+        '1859'
+        """
         datestring = row[binding]
         # assume a date(time) like '2014-06-05T12:00:00', '2014-06-05'
         # or even '2014-06'
@@ -30,21 +120,79 @@ class Facet(object):
 
     @classmethod
     def booleanvalue(cls, row, binding='schema_free', resource_graph=None):
+        """
+        Returns True iff row[binding] == "true", False otherwise.
+        
+        >>> row = {"rdf_type": "http://purl.org/ontology/bibo/Book",
+        ...        "dcterms_title": "A Tale of Two Cities",
+        ...        "dcterms_issued": "1859-04-30",
+        ...        "dcterms_publisher": "http://example.org/chapman_hall",
+        ...        "schema_free": "true"}
+        >>> Facet.booleanvalue(row, "schema_free")
+        True
+        """
         # only 'true' is True, everything else is False
         return row[binding] == 'true'
+
         
     @classmethod
     def titlesortkey(cls, row, binding='dcterms_title', resource_graph=None):
-        # ingnore provided binding -- this key func sorts by dcterms:title, period.
+        """Returns a version of row[binding] suitable for sorting. The
+        function :py:func:`~ferenda.util.title_sortkey` is used for
+        string transformation.
+        
+        >>> row = {"rdf_type": "http://purl.org/ontology/bibo/Book",
+        ...        "dcterms_title": "A Tale of Two Cities",
+        ...        "dcterms_issued": "1859-04-30",
+        ...        "dcterms_publisher": "http://example.org/chapman_hall",
+        ...        "schema_free": "true"}
+        >>> Facet.titlesortkey(row, "dcterms_title")
+        'ataleoftwocities'
+
+        """
+        True
+        # ignore provided binding -- this key func sorts by
+        # dcterms:title, period.
+        # FIXME: Why was that, now again?
         title = row['dcterms_title']
         return util.title_sortkey(title)
 
     @classmethod
     def firstletter(cls, row, binding='dcterms_title', resource_graph=None):
+        """Returns the first letter of row[binding], transformed into a
+        sortable string.
+        
+        >>> row = {"rdf_type": "http://purl.org/ontology/bibo/Book",
+        ...        "dcterms_title": "A Tale of Two Cities",
+        ...        "dcterms_issued": "1859-04-30",
+        ...        "dcterms_publisher": "http://example.org/chapman_hall",
+        ...        "schema_free": "true"}
+        >>> Facet.firstletter(row, "dcterms_title")
+        'a'
+
+        """
         return cls.titlesortkey(row, binding)[0]
 
     @classmethod
     def resourcelabel(cls, row, binding='dcterms_publisher', resource_graph=None):
+        """Lookup a suitable text label for row[binding] in resource_graph.
+        
+        >>> row = {"rdf_type": "http://purl.org/ontology/bibo/Book",
+        ...        "dcterms_title": "A Tale of Two Cities",
+        ...        "dcterms_issued": "1859-04-30",
+        ...        "dcterms_publisher": "http://example.org/chapman_hall",
+        ...        "schema_free": "true"}
+        >>> import rdflib
+        >>> resources = rdflib.Graph().parse(format="turtle", data=\"""
+        ... @prefix foaf: <http://xmlns.com/foaf/0.1/> .
+        ... 
+        ... <http://example.org/chapman_hall> a foaf:Organization;
+        ...     foaf:name "Chapman & Hall" .
+        ... 
+        ... \""")
+        >>> Facet.resourcelabel(row, "dcterms_publisher", resources)
+        'Chapman & Hall'
+        """
         uri = URIRef(row[binding])
         for pred in (RDFS.label, SKOS.prefLabel, SKOS.altLabel, DCTERMS.title, DCTERMS.alternative, FOAF.name):
             if resource_graph.value(uri, pred):
@@ -54,11 +202,46 @@ class Facet(object):
 
     @classmethod
     def sortresource(cls, row, binding='dcterms_publisher', resource_graph=None):
+        """Returns a sortable version of the resource label for
+        ``row[binding]``.
+
+        >>> row = {"rdf_type": "http://purl.org/ontology/bibo/Book",
+        ...        "dcterms_title": "A Tale of Two Cities",
+        ...        "dcterms_issued": "1859-04-30",
+        ...        "dcterms_publisher": "http://example.org/chapman_hall",
+        ...        "schema_free": "true"}
+        >>> import rdflib
+        >>> resources = rdflib.Graph().parse(format="turtle", data=\"""
+        ... @prefix foaf: <http://xmlns.com/foaf/0.1/> .
+        ... 
+        ... <http://example.org/chapman_hall> a foaf:Organization;
+        ...     foaf:name "Chapman & Hall" .
+        ... 
+        ... \""")
+        >>> Facet.sortresource(row, "dcterms_publisher", resources)
+        'chapmanhall'
+        """
         row[binding] = cls.resourcelabel(row, binding, resource_graph)
-        return cls.titlesortkey(row, binding)
+        # workaround the way titlesortkey works
+        return cls.titlesortkey({'dcterms_title': row[binding]}, binding)
 
     @classmethod
     def qname(cls, row, binding='rdf_type', resource_graph=None):
+        """Returns the qname of the rdf URIref contained in row[binding], as
+        determined by the namespace prefixes registered in
+        resource_graph.
+
+        >>> row = {"rdf_type": "http://purl.org/ontology/bibo/Book",
+        ...        "dcterms_title": "A Tale of Two Cities",
+        ...        "dcterms_issued": "1859-04-30",
+        ...        "dcterms_publisher": "http://example.org/chapman_hall",
+        ...        "schema_free": "true"}
+        >>> import rdflib
+        >>> resources = rdflib.Graph()
+        >>> resources.bind("bibo", "http://purl.org/ontology/bibo/")
+        >>> Facet.qname(row, "rdf_type", resources)
+        'bibo:Book'
+        """
         u = URIRef(row[binding])
         return resource_graph.qname(u)
 
@@ -84,7 +267,7 @@ class Facet(object):
                  dimension_type = None, # could be determined by indexingtype
                  dimension_label = None
              ):
-            
+        
         def _finddefault(provided, rdftype, argumenttype, default):
             if provided is None:
                 if rdftype in self.defaults and argumenttype in self.defaults[rdftype]:
@@ -221,4 +404,3 @@ Facet.defaults = {RDF.type: {
                     'dimension_type': 'value'
                 }
             }
-

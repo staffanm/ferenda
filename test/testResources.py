@@ -75,6 +75,9 @@ class=testManager.staticmockclass2
         javascripts=tree.find("javascripts").getchildren()
         self.assertEqual(len(javascripts),1)
         self.assertEqual(javascripts[0].attrib['src'],'rsrc/js/test.js')
+        # the javascript tag must have some text content to avoid it
+        # being self-closed (which doesn't go well with HTML5)
+        self.assertTrue(javascripts[0].text)
         self.assertEqual(tree.find("sitename").text,"MySite")
         self.assertEqual(tree.find("sitedescription").text,"Just another Ferenda site")
         self.assertEqual(tree.find("url").text,"http://localhost:8000/")
