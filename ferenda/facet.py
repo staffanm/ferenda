@@ -29,6 +29,7 @@ class Facet(object):
     :param multiple_values: TBW
     :param dimension_type: TBW
     :param dimension_label: TBW
+    :param identificator: TBW
 
     If optional parameters aren't given, then appropriate values are
     selected if rdfrtype is one of some common rdf properties:
@@ -225,6 +226,21 @@ class Facet(object):
         # workaround the way titlesortkey works
         return cls.titlesortkey({'dcterms_title': row[binding]}, binding)
 
+
+    @classmethod
+    def term(cls, row, binding='dcterms_publisher', resource_graph=None):
+        """Returns the leaf part of the URI found in ``row[binding]``.
+
+        >>> row = {"rdf_type": "http://purl.org/ontology/bibo/Book",
+        ...        "dcterms_title": "A Tale of Two Cities",
+        ...        "dcterms_issued": "1859-04-30",
+        ...        "dcterms_publisher": "http://example.org/chapman_hall",
+        ...        "schema_free": "true"}
+        >>> Facet.term(row, "dcterms_publisher")
+        'chapman_hall'
+        """
+        return util.uri_leaf(row[binding])
+
     @classmethod
     def qname(cls, row, binding='rdf_type', resource_graph=None):
         """Returns the qname of the rdf URIref contained in row[binding], as
@@ -259,8 +275,9 @@ class Facet(object):
                  indexingtype=None,   # if not given, determined by rdftype
                  selector=None,       # - "" -
                  key=None,            # - "" -
+                 identificator=None,  # - "" - (normally same as selector)
                  toplevel_only=None,  # - "" -
-                 use_for_toc=None,     # - "" -
+                 use_for_toc=None,    # - "" -
                  selector_descending = None,
                  key_descending = None,
                  multiple_values = None,
@@ -292,6 +309,7 @@ class Facet(object):
         self.indexingtype        = _finddefault(indexingtype, rdftype, 'indexingtype', fulltextindex.Text())
         self.selector            = _finddefault(selector, rdftype, 'selector', self.defaultselector)
         self.key                 = _finddefault(key, rdftype, 'key', self.defaultselector)
+        self.identificator       = _finddefault(identificator, rdftype, 'identificator', self.defaultselector)
         self.toplevel_only       = _finddefault(toplevel_only, rdftype, 'toplevel_only', False)
         self.use_for_toc         = _finddefault(use_for_toc, rdftype, 'use_for_toc', False)
         self.selector_descending = _finddefault(selector_descending, rdftype, 'selector_descending', False)
@@ -321,6 +339,7 @@ Facet.defaults = {RDF.type: {
                       'toplevel_only': False,
                       'use_for_toc': False,
                       'selector': Facet.qname,
+                      'identificator': Facet.term,
                       'dimension_type': "term"},
                   DCTERMS.title: {
                       'indexingtype': fulltextindex.Text(boost=4),
@@ -328,6 +347,7 @@ Facet.defaults = {RDF.type: {
                       'use_for_toc': True, 
                       'selector': Facet.firstletter,
                       'key': Facet.titlesortkey,
+                      'identificator': Facet.firstletter,
                       'dimension_type': "value",
                       'pagetitle': 'Documents starting with "%(selected)s"'
                   },
@@ -337,6 +357,7 @@ Facet.defaults = {RDF.type: {
                       'use_for_toc': True, 
                       'selector': Facet.firstletter,
                       'key': Facet.titlesortkey,
+                      'identificator': Facet.firstletter,
                   },
                   DCTERMS.abstract: {
                       'indexingtype': fulltextindex.Text(boost=2),
@@ -355,8 +376,9 @@ Facet.defaults = {RDF.type: {
                       'indexingtype': fulltextindex.Resource(),
                       'toplevel_only': True,
                       'use_for_toc': True,
-                      'selector': Facet.defaultselector,
-                      'key': Facet.sortresource,
+                      'selector': Facet.resourcelabel,
+                      'key': Facet.resourcelabel,
+                      'identificator': Facet.term,
                       'dimension_type': 'ref',
                   },
                   DCTERMS.references:{ # NB: this is a single URI reference w/o label
@@ -371,6 +393,7 @@ Facet.defaults = {RDF.type: {
                       'use_for_toc': True,
                       'selector': Facet.year,
                       'key': Facet.defaultselector,
+                      'identificator': Facet.year,
                       'selector_descending': False,
                       'key_descending': False,
                       'dimension_type': "year"
@@ -380,7 +403,7 @@ Facet.defaults = {RDF.type: {
                       'multiple_values': True,
                       'toplevel_only': True,
                       'use_for_toc': True,
-                      'selector': Facet.defaultselector, # probably needs changing
+                      'selector': Facet.defaultselector,
                       'key': Facet.defaultselector,
                       'multiple_values': True,
                       'dimension_type': 'value',
@@ -390,8 +413,9 @@ Facet.defaults = {RDF.type: {
                     'multiple_values': True,
                     'toplevel_only': True,
                     'use_for_toc': True,
-                    'selector': Facet.defaultselector, # probably needs changing
-                    'key': Facet.defaultselector,
+                    'selector': Facet.resourcelabel,
+                    'key': Facet.resourcelabel,
+                    'identificator': Facet.term,
                     'multiple_values': True,
                     'dimension_type': 'value',
                 },

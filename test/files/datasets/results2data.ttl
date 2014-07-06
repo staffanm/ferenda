@@ -1,0 +1,14 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix : <http://example.org/journals/> .
+
+:biochem a bibo:Journal;
+    rdfs:label "Journal of Biological Chemistry" .
+
+:nature a bibo:Journal;
+    rdfs:label "Nature" .
+
+:analytical a bibo:Journal;
+    rdfs:label "Analytical Biochemistry" .
+
+    

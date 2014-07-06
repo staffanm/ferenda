@@ -7,6 +7,7 @@
 @prefix bibo: <http://purl.org/ontology/bibo/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix ex: <http://example.org/articles/> .
+@prefix journal: <http://example.org/journals/> .
 
 # http://www.the-scientist.com/?articles.view/articleNo/9678/title/The-4-Most-Cited-Papers--Magic-In-These-Methods/
 
@@ -17,24 +18,24 @@ ex:pm14907713 a bibo:Book;
                 "A. Lewis Farr",
                 "R.J. Randall";
     dcterms:issued "1951-11-01"^^xsd:date;
-    dcterms:publisher "Journal of Biological Chemistry" .
+    dcterms:publisher <http://example.org/journals/biochem> .
     
 ex:pm5432063 a bibo:Book;
     dcterms:title "Cleavage of structural proteins during the assembly of the head of bacteriophage T4";
     dcterms:creator "Ulrich Karl Laemmli";
     dcterms:issued "1970-08-15"^^xsd:date;
-    dcterms:publisher "Nature" .
+    dcterms:publisher <http://example.org/journals/nature> .
 
 ex:pm5806584 a bibo:Book;
     dcterms:title "Reliability of molecular weight determinations by dodecyl sulfate-polyacrylamide gel electrophoresis";
     dcterms:creator "K. Weber",
-
     "M. Osborn";
     dcterms:issued "1969-08-25"^^xsd:date;
-    dcterms:publisher "Journal of Biological Chemistry" .
+    dcterms:publisher <http://example.org/journals/biochem> .
 
 ex:pm942051 a bibo:Book;
     dcterms:title "A rapid and sensitive method for the quantitation of microgram quantities of protein utilizing the principle of protein dye-binding";
     dcterms:creator "Marion M. Bradford";
     dcterms:issued "1976-05-07"^^xsd:date;
-    dcterms:publisher "Analytical Biochemistry" .
+    dcterms:publisher <http://example.org/journals/analytical> .
+

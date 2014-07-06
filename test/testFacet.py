@@ -62,6 +62,7 @@ WHERE {
 
 # Add doctests in the module
 from ferenda import facet
+from ferenda.testutil import Py23DocChecker
 def load_tests(loader,tests,ignore):
-    tests.addTests(doctest.DocTestSuite(facet))
+    tests.addTests(doctest.DocTestSuite(facet, checker=Py23DocChecker()))
     return tests

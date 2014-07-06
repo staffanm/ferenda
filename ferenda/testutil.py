@@ -445,7 +445,18 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             path = self.datadir + "/" + path
         return path.replace('/', '\\') if os.sep == '\\' else path
 
-
+# Adapted from
+# http://dirkjan.ochtman.nl/writing/2014/07/06/single-source-python-23-doctests.html
+import doctest
+class Py23DocChecker(doctest.OutputChecker):
+    def check_output(self, want, got, optionflags):
+        if sys.version_info[0] < 3:
+            # if running on py2, attempt to prefix all the strings
+            # with a u (since all our apis use unicode strings)
+            want = re.sub("'(.*?)'", "u'\\1'", want)
+            want = re.sub('"(.*?)"', 'u"\\1"', want)
+        return doctest.OutputChecker.check_output(self, want, got, optionflags)
+        
 def parametrize(cls, template_method, name, params, wrapper=None):
     """Creates a new test method on a TestCase class, which calls a
     specific template method with the given parameters (ie. a

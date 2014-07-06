@@ -2131,6 +2131,7 @@ WHERE {
             if not facet.use_for_toc:
                 continue
             selector_values = {}
+            selector_fragments = {}
             selector = facet.selector
             if facet.dimension_label:
                 binding = facet.dimension_label
@@ -2145,17 +2146,20 @@ WHERE {
 
             for row in data:
                 try:
-                    selector_values[selector(row, binding, self.commondata)] = True
+                    selected = selector(row, binding, self.commondata)
+                    selector_values[selected] = True
+                    selector_fragments[selected] = facet.identificator(row, binding, self.commondata)
                 except KeyError: # as e:
                     # this will happen a lot on simple selector
                     # functions when handed incomplete data
                     pass
             for value in sorted(list(selector_values.keys()), reverse=facet.selector_descending):
+                urlfragment = selector_fragments[value]
                 pageset.pages.append(TocPage(linktext=value,
                                              title=facet.pagetitle % {'term': term,
                                                                       'selected': value},
                                              binding=binding,
-                                             value=value))
+                                             value=urlfragment))
             res.append(pageset)
         return res
 

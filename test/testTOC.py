@@ -25,7 +25,7 @@ from ferenda import Facet, TocPageset, TocPage # , DocumentRepository
 class TOC(RepoTester):
     results1 = json.load(open("test/files/datasets/results1.json"))
     results2 = json.load(open("test/files/datasets/results2.json"))
-    # results2data = Graph().parse(open("test/files/datasets/results2common.ttl"), format="turtle")
+    results2data = Graph().parse(open("test/files/datasets/results2data.ttl"), format="turtle")
     pagesets = [TocPageset('Sorted by title',[
                 TocPage('a','Documents starting with "a"','dcterms_title', 'a'),
                 TocPage('d','Documents starting with "d"','dcterms_title', 'd'),
@@ -40,6 +40,18 @@ class TOC(RepoTester):
                 TocPage('1943','Documents published in 1943','dcterms_issued', '1943'),
                 TocPage('1954','Documents published in 1954','dcterms_issued', '1954')
                 ], DCTERMS.issued)]
+
+    pagesets2 = [TocPageset('Sorted by publisher',[
+        TocPage('Analytical Biochemistry',
+                'Documents published in Analytical Biochemistry',
+                'dcterms_publisher', 'analytical'),
+        TocPage('Journal of Biological Chemistry',
+                'Documents published in Journal of Biological Chemistry',
+                'dcterms_publisher', 'biochem'),
+        TocPage('Nature',
+                'Documents published in Nature',
+                'dcterms_publisher', 'nature'),
+    ], DCTERMS.publisher)]
     
     documentlists = {
         ('dcterms_issued', '1791'): [[Link("Dream of the Red Chamber",uri='http://example.org/books/Dream_of_the_Red_Chamber')]],
@@ -132,6 +144,14 @@ class TOC(RepoTester):
         got = self.repo.toc_select_for_pages(res, self.pagesets, self.facets)
         self.assertEqual(len(got), 9)
 
+    def test_pageset_resourcelabel(self):
+        facets = [Facet(DCTERMS.publisher,
+                        pagetitle="Documents published in %(selected)s")]
+        # FIXME: This is mucking about with internal details...
+        self.repo._commondata = self.results2data
+        got = self.repo.toc_pagesets(self.results2, facets)
+        want = self.pagesets2
+        self.assertEqual(want, got)
 
     def test_generate_page(self):
         path = self.repo.toc_generate_page('dcterms_title','a', self.documentlists[('dcterms_title','a')], self.pagesets)
