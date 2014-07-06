@@ -373,9 +373,9 @@ result::
 
 Now you've created your own web site with structured documents. It
 contains listings of all documents, feeds with updated documents (in
-both HTML and Atom flavors) and full text search. In order to deploy
-your site, you can run it under Apache+mod_wsgi, ngnix+uWSGI, Gunicorn
-or just about any WSGI capable web server, see :doc:`wsgi`.
+both HTML and Atom flavors), full text search, and an API. In order to
+deploy your site, you can run it under Apache+mod_wsgi, ngnix+uWSGI,
+Gunicorn or just about any WSGI capable web server, see :doc:`wsgi`.
 
 .. note::
 

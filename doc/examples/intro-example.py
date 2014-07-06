@@ -15,7 +15,8 @@ config = {'datadir':'netstandards/exampledata',
           'storetype':'SQLITE',
           'storelocation':'netstandards/exampledata/netstandards.sqlite',
           'storerepository':'netstandards',
-          'downloadmax': 50 }
+          'downloadmax': 50 # remove this to download everything
+}
 
 setup_logger(level='DEBUG')
 

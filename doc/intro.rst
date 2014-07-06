@@ -2,17 +2,19 @@ Introduction to Ferenda
 =======================
 
 Ferenda is a python library and framework for transforming
-unstructured document collections into structured Linked Data. It
-helps with downloading documents, parsing them to add explicit
-semantic structure and RDF-based metadata, finding relationships
-between documents, and publishing the results.
+unstructured document collections into structured
+`Linked Data <http://en.wikipedia.org/wiki/Linked_data>`_. It helps
+with downloading documents, parsing them to add explicit semantic
+structure and RDF-based metadata, finding relationships between
+documents, and republishing the results.
 
 It uses the XHTML and RDFa standards for representing semantic
-structure, and republishes content using Linked Data principles.
+structure, and republishes content using Linked Data principles and a
+REST-based API.
 
-It works best for large document collections that have some degree of
-internal standardization, such as the laws of a particular country,
-technical standards, or reports published in a series. It is
+Ferenda works best for large document collections that have some
+degree of internal standardization, such as the laws of a particular
+country, technical standards, or reports published in a series. It is
 particularly useful for collections that contains explicit references
 between documents, within or across collections.
 
@@ -113,6 +115,18 @@ RDF triples or 100 000 words, you should start thinking about setting
 up an external triple store or a fulltext search engine. See
 :ref:`external-fulltext`.
 
+Installing
+----------
+
+Ferenda should preferably be installed with `pip
+<http://www.pip-installer.org/en/latest/installing.html>`_ (in fact,
+it's the only method tested)::
+
+    pip install ferenda  
+
+You should definitely consider installing ferenda in a `virtualenv
+<http://www.virtualenv.org/en/latest/>`_.
+
 .. note::
 
    If you want to use the Sleepycat/bsddb backend for storing RDF data
@@ -130,43 +144,28 @@ up an external triple store or a fulltext search engine. See
    http://www.lfd.uci.edu/~gohlke/pythonlibs/#lxml has been tested
    with ferenda on python 3.3 and later, and seems to work great.
 
-Installing
-----------
-
-Ferenda should preferably be installed with `pip
-<http://www.pip-installer.org/en/latest/installing.html>`_ (in fact,
-it's the only method tested)::
-
-    pip install ferenda  
-
-You should definitely consider installing ferenda in a `virtualenv
-<http://www.virtualenv.org/en/latest/>`_.
-
-.. note::
-
-   If installing on Windows, it's probably easiest to install the lxml
-   dependency in binary form (see above), which installs it into the
-   system python library path. To make lxml available for your
-   virtualenv, use the ``--system-site-packages`` command line switch
-   when creating the virtualenv.
+   The binary distributions installs lxml into the system python
+   library path. To make lxml available for your virtualenv, use the
+   ``--system-site-packages`` command line switch when creating the
+   virtualenv.
   
 Features
 --------
 
 * Handles downloading, structural parsing and regeneration of large
   document collections.
-* Contains libraries to make reading of plain text, PDF and MS Word
-  documents as easy as HTML *(Note: these are far from finished)*.
-* Uses established information standards as much as possible: If you
-  like XHTML, XSLT, XML namespaces, RDF and SPARQL, you'll feel right
-  at home.
+* Contains libraries to make reading of plain text, MS Word and PDF
+  documents (including scanned text) as easy as HTML.
+* Uses established information standards like XHTML, XSLT, XML
+  namespaces, RDF and SPARQL as much as possible.
 * Leverages your favourite python libraries: `requests
   <http://docs.python-requests.org/en/latest/>`_, `beautifulsoup
   <http://www.crummy.com/software/BeautifulSoup/>`_, `rdflib
   <https://rdflib.readthedocs.org/en/latest/>`_, `lxml
   <http://lxml.de/>`_, `pyparsing <http://pyparsing.wikispaces.com/>`_
   and `whoosh <https://bitbucket.org/mchaput/whoosh/wiki/Home>`_.
-* Possible to patch documents if the source content has errors.
+* Handle errors in upstream sources by creating one-off patch files
+  for individiual documents.
 * Easy to write reference/citation parsers and run them on document
   text.
 * Documents in the same and other collections are automatically
@@ -174,14 +173,9 @@ Features
 * Uses caches and dependency management to avoid performing the same
   work over and over.
 * Once documents are downloaded and structured, you get a usable web
-  site with API, Atom feeds and search for free *(Note: API
-  functionality not yet implemented)*.
+  site with API, Atom feeds and search for free.
 * Web site generation can create a set of static HTML pages for
-  offline use (though you lose search and API functionality).
-* Pull in commentary for documents from other sources *(Note: you'll
-  have to do most of this work yourself)*.
-* Create topic hubs / keyword pages for document from multiple
-  collections *(Note: remains undocumented)*.
+  offline use.
 
 Next step
 ---------

@@ -7,10 +7,11 @@ Ferenda
 ===================================
 
 Ferenda is a python library and framework for transforming
-unstructured document collections into structured Linked Data. It
-helps with downloading documents, parsing them to add explicit
-semantic structure and RDF-based metadata, finding relationships
-between documents, and publishing the results.
+unstructured document collections into structured
+`Linked Data <http://en.wikipedia.org/wiki/Linked_data>`_. It helps
+with downloading documents, parsing them to add explicit semantic
+structure and RDF-based metadata, finding relationships between
+documents, and republishing the results.
 
 
 .. toctree::

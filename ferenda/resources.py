@@ -137,6 +137,9 @@ class Resources(object):
         return [self._filepath_to_urlpath(outfile, 1)]
 
 
+    # FIXME: When creating <script> elements, must take care not to
+    # create self-closing tags (like by creating a single space text
+    # node)
     def _li_wrap(self, items, container, attribute, **kwargs):
         elements = []
         for item in items:

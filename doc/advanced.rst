@@ -115,3 +115,44 @@ possible to write editorial descriptions about each keyword used, that
 is presented alongside the list of documents that use that keyword.
 
 See :class:`ferenda.sources.general.Keyword`
+
+Custom common data
+------------------
+
+In many cases, you want to describe documents using references to
+other things that are not documents, but which should be named using
+URIs rather than plain text literals. This includes things like
+companies, publishing entities, print series and abstract things like
+the topic/keyword of a document. You can define a RDF graph containing
+more information about each such thing that you know of beforehand, eg
+if we want to model that some RFCs are published in the Internet
+Architecture Board (IAB) stream, we can define the following small
+graph::
+
+    <http://localhost:8000/ext/iab> a foaf:Organization;
+        foaf:name "Internet Architecture Board (IAB)";
+        skos:altLabel "IAB";
+        foaf:homepage <https://www.iab.org/> .
+
+If this is placed in ``res/extra/[alias].ttl``, eg
+``res/extra/rfc.ttl``, the graph is made available as
+:py:data:`~ferenda.DocumentRepository.commondata`, and is also
+provided as the third ``resource_graph`` argument to any selector/key
+functions of your :py:class:`~ferenda.Facet` objects.
+
+
+
+Custom ontologies
+-----------------
+
+Some parts of ferenda, notably :doc:`restapi`, can make use of
+ontologies that your docrepo uses. This is so far only used to provide
+human-readable descriptions of predicates used (as determined by
+``rdfs:label`` or ``rdfs:comment``). Ferenda will try to find an
+ontology for any namespace you use in
+:py:data:`~ferenda.DocumentRepository.namespaces`, and directly
+supports many common vocabularies (``bibo``, ``dc``, ``dcterms``,
+``foaf``, ``prov``, ``rdf``, ``rdfs``, ``schema`` and ``skos``). If
+you have defined your own custom ontology, place it (in Turtle format)
+as ``res/vocab/[alias].ttl``, eg. ``res/vocab/rfc.ttl`` to make
+Ferenda read it.
