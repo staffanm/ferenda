@@ -85,12 +85,7 @@ class Resources(object):
         return self._make_files('jsfiles', self.resourcedir+os.sep+'js', combinefile, jsmin.jsmin)
 
     def make_img(self):
-        # FIXME: make this extensible
-        util.ensure_dir(os.sep.join([self.resourcedir,"img","dummy.png"]))
-        for f in pkg_resources.resource_listdir("ferenda", "res/img"):
-            src = pkg_resources.resource_stream("ferenda", "res/img/" + f)
-            with open(os.sep.join([self.resourcedir,"img", f]), "wb") as dest:
-                dest.write(src.read())
+        return self._make_files('imgfiles', self.resourcedir + os.sep + 'img')
             
     def make_resources_xml(self, cssfiles, jsfiles):
         E = ElementMaker() # namespace = None, nsmap={None: ...}

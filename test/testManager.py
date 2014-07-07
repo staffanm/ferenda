@@ -80,6 +80,7 @@ class staticmockclass(DocumentRepository):
         opts.update({'datadir': 'data',
                      'loglevel': 'DEBUG',
                      'cssfiles': [self.resourcebase + '/test.css'],
+                     'imgfiles': [self.resourcebase + '/test.png'],
                      'jsfiles': [self.resourcebase + '/test.js']})
         return opts
                     
@@ -128,6 +129,7 @@ class=testManager.staticmockclass2
 """%self.tempdir)
         util.writefile(self.tempdir+"/test.js", "// test.js code goes here")
         util.writefile(self.tempdir+"/test.css", "/* test.css code goes here */")
+        util.writefile(self.tempdir+"/test.png", "\x89\x50\x4e\x47\x0d\x0a\x1a\x0a PNG data goes here")
         util.writefile(self.tempdir+"/transformed.scss", "a { color: red + green; }")
 
     def tearDown(self):
@@ -182,6 +184,7 @@ class=testManager.staticmockclass2
         s = os.sep
         want = {'css':[s.join(['rsrc', 'css','test.css'])],
                 'js':[s.join(['rsrc', 'js','test.js'])],
+                'img':[s.join(['rsrc', 'img','test.png'])],
                 'json': ['rsrc/api/context.json',
                          'rsrc/api/common.json',
                          'rsrc/api/terms.json'],
@@ -213,6 +216,7 @@ class=testManager.staticmockclass2
                 'json': ['rsrc/api/context.json',
                          'rsrc/api/common.json',
                          'rsrc/api/terms.json'],
+                'img': [],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
         got = manager.makeresources([test,test2],self.tempdir+os.sep+'rsrc',
@@ -222,6 +226,7 @@ class=testManager.staticmockclass2
                                     jsfiles=['res/js/jquery-1.10.2.js',
                                              'res/js/modernizr-2.6.3.js',
                                              'res/js/respond-1.3.0.js'],
+                                    imgfiles=[],
                                     sitename="Blahonga",
                                     sitedescription="A non-default value")
         self.assertEqual(want,got)
@@ -255,6 +260,9 @@ class=testManager.staticmockclass2
         want = {'css':[s.join(['rsrc', 'css','normalize-1.1.3.css']),
                        s.join(['rsrc', 'css','main.css']),
                        s.join(['rsrc', 'css','ferenda.css'])],
+                'img':[s.join(['rsrc', 'img','navmenu-small-black.png']),
+                       s.join(['rsrc', 'img','navmenu.png']),
+                       s.join(['rsrc', 'img','search.png'])],
                 'js':[s.join(['rsrc', 'js','jquery-1.10.2.js']),
                       s.join(['rsrc', 'js','modernizr-2.6.3.js']),
                       s.join(['rsrc', 'js','respond-1.3.0.js']),
@@ -279,6 +287,7 @@ class=testManager.staticmockclass2
         want = {'css':[s.join(['rsrc', 'css','test.css']),
                        'http://example.org/css/main.css'],
                 'js':[s.join(['rsrc', 'js','test.js'])],
+                'img':[s.join(['rsrc', 'img','test.png'])],
                 'json':[s.join(['rsrc', 'api','context.json']),
                         s.join(['rsrc', 'api','common.json']),
                         s.join(['rsrc', 'api','terms.json'])],
@@ -304,6 +313,7 @@ class=testManager.staticmockclass2
         test.config.cssfiles.append('http://example.org/css/main.css')
         want = {'css':['rsrc\\css\\test.css',
                        'http://example.org/css/main.css'],
+                'img':['rsrc\\img\\test.png'],
                 'js':['rsrc\\js\\test.js'],
                 'json':['rsrc\\api\\context.json',
                         'rsrc\\api\\common.json',
@@ -321,6 +331,7 @@ class=testManager.staticmockclass2
         test = staticmockclass()
         test.config.cssfiles = ['nonexistent.css']
         want = {'css':[],
+                'img':[s.join(['rsrc', 'img','test.png'])],
                 'js':[s.join(['rsrc', 'js','test.js'])],
                 'json':[s.join(['rsrc', 'api','context.json']),
                         s.join(['rsrc', 'api','common.json']),
@@ -559,6 +570,7 @@ searchendpoint = /search/
 apiendpoint = /api/
 cssfiles = ['test.css', 'other.css']        
 jsfiles = ['test.js']
+imgfiles = ['test.png']
 indextype = WHOOSH
 indexlocation = data/whooshindex        
         """ % self.tempdir)
@@ -582,6 +594,7 @@ class Testrepo(DocumentRepository):
         opts.update({'datadir': 'data',
                      'cssfiles': ['test.css'],
                      'jsfiles': ['test.js'],
+                     'imgfiles': ['test.png'],
                      'magic': 'less'})
         return opts
 
@@ -662,6 +675,7 @@ class Testrepo2(Testrepo):
         util.writefile(self.tempdir+"/test.js", "// test.js code goes here")
         util.writefile(self.tempdir+"/test.css", "/* test.css code goes here */")
         util.writefile(self.tempdir+"/other.css", "/* other.css code goes here */")
+        util.writefile(self.tempdir+"/test.png", "\x89\x50\x4e\x47\x0d\x0a\x1a\x0a PNG data goes here")
         sys.path.append(self.tempdir)
 
     def tearDown(self):
@@ -812,6 +826,7 @@ class Testrepo2(Testrepo):
              ('makeresources', {'css':[s.join(['rsrc', 'css','test.css']),
                                        s.join(['rsrc', 'css','other.css'])],
                                 'js':[s.join(['rsrc', 'js','test.js'])],
+                                'img':[s.join(['rsrc', 'img','test.png'])],
                                 'json': ['rsrc/api/context.json',
                                          'rsrc/api/common.json',
                                          'rsrc/api/terms.json'],
@@ -853,6 +868,7 @@ class Testrepo2(Testrepo):
                                  ])),
              ('makeresources', {'css':[s.join(['rsrc', 'css','test.css']),
                                        s.join(['rsrc', 'css','other.css'])],
+                                'img':[s.join(['rsrc', 'img','test.png'])],
                                 'js':[s.join(['rsrc', 'js','test.js'])],
                                 'json': ['rsrc/api/context.json',
                                          'rsrc/api/common.json',
@@ -883,6 +899,7 @@ class Testrepo2(Testrepo):
         want = {'css':[s.join(['rsrc', 'css','test.css']),
                        s.join(['rsrc', 'css','other.css'])],
                 'js':[s.join(['rsrc', 'js','test.js'])],
+                'img': [s.join(['rsrc', 'img', 'test.png'])],
                 'json': ['rsrc/api/context.json',
                          'rsrc/api/common.json',
                          'rsrc/api/terms.json'],
@@ -901,6 +918,7 @@ apiendpoint = /api/
         """ % self.tempdir)
         want = {'css':[],
                 'js':[],
+                'img': [],
                 'json': ['rsrc/api/context.json',
                          'rsrc/api/common.json',
                          'rsrc/api/terms.json'],

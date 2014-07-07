@@ -44,6 +44,7 @@ class=testManager.staticmockclass2
 """%self.tempdir)
         util.writefile(self.tempdir+"/test.js", "// test.js code goes here")
         util.writefile(self.tempdir+"/test.css", "/* test.css code goes here */")
+        util.writefile(self.tempdir+"/test.png", "\x89\x50\x4e\x47\x0d\x0a\x1a\x0a PNG data goes here")
         util.writefile(self.tempdir+"/transformed.scss", "a { color: red + green; }")
 
     def tearDown(self):
@@ -58,6 +59,7 @@ class=testManager.staticmockclass2
         s = os.sep
         want = {'css':[s.join(['rsrc', 'css','test.css'])],
                 'js':[s.join(['rsrc', 'js','test.js'])],
+                'img':[s.join(['rsrc', 'img','test.png'])],
                 'json': ['rsrc/api/context.json',
                          'rsrc/api/common.json',
                          'rsrc/api/terms.json'],
@@ -66,7 +68,8 @@ class=testManager.staticmockclass2
         got = Resources([staticmockclass(),staticmockclass2()],
                         self.tempdir+os.sep+'rsrc',
                         cssfiles=[],
-                        jsfiles=[]).make()
+                        jsfiles=[],
+                        imgfiles=[]).make()
         self.assertEqual(want, got)
         tree = ET.parse(self.tempdir+os.sep+got['xml'][0])
         stylesheets=tree.find("stylesheets").getchildren()
@@ -94,6 +97,7 @@ class=testManager.staticmockclass2
         s = os.sep
         want = {'css':[s.join(['rsrc', 'css','combined.css'])],
                 'js':[s.join(['rsrc', 'js','combined.js'])],
+                'img': [],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
         got = Resources([staticmockclass(),staticmockclass2()],self.tempdir+os.sep+'rsrc',
@@ -136,11 +140,15 @@ class=testManager.staticmockclass2
         repo.config.cssfiles = [x for x in repo.config.cssfiles if not x.startswith("http://")]
         got = Resources([repo],self.tempdir+os.sep+'rsrc',
                         cssfiles=[],
-                        jsfiles=[]).make(api=False)
+                        jsfiles=[],
+                        imgfiles=[]).make(api=False)
         s = os.sep
         want = {'css':[s.join(['rsrc', 'css','normalize-1.1.3.css']),
                        s.join(['rsrc', 'css','main.css']),
                        s.join(['rsrc', 'css','ferenda.css'])],
+                'img':[s.join(['rsrc', 'img','navmenu-small-black.png']),
+                       s.join(['rsrc', 'img','navmenu.png']),
+                       s.join(['rsrc', 'img','search.png'])],
                 'js':[s.join(['rsrc', 'js','jquery-1.10.2.js']),
                       s.join(['rsrc', 'js','modernizr-2.6.3.js']),
                       s.join(['rsrc', 'js','respond-1.3.0.js']),
@@ -165,11 +173,13 @@ class=testManager.staticmockclass2
         want = {'css':[s.join(['rsrc', 'css','test.css']),
                        'http://example.org/css/main.css'],
                 'js':[s.join(['rsrc', 'js','test.js'])],
+                'img':[s.join(['rsrc', 'img','test.png'])],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
         got = Resources([test],self.tempdir+os.sep+'rsrc',
                         cssfiles=[],
-                        jsfiles=[]).make(api=False)
+                        jsfiles=[],
+                        imgfiles=[]).make(api=False)
         self.assertEqual(want,got)
                                     
     def test_external_combine(self):
@@ -182,7 +192,7 @@ class=testManager.staticmockclass2
     def test_footer(self):
         # test7: test the footer() functionality (+ disabling CSS/JS handling)
         s = os.sep
-        got = Resources([staticmockclass3()], self.tempdir+os.sep+'rsrc').make(css=False, js=False, api=False)
+        got = Resources([staticmockclass3()], self.tempdir+os.sep+'rsrc').make(css=False, js=False, img=False, api=False)
         want = {'xml':[s.join(['rsrc', 'resources.xml'])]}
         self.assertEqual(want, got)
         tree = ET.parse(self.tempdir+os.sep+got['xml'][0])
@@ -197,6 +207,7 @@ class=testManager.staticmockclass2
         want = {'css':['rsrc\\css\\test.css',
                        'http://example.org/css/main.css'],
                 'js':['rsrc\\js\\test.js'],
+                'img':['rsrc\\img\\test.png'],
                 'xml':['rsrc\\resources.xml']}
         try:
             realsep = os.sep
@@ -205,7 +216,8 @@ class=testManager.staticmockclass2
             resources.os.sep = "\\"
             got = Resources([test], self.tempdir+os.sep+'rsrc',
                             cssfiles=[],
-                            jsfiles=[]).make(api=False)
+                            jsfiles=[],
+                            imgfiles=[]).make(api=False)
             self.assertEqual(want,got)
         finally:
             os.sep = realsep
@@ -216,12 +228,14 @@ class=testManager.staticmockclass2
         test = staticmockclass()        
         test.config.cssfiles = ['nonexistent.css']
         want = {'css':[],
+                'img':[s.join(['rsrc', 'img','test.png'])],
                 'js':[s.join(['rsrc', 'js','test.js'])],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
         got = Resources([test], self.tempdir+os.sep+'rsrc',
                         cssfiles=[],
-                        jsfiles=[]).make(api=False)
+                        jsfiles=[],
+                        imgfiles=[]).make(api=False)
         self.assertEqual(want,got)
 
     # def test_scss_transform(self):

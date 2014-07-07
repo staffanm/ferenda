@@ -173,6 +173,7 @@ class staticmockclass(DocumentRepository):
         opts.update({'datadir': 'data',
                      'loglevel': 'DEBUG',
                      'cssfiles': [self.resourcebase + '/test.css'],
+                     'imgfiles': [self.resourcebase + '/test.png'],
                      'jsfiles': [self.resourcebase + '/test.js']})
         return opts
                     

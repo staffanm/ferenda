@@ -426,17 +426,20 @@ class DocumentRepository(object):
             'fulltextindex': True,
             'useragent': 'ferenda-bot',
             'republishsource': False,
+            'class': self.qualified_class_name(),
+
+            # FIXME: These only make sense at a global level
             'cssfiles': ['http://fonts.googleapis.com/css?family=Raleway:200,100',
-                             'res/css/normalize-1.1.3.css',
-                             'res/css/main.css',
-                             'res/css/ferenda.css'],
+                         'res/css/normalize-1.1.3.css',
+                         'res/css/main.css',
+                         'res/css/ferenda.css'],
             'jsfiles': ['res/js/jquery-1.10.2.js',
                         'res/js/modernizr-2.6.3.js',
                         'res/js/respond-1.3.0.js',
                         'res/js/ferenda.js'],
-            'class': self.qualified_class_name(),
-
-            # FIXME: These only make sense at a global level
+            'imgfiles': ['res/img/navmenu-small-black.png',
+                        'res/img/navmenu.png',
+                        'res/img/search.png'],
             'storetype': 'SQLITE',
             'storelocation': 'data/ferenda.sqlite',
             'storerepository': 'ferenda',

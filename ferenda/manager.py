@@ -54,6 +54,7 @@ def makeresources(repos,
                   combine=False,
                   cssfiles=[],
                   jsfiles=[],
+                  imgfiles=[],
                   staticsite=False,
                   sitename="MySite",
                   sitedescription="Just another Ferenda site",
@@ -76,6 +77,7 @@ def makeresources(repos,
                      combineresources=combine,
                      cssfiles=cssfiles,
                      jsfiles=jsfiles,
+                     imgfiles=imgfiles,
                      staticsite=staticsite,
                      sitename=sitename,
                      sitedescription=sitedescription,
@@ -527,7 +529,9 @@ overridden by the config file or command line arguments."""
                 'sitename': 'MySite',
                 'sitedescription': 'Just another Ferenda site',
                 'cssfiles': list,
-                'jsfiles': list}
+                'jsfiles': list,
+                'imgfiles': list
+    }
     config = LayeredConfig(defaults, filename, argv, cascade=True)
     return config
 
@@ -567,6 +571,7 @@ def _setup_makeresources_args(config):
             'staticsite':  config.staticsite,
             'cssfiles':    config.cssfiles,
             'jsfiles':     config.jsfiles,
+            'imgfiles':    config.imgfiles,
             'sitename':    config.sitename,
             'sitedescription': config.sitedescription,
             'url':         config.url
