@@ -824,8 +824,11 @@ class ElasticSearchIndex(RemoteIndex):
         # flatten the existing types (pay no mind to duplicate fields):
         for typename, mapping in mappings.items():
             for fieldname, fieldobject in mapping["properties"].items():
-                schema[fieldname] = self.from_native_field(fieldobject)
-        schema["repo"] = self.get_default_schema()['repo']
+                try:
+                    schema[fieldname] = self.from_native_field(fieldobject)
+                except errors.SchemaMappingError as e:
+                    raise errors.SchemaMappingError("%s: %s" % (fieldname, str(e)))
+                schema["repo"] = self.get_default_schema()['repo']
         return schema
 
     def _create_schema_payload(self, repos):

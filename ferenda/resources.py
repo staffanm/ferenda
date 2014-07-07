@@ -45,8 +45,8 @@ class Resources(object):
             res['css'] = self.make_css()
         if js:
             res['js'] = self.make_js()
-        # if img:
-        #    res['img'] = self.make_img()
+        if img:
+            res['img'] = self.make_img()
         if xml:
             res['xml'] = self.make_resources_xml(res.get('css',[]), res.get('js',[]))
         if api:
@@ -85,9 +85,13 @@ class Resources(object):
         return self._make_files('jsfiles', self.resourcedir+os.sep+'js', combinefile, jsmin.jsmin)
 
     def make_img(self):
-        # FIXME: implement this
-        return []
-
+        # FIXME: make this extensible
+        util.ensure_dir(os.sep.join([self.resourcedir,"img","dummy.png"]))
+        for f in pkg_resources.resource_listdir("ferenda", "res/img"):
+            src = pkg_resources.resource_stream("ferenda", "res/img/" + f)
+            with open(os.sep.join([self.resourcedir,"img", f]), "wb") as dest:
+                dest.write(src.read())
+            
     def make_resources_xml(self, cssfiles, jsfiles):
         E = ElementMaker() # namespace = None, nsmap={None: ...}
         root = E.configuration(
@@ -123,6 +127,8 @@ class Resources(object):
                     E.form({'action': self.config.searchendpoint,
                             'type': 'search',
                             'name': 'q'},
+                           E.input({'type': 'search',
+                                    'name': 'q'}),
                            E.a({'href': '#search',
                                 'class': 'searchbutton'},
                                E.img({'src': 'rsrc/img/search.png'})
@@ -286,6 +292,15 @@ class Resources(object):
             with open(filename, "w") as fp:
                     json.dump(d, fp, indent=4, sort_keys=True)
             files.append(self._filepath_to_urlpath(filename, 2))
+
+        # copy ui explorer app to <url>/rsrc/ui/ -- this does not get
+        # included in files
+        util.ensure_dir(os.sep.join([self.resourcedir,"ui","dummy.txt"]))
+        for f in pkg_resources.resource_listdir("ferenda", "res/ui"):
+            src = pkg_resources.resource_stream("ferenda", "res/ui/" + f)
+            with open(os.sep.join([self.resourcedir,"ui", f]), "wb") as dest:
+                dest.write(src.read())
+
         return files
         
     def _convert_legacy_jsonld(self, indata, rooturi):

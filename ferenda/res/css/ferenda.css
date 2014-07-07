@@ -286,9 +286,6 @@ nav#toc a:after {
 	float: none;
 	width: auto;
     }
-    nav#toc > ul > li > ul {
-	display: none; /* js toggles this */
-    }
 }
 
 
