@@ -242,14 +242,20 @@ class=testManager.staticmockclass2
         self.assertTrue(os.path.exists(self.tempdir+'/rsrc/css/combined.css'))
         self.assertTrue(os.path.exists(self.tempdir+'/rsrc/js/combined.js'))
         # check that the combining/minifying indeed saved us some space
-        # physical path for these: relative to the location of ferenda/manager.py.
+
+        # get at physical path for the default CSS/JS files
+        pkg_cssfiles = [pkg_resources.resource_filename("ferenda", x) for x in
+                        ("res/css/normalize-1.1.3.css",
+                         "res/css/main.css")]
+        pkg_jsfiles = [pkg_resources.resource_filename("ferenda", x) for x in
+                       ("res/js/jquery-1.10.2.js",
+                        "res/js/modernizr-2.6.3.js",
+                        "res/js/respond-1.3.0.js")]
+        
         self.assertLess(os.path.getsize(self.tempdir+'/rsrc/css/combined.css'),
-                        sum([os.path.getsize(x) for x in ("ferenda/res/css/normalize-1.1.3.css",
-                                                          "ferenda/res/css/main.css")]))
+                        sum([os.path.getsize(x) for x in pkg_cssfiles]))
         self.assertLess(os.path.getsize(self.tempdir+'/rsrc/js/combined.js'),
-                        sum([os.path.getsize(x) for x in ("ferenda/res/js/jquery-1.10.2.js",
-                                                          "ferenda/res/js/modernizr-2.6.3.js",
-                                                          "ferenda/res/js/respond-1.3.0.js")]))
+                        sum([os.path.getsize(x) for x in pkg_jsfiles]))
         # Test3: No combining, make sure that a non-customized
         # DocumentRepository works
         repo = DocumentRepository()

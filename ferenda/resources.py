@@ -291,11 +291,18 @@ class Resources(object):
         # copy ui explorer app to <url>/rsrc/ui/ -- this does not get
         # included in files
         util.ensure_dir(os.sep.join([self.resourcedir,"ui","dummy.txt"]))
-        for f in pkg_resources.resource_listdir("ferenda", "res/ui"):
-            src = pkg_resources.resource_stream("ferenda", "res/ui/" + f)
-            with open(os.sep.join([self.resourcedir,"ui", f]), "wb") as dest:
-                dest.write(src.read())
-
+        from pudb import set_trace; set_trace()
+        try:
+            os.listdir("/nonexinstent")
+            for f in pkg_resources.resource_listdir("ferenda", "res/ui"):
+                src = pkg_resources.resource_stream("ferenda", "res/ui/" + f)
+                with open(os.sep.join([self.resourcedir,"ui", f]), "wb") as dest:
+                    dest.write(src.read())
+        except OSError as e: # happens on travis-ci
+            x = pkg_resources.get_provider("ferenda")
+            print("Got error '%s'. Provider %s, .module_path %s" % (str(e), x, x.module_path))
+            print("Does %s/res/ui exist? %s " % (x.module_path, os.path.exists(x.module_path + "/res/ui")))
+            raise e # or pass
         return files
         
     def _convert_legacy_jsonld(self, indata, rooturi):

@@ -357,7 +357,14 @@ class Devel(object):
             # given format.
             print(res.decode('utf-8'))
 
-
+    @decorators.action
+    def destroyindex(self):
+        f = FulltextIndex.connect(self.config.indextype,
+                                  self.config.indexlocation,
+                                  [])
+        f.destroy()
+        print("%s index at %s destroyed" % (self.config.indextype,
+                                            self.config.indexlocation))
 
     # FIXME: These are dummy implementations of methods and class
     # variables that manager.py expects all docrepos to have. We don't

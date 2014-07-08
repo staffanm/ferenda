@@ -82,12 +82,12 @@ class WSGIApp(object):
                       Literal(resulthead, lang="en")))
         doc.body = elements.Body()
         for r in res:
-            if not 'title' in r or r['title'] is None:
-                r['title'] = r['uri']
-            if r.get('identifier', False):
-                r['title'] = r['identifier'] + ": " + r['title']
+            if not 'dcterms_title' in r or r['dcterms_title'] is None:
+                r['dcterms_title'] = r['uri']
+            if r.get('dcterms_identifier', False):
+                r['dcterms_title'] = r['dcterms_identifier'] + ": " + r['dcterms_title']
             doc.body.append(html.Div(
-                [html.H2([elements.Link(r['title'], uri=r['uri'])]),
+                [html.H2([elements.Link(r['dcterms_title'], uri=r['uri'])]),
                  r['text']], **{'class': 'hit'}))
 
         pages = [
