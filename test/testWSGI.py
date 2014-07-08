@@ -516,7 +516,7 @@ class Search(WSGI):
 
     def test_search_single(self):
         self.env['QUERY_STRING'] = "q=subsection"
-        res = ([{'title': 'Result #1',
+        res = ([{'dcterms_title': 'Result #1',
                  'uri': 'http://example.org',
                  'text': ['Text that contains the subsection term']}],
                {'pagenum': 1,
@@ -535,8 +535,8 @@ class Search(WSGI):
 
     def test_search_multiple(self):
         self.env['QUERY_STRING'] = "q=part"
-        res = ([{'title':'Introduction',
-                 'identifier': '123/a¶1',
+        res = ([{'dcterms_title':'Introduction',
+                 'dcterms_identifier': '123/a¶1',
                  'uri':'http://example.org/base/123/a#S1',
                  'text': html.P(['This is ',
                                  html.Strong(['part'], **{'class':'match'}),
@@ -547,7 +547,7 @@ class Search(WSGI):
                  'uri':'http://example.org/base/123/a#S2',
                  'text':html.P(['second main document ',
                                 html.Strong(['part'], **{'class':'match'})])},
-                {'title':'Example',
+                {'dcterms_title':'Example',
                  'uri':'http://example.org/base/123/a',
                  'text': html.P(['This is ',
                                  html.Strong(['part'], **{'class':'match'}),
@@ -580,19 +580,19 @@ class Search(WSGI):
         self.assertEqual(len(docs), 3)
         self.assertEqual(docs[0][0].tag, 'h2')
         expect = res[0]
-        self.assertIn(expect[0]['title'], docs[0][0][0].text)
+        self.assertIn(expect[0]['dcterms_title'], docs[0][0][0].text)
         self.assertEqual(expect[0]['uri'], docs[0][0][0].get('href'))
         self.assertEqualXML(expect[0]['text'].as_xhtml(),
                             docs[0][1],
                             namespace_aware=False)
 
-        self.assertIn(expect[1]['title'], docs[1][0][0].text)
+        self.assertIn(expect[1]['dcterms_title'], docs[1][0][0].text)
         self.assertEqual(expect[1]['uri'], docs[1][0][0].get('href'))
         self.assertEqualXML(expect[1]['text'].as_xhtml(),
                             docs[1][1],
                             namespace_aware=False)
                          
-        self.assertIn(expect[2]['title'], docs[2][0][0].text)
+        self.assertIn(expect[2]['dcterms_title'], docs[2][0][0].text)
         self.assertEqual(expect[2]['uri'], docs[2][0][0].get('href'))
         self.assertEqualXML(expect[2]['text'].as_xhtml(),
                             docs[2][1],

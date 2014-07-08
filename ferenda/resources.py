@@ -291,9 +291,7 @@ class Resources(object):
         # copy ui explorer app to <url>/rsrc/ui/ -- this does not get
         # included in files
         util.ensure_dir(os.sep.join([self.resourcedir,"ui","dummy.txt"]))
-        from pudb import set_trace; set_trace()
         try:
-            os.listdir("/nonexinstent")
             for f in pkg_resources.resource_listdir("ferenda", "res/ui"):
                 src = pkg_resources.resource_stream("ferenda", "res/ui/" + f)
                 with open(os.sep.join([self.resourcedir,"ui", f]), "wb") as dest:

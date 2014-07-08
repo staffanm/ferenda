@@ -1026,7 +1026,7 @@ def _preflight_check(log, verbose=False):
             if not hasattr(m, '__version__'):
                 log.warning("Module %s has no version information,"
                             "it might be older than required" % mod)
-            elif version < ver:  # FIXME: use util.numcmp?
+            elif util.numcmp(version, ver) < 0:
                 if required:
                     log.error("Module %s has version %s, need %s" %
                           (mod, version, ver))
