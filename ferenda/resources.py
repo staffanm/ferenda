@@ -299,7 +299,12 @@ class Resources(object):
         except OSError as e: # happens on travis-ci
             x = pkg_resources.get_provider("ferenda")
             print("Got error '%s'. Provider %s, .module_path %s" % (str(e), x, x.module_path))
-            print("Does %s/res/ui exist? %s " % (x.module_path, os.path.exists(x.module_path + "/res/ui")))
+            print("Does %s/res/ui exist? %s (wd %s, os.listdir: %r)" % (x.module_path, os.path.exists(x.module_path + "/res/ui"), os.getcwd(), os.listdir(".")))
+            try:
+                fp = pkg_resources.resource_stream('ferenda', "res/ui/index.html")
+                print("Got hold of res/ui/index.html through .resource_stream")
+            except Exception as sub_e:
+                print("Couldn't get a res stream either: %s" % sub_e)
             raise e # or pass
         return files
         
