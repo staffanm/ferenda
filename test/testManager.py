@@ -563,11 +563,16 @@ class Run(unittest.TestCase):
         self.tempdir = tempfile.mkdtemp()
         # self.modulename = hashlib.md5(self.tempdir.encode('ascii')).hexdigest()
         self.modulename = "example"
-        self.orig_cwd = os.getcwd()
+        # When testing locally , we want to avoid cluttering cwd, so
+        # we chdir to a temp dir, but when on travis-ci, changing the
+        # wd makes subsequent calls to pkg_resources.resource_listdir
+        # fail.
+        if not 'TRAVIS' in os.environ:
+            self.orig_cwd = os.getcwd()
+            os.chdir(self.tempdir)
         # 1. create new blank ini file (FIXME: can't we make sure that
         # _find_config_file is called with create=True when using
         # run() ?)
-        os.chdir(self.tempdir)
         util.writefile("ferenda.ini", """[__root__]
 loglevel=WARNING
 datadir = %s
@@ -686,9 +691,10 @@ class Testrepo2(Testrepo):
 
     def tearDown(self):
         manager.shutdown_logger()
-        os.chdir(self.orig_cwd)
-        shutil.rmtree(self.tempdir)
-        sys.path.remove(self.tempdir)
+        if not 'TRAVIS' in os.environ:
+            os.chdir(self.orig_cwd)
+            shutil.rmtree(self.tempdir)
+            sys.path.remove(self.tempdir)
 
 
     def test_noconfig(self):
@@ -808,8 +814,8 @@ class Testrepo2(Testrepo):
     # OSError: [Errno 2] No such file or directory: 'ferenda/res/xsl'
     #
     # I can not figure out why. Skip for now.
-    @unittest.skipIf('TRAVIS' in os.environ,
-                 "Skipping test_run_all_allmethods on travis-ci")    
+#    @unittest.skipIf('TRAVIS' in os.environ,
+#                 "Skipping test_run_all_allmethods on travis-ci")    
     def test_run_all_allmethods(self):
         self._enable_repos()
         argv = ["all", "all", "--magic=more"]
@@ -854,8 +860,8 @@ class Testrepo2(Testrepo):
         
     # since this method also calls frontpage, it fails on travis in
     # the same way as test_run_all_allmethods.
-    @unittest.skipIf('TRAVIS' in os.environ,
-                 "Skipping test_run_single_allmethods on travis-ci")    
+#    @unittest.skipIf('TRAVIS' in os.environ,
+#                 "Skipping test_run_single_allmethods on travis-ci")    
     def test_run_single_allmethods(self):
         self._enable_repos()
         argv = ["test","all"]
