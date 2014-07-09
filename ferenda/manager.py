@@ -722,7 +722,6 @@ def _enabled_classes(inifile=None):
 
     >>> enable("ferenda.DocumentRepository") == 'base'
     True
-    >>> _enabled_classes()
     >>> _enabled_classes() == {'base': 'ferenda.DocumentRepository'}
     True
     >>> os.unlink("ferenda.ini")

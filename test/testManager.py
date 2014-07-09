@@ -694,7 +694,9 @@ class Testrepo2(Testrepo):
 
     def tearDown(self):
         manager.shutdown_logger()
-        if not 'TRAVIS' in os.environ:
+        if 'TRAVIS' in os.environ:
+            util.robust_remove("ferenda.ini")
+        else:
             os.chdir(self.orig_cwd)
             shutil.rmtree(self.tempdir)
             sys.path.remove(self.tempdir)

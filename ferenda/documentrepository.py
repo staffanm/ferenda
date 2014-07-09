@@ -2044,17 +2044,16 @@ WHERE {
     #
     
     def toc(self, otherrepos=[]):
-        """Creates a set of pages that together acts as a table of
-        contents for all documents in the repository. For smaller
-        repositories a single page might be enough, but for
-        repositoriees with a few hundred documents or more, there will
-        usually be one page for all documents starting with A,
-        starting with B, and so on. There might be different ways of
-        browseing/drilling down, i.e. both by title, publication year,
-        keyword and so on.
+        """Creates a set of pages that together acts as a table of contents
+        for all documents in the repository. For smaller repositories
+        a single page might be enough, but for repositoriees with a
+        few hundred documents or more, there will usually be one page
+        for all documents starting with A, starting with B, and so
+        on. There might be different ways of browseing/drilling down,
+        i.e. both by title, publication year, keyword and so on.
 
         The default implementation calls
-        :py:meth:`~ferenda.DocumentRepository.toc_select` to get all
+        :py:meth:`~ferenda.DocumentRepository.faceted_data` to get all
         data from the triple store,
         :py:meth:`~ferenda.DocumentRepository.facets` to find
         out the facets for ordering,
@@ -2069,8 +2068,11 @@ WHERE {
         ``dcterms:issued`` property). 
 
         You can override any of these methods to customize any part of
-        the toc generation process. Often overriding :py:meth:`~ferenda.DocumentRepository.facets` to
-        specify other document properties will be sufficient."""
+        the toc generation process. Often overriding
+        :py:meth:`~ferenda.DocumentRepository.facets` to specify other
+        document properties will be sufficient.
+
+        """
 
         params = {}
         with util.logtime(self.log.debug,

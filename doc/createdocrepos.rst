@@ -664,8 +664,8 @@ etc used by :meth:`~ferenda.DocumentRepository.generate`.
 
 The default implementation is generic enough to handle most cases, but
 you'll have to override other methods which it calls, primarily
-:meth:`~ferenda.DocumentRepository.facets`,
-:meth:`~ferenda.DocumentRepository.toc_items`. These methods all
+:meth:`~ferenda.DocumentRepository.facets` and
+:meth:`~ferenda.DocumentRepository.toc_items`. These methods
 depend on the metadata you've created by your parse implementation,
 but in the simplest cases it's enough to specify that you want one set
 of pages organized by the ``dcterms:title`` of each document
