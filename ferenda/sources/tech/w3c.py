@@ -12,9 +12,10 @@ from six import text_type as str
 from rdflib import Literal, Graph, URIRef, RDF, Namespace
 
 from .rfc import PreambleSection
-from ferenda import Describer, DocumentRepository, FSMParser
+from ferenda import Describer, DocumentRepository, FSMParser, Facet
 from ferenda import util, decorators
 from ferenda.elements import serialize, html, Body, Section, Subsection, Subsubsection
+DCTERMS = Namespace(util.ns['dcterms'])
 
 
 class W3Standards(DocumentRepository):
@@ -291,6 +292,15 @@ class W3Standards(DocumentRepository):
             # desc.value(self.ns['dcterms'].isPartOf, part.parent.uri) # implied
         for subpart in part:
             self.decorate_bodyparts(subpart, baseuri)
+
+    def facets(self): 
+        return [Facet(RDF.type),           
+                Facet(DCTERMS.title),      
+                # Facet(DCTERMS.publisher), -- is always w3c
+                Facet(DCTERMS.identifier),
+                Facet(DCTERMS.issued)
+        ]     
+       
 
     def tabs(self):
         return [("W3C standards", self.dataset_uri())]

@@ -609,12 +609,25 @@ class RFC(DocumentRepository):
                 desc.value(self.ns['dcterms'].rightsHolder, line)
 
     def facets(self):
+        def select_rfcnum(row, binding, resource_graph):
+            # "RFC 6998" -> "6900"
+            return row[binding][4:-2] + "00"
+            
         return [Facet(self.ns['rdf'].type),
-                Facet(self.ns['dcterms'].identifier),
+                Facet(self.ns['dcterms'].identifier,
+                      label="Sorted by RFC #",
+                      pagetitle="RFC %(selected)s00-%(selected)s99",
+                      selector=select_rfcnum,
+                      use_for_toc=True),
                 Facet(self.ns['dcterms'].title),
-                Facet(self.ns['dcterms'].publisher),
+                Facet(self.ns['dcterms'].publisher,
+                      label="Sorted by stream",
+                      pagetitle="The %(selected)s stream"),
                 Facet(self.ns['dcterms'].issued),
-                Facet(self.ns['dcterms'].subject)]
+                Facet(self.ns['dcterms'].subject,  # should be rfc:category not dcterms:status?
+                      label="Sorted by status",
+                      pagetitle="Status: %(selected)s")]
+
     def toc_item(self, binding, row):
         return [row['dcterms_identifier'] + ": ",
                 Link(row['dcterms_title'],

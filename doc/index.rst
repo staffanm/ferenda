@@ -64,8 +64,9 @@ Classes
    api/textreader
    api/pdfreader
    api/wordreader
+..  
    api/wsgiapp
-   api/resources
+   api/resources -- these are not yet public api
    
 Modules
 -------

@@ -8,6 +8,7 @@ from six import text_type as str
 from rdflib import URIRef, Namespace
 from rdflib.namespace import RDF, RDFS, DC, SKOS, FOAF, DCTERMS
 SCHEMA = Namespace("http://schema.org/")
+BIBO = Namespace("http://purl.org/ontology/bibo/")
 
 from ferenda import fulltextindex # to get the IndexedType classes
 from ferenda import util
@@ -195,7 +196,7 @@ class Facet(object):
         'Chapman & Hall'
         """
         uri = URIRef(row[binding])
-        for pred in (RDFS.label, SKOS.prefLabel, SKOS.altLabel, DCTERMS.title, DCTERMS.alternative, FOAF.name):
+        for pred in (RDFS.label, SKOS.prefLabel, SKOS.altLabel, DCTERMS.title, DCTERMS.alternative, FOAF.name, BIBO.identifier):
             if resource_graph.value(uri, pred):
                 return str(resource_graph.value(uri, pred))
         else:
@@ -354,7 +355,7 @@ Facet.defaults = {RDF.type: {
                   DCTERMS.identifier: {
                       'indexingtype': fulltextindex.Label(boost=16),
                       'toplevel_only': False,
-                      'use_for_toc': True, 
+                      'use_for_toc': False,  # typically no info that isn't already in title
                       'selector': Facet.firstletter,
                       'key': Facet.titlesortkey,
                       'identificator': Facet.firstletter,

@@ -21,6 +21,13 @@ from ferenda import LayeredConfig, DocumentRepository
 from ferenda import util, errors
 
 class Resources(object):
+    """Creates and manages various assets/resources needed for web serving.
+
+    This class is not yet part of the public API -- clients should use
+    manager.makeresources for now.
+
+    """
+    
     def __init__(self, repos, resourcedir, **kwargs):
         # FIXME: document what kwargs could be (particularly 'combineresources')
         self.repos = repos

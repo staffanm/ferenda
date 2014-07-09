@@ -21,6 +21,12 @@ from ferenda import fulltextindex, util, elements
 from ferenda.elements import html
 
 class WSGIApp(object):
+    """Implements a WSGI app.
+
+    This class is not yet part of the public API -- clients should use
+    manager.make_wsgi_app for now.
+
+    """
     def __init__(self, repos, inifile=None, **kwargs):
         self.repos = repos
         # FIXME: need to specify documentroot?
@@ -428,13 +434,13 @@ class WSGIApp(object):
             
 
     def _str(self, s, encoding="ascii"):
-        """If running under python2.6, return byte string version of the
+        """If running under python2, return byte string version of the
         argument, otherwise return the argument unchanged.
 
-        Needed since wsgiref under python 2.6 hates unicode.
+        Needed since wsgiref under python 2 hates unicode.
 
         """
-        if sys.version_info < (2, 7, 0):
+        if sys.version_info < (3, 0, 0):
             return s.encode("ascii")  # pragma: no cover
         else:
             return s
