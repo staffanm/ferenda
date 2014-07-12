@@ -1,5 +1,5 @@
-Describing how to group documents using facets
-==============================================
+Grouping documents with facets
+==============================
 
 A collection of documents can typically be arranged in a set of
 groups, such as by year of publication, by document author, or by
@@ -36,7 +36,8 @@ Table of contents
 ^^^^^^^^^^^^^^^^^
 
 Each docrepo will have their own set of Table of contents pages. The
-facets defined for one docrepo will be present only
+TOC for a docrepo will contain one set of pages for each defined
+facet, unless ``use_for_toc`` is set to ``False``.
 
 The ReST API
 ^^^^^^^^^^^^
@@ -48,12 +49,31 @@ requires that the defined facets don't clash, eg. that you don't have
 two facets based on ``dcterms:publisher`` where one uses URI
 references and the other uses.
 
+The fulltext index
+^^^^^^^^^^^^^^^^^^
+
+The metadata that each facet uses is stored as a separate field in the
+fulltext index. Facet can specify exactly how a particular facet
+should be stored (ie if the field should be boosted in any particular
+way). Note that the data stored in the fulltext index is not passed
+through the selector function, the original RDF data is stored as-is.
 
 Grouping a document in several groups
 -------------------------------------
+
+If a docrepo uses a facet that has ``multiple_values`` set to
+``True``, it's possible for that facet to categorize the document in
+more than one group (a typical usecase is documents that have multiple
+``dcterms:subject`` keywords, or articles that have multiple
+``dcterms:creator`` authors).
 
 
 Combining facets from different docrepos
 ----------------------------------------
 
-
+Facets that map to the same fulltextindex field must be equal. The
+rules for equality: If the ``rdftype`` and the ``dimension_type`` and
+``dimension_label`` and ``selector`` is equal, then the facets are
+equal. ``selector``s are only equal if they are the same function
+object, ie it's not just enough that they are two functions that work
+identically.

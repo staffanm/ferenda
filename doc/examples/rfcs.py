@@ -9,6 +9,7 @@ import requests
 
 from ferenda import DocumentRepository, TextReader
 from ferenda import util
+from ferenda.decorators import downloadmax
 
 class RFCs(DocumentRepository):
     alias = "rfc"
@@ -292,6 +293,20 @@ class RFCs(DocumentRepository):
                 Facet(self.ns['dcterms'].subject),
                 Facet(self.ns['dcterms'].identifier)]
 # end facets
+
+# begin facets2
+    def facets(self):
+        def select_rfcnum(row, binding, resource_graph):
+            # "RFC 6998" -> "6900"
+            return row[binding][4:-2] + "00"
+        from ferenda import Facet
+        return [Facet(self.ns['dcterms'].title),
+                Facet(self.ns['dcterms'].issued),
+                Facet(self.ns['dcterms'].subject,
+                      selector=Facet.defaultselector),
+                Facet(self.ns['dcterms'].identifier,
+                      selector=select_rfcnum)]
+# end facets2
 
 # begin toc_item
     def toc_item(self, binding, row):

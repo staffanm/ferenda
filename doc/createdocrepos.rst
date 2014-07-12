@@ -665,7 +665,7 @@ etc used by :meth:`~ferenda.DocumentRepository.generate`.
 The default implementation is generic enough to handle most cases, but
 you'll have to override other methods which it calls, primarily
 :meth:`~ferenda.DocumentRepository.facets` and
-:meth:`~ferenda.DocumentRepository.toc_items`. These methods
+:meth:`~ferenda.DocumentRepository.toc_item`. These methods
 depend on the metadata you've created by your parse implementation,
 but in the simplest cases it's enough to specify that you want one set
 of pages organized by the ``dcterms:title`` of each document
@@ -691,6 +691,12 @@ correct this, we must create a set of :class:`~ferenda.Facet` objects
 that specify how documents should be ordered for any particular
 criteria, and have :meth:`~ferenda.DocumentRepository.facets` return
 these.
+
+.. literalinclude:: examples/rfcs.py
+   :start-after: # begin facets2
+   :end-before: # end facets2
+
+
 
 The above code gives some example of how :class:`~ferenda.Facet`
 objects can be configured. However, a :class:`~ferenda.Facet`
