@@ -10,11 +10,6 @@ from lxml import etree
 from lxml.builder import ElementMaker
 from rdflib import URIRef, Literal, BNode, Graph, RDF, RDFS
 from rdflib.namespace import FOAF, SKOS
-from rdflib.plugin import register, Parser, Serializer
-register('json-ld', Parser, 'ferenda.thirdparty.rdflib_jsonld.parser',
-         'JsonLDParser')
-register('json-ld', Serializer, 'ferenda.thirdparty.rdflib_jsonld.serializer',
-         'JsonLDSerializer')
 import pkg_resources
 
 from ferenda import LayeredConfig, DocumentRepository

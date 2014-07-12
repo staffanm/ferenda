@@ -26,16 +26,11 @@ from lxml import etree
 from lxml.builder import ElementMaker
 from rdflib import Graph, Literal, Namespace, URIRef, RDF
 from rdflib.namespace import FOAF
-from rdflib.plugin import register, Parser, Serializer
 import bs4
 import lxml.html
 import pkg_resources
 import requests
 import requests.exceptions
-register('json-ld', Parser, 'ferenda.thirdparty.rdflib_jsonld.parser',
-         'JsonLDParser')
-register('json-ld', Serializer, 'ferenda.thirdparty.rdflib_jsonld.serializer',
-         'JsonLDSerializer')
 
 from six import text_type as str
 from six import binary_type as bytes

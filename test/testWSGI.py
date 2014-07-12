@@ -18,11 +18,6 @@ from lxml import etree
 from rdflib import Graph, Namespace, URIRef
 from rdflib.namespace import RDF, DC, DCTERMS
 SCHEMA = Namespace("http://schema.org/")
-from rdflib.plugin import register, Parser, Serializer
-register('json-ld', Parser, 'ferenda.thirdparty.rdflib_jsonld.parser',
-         'JsonLDParser')
-register('json-ld', Serializer, 'ferenda.thirdparty.rdflib_jsonld.serializer',
-         'JsonLDSerializer')
 
 from ferenda import DocumentRepository, Facet, FulltextIndex
 from ferenda import manager, util, fulltextindex

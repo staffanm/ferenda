@@ -33,9 +33,6 @@ from six import text_type as str
 # 3rd party
 import requests
 import requests.exceptions
-from rdflib.plugin import register, Parser, Serializer
-register('json-ld', Parser, 'ferenda.thirdparty.rdflib_jsonld.parser', 'JsonLDParser')
-register('json-ld', Serializer, 'ferenda.thirdparty.rdflib_jsonld.serializer', 'JsonLDSerializer')
 
 # my modules
 from ferenda import DocumentRepository  # needed for a doctest

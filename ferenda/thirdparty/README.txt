@@ -20,9 +20,3 @@ reason or another, couldn't be directly fetched by setup.py from pypi.
 * httpheader by Deron Meranda
   (http://deron.meranda.us/python/httpheader/). Included since the
   package isn't on pypi or is python3 compatible. LGPL License.
-
-* rdflib_jsonld by Niklas Lindström
-  (https://github.com/RDFLib/rdflib-jsonld/). Included since the
-  package isn't installable from pypi. Patched to use a single source
-  tree for py2/3 compatibility (no 2to3 translation step needed). BSD
-  License.

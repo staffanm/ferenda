@@ -53,11 +53,10 @@ authors, included in accordance with their respective licenses:
   Higgins, BSD
 * `patch <https://code.google.com/p/python-patch/>`_ by Anatoly
   Techtonik, MIT
-* `Grit XSLT stylesheets <http://code.google.com/p/oort/wiki/Grit>`_,
-  `RDL service UI
+* `Grit XSLT stylesheets <http://code.google.com/p/oort/wiki/Grit>`_
+  and `RDL service UI
   <https://github.com/rinfo/rdl/tree/master/packages/java/rinfo-service/src/main/webapp/ui>`_
-  and `rdflib-jsonlid <https://github.com/RDFLib/rdflib-jsonld>`_ by
-  Niklas Lindström, BSD
+  by Niklas Lindström, BSD
 * `httpheader <http://deron.meranda.us/python/httpheader/>`_ by Deron
   Meranda, LGPL
 * `normalize.css <http://git.io/normalize>`_, MIT
