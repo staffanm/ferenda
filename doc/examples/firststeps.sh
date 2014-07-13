@@ -146,12 +146,25 @@ data/rsrc/css
 data/rsrc/css/ferenda.css
 data/rsrc/css/main.css
 data/rsrc/css/normalize-1.1.3.css
+data/rsrc/img
+data/rsrc/img/navmenu-small-black.png
+data/rsrc/img/navmenu.png
+data/rsrc/img/search.png
 data/rsrc/js
 data/rsrc/js/ferenda.js
 data/rsrc/js/jquery-1.10.2.js
 data/rsrc/js/modernizr-2.6.3.js
 data/rsrc/js/respond-1.3.0.js
 data/rsrc/resources.xml
+data/rsrc/ui
+data/rsrc/ui/bootstrap-modal.js
+data/rsrc/ui/bootstrap.min.css
+data/rsrc/ui/html5shiv.js
+data/rsrc/ui/index.html
+data/rsrc/ui/jquery-1.8.3.min.js
+data/rsrc/ui/jquery.tmpl.min.js
+data/rsrc/ui/main.css
+data/rsrc/ui/main.js
 # end makeresources
 
 # begin generate-all
@@ -165,10 +178,6 @@ $ ./ferenda-build.py w3c generate --all
 
 # begin final-commands
 $ ./ferenda-build.py w3c toc
-22:17:17 w3c INFO Created data/w3c/toc/dcterms_identifier/e.html
-22:17:17 w3c INFO Created data/w3c/toc/dcterms_identifier/m.html
-22:17:17 w3c INFO Created data/w3c/toc/dcterms_identifier/r.html
-22:17:17 w3c INFO Created data/w3c/toc/dcterms_identifier/x.html
 22:17:17 w3c INFO Created data/w3c/toc/dcterms_issued/2013.html
 22:17:17 w3c INFO Created data/w3c/toc/dcterms_issued/2014.html
 22:17:17 w3c INFO Created data/w3c/toc/dcterms_title/e.html
@@ -201,10 +210,6 @@ $ ./ferenda-build.py w3c all
 22:17:29 w3c INFO emotionml: generate OK (0.000 sec)
 22:17:29 w3c INFO MathML3: generate OK (0.000 sec)
 22:17:29 root INFO w3cstandards.W3CStandards generate finished in 0.006 sec
-22:17:32 w3c INFO Created data/w3c/toc/dcterms_identifier/e.html
-22:17:32 w3c INFO Created data/w3c/toc/dcterms_identifier/m.html
-22:17:32 w3c INFO Created data/w3c/toc/dcterms_identifier/r.html
-22:17:32 w3c INFO Created data/w3c/toc/dcterms_identifier/x.html
 22:17:32 w3c INFO Created data/w3c/toc/dcterms_issued/2013.html
 22:17:32 w3c INFO Created data/w3c/toc/dcterms_issued/2014.html
 22:17:32 w3c INFO Created data/w3c/toc/dcterms_title/e.html

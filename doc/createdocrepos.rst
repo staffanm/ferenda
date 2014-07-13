@@ -684,19 +684,24 @@ every document. By overriding
    :start-after: # begin facets
    :end-before: # end facets
 
-After running toc with this change, you can see that four sets of
-index pages are created. However, except for publication year, the
-actual partitioning of documents are still done by title. In order to
-correct this, we must create a set of :class:`~ferenda.Facet` objects
-that specify how documents should be ordered for any particular
-criteria, and have :meth:`~ferenda.DocumentRepository.facets` return
-these.
+After running toc with this change, you can see that three sets of
+index pages are created. By default, the ``dcterms:identifier``
+predicate isn't used for the TOC pages, as it's often derived from the
+document title. Furthermore, you'll get some error messages along the
+lines of "Best Current Practice does not look like a valid URI", which
+is because the ``dcterms:subject`` predicate normally should have URIs
+as values, and we are using plain string literals.
+
+We can fix both these problems by customizing our facet objects a
+little. We specify that we wish to use ``dcterms:identifier`` as a TOC
+facet, and provide a simple method to group RFCs by their identifier
+in groups of 100, ie one page for RFC 1-99, another for RFC 100-199,
+and so on. We also specify that we expect our ``dcterms:subject``
+values to be plain strings.
 
 .. literalinclude:: examples/rfcs.py
    :start-after: # begin facets2
    :end-before: # end facets2
-
-
 
 The above code gives some example of how :class:`~ferenda.Facet`
 objects can be configured. However, a :class:`~ferenda.Facet`
@@ -711,7 +716,7 @@ RFC number in this display. This is done by overriding
    :start-after: # begin toc_item
    :end-before: # end toc_item
 
-Se also :doc:`toc`.
+Se also :doc:`toc` and :doc:`facets`.
 
 Customizing :meth:`~ferenda.DocumentRepository.news`
 ====================================================
@@ -745,6 +750,9 @@ particular category.
    the edges. Also, there isn't currently any way of discovering the
    Atom feeds or HTML pages from the main site -- you need to know the
    URLs. This will all be fixed in due time.
+
+   The news generation does not make use the Facet objects that we've
+   defined. This will be fixed in later releases of Ferenda.
 		
 Se also :doc:`news`.
 

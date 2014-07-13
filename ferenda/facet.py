@@ -240,7 +240,13 @@ class Facet(object):
         >>> Facet.term(row, "dcterms_publisher")
         'chapman_hall'
         """
-        return util.uri_leaf(row[binding])
+        ret = util.uri_leaf(row[binding])
+        if not ret:
+            # FIXME: get a logger and complain. but also get something
+            # that can act as a URI fragmentx
+            ret = row[binding].replace(" ", "_")
+        return ret
+
 
     @classmethod
     def qname(cls, row, binding='rdf_type', resource_graph=None):
@@ -377,7 +383,7 @@ Facet.defaults = {RDF.type: {
                       'indexingtype': fulltextindex.Resource(),
                       'toplevel_only': True,
                       'use_for_toc': True,
-                      'selector': Facet.resourcelabel,
+                      'selector': Facet.defaultselector,
                       'key': Facet.resourcelabel,
                       'identificator': Facet.term,
                       'dimension_type': 'ref',

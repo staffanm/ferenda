@@ -303,9 +303,13 @@ class RFCs(DocumentRepository):
         return [Facet(self.ns['dcterms'].title),
                 Facet(self.ns['dcterms'].issued),
                 Facet(self.ns['dcterms'].subject,
-                      selector=Facet.defaultselector),
+                      selector=Facet.defaultselector,
+                      identificator=Facet.defaultselector,
+                      key=Facet.defaultselector),
                 Facet(self.ns['dcterms'].identifier,
-                      selector=select_rfcnum)]
+                      use_for_toc=True,
+                      selector=select_rfcnum,
+                      pagetitle="RFC %(selected)s00-%(selected)s99")]
 # end facets2
 
 # begin toc_item

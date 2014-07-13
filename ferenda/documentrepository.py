@@ -2675,13 +2675,12 @@ WHERE {
                               'text/turtle': 'turtle',
                               'text/plain': 'nt',
                               'application/json': 'json-ld'}
-                
+
+                data = False
                 if res == "res":
                     if uri.endswith("/data"):
                         data = True
                         uri = uri[:-5]
-                    else:
-                        data = False
                     basefile = self.basefile_from_uri(uri)
                     assert basefile, "Couldn't find basefile in uri %s" % uri
 
