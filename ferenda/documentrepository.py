@@ -2708,7 +2708,8 @@ WHERE {
                                     self.store.annotation_path(basefile))
                                 g += annotation_graph
                             path = None
-                            # FIXME: we just changed the meaning of the "data" variable!
+                            # FIXME: we just changed the meaning of
+                            # the "data" variable!
                             data = g.serialize(format=rdfformats[accept])
                         else:
                             data = None

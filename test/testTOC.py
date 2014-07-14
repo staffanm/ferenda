@@ -146,7 +146,6 @@ class TOC(RepoTester):
 
     def test_pageset_resourcelabel(self):
         facets = [Facet(DCTERMS.publisher,
-                        selector=Facet.resourcelabel,
                         pagetitle="Documents published in %(selected)s")]
         # FIXME: This is mucking about with internal details...
         self.repo._commondata = self.results2data

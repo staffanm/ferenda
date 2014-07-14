@@ -16,7 +16,7 @@ from rdflib import URIRef, Namespace, Literal, Graph
 from lxml import etree
 
 from ferenda.compat import OrderedDict
-from ferenda import DocumentRepository, LayeredConfig, FulltextIndex, Transformer
+from ferenda import DocumentRepository, LayeredConfig, FulltextIndex, Transformer, Facet
 from ferenda import fulltextindex, util, elements
 from ferenda.elements import html
 
@@ -267,7 +267,12 @@ class WSGIApp(object):
                           # double-counting
             for row in data:
                 try:
-                    observation = transformer(facet.selector(row, binding, resource_graph))
+                    # maybe if dimension_type == "ref", selector
+                    # should always be Facet.defaultselector?
+                    if dimension_type == "ref":
+                        observation = transformer(Facet.defaultselector(row, binding))
+                    else:
+                        observation = transformer(facet.selector(row, binding, resource_graph))
 
                     if not observation in observations:
                         observations[observation] = {dimension_type:observation,

@@ -73,7 +73,7 @@ class WSGI(RepoTester): # base class w/o tests
         if not store:
             store = self.repo.store
         g = Graph()
-        g.parse(source=open(inpath), format="turtle")
+        g.parse(source=codecs.open(inpath, encoding="utf-8"), format="turtle")
         with store._open(outpath, "wb") as fp:
             fp.write(g.serialize(format="pretty-xml"))
         return g
@@ -83,7 +83,6 @@ class WSGI(RepoTester): # base class w/o tests
         util.ensure_dir(self.repo.store.parsed_path("123/a"))
         shutil.copy2("test/files/base/parsed/123/a.xhtml",
                      self.repo.store.parsed_path("123/a"))
-
         g = self.ttl_to_rdf_xml("test/files/base/distilled/123/a.ttl",
                                 self.repo.store.distilled_path("123/a"))
 

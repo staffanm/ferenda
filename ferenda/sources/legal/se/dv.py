@@ -592,7 +592,7 @@ class DV(SwedishLegalSource):
                     if filetype == "docx":
                         self._simplify_ooxml(self.store.intermediate_path(previous_basefile))
                 util.ensure_dir(self.store.intermediate_path(basefile))
-                fp = open(self.store.intermediate_path(basefile), "w")
+                fp = codecs.open(self.store.intermediate_path(basefile), "w", encoding="utf-8")
                 fp.write('<body%s>' % xmlns)
                 if filetype != "docx":
                     fp.write("\n")
@@ -1553,7 +1553,7 @@ class DV(SwedishLegalSource):
 
     def _simplify_ooxml(self, filename, pretty_print=True):
         # simplify the horrendous mess that is OOXML through simplify-ooxml.xsl
-        with open(filename) as fp:
+        with open(filename, "rb") as fp:
             intree = etree.parse(fp)
         fp = pkg_resources.resource_stream('ferenda', "res/xsl/simplify-ooxml.xsl")
         transform = etree.XSLT(etree.parse(fp))

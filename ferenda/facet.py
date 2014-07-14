@@ -383,7 +383,7 @@ Facet.defaults = {RDF.type: {
                       'indexingtype': fulltextindex.Resource(),
                       'toplevel_only': True,
                       'use_for_toc': True,
-                      'selector': Facet.defaultselector,
+                      'selector': Facet.resourcelabel,
                       'key': Facet.resourcelabel,
                       'identificator': Facet.term,
                       'dimension_type': 'ref',
