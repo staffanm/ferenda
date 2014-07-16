@@ -454,7 +454,7 @@ class Py23DocChecker(doctest.OutputChecker):
             # if running on py2, attempt to prefix all the strings
             # with a u (since all our apis use unicode strings)
             want = re.sub("'(.*?)'", "u'\\1'", want)
-            want = re.sub('"(.*?)"', 'u"\\1"', want)
+            # want = re.sub('"(.*?)"', 'u"\\1"', want) -- doctest strings always (?) only use singlequoted strings
         return doctest.OutputChecker.check_output(self, want, got, optionflags)
         
 def parametrize(cls, template_method, name, params, wrapper=None):

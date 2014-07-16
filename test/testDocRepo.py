@@ -2326,6 +2326,7 @@ It can span several lines."""
 
 # Add doctests in the module
 from ferenda import documentrepository
+from ferenda.testutil import Py23DocChecker
 def load_tests(loader,tests,ignore):
-    tests.addTests(doctest.DocTestSuite(documentrepository))
+    tests.addTests(doctest.DocTestSuite(documentrepository, checker=Py23DocChecker()))
     return tests

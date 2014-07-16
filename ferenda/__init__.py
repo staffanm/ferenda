@@ -23,5 +23,5 @@ from .pdfdocumentrepository import PDFDocumentRepository
 from .compositerepository import CompositeRepository, CompositeStore
 from .resources import Resources
 from .wsgiapp import WSGIApp
-# when REST API lands, we update to dev2
-__version__ = "0.2.0.dev2" #gets pulled into setup.py and docs/conf.py
+# During release polishing, we update to dev3
+__version__ = "0.2.0.dev3" #gets pulled into setup.py and docs/conf.py
