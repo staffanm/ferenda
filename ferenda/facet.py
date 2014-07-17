@@ -18,21 +18,34 @@ class Facet(object):
 
     :param rdftype: The type of facet being created
     :type rdftype: rdflib.term.URIRef
-    :param label: TBW
-    :param pagetitle: TBW
-    :param indexingtype: TBW
-    :param selector: TBW
-    :param key: TBW
-    :param toplevel_only: TBW
-    :param use_for_toc: TBW
-    :param selector_descending: TBW
-    :param key_descending: TBW
-    :param multiple_values: TBW
-    :param dimension_type: TBW
-    :param dimension_label: TBW
-    :param identificator: TBW
+    :param label: A template for the label property of TocPageset objects created from this facet
+    :type label: str
+    :param pagetitle: A template for the title property of TocPage objects created from this facet
+    :type pagetitle: str
+    :param indexingtype: Object specifying how to store the data selected by this facet in the fulltext index
+    :type indexingtype: ferenda.fulltext.IndexedType
+    :param selector: A function that takes *(row, binding, resource_graph)* and returns a string acting as a category of some kind
+    :type selector: callable
+    :param key: A function that takes *(row, binding, resource_graph)* and returns a string usable for sorting
+    :type key: callable
+    :param toplevel_only: Whether this facet should be applied to documents only, or any named (ie. given an URI) fragment of a document.
+    :type toplevel_only: bool
+    :param use_for_toc: Whether this facet should be used for TOC generation
+    :type use_for_toc: bool
+    :param selector_descending: Whether the values returned by ``selector`` should be presented in lexical descending order
+    :type selector_descending: bool
+    :param key_descending: Whether documents, when sorted through the ``key`` function, should be presented in reverse order.
+    :type key_descending: bool
+    :param multiple_values: Whether more than one instance of the ``rdftype`` value should be processed (such as multiple keywords each specified by one ``dcterms:subject`` triple).
+    :type multiple_values: bool
+    :param dimension_type: The general type of this facet -- can be ``"type"`` (values are ``rdf:type``), ``"ref"`` (values are URIs), ``"year"`` (values are xsd:datetime or similar), or ``"value"`` (values are string literals).
+    :type dimension_type: str
+    :param dimension_label: An alternate label for this facet to be used if the ``selector`` logic is more transformative than selectional (ie. if it transforms dates to True or False values depending on whether they're April 1st, you might set this to "aprilfirst")
+    :type dimension_label: str
+    :param identificator: A function that takes *(row, binding, resource_graph)* and returns an identifier-like string usable as an id string or URL segment.
+    :type identificator: callable
 
-    If optional parameters aren't given, then appropriate values are
+    If optional parameters aren't provided, then appropriate values are
     selected if rdfrtype is one of some common rdf properties:
 
     ===================  ======================================================

@@ -74,8 +74,8 @@ Just run ``gunicorn wsgi:application``
 
 .. _urls_used:
 
-URLs used
----------
+URLs for retrieving resources
+-----------------------------
 
 In keeping with `Linked Data principles
 <http://www.w3.org/DesignIssues/LinkedData.html>`_, all URIs for your
@@ -86,57 +86,9 @@ the ``url`` parameter in ``ferenda.ini``). These URIs are retrievable
 when you run the built-in web server during development, as described
 above.
 
-.. 
-  URIs for things other than documents
-  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  .. note::
-     The functionality in this section is not yet implemented.
-  It should be noted that the infamous httpRange-14
-  (http://www.jenitennison.com/blog/node/159) issue is largely a
-  non-issue for content served by ferenda, as it only uses URIs for
-  things (documents) that are, in fact, available on the web. But
-  occasionally you need (or want) to use references to things that are
-  not available on the web, for example to specify the publisher of a
-  specific document, eg::
-    <http://localhost:8000/res/rfc/4711>
-        dcterms:publisher <http://localhost:8080/things/org/IETF> .
-  All n3 files present in the directory ``triples`` will be read and
-  used. Eg. create ``triples/org.n3`` with the content::
-    <http://localhost:8000/things/org/IETF>
-        rdfs:label "Internet Engineering Task Force (IETF)"@en ,
-        foaf:homepage <http://www.ietf.org> .
-  Now when you go to http://localhost:8000/things/org/IETF with a web
-  browser, it will redirect you to the IETF homepage, but if you perform
-  a Accept: application/rdf+xml GET on the same URI, it'll reply with
-  all statements about that URI in RDF/XML
-  
-.. 
-  Using ``develurl`` during development
-  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  
-  .. note::
-  
-     The functionality in this section is not yet implemented either.
-  
-  When deploying, you won't use http://localhost:8000/ in your
-  public-facing URLs. Instead, come up with an external base url such as
-  ``http://example.org/netstandards/``, and in ferenda.ini set::
-  
-    [__root__]
-    url=http://example.org/netstandards/   
-    develurl=http://localhost:8000/
-  
-  This will make all uris in parsed and generated documents on the form
-  http://example.org/netstandards/res/rfc/4711, but during devel still
-  support http://localhost:8000/res/rfc/4711.
-  
-  When you set url to a new value, you must re-run ``./ferenda-build.py
-  all generate --all --force``, ``./ferenda-build.py all toc --force``,
-  ``./ferenda-build.py all news --force`` and ``./ferenda-build.py all
-  frontpage --force`` for it to take effect.
 
-The REST(ish) API
------------------
+Document resources
+^^^^^^^^^^^^^^^^^^
 
 For each resource, use the ``Accept`` header to retrieve different
 versions of it:
@@ -198,3 +150,57 @@ in a similar way as the document resources above:
   format.
 * ``curl -H "Accept: text/turtle" http://localhost/dataset/rfc``
   returns the same, but in turtle format.
+
+
+See also :doc:`restapi`.
+
+
+.. 
+  URIs for things other than documents
+  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  .. note::
+     The functionality in this section is not yet implemented.
+  It should be noted that the infamous httpRange-14
+  (http://www.jenitennison.com/blog/node/159) issue is largely a
+  non-issue for content served by ferenda, as it only uses URIs for
+  things (documents) that are, in fact, available on the web. But
+  occasionally you need (or want) to use references to things that are
+  not available on the web, for example to specify the publisher of a
+  specific document, eg::
+    <http://localhost:8000/res/rfc/4711>
+        dcterms:publisher <http://localhost:8080/things/org/IETF> .
+  All n3 files present in the directory ``triples`` will be read and
+  used. Eg. create ``triples/org.n3`` with the content::
+    <http://localhost:8000/things/org/IETF>
+        rdfs:label "Internet Engineering Task Force (IETF)"@en ,
+        foaf:homepage <http://www.ietf.org> .
+  Now when you go to http://localhost:8000/things/org/IETF with a web
+  browser, it will redirect you to the IETF homepage, but if you perform
+  a Accept: application/rdf+xml GET on the same URI, it'll reply with
+  all statements about that URI in RDF/XML
+  
+.. 
+  Using ``develurl`` during development
+  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  
+  .. note::
+  
+     The functionality in this section is not yet implemented either.
+  
+  When deploying, you won't use http://localhost:8000/ in your
+  public-facing URLs. Instead, come up with an external base url such as
+  ``http://example.org/netstandards/``, and in ferenda.ini set::
+  
+    [__root__]
+    url=http://example.org/netstandards/   
+    develurl=http://localhost:8000/
+  
+  This will make all uris in parsed and generated documents on the form
+  http://example.org/netstandards/res/rfc/4711, but during devel still
+  support http://localhost:8000/res/rfc/4711.
+  
+  When you set url to a new value, you must re-run ``./ferenda-build.py
+  all generate --all --force``, ``./ferenda-build.py all toc --force``,
+  ``./ferenda-build.py all news --force`` and ``./ferenda-build.py all
+  frontpage --force`` for it to take effect.
+

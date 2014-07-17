@@ -9,7 +9,10 @@ text search. Ferenda has a simple API, based on the ``rinfo-service``
 component of `RDL <https://github.com/rinfo/rdl>`_, and inspired by
 `Linked data API
 <https://code.google.com/p/linked-data-api/wiki/Specification>`_, that
-enables you to do that.
+enables you to do that. This API only provides search/select
+operations that returns a result list. For information about each
+individual result in that list, use the methods described in
+:ref:`urls_used`.
 
 .. note::
 
@@ -30,35 +33,63 @@ JSON format.
 Free text queries
 -----------------
 
-Searches in body text (+ any stringish fields?)
+The simplest form of query is a free text query that is run against
+all text of all documents. Use the parameter ``q``,
+eg. ``http://localhost:8000/api/?q=tail`` returns all documents
+(and document fragments) containing the word "tail".
 
 Result lists
 ------------
 
-``next`` and ``previous`` fields
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+The result of a query will be a JSON document containing some general
+properties of the result, and a list of result items, eg:
+
+.. literalinclude:: ../test/files/api/basicapi-fulltext-query.json
+    
+Each result item contain all fields that have been indexed (as
+specified by your docrepos' facets, see :doc:`facets`, the document
+URI (as the field ``iri``) and optionally a field ``matches`` that
+provides a snipped of the matching text.
 
 Parameters
 ----------
 
-if dimension_label is defined, use that. Else use the qname for the
-rdftype with underscore, eg ``dcterms_title``
+Any indexed property, as defined by your facets, can be used for
+querying. The parameter is the same as the qname for the rdftype with
+``_`` instead of ``:``, eq to search all documents that have
+``dcterms:publisher`` set to ```http://example.org/publisher/A``, use
+``http://localhost:8000/api/?dcterms_publisher=http%3A%2F%2Fexample.org%2Fpublisher%2FA``
 
-* as wildcard for string data
+You can use * as a wildcard for any string data, eg. the above could
+be shortened to
+``http://localhost:8000/api/?dcterms_publisher=*%2Fpublisher%2FA``.
 
-``_page`` and ``pageSize``
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+If you have a facet with a set ``dimension_label``, you can use that
+label directly as a parameter, eg ``http://localhost:8000/api/?aprilfools=true``. 
+
+
+Paging
+^^^^^^
+
+By default, the result list only contains 10 results. You can inspect
+the properties startIndex and totalResults to find out if there are
+more results, and use the special parameter ``_page`` to request
+subsequent pages of results. You can also request a different length
+of the result list through the ``_pageSize`` parameter.
 
 Statistics
 ----------
 
-Defining facets
----------------
+By requesting the special resource ``;stats``, eg
+``http://localhost:8000/api/;stats``, you can get a statistics view
+over all documents in all your docrepos for each of your defined
+facets including the number of document for each value of it's
+selector, eg:
 
-dimension_label for synthesized labels
+.. literalinclude:: ../test/files/api/basicapi-stats.json
 
-(alternative: express the synthesized value as a rdf predicate in your
-own vocablulary and use a direct facet for it).
+You can also get the same information for the documents in any result
+list by setting the special parameter ``_stats=on``.
 
 
 Ranges
@@ -69,7 +100,12 @@ Ranges
 ``year-``
 
 
+Support resources
+-----------------
+
+var-common.json and var-terms.json.
+
 Legacy mode
 -----------
 
-Ferenda can be made directly compatible with the API used by ``rinfo-service``, which ena
+Ferenda can be made directly compatible with the API used by ``rinfo-service``, which enables...
