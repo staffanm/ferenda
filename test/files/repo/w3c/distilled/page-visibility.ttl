@@ -5,8 +5,9 @@
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix w3c: <http://example.org/ontology/w3c/> .
 
-<http://localhost:8000/res/w3c/page-visibility> a bibo:Standard ;
+<http://localhost:8000/res/w3c/page-visibility> a w3c:Recommendation ;
     dcterms:identifier "page-visibility" ;
     dcterms:issued "2013-05-14"^^xsd:date ;
     dcterms:publisher <http://localhost:8000/ext/w3c> ;

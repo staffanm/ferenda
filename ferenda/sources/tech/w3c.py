@@ -21,7 +21,7 @@ DCTERMS = Namespace(util.ns['dcterms'])
 class W3Standards(DocumentRepository):
     alias = "w3c"
     start_url = "http://www.w3.org/TR/tr-status-all"
-    rdf_type = Namespace(util.ns['bibo']).Standard
+    rdf_type = Namespace("http://example.org/ontology/w3c/").Recommendation
     document_url_regex = "http://www.w3.org/TR/(?P<year>\d{4})/REC-(?P<basefile>.*)-(?P<date>\d+)"
     document_url_template = None  # no simple way of creating a url
                                  # from a basefile alone (we also need
@@ -29,6 +29,14 @@ class W3Standards(DocumentRepository):
     basefile_regex = None  # Link text on index page do not contain basefile
     parse_content_selector = "body"
     parse_filter_selectors = ["div.toc", "div.head"]
+    namespaces = ('rdf',  # always needed
+                  'dcterms',  # title, identifier, etc (could be replaced by equiv bibo prop?)
+                  'bibo',  # Standard and DocumentPart classes, chapter prop
+                  'xsd',  # datatypes
+                  'prov', # for :wasGeneratedBy
+                  ('w3c', 'http://example.org/ontology/w3c/')  # custom (nonstandard) ontology
+                  )
+
 
     # NOTES:
     #

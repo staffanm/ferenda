@@ -1,0 +1,44 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix : <http://example.org/ontology/w3c/> .
+
+# This is a very experimental ontology, modeled after the description
+# at http://www.w3.org/2005/10/Process-20051014/tr.html
+
+: a owl:Ontology . 
+
+:TechnicalReport a owl:Class;
+    rdfs:subClassOf bibo:Standard;
+    rdfs:label "Technical Report"@en;
+    rdfs:comment """The maturity level of a published technical report indicates its place in the development process. The maturity levels "Working Draft" and "Working Group Note" represent the possible initial states of a technical report in the development process. The maturity levels "Recommendation," "Working Group Note," and "Rescinded Recommendation" represent the possible end states."""@en;
+    skos:altLabel "TR";
+    rdfs:seeAlso <http://www.w3.org/TR/> .
+
+:WorkingDraft a owl:Class;
+    rdfs:subClassOf :TechnicalReport;
+    rdfs:label "Working Draft"@en;
+    rdfs:comment "A Working Draft is a document that W3C has published for review by the community, including W3C Members, the public, and other technical organizations. Some, but not all, Working Drafts are meant to advance to Recommendation; see the document status section of a Working Draft for the group's expectations."@en;
+    skos:altLabel "WD" . 
+    
+:CandidateRecommendation a owl:Class;
+    rdfs:subClassOf :TechnicalReport;
+    rdfs:label "Candidate Recommendation"@en;
+    rdfs:comment "A Candidate Recommendation is a document that W3C believes has been widely reviewed and satisfies the Working Group's technical requirements. W3C publishes a Candidate Recommendation to gather implementation experience."@en;
+    skos:altLabel "CR" . 
+
+:ProposedRecommendation a owl:Class;
+    rdfs:subClassOf :TechnicalReport;
+    rdfs:label "Proposed Recommendation"@en;
+    rdfs:comment "A Proposed Recommendation is a mature technical report that, after wide review for technical soundness and implementability, W3C has sent to the W3C Advisory Committee for final endorsement."@en;
+    skos:altLabel "PR" . 
+    
+:Recommendation a owl:Class;
+    rdfs:subClassOf :TechnicalReport;
+    rdfs:label "W3C Recommendation"@en;
+    rdfs:comment "A W3C Recommendation is a specification or set of guidelines that, after extensive consensus-building, has received the endorsement of W3C Members and the Director. W3C recommends the wide deployment of its Recommendations."@en;
+    skos:altLabel "REC" . 
+    

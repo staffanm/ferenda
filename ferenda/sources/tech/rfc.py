@@ -68,7 +68,6 @@ class RFC(DocumentRepository):
                   'dcterms',  # title, identifier, etc (could be replaced by equiv bibo prop?)
                   'bibo',  # Standard and DocumentPart classes, chapter prop
                   'xsd',  # datatypes
-                  'foaf',  # rfcs are foaf:Documents for now
                   'prov', # for :wasGeneratedBy
                   ('rfc', 'http://example.org/ontology/rfc/')  # custom (fake) ontology
                   )
