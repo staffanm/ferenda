@@ -7,8 +7,8 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://localhost:8000/res/rfc/6916> a rfc:RFC ;
-    rfc:BCP "182" ;
+<http://localhost:8000/res/rfc/6916> a rfc:BCP ;
+    rfc:bcpnumber "182" ;
     dcterms:creator "R. Gagliano",
         "S. Kent",
         "S. Turner" ;

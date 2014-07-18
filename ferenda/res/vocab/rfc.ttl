@@ -47,3 +47,16 @@
 :category a owl:DatatypeProperty;
     rdfs:subPropertyOf dcterms:subject;
     rdfs:label "Category"@en .
+
+# compliments the :BCP, :STD and :FYI types
+:bcpnum a owl:DatatypeProperty;
+    rdfs:subPropertyOf dcterms:identifier;
+    rdfs:label "BCP Number"@en .
+
+:stdnum a owl:DatatypeProperty;
+    rdfs:subPropertyOf dcterms:identifier;
+    rdfs:label "STD Number"@en .
+
+:fyinum a owl:DatatypeProperty;
+    rdfs:subPropertyOf dcterms:identifier;
+    rdfs:label "FYI Number"@en .

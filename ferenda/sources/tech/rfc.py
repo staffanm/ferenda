@@ -470,10 +470,15 @@ class RFC(DocumentRepository):
             realid = doc.basefile
         doc.uri = self.canonical_uri(realid)
         desc = Describer(doc.meta, doc.uri)
-        desc.rdftype(self.ns['rfc'].RFC)
         desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
         desc.value(self.ns['dcterms'].title, title, lang="en")
         self.parse_header(header, desc)
+        # parse_header might have set .rdftype, but if not:
+        try:
+            desc.getrdftype()
+        except KeyError:
+            desc.rdftype(self.ns['rfc'].RFC)
+
         if not desc.getvalues(self.ns['dcterms'].identifier):
             desc.value(self.ns['dcterms'].identifier, "RFC %s" % doc.basefile)
 
@@ -579,11 +584,14 @@ class RFC(DocumentRepository):
                     else:
                         self.log.warning("Can't pick out RFC number from line %s" % line)
             elif key == "BCP":
-                desc.value(self.ns['rfc'].BCP, value)
+                desc.value(self.ns['rfc'].bcpnumber, value)
+                desc.rdftype(self.ns['rfc'].BCP)
             elif key == "STD":
-                desc.value(self.ns['rfc'].STD, value)
+                desc.value(self.ns['rfc'].stdnumber, value)
+                desc.rdftype(self.ns['rfc'].FYI)
             elif key == "FYI":
-                desc.value(self.ns['rfc'].FYI, value)
+                desc.value(self.ns['rfc'].fyinumber, value)
+                desc.rdftype(self.ns['rfc'].FYI)
             else:
                 # Unknown headers seen: BCP, STD, FYI
                 self.log.warning("Unknown header key %s (value %s)" % (key, value))
