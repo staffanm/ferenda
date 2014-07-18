@@ -255,7 +255,6 @@ class WSGIApp(object):
                 # convert it into ref, and convert all string values to
                 # fake resource ref URIs
                 dimension_type = "ref"
-                from pudb import set_trace; set_trace()
                 transformer = lambda x: ("http://example.org/fake-resource/%s" % x).replace(" ", "_")
             elif self.config.legacyapi and dimension_type == "term":
                 # legacyapi expects "Standard" over "bibo:Standard", which is what Facet.qname returns
