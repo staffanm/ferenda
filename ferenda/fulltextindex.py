@@ -756,7 +756,10 @@ class ElasticSearchIndex(RemoteIndex):
             if match:
                 query["filtered"]["query"] = {"match": match}
         else:
-            query = {"match": match}
+            if match:
+                query = {"match": match}
+            else:
+                query = {"match_all": match}
             
         payload = {'query': query}
         if q:

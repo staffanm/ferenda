@@ -73,7 +73,11 @@ class RFC(DocumentRepository):
                   )
     sparql_annotations = "res/sparql/rfc-annotations.rq"
     xslt_template = "res/xsl/rfc.xsl"
-    rdf_type = URIRef("http://example.org/ontology/rfc/RFC")
+    rdf_type = [URIRef("http://example.org/ontology/rfc/RFC"),
+                URIRef("http://example.org/ontology/rfc/BCP"),
+                URIRef("http://example.org/ontology/rfc/STD"),
+                URIRef("http://example.org/ontology/rfc/FYI")]
+                
     # NOTES:
     #
     # Like many large document collections that has existed for a long

@@ -212,6 +212,7 @@ class WSGIApp(object):
         facets = [] # will contain all unique facets
         qname_graph = Graph()
         resource_graph = Graph()
+                        
         for repo in self.repos:
             for prefix, ns in repo.make_graph().namespaces():
                 # print("repo %s: binding %s to %s" % (repo.alias, prefix, ns))
@@ -238,7 +239,6 @@ class WSGIApp(object):
         # != None), collect the available observations and the count for
         # each
         for facet in facets:
-
             if not facet.dimension_type:
                 continue
             binding = qname_graph.qname(facet.rdftype).replace(":", "_")
@@ -255,10 +255,11 @@ class WSGIApp(object):
                 # convert it into ref, and convert all string values to
                 # fake resource ref URIs
                 dimension_type = "ref"
+                from pudb import set_trace; set_trace()
                 transformer = lambda x: ("http://example.org/fake-resource/%s" % x).replace(" ", "_")
-            # elif self.config.legacyapi and dimension_type == "term":
-                # # legacyapi expects "Standard" over "bibo:Standard", which is what Facet.qname returns
-                # transformer = lambda x: x.split(":")[1]
+            elif self.config.legacyapi and dimension_type == "term":
+                # legacyapi expects "Standard" over "bibo:Standard", which is what Facet.qname returns
+                transformer = lambda x: x.split(":")[1]
             else:
                 transformer = lambda x: x
 

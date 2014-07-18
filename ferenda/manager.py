@@ -53,6 +53,7 @@ def makeresources(repos,
                   jsfiles=[],
                   imgfiles=[],
                   staticsite=False,
+                  legacyapi=False,
                   sitename="MySite",
                   sitedescription="Just another Ferenda site",
                   url="http://localhost:8000/"):
@@ -76,6 +77,7 @@ def makeresources(repos,
                      jsfiles=jsfiles,
                      imgfiles=imgfiles,
                      staticsite=staticsite,
+                     legacyapi=legacyapi,
                      sitename=sitename,
                      sitedescription=sitedescription,
                      url=url).make()
@@ -147,7 +149,8 @@ def runserver(repos,
               searchendpoint="/search/",
               url="http://localhost:8000/",
               indextype="WHOOSH",
-              indexlocation="data/whooshindex"):
+              indexlocation="data/whooshindex",
+              legacyapi=False):
     """Starts up a internal webserver and runs the WSGI app (see
     :py:func:`make_wsgi_app`) using all the specified document
     repositories. Runs forever (or until interrupted by keyboard).
@@ -175,6 +178,7 @@ def runserver(repos,
               'searchendpoint': searchendpoint,
               'indextype': indextype,
               'indexlocation': indexlocation,
+              'legacyapi': legacyapi,
               'repos': repos}
     httpd = make_server('', port, make_wsgi_app(None, **kwargs))
     httpd.serve_forever()
@@ -527,7 +531,8 @@ overridden by the config file or command line arguments."""
                 'sitedescription': 'Just another Ferenda site',
                 'cssfiles': list,
                 'jsfiles': list,
-                'imgfiles': list
+                'imgfiles': list,
+                'legacyapi': False
     }
     config = LayeredConfig(defaults, filename, argv, cascade=True)
     return config
@@ -571,7 +576,8 @@ def _setup_makeresources_args(config):
             'imgfiles':    config.imgfiles,
             'sitename':    config.sitename,
             'sitedescription': config.sitedescription,
-            'url':         config.url
+            'url':         config.url,
+            'legacyapi':   config.legacyapi
     }
 
 
@@ -942,6 +948,7 @@ def _setup_runserver_args(config, inifilename):
             'url':            config.url,
             'indextype':      config.indextype,
             'indexlocation':  config.indexlocation,
+            'legacyapi':      config.legacyapi,
             'repos':          repos}
 
 

@@ -22,15 +22,15 @@
 
 :STD a owl:Class;
     rdfs:subClassOf :RFC;
-    rdfs:label "STD" .
+    rdfs:label "Standard (STD)" .
 
 :BCP a owl:Class;
     rdfs:subClassOf :RFC;
-    rdfs:label "BCP" .
+    rdfs:label "Best Current Practice (BCP)" .
 
 :FYI a owl:Class;
     rdfs:subClassOf :RFC;
-    rdfs:label "FYI" .
+    rdfs:label "Information (FYI)" .
     
 :updates a owl:DatatypeProperty;
     rdfs:subPropertyOf dcterms:requires;

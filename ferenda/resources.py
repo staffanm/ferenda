@@ -8,8 +8,9 @@ import six
 from six import text_type as str
 from lxml import etree
 from lxml.builder import ElementMaker
-from rdflib import URIRef, Literal, BNode, Graph, RDF, RDFS
+from rdflib import URIRef, Literal, BNode, Graph, Namespace, RDF, RDFS
 from rdflib.namespace import FOAF, SKOS
+BIBO = Namespace("http://purl.org/ontology/bibo/")
 import pkg_resources
 
 from ferenda import LayeredConfig, DocumentRepository
@@ -136,7 +137,7 @@ class Resources(object):
                                     
         outfile = self.resourcedir + os.sep + "resources.xml"
         util.writefile(outfile, etree.tostring(root, encoding="utf-8", pretty_print=True).decode("utf-8"))
-        self.log.debug("Wrote %s" % outfile)
+        self.log.info("Wrote %s" % outfile)
         return [self._filepath_to_urlpath(outfile, 1)]
 
 
@@ -254,10 +255,10 @@ class Resources(object):
         # api/terms.json (aliased to /var/terms.json if legacyapi)
         # api/common.json (aliased to /var/common.json if legacyapi)
         # MAYBE api/ui/  - copied from ferenda/res/ui
-        legacyapi = True
         files = []
         context = os.sep.join([self.resourcedir, "api", "context.json"])
-        if legacyapi:
+        if self.config.legacyapi:
+            self.log.info("Creating API files for legacyapi")
             contextpath = "/json-ld/context.json"
             termspath   = "/var/terms"
             commonpath  = "/var/common"
@@ -284,7 +285,7 @@ class Resources(object):
             # no repos are given)
             if '@context' in d:
                 d['@context'] = contextpath
-            if legacyapi:
+            if self.config.legacyapi:
                 d = self._convert_legacy_jsonld(d, self.config.url + urlpath[1:])
             with open(filename, "w") as fp:
                     json.dump(d, fp, indent=4, sort_keys=True)
@@ -357,6 +358,17 @@ class Resources(object):
                             # make sure multiple values are sorted for
                             # the same reason as below
                             subject[key].sort()
+
+                    # FIXME: We want to use just the urileaf for
+                    # legacyapi clients (ie Standard instead of
+                    # bibo:Standard) but to be proper json-ld, this
+                    # requires that we define contexts for this. Which
+                    # we don't (yet)
+                    if ("iri" in subject and
+                        ":" in subject["iri"] and
+                        "://" not in subject["iri"]):
+                        subject["iri"] = subject["iri"].split(":",1)[1]
+                    
                     topics.append(subject)
 
         # make sure the triples are in a predictable order, so we can
@@ -376,6 +388,10 @@ class Resources(object):
                     assert data[prefix] == str(ns), "Conflicting URIs for prefix %s" % prefix
                 else:
                     data[prefix] = str(ns)
+
+        # foaf and rdfs must always be defined prefixes
+        data["foaf"] = "http://xmlns.com/foaf/0.1/"
+        data["rdfs"] = "http://www.w3.org/2000/01/rdf-schema#"
 
         # the legacy api client expects some terms to be available using
         # shortened forms (eg 'label' instead of 'rdfs:label'), so we must
@@ -412,6 +428,8 @@ class Resources(object):
             for prefix, uri in repo.ontologies.store.namespaces():
                 if prefix:
                     g.bind(prefix, uri)
+            # foaf: must always be bound
+            g.bind("foaf", "http://xmlns.com/foaf/0.1/")
             for (s,p,o) in repo.ontologies:
                 if isinstance(s, BNode):
                     continue
@@ -438,7 +456,7 @@ class Resources(object):
                                             # ("res/extra/rfc.ttl",
                                             #  "res/extra/propregeringen.ttl" in
                                             # a controlled way)
-                if p in (FOAF.name, SKOS.prefLabel, SKOS.altLabel):
+                if p in (FOAF.name, SKOS.prefLabel, SKOS.altLabel, BIBO.identifier):
                     g.add((root, FOAF.topic, s))
                     g.add((s,p,o))
                     # try to find a type

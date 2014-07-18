@@ -368,7 +368,7 @@ Facet.defaults = {RDF.type: {
                       'selector': Facet.firstletter,
                       'key': Facet.titlesortkey,
                       'identificator': Facet.firstletter,
-                      'dimension_type': "value",
+                      'dimension_type': None, # or "value",
                       'pagetitle': 'Documents starting with "%(selected)s"'
                   },
                   DCTERMS.identifier: {
@@ -437,7 +437,7 @@ Facet.defaults = {RDF.type: {
                     'key': Facet.resourcelabel,
                     'identificator': Facet.term,
                     'multiple_values': True,
-                    'dimension_type': 'value',
+                    'dimension_type': 'ref',
                 },
                 SCHEMA.free: { # "A flag to signal that the publication is accessible for free."
                     'indexingtype': fulltextindex.Boolean(),

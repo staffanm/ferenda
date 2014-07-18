@@ -31,21 +31,27 @@
 # Statuses, modelled as categories (rfc:category, subtype of dcterms:subject)
 
 <http://localhost:8000/dataset/rfc/standard> a bibo:Collection;
+    foaf:name "Standards Track";
     bibo:identifier "Standards Track" .
 
 <http://localhost:8000/dataset/rfc/informational> a bibo:Collection;
+    foaf:name "Informational";
     bibo:identifier "Informational" .
 
 <http://localhost:8000/dataset/rfc/experimental> a bibo:Collection;
+    foaf:name "Experimental";
     bibo:identifier "Experimental" .
 
 <http://localhost:8000/dataset/rfc/best-current-practice> a bibo:Collection;
+    foaf:name "Best Current Practice";
     bibo:identifier "Best Current Practice" .
 
 <http://localhost:8000/dataset/rfc/historic> a bibo:Collection;
+    foaf:name "Historic";
     bibo:identifier "Historic" .
 
 <http://localhost:8000/dataset/rfc/unknown> a bibo:Collection;
+    foaf:name "Unknown";
     bibo:identifier "Unknown" .
 
 
