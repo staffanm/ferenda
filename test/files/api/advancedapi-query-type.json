@@ -1,0 +1,11 @@
+{"current": "/myapi/?rdf_type=ex:OtherType",
+ "duration": null,
+ "items": [{"dcterms_issued": "2014-05-06",
+            "dcterms_publisher": {"iri": "http://example.org/vocab/publ2",
+                                  "label": "Bookprinters and associates"},
+            "dcterms_title": "More docs",
+            "rdf_type": "http://example.org/vocab/OtherType",
+            "iri": "http://example.org/repo1/c"}],
+ "itemsPerPage": 10,
+ "startIndex": 0,
+ "totalResults": 1}

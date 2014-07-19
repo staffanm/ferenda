@@ -511,7 +511,6 @@ class WhooshIndex(FulltextIndex):
             query = freetext
         else:
             raise ValueError("Neither q or kwargs specified")
-
         with self.index.searcher() as searcher:
             page = searcher.search_page(query, pagenum, pagelen)
             res = self._convert_result(page)
@@ -537,6 +536,8 @@ class WhooshIndex(FulltextIndex):
             highlighted = hl.highlight_hit(hit, "text", fields['text'])
             if highlighted:
                 fields['text'] = highlighted
+            else:
+                del fields['text']
             # de-marschal Resource objects from list to dict
             for key in resourcefields:
                 if key in fields:
@@ -657,7 +658,7 @@ class ElasticSearchIndex(RemoteIndex):
                     (Keyword(),
                      {"type": "string", "index_name": "keyword"}),
                     (URI(),
-                     {"type": "string"}),
+                     {"type": "string", "index": "not_analyzed", "boost": 1.1, "norms": {"enabled": True}}),
                     )
 
     def commit(self):
@@ -767,7 +768,8 @@ class ElasticSearchIndex(RemoteIndex):
                                     'pre_tags': ["<strong class='match'>"],
                                     'post_tags': ["</strong>"],
                                     'fragment_size': '40'}
-        
+        # Don't include the full text of every document in every hit
+        payload['_source'] = {'exclude': ['text']}
         return relurl, json.dumps(payload, indent=4, default=util.json_default_date)
 
     def _decode_query_result(self, response, pagenum, pagelen):

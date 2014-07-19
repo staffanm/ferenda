@@ -15,7 +15,7 @@ SCHEMA = Namespace("http://schema.org/")
 
 # mine
 from testWSGI import WSGI  # provides the nice call_wsgi func
-from ferenda import DocumentRepository, FulltextIndex, Facet
+from ferenda import DocumentRepository, FulltextIndex, TripleStore, Facet
 from ferenda import util, fulltextindex
 
 class BasicAPI(object):
@@ -207,6 +207,7 @@ class AdvancedAPI(object):
     def tearDown(self):
         FulltextIndex.connect(self.indextype, self.indexlocation,
                               [DocumentRepository()]).destroy()
+        TripleStore.connect(self.storetype, self.storelocation, self.storerepository).clear()
 
     def put_files_in_place(self):
         self.repos = []
@@ -275,6 +276,14 @@ class AdvancedAPI(object):
         got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
         self.assertEqual(self.query_parameters_want, got)
 
+    # test querying by rdftype -- handled in a very special way
+    query_type = "rdf_type=ex:OtherType"
+    query_type_want = json.load(open("test/files/api/advancedapi-query-type.json"))
+    def test_query_type(self):
+        self.env['QUERY_STRING'] = self.query_type
+        got = json.loads(self.call_wsgi(self.env)[2].decode("utf-8"))
+        self.assertEqual(self.query_type_want, got)
+        
     # test a custom facet (is_april_fools) and stats for those results
     query_customfacet = "aprilfools=true&_stats=on"
     query_customfacet_want = json.load(open("test/files/api/advancedapi-query-customfacet.json"))
@@ -311,6 +320,8 @@ class AdvancedLegacyAPI(AdvancedAPI):
     faceting_want = json.load(open("test/files/api/advancedapi-faceting.legacy.json"))
     query_parameters = "subject=red&free=true"
     query_parameters_want = json.load(open("test/files/api/advancedapi-query-parameters.legacy.json"))
+    query_type = "type=OtherType"
+    query_type_want = json.load(open("test/files/api/advancedapi-query-type.legacy.json"))
     query_customfacet_want = json.load(open("test/files/api/advancedapi-query-customfacet.legacy.json"))
     query_range = "min-issued=2012-04-01&max-issued=2012-04-03"
     query_range_want = json.load(open("test/files/api/advancedapi-query-range.legacy.json"))

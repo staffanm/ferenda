@@ -194,7 +194,7 @@ class API(WSGI):
                 'dcterms_title': "Hello World",
                 'dcterms_issued': datetime.datetime(2014,6,30,0,0,0),
                 'schema_free': True,
-                'rdf_type': 'bibo:Standard',
+                'rdf_type': 'bibo:Standard', # FIXME: should be http://purl.org/ontology/bibo/Standard -- but requires that self.repos in wsgiapp is set up
                 'pagenum': 1,
                 'pagelen': 10}
         with patch('ferenda.wsgiapp.FulltextIndex', **config):
@@ -219,7 +219,7 @@ class API(WSGI):
                 'dcterms_title': "Hello World",
                 'dcterms_issued': datetime.datetime(2014,6,30,0,0,0),
                 'schema_free': True,
-                'rdf_type': 'Standard', # should be bibo:Standard or even http://purl.org/ontology/bibo/Standard
+                'rdf_type': '*Standard', # should be bibo:Standard or even http://purl.org/ontology/bibo/Standard, but requires proper context handling to work
                 'pagenum': 1,
                 'pagelen': 10}
 

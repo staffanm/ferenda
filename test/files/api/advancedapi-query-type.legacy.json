@@ -1,12 +1,11 @@
-{"current": "/-/publ?year-issued=2013",
+{"current": "/-/publ?type=OtherType",
  "duration": null,
- "items": [{"issued": "2013-06-06",
+ "items": [{"issued": "2014-05-06",
             "publisher": {"iri": "http://example.org/vocab/publ2",
                                   "label": "Bookprinters and associates"},
-            "title": "Other doc",
-            "iri": "http://example.org/repo1/b",
-            "type": "http://example.org/vocab/MainType"}],
+            "title": "More docs",
+            "type": "http://example.org/vocab/OtherType",
+            "iri": "http://example.org/repo1/c"}],
  "itemsPerPage": 10,
  "startIndex": 0,
  "totalResults": 1}
-

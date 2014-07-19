@@ -8,9 +8,6 @@
              "label": "Publishing & sons"
          },
          "dcterms_title": "A simple doc",
-         "matches": {
-             "text": "This is part of the main document, but not of any sub-resource."
-         },
          "rdf_type": "http://example.org/vocab/MainType",
          "iri": "http://example.org/repo1/a"
      }

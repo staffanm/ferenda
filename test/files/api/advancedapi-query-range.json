@@ -6,7 +6,6 @@
             "dcterms_publisher": {"iri": "http://example.org/vocab/publ1",
                                   "label": "Publishing & sons"},
             "dcterms_title": "Another doc with all datatypes",
-            "matches": {"text": "This is part of the main document, but not of any sub-resource."},
             "rdf_type": "http://example.org/vocab/MainType",
             "schema_free": false,
             "iri": "http://example.org/repo2/b"}],

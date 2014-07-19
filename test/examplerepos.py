@@ -30,13 +30,13 @@ class DocRepo1(DocumentRepository):
     # A ex:MainType     "A simple doc"   ex:publ1          2012-04-01
     # B ex:MainType     "Other doc"      ex:publ2          2013-06-06
     # C ex:OtherType    "More docs"      ex:publ2          2014-05-06
-    # D ex:YetOtherType "Another doc"    ex:publ3          2014-09-23
+    # D ex:YetAnootherType "Another doc"    ex:publ3          2014-09-23
     alias = "repo1"
     namespaces = ['rdf', 'rdfs', 'xsd', 'xsi', 'dcterms', 'foaf',
                   ('ex', 'http://example.org/vocab/')]
     rdf_type = (URIRef('http://example.org/vocab/MainType'),
                 URIRef('http://example.org/vocab/OtherType'),
-                URIRef('http://example.org/vocab/YetOtherType'))
+                URIRef('http://example.org/vocab/YetAnotherType'))
                 
     @property
     def commondata(self):

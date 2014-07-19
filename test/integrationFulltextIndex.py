@@ -66,7 +66,8 @@ custom_dataset = [
      'dcterms_publisher': [{'iri': 'http://example.org/vocab/publ1',
                    'label': 'Publishing & sons'}],
      'dc_subject': ['green', 'standards'],
-     'text': 'Long text here'},
+     'text': 'Long text here'
+ },
     {'repo':'repo1',
      'basefile':'2',
      'uri':'http://example.org/repo1/2',
@@ -78,7 +79,8 @@ custom_dataset = [
                            {'iri': 'http://example.org/vocab/publ3',
                             'label': 'Printers intl.'}],
      'dc_subject': ['suggestions'],
-     'text': 'Even longer text here'},
+     'text': 'Even longer text here'
+ },
     {'repo':'repo2',
      'basefile':'1',
      'uri':'http://example.org/repo2/1',
@@ -87,7 +89,8 @@ custom_dataset = [
      'ex_secret': False,
      'dcterms_references':'http://example.org/repo2/2',
      'dc_subject':['green', 'yellow'],
-     'text': 'All documents must have texts'},
+     'text': 'All documents must have texts'
+ },
     {'repo':'repo2',
      'basefile':'2',
      'uri':'http://example.org/repo2/2',
@@ -96,7 +99,8 @@ custom_dataset = [
      'ex_secret': True,
      'dcterms_references':'http://example.org/repo2/2',
      'dc_subject':['yellow', 'red'],
-     'text': 'Even this one'}
+     'text': 'Even this one'
+ }
     ]
 
 class DocRepo1(DocumentRepository):
@@ -251,13 +255,20 @@ class CustomIndex(object):
         self.index.commit()
         self.assertEqual(self.index.doccount(),2)
 
+        # the expected result sets do NOT include the text field
+        # unless specificallly queried -- it's typically a lot of data
+        import copy
+        ds = copy.deepcopy(custom_dataset)
+        for row in ds:
+            del row['text']
+
         res, pager = self.index.query(uri="http://example.org/repo1/1")
         self.assertEqual(len(res), 1)
-        self.assertEqual(custom_dataset[0],res[0])
+        self.assertEqual(ds[0],res[0])
 
         res, pager = self.index.query(uri="http://example.org/repo2/2")
         self.assertEqual(len(res), 1)
-        self.assertEqual(custom_dataset[3],res[0])
+        self.assertEqual(ds[3],res[0])
 
     
     

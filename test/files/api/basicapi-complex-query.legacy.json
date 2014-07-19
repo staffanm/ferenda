@@ -5,7 +5,6 @@
             "publisher": {"iri": "http://example.org/publisher/B",
                           "label": "http://example.org/publisher/B"},
             "title": "Of needles and haystacks",
-            "matches": {"text": ""},
             "type": "http://purl.org/ontology/bibo/Standard",
             "iri": "http://example.org/base/123/c"}],
  "itemsPerPage": 10,

@@ -8,6 +8,7 @@ from wsgiref.util import FileWrapper
 import mimetypes
 from operator import itemgetter
 from datetime import date, datetime
+import re
 
 import six
 from six.moves.urllib_parse import parse_qsl, urlencode
@@ -414,9 +415,10 @@ class WSGIApp(object):
 
 
         # 2.1 some values need to be converted, based upon the
-        # fulltextindex schema. if schema[k] == fulltextindex.Datetime, do
-        # strptime. if schema[k] == fulltextindex.Boolean, convert
-        # 'true'/'false' to True/False.
+        # fulltextindex schema.
+        # if schema[k] == fulltextindex.Datetime, do strptime.
+        # if schema[k] == fulltextindex.Boolean, convert 'true'/'false' to True/False.
+        # if k = "rdf_type" and v looks like a qname or termname, expand v
         for k, fld in schema.items():
             # NB: Some values might already have been converted previously!
             if k in filtered and isinstance(filtered[k], str):
@@ -424,6 +426,18 @@ class WSGIApp(object):
                     filtered[k] = datetime.strptime(filtered[k], "%Y-%m-%d")
                 elif isinstance(fld, fulltextindex.Boolean):
                     filtered[k] = (filtered[k] == "true") # only "true" is True
+                elif k == "rdf_type" and re.match("\w+:[\w\-_]+", filtered[k]):
+                    # expand prefix ("bibo:Standard" -> "http://purl.org/ontology/bibo/")
+                    (prefix, term) = re.match("(\w+):([\w\-_]+)", filtered[k]).groups()
+                    for repo in self.repos:
+                        if prefix in repo.ns:
+                            filtered[k] = str(repo.ns[prefix]) + term
+                            break
+                    else:
+                        self.log.warning("Can't map %s to full URI" % (filtered[k]))
+                    pass
+                elif k == "rdf_type" and self.config.legacyapi and re.match("[\w\-\_]+", filtered[k]):
+                    filtered[k] = "*" + filtered[k]
 
 
         q = param['q'] if 'q' in param else None

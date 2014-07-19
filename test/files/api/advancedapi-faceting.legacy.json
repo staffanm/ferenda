@@ -4,7 +4,7 @@
                               {"count": 1,
                                "term": "OtherType"},
                               {"count": 1,
-                               "term": "YetOtherType"}]},
+                               "term": "YetAnotherType"}]},
             {"dimension": "publisher",
              "observations": [{"count": 5,
                                "ref": "http://example.org/vocab/publ1"},

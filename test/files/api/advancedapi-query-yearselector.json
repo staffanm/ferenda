@@ -5,7 +5,6 @@
                                   "label": "Bookprinters and associates"},
             "dcterms_title": "Other doc",
             "iri": "http://example.org/repo1/b",
-            "matches": {"text": "This is part of the main document, but not of any sub-resource."},
             "rdf_type": "http://example.org/vocab/MainType"}],
  "itemsPerPage": 10,
  "startIndex": 0,

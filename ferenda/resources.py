@@ -370,7 +370,7 @@ class Resources(object):
                         "://" not in subject["iri"]):
                         short = subject["iri"].split(":",1)[1]
                         if short in shortened:
-                            self.log.error("Cannot shorten IRI %s -> %s, already defined (%s)" % (subject["iri"], short, shortened[short]))
+                            self.log.warning("Cannot shorten IRI %s -> %s, already defined (%s)" % (subject["iri"], short, shortened[short]))
                             del subject["iri"] # skips adding this to topics
                         else:
                             shortened[short] = subject["iri"]
