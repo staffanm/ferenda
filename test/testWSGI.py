@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 import os, sys
-from ferenda.compat import unittest, Mock, patch
+from ferenda.compat import Mock, patch
 
 from ferenda import manager
 manager.setup_logger('CRITICAL')
@@ -15,8 +15,8 @@ import shutil
 import datetime
 
 from lxml import etree
-from rdflib import Graph, Namespace, URIRef
-from rdflib.namespace import RDF, DC, DCTERMS
+from rdflib import Graph, Namespace
+from rdflib.namespace import RDF, DCTERMS
 SCHEMA = Namespace("http://schema.org/")
 
 from ferenda import DocumentRepository, Facet, FulltextIndex

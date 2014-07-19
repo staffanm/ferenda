@@ -9,15 +9,6 @@
 	    ]
 	},
 	{
-	    "dimension": "dcterms_title",
-	    "observations": [ {
-		"count": 2,
-		"value": "e"
-	    }, {
-		"count": 1,
-		"value": "o"
-	    } ]
-	}, {
 	    "dimension": "dcterms_publisher",
 	    "observations": [ {
 		"count": 1,

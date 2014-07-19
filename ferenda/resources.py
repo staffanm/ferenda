@@ -346,7 +346,8 @@ class Resources(object):
         if not wantedlist:
             self.log.warning("Couldn't find list of mappings in %s, topics will be empty" % indata)
         else:
-            for subject in wantedlist:
+            shortened = {}
+            for subject in sorted(wantedlist, key=lambda x: x["iri"]):
                 if subject[idfld] == rooturi:
                     for key,value in subject.items():
                         if key in  (idfld, 'foaf:topic'):
@@ -367,9 +368,16 @@ class Resources(object):
                     if ("iri" in subject and
                         ":" in subject["iri"] and
                         "://" not in subject["iri"]):
-                        subject["iri"] = subject["iri"].split(":",1)[1]
+                        short = subject["iri"].split(":",1)[1]
+                        if short in shortened:
+                            self.log.error("Cannot shorten IRI %s -> %s, already defined (%s)" % (subject["iri"], short, shortened[short]))
+                            del subject["iri"] # skips adding this to topics
+                        else:
+                            shortened[short] = subject["iri"]
+                            subject["iri"] = short
+                    if "iri" in subject and subject["iri"]:
+                        topics.append(subject)
                     
-                    topics.append(subject)
 
         # make sure the triples are in a predictable order, so we can
         # compare on the JSON level for testing
