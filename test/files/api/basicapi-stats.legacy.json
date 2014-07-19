@@ -5,19 +5,10 @@
 	    "dimension": "type",
             "observations": [
 		{"count": 3,
-		 "term": "bibo:Standard"}
+		 "term": "Standard"}
 	    ]
 	},
 	{
-	    "dimension": "title",
-	    "observations": [ {
-		"count": 2,
-		"ref": "http://example.org/fake-resource/e"
-	    }, {
-		"count": 1,
-		"ref": "http://example.org/fake-resource/o"
-	    } ]
-	}, {
 	    "dimension": "publisher",
 	    "observations": [ {
 		"count": 1,

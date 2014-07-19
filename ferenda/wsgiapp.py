@@ -250,7 +250,8 @@ class WSGIApp(object):
                 dimension_label = binding
 
             dimension_type = facet.dimension_type
-            if self.config.legacyapi and dimension_type == "value":
+            if (self.config.legacyapi and
+                dimension_type == "value"):
                 # legacyapi doesn't support the value type, we must
                 # convert it into ref, and convert all string values to
                 # fake resource ref URIs
@@ -267,9 +268,12 @@ class WSGIApp(object):
                           # double-counting
             for row in data:
                 try:
-                    # maybe if dimension_type == "ref", selector
-                    # should always be Facet.defaultselector?
-                    if dimension_type == "ref":
+                    # maybe if facet.dimension_type == "ref", selector
+                    # should always be Facet.defaultselector?  NOTE:
+                    # we look at facet.dimension_type, not
+                    # dimension_type, as the latter may be altered if
+                    # legacyapi == True
+                    if facet.dimension_type == "ref":
                         observation = transformer(Facet.defaultselector(row, binding))
                     else:
                         observation = transformer(facet.selector(row, binding, resource_graph))
