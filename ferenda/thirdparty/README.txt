@@ -1,10 +1,6 @@
 This directory contains some smaller python modules that, for one
 reason or another, couldn't be directly fetched by setup.py from pypi.
 
-* cssmin by Zachary Voase (https://pypi.python.org/pypi/cssmin/)
-  Included since it's setup.py wasn't python3 compatible, otherwise
-  the code is identical to cssmin-0.1.4. BSD License.
-
 * rdflib-sqlite by Graham Higgins
   (https://pypi.python.org/pypi/rdflib-sqlite) Included since this
   package has been mothballed by it's author. Code based on latest
@@ -19,4 +15,8 @@ reason or another, couldn't be directly fetched by setup.py from pypi.
 
 * httpheader by Deron Meranda
   (http://deron.meranda.us/python/httpheader/). Included since the
-  package isn't on pypi or is python3 compatible. LGPL License.
+  package isn't on pypi or is python3 compatible (NOTE: rdflib bundles
+  a copy of this module as
+  rdflib.plugins.parsers.pyRdfa.extras.httpheader, but that version
+  has a bug in the one function that we (but not rdflib) uses, so we
+  can't use that). LGPL License.

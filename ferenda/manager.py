@@ -999,6 +999,7 @@ def _preflight_check(log, verbose=False):
         ('requests', '1.2.0', True),
         ('six', '1.4.0', True),
         ('jsmin', '2.0.2', True),
+        ('cssmin', '0.2.0', True),
         ('whoosh', '2.4.1', True),
         ('pyparsing', '1.5.7', True))
 

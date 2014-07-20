@@ -11,6 +11,7 @@ else:
 
 install_requires = ['beautifulsoup4 >= 4.3.0',
                     'jsmin >= 2.0.2',
+                    'cssmin >= 0.2.0',
                     'lxml >= 3.2.0',
                     'rdflib >= 4.0.1',
                     'html5lib >= 1.0b1',

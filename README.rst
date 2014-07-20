@@ -48,7 +48,6 @@ Most of the code written by Staffan Malmgren, licensed under the main
 Some bundled code and other creative works are written by other
 authors, included in accordance with their respective licenses:
 
-* `cssmin <https://pypi.python.org/pypi/cssmin/>`_ by Zachary Voase, BSD
 * `rdflib-sqlite <https://github.com/RDFLib/rdflib-sqlite>`_ by Graham
   Higgins, BSD
 * `patch <https://code.google.com/p/python-patch/>`_ by Anatoly

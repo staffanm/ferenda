@@ -70,7 +70,7 @@ class Resources(object):
         return res
 
     def make_css(self):
-        from .thirdparty import cssmin
+        import cssmin
         combinefile = None
         if self.config.combineresources:
             combinefile  = os.sep.join([self.resourcedir, 'css', 'combined.css'])
