@@ -15,7 +15,9 @@ $ git tag -a "v0.1.0" -m "Initial release"
 $ git push orgin release/0.1.0
 $ git push --tags # makes the release show up in Github
 $ python setup.py register
-$ python setup.py sdist upload
+$ python setup.py sdist 
+$ python setup.py bdist_wheel --universal
+$ twine upload dist/*
 $ git checkout master
 $ git merge release/0.1.0
 # update ferenda/__init__.py to eg version=0.1.1-dev
