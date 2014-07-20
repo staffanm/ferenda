@@ -23,5 +23,4 @@ from .pdfdocumentrepository import PDFDocumentRepository
 from .compositerepository import CompositeRepository, CompositeStore
 from .resources import Resources
 from .wsgiapp import WSGIApp
-# During release polishing, we update to dev3
-__version__ = "0.2.0.dev3" #gets pulled into setup.py and docs/conf.py
+__version__ = "0.2.0" #gets pulled into setup.py and docs/conf.py

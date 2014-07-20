@@ -74,6 +74,6 @@ Combining facets from different docrepos
 Facets that map to the same fulltextindex field must be equal. The
 rules for equality: If the ``rdftype`` and the ``dimension_type`` and
 ``dimension_label`` and ``selector`` is equal, then the facets are
-equal. ``selector``s are only equal if they are the same function
+equal. ``selector`` functions are only equal if they are the same function
 object, ie it's not just enough that they are two functions that work
 identically.

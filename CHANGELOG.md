@@ -1,3 +1,95 @@
+2014-07-?? RELEASE 0.2.0
+
+This release adds a REST-based HTTP API and includes a lot of
+infrastructure to support repo-defined querying and aggregation of
+arbitrary document properties. This also led to a generalization of
+the TocCriteria class and associated methods, which are now replaced
+by the Facet class.
+
+The REST API should be considered an alpha version and is definitly
+not stable.
+
+Backwards-incompatible changes:
+
+The class TocCriteria and the DocumentRepository methods
+toc_predicates, toc_criteria et al have been removed and replaced with
+the Facet class and similar methods.
+
+ferenda.sources.legal.se.direktiv.DirPolopoly and
+ferenda.sources.legal.se.propositioner.PropPolo has been renamed to
+...DirRegeringen and ...PropRegeringen, respectively.
+
+New features:
+
+A REST API enables clients to do faceted querying (ie document whose
+properties have specified values), full-text search or combinations.
+
+Several popular RDF ontologies are included and exposed using the REST
+API. A docrepo can include custom RDF ontologies that are used in the
+same way. All ontologies used by a docrepo is available as a RDFLib
+graph from the .ontologies property
+
+Docrepos can include extra/common data that describes things which
+your documents refer to, like companies, publishing entities, print
+series and abstract things like the topic/keyword of a document. This
+information is provided in the form of a RDF graph, which is also
+exposed using the REST API. All common data defined for a docrepo is
+available as the .commondata property.
+
+New method DocumentRepository.lookup_resource lookup resource URIs
+from the common data using foaf:name labels (or any other RDF
+predicate that you might want to use)
+
+New class Facet and new methods DocumentRepository.facets,
+.faceted_data, facet_query and facet_seltct to go with that
+class. These replace the TocCriteria class and the methods
+DocumentRepository.toc_select, .toc_query, .toc_criteria and
+.toc_predicates.
+
+The WSGI app now provides content negotiation using file extensions as
+well as a the HTTP Accept header, ie. requesting
+"http://localhost:8000/res/base/123.ttl" gives the same result as
+requesting the resource "http://localhost:8000/res/base/123" using the
+"Accept: text/turtle" header.
+
+New exceptions ferenda.errors.SchemaConflictError and .SchemaMappingError.
+
+The FulltextIndex class now creates a schema in the underlying
+fulltext enginge based upon the used docrepos, and the facets that
+those repos define. The FulltextIndex.update method now takes
+arbitrary arguments that are stored as separate fields in the fulltext
+index. Similarly, the FulltextIndex.query method now takes arbitrary
+arguments that are used to limit the search to only those documents
+whose properties match the arguments.
+
+ferenda.Devel has a new ´destroyindex' action which completely removes
+the fulltext index, which might be needed whenever its schema
+changes. If you add any new facets, you'll need to run
+"./ferenda-build.py devel destroyindex" followed by
+"./ferenda-build.py all relate --all --force"
+
+The docrepos ferenda.sources.tech.RFC and W3Standards have been
+updated with their own ontologies and commondata. The result of parse
+now creates better RDF, in particular things like dcterms:creator and
+dcterms:subject not point to URIs (defined in commondata) instead of
+plain string literals.
+
+Infrastructural changes:
+
+cssmin is no longer bundled within ferenda. Instead it's marked as a
+dependency so that pip/easy_install automatically downloads it from
+pypi.
+
+The prefix for DCMI Metadata Terms have been changed from "dct" to
+"dcterms" in all code and documentation.
+
+testutil now has a Py23DocChecker that can be used with
+doctest.DocTestSuite() to enable single-source doctests that work with
+both python 2 and 3.
+
+New method ferenda.util.json_default_date, usable as the default
+argument of json.dump to serialize datetime object into JSON strings.
+
 2014-04-22 RELEASE 0.1.7
 ========================
 

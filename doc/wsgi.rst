@@ -152,6 +152,30 @@ in a similar way as the document resources above:
   returns the same, but in turtle format.
 
 
+File extension content negotiation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In some environments, it might be difficult to set the Accept
+header. Therefore, it's also possible to request different versions of
+a resource using a file extension suffix. Ie. requesting
+``http://localhost:8000/res/base/123.ttl`` gives the same result as
+requesting the resource ``http://localhost:8000/res/base/123`` using
+the ``Accept: text/turtle`` header. The following extensions can be used
+
+======================  =========
+Content-type            Extension
+======================  =========
+application/xhtml+xml   .xhtml
+----------------------  ---------
+application/rdf+xml     .rdf
+----------------------  ---------
+text/turtle             .ttl
+----------------------  ---------
+text/plain              .nt
+----------------------  ---------
+application/json        .json
+======================  =========
+  
 See also :doc:`restapi`.
 
 

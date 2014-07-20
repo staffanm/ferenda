@@ -173,7 +173,7 @@ Features
 * Uses caches and dependency management to avoid performing the same
   work over and over.
 * Once documents are downloaded and structured, you get a usable web
-  site with API, Atom feeds and search for free.
+  site with REST API, Atom feeds and search for free.
 * Web site generation can create a set of static HTML pages for
   offline use.
 

@@ -281,31 +281,7 @@ def list_dirs(d, suffix=None, reverse=False):
                 else:
                     yield f
 
-# util.String (or XML?)
-# Still used by manager.makeresources, should be removed in favor of lxml
-#
-def indent_node(elem, level=0):
-    """indents a etree node, recursively.
-
-    .. note::
-
-       This is deprecated, don't use it
-    """
-    i = "\r\n" + level * "  "
-    if len(elem):
-        if not elem.text or not elem.text.strip():
-            elem.text = i + "  "
-        for elem in elem:
-            indent_node(elem, level + 1)
-        if not elem.tail or not elem.tail.strip():
-            elem.tail = i
-    else:
-        if level and (not elem.tail or not elem.tail.strip()):
-            elem.tail = i
-
 # util.File
-
-
 def replace_if_different(src, dst, archivefile=None):
     """Like :py:func:`shutil.move`, except the *src* file isn't moved if the
     *dst* file already exists and is identical to *src*. Also doesn't

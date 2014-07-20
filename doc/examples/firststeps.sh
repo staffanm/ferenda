@@ -156,15 +156,6 @@ data/rsrc/js/jquery-1.10.2.js
 data/rsrc/js/modernizr-2.6.3.js
 data/rsrc/js/respond-1.3.0.js
 data/rsrc/resources.xml
-data/rsrc/ui
-data/rsrc/ui/bootstrap-modal.js
-data/rsrc/ui/bootstrap.min.css
-data/rsrc/ui/html5shiv.js
-data/rsrc/ui/index.html
-data/rsrc/ui/jquery-1.8.3.min.js
-data/rsrc/ui/jquery.tmpl.min.js
-data/rsrc/ui/main.css
-data/rsrc/ui/main.js
 # end makeresources
 
 # begin generate-all
