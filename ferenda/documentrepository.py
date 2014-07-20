@@ -590,6 +590,8 @@ with the *config* object as single parameter.
                 alias, basefile = path.split("/", 1)
                 if "#" in basefile:
                     basefile = basefile.split("#")[0]
+                elif "." in basefile:
+                    basefile = basefile.split(".")[0]
                 if alias == self.alias:
                     return basefile
 
@@ -2716,8 +2718,13 @@ WHERE {
         to be returned.
 
         """
+        # FIXME: This function ought to be taken out and shot.
         if environ['PATH_INFO'].count("/") >= 2:
             segments = environ['PATH_INFO'].split("/", 3)
+            if "." in segments[-1]:
+                (segments[-1], suffix) = segments[-1].rsplit(".", 1)
+            else:
+                suffix = None
             if len(segments) == 3:
                 null, res, alias = segments
             else:
@@ -2735,7 +2742,7 @@ WHERE {
                 # available options (as modern browsers may
                 # prefer it to text/html, and our
                 # application/xhtml+xml isn't what they want)
-                # -- ie we only serve application/xtml+xml if
+                # -- ie we only serve application/xhtml+xml if
                 # a client specifically only asks for
                 # that. Yep, that's a big FIXME.
                 available = ("text/html")  # add to this?
@@ -2746,12 +2753,20 @@ WHERE {
                               'text/turtle': 'turtle',
                               'text/plain': 'nt',
                               'application/json': 'json-ld'}
-
+                revformats = dict([(v, k) for k, v in rdfformats.items()])
+                rdfsuffixes = {'rdf': 'pretty-xml',
+                               'ttl': 'turtle',
+                               'nt': 'nt',
+                               'json': 'json-ld'}
+                mimesuffixes = {'xhtml': 'application/xhtml+xml',
+                                'rdf': 'application/rdf+xml'}
                 data = False
                 if res == "res":
-                    if uri.endswith("/data"):
+                    if basefile.endswith("/data"):
                         data = True
-                        uri = uri[:-5]
+                        if suffix: # remove trailing suffix
+                            uri = uri.rsplit(".")[0] 
+                        uri = uri[:-5] # remove trailing "/data"
                     basefile = self.basefile_from_uri(uri)
                     assert basefile, "Couldn't find basefile in uri %s" % uri
 
@@ -2761,17 +2776,23 @@ WHERE {
                         pathmap = {'text/html': self.store.generated_path,
                                    'application/xhtml+xml': self.store.parsed_path,
                                    'application/rdf+xml': self.store.distilled_path}
+                        suffixmap = {'xhtml': self.store.parsed_path,
+                                     'rdf': self.store.distilled_path}
                         if accept in pathmap:
                             contenttype = accept
                             pathfunc = pathmap[accept]
+                        elif suffix in suffixmap:
+                            contenttype = mimesuffixes[suffix]
+                            pathfunc = suffixmap[suffix]
                         else:
-                            if preferred and preferred[0].media_type == "text/html":
+                            if ((not suffix) and
+                                preferred and
+                                preferred[0].media_type == "text/html"):
                                 contenttype = preferred[0].media_type
                                 pathfunc = self.store.generated_path
 
                     if pathfunc is None:
-                        if accept in rdfformats:
-                            contenttype = accept
+                        if accept in rdfformats or suffix in rdfsuffixes:
                             g = Graph()
                             g.parse(self.store.distilled_path(basefile))
                             if data:
@@ -2779,9 +2800,16 @@ WHERE {
                                     self.store.annotation_path(basefile))
                                 g += annotation_graph
                             path = None
+                        if accept in rdfformats:
+                            contenttype = accept
                             # FIXME: we just changed the meaning of
                             # the "data" variable!
                             data = g.serialize(format=rdfformats[accept])
+                        elif suffix in rdfsuffixes:
+                            contenttype = revformats[rdfsuffixes[suffix]]
+                            # FIXME: we just changed the meaning of
+                            # the "data" variable!
+                            data = g.serialize(format=rdfsuffixes[suffix])
                         else:
                             data = None
                     else:
@@ -2792,7 +2820,9 @@ WHERE {
                     # calculates basefile/path at the end of
                     # toc_pagesets AND transform_links
                     contenttype = accept
-                    if preferred and preferred[0].media_type == "text/html":
+                    if ((not suffix) and
+                        preferred and
+                        preferred[0].media_type == "text/html"):
                         contenttype = preferred[0].media_type
 
                     if contenttype == "text/html":
@@ -2803,13 +2833,22 @@ WHERE {
                             pseudobasefile = "index"
                         path = self.store.path(pseudobasefile, 'toc', '.html')
                         contenttype = "text/html"
-                    elif contenttype == "text/plain":
+                    elif contenttype == "text/plain" or suffix == "nt":
+                        contenttype = "text/plain"
                         path = self.store.path("dump", "distilled", ".nt")
                     elif contenttype in rdfformats:
                         g = Graph()
                         g.parse(self.store.path("dump", "distilled", ".nt"),
                                 format="nt")
                         data = g.serialize(format=rdfformats[accept])
+                    elif suffix in rdfsuffixes:
+                        # reverse lookup in rdfformats
+                        # "rdf" -> "pretty-xml" -> "application/rdf+xml"
+                        contenttype = revformats[rdfsuffixes[suffix]]
+                        g = Graph()
+                        g.parse(self.store.path("dump", "distilled", ".nt"),
+                                format="nt")
+                        data = g.serialize(format=rdfsuffixes[suffix])
 
                 if path and os.path.exists(path):
                     return (open(path, 'rb'),

@@ -28,6 +28,8 @@ from ferenda.testutil import RepoTester
 # simulates what make_server().serve_forever() would send and
 # recieve. Should be simple enough, yet reasonably realistic, for
 # testing the API.
+DEFAULT_HTTP_ACCEPT = 'text/xml, application/xml, application/xhtml+xml, text/html;q=0.9, text/plain;q=0.8, image/png,*/*;q=0.5'
+
 class WSGI(RepoTester): # base class w/o tests
     storetype = 'SQLITE'
     storelocation = 'data/ferenda.sqlite' # append self.datadir
@@ -61,7 +63,7 @@ class WSGI(RepoTester): # base class w/o tests
                                          indextype = self.indextype,
                                          indexlocation = self.indexlocation
         )
-        self.env = {'HTTP_ACCEPT': 'text/xml, application/xml, application/xhtml+xml, text/html;q=0.9, text/plain;q=0.8, image/png,*/*;q=0.5',
+        self.env = {'HTTP_ACCEPT': DEFAULT_HTTP_ACCEPT,
                     'PATH_INFO':   '/',
                     'SERVER_NAME': 'localhost',
                     'SERVER_PORT': '8000',
@@ -138,7 +140,7 @@ class WSGI(RepoTester): # base class w/o tests
         self.assertEqual(wanted_status, got_status)
         got_headers = dict(got_headers)
         for (key, value) in wanted_headers.items():
-            self.assertEqual(got_headers[key], value)
+            self.assertEqual(value, got_headers[key])
         if wanted_content:
             self.assertEqual(wanted_content, got_content)
 
@@ -318,19 +320,33 @@ class ConNeg(WSGI):
         # basic test 2: accept: application/xhtml+xml -> parsed file
         self.env['HTTP_ACCEPT'] = 'application/xhtml+xml'
         status, headers, content = self.call_wsgi(self.env)
-        self.assertResponse("200 OK",
-                            {'Content-Type': 'application/xhtml+xml'},
-                            util.readfile(self.repo.store.parsed_path("123/a"), "rb"),
-                            status, headers, content)
+        want = ["200 OK",
+                {'Content-Type': 'application/xhtml+xml'},
+                util.readfile(self.repo.store.parsed_path("123/a"), "rb")]
+        self.assertResponse(want[0], want[1], want[2], status, headers, content)
+        # variation: use file extension
+        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
+        self.env["PATH_INFO"] += ".xhtml"
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse(want[0], want[1], want[2], status, headers, content)
+        
 
     def test_rdf(self):
         # basic test 3: accept: application/rdf+xml -> RDF statements (in XML)
         self.env['HTTP_ACCEPT'] = 'application/rdf+xml'
         status, headers, content = self.call_wsgi(self.env)
-        self.assertResponse("200 OK",
-                            {'Content-Type': 'application/rdf+xml'},
-                            util.readfile(self.repo.store.distilled_path("123/a"), "rb"),
+        want = ["200 OK",
+                {'Content-Type': 'application/rdf+xml'},
+                util.readfile(self.repo.store.distilled_path("123/a"), "rb")]
+        self.assertResponse(want[0], want[1], want[2],
                             status, headers, content)
+
+        # variation: use file extension
+        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
+        self.env["PATH_INFO"] += ".rdf"
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse(want[0], want[1], want[2], status, headers, content)
+
 
     def test_ntriples(self):
         # Serialization may upset order of triples -- it's not
@@ -343,10 +359,20 @@ class ConNeg(WSGI):
         g.parse(source=self.repo.store.distilled_path("123/a"))
         self.env['HTTP_ACCEPT'] = 'text/plain'
         status, headers, content = self.call_wsgi(self.env)
-        self.assertResponse("200 OK",
-                            {'Content-Type': 'text/plain'},
-                            None,
+        want = ["200 OK",
+                {'Content-Type': 'text/plain'},
+                None]
+        self.assertResponse(want[0], want[1], want[2],
                             status, headers, None)
+        got = Graph()
+        got.parse(data=content, format="nt")
+        self.assertEqualGraphs(g, got)
+
+        # variation: use file extension
+        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
+        self.env["PATH_INFO"] += ".nt"
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse(want[0], want[1], want[2], status, headers, content)
         got = Graph()
         got.parse(data=content, format="nt")
         self.assertEqualGraphs(g, got)
@@ -357,10 +383,20 @@ class ConNeg(WSGI):
         g.parse(source=self.repo.store.distilled_path("123/a"))
         self.env['HTTP_ACCEPT'] = 'text/turtle'
         status, headers, content = self.call_wsgi(self.env)
-        self.assertResponse("200 OK",
-                            {'Content-Type': 'text/turtle'},
-                            None,
+        want = ["200 OK",
+                {'Content-Type': 'text/turtle'},
+                None]
+        self.assertResponse(want[0], want[1], want[2],
                             status, headers, None)
+        got = Graph()
+        got.parse(data=content, format="turtle")
+        self.assertEqualGraphs(g, got)
+
+        # variation: use file extension
+        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
+        self.env["PATH_INFO"] += ".ttl"
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse(want[0], want[1], want[2], status, headers, content)
         got = Graph()
         got.parse(data=content, format="turtle")
         self.assertEqualGraphs(g, got)
@@ -371,22 +407,40 @@ class ConNeg(WSGI):
         g.parse(source=self.repo.store.distilled_path("123/a"))
         self.env['HTTP_ACCEPT'] = 'application/json'
         status, headers, content = self.call_wsgi(self.env)
-        self.assertResponse("200 OK",
-                            {'Content-Type': 'application/json'},
-                            None,
+        want = ["200 OK",
+                {'Content-Type': 'application/json'},
+                None]
+        self.assertResponse(want[0], want[1], want[2],
                             status, headers, None)
         got = Graph()
         got.parse(data=content, format="json-ld")
         self.assertEqualGraphs(g, got)
         
+        # variation: use file extension
+        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
+        self.env["PATH_INFO"] += ".json"
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse(want[0], want[1], want[2], status, headers, content)
+        got = Graph()
+        got.parse(data=content, format="json-ld")
+        self.assertEqualGraphs(g, got)
+
     def test_unacceptable(self):
         self.env['HTTP_ACCEPT'] = 'application/pdf'
         status, headers, content = self.call_wsgi(self.env)
-        self.assertResponse("406 Not Acceptable",
-                            {'Content-Type': 'text/html'},
-                            None,
+        want = ["406 Not Acceptable",
+                {'Content-Type': 'text/html'},
+                None]
+        self.assertResponse(want[0], want[1], want[2],
                             status, headers, None)
     
+        # variation: unknown file extension should also be unacceptable
+        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
+        self.env["PATH_INFO"] += ".pdf"
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse(want[0], want[1], want[2], status, headers, content)
+
+
     def test_extended_rdf(self):
         # extended test 6: accept: "/data" -> extended RDF statements
         self.env['PATH_INFO'] = self.env['PATH_INFO'] + "/data"
@@ -395,10 +449,20 @@ class ConNeg(WSGI):
         g.parse(source=self.repo.store.distilled_path("123/a"))
         g += self.repo.annotation_file_to_graph(self.repo.store.annotation_path("123/a"))
         status, headers, content = self.call_wsgi(self.env)
-        self.assertResponse("200 OK",
-                            {'Content-Type': 'application/rdf+xml'},
-                            None,
+        want = ["200 OK",
+                {'Content-Type': 'application/rdf+xml'},
+                None]
+        self.assertResponse(want[0], want[1], want[2],
                             status, headers, None)
+        got = Graph()
+        got.parse(data=content)
+        self.assertEqualGraphs(g, got)
+
+        # variation: use file extension
+        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
+        self.env["PATH_INFO"] += ".rdf"
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse(want[0], want[1], want[2], status, headers, content)
         got = Graph()
         got.parse(data=content)
         self.assertEqualGraphs(g, got)
@@ -412,10 +476,20 @@ class ConNeg(WSGI):
         g.parse(source=self.repo.store.distilled_path("123/a"))
         g += self.repo.annotation_file_to_graph(self.repo.store.annotation_path("123/a"))
         status, headers, content = self.call_wsgi(self.env)
-        self.assertResponse("200 OK",
-                            {'Content-Type': 'text/plain'},
-                            None,
+        want = ["200 OK",
+                 {'Content-Type': 'text/plain'},
+                 None]
+        self.assertResponse(want[0], want[1], want[2],
                             status, headers, None)
+        got = Graph()
+        got.parse(data=content, format="nt")
+        self.assertEqualGraphs(g, got)
+
+        # variation: use file extension
+        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
+        self.env["PATH_INFO"] += ".nt"
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse(want[0], want[1], want[2], status, headers, content)
         got = Graph()
         got.parse(data=content, format="nt")
         self.assertEqualGraphs(g, got)
@@ -429,14 +503,23 @@ class ConNeg(WSGI):
         g.parse(source=self.repo.store.distilled_path("123/a"))
         g += self.repo.annotation_file_to_graph(self.repo.store.annotation_path("123/a"))
         status, headers, content = self.call_wsgi(self.env)
-        self.assertResponse("200 OK",
-                            {'Content-Type': 'text/turtle'},
-                            None,
+        want = ["200 OK",
+                {'Content-Type': 'text/turtle'},
+                None]
+        self.assertResponse(want[0], want[1], want[2],
                             status, headers, None)
         got = Graph()
         got.parse(data=content, format="turtle")
         self.assertEqualGraphs(g, got)
 
+        # variation: use file extension
+        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
+        self.env["PATH_INFO"] += ".ttl"
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse(want[0], want[1], want[2], status, headers, content)
+        got = Graph()
+        got.parse(data=content, format="turtle")
+        self.assertEqualGraphs(g, got)
 
     def test_dataset_html(self):
         self.env['PATH_INFO'] = "/dataset/base"
@@ -459,47 +542,78 @@ class ConNeg(WSGI):
         self.env['PATH_INFO'] = "/dataset/base"
         self.env['HTTP_ACCEPT'] = 'text/plain'
         status, headers, content = self.call_wsgi(self.env)
-        self.assertResponse("200 OK",
-                            {'Content-Type': 'text/plain'},
-                            None,
+        want = ("200 OK",
+                {'Content-Type': 'text/plain'},
+                None)
+        self.assertResponse(want[0], want[1], want[2],
                             status, headers, None)
-        want = Graph()
-        want.parse(source="test/files/base/distilled/123/a.ttl",
+        wantgraph = Graph()
+        wantgraph.parse(source="test/files/base/distilled/123/a.ttl",
                    format="turtle")
-        got = Graph()
-        got.parse(data=content, format="nt")
-        self.assertEqualGraphs(want, got)
+        gotgraph = Graph()
+        gotgraph.parse(data=content, format="nt")
+        self.assertEqualGraphs(wantgraph, gotgraph)
+
+        # variation: use file extension
+        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
+        self.env["PATH_INFO"] += ".nt"
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse(want[0], want[1], want[2], status, headers, content)
+        gotgraph = Graph()
+        gotgraph.parse(data=content, format="nt")
+        self.assertEqualGraphs(wantgraph, gotgraph)
+
 
     def test_dataset_turtle(self):
         self.env['PATH_INFO'] = "/dataset/base"
         self.env['HTTP_ACCEPT'] = 'text/turtle'
         status, headers, content = self.call_wsgi(self.env)
-        self.assertResponse("200 OK",
-                            {'Content-Type': 'text/turtle'},
-                            None,
+        want = ["200 OK",
+                {'Content-Type': 'text/turtle'},
+                None]
+        self.assertResponse(want[0], want[1], want[2],
                             status, headers, None)
-        want = Graph()
-        want.parse(source="test/files/base/distilled/123/a.ttl",
+        wantgraph = Graph()
+        wantgraph.parse(source="test/files/base/distilled/123/a.ttl",
                    format="turtle")
-        got = Graph()
-        got.parse(data=content, format="turtle")
-        self.assertEqualGraphs(want, got)
+        gotgraph = Graph()
+        gotgraph.parse(data=content, format="turtle")
+        self.assertEqualGraphs(wantgraph, gotgraph)
+
+        # variation: use file extension
+        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
+        self.env["PATH_INFO"] += ".ttl"
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse(want[0], want[1], want[2], status, headers, content)
+        gotgraph = Graph()
+        gotgraph.parse(data=content, format="turtle")
+        self.assertEqualGraphs(wantgraph, gotgraph)
+
 
     def test_dataset_xml(self):
         self.env['PATH_INFO'] = "/dataset/base"
         self.env['HTTP_ACCEPT'] = 'application/rdf+xml'
         status, headers, content = self.call_wsgi(self.env)
-        self.assertResponse("200 OK",
-                            {'Content-Type': 'application/rdf+xml'},
-                            None,
+        want = ["200 OK",
+                {'Content-Type': 'application/rdf+xml'},
+                None]
+        self.assertResponse(want[0], want[1], want[2],
                             status, headers, None)
-        want = Graph()
-        want.parse(source="test/files/base/distilled/123/a.ttl",
+        wantgraph = Graph()
+        wantgraph.parse(source="test/files/base/distilled/123/a.ttl",
                    format="turtle")
-        got = Graph()
-        got.parse(data=content, format="xml")
-        self.assertEqualGraphs(want, got)
+        gotgraph = Graph()
+        gotgraph.parse(data=content, format="xml")
+        self.assertEqualGraphs(wantgraph, gotgraph)
 
+        # variation: use file extension
+        self.env["HTTP_ACCEPT"] = DEFAULT_HTTP_ACCEPT
+        self.env["PATH_INFO"] += ".rdf"
+        status, headers, content = self.call_wsgi(self.env)
+        self.assertResponse(want[0], want[1], want[2], status, headers, content)
+        gotgraph = Graph()
+        gotgraph.parse(data=content, format="xml")
+        self.assertEqualGraphs(wantgraph, gotgraph)
 
 class Search(WSGI):
 
