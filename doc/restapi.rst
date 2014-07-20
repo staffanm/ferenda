@@ -69,13 +69,14 @@ label directly as a parameter, eg ``http://localhost:8000/api/?aprilfools=true``
 
 
 Paging
-^^^^^^
+------
 
 By default, the result list only contains 10 results. You can inspect
-the properties startIndex and totalResults to find out if there are
-more results, and use the special parameter ``_page`` to request
-subsequent pages of results. You can also request a different length
-of the result list through the ``_pageSize`` parameter.
+the properties ``startIndex`` and ``totalResults`` of the response to
+find out if there are more results, and use the special parameter
+``_page`` to request subsequent pages of results. You can also request
+a different length of the result list through the ``_pageSize``
+parameter.
 
 Statistics
 ----------
@@ -95,17 +96,41 @@ list by setting the special parameter ``_stats=on``.
 Ranges
 ------
 
-``min-`` and ``max-``
-
-``year-``
+For some parameters, particularly those that use datetime values, it's
+useful to specify ranges instead of exact values. By prefixing the
+parameter name with ``min-``, ``max-`` or ``year-``, it's possible to
+do that,
+eg. ``http://localhost:8000/api/?min-dcterms_issued=2012-04-01`` to
+retrieve all documents that have a dcterms:issued later than
+2012-04-01, or ``http://localhost:8000/api/?year-dcterms_issued=2012``
+to retrieve all documents that are dct:issued during 2012.
 
 
 Support resources
 -----------------
 
-var-common.json and var-terms.json.
+The special resources ``common.json`` and ``terms.json``
+(eg. ``http://localhost:8000/api/common.json`` and
+``http://localhost:8000/api/terms.json``) contains all the extra data
+(see :ref:`custom-common-data`) and ontologies (see
+:ref:`custom-ontologies`) that your repositories use, in JSON-LD
+format. You can use these to display user-friendly labels for
+properties and things in your application.
+
 
 Legacy mode
 -----------
 
-Ferenda can be made directly compatible with the API used by ``rinfo-service``, which enables...
+Ferenda can be made directly compatible with the API used by
+``rinfo-service`` (mentioned above) by activating the setting
+``legacyapi``, eg by setting ``legacyapi = True`` in ferenda.conf or
+using the option ``--legacyapi`` on the command line.
+
+Note that this setting is used both during the ``makeresources`` step
+as well as when serving the API eg with the ``runserver`` command. If
+you want to play with this setting, you'll need to re-run
+``makeresources --force`` with this enabled.
+
+Running ``makeresources`` with this setting enabled also installs a
+API explorer app, taken from ``rinfo-service``. You can try it out at
+``http://localhost:8000/rsrc/ui/``.

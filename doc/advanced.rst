@@ -116,6 +116,8 @@ is presented alongside the list of documents that use that keyword.
 
 See :class:`ferenda.sources.general.Keyword`
 
+.. _custom-common-data:
+
 Custom common data
 ------------------
 
@@ -141,6 +143,7 @@ provided as the third ``resource_graph`` argument to any selector/key
 functions of your :py:class:`~ferenda.Facet` objects.
 
 
+.. _custom-ontologies:
 
 Custom ontologies
 -----------------

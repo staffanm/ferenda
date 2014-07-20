@@ -291,24 +291,25 @@ class Resources(object):
                     json.dump(d, fp, indent=4, sort_keys=True)
             files.append(self._filepath_to_urlpath(filename, 2))
 
-        # copy ui explorer app to <url>/rsrc/ui/ -- this does not get
-        # included in files
-        util.ensure_dir(os.sep.join([self.resourcedir,"ui","dummy.txt"]))
-        try:
-            for f in pkg_resources.resource_listdir("ferenda", "res/ui"):
-                src = pkg_resources.resource_stream("ferenda", "res/ui/" + f)
-                with open(os.sep.join([self.resourcedir,"ui", f]), "wb") as dest:
-                    dest.write(src.read())
-        except OSError as e: # happens on travis-ci
-            x = pkg_resources.get_provider("ferenda")
-            print("Got error '%s'. Provider %s, .module_path %s" % (str(e), x, x.module_path))
-            print("Does %s/res/ui exist? %s (wd %s, os.listdir: %r)" % (x.module_path, os.path.exists(x.module_path + "/res/ui"), os.getcwd(), os.listdir(".")))
+        if self.config.legacyapi:
+            # copy ui explorer app to <url>/rsrc/ui/ -- this does not get
+            # included in files
+            util.ensure_dir(os.sep.join([self.resourcedir,"ui","dummy.txt"]))
             try:
-                fp = pkg_resources.resource_stream('ferenda', "res/ui/index.html")
-                print("Got hold of res/ui/index.html through .resource_stream")
-            except Exception as sub_e:
-                print("Couldn't get a res stream either: %s" % sub_e)
-            raise e # or pass
+                for f in pkg_resources.resource_listdir("ferenda", "res/ui"):
+                    src = pkg_resources.resource_stream("ferenda", "res/ui/" + f)
+                    with open(os.sep.join([self.resourcedir,"ui", f]), "wb") as dest:
+                        dest.write(src.read())
+            except OSError as e: # happens on travis-ci
+                x = pkg_resources.get_provider("ferenda")
+                print("Got error '%s'. Provider %s, .module_path %s" % (str(e), x, x.module_path))
+                print("Does %s/res/ui exist? %s (wd %s, os.listdir: %r)" % (x.module_path, os.path.exists(x.module_path + "/res/ui"), os.getcwd(), os.listdir(".")))
+                try:
+                    fp = pkg_resources.resource_stream('ferenda', "res/ui/index.html")
+                    print("Got hold of res/ui/index.html through .resource_stream")
+                except Exception as sub_e:
+                    print("Couldn't get a res stream either: %s" % sub_e)
+                raise e # or pass
         return files
         
     def _convert_legacy_jsonld(self, indata, rooturi):
