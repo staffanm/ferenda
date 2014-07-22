@@ -16,8 +16,9 @@ init:
   - ps: Invoke-WebRequest $env:LXML -OutFile "C:/lxml.exe"
   - ps: "ls C:/"
 install:
-  - "%PYTHON%/python.exe c:/ez_setup.py"
+  - "%PYTHON%/python.exe c:/ez_setup.py > NUL"
   - "%PYTHON%/Scripts/easy_install.exe C:/lxml.exe"
   - "%PYTHON%/Scripts/pip.exe install -r %REQUIREMENTS%"
 test_script:
-  - "%PYTHON%/python.exe setup.py test"
+#  - "%PYTHON%/python.exe setup.py test"
+  - "%PYTHON%/python.exe -Wi -m unittest discover test"
