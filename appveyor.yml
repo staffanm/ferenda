@@ -5,16 +5,16 @@ environment:
 #    - PYTHON: "C:/Python27"
 #      LXML: "lxml-3.3.5.win32-py2.7.exe"
     - PYTHON: "C:/Python34"
-      LXML: "lxml-3.3.5.win32-py3.4.exe"
+      LXML: "http://www.lfd.uci.edu/~gohlke/pythonlibs/an4m68cn/lxml-3.3.5.win32-py3.4.exe"
 init:
   - "ECHO %PYTHON%"
   - "ECHO %LXML%"
   - ps: "ls C:/Python*"
 install:
   - ps: Invoke-WebRequest "https://bootstrap.pypa.io/ez_setup.py" -OutFile "c:/ez_setup.py"
-  - ps: Invoke-WebRequest "http://www.lfd.uci.edu/~gohlke/pythonlibs/an4m68cn/$LXML" -OutFile "C:/$LXML"
+  - ps: Invoke-WebRequest $LXML -OutFile "C:/lxml.exe"
   - ps: "ls C:/"
   - "%PYTHON%/python.exe c:/ez_setup.py"
-  - "%PYTHON%/Scripts/easy_install.exe C:/%LXML%"
+  - "%PYTHON%/Scripts/easy_install.exe C:/lxml.exe"
 test_script:
   - "%PYTHON%/python.exe setup.py test"
