@@ -10,10 +10,10 @@ init:
   - "ECHO %PYTHON%"
   - "ECHO %LXML%"
   - ps: "ls C:/Python*"
-install:
   - ps: Invoke-WebRequest "https://bootstrap.pypa.io/ez_setup.py" -OutFile "c:/ez_setup.py"
-  - ps: Invoke-WebRequest $LXML -OutFile "C:/lxml.exe"
+  - ps: Invoke-WebRequest $env:LXML -OutFile "C:/lxml.exe"
   - ps: "ls C:/"
+install:
   - "%PYTHON%/python.exe c:/ez_setup.py"
   - "%PYTHON%/Scripts/easy_install.exe C:/lxml.exe"
 test_script:
