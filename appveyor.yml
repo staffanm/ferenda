@@ -18,6 +18,6 @@ init:
 install:
   - "%PYTHON%/python.exe c:/ez_setup.py"
   - "%PYTHON%/Scripts/easy_install.exe C:/lxml.exe"
-  - "%PYTHON%/Scripts/pip.exe -r %REQUIREMENTS%"
+  - "%PYTHON%/Scripts/pip.exe install -r %REQUIREMENTS%"
 test_script:
   - "%PYTHON%/python.exe setup.py test"
