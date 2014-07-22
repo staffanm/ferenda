@@ -12,8 +12,7 @@ init:
   - ps: "ls C:/Python*"
 install:
   - ps: Invoke-WebRequest "https://bootstrap.pypa.io/ez_setup.py" -OutFile "c:/ez_setup.py"
-  - ps: Invoke-WebRequest "http://www.lfd.uci.edu/~gohlke/pythonlibs/an4m68cn/%LXML%" -OutFile "C:/lxml.tmp.exe"
-  - ps: "ren C:/lxml.tmp.exe C:/%LXML%"
+  - ps: Invoke-WebRequest "http://www.lfd.uci.edu/~gohlke/pythonlibs/an4m68cn/$LXML" -OutFile "C:/$LXML"
   - ps: "ls C:/"
   - "%PYTHON%/python.exe c:/ez_setup.py"
   - "%PYTHON%/Scripts/easy_install.exe C:/%LXML%"
