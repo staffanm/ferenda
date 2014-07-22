@@ -661,9 +661,9 @@ class Testrepo2(Testrepo):
                                        s.join(['rsrc', 'css','other.css'])],
                                 'js':[s.join(['rsrc', 'js','test.js'])],
                                 'img':[s.join(['rsrc', 'img','test.png'])],
-                                'json': ['rsrc/api/context.json',
-                                         'rsrc/api/common.json',
-                                         'rsrc/api/terms.json'],
+                                'json': [s.join(['rsrc','api','context.json']),
+                                         s.join(['rsrc','api','common.json']),
+                                         s.join(['rsrc','api','terms.json'])],
                                 'xml':[s.join(['rsrc', 'resources.xml'])]}),
              ('generate', OrderedDict([('test', ['test generate arg1',
                                                  'test generate myarg',
@@ -704,9 +704,9 @@ class Testrepo2(Testrepo):
                                        s.join(['rsrc', 'css','other.css'])],
                                 'img':[s.join(['rsrc', 'img','test.png'])],
                                 'js':[s.join(['rsrc', 'js','test.js'])],
-                                'json': ['rsrc/api/context.json',
-                                         'rsrc/api/common.json',
-                                         'rsrc/api/terms.json'],
+                                'json': [s.join(['rsrc','api','context.json']),
+                                         s.join(['rsrc','api','common.json']),
+                                         s.join(['rsrc','api','terms.json'])],
                                 'xml':[s.join(['rsrc', 'resources.xml'])]}),
              ('generate', OrderedDict([('test', ['test generate arg1',
                                                  'test generate myarg',
@@ -734,9 +734,9 @@ class Testrepo2(Testrepo):
                        s.join(['rsrc', 'css','other.css'])],
                 'js':[s.join(['rsrc', 'js','test.js'])],
                 'img': [s.join(['rsrc', 'img', 'test.png'])],
-                'json': ['rsrc/api/context.json',
-                         'rsrc/api/common.json',
-                         'rsrc/api/terms.json'],
+                'json': [s.join(['rsrc','api','context.json']),
+                         s.join(['rsrc','api','common.json']),
+                         s.join(['rsrc','api','terms.json'])],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
         got = manager.run(['all', 'makeresources'])
@@ -753,9 +753,9 @@ apiendpoint = /api/
         want = {'css':[],
                 'js':[],
                 'img': [],
-                'json': ['rsrc/api/context.json',
-                         'rsrc/api/common.json',
-                         'rsrc/api/terms.json'],
+                'json': [s.join(['rsrc','api','context.json']),
+                         s.join(['rsrc','api','common.json']),
+                         s.join(['rsrc','api','terms.json'])],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
         got = manager.run(['all', 'makeresources'])

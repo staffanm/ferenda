@@ -60,9 +60,9 @@ class=testManager.staticmockclass2
         want = {'css':[s.join(['rsrc', 'css','test.css'])],
                 'js':[s.join(['rsrc', 'js','test.js'])],
                 'img':[s.join(['rsrc', 'img','test.png'])],
-                'json': ['rsrc/api/context.json',
-                         'rsrc/api/common.json',
-                         'rsrc/api/terms.json'],
+                'json': [s.join(['rsrc','api','context.json']),
+                         s.join(['rsrc','api','common.json']),
+                         s.join(['rsrc','api','terms.json'])],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
         got = Resources([staticmockclass(),staticmockclass2()],
@@ -270,10 +270,11 @@ class BaseAPI(RepoTester):
 
         got = Resources([self.repo], self.datadir + "/data/rsrc",
                         legacyapi=True).make(css=False, js=False, img=False, xml=False, api=True)
-        want = {'json': ['rsrc/api/context.json',
-                         'rsrc/api/common.json',
-                         'rsrc/api/terms.json']}
-        self.assertEqual(got, want)
+        s = os.sep
+        want = {'json': [s.join(['rsrc','api','context.json']),
+                         s.join(['rsrc','api','common.json']),
+                         s.join(['rsrc','api','terms.json'])]}
+        self.assertEqual(want, got)
 
         got  = json.load(open(self.datadir + "/data/rsrc/api/context.json"))
         want = json.load(open("test/files/api/jsonld-context.json"))

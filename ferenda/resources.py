@@ -66,7 +66,6 @@ class Resources(object):
                     else:
                         result.append(x.replace('/', os.sep))
                 res[part] = result
-        
         return res
 
     def make_css(self):
