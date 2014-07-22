@@ -1,0 +1,18 @@
+build: false
+environment:
+  matrix:
+    - PYTHON: "C:/Python27"
+      LXML: "lxml-3.3.5.win32-py2.7.exe"
+    - PYTHON: "C:/Python34"
+      LXML: "lxml-3.3.5.win32-py3.4.exe"
+init:
+  - "ECHO %PYTHON%"
+  - "ECHO %LXML%"
+  - ps: "ls C:/Python*"
+install:
+  - ps: Invoke-WebRequest "https://bootstrap.pypa.io/ez_setup.py" -OutFile "c:/ez_setup.py"
+  - ps: Invoke-WebRequest "http://www.lfd.uci.edu/~gohlke/pythonlibs/an4m68cn/%LXML%" -OutFile "C:/%LXML%"
+  - "%PYTHON% c:/ez_setup.py"
+  - "%PYTHON%/Scripts/easy_install.exe %LXML%"
+test_script:
+  - "%PYTHON%/python.exe setup.py test"
