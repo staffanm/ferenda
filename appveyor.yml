@@ -2,21 +2,21 @@ build: false
 version: 0.2.0.{build}
 environment:
   matrix:
-#    - PYTHON: "C:/Python27"
-#      LXML: "lxml-3.3.5.win32-py2.7.exe"
+    - PYTHON: "C:/Python27"
+      LXML: "lxml-3.3.5.win32-py2.7.exe"
     - PYTHON: "C:/Python34"
       LXML: "http://www.lfd.uci.edu/~gohlke/pythonlibs/an4m68cn/lxml-3.3.5.win32-py3.4.exe"
       REQUIREMENTS: "requirements.py3.txt"
 init:
   - "ECHO %PYTHON%"
   - "ECHO %LXML%"
-  - ps: "ls C:/Python*"
+#  - ps: "ls C:/Python*"
   - ps: Invoke-WebRequest "https://bootstrap.pypa.io/ez_setup.py" -OutFile "c:/ez_setup.py"
   - ps: Invoke-WebRequest "https://raw.github.com/pypa/pip/master/contrib/get-pip.py" -OutFile "c:/get-pip.py"
   - ps: Invoke-WebRequest $env:LXML -OutFile "C:/lxml.exe"
-  - ps: "ls C:/"
+#  - ps: "ls C:/"
   - ps: "git config --global core.autocrlf false" # always use unix lineendings
-  - ps: "git config --list"
+#  - ps: "git config --list"
 install:
   - "%PYTHON%/python.exe c:/ez_setup.py > NUL"
   - "%PYTHON%/Scripts/easy_install.exe C:/lxml.exe"

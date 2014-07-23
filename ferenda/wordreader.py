@@ -71,6 +71,10 @@ class WordReader(object):
         if " " in indoc:
             indoc = '"%s"' % indoc
         cmd = "antiword -x db %s > %s" % (indoc, tmpfile)
+        # make sure HOME is set even on win32 -- antiword seems to require it?
+        if 'HOME' not in os.environ and 'USERPROFILE' in os.environ:
+            os.environ['HOME'] = os.environ['USERPROFILE']
+        
         self.log.debug("Executing %s" % cmd)
         (ret, stdout, stderr) = util.runcmd(cmd)
 

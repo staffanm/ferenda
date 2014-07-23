@@ -20,7 +20,7 @@ $ python setup.py bdist_wheel --universal
 $ twine upload dist/ferenda-0.1.0.tar.gz dist/ferenda-0.1.0-py2.py3-none-any.whl
 $ git checkout master
 $ git merge release/0.1.0
-# update ferenda/__init__.py to eg version=0.1.1-dev
+# update ferenda/__init__.py to eg version=0.1.1.dev1
 $ git commit -m "start of next iteration" ferenda/__init__.py
 $ git push
 

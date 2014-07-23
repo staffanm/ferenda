@@ -136,6 +136,7 @@ $ ./ferenda-build.py w3c relate --all
 
 # begin makeresources
 $ ./ferenda-build.py w3c makeresources
+22:17:08 root INFO Wrote data/rsrc/resources.xml
 $ find data/rsrc -print
 data/rsrc
 data/rsrc/api
