@@ -15,12 +15,14 @@ init:
   - ps: Invoke-WebRequest "https://raw.github.com/pypa/pip/master/contrib/get-pip.py" -OutFile "c:/get-pip.py"
   - ps: Invoke-WebRequest $env:LXML -OutFile "C:/lxml.exe"
   - ps: "ls C:/"
+  - ps: "md .git"
+  - ps: "ls"
   - ps: "git config --list"
   - ps: "git config core.autocrlf false" # always use unix lineendings
 install:
   - "%PYTHON%/python.exe c:/ez_setup.py > NUL"
   - "%PYTHON%/Scripts/easy_install.exe C:/lxml.exe"
-  - "%PYTHON%/Scripts/pip.exe install -r %REQUIREMENTS%"
+  - "%PYTHON%/Scripts/pip.exe -q install -r %REQUIREMENTS%"
 test_script:
 #  - "%PYTHON%/python.exe setup.py test"
   - "%PYTHON%/python.exe -Wi -m unittest discover test"
