@@ -71,7 +71,7 @@ class Main(unittest.TestCase):
         doc = d.make_document("sample")
         reader = PDFReader()
         # make SURE that the intermediate files are newer than the pdf
-        os.utime("test/files/pdfreader/intermediate/sample.xml")
+        os.utime("test/files/pdfreader/intermediate/sample.xml", None)
         reader.read("test/files/pdfreader/sample.pdf",
                     "test/files/pdfreader/intermediate")
         d.parse_from_pdfreader(reader, doc)
