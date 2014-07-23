@@ -197,6 +197,7 @@ $ ./ferenda-build.py w3c all
 22:17:25 root INFO w3cstandards.W3CStandards parse finished in 0.019 sec
 22:17:25 root INFO w3cstandards.W3CStandards relate: Nothing to do!
 22:17:25 root INFO w3cstandards.W3CStandards relate finished in 0.025 sec
+22:17:25 root INFO Wrote data/rsrc/resources.xml
 22:17:29 w3c INFO xml-entity-names: generate OK (0.000 sec)
 22:17:29 w3c INFO rdfa-core: generate OK (0.000 sec)
 22:17:29 w3c INFO emotionml: generate OK (0.000 sec)
