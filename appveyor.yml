@@ -4,6 +4,7 @@ environment:
   matrix:
     - PYTHON: "C:/Python27"
       LXML: "http://www.lfd.uci.edu/~gohlke/pythonlibs/an4m68cn/lxml-3.3.5.win32-py2.7.exe"
+      REQUIREMENTS: "requirements.py2.txt"
     - PYTHON: "C:/Python34"
       LXML: "http://www.lfd.uci.edu/~gohlke/pythonlibs/an4m68cn/lxml-3.3.5.win32-py3.4.exe"
       REQUIREMENTS: "requirements.py3.txt"
@@ -19,6 +20,7 @@ init:
 #  - ps: "git config --list"
 install:
   - "%PYTHON%/python.exe c:/ez_setup.py > NUL"
+  - "%PYTHON%/python.exe c:/get-pip.py"
   - "%PYTHON%/Scripts/easy_install.exe C:/lxml.exe"
   - "%PYTHON%/Scripts/pip.exe -q install -r %REQUIREMENTS%"
 test_script:
