@@ -62,7 +62,7 @@ class PropTrips(Trips):
         if basefile:
             return super(PropTrips, self).download(basefile)
         else:
-            if (hasattr(self.config, 'lastbase') and
+            if ('lastbase' in self.config and
                 self.config.lastbase and
                 not self.config.refresh):
                 now = datetime.now()

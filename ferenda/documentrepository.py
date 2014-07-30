@@ -1472,7 +1472,7 @@ with the *config* object as single parameter.
             # If using the Bulk upload feature, append to the temporary
             # file that is to be bulk uploaded (see relate_all_setup)
             nttemp = self.store.path("_dump", "distilled", ".nt.temp", storage_policy="file")
-            if os.path.exists(nttemp) and hasattr(self.config, 'all'):
+            if os.path.exists(nttemp) and 'all' in self.config:
                 values = {'basefile': basefile,
                           'nttemp': nttemp}
                 with util.logtime(self.log.debug,
@@ -1534,7 +1534,7 @@ with the *config* object as single parameter.
             # it's used to speed things up, and we now have
             # ElasticSearch support for that, it's disabled until
             # further notice.
-            # if hasattr(self.config, 'all'):
+            # if 'all' in self.config:
             #     self._fulltextindexer._batchwriter = True
 
         return self._fulltextindexer

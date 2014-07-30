@@ -141,6 +141,7 @@ class Decorators(unittest.TestCase):
                 return True
 
         mockrepo = Mock()
+        mockrepo.config = MagicMock()  # must support __in__()
         mockdoc = Mock()
         # 1. should not raise an exception (but should call log.info
         #    and util.robust_remove, and return false)

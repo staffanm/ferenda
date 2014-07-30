@@ -190,6 +190,12 @@ def handleerror(f):
             raise
         except ParseError as e:
             self.log.error("%s: ParseError %s", doc.basefile, e)
+            # FIXME: we'd like to use the shorter "if
+            # ('fatalexceptions' in self.config" but a Mock we're
+            # using in testDecorators.Decorators.test_handleerror does
+            # not emulate this way of using the LayeredConfig
+            # object. Until we rewrite the testcase better, this is
+            # what we have to do.
             if (hasattr(self.config, 'fatalexceptions') and
                     self.config.fatalexceptions):
                 raise
@@ -197,6 +203,7 @@ def handleerror(f):
                 return False
         except:
             self.log.exception("parse of %s failed", doc.basefile)
+            # FIXME: see above
             if (hasattr(self.config, 'fatalexceptions') and
                     self.config.fatalexceptions):
                 raise

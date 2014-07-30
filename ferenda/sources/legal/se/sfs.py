@@ -388,8 +388,6 @@ class SFS(Trips):
         else:
             ret = self.download_new()
         return ret
-        
-        
 
     def _set_last_sfsnr(self, last_sfsnr=None):
         maxyear = datetime.today().year

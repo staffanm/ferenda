@@ -667,7 +667,7 @@ def _run_class(enabled, argv):
                     otherrepos.append(_instantiate_class(othercls, argv=argv))
             kwargs['otherrepos'] = otherrepos
 
-        if hasattr(inst.config, 'all') and inst.config.all == True:
+        if 'all' in inst.config and inst.config.all == True:
             res = []
             # semi-magic handling
             ret = cls.setup(command, inst.config)
