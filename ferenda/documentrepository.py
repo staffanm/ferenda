@@ -262,11 +262,14 @@ class DocumentRepository(object):
     documentstore_class = DocumentStore
 #    """Class that implements the :class:`~ferenda.DocumentStore` interface."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, config=None, **kwargs):
         """See :py:class:`~ferenda.DocumentRepository`."""
-        codedefaults = self.get_default_options()
-        defaults = util.merge_dict_recursive(codedefaults, kwargs)
-        self._config = LayeredConfig(defaults=defaults)
+        if not config:
+            codedefaults = self.get_default_options()
+            defaults = util.merge_dict_recursive(codedefaults, kwargs)
+            self._config = LayeredConfig(defaults=defaults)
+        else:
+            self._config = config
         if not hasattr(self, 'store'):
             self.store = self.documentstore_class(self.config.datadir + os.sep + self.alias)
         # should documentstore have a connection to self, ie

@@ -161,15 +161,23 @@ class=testManager.staticmockclass2
             manager.enable("staticmock")
 
     def test_run_class(self):
-        enabled_classes = {'test':'testManager.staticmockclass'}
-        argv = ["test", "mymethod","myarg"]
-        self.assertEqual(manager._run_class(enabled_classes,argv),"ok!")
+        enabled_classes = {'test': 'testManager.staticmockclass'}
+        config = LayeredConfig({'datadir': 'data',
+                                'loglevel': 'INFO',
+                                'logfile': None,
+                                'staticmock': {}
+                            },
+                               cascade=True)
+        argv = ["test", "mymethod", "myarg"]
+        self.assertEqual(manager._run_class(enabled_classes,
+                                            argv,
+                                            config),
+                         "ok!")
 
-                    
     def test_list_enabled_classes(self):
         self.assertEqual(manager._list_enabled_classes(),
-                         OrderedDict((("test","Example class for testing"),
-                                      ("test2","Another class for testing"))))
+                         OrderedDict((("test", "Example class for testing"),
+                                      ("test2", "Another class for testing"))))
 
     def test_list_class_usage(self):
         self.assertEqual(manager._list_class_usage(staticmockclass),
@@ -686,11 +694,12 @@ class Testrepo2(Testrepo):
 #                 "Skipping test_run_single_allmethods on travis-ci")    
     def test_run_single_allmethods(self):
         self._enable_repos()
-        argv = ["test","all"]
+        argv = ["test", "all"]
         s = os.sep
         self.maxDiff = None
         want = OrderedDict(
-            [('download', OrderedDict([('test','test download ok (magic=less)'),
+            [('download', OrderedDict([('test',
+                                        'test download ok (magic=less)'),
                                    ])),
              ('parse', OrderedDict([('test', ['test parse arg1',
                                               'test parse myarg',
@@ -700,23 +709,24 @@ class Testrepo2(Testrepo):
                                                'test relate myarg',
                                                'test relate arg2']),
                                  ])),
-             ('makeresources', {'css':[s.join(['rsrc', 'css','test.css']),
-                                       s.join(['rsrc', 'css','other.css'])],
-                                'img':[s.join(['rsrc', 'img','test.png'])],
-                                'js':[s.join(['rsrc', 'js','test.js'])],
-                                'json': [s.join(['rsrc','api','context.json']),
-                                         s.join(['rsrc','api','common.json']),
-                                         s.join(['rsrc','api','terms.json'])],
-                                'xml':[s.join(['rsrc', 'resources.xml'])]}),
+             ('makeresources',
+              {'css': [s.join(['rsrc', 'css', 'test.css']),
+                       s.join(['rsrc', 'css', 'other.css'])],
+               'img':[s.join(['rsrc', 'img', 'test.png'])],
+               'js':[s.join(['rsrc', 'js', 'test.js'])],
+               'json': [s.join(['rsrc', 'api', 'context.json']),
+                        s.join(['rsrc', 'api', 'common.json']),
+                        s.join(['rsrc', 'api', 'terms.json'])],
+               'xml':[s.join(['rsrc', 'resources.xml'])]}),
              ('generate', OrderedDict([('test', ['test generate arg1',
                                                  'test generate myarg',
                                                  'test generate arg2']),
                                    ])),
-             ('toc', OrderedDict([('test','test toc ok'),
+             ('toc', OrderedDict([('test', 'test toc ok'),
                               ])),
-             ('news', OrderedDict([('test','test news ok'),
+             ('news', OrderedDict([('test', 'test news ok'),
                                ])),
-            ('frontpage', True)])
+             ('frontpage', True)])
 
         self.assertEqual(manager.run(argv),
                          want)
@@ -779,6 +789,21 @@ apiendpoint = /api/
         self.assertEqual("dir",                  manager.run(['test2','inspect','storage_policy']))
         self.assertEqual(self.tempdir+os.sep+"test2",  manager.run(['test2','inspect','store', 'datadir']))
         
+    def test_config_init(self):
+        # make sure that the sub-config object created by run() is
+        # identical to the config object used by the instance
+        self._enable_repos()
+        ourcfg = LayeredConfig({'loglevel': 'INFO',
+                                'logfile': None,
+                                'datadir': 'data',
+                                'test': {'hello': 'world'}},
+                               cascade=True)
+        with patch('ferenda.manager._load_config', return_value=ourcfg):
+            instcfg = manager.run(['test', 'inspect', 'config'])
+            self.assertIsInstance(instcfg, LayeredConfig)
+            self.assertEqual(id(ourcfg.test),
+                             id(instcfg))
+
     def test_custom_docstore(self):
         self._enable_repos()
         got = manager.run(['test2', 'callstore'])
