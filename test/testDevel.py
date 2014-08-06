@@ -17,6 +17,7 @@ from ferenda import DocumentRepository, DocumentStore, LayeredConfig, util
 # SUT
 from ferenda import Devel
 
+    
 class Main(unittest.TestCase):
 
     def mask_time(self, s):
@@ -55,88 +56,6 @@ class Main(unittest.TestCase):
         want = "[fake store content]"
         printmock.assert_has_calls([call(want)])
         
-    def test_mkpatch(self):
-        tempdir = tempfile.mkdtemp()
-        basefile = "1"
-        # Test 1: A repo which do not use any intermediate files. In
-        # this case, the user edits the downloaded file, then runs
-        # mkpatch, which saves the edited file, re-downloads the file,
-        # and computes the diff.
-        store = DocumentStore(tempdir + "/base")
-        downloaded_path = store.downloaded_path(basefile)
-        def my_download_single(self):
-            # this function simulates downloading
-            with open(downloaded_path, "wb") as fp:
-                fp.write("""This is a file.
-It has been downloaded.
-""".encode())
-        
-        repo = DocumentRepository(datadir=tempdir)
-        with repo.store.open_downloaded(basefile, "wb") as fp:
-            fp.write("""This is a file.
-It has been patched.
-""".encode())
-
-        d = Devel()
-        globalconf = LayeredConfig({'datadir':tempdir,
-                                    'patchdir':tempdir,
-                                    'devel': {'class':'ferenda.Devel'},
-                                    'base': {'class':
-                                             'ferenda.DocumentRepository'}},
-                                   cascade=True)
-        
-        d.config = globalconf.devel
-        with patch('ferenda.DocumentRepository.download_single') as mock:
-            mock.side_effect = my_download_single
-            patchpath = d.mkpatch("base", basefile, "Example patch")
-        
-        patchcontent = util.readfile(patchpath)
-        self.assertIn("Example patch", patchcontent)
-        self.assertIn("@@ -1,2 +1,2 @@", patchcontent)
-        self.assertIn("-It has been downloaded.", patchcontent)
-        self.assertIn("+It has been patched.", patchcontent)
-
-        # test 2: Same, but with a multi-line desc
-        with repo.store.open_downloaded(basefile, "wb") as fp:
-            fp.write("""This is a file.
-It has been patched.
-""".encode())
-        longdesc = """A longer comment
-spanning
-several lines"""
-        with patch('ferenda.DocumentRepository.download_single') as mock:
-            mock.side_effect = my_download_single
-            patchpath = d.mkpatch("base", basefile, longdesc)
-        patchcontent = util.readfile(patchpath)
-        desccontent = util.readfile(patchpath.replace(".patch", ".desc"))
-        self.assertEqual(longdesc, desccontent)
-        self.assertFalse("A longer comment" in patchcontent)
-        self.assertIn("@@ -1,2 +1,2 @@", patchcontent)
-        self.assertIn("-It has been downloaded.", patchcontent)
-        self.assertIn("+It has been patched.", patchcontent)
-
-        # test 3: If intermediate file exists, patch that one
-        intermediate_path = store.intermediate_path(basefile)
-        util.ensure_dir(intermediate_path)
-        with open(intermediate_path, "wb") as fp:
-            fp.write("""This is a intermediate file.
-It has been patched.
-""".encode())
-        intermediate_path = store.intermediate_path(basefile)
-        def my_parse(self, basefile=None):
-            # this function simulates downloading
-            with open(intermediate_path, "wb") as fp:
-                fp.write("""This is a intermediate file.
-It has been processed.
-""".encode())
-        with patch('ferenda.DocumentRepository.parse') as mock:
-            mock.side_effect = my_parse
-            patchpath = d.mkpatch("base", basefile, "Example patch")
-        patchcontent = util.readfile(patchpath)
-        self.assertIn("@@ -1,2 +1,2 @@ Example patch", patchcontent)
-        self.assertIn(" This is a intermediate file", patchcontent)
-        self.assertIn("-It has been processed.", patchcontent)
-        self.assertIn("+It has been patched.", patchcontent)
         
     def test_fsmparse(self):
         try:
@@ -335,3 +254,131 @@ Doc #2 (http://example.org/doc2): matching doc 2
         d = Devel()
         with self.assertRaises(NotImplementedError):
             d.parsestring(None,None,None)
+
+
+class MockRepo(DocumentRepository):
+    # alias = "base"
+
+    def download_single(self, basefile):
+        if self.config.download_text:
+            with self.store.open_downloaded(basefile, "wb") as fp:
+                fp.write(self.config.download_text)
+
+    def parse(self, basefile):
+        if self.config.intermediate_text:
+            with self.store.open_intermediate(basefile, "wb") as fp:
+                fp.write(self.config.intermediate_text)
+
+
+class Koi8Repo(MockRepo):
+    source_encoding = "koi8_r"
+    pass
+        
+
+class Mkpatch(unittest.TestCase):
+
+    def setUp(self):
+        self.datadir = tempfile.mkdtemp()
+        self.basefile = "1"
+        self.store = DocumentStore(self.datadir + "/base")
+        self.d = Devel()
+        self.globalconf = LayeredConfig({'datadir': self.datadir,
+                                         'patchdir': self.datadir,
+                                         'download_text': None,
+                                         'intermediate_text': None,
+                                         'devel': {'class': 'ferenda.Devel'},
+                                         'base': {'class':
+                                                  'testDevel.MockRepo'},
+                                         'koi8': {'class':
+                                                  'testDevel.Koi8Repo'}},
+                                        cascade=True)
+        self.d.config = self.globalconf.devel
+
+    def tearDown(self):
+        shutil.rmtree(self.datadir)
+        
+    def test_download(self):
+        # Test 1: A repo which do not use any intermediate files. In
+        # this case, the user edits the downloaded file, then runs
+        # mkpatch, which saves the edited file, re-downloads the file,
+        # and computes the diff.
+        dconf = self.globalconf.base
+        dconf.download_text = b"This is a file.\nIt has been downloaded.\n"
+
+        repo = MockRepo(datadir=self.datadir)
+        with repo.store.open_downloaded(self.basefile, "wb") as fp:
+            fp.write(b"This is a file.\nIt has been patched.\n")
+
+        patchpath = self.d.mkpatch("base", self.basefile, "Example patch")
+        self.assertTrue(patchpath)
+        patchcontent = util.readfile(patchpath)
+        self.assertIn("Example patch", patchcontent)
+        self.assertIn("@@ -1,2 +1,2 @@", patchcontent)
+        self.assertIn("-It has been downloaded.", patchcontent)
+        self.assertIn("+It has been patched.", patchcontent)
+
+    def test_longdesc(self):
+        # test 2: Same, but with a multi-line desc
+        dconf = self.globalconf.base
+        dconf.download_text = b"This is a file.\nIt has been downloaded.\n"
+
+        repo = MockRepo(datadir=self.datadir)
+        with repo.store.open_downloaded(self.basefile, "wb") as fp:
+            fp.write(b"This is a file.\nIt has been patched.\n")
+        longdesc = "A longer comment\nspanning\nseveral lines"
+
+        patchpath = self.d.mkpatch("base", self.basefile, longdesc)
+        self.assertTrue(patchpath)
+        patchcontent = util.readfile(patchpath)
+        desccontent = util.readfile(patchpath.replace(".patch", ".desc"))
+        self.assertEqual(longdesc, desccontent)
+        self.assertFalse("A longer comment" in patchcontent)
+        self.assertIn("@@ -1,2 +1,2 @@", patchcontent)
+        self.assertIn("-It has been downloaded.", patchcontent)
+        self.assertIn("+It has been patched.", patchcontent)
+
+    def test_intermediate(self):
+        # test 3: If intermediate file exists, patch that one instead
+        dconf = self.globalconf.base
+        dconf.intermediate_text = b"This is a intermediate file.\nIt has been processed.\n"
+
+        repo = MockRepo(datadir=self.datadir)
+        with repo.store.open_intermediate(self.basefile, "wb") as fp:
+            fp.write(b"This is a intermediate file.\nIt has been patched.\n")
+
+        patchpath = self.d.mkpatch("base", self.basefile, "Example patch")
+        self.assertTrue(patchpath)
+        patchcontent = util.readfile(patchpath)
+        self.assertIn("@@ -1,2 +1,2 @@ Example patch", patchcontent)
+        self.assertIn(" This is a intermediate file", patchcontent)
+        self.assertIn("-It has been processed.", patchcontent)
+        self.assertIn("+It has been patched.", patchcontent)
+
+    def test_unicode(self):
+        # test 4: Unicode characters (note the 'ş' character) 
+        dconf = self.globalconf.base
+        dconf.intermediate_text = b"This is a intermediate file.\nIt has been processed.\n"
+
+        repo = MockRepo(datadir=self.datadir)
+        with repo.store.open_intermediate(self.basefile, "wb") as fp:
+            fp.write("This is a intermediate file.\nKardeş Gibiydiler\n".encode("utf-8"))
+
+        patchpath = self.d.mkpatch("base", self.basefile, "Example patch")
+        self.assertTrue(patchpath)
+        patchcontent = util.readfile(patchpath, encoding="utf-8")
+        self.assertIn("+Kardeş Gibiydiler", patchcontent)
+
+    def test_encoding(self):
+        # test 5: Non-default charset for patch
+        dconf = self.globalconf.koi8
+        dconf.intermediate_text = b"This is a intermediate file.\nIt has been processed.\n"
+
+        repo = Koi8Repo(datadir=self.datadir)
+        with repo.store.open_intermediate(self.basefile, "wb") as fp:
+            fp.write("This is a intermediate file.\nБойцовский клуб\n".encode("koi8_r"))
+            
+        patchpath = self.d.mkpatch("koi8", self.basefile, "Example patch")
+        self.assertTrue(patchpath)
+        patchcontent = util.readfile(patchpath, encoding="koi8_r")
+        self.assertIn("+Бойцовский клуб", patchcontent)
+        

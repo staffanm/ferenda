@@ -2223,6 +2223,22 @@ class Patch(RepoTester):
   </p>
   </body>
 """
+
+    # contains non-ascii characters, but only those that fit in a
+    # non-utf8-encoding (latin-1 to be precise)
+    targetdoc2 = """<body>
+  <h1>Räksmörgås</h1>
+  <p>
+    This is some unchanged text.
+    1: And some more again
+    2: And some more again
+    3: And some more again
+    4: And some more again
+    (to make sure we use two separate hunks)
+    This is text thåt has chänged
+  </p>
+  </body>
+"""
     
     def setUp(self):
         super(Patch, self).setUp()
@@ -2322,6 +2338,62 @@ It can span several lines."""
         self.assertEqual(None, desc)
         self.assertEqual(self.sourcedoc, result)
 
+    def test_unicode_patch(self):
+        patchpath = self.patchstore.path("123/a", "patches", ".patch")
+        util.ensure_dir(patchpath)
+        with codecs.open(patchpath, "w", encoding="utf-8") as fp:
+            fp.write("""--- basic.txt	2013-06-13 09:16:37.000000000 +0200
++++ changed.txt	2013-06-13 09:16:39.000000000 +0200
+@@ -1,5 +1,5 @@ Editöriål edit
+ <body>
+-  <h1>Basic document</h1>
++  <h1>Räksmörgås</h1>
+   <p>
+     This is some unchanged text.
+     1: And some more again
+@@ -7,6 +7,6 @@
+     3: And some more again
+     4: And some more again
+     (to make sure we use two separate hunks)
+-    This is text that will be changed.
++    This is text thåt has chänged
+   </p>
+   </body>
+""")
+        result, desc = self.repo.patch_if_needed("123/a", self.sourcedoc)
+        self.assertEqual("Editöriål edit", desc)
+        self.assertEqual(self.targetdoc2, result)
+
+    def test_encoded_patch(self):
+        # Note that this patch's "fromfile" and "tofile" fields
+        # doesn't match any actual file (and that there really isn't
+        # any file stored on disk)
+        patchpath = self.patchstore.path("123/a", "patches", ".patch")
+        util.ensure_dir(patchpath)
+        with codecs.open(patchpath, "w", encoding="latin-1") as fp:
+            fp.write("""--- basic.txt	2013-06-13 09:16:37.000000000 +0200
++++ changed.txt	2013-06-13 09:16:39.000000000 +0200
+@@ -1,5 +1,5 @@ Editöriål edit
+ <body>
+-  <h1>Basic document</h1>
++  <h1>Räksmörgås</h1>
+   <p>
+     This is some unchanged text.
+     1: And some more again
+@@ -7,6 +7,6 @@
+     3: And some more again
+     4: And some more again
+     (to make sure we use two separate hunks)
+-    This is text that will be changed.
++    This is text thåt has chänged
+   </p>
+   </body>
+""")
+        self.repo.source_encoding = "latin-1"
+        result, desc = self.repo.patch_if_needed("123/a", self.sourcedoc)
+        self.assertEqual("Editöriål edit", desc)
+        self.assertEqual(self.targetdoc2, result)
+        
 
 
 # Add doctests in the module

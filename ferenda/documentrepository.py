@@ -1115,6 +1115,11 @@ with the *config* object as single parameter.
         (patchedtext, patchdescription) if so, (text,None)
         otherwise.
 
+        :param basefile: The basefile of the text
+        :type basefile: str
+        :param text: The text to be patched
+        :type text: bytes
+ 
         """
 
         # 1. do we have a patch?
@@ -1131,7 +1136,10 @@ with the *config* object as single parameter.
             plog.addHandler(logging.StreamHandler(pbuf))
 
             # 2. read and parse it
-            with open(patchpath) as fp:
+            # patches use the same encoding as source
+            encoding = self.source_encoding
+            with codecs.open(patchpath, encoding=encoding) as fp:
+            # with open(patchpath) as fp:
                 ps = patch.PatchSet()
                 success = ps.parse(fp)
             if not success:
@@ -1143,7 +1151,7 @@ with the *config* object as single parameter.
             fileno, tmpfile = mkstemp()
             fp = os.fdopen(fileno, "wb")
             # dump text to tmpfile
-            fp.write(text.encode("utf-8"))  # assume that patches are also in utf-8
+            fp.write(text.encode(encoding))
             fp.close()
             ps.items[0].source = tmpfile
             # 5. now do the patching

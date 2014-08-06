@@ -5,6 +5,7 @@ import os
 from difflib import unified_diff
 from tempfile import mkstemp
 import inspect
+import codecs
 
 from rdflib import Graph, URIRef, RDF
 import six
@@ -214,18 +215,30 @@ class Devel(object):
         with os.fdopen(fileno, "wb") as fp:
             fp.write(util.readfile(outfile, mode="rb"))
         
-        # 2.1 if intermediate: stash a copy, run parse(config.force=True)
+        # 2.1 if intermediate: stash a copy, run
+        # parse(config.force=True) to regenerate the intermediate file
         if stage == "intermediate":
             repo.config.force = True
-            repo.parse(basefile)
+            try: 
+                repo.parse(basefile)  
+            except:
+                # maybe this throws an error (hopefully after creating
+                # the intermediate file)? may be the reason for
+                # patching in the first place?
+                pass
+            
         # 2.2 if only downloaded: stash a copy, run download_single(config.refresh=True)
         else:
             repo.config.refresh = True
             repo.download_single(basefile)
             
         # 3. calculate the diff using difflib.
-        outfile_lines = open(outfile).readlines()
-        stash_lines = open(stash).readlines()
+
+        # Assume that intermediate files use the same encoding as
+        # source files
+        encoding = repo.source_encoding
+        outfile_lines = codecs.open(outfile, encoding=encoding).readlines()
+        stash_lines = codecs.open(stash, encoding=encoding).readlines()
         difflines = list(unified_diff(outfile_lines,
                                       stash_lines,
                                       outfile,
@@ -250,8 +263,15 @@ class Devel(object):
             util.writefile(descpath, description)
             
         # 4.1 write patch
-        util.writefile(patchpath, "".join(difflines))
-        return patchpath
+        patchcontent = "".join(difflines)
+        if patchcontent:
+            # write the patch using the same encoding as the
+            # downloaded/intermediate files
+            util.writefile(patchpath, patchcontent, encoding=encoding)
+            # print("Created patch %s" % patchpath)
+            return patchpath
+        else:
+            print("WARNING: patch would be empty, not creating it")
 
     @decorators.action
     def parsestring(self, string, citationpattern, uriformatter=None):
