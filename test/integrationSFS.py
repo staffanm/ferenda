@@ -14,12 +14,6 @@ from ferenda.elements import serialize, LinkSubject
 from ferenda import TextReader
 
 
-class FakeParser(object):
-
-    def parse(self, s, baseuri, rdftype):
-        return [s]
-
-
 class Parse(unittest.TestCase):
 
     def parametric_test(self, filename):
@@ -57,8 +51,7 @@ class Parse(unittest.TestCase):
                 self._remove_uri_for_testcases(subpart)
             elif hasattr(subpart, 'uri') and not isinstance(subpart, LinkSubject):
                 del subpart.uri
-            
-                
+
             
 from ferenda.testutil import file_parametrize
 
@@ -79,6 +72,8 @@ brokentests = ['definition-no-definition.txt',
                'tricky-tabell-overgangsbest.txt',
                'tricky-tabell-sju-kolumner.txt']
 
+
 def broken(testname):
     return testname in brokentests
-file_parametrize(Parse,"test/files/sfs/parse",".txt", broken)
+    
+file_parametrize(Parse, "test/files/sfs/parse", ".txt", broken)

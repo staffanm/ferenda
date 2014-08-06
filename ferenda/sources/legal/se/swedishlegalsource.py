@@ -152,41 +152,8 @@ class SwedishLegalSource(DocumentRepository):
             d[str(label)] = str(uri)
         return d
 
-    def lookup_resource(self, resource_label, cutoff=0.8, warn=True):
-        """Given a text label refering to some kind of organization,
-        person or other entity, eg. 'Justitiedepartementet Gransk',
-        return a URIRef for that entity. The text label does not need to
-        match exactly byte-for-byte, a fuzziness matching function
-        returns any reasonably similar (adjusted by the cutoff
-        parameter) entity."""
-        keys = []
-        if not hasattr(self, 'org_resources'):
-            self.org_resources = self._load_resources(self.config.authrec)
-
-        for (key, value) in list(self.org_resources.items()):
-            if resource_label.lower().startswith(key.lower()):
-                return URIRef(value)
-            else:
-                keys.append(key)
-
-        fuzz = difflib.get_close_matches(resource_label, keys, 1, cutoff)
-        if fuzz:
-            if warn:
-                self.log.warning("Assuming that '%s' should be '%s'?" %
-                                 (resource_label, fuzz[0]))
-            return URIRef(self.lookup_resource(fuzz[0]))
-        else:
-            self.log.warning("No good match for '%s'" % (resource_label))
-            raise KeyError(resource_label)
-
     def lookup_label(self, resource):
-        if not hasattr(self, 'org_resources'):
-            self.org_resources = self._load_resources(self.config.authrec)
-        for (key, value) in list(self.org_resources.items()):
-            if resource == value:
-                return key
-
-        raise KeyError(resource)
+        raise NotImplementedError("Rewrite SwedishLegalSource.lookup_label to use .commondata")
 
     def sameas_uri(self, uri):
         # "http://localhost:8000/res/dir/2012:35" => "http://rinfo.lagrummet.se/publ/dir/2012:35",
