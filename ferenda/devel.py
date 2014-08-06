@@ -162,6 +162,10 @@ class Devel(object):
         repocls = manager._load_class(getattr(repoconfig, 'class'))
         repo = repocls()
         repo.config = getattr(mainconfig, alias)
+        # work in all parameters from get_default_options
+        for key, val in repo.get_default_options().items():
+            if key not in repo.config:
+                setattr(repo.config, key, val)
         repo.store = repo.documentstore_class(
             repo.config.datadir + os.sep + repo.alias,
             downloaded_suffix=repo.downloaded_suffix,

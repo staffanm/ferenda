@@ -344,7 +344,8 @@ def run(argv):
                 args = _setup_makeresources_args(config)
                 repos = []
                 for cls in repoclasses:
-                    inst = _instantiate_class(cls, _find_config_file(), argv)
+                    # inst = _instantiate_class(cls, _find_config_file(), argv)
+                    inst = _instantiate_class(cls, config, argv)
                     repos.append(inst)
                 return makeresources(repos, **args)
 
@@ -385,13 +386,13 @@ def run(argv):
                         argv_copy = list(argv)
                         argv_copy[0] = alias
                         try:
-                            ret.append(_run_class(enabled, argv_copy))
+                            ret.append(_run_class(enabled, argv_copy, config))
                         except Exception as e:
                             (alias, command, args) = _filter_argv(argv_copy)
                             log.error("%s %s failed: %s" % (command, alias, e))
                     return ret
                 else:
-                    return _run_class(enabled, argv)
+                    return _run_class(enabled, argv, config)
     finally:
         shutdown_logger()
 
@@ -609,7 +610,7 @@ def _setup_classnames(enabled, classname):
         return [classname]
 
 
-def _run_class(enabled, argv):
+def _run_class(enabled, argv, config):
     """Runs a particular action for a particular class.
 
     :param enabled: The currently enabled repo classes, as returned by
@@ -620,6 +621,8 @@ def _run_class(enabled, argv):
                  enabled class in turn and then calls this method
                  with the same argv.
     :type argv: list
+    :param config: A config object
+    :type  config: ferenda.LayeredConfig
 
     If the parameter ``--all`` is given (e.g. ``['myrepo', 'parse',
     '--all']``), the specified command is run once for every available
@@ -645,7 +648,7 @@ def _run_class(enabled, argv):
         else:
             classname = enabled[alias]
         cls = _load_class(classname)
-        inst = _instantiate_class(cls, argv=argv)
+        inst = _instantiate_class(cls, config, argv=argv)
         try:
             clbl = getattr(inst, command)
             assert(callable(clbl))
@@ -704,19 +707,28 @@ def _run_class(enabled, argv):
     return res
 
 
-def _instantiate_class(cls, configfile="ferenda.ini", argv=[]):
+def _instantiate_class(cls, config=None, argv=[]):
     """Given a class object, instantiate that class and make sure the
        instance is properly configured given it's own defaults, a
        config file, and command line parameters."""
 
-    inst = cls()  # no options -- we re-set .config and .store explicitly
-    defaults = inst.get_default_options()
-    defaults[cls.alias] = {}
-    globalcfg = LayeredConfig(defaults,
-                              configfile,
-                              argv, cascade=True)
-    classcfg = getattr(globalcfg, cls.alias)
-    inst.config = classcfg # magically creates inst.store
+    clsdefaults = cls().get_default_options()
+    if not config:
+        defaults = dict(clsdefaults)
+        defaults[cls.alias] = {}
+        config = LayeredConfig(defaults,
+                               _find_config_file(),
+                               argv, cascade=True)
+    clsconfig = getattr(config, cls.alias)
+
+    # work in all parameters from get_default_options unless they have
+    # been set by some other means
+    for param in clsdefaults:
+        if param not in clsconfig:
+            setattr(clsconfig, param, clsdefaults[param])
+
+    
+    inst = cls(clsconfig)
     return inst
 
 
@@ -964,7 +976,8 @@ def _setup_frontpage_args(config, argv):
     repoclasses = _classes_from_classname(enabled, classname="all")
     repos = []
     for cls in repoclasses:
-        inst = _instantiate_class(cls, _find_config_file(), argv)
+        # inst = _instantiate_class(cls, _find_config_file(), argv)
+        inst = _instantiate_class(cls, config, argv)
         repos.append(inst)
     return {'sitename': config.sitename,
             'path': config.datadir + "/index.html",
