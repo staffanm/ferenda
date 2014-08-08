@@ -440,6 +440,7 @@ class DocumentRepository(object):
         return {  # 'loglevel': 'INFO',
             'datadir': 'data',
             'patchdir': 'patches',
+            'processes': 1,
             'force': False,
             'parseforce': False,
             'serializejson': False,

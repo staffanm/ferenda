@@ -453,6 +453,15 @@ class Testrepo(DocumentRepository):
             return "ok!"
 
     @decorators.action
+    def pid(self, arg):
+        import os
+        from time import sleep
+        self.log.info("%s: pid is %s" % (arg, os.getpid()))
+        self.log.debug("%s: some more debug info" % (arg))
+        sleep(0.1)
+        return(arg, os.getpid())
+
+    @decorators.action
     def errmethod(self, arg):
         if arg == "arg1":
             raise Exception("General error")
@@ -603,16 +612,31 @@ class Testrepo2(Testrepo):
     def test_run_single_all(self):
         self._enable_repos()
         argv = ["test","mymethod","--all"]
+        # Test 1: make sure that if setup signals that no work should
+        # be done, this is respected
         with patch("example.Testrepo.setup", return_value=False):
-            self.assertEqual(manager.run(argv), [])
+            self.assertEqual(manager.run(list(argv)), [])
+            # pass
 
+        # Test 2: but if not, do the work
+        self.assertEqual(manager.run(list(argv)), [None, "ok!", None])
+
+    def test_run_single_all_multiprocessing(self):
+        self._enable_repos()
+        argv = ["test","pid","--all", "--processes=3"]
+        res = manager.run(argv)
+        args = [x[0] for x in res]
+        pids = [x[1] for x in res]
+        self.assertEqual(args, ["arg1", "myarg", "arg2"])
+        # assert that all pids are unique
+        self.assertEqual(3, len(set(pids)))
+            
     def test_run_all(self):
         self._enable_repos()
         argv = ["all","mymethod","myarg"]
         self.assertEqual(manager.run(argv),
                          ["ok!", "yeah!"])
 
-        
     def test_run_all_all(self):
         self._enable_repos()
         argv = ["all", "mymethod", "--all"]

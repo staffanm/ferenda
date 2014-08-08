@@ -23,6 +23,9 @@ import tempfile
 from datetime import datetime
 from ferenda.compat import OrderedDict, MagicMock
 from wsgiref.simple_server import make_server
+from multiprocessing import Pool
+from functools import partial
+from ast import literal_eval
 
 import six
 from six.moves.urllib_parse import urlsplit
@@ -525,6 +528,7 @@ overridden by the config file or command line arguments."""
     # (those have the get_default_options() method).
     defaults = {'loglevel': 'DEBUG',
                 'logfile': True,
+                'processes': 1,
                 'datadir': 'data',
                 'combineresources': False,
                 'staticsite': False,
@@ -677,36 +681,71 @@ def _run_class(enabled, argv, config):
             if ret == False:
                 log.info("%s %s: Nothing to do!" % (alias, command))
             else:
+                if inst.config.processes > 1:
+                    # parallelize using multiprocessing
+                    dictconfig = dict([(x, getattr(config,x)) for x in list(config)])
+                    pool = Pool(processes=inst.config.processes,
+                                initializer=_setup_subprocess_callable,
+                                initargs=(classname, command, config, argv))
+                    clbl = _subprocess_proxy
+                    log.info("Starting multiprocessing with %d processes" % inst.config.processes)
+                    res = pool.map(clbl, inst.store.list_basefiles_for(command))
+                else:
+                    for basefile in inst.store.list_basefiles_for(command):
+                        res.append(_run_class_with_basefile(clbl, basefile, kwargs, command))
+                    
                 # TODO: use multiprocessing.pool.map or celery for
                 # task queue handling
-                for basefile in inst.store.list_basefiles_for(command):
-                    try:
-                        res.append(clbl(basefile, **kwargs))
-                    except errors.DocumentRemovedError as e:
-                        if hasattr(e, 'dummyfile'):
-                            if not os.path.exists(e.dummyfile):
-                                util.writefile(e.dummyfile, "")
-                            res.append(None) # is what
-                                             # DocumentRepository.parse
-                                             # returns when
-                                             # everyting's ok
-                        else:
-                            errmsg = str(e)
-                            log.error("%s of %s failed: %s" %
-                                      (command, basefile, errmsg))
-                            res.append(sys.exc_info())
-
-                    except Exception as e:
-                        errmsg = str(e)
-                        log.error("%s of %s failed: %s" %
-                                  (command, basefile, errmsg))
-                        res.append(sys.exc_info())
                 cls.teardown(command, inst.config)
         else:
             res = clbl(*args, **kwargs)
     return res
 
+subprocess_callable = None
 
+
+def _setup_subprocess_callable(classname, command, config, argv):
+    # this is never called in the main process, only pool processes, and
+    # the purpose is to setup an (global) object instance in that process.
+    global subprocess_callable
+    if not subprocess_callable:
+        cls = _load_class(classname)
+        # config = LayeredConfig(literal_eval(dictconfig))
+        # config = LayeredConfig(dictconfig)
+        inst = _instantiate_class(cls, config, argv=argv)
+        subprocess_callable = getattr(inst, command)
+
+
+def _subprocess_proxy(basefile):
+    # This is our way of creating a callable in the main process which,
+    # when called in the subprocess, can access the subprocess-global
+    # callable
+    global subprocess_callable
+    return subprocess_callable(basefile)
+
+    
+def _run_class_with_basefile(clbl, basefile, kwargs, command):
+    try:
+        return clbl(basefile, **kwargs)
+    except errors.DocumentRemovedError as e:
+        if hasattr(e, 'dummyfile'):
+            if not os.path.exists(e.dummyfile):
+                util.writefile(e.dummyfile, "")
+            return None  # is what DocumentRepository.parse returns
+                         # when everyting's ok
+        else:
+            errmsg = str(e)
+            setup_logger().error("%s of %s failed: %s" %
+                                 (command, basefile, errmsg))
+            return sys.exc_info()
+
+    except Exception as e:
+        errmsg = str(e)
+        setup_logger().error("%s of %s failed: %s" %
+                             (command, basefile, errmsg))
+        return sys.exc_info()
+
+        
 def _instantiate_class(cls, config=None, argv=[]):
     """Given a class object, instantiate that class and make sure the
        instance is properly configured given it's own defaults, a
