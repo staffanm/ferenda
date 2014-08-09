@@ -32,9 +32,10 @@ import pkg_resources
 import requests
 import requests.exceptions
 
+
 from six import text_type as str
 from six import binary_type as bytes
-
+from six import PY2
 from six.moves.urllib_parse import quote
 
 # mine
@@ -1131,16 +1132,23 @@ with the *config* object as single parameter.
             # 4. make sure error msgs from the patch modules are
             # available if we fail.
             from io import StringIO
-            pbuf = StringIO()
+            if PY2:
+                pbuf = BytesIO()
+            else:
+                pbuf = StringIO()
             plog = logging.getLogger('ferenda.thirdparty.patch')
             plog.setLevel(logging.WARNING)
             plog.addHandler(logging.StreamHandler(pbuf))
 
             # 2. read and parse it
-            # patches use the same encoding as source
+
+            # patches use the same encoding as source, but must be
+            # read as a byte string for patch.PatchSet() to work -- at
+            # least on py2
             encoding = self.source_encoding
-            with codecs.open(patchpath, encoding=encoding) as fp:
-            # with open(patchpath) as fp:
+            with open(patchpath, 'rb') as fp:
+                if not PY2:
+                    fp = codecs.getreader(encoding)(fp)
                 ps = patch.PatchSet()
                 success = ps.parse(fp)
             if not success:
@@ -1161,13 +1169,20 @@ with the *config* object as single parameter.
                 raise errors.PatchError("Patch %s failed: %s" % (patchpath, pbuf.getvalue()))
             else:
                 # 6. Finally get a patch description
-                if ps.items[0].hunks[0].desc:
+                if ps.items[0].hunks[0].desc: 
                     desc = ps.items[0].hunks[0].desc
+                    if isinstance(desc, bytes): # on py2
+                        desc = desc.decode(encoding)
                 elif os.path.exists(descpath):
                     desc = util.readfile(descpath)
                 else:
                     desc = "(No patch description available)"
-                return util.readfile(tmpfile), desc
+                if not PY2:
+                    # on py3, the patch module will unfortunately use
+                    # unicode strings internally and then create a
+                    # utf8 file (by opening then w/o encoding in write_hunks)
+                    encoding = "utf-8" 
+                return util.readfile(tmpfile, encoding=encoding), desc
         else:
             return (text, None)
 

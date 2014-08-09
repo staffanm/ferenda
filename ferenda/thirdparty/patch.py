@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import unicode_literals
+# from __future__ import unicode_literals
 """ Patch utility to apply unified diffs
 
     Brute-force line-by-line non-recursive parsing 
@@ -364,7 +364,7 @@ class PatchSet(object):
         # [x] treat empty lines inside hunks as containing single space
         #     (this happens when diff is saved by copy/pasting to editor
         #      that strips trailing whitespace)
-        if line.strip("\r\n") == "":
+        if not line.strip("\r\n"):
             debug("expanding empty line in a middle of hunk body")
             self.warnings += 1
             line = ' ' + line
