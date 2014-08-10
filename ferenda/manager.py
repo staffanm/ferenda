@@ -690,6 +690,9 @@ def _run_class(enabled, argv, config):
                     clbl = _subprocess_proxy
                     log.info("Starting multiprocessing with %d processes" % inst.config.processes)
                     res = pool.map(clbl, inst.store.list_basefiles_for(command))
+                    # make sure all subprocesses are dead and have released
+                    # their handles
+                    pool.terminate()
                 else:
                     for basefile in inst.store.list_basefiles_for(command):
                         res.append(_run_class_with_basefile(clbl, basefile, kwargs, command))

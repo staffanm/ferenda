@@ -458,7 +458,7 @@ class Testrepo(DocumentRepository):
         from time import sleep
         self.log.info("%s: pid is %s" % (arg, os.getpid()))
         self.log.debug("%s: some more debug info" % (arg))
-        sleep(0.1)
+        sleep(2) # tasks need to run for some time in order to keep all subprocesses busy
         return(arg, os.getpid())
 
     @decorators.action
@@ -623,6 +623,7 @@ class Testrepo2(Testrepo):
 
     def test_run_single_all_multiprocessing(self):
         self._enable_repos()
+        # print("running multiproc for pid %s, datadir %s" % (os.getpid(), self.tempdir))
         argv = ["test","pid","--all", "--processes=3"]
         res = manager.run(argv)
         args = [x[0] for x in res]
