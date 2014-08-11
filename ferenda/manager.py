@@ -23,7 +23,7 @@ import tempfile
 from datetime import datetime
 from ferenda.compat import OrderedDict, MagicMock
 from wsgiref.simple_server import make_server
-from multiprocessing import Pool
+import multiprocessing
 from functools import partial, wraps
 from ast import literal_eval
 
@@ -613,6 +613,8 @@ def _setup_classnames(enabled, classname):
             classname = enabled[classname]
         return [classname]
 
+class WrappedKeyboardInterrupt(Exception):
+    pass
 
 def _run_class(enabled, argv, config):
     """Runs a particular action for a particular class.
@@ -683,13 +685,23 @@ def _run_class(enabled, argv, config):
             else:
                 if inst.config.processes > 1:
                     # parallelize using multiprocessing
-                    dictconfig = dict([(x, getattr(config,x)) for x in list(config)])
-                    pool = Pool(processes=inst.config.processes,
-                                initializer=_setup_subprocess_callable,
-                                initargs=(classname, command, config, argv))
+                    # multiprocessing.log_to_stderr(logging.DEBUG)
+                    pool = multiprocessing.Pool(processes=inst.config.processes,
+                                                initializer=_setup_subprocess_callable,
+                                                initargs=(classname, command, config, argv))
                     clbl = _subprocess_proxy
-                    log.info("Starting multiprocessing with %d processes" % inst.config.processes)
-                    res = pool.map(clbl, inst.store.list_basefiles_for(command))
+                    log.info("Starting multiprocessing with %d processes" %
+                             inst.config.processes)
+
+                    try:
+                        # FIXME: The 99999 second timeout is so that a
+                        # exception gets raised to the controlling
+                        # process immediately, see
+                        # http://stackoverflow.com/questions/1408356/keyboard-interrupts-with-pythons-multiprocessing-pool/1408476#1408476
+                        res = pool.map_async(clbl, inst.store.list_basefiles_for(command)).get(timeout=99999)
+                    except WrappedKeyboardInterrupt:
+                        raise KeyboardInterrupt()
+                    
                     # make sure all subprocesses are dead and have released
                     # their handles
                     pool.terminate()
@@ -697,8 +709,6 @@ def _run_class(enabled, argv, config):
                     for basefile in inst.store.list_basefiles_for(command):
                         res.append(_run_class_with_basefile(clbl, basefile, kwargs, command))
                     
-                # TODO: use multiprocessing.pool.map or celery for
-                # task queue handling
                 cls.teardown(command, inst.config)
         else:
             res = clbl(*args, **kwargs)
@@ -710,7 +720,8 @@ subprocess_callable = None
 
 def _setup_subprocess_callable(classname, command, config, argv):
     # this is never called in the main process, only pool processes, and
-   # the purpose is to setup an (global) object instance in that process.
+    # the purpose is to setup an (global) object instance in that process.
+
     global subprocess_callable
     if not subprocess_callable:
         cls = _load_class(classname)
@@ -718,6 +729,7 @@ def _setup_subprocess_callable(classname, command, config, argv):
         # config = LayeredConfig(dictconfig)
         inst = _instantiate_class(cls, config, argv=argv)
         subprocess_callable = _wrapexception(getattr(inst, command))
+        # subprocess_callable = getattr(inst, command)
 
 
 def _wrapexception(f):
@@ -728,36 +740,26 @@ def _wrapexception(f):
     def wrapper(*args, **kwargs):
         command = f.__name__
         basefile = args[0]
+        except_type = except_value = None
         import traceback
         try:
             return f(*args, **kwargs)
         except errors.DocumentRemovedError as e:
+            except_type, except_value, tb = sys.exc_info()
             if hasattr(e, 'dummyfile'):
                 if not os.path.exists(e.dummyfile):
                     util.writefile(e.dummyfile, "")
                 return None   # is what DocumentRepository.parse
                               # returns when everything's ok
             else:
-                # FIXME: Should we remove self.parsedpath(basefile)?
-
-                # FIXME: look at config.fatalexceptions (how to get
-                # config) and re-raise if set
-                
-                errmsg = str(e)
-                setup_logger().error("%s of %s failed: %s" %
-                                     (command, basefile, errmsg))
-                # can't return sys.exc_info() tuple b/c tracebacks cant be
-                # pickled. Send a text representation instead.
-                except_type, except_class, tb = sys.exc_info()
-                return except_type, except_class, traceback.extract_tb(tb)
-        except KeyboardInterrupt:
-            raise
+                except_type, except_value, tb = sys.exc_info()
         except Exception as e:
-            errmsg = str(e)
-            setup_logger().error("%s of %s failed: %s" %
-                                 (command, basefile, errmsg))
-            except_type, except_class, tb = sys.exc_info()
-            return except_type, except_class, traceback.extract_tb(tb)
+            except_type, except_value, tb = sys.exc_info()
+        except KeyboardInterrupt as e:
+            except_type, except_value, tb = sys.exc_info()
+            raise WrappedKeyboardInterrupt()
+        return except_type, except_value, traceback.extract_tb(tb)
+
     return wrapper
 
 
@@ -783,8 +785,6 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command):
             setup_logger().error("%s of %s failed: %s" %
                                  (command, basefile, errmsg))
             return sys.exc_info()
-    except KeyboardInterrupt:
-        raise
     except Exception as e:
         errmsg = str(e)
         setup_logger().error("%s of %s failed: %s" %

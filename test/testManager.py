@@ -417,6 +417,9 @@ indexlocation = data/whooshindex
         # 2. dump 2 example docrepo classes to example.py
         # FIXME: should we add self.tempdir to sys.path also (and remove it in teardown)?
         util.writefile(self.modulename+".py", """# Test code
+import os
+from time import sleep
+
 from ferenda import DocumentRepository, DocumentStore, decorators, errors
 
 class Teststore(DocumentStore):
@@ -454,8 +457,6 @@ class Testrepo(DocumentRepository):
 
     @decorators.action
     def pid(self, arg):
-        import os
-        from time import sleep
         self.log.info("%s: pid is %s" % (arg, os.getpid()))
         self.log.debug("%s: some more debug info" % (arg))
         sleep(2) # tasks need to run for some time in order to keep all subprocesses busy
@@ -471,6 +472,10 @@ class Testrepo(DocumentRepository):
             e = errors.DocumentRemovedError("Document was removed")
             e.dummyfile = "dummyfile.txt"
             raise e
+
+    @decorators.action
+    def keyboardinterrupt(self, arg):
+        raise KeyboardInterrupt()
 
     def download(self):
         return "%s download ok (magic=%s)" % (self.alias, self.config.magic)
@@ -642,9 +647,21 @@ class Testrepo2(Testrepo):
         self.assertEqual(res[2], None)
         self.assertTrue(os.path.exists("dummyfile.txt"))
             
+    def test_run_ctrlc(self):
+        self._enable_repos()
+        argv = ["test", "keyboardinterrupt", "--all"]
+        with self.assertRaises(KeyboardInterrupt):
+            manager.run(argv)
+
+    def test_run_ctrlc_multiprocessing(self):
+        self._enable_repos()
+        argv = ["test", "keyboardinterrupt", "--all", "--processes=2"]
+        with self.assertRaises(KeyboardInterrupt):
+            manager.run(argv)
+
     def test_run_all(self):
         self._enable_repos()
-        argv = ["all","mymethod","myarg"]
+        argv = ["all", "mymethod", "myarg"]
         self.assertEqual(manager.run(argv),
                          ["ok!", "yeah!"])
 
