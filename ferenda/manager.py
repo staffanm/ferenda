@@ -710,7 +710,7 @@ subprocess_callable = None
 
 def _setup_subprocess_callable(classname, command, config, argv):
     # this is never called in the main process, only pool processes, and
-    # the purpose is to setup an (global) object instance in that process.
+   # the purpose is to setup an (global) object instance in that process.
     global subprocess_callable
     if not subprocess_callable:
         cls = _load_class(classname)
@@ -738,6 +738,11 @@ def _wrapexception(f):
                 return None   # is what DocumentRepository.parse
                               # returns when everything's ok
             else:
+                # FIXME: Should we remove self.parsedpath(basefile)?
+
+                # FIXME: look at config.fatalexceptions (how to get
+                # config) and re-raise if set
+                
                 errmsg = str(e)
                 setup_logger().error("%s of %s failed: %s" %
                                      (command, basefile, errmsg))
@@ -745,6 +750,8 @@ def _wrapexception(f):
                 # pickled. Send a text representation instead.
                 except_type, except_class, tb = sys.exc_info()
                 return except_type, except_class, traceback.extract_tb(tb)
+        except KeyboardInterrupt:
+            raise
         except Exception as e:
             errmsg = str(e)
             setup_logger().error("%s of %s failed: %s" %
@@ -776,6 +783,8 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command):
             setup_logger().error("%s of %s failed: %s" %
                                  (command, basefile, errmsg))
             return sys.exc_info()
+    except KeyboardInterrupt:
+        raise
     except Exception as e:
         errmsg = str(e)
         setup_logger().error("%s of %s failed: %s" %
