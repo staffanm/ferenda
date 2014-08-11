@@ -24,7 +24,7 @@ from datetime import datetime
 from ferenda.compat import OrderedDict, MagicMock
 from wsgiref.simple_server import make_server
 from multiprocessing import Pool
-from functools import partial
+from functools import partial, wraps
 from ast import literal_eval
 
 import six
@@ -704,6 +704,7 @@ def _run_class(enabled, argv, config):
             res = clbl(*args, **kwargs)
     return res
 
+
 subprocess_callable = None
 
 
@@ -716,7 +717,41 @@ def _setup_subprocess_callable(classname, command, config, argv):
         # config = LayeredConfig(literal_eval(dictconfig))
         # config = LayeredConfig(dictconfig)
         inst = _instantiate_class(cls, config, argv=argv)
-        subprocess_callable = getattr(inst, command)
+        subprocess_callable = _wrapexception(getattr(inst, command))
+
+
+def _wrapexception(f):
+    # this is similar to decorators.handleerror but maybe more generic
+    # and returns exception info instead of False. FIXME: unify with
+    # _run_class_with_basefile
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        command = f.__name__
+        basefile = args[0]
+        import traceback
+        try:
+            return f(*args, **kwargs)
+        except errors.DocumentRemovedError as e:
+            if hasattr(e, 'dummyfile'):
+                if not os.path.exists(e.dummyfile):
+                    util.writefile(e.dummyfile, "")
+                return None   # is what DocumentRepository.parse
+                              # returns when everything's ok
+            else:
+                errmsg = str(e)
+                setup_logger().error("%s of %s failed: %s" %
+                                     (command, basefile, errmsg))
+                # can't return sys.exc_info() tuple b/c tracebacks cant be
+                # pickled. Send a text representation instead.
+                except_type, except_class, tb = sys.exc_info()
+                return except_type, except_class, traceback.extract_tb(tb)
+        except Exception as e:
+            errmsg = str(e)
+            setup_logger().error("%s of %s failed: %s" %
+                                 (command, basefile, errmsg))
+            except_type, except_class, tb = sys.exc_info()
+            return except_type, except_class, traceback.extract_tb(tb)
+    return wrapper
 
 
 def _subprocess_proxy(basefile):
@@ -741,7 +776,6 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command):
             setup_logger().error("%s of %s failed: %s" %
                                  (command, basefile, errmsg))
             return sys.exc_info()
-
     except Exception as e:
         errmsg = str(e)
         setup_logger().error("%s of %s failed: %s" %

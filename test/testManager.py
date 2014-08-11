@@ -631,6 +631,16 @@ class Testrepo2(Testrepo):
         self.assertEqual(args, ["arg1", "myarg", "arg2"])
         # assert that all pids are unique
         self.assertEqual(3, len(set(pids)))
+
+    def test_run_single_all_multiprocessing_fail(self):
+        self._enable_repos()
+        # print("running multiproc for pid %s, datadir %s" % (os.getpid(), self.tempdir))
+        argv = ["test","errmethod","--all", "--processes=3"]
+        res = manager.run(argv)
+        self.assertEqual(res[0][0], Exception)
+        self.assertEqual(res[1][0], errors.DocumentRemovedError)
+        self.assertEqual(res[2], None)
+        self.assertTrue(os.path.exists("dummyfile.txt"))
             
     def test_run_all(self):
         self._enable_repos()
