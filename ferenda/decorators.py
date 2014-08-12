@@ -189,8 +189,6 @@ def handleerror(f):
                 "%s: Document has been removed (%s)", doc.basefile, e)
             util.robust_remove(self.parsed_path(doc.basefile))
             return False
-        except KeyboardInterrupt:
-            raise
         except ParseError as e:
             self.log.error("%s: ParseError %s", doc.basefile, e)
             # FIXME: we'd like to use the shorter "if
@@ -204,7 +202,7 @@ def handleerror(f):
                 raise
             else:
                 return False
-        except:
+        except Exception:
             self.log.exception("parse of %s failed", doc.basefile)
             # FIXME: see above
             if (hasattr(self.config, 'fatalexceptions') and

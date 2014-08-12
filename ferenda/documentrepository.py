@@ -1152,8 +1152,12 @@ with the *config* object as single parameter.
                 ps = patch.PatchSet()
                 success = ps.parse(fp)
             if not success:
+                errmsg = pbuf.getvalue()
+                if not isinstance(errmsg, str):
+                    errmsg = errmsg.decode(encoding)
                 raise errors.PatchError(
-                    "Patch %s couldn't be parsed: %s" % (patchpath, pbuf.getvalue()))
+                    "Patch %s couldn't be parsed: %s" % (patchpath, errmsg))
+            pbuf.truncate(0) # call was success, so flush any warnings so far
             assert len(ps.items) == 1
             # 3. Create a temporary file with the file to be patched
             # open tmpfile
@@ -1166,7 +1170,11 @@ with the *config* object as single parameter.
             # 5. now do the patching
             success = ps.apply()
             if not success:
-                raise errors.PatchError("Patch %s failed: %s" % (patchpath, pbuf.getvalue()))
+                errmsg = pbuf.getvalue()
+                if not isinstance(errmsg, str):
+                    errmsg = errmsg.decode(encoding)
+                print(errmsg)
+                raise errors.PatchError("Patch %s failed: %s" % (patchpath, errmsg))
             else:
                 # 6. Finally get a patch description
                 if ps.items[0].hunks[0].desc: 
@@ -1181,7 +1189,8 @@ with the *config* object as single parameter.
                     # on py3, the patch module will unfortunately use
                     # unicode strings internally and then create a
                     # utf8 file (by opening then w/o encoding in write_hunks)
-                    encoding = "utf-8" 
+                    encoding = "utf-8"
+                self.log.warning("%s: Applied patch %s" % (basefile, patchpath))
                 return util.readfile(tmpfile, encoding=encoding), desc
         else:
             return (text, None)

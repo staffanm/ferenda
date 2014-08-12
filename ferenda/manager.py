@@ -730,7 +730,7 @@ def _setup_subprocess_callable(classname, command, config, argv):
         inst = _instantiate_class(cls, config, argv=argv)
         subprocess_callable = _wrapexception(getattr(inst, command))
         # subprocess_callable = getattr(inst, command)
-
+        setup_logger(level=config.loglevel)
 
 def _wrapexception(f):
     # this is similar to decorators.handleerror but maybe more generic

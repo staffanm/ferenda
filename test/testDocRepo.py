@@ -2303,7 +2303,6 @@ It can span several lines."""
         result, desc = self.repo.patch_if_needed("123/a", self.sourcedoc)
         self.assertEqual("(No patch description available)", desc)
         
-
     def test_failed_patch(self):
         with self.patchstore.open("123/a", "patches", ".patch", "w") as fp:
             fp.write("""--- basic.txt	2013-06-13 09:16:37.000000000 +0200

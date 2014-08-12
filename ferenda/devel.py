@@ -395,8 +395,9 @@ class Devel(object):
     # want to have coverage counting these as missing lines, hence the
     # pragma: no cover comments.
 
-    def __init__(self, **kwargs):
+    def __init__(self, config=None, **kwargs):
         self.store = DummyStore(None)
+        self.config = config
     
     documentstore_class = DummyStore
     downloaded_suffix = ".html"
