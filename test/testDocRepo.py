@@ -1344,7 +1344,7 @@ class RelateFulltext(RepoTester):
                      text="This is part of a subdocument, that has some unique properties",
                      dc_creator=date(2012,4,1))]
         got = mock_method.mock_calls
-        self.assertEqualCalls(want_got)
+        self.assertEqualCalls(want, got)
 
 
     def test_missing(self):
