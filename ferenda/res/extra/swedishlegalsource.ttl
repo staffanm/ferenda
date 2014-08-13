@@ -928,7 +928,7 @@
 <http://lagen.nu/org/2008/hogsta-domstolen> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/hoegsta_domstolen>,
         <http://rinfo.lagrummet.se/org/hogsta-domstolen> ;
-    foaf:name "Högsta domstolen"@sv .
+    foaf:name "Högsta Domstolen"@sv .
 
 <http://lagen.nu/org/2008/hovratten-for-nedre-norrland> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/hovraetten_foer_nedre_norrland>,

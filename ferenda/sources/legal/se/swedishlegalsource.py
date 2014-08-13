@@ -18,8 +18,10 @@ from ferenda.elements import Paragraph, Section, Body, CompoundElement, Sectiona
 from ferenda.pdfreader import Page
 
 from . import RPUBL
+# RPUBL = Namespace('http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
 DCTERMS = Namespace(util.ns['dcterms'])
 PROV = Namespace(util.ns['prov'])
+FOAF = Namespace(util.ns['foaf'])
 
 class Stycke(Paragraph):
     pass
@@ -98,6 +100,9 @@ class SwedishLegalSource(DocumentRepository):
                   'xhv', 'xsi', 'owl', 'prov', 'bibo',
                   ('rpubl', 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#'),
                   ('rinfoex', 'http://lagen.nu/terms#')]
+
+    alias = "swedishlegalsource"
+
     lang="sv"
 
     rdf_type = RPUBL.Rattsinformationsdokument # subclasses override this
@@ -129,10 +134,7 @@ class SwedishLegalSource(DocumentRepository):
                       "\xe5r": 12}
 
     def get_default_options(self):
-        resource_path = os.path.normpath(
-            os.path.dirname(__file__) + "../../../../res/etc/authrec.n3")
         opts = super(SwedishLegalSource, self).get_default_options()
-        opts['authrec'] = resource_path
         opts['pdfimages'] = False 
         return opts
 
@@ -142,18 +144,13 @@ class SwedishLegalSource(DocumentRepository):
             return self.swedish_ordinal_dict[sl]
         return None
 
-    def _load_resources(self, resource_path):
-        # returns a mapping [resource label] => [resource uri]
-        # resource_path is given relative to cwd
-        graph = Graph()
-        graph.load(resource_path, format='n3')
-        d = {}
-        for uri, label in graph.subject_objects(RDFS.label):
-            d[str(label)] = str(uri)
-        return d
-
-    def lookup_label(self, resource):
-        raise NotImplementedError("Rewrite SwedishLegalSource.lookup_label to use .commondata")
+    def lookup_label(self, resource, predicate=FOAF.name):
+        val = self.commondata.value(subject=URIRef(resource), predicate=predicate)
+        if not val:
+            raise KeyError(resource)
+        else:
+            return str(val)
+        
 
     def sameas_uri(self, uri):
         # "http://localhost:8000/res/dir/2012:35" => "http://rinfo.lagrummet.se/publ/dir/2012:35",

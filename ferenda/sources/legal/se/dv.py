@@ -33,6 +33,7 @@ from ferenda.elements import Body, Paragraph, CompoundElement, OrdinalElement, H
 
 from ferenda.elements.html import Strong, Em
 from . import SwedishLegalSource, SwedishCitationParser, RPUBL
+# from swedishlegalsource import SwedishLegalSource, SwedishCitationParser, RPUBL
 DCTERMS = Namespace(util.ns['dcterms'])
 PROV = Namespace(util.ns['prov'])
 
@@ -790,7 +791,7 @@ class DV(SwedishLegalSource):
                             header.append(tmp)
             
         if coll == "HDO":
-            head['Domstol'] = "Högsta domstolen"
+            head['Domstol'] = "Högsta Domstolen"
         elif coll == "HFD":
             head['Domstol'] = "Högsta förvaltningsdomstolen"
         elif coll == "REG":

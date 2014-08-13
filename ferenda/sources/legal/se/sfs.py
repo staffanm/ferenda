@@ -17,6 +17,7 @@ import logging
 import os
 import re
 import sys
+import shutil
 
 from six.moves import html_parser
 from six.moves.urllib_parse import quote, unquote
@@ -24,14 +25,15 @@ from six import text_type as str
 from ferenda.compat import OrderedDict
 
 # 3rdparty libs
-from rdflib import Graph, Namespace, URIRef, RDF, Literal
+from rdflib import Namespace, URIRef, Literal
 from lxml import etree
 from lxml.builder import ElementMaker
 import bs4
 import requests
 
 # my own libraries
-from . import Trips, RPUBL
+from . import Trips
+# from trips import Trips
 from ferenda import DocumentEntry, DocumentStore
 from ferenda import TextReader, Describer
 from ferenda import decorators
@@ -259,7 +261,6 @@ class Registerpost(CompoundElement):
         # property -- should be parsed and linked)
         return super(Registerpost, self).as_xhtml()
 
-
 class IckeSFS(ParseError):
 
     """Slängs när en författning som inte är en egentlig
@@ -272,6 +273,14 @@ class UpphavdForfattning(DocumentRemovedError):
 
 class IdNotFound(DocumentRemovedError):
     pass
+
+class InteUppdateradSFS(Exception):
+    pass
+
+
+class InteExisterandeSFS(Exception):
+    pass  # same as IdNotFound?
+
 
 DCTERMS = Namespace(util.ns['dcterms'])
 XSD = Namespace(util.ns['xsd'])
@@ -289,9 +298,17 @@ class SFSDocumentStore(DocumentStore):
     def register_path(self, basefile):
         return self.path(basefile, "register", ".html")
 
+    def open_register(self, basefile, mode="r"):
+        filename = self.register_path(basefile)
+        return self._open(filename, mode)
+
     def metadata_path(self, basefile):
         return self.path(basefile, "metadata", ".html")
 
+    def intermediate_path(self, basefile):
+        return self.path(basefile, "intermediate", ".txt")
+
+    
 
 class SFS(Trips):
 
@@ -323,67 +340,111 @@ class SFS(Trips):
     # need to (re)write this
     # xslt_template = "res/xsl/sfs.xsl"
 
-    download_params = [{'maxpage': 101,
-                        'app': app,
-                        'base': base,
-                        'start': '1600',
-                        'end': '2008'},
-                       {'maxpage': 101,
-                        'app': app,
-                        'base': base,
-                        'start': '2009',
-                        'end': str(datetime.today().year)}]
+    download_params = [
+        {'maxpage': 101,
+         'app': app,
+         'base': base,
+         'start': '1600',
+         'end': '2008'},
+        {'maxpage': 101,
+         'app': app,
+         'base': base,
+         'start': '2009',
+         'end': str(datetime.today().year)}
+    ]
+    
+    document_url_template = (
+        "http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfst_dok&"
+        "${HTML}=sfst_lst&${SNHTML}=sfst_err&${BASE}=SFST&"
+        "${TRIPSHOW}=format=THW&BET=%(basefile)s")
 
-    document_url_template = ("http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfst_dok&"
-                             "${HTML}=sfst_lst&${SNHTML}=sfst_err&${BASE}=SFST&"
-                             "${TRIPSHOW}=format=THW&BET=%(basefile)s")
+    document_sfsr_url_template = (
+        "http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfsr_dok&"
+        "${HTML}=sfst_lst&${SNHTML}=sfsr_err&${BASE}=SFSR&"
+        "${TRIPSHOW}=format=THW&BET=%(basefile)s")
 
-    document_sfsr_url_template = ("http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfsr_dok&"
-                                  "${HTML}=sfst_lst&${SNHTML}=sfsr_err&${BASE}=SFSR&"
-                                  "${TRIPSHOW}=format=THW&BET=%(basefile)s")
-
-    document_sfsr_change_url_template = ("http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfsr_dok&"
-                                         "${HTML}=sfst_lst&${SNHTML}=sfsr_err&${BASE}=SFSR&"
-                                         "${TRIPSHOW}=format=THW&%%C4BET=%(basefile)s")
+    document_sfsr_change_url_template = (
+        "http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfsr_dok&"
+        "${HTML}=sfst_lst&${SNHTML}=sfsr_err&${BASE}=SFSR&"
+        "${TRIPSHOW}=format=THW&%%C4BET=%(basefile)s")
 
     documentstore_class = SFSDocumentStore
 
-    def __init__(self, **kwargs):
-        super(SFS, self).__init__(**kwargs)
-        self.trace = {}
-        self.trace['paragraf'] = logging.getLogger('%s.paragraf' % self.alias)
-        self.trace['tabell'] = logging.getLogger('%s.tabell' % self.alias)
-        self.trace['numlist'] = logging.getLogger('%s.numlist' % self.alias)
-        self.trace['rubrik'] = logging.getLogger('%s.rubrik' % self.alias)
-        self.lagrum_parser = LegalRef(LegalRef.LAGRUM,
-                                      LegalRef.EGLAGSTIFTNING)
-        self.forarbete_parser = LegalRef(LegalRef.FORARBETEN)
+    def __init__(self, config=None, **kwargs):
+        super(SFS, self).__init__(config, **kwargs)
         self.current_section = '0'
         self.current_headline_level = 0  # 0 = unknown, 1 = normal, 2 = sub
 
+        # the new DNS-based URLs are dog slow for some reasons
+        # sometimes -- a quick hack to change them back to the old
+        # IP-based ones.
+        for p in ('document_url_template',
+                  'document_sfsr_url_template',
+                  'document_sfsr_change_url_template'):
+            setattr(self, p,
+                    getattr(self, p).replace('rkrattsbaser.gov.se',
+                                             '62.95.69.15'))
+        from ferenda.manager import loglevels
+        self.trace = {}
+        for logname in ('paragraf', 'tabell', 'numlist', 'rubrik'):
+            self.trace[logname] = logging.getLogger('%s.%s' %
+                                                    (self.alias, logname))
+            # NOTE: the self.config used here will not be properly
+            # initialized with values from cmdline/inifile because of
+            # a bug in manager.py in ferenda 0.2.0. This is probably
+            # fixed in 0.2.1.dev.
+            if 'trace' in self.config:
+                if logname in self.config.trace:
+                    loglevel = getattr(self.config.trace, logname)
+                    if loglevel is True:
+                        loglevel = logging.DEBUG
+                    else:
+                        loglevel = loglevels[loglevel]
+                    self.trace[logname].setLevel(loglevel)
+                
+            else:
+                # shut up logger
+                self.trace[logname].propagate = False
+
+    # make sure our EBNF-based parsers (which are expensive to create)
+    # only gets created if they are demanded.
+    @property
+    def lagrum_parser(self):
+        if not hasattr(self, '_lagrum_parser'):
+            self._lagrum_parser = LegalRef(LegalRef.LAGRUM,
+                                           LegalRef.EGLAGSTIFTNING)
+        return self._lagrum_parser
+
+    @property
+    def forarbete_parser(self):
+        if not hasattr(self, '_forarbete_parser'):
+            self._forarbete_parser = LegalRef(LegalRef.FORARBETEN)
+        return self._forarbete_parser
+
     def get_default_options(self):
-        resource_path = "../../../res/etc/sfs-extra.n3"
-        resource_path = os.path.normpath(
-            os.path.dirname(__file__) + os.sep + resource_path)
-        
         opts = super(SFS, self).get_default_options()
         opts['keepexpired'] = False
-        opts['lawabbrevs'] = resource_path
+        opts['revisit'] = list
         return opts
-
+    
     def canonical_uri(self, basefile, konsolidering=False):
         baseuri = "https://lagen.nu/sfs"  # should(?) be hardcoded
+        basefile = basefile.replace(" ", "_")
         if konsolidering:
             if konsolidering == True:
                 return "%s/%s/konsolidering" % (baseuri, basefile)
             else:
+                konsolidering = konsolidering.replace(" ", "_")
                 return "%s/%s/konsolidering/%s" % (baseuri, basefile, konsolidering)
         else:
             return "%s/%s" % (baseuri, basefile)
 
     def download(self, basefile=None):
-        if self.config.refresh or (not 'next_sfsnr' in self.config):
-            ret = super(SFS,self).download(basefile)
+        if basefile:
+            ret = self.download_single(basefile)
+        # following is copied from supers' download
+        elif self.config.refresh or ('next_sfsnr' not in self.config):
+            ret = super(SFS, self).download(basefile)
             self._set_last_sfsnr()
         else:
             ret = self.download_new()
@@ -410,62 +471,82 @@ class SFS(Trips):
         LayeredConfig.write(self.config)
 
     def download_new(self):
-        if not 'next_sfsnr' in self.config:
+        if 'next_sfsnr' not in self.config:
             self._set_last_sfsnr()
         (year, nr) = [int(
             x) for x in self.config.next_sfsnr.split(":")]
         done = False
-        real_last_sfs_nr = False
-        while not done:
-            wanted_sfs_nr = '%s:%s' % (year, nr)
-            self.log.info('Looking for %s' % wanted_sfs_nr)
-            base_sfsnr_list = self._check_for_sfs(year, nr)
-            if base_sfsnr_list:
-                # usually only a 1-elem list
-                for base_sfsnr in base_sfsnr_list:
-                    self.download_single(base_sfsnr)
-                    # get hold of uppdaterad_tom from the
-                    # just-downloaded doc
-                    filename = self.store.downloaded_path(base_sfsnr)
-                    uppdaterad_tom = self._find_uppdaterad_tom(base_sfsnr,
-                                                               filename)
-                    if base_sfsnr_list[0] == wanted_sfs_nr:
-                        # initial grundförfattning - varken
-                        # "Uppdaterad T.O.M. eller "Upphävd av" ska
-                        # vara satt
-                        pass
-                    elif util.numcmp(uppdaterad_tom, wanted_sfs_nr) < 0:
-                        self.log.warning("    Text updated to and including %s, "
-                                         "not %s" %
-                                         (uppdaterad_tom, wanted_sfs_nr))
-                        if not real_last_sfs_nr:
-                            real_last_sfs_nr = wanted_sfs_nr
-                nr = nr + 1
-            else:
-                self.log.info('Peeking for SFS %s:%s' % (year, nr + 1))
-                base_sfsnr_list = self._check_for_sfs(year, nr + 1)
-                if base_sfsnr_list:
-                    if not real_last_sfs_nr:
-                        real_last_sfs_nr = wanted_sfs_nr
-                    nr = nr + 1  # actual downloading next loop
-                elif datetime.today().year > year:
-                    self.log.info('    Time to change year?')
-                    base_sfsnr_list = self._check_for_sfs(
-                        datetime.today().year, 1)
-                    if base_sfsnr_list:
-                        year = datetime.today().year
-                        nr = 1  # actual downloading next loop
-                    else:
-                        self.log.info("    We're done")
-                        done = True
-                else:
-                    self.log.info("    We're done")
-                    done = True
-        if real_last_sfs_nr:
-            self._set_last_sfsnr(real_last_sfs_nr)
-        else:
-            self._set_last_sfsnr("%s:%s" % (year, nr))
+        revisit = []
+        if hasattr(self.config, 'revisit'):
+            last_revisit = self.config.revisit
+            for wanted_sfs_nr in last_revisit:
+                self.log.info('Revisiting %s' % wanted_sfs_nr)
+                try:
+                    self.download_base_sfs(wanted_sfs_nr)
+                except InteUppdateradSFS:
+                    revisit.append(wanted_sfs_nr)
 
+        peek = False
+        last_sfsnr = self.config.next_sfsnr
+        while not done:
+            # first do all of last_revisit, then check the rest...
+            wanted_sfs_nr = '%s:%s' % (year, nr)
+            try:
+                self.download_base_sfs(wanted_sfs_nr)
+                last_sfsnr = wanted_sfs_nr
+            except InteUppdateradSFS:
+                revisit.append(wanted_sfs_nr)
+            except InteExisterandeSFS:
+                # try peeking at next number, or maybe next year, and
+                # if none are there, we're done
+                if not peek:
+                    peek = True
+                    self.log.info('Peeking for SFS %s:%s' % (year, nr+1)) # increments below
+                elif datetime.today().year > year:
+                    peek = False
+                    year = datetime.today().year
+                    nr = 0  # increments below, actual downloading occurs next loop
+                else:
+                    done = True
+            nr = nr + 1
+
+        self._set_last_sfsnr(last_sfsnr)
+        self.config.revisit = revisit
+        LayeredConfig.write(self.config)
+
+    def download_base_sfs(self, wanted_sfs_nr):
+        self.log.info('Looking for %s' % wanted_sfs_nr)
+        (year, nr) = [int(x) for x in wanted_sfs_nr.split(":", 1)]
+        base_sfsnr_list = self._check_for_sfs(year, nr)
+        if base_sfsnr_list:
+            # usually only a 1-elem list
+            for base_sfsnr in base_sfsnr_list:
+                self.download_single(base_sfsnr)
+                # get hold of uppdaterad_tom from the
+                # just-downloaded doc
+                filename = self.store.downloaded_path(base_sfsnr)
+                uppdaterad_tom = self._find_uppdaterad_tom(base_sfsnr,
+                                                           filename)
+                if base_sfsnr_list[0] == wanted_sfs_nr:
+                    # initial grundförfattning - varken
+                    # "Uppdaterad T.O.M. eller "Upphävd av" ska
+                    # vara satt
+                    pass
+                elif util.numcmp(uppdaterad_tom, wanted_sfs_nr) < 0:
+                    # the "Uppdaterad T.O.M." field is outdated --
+                    # this is OK only if the act is revoked (upphavd)
+                    if self._find_upphavts_genom(filename):
+                        self.log.debug("    Text only updated to %s, "
+                                       "but slated for revocation by %s" % 
+                                       (uppdaterad_tom,
+                                        self._find_upphavts_genom(filename)))
+                    else:
+                        self.log.warning("    Text updated to %s, not %s" %
+                                         (uppdaterad_tom, wanted_sfs_nr))
+                        raise InteUppdateradSFS(wanted_sfs_nr)
+        else:
+            raise InteExisterandeSFS(wanted_sfs_nr)
+        
     def _check_for_sfs(self, year, nr):
         """Givet ett SFS-nummer, returnera en lista med alla
         SFS-numret för dess grundförfattningar. Normalt sett har en
@@ -503,11 +584,12 @@ class SFS(Trips):
             except IOError:
                 t.seek(0)
                 page = t.read(sys.maxsize)
-                for m in re.finditer('>(\d+:\d+)</a>', page):
+                for m in re.finditer('>(\d+:[\d\w\. ]+)</a>', page):
                     grundforf.append(m.group(1))
                     self.log.debug('    Found change act (to %s)'
                                    % grundforf[-1])
                 return grundforf
+
 
     def download_single(self, basefile, url=None):
         """Laddar ner senaste konsoliderade versionen av
@@ -763,6 +845,7 @@ class SFS(Trips):
         # now we can set doc.uri for reals
         doc.uri = self.canonical_uri(doc.basefile, uppdaterad_tom)
         desc = Describer(doc.meta, doc.uri)
+
         try:
             registry = self.parse_sfsr(sfsr_file, doc.uri)
         except (UpphavdForfattning, IdNotFound) as e:
@@ -775,13 +858,15 @@ class SFS(Trips):
 
         try:
             plaintext = self.extract_sfst(sfst_file)
-            plaintextfile = self.store.path(doc.basefile, "intermediate", ".txt")
+            plaintextfile = self.store.intermediate_path(doc.basefile)
             util.writefile(plaintextfile, plaintext, encoding="iso-8859-1")
-            (plaintext, patchdesc) = self.patch_if_needed(doc.basefile, plaintext)
+            (plaintext, patchdesc) = self.patch_if_needed(doc.basefile,
+                                                          plaintext)
             if patchdesc:
                 desc.value(self.ns['rinfoex'].patchdescription,
                            patchdesc)
 
+            # Main parsing logic goes here
             self.parse_sfst(plaintext, doc)
         except IOError:
             self.log.warning("%s: Fulltext saknas" % self.id)
@@ -810,16 +895,15 @@ class SFS(Trips):
         # FIXME: make this part of head metadata
         desc.rev(self.ns['owl'].sameAs, self.canonical_uri(doc.basefile, True))
         desc.rel(self.ns['rpubl'].konsoliderar, self.canonical_uri(doc.basefile))
-        desc.rel(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
+        desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
         de = DocumentEntry(docentry_file)
+        
         desc.value(self.ns['rinfoex'].senastHamtad, de.orig_updated)
         desc.value(self.ns['rinfoex'].senastKontrollerad, de.orig_checked)
-        # find any established abbreviation -- FIXME: simplifize, most
-        # code should be in SwedishLegalSource (c.f. lookup_resource)
-        g = Graph()
-        g.load(self.config.lawabbrevs, format="n3")
+
+        # find any established abbreviation
         grf_uri = self.canonical_uri(doc.basefile)
-        v = g.value(URIRef(grf_uri), self.ns['dcterms'].alternate, any=True)
+        v = self.commondata.value(URIRef(grf_uri), self.ns['dcterms'].alternate, any=True)
         if v:
             desc.value(self.ns['dcterms'].alternate, v)
 
@@ -857,7 +941,7 @@ class SFS(Trips):
         # use manual formatting of the issued date -- date.strftime
         # doesn't work with years < 1900 in older versions of python
         rinfo_sameas = "http://rinfo.lagrummet.se/publ/sfs/%s/konsolidering/%d-%02d-%02d" % (
-            doc.basefile, issued.year, issued.month, issued.day)
+            doc.basefile.replace(" ", "_"), issued.year, issued.month, issued.day)
         desc.rel(self.ns['owl'].sameAs, rinfo_sameas)
 
         # finally, combine data from the registry with any possible
@@ -967,12 +1051,14 @@ class SFS(Trips):
 
                 elif key == 'Ansvarig myndighet':
                     try:
-                        authrec = self.lookup_resource(val)
+                        authrec = self.lookup_resource(self.clean_departement(val))
                         desc.rel(self.ns['rpubl'].departement, authrec)
                     except Exception:
                         desc.value(self.ns['rpubl'].departement, val)
                 elif key == 'Rubrik':
-                    if not self.id in val:
+                    # Change acts to Balkar never contain the SFS no
+                    # of the Balk.
+                    if not self.id.replace("_", " ") in val and not val.endswith("balken"):
                         self.log.warning(
                             "%s: Base SFS %s not found in title %r" % (self.id, self.id, val))
                     desc.value(self.ns['dcterms'].title, Literal(val, lang="sv"))
@@ -1051,12 +1137,26 @@ class SFS(Trips):
             desc.rel(self.ns['rpubl'].forfattningssamling,
                      "http://rinfo.lagrummet.se/serie/fs/sfs")
             desc.rel(self.ns['owl'].sameAs,
-                     "http://rinfo.lagrummet.se/publ/sfs/" + sfsnr)
+                     "http://rinfo.lagrummet.se/publ/sfs/" + sfsnr.replace(" ", "_"))
             utfardandedatum = self._find_utfardandedatum(sfsnr)
             if utfardandedatum:
                 desc.value(self.ns['rpubl'].utfardandedatum, utfardandedatum)
 
         return d
+
+    def clean_departement(self, val):
+        # to avoid "Assuming that" warnings, autoremove sub-org ids,
+        # ie "Finansdepartementet S3" -> "Finansdepartementet"
+        # loop until done to handle "Justitiedepartementet DOM, L5 och Å"
+        
+        cleaned = None
+        while True:
+            cleaned = re.sub(",? (och|[A-ZÅÄÖ\d]{1,5})$", "", val)
+            if val == cleaned:
+                break
+            val = cleaned
+        return cleaned
+        
 
     def _find_utfardandedatum(self, sfsnr):
         # FIXME: Code to instantiate a SFSTryck object and muck about goes here
@@ -1079,6 +1179,8 @@ class SFS(Trips):
             txt = txt.replace('\n', '\r\n')
         re_tags = re.compile("</?\w{1,3}>")
         txt = re_tags.sub('', txt)
+        # add ending CRLF aids with producing better diffs
+        txt += "\r\n"
         return txt
 
     def _term_to_subject(self, term):
@@ -1341,8 +1443,15 @@ class SFS(Trips):
 
             # urirefs
             elif key == 'Departement/ myndighet':
-                authrec = self.lookup_resource(val)
-                desc.rel(self.ns['dcterms'].creator, authrec)
+                # this is only needed because of SFS 1942:724, which
+                # has "Försvarsdepartementet, Socialdepartementet"...
+                if "departementet, " in val:
+                    vals = val.split(", ")
+                else:
+                    vals = [val]
+                for val in vals:
+                    authrec = self.lookup_resource(self.clean_departement(val))
+                    desc.rel(self.ns['dcterms'].creator, authrec)
             elif (key == 'Ändring införd' and re_sfs(val)):
                 uppdaterad = re_sfs(val).group(1)
                 # not sure we need to add this, since parse_sfsr catches same
@@ -1687,10 +1796,10 @@ class SFS(Trips):
             if res is not None:
                 if state_handler != self.makeOvergangsbestammelse:
                     # assume these are the initial Övergångsbestämmelser
-                    if hasattr(self, 'id') and '/' in self.id:
+                    if hasattr(self, 'id'):
                         sfsnr = self.id
                         self.log.warning(
-                            "%s: Övergångsbestämmelsen saknar SFS-nummer - antar [%s]" % (self.id, sfsnr))
+                            "%s: Övergångsbestämmelsen saknar SFS-nummer - antar %s" % (self.id, sfsnr))
                     else:
                         sfsnr = '0000:000'
                         self.log.warning(
@@ -3027,3 +3136,101 @@ class SFS(Trips):
         if e.tail:
             tail = cgi.escape(e.tail)
         return "<%s%s>%s%s%s</%s>" % (tag, attributestr, text, childstr, tail, tag)
+
+
+    templ = [
+        "downloaded/(?P<type>\w+)/(?P<byear>\d+)/(?P<bnum>[\d_s\.bih]+)\.html",
+        # these next are only interesting for sfst, not sfsr
+        "downloaded/sfst/(?P<byear>\d+)/(?P<bnum>[\d_s\.bih]+)-(?P<vyear>\d+)-(?P<vnum>[\d_s\.bih]+)\.html",
+        "downloaded/sfst/(?P<byear>\d+)/(?P<bnum>[\d_s\.bih]+)-(?P<vyear>first)-(?P<vnum>version)\.html",
+        "downloaded/sfst/(?P<byear>\d+)/(?P<bnum>[\d_s\.bih]+)-(?P<vyear>\d+)-(?P<vnum>[\d_s\.bih]+)-checksum-(?P<vcheck>[\w\d]+)\.html"
+        ]
+
+    @decorators.action
+    def importarchive(self, archivedir):
+        """Imports downloaded data from an archive from legacy lagen.nu data.
+
+        In particular, creates proper archive storage for older
+        versions of each text.
+
+        """
+#        import tarfile
+#        if not tarfile.is_tarfile(archivefile):
+#            self.log.error("%s is not a readable tarfile" % archivefile)
+#            return
+#        t = tarfile.open(archivefile)
+#        for ti in t.getmembers():
+#            if not ti.isfile():
+#                continue
+#            f = ti.name
+        current = archived = 0
+        for f in util.list_dirs(archivedir, ".html"):
+            if not f.startswith("downloaded/sfs"):  # sfst or sfsr
+                continue
+            for regex in self.templ:
+                m = re.match(regex, f)
+                if not m:
+                    continue
+                if "vcheck" in m.groupdict():  # silently ignore
+                    break
+                basefile = "%s:%s" % (m.group("byear"), m.group("bnum"))
+
+                # need to look at the file to find out its version
+                # text = t.extractfile(f).read(4000).decode("latin-1")
+                text = open(f).read(4000).decode("latin-1")
+                reader = TextReader(string=text)
+                updated_to = self._find_uppdaterad_tom(basefile,
+                                                       reader=reader)
+
+                if "vyear" in m.groupdict():  # this file is marked as an archival version
+                    archived += 1
+                    version = updated_to
+
+                    if m.group("vyear") == "first":
+                        pass
+                    else:
+                        exp = "%s:%s" % (m.group("vyear"), m.group("vnum"))
+                        if version != exp:
+                            self.log.warning("%s: Expected %s, found %s" %
+                                             (f, exp, version))
+                else:
+                    version = None
+                    current += 1
+                    de = DocumentEntry()
+                    de.basefile = basefile
+                    de.id = self.canonical_uri(basefile, updated_to)
+                    # fudge timestamps best as we can
+                    de.orig_created = datetime.fromtimestamp(os.path.getctime(f))
+                    de.orig_updated = datetime.fromtimestamp(os.path.getmtime(f))
+                    de.orig_updated = datetime.now()
+                    de.orig_url = self.document_url_template % locals()
+                    de.published = datetime.now()
+                    de.url = self.generated_url(basefile)
+                    de.title  = "SFS %s" % basefile
+                    # de.set_content()
+                    # de.set_link()
+                    de.save(self.store.documententry_path(basefile))
+                    
+                # this yields more reasonable basefiles, but they are not
+                # backwards compatible -- skip them for now
+                # basefile = basefile.replace("_", "").replace(".", "")
+
+                if "type" in m.groupdict() and m.group("type") == "sfsr":
+                    dest = self.store.register_path(basefile)
+                    current -= 1  # to offset the previous increment
+                else:
+                    dest = self.store.downloaded_path(basefile, version)
+
+                self.log.debug("%s: extracting %s to %s" % (basefile, f, dest))
+
+                #with openmethod(basefile, mode="wb", version=version) as fp:
+                #    fp.write(t.extractfile(f).read())
+                util.ensure_dir(dest)
+                shutil.copy2(f, dest)
+                break
+                    
+            else:
+                self.log.warning("Couldn't process %s" % f)
+
+
+        self.log.info("Extracted %s current versions and %s archived versions" % (current, archived))

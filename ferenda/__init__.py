@@ -23,6 +23,8 @@ from .pdfdocumentrepository import PDFDocumentRepository
 from .compositerepository import CompositeRepository, CompositeStore
 from .resources import Resources
 from .wsgiapp import WSGIApp
-__version__ = "0.2.1.dev2" #gets pulled into setup.py and docs/conf.py
+__version__ = "0.2.1.dev3" #gets pulled into setup.py and docs/conf.py
 # dev1: changes constructor signature for DocumentRepository (using a config obj as first positional parameter)
 # dev2: enables multiprocessing for manager task queue handling (./ferenda.py rfc parse --all --processes=4)
+# dev3: incorporation of changes in ferenda.sources.legal.se during lagen.nu-tng experimentation
+

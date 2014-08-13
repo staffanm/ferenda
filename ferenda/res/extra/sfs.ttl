@@ -1,0 +1,235 @@
+# -*- coding: utf-8 -*-
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+<https://lagen.nu/sfs/1736:0123_1> rdfs:label "byggningabalken"; dcterms:alternate "BB" .
+<https://lagen.nu/sfs/1736:0123_2> rdfs:label "handelsbalken"; dcterms:alternate "HB" .
+<https://lagen.nu/sfs/1810:0926> rdfs:label "successionsordningen"; dcterms:alternate "SO" .
+<https://lagen.nu/sfs/1845:50_s._1> rdfs:label "lösöresköpslagen"; dcterms:alternate "LkL" . 
+<https://lagen.nu/sfs/1904:26_1> dcterms:alternate "IÄL" .
+<https://lagen.nu/sfs/1915:218> rdfs:label "avtalslagen"; dcterms:alternate "AvtL" .
+<https://lagen.nu/sfs/1920:405> rdfs:label "giftermålsbalken"; dcterms:alternate "GB" .
+<https://lagen.nu/sfs/1932:130> rdfs:label "växellagen" .
+<https://lagen.nu/sfs/1932:131> rdfs:label "checklagen" .
+<https://lagen.nu/sfs/1936:81> dcterms:alternate "SkbrL" .
+<https://lagen.nu/sfs/1936:83> rdfs:label "gåvolagen"; dcterms:alternate "GåvoL" .
+<https://lagen.nu/sfs/1942:740> rdfs:label "rättegångsbalken"; dcterms:alternate "RB" .
+<https://lagen.nu/sfs/1946:808> dcterms:alternate "LsL" .
+<https://lagen.nu/sfs/1949:105> rdfs:label "tryckfrihetsförordningen"; dcterms:alternate "TF" .
+<https://lagen.nu/sfs/1949:381> rdfs:label "föräldrabalken"; dcterms:alternate "FB" .
+<https://lagen.nu/sfs/1957:259> dcterms:alternate "Upplåtelser" .
+<https://lagen.nu/sfs/1957:297> rdfs:label "luftfartslagen" .
+<https://lagen.nu/sfs/1958:637> rdfs:label "ärvdabalken"; dcterms:alternate "ÄB" .
+<https://lagen.nu/sfs/1960:644> rdfs:label "varumärkeslagen" ; dcterms:alternate "VML" .
+<https://lagen.nu/sfs/1960:645> rdfs:label "kollektivmärkeslagen" .
+<https://lagen.nu/sfs/1960:729> rdfs:label "upphovsrättslagen"; dcterms:alternate "URL" .
+<https://lagen.nu/sfs/1962:700> rdfs:label "brottsbalken"; dcterms:alternate "BrB" .
+<https://lagen.nu/sfs/1964:163> dcterms:alternate "BrP" .
+<https://lagen.nu/sfs/1964:19> rdfs:label "krigshandelslagen" .
+<https://lagen.nu/sfs/1966:209> rdfs:label "virkesmätningslagen" .
+<https://lagen.nu/sfs/1967:837> rdfs:label "patentlagen" .
+<https://lagen.nu/sfs/1967:868> rdfs:label "förköpslagen" ; dcterms:alternate "FL" .
+<https://lagen.nu/sfs/1968:45> rdfs:label "atomansvarighetslagen" .
+<https://lagen.nu/sfs/1968:64> dcterms:alternate "NSL" .
+<https://lagen.nu/sfs/1968:64> rdfs:label "narkotikastrafflagen" .
+<https://lagen.nu/sfs/1970:428> rdfs:label "delgivningslagen" .
+<https://lagen.nu/sfs/1970:485> rdfs:label "mönsterskyddslagen" .
+<https://lagen.nu/sfs/1970:624> rdfs:label "kupongskattelagen" .
+<https://lagen.nu/sfs/1970:979> rdfs:label "förmånsrättslagen" ; dcterms:alternate "FRL" .
+<https://lagen.nu/sfs/1970:988> rdfs:label "fastighetsbildningslagen" ; dcterms:alternate "FBL" .
+<https://lagen.nu/sfs/1970:994> rdfs:label "jordabalken"; dcterms:alternate "JB" .
+<https://lagen.nu/sfs/1970:995> dcterms:alternate "JP" .
+<https://lagen.nu/sfs/1971:289> dcterms:alternate "AFDL" .
+<https://lagen.nu/sfs/1971:291> rdfs:label "förvaltningsprocesslagen" ; dcterms:alternate "FPL" .
+<https://lagen.nu/sfs/1971:309> dcterms:alternate "BehL" .
+<https://lagen.nu/sfs/1971:437> rdfs:label "rennäringslagen" .
+<https://lagen.nu/sfs/1971:494> dcterms:alternate "FfL" .
+<https://lagen.nu/sfs/1971:69> rdfs:label "skattebrottslagen" ; dcterms:alternate "SBL" .
+<https://lagen.nu/sfs/1971:796> dcterms:alternate "LIA" .
+<https://lagen.nu/sfs/1971:948> dcterms:alternate "VägL" .
+<https://lagen.nu/sfs/1971:948> rdfs:label "väglagen" .
+<https://lagen.nu/sfs/1972:204> rdfs:label "resegarantilagen" .
+<https://lagen.nu/sfs/1972:205> rdfs:label "permutationslagen" .
+<https://lagen.nu/sfs/1972:207> rdfs:label "skadeståndslagen"; dcterms:alternate "SkL".
+<https://lagen.nu/sfs/1972:318> rdfs:label "växtskyddslagen" .
+<https://lagen.nu/sfs/1972:719> rdfs:label "expropriationslagen" ; dcterms:alternate "ExprL"; dcterms:alternate "ExL" .
+<https://lagen.nu/sfs/1973:1144> rdfs:label "ledningsrättslagen" .
+<https://lagen.nu/sfs/1973:1149> rdfs:label "anläggningslagen" ; dcterms:alternate "AL" .
+<https://lagen.nu/sfs/1973:1150> dcterms:alternate "SFL" .
+<https://lagen.nu/sfs/1973:1173> rdfs:label "kreditupplysningslagen" .
+<https://lagen.nu/sfs/1973:282> rdfs:label "sjömanslagen" .
+<https://lagen.nu/sfs/1974:152> rdfs:label "regeringsformen"; dcterms:alternate "RF" .
+<https://lagen.nu/sfs/1974:153> rdfs:label "riksdagsordningen"; dcterms:alternate "RO" .
+<https://lagen.nu/sfs/1974:156> rdfs:label "firmalagen" .
+<https://lagen.nu/sfs/1974:157> rdfs:label "handelsregisterlagen" .
+<https://lagen.nu/sfs/1974:158> rdfs:label "prokuralagen" .
+<https://lagen.nu/sfs/1974:182> rdfs:label "inkassolagen" .
+<https://lagen.nu/sfs/1974:211> rdfs:label "bisjukdomslagen" .
+<https://lagen.nu/sfs/1974:595> rdfs:label "abortlagen" .
+<https://lagen.nu/sfs/1975:1313> rdfs:label "terrängkörningslagen" .
+<https://lagen.nu/sfs/1975:1410> rdfs:label "trafikskadelagen" .
+<https://lagen.nu/sfs/1975:197> rdfs:label "oljekrislagen" .
+<https://lagen.nu/sfs/1975:580> rdfs:label "steriliseringslagen" .
+<https://lagen.nu/sfs/1975:635> rdfs:label "räntelagen" .
+<https://lagen.nu/sfs/1976:19> rdfs:label "lagföringslagen" .
+<https://lagen.nu/sfs/1976:298> rdfs:label "utsädeslagen" .
+<https://lagen.nu/sfs/1976:580> dcterms:alternate "MBL" .
+<https://lagen.nu/sfs/1976:633> rdfs:label "kungörandelagen" .
+<https://lagen.nu/sfs/1977:1160> rdfs:label "arbetsmiljölagen" .
+<https://lagen.nu/sfs/1977:480> rdfs:label "semesterlagen" .
+<https://lagen.nu/sfs/1977:792> rdfs:label "bostadsförvaltningslagen" .
+<https://lagen.nu/sfs/1978:262> rdfs:label "förfogandelagen" .
+<https://lagen.nu/sfs/1978:268> rdfs:label "ransoneringslagen" .
+<https://lagen.nu/sfs/1978:302> rdfs:label "passlagen" .
+<https://lagen.nu/sfs/1978:304> rdfs:label "hyresförhandlingslagen" ; dcterms:alternate "HFL" .
+<https://lagen.nu/sfs/1978:413> rdfs:label "brottsskadelagen" .
+<https://lagen.nu/sfs/1978:520> rdfs:label "familjebidragslagen" .
+<https://lagen.nu/sfs/1979:1152> rdfs:label "fastighetstaxeringslagen" ; dcterms:alternate "FTL" .
+<https://lagen.nu/sfs/1979:189> rdfs:label "bötesverkställighetslagen" .
+<https://lagen.nu/sfs/1979:230> rdfs:label "jordförvärvslagen" .
+<https://lagen.nu/sfs/1979:369> rdfs:label "folkomröstningslagen" .
+<https://lagen.nu/sfs/1979:429> rdfs:label "skogsvårdslagen" .
+<https://lagen.nu/sfs/1980:100> dcterms:alternate "SekrL" .
+<https://lagen.nu/sfs/1980:152> rdfs:label "containerlagen" .
+<https://lagen.nu/sfs/1980:657> dcterms:alternate "SekrF" .
+<https://lagen.nu/sfs/1981:130> rdfs:label "preskriptionslagen" .
+<https://lagen.nu/sfs/1981:774> rdfs:label "utsökningsbalken"; dcterms:alternate "UB" .
+<https://lagen.nu/sfs/1981:981> dcterms:alternate "UF" .
+<https://lagen.nu/sfs/1982:670> rdfs:label "namnlagen" .
+<https://lagen.nu/sfs/1982:673> rdfs:label "arbetstidslagen" .
+<https://lagen.nu/sfs/1982:713> rdfs:label "försäkringsrörelselagen" .
+<https://lagen.nu/sfs/1982:763> dcterms:alternate "HSL" .
+<https://lagen.nu/sfs/1982:80> rdfs:label "anställningsskyddslagen"; dcterms:alternate "LAS" .
+<https://lagen.nu/sfs/1983:929> rdfs:label "mönstringslagen" .
+<https://lagen.nu/sfs/1984:387> dcterms:alternate "PolisL"; dcterms:alternate "PL".
+<https://lagen.nu/sfs/1984:387> rdfs:label "polislagen" .
+<https://lagen.nu/sfs/1985:1100> rdfs:label "skollagen" .
+<https://lagen.nu/sfs/1985:125> rdfs:label "tandvårdslagen" .
+<https://lagen.nu/sfs/1985:192> rdfs:label "järnvägstrafiklagen" .
+<https://lagen.nu/sfs/1985:206> dcterms:alternate "VitesL" .
+<https://lagen.nu/sfs/1985:716> rdfs:label "konsumenttjänstlagen" ; dcterms:alternate "KTjL" .
+<https://lagen.nu/sfs/1986:223> rdfs:label "förvaltningslagen" ; dcterms:alternate "FL" .
+<https://lagen.nu/sfs/1987:10> dcterms:alternate "PBL" .
+<https://lagen.nu/sfs/1987:11> dcterms:alternate "ESL" .
+<https://lagen.nu/sfs/1987:230> rdfs:label "äktenskapsbalken"; dcterms:alternate "ÄktB" .
+<https://lagen.nu/sfs/1987:259> rdfs:label "jaktlagen" .
+<https://lagen.nu/sfs/1987:619> rdfs:label "sparbankslagen" .
+<https://lagen.nu/sfs/1987:672> rdfs:label "konkurslagen" ; dcterms:alternate "KL" .
+<https://lagen.nu/sfs/1987:822> dcterms:alternate "CISG" .
+<https://lagen.nu/sfs/1988:220> rdfs:label "strålskyddslagen" .
+<https://lagen.nu/sfs/1988:254> rdfs:label "knivlagen" .
+<https://lagen.nu/sfs/1988:534> rdfs:label "djurskyddslagen" .
+<https://lagen.nu/sfs/1988:870> dcterms:alternate "LVM" .
+<https://lagen.nu/sfs/1989:978> rdfs:label "prisregleringslagen" .
+<https://lagen.nu/sfs/1990:1144> rdfs:label "begravningslagen" .
+<https://lagen.nu/sfs/1990:324> rdfs:label "taxeringslagen" ; dcterms:alternate "TaxL" .
+<https://lagen.nu/sfs/1990:52> dcterms:alternate "LVU" .
+<https://lagen.nu/sfs/1990:746> dcterms:alternate "LBH" .
+<https://lagen.nu/sfs/1990:782> dcterms:alternate "ArkivL" .
+<https://lagen.nu/sfs/1990:782> rdfs:label "arkivlagen" .
+<https://lagen.nu/sfs/1990:931> rdfs:label "köplagen" ; dcterms:alternate "KöpL" .
+<https://lagen.nu/sfs/1990:932> rdfs:label "konsumentköplagen" ; dcterms:alternate "KKöpL" .
+<https://lagen.nu/sfs/1991:1128> dcterms:alternate "LPT" .
+<https://lagen.nu/sfs/1991:1129> dcterms:alternate "LRV" .
+<https://lagen.nu/sfs/1991:1469> rdfs:label "yttrandefrihetsgrundlagen"; dcterms:alternate "YGL" .
+<https://lagen.nu/sfs/1991:45> rdfs:label "minerallagen" .
+<https://lagen.nu/sfs/1991:481> rdfs:label "folkbokföringslagen" .
+<https://lagen.nu/sfs/1991:586> dcterms:alternate "SINK" .
+<https://lagen.nu/sfs/1991:614> rdfs:label "bostadsrättslagen" .
+<https://lagen.nu/sfs/1991:641> dcterms:alternate "BRL" . 
+<https://lagen.nu/sfs/1991:900> rdfs:label "kommunallagen" ; dcterms:alternate "KomL" ; dcterms:alternate "KL".
+<https://lagen.nu/sfs/1992:1433> rdfs:label "sametingslagen" .
+<https://lagen.nu/sfs/1992:1434> rdfs:label "högskolelagen" .
+<https://lagen.nu/sfs/1992:1672> rdfs:label "paketreselagen" .
+<https://lagen.nu/sfs/1992:1685> dcterms:alternate "KML" .
+<https://lagen.nu/sfs/1992:18> rdfs:label "produktansvarslagen" .
+<https://lagen.nu/sfs/1992:191> dcterms:alternate "Avgift" .
+<https://lagen.nu/sfs/1992:497> rdfs:label "lönegarantilagen" .
+<https://lagen.nu/sfs/1992:830> rdfs:label "konsumentkreditlagen" ; dcterms:alternate "KKrL" .
+<https://lagen.nu/sfs/1992:859> rdfs:label "läkemedelslagen" .
+<https://lagen.nu/sfs/1993:1617> dcterms:alternate "OL" .
+<https://lagen.nu/sfs/1993:1617> rdfs:label "ordningslagen" .
+<https://lagen.nu/sfs/1993:1684> rdfs:label "postlagen" .
+<https://lagen.nu/sfs/1993:387> dcterms:alternate "LSS" .
+<https://lagen.nu/sfs/1993:581> rdfs:label "tobakslagen" .
+<https://lagen.nu/sfs/1993:787> rdfs:label "fiskelagen" .
+<https://lagen.nu/sfs/1994:1000> rdfs:label "lotterilagen" .
+<https://lagen.nu/sfs/1994:1009> rdfs:label "sjölagen" ; dcterms:alternate "SjöL" .
+<https://lagen.nu/sfs/1994:1220> rdfs:label "stiftelselagen" .
+<https://lagen.nu/sfs/1994:1738> rdfs:label "alkohollagen" .
+<https://lagen.nu/sfs/1994:193> dcterms:alternate "IURF" .
+<https://lagen.nu/sfs/1994:200> rdfs:label "mervärdesskattelagen" ; dcterms:alternate "ML" .
+<https://lagen.nu/sfs/1994:260> dcterms:alternate "LOA" .
+<https://lagen.nu/sfs/1994:448> dcterms:alternate "PbrL" .
+<https://lagen.nu/sfs/1994:847> dcterms:alternate "BVL" .
+<https://lagen.nu/sfs/1995:1000> rdfs:label "pantbankslagen" .
+<https://lagen.nu/sfs/1995:1322> dcterms:alternate "VerksF" .
+<https://lagen.nu/sfs/1995:1554> rdfs:label "årsredovisningslagen" .
+<https://lagen.nu/sfs/1995:400> rdfs:label "fastighetsmäklarlagen" .
+<https://lagen.nu/sfs/1995:584> rdfs:label "föräldraledighetslagen" .
+<https://lagen.nu/sfs/1996:1596> rdfs:label "bibliotekslagen" .
+<https://lagen.nu/sfs/1996:1619> rdfs:label "rättshjälpslagen" .
+<https://lagen.nu/sfs/1996:627> rdfs:label "säkerhetsskyddslagen" .
+<https://lagen.nu/sfs/1996:67> rdfs:label "vapenlagen" .
+<https://lagen.nu/sfs/1996:799> rdfs:label "patientskadelagen" .
+<https://lagen.nu/sfs/1997:192> dcterms:alternate "LIF" .
+<https://lagen.nu/sfs/1997:288> rdfs:label "elberedskapslagen" .
+<https://lagen.nu/sfs/1997:306> rdfs:label "växtförädlarrättslagen" .
+<https://lagen.nu/sfs/1997:483> rdfs:label "skattebetalningslagen" .
+<https://lagen.nu/sfs/1997:857> dcterms:alternate "EL" .
+<https://lagen.nu/sfs/1997:857> rdfs:label "ellagen" .
+<https://lagen.nu/sfs/1998:204> rdfs:label "personuppgiftslagen"; dcterms:alternate "PUL" .
+<https://lagen.nu/sfs/1998:488> rdfs:label "körkortslagen" ; dcterms:alternate "KörkL" .
+<https://lagen.nu/sfs/1998:490> rdfs:label "yrkestrafiklagen" .
+<https://lagen.nu/sfs/1998:622> rdfs:label "polisdatalagen" .
+<https://lagen.nu/sfs/1998:674> dcterms:alternate "LIP" .
+<https://lagen.nu/sfs/1998:808> rdfs:label "miljöbalken"; dcterms:alternate "MB" .
+<https://lagen.nu/sfs/1998:980> rdfs:label "körkortsförordningen" .
+<https://lagen.nu/sfs/1999:1078> rdfs:label "bokföringslagen" .
+<https://lagen.nu/sfs/1999:1079> rdfs:label "revisionslagen" .
+<https://lagen.nu/sfs/1999:1229> rdfs:label "inkomstskattelagen" ; dcterms:alternate "IL" .
+<https://lagen.nu/sfs/1999:1395> rdfs:label "studiestödslagen" .
+<https://lagen.nu/sfs/1999:355> rdfs:label "kasinolagen" .
+<https://lagen.nu/sfs/1999:381> rdfs:label "sevesolagen" .
+<https://lagen.nu/sfs/1999:382> rdfs:label "sevesoförordningen" .
+<https://lagen.nu/sfs/1999:657> rdfs:label "epizootilagen" .
+<https://lagen.nu/sfs/1999:658> rdfs:label "zoonoslagen" .
+<https://lagen.nu/sfs/1999:799> rdfs:label "socialförsäkringslagen" .
+<https://lagen.nu/sfs/2000:1281> rdfs:label "tullagen" .
+<https://lagen.nu/sfs/2000:980> rdfs:label "socialavgiftslagen" ; dcterms:alternate "SAL" .
+<https://lagen.nu/sfs/2001:1227> dcterms:alternate "LSK" .
+<https://lagen.nu/sfs/2001:453> dcterms:alternate "SoL" .
+<https://lagen.nu/sfs/2001:453> rdfs:label "socialtjänstlagen" .
+<https://lagen.nu/sfs/2001:883> rdfs:label "revisorslagen" .
+<https://lagen.nu/sfs/2002:574> rdfs:label "fordonslagen" .
+<https://lagen.nu/sfs/2003:234> dcterms:alternate "Tillhandahållande" .
+<https://lagen.nu/sfs/2003:364> rdfs:label "fartygssäkerhetslagen" .
+<https://lagen.nu/sfs/2003:376> rdfs:label "sambolagen" .
+<https://lagen.nu/sfs/2003:389> dcterms:alternate "LEK" .
+<https://lagen.nu/sfs/2003:778> dcterms:alternate "LSO" .
+<https://lagen.nu/sfs/2004:168> rdfs:label "smittskyddslagen" ; dcterms:alternate "SmittskL" .
+<https://lagen.nu/sfs/2004:347> rdfs:label "prisinformationslagen" .
+<https://lagen.nu/sfs/2004:451> rdfs:label "produktsäkerhetslagen" .
+<https://lagen.nu/sfs/2004:519> rdfs:label "järnvägslagen" .
+<https://lagen.nu/sfs/2005:104> rdfs:label "försäkringsavtalslagen" ; dcterms:alternate "FAL" .
+<https://lagen.nu/sfs/2005:403> rdfs:label "naturgaslagen" .
+<https://lagen.nu/sfs/2005:551> rdfs:label "aktiebolagslagen"; dcterms:alternate "ABL" .
+<https://lagen.nu/sfs/2005:59> rdfs:label "distansavtalslagen" .
+<https://lagen.nu/sfs/2005:716> rdfs:label "utlänningslagen" ; dcterms:alternate "UtlL" .
+<https://lagen.nu/sfs/2005:837> rdfs:label "vallagen" .
+<https://lagen.nu/sfs/2006:227> rdfs:label "vägtrafikskattelagen" .
+<https://lagen.nu/sfs/2006:304> rdfs:label "rättsprövningslagen"; dcterms:alternate "RpL" ; dcterms:alternate "RättsprL" .
+<https://lagen.nu/sfs/2006:548> rdfs:label "skuldsaneringslagen" .
+<https://lagen.nu/sfs/2006:804> rdfs:label "livsmedelslagen" .
+<https://lagen.nu/sfs/2007:612> rdfs:label "bidragsbrottslagen" .
+<https://lagen.nu/sfs/2008:263> rdfs:label "fjärrvärmelagen" .
+<https://lagen.nu/sfs/2008:355> rdfs:label "patientdatalagen" .
+<https://lagen.nu/sfs/2008:486> rdfs:label "marknadsföringslagen" ; dcterms:alternate "MFL" .
+<https://lagen.nu/sfs/2008:567> rdfs:label "diskrimineringslagen" .
+<https://lagen.nu/sfs/2008:579> rdfs:label "konkurrenslagen" .
+<https://lagen.nu/sfs/2009:287> rdfs:label "studiestödsdatalagen" .
+<https://lagen.nu/sfs/2009:367> rdfs:label "apoteksdatalagen" .
+<https://lagen.nu/sfs/2009:400> rdfs:label "offentlighets- och sekretesslagen" ; dcterms:alternate "OSL" .
+<https://lagen.nu/sfs/2009:600> rdfs:label "språklagen" .
+<https://lagen.nu/sfs/2009:865> rdfs:label "kommissionslagen" .
