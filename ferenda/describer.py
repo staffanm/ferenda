@@ -4,6 +4,7 @@ from rdflib.extras.describer import Describer as OrigDescriber
 from rdflib import URIRef
 from rdflib import Literal
 from rdflib import RDF
+from six import text_type as str
 
 
 class Describer(OrigDescriber):

@@ -26,6 +26,7 @@ import rdflib
 import requests.exceptions
 
 import six
+from six import text_type as str
 from ferenda.compat import Mock, MagicMock, patch, call
 from bs4 import BeautifulSoup
 import doctest
@@ -1254,36 +1255,41 @@ class RelateFulltext(RepoTester):
                                 convert=True)
 
         with patch.object(WhooshIndex,'update') as mock_method:
+            from pudb import set_trace; set_trace()
             d.relate_fulltext("123/a", [d])
-            calls = [call(basefile='123/a',
-                          uri='http://example.org/base/123/a', repo='base',
-                          text='This is part of the main document, but not of any sub-resource. This is the tail end of the main document',
-                          rdf_type='http://purl.org/ontology/bibo/Standard',
-                          dcterms_title='Example',
-                          dcterms_identifier='123(A)',
-                          dcterms_issued=date(2014,1,4),
-                          dcterms_publisher={'iri':'http://example.org/publisher/A',
-                                             'label':'http://example.org/publisher/A'}),
-                     call(dcterms_title='Introduction',
-                          rdf_type='http://purl.org/ontology/bibo/DocumentPart',
-                          basefile='123/a',
-                          uri='http://example.org/base/123/a#S1', repo='base',
-                          text='This is part of document-part section 1',
-                          dcterms_identifier='123(A)\xb61'),  # \xb6 = Pilcrow 
-                     call(dcterms_title='Requirements Language',
-                          rdf_type='http://purl.org/ontology/bibo/DocumentPart',
-                          basefile='123/a',
-                          uri='http://example.org/base/123/a#S1.1', repo='base',
-                          text='This is the text in subsection 1.1',
-                          dcterms_identifier='123(A)\xb61.1'),
-                     call(dcterms_title='Definitions and Abbreviations',
-                          rdf_type='http://purl.org/ontology/bibo/DocumentPart',
-                          basefile='123/a',
-                          uri='http://example.org/base/123/a#S2', repo='base',
-                          text='This is the second main document part',
-                          dcterms_identifier='123(A)\xb62')]
-            self.assertEqualCalls(mock_method.mock_calls, calls)
-
+            want = [call(basefile='123/a',
+                         uri='http://example.org/base/123/a', repo='base',
+                         text='This is part of the main document, but not of any sub-resource. This is the tail end of the main document',
+                         rdf_type='http://purl.org/ontology/bibo/Standard',
+                         dcterms_title='Example',
+                         dcterms_identifier='123(A)',
+                         dcterms_issued=date(2014,1,4),
+                         dcterms_publisher={'iri':'http://example.org/publisher/A',
+                                            'label':'http://example.org/publisher/A'}),
+                    call(dcterms_title='Introduction',
+                         rdf_type='http://purl.org/ontology/bibo/DocumentPart',
+                         basefile='123/a',
+                         uri='http://example.org/base/123/a#S1', repo='base',
+                         text='This is part of document-part section 1',
+                         dcterms_identifier='123(A)\xb61'),  # \xb6 = Pilcrow 
+                    call(dcterms_title='Requirements Language',
+                         rdf_type='http://purl.org/ontology/bibo/DocumentPart',
+                         basefile='123/a',
+                         uri='http://example.org/base/123/a#S1.1', repo='base',
+                         text='This is the text in subsection 1.1',
+                         dcterms_identifier='123(A)\xb61.1'),
+                    call(dcterms_title='Definitions and Abbreviations',
+                         rdf_type='http://purl.org/ontology/bibo/DocumentPart',
+                         basefile='123/a',
+                         uri='http://example.org/base/123/a#S2', repo='base',
+                         text='This is the second main document part',
+                         dcterms_identifier='123(A)\xb62')]
+            got = mock_method.mock_calls
+            self.assertEqualCalls(want, got)
+            # do a little extra assertion since equality tests of call
+            # objects think that 'foo' and b'foo' are equal (at least
+            # under py2)
+            self.assertIsInstance(got[0][2]['rdf_type'], str)
 
             
             
@@ -1296,19 +1302,20 @@ class RelateFulltext(RepoTester):
         with patch.object(WhooshIndex,'update') as mock_method:
             repo.relate_fulltext("a", [repo])
 
-        want_calls = [call(aprilfools=True,
-                           basefile = 'a',
-                           repo = 'repo2',
-                           uri = 'http://example.org/repo2/a',
-                           text = 'This is part of the main document, but not of any sub-resource.',
-                           dc_subject = ['green', 'yellow'],
-                           dcterms_issued = date(2012, 4, 1),
-                           dcterms_publisher = {'iri': 'http://example.org/vocab/publ1',
-                                                'label': 'Publishing & sons'},
-                           dcterms_title = 'A doc with all datatypes',
-                           rdf_type = 'http://example.org/vocab/MainType',
-                           schema_free =  True)]
-        self.assertEqualCalls(mock_method.mock_calls, want_calls)
+        want = [call(aprilfools=True,
+                     basefile = 'a',
+                     repo = 'repo2',
+                     uri = 'http://example.org/repo2/a',
+                     text = 'This is part of the main document, but not of any sub-resource.',
+                     dc_subject = ['green', 'yellow'],
+                     dcterms_issued = date(2012, 4, 1),
+                     dcterms_publisher = {'iri': 'http://example.org/vocab/publ1',
+                                          'label': 'Publishing & sons'},
+                     dcterms_title = 'A doc with all datatypes',
+                     rdf_type = 'http://example.org/vocab/MainType',
+                     schema_free =  True)]
+        got = mock_method.mock_calls
+        self.assertEqualCalls(want, got)
 
     def test_unexpected_type(self):
         repo = DocRepo3(datadir=self.datadir,
@@ -1317,26 +1324,27 @@ class RelateFulltext(RepoTester):
         with patch.object(WhooshIndex,'update') as mock_method:
             repo.relate_fulltext("b", [repo])
 
-        want_calls = [call(basefile='b',
-                           repo='repo3',
-                           uri='http://example.org/repo3/b',
-                           text="A document with common properties, but unusual data types for those properties.",
-                           dc_creator='Fred Bloggs',
-                           dcterms_identifier='3 stroke B',
-                           # dcterms_issued='June 10th, 2014', # removed non-standard DCTERMS.issued property
-                           dcterms_rightsHolder= [{'iri': 'http://example.org/vocab/company1',
-                                                   'label': 'Comp Inc'},
-                                                  {'iri': 'http://example.org/vocab/company2',
-                                                   'label': 'Another company'}],
-                           dcterms_title='A doc with unusual metadata'
-                       ),
-                      call(basefile='b',
-                           dcterms_identifier='3/B (1)',
-                           repo='repo3',
-                           uri='http://example.org/repo3/b#S1',
-                           text="This is part of a subdocument, that has some unique properties",
-                           dc_creator=date(2012,4,1))]
-        self.assertEqualCalls(want_calls, mock_method.mock_calls)
+        want = [call(basefile='b',
+                     repo='repo3',
+                     uri='http://example.org/repo3/b',
+                     text="A document with common properties, but unusual data types for those properties.",
+                     dc_creator='Fred Bloggs',
+                     dcterms_identifier='3 stroke B',
+                     # dcterms_issued='June 10th, 2014', # removed non-standard DCTERMS.issued property
+                     dcterms_rightsHolder= [{'iri': 'http://example.org/vocab/company1',
+                                             'label': 'Comp Inc'},
+                                            {'iri': 'http://example.org/vocab/company2',
+                                             'label': 'Another company'}],
+                     dcterms_title='A doc with unusual metadata'
+                 ),
+                call(basefile='b',
+                     dcterms_identifier='3/B (1)',
+                     repo='repo3',
+                     uri='http://example.org/repo3/b#S1',
+                     text="This is part of a subdocument, that has some unique properties",
+                     dc_creator=date(2012,4,1))]
+        got = mock_method.mock_calls
+        self.assertEqualCalls(want_got)
 
 
     def test_missing(self):
@@ -1346,11 +1354,12 @@ class RelateFulltext(RepoTester):
         with patch.object(WhooshIndex,'update') as mock_method:
             repo.relate_fulltext("c", [repo])
 
-        want_calls = [call(basefile = 'c',
-                           repo = 'repo3',
-                           uri = 'http://example.org/repo3/c',
-                           text = "This document lacks all extra metadata that it's repo's Facet expects to be there.")]
-        self.assertEqualCalls(mock_method.mock_calls, want_calls)
+        want = [call(basefile = 'c',
+                     repo = 'repo3',
+                     uri = 'http://example.org/repo3/c',
+                     text = "This document lacks all extra metadata that it's repo's Facet expects to be there.")]
+        got = mock_method.mock_calls
+        self.assertEqualCalls(want, got)
 
 
 #     def test_synthetic(self):
