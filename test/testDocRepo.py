@@ -1255,7 +1255,6 @@ class RelateFulltext(RepoTester):
                                 convert=True)
 
         with patch.object(WhooshIndex,'update') as mock_method:
-            from pudb import set_trace; set_trace()
             d.relate_fulltext("123/a", [d])
             want = [call(basefile='123/a',
                          uri='http://example.org/base/123/a', repo='base',
