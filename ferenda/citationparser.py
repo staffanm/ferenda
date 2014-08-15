@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from copy import copy
+
 from six import text_type as str
 
 from ferenda.elements import LinkSubject
@@ -73,6 +75,7 @@ class CitationParser(object):
         # Returns a list of strings and/or tuples, where each tuple is
         # (string,pyparsing.ParseResult)
         nodes = [string]
+        res = nodes # if self._grammars is None
         for grammar in self._grammars:
             res = []
             for node in nodes:
@@ -120,10 +123,27 @@ class CitationParser(object):
             # of the document we're in, so that we can resolve
             # partial/relative references
             # splits a string into a list of string and ParseResult objects
+            #
             nodes = self.parse_string(part)
             for node in nodes:
                 if isinstance(node, str):
-                    res.append(node)
+                    if type(part) == str:
+                        res.append(node)
+                    else:
+                        # handle str-derived types by instantiting
+                        # that type and cloning its properties, so:
+                        #
+                        #     Header("foo 123 baz", lvl=2)
+                        #
+                        # can result in:
+                        #
+                        #     [Header("foo ", lvl=2),
+                        #      Link("123", uri="..."),
+                        #      Header(" baz", lvl=2)]
+                        #
+                        replacement = type(part)(node)
+                        replacement.__dict__ = copy(part.__dict__)
+                        res.append(replacement)
                 elif isinstance(node, tuple):
                     (text, parseresult) = node
                     # node = self.resolve_relative(node,currentloc)

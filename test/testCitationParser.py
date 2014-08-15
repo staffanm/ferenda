@@ -6,17 +6,21 @@ if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 import pkg_resources
 pkg_resources.resource_listdir('ferenda','res')
 
+from copy import deepcopy
+
 from pyparsing import Word,nums
 
 from ferenda.compat import unittest
 
 from ferenda.citationparser import CitationParser
 from ferenda.uriformatter import URIFormatter
-from ferenda.elements import Body, Heading, Paragraph, Footnote, LinkSubject, serialize
+from ferenda.elements import Body, Heading, Paragraph, Footnote, LinkSubject, UnicodeElement, serialize
 import ferenda.uriformats
 import ferenda.citationpatterns
 
 class Main(unittest.TestCase):
+
+
 
     def test_parse_recursive(self):
         doc_citation = ("Doc" + Word(nums).setResultsName("ordinal") 
@@ -55,6 +59,37 @@ class Main(unittest.TestCase):
         self.maxDiff = 4096
         self.assertEqual(serialize(doc),serialize(result))
 
+    def test_parse_existing(self):
+        # make sure parserecursive doesn't mess with existing structure.
+        class MyHeader(UnicodeElement): pass
+        
+
+        doc = Body([MyHeader("My document"),
+                    Paragraph([
+                        "It's a very very fine document.",
+                        MyHeader("Subheading"),
+                        "And now we're done."
+                        ])
+                    ])
+        
+        want = serialize(doc)
+
+        # first test a blank CitationParser, w/o patterns or formatter
+        cp = CitationParser() 
+        
+        doccopy = deepcopy(doc)
+        cp.parse_recursive(doccopy)
+        got = serialize(doccopy)
+        self.assertEqual(want, got)
+
+        cp = CitationParser(ferenda.citationpatterns.url)
+        cp.set_formatter(URIFormatter(("url", ferenda.uriformats.url)))
+        doccopy = deepcopy(doc)
+        cp.parse_recursive(doccopy)
+        got = serialize(doccopy)
+        self.assertEqual(want, got)
+
+        
 import doctest
 from ferenda import citationparser
 def load_tests(loader,tests,ignore):

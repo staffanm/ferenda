@@ -652,6 +652,15 @@ class FusekiStore(RemoteStore):
             
         return super(FusekiStore, self).construct(query)
             
+    def select(self, query, format=format, uniongraph=True):
+        # see above
+        if uniongraph:
+            query = re.sub(r"\s+WHERE\s+{", " WHERE { GRAPH <urn:x-arq:UnionGraph> {",
+                           query, flags=re.MULTILINE)
+            query += " }"
+            
+        return super(FusekiStore, self).select(query, format)
+
     def initialize_repository(self):
         # I have no idea how to do this for Fuseki
         pass

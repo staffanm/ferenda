@@ -151,7 +151,8 @@ class UnicodeElement(AbstractElement, str):
     """Based on :py:class:`str`, but can also have other
 properties (such as ordinal label, date of enactment, etc)."""
 
-    # immutable objects (like strings, unicode, etc) must provide a __new__ method
+    # immutable objects (like strings, unicode, etc) must provide a
+    # __new__ method
     def __new__(cls, arg='', *args, **kwargs):
         if not isinstance(arg, str):
             raise TypeError("%r is not a str" % arg)

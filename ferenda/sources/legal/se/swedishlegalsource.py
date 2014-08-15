@@ -612,8 +612,8 @@ class SwedishCitationParser(CitationParser):
             self._dvpath = 'dv/'
             self._sfspath = 'sfs/'
         
-    def parse_string(self, string):
-        unfiltered = self._legalrefparser.parse(string, predicate="dcterms:references")
+    def parse_string(self, string, predicate="dcterms:references"):
+        unfiltered = self._legalrefparser.parse(string, predicate=predicate)
         # remove those references that we cannot fully resolve (should
         # be an option in LegalRef, but...
         filtered = []
@@ -644,5 +644,11 @@ class SwedishCitationParser(CitationParser):
         elif "publ/utr/ds" in uri:
             return uri.replace("http://rinfo.lagrummet.se/publ/utr/ds",
                                self._baseurl + self._urlpath + "ds/")
+        elif "publ/bet" in uri:
+            return uri.replace("http://rinfo.lagrummet.se/publ/bet/",
+                               self._baseurl + self._urlpath + "bet/")
+        elif "publ/rskr" in uri:
+            return uri.replace("http://rinfo.lagrummet.se/publ/rskr/",
+                               self._baseurl + self._urlpath + "rskr/")
         else:
             return uri
