@@ -4,17 +4,17 @@ from __future__ import unicode_literals
 # for handling data sources of swedish law.
 
 from datetime import datetime, date
-import difflib
-import os
 import re
 
-from rdflib import URIRef, RDF, RDFS, Graph, Namespace
+from rdflib import URIRef, RDF, Namespace
 from six import text_type as str
 
-from ferenda import DocumentRepository, DocumentStore, FSMParser, CitationParser
+from ferenda import (DocumentRepository, DocumentStore, FSMParser,
+                     CitationParser)
 from ferenda import util
 from ferenda.sources.legal.se.legalref import Link
-from ferenda.elements import Paragraph, Section, Body, CompoundElement, SectionalElement
+from ferenda.elements import (Paragraph, Section, Body, CompoundElement,
+                              SectionalElement)
 from ferenda.pdfreader import Page
 
 from . import RPUBL
@@ -22,6 +22,7 @@ from . import RPUBL
 DCTERMS = Namespace(util.ns['dcterms'])
 PROV = Namespace(util.ns['prov'])
 FOAF = Namespace(util.ns['foaf'])
+
 
 class Stycke(Paragraph):
     pass
@@ -46,6 +47,7 @@ class PreambleSection(CompoundElement):
         element.set('typeof', 'bibo:DocumentPart')
         return element
 
+
 class UnorderedSection(CompoundElement):
     tagname = "div"
     classname = "unorderedsection"
@@ -62,6 +64,7 @@ class UnorderedSection(CompoundElement):
         element.set('typeof', 'bibo:DocumentPart')
         return element
 
+
 class Appendix(SectionalElement): 
     tagname = "div"
     classname = "appendix"
@@ -70,6 +73,7 @@ class Appendix(SectionalElement):
             self.uri = uri + "#B%s" % self.ordinal
 
         return super(Appendix, self).as_xhtml(uri)
+
 
 class Coverpage(CompoundElement):
     tagname = "div"
@@ -91,7 +95,8 @@ class SwedishLegalStore(DocumentStore):
         return pathfrag.replace("/", ":").replace("-", "/")
 
     def intermediate_path(self, basefile, attachment=None):
-        return self.path(basefile, "intermediate", ".xml", attachment=attachment)
+        return self.path(basefile, "intermediate", ".xml",
+                         attachment=attachment)
 
 
 class SwedishLegalSource(DocumentRepository):
@@ -103,19 +108,21 @@ class SwedishLegalSource(DocumentRepository):
 
     alias = "swedishlegalsource"
 
-    lang="sv"
+    lang = "sv"
 
-    rdf_type = RPUBL.Rattsinformationsdokument # subclasses override this
+    rdf_type = RPUBL.Rattsinformationsdokument  # subclasses override this
 
     # This is according to the RPUBL vocabulary: All
     # rpubl:Rattsinformationsdokument should have dcterms:title,
     # dcterms:issued (must be a xsd:date), dcterms:publisher and
     # dcterms:identifier
-    required_predicates = [RDF.type, DCTERMS.title, DCTERMS.issued, DCTERMS.identifier, PROV.wasGeneratedBy]
+    required_predicates = [RDF.type, DCTERMS.title, DCTERMS.issued,
+                           DCTERMS.identifier, PROV.wasGeneratedBy]
 
     swedish_ordinal_list = ('f\xf6rsta', 'andra', 'tredje', 'fj\xe4rde',
                             'femte', 'sj\xe4tte', 'sjunde', '\xe5ttonde',
                             'nionde', 'tionde', 'elfte', 'tolfte')
+
     swedish_ordinal_dict = dict(list(zip(
         swedish_ordinal_list, list(range(1, len(swedish_ordinal_list) + 1)))))
 
@@ -133,6 +140,13 @@ class SwedishLegalSource(DocumentRepository):
                       "december": 12,
                       "\xe5r": 12}
 
+    def __init__(self, config=None, **kwargs):
+        super(SwedishLegalSource, self).__init__(config, **kwargs)
+        assert self.alias != "swedishlegalsource", "Subclasses must override self.alias!"
+        if not hasattr(self.config, 'urlpath'):
+            self.config.urlpath = "res/%s/" % self.alias
+        
+
     def get_default_options(self):
         opts = super(SwedishLegalSource, self).get_default_options()
         opts['pdfimages'] = False 
@@ -145,25 +159,46 @@ class SwedishLegalSource(DocumentRepository):
         return None
 
     def lookup_label(self, resource, predicate=FOAF.name):
-        val = self.commondata.value(subject=URIRef(resource), predicate=predicate)
+        val = self.commondata.value(subject=URIRef(resource),
+                                    predicate=predicate)
         if not val:
             raise KeyError(resource)
         else:
             return str(val)
-        
 
     def sameas_uri(self, uri):
-        # "http://localhost:8000/res/dir/2012:35" => "http://rinfo.lagrummet.se/publ/dir/2012:35",
-        # "http://localhost:8000/res/dv/hfd/2012:35" => "http://rinfo.lagrummet.se/publ/rattsfall/hdf/2012:35",
+        # "http://localhost:8000/res/dir/2012:35" =>
+        #     "http://rinfo.lagrummet.se/publ/dir/2012:35",
+        # "http://localhost:8000/res/dv/hfd/2012:35" =>
+        #     "http://rinfo.lagrummet.se/publ/rattsfall/hfd/2012:35"
+        # 
+        # but also:
+        #
+        # "https://lagen.nu/dom/hfd/2012:35" =>
+        #     "http://rinfo.lagrummet.se/publ/rattsfall/hfd/2012:35"
+        # "http://lagen.nu/1998:204" =>
+        #     "http://rinfo.lagrummet.se/publ/sfs/1998:204"
+        
         assert uri.startswith(self.config.url)
-        # FIXME: This hardcodes the res/ part of our local URIs
-        # needlessly -- make configurable
-        maps = (("res/dv/", "publ/rattsfall/"),
-                ("res/", "publ/"))
+        
+        # NOTE: This hardcodes what we can guess about other repos
+        # and their .config.url + .config.urlpath
+        maps = ((self.config.url+"res/dv/",
+                 "http://rinfo.lagrummet.se/publ/rattsfall/"),
+                (self.config.url+"res/",
+                 "http://rinfo.lagrummet.se/publ/"),
+                # Special hacky SFS handling (always starts digits 1 or 2)
+                ("https://lagen.nu/1",
+                 "http://rinfo.lagrummet.se/publ/sfs/1"),
+                ("https://lagen.nu/2",
+                 "http://rinfo.lagrummet.se/publ/sfs/2"),
+                ("https://lagen.nu/dom",
+                 "http://rinfo.lagrummet.se/publ/rattsfall"),
+                ("https://lagen.nu/",
+                 "http://rinfo.lagrummet.se/publ/"))
         for fr, to in maps:
-            if self.config.url + fr in uri:
-                return uri.replace(self.config.url + fr,
-                                   "http://rinfo.lagrummet.se/" + to)
+            if uri.startswith(fr):
+                return uri.replace(fr, to)
 
     def parse_iso_date(self, datestr):
         # only handles YYYY-MM-DD now. Look into dateutil or isodate
@@ -171,7 +206,9 @@ class SwedishLegalSource(DocumentRepository):
         return datetime.strptime(datestr, "%Y-%m-%d")
 
     def parse_swedish_date(self, datestr):
-        """ Parses a number of common forms of expressing swedish dates with varying precision.
+        """Parses a number of common forms of expressing swedish dates with
+        varying precision.
+        
         >>> parse_swedish_date("3 februari 2010")
         datetime.date(2010, 2, 3)
         >>> parse_swedish_date("vid utgången av december 1999")
@@ -180,6 +217,7 @@ class SwedishLegalSource(DocumentRepository):
         ferenda.util.gYearMonth(1999, 11)
         >>> parse_swedish_date("1998")
         ferenda.util.gYear(1999)
+
         """
         day = month = year = None
         # assume strings on the form "3 februari 2010"
@@ -206,7 +244,6 @@ class SwedishLegalSource(DocumentRepository):
             return util.gYearMonth(year, month)
         else:
             return util.gYear(year)
-
 
     def infer_triples(self, d, basefile):
         try:
@@ -280,6 +317,7 @@ class SwedishLegalSource(DocumentRepository):
     def toc_item(self, binding, row):
         return {'uri': row['uri'],
                 'label': row['identifier'] + ": " + row['title']}
+
 
 def offtryck_parser(basefile="0", preset="proposition", metrics={}):
     presets = {'default': {},
@@ -565,7 +603,15 @@ class SwedishCitationParser(CitationParser):
     def __init__(self, legalrefparser, baseurl):
         self._legalrefparser = legalrefparser
         self._baseurl = baseurl
-
+        if self._baseurl == "https://lagen.nu/":
+            self._urlpath = ''
+            self._dvpath = 'dom/'
+            self._sfspath = ''
+        else:
+            self._urlpath = 'res/'
+            self._dvpath = 'dv/'
+            self._sfspath = 'sfs/'
+        
     def parse_string(self, string):
         unfiltered = self._legalrefparser.parse(string, predicate="dcterms:references")
         # remove those references that we cannot fully resolve (should
@@ -584,19 +630,19 @@ class SwedishCitationParser(CitationParser):
     # (which is used only on metadata fields, not body text)
     def localize_uri(self, uri):
         if "publ/rattsfall" in uri:
-            return uri.replace("http://rinfo.lagrummet.se/publ/rattsfall",
-                               self._baseurl + "res/dv")
+            return uri.replace("http://rinfo.lagrummet.se/publ/rattsfall/",
+                               self._baseurl + self._urlpath + self._dvpath)
         elif "publ/sfs/" in uri:
-            return uri.replace("http://rinfo.lagrummet.se/publ/sfs",
-                               self._baseurl + "res/sfs")
+            return uri.replace("http://rinfo.lagrummet.se/publ/sfs/",
+                               self._baseurl + self._urlpath + self._sfspath)
         elif "publ/prop" in uri:
-            return uri.replace("http://rinfo.lagrummet.se/publ/prop",
-                               self._baseurl + "res/prop")
+            return uri.replace("http://rinfo.lagrummet.se/publ/prop/",
+                               self._baseurl + self._urlpath + "prop/")
         elif "publ/utr/sou" in uri:
             return uri.replace("http://rinfo.lagrummet.se/publ/utr/sou",
-                               self._baseurl + "res/sou")
+                               self._baseurl + self._urlpath + "sou/")
         elif "publ/utr/ds" in uri:
             return uri.replace("http://rinfo.lagrummet.se/publ/utr/ds",
-                               self._baseurl + "res/ds")
+                               self._baseurl + self._urlpath + "ds/")
         else:
             return uri
