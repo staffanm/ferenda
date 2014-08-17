@@ -129,24 +129,32 @@ class AbstractElement(object):
         return self.__class__.__name__.lower()
 
     tagname = property(_get_tagname)
-    """The tag used for this element in the resulting XHTML (the default implementation simply uses the class name, lowercased)."""
+    """The tag used for this element in the resulting XHTML (the default
+    implementation simply uses the class name, lowercased)."""
 
     classname = None
-    """If set, this property gets converted to a ``@class`` attribute in the resulting XHTML."""
+    """If set, this property gets converted to a ``@class`` attribute in
+    the resulting XHTML."""
     
+    partrelation = DCTERMS.isPartOf
+    """The default relationship between this element and any other element
+that includes this element."""
+
     def as_xhtml(self, uri=None):
         """Converts this object to a ``lxml.etree`` object (with children)
 
-        :param uri: If provided, gets converted to an ``@about`` attribute in the resulting XHTML.
+        :param uri: If provided, gets converted to an ``@about`` attribute
+                    in the resulting XHTML.
         :type uri: str
-
-        """
+"""
         attrs = {}
-        for stdattr in ('class', 'id', 'dir', 'lang', 'src', 'href', 'name', 'alt', 'role'):
-            if hasattr(self,stdattr):
-                attrs[stdattr] = getattr(self,stdattr)
+        for stdattr in ('class', 'id', 'dir', 'lang', 'src',
+                        'href', 'name', 'alt', 'role'):
+            if hasattr(self, stdattr):
+                attrs[stdattr] = getattr(self, stdattr)
         return E(self.tagname, attrs) 
 
+        
 class UnicodeElement(AbstractElement, str):
     """Based on :py:class:`str`, but can also have other
 properties (such as ordinal label, date of enactment, etc)."""
@@ -211,6 +219,7 @@ class CompoundElement(AbstractElement, list):
         # start by handling all children recursively
         for subpart in self:
             if (isinstance(subpart, AbstractElement) or hasattr(subpart, 'as_xhtml')):
+                # FIXME: should be self.uri if present?
                 node = subpart.as_xhtml(uri)
                 if node is not None:
                     children.append(node)
@@ -236,7 +245,9 @@ class CompoundElement(AbstractElement, list):
         # create extra attributes depending on circumstances
         if hasattr(self,'uri') and self.uri:
             attrs['about'] = self.uri
-
+            # FIXME: this
+            # if self.partrelation:
+            #     self._span(URIRef(self.uri), self.partrelation, self.parent)
         
         if hasattr(self,'uri') and self.uri and hasattr(self,'meta') and self.meta:
             assert isinstance(self.meta,Graph), "self.meta is %r, not rdflib.Graph" % type(self.meta)
@@ -254,7 +265,7 @@ class CompoundElement(AbstractElement, list):
                 else:
                     # FIXME: Is it sane to reverse the order of
                     # triples in this way? Maybe we should do a
-                    # children.append instead?
+                    # children.append instead
                     children.insert(0, self._span(s,p,o,self.meta))
 
 
@@ -262,7 +273,7 @@ class CompoundElement(AbstractElement, list):
         # contain any XML illegal characters
         return E(self.tagname, attrs, *children)
 
-    def _span(self, subj, pred, obj, graph):
+    def _span(self, subj, pred, obj, graph=None):
         """Returns any triple as a span element with rdfa attributes. Object
            can be a uriref or literal, subject must be a
            uriref. Bnodes not supported. Recursively creates sub-span
@@ -292,8 +303,9 @@ class CompoundElement(AbstractElement, list):
                 'rel':self.meta.qname(pred),
                 'href':str(obj)
             }
-            for sub_pred, sub_obj in graph.predicate_objects(subject=obj):
-                children.append(self._span(obj, sub_pred, sub_obj, graph))
+            if graph:
+                for sub_pred, sub_obj in graph.predicate_objects(subject=obj):
+                    children.append(self._span(obj, sub_pred, sub_obj, graph))
 
         # Theoretical, obj could be a BNode, but that should never happen. If
         # it does, just silently ignore it.

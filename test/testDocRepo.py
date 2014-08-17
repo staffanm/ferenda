@@ -651,6 +651,7 @@ class Repo(RepoTester):
 
 
     # class RenderXHTML(RepoTester) # maybe
+    # helper method
     def _test_render_xhtml(self, body, want):
         doc = self.repo.make_document('basefile')
         doc.body = body
@@ -906,6 +907,70 @@ class Repo(RepoTester):
 </html>
 """
         self._test_render_xhtml(body,want)
+
+
+    def test_render_xhtml_nested(self):
+        # Make sure nested sections have the expected dcterms:isPartOf
+        # relation if they have a @about property (could be from a
+        # .uri property or dynamically constructed like
+        # SectionalElement.as_xhtml)
+        from ferenda import elements as el
+
+        class MySection(el.CompoundElement):
+            partrelation = rdflib.Namespace(util.ns['schema']).isPartOf
+        
+        from ferenda import elements as el
+        body = el.Body([el.Section([el.Paragraph(['Some text']),
+                                    el.Link("txt", uri="http://ex.org/ext"),
+                                    el.Subsection([el.Paragraph(['More text'])],
+                                                  ordinal="1.1",
+                                                  title="First subsection")],
+                                   ordinal="1",
+                                   title="First section"),
+                        MySection([el.Paragraph(['Even more text'])],
+                                   uri="http://example.org/s2")])
+                                   
+        want = """<html xmlns="http://www.w3.org/1999/xhtml"
+                        xmlns:bibo="http://purl.org/ontology/bibo/"
+                        xmlns:schema="..."
+                        xmlns:dcterms="http://purl.org/dc/terms/"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        version="XHTML+RDFa 1.1"
+                        xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd"        
+                        xml:lang="en">
+  <head about="http://localhost:8000/res/base/basefile"/>
+  <body about="http://localhost:8000/res/base/basefile">
+    <div about="http://localhost:8000/res/base/basefile#S1"
+         typeof="bibo:DocumentPart"
+         class="section">
+      <span rel="dcterms:isPartOf"
+            href="http://localhost:8000/res/base/basefile"/>
+      <span content="1" about="http://localhost:8000/res/base/basefile#S1"
+            property="bibo:chapter"/>
+      <p>Some text</p>
+      <div content="First subsection"
+           about="http://localhost:8000/res/base/basefile#S1.1"
+           typeof="bibo:DocumentPart"
+           class="subsection">
+        <span rel="dcterms:isPartOf" href="http://localhost:8000/res/base/basefile#S1"/>
+        <span content="1.1" about="http://localhost:8000/res/base/basefile#S1.1"
+              property="bibo:chapter"/>
+        <p>More text</p>
+      </div>
+    </div>
+    <div about="http://localhost:8000/res/base/basefile#S2"
+         typeof="bibo:DocumentPart"
+         class="section">
+      <span rel="schema:isPartOf"
+            href="http://localhost:8000/res/base/basefile"/>
+      <span content="2" about="http://localhost:8000/res/base/basefile#S2"
+            property="bibo:chapter"/>
+      <p>Even more text</p>
+    </div>
+  </body>
+</html>"""
+        # FIXME: uncomment and fix
+        # self._test_render_xhtml(body, want)
 
     def test_render_xhtml_malformed(self):
         # Test 5: Illegal indata (raw ESC character in string)
