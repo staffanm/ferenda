@@ -8,6 +8,38 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
+<http://localhost:8000/res/utr/sou/2013:75#PS1> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/utr/sou/2013:75> ;
+    dcterms:title "Till statsrådet Anna-Karin Hatt"@sv .
+
+<http://localhost:8000/res/utr/sou/2013:75#PS2> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/utr/sou/2013:75> ;
+    dcterms:title "Innehåll"@sv .
+
+<http://localhost:8000/res/utr/sou/2013:75#PS3> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/utr/sou/2013:75> ;
+    dcterms:title "Sammanfattning"@sv .
+
+<http://localhost:8000/res/utr/sou/2013:75#S1> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/utr/sou/2013:75> ;
+    dcterms:title "Uppdraget"@sv ;
+    bibo:chapter "1"@sv .
+
+<http://localhost:8000/res/utr/sou/2013:75#S2.1.1> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/utr/sou/2013:75#S2.1> ;
+    dcterms:title "E-förvaltning – en definition"@sv ;
+    bibo:chapter "2.1.1"@sv .
+
+<http://localhost:8000/res/utr/sou/2013:75#S2> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/utr/sou/2013:75> ;
+    dcterms:title "Bakgrund och nuläge"@sv ;
+    bibo:chapter "2"@sv .
+
+<http://localhost:8000/res/utr/sou/2013:75#S2.1> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/utr/sou/2013:75#S2> ;
+    dcterms:title "Regeringens målbild för e-förvaltningen"@sv ;
+    bibo:chapter "2.1"@sv .
+
 <http://localhost:8000/res/utr/sou/2013:75> a rpubl:Utredning ;
     dcterms:abstract "E-delegationen har under fyra års tid arbetat för att stärka utvecklingen av e-förvaltning. Detta betänkande ger förslag på hur framtidens e-förvaltning kan organiseras och föras vidare i ett längre perspektiv."@sv ;
     dcterms:identifier "SOU 2013:75" ;
@@ -21,29 +53,4 @@
         <http://localhost:8000/res/dir/2013:40> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/utr/sou/2013:75> ;
     prov:wasGeneratedBy "ferenda.sources.legal.se.sou.SOU" .
-
-<http://localhost:8000/res/utr/sou/2013:75#PS1> a bibo:DocumentPart ;
-    dcterms:title "Till statsrådet Anna-Karin Hatt"@sv .
-
-<http://localhost:8000/res/utr/sou/2013:75#PS2> a bibo:DocumentPart ;
-    dcterms:title "Innehåll"@sv .
-
-<http://localhost:8000/res/utr/sou/2013:75#PS3> a bibo:DocumentPart ;
-    dcterms:title "Sammanfattning"@sv .
-
-<http://localhost:8000/res/utr/sou/2013:75#S1> a bibo:DocumentPart ;
-    dcterms:title "Uppdraget"@sv ;
-    bibo:chapter "1"@sv .
-
-<http://localhost:8000/res/utr/sou/2013:75#S2> a bibo:DocumentPart ;
-    dcterms:title "Bakgrund och nuläge"@sv ;
-    bibo:chapter "2"@sv .
-
-<http://localhost:8000/res/utr/sou/2013:75#S2.1> a bibo:DocumentPart ;
-    dcterms:title "Regeringens målbild för e-förvaltningen"@sv ;
-    bibo:chapter "2.1"@sv .
-
-<http://localhost:8000/res/utr/sou/2013:75#S2.1.1> a bibo:DocumentPart ;
-    dcterms:title "E-förvaltning – en definition"@sv ;
-    bibo:chapter "2.1.1"@sv .
 

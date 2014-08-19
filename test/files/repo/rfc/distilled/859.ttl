@@ -7,6 +7,21 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
+<http://localhost:8000/res/rfc/859#PS1> a bibo:DocumentPart ;
+    dcterms:title "(Abstract)"@en .
+
+<http://localhost:8000/res/rfc/859#S1> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 859, section 1"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/859> ;
+    dcterms:title "Command Name and Code"@en ;
+    bibo:chapter "1"@en .
+
+<http://localhost:8000/res/rfc/859#S2> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 859, section 2"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/859> ;
+    dcterms:title "Command Meanings"@en ;
+    bibo:chapter "2"@en .
+
 <http://localhost:8000/res/rfc/859> a rfc:RFC ;
     rfc:obsoletes <http://localhost:8000/res/rfc/651> ;
     dcterms:creator "J. Postel",
@@ -17,17 +32,4 @@
     dcterms:rightsHolder "ISI" ;
     dcterms:title "TELNET STATUS OPTION"@en ;
     prov:wasGeneratedBy "ferenda.sources.tech.rfc.RFC" .
-
-<http://localhost:8000/res/rfc/859#PS1> a bibo:DocumentPart ;
-    dcterms:title "(Abstract)"@en .
-
-<http://localhost:8000/res/rfc/859#S1> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 859, section 1"@en ;
-    dcterms:title "Command Name and Code"@en ;
-    bibo:chapter "1"@en .
-
-<http://localhost:8000/res/rfc/859#S2> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 859, section 2"@en ;
-    dcterms:title "Command Meanings"@en ;
-    bibo:chapter "2"@en .
 

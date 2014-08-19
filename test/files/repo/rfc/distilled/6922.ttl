@@ -7,17 +7,6 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://localhost:8000/res/rfc/6922> a rfc:RFC ;
-    dcterms:creator "Y. Shafranovich" ;
-    dcterms:identifier "RFC 6922" ;
-    dcterms:issn "2070-1721" ;
-    dcterms:issued "2013-04"^^xsd:gYearMonth ;
-    dcterms:publisher <http://localhost:8000/ext/ietf> ;
-    dcterms:rightsHolder "BioFortis, Inc." ;
-    dcterms:subject <http://localhost:8000/dataset/rfc/informational> ;
-    dcterms:title "The application/sql Media Type"@en ;
-    prov:wasGeneratedBy "ferenda.sources.tech.rfc.RFC" .
-
 <http://localhost:8000/res/rfc/6922#PS1> a bibo:DocumentPart ;
     dcterms:title "Abstract"@en .
 
@@ -31,28 +20,33 @@
 
 <http://localhost:8000/res/rfc/6922#S1> a bibo:DocumentPart ;
     dcterms:identifier "RFC 6922, section 1"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6922> ;
     dcterms:title "Introduction"@en ;
     bibo:chapter "1"@en .
 
 <http://localhost:8000/res/rfc/6922#S2> a bibo:DocumentPart ;
     dcterms:identifier "RFC 6922, section 2"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6922> ;
     dcterms:references <http://localhost:8000/res/rfc/2119> ;
     dcterms:title "Conventions Used in This Document"@en ;
     bibo:chapter "2"@en .
 
 <http://localhost:8000/res/rfc/6922#S5> a bibo:DocumentPart ;
     dcterms:identifier "RFC 6922, section 5"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6922> ;
     dcterms:references <http://localhost:8000/res/rfc/6922#S3> ;
     dcterms:title "Security Considerations"@en ;
     bibo:chapter "5"@en .
 
 <http://localhost:8000/res/rfc/6922#S6> a bibo:DocumentPart ;
     dcterms:identifier "RFC 6922, section 6"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6922> ;
     dcterms:title "Acknowledgments"@en ;
     bibo:chapter "6"@en .
 
 <http://localhost:8000/res/rfc/6922#S7> a bibo:DocumentPart ;
     dcterms:identifier "RFC 6922, section 7"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6922> ;
     dcterms:references <http://localhost:8000/res/rfc/2119>,
         <http://localhost:8000/res/rfc/6838> ;
     dcterms:title "Normative References"@en ;
@@ -60,14 +54,27 @@
 
 <http://localhost:8000/res/rfc/6922#S4> a bibo:DocumentPart ;
     dcterms:identifier "RFC 6922, section 4"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6922> ;
     dcterms:references <http://localhost:8000/res/rfc/6922#S3> ;
     dcterms:title "IANA Considerations"@en ;
     bibo:chapter "4"@en .
 
 <http://localhost:8000/res/rfc/6922#S3> a bibo:DocumentPart ;
     dcterms:identifier "RFC 6922, section 3"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6922> ;
     dcterms:references <http://localhost:8000/res/rfc/6838>,
         <http://localhost:8000/res/rfc/6922#S5.6> ;
     dcterms:title "Media Type Registration Application"@en ;
     bibo:chapter "3"@en .
+
+<http://localhost:8000/res/rfc/6922> a rfc:RFC ;
+    dcterms:creator "Y. Shafranovich" ;
+    dcterms:identifier "RFC 6922" ;
+    dcterms:issn "2070-1721" ;
+    dcterms:issued "2013-04"^^xsd:gYearMonth ;
+    dcterms:publisher <http://localhost:8000/ext/ietf> ;
+    dcterms:rightsHolder "BioFortis, Inc." ;
+    dcterms:subject <http://localhost:8000/dataset/rfc/informational> ;
+    dcterms:title "The application/sql Media Type"@en ;
+    prov:wasGeneratedBy "ferenda.sources.tech.rfc.RFC" .
 

@@ -7,6 +7,15 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
+<http://localhost:8000/res/rfc/2757#PS1> a bibo:DocumentPart ;
+    dcterms:title "Status of this Memo"@en .
+
+<http://localhost:8000/res/rfc/2757#S1.1> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 2757, section 1.1"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/2757#S1> ;
+    dcterms:title "Network Architecture"@en ;
+    bibo:chapter "1.1"@en .
+
 <http://localhost:8000/res/rfc/2757> a rfc:RFC ;
     dcterms:creator "G. Montenegro",
         "S. Dawkins" ;
@@ -19,16 +28,9 @@
     dcterms:title "Long Thin Networks"@en ;
     prov:wasGeneratedBy "ferenda.sources.tech.rfc.RFC" .
 
-<http://localhost:8000/res/rfc/2757#PS1> a bibo:DocumentPart ;
-    dcterms:title "Status of this Memo"@en .
-
 <http://localhost:8000/res/rfc/2757#S1> a bibo:DocumentPart ;
     dcterms:identifier "RFC 2757, section 1"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/2757> ;
     dcterms:title "Introduction"@en ;
     bibo:chapter "1"@en .
-
-<http://localhost:8000/res/rfc/2757#S1.1> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 2757, section 1.1"@en ;
-    dcterms:title "Network Architecture"@en ;
-    bibo:chapter "1.1"@en .
 

@@ -8,9 +8,8 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/sfs/2008:344#P1> a rpubl:Paragraf .
-
 <https://lagen.nu/sfs/2008:344#P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/sfs/2008:344#P1> ;
     dcterms:references <http://rinfo.lagrummet.se/publ/sfs/1982:763>,
         <http://rinfo.lagrummet.se/publ/sfs/1985:125> .
 
@@ -34,6 +33,9 @@
 
 <http://rinfo.lagrummet.se/publ/rskr/2012/13:230> dcterms:identifier "rskr. 2012/13:230" .
 
+<https://lagen.nu/sfs/2008:344#P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/sfs/2008:344> .
+
 <https://lagen.nu/sfs/2008:344/konsolidering/2013:411> a rpubl:KonsolideradGrundforfattning ;
     rinfoex:senastHamtad "2013-06-12T18:58:58.242181"^^xsd:dateTime ;
     rinfoex:senastKontrollerad "2013-06-13T18:58:58.242181"^^xsd:dateTime ;
@@ -48,7 +50,7 @@
         <https://lagen.nu/sfs/2013:411> ;
     rpubl:utfardandedatum "2008-05-22"^^xsd:date ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2008:344/konsolidering/2013-05-30> ;
-    prov:wasGeneratedBy <https://lagen.nu/sfs/2008:344/konsolidering/ferenda.sources.legal.se.sfs.SFS> .
+    prov:wasGeneratedBy "ferenda.sources.legal.se.sfs.SFS" .
 
 <https://lagen.nu/sfs/2009:1550> a rpubl:Lag ;
     dcterms:identifier "SFS 2009:1550" ;

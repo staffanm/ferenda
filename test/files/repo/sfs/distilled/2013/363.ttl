@@ -8,14 +8,12 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/sfs/2013:363#P1> a rpubl:Paragraf .
-
-<https://lagen.nu/sfs/2013:363#P1S1> a rinfoex:Stycke .
-
-<https://lagen.nu/sfs/2013:363#P1S1N1> dcterms:references <http://rinfo.lagrummet.se/ext/celex/31991R2092>,
+<https://lagen.nu/sfs/2013:363#P1S1N1> dcterms:isPartOf <https://lagen.nu/sfs/2013:363#P1S1> ;
+    dcterms:references <http://rinfo.lagrummet.se/ext/celex/31991R2092>,
         <http://rinfo.lagrummet.se/ext/celex/32007R0834> .
 
-<https://lagen.nu/sfs/2013:363#P1S1N2> dcterms:references <http://rinfo.lagrummet.se/ext/celex/32007R0834> .
+<https://lagen.nu/sfs/2013:363#P1S1N2> dcterms:isPartOf <https://lagen.nu/sfs/2013:363#P1S1> ;
+    dcterms:references <http://rinfo.lagrummet.se/ext/celex/32007R0834> .
 
 <https://lagen.nu/sfs/2013:363/konsolidering> owl:sameAs <https://lagen.nu/sfs/2013:363/konsolidering/2013:363> .
 
@@ -31,6 +29,9 @@
 
 <http://rinfo.lagrummet.se/publ/rskr/2012/13:210> dcterms:identifier "rskr. 2012/13:210" .
 
+<https://lagen.nu/sfs/2013:363#P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/sfs/2013:363> .
+
 <https://lagen.nu/sfs/2013:363/konsolidering/2013:363> a rpubl:KonsolideradGrundforfattning ;
     rinfoex:senastHamtad "2013-06-11T18:58:58.242181"^^xsd:dateTime ;
     rinfoex:senastKontrollerad "2013-06-11T18:59:58.242181"^^xsd:dateTime ;
@@ -43,7 +44,10 @@
     rpubl:konsolideringsunderlag <https://lagen.nu/sfs/2013:363> ;
     rpubl:utfardandedatum "2013-05-23"^^xsd:date ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2013:363/konsolidering/2013-05-23> ;
-    prov:wasGeneratedBy <https://lagen.nu/sfs/2013:363/konsolidering/ferenda.sources.legal.se.sfs.SFS> .
+    prov:wasGeneratedBy "ferenda.sources.legal.se.sfs.SFS" .
+
+<https://lagen.nu/sfs/2013:363#P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/sfs/2013:363#P1> .
 
 <https://lagen.nu/sfs/2013:363> a rpubl:Lag ;
     dcterms:identifier "SFS 2013:363" ;

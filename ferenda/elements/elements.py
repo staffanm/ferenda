@@ -239,8 +239,10 @@ class CompoundElement(AbstractElement, list):
                     p = self.uri
                 elif hasattr(self, 'compute_uri'):
                     p = self.compute_uri(baseuri=uri)
-                else:
+                elif parent_uri:
                     p = parent_uri
+                else:
+                    p = uri
                 node = subpart.as_xhtml(uri, p)
                 if node is not None:
                     children.append(node)

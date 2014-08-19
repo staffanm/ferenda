@@ -21,29 +21,28 @@
 
 <http://localhost:8000/res/rfc/6919#S1> a bibo:DocumentPart ;
     dcterms:identifier "RFC 6919, section 1"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6919> ;
     dcterms:references <http://localhost:8000/res/rfc/6120> ;
     dcterms:title "MUST (BUT WE KNOW YOU WON'T)"@en ;
     bibo:chapter "1"@en .
 
 <http://localhost:8000/res/rfc/6919#S10> a bibo:DocumentPart ;
     dcterms:identifier "RFC 6919, section 10"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6919> ;
     dcterms:references <http://localhost:8000/res/rfc/2119> ;
     dcterms:title "Security Considerations"@en ;
     bibo:chapter "10"@en .
 
-<http://localhost:8000/res/rfc/6919#S11> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6919, section 11"@en ;
-    dcterms:title "References"@en ;
-    bibo:chapter "11"@en .
-
 <http://localhost:8000/res/rfc/6919#S11.1> a bibo:DocumentPart ;
     dcterms:identifier "RFC 6919, section 11.1"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6919#S11> ;
     dcterms:references <http://localhost:8000/res/rfc/2119> ;
     dcterms:title "Normative References"@en ;
     bibo:chapter "11.1"@en .
 
 <http://localhost:8000/res/rfc/6919#S11.2> a bibo:DocumentPart ;
     dcterms:identifier "RFC 6919, section 11.2"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6919#S11> ;
     dcterms:references <http://localhost:8000/res/rfc/2616>,
         <http://localhost:8000/res/rfc/3207>,
         <http://localhost:8000/res/rfc/3501>,
@@ -58,51 +57,65 @@
 
 <http://localhost:8000/res/rfc/6919#S2> a bibo:DocumentPart ;
     dcterms:identifier "RFC 6919, section 2"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6919> ;
     dcterms:references <http://localhost:8000/res/rfc/5988> ;
     dcterms:title "SHOULD CONSIDER"@en ;
     bibo:chapter "2"@en .
 
 <http://localhost:8000/res/rfc/6919#S3> a bibo:DocumentPart ;
     dcterms:identifier "RFC 6919, section 3"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6919> ;
     dcterms:references <http://localhost:8000/res/rfc/493> ;
     dcterms:title "REALLY SHOULD NOT"@en ;
     bibo:chapter "3"@en .
 
 <http://localhost:8000/res/rfc/6919#S4> a bibo:DocumentPart ;
     dcterms:identifier "RFC 6919, section 4"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6919> ;
     dcterms:references <http://localhost:8000/res/rfc/2616> ;
     dcterms:title "OUGHT TO"@en ;
     bibo:chapter "4"@en .
 
 <http://localhost:8000/res/rfc/6919#S5> a bibo:DocumentPart ;
     dcterms:identifier "RFC 6919, section 5"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6919> ;
     dcterms:references <http://localhost:8000/res/rfc/3207> ;
     dcterms:title "WOULD PROBABLY"@en ;
     bibo:chapter "5"@en .
 
 <http://localhost:8000/res/rfc/6919#S6> a bibo:DocumentPart ;
     dcterms:identifier "RFC 6919, section 6"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6919> ;
     dcterms:references <http://localhost:8000/res/rfc/6376> ;
     dcterms:title "MAY WISH TO"@en ;
     bibo:chapter "6"@en .
 
 <http://localhost:8000/res/rfc/6919#S7> a bibo:DocumentPart ;
     dcterms:identifier "RFC 6919, section 7"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6919> ;
     dcterms:references <http://localhost:8000/res/rfc/6733> ;
     dcterms:title "COULD"@en ;
     bibo:chapter "7"@en .
 
 <http://localhost:8000/res/rfc/6919#S8> a bibo:DocumentPart ;
     dcterms:identifier "RFC 6919, section 8"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6919> ;
     dcterms:references <http://localhost:8000/res/rfc/3501> ;
     dcterms:title "POSSIBLE"@en ;
     bibo:chapter "8"@en .
 
 <http://localhost:8000/res/rfc/6919#S9> a bibo:DocumentPart ;
     dcterms:identifier "RFC 6919, section 9"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6919> ;
     dcterms:references <http://localhost:8000/res/rfc/5888> ;
     dcterms:title "MIGHT"@en ;
     bibo:chapter "9"@en .
+
+<http://localhost:8000/res/rfc/6919#S11> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6919, section 11"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6919> ;
+    dcterms:title "References"@en ;
+    bibo:chapter "11"@en .
 
 <http://localhost:8000/res/rfc/6919> a rfc:RFC ;
     dcterms:creator "E. Rescorla",

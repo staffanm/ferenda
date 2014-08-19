@@ -129,14 +129,13 @@ class DVStore(DocumentStore):
             for x in super(DVStore, self).list_basefiles_for(action, basedir):
                 yield x
 
-# (ab)use the CitationClass, with it's useful parse_recursive method,
-# to use a legalref based parser instead of a set of pyparsing
-# grammars. 
-
 class OrderedParagraph(Paragraph, OrdinalElement):
     def as_xhtml(self, baseuri, parent_uri=None):
-        element = super(Instans, self).as_xhtml(baseuri, parent_uri)
-        element.set('id', self.ordinal)
+        element = super(OrderedParagraph, self).as_xhtml(baseuri, parent_uri)
+        # FIXME: id needs to be unique in document by prepending a
+        # instans identifier
+        # element.set('id', self.ordinal)
+        return element
 
 class DomElement(CompoundElement):
     tagname = "div"
@@ -176,14 +175,6 @@ class DV(SwedishLegalSource):
     downloaded_suffix = ".zip"
     rdf_type = RPUBL.Rattsfallsreferat
     documentstore_class = DVStore
-    namespaces = ('rdf',  # always needed
-                  'xsi',  # XML Schema/RDFa validation
-                  'dcterms',  # title, identifier, etc
-                  'xsd',  # datatypes
-                  'owl',  # : sameAs
-                  'prov',
-                  ('rpubl', 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
-                  )
     # This is very similar to SwedishLegalSource.required_predicates,
     # only DCTERMS.title has been changed to RPUBL.referatrubrik (and if
     # our validating function grokked that rpubl:referatrubrik
@@ -244,7 +235,7 @@ class DV(SwedishLegalSource):
 
     def canonical_uri(self, basefile):
         # The canonical URI for HDO/B3811-03 should be
-        # http://localhost:8000/res/dv/nja/2004s510. We can't know
+        # https://lagen.nu/dom/nja/2004s510. We can't know
         # this URI before we parse the document. Once we have, we can
         # find the first rdf:type = rpubl:Rattsfallsreferat (or
         # rpubl:Rattsfallsnotis) and get its url.
@@ -279,7 +270,7 @@ class DV(SwedishLegalSource):
     # fact that there is no 1:1 correspondance between basefiles and
     # uris
     def basefile_from_uri(self, uri):
-        prefix = self.config.url + "res/" + self.alias + "/"
+        prefix = self.config.url + self.config.urlpath
         if uri.startswith(prefix):
             path = uri[len(prefix):]
             if not hasattr(self, "_basefilemap"):
@@ -728,8 +719,8 @@ class DV(SwedishLegalSource):
         doc.uri = self.polish_metadata(sanitized_head, doc)
         if patchdesc:
             doc.meta.add((URIRef(doc.uri),
-                          self.ns['ferenda'].patchdescription,
-                          patchdesc))
+                          self.ns['rinfoex'].patchdescription,
+                          Literal(patchdesc)))
         doc.body = self.format_body(rawbody)
         return True
 
@@ -1124,25 +1115,31 @@ class DV(SwedishLegalSource):
             return localize_uri(uri)
 
         def dom_to_uri(domstol, malnr, avg):
-            baseuri = self.config.url
+            prefix = self.config.url + self.config.urlpath
             slug = self.slugs[domstol.lower()]
             # FIXME: We should create multiple urls if we have multiple malnummers?
             first_malnr = malnr[0]
-            return "%(baseuri)sres/dv/%(slug)s/%(first_malnr)s/%(avg)s" % locals()
+            return "%(prefix)s%(slug)s/%(first_malnr)s/%(avg)s" % locals()
 
         def localize_uri(uri):
+            if self.config.url == "https://lagen.nu/":
+                sfsprefix = ""
+            else:
+                sfsprefix = "res/sfs/"
             if "publ/rattsfall" in uri:
-                return uri.replace("http://rinfo.lagrummet.se/publ/rattsfall",
-                                   self.config.url + "res/dv")
+                
+                return uri.replace("http://rinfo.lagrummet.se/publ/rattsfall/",
+                                   self.config.url + self.config.urlpath)
             elif "publ/sfs/" in uri:
-                return uri.replace("http://rinfo.lagrummet.se/publ/sfs",
-                                   self.config.url + "res/sfs")
-
+                return uri.replace("http://rinfo.lagrummet.se/publ/sfs/",
+                                   self.config.url + sfsprefix)
+                
         def split_nja(value):
             return [x[:-1] for x in value.split("(")]
 
         def sokord_uri(value):
-            return self.config.url + "concept/%s" % util.ucfirst(value).replace(' ', '_')
+            baseuri = self.config.url + "concept/"
+            return baseuri + util.ucfirst(value).replace(' ', '_')
 
         # 1. mint uris and create the two Describers we'll use
         refuri = ref_to_uri(head["Referat"])
@@ -1189,7 +1186,10 @@ class DV(SwedishLegalSource):
                         if pred == 'rattsfallspublikation':
                             # "NJA" -> "http://localhost:8000/coll/dv/nja"
                             # "RÅ" -> "http://localhost:8000/coll/dv/rå" <-- FIXME, should be .../dv/ra
-                            uri = self.config.url + "coll/dv/" + m.group(1).lower()
+                            if self.config.url == "https://lagen.nu/":  #FIXME!
+                                uri = "https://lagen.nu/dataset/" + m.group(1).lower()
+                            else:
+                                uri = self.config.url + "coll/dv/" + m.group(1).lower()
                             refdesc.rel(self.ns['rpubl'][pred], uri)
                         else:
                             refdesc.value(self.ns['rpubl'][pred], m.group(1))
@@ -1203,7 +1203,8 @@ class DV(SwedishLegalSource):
                     refdesc.value(self.ns['rpubl'].lopnummer, m.group(1))
 
                 refdesc.rel(self.ns['owl'].sameAs,
-                            self.config.url + "res/dv/nja/" + value.split(" ")[1])
+                            (self.config.url + self.config.urlpath +
+                             "nja/" + value.split(" ")[1]))
 
             elif label == "Avgörandedatum":
                 domdesc.value(self.ns['rpubl'].avgorandedatum, self.parse_iso_date(value))
@@ -1449,8 +1450,6 @@ class DV(SwedishLegalSource):
             m.append(parser.reader.next())
             return parser.make_children(m)
             
-        
-            
         def make_paragraph(parser):
             chunk = parser.reader.next()
             strchunk = str(chunk)
@@ -1469,7 +1468,7 @@ class DV(SwedishLegalSource):
 
         def ordered(chunk):
             if re.match("(\d+).", chunk):
-                return chunk.split(".", 1)
+                return chunk.split(".", 1)[0]
 
         def transition_domskal(symbol, statestack):
             if 'betankande' in statestack:

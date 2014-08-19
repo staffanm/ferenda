@@ -8,13 +8,11 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/sfs/2013:460#P7> a rpubl:Paragraf .
-
-<https://lagen.nu/sfs/2013:460#P7S1> a rinfoex:Stycke .
-
-<https://lagen.nu/sfs/2013:460#P8> a rpubl:Paragraf .
+<https://lagen.nu/sfs/2013:460#P7S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/sfs/2013:460#P7> .
 
 <https://lagen.nu/sfs/2013:460#P8S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/sfs/2013:460#P8> ;
     dcterms:references <https://lagen.nu/sfs/2013:460#P10>,
         <https://lagen.nu/sfs/2013:460#P12>,
         <https://lagen.nu/sfs/2013:460#P15> .
@@ -29,6 +27,12 @@
 
 <http://rinfo.lagrummet.se/publ/rskr/2012/13:252> dcterms:identifier "rskr. 2012/13:252" .
 
+<https://lagen.nu/sfs/2013:460#P7> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/sfs/2013:460> .
+
+<https://lagen.nu/sfs/2013:460#P8> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/sfs/2013:460> .
+
 <https://lagen.nu/sfs/2013:460/konsolidering/2013:460> a rpubl:KonsolideradGrundforfattning ;
     rinfoex:senastHamtad "None" ;
     rinfoex:senastKontrollerad "None" ;
@@ -41,7 +45,7 @@
     rpubl:konsolideringsunderlag <https://lagen.nu/sfs/2013:460> ;
     rpubl:utfardandedatum "2013-05-30"^^xsd:date ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2013:460/konsolidering/2013-05-30> ;
-    prov:wasGeneratedBy <https://lagen.nu/sfs/2013:460/konsolidering/ferenda.sources.legal.se.sfs.SFS> .
+    prov:wasGeneratedBy "ferenda.sources.legal.se.sfs.SFS" .
 
 <https://lagen.nu/sfs/2013:460> a rpubl:Forordning ;
     dcterms:identifier "SFS 2013:460" ;

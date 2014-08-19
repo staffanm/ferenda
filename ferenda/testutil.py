@@ -43,7 +43,8 @@ class FerendaTestCase(object):
 
         class MyTestcase(unittest.TestCase, ferenda.testutil.FerendaTestCase):
             def test_simple(self):
-                self.assertEqualXML("<foo arg1='x' arg2='y'/>", "<foo arg2='y' arg1='x'/>")
+                self.assertEqualXML("<foo arg1='x' arg2='y'/>",
+                                    "<foo arg2='y' arg1='x'></foo>")
 
     """
     # FIXME: Some of these should (at least optionally) be registered

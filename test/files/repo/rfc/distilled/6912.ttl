@@ -7,6 +7,183 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
+<http://localhost:8000/res/rfc/6912#PS1> a bibo:DocumentPart ;
+    dcterms:title "Abstract"@en .
+
+<http://localhost:8000/res/rfc/6912#PS2> a bibo:DocumentPart ;
+    dcterms:references <http://localhost:8000/res/rfc/5741#S2> ;
+    dcterms:title "Status of This Memo"@en .
+
+<http://localhost:8000/res/rfc/6912#PS3> a bibo:DocumentPart ;
+    dcterms:title "Copyright Notice"@en .
+
+<http://localhost:8000/res/rfc/6912#S1.1> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 1.1"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912#S1> ;
+    dcterms:references <http://localhost:8000/res/rfc/2119>,
+        <http://localhost:8000/res/rfc/5890>,
+        <http://localhost:8000/res/rfc/5890#S2.3.1>,
+        <http://localhost:8000/res/rfc/5890#S2.3.2.1>,
+        <http://localhost:8000/res/rfc/6365>,
+        <http://localhost:8000/res/rfc/6365#S2>,
+        <http://localhost:8000/res/rfc/6365#S5>,
+        <http://localhost:8000/res/rfc/6912#S2>,
+        <http://localhost:8000/res/rfc/6912#S2.3.2.1> ;
+    dcterms:title "Terminology"@en ;
+    bibo:chapter "1.1"@en .
+
+<http://localhost:8000/res/rfc/6912#S10> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 10"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912> ;
+    dcterms:title "IAB Members at the Time of Approval"@en ;
+    bibo:chapter "10"@en .
+
+<http://localhost:8000/res/rfc/6912#S11> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 11"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912> ;
+    dcterms:references <http://localhost:8000/res/rfc/1123>,
+        <http://localhost:8000/res/rfc/2119>,
+        <http://localhost:8000/res/rfc/4690>,
+        <http://localhost:8000/res/rfc/5890>,
+        <http://localhost:8000/res/rfc/5891>,
+        <http://localhost:8000/res/rfc/5892>,
+        <http://localhost:8000/res/rfc/5893>,
+        <http://localhost:8000/res/rfc/5894>,
+        <http://localhost:8000/res/rfc/5895>,
+        <http://localhost:8000/res/rfc/6365> ;
+    dcterms:title "Informative References"@en ;
+    bibo:chapter "11"@en .
+
+<http://localhost:8000/res/rfc/6912#S2.1> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 2.1"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912#S2> ;
+    dcterms:title "More-Restrictive Rules Going Up the DNS Tree"@en ;
+    bibo:chapter "2.1"@en .
+
+<http://localhost:8000/res/rfc/6912#S3.1> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 3.1"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912#S3> ;
+    dcterms:references <http://localhost:8000/res/rfc/6912#S4.5> ;
+    dcterms:title "Longevity Principle"@en ;
+    bibo:chapter "3.1"@en .
+
+<http://localhost:8000/res/rfc/6912#S3.3> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 3.3"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912#S3> ;
+    dcterms:title "Contextual Safety Principle"@en ;
+    bibo:chapter "3.3"@en .
+
+<http://localhost:8000/res/rfc/6912#S4.2> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 4.2"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912#S4> ;
+    dcterms:title "Inclusion Principle"@en ;
+    bibo:chapter "4.2"@en .
+
+<http://localhost:8000/res/rfc/6912#S4.4> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 4.4"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912#S4> ;
+    dcterms:references <http://localhost:8000/res/rfc/6912#S4.1>,
+        <http://localhost:8000/res/rfc/6912#S4.3> ;
+    dcterms:title "Predictability Principle"@en ;
+    bibo:chapter "4.4"@en .
+
+<http://localhost:8000/res/rfc/6912#S5.1> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 5.1"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912#S5> ;
+    dcterms:references <http://localhost:8000/res/rfc/1123>,
+        <http://localhost:8000/res/rfc/4690> ;
+    dcterms:title "Letter Principle"@en ;
+    bibo:chapter "5.1"@en .
+
+<http://localhost:8000/res/rfc/6912#S6> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 6"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912> ;
+    dcterms:title "Confusion and Context"@en ;
+    bibo:chapter "6"@en .
+
+<http://localhost:8000/res/rfc/6912#S7> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 7"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912> ;
+    dcterms:references <http://localhost:8000/res/rfc/6912#S4.5> ;
+    dcterms:title "Conclusion"@en ;
+    bibo:chapter "7"@en .
+
+<http://localhost:8000/res/rfc/6912#S8> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 8"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912> ;
+    dcterms:title "Security Considerations"@en ;
+    bibo:chapter "8"@en .
+
+<http://localhost:8000/res/rfc/6912#S9> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 9"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912> ;
+    dcterms:title "Acknowledgements"@en ;
+    bibo:chapter "9"@en .
+
+<http://localhost:8000/res/rfc/6912#S1> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 1"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912> ;
+    dcterms:title "Introduction"@en ;
+    bibo:chapter "1"@en .
+
+<http://localhost:8000/res/rfc/6912#S3.2> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 3.2"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912#S3> ;
+    dcterms:title "Least Astonishment Principle"@en ;
+    bibo:chapter "3.2"@en .
+
+<http://localhost:8000/res/rfc/6912#S5> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 5"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912> ;
+    dcterms:title "Principle Specific to the Root Zone"@en ;
+    bibo:chapter "5"@en .
+
+<http://localhost:8000/res/rfc/6912#S2> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 2"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912> ;
+    dcterms:references <http://localhost:8000/res/rfc/4690>,
+        <http://localhost:8000/res/rfc/5890>,
+        <http://localhost:8000/res/rfc/5891>,
+        <http://localhost:8000/res/rfc/5892>,
+        <http://localhost:8000/res/rfc/5893>,
+        <http://localhost:8000/res/rfc/5894>,
+        <http://localhost:8000/res/rfc/5895>,
+        <http://localhost:8000/res/rfc/6912#S4.1>,
+        <http://localhost:8000/res/rfc/6912#S4.3> ;
+    dcterms:title "Background"@en ;
+    bibo:chapter "2"@en .
+
+<http://localhost:8000/res/rfc/6912#S4.1> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 4.1"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912#S4> ;
+    dcterms:title "Conservatism Principle"@en ;
+    bibo:chapter "4.1"@en .
+
+<http://localhost:8000/res/rfc/6912#S4.3> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 4.3"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912#S4> ;
+    dcterms:references <http://localhost:8000/res/rfc/6912#S3.2> ;
+    dcterms:title "Simplicity Principle"@en ;
+    bibo:chapter "4.3"@en .
+
+<http://localhost:8000/res/rfc/6912#S4.5> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 4.5"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912#S4> ;
+    dcterms:title "Stability Principle"@en ;
+    bibo:chapter "4.5"@en .
+
+<http://localhost:8000/res/rfc/6912#S3> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 3"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912> ;
+    dcterms:title "Principles Applicable to All Zones"@en ;
+    bibo:chapter "3"@en .
+
+<http://localhost:8000/res/rfc/6912#S4> a bibo:DocumentPart ;
+    dcterms:identifier "RFC 6912, section 4"@en ;
+    dcterms:isPartOf <http://localhost:8000/res/rfc/6912> ;
+    dcterms:title "Principles Applicable to All Public Zones"@en ;
+    bibo:chapter "4"@en .
+
 <http://localhost:8000/res/rfc/6912> a rfc:RFC ;
     dcterms:creator "A. Sullivan",
         "D. Thaler",
@@ -23,159 +200,4 @@
     dcterms:title "Principles for Unicode Code Point Inclusion in Labels in the DNS"@en ;
     bibo:shortTitle "DNS Zone Code Point Principles"@en ;
     prov:wasGeneratedBy "ferenda.sources.tech.rfc.RFC" .
-
-<http://localhost:8000/res/rfc/6912#PS1> a bibo:DocumentPart ;
-    dcterms:title "Abstract"@en .
-
-<http://localhost:8000/res/rfc/6912#PS2> a bibo:DocumentPart ;
-    dcterms:references <http://localhost:8000/res/rfc/5741#S2> ;
-    dcterms:title "Status of This Memo"@en .
-
-<http://localhost:8000/res/rfc/6912#PS3> a bibo:DocumentPart ;
-    dcterms:title "Copyright Notice"@en .
-
-<http://localhost:8000/res/rfc/6912#S1> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 1"@en ;
-    dcterms:title "Introduction"@en ;
-    bibo:chapter "1"@en .
-
-<http://localhost:8000/res/rfc/6912#S1.1> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 1.1"@en ;
-    dcterms:references <http://localhost:8000/res/rfc/2119>,
-        <http://localhost:8000/res/rfc/5890>,
-        <http://localhost:8000/res/rfc/5890#S2.3.1>,
-        <http://localhost:8000/res/rfc/5890#S2.3.2.1>,
-        <http://localhost:8000/res/rfc/6365>,
-        <http://localhost:8000/res/rfc/6365#S2>,
-        <http://localhost:8000/res/rfc/6365#S5>,
-        <http://localhost:8000/res/rfc/6912#S2>,
-        <http://localhost:8000/res/rfc/6912#S2.3.2.1> ;
-    dcterms:title "Terminology"@en ;
-    bibo:chapter "1.1"@en .
-
-<http://localhost:8000/res/rfc/6912#S10> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 10"@en ;
-    dcterms:title "IAB Members at the Time of Approval"@en ;
-    bibo:chapter "10"@en .
-
-<http://localhost:8000/res/rfc/6912#S11> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 11"@en ;
-    dcterms:references <http://localhost:8000/res/rfc/1123>,
-        <http://localhost:8000/res/rfc/2119>,
-        <http://localhost:8000/res/rfc/4690>,
-        <http://localhost:8000/res/rfc/5890>,
-        <http://localhost:8000/res/rfc/5891>,
-        <http://localhost:8000/res/rfc/5892>,
-        <http://localhost:8000/res/rfc/5893>,
-        <http://localhost:8000/res/rfc/5894>,
-        <http://localhost:8000/res/rfc/5895>,
-        <http://localhost:8000/res/rfc/6365> ;
-    dcterms:title "Informative References"@en ;
-    bibo:chapter "11"@en .
-
-<http://localhost:8000/res/rfc/6912#S2.1> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 2.1"@en ;
-    dcterms:title "More-Restrictive Rules Going Up the DNS Tree"@en ;
-    bibo:chapter "2.1"@en .
-
-<http://localhost:8000/res/rfc/6912#S3> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 3"@en ;
-    dcterms:title "Principles Applicable to All Zones"@en ;
-    bibo:chapter "3"@en .
-
-<http://localhost:8000/res/rfc/6912#S3.1> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 3.1"@en ;
-    dcterms:references <http://localhost:8000/res/rfc/6912#S4.5> ;
-    dcterms:title "Longevity Principle"@en ;
-    bibo:chapter "3.1"@en .
-
-<http://localhost:8000/res/rfc/6912#S3.3> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 3.3"@en ;
-    dcterms:title "Contextual Safety Principle"@en ;
-    bibo:chapter "3.3"@en .
-
-<http://localhost:8000/res/rfc/6912#S4> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 4"@en ;
-    dcterms:title "Principles Applicable to All Public Zones"@en ;
-    bibo:chapter "4"@en .
-
-<http://localhost:8000/res/rfc/6912#S4.2> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 4.2"@en ;
-    dcterms:title "Inclusion Principle"@en ;
-    bibo:chapter "4.2"@en .
-
-<http://localhost:8000/res/rfc/6912#S4.4> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 4.4"@en ;
-    dcterms:references <http://localhost:8000/res/rfc/6912#S4.1>,
-        <http://localhost:8000/res/rfc/6912#S4.3> ;
-    dcterms:title "Predictability Principle"@en ;
-    bibo:chapter "4.4"@en .
-
-<http://localhost:8000/res/rfc/6912#S5> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 5"@en ;
-    dcterms:title "Principle Specific to the Root Zone"@en ;
-    bibo:chapter "5"@en .
-
-<http://localhost:8000/res/rfc/6912#S5.1> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 5.1"@en ;
-    dcterms:references <http://localhost:8000/res/rfc/1123>,
-        <http://localhost:8000/res/rfc/4690> ;
-    dcterms:title "Letter Principle"@en ;
-    bibo:chapter "5.1"@en .
-
-<http://localhost:8000/res/rfc/6912#S6> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 6"@en ;
-    dcterms:title "Confusion and Context"@en ;
-    bibo:chapter "6"@en .
-
-<http://localhost:8000/res/rfc/6912#S7> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 7"@en ;
-    dcterms:references <http://localhost:8000/res/rfc/6912#S4.5> ;
-    dcterms:title "Conclusion"@en ;
-    bibo:chapter "7"@en .
-
-<http://localhost:8000/res/rfc/6912#S8> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 8"@en ;
-    dcterms:title "Security Considerations"@en ;
-    bibo:chapter "8"@en .
-
-<http://localhost:8000/res/rfc/6912#S9> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 9"@en ;
-    dcterms:title "Acknowledgements"@en ;
-    bibo:chapter "9"@en .
-
-<http://localhost:8000/res/rfc/6912#S2> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 2"@en ;
-    dcterms:references <http://localhost:8000/res/rfc/4690>,
-        <http://localhost:8000/res/rfc/5890>,
-        <http://localhost:8000/res/rfc/5891>,
-        <http://localhost:8000/res/rfc/5892>,
-        <http://localhost:8000/res/rfc/5893>,
-        <http://localhost:8000/res/rfc/5894>,
-        <http://localhost:8000/res/rfc/5895>,
-        <http://localhost:8000/res/rfc/6912#S4.1>,
-        <http://localhost:8000/res/rfc/6912#S4.3> ;
-    dcterms:title "Background"@en ;
-    bibo:chapter "2"@en .
-
-<http://localhost:8000/res/rfc/6912#S3.2> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 3.2"@en ;
-    dcterms:title "Least Astonishment Principle"@en ;
-    bibo:chapter "3.2"@en .
-
-<http://localhost:8000/res/rfc/6912#S4.1> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 4.1"@en ;
-    dcterms:title "Conservatism Principle"@en ;
-    bibo:chapter "4.1"@en .
-
-<http://localhost:8000/res/rfc/6912#S4.3> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 4.3"@en ;
-    dcterms:references <http://localhost:8000/res/rfc/6912#S3.2> ;
-    dcterms:title "Simplicity Principle"@en ;
-    bibo:chapter "4.3"@en .
-
-<http://localhost:8000/res/rfc/6912#S4.5> a bibo:DocumentPart ;
-    dcterms:identifier "RFC 6912, section 4.5"@en ;
-    dcterms:title "Stability Principle"@en ;
-    bibo:chapter "4.5"@en .
 

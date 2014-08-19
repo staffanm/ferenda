@@ -106,6 +106,9 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
     def __del__(self):
         self.close()
 
+    re_fromgraph = re.compile(r"\sFROM <(?P<graphuri>[^>]+)>\s")
+    """Internal utility regex to determine wether a query specifies a particular graph to select against."""
+
     def add_serialized(self, data, format, context=None):
         """Add the serialized RDF statements in the string *data* directly to the repository."""
         raise NotImplementedError  # pragma: no cover
@@ -222,12 +225,11 @@ class RDFLibStore(TripleStore):
         # <%s> differently than Sesame/Fuseki. We remove the 'FROM
         # <%s>' part from the query and instead get a context graph
         # for the same URI.
-        re_fromgraph = re.compile(r"\sFROM <(?P<graphuri>[^>]+)>\s")
         graphuri = None
-        m = re_fromgraph.search(query)
+        m = self.re_fromgraph.search(query)
         if m:
             graphuri = m.group("graphuri")
-            query = re_fromgraph.sub(" ", query)
+            query = self.re_fromgraph.sub(" ", query)
         try:
             res = self._getcontextgraph(graphuri).query(query)
         except pyparsing.ParseException as e:
@@ -616,17 +618,17 @@ class FusekiStore(RemoteStore):
         # find out.
         if context:
             sq = "SELECT COUNT(*) WHERE { GRAPH <%s> { ?s ?p ?o}}" % context
-            res = self.select(sq, format="python")
+            res = self.select(sq, format="python", uniongraph=False)
             return int(list(res[0].values())[0])
         else:
             # this ONLY counts triples in the default graph
             sq = "SELECT COUNT(*) WHERE {?s ?p ?o}"
-            res = self.select(sq, format="python")
+            res = self.select(sq, format="python", uniongraph=False)
             default = int(list(res[0].values())[0])
 
             # this ONLY counts triples in all named graphs
             sq = "SELECT COUNT(*) WHERE { GRAPH <urn:x-arq:UnionGraph> {?s ?p ?o}}"
-            res = self.select(sq, format="python")
+            res = self.select(sq, format="python", uniongraph=False)
             named = int(list(res[0].values())[0])
             return default + named
 
@@ -655,10 +657,9 @@ class FusekiStore(RemoteStore):
 
     re_select_query = re.compile(r"\s+WHERE\s+{", flags=re.MULTILINE)
 
-    def select(self, query, format=format, uniongraph=True):
-        # see above
-        if uniongraph:
-            query = self.re_select_query.sub("} WHERE { GRAPH <urn:x-arq:UnionGraph> {",
+    def select(self, query, format="sparql", uniongraph=True):
+        if not self.re_fromgraph.search(query) and uniongraph:
+            query = self.re_select_query.sub(" WHERE { GRAPH <urn:x-arq:UnionGraph> {",
                            query)
             query += " }"
             
