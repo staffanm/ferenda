@@ -701,8 +701,8 @@ all text in a Textbox has the same font and size.
                           other.top + other.height) - self.top
         return self
         
-    def as_xhtml(self, uri):
-        element = super(Textbox, self).as_xhtml(uri)
+    def as_xhtml(self, uri, parent_uri=None):
+        element = super(Textbox, self).as_xhtml(uri, parent_uri)
         # FIXME: we should output these positioned style attributes
         # only when the resulting document is being serialized in a
         # positioned fashion. Possibly do some translation from PDF

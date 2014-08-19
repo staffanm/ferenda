@@ -176,7 +176,7 @@ class FerendaTestCase(object):
                 fp = BytesIO(something)
                 # return etree.parse(fp).getroot()
                 return etree.parse(fp)
-            elif isinstance(want, etree._Element):
+            elif isinstance(something, etree._Element):
                 return etree.ElementTree(something)
             else:
                 raise ValueError("Can't convert a %s into an ElementTree" % type(something))

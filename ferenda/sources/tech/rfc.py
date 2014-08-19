@@ -46,8 +46,8 @@ class PreambleSection(CompoundElement):
     # the attributes "manually". This is not consistent. We should
     # probably extend decorate_bodyparts to handle preamblesections as
     # well.
-    def as_xhtml(self, uri):
-        element = super(PreambleSection, self).as_xhtml(uri)
+    def as_xhtml(self, uri, parent_uri=None):
+        element = super(PreambleSection, self).as_xhtml(uri, parent_uri)
         element.set('property', 'dcterms:title')
         element.set('content', self.title)
         element.set('typeof', 'bibo:DocumentPart')

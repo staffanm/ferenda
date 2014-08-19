@@ -134,8 +134,8 @@ class DVStore(DocumentStore):
 # grammars. 
 
 class OrderedParagraph(Paragraph, OrdinalElement):
-    def as_html(self, baseuri):
-        element = super(Instans, self).as_xhtml(baseuri)
+    def as_xhtml(self, baseuri, parent_uri=None):
+        element = super(Instans, self).as_xhtml(baseuri, parent_uri)
         element.set('id', self.ordinal)
 
 class DomElement(CompoundElement):
@@ -145,8 +145,8 @@ class DomElement(CompoundElement):
         return self.__class__.__name__.lower()
     classname = property(_get_classname)
 
-    def as_xhtml(self, baseuri):
-        element = super(DomElement, self).as_xhtml(baseuri)
+    def as_xhtml(self, baseuri, parent_uri=None):
+        element = super(DomElement, self).as_xhtml(baseuri, parent_uri)
         if self.prop:
             # ie if self.prop = ('ordinal', 'dcterms:identifier'), then
             # dcterms:identifier = self.ordinal

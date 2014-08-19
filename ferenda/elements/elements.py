@@ -140,7 +140,7 @@ class AbstractElement(object):
     """The default relationship between this element and any other element
 that includes this element."""
 
-    def as_xhtml(self, uri=None):
+    def as_xhtml(self, uri=None, parent_uri=None):
         """Converts this object to a ``lxml.etree`` object (with children)
 
         :param uri: If provided, gets converted to an ``@about`` attribute
@@ -169,8 +169,8 @@ properties (such as ordinal label, date of enactment, etc)."""
         object.__setattr__(obj, '__initialized', False)
         return obj
 
-    def as_xhtml(self, uri=None):
-        res = super(UnicodeElement, self).as_xhtml(uri)
+    def as_xhtml(self, uri=None, parent_uri=None):
+        res = super(UnicodeElement, self).as_xhtml(uri, parent_uri)
         if self:
             res.text = str(self)
         return res
@@ -208,19 +208,40 @@ class CompoundElement(AbstractElement, list):
         for subpart in self:
             if isinstance(subpart, str):
                 res.append(util.normalize_space(subpart))
-            elif (isinstance(subpart, AbstractElement) or hasattr(subpart, 'as_plaintext')):
+            elif (isinstance(subpart, AbstractElement) or
+                  hasattr(subpart, 'as_plaintext')):
                 res.append(subpart.as_plaintext())
         # the rule for concatenating children into a plaintext string is:
-        # filter out all empty children, then place single space between the others.
-        return " ".join(filter(None,res))
-        
-    def as_xhtml(self, uri=None):
+        # filter out all empty children, then place single space between
+        # the others.
+        return " ".join(filter(None, res))
+
+    # body uri="http://ex.org/"
+    # section ordinal="1" uri=body.uri+"#S"+ordinal, ispartof=parent.uri 
+    # subsection ordinal="1.1" uri=body.uri+"#S"+ordinal, ispartof=parent.uri 
+    # subsubsection ordinal="1.1.1" uri=body.uri+"#S"+ordinal, ispartof=parent.uri 
+    def as_xhtml(self, uri=None, parent_uri=None):
         children = []
         # start by handling all children recursively
+
         for subpart in self:
-            if (isinstance(subpart, AbstractElement) or hasattr(subpart, 'as_xhtml')):
-                # FIXME: should be self.uri if present?
-                node = subpart.as_xhtml(uri)
+            if (isinstance(subpart, AbstractElement) or
+                hasattr(subpart, 'as_xhtml')):
+
+                # this is the difficult part - p must be eg
+                # "http://ex.org/#S1" but self doesn't have uri
+                # property. the @about attribute is set later by
+                # SectionalElement.as_xhtml (which overrides and calls
+                # this method). can self.uri be a property method,
+                # what will it need? (uri and self.ordinal)
+
+                if hasattr(self, 'uri') and self.uri:
+                    p = self.uri
+                elif hasattr(self, 'compute_uri'):
+                    p = self.compute_uri(baseuri=uri)
+                else:
+                    p = parent_uri
+                node = subpart.as_xhtml(uri, p)
                 if node is not None:
                     children.append(node)
             elif isinstance(subpart, str):
@@ -238,35 +259,41 @@ class CompoundElement(AbstractElement, list):
             attrs['class'] = self.classname
             
         # copy (a subset of) standard xhtml attributes
-        for stdattr in ('class', 'id', 'dir', 'lang', 'src', 'href', 'name', 'alt', 'role', 'typeof'):
-            if hasattr(self,stdattr):
-                attrs[stdattr] = getattr(self,stdattr)
+        for stdattr in ('class', 'id', 'dir', 'lang', 'src',
+                        'href', 'name', 'alt', 'role', 'typeof'):
+            if hasattr(self, stdattr):
+                attrs[stdattr] = getattr(self, stdattr)
 
         # create extra attributes depending on circumstances
-        if hasattr(self,'uri') and self.uri:
+        if hasattr(self, 'uri') and self.uri:
+
             attrs['about'] = self.uri
-            # FIXME: this
-            # if self.partrelation:
-            #     self._span(URIRef(self.uri), self.partrelation, self.parent)
-        
-        if hasattr(self,'uri') and self.uri and hasattr(self,'meta') and self.meta:
-            assert isinstance(self.meta,Graph), "self.meta is %r, not rdflib.Graph" % type(self.meta)
-            # we use sorted() to get the triples in a predictable
-            # order (by predicate, then subject, then object)
-            for (s,p,o) in sorted(self.meta, key=itemgetter(1,0,2)):
-                if s != URIRef(self.uri):
-                    continue
-                if p == RDF.type:
-                    attrs['typeof'] = self.meta.qname(o)
-                    # attrs['rev'] = self.meta.qname(DCTERMS.isPartOf)
-                elif p == DCTERMS.title:
-                    attrs['property'] = self.meta.qname(p)
-                    attrs['content'] = o.toPython()
-                else:
-                    # FIXME: Is it sane to reverse the order of
-                    # triples in this way? Maybe we should do a
-                    # children.append instead
-                    children.insert(0, self._span(s,p,o,self.meta))
+
+            if hasattr(self, 'meta') and self.meta:
+                assert isinstance(self.meta,Graph), "self.meta is %r, not rdflib.Graph" % type(self.meta)
+                # we use sorted() to get the triples in a predictable
+                # order (by predicate, then subject, then object)
+                for (s, p, o) in sorted(self.meta, key=itemgetter(1, 0, 2)):
+                    if s != URIRef(self.uri):
+                        continue
+                    if p == RDF.type:
+                        attrs['typeof'] = self.meta.qname(o)
+                        # attrs['rev'] = self.meta.qname(DCTERMS.isPartOf)
+                    elif p == DCTERMS.title:
+                        attrs['property'] = self.meta.qname(p)
+                        attrs['content'] = o.toPython()
+                    else:
+                        # FIXME: Is it sane to reverse the order of
+                        # triples in this way? Maybe we should do a
+                        # children.append instead
+                        children.insert(0, self._span(s, p, o, self.meta))
+                
+            if self.partrelation and parent_uri:
+                children.insert(0,
+                                E('span', {'rel':
+                                           self._qname(self.partrelation),
+                                           'href': parent_uri}))
+            # parent_uri = self.uri
 
 
         # for each childen that is a string, make sure it doesn't
@@ -281,13 +308,13 @@ class CompoundElement(AbstractElement, list):
            another triple in graph.
         """
         children = []
-        if isinstance(obj,Literal):
+        if isinstance(obj, Literal):
             o_python = obj.toPython()
             if isinstance(o_python, datetime.date):
                 o_python = o_python.isoformat()
             attrs = {
-                # 'about':self.uri,
-                'property':self.meta.qname(pred),
+                # 'about': self.uri,
+                'property': self.meta.qname(pred),
                 'content': o_python
             }
 
@@ -296,17 +323,18 @@ class CompoundElement(AbstractElement, list):
             else:
                 # only datatype-less literals can have language
                 attrs[XML_LANG] = obj.language if obj.language else ''
-        elif isinstance(obj,URIRef):
+        elif isinstance(obj, URIRef) and hasattr(self, 'meta'):
             attrs = {
                 # 'about':self.uri,
                 # 'about': str(obj),
-                'rel':self.meta.qname(pred),
-                'href':str(obj)
+                'rel': self.meta.qname(pred),
+                'href': str(obj)
             }
             if graph:
                 for sub_pred, sub_obj in graph.predicate_objects(subject=obj):
                     children.append(self._span(obj, sub_pred, sub_obj, graph))
-
+        else:
+            attrs = {}
         # Theoretical, obj could be a BNode, but that should never happen. If
         # it does, just silently ignore it.
         # else:
@@ -314,7 +342,16 @@ class CompoundElement(AbstractElement, list):
 
         return E('span', attrs, *children)
 
-        
+    def _qname(self, predicate):
+        # we need to get hold of the root namespace mapping. But that
+        # aint available. Or we could get hold of a graph from
+        # docrepo.make_graph, but docrepo aint available. Gah!
+        # FIXME: 
+        if predicate == Namespace("http://schema.org/").isPartOf:
+            return "schema:isPartOf"
+        else:
+            return "dcterms:isPartOf"
+        pass
 
 # Abstract classes intendet to use with multiple inheritance, which
 # adds common properties
@@ -440,8 +477,8 @@ class Link(UnicodeElement):
             rep = self
         return 'Link(\'%s\', uri=%s)' % (rep, self.uri)
 
-    def as_xhtml(self, uri):
-        element = super(Link, self).as_xhtml(uri)
+    def as_xhtml(self, uri, parent_uri=None):
+        element = super(Link, self).as_xhtml(uri, parent_uri)
         if hasattr(self,'uri'):
             element.set('href', self.uri)
         return element
@@ -454,16 +491,19 @@ class LinkSubject(PredicateElement, Link):
     rdflib object.
 
     """
-    def as_xhtml(self, uri):
-        element = super(LinkSubject, self).as_xhtml(uri)
+    def as_xhtml(self, uri, parent_uri=None):
+        element = super(LinkSubject, self).as_xhtml(uri, parent_uri)
         if hasattr(self,'predicate'):
             element.set('rel', self.predicate)
         return element
 
 
 class Body(CompoundElement):
-    def as_xhtml(self, uri):
-        element = super(Body, self).as_xhtml(uri)
+    def as_xhtml(self, uri, parent_uri=None):
+        # A body should always be called with a uri. This becomes the
+        # parent_uri for all subsections
+        parent_uri = uri
+        element = super(Body, self).as_xhtml(uri, parent_uri)
         element.set('about', uri)
         return element
 class Title(CompoundElement): pass
@@ -479,19 +519,22 @@ class SectionalElement(CompoundElement):
         return self.__class__.__name__.lower()
     classname = property(_get_classname)
 
-    def as_xhtml(self, baseuri):
+    # def __init__(self, *args, **kwargs):
+    #     self.baseuri = None
+    #     super(TemporalElement, self).__init__(*args, **kwargs)
+
+    def compute_uri(self, baseuri):
+        return baseuri + "#S%s" % self.ordinal
+
+    def as_xhtml(self, baseuri, parent_uri=None):
         if hasattr(self, 'uri'):
             newuri = self.uri
         else:
-            newuri = baseuri + "#S%s" % self.ordinal
+            newuri = self.compute_uri(baseuri)
         # Addressable subelements (ie. elements which has an uri) are
         # expected to be able to construct that URI from the base uri
-        # of the entire document (plus it's own internal state). Even
-        # though we construct a new uri here for a particular
-        # subelement, we don't pass it along as the uri parameter for
-        # its own subelements -- these can construct their entire URI
-        # themselves.
-        element = super(SectionalElement, self).as_xhtml(baseuri)
+        # of the entire document (plus it's own internal state).
+        element = super(SectionalElement, self).as_xhtml(baseuri, parent_uri)
         if not hasattr(self, 'uri') or not hasattr(self, 'meta'):
             element.set('property', 'dcterms:title')
             element.set('content', self.title)
@@ -500,17 +543,24 @@ class SectionalElement(CompoundElement):
             # NOTE: we don't set xml:lang for either the main @content
             # or the @content in the below <span> -- the data does not
             # originate from RDF and so isn't typed like that.
-            if hasattr(self,'ordinal'):
+            if hasattr(self, 'ordinal'):
                 attrs = {'about': newuri,
                          'property': 'bibo:chapter',
                          'content': self.ordinal}
-                element.insert(0,E('span',attrs))
-            if hasattr(self,'identifier'):
+                element.insert(0, E('span', attrs))
+            if hasattr(self, 'identifier'):
                 attrs = {'about': newuri,
                          'property': 'dcterms:identifier',
                          'content': self.identifier}
-                element.insert(0,E('span',attrs))
-            if element.text: # make sure that naked PCDATA comes after the elements we've inserted
+                element.insert(0, E('span', attrs))
+            if self.partrelation:
+                attrs = {'rel': self._qname(self.partrelation),
+                         'href': parent_uri}
+                element.insert(0, E('span', attrs))
+
+            # make sure that naked PCDATA comes after the elements we've
+            # inserted
+            if element.text:
                 element[-1].tail = element.text
                 element.text = None
 

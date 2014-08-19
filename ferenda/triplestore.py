@@ -640,23 +640,26 @@ class FusekiStore(RemoteStore):
         else:
             super(FusekiStore, self).clear(context)
             
+    re_construct_query = re.compile(r"}\s+WHERE\s+{", flags=re.MULTILINE)
 
     def construct(self, query, uniongraph=True):
         # This is to work around the default config where Fuseki does
         # not include all named graphs in the default
         # graph. Not very pretty...
         if uniongraph:
-            query = re.sub(r"}\s+WHERE\s+{", "} WHERE { GRAPH <urn:x-arq:UnionGraph> {",
-                           query, flags=re.MULTILINE)
+            query = self.re_construct_query.sub("} WHERE { GRAPH <urn:x-arq:UnionGraph> {",
+                                           query)
             query += " }"
             
         return super(FusekiStore, self).construct(query)
-            
+
+    re_select_query = re.compile(r"\s+WHERE\s+{", flags=re.MULTILINE)
+
     def select(self, query, format=format, uniongraph=True):
         # see above
         if uniongraph:
-            query = re.sub(r"\s+WHERE\s+{", " WHERE { GRAPH <urn:x-arq:UnionGraph> {",
-                           query, flags=re.MULTILINE)
+            query = self.re_select_query.sub("} WHERE { GRAPH <urn:x-arq:UnionGraph> {",
+                           query)
             query += " }"
             
         return super(FusekiStore, self).select(query, format)

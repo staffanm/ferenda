@@ -37,11 +37,11 @@ class PreambleSection(CompoundElement):
     classname = "preamblesection"
     counter = 0
     uri = None
-    def as_xhtml(self, uri):
+    def as_xhtml(self, uri, parent_uri=None):
         if not self.uri:
             self.__class__.counter += 1
             self.uri = uri + "#PS%s" % self.__class__.counter
-        element = super(PreambleSection, self).as_xhtml(uri)
+        element = super(PreambleSection, self).as_xhtml(uri, parent_uri)
         element.set('property', 'dcterms:title')
         element.set('content', self.title)
         element.set('typeof', 'bibo:DocumentPart')
@@ -53,12 +53,12 @@ class UnorderedSection(CompoundElement):
     classname = "unorderedsection"
     counter = 0
     uri = None
-    def as_xhtml(self, uri):
+    def as_xhtml(self, uri, parent_uri=None):
         if not self.uri:
             self.__class__.counter += 1
             # note that this becomes a document-global running counter
             self.uri = uri + "#US%s" % self.__class__.counter
-        element = super(UnorderedSection, self).as_xhtml(uri)
+        element = super(UnorderedSection, self).as_xhtml(uri, parent_uri)
         element.set('property', 'dcterms:title')
         element.set('content', self.title)
         element.set('typeof', 'bibo:DocumentPart')
@@ -68,11 +68,11 @@ class UnorderedSection(CompoundElement):
 class Appendix(SectionalElement): 
     tagname = "div"
     classname = "appendix"
-    def as_xhtml(self, uri):
+    def as_xhtml(self, uri, parent_uri=None):
         if not self.uri:
             self.uri = uri + "#B%s" % self.ordinal
 
-        return super(Appendix, self).as_xhtml(uri)
+        return super(Appendix, self).as_xhtml(uri, parent_uri)
 
 
 class Coverpage(CompoundElement):

@@ -98,8 +98,8 @@ class Body(HTMLElement):
 
     """Element corresponding to the ``<body>`` tag"""
 
-    def as_xhtml(self, uri):
-        element = super(Body, self).as_xhtml(uri)
+    def as_xhtml(self, uri, parent_uri=None):
+        element = super(Body, self).as_xhtml(uri, parent_uri)
         element.set('about', uri)
         return element
 
