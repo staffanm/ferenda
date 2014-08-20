@@ -34,7 +34,7 @@ import requests
 # my own libraries
 from . import Trips
 # from trips import Trips
-from ferenda import DocumentEntry, DocumentStore
+from ferenda import DocumentEntry, DocumentStore, TripleStore
 from ferenda import TextReader, Describer
 from ferenda import decorators
 from ferenda.sources.legal.se import legaluri
@@ -45,6 +45,7 @@ from ferenda.elements import TemporalElement
 from ferenda.elements import UnicodeElement
 from ferenda.errors import DocumentRemovedError, ParseError
 from ferenda.sources.legal.se.legalref import LegalRef, LinkSubject
+from ferenda.sources.legal.se import SwedishCitationParser
 
 E = ElementMaker(namespace="http://www.w3.org/1999/xhtml")
 # Objektmodellen för en författning är uppbyggd av massa byggstenar
@@ -368,6 +369,9 @@ class SFS(Trips):
         "${HTML}=sfst_lst&${SNHTML}=sfsr_err&${BASE}=SFSR&"
         "${TRIPSHOW}=format=THW&%%C4BET=%(basefile)s")
 
+
+    sparql_annotations = "sparql/sfs.rq"
+
     documentstore_class = SFSDocumentStore
 
     def __init__(self, config=None, **kwargs):
@@ -401,24 +405,26 @@ class SFS(Trips):
                     else:
                         loglevel = loglevels[loglevel]
                     self.trace[logname].setLevel(loglevel)
-                
             else:
                 # shut up logger
                 self.trace[logname].propagate = False
+        
 
     # make sure our EBNF-based parsers (which are expensive to create)
     # only gets created if they are demanded.
     @property
     def lagrum_parser(self):
         if not hasattr(self, '_lagrum_parser'):
-            self._lagrum_parser = LegalRef(LegalRef.LAGRUM,
-                                           LegalRef.EGLAGSTIFTNING)
+            self._lagrum_parser = SwedishCitationParser(LegalRef(LegalRef.LAGRUM,
+                                                                 LegalRef.EGLAGSTIFTNING),
+                                                        self.config.url)
         return self._lagrum_parser
 
     @property
     def forarbete_parser(self):
         if not hasattr(self, '_forarbete_parser'):
-            self._forarbete_parser = LegalRef(LegalRef.FORARBETEN)
+            self._forarbete_parser = SwedishCitationParser(LegalRef(LegalRef.FORARBETEN),
+                                                           self.config.url)
         return self._forarbete_parser
 
     def get_default_options(self):
@@ -428,16 +434,16 @@ class SFS(Trips):
         return opts
     
     def canonical_uri(self, basefile, konsolidering=False):
-        baseuri = "https://lagen.nu/sfs"  # should(?) be hardcoded
+        prefix = self.config.url + self.config.urlpath
         basefile = basefile.replace(" ", "_")
         if konsolidering:
             if konsolidering == True:
-                return "%s/%s/konsolidering" % (baseuri, basefile)
+                return "%s%s/konsolidering" % (prefix, basefile)
             else:
                 konsolidering = konsolidering.replace(" ", "_")
-                return "%s/%s/konsolidering/%s" % (baseuri, basefile, konsolidering)
+                return "%s%s/konsolidering/%s" % (prefix, basefile, konsolidering)
         else:
-            return "%s/%s" % (baseuri, basefile)
+            return "%s%s" % (prefix, basefile)
 
     def download(self, basefile=None):
         if basefile:
@@ -1105,7 +1111,7 @@ class SFS(Trips):
                     # Secondly, preserve the entire text
                     desc.value(self.ns['rpubl'].andrar, val)
                 elif key == 'Förarbeten':
-                    for node in self.forarbete_parser.parse(val):
+                    for node in self.forarbete_parser.parse_string(val, "rpubl:forarbete"):
                         if hasattr(node, 'uri'):
                             with desc.rel(self.ns['rpubl'].forarbete,
                                           node.uri):
@@ -1315,34 +1321,36 @@ class SFS(Trips):
                     else:
                         term = None
 
-                for p in element:  # normally only one, but can be more
-                                  # if the Stycke has a NumreradLista
-                                  # or similar
-
-                    if isinstance(p, str):  # look for stuff
-                        # normalize and convert some characters
-                        s = " ".join(p.split())
-                        s = s.replace("\x96", "-")
-                        # Make all links have a dcterms:references
-                        # predicate -- not that meaningful for the
-                        # XHTML2 code, but needed to get useful RDF
-                        # triples in the RDFa output
-                        # print "Parsing %s" % " ".join(p.split())
-                        # print "Calling parse w %s" % baseuri+"#"+prefix
-                        parsednodes = self.lagrum_parser.parse(s,
-                                                               baseuri +
-                                                               prefix,
-                                                               "dcterms:references")
-                        for n in parsednodes:
-                            # py2 compat FIxme
-                            if term and isinstance(n, str) and term in n:
-                                (head, tail) = n.split(term, 1)
-                                nodes.extend((head, termnode, tail))
-                            else:
-                                nodes.append(n)
-
-                        idx = element.index(p)
-                element[idx:idx + 1] = nodes
+# do this in a CitationParser.parse_recursive call instead
+#                for p in element:  # normally only one, but can be more
+#                                  # if the Stycke has a NumreradLista
+#                                  # or similar
+#
+#                    if isinstance(p, str):  # look for stuff
+#                        # normalize and convert some characters
+#                        s = " ".join(p.split())
+#                        s = s.replace("\x96", "-")
+#                        # Make all links have a dcterms:references
+#                        # predicate -- not that meaningful for the
+#                        # XHTML2 code, but needed to get useful RDF
+#                        # triples in the RDFa output
+#                        # print "Parsing %s" % " ".join(p.split())
+#                        # print "Calling parse w %s" % baseuri+"#"+prefix
+#                        from pudb import set_trace; set_trace()
+#                        parsednodes = self.lagrum_parser.parse(s,
+#                                                               baseuri +
+#                                                               prefix,
+#                                                               "dcterms:references")
+#                        for n in parsednodes:
+#                            # py2 compat FIxme
+#                            if term and isinstance(n, str) and term in n:
+#                                (head, tail) = n.split(term, 1)
+#                                nodes.extend((head, termnode, tail))
+#                            else:
+#                                nodes.append(n)
+#
+#                        idx = element.index(p)
+#                element[idx:idx + 1] = nodes
 
             # Konstruera IDs
             for p in element:
@@ -1406,6 +1414,8 @@ class SFS(Trips):
         self._construct_ids(doc.body, '',
                             self.canonical_uri(doc.basefile),
                             skipfragments)
+
+        self.lagrum_parser.parse_recursive(doc.body)
 
     #----------------------------------------------------------------
     #
@@ -2562,9 +2572,26 @@ class SFS(Trips):
 
     _document_name_cache = {}
 
-    def _generateAnnotations(self, annotationfile, basefile):
-        baseuri = self.canonical_uri(basefile)
-        start = time()
+    def prep_annotation_file(self, basefile):
+        def select(store, query_template, context=None):
+            if os.path.exists(query_template):
+                fp = open(query_template, 'rb')
+            elif pkg_resources.resource_exists('ferenda', query_template):
+                fp = pkg_resources.resource_stream('ferenda', query_template)
+            else:
+                raise ValueError("query template %s not found" % query_template)
+            params = {'uri': uri}
+            sq = fp.read().decode('utf-8') % params
+            fp.close()
+            return store.select(sq, "python")
+            
+        # this is old legacy code. The new nice way would be to create
+        # one giant SPARQL CONSTRUCT query file and just set
+        # self.sparql_annotations to that file. But you know, this works.
+        uri = self.canonical_uri(basefile)
+        store = TripleStore.connect(self.config.storetype,
+                                    self.config.storelocation,
+                                    self.config.storerepository)
         # Putting togeher a (non-normalized) RDF/XML file, suitable
         # for XSLT inclusion in six easy steps
         stuff = {}
@@ -2572,8 +2599,7 @@ class SFS(Trips):
         # rinfo:lagrum, either directly or through a chain of
         # dcterms:isPartOf statements
         start = time()
-        rattsfall = self._store_run_query(
-            "sparql/sfs_rattsfallsref.sq", uri=baseuri)
+        rattsfall = select(store, "res/sparql/sfs_rattsfallsref.rq", dvdataset)
         self.log.debug('%s: Orig: Selected %d legal cases (%.3f sec)',
                        basefile, len(rattsfall), time() - start)
         stuff[baseuri] = {}
@@ -2621,9 +2647,7 @@ class SFS(Trips):
 
         # 2. all law sections that has a dcterms:references that matches this (using dcterms:isPartOf).
         start = time()
-        start = time()
-        inboundlinks = self._store_run_query(
-            "sparql/sfs_inboundlinks.sq", uri=baseuri)
+        inboundlinks = select(store, "res/sparql/sfs_inboundlinks.rq", sfsdataset)
         self.log.debug('%s:  New: Selected %d inbound links (%.3f sec)',
                        basefile, len(inboundlinks), time() - start)
         self.log.debug('%s: Selected %d inbound links (%.3f sec)',
@@ -2666,11 +2690,8 @@ class SFS(Trips):
         # pprint (stuff)
         # 3. all wikientries that dcterms:description this
         start = time()
-        #wikidesc = self._store_run_query("sparql/sfs_wikientries_orig.sq",uri=baseuri)
-        #self.log.debug('%s: Orig: Selected %d wiki comments (%.3f sec)', basefile, len(wikidesc), time()-start)
-        start = time()
-        wikidesc = self._store_run_query(
-            "sparql/sfs_wikientries.sq", uri=baseuri)
+        wikidesc = select(store, "res/sparql/sfs_wikientries.rq")
+
         self.log.debug('%s:  New: Selected %d wiki comments (%.3f sec)',
                        basefile, len(wikidesc), time() - start)
         # wikidesc = []
@@ -2694,10 +2715,7 @@ class SFS(Trips):
         # FIXME: we need to differentiate between additions, changes
         # and deletions
         start = time()
-        #changes = self._store_run_query("sparql/sfs_changes_orig.sq",uri=baseuri)
-        #self.log.debug('%s: Orig: Selected %d change annotations (%.3f sec)', basefile, len(changes), time()-start)
-        start = time()
-        changes = self._store_run_query("sparql/sfs_changes.sq", uri=baseuri)
+        changes = self._store_run_query("sparql/sfs_changes.rq", uri=baseuri)
         self.log.debug('%s:  New: Selected %d change annotations (%.3f sec)',
                        basefile, len(changes), time() - start)
         # changes = []
@@ -2832,14 +2850,10 @@ class SFS(Trips):
         tmpfile = mktemp()
         treestring = etree.tostring(root_node, encoding="utf-8").replace(
             ' xmlns:xht2="http://www.w3.org/2002/06/xhtml2/"', '', 1)
-        fp = open(tmpfile, "w")
-        fp.write(treestring)
-        fp.close()
-        #tree.write(tmpfile, encoding="utf-8")
-        util.replace_if_different(tmpfile, annotationfile)
-        os.utime(annotationfile, None)
-        self.log.debug(
-            '%s: Serialized annotation (%.3f sec)', basefile, time() - start)
+        g = Graph().parse(data=treestring)
+        with self.store.open_annotation(basefile) as fp:
+            fp.write(self.graph(g))
+        return self.store.annotation_path(basefile)
 
     def Generate(self, basefile):
         start = time()
