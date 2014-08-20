@@ -122,6 +122,7 @@ class TripleStoreTestCase(FerendaTestCase):
             util.readfile("test/files/datasets/actors.ttl"),
             format="turtle", context="http://example.org/actors")
         del self.loader
+        # test1: the simplest possible select
         sq = """PREFIX foaf: <http://xmlns.com/foaf/0.1/>
                 PREFIX owl: <http://www.w3.org/2002/07/owl#>
 
@@ -132,6 +133,22 @@ class TripleStoreTestCase(FerendaTestCase):
         p = self.store.select(sq,"python")
         self.assertIsInstance(p[0]['name'], str)
         self.assertEqual(p,[{'name':'Kevin Bacon'}])
+
+        # test 2:select across graphs and retrieve results with non-ascii chars
+        sq = """PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+                PREFIX owl: <http://www.w3.org/2002/07/owl#>
+                PREFIX schema: <http://schema.org/>
+                SELECT ?moviename
+                WHERE { ?actoruri owl:sameAs <http://live.dbpedia.org/resource/Kevin_Bacon> .
+                        ?movieuri schema:actor ?actoruri;
+                                  schema:name ?moviename .
+                        FILTER(langMatches(lang(?moviename), "tr"))
+                }
+        """
+        p = self.store.select(sq, "python")
+        self.assertIsInstance(p[0]['moviename'], str)
+        self.assertEqual(p, [{'moviename': 'Kardeş Gibiydiler'}])
+
         if self.store.__class__ == SleepycatStore:
             self.store.graph.close()
         

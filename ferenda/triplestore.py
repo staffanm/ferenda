@@ -441,7 +441,7 @@ class RemoteStore(TripleStore):
             results = requests.get(url, headers=headers, data=query)
             results.raise_for_status()
             if format == "python":
-                return self._sparql_results_to_list(results.text)
+                return self._sparql_results_to_list(results.content)
             # when using format="json", we should return a json
             # string, not the decoded data structure (c.f. how the
             # RDFLib based backends do it).
@@ -461,7 +461,7 @@ class RemoteStore(TripleStore):
             resp = requests.get(url, headers=headers)
             resp.raise_for_status()
             result = Graph()
-            result.parse(data=resp.text, format=format)
+            result.parse(data=resp.content, format=format)
             return result
         except requests.exceptions.HTTPError as e:
             raise errors.SparqlError(e)
