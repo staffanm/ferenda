@@ -136,7 +136,7 @@ class Transformer(object):
         """Accepts two filenames, reads from *infile*, writes to *outfile*."""
         depth = self._depth(os.path.dirname(outfile),
                             self.documentroot+os.sep+"index.html")
-        helpful = False
+        helpful = os.environ.get('FERENDA_TRANSFORMDEBUG', False)
         if helpful:
             import logging
             log = logging.getLogger("ferenda.transformer")
