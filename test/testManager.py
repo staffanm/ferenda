@@ -823,6 +823,31 @@ apiendpoint = /api/
         got = manager.run(['all', 'makeresources'])
         self.assertEqual(want,got)
 
+    def test_run_makeresources_defaultconfig(self):
+        util.resource_extract('res/scripts/ferenda.template.ini', "ferenda.ini",
+                              {'storetype': 'SQLITE',
+                               'storelocation': 'data/ferenda.sqlite',
+                               'storerepository': 'ferenda',
+                               'indextype': 'WHOOSH',
+                               'indexlocation': 'data/whooshindex',
+                               'sitename': 'Test'})
+        self._enable_repos()
+        got = manager.run(['all', 'makeresources'])
+        want = {'xml': ['rsrc/resources.xml'],
+                'json': ['rsrc/api/context.json',
+                         'rsrc/api/common.json',
+                         'rsrc/api/terms.json'],
+                'img': ['rsrc/img/navmenu-small-black.png',
+                        'rsrc/img/navmenu.png', 'rsrc/img/search.png'],
+                'css': ['http://fonts.googleapis.com/css?family=Raleway:200,100',
+                        'rsrc/css/normalize-1.1.3.css',
+                        'rsrc/css/main.css', 'rsrc/css/ferenda.css'],
+                'js': ['rsrc/js/jquery-1.10.2.js',
+                       'rsrc/js/modernizr-2.6.3.js',
+                       'rsrc/js/respond-1.3.0.js',
+                       'rsrc/js/ferenda.js']}
+        self.assertEqual(want, got)
+
     def test_delayed_config(self):
         # Make sure configuration values gets stored properly in the instance created by run()
         self._enable_repos()

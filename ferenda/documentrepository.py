@@ -458,7 +458,8 @@ class DocumentRepository(object):
             'republishsource': False,
             'class': self.qualified_class_name(),
 
-            # FIXME: These only make sense at a global level
+            # FIXME: These only make sense at a global level, and
+            # furthermore are duplicated in manager._load_config
             'cssfiles': ['http://fonts.googleapis.com/css?family=Raleway:200,100',
                          'res/css/normalize-1.1.3.css',
                          'res/css/main.css',

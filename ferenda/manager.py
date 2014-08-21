@@ -534,9 +534,17 @@ overridden by the config file or command line arguments."""
                 'staticsite': False,
                 'sitename': 'MySite',
                 'sitedescription': 'Just another Ferenda site',
-                'cssfiles': list,
-                'jsfiles': list,
-                'imgfiles': list,
+                'cssfiles': ['http://fonts.googleapis.com/css?family=Raleway:200,100',
+                             'res/css/normalize-1.1.3.css',
+                             'res/css/main.css',
+                             'res/css/ferenda.css'],
+                'jsfiles': ['res/js/jquery-1.10.2.js',
+                            'res/js/modernizr-2.6.3.js',
+                            'res/js/respond-1.3.0.js',
+                            'res/js/ferenda.js'],
+                'imgfiles': ['res/img/navmenu-small-black.png',
+                             'res/img/navmenu.png',
+                             'res/img/search.png'],
                 'legacyapi': False
     }
     config = LayeredConfig(defaults, filename, argv, cascade=True)
