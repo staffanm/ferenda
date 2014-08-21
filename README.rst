@@ -10,6 +10,9 @@ REST-based HTTP API.
 .. image:: https://travis-ci.org/staffanm/ferenda.png?branch=master
     :target: http://travis-ci.org/staffanm/ferenda/
 
+.. image:: https://ci.appveyor.com/api/projects/status/aqdo3c39cdof8opa/branch/master
+    :target: https://ci.appveyor.com/project/staffanm/ferenda/branch/master
+
 .. image:: https://coveralls.io/repos/staffanm/ferenda/badge.png?branch=master
     :target: https://coveralls.io/r/staffanm/ferenda
 

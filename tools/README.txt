@@ -30,3 +30,7 @@ This directory contains a number of useful scripts when developing ferenda.
   fails since LXML and SimpleParse is hard to compile. Read comments
   for more info.
   
+* win32/: This directory contains prebuilt versions of lxml for
+  windows (taken from http://www.lfd.uci.edu/~gohlke/pythonlibs/#lxml,
+  but reproduced here since the download urls there arent't
+  stable). These are primarily used for CI builds on appveyor.
