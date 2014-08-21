@@ -383,8 +383,11 @@ class Setup(RepoTester):
 class Run(unittest.TestCase):
     """Tests manager interface using only the run() entry point used by ferenda-build.py"""
 
+    
     def setUp(self):
         self.addTypeEqualityFunc(OrderedDict, self.assertDictEqual)
+        self.maxDiff = None
+
         # self.modulename = hashlib.md5(self.tempdir.encode('ascii')).hexdigest()
         self.modulename = "example"
         # When testing locally , we want to avoid cluttering cwd, so
@@ -811,6 +814,9 @@ datadir = %s
 url = http://localhost:8000/
 searchendpoint = /search/
 apiendpoint = /api/
+cssfiles = []        
+jsfiles = []        
+imgfiles = []        
         """ % self.tempdir)
         want = {'css':[],
                 'js':[],
