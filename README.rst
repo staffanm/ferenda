@@ -62,6 +62,7 @@ authors, included in accordance with their respective licenses:
   by Niklas Lindström, BSD
 * `httpheader <http://deron.meranda.us/python/httpheader/>`_ by Deron
   Meranda, LGPL
+* `smc.mw <https://pypi.python.org/pypi/smc.mw>`_ by Marcus Brinkmann, BSD
 * `normalize.css <http://git.io/normalize>`_, MIT
 * `responsive template <http://verekia.com/initializr/responsive-template>`_, PD
 * `jquery <http://jquery.com>`_ , MIT

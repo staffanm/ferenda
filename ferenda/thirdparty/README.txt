@@ -1,3 +1,4 @@
+
 This directory contains some smaller python modules that, for one
 reason or another, couldn't be directly fetched by setup.py from pypi.
 
@@ -20,3 +21,8 @@ reason or another, couldn't be directly fetched by setup.py from pypi.
   rdflib.plugins.parsers.pyRdfa.extras.httpheader, but that version
   has a bug in the one function that we (but not rdflib) uses, so we
   can't use that). LGPL License.
+
+* smc.mw by Marcus Brinkmann
+  (https://pypi.python.org/pypi/smc.mw). Included since the released
+  0.3 version isn't compatible with recent grako releases, instead
+  using a GIT snapshot (4e339f0b82). BSD License.
