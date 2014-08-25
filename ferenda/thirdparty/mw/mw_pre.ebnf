@@ -1,0 +1,147 @@
+(* Copyright 2013 semantics GmbH
+   Written by Marcus Brinkmann <m.brinkmann@:semantics.de>
+
+   PEG for VLS Wiki Markup Preprocessor
+   ====================================
+
+   The goal is to be similar to MediaWiki's Wiki markup.  However,
+   some differences are allowed to simplify the grammar definition.
+
+   This file describes the preprocessor language that is mainly
+   responsible for template transclusion.
+
+   This grammar is for Grako (https://bitbucket.org/apalala/grako).
+   Automatic whitespace skipping and nameguards should be switched
+   off.
+
+   grako --whitespace="" --no-nameguard -o mw_pre.py mw_pre.ebnf 
+*)
+
+
+(* Utility.  *)
+
+blank = [ ?/[ \t]+/? ] ;
+
+(* QUIRK: For XML tags, we ignore any structure within the attributes
+   of the opening tag.  Does also not use check_no.  *)
+end_of_open_tag = ?/(\s(.|\n)*?)?(?=>|/>)/? ;
+end_of_close_tag = ?/(\s(.|\n)*?)?(?=>)/? ;
+
+
+
+(* QUIRK: We do not strip a comment on a line by itself if it is the
+   very first line in the document (cf. comment_alone).  *)
+document = elements: { element ~ } * $ ;
+
+(* argument must come before template.  *)
+element = text | link | argument | template | heading | comment
+  | noinclude | includeonly | onlyinclude | ignore | ?/(.|\n)/? ;
+
+
+(* Any characters that do not interfere with element markup (this is
+   just an optimization):
+   \n Detect comment_alone and template at begin-of-line
+   <  Begin various tags
+   {  Begin template/template argument
+   }  End template
+   |  Template argument separator
+   =  Headings, Template named arguments
+   [  Begin link (may contain "|")
+   ]  End link
+ *)
+text = ?/[^\n<{}|=\[\]]+/? ;
+
+
+(* We need to parse link syntax, as that shares the pipe symbol "|"
+   with templates.  *)
+link = "[[" content:link_content "]]" ;
+link_content = { !"]]" element } * ;
+
+
+(* QUIRK: Although only the first default is used, the parser accepts
+   (and swallows) multiple.  *)
+argument = "{{{" name:argument_content defaults: { argument_default } * "}}}" ;
+argument_content = { ! ( "}}}" | "|" ) element } * ;
+argument_default = "|" content:argument_content ;
+
+
+(* QUIRK: If not at beginning of line, a template that starts with a
+   list or table introduces a newline (cf. MediaWiki Bug #529).  *)
+template = [ bol: ?/(?<=^)|(?<=\n)/? ] "{{" name:template_content
+           arguments: { template_arg } * "}}" ;
+template_content = { ! ( "}}" | "|" ) element } * ;
+template_arg = "|" @:( template_named_arg | template_unnamed_arg ) ;
+(* QUIRK: Empty name is allowed! *)
+template_named_arg = name:template_arg_name_content "=" content:template_content ;
+template_arg_name_content = { ! ( "}}" | "|" | "=" ) element } * ;
+(* QUIRK: No whitespace trimming for unnamed arguments.  *)
+template_unnamed_arg = content:template_content ;
+
+
+comment = comment_alone | comment_plain ;
+(* QUIRK: A comment on a line by itself is deleted and swallows surrounding
+   whitespace and one of the two surrounding newlines.  *)
+comment_alone = ?/\n/? blank comment_plain blank &?/\n/? ;
+(* QUIRK: End tag may be missing in comment.  *)
+(* QUIRK: No check_no, as multiline comments are allowed in headings.  *)
+comment_plain = "<!--" ?/((?!-->).|\n)*/? ( "-->" | $ ) ;
+
+
+(* QUIRK: Allow missing close tags for these elements.  *)
+
+noinclude = "<noinclude" attr:end_of_open_tag
+  ( "/>" | ">" content:noinclude_content ( end:noinclude_end | $ ) ) ;
+noinclude_content = { !noinclude_end element } *;
+noinclude_end = "</noinclude" end_of_close_tag ">" ;
+
+
+includeonly = "<includeonly" attr:end_of_open_tag
+  ( "/>" | ">" content:includeonly_content ( end:includeonly_end | $ ) ) ;
+includeonly_content = { !includeonly_end element } *;
+includeonly_end = "</includeonly" end_of_close_tag ">" ;
+
+
+onlyinclude = "<onlyinclude" attr:end_of_open_tag
+  ( "/>" | ">" content:onlyinclude_content ( end:onlyinclude_end | $ ) ) ;
+onlyinclude_content = { !onlyinclude_end onlyinclude_element } *;
+onlyinclude_end = "</onlyinclude" end_of_close_tag ">" ;
+(* QUIRK: onlyinclude can't be nested.  *)
+onlyinclude_element = !onlyinclude element | ?/(.|\n)/? ;
+
+
+(* QUIRK: We ignore some dangling close tags and anything in them.
+   Note that unlike with comments, we make no attempt to prevent
+   breaking paragraphs.  *)
+ignore = "</" ("noinclude" | "includeonly" | "onlyinclude" ) end_of_close_tag ">" ;
+
+
+heading = ?/^|(?<=\n)/? @:( h6 | h5 | h4 | h3 | h2 | h1 ) &( { blank [ comment_plain ] } * blank ( ?/\n/? | $ ) ) ;
+h6 = "======" push_no_h6 @:heading_inline pop_no "======" ;
+h5 = "=====" push_no_h5 @:heading_inline pop_no "=====" ;
+h4 = "====" push_no_h4 @:heading_inline pop_no "====" ;
+h3 = "===" push_no_h3 @:heading_inline pop_no "===" ;
+h2 = "==" push_no_h2 @:heading_inline pop_no "==" ;
+h1 = "=" push_no_h1 @:heading_inline pop_no "=" ;
+
+(* SEMANTICS: Negative lookaheads to prevent inline elements from
+   swallowing up the heading terminator (see check_ifnots).  *)
+push_no_h6 = () ; (* "======([ \t]*(?:<!--((?!-->).|\n)*(-->|$)))*[ \t]*(\n|$)" *)
+push_no_h5 = () ; (* "=====([ \t]*(?:<!--((?!-->).|\n)*(-->|$)))*[ \t]*(\n|$)" *)
+push_no_h4 = () ; (* "====([ \t]*(?:<!--((?!-->).|\n)*(-->|$)))*[ \t]*(\n|$)" *)
+push_no_h3 = () ; (* "===([ \t]*(?:<!--((?!-->).|\n)*(-->|$)))*[ \t]*(\n|$)" *)
+push_no_h2 = () ; (* "==([ \t]*(?:<!--((?!-->).|\n)*(-->|$)))*[ \t]*(\n|$)" *)
+push_no_h1 = () ; (* "=([ \t]*(?:<!--((?!-->).|\n)*(-->|$)))*[ \t]*(\n|$)" *)
+
+heading_inline = push_no_nl @:heading_content pop_no ;
+heading_content = { check_no ?/(.|\n)/? } * ;
+
+
+(* SEMANTICS: Fail if following text matches any of the
+   no-stack.  For example, a heading element automatically
+   closes bold and italic spans.  *)
+pop_no = () ;
+check_no = () ;
+
+(* SEMANTICS: Enable/disable newline in inline elements.  Useful for
+   list items and headings, for example.   *)
+push_no_nl = () ; (* ?/\n/? *)

@@ -1,0 +1,487 @@
+(* Copyright 2013 semantics GmbH
+   Written by Marcus Brinkmann <m.brinkmann@semantics.de>
+
+   PEG for VLS Wiki Markup
+   =======================
+
+   The goal is to be similar to MediaWiki's Wiki markup.  However,
+   some differences are allowed to simplify the grammar definition.
+
+   This is a Parsing Expression Grammar (PEG), a concept developed by
+   Bryan Ford in 2004 (http://bford.info/packrat/).  The production
+   rules are similar to those in a CFG, but the | operator is
+   prioritized from left to right, regular expressions are allowed as
+   terminals, and infinite look-ahead is allowed.  Thus, there are no
+   ambiguities (the first matching alternative wins).  As PEG parsers
+   are top-down, they use backtracking.  Memoization is used to get
+   parsing time linear with input length anyway, but increases memory
+   usage.  The cut element ">>" can be used to manually fix previously
+   selected options, for example, after each block element has been
+   parsed (hat tip to PROLOG).  This throws away the memoization cache
+   up to that position and thus achieves parsing in mostly constant
+   space.
+
+   PEGs have nice formal properties: They can express all LR(k) and
+   some context-sensitive languages, and they are closed under union,
+   intersection and complement.
+
+   This grammar is for Grako (https://bitbucket.org/apalala/grako).
+   Automatic whitespace skipping and nameguards should be switched off
+   (these are more useful in a traditional programming language
+   setting than in a markup context).
+
+   grako --blank="" --no-nameguard -o parser.py mw.ebnf
+
+   The grammar is stateful, which is an extension to regular PEG.
+   Some rules with a dummy right-hand side "()" serve only as traps
+   into the semantics layer, where states are prepared ("push_*"
+   rules), removed ("pop_*") or state-based validation is
+   enforced ("check_*").
+*)
+
+(* Future:
+   <hr>
+   Parser tags: <gallery>
+   Extension tags: <categorytree>, <charinsert>, <hiero>, <imagemap>,
+   <inputbox>, <math>, <poem>, <score>, <syntaxhighlight> (alias
+   <source>), <timeline>
+ *)
+
+
+(* Utility *)
+
+blank = [ ?/[ \t]+/? ] ;
+multiline_blank = { empty_line check_bol_skip | ?/[ \t]+/? } * ;
+
+(* Document Level
+   ==============
+*)
+
+(* A document is a list of blocks, but all whitespace at the end is
+   ignored.  *)
+document = blocks:{ !empty_tail document_block } * [ empty_tail ] $ ;
+
+(* Prevent empty tails and documents to create <br/> elements.  *)
+empty_tail = { empty_line } * blank $ ;
+
+(* One empty line is allowed before a block, more create <br/>
+   elements.  *)
+document_block = [ empty_line ] @:block ;
+empty_line = ?/[ \t]*\n/? ;
+
+(* Paragraph blocks need to come last, as they are catch-all.  *)
+block = ( block_not_par | paragraph ) ~ ;
+
+block_not_par = block_at_bol | block_anywhere ;
+
+(* Blocks that have to start at beginning of line, even if the
+   previous block didn't end there.  Note that list_block must come
+   after table_block, because of the indent-hack ("::{|").  *)
+block_at_bol = &?/^/? ( heading_block | horizontal_rule_block | table_block
+  | list_block | toc_block | wspre_block ) ;
+
+(* Some blocks can occur in the place of some inline elements and
+   split the surrounding block.  *)
+block_anywhere = html_block | html_block_no_wspre | html_p | pre
+  | html_heading | html_table | html_list | html_dl ;
+
+
+(* Heading Block
+   -------------
+*)
+
+(* QUIRK: empty lines after a heading are ignored (and never make it
+   into a <br/>).  *)
+heading_block = @:heading blank [ comment ] blank ( ?/\n/? | $ ) { empty_line } * ;
+heading = @:( h6 | h5 | h4 | h3 | h2 | h1 ) ;
+h6 = "======" push_no_h6 @:heading_inline pop_no "======" ;
+h5 = "=====" push_no_h5 @:heading_inline pop_no "=====" ;
+h4 = "====" push_no_h4 @:heading_inline pop_no "====" ;
+h3 = "===" push_no_h3 @:heading_inline pop_no "===" ;
+h2 = "==" push_no_h2 @:heading_inline pop_no "==" ;
+h1 = "=" push_no_h1 @:heading_inline pop_no "=" ;
+
+(* FIXME: Allow some (but by far not all) inline elements.
+   sup, sub (MW bug 8393), i (MW bug 26375), b (MW r105284), span dir=rtl/ltr (MW bug 35167)
+*)
+heading_inline = push_no_nl heading_content pop_no ;
+heading_content = { check_ifnots ?/(.|\n)/? } * ;
+
+(* SEMANTICS: Negative lookaheads to prevent inline elements from
+   swallowing up the heading terminator (see check_ifnots).  *)
+push_no_h6 = () ; (* "======([ \t]*(?:<!--((?!-->).|\n)*(-->|$)))*[ \t]*(\n|$)" *)
+push_no_h5 = () ; (* "=====([ \t]*(?:<!--((?!-->).|\n)*(-->|$)))*[ \t]*(\n|$)" *)
+push_no_h4 = () ; (* "====([ \t]*(?:<!--((?!-->).|\n)*(-->|$)))*[ \t]*(\n|$)" *)
+push_no_h3 = () ; (* "===([ \t]*(?:<!--((?!-->).|\n)*(-->|$)))*[ \t]*(\n|$)" *)
+push_no_h2 = () ; (* "==([ \t]*(?:<!--((?!-->).|\n)*(-->|$)))*[ \t]*(\n|$)" *)
+push_no_h1 = () ; (* "=([ \t]*(?:<!--((?!-->).|\n)*(-->|$)))*[ \t]*(\n|$)" *)
+
+
+(* Horizontal Rule Block
+   ---------------------
+*)
+
+(* QUIRK: Newline not required to terminate the block.  *)
+horizontal_rule_block = ?/-{4,}/? blank [ ?/\n/? ] ;
+
+
+(* List Block
+   ----------
+*)
+
+list_block = @:list_list ( list_newline | $ );
+list_list = ul_block | ol_block | dl_block ;
+list_newline = ?/\n/? check_bol_skip ;
+
+ul_block = "*" push_bol_skip_ul li+:list_li { list_newline li:list_li } * pop_bol_skip ;
+ol_block = "#" push_bol_skip_ol li+:list_li { list_newline li:list_li } * pop_bol_skip ;
+dl_block = ?/[;:]/? push_bol_skip_dl li+:dt_or_dd { list_newline li:dt_or_dd } * pop_bol_skip ;
+push_bol_skip_ul = () ; (* r"\*" *)
+push_bol_skip_ol = () ; (* "#" *)
+(* Quirk: The distinction between ; and : is made at only most inner level.  *)
+push_bol_skip_dl = () ; (* "[;:]" *)
+
+dt_or_dd = dl_dt | dl_dd ;
+dl_dt = ?/(?<=;)/? @:list_dt ;
+dl_dd = ?/(?<=:)/? @:list_li ;
+
+(* Quirk: If the item is followed by sublists, those sublists do not
+   get their own li/dl.  *)
+list_li = ( sublists+:list_list | inline:li_inline ) { sublists+:list_sublist } * ;
+li_inline = push_no_nl @:inline pop_no ;
+list_sublist = list_newline @:list_list ;
+
+(* A dt may have the dd on the same line, but then sublists get their
+   own item.  *)
+list_dt = ( sublists+:list_list { sublists+:list_sublist } *
+  | inline_dd:dt_inline_dd | inline:li_inline { sublists+:list_sublist } * ) ;
+(* FIXME: MediaWiki allows block level elements in, so maybe don't use
+   inline but document.  This would alos deal with indented tables.  *)
+dt_inline_dd = push_no_nl push_ifnot_dt dt:inline pop_ifnot ":" dd:inline pop_no ;
+
+push_ifnot_dt = () ; (* ":" *)
+
+
+(* Indent-Pre Block
+  -----------------
+*)
+
+(* QUIRK: First line must not only contain whitespace.  *)
+wspre_block = check_wspre &?/^/? " " !empty_line
+  push_bol_skip_wspre @:wspre_inline pop_bol_skip ( ?/\n/? | $ );
+wspre_inline = content:{ !block_anywhere wspre_inline_one } + ;
+(* FIXME: inline_impl_one_no_newline elements may contain newlines and
+   must then use check_bol_skip.  *)
+wspre_inline_one = wspre_newline | inline_impl_one_no_newline ;
+wspre_newline = @:empty_line check_bol_skip ;
+
+(* SEMANTICS: Skip over leading space character in wspre block.  *)
+push_bol_skip_wspre = () ; (* " " *)
+
+(* Some elements need to enable or disable wspre blocks, so provide a
+   mechanism for that here.  *)
+push_wspre_off = () ;
+pop_wspre = () ;
+(* Within a push/pop block, reenable wspre.  *)
+set_wspre_on = () ;
+check_wspre = () ;
+
+(* ... *)
+
+(* SEMANTICS: Negative lookahead for all inline elements.  This is
+   used to prevent closing tags etc. to be swallowed up by the
+   catch-all or other rules.  *)
+check_ifnots = check_ifnot check_no ;
+
+(* SEMANTICS: Fail if following text matches top of the ifnot-stack.
+   *)
+pop_ifnot = () ;
+check_ifnot = () ;
+
+(* SEMANTICS: Fail if following text matches any of the
+   no-stack.  For example, a heading element automatically
+   closes bold and italic spans.  *)
+pop_no = () ;
+check_no = () ;
+
+(* SEMANTICS: Enable/disable newline in inline elements.  Useful for
+   list items and headings, for example.   *)
+push_no_nl = () ; (* ?/\n/? *)
+
+(* SEMANTICS: At the beginning of a new line, skip the characters on
+   the bol_skip-stack to support nested lists and pre mode.  *)
+pop_bol_skip = () ;
+check_bol_skip = () ;
+
+
+toc_block = toc | notoc | forcetoc ;
+
+
+(* FIXME: These can occur inline (ie, block_anywhere).  *)
+toc = blank "__TOC__" blank ( ?/\n/? | $ );
+notoc = blank "__NOTOC__" blank ( ?/\n/? | $ );
+forcetoc = blank "__FORCETOC__" blank ( ?/\n/? | $ );
+
+table_attribute_junk = { !html_attribute ?/[^ \t\n]*/? ?/[ \t]+/? } * ;
+table_attribute_one = @:html_attribute [ table_attribute_junk ] ;
+table_attributes = [ table_attribute_junk ] @: { table_attribute_one } * ;
+
+table_cell_attribute_junk = { !( "|" | html_attribute ) ?/[^| \t\n]*/? ?/[ \t]+/? } * ;
+table_cell_attribute_one = @:html_attribute [ table_cell_attribute_junk ] ;
+table_cell_attributes = [ table_cell_attribute_junk ] @: { table_cell_attribute_one } * ;
+
+table_header_attribute_junk = { !( "|" | "!!" | "||" | html_attribute ) ?/(?:[^|! \t\n]+|!(?!!))*/? ?/[ \t]+/? } * ;
+table_header_attribute_one = @:html_attribute [ table_header_attribute_junk ] ;
+table_header_attributes = [ table_header_attribute_junk ] @: { table_header_attribute_one } * ;
+
+table_block = blank indent:?/:*/? "{|" attribs:table_attributes [ { empty_line } + [ caption:table_caption ] rows:table_rows ] blank "|}" blank ( ?/\n/? | $ ) ;
+
+(* FIXME: should start with wspre_off and then after second block, accept it, like blockquote.  This is unlike data and header cells.  *)
+table_caption = blank "|+" [ attribs: table_cell_attributes blank "|" ] content:table_mode_document ;
+
+table_rows = [ first:table_row_first ] rest:{ table_row } * ;
+table_row_first = content:{ table_data | table_header } + ;
+table_row = blank ?/\|-+/? attribs:table_attributes blank ?/\n+/? content:{ table_data | table_header } * ;
+
+(* QUIRK: After "!", "||" is a synonym for "!!".  *)
+table_header = blank "!" push_no_nl inline:{ table_header_cell_inline } * pop_no final:table_header_cell ;
+table_header_cell_inline = [ attribs: table_header_attributes blank "|" ] blank push_ifnot_table_header text:inline pop_ifnot ( "!!" | "||" ) ;
+table_header_cell = [ attribs: table_cell_attributes blank "|" ] blank content:table_mode_document ;
+push_ifnot_table_header = () ; (* "!!|\|\|" *)
+
+table_data = blank "|" ! ("}" | "-") push_no_nl inline:{ table_data_cell_inline } * pop_no [ final:table_data_cell ] ;
+table_data_cell_inline = [ attribs: table_cell_attributes blank "|" !"|" ] blank push_ifnot_table_data text:inline pop_ifnot "||" ;
+table_data_cell = [ attribs: table_cell_attributes blank "|" !"|" ] blank [ empty_line ] content:table_mode_document ;
+push_ifnot_table_data = () ; (* "||" )
+
+(* We flatten simple block data (single block of inline data) later in post-processing.  *)
+(* blank can match wspre block.  *)
+table_mode_document = push_no_tableline blocks:{ ! (blank "|" | blank "!" ) document_block } * pop_no ;
+push_no_tableline = () ; (* "^[ \t]*(\||\!)" *)
+
+(* Consume one newline at the end.  *)
+
+(* Any characters that do not interfere with inline markup (this is
+   just an optimization).
+   \n This may lead into other blocks (block begin markers are checked separately).
+   [  Begin links
+   ]  End links
+   {  Begin table
+   '  Bold/italic
+   "  XHTML attribute
+   |  Parameter separator/Table cells/End table
+   =  XHTML attribute
+   <  XHTML element
+   &  XHTML entity
+   !  Table header
+   :  dt/dd separator
+   Also assert that the string does not contain a possible valid external link.
+ *)
+non_special_chars = ?/((?!(http://|https://|ftp://|telnet://|irc://|ircs://|nntp://|worldwind://|mailto:|news:|svn://|git://|mms://))[^\n\[\]{'"|=<&!:])+/? ;
+
+(* Special characters (except newlines, . doesn't match those) are
+   committed one at a time, after trying all possible other
+   interpretations.  This ensures that we will always consume the
+   whole document in case of broken markup etc.  *)
+paragraph = paragraph_only_br | paragraph_impl ;
+(* Two empty lines create a separate <br/> element.  *)
+paragraph_only_br = empty_line ( empty_line | &block_not_par | !check_ifnots ) ;
+paragraph_impl = [ content+:paragraph_br ] { !block_anywhere content+:inline_impl_one } + [ content+:empty_line ] ;
+(* A single empty line before a paragraph creates a <br/> element at the start of the paragraph.  *)
+paragraph_br = empty_line ;
+
+(* FIXME: Block elements inside inline elements? *)
+inline = { !block_anywhere inline_impl_one } * ;
+inline_impl_one = check_ifnots ( inline_newline | inline_impl_one_no_newline ) ;
+inline_impl_one_no_newline = non_special_chars | internal_link | external_link
+  | plain_link | many_quotes | bold_and_italic | bold | italic | html_inline
+  | html_entity | ref | nowiki | comment | ?/./? ;
+inline_newline = empty_line check_bol_skip !empty_line !block_not_par ;
+
+(* FIXME: This should be pretty much any actual letter.  Add Unicode
+   support to grako buffering so this will match if we add umlaute etc *)
+internal_link_trail = ?/([a-zA-Z]|'(?!'))+/? ;
+(* FIXME:target:inline is surely wrong.  *)
+internal_link = "[[" blank push_ifnot_intlink_target target:inline pop_ifnot blank [ "|" push_wspre_off push_ifnot_intlink multiline_blank text:inline pop_ifnot pop_wspre ] "]]" [ suffix:internal_link_trail ] ;
+push_ifnot_intlink_target = () ; (* "\||\]\]" *) 
+push_ifnot_intlink = () ; (* "\]\]" *)
+
+(* QUIRK: open square bracket forbidden in URL (bug 4377).  *)
+link_tail_chars_no_parens = ?/[,;\.:!\?\(\)]+/? ;
+link_tail_chars = ?/[,;\.:!\?]+/? ;
+link_terminators = ?/[\n\[\] \t]/? | $ ;
+(* & for HTML entities.  *)
+link_normal_chars_no_parens = ?/[^&,;\.:!\?\(\)\n\[\] \t]+/? ;
+link_normal_chars = ?/[^&,;\.:!\?\n\[\] \t]+/? ;
+
+(* QUIRK: HTML entities allowed in links, see test "Parsoid: pipe in transclusion parameter".  *)
+(* QUIRK: HTML entities end in ";", which is considered a trail if followed by a terminator.  *)
+more_link_chars_no_parens = { link_normal_chars_no_parens | ( link_tail_chars_no_parens | html_entity ) !link_terminators | "&" } + !"(" ;
+more_link_chars_parens = { link_normal_chars_no_parens | ( link_tail_chars | html_entity ) !link_terminators | "&" } + ;
+(* FIXME: closing parenthesis is a tail char unless opening
+   parenthesis occurs in the link.  FIXME: Could do this with stateful
+   parsing, too, by keeping a link parse stack with a flag that is True
+   when an open parens has been seen.  Not sure if that is simpler.  *)
+more_link_chars = more_link_chars_no_parens | more_link_chars_parens ;
+
+link_chars = ?/(http://|https://|ftp://|telnet://|irc://|ircs://|nntp://|worldwind://|mailto:|news:|svn://|git://|mms://|//)/? more_link_chars ;
+external_link = "[" push_ifnot_extlink target:link_chars blank [ push_no_nl text:inline pop_no ] pop_ifnot "]" ;
+(* SEMANTICS *)
+push_ifnot_extlink = () ; (* "]" *)
+
+(* QUIRK: Start at word boundary.  *)
+(* QUIRK: Don't consume trailing interpunctation, unless it's a closing parens for an open parens within the link.  *)
+(* QUIRK: open square bracket forbidden in URL (bug 4377) *)
+plain_link = ?/(?=\b)(http://|https://|ftp://|telnet://|irc://|ircs://|nntp://|worldwind://|mailto:|news:|svn://|git://|mms://)/? more_link_chars ;
+
+(* 4, 6 or more quotes are consumed until 3 or 5 are left.  *)
+many_quotes = "'" &"'''''" | "'" &("'''" !"'") ;
+
+bold = "'''" !"'" push_no_nl content:bold_inline pop_no ("'''" | &?/\n/? | $ ) ;
+(* !"'''" also implies !"'''''".  The important thing is that we allow 2, 4, 6 or more.  *)
+(* FIXME: handle improper nesting of b and i.  *)
+bold_inline = { (&many_quotes | !"'''" ) inline_impl_one } * ; 
+
+(* Exactly 3 or 4 apostrophes don't end italic mode (but 5 might).  *)
+
+italic = "''" !"'" push_no_nl content:italic_inline pop_no ( "''" | &?/\n/? | $ ) ;
+(* Not 2 or 5, we allow 3, 4, 6 or more.  *)
+italic_inline = { (&many_quotes | ( &"'''" !"'''''" ) | ! ( "''" | "'''''" ) ) inline_impl_one } * ;
+
+bold_and_italic = bold_italic_both | italic_bold | bold_italic ;
+bold_italic_both = "'''''" push_no_nl content:bold_italic_inline pop_no ( "'''''" | &?/\n/? | $ );
+italic_bold = "'''''" push_no_nl bold_content:bold_italic_inline "'''" italic_content:italic_inline pop_no ( "''" | &?/\n/? | $ ) ;
+bold_italic = "'''''" push_no_nl italic_content:bold_italic_inline "''" bold_content:bold_inline pop_no ( "'''" | &?/\n/? | $ ) ;
+(* Implies !"'''" and !"'''''" *)
+bold_italic_inline = { (&many_quotes | !"''" ) inline_impl_one } * ;
+
+comment = ?/<!--(.|\n)*?-->/? ;
+
+
+(* HTML entities *)
+
+html_entity = "&" @:( html_named_entity | html_numbered_entity ) ";" ;
+html_named_entity = name: ?/[a-zA-Z0-9]+/? ;
+html_numbered_entity = "#" (number: ?/[0-9]+/? | ?/[xX]/? hexnumber: ?/[0-9a-fA-F]+/?) ;
+
+(* HTML attributes.  *)
+(* FIXME: QUIRK: MediaWiki allows all kind of junk where attributes
+   can be, such as <br*/>, but not <, which is replaced in the HTML
+   sanitizer (removeHTMLtags).  *)
+(* QUIRK: Attribute values can span multiple lines but do not respect bol_skip.  *)
+html_attribute_value_doublequote = '"' @: { ?/[^<"&]+/? | html_entity | nowiki | "&" } * '"' ;
+html_attribute_value_singlequote = "'" @: { ?/[^<'&]+/? | html_entity | nowiki | "&" } * "'" ;
+html_attribute_value_noquote = { ?/[a-zA-Z0-9!#$%()*,\-./:;<>?@:[\]^_`{|}~]+/? | html_entity | "&" } + ;
+html_attribute_value = html_attribute_value_doublequote | html_attribute_value_singlequote | html_attribute_value_noquote ;
+html_attribute = name:html_attribute_name multiline_blank "=" multiline_blank value:html_attribute_value  ;
+(* QUIRK: < is not allowed as junk.  *)
+html_attribute_junk = { !( "/>" | ">" | html_attribute ) ?/(?:[^/<> \t\n]+|/(?!>))*/? ?/[ \t\n]+/? } * ;
+
+(* https://en.wikipedia.org/wiki/Help:HTML_in_wikitext - element
+   specific attributes are not yet included.  FIXME: Discard unsafe
+   style attributes.  FIXME: Maybe ignore
+   other attributes instead of not parsing the whole thing? *)
+html_attribute_name = ?/[:A-Z_a-z0-9][:A-Z_a-z0-9\-.]*/? ;
+
+(*
+html_attribute_name = ( "class" | "dir" | "id" | "lang" | "title" | "style"
+  | ?/data-[-a-z0-9_:.]*/? | "itemid" | "itemprop" | "itemref" | "itemscope"
+  | "itemtype" | "border" | "align" | "valign" | "width" | "height"
+  | "cellspacing" | "cellpadding" | "colspan" | "rowspan" | "scope"
+
+  | "name" | "group" ) ;
+*)
+
+(* At least one space required to separate the attribute name from the preceding token *)
+
+html_attribute_one = @:html_attribute [ html_attribute_junk ] ;
+html_attributes = [ html_attribute_junk ] @:{ html_attribute_one } * ;
+
+(* FIXME: All html inline elements are auto-closing, this may be more relaxed than MediaWiki (removeHTMLtags).  *)
+html_inline = "<" &html_inline_element name:push_ifnot_html_tag attribs:html_attributes multiline_blank html_attribute_junk ( "/>" | ">" content:inline [ !check_ifnot ?/</\w+[ \t\n]*>/? ] ) pop_ifnot ;
+
+(* SEMANTICS: This rule parses the tag name and adds an ifnot for the closing tag.  *)
+(* Note that names that are the prefix of another must come after.  *)
+push_ifnot_html_tag = ?/\w+/? ; (* "</" + match + "[ \t\n]*" *)
+
+html_inline_element = ( "abbr" | "br" | "big" | "b" | "cite" | "code" | "data"
+  | "del" | "dfn" | "em" | "font" | "ins" | "i" | "kbd" | "mark" | "samp"
+  | "small" | "span" | "strong" | "sub" | "sup" | "strike" | "s"
+  | "time" | "tt" | "u" | "var" ) !?/\w/? ;
+
+
+nowiki = "<" &nowiki_element name:push_ifnot_html_tag attribs:html_attributes multiline_blank html_attribute_junk ( "/>" | ">" content:nowiki_inline [ !check_ifnot ?/</\w+[ \t\n]*>/? ] ) pop_ifnot ;
+nowiki_element = ( "nowiki" ) !?/\w/? ;
+(* Note that nowiki takes precendence over check_no here, so don't do that check.  *)
+nowiki_inline = { check_ifnot ( html_entity | nowiki_non_special_chars | ?/./? ) } * ;
+nowiki_non_special_chars = ?/[^<&]+/? ;
+
+(* QUIRK: Inside a <pre><nowiki>, first close tag wins.  *)
+(* QUIRK: Inside a pre element, the close tag for nowiki is not optional.  *)
+pre_nowiki = "<" &nowiki_element name:push_ifnot_html_tag attribs:html_attributes multiline_blank html_attribute_junk ( "/>" | ">" content:pre_nowiki_inline !check_ifnot ?/</\w+[ \t\n]*>/? ) pop_ifnot ;
+pre_nowiki_inline = { check_ifnot !?/</pre[ \t\n]*>/? ( html_entity | nowiki_non_special_chars | ?/./? ) } * ;
+
+pre =  "<" &pre_element name:push_ifnot_html_tag attribs:html_attributes multiline_blank html_attribute_junk ( "/>" | ">" content:pre_inline [ !check_ifnot ?/</\w+[ \t\n]*>/? ] ) pop_ifnot [ empty_line ] ;
+pre_element = ?/(?i)(?:pre)(?!\w)/? ;
+pre_non_special_chars = ?/[^<&]+/? ;
+pre_inline = { check_ifnot ( html_entity | pre_nowiki | pre_non_special_chars | ?/./? ) } * ;
+
+(* FIXME: ref and references should only have name and group attributes.  *)
+(* ref is a special case, as it occurs inline, but behaves otherwise like blockquote.  *)
+ref = "<" &ref_element name:push_ifnot_html_tag attribs:html_attributes multiline_blank html_attribute_junk ( "/>" | ">" content:html_block_no_wspre_document [ !check_ifnot ?/</\w+[ \t\n]*>/? ] ) pop_ifnot [ empty_line ] ;
+ref_element = ?/(?i)(?:ref)(?!\w)/? ;
+
+(* h1-h6 are special, as they are block-level elements, but they only support some inline elements.  *)
+html_heading = blank "<" &html_heading_element name:push_ifnot_html_tag attribs:html_attributes multiline_blank html_attribute_junk ( "/>" | ">" content:heading_content [ !check_ifnot ?/</\w+[ \t\n]*>/? ] ) pop_ifnot [ empty_line ];
+html_heading_element = ?/(?i)(?:h[1-6])(?!\w)/? ;
+
+(* We flatten simple block data (single block of inline data) later in post-processing.  *)
+(* QUIRK: Block level elements are allowed to start with blanks, while inline elements don't have this property (they start a wspre block).  *)
+html_block = blank "<" &html_block_element name:push_ifnot_html_tag attribs:html_attributes multiline_blank html_attribute_junk ( "/>" | ">" content:html_block_document [ !check_ifnot ?/</\w+[ \t\n]*>/? ] ) pop_ifnot [ empty_line ];
+html_block_document = blocks:{ document_block } * ;
+html_block_element = ?/(?i)(?:center|div|references)(?!\w)/? ;
+
+(* We flatten simple block data (single block of inline data) later in post-processing.  *)
+(* FIXME: At the beginning of a blockquote, newlines are skipped, even after text and lists.  Same for ref.
+   Inserting a center block reinstates normal <br/> etc behavior.  *)
+(* QUIRK: In center et al, indent-pre is allowed, but not in blockquote, see https://bugzilla.wikimedia.org/show_bug.cgi?id=52763 and
+   test "3b. Indent-Pre and block tags (pre-content on separate line)".  *)
+html_block_no_wspre = blank "<" &html_block_no_wspre_element name:push_ifnot_html_tag attribs:html_attributes multiline_blank html_attribute_junk ( "/>" | ">" content:html_block_no_wspre_document [ !check_ifnot ?/</\w+[ \t\n]*>/? ] ) pop_ifnot [ empty_line ] ;
+html_block_no_wspre_element = ?/(?i)(?:blockquote)(?!\w)/? ;
+html_block_no_wspre_document = push_wspre_off blocks:{ document_block } * pop_wspre ; (* FIXME: After first par-style block, switch off wspre_off *)
+
+(* A <p> element is special in that it is a block element that may only contain inline elements.  *)
+html_p = blank "<" &html_p_element name:push_ifnot_html_tag attribs:html_attributes multiline_blank html_attribute_junk ( "/>" | ">" content:html_p_inline [ !check_ifnot ?/</\w+[ \t\n]*>/? ] ) pop_ifnot [ empty_line ] ;
+html_p_element = ?/(?i)(?:p)(?!\w)/? ;
+html_p_inline = push_wspre_off { !block_anywhere inline_impl_one } * pop_wspre ;
+
+(* html table is special, as it may contain other html table elements.  *)
+html_table = blank "<" &html_table_element name:push_ifnot_html_tag attribs:html_attributes multiline_blank html_attribute_junk ( "/>" | ">" content:html_table_content multiline_blank [ !check_ifnot ?/</\w+[ \t\n]*>/? ] ) pop_ifnot [ empty_line ];
+html_table_element = ?/(?i)(?:table)(?!\w)/? ;
+html_table_content = { html_table_content_item } * ;
+html_table_content_item = multiline_blank @:html_table_tr ;
+
+html_table_tr = "<" &html_table_tr_element name:push_ifnot_html_tag attribs:html_attributes multiline_blank html_attribute_junk ( "/>" | ">" content:html_table_tr_content multiline_blank [ !check_ifnot ?/</\w+[ \t\n]*>/? ] ) pop_ifnot [ empty_line ];
+html_table_tr_element = ?/(?i)(?:tr)(?!\w)/? ;
+html_table_tr_content = { html_table_tr_content_item } * ;
+html_table_tr_content_item = multiline_blank @:( html_table_cell ) ;
+
+(* FIXME: Close td and th elements with missing close tags before accepting another one.  *)
+html_table_cell = "<" &html_table_cell_element name:push_ifnot_html_tag attribs:html_attributes multiline_blank html_attribute_junk ( "/>" | ">" content:html_block_document [ !check_ifnot ?/</\w+[ \t\n]*>/? ] ) pop_ifnot [ empty_line ];
+html_table_cell_element = ?/(?i)(?:td|th)(?!\w)/? ;
+
+html_list = "<" &html_list_element name:push_ifnot_html_tag attribs:html_attributes multiline_blank html_attribute_junk ( "/>" | ">" content:html_list_content [ !check_ifnot ?/</\w+[ \t\n]*>/? ] ) pop_ifnot [ empty_line ];
+html_list_element = ?/(?i)(?:ul|ol)(?!\w)/? ;
+html_list_content = { html_list_content_item } * ;
+html_list_content_item = multiline_blank @:( html_list_item ) ;
+
+html_list_item = "<" &html_list_item_element name:push_ifnot_html_tag attribs:html_attributes multiline_blank html_attribute_junk ( "/>" | ">" content:html_block_no_wspre_document [ !check_ifnot ?/</\w+[ \t\n]*>/? ] ) pop_ifnot [ empty_line ];
+html_list_item_element = ?/(?i)(?:li)(?!\w)/? ;
+
+html_dl = "<" &html_dl_element name:push_ifnot_html_tag attribs:html_attributes multiline_blank html_attribute_junk ( "/>" | ">" content:html_dl_content [ !check_ifnot ?/</\w+[ \t\n]*>/? ] ) pop_ifnot [ empty_line ];
+html_dl_element = ?/(?i)(?:dl)(?!\w)/? ;
+html_dl_content = { html_dl_content_item } * ;
+html_dl_content_item = multiline_blank @:( html_dl_item ) ;
+
+html_dl_item = "<" &html_dl_item_element name:push_ifnot_html_tag attribs:html_attributes multiline_blank html_attribute_junk ( "/>" | ">" content:html_block_no_wspre_document [ !check_ifnot ?/</\w+[ \t\n]*>/? ] ) pop_ifnot [ empty_line ];
+html_dl_item_element = ?/(?i)(?:dt|dd)(?!\w)/? ;
