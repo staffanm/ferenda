@@ -953,14 +953,15 @@ def _filter_argv(args):
     alias = None
     command = None
     commandargs = []
+    if isinstance(args[0], bytes):
+         # FIXME: duplicated code of LayeredConfig._load_commandline
+        args = [arg.decode("utf-8") for arg in args]
     if len(args) > 0 and not args[0].startswith("--"):
         alias = args[0]
     if len(args) > 1 and not args[1].startswith("--"):
         command = args[1]
     if len(args) > 2:
         for arg in args[2:]:
-            if isinstance(arg, bytes):
-                arg = arg.decode("utf-8") # FIXME: duplicated code of LayeredConfig._load_commandline
             if not arg.startswith("--"):
                 commandargs.append(arg)
     return (alias, command, commandargs)
