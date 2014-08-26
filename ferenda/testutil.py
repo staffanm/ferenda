@@ -584,9 +584,8 @@ documentation for that class)."""
         pathfrag = store.basefile_to_pathfrag(basefile)
         filename = store.downloaded_path(basefile)
         filename = filename[len(basedir) + 1:]
-
         downloaded_file = "%s/downloaded/%s" % (docroot, filename)
-        basetest = basefile.replace("-", "_").replace(os.sep,"_").replace("/", "_").replace(":", "_")
+        basetest = basefile.replace("-", "_").replace(os.sep,"_").replace("/", "_").replace(":", "_").replace(" ", "_")
         # transliterate basetest (ie å -> a)
         basetest = "".join((c for c in unicodedata.normalize('NFKD', basetest)
                             if not unicodedata.combining(c)))
