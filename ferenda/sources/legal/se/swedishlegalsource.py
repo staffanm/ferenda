@@ -13,6 +13,7 @@ from ferenda import (DocumentRepository, DocumentStore, FSMParser,
                      CitationParser)
 from ferenda import util
 from ferenda.sources.legal.se.legalref import Link
+from ferenda.elements.html import A, H1, H2, H3
 from ferenda.elements import (Paragraph, Section, Body, CompoundElement,
                               SectionalElement)
 from ferenda.pdfreader import Page
@@ -603,6 +604,7 @@ class SwedishCitationParser(CitationParser):
     def __init__(self, legalrefparser, baseurl):
         self._legalrefparser = legalrefparser
         self._baseurl = baseurl
+        self._currenturl = self._baseurl
         if self._baseurl == "https://lagen.nu/":
             self._urlpath = ''
             self._dvpath = 'dom/'
@@ -611,9 +613,20 @@ class SwedishCitationParser(CitationParser):
             self._urlpath = 'res/'
             self._dvpath = 'dv/'
             self._sfspath = 'sfs/'
+
+    def parse_recursive(self, part, predicate="dcterms:references"):
+        if hasattr(part, 'about'):
+            self._currenturl = part.about
+        elif hasattr(part, 'uri'):
+            self._currenturl = part.uri
+        if isinstance(part, (Link, A, H1, H2, H3)):
+            # don't process text that's already a link (or a heading)
+            return part
+        else:
+            return super(SwedishCitationParser, self).parse_recursive(part, predicate)
         
     def parse_string(self, string, predicate="dcterms:references"):
-        unfiltered = self._legalrefparser.parse(string, predicate=predicate)
+        unfiltered = self._legalrefparser.parse(string, baseuri=self._currenturl, predicate=predicate)
         # remove those references that we cannot fully resolve (should
         # be an option in LegalRef, but...
         filtered = []

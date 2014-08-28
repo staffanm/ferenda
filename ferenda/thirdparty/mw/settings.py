@@ -108,8 +108,8 @@ class Namespaces(object):
 
     def _remove(self, namespace):
         _namespace = self.find(namespace)
-        if ns is not None:
-            self.namespace = [ns for ns in self.namespace if ns != _namespace]
+        if _namespace is not None:
+            self.namespaces = [ns for ns in self.namespaces if ns != _namespace]
 
     def remove(self, namespace):
         self._remove(namespace.ident)
@@ -118,7 +118,7 @@ class Namespaces(object):
     def add(self, namespace):
         self._remove(namespace.ident)
         self.namespaces.append(namespace)
-        self.refresh()
+        self._refresh()
 
     def canonical_name(self, namespace):
         return namespace.canonical_name(self.lang)

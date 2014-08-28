@@ -30,6 +30,7 @@ from lxml import etree
 
 from ferenda import DocumentRepository, TextReader
 from ferenda import elements, util
+from ferenda.errors import ExternalCommandError
 
 
 class FerendaTestCase(object):
@@ -114,7 +115,7 @@ class FerendaTestCase(object):
                              (datetime1.isoformat(), datetime2.isoformat(),
                               absdiff))
 
-    def assertEqualXML(self, want, got, namespace_aware=True):
+    def assertEqualXML(self, want, got, namespace_aware=True, tidy_xhtml=False):
         """Assert that two xml trees are canonically identical.
 
         :param want: The XML document as expected, as a string, byte string or ElementTree element
@@ -182,10 +183,36 @@ class FerendaTestCase(object):
             else:
                 raise ValueError("Can't convert a %s into an ElementTree" % type(something))
 
+        def tidy(tree):
+            import subprocess
+            p = subprocess.Popen("tidy -i -q -asxhtml -w 100 -utf8",
+                                 shell=True,
+                                 stdin=subprocess.PIPE,
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE)
+            treestr = etree.tostring(tree, encoding="utf-8")
+            stdout, stderr = p.communicate(treestr)
+            if p.returncode and stderr:
+                raise ExternalCommandError(stderr)
+            newtree = etree.parse(BytesIO(stdout))
+            return newtree
+
         def c14nize(tree):
             tmp = BytesIO()
             tree.write_c14n(tmp)
             return tmp.getvalue().decode('utf-8')
+
+        # strip all empty whitespace (but not space in things like
+        # <p>Name: <b>Foo</b></p>)
+        def strip_space(node):
+            if node.text and node.text.strip() == "":
+                node.text = None
+                for child in node:
+                    node.replace(child, strip_space(child))
+                        
+            if node.tail and node.tail.strip() == "":
+                node.tail = None
+            return node
 
         errors = []
         want_tree = treeify(want)
@@ -195,6 +222,9 @@ class FerendaTestCase(object):
                     errors.append)
 
         if errors:
+            if tidy_xhtml:
+                want_tree = tidy(want_tree)
+                got_tree = tidy(got_tree)
             want_lines = [x + "\n" for x in c14nize(want_tree).split("\n")]
             got_lines = [x + "\n" for x in c14nize(got_tree).split("\n")]
             diff = unified_diff(want_lines, got_lines, "want.xml", "got.xml")
@@ -436,7 +466,9 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
                 shutil.copy2(self.repo.store.parsed_path(basefile), xhtml_file)
                 return
             self.assertEqualXML(util.readfile(xhtml_file),
-                                util.readfile(self.repo.store.parsed_path(basefile)))
+                                util.readfile(self.repo.store.parsed_path(basefile)),
+                                tidy_xhtml=True)
+                                
         finally:
             self.repo.store = origstore
 

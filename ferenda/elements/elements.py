@@ -260,9 +260,11 @@ class CompoundElement(AbstractElement, list):
         if self.classname  is not None:
             attrs['class'] = self.classname
             
-        # copy (a subset of) standard xhtml attributes
+        # copy (a subset of) standard xhtml attributes (including some
+        # RDFa ones)
         for stdattr in ('class', 'id', 'dir', 'lang', 'src',
-                        'href', 'name', 'alt', 'role', 'typeof'):
+                        'href', 'name', 'alt', 'role', 'typeof',
+                        'datatype', 'property', 'rel', 'about'):
             if hasattr(self, stdattr):
                 attrs[stdattr] = getattr(self, stdattr)
 

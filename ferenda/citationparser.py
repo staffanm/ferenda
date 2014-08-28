@@ -62,7 +62,7 @@ class CitationParser(object):
         """
         self._grammars.append(grammar)
 
-    def parse_string(self, string):
+    def parse_string(self, string, predicate="dcterms:references"):
         """Find any citations in a text string, using the configured grammars.
         
         :param string: Text to parse for citations
@@ -95,7 +95,7 @@ class CitationParser(object):
             nodes = list(res)
         return res
 
-    def parse_recursive(self, part):
+    def parse_recursive(self, part, predicate="dcterms:references"):
         """Traverse a nested tree of elements, finding citations in
         any strings contained in the tree. Found citations are marked
         up as :py:class:`~ferenda.elements.Link` elements with the uri
@@ -111,9 +111,9 @@ class CitationParser(object):
         if not isinstance(part, str):
             for subpart in part:
                 if isinstance(subpart, str):
-                    res.extend(self.parse_recursive(subpart))
+                    res.extend(self.parse_recursive(subpart, predicate))
                 else:
-                    res.append(self.parse_recursive(subpart))
+                    res.append(self.parse_recursive(subpart, predicate))
             # replace our exising subparts/children with the combined result of parse_recursive
             part[:] = res[:]
             return part
@@ -124,7 +124,7 @@ class CitationParser(object):
             # partial/relative references
             # splits a string into a list of string and ParseResult objects
             #
-            nodes = self.parse_string(part)
+            nodes = self.parse_string(part, predicate)
             for node in nodes:
                 if isinstance(node, str):
                     if type(part) == str:
@@ -150,7 +150,7 @@ class CitationParser(object):
                     uri = self._formatter.format(parseresult)
                     if uri:
                         res.append(LinkSubject(
-                            text, uri=uri, predicate="dcterms:references"))
+                            text, uri=uri, predicate=predicate))
                     else:
                         res.append(text)
                 # FIXME: concatenate adjacent str nodes

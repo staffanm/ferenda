@@ -1,0 +1,42 @@
+<page xmlns="http://www.mediawiki.org/xml/export-0.7/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <title>SFS/1998:204</title>
+    <ns>0</ns>
+    <id>1881</id>
+    <revision>
+      <id>11927</id>
+      <parentid>11926</parentid>
+      <timestamp>2012-11-24T15:13:54Z</timestamp>
+      <contributor>
+        <username>Staffan</username>
+        <id>2</id>
+      </contributor>
+      <sha1>4rasg6vqzru4retbjbl379whna0yol3</sha1>
+      <text xml:space="preserve" bytes="28907">''Huvudförfattare: [[Användare:Staffan|Staffan Malmgren]]''
+
+Personuppgiftslagen (PUL) reglerar hur [[juridisk person|juridiska]] och [[fysisk person|fysiska personer]] ([[myndighet]]er, [[företag]], [[enskilda]], m.fl.) får hantera [[personuppgift]]er och tar framförallt sikte på databehandling.  
+
+Det finns fyra huvudsakliga frågor man måste undersöka: 
+# Om PUL är '''tillämplig''' (2-8 §§)
+# om behandlingen är '''tillåten''' (9-22 §§)
+# om den är '''anmälningspliktig''' (36-37 §§)
+# vilka '''krav''' som ställs på behandlingen när den är igång (9, 23-35 och 42 §§). 
+
+PUL kompletteras av [[SFS/1998:1191|personuppgiftsförordningen (PUF)]] och [http://www.datainspektionen.se/lagar-och-regler/datainspektionens-foreskrifter/ datainspektionens föreskrifter (DIFS)]. Härutöver gäller även ett stort antal [[registerförfattning]]ar, exempelvis [[SFS/2001:640|förordningen (2001:640) om registerföring m.m. vid länsrätt med hjälp av automatiserad behandling]]. Även [[europakonventionen]]s artikel 8 (rätt till privatliv) reglerar den personliga integriteten.
+
+{{TranslatedAct
+|href=http://www.sweden.gov.se/content/1/c6/01/55/42/b451922d.pdf
+|actname=the Personal Data Act
+|source=the Government Offices}}
+
+== 1 § ==
+
+I 2 kap 3 § 2 st. regeringsformen stadgas att det ska finnas lagstöd för den personliga integriteten. Det är denna lag som avses.
+
+== 2 § ==
+
+Lagen är alltså [[subsidiär lag|subsidiär]]. Ett exempel på en lag som delvis gäller framför PUL är [[SFS/2001:99|lagen (2001:99) om den offentliga statistiken]]. Även tryckfrihetsförordningen har företräde framför PUL, dels på grund av denna paragraf och 7-8 §§, men framförallt pga principen om ''[[lex superior]]''.
+
+[[Kategori:Lagar inom IT-rätt]]</text>
+    </revision>
+  </page>
+  
