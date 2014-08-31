@@ -545,7 +545,8 @@ overridden by the config file or command line arguments."""
                 'imgfiles': ['res/img/navmenu-small-black.png',
                              'res/img/navmenu.png',
                              'res/img/search.png'],
-                'legacyapi': False
+                'legacyapi': False,
+                'fulltextindex': True
     }
     config = LayeredConfig(defaults, filename, argv, cascade=True)
     return config

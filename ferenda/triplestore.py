@@ -661,7 +661,9 @@ class FusekiStore(RemoteStore):
         if not self.re_fromgraph.search(query) and uniongraph:
             query = self.re_select_query.sub(" WHERE { GRAPH <urn:x-arq:UnionGraph> {",
                            query)
-            query += " }"
+            # add an extra } after the last }x
+            qparts = query.rsplit("}",1)
+            query = "%s } } %s" % (qparts[0], qparts[1])
             
         return super(FusekiStore, self).select(query, format)
 
