@@ -15,8 +15,9 @@ from ferenda import TextReader
 
 
 class Parse(unittest.TestCase):
-
+    
     def parametric_test(self, filename):
+        self.maxDiff = None
         p = SFS()
         p.id = '(test)'
         p.reader = TextReader(filename=filename, encoding='iso-8859-1',
@@ -30,12 +31,17 @@ class Parse(unittest.TestCase):
             skipfragments = ['A', 'K']
         else:
             skipfragments = ['A']
-        p._construct_ids(b, '', 'http://rinfo.lagrummet.se/publ/sfs/9999:999',
+
+        # NB: _construct_ids won't look for references
+        p._construct_ids(b, '', 'http://rinfo.lagrummet.se/publ/sfs/9999:998',
                          skipfragments)
+        # NB: parse_recursive filters out references that end in
+        # 9999:999, that's why we use :998 above...
+        p.lagrum_parser.parse_recursive(b)
+        
 
         self._remove_uri_for_testcases(b)
         resultfilename = filename.replace(".txt", ".xml")
-        self.maxDiff = 4096
         if os.path.exists(resultfilename):
             with codecs.open(resultfilename, encoding="utf-8") as fp:
                 result = fp.read().strip()

@@ -5,51 +5,51 @@
       <NumreradLista>
         <Listelement id="P2S1N1" ordinal="1">
           <str>1. för sådan omsättning som anges i </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P1S1N1">1 § första stycket 1</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P1S1N1">1 § första stycket 1</LinkSubject>
           <str>, om inte annat följer av 2-4 c: den som omsätter varan eller tjänsten,</str>
         </Listelement><Listelement id="P2S1N2" ordinal="2">
           <str>2. för omsättning som anges i </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P1S1N1">1 § första stycket 1</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P1S1N1">1 § första stycket 1</LinkSubject>
           <str> av sådana tjänster som avses i </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K5P7">5 kap. 7 §</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K5P7">5 kap. 7 §</LinkSubject>
           <str>, om den som omsätter tjänsten är en utländsk företagare och förvärvaren är en näringsidkare: den som förvärvar tjänsten,</str>
         </Listelement><Listelement id="P2S1N3" ordinal="3">
           <str>3. för omsättning som anges i </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P1S1N1">1 § första stycket 1</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P1S1N1">1 § första stycket 1</LinkSubject>
           <str> av sådana varor som avses i </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K5">5 kap.</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K5">5 kap.</LinkSubject>
           <str> </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K5P2c">2 c</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K5P2c">2 c</LinkSubject>
           <str> och </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K5P2d">2 d §§</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K5P2d">2 d §§</LinkSubject>
           <str> eller av sådana tjänster som avses i </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K5P5S3">5 kap. 5 § tredje stycket</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K5P5S3">5 kap. 5 § tredje stycket</LinkSubject>
           <str> samt </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P5a">5 a</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P5a">5 a</LinkSubject>
           <str>, </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P6a">6 a</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P6a">6 a</LinkSubject>
           <str>, </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P6b">6 b</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P6b">6 b</LinkSubject>
           <str> och </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P7a">7 a §§</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P7a">7 a §§</LinkSubject>
           <str>, om den som omsätter varan eller tjänsten är en utländsk företagare och förvärvaren är registrerad till mervärdesskatt här: den som förvärvar varan eller tjänsten,</str>
         </Listelement><Listelement id="P2S1N4" ordinal="4">
           <str>4. för sådan efterföljande omsättning inom landet som avses i </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K3P30bS1">3 kap. 30 b § första stycket</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K3P30bS1">3 kap. 30 b § första stycket</LinkSubject>
           <str>: den till vilken omsättningen görs,</str>
         </Listelement><Listelement id="P2S1N4a" ordinal="4a">
           <str>4 a. för omsättning som anges i </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P1S1N1">1 § första stycket 1</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P1S1N1">1 § första stycket 1</LinkSubject>
           <str> mellan näringsidkare som är eller ska vara registrerade till mervärdesskatt här, av guldmaterial eller halvfärdiga produkter med en finhalt av minst 325 tusendelar eller av investeringsguld om den som omsätter guldet är skattskyldig enligt </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K3P10b">3 kap. 10 b §</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K3P10b">3 kap. 10 b §</LinkSubject>
           <str>: den som förvärvar varan,</str>
         </Listelement><Listelement id="P2S1N4b" ordinal="4b">
           <str>4 b. för omsättning som anges i </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P1S1N1">1 § första stycket 1</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P1S1N1">1 § första stycket 1</LinkSubject>
           <str> av sådana tjänster som avses i </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P2S2">andra stycket</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P2S2">andra stycket</LinkSubject>
           <str>, om skattskyldighet inte föreligger enligt </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P2S1N2">första stycket 2</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P2S1N2">första stycket 2</LinkSubject>
           <str> i denna paragraf: den som förvärvar tjänsten, om denne är</str>
           <Strecksatslista>
             <Listelement id="P2S1N4bN1" ordinal="1">
@@ -60,29 +60,29 @@
           </Strecksatslista>
         </Listelement><Listelement id="P2S1N4c" ordinal="4c">
           <str>4 c. för annan omsättning som anges i </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P1S1N1">1 § första stycket 1</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P1S1N1">1 § första stycket 1</LinkSubject>
           <str> än som avses i </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P2S1N2">första stycket 2</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P2S1N2">första stycket 2</LinkSubject>
           <str>, </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P2S1N3">3</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P2S1N3">3</LinkSubject>
           <str> eller </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P2S1N4b">4 b</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P2S1N4b">4 b</LinkSubject>
           <str> i denna paragraf, i </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K3">3 kap.</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K3">3 kap.</LinkSubject>
           <str> </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K3P3S2">3 § andra</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K3P3S2">3 § andra</LinkSubject>
           <str> och </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K3P3S3">tredje styckena</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K3P3S3">tredje styckena</LinkSubject>
           <str>, i </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K5P6S1N1">5 kap. 6 § 1</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K5P6S1N1">5 kap. 6 § 1</LinkSubject>
           <str> eller i </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K7P1S3N11">7 kap. 1 § tredje stycket 11</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K7P1S3N11">7 kap. 1 § tredje stycket 11</LinkSubject>
           <str>, om den som omsätter varan eller tjänsten är en utländsk företagare och förvärvaren är registrerad till mervärdesskatt här: den som förvärvar varan eller tjänsten, om inte annat följer av </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P2d">2 d §</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P2d">2 d §</LinkSubject>
           <str>,</str>
         </Listelement><Listelement id="P2S1N5" ordinal="5">
           <str>5. för sådant förvärv som anges i </str>
-          <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P1S1N2">1 § första stycket 2</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P1S1N2">1 § första stycket 2</LinkSubject>
           <str>: den som förvärvar varan, och</str>
         </Listelement><Listelement id="P2S1N6" ordinal="6">
           <str>6. för import av varor</str>
@@ -93,7 +93,7 @@
               <str>b) om importen avser en gemenskapsvara eller om varan ska förtullas i Sverige men inte är belagd med tull: den som skulle ha varit skyldig att betala tullen om varan hade varit tullbelagd,</str>
             </Listelement><Listelement id="P2S1N6Nc" ordinal="c">
               <str>c) om skyldighet att betala tull med anledning av importen uppkommer, eller skulle ha uppkommit om varan hade varit belagd med tull, i ett annat EG-land till följd av att ett sådant mellanstatligt enhetstillstånd som avses i </str>
-              <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/2000:1281#K4P24S2">4 kap. 24 § andra stycket tullagen (2000:1281)</LinkSubject>
+              <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/2000:1281#K4P24S2">4 kap. 24 § andra stycket tullagen (2000:1281)</LinkSubject>
               <str> åberopas: innehavaren av tillståndet.</str>
             </Listelement>
           </Bokstavslista>
@@ -129,13 +129,13 @@
       <str> om inrättandet av en tullkodex för gemenskapen.</str>
     </Stycke><Stycke id="P2S4">
       <str>Särskilda bestämmelser om vem som i vissa fall är skattskyldig finns i </str>
-      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K6">6 kap.</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K6">6 kap.</LinkSubject>
       <str>, </str>
-      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K9">9 kap.</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K9">9 kap.</LinkSubject>
       <str> och </str>
-      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K9c">9 c kap.</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K9c">9 c kap.</LinkSubject>
       <str> </str>
-      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#L2007:1376">Lag (2007:1376).</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#L2007:1376">Lag (2007:1376).</LinkSubject>
     </Stycke>
   </Paragraf>
 </Forfattning>

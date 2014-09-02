@@ -10,11 +10,11 @@
         <Bokstavslista>
           <Listelement id="L1993:1617S1Na" ordinal="a">
             <str>a) lagen (</str>
-            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/1956:618">1956:618</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/1956:618">1956:618</LinkSubject>
             <str>) om allmänna sammankomster,</str>
           </Listelement><Listelement id="L1993:1617S1Nb" ordinal="b">
             <str>b) allmänna </str>
-            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/1956:617">ordningsstadgan (1956:617)</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/1956:617">ordningsstadgan (1956:617)</LinkSubject>
             <str>,</str>
           </Listelement>
         </Bokstavslista>

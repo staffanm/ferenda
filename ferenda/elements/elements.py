@@ -456,10 +456,12 @@ class OrdinalElement(AbstractElement):
         return util.numcmp(self.ordinal, other.ordinal) <= 0
 
     def __eq__(self, other):
-        return self.ordinal == other.ordinal
+        return (isinstance(other, OrdinalElement) and
+                self.ordinal == other.ordinal)
 
     def __ne__(self, other):
-        return self.ordinal != other.ordinal
+        return not(isinstance(other, OrdinalElement) and
+                   self.ordinal == other.ordinal)
 
     def __gt__(self, other):
         return util.numcmp(self.ordinal, other.ordinal) > 0

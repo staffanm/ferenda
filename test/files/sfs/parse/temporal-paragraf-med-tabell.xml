@@ -7,13 +7,13 @@
           <Tabellcell>
             <str>absorption</str>
           </Tabellcell><Tabellcell>
-            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K23P1">23 kap. 1 §</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K23P1">23 kap. 1 §</LinkSubject>
           </Tabellcell>
         </Tabellrad><Tabellrad>
           <Tabellcell>
             <str>apportegendom</str>
           </Tabellcell><Tabellcell>
-            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K2P6">2 kap. 6 §</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K2P6">2 kap. 6 §</LinkSubject>
           </Tabellcell>
         </Tabellrad>
       </Tabell>
@@ -27,13 +27,13 @@
           <Tabellcell>
             <str>absorption</str>
           </Tabellcell><Tabellcell>
-            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K23P1">23 kap. 1 §</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K23P1">23 kap. 1 §</LinkSubject>
           </Tabellcell>
         </Tabellrad><Tabellrad>
           <Tabellcell>
             <str>apportegendom</str>
           </Tabellcell><Tabellcell>
-            <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K2P6">2 kap. 6 §</LinkSubject>
+            <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K2P6">2 kap. 6 §</LinkSubject>
           </Tabellcell>
         </Tabellrad>
       </Tabell>

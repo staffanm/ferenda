@@ -5,11 +5,11 @@
     </Stycke>
   </Paragraf>
   <Overgangsbestammelser rubrik="Övergångsbestämmelser">
-    <Overgangsbestammelse id="L0000:000" sfsnr="0000:000">
+    <Overgangsbestammelse id="L(test)" sfsnr="(test)">
       <NumreradLista>
-        <Listelement id="L0000:000N1" ordinal="1">
+        <Listelement id="L(test)N1" ordinal="1">
           <str>1. Det här är en övergångsbestämmelse.</str>
-        </Listelement><Listelement id="L0000:000N2" ordinal="2">
+        </Listelement><Listelement id="L(test)N2" ordinal="2">
           <str>2. Med två punkter</str>
         </Listelement>
       </NumreradLista>

@@ -1310,10 +1310,6 @@ class SFS(Trips):
                     # betalningsöverföring och annan finansiell
                     # verksamhet"
                     if term and len(term) < 68:
-                        # this results in empty/hidden links -- might
-                        # be better to hchange sfs.template.xht2 to
-                        # change these to <span rel="" href=""/>
-                        # instead. Or use another object than LinkSubject.
                         term = util.normalize_space(term)
                         termnode = LinkSubject(term, uri=self._term_to_subject(
                             term), predicate="dcterms:subject")
@@ -1321,36 +1317,13 @@ class SFS(Trips):
                     else:
                         term = None
 
-# do this in a CitationParser.parse_recursive call instead
-#                for p in element:  # normally only one, but can be more
-#                                  # if the Stycke has a NumreradLista
-#                                  # or similar
-#
-#                    if isinstance(p, str):  # look for stuff
-#                        # normalize and convert some characters
-#                        s = " ".join(p.split())
-#                        s = s.replace("\x96", "-")
-#                        # Make all links have a dcterms:references
-#                        # predicate -- not that meaningful for the
-#                        # XHTML2 code, but needed to get useful RDF
-#                        # triples in the RDFa output
-#                        # print "Parsing %s" % " ".join(p.split())
-#                        # print "Calling parse w %s" % baseuri+"#"+prefix
-#                        from pudb import set_trace; set_trace()
-#                        parsednodes = self.lagrum_parser.parse(s,
-#                                                               baseuri +
-#                                                               prefix,
-#                                                               "dcterms:references")
-#                        for n in parsednodes:
-#                            # py2 compat FIxme
-#                            if term and isinstance(n, str) and term in n:
-#                                (head, tail) = n.split(term, 1)
-#                                nodes.extend((head, termnode, tail))
-#                            else:
-#                                nodes.append(n)
-#
-#                        idx = element.index(p)
-#                element[idx:idx + 1] = nodes
+                if term:
+                    for p in element:
+                        if isinstance(p, str) and term in p:
+                            (head, tail) = p.split(term, 1)
+                            nodes = (head, termnode, tail)
+                            idx = element.index(p)
+                    element[idx:idx + 1] = nodes
 
             # Konstruera IDs
             for p in element:

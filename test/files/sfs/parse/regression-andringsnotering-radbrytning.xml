@@ -2,7 +2,7 @@
   <Paragraf id="P1" ordinal="1">
     <Stycke id="P1S1">
       <str>En ändringsnotering med radbrytning. </str>
-      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#L1976:192">Lag (1976:192).</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#L1976:192">Lag (1976:192).</LinkSubject>
     </Stycke>
   </Paragraf>
 </Forfattning>

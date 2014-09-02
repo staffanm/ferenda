@@ -4,18 +4,18 @@
       <str>Bestämmelser om betydelsen av följande begrepp finns i nedan angivna paragrafer:</str>
     </Stycke><Stycke id="P1S2">
       <str>aktiebolag i </str>
-      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P4">4 §</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P4">4 §</LinkSubject>
     </Stycke><Stycke id="P1S3">
       <str>återföring av avdrag i </str>
-      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P34">34 §</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P34">34 §</LinkSubject>
     </Stycke><Stycke id="P1S4">
       <str>ägarlägenhet i </str>
-      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P15">15 §</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P15">15 §</LinkSubject>
     </Stycke><Stycke id="P1S5">
       <str>ägarlägenhetsenhet i </str>
-      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P15">15 §</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P15">15 §</LinkSubject>
       <str>. </str>
-      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#L2009:107">Lag (2009:107).</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#L2009:107">Lag (2009:107).</LinkSubject>
     </Stycke>
   </Paragraf>
 </Forfattning>

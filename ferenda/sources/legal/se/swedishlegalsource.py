@@ -621,11 +621,20 @@ class SwedishCitationParser(CitationParser):
             self._currenturl = part.uri
         if isinstance(part, (Link, A, H1, H2, H3)):
             # don't process text that's already a link (or a heading)
-            return part
+            if isinstance(part, str): # caller expects a list
+                return [part]
+            else:
+                return part
         else:
             return super(SwedishCitationParser, self).parse_recursive(part, predicate)
         
     def parse_string(self, string, predicate="dcterms:references"):
+        from sfs import UpphavtKapitel, UpphavdParagraf
+        if isinstance(string, (UpphavtKapitel, UpphavdParagraf)):
+            return [string]
+
+        # basic normalization without stripping
+        string = string.replace("\r\n", " ").replace("\n", " ")
         unfiltered = self._legalrefparser.parse(string, baseuri=self._currenturl, predicate=predicate)
         # remove those references that we cannot fully resolve (should
         # be an option in LegalRef, but...
