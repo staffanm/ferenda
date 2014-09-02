@@ -46,6 +46,7 @@ from ferenda.elements import UnicodeElement
 from ferenda.errors import DocumentRemovedError, ParseError
 from ferenda.sources.legal.se.legalref import LegalRef, LinkSubject
 from ferenda.sources.legal.se import SwedishCitationParser
+RPUBL = Namespace('http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
 
 E = ElementMaker(namespace="http://www.w3.org/1999/xhtml")
 # Objektmodellen för en författning är uppbyggd av massa byggstenar
@@ -1218,6 +1219,13 @@ class SFS(Trips):
                 if self.re_loptextdef(element[0][0]):
                     find_definitions = "loptext"
 
+                for p in element:
+                    if isinstance(p, Stycke):
+                        # do an extra check in case "I denna paragraf
+                        # avses med" occurs in the 2nd or later
+                        # paragrapgh of a section
+                        if self.re_definitions(p[0]):
+                            find_definitions = "normal"
                 find_definitions_recursive = find_definitions
 
             # Hitta lagrumshänvisningar + definitioner
@@ -1226,6 +1234,7 @@ class SFS(Trips):
                     or isinstance(element, Tabellcell)):
                 nodes = []
                 term = None
+
 
                 # self.log.debug("handling text %s, find_definitions %s" % (element[0],find_definitions))
                 if find_definitions:
@@ -1238,6 +1247,7 @@ class SFS(Trips):
                             self.log.debug(
                                 '"%s" är nog en definition (1)' % term)
                     elif isinstance(element, Stycke):
+
                         # Case 1: "antisladdsystem: ett tekniskt stödsystem"
                         # Sometimes, : is not the delimiter between
                         # the term and the definition, but even in
@@ -1245,7 +1255,6 @@ class SFS(Trips):
                         # definition itself, usually as part of the
                         # SFS number. Do some hairy heuristics to find
                         # out what delimiter to use
-
                         if find_definitions == "normal":
                             if not self.re_definitions(elementtext):
                                 if " - " in elementtext:

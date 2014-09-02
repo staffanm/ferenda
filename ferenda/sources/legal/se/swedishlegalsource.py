@@ -617,7 +617,7 @@ class SwedishCitationParser(CitationParser):
     def parse_recursive(self, part, predicate="dcterms:references"):
         if hasattr(part, 'about'):
             self._currenturl = part.about
-        elif hasattr(part, 'uri'):
+        elif hasattr(part, 'uri') and not isinstance(part, (Link, A)):
             self._currenturl = part.uri
         if isinstance(part, (Link, A, H1, H2, H3)):
             # don't process text that's already a link (or a heading)
