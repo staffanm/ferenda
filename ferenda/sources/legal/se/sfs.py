@@ -25,6 +25,7 @@ from six import text_type as str
 from ferenda.compat import OrderedDict
 
 # 3rdparty libs
+import pkg_resources
 from rdflib import Namespace, URIRef, Literal
 from lxml import etree
 from lxml.builder import ElementMaker
@@ -47,6 +48,7 @@ from ferenda.errors import DocumentRemovedError, ParseError
 from ferenda.sources.legal.se.legalref import LegalRef, LinkSubject
 from ferenda.sources.legal.se import SwedishCitationParser
 RPUBL = Namespace('http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
+
 
 E = ElementMaker(namespace="http://www.w3.org/1999/xhtml")
 # Objektmodellen för en författning är uppbyggd av massa byggstenar
@@ -1186,19 +1188,19 @@ class SFS(Trips):
         txt += "\r\n"
         return txt
 
+    # FIXME: should get hold of a real LNKeyword repo object and call
+    # it's canonical_uri()
     def _term_to_subject(self, term):
         capitalized = term[0].upper() + term[1:]
-        return 'http://lagen.nu/concept/%s' % capitalized.replace(' ', '_')
+        return 'https://lagen.nu/concept/%s' % capitalized.replace(' ', '_')
 
-    # Post-processar dokumentträdet rekursivt och gör tre saker:
-    #
-    # Hittar begreppsdefinitioner i löptexten
+    # Post-processar dokumentträdet rekursivt och gör två saker:
     #
     # Hittar adresserbara enheter (delresurser som ska ha unika URI:s,
     # dvs kapitel, paragrafer, stycken, punkter) och konstruerar id's
     # för dem, exv K1P2S3N4 för 1 kap. 2 \xa7 3 st. 4 p
     #
-    # Hittar lagrumshänvisningar i löptexten
+    # Hittar begreppsdefinitioner i löptexten
     def _construct_ids(self, element, prefix, baseuri, skip_fragments=[],
                        find_definitions=False):
         find_definitions_recursive = find_definitions
@@ -1234,7 +1236,6 @@ class SFS(Trips):
                     or isinstance(element, Tabellcell)):
                 nodes = []
                 term = None
-
 
                 # self.log.debug("handling text %s, find_definitions %s" % (element[0],find_definitions))
                 if find_definitions:
@@ -1393,7 +1394,6 @@ class SFS(Trips):
         self._construct_ids(doc.body, '',
                             self.canonical_uri(doc.basefile),
                             skipfragments)
-
         self.lagrum_parser.parse_recursive(doc.body)
 
     #----------------------------------------------------------------
@@ -2562,7 +2562,6 @@ class SFS(Trips):
         sq = fp.read().decode('utf-8') % params
         fp.close()
         return store.select(sq, "python")
-
 
     def prep_annotation_file(self, basefile):
 

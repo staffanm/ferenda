@@ -18,7 +18,7 @@ import tempfile
 
 # 3rdparty libs
 import pkg_resources
-from rdflib import Namespace, URIRef, Graph, RDF
+from rdflib import Namespace, URIRef, Graph, RDF, Literal
 import requests
 import lxml.html
 from lxml import etree
@@ -196,9 +196,9 @@ class DV(SwedishLegalSource):
         mapfile = os.path.sep.join(
             [config.datadir, 'dv', 'generated', 'uri.map'])
         if not util.outfile_is_newer(util.list_dirs(parsed_dir, ".xhtml"), mapfile):
-            re_xmlbase = re.compile('<head about="%(uri)sres/%(alias)s/([^"]+)"' %
-                                    {'uri': config.url,
-                                     'alias': cls.alias})
+            prefix = config.url + config.urlpath
+            # prefix = config.url + "res/" + cls.alias + "/"
+            re_xmlbase = re.compile('<head about="%s([^"]+)"' % prefix)
             log = cls._setup_logger(cls.alias)
             log.info("Creating uri.map file")
             cnt = 0
