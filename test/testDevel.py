@@ -134,7 +134,8 @@ WHERE { ?s ?p ?o .
         g.add((URIRef(uri),
                DCTERMS.title,
                Literal("Document title")))
-        config = {'connect.return_value': Mock(**{'construct.return_value': g})}
+        config = {'connect.return_value':
+                  Mock(**{'construct.return_value': g})}
         printmock = MagicMock()
         with patch('ferenda.devel.TripleStore', **config):
             with patch(builtins+'.print', printmock):
