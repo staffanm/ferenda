@@ -192,7 +192,10 @@ class FerendaTestCase(object):
                                  stderr=subprocess.PIPE)
             treestr = etree.tostring(tree, encoding="utf-8")
             stdout, stderr = p.communicate(treestr)
-            if p.returncode and stderr:
+            if stdout.strip():
+                newtree = etree.parse(BytesIO(stdout))
+                return newtree
+            elif p.returncode and stderr:
                 raise ExternalCommandError(stderr)
             newtree = etree.parse(BytesIO(stdout))
             return newtree

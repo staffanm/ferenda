@@ -1,0 +1,24 @@
+@prefix : <http://www.w3.org/1999/xhtml> .
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rinfoex: <http://lagen.nu/terms#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xhv: <http://www.w3.org/1999/xhtml/vocab#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix xsi: <http://www.w3.org/2001/XMLSchema-instance> .
+
+<https://lagen.nu/concept/Allmän_domstol> a skos:Concept ;
+    dcterms:description """
+    <p xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml"><b>Allmän domstol</b> är <a href="https://lagen.nu/concept/Tingsrätt">tingsrätt</a>, <a href="https://lagen.nu/concept/Hovrätt">hovrätt</a> och <a href="https://lagen.nu/concept/Högsta_domstolen">Högsta domstolen</a>. </p>
+  """^^rdf:XMLLiteral ;
+    dcterms:subject <https://lagen.nu/concept/Processrätt> ;
+    dcterms:title "Allmän domstol"@sv ;
+    prov:wasGeneratedBy "lnwiki.LNMediaWiki" .
+

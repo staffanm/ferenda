@@ -1,0 +1,26 @@
+@prefix : <http://www.w3.org/1999/xhtml> .
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rinfoex: <http://lagen.nu/terms#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xhv: <http://www.w3.org/1999/xhtml/vocab#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix xsi: <http://www.w3.org/2001/XMLSchema-instance> .
+
+<https://lagen.nu/concept/Anskaffarfrihet> a skos:Concept ;
+    dcterms:description """
+    <p xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">En tryckfrihetsrättsliga princip som innebär att alla har rätt att anskaffa uppgifter i syfte att offentliggöra eller publicera dem. </p>
+    <p xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">Anskaffarfriheten regleras i <a href="http://localhost:8000/res/sfs/1949:105#K1P1S4">TF 1:1 4 st.</a> </p>
+    <p xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">Synonym: Anskaffarskydd. </p>
+  """^^rdf:XMLLiteral ;
+    dcterms:subject <https://lagen.nu/concept/Tryckfrihetsrätt> ;
+    dcterms:title "Anskaffarfrihet"@sv ;
+    prov:wasGeneratedBy "lnwiki.LNMediaWiki" .
+
