@@ -141,8 +141,11 @@ class Transformer(object):
             import logging
             log = logging.getLogger("ferenda.transformer")
             if self.config:
-                import pkg_resources
-                xslfile = pkg_resources.resource_filename('ferenda', self.t.orig_template)
+                if os.path.exists(self.t.orig_template):
+                    xslfile = self.t.orig_template
+                else:
+                    import pkg_resources
+                    xslfile = pkg_resources.resource_filename('ferenda', self.t.orig_template)
                 p = parameters.copy()
                 for key, value in p.items():
                     if key.endswith("file"):
@@ -199,15 +202,15 @@ class XSLTTransform(TransformerEngine):
         workdir = mkdtemp()
         # copy everything to this temp dir
         for d in templatedirs:
-            if pkg_resources.resource_isdir('ferenda', d):
+            if os.path.exists(d) and os.path.isdir(d):
+                for f in os.listdir(d):
+                    shutil.copy2(d + os.sep + f, workdir + os.sep + f)
+            elif pkg_resources.resource_isdir('ferenda', d):
                 for f in pkg_resources.resource_listdir('ferenda', d):
                     fp = pkg_resources.resource_stream('ferenda', d + "/" + f)
                     dest = workdir + os.sep + f
                     with open(dest, "wb") as dest_fp:
                         dest_fp.write(fp.read())
-            elif os.path.exists(d) and os.path.isdir(d):
-                for f in os.listdir(d):
-                    shutil.copy2(d + os.sep + f, workdir + os.sep + f)
         if os.path.basename(template) not in os.listdir(workdir):
             shutil.copy2(template, workdir)
         return workdir

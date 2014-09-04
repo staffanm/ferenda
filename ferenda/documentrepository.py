@@ -1285,6 +1285,7 @@ with the *config* object as single parameter.
         XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
         XSI_SCHEMALOC = "{http://www.w3.org/2001/XMLSchema-instance}schemaLocation"
         def render_head(g, uri, children=None):
+            E = ElementMaker(namespace="http://www.w3.org/1999/xhtml")
             if not children:
                 children = []
                 # if revlink == True, we're serializing triples for
@@ -1346,13 +1347,33 @@ with the *config* object as single parameter.
 
             return E.head({'about': uri}, *children)
 
-        nsmap = {None: "http://www.w3.org/1999/xhtml"}
 
-        for prefix, namespace in self.ns.items():
-            nsmap[prefix] = str(namespace)
+        bodycontent = doc.body.as_xhtml(doc.uri)
+        headcontent = render_head(doc.meta, doc.uri)
+        
+        # examine headcontent and bodycontent to only use prefixes
+        # that are actually used
+        prefixes = dict([(str(x[1]), x[0]) for x in self.ns.items()])
+        used = {"http://www.w3.org/1999/xhtml": None}
+        for e in bodycontent.iter():
+            if "}" in e.tag:
+                ns = e.tag.split("}",1)[0][1:]
+                if ns not in used:
+                    used[ns] = prefixes[ns]
+        nsmap = dict([(x[1], x[0]) for x in used.items()])
+
+        for e in headcontent.iter():
+            # examine @property @datatype @rel for CURIEs and make
+            # sure they're mapped
+            for a in ('property', 'datatype', 'rel'):
+                v = e.get(a) 
+                if v and ":" in v:
+                    prefix = v.split(":")[0]
+                    if prefix not in nsmap:
+                        nsmap[prefix] = str(self.ns[prefix])
+                    
         E = ElementMaker(namespace="http://www.w3.org/1999/xhtml",
                          nsmap=nsmap)
-        headcontent = render_head(doc.meta, doc.uri)
         bodycontent = doc.body.as_xhtml(doc.uri)
         htmlattrs = {XSI_SCHEMALOC: "http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd",
                      "version": "XHTML+RDFa 1.1"}
