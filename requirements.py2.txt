@@ -4,7 +4,7 @@ rdflib
 rdfextras
 rdflib-jsonld
 html5lib
-requests
+requests=2.3.0
 six
 jsmin
 cssmin
