@@ -629,7 +629,10 @@ class SwedishCitationParser(CitationParser):
             return super(SwedishCitationParser, self).parse_recursive(part, predicate)
         
     def parse_string(self, string, predicate="dcterms:references"):
-        from sfs import UpphavtKapitel, UpphavdParagraf
+        try:
+            from sfs import UpphavtKapitel, UpphavdParagraf
+        except ImportError:
+            from ferenda.sources.legal.se.sfs import UpphavtKapitel, UpphavdParagraf
         if isinstance(string, (UpphavtKapitel, UpphavdParagraf)):
             return [string]
 

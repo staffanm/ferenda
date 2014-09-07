@@ -193,7 +193,9 @@ class FerendaTestCase(object):
             treestr = etree.tostring(tree, encoding="utf-8")
             stdout, stderr = p.communicate(treestr)
             if stdout.strip():
-                newtree = etree.parse(BytesIO(stdout))
+                rawres = stdout
+                cookedres = stdout.decode("utf-8").replace("&nbsp;", "&#160;").encode("utf-8")
+                newtree = etree.parse(BytesIO(cookedres))
                 return newtree
             elif p.returncode and stderr:
                 raise ExternalCommandError(stderr)
