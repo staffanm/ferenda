@@ -204,7 +204,7 @@ class SwedishLegalSource(DocumentRepository):
     def parse_iso_date(self, datestr):
         # only handles YYYY-MM-DD now. Look into dateutil or isodate
         # for more complete support of all ISO 8601 variants
-        return datetime.strptime(datestr, "%Y-%m-%d")
+        return datetime.strptime(datestr, "%Y-%m-%d").date()
 
     def parse_swedish_date(self, datestr):
         """Parses a number of common forms of expressing swedish dates with
@@ -638,7 +638,8 @@ class SwedishCitationParser(CitationParser):
 
         # basic normalization without stripping
         string = string.replace("\r\n", " ").replace("\n", " ")
-        unfiltered = self._legalrefparser.parse(string, baseuri=self._currenturl, predicate=predicate)
+        # unfiltered = self._legalrefparser.parse(string, baseuri=self._currenturl, predicate=predicate)
+        unfiltered = self._legalrefparser.parse(string, baseuri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K9P9S9P9", predicate=predicate)
         # remove those references that we cannot fully resolve (should
         # be an option in LegalRef, but...
         filtered = []
