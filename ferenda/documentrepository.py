@@ -19,6 +19,7 @@ import socket
 import inspect
 import difflib
 import functools
+import json
 from ferenda.compat import OrderedDict
 
 # 3rd party
@@ -572,6 +573,9 @@ with the *config* object as single parameter.
 
         uri = "%sdataset/%s" % (self.config.url, self.alias)
         if param and value:
+            if PY2:
+                # FIXME: see comment in documentstore.basefile_to_pathfrag
+                value = value.encode("utf-8")
             uri += "?%s=%s" % (param, quote(value))
         return uri
 
@@ -2194,7 +2198,19 @@ WHERE {
         with util.logtime(self.log.debug,
                           "toc: selected %(rowcount)s rows (%(elapsed).3f sec)",
                           params):
-            data = self.faceted_data()
+            cachepath = self.store.path('faceted_data', 'toc', '.json')
+            if (not self.config.force) and os.path.exists(cachepath):
+                self.log.debug("Loading faceted_data from %s" % cachepath)
+                data = json.load(open(cachepath))
+            else:
+                data = self.faceted_data()
+                util.ensure_dir(cachepath)
+                with open(cachepath, "w") as fp:
+                    self.log.debug("Saving faceted_data to %s" % cachepath)
+                    json.dump(data, fp, indent=4)
+                if os.path.getsize(cachepath) == 0:
+                    util.robust_remove(cachepath)
+                    
             params['rowcount'] = len(data)
         if len(data) > 0:
             facets = self.facets()

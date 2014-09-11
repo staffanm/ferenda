@@ -282,42 +282,11 @@ class SwedishLegalSource(DocumentRepository):
         d.value(self.ns['rpubl'].arsutgava, arsutgava)
         d.value(self.ns['rpubl'].lopnummer, lopnummer)
 
-    def toc_query(self):
-        return """PREFIX dcterms:<http://purl.org/dc/terms/>
-                  PREFIX rpubl:<http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
-                  SELECT DISTINCT ?uri ?title ?identifier ?arsutgava ?lopnummer ?departement
-                  FROM <%s>
-                  WHERE {?uri dcterms:title ?title;
-                              dcterms:identifier ?identifier;
-                              rpubl:arsutgava ?arsutgava;
-                              rpubl:lopnummer ?lopnummer;
-                              rpubl:departement ?departement;
-                  }""" % self.context()
-
-    def toc_criteria(self):
-        return (
-            {'predicate': self.ns['rpubl']['arsutgava'],
-             'binding': 'arsutgava',
-             'label': 'Efter \xe5rtal',
-             'sorter': cmp,
-             'pages': []},
-            {'predicate': self.ns['dcterms']['title'],
-             'binding': 'title',
-             'label': 'Efter rubrik',
-             'selector': lambda x: x[0].lower(),
-             'sorter': cmp,
-             'pages': []},
-            {'predicate': self.ns['rpubl']['departement'],
-             'binding': 'departement',
-             'label': 'Efter departement',
-             'selector': self.lookup_label,
-             'sorter': cmp,
-             'pages': []},
-        )
-
-    def toc_item(self, binding, row):
-        return {'uri': row['uri'],
-                'label': row['identifier'] + ": " + row['title']}
+# can't really have a toc_item thats general for all kinds of swedish legal documents?
+# 
+#    def toc_item(self, binding, row):
+#        return {'uri': row['uri'],
+#                'label': row['dcterms_identifier'] + ": " + row['dcterms_title']}
 
 
 def offtryck_parser(basefile="0", preset="proposition", metrics={}):

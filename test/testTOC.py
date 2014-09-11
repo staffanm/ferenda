@@ -14,7 +14,7 @@ from lxml import etree
 from rdflib import RDF, Graph
 from rdflib.namespace import DCTERMS
 
-from ferenda.compat import Mock, MagicMock
+from ferenda.compat import Mock, MagicMock, patch
 from ferenda import util
 from ferenda.testutil import RepoTester
 from ferenda.elements import Link
@@ -94,7 +94,8 @@ class TOC(RepoTester):
         self.repo.toc_select_for_pages = Mock()
         self.repo.toc_generate_pages = Mock()
         self.repo.toc_generate_first_page = Mock()
-        self.repo.toc()
+        with patch('json.dump'):
+            self.repo.toc()
 
         # assert facet_query was properly called, error and info msg
         # was printed
@@ -109,7 +110,8 @@ class TOC(RepoTester):
 
         # test2: facet_select returns something
         self.repo.faceted_data.return_value = ["fake", "data"]
-        self.repo.toc()
+        with patch('json.load'):
+            self.repo.toc()
         # Now all other methods should be called
         self.assertTrue(self.repo.toc_pagesets.called)
         self.assertTrue(self.repo.toc_select_for_pages.called)
