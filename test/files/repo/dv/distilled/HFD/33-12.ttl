@@ -13,7 +13,7 @@
         "Högsta förvaltningsdomstolen"@sv,
         "Kammarrätten i Göteborg"@sv ;
     dcterms:identifier "HFD 2013:29" ;
-    dcterms:publisher <http://lagen.nu/org/2008/domstolsverket> ;
+    dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
     rpubl:arsutgava "2013" ;
     rpubl:lopnummer "29" ;
     rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/hfd> ;
@@ -23,11 +23,11 @@
     prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
 
 <http://localhost:8000/res/dv/hfd/33-12/2013-05-27> a rpubl:VagledandeDomstolsavgorande ;
-    dcterms:publisher <http://lagen.nu/org/2011/hogsta-forvaltningsdomstolen> ;
+    dcterms:publisher <https://lagen.nu/org/2011/hogsta-forvaltningsdomstolen> ;
     dcterms:relation "Prop. 1992/93:30 s. 34 och 39" ;
     dcterms:subject <http://localhost:8000/concept/Allmän_försäkring> ;
     dcterms:title "Minskning av en retroaktivt beviljad sjukersättning med sjukpenning som tidigare betalats ut för en del av den retroaktiva perioden skulle göras för den retroaktiva perioden i dess helhet."@sv ;
-    rpubl:avgorandedatum "2013-05-27T00:00:00"^^xsd:dateTime ;
+    rpubl:avgorandedatum "2013-05-27"^^xsd:date ;
     rpubl:lagrum <http://localhost:8000/res/sfs/1962:381>,
         <http://localhost:8000/res/sfs/1962:381#K17P1S1> ;
     rpubl:malnummer "33-12" ;

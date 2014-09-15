@@ -9,7 +9,7 @@
 
 <http://localhost:8000/res/dv/ad/2010:70> a rpubl:Rattsfallsreferat ;
     dcterms:identifier "AD 2010 nr 70" ;
-    dcterms:publisher <http://lagen.nu/org/2008/domstolsverket> ;
+    dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
     rpubl:arsutgava "2010" ;
     rpubl:lopnummer "70" ;
     rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/ad> ;
@@ -19,9 +19,9 @@
     prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
 
 <http://localhost:8000/res/dv/ad/B-117-2009/2010-10-13> a rpubl:VagledandeDomstolsavgorande ;
-    dcterms:publisher <http://lagen.nu/org/2008/arbetsdomstolen> ;
+    dcterms:publisher <https://lagen.nu/org/2008/arbetsdomstolen> ;
     dcterms:title "Målet gällde skadestånd. Domen innebar att tingsrättens domslut fastställdes."@sv ;
-    rpubl:avgorandedatum "2010-10-13T00:00:00"^^xsd:dateTime ;
+    rpubl:avgorandedatum "2010-10-13"^^xsd:date ;
     rpubl:domsnummer "2010-70" ;
     rpubl:malnummer "B-117-2009" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/ad/B-117-2009/2010-10-13> .

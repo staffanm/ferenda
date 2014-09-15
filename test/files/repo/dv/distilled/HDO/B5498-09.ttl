@@ -17,7 +17,7 @@
     dcterms:identifier "NJA 2010 s. 168",
         "I"@sv,
         "II"@sv ;
-    dcterms:publisher <http://lagen.nu/org/2008/domstolsverket> ;
+    dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
     dcterms:references <http://localhost:8000/res/dv/nja/2000s622>,
         <http://localhost:8000/res/dv/nja/2004s840>,
         <http://localhost:8000/res/dv/nja/2005s856>,
@@ -38,7 +38,7 @@
     prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
 
 <http://localhost:8000/res/dv/hd/B5498-09/2010-03-31> a rpubl:VagledandeDomstolsavgorande ;
-    dcterms:publisher <http://lagen.nu/org/2008/hogsta-domstolen> ;
+    dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
     dcterms:subject <http://localhost:8000/concept/Dubbla_förfaranden>,
         <http://localhost:8000/concept/Ne_bis_in_idem>,
         <http://localhost:8000/concept/Res_judicata>,
@@ -46,7 +46,7 @@
         <http://localhost:8000/concept/Skattetillägg> ;
     dcterms:title "Fråga om det svenska systemet med dubbla sanktioner (skattetillägg och brottspåföljd) och två förfaranden för oriktiga uppgifter i skatteförfarandet är förenligt med det i artikel 4 i det sjunde tilläggsprotokollet till Europakonventionen upptagna förbudet mot dubbla förfaranden (ne bis in idem). (I=B 5498-09 och II= 2509-09)"@sv ;
     rpubl:avdelning "1" ;
-    rpubl:avgorandedatum "2010-03-31T00:00:00"^^xsd:dateTime ;
+    rpubl:avgorandedatum "2010-03-31"^^xsd:date ;
     rpubl:lagrum <http://localhost:8000/res/sfs/1994:1219> ;
     rpubl:malnummer "B5498-09" ;
     rpubl:rattsfall <http://localhost:8000/res/dv/nja/2000s622>,

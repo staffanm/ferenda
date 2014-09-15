@@ -9,7 +9,7 @@
 
 <http://localhost:8000/res/dv/nja/2009/not/1> a rpubl:Rattsfallsnotis ;
     dcterms:identifier "NJA 2009 not 1" ;
-    dcterms:publisher <http://lagen.nu/org/2008/domstolsverket> ;
+    dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
     dcterms:references <http://localhost:8000/res/dv/nja/1999s715> ;
     rpubl:arsutgava "2009" ;
     rpubl:lopnummer "1" ;
@@ -19,8 +19,8 @@
     prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
 
 <http://localhost:8000/res/dv/hd/Ö1242-08/2009-01-27> a rpubl:VagledandeDomstolsavgorande ;
-    dcterms:publisher <http://lagen.nu/org/2008/hogsta-domstolen> ;
-    rpubl:avgorandedatum "2009-01-27T00:00:00"^^xsd:dateTime ;
+    dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
+    rpubl:avgorandedatum "2009-01-27"^^xsd:date ;
     rpubl:malnummer "Ö1242-08" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/hd/Ö1242-08/2009-01-27> .
 

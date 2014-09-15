@@ -23,7 +23,7 @@ def import_org(filename, targetgraph):
         targeturi = targetgraph.value(predicate=FOAF.name, object=name)
         if not targeturi: # We didn't have this previously. Need to
                           # make up a URI
-            uri = "http://lagen.nu/org/2014/%s" % str(name).lower().translate(TRANS)
+            uri = "https://lagen.nu/org/2014/%s" % str(name).lower().translate(TRANS)
             print("  Adding new resource %s" %uri)
             targeturi = rdflib.URIRef(uri)
             
@@ -49,7 +49,7 @@ def import_dataset(filename, targetgraph):
                 print("WARNING: Can't find skos:altLabel for %s, using alternate method" %  sourceuri)
                 slug = util.uri_leaf(str(sourceuri))
                       
-            uri = "http://lagen.nu/dataset/%s" % str(slug).lower().translate(TRANS)
+            uri = "https://lagen.nu/dataset/%s" % str(slug).lower().translate(TRANS)
             print("  Adding new resource %s" %uri)
             targeturi = rdflib.URIRef(uri)
             
