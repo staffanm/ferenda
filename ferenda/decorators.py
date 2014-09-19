@@ -250,7 +250,8 @@ def downloadmax(f):
         downloadmax = None
         if 'FERENDA_DOWNLOADMAX' in os.environ:
             downloadmax = int(os.environ['FERENDA_DOWNLOADMAX'])
-        elif self.config.downloadmax:
+        elif self.config.downloadmax and not isinstance(self.config.downloadmax, type):
+
             downloadmax = self.config.downloadmax
 
         if downloadmax:

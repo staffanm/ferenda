@@ -128,22 +128,35 @@ class SwedishLegalSource(DocumentRepository):
         swedish_ordinal_list, list(range(1, len(swedish_ordinal_list) + 1)))))
 
     swedish_months = {"januari": 1,
+                      "jan": 1,
                       "februari": 2,
+                      "feb": 2,
                       "mars": 3,
+                      "mar": 3,
                       "april": 4,
+                      "apr": 4,
                       "maj": 5,
                       "juni": 6,
+                      "jun": 6,
                       "juli": 7,
+                      "jul": 7,
                       "augusti": 8,
+                      "aug": 8,
                       "september": 9,
+                      "sep": 9,
+                      "sept": 9,
                       "oktober": 10,
+                      "okt": 10,
                       "november": 11,
+                      "nov": 11,
                       "december": 12,
+                      "dec": 12,
                       "\xe5r": 12}
 
     def __init__(self, config=None, **kwargs):
         super(SwedishLegalSource, self).__init__(config, **kwargs)
-        assert self.alias != "swedishlegalsource", "Subclasses must override self.alias!"
+        if type(self) != SwedishLegalSource:
+            assert self.alias != "swedishlegalsource", "Subclasses must override self.alias!"
         if not hasattr(self.config, 'urlpath'):
             self.config.urlpath = "res/%s/" % self.alias
         

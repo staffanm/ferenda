@@ -19,12 +19,6 @@ from ferenda.sources.legal.se import ARN, Direktiv, Ds, DV, JK, JO, Kommitte, My
 from ferenda.sources.legal.se.propositioner import PropRegeringen
 from ferenda.sources.legal.se.direktiv import DirTrips
 
-class TestSwedishLegalSource(unittest.TestCase):
-    def test_parse_swedish_date(self):
-        repo = SwedishLegalSource()
-        self.assertEqual(repo.parse_swedish_date("3 februari 2010"), datetime.date(2010,2,3))
-
-
 for cls in (Keyword, Skeleton, MediaWiki,
             RFC, W3Standards, PEP,
             EurlexCaselaw, EurlexTreaties,
