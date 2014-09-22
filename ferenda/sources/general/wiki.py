@@ -87,7 +87,7 @@ class MediaWiki(DocumentRepository):
 
         if self.config.mediawikidump:
             resp = requests.get(self.config.mediawikidump)
-            with self.store._open('dump', 'downloaded', '.xml') as fp:
+            with self.store._open('dump', 'downloaded', '.xml', mode="wb") as fp:
                 fp.write(resp.content)
             # xml = etree.parse(resp.content)
             xmldumppath = self.store.path('dump', 'downloaded', '.xml')
