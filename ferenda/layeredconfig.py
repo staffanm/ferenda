@@ -118,6 +118,13 @@ class LayeredConfig(object):
             with open(root._inifilename, "w") as fp:
                 root._configparser.write(fp)
 
+    def set(config, key, value, source="defaults"):
+        """Sets a value without marking the config file dirty"""
+        src = {'defaults': config._defaults,
+               'inifile': config._inifile,
+               'commandline': config._commandline}[source]
+        src[key] = value
+
     def __iter__(self):
         l = []
         iterables = [self._commandline.keys(),

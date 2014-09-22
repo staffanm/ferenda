@@ -819,8 +819,10 @@ def _instantiate_class(cls, config=None, argv=[]):
     # been set by some other means
     for param in clsdefaults:
         if param not in clsconfig:
-            setattr(clsconfig, param, clsdefaults[param])
-
+            # the set method sets the parameter on an appropriate
+            # store w/o dirtiying it.
+            LayeredConfig.set(clsconfig, param, clsdefaults[param], "defaults")
+            # setattr(clsconfig, param, clsdefaults[param])
     
     inst = cls(clsconfig)
     return inst

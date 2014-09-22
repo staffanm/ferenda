@@ -248,9 +248,6 @@ jsfiles = ['default.js','modernizr.js']
         cmdline = ["--logfile=out.log"]
         cfg = LayeredConfig(defaults=types,commandline=cmdline)
         self.assertEqual(cfg.logfile, "out.log")
-        
-        
-
 
     def test_typed_commandline_cascade(self):
         # the test here is that _load_commandline must use _type_value property.
@@ -267,6 +264,17 @@ jsfiles = ['default.js','modernizr.js']
         self.assertEqual(cfg.lastdownload, None)
         self.assertEqual(subconfig.lastdownload, None)
         
+# Note: above test assumes that typed, no-actual-value parameters
+# should return None, not raise AttributeError. Maybe that is the best
+# behaviour. 
+# 
+#     def test_typed_novalue(self):
+#         # Test that a config object never returns an actual type value
+#         # (if it isn't "filled in" with a proper value
+#         defaults = {'lastdownload': datetime}
+#         cfg = LayeredConfig(defaults=defaults)
+#         with self.assertRaises(AttributeError):
+#             cfg.lastdownload
 
     def test_layered(self):
         defaults = {'loglevel':'ERROR'}
@@ -348,6 +356,16 @@ lastrun = 2013-09-18 15:41:00
         cfg = LayeredConfig(defaults={'lastrun': datetime(2012,9,18,15,41,0)})
         cfg.lastrun = datetime(2013,9,18,15,41,0)
         LayeredConfig.write(cfg)
+
+    def test_set(self):
+        # a value is set in a particular underlying source, and the
+        # dirty flag isn't set.
+        cfg = LayeredConfig(inifile="ferenda.ini")
+        LayeredConfig.set(cfg, 'lastrun', datetime(2013, 9, 18, 15, 41, 0),
+                          "defaults")
+        self.assertEqual(datetime(2013, 9, 18, 15, 41, 0), cfg.lastrun)
+        self.assertFalse(cfg._inifile_dirty)
+        
 
 from ferenda import layeredconfig
 def load_tests(loader,tests,ignore):

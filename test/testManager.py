@@ -423,7 +423,8 @@ indexlocation = data/whooshindex
 import os
 from time import sleep
 
-from ferenda import DocumentRepository, DocumentStore, decorators, errors
+from ferenda import DocumentRepository, DocumentStore, LayeredConfig
+from ferenda import decorators, errors
 
 class Teststore(DocumentStore):
     def list_basefiles_for(cls,action):
@@ -479,6 +480,11 @@ class Testrepo(DocumentRepository):
     @decorators.action
     def keyboardinterrupt(self, arg):
         raise KeyboardInterrupt()
+
+    @decorators.action
+    def save(self):
+        self.config.saved = True
+        LayeredConfig.write(self.config)
 
     def download(self):
         return "%s download ok (magic=%s)" % (self.alias, self.config.magic)
@@ -548,6 +554,18 @@ class Testrepo2(Testrepo):
         os.unlink("ferenda.ini")
         with self.assertRaises(errors.ConfigurationError):
             manager.run(["test", "mymethod", "myarg"])
+
+    def test_noclobber(self):
+        manager.run([self.modulename+".Testrepo", "enable"])
+        manager.run([self.modulename+".Testrepo", "save"])
+        cfg = configparser.ConfigParser()
+        cfg.read(["ferenda.ini"])
+        # make sure cfg has one section for testrepo and only two
+        # attributes ('class' was created when enabling the module,
+        # saved was created in the 'save' call)
+        self.assertEqual([('class', 'example.Testrepo'),
+                          ('saved', 'True')],
+                         cfg.items('test'))
         
     # functionality used by most test methods except test_noconfig
     def _enable_repos(self):
