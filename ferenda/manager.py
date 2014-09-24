@@ -762,8 +762,14 @@ def _wrapexception(f):
                               # returns when everything's ok
             else:
                 except_type, except_value, tb = sys.exc_info()
+                errmsg = str(except_value)
+                setup_logger().error("%s of %s failed: %s" %
+                                     (command, basefile, errmsg))
         except Exception as e:
             except_type, except_value, tb = sys.exc_info()
+            errmsg = str(except_value)
+            setup_logger().error("%s of %s failed: %s" %
+                                 (command, basefile, errmsg))
         except KeyboardInterrupt as e:
             except_type, except_value, tb = sys.exc_info()
             raise WrappedKeyboardInterrupt()
@@ -777,7 +783,8 @@ def _subprocess_proxy(basefile):
     # when called in the subprocess, can access the subprocess-global
     # callable
     global subprocess_callable
-    return subprocess_callable(basefile)
+    res = subprocess_callable(basefile)
+    return res
 
     
 def _run_class_with_basefile(clbl, basefile, kwargs, command):

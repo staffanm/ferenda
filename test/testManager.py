@@ -663,6 +663,8 @@ class Testrepo2(Testrepo):
         # print("running multiproc for pid %s, datadir %s" % (os.getpid(), self.tempdir))
         argv = ["test","errmethod","--all", "--processes=3"]
         res = manager.run(argv)
+        # this doesn't test that errors get reported immediately
+        # (which they dont)
         self.assertEqual(res[0][0], Exception)
         self.assertEqual(res[1][0], errors.DocumentRemovedError)
         self.assertEqual(res[2], None)

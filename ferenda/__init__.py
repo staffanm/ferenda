@@ -23,7 +23,7 @@ from .pdfdocumentrepository import PDFDocumentRepository
 from .compositerepository import CompositeRepository, CompositeStore
 from .resources import Resources
 from .wsgiapp import WSGIApp
-__version__ = "0.2.1.dev7" #gets pulled into setup.py and docs/conf.py
+__version__ = "0.2.1.dev8" #gets pulled into setup.py and docs/conf.py
 # dev1: changes constructor signature for DocumentRepository (using a config obj as first positional parameter)
 # dev2: enables multiprocessing for manager task queue handling (./ferenda.py rfc parse --all --processes=4)
 # dev3: incorporation of changes in ferenda.sources.legal.se during lagen.nu-tng experimentation
@@ -31,3 +31,4 @@ __version__ = "0.2.1.dev7" #gets pulled into setup.py and docs/conf.py
 # dev5: bundled a git snapshot (4e339f0) of swc.mw (for MediaWiki markup) as ferenda.thirdparty.mw 
 # dev6: more incorporation of changes in ferenda.sources.legal.se during lagen.nu-tng experimentation
 # dev7: changes in toc handling
+# dev8: LayeredConfig.set (used by manager._instantiate_class)

@@ -1275,6 +1275,10 @@ with the *config* object as single parameter.
         with open(tmpfile, "wb") as fp:
             fp.write(res)
         util.replace_if_different(tmpfile, outfile)
+        # it's a bit nonsensical to first use replace_if_different and
+        # then go ahead and update the timestamp, but it helps those
+        # cases where a file gets parsed again and again and again.
+        os.utime(outfile, None)  # update access/modified timestamp
         return res
 
     def render_xhtml_tree(self, doc):

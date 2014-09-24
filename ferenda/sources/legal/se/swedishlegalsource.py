@@ -131,6 +131,7 @@ class SwedishLegalSource(DocumentRepository):
                       "jan": 1,
                       "februari": 2,
                       "feb": 2,
+                      "febr": 2,
                       "mars": 3,
                       "mar": 3,
                       "april": 4,
