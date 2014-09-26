@@ -563,9 +563,10 @@ class Testrepo2(Testrepo):
         # make sure cfg has one section for testrepo and only two
         # attributes ('class' was created when enabling the module,
         # saved was created in the 'save' call)
-        self.assertEqual([('class', 'example.Testrepo'),
-                          ('saved', 'True')],
-                         cfg.items('test'))
+        
+        self.assertEqual(set((('class', 'example.Testrepo'),
+                             ('saved', 'True'))),
+                         set(cfg.items('test')))
         
     # functionality used by most test methods except test_noconfig
     def _enable_repos(self):

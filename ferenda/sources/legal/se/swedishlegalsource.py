@@ -218,6 +218,9 @@ class SwedishLegalSource(DocumentRepository):
     def parse_iso_date(self, datestr):
         # only handles YYYY-MM-DD now. Look into dateutil or isodate
         # for more complete support of all ISO 8601 variants
+        datestr = datestr.replace(" ","") # Data cleaning occasionally
+                                          # needed. Maybe this isn't
+                                          # the right place?
         return datetime.strptime(datestr, "%Y-%m-%d").date()
 
     def parse_swedish_date(self, datestr):
@@ -244,10 +247,12 @@ class SwedishLegalSource(DocumentRepository):
             year = int(year)
             day = calendar.monthrange(year, month)[1]
         else:
-            # assume strings on the form "3 februari 2010"
+            # assume strings on the form "3 februari 2010", "8 dec. 1997"
             components =  datestr.split()
             year = int(components[-1])
             if len(components) >= 2:
+                if components[-2].endswith("."):
+                    components[-2] = components[-2][:-1]
                 month = self.swedish_months[components[-2]]
             if len(components) >= 3:
                 day = int(components[-3])
