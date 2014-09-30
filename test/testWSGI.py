@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-<<<<<<< HEAD
-from __future__ import unicode_literals
-import os, sys
-from ferenda.compat import Mock, patch
-=======
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 import sys
@@ -17,7 +12,6 @@ else:
 import os
 
 from ferenda.compat import unittest, Mock, patch
->>>>>>> testcases now ported from six to future, works on py34
 
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
