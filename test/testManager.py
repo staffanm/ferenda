@@ -378,17 +378,12 @@ class Setup(RepoTester):
             with patch('ferenda.manager.setup', return_value=False):
                 manager.runsetup()
                 self.assertTrue(mockexit.called)
-                
+               
 
-class Run(unittest.TestCase):
-    """Tests manager interface using only the run() entry point used by ferenda-build.py"""
-
-    
+class RunBase(object):
     def setUp(self):
         self.addTypeEqualityFunc(OrderedDict, self.assertDictEqual)
         self.maxDiff = None
-
-        # self.modulename = hashlib.md5(self.tempdir.encode('ascii')).hexdigest()
         self.modulename = "example"
         # When testing locally , we want to avoid cluttering cwd, so
         # we chdir to a temp dir, but when testing on travis-ci,
@@ -401,6 +396,52 @@ class Run(unittest.TestCase):
             self.tempdir = tempfile.mkdtemp()
             self.orig_cwd = os.getcwd()
             os.chdir(self.tempdir)
+
+        self._setup_files(self.tempdir,  self.modulename)
+        sys.path.append(self.tempdir)
+
+    def tearDown(self):
+        manager.shutdown_logger()
+        if 'TRAVIS' in os.environ:
+            util.robust_remove("ferenda.ini")
+        else:
+            os.chdir(self.orig_cwd)
+            shutil.rmtree(self.tempdir)
+            sys.path.remove(self.tempdir)
+
+    # functionality used by most test methods except test_noconfig
+    def _enable_repos(self):
+
+        # 3. run('example.Testrepo', 'enable')
+        with patch.object(logging.Logger, 'info') as mocklog:
+            self.assertEqual("test",
+                             manager.run([self.modulename+".Testrepo", "enable"]))
+            # 4. verify that "alias foo enabled" is logged
+            log_arg = mocklog.call_args[0][0]
+            self.assertEqual("Enabled class %s.Testrepo (alias 'test')" % self.modulename,
+                             log_arg)
+
+            # 5. verify that ferenda.ini has changed
+            cfg = configparser.ConfigParser()
+            cfg.read(["ferenda.ini"])
+            self.assertEqual(cfg.get("test","class"), self.modulename+".Testrepo")
+
+            #  (same, with 'example.Testrepo2')
+            self.assertEqual("test2",
+                             manager.run([self.modulename+".Testrepo2", "enable"]))
+            cfg = configparser.ConfigParser()
+            cfg.read(["ferenda.ini"])
+            self.assertEqual(cfg.get("test2","class"), self.modulename+".Testrepo2")
+
+        with patch.object(logging.Logger, 'error') as mocklog:
+            # 6. run('example.Nonexistent', 'enable') -- the ImportError must
+            # be caught and an error printed.
+            manager.run([self.modulename+".Nonexistent", "enable"])
+            # 7. verify that a suitable error messsage is logged
+            self.assertEqual("No class named '%s.Nonexistent'" % self.modulename,
+                             mocklog.call_args[0][0])
+
+    def _setup_files(self, tempdir, modulename):
         # 1. create new blank ini file (FIXME: can't we make sure that
         # _find_config_file is called with create=True when using
         # run() ?)
@@ -415,11 +456,11 @@ jsfiles = ['test.js']
 imgfiles = ['test.png']
 indextype = WHOOSH
 indexlocation = data/whooshindex        
-        """ % self.tempdir)
+    """ % tempdir)
 
         # 2. dump 2 example docrepo classes to example.py
         # FIXME: should we add self.tempdir to sys.path also (and remove it in teardown)?
-        util.writefile(self.modulename+".py", """# Test code
+        util.writefile(modulename+".py", """# Test code
 import os
 from time import sleep
 
@@ -533,22 +574,15 @@ class Testrepo2(Testrepo):
         return self.store.custommethod()
 
 """)
-        
-        util.writefile(self.tempdir+"/test.js", "// test.js code goes here")
-        util.writefile(self.tempdir+"/test.css", "/* test.css code goes here */")
-        util.writefile(self.tempdir+"/other.css", "/* other.css code goes here */")
-        util.writefile(self.tempdir+"/test.png", "\x89\x50\x4e\x47\x0d\x0a\x1a\x0a PNG data goes here")
-        sys.path.append(self.tempdir)
+        util.writefile(tempdir+"/test.js", "// test.js code goes here")
+        util.writefile(tempdir+"/test.css", "/* test.css code goes here */")
+        util.writefile(tempdir+"/other.css", "/* other.css code goes here */")
+        util.writefile(tempdir+"/test.png", "\x89\x50\x4e\x47\x0d\x0a\x1a\x0a PNG data goes here")
+    
 
-    def tearDown(self):
-        manager.shutdown_logger()
-        if 'TRAVIS' in os.environ:
-            util.robust_remove("ferenda.ini")
-        else:
-            os.chdir(self.orig_cwd)
-            shutil.rmtree(self.tempdir)
-            sys.path.remove(self.tempdir)
-
+    
+class Run(RunBase, unittest.TestCase):
+    """Tests manager interface using only the run() entry point used by ferenda-build.py"""
 
     def test_noconfig(self):
         os.unlink("ferenda.ini")
@@ -568,37 +602,6 @@ class Testrepo2(Testrepo):
                              ('saved', 'True'))),
                          set(cfg.items('test')))
         
-    # functionality used by most test methods except test_noconfig
-    def _enable_repos(self):
-
-        # 3. run('example.Testrepo', 'enable')
-        with patch.object(logging.Logger, 'info') as mocklog:
-            self.assertEqual("test",
-                             manager.run([self.modulename+".Testrepo", "enable"]))
-            # 4. verify that "alias foo enabled" is logged
-            log_arg = mocklog.call_args[0][0]
-            self.assertEqual("Enabled class %s.Testrepo (alias 'test')" % self.modulename,
-                             log_arg)
-
-            # 5. verify that ferenda.ini has changed
-            cfg = configparser.ConfigParser()
-            cfg.read(["ferenda.ini"])
-            self.assertEqual(cfg.get("test","class"), self.modulename+".Testrepo")
-
-            #  (same, with 'example.Testrepo2')
-            self.assertEqual("test2",
-                             manager.run([self.modulename+".Testrepo2", "enable"]))
-            cfg = configparser.ConfigParser()
-            cfg.read(["ferenda.ini"])
-            self.assertEqual(cfg.get("test2","class"), self.modulename+".Testrepo2")
-
-        with patch.object(logging.Logger, 'error') as mocklog:
-            # 6. run('example.Nonexistent', 'enable') -- the ImportError must
-            # be caught and an error printed.
-            manager.run([self.modulename+".Nonexistent", "enable"])
-            # 7. verify that a suitable error messsage is logged
-            self.assertEqual("No class named '%s.Nonexistent'" % self.modulename,
-                             mocklog.call_args[0][0])
 
     def test_run_enable(self):
         self._enable_repos()
@@ -648,41 +651,6 @@ class Testrepo2(Testrepo):
         # Test 2: but if not, do the work
         self.assertEqual(manager.run(list(argv)), [None, "ok!", None])
 
-    def test_run_single_all_multiprocessing(self):
-        self._enable_repos()
-        # print("running multiproc for pid %s, datadir %s" % (os.getpid(), self.tempdir))
-        argv = ["test","pid","--all", "--processes=3"]
-        res = manager.run(argv)
-        args = [x[0] for x in res]
-        pids = [x[1] for x in res]
-        self.assertEqual(args, ["arg1", "myarg", "arg2"])
-        # assert that all pids are unique
-        self.assertEqual(3, len(set(pids)))
-
-    def test_run_single_all_multiprocessing_fail(self):
-        self._enable_repos()
-        # print("running multiproc for pid %s, datadir %s" % (os.getpid(), self.tempdir))
-        argv = ["test","errmethod","--all", "--processes=3"]
-        res = manager.run(argv)
-        # this doesn't test that errors get reported immediately
-        # (which they dont)
-        self.assertEqual(res[0][0], Exception)
-        self.assertEqual(res[1][0], errors.DocumentRemovedError)
-        self.assertEqual(res[2], None)
-        self.assertTrue(os.path.exists("dummyfile.txt"))
-            
-    def test_run_ctrlc(self):
-        self._enable_repos()
-        argv = ["test", "keyboardinterrupt", "--all"]
-        with self.assertRaises(KeyboardInterrupt):
-            manager.run(argv)
-
-    def test_run_ctrlc_multiprocessing(self):
-        self._enable_repos()
-        argv = ["test", "keyboardinterrupt", "--all", "--processes=2"]
-        with self.assertRaises(KeyboardInterrupt):
-            manager.run(argv)
-
     def test_run_all(self):
         self._enable_repos()
         argv = ["all", "mymethod", "myarg"]
@@ -697,31 +665,6 @@ class Testrepo2(Testrepo):
                          [[None,"ok!",None],
                           [None,"yeah!",None]])
 
-    # FIXME: This test magically fails every *other* run on Travis
-    # with the following stacktrace:
-    # 
-    # Traceback (most recent call last):
-    #   File "/home/travis/build/staffanm/ferenda/test/testManager.py", line 482, in test_run_all_allmethods
-    #     got = manager.run(argv)
-    #   File "ferenda/manager.py", line 694, in run
-    #     results[action] = run(argscopy)
-    #   File "ferenda/manager.py", line 681, in run
-    #     return frontpage(**args)
-    #   File "ferenda/manager.py", line 360, in frontpage
-    #     xsltdir = repos[0].setup_transform_templates(os.path.dirname(stylesheet), stylesheet)
-    #   File "ferenda/documentrepository.py", line 1747, in setup_transform_templates
-    #     for f in pkg_resources.resource_listdir('ferenda',xsltdir):
-    #   File "/home/travis/virtualenv/python2.7/local/lib/python2.7/site-packages/distribute-0.6.34-py2.7.egg/pkg_resources.py", line 932, in resource_listdir
-    #     resource_name
-    #   File "/home/travis/virtualenv/python2.7/local/lib/python2.7/site-packages/distribute-0.6.34-py2.7.egg/pkg_resources.py", line 1229, in resource_listdir
-    #     return self._listdir(self._fn(self.module_path,resource_name))
-    #   File "/home/travis/virtualenv/python2.7/local/lib/python2.7/site-packages/distribute-0.6.34-py2.7.egg/pkg_resources.py", line 1320, in _listdir
-    #     return os.listdir(path)
-    # OSError: [Errno 2] No such file or directory: 'ferenda/res/xsl'
-    #
-    # I can not figure out why. Skip for now.
-#    @unittest.skipIf('TRAVIS' in os.environ,
-#                 "Skipping test_run_all_allmethods on travis-ci")    
     def test_run_all_allmethods(self):
         self._enable_repos()
         argv = ["all", "all", "--magic=more"]
@@ -764,10 +707,6 @@ class Testrepo2(Testrepo):
         self.maxDiff = None
         self.assertEqual(want,got)
         
-    # since this method also calls frontpage, it fails on travis in
-    # the same way as test_run_all_allmethods.
-#    @unittest.skipIf('TRAVIS' in os.environ,
-#                 "Skipping test_run_single_allmethods on travis-ci")    
     def test_run_single_allmethods(self):
         self._enable_repos()
         argv = ["test", "all"]
@@ -946,6 +885,44 @@ Available modules:
             manager.run(["all", "runserver"])
             self.assertTrue(m2.called)
             self.assertTrue(m.serve_forever.called)
+
+    def test_run_ctrlc(self):
+        self._enable_repos()
+        argv = ["test", "keyboardinterrupt", "--all"]
+        with self.assertRaises(KeyboardInterrupt):
+            manager.run(argv)
+
+
+class RunMultiproc(RunBase, unittest.TestCase):
+    
+    def test_run_single_all_multiprocessing(self):
+        self._enable_repos()
+        # print("running multiproc for pid %s, datadir %s" % (os.getpid(), self.tempdir))
+        argv = ["test","pid","--all", "--processes=3"]
+        res = manager.run(argv)
+        args = [x[0] for x in res]
+        pids = [x[1] for x in res]
+        self.assertEqual(args, ["arg1", "myarg", "arg2"])
+        # assert that all pids are unique
+        self.assertEqual(3, len(set(pids)))
+
+    def test_run_single_all_multiprocessing_fail(self):
+        self._enable_repos()
+        # print("running multiproc for pid %s, datadir %s" % (os.getpid(), self.tempdir))
+        argv = ["test","errmethod","--all", "--processes=3"]
+        res = manager.run(argv)
+        # this doesn't test that errors get reported immediately
+        # (which they do)
+        self.assertEqual(res[0][0], Exception)
+        self.assertEqual(res[1][0], errors.DocumentRemovedError)
+        self.assertEqual(res[2], None)
+        self.assertTrue(os.path.exists("dummyfile.txt"))
+            
+    def test_run_ctrlc_multiprocessing(self):
+        self._enable_repos()
+        argv = ["test", "keyboardinterrupt", "--all", "--processes=2"]
+        with self.assertRaises(KeyboardInterrupt):
+            manager.run(argv)
 
 
 

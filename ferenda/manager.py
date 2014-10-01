@@ -14,19 +14,22 @@ from __future__ import unicode_literals, print_function
 # system
 import os
 import stat
+import run
 import subprocess
 import sys
 import inspect
 import logging
 import shutil
 import tempfile
+from time import sleep
 from datetime import datetime
 from ferenda.compat import OrderedDict, MagicMock
 from wsgiref.simple_server import make_server
 import multiprocessing
 from functools import partial, wraps
 from ast import literal_eval
-
+from queue import Queue, Empty
+from multiprocessing.managers import SyncManager
 import six
 from six.moves.urllib_parse import urlsplit
 from six.moves import configparser
@@ -290,7 +293,7 @@ def shutdown_logger():
 
     
 
-def run(argv):
+def run(argv, subcall=False):
     """Runs a particular action for either a particular class or all
     enabled classes.
 
@@ -341,7 +344,14 @@ def run(argv):
                 args = _setup_runserver_args(config, _find_config_file())
                 # Note: the actual runserver method never returns
                 return runserver(**args)
-
+            elif action == 'client':
+                repoclasses = _classes_from_classname(enabled, classname)
+                args = _setup_buildclient_args(config)
+                repos = []
+                for cls in repoclasses:
+                    inst = _instantiate_class(cls, config, argv)
+                    repos.append(inst)
+                return run_buildclient(repos, **args)
             elif action == 'makeresources':
                 repoclasses = _classes_from_classname(enabled, classname)
                 args = _setup_makeresources_args(config)
@@ -368,7 +378,7 @@ def run(argv):
                         argscopy.extend(_filter_argv_options(argv))
                         argscopy.insert(0, action)
                         argscopy.insert(0, "all")
-                        results[action] = run(argscopy)
+                        results[action] = run(argscopy, subcall=True)
                     else:
                         results[action] = OrderedDict()
                         for classname in classnames:
@@ -380,7 +390,7 @@ def run(argv):
                                 argscopy.append("--all")
                             argscopy.insert(0, action)
                             argscopy.insert(0, classname)
-                            results[action][alias] = run(argscopy)
+                            results[action][alias] = run(argscopy, subcall=True)
                 return results
             else:
                 if classname == "all":
@@ -686,34 +696,17 @@ def _run_class(enabled, argv, config):
             kwargs['otherrepos'] = otherrepos
 
         if 'all' in inst.config and inst.config.all == True:
+            iterable = inst.store.list_basefiles_for(command)
             res = []
             # semi-magic handling
             ret = cls.setup(command, inst.config)
             if ret == False:
                 log.info("%s %s: Nothing to do!" % (alias, command))
             else:
-                if inst.config.processes > 1:
-                    # parallelize using multiprocessing
-                    # multiprocessing.log_to_stderr(logging.DEBUG)
-                    pool = multiprocessing.Pool(processes=inst.config.processes,
-                                                initializer=_setup_subprocess_callable,
-                                                initargs=(classname, command, config, argv))
-                    clbl = _subprocess_proxy
-                    log.info("Starting multiprocessing with %d processes" %
-                             inst.config.processes)
-
-                    try:
-                        # FIXME: The 99999 second timeout is so that a
-                        # exception gets raised to the controlling
-                        # process immediately, see
-                        # http://stackoverflow.com/questions/1408356/keyboard-interrupts-with-pythons-multiprocessing-pool/1408476#1408476
-                        res = pool.map_async(clbl, inst.store.list_basefiles_for(command)).get(timeout=99999)
-                    except WrappedKeyboardInterrupt:
-                        raise KeyboardInterrupt()
-                    
-                    # make sure all subprocesses are dead and have released
-                    # their handles
-                    pool.terminate()
+                if inst.config.buildserver:
+                    run_buildserver(iterable, inst)
+                elif inst.config.processes > 1:
+                    paralellize(iterable, inst)
                 else:
                     for basefile in inst.store.list_basefiles_for(command):
                         res.append(_run_class_with_basefile(clbl, basefile, kwargs, command))
@@ -723,10 +716,129 @@ def _run_class(enabled, argv, config):
             res = clbl(*args, **kwargs)
     return res
 
+def run_bildclient(repos, **kwargs):
+    manager = make_client_manager("127.0.0.1", PORTNUM, AUTHKEY)
+    job_q = manager.get_job_q()
+    result_q = manager.get_result_q()
+    clientname = random.choice(["Monty Messmer",
+                                "Maurine Melius",
+                                "Ike Indelicato",
+                                "Dara Dombroski",
+                                "Sari Sciortino",
+                                "Rosanne Runge",
+                                "Soledad Shifflett",
+                                "Jeramy Johnston",
+                                "Major Malloy",
+                                "Leontine Lawalin",
+                                "Blossom Barbieri",
+                                "Brett Brandt",
+                                "Tenesha Toppin",
+                                "Rich Rawls",
+                                "Sommer Shires",
+                                "Desire Duffel",
+                                "Abbey Allington",
+                                "Elroy Egli",
+                                "Aundrea Ackley",
+                                "Tobias Turco"])
+    mp_run(job_q, result_q, multiprocessing.cpu_count(), clientname)
+
+    # how to define mp_run...
+
+def run_buildserver(buildserver, iterable, inst, config):
+    # Start a shared manager server and access its queues
+    # NOTE: make_server_manager reuses existing buldserver
+    manager = make_server_manager(port=5555, authkey=b"secret")
+    shared_job_q = manager.get_job_q()
+    shared_result_q = manager.get_result_q()
+    for idx, basefile in enumerate(iterable):
+        # maybe we should put a struct here:
+        # {'classname': 'dv.DV',
+        #  'commmand': 'parse',
+        #  'basefile': 'ADO/1999:2'}
+        #
+        # but that would require us to know classname and command here
+        shared_job_q.put(basefile)
+    number_of_jobs = idx+1
+    print("Server: Put %s jobs in the queue" % number_of_jobs)
+    numres = 0
+    res = {}
+    while numres < number_of_jobs:
+        outdict = shared_result_q.get()
+        if outdict['exception'] == 'KeyboardInterrupt':
+            raise KeyboardInterrupt
+        elif outdict['exception']:
+            print("%(client)s failed %(basefile)s: %(exception)s" % outdict)
+        else:
+            print("%(client)s processed %(basefile)s (%(result)s): OK" % outdict)
+        res.update(outdict)
+        numres += 1
+    print("%s tasks processed" % numres)
+    sleep(1)
+
+    # don't shut this down --- the toplevel manager.run call must do
+    # that
+    # manager.shutdown()
+
+def stop_buildserver():
+    global buildmanager
+    if buildmanager:
+        buildmanager.shutdown()
+    
+buildmanager = None
+        
+def make_server_manager(port, authkey):
+    """ Create a manager for the server, listening on the given port.
+        Return a manager object with get_job_q and get_result_q methods.
+    """
+    global buildmanager
+    if not buildmanager:
+        job_q = Queue()
+        result_q = Queue()
+
+        # This is based on the examples in the official docs of
+        # multiprocessing.  get_{job|result}_q return synchronized
+        # proxies for the actual Queue objects.
+        class JobQueueManager(SyncManager):
+            pass
+
+        JobQueueManager.register('get_job_q', callable=lambda: job_q)
+        JobQueueManager.register('get_result_q', callable=lambda: result_q)
+
+        manager = JobQueueManager(address=('', port), authkey=authkey)
+        print("Created new buildmanager at %s" % id(manager))
+        manager.start()
+        print('Server started at port %s' % port)
+    else:
+        print("Reusing existing buildmanager at %s" % id(manager))
+        
+    return buildmanager
+
+
+def parallelize(iterable, inst):
+    # parallelize using multiprocessing
+    # multiprocessing.log_to_stderr(logging.DEBUG)
+    pool = multiprocessing.Pool(processes=inst.config.processes,
+                                initializer=_setup_subprocess_callable,
+                                initargs=(classname, command, config, argv))
+    func = _subprocess_proxy
+    log.info("Starting multiprocessing with %d processes" %
+             inst.config.processes)
+
+    try:
+        # FIXME: The 99999 second timeout is so that a
+        # exception gets raised to the controlling
+        # process immediately, see
+        # http://stackoverflow.com/questions/1408356/keyboard-interrupts-with-pythons-multiprocessing-pool/1408476#1408476
+        res = pool.map_async(func, iterable).get(timeout=99999)
+    except WrappedKeyboardInterrupt:
+        raise KeyboardInterrupt()
+
+    # make sure all subprocesses are dead and have released
+    # their handles
+    pool.terminate()
+    
 
 subprocess_callable = None
-
-
 def _setup_subprocess_callable(classname, command, config, argv):
     # this is never called in the main process, only pool processes, and
     # the purpose is to setup an (global) object instance in that process.
@@ -780,7 +892,7 @@ def _wrapexception(f):
 
 def _subprocess_proxy(basefile):
     # This is our way of creating a callable in the main process which,
-    # when called in the subprocess, can access the subprocess-global
+    # when called in the subprocess, can access the (subprocess-)global
     # callable
     global subprocess_callable
     res = subprocess_callable(basefile)
@@ -1087,6 +1199,18 @@ def _setup_frontpage_args(config, argv):
             'path': config.datadir + "/index.html",
             'staticsite': config.staticsite,
             'repos': repos}
+
+def _setup_buildclient_args(config):
+    import socket
+    return {'clientname': LayeredConfig.get(config, 'clientname',
+                                            socket.gethostname()),
+            'serverhost': LayeredConfig.get(config, 'serverhost', '127.0.0.1'),
+            'serverport': LayeredConfig.get(config, 'serverport', 5555)
+            'authkey':    LayeredConfig.get(config, 'authkey', 'secret')
+            'processes':  LayeredConfig.get(config, 'processes',
+                                            multiprocessing.cpu_count())
+            }
+            
 
 
 def _filepath_to_urlpath(path, keep_segments=2):
