@@ -12,29 +12,31 @@ else, for you.
 """
 from __future__ import unicode_literals, print_function
 # system
-import os
-import stat
-import run
-import subprocess
-import sys
-import inspect
-import logging
-import shutil
-import tempfile
-from time import sleep
+from ast import literal_eval
 from datetime import datetime
 from ferenda.compat import OrderedDict, MagicMock
-from wsgiref.simple_server import make_server
-import multiprocessing
 from functools import partial, wraps
-from ast import literal_eval
-from queue import Queue, Empty
+from io import StringIO, BytesIO
 from multiprocessing.managers import SyncManager
-import six
-from six.moves.urllib_parse import urlsplit
-from six.moves import configparser
-input = six.moves.input
+from queue import Queue, Empty
+from time import sleep
+from wsgiref.simple_server import make_server
+import inspect
+import logging
+import multiprocessing
+import os
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+import traceback
+
 from six import text_type as str
+from six.moves import configparser
+from six.moves.urllib_parse import urlsplit
+import six
+input = six.moves.input
 
 # 3rd party
 import requests
@@ -407,6 +409,8 @@ def run(argv, subcall=False):
                 else:
                     return _run_class(enabled, argv, config)
     finally:
+        if not subcall:
+            shutdown_buildserver()
         shutdown_logger()
 
 def enable(classname):
@@ -703,8 +707,8 @@ def _run_class(enabled, argv, config):
             if ret == False:
                 log.info("%s %s: Nothing to do!" % (alias, command))
             else:
-                if inst.config.buildserver:
-                    run_buildserver(iterable, inst)
+                if LayeredConfig.get(config, 'buildserver'):
+                    run_buildserver(iterable, inst, classname, command)
                 elif inst.config.processes > 1:
                     paralellize(iterable, inst)
                 else:
@@ -716,50 +720,164 @@ def _run_class(enabled, argv, config):
             res = clbl(*args, **kwargs)
     return res
 
-def run_bildclient(repos, **kwargs):
-    manager = make_client_manager("127.0.0.1", PORTNUM, AUTHKEY)
-    job_q = manager.get_job_q()
-    result_q = manager.get_result_q()
-    clientname = random.choice(["Monty Messmer",
-                                "Maurine Melius",
-                                "Ike Indelicato",
-                                "Dara Dombroski",
-                                "Sari Sciortino",
-                                "Rosanne Runge",
-                                "Soledad Shifflett",
-                                "Jeramy Johnston",
-                                "Major Malloy",
-                                "Leontine Lawalin",
-                                "Blossom Barbieri",
-                                "Brett Brandt",
-                                "Tenesha Toppin",
-                                "Rich Rawls",
-                                "Sommer Shires",
-                                "Desire Duffel",
-                                "Abbey Allington",
-                                "Elroy Egli",
-                                "Aundrea Ackley",
-                                "Tobias Turco"])
-    mp_run(job_q, result_q, multiprocessing.cpu_count(), clientname)
 
-    # how to define mp_run...
+def run_buildclient(repos,
+                    clientname,
+                    serverhost,
+                    serverport,
+                    authkey,
+                    processes):
 
-def run_buildserver(buildserver, iterable, inst, config):
+    while True:  # mp_run > build_worker might throw an exception,
+                 # which is how we exit
+        manager = make_client_manager(serverhost,
+                                  serverport,
+                                  authkey)
+        job_q = manager.get_job_q()
+        result_q = manager.get_result_q()
+        mp_run(job_q, result_q, processes, clientname)
+
+def make_client_manager(ip, port, authkey):
+    """Create a manager for a client. This manager connects to a server
+        on the given address and exposes the get_job_q and
+        get_result_q methods for accessing the shared queues from the
+        server.  Return a manager object.
+
+    """
+    class ServerQueueManager(SyncManager):
+        pass
+
+    ServerQueueManager.register('get_job_q')
+    ServerQueueManager.register('get_result_q')
+
+    while True:
+        try:
+            manager = ServerQueueManager(address=(ip, port), authkey=authkey.encode("utf-8"))
+            manager.connect()
+            print('Client: connected to %s:%s' % (ip, port))
+            return manager
+        except Exception as e:
+            print("Client: %s: sleeping and retrying..." % e)
+            sleep(2)
+
+
+def mp_run(shared_job_q, shared_result_q, nprocs, clientname):
+    """ Split the work with jobs in shared_job_q and results in
+        shared_result_q into several processes. Launch each process with
+        factorizer_worker as the worker function, and wait until all are
+        finished.
+    """
+    procs = []
+    print("Client: about to start %s processes" % nprocs)
+    for i in range(nprocs):
+        print("Client: starting a worker process...")
+        p = multiprocessing.Process(
+                target=build_worker,
+                args=(shared_job_q, shared_result_q, clientname))
+        procs.append(p)
+        p.start()
+
+    for p in procs:
+        p.join()
+
+
+def build_worker(job_q, result_q, clientname):
+    """A worker function to be launched in a separate process. Takes jobs
+        from job_q - each job a dict. When the
+        job is done, the result is placed into result_q. Runs until
+        instructed to quit.
+
+    """
+    # create the inst with a default config
+    # (_instantiate_class will try to read ferenda.ini)
+
+    inst = None
+    logstream = None
+    while True:
+        job = job_q.get() # get() blocks -- wait until a job or the
+                          # quit signal comes
+        if job == "DONE": # or a more sensible value
+            print("Client: Got DONE signal")
+            return  # back to run_buildclient
+        if job == "SHUTDOWN":
+            print("Client: Got SHUTDOWN signal")
+            # kill the entire thing
+            raise Exception("OK we're done now")
+        try:
+            if inst == None:
+                print("Client: PID %s instantiating and configuring %s" % (os.getpid(), job['classname']))
+                inst = _instantiate_class(_load_class(job['classname']))
+                for k,v in job['config'].items():
+                    print("Client: setting config value %s to %r" % (k, v))
+                    LayeredConfig.set(inst.config, k, v)
+                # setup logging to a StringIO
+                logstream  = StringIO()
+                log = setup_logger(inst.config.loglevel)
+                for handler in log.handlers:
+                    log.removeHandler(handler)
+                handler = logging.StreamHandler(logstream)
+                handler.setFormatter(
+                    logging.Formatter(clientname+" %(asctime)s %(name)s %(levelname)s %(message)s", datefmt="%H:%M:%S"))
+                handler.setLevel(loglevels[inst.config.loglevel])
+                log.addHandler(handler)
+                log.setLevel(loglevels[inst.config.loglevel])
+            # getattr the command
+            # call the result with job['basefile'] 
+            # let exceptions happen (we catch them below)
+            print("Client: Starting job %s %s %s" % (job['classname'], job['command'], job['basefile']))
+            res = getattr(inst, job['command'])(job['basefile'])
+            # collect the results + logs
+            print("Client: %s finished: %s" % (job['basefile'], res))
+            log = logstream.getvalue()
+            logstream.truncate(0)
+            logstream.seek(0)
+            exc = None
+        except KeyboardInterrupt:
+            res = None
+            log = None
+            exc = 'KeyboardInterrupt'
+        except Exception:
+            res = None
+            log = None
+            except_type, except_value, tb = sys.exc_info()
+            exc = (except_type, except_value, traceback.extract_tb(tb))
+        outdict = {'basefile': job['basefile'],
+                   'result':  res,
+                   'log': log,
+                   'exception': exc,
+                   'client': clientname}
+        result_q.put(outdict)
+
+
+def run_buildserver(iterable, inst, classname, command):
     # Start a shared manager server and access its queues
-    # NOTE: make_server_manager reuses existing buldserver
+    # NOTE: make_server_manager reuses existing buildserver if there is one
     manager = make_server_manager(port=5555, authkey=b"secret")
     shared_job_q = manager.get_job_q()
     shared_result_q = manager.get_result_q()
+
+    # we'd like to just provide those config parameters that diff from
+    # the default (what the client will already have), ie.  those set
+    # by command line parameters (or possibly env variables)
+    default_config = _instantiate_class(_load_class(classname)).config
+    client_config = {}
+    for k in inst.config:
+        if (k not in ('all', 'logfile', 'buildserver') and
+            (LayeredConfig.get(default_config, k) !=
+             LayeredConfig.get(inst.config, k))):
+            client_config[k] = LayeredConfig.get(inst.config, k)
+    print("Server: Config for clients is %r" % client_config)
     for idx, basefile in enumerate(iterable):
-        # maybe we should put a struct here:
-        # {'classname': 'dv.DV',
-        #  'commmand': 'parse',
-        #  'basefile': 'ADO/1999:2'}
-        #
-        # but that would require us to know classname and command here
-        shared_job_q.put(basefile)
+        job = {'basefile': basefile,
+               'classname': classname,
+               'command': command,
+               'config': client_config}
+        # print("putting %r into shared_job_q" %  job)
+        shared_job_q.put(job)
     number_of_jobs = idx+1
-    print("Server: Put %s jobs in the queue" % number_of_jobs)
+    print("Server: Put %s jobs into shared_job_q" % number_of_jobs)
+    shared_job_q.put("DONE")
+    print("Server: Put DONE into shared_job_q")
     numres = 0
     res = {}
     while numres < number_of_jobs:
@@ -767,24 +885,33 @@ def run_buildserver(buildserver, iterable, inst, config):
         if outdict['exception'] == 'KeyboardInterrupt':
             raise KeyboardInterrupt
         elif outdict['exception']:
-            print("%(client)s failed %(basefile)s: %(exception)s" % outdict)
+            outdict['except_type'] = outdict['exception'][0]
+            outdict['except_value'] = outdict['exception'][1]
+            print("Server: %(client)s failed %(basefile)s: %(except_type)s: %(except_value)s" % outdict)
+            print("".join(traceback.format_list(outdict['exception'][2])))
         else:
-            print("%(client)s processed %(basefile)s (%(result)s): OK" % outdict)
+            for line in [x.strip() for x in outdict['log'].split("\n") if x.strip()]:
+                print("   %s" % line)
+            print("Server: %(client)s processed %(basefile)s (%(result)s): OK" % outdict)
         res.update(outdict)
         numres += 1
-    print("%s tasks processed" % numres)
+    print("Server: %s tasks processed" % numres)
     sleep(1)
 
     # don't shut this down --- the toplevel manager.run call must do
     # that
     # manager.shutdown()
 
-def stop_buildserver():
+
+def shutdown_buildserver():
     global buildmanager
     if buildmanager:
+        print("Server: Shutting down")
         buildmanager.shutdown()
     
+
 buildmanager = None
+
         
 def make_server_manager(port, authkey):
     """ Create a manager for the server, listening on the given port.
@@ -804,12 +931,12 @@ def make_server_manager(port, authkey):
         JobQueueManager.register('get_job_q', callable=lambda: job_q)
         JobQueueManager.register('get_result_q', callable=lambda: result_q)
 
-        manager = JobQueueManager(address=('', port), authkey=authkey)
-        print("Created new buildmanager at %s" % id(manager))
-        manager.start()
-        print('Server started at port %s' % port)
+        buildmanager = JobQueueManager(address=('', port), authkey=authkey)
+        print("Server: Created new buildmanager at %s" % id(buildmanager))
+        buildmanager.start()
+        print('Server: Started at port %s' % port)
     else:
-        print("Reusing existing buildmanager at %s" % id(manager))
+        print("Server: Reusing existing buildmanager at %s" % id(manager))
         
     return buildmanager
 
@@ -1205,10 +1332,11 @@ def _setup_buildclient_args(config):
     return {'clientname': LayeredConfig.get(config, 'clientname',
                                             socket.gethostname()),
             'serverhost': LayeredConfig.get(config, 'serverhost', '127.0.0.1'),
-            'serverport': LayeredConfig.get(config, 'serverport', 5555)
-            'authkey':    LayeredConfig.get(config, 'authkey', 'secret')
-            'processes':  LayeredConfig.get(config, 'processes',
-                                            multiprocessing.cpu_count())
+            'serverport': LayeredConfig.get(config, 'serverport', 5555),
+            'authkey':    LayeredConfig.get(config, 'authkey', 'secret'),
+            #'processes':  LayeredConfig.get(config, 'processes',
+            #                                multiprocessing.cpu_count())
+            'processes': multiprocessing.cpu_count()   # no choice!
             }
             
 
