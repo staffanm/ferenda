@@ -710,7 +710,7 @@ def _run_class(enabled, argv, config):
                 if LayeredConfig.get(config, 'buildserver'):
                     run_buildserver(iterable, inst, classname, command)
                 elif inst.config.processes > 1:
-                    paralellize(iterable, inst)
+                    res = parallelize(iterable, inst, classname, command, config, argv)
                 else:
                     for basefile in inst.store.list_basefiles_for(command):
                         res.append(_run_class_with_basefile(clbl, basefile, kwargs, command))
@@ -728,15 +728,18 @@ def run_buildclient(repos,
                     authkey,
                     processes):
 
-    while True:  # mp_run > build_worker might throw an exception,
-                 # which is how we exit
+    done = False
+    while not done:  # mp_run > build_worker might throw an exception,
+                     # which is how we exit
         manager = make_client_manager(serverhost,
                                   serverport,
                                   authkey)
         job_q = manager.get_job_q()
         result_q = manager.get_result_q()
         mp_run(job_q, result_q, processes, clientname)
-
+        print("Client: All done with one run, mp_run returned happily")
+        done = True
+        
 def make_client_manager(ip, port, authkey):
     """Create a manager for a client. This manager connects to a server
         on the given address and exposes the get_job_q and
@@ -754,7 +757,7 @@ def make_client_manager(ip, port, authkey):
         try:
             manager = ServerQueueManager(address=(ip, port), authkey=authkey.encode("utf-8"))
             manager.connect()
-            print('Client: connected to %s:%s' % (ip, port))
+            print('Client: [pid %s] connected to %s:%s' % (os.getpid(), ip, port))
             return manager
         except Exception as e:
             print("Client: %s: sleeping and retrying..." % e)
@@ -768,15 +771,17 @@ def mp_run(shared_job_q, shared_result_q, nprocs, clientname):
         finished.
     """
     procs = []
-    print("Client: about to start %s processes" % nprocs)
+    print("Client: [pid %s] about to start %s processes" % (os.getpid(), nprocs))
     for i in range(nprocs):
         print("Client: starting a worker process...")
         p = multiprocessing.Process(
                 target=build_worker,
                 args=(shared_job_q, shared_result_q, clientname))
         procs.append(p)
+        sleep(1)
         p.start()
-
+        print("Client: Started process %s" % p.pid)
+        
     for p in procs:
         p.join()
 
@@ -793,6 +798,7 @@ def build_worker(job_q, result_q, clientname):
 
     inst = None
     logstream = None
+    print("Client: build_worker alive as process %s" % os.getpid())
     while True:
         job = job_q.get() # get() blocks -- wait until a job or the
                           # quit signal comes
@@ -810,7 +816,9 @@ def build_worker(job_q, result_q, clientname):
                 for k,v in job['config'].items():
                     print("Client: setting config value %s to %r" % (k, v))
                     LayeredConfig.set(inst.config, k, v)
-                # setup logging to a StringIO
+                # setup logging to a StringIO. Maybe it would be best
+                # to just collect logentries as a tuple list and send
+                # them over.
                 logstream  = StringIO()
                 log = setup_logger(inst.config.loglevel)
                 for handler in log.handlers:
@@ -941,7 +949,8 @@ def make_server_manager(port, authkey):
     return buildmanager
 
 
-def parallelize(iterable, inst):
+def parallelize(iterable, inst, classname, command, config, argv):
+    log = setup_logger()
     # parallelize using multiprocessing
     # multiprocessing.log_to_stderr(logging.DEBUG)
     pool = multiprocessing.Pool(processes=inst.config.processes,
@@ -963,7 +972,7 @@ def parallelize(iterable, inst):
     # make sure all subprocesses are dead and have released
     # their handles
     pool.terminate()
-    
+    return res
 
 subprocess_callable = None
 def _setup_subprocess_callable(classname, command, config, argv):
@@ -1336,7 +1345,8 @@ def _setup_buildclient_args(config):
             'authkey':    LayeredConfig.get(config, 'authkey', 'secret'),
             #'processes':  LayeredConfig.get(config, 'processes',
             #                                multiprocessing.cpu_count())
-            'processes': multiprocessing.cpu_count()   # no choice!
+            #'processes': multiprocessing.cpu_count()   # no choice!
+            'processes': 2
             }
             
 
@@ -1554,3 +1564,6 @@ def _select_fulltextindex(log, sitename, verbose=False):
             pass
     # 2. Whoosh (just assume that it works)
     return ("WHOOSH", "data/whooshindex")
+
+if __name__ == '__main__':
+    pass
