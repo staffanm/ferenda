@@ -563,7 +563,9 @@ overridden by the config file or command line arguments."""
                              'res/img/navmenu.png',
                              'res/img/search.png'],
                 'legacyapi': False,
-                'fulltextindex': True
+                'fulltextindex': True,
+                'serverport': 5555,
+                'authkey': b'secret'
     }
     config = LayeredConfig(defaults, filename, argv, cascade=True)
     return config
@@ -712,7 +714,7 @@ def _run_class(enabled, argv, config):
             else:
                 if LayeredConfig.get(config, 'buildserver'):
                     res = run_buildserver(iterable, inst, classname, command)
-                if LayeredConfig.get(config, 'buildqueue'):
+                elif LayeredConfig.get(config, 'buildqueue'):
                     res = queue_to_buildqueue(iterable, inst, classname, command)
                 elif inst.config.processes > 1:
                     res = parallelize(iterable, inst, classname, command, config, argv)
@@ -752,10 +754,16 @@ def make_client_manager(ip, port, authkey):
         server.  Return a manager object.
 
     """
+    # FIXME: caller should be responsible for setting these to proper
+    # values
     if isinstance(ip, bool):
         ip = '127.0.0.1'
     if isinstance(port, str):
         port = int(port)
+    if isinstance(authkey, str):
+        # authkey must be bytes
+        authkey = authkey.encode("utf-8")
+
     class ServerQueueManager(SyncManager):
         pass
 
@@ -764,7 +772,7 @@ def make_client_manager(ip, port, authkey):
 
     while True:
         try:
-            manager = ServerQueueManager(address=(ip, port), authkey=authkey.encode("utf-8"))
+            manager = ServerQueueManager(address=(ip, port), authkey=authkey)
             manager.connect()
             print('Client: [pid %s] connected to %s:%s' % (os.getpid(), ip, port))
             return manager
@@ -782,14 +790,13 @@ def mp_run(shared_job_q, shared_result_q, nprocs, clientname):
     procs = []
     print("Client: [pid %s] about to start %s processes" % (os.getpid(), nprocs))
     for i in range(nprocs):
-        print("Client: starting a worker process...")
         p = multiprocessing.Process(
                 target=build_worker,
                 args=(shared_job_q, shared_result_q, clientname))
         procs.append(p)
         # sleep(1)
         p.start()
-        print("Client: Started process %s" % p.pid)
+        print("Client: [pid %s] Started process %s" % (os.getpid(), p.pid))
         
     for p in procs:
         p.join()
@@ -807,12 +814,12 @@ def build_worker(job_q, result_q, clientname):
 
     inst = None
     logstream = None
-    print("Client: build_worker alive as process %s" % os.getpid())
+    print("Client: [pid %s] build_worker ready to process job queue" % os.getpid())
     while True:
         job = job_q.get() # get() blocks -- wait until a job or the
                           # quit signal comes
         if job == "DONE": # or a more sensible value
-            print("Client: Got DONE signal")
+            print("Client: [pid %s] Got DONE signal" % os.getpid())
             return  # back to run_buildclient
         if job == "SHUTDOWN":
             print("Client: Got SHUTDOWN signal")
@@ -820,10 +827,10 @@ def build_worker(job_q, result_q, clientname):
             raise Exception("OK we're done now")
         try:
             if inst == None:
-                print("Client: PID %s instantiating and configuring %s" % (os.getpid(), job['classname']))
+                print("Client: [pid %s] instantiating and configuring %s" % (os.getpid(), job['classname']))
                 inst = _instantiate_class(_load_class(job['classname']))
                 for k,v in job['config'].items():
-                    print("Client: setting config value %s to %r" % (k, v))
+                    print("Client: [pid %s] setting config value %s to %r" % (os.getpid(), k, v))
                     LayeredConfig.set(inst.config, k, v)
                 # setup logging to a StringIO. Maybe it would be best
                 # to just collect logentries as a tuple list and send
@@ -841,10 +848,10 @@ def build_worker(job_q, result_q, clientname):
             # getattr the command
             # call the result with job['basefile'] 
             # let exceptions happen (we catch them below)
-            print("Client: Starting job %s %s %s" % (job['classname'], job['command'], job['basefile']))
+            print("Client: [pid %s] Starting job %s %s %s" % (os.getpid(), job['classname'], job['command'], job['basefile']))
             res = getattr(inst, job['command'])(job['basefile'])
             # collect the results + logs
-            print("Client: %s finished: %s" % (job['basefile'], res))
+            print("Client: [pid %s] %s finished: %s" % (os.getpid(), job['basefile'], res))
             log = logstream.getvalue()
             logstream.truncate(0)
             logstream.seek(0)
@@ -874,7 +881,6 @@ def run_buildserver(iterable, inst, classname, command):
     return queue_jobs(manager, iterable, inst, classname, command)
 
 def queue_to_buildqueue(iterable, inst, classname, command):
-    from pudb import set_trace; set_trace()
     manager = make_client_manager(inst.config.buildqueue,
                                   inst.config.serverport,
                                   inst.config.authkey)
@@ -890,11 +896,11 @@ def queue_jobs(manager, iterable, inst, classname, command):
     default_config = _instantiate_class(_load_class(classname)).config
     client_config = {}
     for k in inst.config:
-        if (k not in ('all', 'logfile', 'buildserver') and
+        if (k not in ('all', 'logfile', 'buildserver', 'buildqueue', 'serverport', 'authkey') and
             (LayeredConfig.get(default_config, k) !=
              LayeredConfig.get(inst.config, k))):
             client_config[k] = LayeredConfig.get(inst.config, k)
-    print("Server: Config for clients is %r" % client_config)
+    print("Server: Extra config for clients is %r" % client_config)
     for idx, basefile in enumerate(iterable):
         job = {'basefile': basefile,
                'classname': classname,
@@ -903,9 +909,12 @@ def queue_jobs(manager, iterable, inst, classname, command):
         # print("putting %r into shared_job_q" %  job)
         shared_job_q.put(job)
     number_of_jobs = idx+1
-    print("Server: Put %s jobs into shared_job_q" % number_of_jobs)
+    print("Server: Put %s jobs into job queue" % number_of_jobs)
+    # FIXME: only one of the clients will read this DONE package, and
+    # we have no real way of knowing how many clients there will
+    # be. Didn't think this one through...
     shared_job_q.put("DONE")
-    print("Server: Put DONE into shared_job_q")
+    print("Server: Put DONE into job queue")
     numres = 0
     res = []
     while numres < number_of_jobs:
@@ -920,7 +929,7 @@ def queue_jobs(manager, iterable, inst, classname, command):
         else:
             for line in [x.strip() for x in outdict['log'].split("\n") if x.strip()]:
                 print("   %s" % line)
-            print("Server: %(client)s processed %(basefile)s (%(result)s): OK" % outdict)
+            print("Server: client %(client)s processed %(basefile)s: Result (%(result)s): OK" % outdict)
         if 'result' in outdict:
             res.append(outdict['result'])
         numres += 1
@@ -935,11 +944,14 @@ def queue_jobs(manager, iterable, inst, classname, command):
     
 buildmanager = None
 def make_server_manager(port, authkey, start=True):
+
     """ Create a manager for the server, listening on the given port.
         Return a manager object with get_job_q and get_result_q methods.
     """
     global buildmanager
     if not buildmanager:
+        if isinstance(port, str):
+            port = int(port)
         job_q = Queue()
         result_q = Queue()
 
@@ -969,7 +981,7 @@ def make_server_manager(port, authkey, start=True):
 def run_buildqueue(serverport, authkey):
     # NB: This never returns!
     manager = make_server_manager(serverport, authkey, start=False)
-    print("Queue: OK now i'm starting the service and won't return")
+    print("Queue: Starting server manager with .serve_forever()")
     manager.get_server().serve_forever()
     
 
@@ -978,6 +990,7 @@ def shutdown_buildserver():
     if buildmanager:
         print("Server: Shutting down buildserver")
         buildmanager.shutdown()
+        buildmanager = None
         sleep(1)
 
 def parallelize(iterable, inst, classname, command, config, argv):
