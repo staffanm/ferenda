@@ -8,7 +8,7 @@ import pkg_resources
 import shutil
 import sys
 import tempfile
-
+from subprocess import Popen
 # NOTE: by inserting cwd (which *should* be the top-level source code
 # dir, with 'ferenda' and 'test' as subdirs) into sys.path as early as
 # possible, we make it possible for pkg_resources to find resources in
@@ -502,6 +502,10 @@ class Testrepo(DocumentRepository):
 
     @decorators.action
     def pid(self, arg):
+        if hasattr(self.config, 'clientname'):
+            res = "%s:%s" % (clientname, os.getpid())
+        else:
+            res = os.getpid()
         self.log.info("%s: pid is %s" % (arg, os.getpid()))
         self.log.debug("%s: some more debug info" % (arg))
         sleep(2) # tasks need to run for some time in order to keep all subprocesses busy
@@ -892,9 +896,9 @@ Available modules:
         with self.assertRaises(KeyboardInterrupt):
             manager.run(argv)
 
-
+ 
 class RunMultiproc(RunBase, unittest.TestCase):
-    
+   
     def test_run_single_all_multiprocessing(self):
         self._enable_repos()
         # print("running multiproc for pid %s, datadir %s" % (os.getpid(), self.tempdir))
@@ -925,6 +929,66 @@ class RunMultiproc(RunBase, unittest.TestCase):
             manager.run(argv)
 
 
+class RunDistributed(RunBase, unittest.TestCase):
+    def setUp(self):
+        self.startcwd = os.getcwd()
+        super(RunDistributed, self).setUp()
+        # create a minimal version of ferenda-build.py with the
+        # correct paths appended to sys.path
+        print("Creating ferenda-build, cwd is %s" % os.getcwd())
+        with open("ferenda-build.py", "w") as fp:
+            fp.write("""import sys, os
+sys.path.append('%s')
+            
+from ferenda import manager
+if __name__ == '__main__':
+    manager.run(sys.argv[1:])
+            """ % self.startcwd)
+                     
+    def test_server(self):
+        self._enable_repos()
+        # create two out-of-process clients
+        Popen(['python', 'ferenda-build.py', 'all',
+               'buildclient', '--clientname=foo'])
+        Popen(['python', 'ferenda-build.py', 'all',
+               'buildclient', '--clientname=bar'])
+
+        # run an in-process server
+        argv = ["test", "pid", "--all", "--buildserver"]
+        res = manager.run(argv)
+        print("test_server: res was %s " % res)
+        # same tests as for RunMultiproc.test_run_single_all
+        args = [x[0] for x in res]
+        pids = [x[1] for x in res]
+        self.assertEqual(args, ["arg1", "myarg", "arg2"])
+        self.assertEqual(3, len(set(pids)))
+
+    def test_queue(self):
+        # runs a separate queue-handling process (which is the only
+        # way to do it on windows)
+        self._enable_repos()
+        
+        # create a out-of-process buildqueue server
+        Popen(['python', 'ferenda-build.py', 'all',
+               'buildqueue', '--serverport=3456'])
+
+        # create two out-of-process clients
+        Popen(['python', 'ferenda-build.py', 'all',
+               'buildclient', '--clientname=foo', '--serverport=3456'])
+        Popen(['python', 'ferenda-build.py', 'all',
+               'buildclient', '--clientname=bar', '--serverport=3456'])
+        
+        # then, in-process, push jobs to that queue and watch them
+        # return results
+        argv = ["test", "pid", "--all", "--buildqueue --serverport=3456"]
+        res = manager.run(argv)
+
+        # same tests as for RunMultiproc.test_run_single_all
+        args = [x[0] for x in res]
+        pids = [x[1] for x in res]
+        self.assertEqual(args, ["arg1", "myarg", "arg2"])
+        self.assertEqual(3, len(set(pids)))
+        
 
 import doctest
 from ferenda import manager

@@ -340,13 +340,13 @@ def run(argv, subcall=False):
                 try:
                     return enable(classname)
                 except (ImportError, ValueError) as e:
-                    log.error(six.text_type(e))
+                    log.error(str(e))
                     return None
             elif action == 'runserver':
                 args = _setup_runserver_args(config, _find_config_file())
                 # Note: the actual runserver method never returns
                 return runserver(**args)
-            elif action == 'client':
+            elif action == 'buildclient':
                 repoclasses = _classes_from_classname(enabled, classname)
                 args = _setup_buildclient_args(config)
                 repos = []
@@ -354,6 +354,9 @@ def run(argv, subcall=False):
                     inst = _instantiate_class(cls, config, argv)
                     repos.append(inst)
                 return run_buildclient(repos, **args)
+            elif action == 'buildqueue':
+                args = _setup_buildqueue_args(config)
+                return run_buildqueue(**args)
             elif action == 'makeresources':
                 repoclasses = _classes_from_classname(enabled, classname)
                 args = _setup_makeresources_args(config)
@@ -708,7 +711,9 @@ def _run_class(enabled, argv, config):
                 log.info("%s %s: Nothing to do!" % (alias, command))
             else:
                 if LayeredConfig.get(config, 'buildserver'):
-                    run_buildserver(iterable, inst, classname, command)
+                    res = run_buildserver(iterable, inst, classname, command)
+                if LayeredConfig.get(config, 'buildqueue'):
+                    res = queue_to_buildqueue(iterable, inst, classname, command)
                 elif inst.config.processes > 1:
                     res = parallelize(iterable, inst, classname, command, config, argv)
                 else:
@@ -747,6 +752,10 @@ def make_client_manager(ip, port, authkey):
         server.  Return a manager object.
 
     """
+    if isinstance(ip, bool):
+        ip = '127.0.0.1'
+    if isinstance(port, str):
+        port = int(port)
     class ServerQueueManager(SyncManager):
         pass
 
@@ -760,7 +769,7 @@ def make_client_manager(ip, port, authkey):
             print('Client: [pid %s] connected to %s:%s' % (os.getpid(), ip, port))
             return manager
         except Exception as e:
-            print("Client: %s: sleeping and retrying..." % e)
+            # print("Client: %s: sleeping and retrying..." % e)
             sleep(2)
 
 
@@ -778,7 +787,7 @@ def mp_run(shared_job_q, shared_result_q, nprocs, clientname):
                 target=build_worker,
                 args=(shared_job_q, shared_result_q, clientname))
         procs.append(p)
-        sleep(1)
+        # sleep(1)
         p.start()
         print("Client: Started process %s" % p.pid)
         
@@ -860,7 +869,18 @@ def build_worker(job_q, result_q, clientname):
 def run_buildserver(iterable, inst, classname, command):
     # Start a shared manager server and access its queues
     # NOTE: make_server_manager reuses existing buildserver if there is one
-    manager = make_server_manager(port=5555, authkey=b"secret")
+    manager = make_server_manager(port=inst.config.serverport,
+                                  authkey=inst.config.authkey)
+    return queue_jobs(manager, iterable, inst, classname, command)
+
+def queue_to_buildqueue(iterable, inst, classname, command):
+    from pudb import set_trace; set_trace()
+    manager = make_client_manager(inst.config.buildqueue,
+                                  inst.config.serverport,
+                                  inst.config.authkey)
+    return queue_jobs(manager, iterable, inst, classname, command)
+    
+def queue_jobs(manager, iterable, inst, classname, command):
     shared_job_q = manager.get_job_q()
     shared_result_q = manager.get_result_q()
 
@@ -887,7 +907,7 @@ def run_buildserver(iterable, inst, classname, command):
     shared_job_q.put("DONE")
     print("Server: Put DONE into shared_job_q")
     numres = 0
-    res = {}
+    res = []
     while numres < number_of_jobs:
         outdict = shared_result_q.get()
         if outdict['exception'] == 'KeyboardInterrupt':
@@ -901,27 +921,20 @@ def run_buildserver(iterable, inst, classname, command):
             for line in [x.strip() for x in outdict['log'].split("\n") if x.strip()]:
                 print("   %s" % line)
             print("Server: %(client)s processed %(basefile)s (%(result)s): OK" % outdict)
-        res.update(outdict)
+        if 'result' in outdict:
+            res.append(outdict['result'])
         numres += 1
     print("Server: %s tasks processed" % numres)
-    sleep(1)
+    return res
+    # sleep(1)
 
     # don't shut this down --- the toplevel manager.run call must do
     # that
     # manager.shutdown()
 
-
-def shutdown_buildserver():
-    global buildmanager
-    if buildmanager:
-        print("Server: Shutting down")
-        buildmanager.shutdown()
     
-
 buildmanager = None
-
-        
-def make_server_manager(port, authkey):
+def make_server_manager(port, authkey, start=True):
     """ Create a manager for the server, listening on the given port.
         Return a manager object with get_job_q and get_result_q methods.
     """
@@ -939,15 +952,33 @@ def make_server_manager(port, authkey):
         JobQueueManager.register('get_job_q', callable=lambda: job_q)
         JobQueueManager.register('get_result_q', callable=lambda: result_q)
 
+        if isinstance(authkey, str):
+            # authkey must be bytes
+            authkey = authkey.encode("utf-8")
+
         buildmanager = JobQueueManager(address=('', port), authkey=authkey)
-        print("Server: Created new buildmanager at %s" % id(buildmanager))
-        buildmanager.start()
-        print('Server: Started at port %s' % port)
+        print("Server: Process %s created new buildmanager at %s" % (os.getpid(), id(buildmanager)))
+        if start: # run_buildqueue wants to control this itself
+            buildmanager.start()
+            print('Server: Started at port %s' % port)
     else:
         print("Server: Reusing existing buildmanager at %s" % id(manager))
         
     return buildmanager
 
+def run_buildqueue(serverport, authkey):
+    # NB: This never returns!
+    manager = make_server_manager(serverport, authkey, start=False)
+    print("Queue: OK now i'm starting the service and won't return")
+    manager.get_server().serve_forever()
+    
+
+def shutdown_buildserver():
+    global buildmanager
+    if buildmanager:
+        print("Server: Shutting down buildserver")
+        buildmanager.shutdown()
+        sleep(1)
 
 def parallelize(iterable, inst, classname, command, config, argv):
     log = setup_logger()
@@ -1343,10 +1374,15 @@ def _setup_buildclient_args(config):
             'serverhost': LayeredConfig.get(config, 'serverhost', '127.0.0.1'),
             'serverport': LayeredConfig.get(config, 'serverport', 5555),
             'authkey':    LayeredConfig.get(config, 'authkey', 'secret'),
-            #'processes':  LayeredConfig.get(config, 'processes',
-            #                                multiprocessing.cpu_count())
-            #'processes': multiprocessing.cpu_count()   # no choice!
-            'processes': 2
+            'processes':  LayeredConfig.get(config, 'processes',
+                                            multiprocessing.cpu_count())
+            }
+            
+
+def _setup_buildqueue_args(config):
+    import socket
+    return {'serverport': LayeredConfig.get(config, 'serverport', 5555),
+            'authkey':    LayeredConfig.get(config, 'authkey', 'secret'),
             }
             
 
