@@ -118,12 +118,21 @@ class LayeredConfig(object):
             with open(root._inifilename, "w") as fp:
                 root._configparser.write(fp)
 
+    @staticmethod
     def set(config, key, value, source="defaults"):
         """Sets a value without marking the config file dirty"""
         src = {'defaults': config._defaults,
                'inifile': config._inifile,
                'commandline': config._commandline}[source]
         src[key] = value
+
+    @staticmethod
+    def get(config, key, default=None):
+        """Works like dict.get."""
+        if hasattr(config, key):
+            return getattr(config, key)
+        else:
+            return default
 
     def __iter__(self):
         l = []

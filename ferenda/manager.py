@@ -12,26 +12,31 @@ else, for you.
 """
 from __future__ import unicode_literals, print_function
 # system
+from ast import literal_eval
+from datetime import datetime
+from ferenda.compat import OrderedDict, MagicMock
+from functools import partial, wraps
+from io import StringIO, BytesIO
+from multiprocessing.managers import SyncManager
+from time import sleep
+from wsgiref.simple_server import make_server
+import inspect
+import logging
+import multiprocessing
 import os
+import shutil
 import stat
 import subprocess
 import sys
-import inspect
-import logging
-import shutil
 import tempfile
-from datetime import datetime
-from ferenda.compat import OrderedDict, MagicMock
-from wsgiref.simple_server import make_server
-import multiprocessing
-from functools import partial, wraps
-from ast import literal_eval
+import traceback
 
-import six
-from six.moves.urllib_parse import urlsplit
-from six.moves import configparser
-input = six.moves.input
 from six import text_type as str
+from six.moves import configparser
+from six.moves.urllib_parse import urlsplit
+from six.moves.queue import Queue, Empty
+import six
+input = six.moves.input
 
 # 3rd party
 import requests
@@ -261,7 +266,8 @@ def setup_logger(level='INFO', filename=None,
 
     # turn of some library loggers we're not interested in
     for logname in ['requests.packages.urllib3.connectionpool',
-                    'rdflib.plugins.sleepycat']:
+                    'rdflib.plugins.sleepycat',
+                    'ferenda.thirdparty.patch']:
         log = logging.getLogger(logname)
         log.propagate = False
         if log.handlers == []:
@@ -290,7 +296,7 @@ def shutdown_logger():
 
     
 
-def run(argv):
+def run(argv, subcall=False):
     """Runs a particular action for either a particular class or all
     enabled classes.
 
@@ -335,13 +341,24 @@ def run(argv):
                 try:
                     return enable(classname)
                 except (ImportError, ValueError) as e:
-                    log.error(six.text_type(e))
+                    log.error(str(e))
                     return None
             elif action == 'runserver':
                 args = _setup_runserver_args(config, _find_config_file())
                 # Note: the actual runserver method never returns
                 return runserver(**args)
-
+            elif action == 'buildclient':
+                # repoclasses = _classes_from_classname(enabled, classname)
+                args = _setup_buildclient_args(config)
+                # repos = []
+                # for cls in repoclasses:
+                #     inst = _instantiate_class(cls, config, argv)
+                #     repos.append(inst)
+                # return run_buildclient(repos, **args)
+                return run_buildclient(**args)
+            elif action == 'buildqueue':
+                args = _setup_buildqueue_args(config)
+                return run_buildqueue(**args)
             elif action == 'makeresources':
                 repoclasses = _classes_from_classname(enabled, classname)
                 args = _setup_makeresources_args(config)
@@ -368,7 +385,7 @@ def run(argv):
                         argscopy.extend(_filter_argv_options(argv))
                         argscopy.insert(0, action)
                         argscopy.insert(0, "all")
-                        results[action] = run(argscopy)
+                        results[action] = run(argscopy, subcall=True)
                     else:
                         results[action] = OrderedDict()
                         for classname in classnames:
@@ -380,7 +397,7 @@ def run(argv):
                                 argscopy.append("--all")
                             argscopy.insert(0, action)
                             argscopy.insert(0, classname)
-                            results[action][alias] = run(argscopy)
+                            results[action][alias] = run(argscopy, subcall=True)
                 return results
             else:
                 if classname == "all":
@@ -397,6 +414,8 @@ def run(argv):
                 else:
                     return _run_class(enabled, argv, config)
     finally:
+        if not subcall:
+            shutdown_buildserver()
         shutdown_logger()
 
 def enable(classname):
@@ -546,7 +565,9 @@ overridden by the config file or command line arguments."""
                              'res/img/navmenu.png',
                              'res/img/search.png'],
                 'legacyapi': False,
-                'fulltextindex': True
+                'fulltextindex': True,
+                'serverport': 5555,
+                'authkey': b'secret'
     }
     config = LayeredConfig(defaults, filename, argv, cascade=True)
     return config
@@ -686,34 +707,19 @@ def _run_class(enabled, argv, config):
             kwargs['otherrepos'] = otherrepos
 
         if 'all' in inst.config and inst.config.all == True:
+            iterable = inst.store.list_basefiles_for(command)
             res = []
             # semi-magic handling
             ret = cls.setup(command, inst.config)
             if ret == False:
                 log.info("%s %s: Nothing to do!" % (alias, command))
             else:
-                if inst.config.processes > 1:
-                    # parallelize using multiprocessing
-                    # multiprocessing.log_to_stderr(logging.DEBUG)
-                    pool = multiprocessing.Pool(processes=inst.config.processes,
-                                                initializer=_setup_subprocess_callable,
-                                                initargs=(classname, command, config, argv))
-                    clbl = _subprocess_proxy
-                    log.info("Starting multiprocessing with %d processes" %
-                             inst.config.processes)
-
-                    try:
-                        # FIXME: The 99999 second timeout is so that a
-                        # exception gets raised to the controlling
-                        # process immediately, see
-                        # http://stackoverflow.com/questions/1408356/keyboard-interrupts-with-pythons-multiprocessing-pool/1408476#1408476
-                        res = pool.map_async(clbl, inst.store.list_basefiles_for(command)).get(timeout=99999)
-                    except WrappedKeyboardInterrupt:
-                        raise KeyboardInterrupt()
-                    
-                    # make sure all subprocesses are dead and have released
-                    # their handles
-                    pool.terminate()
+                if LayeredConfig.get(config, 'buildserver'):
+                    res = run_buildserver(iterable, inst, classname, command)
+                elif LayeredConfig.get(config, 'buildqueue'):
+                    res = queue_to_buildqueue(iterable, inst, classname, command)
+                elif inst.config.processes > 1:
+                    res = parallelize(iterable, inst, classname, command, config, argv)
                 else:
                     for basefile in inst.store.list_basefiles_for(command):
                         res.append(_run_class_with_basefile(clbl, basefile, kwargs, command))
@@ -723,71 +729,347 @@ def _run_class(enabled, argv, config):
             res = clbl(*args, **kwargs)
     return res
 
+# The functions run_buildclient, run_buildserver, make_client_manager,
+# make_server_manager, mp_run and build_worker are based on the
+# examples in
+# http://eli.thegreenplace.net/2012/01/24/distributed-computing-in-python-with-multiprocessing/
+def run_buildclient(clientname,
+                    serverhost,
+                    serverport,
+                    authkey,
+                    processes):
 
-subprocess_callable = None
+    done = False
+    while not done:  # mp_run > build_worker might throw an exception,
+                     # which is how we exit
+        manager = make_client_manager(serverhost,
+                                  serverport,
+                                  authkey)
+        job_q = manager.get_job_q()
+        result_q = manager.get_result_q()
+        mp_run(job_q, result_q, processes, clientname)
+        # setup_logger().debug("Client: [pid %s] All done with one run, mp_run returned happily" % os.getpid())
+        done = True
+        
+def make_client_manager(ip, port, authkey):
+    """Create a manager for a client. This manager connects to a server
+        on the given address and exposes the get_job_q and
+        get_result_q methods for accessing the shared queues from the
+        server.  Return a manager object.
 
+    """
+    # FIXME: caller should be responsible for setting these to proper
+    # values
+    if isinstance(ip, bool):
+        ip = '127.0.0.1'
+    if isinstance(port, str):
+        port = int(port)
+    if isinstance(authkey, str):
+        # authkey must be bytes
+        authkey = authkey.encode("utf-8")
 
-def _setup_subprocess_callable(classname, command, config, argv):
-    # this is never called in the main process, only pool processes, and
-    # the purpose is to setup an (global) object instance in that process.
+    class ServerQueueManager(SyncManager):
+        pass
 
-    global subprocess_callable
-    if not subprocess_callable:
-        cls = _load_class(classname)
-        # config = LayeredConfig(literal_eval(dictconfig))
-        # config = LayeredConfig(dictconfig)
-        inst = _instantiate_class(cls, config, argv=argv)
-        subprocess_callable = _wrapexception(getattr(inst, command))
-        # subprocess_callable = getattr(inst, command)
-        setup_logger(level=config.loglevel)
+    ServerQueueManager.register(jobqueue_id)
+    ServerQueueManager.register(resultqueue_id)
 
-def _wrapexception(f):
-    # this is similar to decorators.handleerror but maybe more generic
-    # and returns exception info instead of False. FIXME: unify with
-    # _run_class_with_basefile
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        command = f.__name__
-        basefile = args[0]
-        except_type = except_value = None
-        import traceback
+    while True:
         try:
-            return f(*args, **kwargs)
-        except errors.DocumentRemovedError as e:
-            except_type, except_value, tb = sys.exc_info()
-            if hasattr(e, 'dummyfile'):
-                if not os.path.exists(e.dummyfile):
-                    util.writefile(e.dummyfile, "")
-                return None   # is what DocumentRepository.parse
-                              # returns when everything's ok
-            else:
-                except_type, except_value, tb = sys.exc_info()
-                errmsg = str(except_value)
-                setup_logger().error("%s of %s failed: %s" %
-                                     (command, basefile, errmsg))
+            manager = ServerQueueManager(address=(ip, port), authkey=authkey)
+            manager.connect()
+            setup_logger().debug('Client: [pid %s] connected to %s:%s' % (os.getpid(), ip, port))
+            return manager
         except Exception as e:
-            except_type, except_value, tb = sys.exc_info()
-            errmsg = str(except_value)
-            setup_logger().error("%s of %s failed: %s" %
-                                 (command, basefile, errmsg))
-        except KeyboardInterrupt as e:
-            except_type, except_value, tb = sys.exc_info()
-            raise WrappedKeyboardInterrupt()
-        return except_type, except_value, traceback.extract_tb(tb)
-
-    return wrapper
+            # print("Client: %s: sleeping and retrying..." % e)
+            sleep(2)
 
 
-def _subprocess_proxy(basefile):
-    # This is our way of creating a callable in the main process which,
-    # when called in the subprocess, can access the subprocess-global
-    # callable
-    global subprocess_callable
-    res = subprocess_callable(basefile)
+def mp_run(jobqueue, resultqueue, nprocs, clientname):
+    """ Split the work with jobs in jobqueue and results in
+        resultqueue into several processes. Launch each process with
+        factorizer_worker as the worker function, and wait until all are
+        finished.
+    """
+    procs = start_multiprocessing(jobqueue, resultqueue, nprocs, clientname)
+    finish_multiprocessing(procs)
+
+def start_multiprocessing(jobqueue, resultqueue, nprocs, clientname):
+    procs = []
+    log = setup_logger()
+    # log.debug("Client: [pid %s] about to start %s processes" % (os.getpid(), nprocs))
+    for i in range(nprocs):
+
+        p = multiprocessing.Process(
+                target=build_worker,
+                args=(jobqueue, resultqueue, clientname))
+        procs.append(p)
+        # sleep(1)
+        p.start()
+        log.debug("Client: [pid %s] Started process %s" % (os.getpid(), p.pid))
+    return procs
+
+
+def finish_multiprocessing(procs, join=True):
+    # we could either send a DONE signal to each proc or we could just
+    # kill them
+    for p in procs:
+        if join:  # in distributed mode
+            p.join()
+        else:  # in multiproc mode
+            # setup_logger().debug("Server: killing proc %s" % p.pid)
+            p.terminate()
+
+        
+def build_worker(jobqueue, resultqueue, clientname):
+    """A worker function to be launched in a separate process. Takes jobs
+        from jobqueue - each job a dict. When the job is done, the
+        result is placed into resultqueue. Runs until instructed to
+        quit.
+
+    """
+    # create the inst with a default config
+    # (_instantiate_class will try to read ferenda.ini)
+    inst = None
+    logstream  = StringIO()
+    log = setup_logger()
+    log.debug("Client: [pid %s] build_worker ready to process job queue" % os.getpid())
+    while True:
+        job = jobqueue.get() # get() blocks -- wait until a job or the
+                          # DONE/SHUTDOWN signal comes
+        if job == "DONE": # or a more sensible value
+            # setup_logger().debug("Client: [pid %s] Got DONE signal" % os.getpid())
+            return  # back to run_buildclient
+        if job == "SHUTDOWN":
+            # setup_logger().debug("Client: Got SHUTDOWN signal")
+            # kill the entire thing
+            raise Exception("OK we're done now")
+        if inst == None:
+            inst = _instantiate_and_configure(job['classname'],
+                                              job['config'],
+                                              logstream,
+                                              clientname)
+            # need to get hold of log as well
+        # log.debug("Client: [pid %s] Starting job %s %s %s" % (os.getpid(), job['classname'], job['command'], job['basefile']))
+        # Do the work
+        clbl = getattr(inst, job['command'])
+        # kwargs = job['kwargs']   # if we ever support that
+        kwargs = {}
+        res = _run_class_with_basefile(clbl, job['basefile'],
+                                       kwargs, job['command'],
+                                       wrapctrlc=True)
+        log.debug("Client: [pid %s] %s finished: %s" % (os.getpid(), job['basefile'], res))
+        logtext = logstream.getvalue()
+        logstream.truncate(0)
+        logstream.seek(0)
+        outdict = {'basefile': job['basefile'],
+                   'result':  res,
+                   'log': logtext,
+                   'client': clientname}
+        resultqueue.put(outdict)
+        # log.debug("Client: [pid %s] Put '%s' on the queue" % (os.getpid(), outdict['result']))
+        
+
+def _instantiate_and_configure(classname, config, logstream, clientname):
+    log = setup_logger()
+    log.debug("Client: [pid %s] instantiating and configuring %s" % (os.getpid(), classname))
+    inst = _instantiate_class(_load_class(classname))
+    for k,v in config.items():
+        # log.debug("Client: [pid %s] setting config value %s to %r" % (os.getpid(), k, v))
+        LayeredConfig.set(inst.config, k, v)
+    # setup logging to a StringIO. Maybe it would be best
+    # to just collect logentries as a tuple list and send
+    # them over.
+    # log.debug("Client: [pid %s] Setting up log" % os.getpid())
+    log = setup_logger(inst.config.loglevel)
+    for handler in log.handlers:
+        log.removeHandler(handler)
+    handler = logging.StreamHandler(logstream)
+    if clientname:
+        formatter = logging.Formatter(clientname+" %(asctime)s %(name)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
+    else:
+        formatter = logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
+    handler.setFormatter(formatter)
+    handler.setLevel(loglevels[inst.config.loglevel])
+    log.addHandler(handler)
+    log.setLevel(loglevels[inst.config.loglevel])
+    # log.debug("Client: [pid %s] Log is configured" % os.getpid())
+    return inst
+    
+
+def run_buildserver(iterable, inst, classname, command):
+    # Start a shared manager server and access its queues
+    # NOTE: make_server_manager reuses existing buildserver if there is one
+    manager = make_server_manager(port=inst.config.serverport,
+                                  authkey=inst.config.authkey)
+    return queue_jobs(manager, iterable, inst, classname, command)
+
+
+def queue_to_buildqueue(iterable, inst, classname, command):
+    manager = make_client_manager(inst.config.buildqueue,
+                                  inst.config.serverport,
+                                  inst.config.authkey)
+    return queue_jobs(manager, iterable, inst, classname, command)
+
+
+def queue_jobs_nomanager(jobqueue, iterable, inst, classname, command):
+    log = setup_logger()
+    default_config = _instantiate_class(_load_class(classname)).config
+    client_config = {}
+    for k in inst.config:
+        if (k not in ('all', 'logfile', 'buildserver', 'buildqueue', 'serverport', 'authkey') and
+            (LayeredConfig.get(default_config, k) !=
+             LayeredConfig.get(inst.config, k))):
+            client_config[k] = LayeredConfig.get(inst.config, k)
+    # print("Server: Extra config for clients is %r" % client_config)
+    basefiles = []
+    for idx, basefile in enumerate(iterable):
+        job = {'basefile': basefile,
+               'classname': classname,
+               'command': command,
+               'config': client_config}
+        # log.debug("Server: putting %r into jobqueue" %  job['basefile'])
+        jobqueue.put(job)
+        basefiles.append(basefile)
+    log.debug("Server: Put %s jobs into job queue" % len(basefiles))
+    return basefiles
+
+
+def queue_jobs(manager, iterable, inst, classname, command):
+    jobqueue = manager.get_job_q()
+    resultqueue = manager.get_result_q()
+    log = setup_logger()
+    # we'd like to just provide those config parameters that diff from
+    # the default (what the client will already have), ie.  those set
+    # by command line parameters (or possibly env variables)
+    default_config = _instantiate_class(_load_class(classname)).config
+    client_config = {}
+    for k in inst.config:
+        if (k not in ('all', 'logfile', 'buildserver', 'buildqueue', 'serverport', 'authkey') and
+            (LayeredConfig.get(default_config, k) !=
+             LayeredConfig.get(inst.config, k))):
+            client_config[k] = LayeredConfig.get(inst.config, k)
+    log.debug("Server: Extra config for clients is %r" % client_config)
+    for idx, basefile in enumerate(iterable):
+        job = {'basefile': basefile,
+               'classname': classname,
+               'command': command,
+               'config': client_config}
+        # print("putting %r into jobqueue" %  job)
+        jobqueue.put(job)
+    number_of_jobs = idx+1
+    log.debug("Server: Put %s jobs into job queue" % number_of_jobs)
+    # FIXME: only one of the clients will read this DONE package, and
+    # we have no real way of knowing how many clients there will be
+    # (they can come and go at will). Didn't think this one through...
+    jobqueue.put("DONE")
+    numres = 0
+    res = []
+    while numres < number_of_jobs:
+        r = resultqueue.get()
+        if isinstance(r['result'], tuple) and r['result'][0] == WrappedKeyboardInterrupt:
+            raise KeyboardInterrupt()
+        elif isinstance(r['result'], tuple) and isinstance(r['result'], Exception):
+            r['except_type'] = r['result'][0]
+            r['except_value'] = r['result'][1]
+            log.debug("Server: %(client)s failed %(basefile)s: %(except_type)s: %(except_value)s" % r)
+            print("".join(traceback.format_list(r['result'][2])))
+        else:
+            for line in [x.strip() for x in r['log'].split("\n") if x.strip()]:
+                print("   %s" % line)
+            log.debug("Server: client %(client)s processed %(basefile)s: Result (%(result)s): OK" % r)
+        if 'result' in r:
+            res.append(r['result'])
+        numres += 1
+    log.debug("Server: %s tasks processed" % numres)
     return res
+    # sleep(1)
+
+    # don't shut this down --- the toplevel manager.run call must do
+    # that
+    # manager.shutdown()
 
     
-def _run_class_with_basefile(clbl, basefile, kwargs, command):
+buildmanager = None
+if six.PY2:
+    jobqueue_id = b'get_job_q'
+    resultqueue_id = b'get_result_q'
+else:
+    jobqueue_id = 'get_job_q'
+    resultqueue_id = 'get_result_q'
+    
+def make_server_manager(port, authkey, start=True):
+
+    """ Create a manager for the server, listening on the given port.
+        Return a manager object with get_job_q and get_result_q methods.
+    """
+    global buildmanager
+    if not buildmanager:
+        if isinstance(port, str):
+            port = int(port)
+        job_q = Queue()
+        result_q = Queue()
+
+        # This is based on the examples in the official docs of
+        # multiprocessing.  get_{job|result}_q return synchronized
+        # proxies for the actual Queue objects.
+        class JobQueueManager(SyncManager):
+            pass
+
+        JobQueueManager.register(jobqueue_id, callable=lambda: job_q)
+        JobQueueManager.register(resultqueue_id, callable=lambda: result_q)
+
+        if isinstance(authkey, str):
+            # authkey must be bytes
+            authkey = authkey.encode("utf-8")
+
+        buildmanager = JobQueueManager(address=('', port), authkey=authkey)
+        setup_logger().debug("Server: Process %s created new buildmanager at %s" % (os.getpid(), id(buildmanager)))
+        if start: # run_buildqueue wants to control this itself
+            buildmanager.start()
+            setup_logger().debug('Server: Started at port %s' % port)
+        
+    return buildmanager
+
+def run_buildqueue(serverport, authkey):
+    # NB: This never returns!
+    manager = make_server_manager(serverport, authkey, start=False)
+    setup_logger().debug("Queue: Starting server manager with .serve_forever()")
+    manager.get_server().serve_forever()
+    
+
+def shutdown_buildserver():
+    global buildmanager
+    if buildmanager:
+        setup_logger().debug("Server: Shutting down buildserver")
+        buildmanager.shutdown()
+        buildmanager = None
+        sleep(1)
+
+def parallelize(iterable, inst, classname, command, config, argv):
+    jobqueue = multiprocessing.Queue()
+    resultqueue = multiprocessing.Queue()
+    procs = start_multiprocessing(jobqueue, resultqueue, inst.config.processes, None)
+    try:
+        basefiles = queue_jobs_nomanager(jobqueue, iterable, inst, classname, command)
+        res = process_resultqueue(resultqueue, basefiles)
+        return res
+    finally:
+        finish_multiprocessing(procs, join=False)
+
+def process_resultqueue(resultqueue, basefiles):
+    res = {}
+    queuelength = len(basefiles)
+    for i in range(queuelength):
+        r = resultqueue.get()
+        if isinstance(r['result'], tuple) and r['result'][0] == WrappedKeyboardInterrupt:
+            raise KeyboardInterrupt()
+        res[r['basefile']] = r['result']
+    # return the results in the same order as they were queued
+    return [res[x] for x in basefiles]
+
+    
+def _run_class_with_basefile(clbl, basefile, kwargs, command, wrapctrlc=False):
     try:
         return clbl(basefile, **kwargs)
     except errors.DocumentRemovedError as e:
@@ -800,12 +1082,21 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command):
             errmsg = str(e)
             setup_logger().error("%s of %s failed: %s" %
                                  (command, basefile, errmsg))
-            return sys.exc_info()
+            exc_type, exc_value, tb = sys.exc_info()
+            return exc_type, exc_value, traceback.extract_tb(tb)
     except Exception as e:
         errmsg = str(e)
         setup_logger().error("%s of %s failed: %s" %
                              (command, basefile, errmsg))
-        return sys.exc_info()
+        exc_type, exc_value, tb = sys.exc_info()
+        return exc_type, exc_value, traceback.extract_tb(tb)
+    except KeyboardInterrupt as e:   # KeyboardInterrupt is not an Exception
+        if wrapctrlc:
+            except_type, except_value, tb = sys.exc_info()
+            return WrappedKeyboardInterrupt, WrappedKeyboardInterrupt(), traceback.extract_tb(tb)
+        else:
+            raise
+
 
         
 def _instantiate_class(cls, config=None, argv=[]):
@@ -1088,6 +1379,25 @@ def _setup_frontpage_args(config, argv):
             'staticsite': config.staticsite,
             'repos': repos}
 
+def _setup_buildclient_args(config):
+    import socket
+    return {'clientname': LayeredConfig.get(config, 'clientname',
+                                            socket.gethostname()),
+            'serverhost': LayeredConfig.get(config, 'serverhost', '127.0.0.1'),
+            'serverport': LayeredConfig.get(config, 'serverport', 5555),
+            'authkey':    LayeredConfig.get(config, 'authkey', 'secret'),
+            'processes':  LayeredConfig.get(config, 'processes',
+                                            multiprocessing.cpu_count())
+            }
+            
+
+def _setup_buildqueue_args(config):
+    import socket
+    return {'serverport': LayeredConfig.get(config, 'serverport', 5555),
+            'authkey':    LayeredConfig.get(config, 'authkey', 'secret'),
+            }
+            
+
 
 def _filepath_to_urlpath(path, keep_segments=2):
     """
@@ -1302,3 +1612,6 @@ def _select_fulltextindex(log, sitename, verbose=False):
             pass
     # 2. Whoosh (just assume that it works)
     return ("WHOOSH", "data/whooshindex")
+
+if __name__ == '__main__':
+    pass

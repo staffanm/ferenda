@@ -159,3 +159,72 @@ supports many common vocabularies (``bibo``, ``dc``, ``dcterms``,
 you have defined your own custom ontology, place it (in Turtle format)
 as ``res/vocab/[alias].ttl``, eg. ``res/vocab/rfc.ttl`` to make
 Ferenda read it.
+
+Parallel processing
+-------------------
+
+It's common to use ferenda with document collections with tens of
+thousands of documents. If a single document takes a second to parse,
+it means the entire document collection will take three hours or more,
+which is not ideal for quick turnaround. Ferenda, and in particular
+the ``ferenda-build.py`` tool, can run tasks in parallel to speed
+things up.
+
+Multiprocessing on a single machine
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The simplest way of speeding up processing is to use the ``processes``
+parameter, eg::
+
+    ./ferenda-build rfc parse --all --processes=4
+
+This will create 4 processes (started by a fifth control proccess),
+each processing individual documents as instructed by the control
+process. As a rule of thumb, you should create as many processes as
+you have CPU cores.
+
+
+Distributed processing
+^^^^^^^^^^^^^^^^^^^^^^
+
+A more complex, but also more scalable way, is to set up a bunch of
+computers acting as processing clients, together with a main (control)
+system. Each of these clients must have access to the same code and
+data directory as the main system (ie they should all mount the same
+network file system). On each client, you then run (assuming that your
+main system has the IP address 192.168.1.42, and that this particular
+client has 4 CPU cores)::
+
+    ./ferenda-build all buildclient --serverhost=192.168.1.42 --processes=4
+
+On the main system, you first start a message queue with::
+
+    ./ferenda-build all buildqueue
+
+Then you can run ferenda-build as normal but with the ``buildqueue``
+parameter, eg::
+
+    ./ferenda-build rfc parse --all --buildqueue
+    
+This will put each file to be processed in the message queue, where
+all clients will pick up these jobs and process them.
+    
+The clients and the message queue can be kept running indefinitely
+(although the clients will need to be restarted when you change the
+code that they're running).
+
+If you're not running ferenda on windows, you can skip the separate
+message queue process. Just start your clients like above, then start
+ferenda-build on your main system with the ``buildserver`` parameter,
+eg::
+
+    ./ferenda-build rfc parse --all --buildserver
+
+This sets up a temporary in-subprocess message queue that your clients
+will connect to as soon as it's up.
+
+.. note::
+
+   Because of reasons, this in-subprocess queue does not work on
+   windows. On that platform you'll need to run the message queue
+   separately, as described initially.

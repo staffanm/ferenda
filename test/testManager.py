@@ -8,7 +8,8 @@ import pkg_resources
 import shutil
 import sys
 import tempfile
-
+from time import sleep
+from subprocess import Popen, PIPE
 # NOTE: by inserting cwd (which *should* be the top-level source code
 # dir, with 'ferenda' and 'test' as subdirs) into sys.path as early as
 # possible, we make it possible for pkg_resources to find resources in
@@ -56,7 +57,7 @@ class staticmockclass(DocumentRepository):
 
     def relate(self, basefile):
         return "%s relate %s" % (self.alias, basefile)
-
+ 
     def generate(self, basefile): 
         return "%s generate %s" % (self.alias, basefile)
 
@@ -378,17 +379,12 @@ class Setup(RepoTester):
             with patch('ferenda.manager.setup', return_value=False):
                 manager.runsetup()
                 self.assertTrue(mockexit.called)
-                
+               
 
-class Run(unittest.TestCase):
-    """Tests manager interface using only the run() entry point used by ferenda-build.py"""
-
-    
+class RunBase(object):
     def setUp(self):
         self.addTypeEqualityFunc(OrderedDict, self.assertDictEqual)
         self.maxDiff = None
-
-        # self.modulename = hashlib.md5(self.tempdir.encode('ascii')).hexdigest()
         self.modulename = "example"
         # When testing locally , we want to avoid cluttering cwd, so
         # we chdir to a temp dir, but when testing on travis-ci,
@@ -401,6 +397,52 @@ class Run(unittest.TestCase):
             self.tempdir = tempfile.mkdtemp()
             self.orig_cwd = os.getcwd()
             os.chdir(self.tempdir)
+
+        self._setup_files(self.tempdir,  self.modulename)
+        sys.path.append(self.tempdir)
+
+    def tearDown(self):
+        manager.shutdown_logger()
+        if 'TRAVIS' in os.environ:
+            util.robust_remove("ferenda.ini")
+        else:
+            os.chdir(self.orig_cwd)
+            shutil.rmtree(self.tempdir)
+            sys.path.remove(self.tempdir)
+
+    # functionality used by most test methods except test_noconfig
+    def _enable_repos(self):
+
+        # 3. run('example.Testrepo', 'enable')
+        with patch.object(logging.Logger, 'info') as mocklog:
+            self.assertEqual("test",
+                             manager.run([self.modulename+".Testrepo", "enable"]))
+            # 4. verify that "alias foo enabled" is logged
+            log_arg = mocklog.call_args[0][0]
+            self.assertEqual("Enabled class %s.Testrepo (alias 'test')" % self.modulename,
+                             log_arg)
+
+            # 5. verify that ferenda.ini has changed
+            cfg = configparser.ConfigParser()
+            cfg.read(["ferenda.ini"])
+            self.assertEqual(cfg.get("test","class"), self.modulename+".Testrepo")
+
+            #  (same, with 'example.Testrepo2')
+            self.assertEqual("test2",
+                             manager.run([self.modulename+".Testrepo2", "enable"]))
+            cfg = configparser.ConfigParser()
+            cfg.read(["ferenda.ini"])
+            self.assertEqual(cfg.get("test2","class"), self.modulename+".Testrepo2")
+
+        with patch.object(logging.Logger, 'error') as mocklog:
+            # 6. run('example.Nonexistent', 'enable') -- the ImportError must
+            # be caught and an error printed.
+            manager.run([self.modulename+".Nonexistent", "enable"])
+            # 7. verify that a suitable error messsage is logged
+            self.assertEqual("No class named '%s.Nonexistent'" % self.modulename,
+                             mocklog.call_args[0][0])
+
+    def _setup_files(self, tempdir, modulename):
         # 1. create new blank ini file (FIXME: can't we make sure that
         # _find_config_file is called with create=True when using
         # run() ?)
@@ -415,11 +457,11 @@ jsfiles = ['test.js']
 imgfiles = ['test.png']
 indextype = WHOOSH
 indexlocation = data/whooshindex        
-        """ % self.tempdir)
+    """ % tempdir)
 
         # 2. dump 2 example docrepo classes to example.py
         # FIXME: should we add self.tempdir to sys.path also (and remove it in teardown)?
-        util.writefile(self.modulename+".py", """# Test code
+        util.writefile(modulename+".py", """# Test code
 import os
 from time import sleep
 
@@ -461,6 +503,10 @@ class Testrepo(DocumentRepository):
 
     @decorators.action
     def pid(self, arg):
+        if hasattr(self.config, 'clientname'):
+            res = "%s:%s" % (clientname, os.getpid())
+        else:
+            res = os.getpid()
         self.log.info("%s: pid is %s" % (arg, os.getpid()))
         self.log.debug("%s: some more debug info" % (arg))
         sleep(2) # tasks need to run for some time in order to keep all subprocesses busy
@@ -533,22 +579,15 @@ class Testrepo2(Testrepo):
         return self.store.custommethod()
 
 """)
-        
-        util.writefile(self.tempdir+"/test.js", "// test.js code goes here")
-        util.writefile(self.tempdir+"/test.css", "/* test.css code goes here */")
-        util.writefile(self.tempdir+"/other.css", "/* other.css code goes here */")
-        util.writefile(self.tempdir+"/test.png", "\x89\x50\x4e\x47\x0d\x0a\x1a\x0a PNG data goes here")
-        sys.path.append(self.tempdir)
+        util.writefile(tempdir+"/test.js", "// test.js code goes here")
+        util.writefile(tempdir+"/test.css", "/* test.css code goes here */")
+        util.writefile(tempdir+"/other.css", "/* other.css code goes here */")
+        util.writefile(tempdir+"/test.png", "\x89\x50\x4e\x47\x0d\x0a\x1a\x0a PNG data goes here")
+    
 
-    def tearDown(self):
-        manager.shutdown_logger()
-        if 'TRAVIS' in os.environ:
-            util.robust_remove("ferenda.ini")
-        else:
-            os.chdir(self.orig_cwd)
-            shutil.rmtree(self.tempdir)
-            sys.path.remove(self.tempdir)
-
+    
+class Run(RunBase, unittest.TestCase):
+    """Tests manager interface using only the run() entry point used by ferenda-build.py"""
 
     def test_noconfig(self):
         os.unlink("ferenda.ini")
@@ -568,37 +607,6 @@ class Testrepo2(Testrepo):
                              ('saved', 'True'))),
                          set(cfg.items('test')))
         
-    # functionality used by most test methods except test_noconfig
-    def _enable_repos(self):
-
-        # 3. run('example.Testrepo', 'enable')
-        with patch.object(logging.Logger, 'info') as mocklog:
-            self.assertEqual("test",
-                             manager.run([self.modulename+".Testrepo", "enable"]))
-            # 4. verify that "alias foo enabled" is logged
-            log_arg = mocklog.call_args[0][0]
-            self.assertEqual("Enabled class %s.Testrepo (alias 'test')" % self.modulename,
-                             log_arg)
-
-            # 5. verify that ferenda.ini has changed
-            cfg = configparser.ConfigParser()
-            cfg.read(["ferenda.ini"])
-            self.assertEqual(cfg.get("test","class"), self.modulename+".Testrepo")
-
-            #  (same, with 'example.Testrepo2')
-            self.assertEqual("test2",
-                             manager.run([self.modulename+".Testrepo2", "enable"]))
-            cfg = configparser.ConfigParser()
-            cfg.read(["ferenda.ini"])
-            self.assertEqual(cfg.get("test2","class"), self.modulename+".Testrepo2")
-
-        with patch.object(logging.Logger, 'error') as mocklog:
-            # 6. run('example.Nonexistent', 'enable') -- the ImportError must
-            # be caught and an error printed.
-            manager.run([self.modulename+".Nonexistent", "enable"])
-            # 7. verify that a suitable error messsage is logged
-            self.assertEqual("No class named '%s.Nonexistent'" % self.modulename,
-                             mocklog.call_args[0][0])
 
     def test_run_enable(self):
         self._enable_repos()
@@ -648,41 +656,6 @@ class Testrepo2(Testrepo):
         # Test 2: but if not, do the work
         self.assertEqual(manager.run(list(argv)), [None, "ok!", None])
 
-    def test_run_single_all_multiprocessing(self):
-        self._enable_repos()
-        # print("running multiproc for pid %s, datadir %s" % (os.getpid(), self.tempdir))
-        argv = ["test","pid","--all", "--processes=3"]
-        res = manager.run(argv)
-        args = [x[0] for x in res]
-        pids = [x[1] for x in res]
-        self.assertEqual(args, ["arg1", "myarg", "arg2"])
-        # assert that all pids are unique
-        self.assertEqual(3, len(set(pids)))
-
-    def test_run_single_all_multiprocessing_fail(self):
-        self._enable_repos()
-        # print("running multiproc for pid %s, datadir %s" % (os.getpid(), self.tempdir))
-        argv = ["test","errmethod","--all", "--processes=3"]
-        res = manager.run(argv)
-        # this doesn't test that errors get reported immediately
-        # (which they dont)
-        self.assertEqual(res[0][0], Exception)
-        self.assertEqual(res[1][0], errors.DocumentRemovedError)
-        self.assertEqual(res[2], None)
-        self.assertTrue(os.path.exists("dummyfile.txt"))
-            
-    def test_run_ctrlc(self):
-        self._enable_repos()
-        argv = ["test", "keyboardinterrupt", "--all"]
-        with self.assertRaises(KeyboardInterrupt):
-            manager.run(argv)
-
-    def test_run_ctrlc_multiprocessing(self):
-        self._enable_repos()
-        argv = ["test", "keyboardinterrupt", "--all", "--processes=2"]
-        with self.assertRaises(KeyboardInterrupt):
-            manager.run(argv)
-
     def test_run_all(self):
         self._enable_repos()
         argv = ["all", "mymethod", "myarg"]
@@ -697,31 +670,6 @@ class Testrepo2(Testrepo):
                          [[None,"ok!",None],
                           [None,"yeah!",None]])
 
-    # FIXME: This test magically fails every *other* run on Travis
-    # with the following stacktrace:
-    # 
-    # Traceback (most recent call last):
-    #   File "/home/travis/build/staffanm/ferenda/test/testManager.py", line 482, in test_run_all_allmethods
-    #     got = manager.run(argv)
-    #   File "ferenda/manager.py", line 694, in run
-    #     results[action] = run(argscopy)
-    #   File "ferenda/manager.py", line 681, in run
-    #     return frontpage(**args)
-    #   File "ferenda/manager.py", line 360, in frontpage
-    #     xsltdir = repos[0].setup_transform_templates(os.path.dirname(stylesheet), stylesheet)
-    #   File "ferenda/documentrepository.py", line 1747, in setup_transform_templates
-    #     for f in pkg_resources.resource_listdir('ferenda',xsltdir):
-    #   File "/home/travis/virtualenv/python2.7/local/lib/python2.7/site-packages/distribute-0.6.34-py2.7.egg/pkg_resources.py", line 932, in resource_listdir
-    #     resource_name
-    #   File "/home/travis/virtualenv/python2.7/local/lib/python2.7/site-packages/distribute-0.6.34-py2.7.egg/pkg_resources.py", line 1229, in resource_listdir
-    #     return self._listdir(self._fn(self.module_path,resource_name))
-    #   File "/home/travis/virtualenv/python2.7/local/lib/python2.7/site-packages/distribute-0.6.34-py2.7.egg/pkg_resources.py", line 1320, in _listdir
-    #     return os.listdir(path)
-    # OSError: [Errno 2] No such file or directory: 'ferenda/res/xsl'
-    #
-    # I can not figure out why. Skip for now.
-#    @unittest.skipIf('TRAVIS' in os.environ,
-#                 "Skipping test_run_all_allmethods on travis-ci")    
     def test_run_all_allmethods(self):
         self._enable_repos()
         argv = ["all", "all", "--magic=more"]
@@ -764,10 +712,6 @@ class Testrepo2(Testrepo):
         self.maxDiff = None
         self.assertEqual(want,got)
         
-    # since this method also calls frontpage, it fails on travis in
-    # the same way as test_run_all_allmethods.
-#    @unittest.skipIf('TRAVIS' in os.environ,
-#                 "Skipping test_run_single_allmethods on travis-ci")    
     def test_run_single_allmethods(self):
         self._enable_repos()
         argv = ["test", "all"]
@@ -859,20 +803,23 @@ imgfiles = []
                                'indexlocation': 'data/whooshindex',
                                'sitename': 'Test'})
         self._enable_repos()
-        got = manager.run(['all', 'makeresources'])
-        want = {'xml': ['rsrc/resources.xml'],
-                'json': ['rsrc/api/context.json',
-                         'rsrc/api/common.json',
-                         'rsrc/api/terms.json'],
-                'img': ['rsrc/img/navmenu-small-black.png',
-                        'rsrc/img/navmenu.png', 'rsrc/img/search.png'],
+        s = os.sep
+        got = manager.run(['all', 'makeresources', '--loglevel=CRITICAL'])
+        want = {'xml':[s.join(['rsrc', 'resources.xml'])],
+                'json': [s.join(['rsrc','api','context.json']),
+                         s.join(['rsrc','api','common.json']),
+                         s.join(['rsrc','api','terms.json'])],
+                'img': [s.join(['rsrc', 'img', 'navmenu-small-black.png']),
+                        s.join(['rsrc', 'img', 'navmenu.png']),
+                        s.join(['rsrc', 'img', 'search.png'])],
                 'css': ['http://fonts.googleapis.com/css?family=Raleway:200,100',
-                        'rsrc/css/normalize-1.1.3.css',
-                        'rsrc/css/main.css', 'rsrc/css/ferenda.css'],
-                'js': ['rsrc/js/jquery-1.10.2.js',
-                       'rsrc/js/modernizr-2.6.3.js',
-                       'rsrc/js/respond-1.3.0.js',
-                       'rsrc/js/ferenda.js']}
+                        s.join(['rsrc', 'css', 'normalize-1.1.3.css']),
+                        s.join(['rsrc', 'css', 'main.css']),
+                        s.join(['rsrc', 'css', 'ferenda.css'])],
+                'js': [s.join(['rsrc', 'js', 'jquery-1.10.2.js']),
+                       s.join(['rsrc', 'js', 'modernizr-2.6.3.js']),
+                       s.join(['rsrc', 'js', 'respond-1.3.0.js']),
+                       s.join(['rsrc', 'js', 'ferenda.js'])]}
         self.assertEqual(want, got)
 
     def test_delayed_config(self):
@@ -897,7 +844,7 @@ imgfiles = []
         # make sure that the sub-config object created by run() is
         # identical to the config object used by the instance
         self._enable_repos()
-        ourcfg = LayeredConfig({'loglevel': 'INFO',
+        ourcfg = LayeredConfig({'loglevel': 'CRITICAL',  # keep the stdout logging neat
                                 'logfile': None,
                                 'datadir': 'data',
                                 'test': {'hello': 'world'}},
@@ -947,7 +894,135 @@ Available modules:
             self.assertTrue(m2.called)
             self.assertTrue(m.serve_forever.called)
 
+    def test_run_ctrlc(self):
+        self._enable_repos()
+        argv = ["test", "keyboardinterrupt", "--all"]
+        with self.assertRaises(KeyboardInterrupt):
+            manager.run(argv)
 
+ 
+class RunMultiproc(RunBase, unittest.TestCase):
+
+    def tearDown(self):
+        if sys.platform == "win32":
+            sleep(1) # to allow subprocesses to clean up
+        super(RunMultiproc, self).tearDown()
+    
+    def test_run_single_all_multiprocessing(self):
+        self._enable_repos()
+        argv = ["test", "pid", "--all", "--processes=3"]
+        res = manager.run(argv)
+        args = [x[0] for x in res]
+        pids = [x[1] for x in res]
+        self.assertEqual(args, ["arg1", "myarg", "arg2"])
+        # assert that all pids are unique
+        self.assertEqual(3, len(set(pids)))
+
+    def test_run_single_all_multiprocessing_fail(self):
+        self._enable_repos()
+        # print("running multiproc for pid %s, datadir %s" % (os.getpid(), self.tempdir))
+        argv = ["test","errmethod","--all", "--processes=3"]
+        res = manager.run(argv)
+        # this doesn't test that errors get reported immediately
+        # (which they do)
+        self.assertEqual(res[0][0], Exception)
+        self.assertEqual(res[1][0], errors.DocumentRemovedError)
+        self.assertEqual(res[2], None)
+        self.assertTrue(os.path.exists("dummyfile.txt"))
+            
+    def test_run_ctrlc_multiprocessing(self):
+        self._enable_repos()
+        argv = ["test", "keyboardinterrupt", "--all", "--processes=2"]
+        with self.assertRaises(KeyboardInterrupt):
+            manager.run(argv)
+
+
+class RunDistributed(RunBase, unittest.TestCase):
+    def setUp(self):
+        self.startcwd = os.getcwd()
+        super(RunDistributed, self).setUp()
+        pathtostart = os.path.relpath(self.startcwd, os.getcwd())
+        # create a minimal version of ferenda-build.py with the
+        # correct paths appended to sys.path
+        with open("ferenda-build.py", "w") as fp:
+            fp.write("""import sys, os
+sys.path.append('%s')
+            
+from ferenda import manager
+if __name__ == '__main__':
+    manager.run(sys.argv[1:])
+            """ % pathtostart.replace("\\", "/"))
+                     
+    def tearDown(self):
+        if sys.platform == "win32":
+            sleep(5) # to allow all 7 subprocess to close and release their
+                     # handles
+        super(RunDistributed, self).tearDown()
+
+    @unittest.skipIf(sys.platform == "win32", "Queueless server mode not supported on Windows")
+    def test_server(self):
+        self._enable_repos()
+        # create two out-of-process clients
+        foo = Popen(['python', 'ferenda-build.py', 'all',
+                     'buildclient', '--clientname=foo', '--processes=2'],
+                    stderr=PIPE)
+        bar = Popen(['python', 'ferenda-build.py', 'all',
+                     'buildclient', '--clientname=bar', '--processes=2'],
+                    stderr=PIPE)
+        try:
+            # run an in-process server
+            argv = ["test", "pid", "--all", "--buildserver"]
+            res = manager.run(argv)
+            # same tests as for RunMultiproc.test_run_single_all
+            args = [x[0] for x in res]
+            pids = [x[1] for x in res]
+            # we're not guaranteed any particular order, therefore we
+            # compare sets instead of lists
+            self.assertEqual(set(args), set(["arg1", "myarg", "arg2"]))
+            self.assertEqual(3, len(set(pids)))
+        finally:
+            foo.terminate()
+            bar.terminate()
+        
+
+    def test_queue(self):
+        # runs a separate queue-handling process (which is the only
+        # way to do it on windows). also, test with non-default port
+        self._enable_repos()
+        
+        # create a out-of-process buildqueue server
+        queue = Popen(['python', 'ferenda-build.py', 'all',
+                       'buildqueue', '--serverport=3456'])
+
+        # create two out-of-process clients
+        foo = Popen(['python', 'ferenda-build.py', 'all',
+                     'buildclient', '--clientname=foo', '--serverport=3456',
+                     '--processes=2'],
+                    stderr=PIPE)
+        bar = Popen(['python', 'ferenda-build.py', 'all',
+                     'buildclient', '--clientname=bar', '--serverport=3456',
+                     '--processes=2'],
+                    stderr=PIPE)
+        sleep(2) # to allow both clients to spin up so that one won't
+                 # be hogging all the jobs (since they have 2 procs
+                 # each, that will lead to duplicated pids). NOTE: this
+                 # does not guarantee anything
+        try:
+            # then, in-process, push jobs to that queue and watch them
+            # return results
+            argv = ["test", "pid", "--all", "--buildqueue", "--serverport=3456"]
+            res = manager.run(argv)
+            # same tests as for RunMultiproc.test_run_single_all
+            args = [x[0] for x in res]
+            pids = [x[1] for x in res]
+            # we're not guaranteed any particular order, therefore we
+            # compare sets instead of lists
+            self.assertEqual(set(args), set(["arg1", "myarg", "arg2"]))
+            self.assertEqual(3, len(set(pids)))
+        finally:
+            foo.terminate()
+            bar.terminate()
+            queue.terminate()
 
 import doctest
 from ferenda import manager

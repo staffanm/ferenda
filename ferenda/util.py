@@ -442,6 +442,7 @@ def readfile(filename, mode="r", encoding="utf-8"):
         with open(filename, mode=mode) as fp:
             return fp.read()  # returns bytes, not str
     else:
+        # print("opening %s with encoding %s"%  (filename, encoding))
         with codecs.open(filename, mode=mode, encoding=encoding) as fp:
             return fp.read()
 
