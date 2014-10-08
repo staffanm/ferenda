@@ -57,7 +57,7 @@ class staticmockclass(DocumentRepository):
 
     def relate(self, basefile):
         return "%s relate %s" % (self.alias, basefile)
-
+ 
     def generate(self, basefile): 
         return "%s generate %s" % (self.alias, basefile)
 
@@ -803,20 +803,23 @@ imgfiles = []
                                'indexlocation': 'data/whooshindex',
                                'sitename': 'Test'})
         self._enable_repos()
+        s = os.sep
         got = manager.run(['all', 'makeresources', '--loglevel=CRITICAL'])
-        want = {'xml': ['rsrc/resources.xml'],
-                'json': ['rsrc/api/context.json',
-                         'rsrc/api/common.json',
-                         'rsrc/api/terms.json'],
-                'img': ['rsrc/img/navmenu-small-black.png',
-                        'rsrc/img/navmenu.png', 'rsrc/img/search.png'],
+        want = {'xml':[s.join(['rsrc', 'resources.xml'])],
+                'json': [s.join(['rsrc','api','context.json']),
+                         s.join(['rsrc','api','common.json']),
+                         s.join(['rsrc','api','terms.json'])],
+                'img': [s.join(['rsrc', 'img', 'navmenu-small-black.png']),
+                        s.join(['rsrc', 'img', 'navmenu.png']),
+                        s.join(['rsrc', 'img', 'search.png'])],
                 'css': ['http://fonts.googleapis.com/css?family=Raleway:200,100',
-                        'rsrc/css/normalize-1.1.3.css',
-                        'rsrc/css/main.css', 'rsrc/css/ferenda.css'],
-                'js': ['rsrc/js/jquery-1.10.2.js',
-                       'rsrc/js/modernizr-2.6.3.js',
-                       'rsrc/js/respond-1.3.0.js',
-                       'rsrc/js/ferenda.js']}
+                        s.join(['rsrc', 'css', 'normalize-1.1.3.css']),
+                        s.join(['rsrc', 'css', 'main.css']),
+                        s.join(['rsrc', 'css', 'ferenda.css'])],
+                'js': [s.join(['rsrc', 'js', 'jquery-1.10.2.js']),
+                       s.join(['rsrc', 'js', 'modernizr-2.6.3.js']),
+                       s.join(['rsrc', 'js', 'respond-1.3.0.js']),
+                       s.join(['rsrc', 'js', 'ferenda.js'])]}
         self.assertEqual(want, got)
 
     def test_delayed_config(self):
@@ -899,7 +902,12 @@ Available modules:
 
  
 class RunMultiproc(RunBase, unittest.TestCase):
-   
+
+    def tearDown(self):
+        if sys.platform == "win32":
+            sleep(1) # to allow subprocesses to clean up
+        super(RunMultiproc, self).tearDown()
+    
     def test_run_single_all_multiprocessing(self):
         self._enable_repos()
         argv = ["test", "pid", "--all", "--processes=3"]
@@ -909,7 +917,6 @@ class RunMultiproc(RunBase, unittest.TestCase):
         self.assertEqual(args, ["arg1", "myarg", "arg2"])
         # assert that all pids are unique
         self.assertEqual(3, len(set(pids)))
-
 
     def test_run_single_all_multiprocessing_fail(self):
         self._enable_repos()
@@ -934,6 +941,7 @@ class RunDistributed(RunBase, unittest.TestCase):
     def setUp(self):
         self.startcwd = os.getcwd()
         super(RunDistributed, self).setUp()
+        pathtostart = os.path.relpath(self.startcwd, os.getcwd())
         # create a minimal version of ferenda-build.py with the
         # correct paths appended to sys.path
         with open("ferenda-build.py", "w") as fp:
@@ -943,8 +951,15 @@ sys.path.append('%s')
 from ferenda import manager
 if __name__ == '__main__':
     manager.run(sys.argv[1:])
-            """ % self.startcwd)
+            """ % pathtostart.replace("\\", "/"))
                      
+    def tearDown(self):
+        if sys.platform == "win32":
+            sleep(5) # to allow all 7 subprocess to close and release their
+                     # handles
+        super(RunDistributed, self).tearDown()
+
+    @unittest.skipIf(sys.platform == "win32", "Queueless server mode not supported on Windows")
     def test_server(self):
         self._enable_repos()
         # create two out-of-process clients
@@ -954,7 +969,6 @@ if __name__ == '__main__':
         bar = Popen(['python', 'ferenda-build.py', 'all',
                      'buildclient', '--clientname=bar', '--processes=2'],
                     stderr=PIPE)
-
         try:
             # run an in-process server
             argv = ["test", "pid", "--all", "--buildserver"]
@@ -989,9 +1003,10 @@ if __name__ == '__main__':
                      'buildclient', '--clientname=bar', '--serverport=3456',
                      '--processes=2'],
                     stderr=PIPE)
-        sleep(1) # to allow both clients to spin up so that one won't
+        sleep(2) # to allow both clients to spin up so that one won't
                  # be hogging all the jobs (since they have 2 procs
-                 # each, that will lead to duplicated pids). NOTE: this does not guarantee 
+                 # each, that will lead to duplicated pids). NOTE: this
+                 # does not guarantee anything
         try:
             # then, in-process, push jobs to that queue and watch them
             # return results
