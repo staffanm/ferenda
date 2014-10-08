@@ -8,6 +8,7 @@ import pkg_resources
 import shutil
 import sys
 import tempfile
+from time import sleep
 from subprocess import Popen, PIPE
 # NOTE: by inserting cwd (which *should* be the top-level source code
 # dir, with 'ferenda' and 'test' as subdirs) into sys.path as early as
@@ -508,7 +509,7 @@ class Testrepo(DocumentRepository):
             res = os.getpid()
         self.log.info("%s: pid is %s" % (arg, os.getpid()))
         self.log.debug("%s: some more debug info" % (arg))
-        sleep(1) # tasks need to run for some time in order to keep all subprocesses busy
+        sleep(2) # tasks need to run for some time in order to keep all subprocesses busy
         return(arg, os.getpid())
 
     @decorators.action
@@ -802,7 +803,7 @@ imgfiles = []
                                'indexlocation': 'data/whooshindex',
                                'sitename': 'Test'})
         self._enable_repos()
-        got = manager.run(['all', 'makeresources'])
+        got = manager.run(['all', 'makeresources', '--loglevel=CRITICAL'])
         want = {'xml': ['rsrc/resources.xml'],
                 'json': ['rsrc/api/context.json',
                          'rsrc/api/common.json',
@@ -840,7 +841,7 @@ imgfiles = []
         # make sure that the sub-config object created by run() is
         # identical to the config object used by the instance
         self._enable_repos()
-        ourcfg = LayeredConfig({'loglevel': 'INFO',
+        ourcfg = LayeredConfig({'loglevel': 'CRITICAL',  # keep the stdout logging neat
                                 'logfile': None,
                                 'datadir': 'data',
                                 'test': {'hello': 'world'}},
@@ -901,14 +902,14 @@ class RunMultiproc(RunBase, unittest.TestCase):
    
     def test_run_single_all_multiprocessing(self):
         self._enable_repos()
-        # print("running multiproc for pid %s, datadir %s" % (os.getpid(), self.tempdir))
-        argv = ["test","pid","--all", "--processes=3"]
+        argv = ["test", "pid", "--all", "--processes=3"]
         res = manager.run(argv)
         args = [x[0] for x in res]
         pids = [x[1] for x in res]
         self.assertEqual(args, ["arg1", "myarg", "arg2"])
         # assert that all pids are unique
         self.assertEqual(3, len(set(pids)))
+
 
     def test_run_single_all_multiprocessing_fail(self):
         self._enable_repos()
@@ -956,7 +957,7 @@ if __name__ == '__main__':
 
         try:
             # run an in-process server
-            argv = ["test", "pid", "--all", "--buildserver", '--loglevel=DEBUG']
+            argv = ["test", "pid", "--all", "--buildserver"]
             res = manager.run(argv)
             # same tests as for RunMultiproc.test_run_single_all
             args = [x[0] for x in res]
@@ -988,11 +989,13 @@ if __name__ == '__main__':
                      'buildclient', '--clientname=bar', '--serverport=3456',
                      '--processes=2'],
                     stderr=PIPE)
-
+        sleep(1) # to allow both clients to spin up so that one won't
+                 # be hogging all the jobs (since they have 2 procs
+                 # each, that will lead to duplicated pids). NOTE: this does not guarantee 
         try:
             # then, in-process, push jobs to that queue and watch them
             # return results
-            argv = ["test", "pid", "--all", "--buildqueue", "--serverport=3456", '--loglevel=DEBUG']
+            argv = ["test", "pid", "--all", "--buildqueue", "--serverport=3456"]
             res = manager.run(argv)
             # same tests as for RunMultiproc.test_run_single_all
             args = [x[0] for x in res]

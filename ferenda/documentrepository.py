@@ -1143,6 +1143,8 @@ with the *config* object as single parameter.
                 pbuf = StringIO()
             plog = logging.getLogger('ferenda.thirdparty.patch')
             plog.setLevel(logging.WARNING)
+            for h in plog.handlers:
+                plog.removeHandler(h)
             plog.addHandler(logging.StreamHandler(pbuf))
 
             # 2. read and parse it
@@ -1173,6 +1175,11 @@ with the *config* object as single parameter.
             fp.close()
             ps.items[0].source = tmpfile
             # 5. now do the patching
+
+            # FIXME: we need to make sure
+            # a naked open() call on py3 opens files with a
+            # predictable encoding. (ie handle the case when the user
+            # has set LANG=sv_SE.ISO8859-1)
             success = ps.apply()
             if not success:
                 errmsg = pbuf.getvalue()
@@ -1193,9 +1200,10 @@ with the *config* object as single parameter.
                 if not PY2:
                     # on py3, the patch module will unfortunately use
                     # unicode strings internally and then create a
-                    # utf8 file (by opening then w/o encoding in write_hunks)
+                    # utf8 file (by opening it w/o encoding in write_hunks)
+                    # (depending on the val of LC_CTYPE/LANG)
                     encoding = "utf-8"
-                self.log.warning("%s: Applied patch %s" % (basefile, patchpath))
+
                 return util.readfile(tmpfile, encoding=encoding), desc
         else:
             return (text, None)

@@ -18,7 +18,6 @@ from ferenda.compat import OrderedDict, MagicMock
 from functools import partial, wraps
 from io import StringIO, BytesIO
 from multiprocessing.managers import SyncManager
-from queue import Queue, Empty
 from time import sleep
 from wsgiref.simple_server import make_server
 import inspect
@@ -35,6 +34,7 @@ import traceback
 from six import text_type as str
 from six.moves import configparser
 from six.moves.urllib_parse import urlsplit
+from six.moves.queue import Queue, Empty
 import six
 input = six.moves.input
 
@@ -266,7 +266,8 @@ def setup_logger(level='INFO', filename=None,
 
     # turn of some library loggers we're not interested in
     for logname in ['requests.packages.urllib3.connectionpool',
-                    'rdflib.plugins.sleepycat']:
+                    'rdflib.plugins.sleepycat',
+                    'ferenda.thirdparty.patch']:
         log = logging.getLogger(logname)
         log.propagate = False
         if log.handlers == []:
@@ -347,13 +348,14 @@ def run(argv, subcall=False):
                 # Note: the actual runserver method never returns
                 return runserver(**args)
             elif action == 'buildclient':
-                repoclasses = _classes_from_classname(enabled, classname)
+                # repoclasses = _classes_from_classname(enabled, classname)
                 args = _setup_buildclient_args(config)
-                repos = []
-                for cls in repoclasses:
-                    inst = _instantiate_class(cls, config, argv)
-                    repos.append(inst)
-                return run_buildclient(repos, **args)
+                # repos = []
+                # for cls in repoclasses:
+                #     inst = _instantiate_class(cls, config, argv)
+                #     repos.append(inst)
+                # return run_buildclient(repos, **args)
+                return run_buildclient(**args)
             elif action == 'buildqueue':
                 args = _setup_buildqueue_args(config)
                 return run_buildqueue(**args)
@@ -727,9 +729,11 @@ def _run_class(enabled, argv, config):
             res = clbl(*args, **kwargs)
     return res
 
-
-def run_buildclient(repos,
-                    clientname,
+# The functions run_buildclient, run_buildserver, make_client_manager,
+# make_server_manager, mp_run and build_worker are based on the
+# examples in
+# http://eli.thegreenplace.net/2012/01/24/distributed-computing-in-python-with-multiprocessing/
+def run_buildclient(clientname,
                     serverhost,
                     serverport,
                     authkey,
@@ -744,7 +748,7 @@ def run_buildclient(repos,
         job_q = manager.get_job_q()
         result_q = manager.get_result_q()
         mp_run(job_q, result_q, processes, clientname)
-        print("Client: All done with one run, mp_run returned happily")
+        # setup_logger().debug("Client: [pid %s] All done with one run, mp_run returned happily" % os.getpid())
         done = True
         
 def make_client_manager(ip, port, authkey):
@@ -767,111 +771,131 @@ def make_client_manager(ip, port, authkey):
     class ServerQueueManager(SyncManager):
         pass
 
-    ServerQueueManager.register('get_job_q')
-    ServerQueueManager.register('get_result_q')
+    ServerQueueManager.register(jobqueue_id)
+    ServerQueueManager.register(resultqueue_id)
 
     while True:
         try:
             manager = ServerQueueManager(address=(ip, port), authkey=authkey)
             manager.connect()
-            print('Client: [pid %s] connected to %s:%s' % (os.getpid(), ip, port))
+            setup_logger().debug('Client: [pid %s] connected to %s:%s' % (os.getpid(), ip, port))
             return manager
         except Exception as e:
             # print("Client: %s: sleeping and retrying..." % e)
             sleep(2)
 
 
-def mp_run(shared_job_q, shared_result_q, nprocs, clientname):
-    """ Split the work with jobs in shared_job_q and results in
-        shared_result_q into several processes. Launch each process with
+def mp_run(jobqueue, resultqueue, nprocs, clientname):
+    """ Split the work with jobs in jobqueue and results in
+        resultqueue into several processes. Launch each process with
         factorizer_worker as the worker function, and wait until all are
         finished.
     """
+    procs = start_multiprocessing(jobqueue, resultqueue, nprocs, clientname)
+    finish_multiprocessing(procs)
+
+def start_multiprocessing(jobqueue, resultqueue, nprocs, clientname):
     procs = []
-    print("Client: [pid %s] about to start %s processes" % (os.getpid(), nprocs))
+    log = setup_logger()
+    # log.debug("Client: [pid %s] about to start %s processes" % (os.getpid(), nprocs))
     for i in range(nprocs):
+
         p = multiprocessing.Process(
                 target=build_worker,
-                args=(shared_job_q, shared_result_q, clientname))
+                args=(jobqueue, resultqueue, clientname))
         procs.append(p)
         # sleep(1)
         p.start()
-        print("Client: [pid %s] Started process %s" % (os.getpid(), p.pid))
-        
+        log.debug("Client: [pid %s] Started process %s" % (os.getpid(), p.pid))
+    return procs
+
+
+def finish_multiprocessing(procs, join=True):
+    # we could either send a DONE signal to each proc or we could just
+    # kill them
     for p in procs:
-        p.join()
+        if join:  # in distributed mode
+            p.join()
+        else:  # in multiproc mode
+            # setup_logger().debug("Server: killing proc %s" % p.pid)
+            p.terminate()
 
-
-def build_worker(job_q, result_q, clientname):
+        
+def build_worker(jobqueue, resultqueue, clientname):
     """A worker function to be launched in a separate process. Takes jobs
-        from job_q - each job a dict. When the
-        job is done, the result is placed into result_q. Runs until
-        instructed to quit.
+        from jobqueue - each job a dict. When the job is done, the
+        result is placed into resultqueue. Runs until instructed to
+        quit.
 
     """
     # create the inst with a default config
     # (_instantiate_class will try to read ferenda.ini)
-
     inst = None
-    logstream = None
-    print("Client: [pid %s] build_worker ready to process job queue" % os.getpid())
+    logstream  = StringIO()
+    log = setup_logger()
+    log.debug("Client: [pid %s] build_worker ready to process job queue" % os.getpid())
     while True:
-        job = job_q.get() # get() blocks -- wait until a job or the
-                          # quit signal comes
+        job = jobqueue.get() # get() blocks -- wait until a job or the
+                          # DONE/SHUTDOWN signal comes
         if job == "DONE": # or a more sensible value
-            print("Client: [pid %s] Got DONE signal" % os.getpid())
+            # setup_logger().debug("Client: [pid %s] Got DONE signal" % os.getpid())
             return  # back to run_buildclient
         if job == "SHUTDOWN":
-            print("Client: Got SHUTDOWN signal")
+            # setup_logger().debug("Client: Got SHUTDOWN signal")
             # kill the entire thing
             raise Exception("OK we're done now")
-        try:
-            if inst == None:
-                print("Client: [pid %s] instantiating and configuring %s" % (os.getpid(), job['classname']))
-                inst = _instantiate_class(_load_class(job['classname']))
-                for k,v in job['config'].items():
-                    print("Client: [pid %s] setting config value %s to %r" % (os.getpid(), k, v))
-                    LayeredConfig.set(inst.config, k, v)
-                # setup logging to a StringIO. Maybe it would be best
-                # to just collect logentries as a tuple list and send
-                # them over.
-                logstream  = StringIO()
-                log = setup_logger(inst.config.loglevel)
-                for handler in log.handlers:
-                    log.removeHandler(handler)
-                handler = logging.StreamHandler(logstream)
-                handler.setFormatter(
-                    logging.Formatter(clientname+" %(asctime)s %(name)s %(levelname)s %(message)s", datefmt="%H:%M:%S"))
-                handler.setLevel(loglevels[inst.config.loglevel])
-                log.addHandler(handler)
-                log.setLevel(loglevels[inst.config.loglevel])
-            # getattr the command
-            # call the result with job['basefile'] 
-            # let exceptions happen (we catch them below)
-            print("Client: [pid %s] Starting job %s %s %s" % (os.getpid(), job['classname'], job['command'], job['basefile']))
-            res = getattr(inst, job['command'])(job['basefile'])
-            # collect the results + logs
-            print("Client: [pid %s] %s finished: %s" % (os.getpid(), job['basefile'], res))
-            log = logstream.getvalue()
-            logstream.truncate(0)
-            logstream.seek(0)
-            exc = None
-        except KeyboardInterrupt:
-            res = None
-            log = None
-            exc = 'KeyboardInterrupt'
-        except Exception:
-            res = None
-            log = None
-            except_type, except_value, tb = sys.exc_info()
-            exc = (except_type, except_value, traceback.extract_tb(tb))
+        if inst == None:
+            inst = _instantiate_and_configure(job['classname'],
+                                              job['config'],
+                                              logstream,
+                                              clientname)
+            # need to get hold of log as well
+        # log.debug("Client: [pid %s] Starting job %s %s %s" % (os.getpid(), job['classname'], job['command'], job['basefile']))
+        # Do the work
+        clbl = getattr(inst, job['command'])
+        # kwargs = job['kwargs']   # if we ever support that
+        kwargs = {}
+        res = _run_class_with_basefile(clbl, job['basefile'],
+                                       kwargs, job['command'],
+                                       wrapctrlc=True)
+        log.debug("Client: [pid %s] %s finished: %s" % (os.getpid(), job['basefile'], res))
+        logtext = logstream.getvalue()
+        logstream.truncate(0)
+        logstream.seek(0)
         outdict = {'basefile': job['basefile'],
                    'result':  res,
-                   'log': log,
-                   'exception': exc,
+                   'log': logtext,
                    'client': clientname}
-        result_q.put(outdict)
+        resultqueue.put(outdict)
+        # log.debug("Client: [pid %s] Put '%s' on the queue" % (os.getpid(), outdict['result']))
+        
 
+def _instantiate_and_configure(classname, config, logstream, clientname):
+    log = setup_logger()
+    log.debug("Client: [pid %s] instantiating and configuring %s" % (os.getpid(), classname))
+    inst = _instantiate_class(_load_class(classname))
+    for k,v in config.items():
+        # log.debug("Client: [pid %s] setting config value %s to %r" % (os.getpid(), k, v))
+        LayeredConfig.set(inst.config, k, v)
+    # setup logging to a StringIO. Maybe it would be best
+    # to just collect logentries as a tuple list and send
+    # them over.
+    # log.debug("Client: [pid %s] Setting up log" % os.getpid())
+    log = setup_logger(inst.config.loglevel)
+    for handler in log.handlers:
+        log.removeHandler(handler)
+    handler = logging.StreamHandler(logstream)
+    if clientname:
+        formatter = logging.Formatter(clientname+" %(asctime)s %(name)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
+    else:
+        formatter = logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
+    handler.setFormatter(formatter)
+    handler.setLevel(loglevels[inst.config.loglevel])
+    log.addHandler(handler)
+    log.setLevel(loglevels[inst.config.loglevel])
+    # log.debug("Client: [pid %s] Log is configured" % os.getpid())
+    return inst
+    
 
 def run_buildserver(iterable, inst, classname, command):
     # Start a shared manager server and access its queues
@@ -880,16 +904,41 @@ def run_buildserver(iterable, inst, classname, command):
                                   authkey=inst.config.authkey)
     return queue_jobs(manager, iterable, inst, classname, command)
 
+
 def queue_to_buildqueue(iterable, inst, classname, command):
     manager = make_client_manager(inst.config.buildqueue,
                                   inst.config.serverport,
                                   inst.config.authkey)
     return queue_jobs(manager, iterable, inst, classname, command)
-    
-def queue_jobs(manager, iterable, inst, classname, command):
-    shared_job_q = manager.get_job_q()
-    shared_result_q = manager.get_result_q()
 
+
+def queue_jobs_nomanager(jobqueue, iterable, inst, classname, command):
+    log = setup_logger()
+    default_config = _instantiate_class(_load_class(classname)).config
+    client_config = {}
+    for k in inst.config:
+        if (k not in ('all', 'logfile', 'buildserver', 'buildqueue', 'serverport', 'authkey') and
+            (LayeredConfig.get(default_config, k) !=
+             LayeredConfig.get(inst.config, k))):
+            client_config[k] = LayeredConfig.get(inst.config, k)
+    # print("Server: Extra config for clients is %r" % client_config)
+    basefiles = []
+    for idx, basefile in enumerate(iterable):
+        job = {'basefile': basefile,
+               'classname': classname,
+               'command': command,
+               'config': client_config}
+        # log.debug("Server: putting %r into jobqueue" %  job['basefile'])
+        jobqueue.put(job)
+        basefiles.append(basefile)
+    log.debug("Server: Put %s jobs into job queue" % len(basefiles))
+    return basefiles
+
+
+def queue_jobs(manager, iterable, inst, classname, command):
+    jobqueue = manager.get_job_q()
+    resultqueue = manager.get_result_q()
+    log = setup_logger()
     # we'd like to just provide those config parameters that diff from
     # the default (what the client will already have), ie.  those set
     # by command line parameters (or possibly env variables)
@@ -900,40 +949,39 @@ def queue_jobs(manager, iterable, inst, classname, command):
             (LayeredConfig.get(default_config, k) !=
              LayeredConfig.get(inst.config, k))):
             client_config[k] = LayeredConfig.get(inst.config, k)
-    print("Server: Extra config for clients is %r" % client_config)
+    log.debug("Server: Extra config for clients is %r" % client_config)
     for idx, basefile in enumerate(iterable):
         job = {'basefile': basefile,
                'classname': classname,
                'command': command,
                'config': client_config}
-        # print("putting %r into shared_job_q" %  job)
-        shared_job_q.put(job)
+        # print("putting %r into jobqueue" %  job)
+        jobqueue.put(job)
     number_of_jobs = idx+1
-    print("Server: Put %s jobs into job queue" % number_of_jobs)
+    log.debug("Server: Put %s jobs into job queue" % number_of_jobs)
     # FIXME: only one of the clients will read this DONE package, and
-    # we have no real way of knowing how many clients there will
-    # be. Didn't think this one through...
-    shared_job_q.put("DONE")
-    print("Server: Put DONE into job queue")
+    # we have no real way of knowing how many clients there will be
+    # (they can come and go at will). Didn't think this one through...
+    jobqueue.put("DONE")
     numres = 0
     res = []
     while numres < number_of_jobs:
-        outdict = shared_result_q.get()
-        if outdict['exception'] == 'KeyboardInterrupt':
-            raise KeyboardInterrupt
-        elif outdict['exception']:
-            outdict['except_type'] = outdict['exception'][0]
-            outdict['except_value'] = outdict['exception'][1]
-            print("Server: %(client)s failed %(basefile)s: %(except_type)s: %(except_value)s" % outdict)
-            print("".join(traceback.format_list(outdict['exception'][2])))
+        r = resultqueue.get()
+        if isinstance(r['result'], tuple) and r['result'][0] == WrappedKeyboardInterrupt:
+            raise KeyboardInterrupt()
+        elif isinstance(r['result'], tuple) and isinstance(r['result'], Exception):
+            r['except_type'] = r['result'][0]
+            r['except_value'] = r['result'][1]
+            log.debug("Server: %(client)s failed %(basefile)s: %(except_type)s: %(except_value)s" % r)
+            print("".join(traceback.format_list(r['result'][2])))
         else:
-            for line in [x.strip() for x in outdict['log'].split("\n") if x.strip()]:
+            for line in [x.strip() for x in r['log'].split("\n") if x.strip()]:
                 print("   %s" % line)
-            print("Server: client %(client)s processed %(basefile)s: Result (%(result)s): OK" % outdict)
-        if 'result' in outdict:
-            res.append(outdict['result'])
+            log.debug("Server: client %(client)s processed %(basefile)s: Result (%(result)s): OK" % r)
+        if 'result' in r:
+            res.append(r['result'])
         numres += 1
-    print("Server: %s tasks processed" % numres)
+    log.debug("Server: %s tasks processed" % numres)
     return res
     # sleep(1)
 
@@ -943,6 +991,13 @@ def queue_jobs(manager, iterable, inst, classname, command):
 
     
 buildmanager = None
+if six.PY2:
+    jobqueue_id = b'get_job_q'
+    resultqueue_id = b'get_result_q'
+else:
+    jobqueue_id = 'get_job_q'
+    resultqueue_id = 'get_result_q'
+    
 def make_server_manager(port, authkey, start=True):
 
     """ Create a manager for the server, listening on the given port.
@@ -961,125 +1016,60 @@ def make_server_manager(port, authkey, start=True):
         class JobQueueManager(SyncManager):
             pass
 
-        JobQueueManager.register('get_job_q', callable=lambda: job_q)
-        JobQueueManager.register('get_result_q', callable=lambda: result_q)
+        JobQueueManager.register(jobqueue_id, callable=lambda: job_q)
+        JobQueueManager.register(resultqueue_id, callable=lambda: result_q)
 
         if isinstance(authkey, str):
             # authkey must be bytes
             authkey = authkey.encode("utf-8")
 
         buildmanager = JobQueueManager(address=('', port), authkey=authkey)
-        print("Server: Process %s created new buildmanager at %s" % (os.getpid(), id(buildmanager)))
+        setup_logger().debug("Server: Process %s created new buildmanager at %s" % (os.getpid(), id(buildmanager)))
         if start: # run_buildqueue wants to control this itself
             buildmanager.start()
-            print('Server: Started at port %s' % port)
-    else:
-        print("Server: Reusing existing buildmanager at %s" % id(manager))
+            setup_logger().debug('Server: Started at port %s' % port)
         
     return buildmanager
 
 def run_buildqueue(serverport, authkey):
     # NB: This never returns!
     manager = make_server_manager(serverport, authkey, start=False)
-    print("Queue: Starting server manager with .serve_forever()")
+    setup_logger().debug("Queue: Starting server manager with .serve_forever()")
     manager.get_server().serve_forever()
     
 
 def shutdown_buildserver():
     global buildmanager
     if buildmanager:
-        print("Server: Shutting down buildserver")
+        setup_logger().debug("Server: Shutting down buildserver")
         buildmanager.shutdown()
         buildmanager = None
         sleep(1)
 
 def parallelize(iterable, inst, classname, command, config, argv):
-    log = setup_logger()
-    # parallelize using multiprocessing
-    # multiprocessing.log_to_stderr(logging.DEBUG)
-    pool = multiprocessing.Pool(processes=inst.config.processes,
-                                initializer=_setup_subprocess_callable,
-                                initargs=(classname, command, config, argv))
-    func = _subprocess_proxy
-    log.info("Starting multiprocessing with %d processes" %
-             inst.config.processes)
-
+    jobqueue = multiprocessing.Queue()
+    resultqueue = multiprocessing.Queue()
+    procs = start_multiprocessing(jobqueue, resultqueue, inst.config.processes, None)
     try:
-        # FIXME: The 99999 second timeout is so that a
-        # exception gets raised to the controlling
-        # process immediately, see
-        # http://stackoverflow.com/questions/1408356/keyboard-interrupts-with-pythons-multiprocessing-pool/1408476#1408476
-        res = pool.map_async(func, iterable).get(timeout=99999)
-    except WrappedKeyboardInterrupt:
-        raise KeyboardInterrupt()
+        basefiles = queue_jobs_nomanager(jobqueue, iterable, inst, classname, command)
+        res = process_resultqueue(resultqueue, basefiles)
+        return res
+    finally:
+        finish_multiprocessing(procs, join=False)
 
-    # make sure all subprocesses are dead and have released
-    # their handles
-    pool.terminate()
-    return res
-
-subprocess_callable = None
-def _setup_subprocess_callable(classname, command, config, argv):
-    # this is never called in the main process, only pool processes, and
-    # the purpose is to setup an (global) object instance in that process.
-
-    global subprocess_callable
-    if not subprocess_callable:
-        cls = _load_class(classname)
-        # config = LayeredConfig(literal_eval(dictconfig))
-        # config = LayeredConfig(dictconfig)
-        inst = _instantiate_class(cls, config, argv=argv)
-        subprocess_callable = _wrapexception(getattr(inst, command))
-        # subprocess_callable = getattr(inst, command)
-        setup_logger(level=config.loglevel)
-
-def _wrapexception(f):
-    # this is similar to decorators.handleerror but maybe more generic
-    # and returns exception info instead of False. FIXME: unify with
-    # _run_class_with_basefile
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        command = f.__name__
-        basefile = args[0]
-        except_type = except_value = None
-        import traceback
-        try:
-            return f(*args, **kwargs)
-        except errors.DocumentRemovedError as e:
-            except_type, except_value, tb = sys.exc_info()
-            if hasattr(e, 'dummyfile'):
-                if not os.path.exists(e.dummyfile):
-                    util.writefile(e.dummyfile, "")
-                return None   # is what DocumentRepository.parse
-                              # returns when everything's ok
-            else:
-                except_type, except_value, tb = sys.exc_info()
-                errmsg = str(except_value)
-                setup_logger().error("%s of %s failed: %s" %
-                                     (command, basefile, errmsg))
-        except Exception as e:
-            except_type, except_value, tb = sys.exc_info()
-            errmsg = str(except_value)
-            setup_logger().error("%s of %s failed: %s" %
-                                 (command, basefile, errmsg))
-        except KeyboardInterrupt as e:
-            except_type, except_value, tb = sys.exc_info()
-            raise WrappedKeyboardInterrupt()
-        return except_type, except_value, traceback.extract_tb(tb)
-
-    return wrapper
-
-
-def _subprocess_proxy(basefile):
-    # This is our way of creating a callable in the main process which,
-    # when called in the subprocess, can access the (subprocess-)global
-    # callable
-    global subprocess_callable
-    res = subprocess_callable(basefile)
-    return res
+def process_resultqueue(resultqueue, basefiles):
+    res = {}
+    queuelength = len(basefiles)
+    for i in range(queuelength):
+        r = resultqueue.get()
+        if isinstance(r['result'], tuple) and r['result'][0] == WrappedKeyboardInterrupt:
+            raise KeyboardInterrupt()
+        res[r['basefile']] = r['result']
+    # return the results in the same order as they were queued
+    return [res[x] for x in basefiles]
 
     
-def _run_class_with_basefile(clbl, basefile, kwargs, command):
+def _run_class_with_basefile(clbl, basefile, kwargs, command, wrapctrlc=False):
     try:
         return clbl(basefile, **kwargs)
     except errors.DocumentRemovedError as e:
@@ -1092,12 +1082,21 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command):
             errmsg = str(e)
             setup_logger().error("%s of %s failed: %s" %
                                  (command, basefile, errmsg))
-            return sys.exc_info()
+            exc_type, exc_value, tb = sys.exc_info()
+            return exc_type, exc_value, traceback.extract_tb(tb)
     except Exception as e:
         errmsg = str(e)
         setup_logger().error("%s of %s failed: %s" %
                              (command, basefile, errmsg))
-        return sys.exc_info()
+        exc_type, exc_value, tb = sys.exc_info()
+        return exc_type, exc_value, traceback.extract_tb(tb)
+    except KeyboardInterrupt as e:   # KeyboardInterrupt is not an Exception
+        if wrapctrlc:
+            except_type, except_value, tb = sys.exc_info()
+            return WrappedKeyboardInterrupt, WrappedKeyboardInterrupt(), traceback.extract_tb(tb)
+        else:
+            raise
+
 
         
 def _instantiate_class(cls, config=None, argv=[]):
