@@ -20,5 +20,4 @@ install:
   - "%PYTHON%/Scripts/easy_install.exe %LXML%"
   - "%PYTHON%/Scripts/pip.exe -q install -r %REQUIREMENTS%"
 test_script:
-#  - "%PYTHON%/python.exe setup.py test"
-  - "%PYTHON%/python.exe -Wi -m unittest discover test"
+  - "%PYTHON%/python.exe tools/rununittest discover test"
