@@ -44,11 +44,14 @@ class WordReader(object):
             else:
                 try:
                     self.word_to_docbook(wordfile, intermediatefile)
-                except errors.ExternalCommandError:
-                    # Some .doc files are .docx with wrong suffix
-                    self.log.info("%s: Retrying as OOXML" % wordfile)
-                    self.word_to_ooxml(wordfile, intermediatefile)
-                    filetype = "docx"
+                except errors.ExternalCommandError as e:
+                    if "not a Word Document" in str(e):
+                        # Some .doc files are .docx with wrong suffix
+                        self.log.info("%s: Retrying as OOXML" % wordfile)
+                        self.word_to_ooxml(wordfile, intermediatefile)
+                        filetype = "docx"
+                    else:
+                        raise e
         else:
             # sniff the intermediatefile to see if its a
             # docbook or a OOXML file

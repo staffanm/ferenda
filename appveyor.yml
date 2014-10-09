@@ -2,9 +2,9 @@ build: false
 version: 0.2.1.dev9.{build}
 environment:
   matrix:
-    - PYTHON: "C:/Python27"
-      LXML: "tools/win32/lxml-3.3.5.win32-py2.7.exe"
-      REQUIREMENTS: "requirements.py2.txt"
+#    - PYTHON: "C:/Python27"
+#      LXML: "tools/win32/lxml-3.3.5.win32-py2.7.exe"
+#      REQUIREMENTS: "requirements.py2.txt"
     - PYTHON: "C:/Python34"
       LXML: "tools/win32/lxml-3.3.5.win32-py3.4.exe"
       REQUIREMENTS: "requirements.py3.txt"

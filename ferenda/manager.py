@@ -22,6 +22,7 @@ from time import sleep
 from wsgiref.simple_server import make_server
 import inspect
 import logging
+from logging import getLogger as getlog
 import multiprocessing
 import os
 import shutil
@@ -102,7 +103,7 @@ def frontpage(repos,
     :param path: the filename to create.
     :type  path: str
     """
-    log = setup_logger()
+    log = getlog()
     with util.logtime(log.info,
                       "frontpage: wrote %(path)s (%(elapsed).3f sec)",
                       {'path': path}):
@@ -179,7 +180,7 @@ def runserver(repos,
     :type searchendpoint: str
 
     """
-    setup_logger().info("Serving wsgi app at http://localhost:%s/" % port)
+    getlog().info("Serving wsgi app at http://localhost:%s/" % port)
     kwargs = {'port': port,
               'documentroot': documentroot,
               'apiendpoint': apiendpoint,
@@ -243,10 +244,10 @@ def setup_logger(level='INFO', filename=None,
     :param filename: The name of the file to log to. If None, log to stdout
     :type filename: str
     """
+    l = logging.getLogger()  # get the root logger
     if not isinstance(level, int):
         loglevel = loglevels[level]
 
-    l = logging.getLogger()  # get the root logger
     # if l.handlers == []:
     if filename:
         util.ensure_dir(filename)
@@ -311,6 +312,8 @@ def run(argv, subcall=False):
                  prefixed with ``--``, e.g. ``--loglevel=INFO``, or
                  positional arguments to the specified action).
     """
+    # maybe _load_config is the place to set up all parameter default
+    # values? 
     config = _load_config(_find_config_file(), argv)
     # if logfile is set to True, autogenerate logfile name from
     # current datetime. Otherwise assume logfile is set to the desired
@@ -442,7 +445,7 @@ def enable(classname):
     cfg.set(alias, "class", classname)
     with open(configfilename, "w") as fp:
         cfg.write(fp)
-    log = setup_logger()
+    log = getlog()
     log.info("Enabled class %s (alias '%s')" % (classname, alias))
     return alias
 
@@ -665,7 +668,7 @@ def _run_class(enabled, argv, config):
     file for that action.
 
     """
-    log = setup_logger()
+    log = getlog()
     (alias, command, args) = _filter_argv(argv)
     with util.logtime(
         log.info, "%(alias)s %(command)s finished in %(elapsed).3f sec",
@@ -748,7 +751,7 @@ def run_buildclient(clientname,
         job_q = manager.get_job_q()
         result_q = manager.get_result_q()
         mp_run(job_q, result_q, processes, clientname)
-        # setup_logger().debug("Client: [pid %s] All done with one run, mp_run returned happily" % os.getpid())
+        # getlog().debug("Client: [pid %s] All done with one run, mp_run returned happily" % os.getpid())
         done = True
         
 def make_client_manager(ip, port, authkey):
@@ -778,7 +781,7 @@ def make_client_manager(ip, port, authkey):
         try:
             manager = ServerQueueManager(address=(ip, port), authkey=authkey)
             manager.connect()
-            setup_logger().debug('Client: [pid %s] connected to %s:%s' % (os.getpid(), ip, port))
+            getlog().debug('Client: [pid %s] connected to %s:%s' % (os.getpid(), ip, port))
             return manager
         except Exception as e:
             # print("Client: %s: sleeping and retrying..." % e)
@@ -796,7 +799,7 @@ def mp_run(jobqueue, resultqueue, nprocs, clientname):
 
 def start_multiprocessing(jobqueue, resultqueue, nprocs, clientname):
     procs = []
-    log = setup_logger()
+    log = getlog()
     # log.debug("Client: [pid %s] about to start %s processes" % (os.getpid(), nprocs))
     for i in range(nprocs):
 
@@ -817,7 +820,7 @@ def finish_multiprocessing(procs, join=True):
         if join:  # in distributed mode
             p.join()
         else:  # in multiproc mode
-            # setup_logger().debug("Server: killing proc %s" % p.pid)
+            # getlog().debug("Server: killing proc %s" % p.pid)
             p.terminate()
 
         
@@ -832,16 +835,16 @@ def build_worker(jobqueue, resultqueue, clientname):
     # (_instantiate_class will try to read ferenda.ini)
     inst = None
     logstream  = StringIO()
-    log = setup_logger()
+    log = getlog()
     log.debug("Client: [pid %s] build_worker ready to process job queue" % os.getpid())
     while True:
         job = jobqueue.get() # get() blocks -- wait until a job or the
                           # DONE/SHUTDOWN signal comes
         if job == "DONE": # or a more sensible value
-            # setup_logger().debug("Client: [pid %s] Got DONE signal" % os.getpid())
+            # getlog().debug("Client: [pid %s] Got DONE signal" % os.getpid())
             return  # back to run_buildclient
         if job == "SHUTDOWN":
-            # setup_logger().debug("Client: Got SHUTDOWN signal")
+            # getlog().debug("Client: Got SHUTDOWN signal")
             # kill the entire thing
             raise Exception("OK we're done now")
         if inst == None:
@@ -871,29 +874,31 @@ def build_worker(jobqueue, resultqueue, clientname):
         
 
 def _instantiate_and_configure(classname, config, logstream, clientname):
-    log = setup_logger()
+    log = getlog()
     log.debug("Client: [pid %s] instantiating and configuring %s" % (os.getpid(), classname))
     inst = _instantiate_class(_load_class(classname))
     for k,v in config.items():
         # log.debug("Client: [pid %s] setting config value %s to %r" % (os.getpid(), k, v))
         LayeredConfig.set(inst.config, k, v)
-    # setup logging to a StringIO. Maybe it would be best
-    # to just collect logentries as a tuple list and send
-    # them over.
-    # log.debug("Client: [pid %s] Setting up log" % os.getpid())
-    log = setup_logger(inst.config.loglevel)
-    for handler in log.handlers:
-        log.removeHandler(handler)
-    handler = logging.StreamHandler(logstream)
+
+    # When running in distributed mode (but not in multiprocessing
+    # mode), setup the root logger to log to a StringIO buffer.
     if clientname:
-        formatter = logging.Formatter(clientname+" %(asctime)s %(name)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
-    else:
-        formatter = logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
-    handler.setFormatter(formatter)
-    handler.setLevel(loglevels[inst.config.loglevel])
-    log.addHandler(handler)
-    log.setLevel(loglevels[inst.config.loglevel])
+        # log.debug("Client: [pid %s] Setting up log" % os.getpid())
+        log = setup_logger(inst.config.loglevel)
+        for handler in log.handlers:
+            log.removeHandler(handler)
+        handler = logging.StreamHandler(logstream)
+        fmt = clientname+" %(asctime)s %(name)s %(levelname)s %(message)s"
+        formatter = logging.Formatter(fmt, datefmt="%H:%M:%S")
+        handler.setFormatter(formatter)
+        handler.setLevel(loglevels[inst.config.loglevel])
+        log.addHandler(handler)
+        log.setLevel(loglevels[inst.config.loglevel])
     # log.debug("Client: [pid %s] Log is configured" % os.getpid())
+    else:
+        pass
+        # FIXME: change the logformat to include pid
     return inst
     
 
@@ -913,7 +918,7 @@ def queue_to_buildqueue(iterable, inst, classname, command):
 
 
 def queue_jobs_nomanager(jobqueue, iterable, inst, classname, command):
-    log = setup_logger()
+    log = getlog()
     default_config = _instantiate_class(_load_class(classname)).config
     client_config = {}
     for k in inst.config:
@@ -938,7 +943,7 @@ def queue_jobs_nomanager(jobqueue, iterable, inst, classname, command):
 def queue_jobs(manager, iterable, inst, classname, command):
     jobqueue = manager.get_job_q()
     resultqueue = manager.get_result_q()
-    log = setup_logger()
+    log = getlog()
     # we'd like to just provide those config parameters that diff from
     # the default (what the client will already have), ie.  those set
     # by command line parameters (or possibly env variables)
@@ -972,7 +977,7 @@ def queue_jobs(manager, iterable, inst, classname, command):
         elif isinstance(r['result'], tuple) and isinstance(r['result'], Exception):
             r['except_type'] = r['result'][0]
             r['except_value'] = r['result'][1]
-            log.debug("Server: %(client)s failed %(basefile)s: %(except_type)s: %(except_value)s" % r)
+            log.error("Server: %(client)s failed %(basefile)s: %(except_type)s: %(except_value)s" % r)
             print("".join(traceback.format_list(r['result'][2])))
         else:
             for line in [x.strip() for x in r['log'].split("\n") if x.strip()]:
@@ -1024,24 +1029,24 @@ def make_server_manager(port, authkey, start=True):
             authkey = authkey.encode("utf-8")
 
         buildmanager = JobQueueManager(address=('', port), authkey=authkey)
-        setup_logger().debug("Server: Process %s created new buildmanager at %s" % (os.getpid(), id(buildmanager)))
+        getlog().debug("Server: Process %s created new buildmanager at %s" % (os.getpid(), id(buildmanager)))
         if start: # run_buildqueue wants to control this itself
             buildmanager.start()
-            setup_logger().debug('Server: Started at port %s' % port)
+            getlog().debug('Server: Started at port %s' % port)
         
     return buildmanager
 
 def run_buildqueue(serverport, authkey):
     # NB: This never returns!
     manager = make_server_manager(serverport, authkey, start=False)
-    setup_logger().debug("Queue: Starting server manager with .serve_forever()")
+    getlog().debug("Queue: Starting server manager with .serve_forever()")
     manager.get_server().serve_forever()
     
 
 def shutdown_buildserver():
     global buildmanager
     if buildmanager:
-        setup_logger().debug("Server: Shutting down buildserver")
+        getlog().debug("Server: Shutting down buildserver")
         buildmanager.shutdown()
         buildmanager = None
         sleep(1)
@@ -1080,13 +1085,13 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command, wrapctrlc=False):
                          # when everyting's ok
         else:
             errmsg = str(e)
-            setup_logger().error("%s of %s failed: %s" %
+            getlog().error("%s of %s failed: %s" %
                                  (command, basefile, errmsg))
             exc_type, exc_value, tb = sys.exc_info()
             return exc_type, exc_value, traceback.extract_tb(tb)
     except Exception as e:
         errmsg = str(e)
-        setup_logger().error("%s of %s failed: %s" %
+        getlog().error("%s of %s failed: %s" %
                              (command, basefile, errmsg))
         exc_type, exc_value, tb = sys.exc_info()
         return exc_type, exc_value, traceback.extract_tb(tb)
@@ -1291,7 +1296,7 @@ def _load_class(classname):
             "Classname '%s' should be the fully qualified name of a class (i.e. 'modulename.%s')" %
             (classname, classname))
     # NOTE: Don't remove this line! (or make sure testManager works after you do)
-    log = setup_logger()
+    log = getlog()
 
     __import__(modulename)
     # __import__ returns the topmost module, ie if one attempts to
@@ -1396,13 +1401,13 @@ def _setup_buildqueue_args(config):
     return {'serverport': LayeredConfig.get(config, 'serverport', 5555),
             'authkey':    LayeredConfig.get(config, 'authkey', 'secret'),
             }
-            
 
 
 def _filepath_to_urlpath(path, keep_segments=2):
     """
     :param path: the full or relative filepath to transform into a urlpath
-    :param keep_segments: the number of directory segments to keep (the ending filename is always kept)
+    :param keep_segments: the number of directory segments to keep
+                          (the ending filename is always kept)
     """
     # data/repo/rsrc/js/main.js, 3 -> repo/rsrc/js/main.js
     # /var/folders/tmp4q6b1g/rsrc/resources.xml, 1 -> rsrc/resources.xml
