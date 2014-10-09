@@ -1202,7 +1202,9 @@ with the *config* object as single parameter.
                     # unicode strings internally and then create a
                     # utf8 file (by opening it w/o encoding in write_hunks)
                     # (depending on the val of LC_CTYPE/LANG)
-                    encoding = "utf-8"
+                    # seems the exact encoding is platform dependent
+                    import locale
+                    encoding = locale.getpreferredencoding(False)
 
                 return util.readfile(tmpfile, encoding=encoding), desc
         else:

@@ -1020,6 +1020,17 @@ if __name__ == '__main__':
             self.assertEqual(set(args), set(["arg1", "myarg", "arg2"]))
             self.assertEqual(3, len(set(pids)))
         finally:
+            # NOTE: On Win32/py2 just terminate() will not kill children of foo
+            # and bar (of which tree out of four are left hanging due
+            # to us not being able to send DONE signals to them all).
+            # See http://stackoverflow.com/questions/1230669/subprocess-deleting-child-processes-in-windows
+            if sys.platform == "win32":
+                import psutil
+                for child in psutil.Process(foo.pid).children(recursive=True):
+                    child.kill()
+                for child in psutil.Process(bar.pid).children(recursive=True):
+                    child.kill()
+            
             foo.terminate()
             bar.terminate()
             queue.terminate()

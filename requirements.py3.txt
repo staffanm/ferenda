@@ -18,3 +18,5 @@ coverage
 docutils
 wheel
 twine
+psutil
+

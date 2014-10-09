@@ -39,7 +39,7 @@ if sys.version_info < (2,7,0):
     install_requires.append('ordereddict >= 1.1')
 
 
-tests_require = []
+tests_require = ['psutil']
 
 if sys.version_info < (3,3,0):
     tests_require.append('mock >= 1.0.0')
