@@ -44,7 +44,7 @@ class Read(unittest.TestCase):
             self.assertEqual(out, path)
             self.assertEqual(type, "doc")
         except ExternalCommandError as e:
-            print("ERROR (not fatal): %s" % e)
+            raise unittest.SkipTest("Antiword does not seem to be installed")
         
         
 
@@ -63,16 +63,19 @@ class Read(unittest.TestCase):
             
     def test_mislabeled(self):
         path = self.datadir + os.sep + "out.xml"
-        out, type = self.reader.read("test/files/wordreader/mislabeled.doc",
-                                     path)
-        self.assertEqual(out, path)
-        self.assertEqual(type, "docx")
-        self.assertTrue(os.path.exists(path))
-        tree = etree.parse(path)
-        self.assertEqual("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document",
-                         tree.getroot().tag)
-        xpath = '//*[contains(text(), "mis-labeled as a .doc file")]'
-        self.assertTrue(tree.getroot().xpath(xpath))
-            
+        try:
+            out, type = self.reader.read("test/files/wordreader/mislabeled.doc",
+                                         path)
+            self.assertEqual(out, path)
+            self.assertEqual(type, "docx")
+            self.assertTrue(os.path.exists(path))
+            tree = etree.parse(path)
+            self.assertEqual("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document",
+                             tree.getroot().tag)
+            xpath = '//*[contains(text(), "mis-labeled as a .doc file")]'
+            self.assertTrue(tree.getroot().xpath(xpath))
+        except ExternalCommandError as e:
+            raise unittest.SkipTest("Antiword does not seem to be installed")
+             
 
         

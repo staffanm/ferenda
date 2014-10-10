@@ -7,6 +7,6 @@ SET FERENDA_PYTHON2_FALLBACK="C:\Python27\python.exe"
 IF [%1] == [] (
   python -Wi tools/rununittest.py discover -v test
 ) ELSE (
-  SET PYTHONPATH=test
+  SET PYTHONPATH=test;.
   python -Wi tools/rununittest.py -v %1
 )
