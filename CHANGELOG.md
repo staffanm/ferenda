@@ -1,4 +1,61 @@
-2014-07-?? RELEASE 0.2.0
+2014-10-?? RELEASE 0.3.0
+
+This release adds support for processing things in parallel, both by
+using multiple processes on a single machine, and also by running
+"build clients" on any number of machines, which run jobs managed by a
+central queue. 
+
+Backwards-incompatible changes:
+
+* DocumentRepository and all derived classes now takes an optional
+  first config argument. If present, this should be a LayeredConfig
+  object that contains the repo configuration. If not provided, a
+  blank LayeredConfig object is created. All other optional keyword
+  arguments are then added to the config object. If you have
+  overridden __init__ for your docrepo, you'll need to make sure to
+  handle this first argument.
+
+New features:
+
+* The default serialization of Element objects to XHTML now inserts
+  appropriate dcterms:isPartOf statements when one element with a URI
+  is contained within another element with another URI. Custom element
+  classes can change this by changing the partrelation property of the
+  included document.
+* Serialization of Element documents to XHTML now omits namespaces
+  defined in self.namespaces, but which never actually occur in the
+  data.
+* CitationParser.parse_string and .parse_recursive now has an optional
+  predicate argument that determines the RDF predicate between the
+  refering and the referred resources (by default, this is
+  dcterms:references)
+* The LayeredConfig class has two new class methods, .set and .get.
+* manager (and by extension ./ferenda-build.py) has new commands that
+  allows processing jobs in parallell (see Advanced > Parallel
+  processing)
+* The ferenda.sources.general.wiki can now transform mediawiki markup
+  to Element objects.
+* The ferenda.sources.general.keyword can be used to build keyboard
+  hubs from all concepts that your documents point to through a
+  dcterms:subject property (as well as things in a wiki docrepo, and
+  configurable other sources.
+* The ferenda.sources.legal.se docrepos have been updated generally
+  and are now close to being able to replicate the function set of
+  https://lagen.nu/ (which was the main motivation with this codebase
+  all along).
+* ferenda.testutil.assertEqualXML now has a tidy_xhtml argument which
+  runs the XML documents to be compared through HTML tidy (in XML
+  mode) in order to produce easier-to-read diffs.
+* Transformer now outputs the equivalent xsltproc command if the
+  environment variable FERENDA_TRANSFORMDEBUG is set.
+
+Infrastructural changes:
+
+Ferenda now uses the CI service Appveyor to automatically run the
+entire test suite under Windows on every commit. 
+
+
+2014-07-23 RELEASE 0.2.0
 
 This release adds a REST-based HTTP API and includes a lot of
 infrastructure to support repo-defined querying and aggregation of

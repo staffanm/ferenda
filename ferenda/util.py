@@ -236,6 +236,8 @@ def runcmd(cmdline, require_success=False, cwd=None,
     if (require_success and ret != 0):
         # FIXME: ExternalCommandError should have fields for cmd and
         # ret as well (and a sensible __str__ implementatiton)
+        # FIXME: If the error was that a command was not found, should raise
+        # ExternalCommandNotFound (subclass of ExternalCommandError)
         raise errors.ExternalCommandError(stderr)
     return (p.returncode, stdout, stderr)
 
