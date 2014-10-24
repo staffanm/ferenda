@@ -557,18 +557,17 @@ def parametrize(cls, template_method, name, params, wrapper=None):
 
 
 def file_parametrize(cls, directory, suffix, filter=None, wrapper=None):
-    """Creates a test for each file in a given directory. Call with
-     any class that subclasses unittest.TestCase and which has a
-     method called `` parametric_test``, eg::
+    """Creates a test for each file in a given directory. Call with any
+    class that subclasses unittest.TestCase and which has a method
+    called `` parametric_test``, eg::
     
         class MyTest(unittest.TestCase):
             def parametric_test(self,filename):
                 self.assertTrue(os.path.exists(filename))
-        
-        from ferenda.testutil import file_parametrize
-        
-        file_parametrize(Parse,"test/files/legaluri",".txt")
 
+        from ferenda.testutil import file_parametrize
+        file_parametrize(Parse,"test/files/legaluri",".txt")
+ 
     For each .txt file in the directory ``test/files/legaluri``, a
     corresponding test is created, which calls ``parametric_test``
     with the full path to the .txt file as parameter.

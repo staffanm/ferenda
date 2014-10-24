@@ -195,8 +195,8 @@ def runserver(repos,
 
 def make_wsgi_app(inifile=None, **kwargs):
     """Creates a callable object that can act as a WSGI application by
-     mod_wsgi, gunicorn, the built-in webserver, or any other
-     WSGI-compliant webserver.
+    mod_wsgi, gunicorn, the built-in webserver, or any other
+    WSGI-compliant webserver.
 
     :param inifile: The full path to a ``ferenda.ini`` configuration file
     :type inifile: str
@@ -235,7 +235,7 @@ def setup_logger(level='INFO', filename=None,
                  logformat="%(asctime)s %(name)s %(levelname)s %(message)s",
                  datefmt="%H:%M:%S"):
     """Sets up the logging facilities and creates the module-global log
-       object as a root logger.
+    object as a root logger.
 
     :param name: The name of the logger (used in log messages)
     :type  name: str
@@ -243,6 +243,7 @@ def setup_logger(level='INFO', filename=None,
     :type  level: str
     :param filename: The name of the file to log to. If None, log to stdout
     :type filename: str
+
     """
     l = logging.getLogger()  # get the root logger
     if not isinstance(level, int):
@@ -357,11 +358,11 @@ def run(argv, subcall=False):
                 # for cls in repoclasses:
                 #     inst = _instantiate_class(cls, config, argv)
                 #     repos.append(inst)
-                # return run_buildclient(repos, **args)
-                return run_buildclient(**args)
+                # return runbuildclient(repos, **args)
+                return runbuildclient(**args)
             elif action == 'buildqueue':
                 args = _setup_buildqueue_args(config)
-                return run_buildqueue(**args)
+                return runbuildqueue(**args)
             elif action == 'makeresources':
                 repoclasses = _classes_from_classname(enabled, classname)
                 args = _setup_makeresources_args(config)
@@ -418,7 +419,7 @@ def run(argv, subcall=False):
                     return _run_class(enabled, argv, config)
     finally:
         if not subcall:
-            shutdown_buildserver()
+            _shutdown_buildserver()
         shutdown_logger()
 
 def enable(classname):
@@ -426,8 +427,8 @@ def enable(classname):
     configuration file (``ferenda.ini``). Returns the short-form
     alias for the class.
 
-    >>> enable("ferenda.DocumentRepository") == 'base'
-    True
+    >>> enable("ferenda.DocumentRepository")
+    'base'
     >>> os.unlink("ferenda.ini")
 
     :param classname: The fully qualified name of the class
@@ -474,7 +475,19 @@ def setup(argv=None, force=False, verbose=False, unattended=False):
     Checks to see that all required python modules and command line
     utilities are present. Also checks which triple store(s) are
     available and selects the best one (in order of preference:
-    Sesame, Fuseki, RDFLib+Sleepycat, RDFLib+SQLite).
+    Sesame, Fuseki, RDFLib+Sleepycat, RDFLib+SQLite), and checks which
+    fulltextindex(es) are available and selects the best one (in order
+    of preference: ElasticSearch, Whoosh)
+
+    :param argv: a sys.argv style command line
+    :type  argv: list
+    :param force:
+    :type  force: bool
+    :param verbose:
+    :type  verbose: bool
+    :param unattended:
+    :type  unattended: bool
+
     """
     log = setup_logger(logformat="%(message)s")
 
@@ -646,10 +659,15 @@ def _setup_classnames(enabled, classname):
             classname = enabled[classname]
         return [classname]
 
-class WrappedKeyboardInterrupt(Exception):
+class _WrappedKeyboardInterrupt(Exception):
+    """Internal class. Wraps a KeyboardInterrupt (which does not inherit
+    from :py:exc:`Exception`, but rather :py:exc:`BaseException`) so
+    that it can be passed between processes by :py:mod:`multiprocessing`.
+    """
     pass
-
+    
 def _run_class(enabled, argv, config):
+
     """Runs a particular action for a particular class.
 
     :param enabled: The currently enabled repo classes, as returned by
@@ -717,47 +735,59 @@ def _run_class(enabled, argv, config):
             if ret == False:
                 log.info("%s %s: Nothing to do!" % (alias, command))
             else:
+                # Now we have a list of jobs in the iterable. They can
+                # be processed in four different ways:
+                # 
                 if LayeredConfig.get(config, 'buildserver'):
-                    res = run_buildserver(iterable, inst, classname, command)
+                    # - start an internal jobqueue to which buildclients
+                    #   connect, and send jobs to it (and read results
+                    #   from a similar resultqueue)
+                    res = _queuejobs(iterable, inst, classname, command)
                 elif LayeredConfig.get(config, 'buildqueue'):
-                    res = queue_to_buildqueue(iterable, inst, classname, command)
+                    # - send jobs to an external jobqueue process to which
+                    #   buildclients connect (and read results from a
+                    #   similar resultqueue)
+                    res = _queuejobs_to_queue(iterable, inst, classname, command)
                 elif inst.config.processes > 1:
-                    res = parallelize(iterable, inst, classname, command, config, argv)
+                    # - start a number of processess which read from a
+                    #   shared jobqueue, and send jobs to that queue (and
+                    #   read results from a shared resultqueue)
+                    res = _parallelizejobs(iterable, inst, classname, command, config, argv)
                 else:
+                    # - run the jobs, one by one, in the current process
                     for basefile in inst.store.list_basefiles_for(command):
                         res.append(_run_class_with_basefile(clbl, basefile, kwargs, command))
-                    
                 cls.teardown(command, inst.config)
         else:
             res = clbl(*args, **kwargs)
     return res
 
-# The functions run_buildclient, run_buildserver, make_client_manager,
-# make_server_manager, mp_run and build_worker are based on the
-# examples in
+# The functions runbuildclient, _queuejobs, _make_client_manager,
+# __make_server_manager, _run_jobqueue_multiprocessing and
+# _build_worker are based on the examples in
 # http://eli.thegreenplace.net/2012/01/24/distributed-computing-in-python-with-multiprocessing/
-def run_buildclient(clientname,
+def runbuildclient(clientname,
                     serverhost,
                     serverport,
                     authkey,
                     processes):
 
     done = False
-    while not done:  # mp_run > build_worker might throw an exception,
+    while not done:  # _run_jobqueue_multiprocessing > _build_worker might throw an exception,
                      # which is how we exit
-        manager = make_client_manager(serverhost,
+        manager = _make_client_manager(serverhost,
                                   serverport,
                                   authkey)
-        job_q = manager.get_job_q()
-        result_q = manager.get_result_q()
-        mp_run(job_q, result_q, processes, clientname)
-        # getlog().debug("Client: [pid %s] All done with one run, mp_run returned happily" % os.getpid())
+        job_q = manager.jobqueue()
+        result_q = manager.resultqueue()
+        _run_jobqueue_multiprocessing(job_q, result_q, processes, clientname)
+        # getlog().debug("Client: [pid %s] All done with one run, _run_jobqueue_multiprocessing returned happily" % os.getpid())
         done = True
         
-def make_client_manager(ip, port, authkey):
+def _make_client_manager(ip, port, authkey):
     """Create a manager for a client. This manager connects to a server
-        on the given address and exposes the get_job_q and
-        get_result_q methods for accessing the shared queues from the
+        on the given address and exposes the jobqueue and
+        resultqueue methods for accessing the shared queues from the
         server.  Return a manager object.
 
     """
@@ -787,24 +817,23 @@ def make_client_manager(ip, port, authkey):
             # print("Client: %s: sleeping and retrying..." % e)
             sleep(2)
 
-
-def mp_run(jobqueue, resultqueue, nprocs, clientname):
+def _run_jobqueue_multiprocessing(jobqueue, resultqueue, nprocs, clientname):
     """ Split the work with jobs in jobqueue and results in
         resultqueue into several processes. Launch each process with
         factorizer_worker as the worker function, and wait until all are
         finished.
     """
-    procs = start_multiprocessing(jobqueue, resultqueue, nprocs, clientname)
-    finish_multiprocessing(procs)
+    procs = _start_multiprocessing(jobqueue, resultqueue, nprocs, clientname)
+    _finish_multiprocessing(procs)
 
-def start_multiprocessing(jobqueue, resultqueue, nprocs, clientname):
+def _start_multiprocessing(jobqueue, resultqueue, nprocs, clientname):
     procs = []
     log = getlog()
     # log.debug("Client: [pid %s] about to start %s processes" % (os.getpid(), nprocs))
     for i in range(nprocs):
 
         p = multiprocessing.Process(
-                target=build_worker,
+                target=_build_worker,
                 args=(jobqueue, resultqueue, clientname))
         procs.append(p)
         # sleep(1)
@@ -813,7 +842,7 @@ def start_multiprocessing(jobqueue, resultqueue, nprocs, clientname):
     return procs
 
 
-def finish_multiprocessing(procs, join=True):
+def _finish_multiprocessing(procs, join=True):
     # we could either send a DONE signal to each proc or we could just
     # kill them
     for p in procs:
@@ -824,7 +853,7 @@ def finish_multiprocessing(procs, join=True):
             p.terminate()
 
         
-def build_worker(jobqueue, resultqueue, clientname):
+def _build_worker(jobqueue, resultqueue, clientname):
     """A worker function to be launched in a separate process. Takes jobs
         from jobqueue - each job a dict. When the job is done, the
         result is placed into resultqueue. Runs until instructed to
@@ -836,13 +865,13 @@ def build_worker(jobqueue, resultqueue, clientname):
     inst = None
     logstream  = StringIO()
     log = getlog()
-    log.debug("Client: [pid %s] build_worker ready to process job queue" % os.getpid())
+    log.debug("Client: [pid %s] _build_worker ready to process job queue" % os.getpid())
     while True:
         job = jobqueue.get() # get() blocks -- wait until a job or the
                           # DONE/SHUTDOWN signal comes
         if job == "DONE": # or a more sensible value
             # getlog().debug("Client: [pid %s] Got DONE signal" % os.getpid())
-            return  # back to run_buildclient
+            return  # back to runbuildclient
         if job == "SHUTDOWN":
             # getlog().debug("Client: Got SHUTDOWN signal")
             # kill the entire thing
@@ -902,22 +931,22 @@ def _instantiate_and_configure(classname, config, logstream, clientname):
     return inst
     
 
-def run_buildserver(iterable, inst, classname, command):
+def _queuejobs(iterable, inst, classname, command):
     # Start a shared manager server and access its queues
-    # NOTE: make_server_manager reuses existing buildserver if there is one
-    manager = make_server_manager(port=inst.config.serverport,
+    # NOTE: _make_server_manager reuses existing buildserver if there is one
+    manager = _make_server_manager(port=inst.config.serverport,
                                   authkey=inst.config.authkey)
-    return queue_jobs(manager, iterable, inst, classname, command)
+    return _queue_jobs(manager, iterable, inst, classname, command)
 
 
-def queue_to_buildqueue(iterable, inst, classname, command):
-    manager = make_client_manager(inst.config.buildqueue,
+def _queuejobs_to_queue(iterable, inst, classname, command):
+    manager = _make_client_manager(inst.config.buildqueue,
                                   inst.config.serverport,
                                   inst.config.authkey)
-    return queue_jobs(manager, iterable, inst, classname, command)
+    return _queue_jobs(manager, iterable, inst, classname, command)
 
 
-def queue_jobs_nomanager(jobqueue, iterable, inst, classname, command):
+def __queue_jobs_nomanager(jobqueue, iterable, inst, classname, command):
     log = getlog()
     default_config = _instantiate_class(_load_class(classname)).config
     client_config = {}
@@ -940,9 +969,9 @@ def queue_jobs_nomanager(jobqueue, iterable, inst, classname, command):
     return basefiles
 
 
-def queue_jobs(manager, iterable, inst, classname, command):
-    jobqueue = manager.get_job_q()
-    resultqueue = manager.get_result_q()
+def _queue_jobs(manager, iterable, inst, classname, command):
+    jobqueue = manager.jobqueue()
+    resultqueue = manager.resultqueue()
     log = getlog()
     # we'd like to just provide those config parameters that diff from
     # the default (what the client will already have), ie.  those set
@@ -972,7 +1001,7 @@ def queue_jobs(manager, iterable, inst, classname, command):
     res = []
     while numres < number_of_jobs:
         r = resultqueue.get()
-        if isinstance(r['result'], tuple) and r['result'][0] == WrappedKeyboardInterrupt:
+        if isinstance(r['result'], tuple) and r['result'][0] == _WrappedKeyboardInterrupt:
             raise KeyboardInterrupt()
         elif isinstance(r['result'], tuple) and isinstance(r['result'], Exception):
             r['except_type'] = r['result'][0]
@@ -997,16 +1026,16 @@ def queue_jobs(manager, iterable, inst, classname, command):
     
 buildmanager = None
 if six.PY2:
-    jobqueue_id = b'get_job_q'
-    resultqueue_id = b'get_result_q'
+    jobqueue_id = b'jobqueue'
+    resultqueue_id = b'resultqueue'
 else:
-    jobqueue_id = 'get_job_q'
-    resultqueue_id = 'get_result_q'
+    jobqueue_id = 'jobqueue'
+    resultqueue_id = 'resultqueue'
     
-def make_server_manager(port, authkey, start=True):
+def _make_server_manager(port, authkey, start=True):
 
     """ Create a manager for the server, listening on the given port.
-        Return a manager object with get_job_q and get_result_q methods.
+        Return a manager object with jobqueue and resultqueue methods.
     """
     global buildmanager
     if not buildmanager:
@@ -1030,20 +1059,20 @@ def make_server_manager(port, authkey, start=True):
 
         buildmanager = JobQueueManager(address=('', port), authkey=authkey)
         getlog().debug("Server: Process %s created new buildmanager at %s" % (os.getpid(), id(buildmanager)))
-        if start: # run_buildqueue wants to control this itself
+        if start: # runbuildqueue wants to control this itself
             buildmanager.start()
             getlog().debug('Server: Started at port %s' % port)
         
     return buildmanager
 
-def run_buildqueue(serverport, authkey):
+def runbuildqueue(serverport, authkey):
     # NB: This never returns!
-    manager = make_server_manager(serverport, authkey, start=False)
+    manager = _make_server_manager(serverport, authkey, start=False)
     getlog().debug("Queue: Starting server manager with .serve_forever()")
     manager.get_server().serve_forever()
     
 
-def shutdown_buildserver():
+def _shutdown_buildserver():
     global buildmanager
     if buildmanager:
         getlog().debug("Server: Shutting down buildserver")
@@ -1051,23 +1080,23 @@ def shutdown_buildserver():
         buildmanager = None
         sleep(1)
 
-def parallelize(iterable, inst, classname, command, config, argv):
+def _parallelizejobs(iterable, inst, classname, command, config, argv):
     jobqueue = multiprocessing.Queue()
     resultqueue = multiprocessing.Queue()
-    procs = start_multiprocessing(jobqueue, resultqueue, inst.config.processes, None)
+    procs = _start_multiprocessing(jobqueue, resultqueue, inst.config.processes, None)
     try:
-        basefiles = queue_jobs_nomanager(jobqueue, iterable, inst, classname, command)
-        res = process_resultqueue(resultqueue, basefiles)
+        basefiles = __queue_jobs_nomanager(jobqueue, iterable, inst, classname, command)
+        res = _process_resultqueue(resultqueue, basefiles)
         return res
     finally:
-        finish_multiprocessing(procs, join=False)
+        _finish_multiprocessing(procs, join=False)
 
-def process_resultqueue(resultqueue, basefiles):
+def _process_resultqueue(resultqueue, basefiles):
     res = {}
     queuelength = len(basefiles)
     for i in range(queuelength):
         r = resultqueue.get()
-        if isinstance(r['result'], tuple) and r['result'][0] == WrappedKeyboardInterrupt:
+        if isinstance(r['result'], tuple) and r['result'][0] == _WrappedKeyboardInterrupt:
             raise KeyboardInterrupt()
         res[r['basefile']] = r['result']
     # return the results in the same order as they were queued
@@ -1098,7 +1127,7 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command, wrapctrlc=False):
     except KeyboardInterrupt as e:   # KeyboardInterrupt is not an Exception
         if wrapctrlc:
             except_type, except_value, tb = sys.exc_info()
-            return WrappedKeyboardInterrupt, WrappedKeyboardInterrupt(), traceback.extract_tb(tb)
+            return _WrappedKeyboardInterrupt, _WrappedKeyboardInterrupt(), traceback.extract_tb(tb)
         else:
             raise
 

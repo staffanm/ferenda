@@ -272,8 +272,7 @@ two or more consecutive line separators)."""
         return clone
 
     def getiterator(self, callableObj, *args, **kwargs):
-        """Returns an
-        iterator::
+        """Returns an iterator::
 
             filereader = TextReader("dashed.txt")
             # dashed.txt contains paragraphs separated by "----"

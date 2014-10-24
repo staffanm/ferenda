@@ -176,7 +176,7 @@ Multiprocessing on a single machine
 The simplest way of speeding up processing is to use the ``processes``
 parameter, eg::
 
-    ./ferenda-build rfc parse --all --processes=4
+    ./ferenda-build.py rfc parse --all --processes=4
 
 This will create 4 processes (started by a fifth control proccess),
 each processing individual documents as instructed by the control
@@ -195,13 +195,13 @@ network file system). On each client, you then run (assuming that your
 main system has the IP address 192.168.1.42, and that this particular
 client has 4 CPU cores)::
 
-    ./ferenda-build all buildclient --serverhost=192.168.1.42 --processes=4
+    ./ferenda-build.py all buildclient --serverhost=192.168.1.42 --processes=4
 
 On the main system, you first start a message queue with::
 
-    ./ferenda-build all buildqueue
+    ./ferenda-build.py all buildqueue
 
-Then you can run ferenda-build as normal but with the ``buildqueue``
+Then you can run ``ferenda-build.py`` as normal but with the ``buildqueue``
 parameter, eg::
 
     ./ferenda-build rfc parse --all --buildqueue
@@ -215,10 +215,10 @@ code that they're running).
 
 If you're not running ferenda on windows, you can skip the separate
 message queue process. Just start your clients like above, then start
-ferenda-build on your main system with the ``buildserver`` parameter,
+``ferenda-build.py`` on your main system with the ``buildserver`` parameter,
 eg::
 
-    ./ferenda-build rfc parse --all --buildserver
+    ./ferenda-build.py rfc parse --all --buildserver
 
 This sets up a temporary in-subprocess message queue that your clients
 will connect to as soon as it's up.
@@ -226,5 +226,5 @@ will connect to as soon as it's up.
 .. note::
 
    Because of reasons, this in-subprocess queue does not work on
-   windows. On that platform you'll need to run the message queue
+   Windows. On that platform you'll need to run the message queue
    separately, as described initially.

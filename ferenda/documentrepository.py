@@ -607,8 +607,8 @@ with the *config* object as single parameter.
 
     def dataset_params_from_uri(self, uri):
         """Given a parametrized dataset URI, return the parameter and value
-           used (or an empty tuple, if it is a dataset URI handled by
-           this repo, but without any parameters).
+        used (or an empty tuple, if it is a dataset URI handled by
+        this repo, but without any parameters).
 
         >>> d = DocumentRepository()
         >>> d.alias

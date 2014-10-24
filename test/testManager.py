@@ -103,7 +103,7 @@ class staticmockclass3(staticmockclass):
                 ("Legal", "http://example.org/legal"),
                 ("Contact", "http://example.org/contact")
         )
-    
+
 class API(unittest.TestCase, FerendaTestCase):
     """Test cases for API level methods of the manager modules (functions
        like enable and makeresources, including unit tests of internal
@@ -1037,9 +1037,11 @@ if __name__ == '__main__':
 
 import doctest
 from ferenda import manager
+from ferenda.testutil import Py23DocChecker
+
 def shutup_logger(dt):
     manager.setup_logger('CRITICAL')
 
 def load_tests(loader,tests,ignore):
-    tests.addTests(doctest.DocTestSuite(manager, setUp=shutup_logger))
+    tests.addTests(doctest.DocTestSuite(manager, setUp=shutup_logger, checker=Py23DocChecker()))
     return tests
