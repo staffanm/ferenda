@@ -29,10 +29,11 @@ import six
 from six import text_type as str
 from ferenda.compat import Mock, MagicMock, patch, call
 from bs4 import BeautifulSoup
+from layeredconfig import LayeredConfig, Defaults, INIFile
 import doctest
 
 from ferenda import DocumentEntry, TocPageset, TocPage, \
-    Describer, LayeredConfig, TripleStore, FulltextIndex, Facet
+    Describer, TripleStore, FulltextIndex, Facet
 from ferenda.fulltextindex import WhooshIndex
 from ferenda.errors import *
 
@@ -83,7 +84,7 @@ class Repo(RepoTester):
             @classmethod
             def parse_all_setup(cls, config):
                 config.setup = "parse"
-        config = LayeredConfig(defaults)
+        config = LayeredConfig(Defaults(defaults))
         HasSetup.setup("parse", config)
         HasSetup.teardown("parse", config)
         self.assertEqual(config.setup, "parse")
@@ -96,7 +97,7 @@ class Repo(RepoTester):
             def relate_all_teardown(cls, config):
                 config.teardown = "relate"
                 
-        config = LayeredConfig(defaults)
+        config = LayeredConfig(Defaults(defaults))
         HasTeardown.setup("relate", config)
         HasTeardown.teardown("relate", config)
         self.assertEqual(config.setup, None)
@@ -476,7 +477,9 @@ class Repo(RepoTester):
 
     def test_remote_url(self):
         d = DocumentRepository()
-        d.config = LayeredConfig(defaults=d.get_default_options(),inifile="ferenda.ini",cascade=True)
+        d.config = LayeredConfig(Defaults(d.get_default_options()),
+                                 INIFile("ferenda.ini"),
+                                 cascade=True)
         self.assertEqual(d.remote_url("123/a"), "http://example.org/docs/123/a.html")
         self.assertEqual(d.remote_url("123:a"), "http://example.org/docs/123%3Aa.html")
         self.assertEqual(d.remote_url("123 a"), "http://example.org/docs/123%20a.html")
@@ -491,7 +494,9 @@ class Repo(RepoTester):
         # test1: make sure that default parsing of a document w/o
         # title and lang tags work
         d = DocumentRepository(loglevel="CRITICAL", datadir=self.datadir)
-        config = LayeredConfig(defaults=d.get_default_options(),inifile="ferenda.ini",cascade=True)
+        config = LayeredConfig(Defaults(d.get_default_options()),
+                               INIFile("ferenda.ini"),
+                               cascade=True)
         config.datadir = self.datadir
         d.config = config
         path = d.store.downloaded_path("123/a")
@@ -709,12 +714,12 @@ class Repo(RepoTester):
     def test_relate_all_setup(self, mock_store):
         # so that list_basefiles_for finds something
         util.writefile(self.datadir+"/base/distilled/1.rdf", "example")
-        config = LayeredConfig({'datadir': self.datadir,
-                                'url': 'http://localhost:8000/',
-                                'force': False,
-                                'storetype': 'a',
-                                'storelocation': 'b',
-                                'storerepository': 'c'})
+        config = LayeredConfig(Defaults({'datadir': self.datadir,
+                                         'url': 'http://localhost:8000/',
+                                         'force': False,
+                                         'storetype': 'a',
+                                         'storelocation': 'b',
+                                         'storerepository': 'c'}))
         self.assertTrue(self.repoclass.relate_all_setup(config))
         self.assertTrue(mock_store.connect.called)
         self.assertTrue(mock_store.connect.return_value.clear.called)
@@ -728,12 +733,12 @@ class Repo(RepoTester):
     @patch('ferenda.documentrepository.TripleStore')
     def test_relate_all_teardown(self, mock_store):
         util.writefile(self.datadir+"/base/distilled/dump.nt", "example")
-        config = LayeredConfig({'datadir': self.datadir,
-                                'url': 'http://localhost:8000/',
-                                'force': False,
-                                'storetype': 'a',
-                                'storelocation': 'b',
-                                'storerepository': 'c'})
+        config = LayeredConfig(Defaults({'datadir': self.datadir,
+                                         'url': 'http://localhost:8000/',
+                                         'force': False,
+                                         'storetype': 'a',
+                                         'storelocation': 'b',
+                                         'storerepository': 'c'}))
         self.assertTrue(self.repoclass.relate_all_teardown(config))
         self.assertTrue(mock_store.connect.called)
         self.assertTrue(mock_store.connect.return_value.get_serialized_file.called)

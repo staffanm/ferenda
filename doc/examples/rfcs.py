@@ -370,7 +370,8 @@ class RFCs(DocumentRepository):
 # end frontpage_content
 
 
-from ferenda import manager, LayeredConfig
+from ferenda import manager
+from layeredconfig import LayeredConfig, Defaults
 import sys
 manager.setup_logger("DEBUG")
 d = RFCs(downloadmax=5)
@@ -378,10 +379,10 @@ d = RFCs(downloadmax=5)
 d.download()
 for basefile in d.store.list_basefiles_for("parse"):
     d.parse(basefile)
-RFCs.setup("relate", LayeredConfig(d.get_default_options()))
+RFCs.setup("relate", LayeredConfig(Defaults(d.get_default_options())))
 for basefile in d.store.list_basefiles_for("relate"):
     d.relate(basefile)
-RFCs.teardown("relate", LayeredConfig(d.get_default_options()))
+RFCs.teardown("relate", LayeredConfig(Defaults(d.get_default_options())))
 manager.makeresources([d])
 for basefile in d.store.list_basefiles_for("generate"):
    d.generate(basefile)

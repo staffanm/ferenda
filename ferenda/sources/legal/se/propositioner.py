@@ -8,6 +8,7 @@ import codecs
 from bs4 import BeautifulSoup
 from lxml import etree
 import requests
+from layeredconfig import LayeredConfig
 from six import text_type as str
 
 from ferenda import util, errors
@@ -20,7 +21,6 @@ from ferenda import Describer
 from ferenda import TextReader
 from ferenda import PDFReader
 from ferenda import DocumentEntry
-from ferenda import LayeredConfig
 from ferenda.decorators import managedparsing
 from . import Trips, NoMoreLinks
 from . import Regeringen

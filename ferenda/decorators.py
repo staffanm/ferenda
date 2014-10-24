@@ -18,9 +18,9 @@ import time
 
 import six
 from rdflib import Graph, URIRef
+from layeredconfig import LayeredConfig
 
 from ferenda import util
-from ferenda import LayeredConfig
 from ferenda.errors import DocumentRemovedError, ParseError
 from ferenda.elements import serialize
 

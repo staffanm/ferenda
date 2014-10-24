@@ -246,6 +246,7 @@ texinfo_documents = [
 
 intersphinx_mapping = {'python': ('http://docs.python.org/3/', None),
                        'rdflib': ('https://rdflib.readthedocs.org/en/latest/', None),
+                       'layeredconfig': ('https://layeredconfig.readthedocs.org/en/latest/', None),
                        'beautifulsoup': ('http://www.crummy.com/software/BeautifulSoup/bs4/doc/', None),
                        }
 

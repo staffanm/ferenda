@@ -16,12 +16,17 @@ project.
 
 A project is managed using the ``ferenda-build.py`` tool.
 
-If using the API instead of these command line tools, there is no concept
-of a project except for what your code provides. Your client code
-is responsible for creating the docrepo classes and providing them with
-proper settings. These can be loaded from a ``ferenda.ini``-style file
-(the :class:`~ferenda.LayeredConfig` class makes this simple), be
-hard-coded, or handled in any other way you see fit.
+If using the API instead of these command line tools, there is no
+concept of a project except for what your code provides. Your client
+code is responsible for creating the docrepo classes and providing
+them with proper settings. These can be loaded from a
+``ferenda.ini``-style file, be hard-coded, or handled in any other way
+you see fit.
+
+.. note::
+
+   Ferenda uses the ``layeredconfig`` module internally to handle all
+   settings. 
 
 .. _configuration:
 

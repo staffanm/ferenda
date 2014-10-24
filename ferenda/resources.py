@@ -13,7 +13,9 @@ from rdflib.namespace import FOAF, SKOS
 BIBO = Namespace("http://purl.org/ontology/bibo/")
 import pkg_resources
 
-from ferenda import LayeredConfig, DocumentRepository
+from layeredconfig import LayeredConfig
+
+from ferenda import DocumentRepository
 from ferenda import util, errors
 
 class Resources(object):

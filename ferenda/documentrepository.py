@@ -32,18 +32,20 @@ import lxml.html
 import pkg_resources
 import requests
 import requests.exceptions
-
+from layeredconfig import LayeredConfig, Defaults
 
 from six import text_type as str
 from six import binary_type as bytes
 from six import PY2
 from six.moves.urllib_parse import quote
 
+
+
 # mine
 import ferenda
 from ferenda import util, errors, decorators, fulltextindex
 
-from ferenda import (Describer, LayeredConfig, TripleStore, FulltextIndex,
+from ferenda import (Describer, TripleStore, FulltextIndex,
                      Document, DocumentEntry, NewsCriteria, 
                      TocPageset, TocPage, DocumentStore, Transformer, Facet)
 from ferenda.elements import (Body, Link,
@@ -269,7 +271,7 @@ class DocumentRepository(object):
         if not config:
             codedefaults = self.get_default_options()
             defaults = util.merge_dict_recursive(codedefaults, kwargs)
-            self._config = LayeredConfig(defaults=defaults)
+            self._config = LayeredConfig(Defaults(defaults))
         else:
             self._config = config
         if not hasattr(self, 'store'):
@@ -360,10 +362,10 @@ class DocumentRepository(object):
 
     @property
     def config(self):
-        """The :py:class:`~ferenda.LayeredConfig` object that contains the
+        """The :py:class:`~layeredconfig.LayeredConfig` object that contains the
         current configuration for this docrepo instance. You can read or write
         individual properties of this object, or replace it with a new
-        :py:class:`~ferenda.LayeredConfig` object entirely."""
+        :py:class:`~layeredconfig.LayeredConfig` object entirely."""
         
         return self._config
 

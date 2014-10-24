@@ -15,9 +15,10 @@ from six.moves.urllib_parse import parse_qsl, urlencode
 from six import text_type as str
 from rdflib import URIRef, Namespace, Literal, Graph
 from lxml import etree
+from layeredconfig import LayeredConfig, Defaults, INIFile
 
 from ferenda.compat import OrderedDict
-from ferenda import DocumentRepository, LayeredConfig, FulltextIndex, Transformer, Facet
+from ferenda import DocumentRepository, FulltextIndex, Transformer, Facet
 from ferenda import fulltextindex, util, elements
 from ferenda.elements import html
 
@@ -40,7 +41,8 @@ class WSGIApp(object):
             assert os.path.exists(
                 inifile), "INI file %s doesn't exist (relative to %s)" % (inifile, os.getcwd())
 
-        self.config = LayeredConfig(defaults, inifile, cascade=True)
+        self.config = LayeredConfig(Defaults(defaults),
+                                    INIFile(inifile), cascade=True)
 
     ################################################################
     # Main entry point

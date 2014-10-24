@@ -28,9 +28,10 @@ builtins = "__builtin__" if six.PY2 else "builtins"
 
 from lxml import etree as ET
 import requests.exceptions
+from layeredconfig import LayeredConfig, Defaults
 
 from ferenda import manager, decorators, util, errors
-from ferenda import DocumentRepository, LayeredConfig, DocumentStore
+from ferenda import DocumentRepository, DocumentStore
 
 class staticmockstore(DocumentStore):
     def list_basefiles_for(cls,action):
@@ -163,11 +164,11 @@ class=testManager.staticmockclass2
 
     def test_run_class(self):
         enabled_classes = {'test': 'testManager.staticmockclass'}
-        config = LayeredConfig({'datadir': 'data',
-                                'loglevel': 'INFO',
-                                'logfile': None,
-                                'staticmock': {}
-                            },
+        config = LayeredConfig(Defaults({'datadir': 'data',
+                                         'loglevel': 'INFO',
+                                         'logfile': None,
+                                         'staticmock': {}
+                                     }),
                                cascade=True)
         argv = ["test", "mymethod", "myarg"]
         self.assertEqual(manager._run_class(enabled_classes,
@@ -844,10 +845,10 @@ imgfiles = []
         # make sure that the sub-config object created by run() is
         # identical to the config object used by the instance
         self._enable_repos()
-        ourcfg = LayeredConfig({'loglevel': 'CRITICAL',  # keep the stdout logging neat
-                                'logfile': None,
-                                'datadir': 'data',
-                                'test': {'hello': 'world'}},
+        ourcfg = LayeredConfig(Defaults({'loglevel': 'CRITICAL',
+                                         'logfile': None,
+                                         'datadir': 'data',
+                                         'test': {'hello': 'world'}}),
                                cascade=True)
         with patch('ferenda.manager._load_config', return_value=ourcfg):
             instcfg = manager.run(['test', 'inspect', 'config'])

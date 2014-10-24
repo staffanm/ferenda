@@ -4,7 +4,9 @@ from __future__ import unicode_literals
 import sys, os
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
-from ferenda import DocumentRepository, LayeredConfig, util, errors
+from layeredconfig import LayeredConfig, Defaults
+
+from ferenda import DocumentRepository, util, errors
 from ferenda.testutil import RepoTester
 #SUT
 from ferenda import CompositeRepository
@@ -131,6 +133,6 @@ class TestComposite(RepoTester):
 
         # now test with external config object -- this is where it'll fail
 #        self.repo = CompositeExample()
-#        self.repo.config = LayeredConfig({'datadir': self.datadir})
+#        self.repo.config = LayeredConfig(Defaults({'datadir': self.datadir}))
 #        got = self.repo.custom()
 #        self.assertEqual("Hello world!", got)

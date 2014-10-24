@@ -6,13 +6,14 @@ from tempfile import mkstemp
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
 import six
+from layeredconfig import LayeredConfig, Defaults
 from ferenda.compat import unittest, patch, call,  Mock, MagicMock
 builtins = "__builtin__" if six.PY2 else "builtins"
 
 
 from rdflib import Graph, URIRef, Namespace, Literal
 DCTERMS = Namespace("http://purl.org/dc/terms/")
-from ferenda import DocumentRepository, DocumentStore, LayeredConfig, util
+from ferenda import DocumentRepository, DocumentStore, util
 
 # SUT
 from ferenda import Devel
@@ -140,9 +141,9 @@ WHERE { ?s ?p ?o .
         with patch('ferenda.devel.TripleStore', **config):
             with patch(builtins+'.print', printmock):
                 d = Devel()
-                d.config = LayeredConfig({'storetype': 'a',
-                                          'storelocation': 'b',
-                                          'storerepository': 'c'})
+                d.config = LayeredConfig(Defaults({'storetype': 'a',
+                                                   'storelocation': 'b',
+                                                   'storerepository': 'c'}))
                 d.construct("testconstructtemplate.rq", uri)
         want = """
 # Constructing the following from b, repository c, type a
@@ -195,9 +196,9 @@ WHERE { <%(uri)s> ?p ?o . }
         with patch('ferenda.devel.TripleStore', **config):
             with patch(builtins+'.print', printmock):
                 d = Devel()
-                d.config = LayeredConfig({'storetype': 'a',
-                                          'storelocation': 'b',
-                                          'storerepository': 'c'})
+                d.config = LayeredConfig(Defaults({'storetype': 'a',
+                                                   'storelocation': 'b',
+                                                   'storerepository': 'c'}))
                 d.select("testselecttemplate.rq", uri)
         want = """
 # Constructing the following from b, repository c, type a
@@ -239,8 +240,8 @@ WHERE { <%(uri)s> ?p ?o . }
         with patch('ferenda.devel.FulltextIndex', **config):
             with patch(builtins+'.print', printmock):
                 d = Devel()
-                d.config = LayeredConfig({'indextype': 'a',
-                                          'indexlocation': 'b'})
+                d.config = LayeredConfig(Defaults({'indextype': 'a',
+                                                   'indexlocation': 'b'}))
                 d.queryindex("doc")
         want = """
 Doc #1 (http://example.org/doc1): matching doc 1
@@ -283,16 +284,17 @@ class Mkpatch(unittest.TestCase):
         self.basefile = "1"
         self.store = DocumentStore(self.datadir + "/base")
         self.d = Devel()
-        self.globalconf = LayeredConfig({'datadir': self.datadir,
-                                         'patchdir': self.datadir,
-                                         'download_text': None,
-                                         'intermediate_text': None,
-                                         'devel': {'class': 'ferenda.Devel'},
-                                         'base': {'class':
-                                                  'testDevel.MockRepo'},
-                                         'koi8': {'class':
-                                                  'testDevel.Koi8Repo'}},
-                                        cascade=True)
+        self.globalconf = LayeredConfig(
+            Defaults({'datadir': self.datadir,
+                      'patchdir': self.datadir,
+                      'download_text': None,
+                      'intermediate_text': None,
+                      'devel': {'class': 'ferenda.Devel'},
+                      'base': {'class':
+                               'testDevel.MockRepo'},
+                      'koi8': {'class':
+                               'testDevel.Koi8Repo'}}),
+            cascade=True)
         self.d.config = self.globalconf.devel
 
     def tearDown(self):

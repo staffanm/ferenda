@@ -42,10 +42,10 @@ input = six.moves.input
 # 3rd party
 import requests
 import requests.exceptions
+from layeredconfig import LayeredConfig, Defaults, INIFile, Commandline
 
 # my modules
 from ferenda import DocumentRepository  # needed for a doctest
-from ferenda import LayeredConfig
 from ferenda import Transformer
 from ferenda import TripleStore
 from ferenda import WSGIApp
@@ -554,7 +554,7 @@ def setup(argv=None, force=False, verbose=False, unattended=False):
 def _load_config(filename, argv=[]):
     """Loads general configuration information from ``filename`` (which
 should be a full path to a ferenda.ini file) and/or command line
-arguments into a :py:class:`~ferenda.LayeredConfig` instance. It
+arguments into a :py:class:`~layeredconfig.LayeredConfig` instance. It
 contains a built-in dict of default configuration values which can be
 overridden by the config file or command line arguments."""
 
@@ -585,7 +585,9 @@ overridden by the config file or command line arguments."""
                 'serverport': 5555,
                 'authkey': b'secret'
     }
-    config = LayeredConfig(defaults, filename, argv, cascade=True)
+    config = LayeredConfig(Defaults(defaults),
+                           INIFile(filename),
+                           Commandline(argv), cascade=True)
     return config
 
 
@@ -614,7 +616,7 @@ def _setup_makeresources_args(config):
     
     :param config: An initialized config object with data from a ferenda.ini
                    file
-    :type config: ferenda.LayeredConfig
+    :type config: layered.LayeredConfig
     :returns: A subset of the same configuration options
     :rtype: dict
 
@@ -679,7 +681,7 @@ def _run_class(enabled, argv, config):
                  with the same argv.
     :type argv: list
     :param config: A config object
-    :type  config: ferenda.LayeredConfig
+    :type  config: layeredconfig.LayeredConfig
 
     If the parameter ``--all`` is given (e.g. ``['myrepo', 'parse',
     '--all']``), the specified command is run once for every available
@@ -1142,9 +1144,10 @@ def _instantiate_class(cls, config=None, argv=[]):
     if not config:
         defaults = dict(clsdefaults)
         defaults[cls.alias] = {}
-        config = LayeredConfig(defaults,
-                               _find_config_file(),
-                               argv, cascade=True)
+        config = LayeredConfig(Defaults(defaults),
+                               INIFile(_find_config_file()),
+                               Commandline(argv),
+                               cascade=True)
     clsconfig = getattr(config, cls.alias)
 
     # work in all parameters from get_default_options unless they have
@@ -1361,7 +1364,7 @@ def _setup_runserver_args(config, inifilename):
     
     :param config: An initialized config object with data from a ferenda.ini
                    file
-    :type config: ferenda.LayeredConfig
+    :type config: layeredconfig.LayeredConfig
     :returns: A subset of the same configuration options
     :rtype: dict
 

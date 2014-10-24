@@ -29,7 +29,6 @@ New features:
   predicate argument that determines the RDF predicate between the
   refering and the referred resources (by default, this is
   dcterms:references)
-* The LayeredConfig class has two new class methods, .set and .get.
 * manager (and by extension ./ferenda-build.py) has new commands that
   allows processing jobs in parallell (see Advanced > Parallel
   processing)
@@ -51,8 +50,16 @@ New features:
 
 Infrastructural changes:
 
-Ferenda now uses the CI service Appveyor to automatically run the
-entire test suite under Windows on every commit. 
+* Ferenda now uses the CI service Appveyor to automatically run the
+  entire test suite under Windows on every commit.
+* LayeredConfig is now a separate package and not included with
+  Ferenda. It has been generalized and can take any number of
+  configuration sources (in the form of object instances) as
+  initialization arguments. Classes that provide configuration sources
+  from code defaults, INI files, command line arguments, environment
+  variables and more are included. It also has two new class methods,
+  .set and .get.
+
 
 
 2014-07-23 RELEASE 0.2.0

@@ -21,7 +21,8 @@ install_requires = ['beautifulsoup4 >= 4.3.0',
                     'Whoosh >= 2.4.1',
                     'six >= 1.4.0',
                     'docutils >= 0.11',
-                    'grako >= 3.4.0']
+                    'grako >= 3.4.0',
+                    'layeredconfig >= 0.1.0']
 
 if sys.version_info < (3,0,0):
     # not py3 compatible, but not essential either
@@ -45,8 +46,8 @@ if sys.version_info < (3,3,0):
     tests_require.append('mock >= 1.0.0')
 if sys.version_info < (2,7,0):
     tests_require.append('unittest2 >= 0.5.1')
-    
-# we can't just import ferenda to get at ferenda.__version since it
+
+# we can't just import ferenda to get at ferenda.__version__ since it
 # might have unmet dependencies at this point. Exctract it directly
 # from the file (code from rdflib:s setup.py)
 def find_version(filename):

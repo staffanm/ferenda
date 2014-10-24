@@ -31,6 +31,7 @@ from lxml import etree
 from lxml.builder import ElementMaker
 import bs4
 import requests
+from layeredconfig import LayeredConfig
 
 # my own libraries
 from . import Trips
@@ -39,7 +40,7 @@ from ferenda import DocumentEntry, DocumentStore, TripleStore
 from ferenda import TextReader, Describer
 from ferenda import decorators
 from ferenda.sources.legal.se import legaluri
-from ferenda import util, LayeredConfig
+from ferenda import util
 from ferenda.elements import CompoundElement
 from ferenda.elements import OrdinalElement
 from ferenda.elements import TemporalElement

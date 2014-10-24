@@ -51,7 +51,6 @@ Classes
    api/tocpage
    api/tocpageset
    api/newscriteria
-   api/layeredconfig
    api/elements
    api/elements-html
    api/describer
