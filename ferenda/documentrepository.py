@@ -676,10 +676,11 @@ with the *config* object as single parameter.
                 return self.download_single(basefile)
             else:
                 raise ValueError(
-                    "Downloading single basefile '%s' not supported (no way to convert basefile to url)" % basefile)
-        lastdownload = self.config.lastdownload
-        if lastdownload:
-            self.log.debug("download: Last download was at %s" % lastdownload)
+                    "Downloading single basefile '%s' not supported "
+                    "(no way to convert basefile to url)" % basefile)
+        if 'lastdownload' in self.config:
+            self.log.debug("download: Last download was at %s" %
+                           self.config.lastdownload)
         else:
             self.log.debug("download: Starting full download")
         # NOTE: This very generic implementation of download has no

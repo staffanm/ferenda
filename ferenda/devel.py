@@ -10,6 +10,7 @@ import codecs
 from rdflib import Graph, URIRef, RDF
 import six
 from six import text_type as str
+from layeredconfig import LayeredConfig
 
 from ferenda import TextReader, TripleStore, FulltextIndex
 from ferenda.elements import serialize
@@ -166,7 +167,7 @@ class Devel(object):
         # work in all parameters from get_default_options
         for key, val in repo.get_default_options().items():
             if key not in repo.config:
-                setattr(repo.config, key, val)
+                LayeredConfig.set(repo.config, key, val, "defaults")
         repo.store = repo.documentstore_class(
             repo.config.datadir + os.sep + repo.alias,
             downloaded_suffix=repo.downloaded_suffix,

@@ -1,8 +1,13 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import sys, os, tempfile, re, shutil
+import sys
+import os
+import tempfile
+import re
+import shutil
 from tempfile import mkstemp
+
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
 import six
@@ -296,6 +301,8 @@ class Mkpatch(unittest.TestCase):
                                'testDevel.Koi8Repo'}}),
             cascade=True)
         self.d.config = self.globalconf.devel
+        self.d.config.download_text
+        self.d.config.download_text = "what"
 
     def tearDown(self):
         shutil.rmtree(self.datadir)

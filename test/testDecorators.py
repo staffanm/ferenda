@@ -186,11 +186,11 @@ class Decorators(unittest.TestCase):
         
     def test_makedocument(self):
         @makedocument
-        def testfunc(repo,doc):
+        def testfunc(repo, doc):
             return doc
 
-        doc = testfunc(DocumentRepository(),"base/file")
-        self.assertIsInstance(doc,Document)
+        doc = testfunc(DocumentRepository(), "base/file")
+        self.assertIsInstance(doc, Document)
         self.assertEqual(doc.basefile, "base/file")
 
     def test_recordlastdownload(self):
@@ -205,23 +205,16 @@ class Decorators(unittest.TestCase):
                                   datetime.datetime)
             # and that LayeredConfig.write has been called
             self.assertTrue(mockconf.called)
-        
+
     def test_downloadmax(self):
         @downloadmax
         def testfunc(repo, source):
             for x in range(100):
                 yield x
-        mockrepo = Mock()
+        mockrepo = MagicMock()
         mockrepo.config.downloadmax = None
         self.assertEqual(100, len(list(testfunc(mockrepo, None))))
-        
-        os.environ["FERENDA_DOWNLOADMAX"] = "10"
-        self.assertEqual(10, len(list(testfunc(mockrepo, None))))
-        
-        del os.environ["FERENDA_DOWNLOADMAX"]
-        mockrepo.config.downloadmax = 20
-        self.assertEqual(20, len(list(testfunc(mockrepo, None))))
-        
-            
-            
 
+        mockrepo.config.downloadmax = 10
+        mockrepo.config.__contains__.return_value = True
+        self.assertEqual(10, len(list(testfunc(mockrepo, None))))

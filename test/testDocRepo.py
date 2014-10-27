@@ -84,7 +84,7 @@ class Repo(RepoTester):
             @classmethod
             def parse_all_setup(cls, config):
                 config.setup = "parse"
-        config = LayeredConfig(Defaults(defaults))
+        config = LayeredConfig(Defaults(copy.copy(defaults)))
         HasSetup.setup("parse", config)
         HasSetup.teardown("parse", config)
         self.assertEqual(config.setup, "parse")
@@ -97,7 +97,7 @@ class Repo(RepoTester):
             def relate_all_teardown(cls, config):
                 config.teardown = "relate"
                 
-        config = LayeredConfig(Defaults(defaults))
+        config = LayeredConfig(Defaults(copy.copy(defaults)))
         HasTeardown.setup("relate", config)
         HasTeardown.teardown("relate", config)
         self.assertEqual(config.setup, None)
@@ -118,7 +118,7 @@ class Repo(RepoTester):
         # test index file contains four links that matches
         # d.document_url. Three of these contains link text that
         # matches d.basefile_template, and should thus be downloaded
-        d = DocumentRepository(loglevel='CRITICAL',datadir=self.datadir)
+        d = DocumentRepository(loglevel='CRITICAL', datadir=self.datadir)
 
         d.start_url = "http://localhost/fake/url"
         d.download_single = Mock()
@@ -129,9 +129,10 @@ class Repo(RepoTester):
         # right amount of times, make sure d.log.error is called once,
         # and ensure lastdownload is set
         mockresponse = Mock()
-        with open("%s/files/base/downloaded/index.htm" % os.path.dirname(__file__)) as fp:
+        with open("%s/files/base/downloaded/index.htm" %
+                  os.path.dirname(__file__)) as fp:
             mockresponse.text = fp.read()
-        with patch('requests.get',return_value=mockresponse):
+        with patch('requests.get', return_value=mockresponse):
             self.assertTrue(d.download())
         
         self.assertEqual(d.download_single.call_count,3)

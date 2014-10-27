@@ -466,7 +466,9 @@ indexlocation = data/whooshindex
 import os
 from time import sleep
 
-from ferenda import DocumentRepository, DocumentStore, LayeredConfig
+from layeredconfig import LayeredConfig
+
+from ferenda import DocumentRepository, DocumentStore
 from ferenda import decorators, errors
 
 class Teststore(DocumentStore):
@@ -504,8 +506,8 @@ class Testrepo(DocumentRepository):
 
     @decorators.action
     def pid(self, arg):
-        if hasattr(self.config, 'clientname'):
-            res = "%s:%s" % (clientname, os.getpid())
+        if 'clientname' in self.config:
+            res = "%s:%s" % (self.config.clientname, os.getpid())
         else:
             res = os.getpid()
         self.log.info("%s: pid is %s" % (arg, os.getpid()))

@@ -13,7 +13,7 @@ from rdflib.namespace import FOAF, SKOS
 BIBO = Namespace("http://purl.org/ontology/bibo/")
 import pkg_resources
 
-from layeredconfig import LayeredConfig
+from layeredconfig import LayeredConfig, Defaults
 
 from ferenda import DocumentRepository
 from ferenda import util, errors
@@ -32,7 +32,7 @@ class Resources(object):
         self.resourcedir = resourcedir
         defaults = DocumentRepository().get_default_options()
         defaults.update(kwargs)
-        self.config = LayeredConfig(defaults)
+        self.config = LayeredConfig(Defaults(defaults))
         from ferenda.manager import setup_logger
         self.log = setup_logger()
 
