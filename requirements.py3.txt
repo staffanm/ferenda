@@ -19,4 +19,4 @@ docutils
 wheel
 twine
 psutil
--e git://github.com/staffanm/layeredconfig.git#egg=layeredconfig
+layeredconfig
