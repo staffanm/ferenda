@@ -27,7 +27,9 @@ class DummyStore(object):
 
 class Devel(object):
 
-    """This module acts as a docrepo (and as such is easily callable from
+    """Collection of utility commands for developing docrepos.
+
+    This module acts as a docrepo (and as such is easily callable from
     ``ferenda-manager.py``), but instead of ``download``, ``parse``,
     ``generate`` et al, contains various tool commands that is useful
     for developing and debugging your own docrepo classes.

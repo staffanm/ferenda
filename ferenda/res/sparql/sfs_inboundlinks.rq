@@ -1,0 +1,11 @@
+PREFIX dcterms:<http://purl.org/dc/terms/>
+PREFIX rpubl:<http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
+PREFIX rdf:<http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT ?uri ?lagrum
+WHERE {
+  GRAPH <%(context)s> {
+    ?uri dcterms:references ?lagrum .
+    ?lagrum dcterms:isPartOf{0,4} <%(uri)s> .
+  }
+}

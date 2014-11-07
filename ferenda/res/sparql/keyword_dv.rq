@@ -1,0 +1,16 @@
+PREFIX dcterms:<http://purl.org/dc/terms/>
+PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rpubl:<http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
+PREFIX rinfoex:<http://lagen.nu/terms#>
+
+SELECT ?uri ?id ?desc
+WHERE {
+  GRAPH <%(context)s> {
+    {
+      ?uri rpubl:referatrubrik ?desc .
+      ?uri dcterms:identifier ?id .
+      ?uri rpubl:referatAvDomstolsavgorande ?domuri .
+      ?domuri dcterms:subject <%(uri)s>
+      }
+  }
+}

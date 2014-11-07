@@ -50,7 +50,7 @@ class Keyword(DocumentRepository):
     alias = "keyword"
     downloaded_suffix = ".txt"
     documentstore_class = KeywordStore
-    
+    xslt_template = "res/xsl/keyword.xsl"
     def __init__(self, config=None, **kwargs):
         super(Keyword, self).__init__(config, **kwargs)
         # extra functions -- subclasses can add / remove from this
@@ -178,8 +178,7 @@ class Keyword(DocumentRepository):
             uniongraph = True
         return store.select(sq, "python", uniongraph=uniongraph)
 
-    def time_store_select(self, store, query_template, basefile,
-                          context=None, label="things"):
+    def time_store_select(self, store, query_template, basefile, context=None, label="things"):
         values = {'basefile': basefile,
                   'label': label,
                   'count': None}
@@ -225,9 +224,9 @@ class Keyword(DocumentRepository):
                 prefix, tag = string.split(":", 1)
                 return "{%s}%s" % (str(self.ns[prefix]), tag)
 
-        # FIXME: xhv MUST be part of nsmap -- or must it?
-        # if 'xhtml' not in self.ns:
-        #     self.ns['xhtml'] = "http://www.w3.org/1999/xhtml"
+        # FIXME: xhv MUST be part of nsmap
+        if 'xhtml' not in self.ns:
+            self.ns['xhtml'] = "http://www.w3.org/1999/xhtml"
 
         root_node = etree.Element(ns("rdf:RDF"), nsmap=self.ns)
 
@@ -237,6 +236,8 @@ class Keyword(DocumentRepository):
         for d in wikidesc:
             desc_node = etree.SubElement(main_node, ns("dcterms:description"))
             xhtmlstr = "<div xmlns='http://www.w3.org/1999/xhtml'>%s</div>" % (d['desc'])
+            # xhtmlstr = xhtmlstr.replace(
+            #    ' xmlns="http://www.w3.org/1999/xhtml"', '')
             desc_node.append(etree.fromstring(xhtmlstr.encode('utf-8')))
 
         # subclasses override this to add extra annotations from other

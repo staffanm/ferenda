@@ -1,0 +1,8 @@
+PREFIX dct:<http://purl.org/dc/terms/>
+PREFIX rinfo:<http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#>
+
+SELECT ?lagrum ?desc
+WHERE {
+   ?lagrum dct:description ?desc .
+   ?lagrum dct:isPartOf{0,2} <%(uri)s>
+}

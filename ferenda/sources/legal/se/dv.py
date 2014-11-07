@@ -14,7 +14,9 @@ import re
 import zipfile
 from six import text_type as str
 from six.moves.urllib_parse import urljoin
+from six import BytesIO
 import tempfile
+from collections import defaultdict
 
 # 3rdparty libs
 import pkg_resources
@@ -25,11 +27,13 @@ from lxml import etree
 from bs4 import BeautifulSoup, NavigableString
 
 # my libs
-from ferenda import Document, DocumentStore, Describer, WordReader, FSMParser
+from ferenda import (Document, DocumentStore, Describer, WordReader, FSMParser,
+                     Facet, TocPage, TocPageset)
 from ferenda.decorators import managedparsing, newstate
-from ferenda import util
-from ferenda.sources.legal.se.legalref import LegalRef, Link
-from ferenda.elements import Body, Paragraph, CompoundElement, OrdinalElement, Heading
+from ferenda import util, fulltextindex
+from ferenda.sources.legal.se.legalref import LegalRef
+from ferenda.elements import (Body, Paragraph, CompoundElement, OrdinalElement,
+                              Heading, Link)
 
 from ferenda.elements.html import Strong, Em
 from . import SwedishLegalSource, SwedishCitationParser, RPUBL
@@ -93,13 +97,15 @@ class DVStore(DocumentStore):
     """Customized DocumentStore.
     """
 
+    
     def basefile_to_pathfrag(self, basefile):
         return basefile
 
     def pathfrag_to_basefile(self, pathfrag):
         return pathfrag
 
-    def downloaded_path(self, basefile, version=None, attachment=None, suffix=None):
+    def downloaded_path(self, basefile, version=None, attachment=None,
+                        suffix=None):
         if not suffix:
             if os.path.exists(self.path(basefile, "downloaded", ".doc")):
                 suffix = ".doc"
@@ -149,7 +155,9 @@ class DomElement(CompoundElement):
         if self.prop:
             # ie if self.prop = ('ordinal', 'dcterms:identifier'), then
             # dcterms:identifier = self.ordinal
-            if hasattr(self, self.prop[0]) and getattr(self, self.prop[0]):
+            if (hasattr(self, self.prop[0]) and
+                getattr(self, self.prop[0]) and
+                isinstance(getattr(self, self.prop[0]), str)):
                 element.set('content', getattr(self, self.prop[0]))
                 element.set('property', self.prop[1])
         return element
@@ -169,11 +177,18 @@ class Betankande(DomElement): pass # dcterms:author <- referent
 class Skiljaktig(DomElement): pass # dcterms:author <- name
 class Tillagg(DomElement): pass # dcterms:author <- name
 class Endmeta(DomElement): pass
-        
+
+
 class DV(SwedishLegalSource):
+    """Handles legal cases, in report form, from primarily final instance courts.
+
+    Cases are fetched from Domstolsverkets FTP server for "Vägledande
+    avgöranden", and are converted from doc/docx format.
+
+    """
     alias = "dv"
     downloaded_suffix = ".zip"
-    rdf_type = RPUBL.Rattsfallsreferat
+    rdf_type = (RPUBL.Rattsfallsreferat, RPUBL.Rattsfallsnotis)
     documentstore_class = DVStore
     # This is very similar to SwedishLegalSource.required_predicates,
     # only DCTERMS.title has been changed to RPUBL.referatrubrik (and if
@@ -187,6 +202,8 @@ class DV(SwedishLegalSource):
     
     DCTERMS = Namespace(util.ns['dcterms'])
     sparql_annotations = "res/sparql/dv-annotations.rq"
+    xslt_template = "res/xsl/dv.xsl"
+
 
     @classmethod
     def relate_all_setup(cls, config):
@@ -220,7 +237,7 @@ class DV(SwedishLegalSource):
             util.robust_rename(mapfile + ".new", mapfile)
             log.info("uri.map created, %s entries" % cnt)
         else:
-            print("Not regenerating uri.map")
+            log.debug("Not regenerating uri.map")
             pass
         return super(cls, DV).relate_all_setup(config)
 
@@ -317,7 +334,7 @@ class DV(SwedishLegalSource):
         except MaxDownloadsReached:  # ok we're done!
             pass
 
-    def download_ftp(self, dirname, recurse, user, password, connection=None):
+    def download_ftp(self, dirname, recurse, user=None, password=None, connection=None):
         self.log.debug('Listing contents of %s' % dirname)
         lines = []
         if not connection:
@@ -331,7 +348,7 @@ class DV(SwedishLegalSource):
             parts = line.split()
             filename = parts[-1].strip()
             if line.startswith('d') and recurse:
-                self.download(filename, recurse)
+                self.download_ftp(filename, recurse, connection=connection)
             elif line.startswith('-'):
                 basefile = os.path.splitext(filename)[0]
                 if dirname:
@@ -591,9 +608,9 @@ class DV(SwedishLegalSource):
                 if coll == "HDO" and not avd_p:
                     avd_p = find_month_in_previous(basefile)
                 if avd_p:
-                    fp.write(repr(avd_p))
+                    fp.write(str(avd_p))
             if fp:
-                fp.write(repr(p))
+                fp.write(str(p))
                 if filetype != "docx":
                     fp.write("\n")
         if fp: # should always be the case
@@ -721,10 +738,20 @@ class DV(SwedishLegalSource):
             doc.meta.add((URIRef(doc.uri),
                           self.ns['rinfoex'].patchdescription,
                           Literal(patchdesc)))
-        doc.body = self.format_body(rawbody)
+        doc.body = self.format_body(rawbody, doc.basefile)
         return True
 
-
+    # smth like this
+    def sanitize_body(self, rawbody):
+        for section in rawbody:
+            # are all sections strings? or what can they be?
+            if section.endswith(".II"):
+                yield one
+                yield two
+            else:
+                yield section
+                
+        
     def parse_not(self, text, basefile, filetype):
         basefile_regex = re.compile("(?P<type>\w+)/(?P<year>\d+)_not_(?P<ordinal>\d+)")
         referat_templ = {'REG': 'RÅ %(year)s not %(ordinal)s',
@@ -748,7 +775,7 @@ class DV(SwedishLegalSource):
         iterator = soup.find_all(ptag)
         if coll == "HDO":
             # keep in sync w extract_notis
-            re_notisstart = re.compile("(?:Den (?P<avgdatum>\d+):[ae].\s+|)(?P<ordinal>\d+)\. ?\((?P<malnr>\w \d+-\d+)\)", flags=re.UNICODE)
+            re_notisstart = re.compile("(?:Den (?P<avgdatum>\d+):[ae].\s+|)(?P<ordinal>\d+)\.[ \xa0]*\((?P<malnr>\w[ \xa0]\d+-\d+)\)", flags=re.UNICODE)
             re_avgdatum = re_malnr = re_notisstart
             re_lagrum = re_sokord = None
             # headers consist of the first two chunks (month, then
@@ -1254,8 +1281,7 @@ class DV(SwedishLegalSource):
         # 7. done!
         return refuri
 
-
-    def format_body(self, paras):
+    def format_body(self, paras, basefile):
         b = Body()
         # paras is typically a list of strings, but can be a list of
         # lists, where the innermost list consists of strings
@@ -1265,7 +1291,6 @@ class DV(SwedishLegalSource):
                 x = [x]
             b.append(Paragraph(x))
 
-        
         # find and link references -- this increases processing time
         # 5-10x, so do it only if requested. For some types (NJA
         # notiser) we could consider finding references anyway, as
@@ -1274,59 +1299,311 @@ class DV(SwedishLegalSource):
         # body, we don't have nothing.
         if self.config.parsebodyrefs:
             if not hasattr(self, 'ref_parser'):
-                self.ref_parser = LegalRef(LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN)
+                self.ref_parser = LegalRef(LegalRef.RATTSFALL,
+                                           LegalRef.LAGRUM,
+                                           LegalRef.FORARBETEN)
             citparser = SwedishCitationParser(self.ref_parser, self.config.url)
             b = citparser.parse_recursive(b)
             
-
-        
         # convert the unstructured list of Paragraphs to a
         # hierarchical tree of instances, domslut, domskäl, etc
-        b = self.structure_body(b)
+        b = self.structure_body(b, basefile)
         return b
 
-    def structure_body(self, paras):
-        courtnames = ["Linköpings tingsrätt",
-                      "Lunds tingsrätt",
-                      "Umeå tingsrätt",
-                      "Stockholms tingsrätt", 
+    def structure_body(self, paras, basefile):
+        return self.get_parser(basefile).parse(paras)
 
-                      "Göta hovrätt",
-                      "Hovrätten över Skåne och Blekinge",
-                      "Hovrätten för Övre Norrland",
-                      "Svea hovrätt",
+    @staticmethod
+    def get_parser(basefile):
+        re_courtname = re.compile("^(Högsta domstolen|Hovrätten (över|för) [A-ZÅÄÖa-zåäö ]+|([A-ZÅÄÖ][a-zåäö]+ )(tingsrätt|hovrätt))(|, mark- och miljödomstolen|, Mark- och miljööverdomstolen)$")
 
-                      "Högsta domstolen"]
+#         productions = {'karande': '..',
+#                        'court': '..',
+#                        'date': '..'}
 
-        rx = ('(?P<court>Försäkringskassan|Migrationsverket) beslutade (därefter|) den (?P<date>\d+ \w+ \d+) att',
-              '(A överklagade beslutet till |)(?P<court>(Förvaltningsrätten|Länsrätten|Kammarrätten) i \w+(| län)(|, migrationsdomstolen|, Migrationsöverdomstolen)|Högsta förvaltningsdomstolen) \((?P<date>\d+-\d+\d+)')
-        instans_matchers = [re.compile(x, re.UNICODE) for x in rx]
+        # at parse time, initialize matchers
+        rx = (
+            {'name': 'fr-överkl',
+             're': '(?P<karanden>[\w\.\(\)\- ]+) överklagade (beslutet|domen) '
+                   'till (?P<court>(Förvaltningsrätten|Länsrätten|Kammarrätten) i \w+(| län)'
+                   '(|, migrationsdomstolen|, Migrationsöverdomstolen)|'
+                   'Högsta förvaltningsdomstolen)( \((?P<date>\d+-\d+-\d+), '
+                   '(?P<constitution>[\w\.\- ,]+)\)|$)',
+             'method': 'match',
+             'type': ('instans',),
+             'court': ('REG', 'HFD', 'MIG')},
+
+            {'name': 'fr-dom',
+             're': '(?P<court>(Förvaltningsrätten|'
+                   'Länsrätten|Kammarrätten) i \w+(| län)'
+                   '(|, migrationsdomstolen|, Migrationsöverdomstolen)|'
+                   'Högsta förvaltningsdomstolen) \((?P<date>\d+-\d+-\d+), '
+                   '(?P<constitution>[\w\.\- ,]+)\)',
+             'method': 'match',
+             'type': ('dom',),
+             'court': ('REG', 'HFD', 'MIG')},
             
-        
-        def is_delmal(parser):
-            chunk = parser.reader.peek()
-            return str(chunk) in ("I", "II", "III")
+            {'name': 'tr-dom',
+             're': '(?P<court>TR:n|Tingsrätten|HovR:n|Hovrätten|Mark- och miljödomstolen) \((?P<constitution>[\w\.\- ,]+)\) (anförde|fastställde|stadfäste|meddelade) (följande i |i beslut i |i |)(dom|beslut) (d\.|d|den) (?P<date>\d+ \w+\.? \d+)',
+             'method': 'match',
+             'type': ('dom',),
+             'court': ('HDO', 'HGO', 'HNN', 'HON', 'HSB', 'HSV', 'HVS')},
+            {'name': 'hd-dom',
+             're': 'Målet avgjordes efter huvudförhandling (av|i) (?P<court>HD) \((?P<constitution>[\w:\.\- ,]+)\),? som',
+             'method': 'match',
+             'type': ('dom',),
+             'court': ('HDO',)},
+            {'name': 'hd-dom2',
+             're': '(?P<court>HD) \((?P<constitution>[\w:\.\- ,]+)\) meddelade den (?P<date>\d+ \w+ \d+) följande',
+             'method': 'match',
+             'type': ('dom',),
+             'court': ('HDO',)},
+            {'name': 'hd-fastst',
+             're': '(?P<court>HD) \((?P<constitution>[\w:\.\- ,]+)\) (beslöt|fattade (slutligt|följande slutliga) beslut)',
+             'method': 'match',
+             'type': ('dom',),
+             'court': ('HDO',)},
 
-        def is_instans(parser):
+            {'name': 'mig-dom',
+             're': '(?P<court>Kammarrätten i Stockholm, Migrationsöverdomstolen)  \((?P<date>\d+-\d+-\d+), (?P<constitution>[\w\.\- ,]+)\)',
+             'method': 'match',
+             'type': ('dom',),
+             'court': ('MIG',)},
+            {'name': 'miv-forstainstans',
+             're': '(?P<court>Migrationsverket) avslog (ansökan|ansökningarna) den (?P<date>\d+ \w+ \d+) och beslutade att',
+             'method': 'match',
+             'type': ('dom',),
+             'court': ('MIG',)},
+            {'name': 'miv-forstainstans-2',
+             're': '(?P<court>Migrationsverket) avslog den (?P<date>\d+ \w+ \d+) A:s ansökan och beslutade att',
+             'method': 'match',
+             'type': ('dom',),
+             'court': ('MIG',)},
+            {'name': 'mig-dom-alt',
+             're': 'I sin dom avslog (?P<court>Förvaltningsrätten i Stockholm, migrationsdomstolen) \((?P<date>\d+- ?\d+-\d+), (?P<constitution>[\w\.\- ,]+)\)',
+             'method': 'match',
+             'type': ('dom',),
+             'court': ('MIG',)},
+            {'name': 'allm-åkl',
+             're': 'Allmän åklagare yrkade (.*)vid (?P<court>(([A-ZÅÄÖ]'
+                   '[a-zåäö]+ )+)(TR|tingsrätt))',
+             'method': 'match',
+             'type': ('instans',),
+             'court': ('HDO', 'HGO', 'HNN', 'HON', 'HSB', 'HSV', 'HVS')},
+            {'name': 'stämning',
+             're': 'stämning å (?P<svarande>.*) vid (?P<court>(([A-ZÅÄÖ]'
+                   '[a-zåäö]+ )+)(TR|tingsrätt))',
+             'method': 'search',
+             'type': ('instans',),
+             'court': ('HDO', 'HGO', 'HNN', 'HON', 'HSB', 'HSV', 'HVS')},
+            {'name': 'ansökan',
+             're': 'ansökte vid (?P<court>(([A-ZÅÄÖ][a-zåäö]+ )+)'
+                   '(TR|tingsrätt)) om ',
+             'method': 'search',
+             'type': ('instans',),
+             'court': ('HDO', 'HGO', 'HNN', 'HON', 'HSB', 'HSV', 'HVS')},
+            {'name': 'riksåkl',
+             're': 'Riksåklagaren väckte i (?P<court>HD|HovR:n (över|för) '
+                   '([A-ZÅÄÖ][a-zåäö]+ )+|[A-ZÅÄÖ][a-zåäö]+ HovR) åtal',
+                   'method': 'match',
+             'type': ('instans',),
+             'court': ('HDO', 'HGO', 'HNN', 'HON', 'HSB', 'HSV', 'HVS')},
+            {'name': 'tr-överkl',
+             're': '(?P<karande>[\w\.\(\)\- ]+) (fullföljde talan|'
+                   'överklagade) (|TR:ns dom.*)i (?P<court>HD|(HovR:n|hovrätten) '
+                   '(över|för) (Skåne och Blekinge|Västra Sverige|Nedre '
+                   'Norrland|Övre Norrland)|(Svea|Göta) (HovR|hovrätt))',
+                   'method': 'match',
+             'type': ('instans',),
+             'court': ('HDO', 'HGO', 'HNN', 'HON', 'HSB', 'HSV', 'HVS')},
+            {'name': 'fullfölj-överkl',
+             're': '(?P<karanden>[\w\.\(\)\- ]+) fullföljde sin talan$',
+             'method': 'match',
+             'type': ('instans',)},
+            {'name': 'myndighetsansökan',
+             're': 'I (ansökan|en ansökan|besvär) hos (?P<court>\w+) '
+                   '(om förhandsbesked|yrkade)',
+             'method': 'match',
+             'type': ('instans',),
+             'court': ('REG', 'HFD')},
+            {'name': 'myndighetsbeslut',
+             're': '(?P<court>\w+) beslutade (därefter |)(den (?P<date>\d+ \w+ \d+)|'
+                   '[\w ]+) att',
+             'method': 'match',
+             'type': ('instans',),
+             'court': ('REG', 'HFD', 'MIG')},
+            {'name': 'myndighetsbeslut2',
+             're': '(?P<court>[\w ]+) (bedömde|vägrade) i (bistånds|)beslut'
+                   ' (|den (?P<date>\d+ \w+ \d+))',
+             'method': 'match',
+             'type': ('instans',),
+             'court': ('REG', 'HFD')},
+            {'name': 'hd-revision',
+             're': '(?P<karanden>[\w\.\(\)\- ]+) sökte revision och yrkade(,'
+                   'i första hand,|,|) att (?P<court>HD|)',
+             'method': 'match',
+             'type': ('instans',),
+             'court': ('HDO',)},
+            {'name': 'hd-revision2',
+             're': '(?P<karanden>[\w\.\(\)\- ]+) sökte revision$',
+             'method': 'match',
+             'type': ('instans',),
+             'court': 'HDO'},
+            {'name': 'hd-revision3',
+             're': '(?P<karanden>[\w\.\(\)\- ]+) sökte revision och framställde samma yrkanden',
+             'method': 'match',
+             'type': ('instans',),
+             'court': 'HDO'},
+            {'name': 'överklag-bifall',
+             're': '(?P<karanden>[\w\.\(\)\- ]+) (anförde besvär|'
+                   'överklagade) och yrkade bifall till (sin talan i '
+                   '(?P<prevcourt>HovR:n|TR:n)|)',
+             'method': 'match',
+             'type': ('instans',),
+             'court': ('HDO', 'HGO', 'HNN', 'HON', 'HSB', 'HSV', 'HVS')},
+            {'name': 'överklag-2',
+             're': '(?P<karanden>[\w\.\(\)\- ]+) överklagade '
+                   '(för egen del |)och yrkade (i själva saken |)att '
+                   '(?P<court>HD|HovR:n|kammarrätten|Regeringsrätten|)',
+             'method': 'match',
+             'type': ('instans',)},
+            {'name': 'överklag-3',
+             're': '(?P<karanden>[\w\.\(\)\- ]+) överklagade (?P<prevcourt>'
+                   '\w+)s (beslut|omprövningsbeslut|dom)( i ersättningsfrågan|) (hos|till) '
+                   '(?P<court>[\w\, ]+?)( och|, som|$)',
+             'method': 'match',
+             'type': ('instans',)},
+            {'name': 'överklag-4',
+             're': '(?!Även )(?P<karanden>[\w\.\(\)\- ]+) överklagade ((?P<prevcourt>\w+)s (beslut|dom)|beslutet|domen)( och|$)',
+             'method': 'match',
+             'type': ('instans',)},
+            {'name': 'hd-ansokan',
+             're': '(?P<karanden>[\w\.\(\)\- ]+) anhöll i ansökan som inkom '
+                   'till (?P<court>HD) d \d+ \w+ \d+',
+             'method': 'match',
+             'type': ('instans',),
+             'court': ('HDO',)},
+            {'name': 'hd-skrivelse',
+             're': '(?P<karanden>[\w\.\(\)\- ]+) anförde i en till '
+                   '(?P<court>HD) den \d+ \w+ \d+ ställd',
+             'method': 'match',
+             'type': ('instans',),
+             'court': ('HDO',)},
+            {'name': 'överklag-5',
+             're': '(?!Även )(?P<karanden>[\w\.\(\)\- ]+?) överklagade '
+                   '(?P<prevcourt>\w+)s (dom|domar)',
+             'method': 'match', 
+             'type': ('instans',)},
+            {'name': 'överklag-6',
+             're': '(?P<karanden>[\w\.\(\)\- ]+) överklagade domen till '
+                   '(?P<court>\w+)($| och yrkade)',
+             'method': 'match',
+             'type': ('instans',)},
+            {'name': 'myndighetsbeslut3',
+             're': 'I sitt beslut den (?P<date>\d+ \w+ \d+) avslog '
+                   '(?P<court>\w+)',
+             'method': 'match',
+             'type': ('instans',),
+             'court': ('REG', 'HFD', 'MIG')},
+            {'name': 'domskal',
+             're': "(Skäl|Domskäl|HovR:ns domskäl|Hovrättens domskäl)(\. |$)",
+             'method': 'match',
+             'type': ('domskal',)},
+            {'name': 'domskal-ref',
+             're': "(Tingsrätten|TR[:\.]n|Hovrätten|HD|Högsta förvaltningsdomstolen) \([^)]*\) (meddelade|anförde|fastställde|yttrade)",
+             'method': 'match',
+             'type': ('domskal',)},
+            {'name': 'domskal-dom-fr', # a simplified copy of fr-överkl
+             're': '(?P<court>(Förvaltningsrätten|'
+                   'Länsrätten|Kammarrätten) i \w+(| län)'
+                   '(|, migrationsdomstolen|, Migrationsöverdomstolen)|'
+                   'Högsta förvaltningsdomstolen) \((?P<date>\d+-\d+-\d+), '
+                   '(?P<constitution>[\w\.\- ,]+)\),? yttrade',
+             'method': 'match',
+             'type': ('domskal',)},
+            {'name': 'domslut-standalone',
+             're': '(Domslut|(?P<court>Hovrätten|HD|Högsta förvaltningsdomstolen):?s avgörande)$',
+             'method': 'match',
+             'type': ('domslut',)},
+            {'name': 'domslut-start',
+             're': '(?P<court>[\w ]+(domstolen|rätten))s avgörande$',
+             'method': 'match',
+             'type': ('domslut',)}
+        )
+        court = basefile.split("/")[0]
+        matchers = defaultdict(list)
+        matchersname = defaultdict(list)
+        for pat in rx:
+            if 'court' not in pat or court in pat['court']:
+                for t in pat['type']:
+                    # print("Adding pattern %s to %s" %  (pat['name'], t))
+                    matchers[t].append(getattr(re.compile(pat['re'], re.UNICODE), pat['method']))
+                    matchersname[t].append(pat['name'])
+            
+            
+        def is_delmal(parser):
+            # should handle "IV" and "I (UM1001-08)"
+            strchunk = str(parser.reader.peek())
+            if (len(strchunk) < 20 and
+                not strchunk.endswith(".") and
+                strchunk.split(" ",1)[0] in ("I", "II", "III", "IV")):
+                return {'id': strchunk.split(" ",1)[0]}
+            else:
+                return {}
+                
+        def is_instans(parser, chunk=None):
+            """Determines whether the current position starts a new instans part of the report.
+
+            """
             chunk = parser.reader.peek()
             strchunk = str(chunk)
-            if strchunk in courtnames:
-                return True
-            # elif re.search('Migrationsverket överklagade migrationsdomstolens beslut', strchunk):
-            #     return True
+            res = analyze_instans(strchunk)
+            if res:
+                # in some referats, two subsequent chunks both matches
+                # analyze_instans, even though they refer to the _same_
+                # instans. Check to see if that is the case
+                
+                if (hasattr(parser, 'current_instans') and
+                    hasattr(parser.current_instans, 'court') and
+                    parser.current_instans.court and 
+                    is_equivalent_court(res['court'],
+                                        parser.current_instans.court)):
+                    return {}
+                else:
+                    return res
             elif parser._state_stack == ['body']:
                 # if we're at root level, *anything* starts a new instans
                 return True
             else:
-                for sentence in split_sentences(strchunk):
-                    for r in (instans_matchers):
-                        if r.match(sentence):
-                            return True
-            return False
+                return {}
+
+        def is_equivalent_court(newcourt, oldcourt):
+            # should handle a bunch of cases
+            # >>> is_equivalent_court("Göta Hovrätt", "HovR:n")
+            # True
+            # >>> is_equivalent_court("HD", "Högsta domstolen")
+            # True
+            # >>> is_equivalent_court("Linkäpings tingsrätt", "HovR:n")
+            # False
+            newcourt = canonicalize_court(newcourt)
+            oldcourt = canonicalize_court(oldcourt)
+            if newcourt == oldcourt:
+                return True
+            else:
+                return False
+
+        def canonicalize_court(courtname):
+            if isinstance(courtname, bool):
+                return courtname # we have no idea which court this
+                                 # is, only that it is A court
+            else:
+                return courtname.replace("HD", "Högsta domstolen").replace("HovR", "Hovrätt")
 
         def is_heading(parser):
             chunk = parser.reader.peek()
             strchunk = str(chunk)
+            if not strchunk.strip():
+                return False
             # a heading is reasonably short and does not end with a
             # period (or other sentence ending typography)
             return len(strchunk) < 140 and not (strchunk.endswith(".") or
@@ -1339,19 +1616,18 @@ class DV(SwedishLegalSource):
             return strchunk == "Målet avgjordes efter föredragning."
             
         def is_dom(parser):
-            res = is_domskal(parser)
+            strchunk = str(parser.reader.peek())
+            res = analyze_dom(strchunk)
             return res
 
         def is_domskal(parser):
             strchunk = str(parser.reader.peek())
-            if strchunk == "Skäl":
-                return True
-            if re.match("(Tingsrätten|Hovrätten|HD|Högsta förvaltningsdomstolen) \([^)]*\) (meddelade|anförde|fastställde|yttrade)", strchunk):
-                return True
+            res = analyze_domskal(strchunk)
+            return res
 
         def is_domslut(parser):
             strchunk = str(parser.reader.peek())
-            return strchunk in ("Domslut", "Hovrättens avgörande", "HD:s avgörande", "Högsta förvaltningsdomstolens avgörande")
+            return analyze_domslut(strchunk)
             
         def is_skiljaktig(parser):
             strchunk = str(parser.reader.peek())
@@ -1368,6 +1644,140 @@ class DV(SwedishLegalSource):
         def is_paragraph(parser):
             return True
 
+        # Turns out, this is really difficult if you consider
+        # abbreviations.  This particular heuristic splits on periods
+        # only (Sentences ending with ? or ! are rare in legal text)
+        # and only if followed by a capital letter (ie next sentence)
+        # or EOF. Does not handle things like "Mr. Smith" but that's
+        # also rare in swedish text. However, needs to handle "Linder,
+        # Erliksson, referent, och C. Bohlin", so another heuristic is
+        # that the sentence before can't end in a single capital
+        # letter.
+        def split_sentences(text):
+            text = util.normalize_space(text)
+            text += " "
+            return [x.strip() for x in re.split("(?<![A-ZÅÄÖ])\. (?=[A-ZÅÄÖ]|$)", text)]
+
+        def analyze_instans(strchunk):
+            res = {}
+            # Case 1: Fixed headings indicating new instance
+            if re_courtname.match(strchunk):
+                res['court'] = strchunk
+                res['complete'] = True
+                return res
+            else:
+                # case 2: common wording patterns indicating new
+                # instance
+                # "H.T. sökte revision och yrkade att HD måtte fastställa" =>
+                # <Instans name="HD"><str>H.T. sökte revision och yrkade att <PredicateSubject rel="HD" uri="http://lagen.nu/org/2008/hogsta-domstolen/">HD>/PredicateSubject>
+                # <div class="instans" rel="dc:creator" href="..."
+
+                
+                # the needed sentence is usually 1st or 2nd
+                # (occassionally 3rd), searching more yields risk of
+                # false positives.
+                
+                for sentence in split_sentences(strchunk)[:3]:
+                    for (r, rname) in zip(matchers['instans'], matchersname['instans']):
+                        m = r(sentence)
+                        if m:
+                            # print("analyze_instans: Matcher '%s' succeeded on '%s'" % (rname, sentence))
+                            mg = m.groupdict()
+                            if 'court' in mg and mg['court']:
+                                res['court'] = mg['court'].strip()
+                            else:
+                                res['court'] = True
+                            #if 'prevcourt' in mg and mg['prevcourt']:
+                            #    res['prevcourt'] = mg['prevcourt'].strip()
+                            if 'date' in mg and mg['date']:
+                                parse_swed = DV().parse_swedish_date
+                                parse_iso = DV().parse_iso_date
+                                try:
+                                    res['date'] = parse_swed(mg['date'])
+                                except ValueError:
+                                    res['date'] = parse_iso(mg['date'])
+                            return res
+            return res
+
+        def analyze_dom(strchunk):
+            res = {}
+            # special case for "referat" who are nothing but straight verdict documents.
+            if strchunk.strip() == "SAKEN":
+                return {'court': True}
+            # probably only the 1st sentence is interesting
+            for sentence in split_sentences(strchunk)[:1]:
+                for (r, rname) in zip(matchers['dom'], matchersname['dom']):
+                    m = r(sentence)
+                    if m:
+                        # print("analyze_dom: Matcher '%s' succeeded on '%s': %r" % (rname, sentence,m.groupdict()))
+                        mg = m.groupdict()
+                        if 'court' in mg and mg['court']:
+                            res['court'] = mg['court'].strip()
+                        if 'date' in mg and mg['date']:
+                            parse_swed = DV().parse_swedish_date
+                            parse_iso = DV().parse_iso_date
+                            try:
+                                res['date'] = parse_swed(mg['date'])
+                            except ValueError:
+                                res['date'] = parse_iso(mg['date'])
+                        #if 'constitution' in mg:
+                        #    res['constitution'] = parse_constitution(mg['constitution'])
+                        return res
+            return res
+
+        def analyze_domskal(strchunk):
+            res = {}
+            # only 1st sentence
+            for sentence in split_sentences(strchunk)[:1]:
+                for (r, rname) in zip(matchers['domskal'], matchersname['domskal']):
+                    m = r(sentence)
+                    if m:
+                        # print("analyze_domskal: Matcher '%s' succeeded on '%s'" % (rname, sentence))
+                        res['domskal'] = True
+                        return res
+            return res
+            
+        def analyze_domslut(strchunk):
+            res = {}
+            # only 1st sentence
+            for sentence in split_sentences(strchunk)[:1]:
+                for (r, rname) in zip(matchers['domslut'], matchersname['domslut']):
+                    m = r(sentence)
+                    if m:
+                        # print("analyze_domslut: Matcher '%s' succeeded on '%s'" % (rname, sentence))
+                        mg = m.groupdict()
+                        if 'court' in mg and mg['court']:
+                            res['court'] = mg['court'].strip()
+                        else:
+                            res['court'] = True
+                        return res
+            return res
+
+        def parse_constitution(strchunk):
+            res = []
+            for thing in strchunk.split(", "):
+                if thing in ("ordförande", "referent"):
+                    res[-1]['position'] = thing
+                elif thing.startswith("ordförande ") or thing.startswith("ordf "):
+                    pos, name = thing.split(" ", 1)
+                    if name.startswith("t f lagmannen"):
+                        title, name = name[:13], name[14:]
+                    elif name.startswith("hovrättsrådet"):
+                        title, name = name[:13], name[14:]
+                    else:
+                        title = None
+                    r = {'name': name,
+                         'position': pos,
+                         'title': title}
+                    if 'title' not in r:
+                        del r['title']
+                    res.append(r)
+                else:
+                    name = thing
+                    res.append({'name': name})
+            # also filter nulls
+            return res
+
         # FIXME: This and make_paragraph ought to be expressed as
         # generic functions in the ferenda.fsmparser module
         @newstate('body')
@@ -1383,29 +1793,32 @@ class DV(SwedishLegalSource):
         def make_instans(parser):
             chunk = parser.reader.next()
             strchunk = str(chunk)
-            if strchunk in courtnames:
-                i = Instans(court=strchunk)
-            else:
-                i = False
-                for sentence in split_sentences(strchunk):
-                    for r in (instans_matchers):
-                        m = r.match(sentence)
-                        if m:
-                            if 'court' in m.groupdict():
-                                i = Instans([chunk], court=m.groupdict()['court'])
-                            break
-                    if i:
-                        break
-                if not i:
-                    i = Instans([chunk])
-                    
-            return parser.make_children(i)
+            idata = analyze_instans(strchunk)
+            # idata may be {} if the special toplevel rule in is_instans applied
 
-        def split_sentences(text):
-            text = util.normalize_space(text)
-            text += " "
-            return text.split(". ")
-                
+            if 'complete' in idata:
+                i = Instans(court=strchunk)
+                court = strchunk
+            elif 'court' in idata and idata['court'] is not True:
+                i = Instans([chunk], court=idata['court'])
+                court = idata['court']
+            else:
+                i = Instans([chunk], court=None)
+                court = ""
+
+            # FIXME: ugly hack, but is_instans needs access to this
+            # object...
+            parser.current_instans = i
+            res = parser.make_children(i)
+
+            # might need to adjust the court parameter based on better
+            # information in the parse tree
+            for child in res:
+                if isinstance(child, Dom) and hasattr(child, 'court'):
+                    # longer courtnames are better
+                    if len(str(child.court)) > len(court):
+                        i.court = child.court
+            return res
 
         def make_heading(parser):
             # a heading is by definition a single line
@@ -1419,7 +1832,12 @@ class DV(SwedishLegalSource):
 
         @newstate('dom')
         def make_dom(parser):
-            d = Dom(avgorandedatum=None, malnr=None)
+            # fix date, constitution etc. Note peek() instead of read() --
+            # this is so is_domskal can have a chance at the same data
+            ddata = analyze_dom(str(parser.reader.peek()))
+            d = Dom(avgorandedatum=ddata.get('date'),
+                    court=ddata.get('court'),
+                    malnr=ddata.get('caseid'))
             return parser.make_children(d)
 
         @newstate('domskal')
@@ -1453,6 +1871,8 @@ class DV(SwedishLegalSource):
         def make_paragraph(parser):
             chunk = parser.reader.next()
             strchunk = str(chunk)
+            if not strchunk.strip(): # filter out empty things
+                return None
             if ordered(strchunk):
                 # FIXME: Cut the ordinal from chunk somehow
                 if isinstance(chunk, Paragraph):
@@ -1493,7 +1913,13 @@ class DV(SwedishLegalSource):
                           is_tillagg,
                           is_heading,
                           is_paragraph)
-        commonstates = ("body", "delmal", "instans", "domskal", "domslut", "betankande", "skiljaktig", "tillagg")
+        # "dom" should not really be a commonstate (it should
+        # theoretically alwawys be followed by domskal or maybe
+        # domslut) but in some cases, the domskal merges with the
+        # start of dom in such a way that we can't transition into
+        # domskal right away (eg HovR:s dom in HDO/B10-86_1 and prob
+        # countless others)
+        commonstates = ("body", "delmal", "instans", "dom", "domskal", "domslut", "betankande", "skiljaktig", "tillagg")
         
         p.set_transitions({
             ("body", is_delmal): (make_delmal, "delmal"),
@@ -1503,8 +1929,8 @@ class DV(SwedishLegalSource):
             ("delmal", is_delmal): (False, None),
             ("delmal", is_endmeta): (False, None),
             ("instans", is_betankande): (make_betankande, "betankande"),
-            ("instans", is_dom): (make_dom, "dom"),
             ("instans", is_domslut): (make_domslut, "domslut"),
+            ("instans", is_dom): (make_dom, "dom"),
             ("instans", is_instans): (False, None),
             ("instans", is_skiljaktig): (make_skiljaktig, "skiljaktig"),
             ("instans", is_tillagg): (make_tillagg, "tillagg"),
@@ -1528,6 +1954,7 @@ class DV(SwedishLegalSource):
             ("domskal", is_delmal): (False, None), 
             ("domskal", is_domslut): (False, None),
             ("domskal", is_instans): (False, None), 
+            ("domslut", is_delmal): (False, None), 
             ("domslut", is_instans): (False, None),
             ("domslut", is_domskal): (False, None),
             ("domslut", is_skiljaktig): (False, None), 
@@ -1548,13 +1975,20 @@ class DV(SwedishLegalSource):
         p.initial_state = "body"
         p.initial_constructor = make_body
         p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
-        return p.parse(paras)
-
+        return p
 
     def _simplify_ooxml(self, filename, pretty_print=True):
         # simplify the horrendous mess that is OOXML through simplify-ooxml.xsl
         with open(filename, "rb") as fp:
-            intree = etree.parse(fp)
+            data = fp.read()
+            # in some rare cases, the value \xc2\x81 (utf-8 for
+            # control char) is used where "Å" (\xc3\x85) should be
+            # used.
+            if b"\xc2\x81" in data:
+                self.log.warning("Working around control char x81 in text data")
+                data = data.replace(b"\xc2\x81", b"\xc3\x85")
+            intree = etree.parse(BytesIO(data))
+            # intree = etree.parse(fp)
         fp = pkg_resources.resource_stream('ferenda', "res/xsl/simplify-ooxml.xsl")
         transform = etree.XSLT(etree.parse(fp))
         fp.close()
@@ -1591,7 +2025,88 @@ class DV(SwedishLegalSource):
                     current_r = r
         return soup
     
+    def facets(self):
+        # NOTE: it's important that RPUBL.rattsfallspublikation is the
+        # first facet (toc_pagesets depend on it)
+        def myselector(row, binding, resource_graph=None):
+            return (util.uri_leaf(row['rpubl_rattsfallspublikation']),
+                    row['rpubl_arsutgava'])
             
+        return [Facet(RPUBL.rattsfallspublikation,
+                      indexingtype=fulltextindex.Resource(),
+                      use_for_toc=True,
+                      #selector=Facet.resourcelabel,
+                      selector=myselector,
+                      key=Facet.resourcelabel,
+                      identificator=Facet.term,
+                      dimension_type='ref'),
+                Facet(RDF.type,
+                      use_for_toc=False),
+                Facet(RPUBL.referatrubrik,
+                      indexingtype=fulltextindex.Text(boost=4),
+                      toplevel_only=True,
+                      use_for_toc=False),
+                Facet(DCTERMS.identifier,
+                      use_for_toc=False),
+                Facet(RPUBL.arsutgava,
+                      indexingtype=fulltextindex.Label(),
+                      use_for_toc=False,
+                      selector=Facet.defaultselector,
+                      key=Facet.defaultselector,
+                      dimension_type='value')
+                ]
+
+    def toc_pagesets(self, data, facets):
+        # our primary facet is RPUBL.rattsfallspublikation, but we
+        # need to create one pageset for each value thereof.
+        pagesetdict = {}
+        selector_values = {}
+        facet = facets[0]  # should be the RPUBL.rattsfallspublikation one
+        for row in data:
+            pagesetid = row['rpubl_rattsfallspublikation']
+            if pagesetid not in pagesetdict:
+                label = Facet.resourcelabel(row, 'rpubl_rattsfallspublikation',
+                                            self.commondata)
+                pagesetdict[pagesetid] = TocPageset(label=label,
+                                                    predicate=pagesetid,
+                                                    pages=[])
+            selected = row['rpubl_arsutgava']
+            selector_values[(pagesetid, selected)] = True
+        
+        for (pagesetid, value) in sorted(list(selector_values.keys())):
+            pageset = pagesetdict[pagesetid]
+            pageset.pages.append(TocPage(linktext=value,
+                                         title="%s från %s" % (pageset.label, value),
+                                         binding=util.uri_leaf(pagesetid),
+                                         value=value))
+        return list(pagesetdict.values())
+
+    def toc_select_for_pages(self, data, pagesets, facets):
+        facet = facets[0]
+        res = {}
+        documents = {}
+        for row in data:
+            key = facet.selector(row, None)
+            if key not in documents:
+                documents[key] = []
+            documents[key].append(row)
+        pagesetdict = {}
+        for pageset in pagesets:
+            pagesetdict[util.uri_leaf(pageset.predicate)] = pageset
+        for (binding, value) in sorted(documents.keys()):
+            pageset = pagesetdict[binding]
+            s = sorted(documents[(binding, value)])
+            res[(binding, value)] = [self.toc_item(binding, row)
+                                     for row in s]
+        return res
+
+    def toc_item(self, binding, row):
+        r = [Strong([Link(row['dcterms_identifier'],
+                          uri=row['uri'])])]
+        if 'rpubl_referatrubrik' in row:
+            r.append(row['rpubl_referatrubrik'])
+        return r
+        
     # gonna need this for news_criteria()
     pubs = {'http://rinfo.lagrummet.se/ref/rff/nja': 'Högsta domstolen',
             'http://rinfo.lagrummet.se/ref/rff/rh': 'Hovrätterna',
@@ -1604,3 +2119,4 @@ class DV(SwedishLegalSource):
             'http://rinfo.lagrummet.se/ref/rff/mig': 'Migrationsöverdomstolen',
             'http://rinfo.lagrummet.se/ref/rff/mod': 'Miljööverdomstolen'
             }
+

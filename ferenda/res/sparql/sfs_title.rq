@@ -1,0 +1,2 @@
+PREFIX dcterms:<http://purl.org/dc/terms/>
+SELECT ?title WHERE {<%(uri)s> dcterms:title ?title }

@@ -1,0 +1,15 @@
+PREFIX dcterms:<http://purl.org/dc/terms/>
+PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rpubl:<http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
+
+SELECT DISTINCT ?uri ?baseuri ?label
+WHERE {
+    GRAPH <%(context)s> {
+       { ?uri dcterms:subject <%(uri)s> ;
+              dcterms:isPartOf{0,4} ?baseuri .
+         ?baseuri dcterms:title ?label .
+	 }
+    }
+}
+
+

@@ -8,6 +8,7 @@ import re
 
 from rdflib import URIRef, RDF, Namespace
 from six import text_type as str
+from layeredconfig import LayeredConfig
 
 from ferenda import (DocumentRepository, DocumentStore, FSMParser,
                      CitationParser)
@@ -158,9 +159,8 @@ class SwedishLegalSource(DocumentRepository):
         super(SwedishLegalSource, self).__init__(config, **kwargs)
         if type(self) != SwedishLegalSource:
             assert self.alias != "swedishlegalsource", "Subclasses must override self.alias!"
-        if not hasattr(self.config, 'urlpath'):
-            self.config.urlpath = "res/%s/" % self.alias
-        
+        if not 'urlpath' in self.config:
+            LayeredConfig.set(self.config, 'urlpath', "res/%s/" % self.alias)
 
     def get_default_options(self):
         opts = super(SwedishLegalSource, self).get_default_options()

@@ -87,10 +87,10 @@ class MediaWiki(DocumentRepository):
 
         if self.config.mediawikidump:
             resp = requests.get(self.config.mediawikidump)
-            with self.store._open('dump', 'downloaded', '.xml', mode="wb") as fp:
+            xmldumppath = self.store.path('dump', 'downloaded', '.xml')
+            with self.store._open(xmldumppath, mode="wb") as fp:
                 fp.write(resp.content)
             # xml = etree.parse(resp.content)
-            xmldumppath = self.store.path('dump', 'downloaded', '.xml')
             xml = etree.parse(xmldumppath)
         else:
             raise ConfigurationError("config.mediawikidump not set")
@@ -185,9 +185,14 @@ class MediaWiki(DocumentRepository):
         body = xhtmltree.getchildren()[0]
         # render_xhtml_tree will add @about
         if toplevel_property:
-            # shouldn't add these in SFS mode
+            # shouldn't add these in postprocess_commentary mode
             body.set("property", "dcterms:description")
             body.set("datatype", "rdf:XMLLiteral")
+            containerdiv = etree.Element("div")
+            for child in body:
+                body.remove(child)
+                containerdiv.append(child)
+            body.append(containerdiv)
         # find any links that indicate that this concept has the
         # dcterms:subject of something (typically indicated by
         # Category tags)
@@ -247,6 +252,18 @@ class MediaWiki(DocumentRepository):
 
 
 class WikiSemantics(Semantics):
+
+    def document(self, ast):
+        html = super(WikiSemantics, self).document(ast)
+        # remove the newly-created toc. If postprocess_toc was a
+        # Semantics method we could just override this in this
+        # superclass, now we'll have to rip it out after the fact.
+        toc = html.find(".//div[@id='toc']")
+        if toc is not None:
+            toc.getparent().remove(toc)
+        return html
+            
+    
     def internal_link(self, ast):
         el = super(WikiSemantics, self).internal_link(ast)
         target = "".join(ast.target).strip()
@@ -264,6 +281,11 @@ class WikiSettings(Settings):
 
 class WikiPreprocessor(Preprocessor):
     def get_template(self, namespace, pagename):
+        # FIXME: This is a special hack for supporting
+        # {{DISPLAYTITLE}} (not a proper template? Check if smc.mw is
+        # supposed to have support for wgAllowDisplayTitle
+        if pagename.startswith("DISPLAYTITLE:"):
+            pagename = "DISPLAYTITLE"
         if namespace.prefix != "template":
             return None
         tmpl = self.settings.templates.get((namespace.prefix, pagename), None)
