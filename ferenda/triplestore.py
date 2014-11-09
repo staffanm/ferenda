@@ -658,11 +658,13 @@ class FusekiStore(RemoteStore):
     re_select_query = re.compile(r"\s+WHERE\s+{", flags=re.MULTILINE)
 
     def select(self, query, format="sparql", uniongraph=True):
-        if not self.re_fromgraph.search(query) and uniongraph:
+        if (not self.re_fromgraph.search(query) and uniongraph and
+            self.re_select_query.search(query)):
             query = self.re_select_query.sub(" WHERE { GRAPH <urn:x-arq:UnionGraph> {",
                            query)
             # add an extra } after the last }x
             qparts = query.rsplit("}",1)
+            assert len(qparts) == 2, "Failed to patch the query %s" % query
             query = "%s } } %s" % (qparts[0], qparts[1])
             
         return super(FusekiStore, self).select(query, format)

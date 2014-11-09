@@ -18,6 +18,9 @@ from layeredconfig import LayeredConfig, Defaults
 from ferenda import DocumentRepository
 from ferenda import util, errors
 
+# temporary import -- see FIXME comment in _make_files
+from ferenda.sources.legal.se import SFS
+
 class Resources(object):
     """Creates and manages various assets/resources needed for web serving.
 
@@ -181,6 +184,12 @@ class Resources(object):
                 urls.append(self._process_file(f, buf, filedir, "ferenda.ini"))
                 processed.add(f)
         for repo in self.repos:
+            # FIXME: create a more generic way of optionally
+            # signalling to a repo that "Hey, now it's time to create
+            # your resources if you can"
+            if isinstance(repo, SFS) and option == "imgfiles":
+                self.log.info("calling into SFS._makeimages()")
+                LayeredConfig.set(repo.config, 'imgfiles', repo._makeimages())
             for f in getattr(repo.config, option):
                 if f in processed:
                     continue

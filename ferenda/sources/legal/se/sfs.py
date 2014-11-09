@@ -393,10 +393,6 @@ class SFS(Trips):
         for logname in ('paragraf', 'tabell', 'numlist', 'rubrik'):
             self.trace[logname] = logging.getLogger('%s.%s' %
                                                     (self.alias, logname))
-            # NOTE: the self.config used here will not be properly
-            # initialized with values from cmdline/inifile because of
-            # a bug in manager.py in ferenda 0.2.0. This is probably
-            # fixed in 0.2.1.dev.
             if 'trace' in self.config:
                 if logname in self.config.trace:
                     loglevel = getattr(self.config.trace, logname)
@@ -408,15 +404,7 @@ class SFS(Trips):
             else:
                 # shut up logger
                 self.trace[logname].propagate = False
-        # NOTE: this runs the makeimages function every time a SFS
-        # repo is created, not just when self.config.imgfiles is
-        # accessed. But with caching maybe that's ok?
-        #
-        # use set() instead of __setattr__ to avoid making a mess of
-        # the cofig file
-        #
-        # self.config.imgfiles = self._makeimages()
-        LayeredConfig.set(self.config, 'imgfiles', self._makeimages())
+
     def _makeimages(self):
         # FIXME: make sure a suitable font exists
         font = "Helvetica" 
