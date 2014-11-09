@@ -4,7 +4,7 @@
       <str>Är brott som avses i </str>
       <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P1S1">1 § första stycket</LinkSubject>
       <str> att anse som grovt, skall för </str>
-      <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Grovt_narkotikabrott">grovt narkotikabrott</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Grovt_narkotikabrott">grovt narkotikabrott</LinkSubject>
       <str> dömas till fängelse, lägst två år och högst tio år</str>
     </Stycke>
   </Paragraf>

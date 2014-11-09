@@ -2,7 +2,7 @@
   <Paragraf id="P4" ordinal="4">
     <Stycke id="P4S1">
       <str>Den som obehörigen skiljer ett barn under femton år från någon som har vårdnaden om barnet döms för </str>
-      <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Egenmäktighet_med_barn">egenmäktighet med barn</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Egenmäktighet_med_barn">egenmäktighet med barn</LinkSubject>
       <str> till böter eller fängelse i högst ett år</str>
     </Stycke>
   </Paragraf>

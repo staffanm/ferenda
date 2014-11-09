@@ -2,7 +2,7 @@
   <Paragraf id="P2" ordinal="2">
     <Stycke id="P2S1">
       <str>Med </str>
-      <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Ren_förmögenhetsskada">ren förmögenhetsskada</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Ren_förmögenhetsskada">ren förmögenhetsskada</LinkSubject>
       <str> förstås i denna lag sådan ekonomisk skada som uppkommer utan samband med att någon lider person- eller sakskada.</str>
     </Stycke>
   </Paragraf>

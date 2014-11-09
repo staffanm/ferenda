@@ -3,10 +3,10 @@
     <Stycke id="P2S1">
       <str>I denna förordning avses med</str>
     </Stycke><Stycke id="P2S2">
-      <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Alkolås">alkolås</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Alkolås">alkolås</LinkSubject>
       <str>: en sådan anordning i ett fordon som hindrar att fordonet startas och körs av förare som har alkohol i utandningsluften,</str>
     </Stycke><Stycke id="P2S3">
-      <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Antisladdsystem">antisladdsystem</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Antisladdsystem">antisladdsystem</LinkSubject>
       <str>: ett tekniskt stödsystem som minskar risken för sladd,</str>
     </Stycke>
   </Paragraf>

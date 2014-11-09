@@ -2,7 +2,7 @@
   <Paragraf id="P10" ordinal="10">
     <Stycke id="P10S1">
       <str>Inteckning får på ansökan av fastighetsägaren dödas (</str>
-      <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Dödning">dödning</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Dödning">dödning</LinkSubject>
       <str>). För dödning av gemensam inteckning kräves...</str>
     </Stycke>
   </Paragraf>

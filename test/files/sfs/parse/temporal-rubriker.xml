@@ -4,14 +4,14 @@
   <Paragraf id="P5" ordinal="5" upphor="datetime.datetime(2008, 3, 1, 0, 0)">
     <Stycke id="P5S1">
       <str>Anmälan för registrering görs skriftligen hos Bolagsverket (</str>
-      <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Registreringsmyndigheten">registreringsmyndigheten</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Registreringsmyndigheten">registreringsmyndigheten</LinkSubject>
       <str>).</str>
     </Stycke>
   </Paragraf>
   <Paragraf id="P5" ikrafttrader="datetime.datetime(2008, 3, 1, 0, 0)" ordinal="5">
     <Stycke id="P5S1">
       <str>En anmälan för registrering ska göras skriftligen hos Bolagsverket (</str>
-      <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Registreringsmyndigheten">registreringsmyndigheten</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Registreringsmyndigheten">registreringsmyndigheten</LinkSubject>
       <str>). En sådan anmälan, eller en ansökan enligt den lagen som ska handläggas av registreringsmyndigheten, får överföras elektroniskt till registreringsmyndigheten.</str>
     </Stycke>
   </Paragraf>

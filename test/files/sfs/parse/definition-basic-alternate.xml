@@ -3,7 +3,7 @@
     <Stycke id="P7S1">
       <str>I lagen avses med</str>
     </Stycke><Stycke id="P7S2">
-      <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Abonnent">abonnent</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Abonnent">abonnent</LinkSubject>
       <str>: den som har ingått avtal med en leverantör av allmänt tillgängliga elektroniska kommunikationstjänster om tillhandahållande av sådana tjänster</str>
     </Stycke>
   </Paragraf>

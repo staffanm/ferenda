@@ -2,11 +2,11 @@
   <Paragraf id="P4" ordinal="4">
     <Stycke id="P4S1">
       <str>Med </str>
-      <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Detaljhandel">detaljhandel</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Detaljhandel">detaljhandel</LinkSubject>
       <str> avses i denna lag försäljning av läkemedel till konsument.</str>
     </Stycke><Stycke id="P4S2">
       <str>Med </str>
-      <LinkSubject predicate="dcterms:subject" uri="http://lagen.nu/concept/Nikotinläkemedel">nikotinläkemedel</LinkSubject>
+      <LinkSubject predicate="dcterms:subject" uri="https://lagen.nu/concept/Nikotinläkemedel">nikotinläkemedel</LinkSubject>
       <str> avses i denna lag receptfria läkemedel som inte har förskrivits och vars enda aktiva substans är nikotin.</str>
     </Stycke>
   </Paragraf>
