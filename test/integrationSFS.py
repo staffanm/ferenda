@@ -15,7 +15,7 @@ from ferenda import TextReader
 
 
 class Parse(unittest.TestCase):
-    
+
     def parametric_test(self, filename):
         self.maxDiff = None
         p = SFS()
@@ -27,7 +27,6 @@ class Parse(unittest.TestCase):
         b = p.makeForfattning()
         elements = p._count_elements(b)
         if 'K' in elements and elements['K'] > 1 and elements['P1'] < 2:
-            # should be "skipfragments = ['A','K']", but this breaks test cases
             skipfragments = ['A', 'K']
         else:
             skipfragments = ['A']

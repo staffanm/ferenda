@@ -626,8 +626,9 @@ class SwedishCitationParser(CitationParser):
 
         # basic normalization without stripping
         string = string.replace("\r\n", " ").replace("\n", " ")
-        # unfiltered = self._legalrefparser.parse(string, baseuri=self._currenturl, predicate=predicate)
-        unfiltered = self._legalrefparser.parse(string, baseuri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K9P9S9P9", predicate=predicate)
+        unfiltered = self._legalrefparser.parse(string,
+                                                baseuri=self._currenturl,
+                                                predicate=predicate)
         # remove those references that we cannot fully resolve (should
         # be an option in LegalRef, but...
         filtered = []
