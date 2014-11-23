@@ -22,7 +22,7 @@ install_requires = ['beautifulsoup4 >= 4.3.0',
                     'six >= 1.4.0',
                     'docutils >= 0.11',
                     'grako >= 3.4.0',
-                    'layeredconfig >= 0.1.0']
+                    'layeredconfig >= 0.2.0']
 
 if sys.version_info < (3,0,0):
     # not py3 compatible, but not essential either

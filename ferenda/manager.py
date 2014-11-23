@@ -20,6 +20,7 @@ from io import StringIO, BytesIO
 from multiprocessing.managers import SyncManager
 from time import sleep
 from wsgiref.simple_server import make_server
+import argparse
 import inspect
 import logging
 from logging import getLogger as getlog
@@ -42,7 +43,8 @@ input = six.moves.input
 # 3rd party
 import requests
 import requests.exceptions
-from layeredconfig import LayeredConfig, Defaults, INIFile, Commandline
+from layeredconfig import (LayeredConfig, Defaults, INIFile, Commandline,
+                           Environment)
 
 # my modules
 from ferenda import DocumentRepository  # needed for a doctest
@@ -313,12 +315,11 @@ def run(argv, subcall=False):
                  prefixed with ``--``, e.g. ``--loglevel=INFO``, or
                  positional arguments to the specified action).
     """
-    # maybe _load_config is the place to set up all parameter default
-    # values? 
     config = _load_config(_find_config_file(), argv)
-    # if logfile is set to True, autogenerate logfile name from
-    # current datetime. Otherwise assume logfile is set to the desired
-    # file name of the log
+    classname = config.alias
+    # if logfile is set to True (the default), autogenerate logfile
+    # name from current datetime. Otherwise assume logfile is set to
+    # the desired file name of the log
     log = setup_logger(level=config.loglevel, filename=None)
     if config.logfile:
         if isinstance(config.logfile, bool):
@@ -337,71 +338,70 @@ def run(argv, subcall=False):
         if len(argv) < 1:
             _print_usage()  # also lists enabled modules
         else:
-            # _filter_argv("ecj", "parse", "62008J0034", "--force=True", "--frobnicate")
-            #    -> ("ecj", "parse", ["62008J0034"])
-            # _filter_argv("ecj", "--frobnicate") -> ("ecj", None, [])
-            (classname, action, args) = _filter_argv(argv)
-            if action == 'enable':
+            if config.action == 'enable':
                 try:
                     return enable(classname)
                 except (ImportError, ValueError) as e:
                     log.error(str(e))
                     return None
-            elif action == 'runserver':
+
+            elif config.action == 'runserver':
                 args = _setup_runserver_args(config, _find_config_file())
                 # Note: the actual runserver method never returns
                 return runserver(**args)
-            elif action == 'buildclient':
-                # repoclasses = _classes_from_classname(enabled, classname)
+
+            elif config.action == 'buildclient':
                 args = _setup_buildclient_args(config)
-                # repos = []
-                # for cls in repoclasses:
-                #     inst = _instantiate_class(cls, config, argv)
-                #     repos.append(inst)
-                # return runbuildclient(repos, **args)
                 return runbuildclient(**args)
-            elif action == 'buildqueue':
+
+            elif config.action == 'buildqueue':
                 args = _setup_buildqueue_args(config)
                 return runbuildqueue(**args)
-            elif action == 'makeresources':
+
+            elif config.action == 'makeresources':
                 repoclasses = _classes_from_classname(enabled, classname)
                 args = _setup_makeresources_args(config)
                 repos = []
                 for cls in repoclasses:
-                    # inst = _instantiate_class(cls, _find_config_file(), argv)
                     inst = _instantiate_class(cls, config, argv)
                     repos.append(inst)
                 return makeresources(repos, **args)
 
-            elif action == 'frontpage':
+            elif config.action == 'frontpage':
                 repoclasses = _classes_from_classname(enabled, classname)
                 args = _setup_frontpage_args(config, argv)
                 return frontpage(**args)
 
-            elif action == 'all':
+            elif config.action == 'all':
                 classnames = _setup_classnames(enabled, classname)
                 results = OrderedDict()
-                for action in ("download",
+                for config.action in ("download",
                                "parse", "relate", "makeresources",
                                "generate", "toc", "news", "frontpage"):
-                    if action in ("makeresources", "frontpage"):
+                    if config.action in ("makeresources", "frontpage"):
+                        # FIXME: This way of re-creating the argv so
+                        # that LayeredConfig can process it again in
+                        # the subcall to run is less than elegant. A
+                        # better way would perhaps be to pass the
+                        # existing config object to run as an optional
+                        # argument)
                         argscopy = list(args)
                         argscopy.extend(_filter_argv_options(argv))
-                        argscopy.insert(0, action)
+                        argscopy.insert(0, config.action)
                         argscopy.insert(0, "all")
-                        results[action] = run(argscopy, subcall=True)
+                        results[config.action] = run(argscopy, subcall=True)
                     else:
-                        results[action] = OrderedDict()
+                        results[config.action] = OrderedDict()
                         for classname in classnames:
                             alias = enabled_aliases[classname]
                             argscopy = list(args)
                             argscopy.extend(_filter_argv_options(argv))
-                            if (action in ("parse", "relate", "generate") and
+                            if (config.action in ("parse", "relate", "generate") and
                                     "--all" not in argscopy):
                                 argscopy.append("--all")
-                            argscopy.insert(0, action)
+                            argscopy.insert(0, config.action)
                             argscopy.insert(0, classname)
-                            results[action][alias] = run(argscopy, subcall=True)
+                            results[config.action][alias] = run(argscopy, subcall=True)
                 return results
             else:
                 if classname == "all":
@@ -412,8 +412,8 @@ def run(argv, subcall=False):
                         try:
                             ret.append(_run_class(enabled, argv_copy, config))
                         except Exception as e:
-                            (alias, command, args) = _filter_argv(argv_copy)
-                            log.error("%s %s failed: %s" % (command, alias, e))
+                            log.error("%s %s failed: %s" %
+                                      (config.action, config.alias, e))
                     return ret
                 else:
                     return _run_class(enabled, argv, config)
@@ -585,9 +585,24 @@ overridden by the config file or command line arguments."""
                 'serverport': 5555,
                 'authkey': b'secret'
     }
-    config = LayeredConfig(Defaults(defaults),
-                           INIFile(filename),
-                           Commandline(argv), cascade=True)
+    if argv:
+        parser = argparse.ArgumentParser()
+        parser.add_argument("alias", metavar="REPOSITORY",
+                            help="The repository to process (class or alias)")
+        parser.add_argument("action", metavar="ACTION",
+                            help="The action or command to perform")
+        parser.add_argument("arguments", metavar="ARGS", nargs="*",
+                            help="Any positional arguments to ACTION")
+        config = LayeredConfig(Defaults(defaults),
+                               INIFile(filename),
+                               Environment(prefix="FERENDA_"),
+                               Commandline(argv, parser=parser),
+                               cascade=True)
+    else:
+        config = LayeredConfig(Defaults(defaults),
+                               INIFile(filename),
+                               Environment(prefix="FERENDA_"),
+                               cascade=True)
     return config
 
 
@@ -689,39 +704,38 @@ def _run_class(enabled, argv, config):
 
     """
     log = getlog()
-    (alias, command, args) = _filter_argv(argv)
     with util.logtime(
         log.info, "%(alias)s %(command)s finished in %(elapsed).3f sec",
-        {'alias': alias,
-         'command': command}):
+        {'alias': config.alias,
+         'command': config.action}):
         _enabled_classes = dict(reversed(item) for item in enabled.items())
 
-        if alias not in enabled and alias not in _enabled_classes:
-            log.error("Class-or-alias %s not enabled" % alias)
+        if config.alias not in enabled and config.alias not in _enabled_classes:
+            log.error("Class-or-alias %s not enabled" % config.alias)
             return
-        if alias in argv:
-            argv.remove(alias)
+        if config.alias in argv:
+            argv.remove(config.alias)
         # ie a fully qualified classname was used
-        if alias in _enabled_classes:
-            classname = alias
+        if config.alias in _enabled_classes:
+            classname = config.alias
         else:
-            classname = enabled[alias]
+            classname = enabled[config.alias]
         cls = _load_class(classname)
         inst = _instantiate_class(cls, config, argv=argv)
         try:
-            clbl = getattr(inst, command)
+            clbl = getattr(inst, config.action)
             assert(callable(clbl))
         except:  # action was None or not a callable thing
-            if command:
+            if config.action:
                 log.error("%s is not a valid command for %s" %
-                          (command, classname))
+                          (config.action, classname))
             else:
                 log.error("No command given for %s" % classname)
             _print_class_usage(cls)
             return
 
         kwargs = {}
-        if command in ('relate', 'generate', 'toc', 'news'):
+        if config.action in ('relate', 'generate', 'toc', 'news'):
             # we need to provide the otherrepos parameter
             otherrepos = []
             for othercls in _classes_from_classname(enabled, 'all'):
@@ -730,12 +744,12 @@ def _run_class(enabled, argv, config):
             kwargs['otherrepos'] = otherrepos
 
         if 'all' in inst.config and inst.config.all == True:
-            iterable = inst.store.list_basefiles_for(command)
+            iterable = inst.store.list_basefiles_for(config.action)
             res = []
             # semi-magic handling
-            ret = cls.setup(command, inst.config)
+            ret = cls.setup(config.action, inst.config)
             if ret == False:
-                log.info("%s %s: Nothing to do!" % (alias, command))
+                log.info("%s %s: Nothing to do!" % (config.alias, config.action))
             else:
                 # Now we have a list of jobs in the iterable. They can
                 # be processed in four different ways:
@@ -744,23 +758,24 @@ def _run_class(enabled, argv, config):
                     # - start an internal jobqueue to which buildclients
                     #   connect, and send jobs to it (and read results
                     #   from a similar resultqueue)
-                    res = _queuejobs(iterable, inst, classname, command)
+                    res = _queuejobs(iterable, inst, classname, config.action)
                 elif LayeredConfig.get(config, 'buildqueue'):
                     # - send jobs to an external jobqueue process to which
                     #   buildclients connect (and read results from a
                     #   similar resultqueue)
-                    res = _queuejobs_to_queue(iterable, inst, classname, command)
+                    res = _queuejobs_to_queue(iterable, inst, classname, config.action)
                 elif inst.config.processes > 1:
                     # - start a number of processess which read from a
                     #   shared jobqueue, and send jobs to that queue (and
                     #   read results from a shared resultqueue)
-                    res = _parallelizejobs(iterable, inst, classname, command, config, argv)
+                    res = _parallelizejobs(iterable, inst, classname, config.action, config, argv)
                 else:
                     # - run the jobs, one by one, in the current process
-                    for basefile in inst.store.list_basefiles_for(command):
-                        res.append(_run_class_with_basefile(clbl, basefile, kwargs, command))
-                cls.teardown(command, inst.config)
+                    for basefile in inst.store.list_basefiles_for(config.action):
+                        res.append(_run_class_with_basefile(clbl, basefile, kwargs, config.action))
+                cls.teardown(config.action, inst.config)
         else:
+            args = config.arguments
             res = clbl(*args, **kwargs)
     return res
 
@@ -1275,34 +1290,6 @@ def _list_class_usage(cls):
             else:
                 res[attr.__name__] = "(Undocumented)"
     return res
-
-
-def _filter_argv(args):
-    """Given a command line, extract a tuple containing the
-    class-or-alias to use, the command to run, and the positional
-    arguments for that command. Strip away all --options.
-
-    :param args: A sys.argv style command line argument list.
-    :type args: list
-    :returns: (class-or-alias, command, [positional-arguments])
-    :rtype: tuple
-    
-    """
-    alias = None
-    command = None
-    commandargs = []
-    if isinstance(args[0], bytes):
-         # FIXME: duplicated code of LayeredConfig._load_commandline
-        args = [arg.decode("utf-8") for arg in args]
-    if len(args) > 0 and not args[0].startswith("--"):
-        alias = args[0]
-    if len(args) > 1 and not args[1].startswith("--"):
-        command = args[1]
-    if len(args) > 2:
-        for arg in args[2:]:
-            if not arg.startswith("--"):
-                commandargs.append(arg)
-    return (alias, command, commandargs)
 
 
 def _filter_argv_options(args):
