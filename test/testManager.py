@@ -138,14 +138,7 @@ class=testManager.staticmockclass2
         if os.path.exists("ferenda.ini"):
             os.remove("ferenda.ini")
         shutil.rmtree(self.tempdir)
-        
-    def test_filter_argv(self):
-        self.assertEqual(manager._filter_argv(["ecj", "parse", "62008J0034", "62008J0035"]),
-                         ("ecj", "parse", ["62008J0034", "62008J0035"]))
-        self.assertEqual(manager._filter_argv(["ecj", "parse", "62008J0034", "--force=True", "--frobnicate"]),
-                         ("ecj", "parse", ["62008J0034"]))
-        self.assertEqual(manager._filter_argv(["ecj", "--frobnicate"]),
-                         ("ecj", None, []))
+
 
     def test_enable_class(self):
         # 1. test that a normal enabling goes well
@@ -164,13 +157,12 @@ class=testManager.staticmockclass2
 
     def test_run_class(self):
         enabled_classes = {'test': 'testManager.staticmockclass'}
-        config = LayeredConfig(Defaults({'datadir': 'data',
-                                         'loglevel': 'INFO',
-                                         'logfile': None,
-                                         'staticmock': {}
-                                     }),
-                               cascade=True)
         argv = ["test", "mymethod", "myarg"]
+        defaults = {'datadir': 'data',
+                    'loglevel': 'INFO',
+                    'logfile': None,
+                    'staticmock': {}}
+        config = manager._load_config(argv=argv, defaults=defaults)
         self.assertEqual(manager._run_class(enabled_classes,
                                             argv,
                                             config),
@@ -632,9 +624,9 @@ class Run(RunBase, unittest.TestCase):
                 argv = ["test", "invalid"]
                 self.assertEqual(manager.run(argv), None)
 
-                # test4: specify no method
-                argv = ["test"]
-                self.assertEqual(manager.run(argv), None)
+                # # test4: specify no method -- no, that's now an error
+                # argv = ["test"]
+                # self.assertEqual(manager.run(argv), None)
 
     def test_run_single_errors(self):
         self._enable_repos()
@@ -847,13 +839,14 @@ imgfiles = []
         # make sure that the sub-config object created by run() is
         # identical to the config object used by the instance
         self._enable_repos()
-        ourcfg = LayeredConfig(Defaults({'loglevel': 'CRITICAL',
-                                         'logfile': None,
-                                         'datadir': 'data',
-                                         'test': {'hello': 'world'}}),
-                               cascade=True)
+        argv = ['test', 'inspect', 'config']
+        ourcfg = manager._load_config(argv=argv,
+                                      defaults={'loglevel': 'CRITICAL',
+                                                'logfile': None,
+                                                'datadir': 'data',
+                                                'test': {'hello': 'world'}})
         with patch('ferenda.manager._load_config', return_value=ourcfg):
-            instcfg = manager.run(['test', 'inspect', 'config'])
+            instcfg = manager.run(argv)
             self.assertIsInstance(instcfg, LayeredConfig)
             self.assertEqual(id(ourcfg.test),
                              id(instcfg))

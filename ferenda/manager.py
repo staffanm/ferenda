@@ -316,7 +316,6 @@ def run(argv, subcall=False):
                  positional arguments to the specified action).
     """
     config = _load_config(_find_config_file(), argv)
-    classname = config.alias
     # if logfile is set to True (the default), autogenerate logfile
     # name from current datetime. Otherwise assume logfile is set to
     # the desired file name of the log
@@ -338,6 +337,8 @@ def run(argv, subcall=False):
         if len(argv) < 1:
             _print_usage()  # also lists enabled modules
         else:
+            classname = config.alias
+
             if config.action == 'enable':
                 try:
                     return enable(classname)
@@ -375,45 +376,46 @@ def run(argv, subcall=False):
             elif config.action == 'all':
                 classnames = _setup_classnames(enabled, classname)
                 results = OrderedDict()
-                for config.action in ("download",
+                for action in ("download",
                                "parse", "relate", "makeresources",
                                "generate", "toc", "news", "frontpage"):
-                    if config.action in ("makeresources", "frontpage"):
+                    if action in ("makeresources", "frontpage"):
                         # FIXME: This way of re-creating the argv so
                         # that LayeredConfig can process it again in
                         # the subcall to run is less than elegant. A
                         # better way would perhaps be to pass the
                         # existing config object to run as an optional
                         # argument)
-                        argscopy = list(args)
+                        argscopy = argv[2:] # skip alias and action
                         argscopy.extend(_filter_argv_options(argv))
-                        argscopy.insert(0, config.action)
+                        argscopy.insert(0, action)
                         argscopy.insert(0, "all")
-                        results[config.action] = run(argscopy, subcall=True)
+                        results[action] = run(argscopy, subcall=True)
                     else:
-                        results[config.action] = OrderedDict()
+                        results[action] = OrderedDict()
                         for classname in classnames:
                             alias = enabled_aliases[classname]
-                            argscopy = list(args)
-                            argscopy.extend(_filter_argv_options(argv))
-                            if (config.action in ("parse", "relate", "generate") and
-                                    "--all" not in argscopy):
+                            argscopy = argv[2:]
+                            if (action in ("parse", "relate", "generate") and
+                                "--all" not in argscopy):
                                 argscopy.append("--all")
-                            argscopy.insert(0, config.action)
+                            argscopy.insert(0, action)
                             argscopy.insert(0, classname)
-                            results[config.action][alias] = run(argscopy, subcall=True)
+                            results[action][alias] = run(argscopy, subcall=True)
                 return results
             else:
                 if classname == "all":
                     ret = []
                     for alias, classname in enabled.items():
-                        argv_copy = list(argv)
-                        argv_copy[0] = alias
+                        #argv_copy = list(argv)
+                        #argv_copy[0] = alias
+                        config.alias = alias
                         try:
-                            ret.append(_run_class(enabled, argv_copy, config))
+                            ret.append(_run_class(enabled, argv, config))
                         except Exception as e:
                             log.error("%s %s failed: %s" %
                                       (config.action, config.alias, e))
+                    config.alias = "all"
                     return ret
                 else:
                     return _run_class(enabled, argv, config)
@@ -551,40 +553,48 @@ def setup(argv=None, force=False, verbose=False, unattended=False):
     return True
 
 
-def _load_config(filename, argv=[]):
+def _load_config(filename=None, argv=None, defaults=None):
     """Loads general configuration information from ``filename`` (which
-should be a full path to a ferenda.ini file) and/or command line
-arguments into a :py:class:`~layeredconfig.LayeredConfig` instance. It
-contains a built-in dict of default configuration values which can be
-overridden by the config file or command line arguments."""
+       should be a full path to a ferenda.ini file) and/or command
+       line arguments into a :py:class:`~layeredconfig.LayeredConfig`
+       instance. It contains a built-in dict of default configuration
+       values which can be overridden by the config file or command
+       line arguments.
+
+    """
 
     # FIXME: Expand on this list of defaults? Note that it only
     # pertains to global configuration, not docrepo configuration
     # (those have the get_default_options() method).
-    defaults = {'loglevel': 'DEBUG',
-                'logfile': True,
-                'processes': 1,
-                'datadir': 'data',
-                'combineresources': False,
-                'staticsite': False,
-                'sitename': 'MySite',
-                'sitedescription': 'Just another Ferenda site',
-                'cssfiles': ['http://fonts.googleapis.com/css?family=Raleway:200,100',
-                             'res/css/normalize-1.1.3.css',
-                             'res/css/main.css',
-                             'res/css/ferenda.css'],
-                'jsfiles': ['res/js/jquery-1.10.2.js',
-                            'res/js/modernizr-2.6.3.js',
-                            'res/js/respond-1.3.0.js',
-                            'res/js/ferenda.js'],
-                'imgfiles': ['res/img/navmenu-small-black.png',
-                             'res/img/navmenu.png',
-                             'res/img/search.png'],
-                'legacyapi': False,
-                'fulltextindex': True,
-                'serverport': 5555,
-                'authkey': b'secret'
-    }
+    if not defaults:
+        defaults = {'loglevel': 'DEBUG',
+                    'logfile': True,
+                    'processes': 1,
+                    'datadir': 'data',
+                    'force': False,
+                    'combineresources': False,
+                    'staticsite': False,
+                    'sitename': 'MySite',
+                    'sitedescription': 'Just another Ferenda site',
+                    'cssfiles': ['http://fonts.googleapis.com/css?family=Raleway:200,100',
+                                 'res/css/normalize-1.1.3.css',
+                                 'res/css/main.css',
+                                 'res/css/ferenda.css'],
+                    'jsfiles': ['res/js/jquery-1.10.2.js',
+                                'res/js/modernizr-2.6.3.js',
+                                'res/js/respond-1.3.0.js',
+                                'res/js/ferenda.js'],
+                    'imgfiles': ['res/img/navmenu-small-black.png',
+                                 'res/img/navmenu.png',
+                                 'res/img/search.png'],
+                    'legacyapi': False,
+                    'fulltextindex': True,
+                    'serverport': 5555,
+                    'authkey': b'secret'}
+    sources = [Defaults(defaults)]
+    if filename:
+        sources.append(INIFile(filename))
+    sources.append(Environment(prefix="FERENDA_"))
     if argv:
         parser = argparse.ArgumentParser()
         parser.add_argument("alias", metavar="REPOSITORY",
@@ -593,16 +603,10 @@ overridden by the config file or command line arguments."""
                             help="The action or command to perform")
         parser.add_argument("arguments", metavar="ARGS", nargs="*",
                             help="Any positional arguments to ACTION")
-        config = LayeredConfig(Defaults(defaults),
-                               INIFile(filename),
-                               Environment(prefix="FERENDA_"),
-                               Commandline(argv, parser=parser),
-                               cascade=True)
-    else:
-        config = LayeredConfig(Defaults(defaults),
-                               INIFile(filename),
-                               Environment(prefix="FERENDA_"),
-                               cascade=True)
+        sources.append(Commandline(argv, parser=parser))
+
+    config = LayeredConfig(*sources,
+                           cascade=True)
     return config
 
 
@@ -691,7 +695,7 @@ def _run_class(enabled, argv, config):
                     :py:func:`~ferenda.Manager._enabled_classes`
     :type  enabled: dict
     :param argv: An argv-style list of strings, see run (but note
-                 that that function replaces ``all`` with every
+                 that run() replaces ``all`` with every
                  enabled class in turn and then calls this method
                  with the same argv.
     :type argv: list
@@ -775,8 +779,9 @@ def _run_class(enabled, argv, config):
                         res.append(_run_class_with_basefile(clbl, basefile, kwargs, config.action))
                 cls.teardown(config.action, inst.config)
         else:
-            args = config.arguments
-            res = clbl(*args, **kwargs)
+            # The only thing that kwargs may contain is a
+            # 'otherrrepos' parameter
+            res = clbl(*config.arguments, **kwargs)
     return res
 
 # The functions runbuildclient, _queuejobs, _make_client_manager,
