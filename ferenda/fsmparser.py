@@ -110,8 +110,8 @@ class FSMParser():
         """Internal function used by make_children()"""
         try:
             rawchunk = self.reader.peek()
-            # chunk = str(rawchunk)
-            chunk = repr(rawchunk)
+            chunk = str(rawchunk)
+            # chunk = repr(rawchunk)
             if len(chunk) > 90:
                 # chunk = chunk[:25] + "[...]" + chunk[-10:]
                 seg = (chunk[:25], chunk[-10:])
@@ -136,7 +136,7 @@ class FSMParser():
         applicable_display = ", ".join([x.__name__ for x in applicable_recognizers])
         for recognizer in applicable_recognizers:
             if recognizer(self):
-                self._debug("Tested %r against %s -> %s " %
+                self._debug("Tested '%s' against %s -> %s " %
                             (chunk, applicable_display,
                              recognizer.__name__))
                 # self._debug("%r -> %s" % (chunk, recognizer.__name__))

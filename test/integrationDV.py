@@ -288,6 +288,11 @@ class TestInstans(TestDVParserBase):
         self.t({},
                "Kammarrätten i Stockholm, Migrationsöverdomstolen (2013-03-19, Wahlqvist och C. Bohlin), yttrade följande.",
                basefile="MIG/1")
+
+        # this is domslut, not start of instans (used to match överklag-4)
+        self.t({},
+               "HD fastställer överklagade beslutet")
+
         
 class TestDom(TestDVParserBase):
     method = "is_dom"
@@ -497,7 +502,9 @@ class TestDom(TestDVParserBase):
                "Lars-Åke Olvall, referent, tf. hovrättsassessorn Elisabeth "
                "Rune och två nämndemän) anförde följande i dom den 9 "
                "december 2004.")
-
+        self.t({'court': 'HD'},
+               "HD (JustR:n Gregozu, Magnusson, referent, Lind, Törnell och "
+               "Lennander) fattade följande slutliga beslut: Skäl.")
 
 class TestDomskal(TestDVParserBase):
     method = "is_domskal"

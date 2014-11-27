@@ -240,7 +240,6 @@ class FerendaTestCase(object):
             # remove trailing space for other control lines (py26...)
             diff = [re.sub(r"((?:\+\+\+|\-\-\- ).*) $", r"\1", x)
                     for x in diff]
-            from pudb import set_trace; set_trace()
             msg = "".join(diff) + "\n\nERRORS:" + "\n".join(errors)
             return self.fail(msg)
 

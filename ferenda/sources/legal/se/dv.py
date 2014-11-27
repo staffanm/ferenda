@@ -1485,7 +1485,7 @@ class DV(SwedishLegalSource):
              'method': 'match',
              'type': ('instans',)},
             {'name': 'överklag-4',
-             're': '(?!Även )(?P<karanden>[\w\.\(\)\- ]+) överklagade ((?P<prevcourt>\w+)s (beslut|dom)|beslutet|domen)( och|$)',
+             're': '(?!Även )(?P<karanden>(?!HD fastställer)[\w\.\(\)\- ]+) överklagade ((?P<prevcourt>\w+)s (beslut|dom)|beslutet|domen)( och|$)',
              'method': 'match',
              'type': ('instans',)},
             {'name': 'hd-ansokan',
@@ -1568,6 +1568,7 @@ class DV(SwedishLegalSource):
             """
             chunk = parser.reader.peek()
             strchunk = str(chunk)
+
             res = analyze_instans(strchunk)
             if res:
                 # in some referats, two subsequent chunks both matches
@@ -1949,6 +1950,7 @@ class DV(SwedishLegalSource):
             ("instans", is_endmeta): (False, None),
             ("betankande", is_domskal): transition_domskal, # either (make_domskal, "domskal") or (False, None)
             ("betankande", is_domslut): (make_domslut, "domslut"),
+            ("betankande", is_dom): (False, None),
             ("__done__", is_domskal): (False, None), 
             ("__done__", is_skiljaktig): (False, None), 
             ("__done__", is_tillagg): (False, None), 
@@ -1971,6 +1973,7 @@ class DV(SwedishLegalSource):
             ("domslut", is_skiljaktig): (False, None), 
             ("domslut", is_tillagg): (False, None),
             ("domslut", is_endmeta): (False, None),
+            ("domslut", is_dom): (False, None), 
             ("skiljaktig", is_domslut): (False, None),
             ("skiljaktig", is_instans): (False, None),
             ("skiljaktig", is_skiljaktig): (False, None),
