@@ -1,0 +1,45 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://localhost:8000/res/dv/nja/1994s119> a rpubl:Rattsfallsreferat ;
+    dcterms:bibliographicCitation "NJA 1994:25" ;
+    dcterms:identifier "NJA 1994 s. 119" ;
+    dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
+    dcterms:references <http://localhost:8000/res/sfs/2005:104> ;
+    rpubl:arsutgava "1994" ;
+    rpubl:lopnummer "25" ;
+    rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/nja> ;
+    rpubl:referatAvDomstolsavgorande <http://localhost:8000/res/dv/hd/Ö2072-91/1994-03-10> ;
+    rpubl:referatrubrik "Arvsskattemål. Sedan en person som tecknat en pensionsförsäkring avlidit, har ett återbäringsbelopp tillfallit dödsboet. Återbäringen har ansetts böra tas upp som en fordran bland tillgångarna i bouppteckningen. Inkomstskatten på återbäringen har ansetts böra tas upp som en skuldpost."@sv ;
+    rpubl:sidnummer "119" ;
+    owl:sameAs <http://localhost:8000/res/dv/nja/1994:25>,
+        <http://rinfo.lagrummet.se/publ/rattsfall/nja/1994s119> ;
+    prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
+
+<http://localhost:8000/res/dv/hd/Ö2072-91/1994-03-10> a rpubl:VagledandeDomstolsavgorande ;
+    dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
+    dcterms:relation "" ;
+    dcterms:subject <http://localhost:8000/concept/Arvsskatt>,
+        <http://localhost:8000/concept/Bouppteckning>,
+        <http://localhost:8000/concept/Inkomstskatt>,
+        <http://localhost:8000/concept/Pensionsförsäkring>,
+        <http://localhost:8000/concept/Återbäring> ;
+    dcterms:title "Arvsskattemål. Sedan en person som tecknat en pensionsförsäkring avlidit, har ett återbäringsbelopp tillfallit dödsboet. Återbäringen har ansetts böra tas upp som en fordran bland tillgångarna i bouppteckningen. Inkomstskatten på återbäringen har ansetts böra tas upp som en skuldpost."@sv ;
+    rpubl:avgorandedatum "1994-03-10"^^xsd:date ;
+    rpubl:domsnummer "SÖ62-94" ;
+    rpubl:lagrum <http://localhost:8000/res/sfs/1941:416>,
+        <http://localhost:8000/res/sfs/1941:416#P10>,
+        <http://localhost:8000/res/sfs/1941:416#P12>,
+        <http://localhost:8000/res/sfs/1941:416#P13>,
+        <http://localhost:8000/res/sfs/1941:416#P28> ;
+    rpubl:malnummer "Ö2072-91" ;
+    rpubl:rattsfall <http://localhost:8000/res/dv/nja/1970s529>,
+        <http://localhost:8000/res/dv/nja/1975s33> ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/hd/Ö2072-91/1994-03-10> .
+
