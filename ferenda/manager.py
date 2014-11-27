@@ -603,6 +603,10 @@ def _load_config(filename=None, argv=None, defaults=None):
                             help="The action or command to perform")
         parser.add_argument("arguments", metavar="ARGS", nargs="*",
                             help="Any positional arguments to ACTION")
+        # iterate argv and convert from bytes to strings using a
+        # reasonable decoder
+        cmdlineencoding = "utf-8"
+        argv = [x.decode(cmdlineencoding) for x in argv]
         sources.append(Commandline(argv, parser=parser))
 
     config = LayeredConfig(*sources,
