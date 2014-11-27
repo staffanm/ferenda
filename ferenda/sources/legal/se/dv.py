@@ -17,7 +17,7 @@ from six.moves.urllib_parse import urljoin
 from six import BytesIO
 import tempfile
 from collections import defaultdict
-
+from copy import deepcopy
 # 3rdparty libs
 import pkg_resources
 from rdflib import Namespace, URIRef, Graph, RDF, Literal
@@ -30,7 +30,7 @@ from bs4 import BeautifulSoup, NavigableString
 from ferenda import (Document, DocumentStore, Describer, WordReader, FSMParser,
                      Facet, TocPage, TocPageset)
 from ferenda.decorators import managedparsing, newstate
-from ferenda import util, fulltextindex
+from ferenda import util, fulltextindex, errors
 from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda.elements import (Body, Paragraph, CompoundElement, OrdinalElement,
                               Heading, Link)
@@ -1302,12 +1302,23 @@ class DV(SwedishLegalSource):
                 self.ref_parser = LegalRef(LegalRef.RATTSFALL,
                                            LegalRef.LAGRUM,
                                            LegalRef.FORARBETEN)
+            # You'd think we should initialize citparser with
+            # self.config.url as the baseurl parameter. But by using
+            # this special value we activate SwedishCitationParser's
+            # method of filtering relative SFS links (which shouldn't
+            # occur in a court report, and if it does, it's a sign
+            # that our parser has missed the root SFS reference).
+            baseurl = "http://example.org/sfs/9999:999"
             citparser = SwedishCitationParser(self.ref_parser, self.config.url)
             b = citparser.parse_recursive(b)
             
         # convert the unstructured list of Paragraphs to a
         # hierarchical tree of instances, domslut, domskäl, etc
-        b = self.structure_body(b, basefile)
+        try:
+            b = self.structure_body(deepcopy(b), basefile)
+        except errors.FSMStateError as e:
+            self.log.warning("%s: structure_body failed: %s" % (basefile, e))
+            self.log.debug("%s: using unstructured body" % basefile)
         return b
 
     def structure_body(self, paras, basefile):
