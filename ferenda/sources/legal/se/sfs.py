@@ -435,7 +435,8 @@ class SFS(Trips):
         if not hasattr(self, '_lagrum_parser'):
             self._lagrum_parser = SwedishCitationParser(LegalRef(LegalRef.LAGRUM,
                                                                  LegalRef.EGLAGSTIFTNING),
-                                                        self.config.url)
+                                                        self.config.url,
+                                                        allow_relative=True)
         return self._lagrum_parser
 
     @property
@@ -1105,6 +1106,7 @@ class SFS(Trips):
                                 changecat.startswith('ändring ')):
                             pred = self.ns['rpubl'].ersatter
                         elif (changecat.startswith('upph.') or
+                              changecat.startswith('upp.') or
                               changecat.startswith('utgår')):
                             pred = self.ns['rpubl'].upphaver
                         elif (changecat.startswith('ny') or
@@ -1115,17 +1117,26 @@ class SFS(Trips):
                               changecat.startswith('tillägg')):
                             pred = self.ns['rpubl'].inforsI
                         elif (changecat.startswith('nuvarande') or
+                              changecat.startswith('rubr. närmast') or 
                               changecat in ('begr. giltighet', 'Omtryck',
                                             'omtryck', 'forts.giltighet',
                                             'forts. giltighet',
                                             'forts. giltighet av vissa best.')):
+                            # some of these changecats are renames, eg
+                            # "nuvarande 2, 3, 4, 5 §§ betecknas 10,
+                            # 11, 12, 13, 14, 15 §§;" or
+                            # "rubr. närmast efter 1 § sätts närmast
+                            # före 10 §"
                             pred = None
                         else:
                             self.log.warning("%s: Okänd omfattningstyp %r" % (self.id, changecat))
                             pred = None
-                            for node in self.lagrum_parser.parse(changecat, docuri, pred):
-                                if hasattr(node, 'predicate'):
-                                    desc.rel(node.predicate, node.uri)
+                        old_currenturl = self.lagrum_parser._currenturl
+                        self.lagrum_parser._currenturl = docuri
+                        for node in self.lagrum_parser.parse_string(changecat, pred):
+                            if hasattr(node, 'predicate'):
+                                desc.rel(node.predicate, node.uri)
+                        self.lagrum_parser._currenturl = old_currenturl
                     # Secondly, preserve the entire text
                     desc.value(self.ns['rpubl'].andrar, val)
                 elif key == 'Förarbeten':
@@ -1344,12 +1355,14 @@ class SFS(Trips):
                         term = None
 
                 if term:
+                    idx = None
                     for p in element:
                         if isinstance(p, str) and term in p:
                             (head, tail) = p.split(term, 1)
                             nodes = (head, termnode, tail)
                             idx = element.index(p)
-                    element[idx:idx + 1] = nodes
+                        if idx:
+                            element[idx:idx + 1] = nodes
 
             # Konstruera IDs
             for p in element:
@@ -1870,13 +1883,19 @@ class SFS(Trips):
             else:
                 m = regex.search(line)
             if m:
-                if len(m.groups()) == 3:
-                    dates[key] = datetime(int(m.group(1)),
-                                          int(m.group(2)),
-                                          int(m.group(3)))
-                else:
-                    dates[key] = m.group(1)
-                line = regex.sub('', line)
+                try:
+                    if len(m.groups()) == 3:
+                        dates[key] = datetime(int(m.group(1)),
+                                              int(m.group(2)),
+                                              int(m.group(3)))
+                    else:
+                        dates[key] = m.group(1)
+                    line = regex.sub('', line)
+                except ValueError: # eg if datestring was
+                                   # "2014-081-01" or something
+                                   # similarly invalid - result in no
+                                   # match, eg unaffected line
+                    pass
 
         return (line.strip(), dates['upphor'], dates['ikrafttrader'])
 

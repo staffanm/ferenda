@@ -589,10 +589,11 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
 # to use a legalref based parser instead of a set of pyparsing
 # grammars.
 class SwedishCitationParser(CitationParser):
-    def __init__(self, legalrefparser, baseurl):
+    def __init__(self, legalrefparser, baseurl, allow_relative=False):
         self._legalrefparser = legalrefparser
         self._baseurl = baseurl
         self._currenturl = self._baseurl
+        self._allow_relative = allow_relative
         if self._baseurl == "https://lagen.nu/":
             self._urlpath = ''
             self._dvpath = 'dom/'
@@ -628,7 +629,8 @@ class SwedishCitationParser(CitationParser):
         string = string.replace("\r\n", " ").replace("\n", " ")
         unfiltered = self._legalrefparser.parse(string,
                                                 baseuri=self._currenturl,
-                                                predicate=predicate)
+                                                predicate=predicate,
+                                                allow_relative=self._allow_relative)
         # remove those references that we cannot fully resolve (should
         # be an option in LegalRef, but...
         filtered = []

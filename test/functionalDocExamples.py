@@ -11,7 +11,7 @@ import re
 import six
 
 from ferenda import util
-from ferenda.compat import unittest, patch
+from ferenda.compat import unittest
 from ferenda.testutil import FerendaTestCase
 
 # imports needed by the scripts. I do not fully understand exactly how
@@ -19,12 +19,12 @@ from ferenda.testutil import FerendaTestCase
 # from importing inside of the functions that use the code to work.
 from ferenda import elements, DocumentRepository, DocumentStore, TextReader
 from ferenda.decorators import downloadmax
-
 from bs4 import BeautifulSoup
 from datetime import datetime, date
 from itertools import islice
 from six.moves.urllib_parse import urljoin
 import requests
+
 
 class Examples(unittest.TestCase, FerendaTestCase):
 
@@ -237,7 +237,8 @@ class Examples(unittest.TestCase, FerendaTestCase):
     def test_rfc(self):
         workingdir = tempfile.mkdtemp()
         try:
-            shutil.copy("doc/examples/rfc-annotations.rq", workingdir+"/rfc-annotations.rq")
+            shutil.copy("doc/examples/rfc-annotations.rq",
+                        workingdir+"/rfc-annotations.rq")
             shutil.copy("doc/examples/rfc.xsl", workingdir+"/rfc.xsl")
             self._test_pyfile("doc/examples/rfcs.py", workingdir)
         finally:

@@ -348,15 +348,16 @@ class LegalRef:
             d[six.text_type(subj)] = six.text_type(obj)
         return d
 
-    def parse(self, indata, baseuri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K9P9S9P9", predicate=None):
+    def parse(self, indata,
+              baseuri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K9P9S9P9",
+              predicate=None,
+              allow_relative=True):
         assert isinstance(indata, six.text_type)
         if indata == "":
             return indata  # this actually triggered a bug...
-        # h = hashlib.sha1()
-        # h.update(indata)
-        # print "Called with %r (%s) (%s)" % (indata, h.hexdigest(), self.verbose)
         self.predicate = predicate
         self.baseuri = baseuri
+        self.allow_relative = allow_relative
         if baseuri:
             m = self.re_urisegments.match(baseuri)
             if m:
@@ -655,7 +656,7 @@ class LegalRef:
             # the formatting function decided not to return a URI for
             # some reason (maybe it was a partial/relative reference
             # without a proper base uri context
-            return part.text
+            return text
         elif self.predicate:
             return LinkSubject(text, uri=uri, predicate=self.predicate)
         else:
@@ -797,6 +798,8 @@ class LegalRef:
             return None
 
     def sfs_format_uri(self, attributes):
+        if 'law' not in attributes and not self.allow_relative:
+            return None
         piecemappings = {'första': '1',
                          'andra': '2',
                          'tredje': '3',

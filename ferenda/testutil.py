@@ -240,7 +240,7 @@ class FerendaTestCase(object):
             # remove trailing space for other control lines (py26...)
             diff = [re.sub(r"((?:\+\+\+|\-\-\- ).*) $", r"\1", x)
                     for x in diff]
-
+            from pudb import set_trace; set_trace()
             msg = "".join(diff) + "\n\nERRORS:" + "\n".join(errors)
             return self.fail(msg)
 
@@ -601,7 +601,6 @@ def parametrize_repotester(cls):
     """Helper function to activate a
 :py:class:`ferenda.testutil.RepoTester` based class (see the
 documentation for that class)."""
-
     docroot = cls.docroot
     # 1. download tests
     if os.path.exists(docroot + "/source"):
