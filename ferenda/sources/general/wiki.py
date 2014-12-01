@@ -64,7 +64,8 @@ class MediaWiki(DocumentRepository):
     documentstore_class = MediaWikiStore
     rdf_type = Namespace(util.ns['skos']).Concept
     keyword_class = Keyword
-    
+    namespaces = ['skos', 'prov', 'dcterms']
+
     def __init__(self, config=None, **kwargs):
         super(MediaWiki, self).__init__(config, **kwargs)
         if self.config._parent and hasattr(self.config._parent, 'keyword'):
@@ -84,12 +85,16 @@ class MediaWiki(DocumentRepository):
     def download(self, basefile=None):
         if basefile:
             return self.download_single(basefile)
-
         if self.config.mediawikidump:
-            resp = requests.get(self.config.mediawikidump)
             xmldumppath = self.store.path('dump', 'downloaded', '.xml')
-            with self.store._open(xmldumppath, mode="wb") as fp:
-                fp.write(resp.content)
+            try:
+                resp = requests.get(self.config.mediawikidump)
+                self.log.info("Loaded XML dump from %s" % self.config.mediawikidump)
+                with self.store._open(xmldumppath, mode="wb") as fp:
+                    fp.write(resp.content)
+            except Exception:
+                # try to loa
+                pass 
             # xml = etree.parse(resp.content)
             xml = etree.parse(xmldumppath)
         else:
@@ -104,7 +109,7 @@ class MediaWiki(DocumentRepository):
         # Get list of existing basefiles - if any of those
         # does not appear in the XML dump, remove them afterwards
         basefiles = list(self.store.list_basefiles_for("parse"))
-
+        total = written = 0
         for page_el in xml.findall(MW_NS + "page"):
             basefile = page_el.find(MW_NS + "title").text
             if basefile == "Huvudsida":
@@ -113,17 +118,32 @@ class MediaWiki(DocumentRepository):
                 (namespace, localtitle) = basefile.split(":", 1)
                 if namespace not in self.config.mediawikinamespaces:
                     continue
+            writefile = False
             p = self.store.downloaded_path(basefile)
-            self.log.info("%s: extracting from XML dump" % basefile)
-            with self.store.open_downloaded(basefile, "w") as fp:
-                fp.write(etree.tostring(page_el, encoding="utf-8"))
-
+            newcontent = etree.tostring(page_el, encoding="utf-8")
+            if not os.path.exists(p):
+                writefile = True
+            else:
+                oldcontent = util.readfile(p, "rb")
+                if newcontent != oldcontent:
+                    writefile = True
+            if writefile:
+                util.ensure_dir(p)
+                with open(p, "wb") as fp:
+                    fp.write(newcontent)
+                    self.log.info("%s: extracting from XML dump" % basefile)
+                written += 1
+            
             if basefile in basefiles:
                 del basefiles[basefiles.index(basefile)]
+            total += 1
 
+        if 'dump' in basefiles:  # never remove
+            del basefiles[basefiles.index('dump')]
         for b in basefiles:
-            self.log.debug("%s: removing stale document" % b)
+            self.log.info("%s: removing stale document" % b)
             util.robust_remove(self.store.downloaded_path(b))
+        self.log.info("Examined %s documents, wrote %s of them" % (total, written))
 
     def download_single(self, basefile):
         # download a single term, for speed

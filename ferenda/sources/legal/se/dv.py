@@ -317,8 +317,10 @@ class DV(SwedishLegalSource):
         # recurse =~ download everything, which we do if force is
         # specified OR if we've never downloaded before
         recurse = False
-
-        if self.config.force or not self.config.lastdownload:
+        # if self.config.lastdownload has not been set, it has only
+        # the type value, so self.config.lastdownload will raise
+        # AttributeError. Should it return None instead?
+        if self.config.force or 'lastdownload' not in self.config:
             recurse = True
 
         self.downloadcount = 0  # number of files extracted from zip files
@@ -501,7 +503,10 @@ class DV(SwedishLegalSource):
                         os.utime(outfile, (ts, ts))
 
                         self.downloadcount += 1
-                    if self.config.downloadmax and self.downloadcount >= self.config.downloadmax:
+                    # fix HERE
+                    if ('downloadmax' in self.config and
+                        self.config.downloadmax and
+                        self.downloadcount >= self.config.downloadmax):
                         raise MaxDownloadsReached()
                 else:
                     self.log.warning('Could not interpret filename %r i %s' %
@@ -905,10 +910,10 @@ class DV(SwedishLegalSource):
                 continue
             node = soup.find(text=re.compile(key + ':'))
             if not node:
-                # Sometimes these text fields are broken up
-                # (eg "<w:t>Avgörand</w:t>...<w:t>a</w:t>...<w:t>tum</w:t>")
-                # Use (ridiculous) fallback method
-                if key not in ('Diarienummer', 'Domsnummer', 'Avdelning'): # not always present
+                # FIXME: should warn for missing Målnummer iff
+                # Domsnummer is not present, and vice versa. But at
+                # this point we don't have all fields
+                if key not in ('Diarienummer', 'Domsnummer', 'Avdelning', 'Målnummer'): 
                     self.log.warning("%s: Couldn't find field %r" % (basefile, key))
                 continue
 
@@ -1731,7 +1736,12 @@ class DV(SwedishLegalSource):
                             try:
                                 res['date'] = parse_swed(mg['date'])
                             except ValueError:
-                                res['date'] = parse_iso(mg['date'])
+                                try: 
+                                    res['date'] = parse_iso(mg['date'])
+                                except ValueError:
+                                    pass
+                                    # or res['date'] = mg['date']??
+                                
                         #if 'constitution' in mg:
                         #    res['constitution'] = parse_constitution(mg['constitution'])
                         return res

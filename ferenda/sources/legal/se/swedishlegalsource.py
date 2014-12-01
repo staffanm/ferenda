@@ -253,6 +253,8 @@ class SwedishLegalSource(DocumentRepository):
             if len(components) >= 2:
                 if components[-2].endswith("."):
                     components[-2] = components[-2][:-1]
+                if components[-2] not in self.swedish_months:
+                    raise ValueError(datestr)
                 month = self.swedish_months[components[-2]]
             if len(components) >= 3:
                 day = int(components[-3])

@@ -1387,12 +1387,22 @@ with the *config* object as single parameter.
             # examine @property @datatype @rel for CURIEs and make
             # sure they're mapped
             for a in ('property', 'datatype', 'rel'):
-                v = e.get(a) 
+                v = e.get(a)
                 if v and ":" in v:
                     prefix = v.split(":")[0]
                     if prefix not in nsmap:
                         nsmap[prefix] = str(self.ns[prefix])
-                    
+                if v == "rdf:type":
+                    # prefixes *used by* any rdf:type declarations
+                    # must also be included. The href of that element
+                    # includes the resource URI, but not in CURIE
+                    # form, so we compare agains all known namespace
+                    # URI:s
+                    uri = e.get("href")
+                    for prefix, nsuri in self.ns.items():
+                        if uri.startswith(str(nsuri)):
+                            nsmap[prefix] = str(nsuri)
+
         E = ElementMaker(namespace="http://www.w3.org/1999/xhtml",
                          nsmap=nsmap)
         bodycontent = doc.body.as_xhtml(doc.uri)

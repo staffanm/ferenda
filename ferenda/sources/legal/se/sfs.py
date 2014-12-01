@@ -379,15 +379,18 @@ class SFS(Trips):
         self.current_section = '0'
         self.current_headline_level = 0  # 0 = unknown, 1 = normal, 2 = sub
 
-        # the new DNS-based URLs are dog slow for some reasons
+        # the new DNS-based URLs used to be dog slow for some reasons
         # sometimes -- a quick hack to change them back to the old
-        # IP-based ones.
-        for p in ('document_url_template',
-                  'document_sfsr_url_template',
-                  'document_sfsr_change_url_template'):
-            setattr(self, p,
-                    getattr(self, p).replace('rkrattsbaser.gov.se',
-                                             '62.95.69.15'))
+        # IP-based ones. The hack hade to be sidabled since the
+        # IP-based URLs stopped working. Fortunaltely the DNS-based
+        # ones has been sped up.
+        
+        # for p in ('document_url_template',
+        #           'document_sfsr_url_template',
+        #           'document_sfsr_change_url_template'):
+        #     setattr(self, p,
+        #             getattr(self, p).replace('rkrattsbaser.gov.se',
+        #                                    '62.95.69.15'))
         from ferenda.manager import loglevels
         self.trace = {}
         for logname in ('paragraf', 'tabell', 'numlist', 'rubrik'):
@@ -502,7 +505,7 @@ class SFS(Trips):
             x) for x in self.config.next_sfsnr.split(":")]
         done = False
         revisit = []
-        if hasattr(self.config, 'revisit') and self.config.revisit:
+        if 'revisit' in self.config and self.config.revisit:
             last_revisit = self.config.revisit
             for wanted_sfs_nr in last_revisit:
                 self.log.info('Revisiting %s' % wanted_sfs_nr)

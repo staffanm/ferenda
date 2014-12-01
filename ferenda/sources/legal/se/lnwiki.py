@@ -4,19 +4,35 @@ from __future__ import unicode_literals
 # customize behaviour.
 
 # system
+import unicodedata
+import os
 
 # 3rdparty
 from lxml import etree
 
 # mine
+from ferenda import DocumentStore
 from ferenda.sources.legal.se import SwedishLegalSource, SwedishCitationParser, SFS, LNKeyword
-from ferenda.sources.general.wiki import MediaWiki, WikiSemantics, WikiSettings
+from ferenda.sources.general.wiki import MediaWiki, MediaWikiStore, WikiSemantics, WikiSettings
 
+class LNMediaWikiStore(MediaWikiStore):
+
+    # the pathfrag mangling in MediaWikiStore is not suitable for the
+    # content of the Lagen.nu wiki, which in practice has a highly
+    # heterogenous usage of : and /, which makes general roundtripping
+    # from basefile -> pathfrag -> basefile impossible . Therefore we
+    # fall back to another behaviour which should be roundtrippable
+    def basefile_to_pathfrag(self, basefile):
+        return basefile.replace(":", os.sep+"%3E").replace(" ", "_")
+
+    def pathfrag_to_basefile(self, pathfrag):
+        return unicodedata.normalize("NFC", pathfrag.replace(os.sep+"%3E", ":").replace("_", " "))
 
 class LNMediaWiki(MediaWiki):
     """Managing commentary on legal sources (Lagen.nu-version of MediaWiki)
     """
     namespaces = SwedishLegalSource.namespaces
+    documentstore_class = LNMediaWikiStore
 
     from ferenda.sources.legal.se.legalref import LegalRef
     

@@ -606,8 +606,12 @@ def _load_config(filename=None, argv=None, defaults=None):
         # iterate argv and convert from bytes to strings using a
         # reasonable decoder
         cmdlineencoding = "utf-8"
-        argv = [x.decode(cmdlineencoding) for x in argv]
-        sources.append(Commandline(argv, parser=parser))
+        saneargv = []
+        for arg in argv:
+            if isinstance(arg, bytes):
+                arg = arg.decode(cmdlineencoding)
+            saneargv.append(arg)
+        sources.append(Commandline(saneargv, parser=parser))
 
     config = LayeredConfig(*sources,
                            cascade=True)
@@ -1163,7 +1167,6 @@ def _instantiate_class(cls, config=None, argv=[]):
     """Given a class object, instantiate that class and make sure the
        instance is properly configured given it's own defaults, a
        config file, and command line parameters."""
-
     clsdefaults = cls().get_default_options()
     if not config:
         defaults = dict(clsdefaults)
@@ -1176,13 +1179,27 @@ def _instantiate_class(cls, config=None, argv=[]):
 
     # work in all parameters from get_default_options unless they have
     # been set by some other means
+    clsconfig_parameters = list(clsconfig)
     for param in clsdefaults:
-        if param not in clsconfig:
+        if param not in clsconfig_parameters:
             # the set method sets the parameter on an appropriate
             # store w/o dirtiying it.
             LayeredConfig.set(clsconfig, param, clsdefaults[param], "defaults")
             # setattr(clsconfig, param, clsdefaults[param])
-    
+
+    # FIXME: this is super hacky, but we'd like to make sure that
+    # source[0] (the Defaults source) has all type values from
+    # clsdefaults. Need to rethink how we initialize the main config
+    # object w.r.t. get_default_options() (Maybe: that function could
+    # be a staticmethod and called for all enabled repos beforehand,
+    # so that we can create the main Defaults object with all repos).
+    assert isinstance(clsconfig._sources[0], Defaults)
+    for param, value in clsdefaults.items():
+        if not isinstance(value, type):
+            continue
+        if param not in clsconfig._sources[0].source:
+            clsconfig._sources[0].source[param] = value
+
     inst = cls(clsconfig)
     return inst
 

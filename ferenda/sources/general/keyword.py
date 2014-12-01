@@ -20,6 +20,9 @@ from ferenda import DocumentRepository, TripleStore, DocumentStore, Describer
 from ferenda.decorators import managedparsing
 from ferenda.elements import Body
 
+
+
+# FIXME: Use MW_NS = "{%s}" % xml.getroot().nsmap[None]
 MW_NS = "{http://www.mediawiki.org/xml/export-0.3/}"
 
 
@@ -51,6 +54,9 @@ class Keyword(DocumentRepository):
     downloaded_suffix = ".txt"
     documentstore_class = KeywordStore
     xslt_template = "res/xsl/keyword.xsl"
+    rdf_type = Namespace(util.ns['skos']).Concept
+    namespaces = ['skos', 'prov', 'dcterms']
+
     def __init__(self, config=None, **kwargs):
         super(Keyword, self).__init__(config, **kwargs)
         # extra functions -- subclasses can add / remove from this
