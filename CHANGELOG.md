@@ -1,12 +1,17 @@
-2014-10-?? RELEASE 0.3.0
-
+2014-12-?? RELEASE 0.3.0
+========================
 This release adds support for processing things in parallel, both by
 using multiple processes on a single machine, and also by running
 "build clients" on any number of machines, which run jobs managed by a
-central queue. 
+central queue.
+
+In addition, a lot of the included repositorys have been
+overhauled. The general repos mediawiki and keyword should be usable
+for most projects by creating a subclass and configuring it.
+
 
 Backwards-incompatible changes:
-
+-------------------------------
 * DocumentRepository and all derived classes now takes an optional
   first config argument. If present, this should be a LayeredConfig
   object that contains the repo configuration. If not provided, a
@@ -16,7 +21,7 @@ Backwards-incompatible changes:
   handle this first argument.
 
 New features:
-
+-------------
 * The default serialization of Element objects to XHTML now inserts
   appropriate dcterms:isPartOf statements when one element with a URI
   is contained within another element with another URI. Custom element
@@ -37,7 +42,7 @@ New features:
 * The ferenda.sources.general.keyword can be used to build keyboard
   hubs from all concepts that your documents point to through a
   dcterms:subject property (as well as things in a wiki docrepo, and
-  configurable other sources.
+  configurable other sources).
 * The ferenda.sources.legal.se docrepos have been updated generally
   and are now close to being able to replicate the function set of
   https://lagen.nu/ (which was the main motivation with this codebase
@@ -49,7 +54,7 @@ New features:
   environment variable FERENDA_TRANSFORMDEBUG is set.
 
 Infrastructural changes:
-
+------------------------
 * Ferenda now uses the CI service Appveyor to automatically run the
   entire test suite under Windows on every commit.
 * LayeredConfig is now a separate package and not included with
@@ -63,6 +68,7 @@ Infrastructural changes:
 
 
 2014-07-23 RELEASE 0.2.0
+========================
 
 This release adds a REST-based HTTP API and includes a lot of
 infrastructure to support repo-defined querying and aggregation of
@@ -74,7 +80,7 @@ The REST API should be considered an alpha version and is definitly
 not stable.
 
 Backwards-incompatible changes:
-
+-------------------------------
 The class TocCriteria and the DocumentRepository methods
 toc_predicates, toc_criteria et al have been removed and replaced with
 the Facet class and similar methods.
@@ -84,7 +90,7 @@ ferenda.sources.legal.se.propositioner.PropPolo has been renamed to
 ...DirRegeringen and ...PropRegeringen, respectively.
 
 New features:
-
+-------------
 A REST API enables clients to do faceted querying (ie document whose
 properties have specified values), full-text search or combinations.
 
@@ -139,7 +145,7 @@ dcterms:subject not point to URIs (defined in commondata) instead of
 plain string literals.
 
 Infrastructural changes:
-
+------------------------
 cssmin is no longer bundled within ferenda. Instead it's marked as a
 dependency so that pip/easy_install automatically downloads it from
 pypi.
@@ -165,12 +171,12 @@ of the 0.1 series because the REST API isn't done yet (once it's in,
 that will be release 0.2)
 
 Backwards-incompatible changes:
-
+-------------------------------
 CompositeRepository.parse now raises ParseError if no subrepository
 is able to parse the given basefile.
 
 New features:
-
+-------------
 ferenda.CompositeRepository.parse no longer requires that all subrepos have
 storage_policy == "dir".
 
@@ -286,7 +292,7 @@ wide-screen desktops. The various bundled css and js files has been
 upgraded to their most recent versions.
 
 Backwards-incompatible changes:
-
+-------------------------------
 * The DocumentStore.open_generated method was removed as noone was
   using it.
 
@@ -300,7 +306,7 @@ Backwards-incompatible changes:
   (pyScss) currently has problems on the Python 3 platform.
 
 New features:
-
+-------------
 * The :meth:`ferenda.Devel.mkpatch` command now actually works.
 
 * The `republishsource` configuration parameter is now available, and
@@ -325,7 +331,7 @@ fit reality. They have also been added to the test suite, so they're
 almost guaranteed to be updated when the API changes.
 
 Backwards-incompatible changes
-
+------------------------------
 * Transformation of XHTML1.1+RDFa files to HTML5 is now done
   using the new Transformer class, instead of the
   DocumentRepository.transform_to_html method, which has been removed
@@ -338,7 +344,7 @@ Backwards-incompatible changes
   +        for basefile in self.store.list_basefiles_for("parse"):
 
 New features:
-
+-------------
 * New ferenda.Transformer class (see above)
 
 * A new decorator, ferenda.decorators.downloadmax, can be used to
@@ -369,7 +375,7 @@ New features:
   OrderedDict, unittest and mock.
 
 Infrastructural changes:
-
+------------------------
 * Most of the bundled document repository classes in ferenda.sources
   has been overhauled and adapted to the changes that has occurred to
   the API since the old days.
