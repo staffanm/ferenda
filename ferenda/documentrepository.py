@@ -1479,6 +1479,10 @@ with the *config* object as single parameter.
             context, config.storerepository))
         store.clear(context)
 
+        # FIXME: if config.fulltextindex, we should attempt to connect
+        # to the index (at least if config.indextype != "WHOOSH") to
+        # see if the server is up.
+        
         # Bulk upload: We implemented an alternate way of loading the
         # triplestore, where we didn't POST into the triplestore
         # once for each basefile, but instead appended everything to a
@@ -1639,7 +1643,14 @@ parsed document path to that documents dependency file."""
                           values):
             with self.store.open_distilled(basefile) as fp:
                 g = Graph().parse(fp, format="xml")
+                subjects = set([s for s, p, o in g])
                 for (s, p, o) in g:
+                    # the graph for a single doc can describe
+                    # multiple, linked, resources. Don't attempt to
+                    # find basefiles for these resources, even if they
+                    # occur as objects in the graphs as well.
+                    if o in subjects:
+                        continue
                     # for each URIRef in graph
                     if isinstance(o, URIRef):
                         # in order to minimize calls to

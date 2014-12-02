@@ -2814,7 +2814,8 @@ class SFS(Trips):
                 prefix, tag = string.split(":", 1)
                 return "{%s}%s" % (str(self.ns[prefix]), tag)
         root_node = etree.Element(ns("rdf:RDF"), nsmap=self.ns)
-        for l in sorted(list(stuff.keys()), cmp=util.numcmp):
+
+        for l in sorted(list(stuff.keys()), key=util.split_numalpha):
             lagrum_node = etree.SubElement(root_node, ns("rdf:Description"))
             lagrum_node.set(ns("rdf:about"), l)
             if 'rattsfall' in stuff[l]:

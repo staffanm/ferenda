@@ -212,11 +212,11 @@ class DV(SwedishLegalSource):
         parsed_dir = os.path.sep.join([config.datadir, 'dv', 'parsed'])
         mapfile = os.path.sep.join(
             [config.datadir, 'dv', 'generated', 'uri.map'])
+        log = cls._setup_logger(cls.alias)
         if not util.outfile_is_newer(util.list_dirs(parsed_dir, ".xhtml"), mapfile):
             prefix = config.url + config.urlpath
             # prefix = config.url + "res/" + cls.alias + "/"
             re_xmlbase = re.compile('<head about="%s([^"]+)"' % prefix)
-            log = cls._setup_logger(cls.alias)
             log.info("Creating uri.map file")
             cnt = 0
             util.robust_remove(mapfile + ".new")
@@ -301,6 +301,11 @@ class DV(SwedishLegalSource):
             if path in self._basefilemap:
                 return self._basefilemap[path]
             else:
+                # this will happen for older cases for which we don't
+                # have any files. We could invent URI-redived
+                # basefiles for these, and gain a sort of skeleton
+                # entry for those, which we could use to track
+                # eg. frequently referenced older cases.
                 self.log.warning("%s: Could not find corresponding basefile" % uri)
                 return None
         else:
