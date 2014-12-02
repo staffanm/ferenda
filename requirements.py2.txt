@@ -23,5 +23,5 @@ wheel
 twine
 psutil
 layeredconfig
-grako
+# grako -- doesn't support 2.6 at all
 
