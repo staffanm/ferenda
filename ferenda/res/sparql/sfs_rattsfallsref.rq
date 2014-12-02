@@ -3,8 +3,8 @@ PREFIX rpubl:<http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
 SELECT ?uri ?avguri ?lagrum ?id ?desc
 WHERE {
     ?avguri rpubl:lagrum ?lagrum .
-    ?lagrum dcterms:isPartOf{0,4} <%(uri)s> .
     ?uri rpubl:referatAvDomstolsavgorande ?avguri;
          dcterms:identifier ?id;
          rpubl:referatrubrik ?desc .
+    FILTER(STRSTARTS(STR(?lagrum), "%(uri)s"))
 }

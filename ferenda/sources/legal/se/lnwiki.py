@@ -35,12 +35,10 @@ class LNMediaWiki(MediaWiki):
     documentstore_class = LNMediaWikiStore
 
     from ferenda.sources.legal.se.legalref import LegalRef
-    
-    p = LegalRef(LegalRef.LAGRUM, LegalRef.KORTLAGRUM,
-                 LegalRef.FORARBETEN, LegalRef.RATTSFALL)
-
     keyword_class = LNKeyword
 
+    p = LegalRef(LegalRef.LAGRUM, LegalRef.KORTLAGRUM,
+                 LegalRef.FORARBETEN, LegalRef.RATTSFALL)
     lang = "sv"
     
     def __init__(self, config=None, **kwargs):

@@ -6,6 +6,6 @@ SELECT ?uri ?lagrum
 WHERE {
   GRAPH <%(context)s> {
     ?uri dcterms:references ?lagrum .
-    ?lagrum dcterms:isPartOf{0,4} <%(uri)s> .
-  }
+    FILTER(STRSTARTS(STR(?lagrum), "%(uri)s"))
+    }
 }
