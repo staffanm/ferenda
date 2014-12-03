@@ -193,6 +193,11 @@ class XSLTTransform(TransformerEngine):
         except etree.XSLTParseError as e:
             raise errors.TransformError(str(e.error_log))
 
+    def __del__(self):
+        if os.path.exists(self.templdir):
+            # this had better be a tempdir!
+            shutil.rmtree(self.templdir)
+
     # purpose: get all XSLT files (main and supporting) into one place
     #   (should support zipped eggs, even if setup.py don't)
     # template:     full path to actual template to be used

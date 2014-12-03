@@ -9,6 +9,7 @@ import re
 import hashlib
 import logging
 import tempfile
+import shutil
 # 3rdparty libs
 
 from six import unichr as chr
@@ -78,6 +79,13 @@ with open(picklefile,"wb") as fp:
                                               self.declaration_md5)
             with open(declaration_filename, "wb") as fp:
                 fp.write(declaration)
+
+        def __del__(self):
+            global external_simpleparse_state
+            if external_simpleparse_state and os.path.exists(external_simpleparse_state):
+                shutil.rmtree(external_simpleparse_state)
+                external_simpleparse_state = None
+
 
         def buildTagger(self, production=None, processor=None):
             pickled_tagger = "%s/%s-%s.pickle" % (external_simpleparse_state,

@@ -7,6 +7,9 @@ semantic structure and RDF-based metadata, finding relationships
 between documents, and publishing the results, including through a
 REST-based HTTP API.
 
+.. image:: https://badge.fury.io/py/ferenda.png
+   :target: http://badge.fury.io/py/ferenda
+
 .. image:: https://travis-ci.org/staffanm/ferenda.png?branch=master
     :target: http://travis-ci.org/staffanm/ferenda/
 
@@ -15,6 +18,13 @@ REST-based HTTP API.
 
 .. image:: https://coveralls.io/repos/staffanm/ferenda/badge.png?branch=master
     :target: https://coveralls.io/r/staffanm/ferenda
+
+.. image:: https://landscape.io/github/staffanm/ferenda/master/landscape.png
+   :target: https://landscape.io/github/staffanm/ferenda/master
+   :alt: Code Health
+
+.. image:: https://pypip.in/d/ferenda/badge.png
+   :target: https://pypi.python.org/pypi/ferenda
 
 Quick start
 -----------

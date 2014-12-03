@@ -57,6 +57,11 @@ class MediaWiki(DocumentRepository):
         class = ferenda.sources.general.MediaWiki
         mediawikiexport = http://localhost/wiki/allpages-dump.xml
 
+    .. note::
+
+       This docrepo relies on the smc.mw module, which doesn't work on
+       python 2.6, only 2.7 and newer.
+
     """
 
     alias = "mediawiki"

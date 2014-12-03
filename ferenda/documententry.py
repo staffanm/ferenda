@@ -51,6 +51,13 @@ class DocumentEntry(object):
        (due to the original content being updated, or due to changes
        in our parsing functionality."""
 
+    indexed_ts = None
+    """The last time the metadata was indexed in a triplestore"""
+    indexed_dep = None
+    """The last time the dependent files of the document was indexed"""
+    indexed_ft = None
+    """The last time the document was indexed in a fulltext index"""
+    
     url = None
     """The URL to the browser-ready version of the page, equivalent to what
     :meth:`~ferenda.DocumentRepository.generated_url` returns."""
@@ -71,7 +78,7 @@ class DocumentEntry(object):
     def __init__(self, path=None):
         # for json serialization
         def myhook(d):
-            for key in ('orig_created', 'orig_updated', 'orig_checked', 'published', 'updated'):
+            for key in ('orig_created', 'orig_updated', 'orig_checked', 'published', 'updated', 'indexed_ts', 'indexed_dep', 'indexed_ft'):
                 if key in d and d[key]:
                     try:
                         dt = datetime.strptime(d[key], '%Y-%m-%dT%H:%M:%S.%f')
@@ -92,6 +99,9 @@ class DocumentEntry(object):
             self.orig_updated = None
             self.orig_checked = None
             self.orig_url = None
+            self.indexed_ts = None
+            self.indexed_dep = None
+            self.indexed_ft = None
             self.published = None
             self.updated = None
             self.title = None
@@ -116,8 +126,6 @@ class DocumentEntry(object):
 with.
 
         """
-
-
         if not path:
             path = self._path  # better be there
         d = dict((k, v) for (k, v) in self.__dict__.items() if k[0] != "_")

@@ -246,6 +246,7 @@ class Devel(object):
                                       stash_lines,
                                       outfile,
                                       stash))
+        os.unlink(stash)
         # 4. calculate place of patch using docrepo.store.
         patchstore = repo.documentstore_class(repo.config.patchdir +
                                               os.sep + repo.alias)

@@ -1208,8 +1208,9 @@ with the *config* object as single parameter.
                     # seems the exact encoding is platform dependent
                     import locale
                     encoding = locale.getpreferredencoding(False)
-
-                return util.readfile(tmpfile, encoding=encoding), desc
+                res = util.readfile(tmpfile, encoding=encoding)
+                os.unlink(tmpfile)
+                return res, desc
         else:
             return (text, None)
 
@@ -1471,13 +1472,15 @@ with the *config* object as single parameter.
         if (not config.force and util.outfile_is_newer(xhtmlfiles, dump)):
             return False # signals to Manager that no work needs to be done
 
-        store = TripleStore.connect(config.storetype,
-                                    config.storelocation,
-                                    config.storerepository)
-        log = cls._setup_logger(cls.alias)
-        log.info("Clearing context %s at repository %s" % (
-            context, config.storerepository))
-        store.clear(context)
+
+        if config.force:
+            store = TripleStore.connect(config.storetype,
+                                        config.storelocation,
+                                        config.storerepository)
+            log = cls._setup_logger(cls.alias)
+            log.info("Clearing context %s at repository %s" % (
+                context, config.storerepository))
+            store.clear(context)
 
         # FIXME: if config.fulltextindex, we should attempt to connect
         # to the index (at least if config.indextype != "WHOOSH") to
@@ -1558,6 +1561,26 @@ with the *config* object as single parameter.
            and put the text of the document into a fulltext index.
 
         """
+        entry = DocumentEntry(self.store.documententry_path(basefile))
+        if self.config.force:
+            reltriples = True
+            reldependencies = True
+            relfulltext = True
+        else:
+            def newer(filename, dt):
+                if not os.path.exists(filename):
+                    return False
+                elif not dt: # has never been indexed
+                    return True
+                else:
+                    return datetime.fromtimestamp(os.stat(filename).st_mtime) > dt
+            reltriples = newer(self.store.distilled_path(basefile), entry.indexed_ts)
+            reldependencies = newer(self.store.distilled_path(basefile), entry.indexed_dep)
+            relfulltext = newer(self.store.parsed_path(basefile), entry.indexed_ft)
+
+        if not(reltriples or reldependencies or relfulltext):
+            self.log.debug("%s: skipped relate" % basefile)
+            return
         with util.logtime(self.log.info,
                           "%(basefile)s: relate OK (%(elapsed).3f sec)",
                           {'basefile': basefile}):
@@ -1577,14 +1600,25 @@ with the *config* object as single parameter.
                         fp.write(g.serialize(format="nt"))
                     values['triplecount'] = len(g)
             else:
-                self.relate_triples(basefile)
-            # When otherrepos = [], should we still provide self as one repo? Yes.
-            if self not in otherrepos:
-                otherrepos.append(self)
+                if self.config.force:
+                    self.relate_triples(basefile)
+                    entry.indexed_ts = datetime.now()
+                elif reltriples:
+                    self.relate_triples(basefile, removesubjects=True)
+                    entry.indexed_ts = datetime.now()
 
-            self.relate_dependencies(basefile, otherrepos)
-            if self.config.fulltextindex:
+            if reldependencies:
+                # When otherrepos = [], should we still provide self as one repo? Yes.
+                if self not in otherrepos:
+                    otherrepos.append(self)
+                self.relate_dependencies(basefile, otherrepos)
+                entry.indexed_dep = datetime.now()
+            
+            if self.config.fulltextindex and relfulltext:
                 self.relate_fulltext(basefile, otherrepos)
+                entry.indexed_ft = datetime.now()
+        entry.save()
+        
 
     def _get_triplestore(self, **kwargs):
         if not hasattr(self, '_triplestore'):
@@ -1594,13 +1628,18 @@ with the *config* object as single parameter.
                                                     **kwargs)
         return self._triplestore
 
-    def relate_triples(self, basefile):
+    def relate_triples(self, basefile, removesubjects=False):
         """Insert the (previously distilled) RDF statements into the
         triple store.
 
         :param basefile: The basefile for the document containing the
                          RDF statements.
         :type  basefile: str                        
+        :param removesubjects: Whether to remove all identified subjects 
+                               from the triplestore beforehand (to clear
+                               the previous version of this basefile's 
+                               metadata). FIXME: not yet used
+        :type  removesubjects: bool
         :returns: None
         """
         ts = self._get_triplestore()  # init self._triplestore
@@ -2701,7 +2740,10 @@ WHERE {
         smaller amount of content (like a smaller presentation of the
         repository and the document it contains)."""
         g = self.make_graph()
-        qname = g.qname(self.rdf_type)
+        if isinstance(self.rdf_type, (tuple, list)):
+            qname = ", ".join([g.qname(x) for x in self.rdf_type])
+        else:
+            qname = g.qname(self.rdf_type)
         return ("<h2><a href='%s'>Document repository '%s'</a></h2><p>Handles %s documents. "
                 "Contains %s published documents.</p>"
                 % (self.dataset_uri(), self.alias, qname,
@@ -2812,7 +2854,10 @@ WHERE {
         if self.rdf_type == Namespace(util.ns['foaf']).Document:
             return [(self.alias, uri)]
         else:
-            return [(util.uri_leaf(str(self.rdf_type)), uri)]
+            if isinstance(self.rdf_type, (tuple, list)):
+                return [(util.uri_leaf(str(x)), uri) for x in self.rdf_type]
+            else:
+                return [(util.uri_leaf(str(self.rdf_type)), uri)]
 
     def footer(self):
         """Get a list of resources provided by this repo for publication in the site footer.

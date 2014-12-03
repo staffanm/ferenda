@@ -337,6 +337,8 @@ class SFS(Trips):
     app = "sfst"  # dir, prop, sfst
     base = "SFSR"  # DIR, THWALLPROP, SFSR
 
+    basefile_regex = "(?P<basefile>\d{4}:[\d s\.]+)$"
+
     start_url = ("http://rkrattsbaser.gov.se/cgi-bin/thw?${HTML}=%(app)s_lst"
                  "&${OOHTML}=%(app)s_dok&${SNHTML}=%(app)s_err"
                  "&${MAXPAGE}=%(maxpage)d&${BASE}=%(base)s"

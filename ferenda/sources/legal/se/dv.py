@@ -2124,7 +2124,7 @@ class DV(SwedishLegalSource):
             pagesetdict[util.uri_leaf(pageset.predicate)] = pageset
         for (binding, value) in sorted(documents.keys()):
             pageset = pagesetdict[binding]
-            s = sorted(documents[(binding, value)])
+            s = sorted(documents[(binding, value)], key=repr)
             res[(binding, value)] = [self.toc_item(binding, row)
                                      for row in s]
         return res

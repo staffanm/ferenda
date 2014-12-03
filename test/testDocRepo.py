@@ -722,8 +722,13 @@ class Repo(RepoTester):
                                          'storelocation': 'b',
                                          'storerepository': 'c'}))
         self.assertTrue(self.repoclass.relate_all_setup(config))
-        self.assertTrue(mock_store.connect.called)
-        self.assertTrue(mock_store.connect.return_value.clear.called)
+        self.assertFalse(mock_store.connect.called) # store shouldn't
+                                                    # be called unless
+                                                    # a total clean
+                                                    # and reindex (ie
+                                                    # --force) has
+                                                    # been requested
+        # self.assertTrue(mock_store.connect.return_value.clear.called)
         
         # if triplestore dump is newer than all parsed files, nothing
         # has happened since last relate --all and thus we shouldn't
@@ -763,6 +768,7 @@ class Repo(RepoTester):
         self.repo.relate_triples = Mock()
         self.repo.relate_dependencies = Mock()
         self.repo.relate_fulltext = Mock()
+        self.repo.config.force = True  # otherwise smart dependency tracking kicks in
         self.repo.relate("123/a")
         self.assertTrue(self.repo.relate_triples.called)
         self.assertTrue(self.repo.relate_dependencies.called)

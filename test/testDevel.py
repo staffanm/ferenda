@@ -43,6 +43,7 @@ class Main(unittest.TestCase):
         mock = MagicMock()
         with patch(builtins+'.print', mock):
             d.dumprdf(tmpfile, format="nt")
+        os.unlink(tmpfile)
         self.assertTrue(mock.called)
         want = '<http://example.org/doc> <http://purl.org/dc/terms/> "Doc title" .\n\n'
         mock.assert_has_calls([call(want)])
