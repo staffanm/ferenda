@@ -799,7 +799,7 @@ class DV(SwedishLegalSource):
             # keep in sync like above
             re_notisstart = re.compile("[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)")
             re_malnr = re.compile(r"D:(?P<malnr>\d+\-\d+)")
-            re_avgdatum = re.compile(r"[AD]:(?P<avgdatum>\d+\-\d+\-\d+)")
+            re_avgdatum = re.compile(r"[AD]:(?P<avgdatum>\d{2,4}\-\d{2}\-\d{2})")
             re_sokord = re.compile("Uppslagsord: (?P<sokord>.*)", flags=re.DOTALL)
             re_lagrum = re.compile("Lagrum: ?(?P<lagrum>.*)", flags=re.DOTALL)
             # headers consists of the first five or six
@@ -807,7 +807,7 @@ class DV(SwedishLegalSource):
             header = []
             done = False
             while not done:
-                if re.match("Not \d+\. ", iterator[0].get_text().strip()):
+                if re.match("Not(is|) \d+\.? ", iterator[0].get_text().strip()):
                     done = True
                 else:
                     tmp = iterator.pop(0)
