@@ -179,13 +179,7 @@ class NodeTree:
             raise AttributeError
 
 
-class ParseError(Exception):
-
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return repr(self.value)
+class RefParseError(Exception): pass
 
 # Lite om hur det hela funkar: Att hitta referenser i löptext är en
 # tvåstegsprocess.
@@ -434,7 +428,7 @@ class LegalRef:
             log.error('Problem (%d:%d) with %r / %r' % (
                 taglist[-1] - 8, taglist[-1] + 8, fixedindata, indata))
 
-            raise ParseError(
+            raise RefParseError(
                 "parsed %s chars of %s (...%s...)" % (taglist[-1], len(indata),
                                                       indata[(taglist[-1] - 2):taglist[-1] + 3]))
 

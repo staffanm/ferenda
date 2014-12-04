@@ -539,7 +539,7 @@ class DV(SwedishLegalSource):
                 if re_avdstart.match(tmp.get_text().strip()):
                     avd_p = tmp
             if not avd_p:
-                raise RuntimeError("Cannot find value for month in %s (looked in %s" % (basefile, prev_path))
+                raise errors.ParseError("Cannot find value for month in %s (looked in %s" % (basefile, prev_path))
             return avd_p
 
         # Given a word document containing a set of "notisfall" from
@@ -799,15 +799,18 @@ class DV(SwedishLegalSource):
             # keep in sync like above
             re_notisstart = re.compile("[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)")
             re_malnr = re.compile(r"D:(?P<malnr>\d+\-\d+)")
-            re_avgdatum = re.compile(r"[AD]:(?P<avgdatum>\d{2,4}\-\d{2}\-\d{2})")
+            # the avgdatum regex attempts to include valid dates, eg
+            # not "2770-71-12"
+            re_avgdatum = re.compile(r"[AD]:(?P<avgdatum>\d{2,4}\-[01]\d\-\d{2})")
             re_sokord = re.compile("Uppslagsord: (?P<sokord>.*)", flags=re.DOTALL)
             re_lagrum = re.compile("Lagrum: ?(?P<lagrum>.*)", flags=re.DOTALL)
             # headers consists of the first five or six
             # chunks. Doesn't end until "^Not \d+."
             header = []
             done = False
-            while not done:
-                if re.match("Not(is|) \d+\.? ", iterator[0].get_text().strip()):
+            while not done and iterator:
+                # can possibly be "Not 1a." (RÅ 1994 not 1) or "Not. 109." (RÅ 1998 not 109)
+                if re.match("Not(is|)\.? \d+[abc]?\.? ", iterator[0].get_text().strip()):
                     done = True
                 else:
                     tmp = iterator.pop(0)
@@ -817,7 +820,10 @@ class DV(SwedishLegalSource):
                             header[-1].append(list(tmp.children)[0])
                         else:
                             header.append(tmp)
-            
+
+        if not done:
+            raise errors.ParseError("Cannot find notis number in %s" % basefile)
+                                
         if coll == "HDO":
             head['Domstol'] = "Högsta Domstolen"
         elif coll == "HFD":
@@ -825,7 +831,7 @@ class DV(SwedishLegalSource):
         elif coll == "REG":
             head['Domstol'] = "Regeringsrätten"
         else:
-            raise ValueError("Unsupported: %s" % coll)
+            raise errors.ParseError("Unsupported: %s" % coll)
         for node in header:
             t = node.get_text()
             # if not malnr, avgdatum found, look for those
@@ -1073,7 +1079,7 @@ class DV(SwedishLegalSource):
             # NB: localid needs to be a list
             head["_localid"] = [head["Domsnummer"]]
         else:
-            raise ValueError("Required key (Målnummer/Domsnummer) missing")
+            raise errors.ParseError("Required key (Målnummer/Domsnummer) missing")
 
         # 5. For NJA, Canonicalize the identifier through a very
         # forgiving regex and split of the alternative identifier
@@ -1088,7 +1094,7 @@ class DV(SwedishLegalSource):
                 head["Referat"] = "NJA %s s %s" % (m.group(1), m.group(2))
                 head["_nja_ordinal"] = "NJA %s:%s" % (m.group(3), m.group(4))
             else:
-                raise ValueError("Unparseable NJA ref '%s'" % head["Referat"])
+                raise errors.ParseError("Unparseable NJA ref '%s'" % head["Referat"])
 
         # 6 Canonicalize referats: Fix crap like "AD 2010nr 67",
         # "AD2011 nr 17", "HFD_2012 ref.58", "RH 2012_121", "RH2010
@@ -1102,7 +1108,7 @@ class DV(SwedishLegalSource):
                 else:
                     head["Referat"] = referat_templ[None] % m.groupdict()
             else:
-                raise ValueError("Unparseable ref '%s'" % head["Referat"])
+                raise errors.ParseError("Unparseable ref '%s'" % head["Referat"])
 
         # 7. Convert Sökord string to an actual list 
         res = []
@@ -1136,7 +1142,7 @@ class DV(SwedishLegalSource):
                 year = m.group(1)
             head["Avgörandedatum"] = "%s-%s-%s" % (year, m.group(2), m.group(3))
         else:
-            raise ValueError("Unparseable date %s" % head["Avgörandedatum"])
+            raise errors.ParseError("Unparseable date %s" % head["Avgörandedatum"])
 
         # 9. Done!
         return head
