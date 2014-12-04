@@ -96,7 +96,9 @@ class Keyword(DocumentRepository):
                 label = row['label']
             else:
                 label = self.basefile_from_uri(row['subject'])
-            if len(label) < 100:  # sanity, no legit keyword is 100 chars
+            # sanity checking -- not everything can be a legit
+            # keyword. Must be under 100 chars and not start with .
+            if len(label) < 100 and not label.startswith("."):
                 terms[label]['subjects'] = True
 
         self.log.debug("Retrieved %s subject terms from triplestore" % len(terms))
@@ -107,10 +109,17 @@ class Keyword(DocumentRepository):
         for term in terms:
             if not term:
                 continue
-            self.log.info("%s: in %s termsets" % (term, len(terms[term])))
-            with self.store.open_downloaded(term, "w") as fp:
-                for termset in sorted(terms[term]):
-                    fp.write(termset + "\n")
+            oldterms = ""
+            termpath = self.store.downloaded_path(term)
+            if os.path.exists(termpath):
+                oldterms = util.readfile(termpath)
+            newterms = "\n".join(sorted(terms[term])) + "\n"
+            if newterms != oldterms:
+                util.ensure_dir(termpath)
+                util.writefile(termpath, newterms)
+                self.log.info("%s: in %s termsets" % (term, len(terms[term])))
+            else:
+                self.log.debug("%s: skipped" % term)
 
     def download_termset_mediawiki(self, terms):
         # 2) Download the wiki.lagen.nu dump from

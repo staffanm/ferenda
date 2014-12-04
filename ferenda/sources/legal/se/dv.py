@@ -1070,7 +1070,8 @@ class DV(SwedishLegalSource):
         if head.get("Målnummer"):
             head["_localid"] = head["Målnummer"]
         elif head.get("Domsnummer"):
-            head["_localid"] = head["Domsnummer"]
+            # NB: localid needs to be a list
+            head["_localid"] = [head["Domsnummer"]]
         else:
             raise ValueError("Required key (Målnummer/Domsnummer) missing")
 
@@ -1127,7 +1128,7 @@ class DV(SwedishLegalSource):
         m = date_regex.match(head["Avgörandedatum"])
         if m:
             if len(m.group(1)) < 4:
-                if int(m.group(1) <= 80): # '80-01-01' => '1980-01-01',
+                if int(m.group(1) <= '80'): # '80-01-01' => '1980-01-01',
                     year = '19' + m.group(1) 
                 else:                     # '79-01-01' => '2079-01-01',
                     year = '20' + m.group(1) 

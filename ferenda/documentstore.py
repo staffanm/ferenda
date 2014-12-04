@@ -242,6 +242,7 @@ class DocumentStore(object):
         if not os.path.exists(directory):
             return
 
+        # FIXME: Some stores need a more sophisticated way of filtering than this.
         for x in util.list_dirs(directory, suffix, reverse=True):
             # ignore empty files placed by download (which may
             # have done that in order to avoid trying to
