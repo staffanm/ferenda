@@ -6,7 +6,6 @@ import hashlib
 import json
 from datetime import datetime
 
-
 from ferenda import util
 
 
@@ -20,7 +19,8 @@ class DocumentEntry(object):
     feed. Some properties and methods are used by both of these use
     cases, but not all.
 
-    :param path: If this file path is an existing JSON file, the object is initialized from that file.
+    :param path: If this file path is an existing JSON file, the object is
+                 initialized from that file.
     :type  path: str
     """
     id = None
@@ -53,11 +53,13 @@ class DocumentEntry(object):
 
     indexed_ts = None
     """The last time the metadata was indexed in a triplestore"""
+
     indexed_dep = None
     """The last time the dependent files of the document was indexed"""
+
     indexed_ft = None
     """The last time the document was indexed in a fulltext index"""
-    
+
     url = None
     """The URL to the browser-ready version of the page, equivalent to what
     :meth:`~ferenda.DocumentRepository.generated_url` returns."""
@@ -75,10 +77,18 @@ class DocumentEntry(object):
     """A dict that represents metadata about the document RDF metadata
     (such as it's URI, length, MIME-type and MD5 hash)."""
 
+    # files = [{'path': 'data/sfs/downloaded/1999/175.html',
+    #           'source': 'http://localhost/1234/567',
+    #           'last-modified': '<isodatestring>',
+    #           'etag': '234242323424'}]
+
+    
     def __init__(self, path=None):
         # for json serialization
         def myhook(d):
-            for key in ('orig_created', 'orig_updated', 'orig_checked', 'published', 'updated', 'indexed_ts', 'indexed_dep', 'indexed_ft'):
+            for key in ('orig_created', 'orig_updated', 'orig_checked',
+                        'published', 'updated', 'indexed_ts', 'indexed_dep',
+                        'indexed_ft'):
                 if key in d and d[key]:
                     try:
                         dt = datetime.strptime(d[key], '%Y-%m-%dT%H:%M:%S.%f')
@@ -116,7 +126,6 @@ class DocumentEntry(object):
             # included resources)
             self.link = {}
 
-
     def __repr__(self):
         return '<%s id=%s>' % (self.__class__.__name__, self.id)
 
@@ -131,7 +140,8 @@ with.
         d = dict((k, v) for (k, v) in self.__dict__.items() if k[0] != "_")
         util.ensure_dir(path)
         with open(path, "w") as fp:
-            json.dump(d, fp, default=util.json_default_date, indent=2, separators=(', ',': '), sort_keys=True)
+            json.dump(d, fp, default=util.json_default_date, indent=2,
+                      separators=(', ', ': '), sort_keys=True)
     # If inline=True, the contents of filename is included in the Atom
     # entry. Otherwise, it just references it.
     #
@@ -141,9 +151,12 @@ with.
         """Sets the ``content`` property and calculates md5 hash for the file
 
         :param filename: The full path to the document file
-        :param url: The full external URL that will be used to get the same document file
-        :param mimetype: The MIME-type used in the atom feed. If not provided, guess from file extension.
-        :param inline: whether to inline the document content in the file or refer to *url*
+        :param url: The full external URL that will be used to get the same
+                    document file
+        :param mimetype: The MIME-type used in the atom feed. If not provided,
+                         guess from file extension.
+        :param inline: whether to inline the document content in the file or
+                       refer to *url*
         """
         if not mimetype:
             mimetype = self.guess_type(filename)
@@ -167,8 +180,10 @@ with.
         """Sets the ``link`` property and calculate md5 hash for the RDF metadata.
 
         :param filename: The full path to the RDF file for a document
-        :param url: The full external URL that will be used to get the same RDF file
-        :param mimetype: The MIME-type used in the atom feed. If not provided, guess from file extension.
+        :param url: The full external URL that will be used to get the same
+                    RDF file
+        :param mimetype: The MIME-type used in the atom feed. If not provided,
+                         guess from file extension.
         """
         if not mimetype:
             mimetype = self.guess_type(filename)

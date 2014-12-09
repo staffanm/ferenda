@@ -92,7 +92,11 @@ class Decorators(unittest.TestCase):
      <h1>Hello!</h1>
   </body>
 </html>""")
-
+        with open("entry_path.json", "w") as fp:
+            fp.write("""{
+  "id": "https://lagen.nu/concept/St\\u00e5ende_anbud", 
+  "title": "St\\u00e5ende anbud", 
+}""")
         mockrepo.store.distilled_path.return_value = "distilled_path.xhtml"
         mockrepo.get_globals.return_value = {'symbol table':'fake'}
         mockrepo.required_predicates = []
@@ -102,6 +106,7 @@ class Decorators(unittest.TestCase):
         mockdoc.body = [bodypart]
         mockdoc.meta.__iter__.return_value = []
         mockdoc.uri = "http://example.org/doc"
+        mockrepo.store.documententry_path.return_value = None
         with patch('ferenda.util.ensure_dir', return_value=True):
             testfunc(mockrepo, mockdoc)
         
@@ -131,6 +136,7 @@ class Decorators(unittest.TestCase):
         self.assertTrue(mockrepo.log.warning.called)
         os.remove("parsed_path.xhtml")
         os.remove("distilled_path.xhtml")
+        os.remove("entry_path.json")
 
     def test_handleerror(self):
         @handleerror

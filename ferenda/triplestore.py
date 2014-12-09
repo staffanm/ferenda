@@ -16,6 +16,7 @@ import requests
 import requests.exceptions
 import pyparsing
 
+import six
 from six import text_type as str
 from six.moves.urllib_parse import quote
 
@@ -430,7 +431,10 @@ class RemoteStore(TripleStore):
 
     def select(self, query, format="sparql"):
         url = self._endpoint_url()
-        url += "?query=" + quote(query.replace("\n", " ")).replace("/", "%2F")
+        query = query.replace("\n", " ")
+        if six.PY2:
+            query = query.encode("utf-8")
+        url += "?query=" + quote(query).replace("/", "%2F")
 
         headers = {}
         if format == "python":

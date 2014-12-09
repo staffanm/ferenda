@@ -28,6 +28,9 @@ MW_NS = "{http://www.mediawiki.org/xml/export-0.3/}"
 
 class KeywordStore(DocumentStore):
     def basefile_to_pathfrag(self, basefile):
+        # Shard all files under initial letter, eg "Avtal" => "a/Avtal"
+        # FIXME: This isn't a good fit for non-document related paths,
+        # eg the location of TOC pages, cache files etc.
         first = basefile[0].lower()
         return "%s/%s" % (first, basefile)
 
@@ -97,8 +100,8 @@ class Keyword(DocumentRepository):
             else:
                 label = self.basefile_from_uri(row['subject'])
             # sanity checking -- not everything can be a legit
-            # keyword. Must be under 100 chars and not start with .
-            if len(label) < 100 and not label.startswith("."):
+            # keyword. Must be under 100 chars and not start with . or /
+            if len(label) < 100 and not label[0] in (".", "/", ":"):
                 terms[label]['subjects'] = True
 
         self.log.debug("Retrieved %s subject terms from triplestore" % len(terms))
@@ -169,6 +172,7 @@ class Keyword(DocumentRepository):
         d.value(self.ns['dcterms'].title, Literal(doc.basefile, lang=doc.lang))
         d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
         doc.body = Body()  # can be empty, all content in doc.meta
+        self.parse_entry_update(doc)
         return True
 
     re_tagstrip = re.compile(r'<[^>]*>')

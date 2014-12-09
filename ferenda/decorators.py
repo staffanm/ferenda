@@ -21,6 +21,7 @@ from rdflib import Graph, URIRef
 from layeredconfig import LayeredConfig
 
 from ferenda import util
+from ferenda import DocumentEntry
 from ferenda.errors import DocumentRemovedError, ParseError
 from ferenda.elements import serialize
 
@@ -90,7 +91,10 @@ def render(f):
     # this function validates that the XHTML+RDFa file that we end up
     # with contains the exact same triples as is present in the doc
     # object (including both the doc.meta Graph and any other Graph
-    # that might be present on any doc.body object)
+    # that might be present on any doc.body object). Also, this func
+    # validates taht the documententry file has been properly filled,
+    # which is sort of outside of the responsibility of this func,
+    # but...
     
     def iterate_graphs(node):
         res = []
@@ -172,6 +176,14 @@ def render(f):
                              "not found in the serialized XHTML file:\n%s",
                              doc.basefile, len(doc.meta),
                              doc.meta.serialize(format="nt").decode('utf-8').strip())
+
+        # Validate that entry.title and entry.id has been filled
+        # (might be from doc.meta and doc.uri, might be other things
+        entry = DocumentEntry(self.store.documententry_path(doc.basefile))
+        if not entry.id:
+            self.log.warning("%s: entry.id missing" % doc.basefile)
+        if not entry.title:
+            self.log.warning("%s: entry.title missing" % doc.basefile)
         return ret
     return wrapper
 

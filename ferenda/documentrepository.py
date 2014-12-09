@@ -45,9 +45,9 @@ from six.moves.urllib_parse import quote
 import ferenda
 from ferenda import util, errors, decorators, fulltextindex
 
-from ferenda import (Describer, TripleStore, FulltextIndex,
-                     Document, DocumentEntry, NewsCriteria, 
-                     TocPageset, TocPage, DocumentStore, Transformer, Facet)
+from ferenda import (Describer, TripleStore, FulltextIndex, Document,
+                     DocumentEntry, TocPageset, TocPage,
+                     DocumentStore, Transformer, Facet, Feed, Feedset)
 from ferenda.elements import (Body, Link,
                               UnorderedList, ListItem, Paragraph)
 from ferenda.elements.html import elements_from_soup
@@ -895,7 +895,10 @@ with the *config* object as single parameter.
         return updated
 
     def download_is_different(self, existing, new):
-        """Returns True if the new file is semantically different from the existing file."""
+        """Returns True if the new file is semantically different from the
+        existing file.
+
+        """
         return not filecmp.cmp(new, existing, shallow=False)
 
 
@@ -960,12 +963,8 @@ with the *config* object as single parameter.
 
         return self.generic_url(basefile, 'downloaded', self.downloaded_suffix)
 
-    #
-    #
     # STEP 2: Parse the downloaded data into a structured XML document
     # with RDFa metadata.
-    #
-    #
     @classmethod
     def parse_all_setup(cls, config):
         """
@@ -992,7 +991,12 @@ with the *config* object as single parameter.
         """
 
     def parseneeded(self, basefile):
-        """Returns True iff there is a need to parse the given basefile. If the resulting parsed file exists and is newer than the downloaded file, there is typically no reason to parse the file."""
+        """Returns True iff there is a need to parse the given basefile. If
+        the resulting parsed file exists and is newer than the
+        downloaded file, there is typically no reason to parse the
+        file.
+
+        """
         infile = self.store.downloaded_path(basefile)
         outfile = self.store.parsed_path(basefile)
         return not util.outfile_is_newer([infile], outfile)
@@ -1019,8 +1023,22 @@ with the *config* object as single parameter.
         soup = self.soup_from_basefile(doc.basefile, self.source_encoding)
         self.parse_metadata_from_soup(soup, doc)
         self.parse_document_from_soup(soup, doc)
+        self.parse_entry_update(doc)
         return True  # Signals that everything is OK
 
+    def parse_entry_update(self, doc):
+        entry = DocumentEntry(self.store.documententry_path(doc.basefile))
+        entry.basefile = doc.basefile # do we even need this?
+        entry.id = doc.uri
+        entry.title = self.parse_entry_title(doc)
+        entry.save()
+
+    def parse_entry_title(self, doc):
+        title = doc.meta.value(URIRef(doc.uri), self.ns['dcterms'].title)
+        if title:
+            return str(title)
+        
+        
     def soup_from_basefile(self, basefile, encoding='utf-8', parser='lxml'):
         """
         Load the downloaded document for basefile into a BeautifulSoup object
@@ -1465,11 +1483,11 @@ with the *config* object as single parameter.
         context = "%sdataset/%s" % (config.url, cls.alias)
 
         docstore = DocumentStore(config.datadir + os.sep + cls.alias)
-        dump = docstore.path("dump", "distilled", ".nt")
+        dumppath = docstore.resourcepath("distilled/dump.nt")
 
         # check if we need to work at all.
         xhtmlfiles = (docstore.distilled_path(x) for x in docstore.list_basefiles_for("generate"))
-        if (not config.force and util.outfile_is_newer(xhtmlfiles, dump)):
+        if (not config.force and util.outfile_is_newer(xhtmlfiles, dumppath)):
             return False # signals to Manager that no work needs to be done
 
 
@@ -1495,7 +1513,7 @@ with the *config* object as single parameter.
         # uncomment below.
 
         # create the empty temp NTriples file for appending to:
-        # with docstore._open(docstore.path("_dump", "distilled", ".nt.temp"), "w"):
+        # with docstore._open(docstore.resourcepath("distilled/_dump.nt.temp"), "w"):
         #     pass
 
         # we can't clear the whoosh index in the same way as one index
@@ -1522,36 +1540,36 @@ with the *config* object as single parameter.
 
         context = "%sdataset/%s" % (config.url, cls.alias)
         docstore = DocumentStore(config.datadir + os.sep + cls.alias)
-        dump = docstore.path("dump", "distilled", ".nt")
-        temp = docstore.path("_dump", "distilled", ".nt.temp")
+        dumppath = docstore.resourcepath("distilled/dump.nt")
+        temppath = docstore.resourcepath("distilled/dump.nt.temppath")
         store = TripleStore.connect(config.storetype,
                                     config.storelocation,
                                     config.storerepository)
         values = {'repository': config.storerepository,
                   'context': context,
-                  'dumpfile': dump,
-                  'tempfile': temp}
+                  'dumpfile': dumppath,
+                  'tempfile': temppath}
 
         # If using the Bulk upload functionality (see
         # relate_all_setup), do the actual bulk upload.
-        if os.path.exists(temp):
+        if os.path.exists(temppath):
             with util.logtime(log.info,
                               "Loaded %(triplecount)s triples to context %(context)s from %(tempfile)s (%(elapsed).3f sec)",
                               values):
-                store.add_serialized_file(temp, format="nt", context=context)
+                store.add_serialized_file(temppath, format="nt", context=context)
                 # just to report the number of dumped triples -- may be unneccesary
-                values['triplecount'] = sum(1 for line in open(temp))
-                os.unlink(temp)
+                values['triplecount'] = sum(1 for line in open(temppath))
+                os.unlink(temppath)
 
-        # then extract a new dump file (which should have the exact
-        # same contents as the temp file, but this comes directly from
+        # then extract a new dumppath file (which should have the exact
+        # same contents as the temppath file, but this comes directly from
         # the triplestore
         with util.logtime(log.info,
                           "Dumped %(triplecount)s triples from context %(context)s to %(dumpfile)s (%(elapsed).3f sec)",
                           values):
-            store.get_serialized_file(dump, format="nt", context=context)
+            store.get_serialized_file(dumppath, format="nt", context=context)
             # just to report the number of dumped triples -- may be unneccesary
-            values['triplecount'] = sum(1 for line in open(dump))
+            values['triplecount'] = sum(1 for line in open(dumppath))
         return True
 
     def relate(self, basefile, otherrepos=[]):
@@ -1587,7 +1605,7 @@ with the *config* object as single parameter.
 
             # If using the Bulk upload feature, append to the temporary
             # file that is to be bulk uploaded (see relate_all_setup)
-            nttemp = self.store.path("_dump", "distilled", ".nt.temp", storage_policy="file")
+            nttemp = self.store.resourcepath("distilled/_dump.nt")
             if os.path.exists(nttemp) and 'all' in self.config:
                 values = {'basefile': basefile,
                           'nttemp': nttemp}
@@ -1859,9 +1877,27 @@ parsed document path to that documents dependency file."""
            values that that facet has.
 
         """
-
-        return self.facet_select(self.facet_query(self.dataset_uri()))
-
+        # use some caching logic around the actual meat of the
+        # function (the call to facet_query and facet_select. Custom
+        # implementations might prefer to override facet_select
+        # (eg. to add additional useful data).
+        cachepath = self.store.resourcepath("toc/faceted_data.json")
+        dumppath = self.store.resourcepath("distilled/dump.nt")
+        if ((not self.config.force) and
+            os.path.exists(cachepath) and
+            util.outfile_is_newer([dumppath], cachepath)):
+            self.log.debug("Loading faceted_data from %s" % cachepath)
+            data = json.load(open(cachepath))
+        else:
+            data = self.facet_select(self.facet_query(self.dataset_uri()))
+            util.ensure_dir(cachepath)
+            with open(cachepath, "w") as fp:
+                self.log.debug("Saving faceted_data to %s" % cachepath)
+                json.dump(data, fp, indent=4)
+            if os.path.getsize(cachepath) == 0:
+                util.robust_remove(cachepath)
+        return data
+    
     def facet_query(self, context):
 
         """Constructs a SPARQL SELECT query that fetches all
@@ -2011,27 +2047,29 @@ WHERE {
         :type  basefile: str
         :returns: None
         """
+        # This dependency management could be abstracted away like
+        # the parseifneeded decorator does for parse(). But unlike
+        # parse(), noone is expected to override generate(), so
+        # the proper place to handle this complexity is probably
+        # here.
+        infile = self.store.parsed_path(basefile)
+        annotations = self.store.annotation_path(basefile)
+        if os.path.exists(self.store.dependencies_path(basefile)):
+            deptxt = util.readfile(self.store.dependencies_path(basefile))
+            dependencies = deptxt.strip().split("\n")
+        else:
+            dependencies = []
+        dependencies.extend((infile, annotations))
+
+        outfile = self.store.generated_path(basefile)
+        if ((not self.config.force) and
+                util.outfile_is_newer(dependencies, outfile)):
+            self.log.debug("%s: Skipped", basefile)
+            return
+
         with util.logtime(self.log.info, "%(basefile)s: generate OK (%(elapsed).3f sec)",
                           {'basefile': basefile}):
-            # This dependency management could be abstracted away like
-            # the parseifneeded decorator does for parse(). But unlike
-            # parse(), noone is expected to override generate(), so
-            # the proper place to handle this complexity is probably
-            # here.
-            infile = self.store.parsed_path(basefile)
-            annotations = self.store.annotation_path(basefile)
-            if os.path.exists(self.store.dependencies_path(basefile)):
-                deptxt = util.readfile(self.store.dependencies_path(basefile))
-                dependencies = deptxt.strip().split("\n")
-            else:
-                dependencies = []
-            dependencies.extend((infile, annotations))
 
-            outfile = self.store.generated_path(basefile)
-            if ((not self.config.force) and
-                    util.outfile_is_newer(dependencies, outfile)):
-                self.log.debug("%s: Skipped", basefile)
-                return
             self.log.debug("%s: Starting", basefile)
 
             # All bookkeping done, now lets prepare and transform!
@@ -2109,7 +2147,7 @@ WHERE {
                         pseudobasefile = "/".join(dataset_params)
                     else:
                         pseudobasefile = "index"
-                    path = repo.store.path(pseudobasefile, 'toc', '.html')
+                    path = repo.store.resourcepath("toc/%s.html" % pseudobasefile)
             if path:
                 relpath = os.path.relpath(path, basedir)
                 if os.sep == "\\":
@@ -2270,24 +2308,18 @@ WHERE {
         document properties will be sufficient.
 
         """
+        # Simple caching logic -- won't hold for all cases
+        tocindex = self.store.resourcepath("toc/index.html")
+        faceted_data = self.store.resourcepath("toc/faceted_data.json")
+        if (not self.config.force) and util.outfile_is_newer([faceted_data], tocindex):
+            self.log.debug("Not regenerating TOCs")
+            return
 
         params = {}
         with util.logtime(self.log.debug,
                           "toc: selected %(rowcount)s rows (%(elapsed).3f sec)",
                           params):
-            cachepath = self.store.path('faceted_data', 'toc', '.json')
-            if (not self.config.force) and os.path.exists(cachepath):
-                self.log.debug("Loading faceted_data from %s" % cachepath)
-                data = json.load(open(cachepath))
-            else:
-                data = self.faceted_data()
-                util.ensure_dir(cachepath)
-                with open(cachepath, "w") as fp:
-                    self.log.debug("Saving faceted_data to %s" % cachepath)
-                    json.dump(data, fp, indent=4)
-                if os.path.getsize(cachepath) == 0:
-                    util.robust_remove(cachepath)
-                    
+            data = self.faceted_data()
             params['rowcount'] = len(data)
         if len(data) > 0:
             facets = self.facets()
@@ -2307,9 +2339,8 @@ WHERE {
         :param data: list of dicts, each dict containing metadata about
                      a single document
         :param facets: list of Facet objects
-        :returns: The link text, page title and base file for each needed
-                  TOC page, structured by selection facets.
-        :rtype: 3-dimensional named tuple
+        :returns: A set of Pageset objects
+        :rtype: list
 
         Example:
         
@@ -2409,6 +2440,7 @@ WHERE {
 
         # to 1-dimensional dict (odict?): {(binding,value): [list-of-Elements]}
         res = {}
+        from pudb import set_trace; set_trace()
         qname_graph = self.make_graph()
         facets = [f for f in facets if f.use_for_toc]
         for pageset, facet in zip(pagesets, facets):
@@ -2481,7 +2513,7 @@ WHERE {
         """
         if effective_basefile == None:
             effective_basefile = binding + "/" + value
-        outfile = self.store.path(effective_basefile, 'toc', '.html')
+        outfile = self.store.resourcepath("toc/%s.html" % effective_basefile)
         doc = self.make_document()
         doc.uri = self.dataset_uri(binding, value)
         d = Describer(doc.meta, doc.uri)
@@ -2522,7 +2554,9 @@ WHERE {
 
         fixed = transformer.t.html5_doctype_workaround(etree.tostring(tree))
 
-        with self.store.open(effective_basefile, 'toc', '.html', "wb") as fp:
+        # with self.store.open(effective_basefile, 'toc', '.html', "wb") as fp:
+        util.ensure_dir(outfile)
+        with open(outfile, "wb") as fp:
             fp.write(fixed)
 
         self.log.info("Created %s" % outfile)
@@ -2534,80 +2568,182 @@ WHERE {
         repository.
 
         """
+        params = {}
+        # faceted_data employs caching 
+        data = self.faceted_data()
 
-        criteria = self.news_criteria()
+        # transform list of dicts into a dict with the uri field as
+        # key and teh entire dict as value, for fast lookup in the next step
+        datadict = dict([(x['uri'], x) for x in data])
+
+        # decorate datadict with entries
         for entry in self.news_entries():
-            for criterion in criteria:
-                if criterion.selector(entry):
-                    criterion.entries.append(entry)
+            # let's just hope that there always is one?
+            assert entry.id in d
+            d = datadict[entry.id]
+            for prop in ('updated', 'published', 'basefile', 'title', 'summary', 'content', 'link'):
+                d[prop] = getattr(entry, prop)
+
+        # create an object for each Atom feed. This should include a
+        # "main" feed that will contain all (published) entries in the
+        # docrepo
+        feedsets = self.news_feedsets(data, facets)
+
+        # fill each such feed with relevant entries according to selectors
+        feeds = self.news_select_for_feeds(data, feedsets, facets)
+
+        # generate them feeds
         conffile = os.path.abspath(
             os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
-        docroot = os.path.dirname(self.store.path('foo','feed','.x'))
+        docroot = os.path.dirname(self.store.resourcepath('feed/foo.x'))
         transformer = Transformer("XSLT", "res/xsl/atom.xsl", ["res/xsl"],
                                   docroot, config=conffile)
-        for criterion in criteria:
-            # should reverse=True be configurable? For datetime
-            # properties it makes sense to use most recent first, but
-            # maybe other cases?
-            entries = sorted(criterion.entries, key=criterion.key, reverse=True)
-            self.log.info("feed %s: %s entries" % (criterion.basefile, len(entries)))
-            self.news_write_atom(entries,
-                                 criterion.feedtitle,
-                                 criterion.basefile)
+        for feedset in feedsets:
+            for feed in feedset.feeds:
+                # should reverse=True be configurable? For datetime
+                # properties it makes sense to use most recent first, but
+                # maybe other cases?
+                entries = sorted(feed.entries, key=feed.key, reverse=True)
+                self.log.info("feed %s: %s entries" % (feed.slug, len(entries)))
+                self.news_write_atom(entries,
+                                     feed.title,
+                                     feed.slug)
 
-            outfile = self.store.path(criterion.basefile, 'feed', '.html')
-            transformer.transform_file(self.store.atom_path(criterion.basefile),
-                                       outfile)
+                outfile = self.store.resourcepath('feed/%s.html' % feed.slug)
+                transformer.transform_file(self.store.atom_path(feed.slug),
+                                           outfile)
 
-    def news_criteria(self):
-        """Returns a list of NewsCriteria objects."""
-        return [NewsCriteria('main', 'New and updated documents')]
+    def news_feedsets(self, data, facets):
+        """Calculate the set of needed feedsets based on facets and instance values in the data
+
+        :param data: list of dicts, each dict containing metadata about
+                     a single document
+        :param facets: list of Facet objects
+        :returns: A list of Feedset objects
+
+        """
+
+        qname_graph = self.make_graph()
+        res = []
+        for facet in facets:
+            if not facet.use_for_feed:
+                continue
+            selector_values = {}
+            selector_fragments = {}
+            selector = facet.selector
+            if facet.dimension_label:
+                binding = facet.dimension_label
+                term = facet.dimension_label
+            else:
+                binding = qname_graph.qname(facet.rdftype).replace(":", "_")
+                term = util.uri_leaf(facet.rdftype)
+
+            feedset = Feedset(label=facet.label % {'term': term},
+                              feeds=[],
+                              predicate=facet.rdftype)
+
+            for row in data:
+                try:
+                    selected = selector(row, binding, self.commondata)
+                    selector_values[selected] = True
+                    selector_fragments[selected] = facet.identificator(row, binding, self.commondata)
+                except KeyError: # as e:
+                    # this will happen a lot on simple selector
+                    # functions when handed incomplete data
+                    pass
+            for value in sorted(list(selector_values.keys()), reverse=facet.selector_descending):
+                urlfragment = selector_fragments[value]
+                feedset.feeds.append(Feed(slug=value,
+                                          title=facet.pagetitle % {'term': term,
+                                                                   'selected': value},
+                                          binding=binding,
+                                          value=urlfragment))
+            res.append(feedset)
+        return res
+
+    def news_select_for_feeds(self, data, feedsets, facets):
+        """Go through all data rows (each row representing a document)
+        and, for each newsfeed, select those document entries that are to
+        appear in that feed
+         
+        :param data: List of dicts as returned by 
+                     :meth:`~ferenda.DocumentRepository.news_select`
+        :param feedsets: Result from 
+                         :meth:`~ferenda.DocumentRepository.news_feedsets`
+        :param facets: Result from :meth:`~ferenda.DocumentRepository.facets`
+        :returns: mapping between a (binding, value) tuple and entries for 
+                  that tuple
+        """
+
+        res = {}
+        from pudb import set_trace; set_trace()
+        qname_graph = self.make_graph()
+        facets = [f for f in facets if f.use_for_feed]
+        for feedset, facet in zip(feedsets, facets):
+            documents = defaultdict(list)
+            if facet.dimension_label:
+                binding = facet.dimension_label
+            else:
+                binding = qname_graph.qname(facet.rdftype).replace(":", "_")
+            
+            for row in data:
+                try:
+                    key = facet.selector(row, binding, self.commondata)
+                    documents[key].append(row)
+                except KeyError:
+                    pass
+            for key in documents.keys():
+                # find appropriate page in feedset and read it's basefile
+                for page in feedset.feeds:
+                    if page.linktext == key:
+                        keyfunc = functools.partial(facet.key,
+                                                    binding=binding,
+                                                    resource_graph=self.commondata)
+                        s = sorted(documents[key],
+                                   key=keyfunc,
+                                   reverse=facet.key_descending)
+                        res[(page.binding, page.value)] = [self.news_item(binding, row)
+                                                           for row in s]
+        return res
+        
 
     def news_entries(self):
-        """Return a generator of all available entries, represented as tuples
-        of (DocumentEntry, rdflib.Graph) objects. The Graph contains
-        all distilled metadata about the document.
-
+        """Return a generator of all available (and published) DocumentEntry objects.
         """
         directory = os.path.sep.join((self.config.datadir, self.alias, "entries"))
         for basefile in self.store.list_basefiles_for("news"):
             path = self.store.documententry_path(basefile)
             entry = DocumentEntry(path)
+            dirty = False
             if not entry.published:
                 # not published -> shouldn't be in feed
                 continue
-            if not entry.id:
-                entry.id = self.canonical_uri(basefile)
-            if not entry.url:
-                entry.url = self.generated_url(basefile)
-            if not entry.basefile:
-                entry.basefile = basefile
 
             if not os.path.exists(self.store.distilled_path(basefile)):
-                self.log.warn("%s: No distilled file at %s, skipping" % (basefile,
-                                                                         self.store.distilled_path(basefile)))
+                self.log.warn("%s: No distilled file at %s, skipping" %
+                              (basefile,
+                               self.store.distilled_path(basefile)))
                 continue
 
-            dcterms = self.ns['dcterms']
+            # make sure common (and needed) properties are in fact set
+            if not entry.id:
+                entry.id = self.canonical_uri(basefile)
+                dirty = True
+            if not entry.url:
+                entry.url = self.generated_url(basefile)
+                dirty = True
+            if not entry.basefile:
+                entry.basefile = basefile
+                dirty = True
             if not entry.title:
-                try:
-                    g = Graph()
-                    g.parse(self.store.distilled_path(basefile))
-                    desc = Describer(g, entry.id)
-                    entry.title = desc.getvalue(dcterms.title)
-                except KeyError:  # no dcterms:title -- not so good
-                    self.log.warn("%s: No title available" % basefile)
-                    entry.title = entry.id
+                entry.title = entry.id
+                dirty = True
 
-            try:
-                entry.summary = desc.getvalue(dcterms.abstract)
-            except KeyError:  # no dcterms:abstract -- that's OK
-                pass
-
-            # 4: Set links to RDF metadata and document content
+            # Set links to RDF metadata and document content
             if not entry.link:
                 entry.set_link(self.store.distilled_path(basefile),
                                self.distilled_url(basefile))
+                dirty = True
 
             # If we just republish eg. the original PDF file and don't
             # attempt to parse/enrich the document
@@ -2621,9 +2757,12 @@ WHERE {
                     # element, separate from the set_link <link>
                     entry.set_content(self.store.parsed_path(basefile),
                                       self.parsed_url(basefile))
+                dirty = True
+            if dirty:
+                entry.save()
             yield entry
 
-    def news_write_atom(self, entries, title, basefile, archivesize=1000):
+    def news_write_atom(self, entries, title, slug, archivesize=1000):
         """Given a list of Atom entry-like objects, including links to RDF
         and PDF files (if applicable), create a rinfo-compatible Atom feed,
         optionally splitting into archives."""
@@ -2632,7 +2771,7 @@ WHERE {
         # function code only sets up basic constants and splits the
         # entries list into appropriate chunks
         def write_file(entries, suffix="", prevarchive=None, nextarchive=None):
-            feedfile = self.store.path(basefile + suffix, 'feed', '.atom')
+            feedfile = self.store.resourcepath("feed/%s%s.atom" % (slug, suffix))
             nsmap = {None: 'http://www.w3.org/2005/Atom',
                      'le': 'http://purl.org/atompub/link-extensions/1.0'}
             E = ElementMaker(nsmap=nsmap)
@@ -2700,7 +2839,7 @@ WHERE {
             return feedfile
 
         assert isinstance(entries, list), 'entries should be a list, not %s' % type(entries)
-        feedurl = self.generic_url(basefile, 'feed', '.atom')
+        feedurl = self.generic_url(slug, 'feed', '.atom')
         # not sure abt this - should be uri of dataset?
         feedid = feedurl
 
@@ -2715,20 +2854,20 @@ WHERE {
             entries[:] = entries[:-archivesize]
 
             if cnt > 1:
-                prev = "%s-archive-%s.atom" % (basefile, cnt - 1)
+                prev = "%s-archive-%s.atom" % (slug, cnt - 1)
             else:
                 prev = None
             if len(entries) < archivesize * 2:
-                next = "%s.atom" % basefile
+                next = "%s.atom" % slug
             else:
-                next = "%s-archive-%s.atom" % (basefile, cnt + 1)
+                next = "%s-archive-%s.atom" % (slug, cnt + 1)
             suffix = suffix = '-archive-%s' % cnt
             res.append(write_file(archiveentries, suffix=suffix,
                                   prevarchive=prev,
                                   nextarchive=next))
 
         res.insert(0, write_file(entries,
-                                 prevarchive="%s-archive-%s.atom" % (basefile, cnt)))
+                                 prevarchive="%s-archive-%s.atom" % (slug, cnt)))
         return res
 
     def frontpage_content(self, primary=False):
@@ -2988,14 +3127,14 @@ WHERE {
                             pseudobasefile = "/".join(params)
                         else:
                             pseudobasefile = "index"
-                        path = self.store.path(pseudobasefile, 'toc', '.html')
+                        path = self.store.resourcepath("toc/%s.html" % pseudobasefile)
                         contenttype = "text/html"
                     elif contenttype == "text/plain" or suffix == "nt":
                         contenttype = "text/plain"
-                        path = self.store.path("dump", "distilled", ".nt")
+                        path = self.store.resourcepath("distilled/dump.nt")
                     elif contenttype in rdfformats:
                         g = Graph()
-                        g.parse(self.store.path("dump", "distilled", ".nt"),
+                        g.parse(self.store.resourcepath("distilled/dump.nt"),
                                 format="nt")
                         data = g.serialize(format=rdfformats[accept])
                     elif suffix in rdfsuffixes:
@@ -3003,7 +3142,7 @@ WHERE {
                         # "rdf" -> "pretty-xml" -> "application/rdf+xml"
                         contenttype = revformats[rdfsuffixes[suffix]]
                         g = Graph()
-                        g.parse(self.store.path("dump", "distilled", ".nt"),
+                        g.parse(self.store.resourcepath("distilled/dump.nt"),
                                 format="nt")
                         data = g.serialize(format=rdfsuffixes[suffix])
 

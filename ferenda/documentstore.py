@@ -68,6 +68,13 @@ class DocumentStore(object):
             fp = open(filename, mode)
             yield fp
 
+
+    # TODO: Maybe this is a worthwhile extension to the API? Could ofc
+    # easily be done everywhere where a non-document related path is
+    # needed.
+    def resourcepath(self, resourcename):
+        return self.datadir + os.sep + resourcename.replace("/", os.sep)
+
     def path(self, basefile, maindir, suffix, version=None, attachment=None, storage_policy=None):
         """Calculate a full filesystem path for the given parameters.
 
@@ -155,12 +162,12 @@ class DocumentStore(object):
 
     @contextmanager
     def open(self, basefile, maindir, suffix, mode="r", version=None, attachment=None):
-        """
-        Context manager that opens files for reading or
-        writing. The parameters are the same as for :meth:`~ferenda.DocumentStore.path`, and the
-        note is applicable here as well -- use
-        :meth:`~ferenda.DocumentStore.open_downloaded`, :meth:`~ferenda.DocumentStore.open_parsed` et al if
-        possible.
+        """Context manager that opens files for reading or writing. The
+        parameters are the same as for
+        :meth:`~ferenda.DocumentStore.path`, and the note is
+        applicable here as well -- use
+        :meth:`~ferenda.DocumentStore.open_downloaded`,
+        :meth:`~ferenda.DocumentStore.open_parsed` et al if possible.
 
         Example:
         
@@ -241,6 +248,7 @@ class DocumentStore(object):
 
         if not os.path.exists(directory):
             return
+
 
         # FIXME: Some stores need a more sophisticated way of filtering than this.
         for x in util.list_dirs(directory, suffix, reverse=True):

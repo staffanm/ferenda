@@ -387,12 +387,12 @@ class SFS(Trips):
         # IP-based URLs stopped working. Fortunaltely the DNS-based
         # ones has been sped up.
         
-        # for p in ('document_url_template',
-        #           'document_sfsr_url_template',
-        #           'document_sfsr_change_url_template'):
-        #     setattr(self, p,
-        #             getattr(self, p).replace('rkrattsbaser.gov.se',
-        #                                    '62.95.69.15'))
+#        for p in ('document_url_template',
+#                  'document_sfsr_url_template',
+#                  'document_sfsr_change_url_template'):
+#            setattr(self, p,
+#                    getattr(self, p).replace('rkrattsbaser.gov.se',
+#                                           '62.95.69.15'))
         from ferenda.manager import loglevels
         self.trace = {}
         for logname in ('paragraf', 'tabell', 'numlist', 'rubrik'):
@@ -1002,6 +1002,7 @@ class SFS(Trips):
                 rp.append(obs[uri])
 
         doc.body.append(reg)
+        self.parse_entry_update(doc)
         return True
 
     def _forfattningstyp(self, forfattningsrubrik):

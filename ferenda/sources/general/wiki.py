@@ -257,6 +257,23 @@ class MediaWiki(DocumentRepository):
                     element.append(str(child.tail))
         return element
 
+    @classmethod
+    def generate_all_setup(cls, config):
+        # This is not a document repository that produces its own
+        # pages -- rather, it creates description metadata (through
+        # download/parse/relate) that other repos (primarily Keyword)
+        # can use. THerefore, we return False in this setup method to
+        # signify that no work needs to be done
+        return False
+
+    def toc(self, otherrepos=[]):
+        # and no toc either
+        return 
+
+    def news(self, otherrepos=[]):
+        # nor newsfeeds
+        return
+
 #    # differ from the default relate_triples in that it uses a different
 #    # context for every basefile and clears this beforehand.
 #    # Note that a basefile can contain statements

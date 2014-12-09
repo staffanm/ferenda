@@ -749,7 +749,15 @@ class DV(SwedishLegalSource):
                           self.ns['rinfoex'].patchdescription,
                           Literal(patchdesc)))
         doc.body = self.format_body(rawbody, doc.basefile)
+        self.parse_entry_update(doc)
+        
         return True
+
+
+    def parse_entry_title(self, doc):
+        title = doc.meta.value(URIRef(doc.uri), self.ns['rpubl'].referatrubrik)
+        if title:
+            return str(title)
 
     # smth like this
     def sanitize_body(self, rawbody):
@@ -2071,6 +2079,7 @@ class DV(SwedishLegalSource):
         return [Facet(RPUBL.rattsfallspublikation,
                       indexingtype=fulltextindex.Resource(),
                       use_for_toc=True,
+                      use_for_feed=True,
                       #selector=Facet.resourcelabel,
                       selector=myselector,
                       key=Facet.resourcelabel,
