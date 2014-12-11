@@ -690,3 +690,24 @@ def json_default_date(obj):
     if isinstance(obj, (datetime.datetime, datetime.date)):
         return obj.isoformat()
     raise TypeError("%r is not JSON serializable" % obj)
+
+# return a callable that you can pass as the object_hook to
+# json.load. Any field that is given in *fields will be converted to a
+# datetime.
+def make_json_date_object_hook(*fields):
+    def myhook(d):
+        strp = datetime.datetime.strptime
+        for (key, value) in d.items():
+            # if fields are provided, only try to convert those fields,
+            # otherwise, try anything that looks like a datetime
+            if key in fields or not fields:
+                try:
+                    d[key] = strp(d[key], '%Y-%m-%dT%H:%M:%S.%f')
+                except:
+                    try:
+                        # no fractional part
+                        d[key] = strp(d[key], '%Y-%m-%dT%H:%M:%S')
+                    except: #
+                        pass
+        return d
+    return myhook

@@ -2579,7 +2579,7 @@ WHERE {
         # decorate datadict with entries
         for entry in self.news_entries():
             # let's just hope that there always is one?
-            assert entry.id in d
+            assert entry.id in datadict
             d = datadict[entry.id]
             for prop in ('updated', 'published', 'basefile', 'title', 'summary', 'content', 'link'):
                 d[prop] = getattr(entry, prop)
@@ -2587,6 +2587,7 @@ WHERE {
         # create an object for each Atom feed. This should include a
         # "main" feed that will contain all (published) entries in the
         # docrepo
+        facets = self.facets()
         feedsets = self.news_feedsets(data, facets)
 
         # fill each such feed with relevant entries according to selectors
@@ -2614,7 +2615,8 @@ WHERE {
                                            outfile)
 
     def news_feedsets(self, data, facets):
-        """Calculate the set of needed feedsets based on facets and instance values in the data
+        """Calculate the set of needed feedsets based on facets and instance
+        values in the data
 
         :param data: list of dicts, each dict containing metadata about
                      a single document
@@ -2676,7 +2678,6 @@ WHERE {
         """
 
         res = {}
-        from pudb import set_trace; set_trace()
         qname_graph = self.make_graph()
         facets = [f for f in facets if f.use_for_feed]
         for feedset, facet in zip(feedsets, facets):

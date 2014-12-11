@@ -773,23 +773,13 @@ class ElasticSearchIndex(RemoteIndex):
         return relurl, json.dumps(payload, indent=4, default=util.json_default_date)
 
     def _decode_query_result(self, response, pagenum, pagelen):
-        def date_hook(d):
-            # attempt to decode (a subset of) isoformatted datetimes
-            # ("2013-02-14T14:06:00"). Note that this will incorrectly
-            # decode anything that looks like a ISO date, even though
-            # it might be typed as a string. We have no typing
-            # information (at this stage -- we could look at
-            # self.schema() though)
-            for (key, value) in d.items():
-                #if isinstance(value, str) and len(value) != 19:
-                #    return d
-                try:
-                    d[key] = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")
-                except:
-                    pass
-            return d
-            
-        jsonresp = json.loads(response.text, object_hook=date_hook)
+        # attempt to decode iso-formatted datetimes
+        # ("2013-02-14T14:06:00"). Note that this will incorrectly
+        # decode anything that looks like a ISO date, even though it
+        # might be typed as a string. We have no typing information
+        # (at this stage -- we could look at self.schema() though)
+        jsonresp = json.loads(response.text,
+                              object_hook=util.make_json_date_object_hook())
 
         res = []
         for hit in jsonresp['hits']['hits']:

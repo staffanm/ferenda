@@ -84,23 +84,16 @@ class DocumentEntry(object):
 
     
     def __init__(self, path=None):
-        # for json serialization
-        def myhook(d):
-            for key in ('orig_created', 'orig_updated', 'orig_checked',
-                        'published', 'updated', 'indexed_ts', 'indexed_dep',
-                        'indexed_ft'):
-                if key in d and d[key]:
-                    try:
-                        dt = datetime.strptime(d[key], '%Y-%m-%dT%H:%M:%S.%f')
-                    except ValueError:
-                        # no fractional part
-                        dt = datetime.strptime(d[key], '%Y-%m-%dT%H:%M:%S')
-                    d[key] = dt
-            return d
-
         if path and os.path.exists(path):
             with open(path) as fp:
-                d = json.load(fp, object_hook=myhook)
+                hook = util.make_json_date_object_hook('orig_created',
+                                                       'orig_updated',
+                                                       'orig_checked',
+                                                       'published', 'updated',
+                                                       'indexed_ts',
+                                                       'indexed_dep',
+                                                       'indexed_ft')
+                d = json.load(fp, object_hook=hook)
             self.__dict__.update(d)
             self._path = path
         else:
