@@ -50,7 +50,8 @@ Classes
    api/facet
    api/tocpage
    api/tocpageset
-   api/newscriteria
+   api/feed
+   api/feedset
    api/elements
    api/elements-html
    api/describer

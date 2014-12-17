@@ -17,18 +17,33 @@ define the method of grouping. These include the RDF predicate that
 contains the data used for grouping, the datatype to be used for that
 data, functions (or other callables) that sorts the data into discrete
 groups, and other parameters that affect eg. the sorting order or if a
-particular facet is used in a particular context.
+particular facet is used in a particular context. 
 
-The grouping is primarily done through a selector function. The
-selector function recieves a dict with some basic information about
-one document, the name of the current facet (binding), and optionally
-some repo-dependent extra data in the form of an RDF graph. It should
-return a single string. The selector is called once (at least) for
-every document in the docrepo, and each resulting group contains those
-documents that the selector returned identical strings for. As a
-simple example, a selector may group documents into years of
-publication by finding the date of the ``dcterms:issued`` property and
-extracting the year part of it.
+Selectors and identificators
+----------------------------
+
+The grouping is primarily done through a *selector function*. The
+selector function recieves three arguments:
+
+* a dict with some basic information about one document,
+* the name of the current facet (binding), and
+* optionally some repo-dependent extra data in the form of an RDF graph.
+
+It should return a single string. The selector is called once for
+every document in the docrepo, and each document is sorted in one (or
+more, see below) group identified by that string. As a simple example,
+a selector may group documents into years of publication by finding
+the date of the ``dcterms:issued`` property and extracting the year
+part of it. The string returned by the should be suitable for end-user
+display. 
+
+Each facet also has a similar function called the *identificator
+function*. It recieves the same arguments as the selector function,
+but should return a string that is well suited for eg. a URI fragment,
+ie. not contain spaces or non-ascii characters.
+
+The :py:class:`~ferenda.Facet` class has a number of classmethods that
+can act as selectors and/or identificators.
 
 Contexts where facets are used
 ------------------------------
