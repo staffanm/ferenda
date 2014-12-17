@@ -730,19 +730,23 @@ the same headers, footers, navigation menus etc used by
 :meth:`~ferenda.DocumentRepository.generate`) and `Atom
 syndication format <http://www.ietf.org/rfc/rfc4287.txt>`_ files.
 
-You can specify some basic criteria similar to the way you specified
-the organization of your TOC pages, since you might want to split up
-the documents in different feeds, for example one feed for each RFC
-track.
+The facets you've defined for your docrepo are re-used to create news
+feeds for eg. all documents published by a particular entity, or all
+documents of a certain type. Only facet objects which has the
+``use_for_feed`` property set to a truthy value are used to construct
+newsfeeds. 
+
+In this example, we adjust the facet based on ``dcterms:subject`` so
+that it can be used for newsfeed generation.
 
 .. literalinclude:: examples/rfcs.py
-   :start-after: # begin news_criteria
-   :end-before: # end news_criteria
+   :start-after: # begin news_facets
+   :end-before: # end news_facets
 
 When running ``news``, this will create five different atom feeds
 (which are mirrored as HTML pages) under ``data/rfc/news``: One
 containing all documents, and four others that contain documents in a
-particular category.
+particular category (eg having a particular ``dcterms:subject`` value.
 		
 .. note::
 
@@ -750,9 +754,6 @@ particular category.
    the edges. Also, there isn't currently any way of discovering the
    Atom feeds or HTML pages from the main site -- you need to know the
    URLs. This will all be fixed in due time.
-
-   The news generation does not make use the Facet objects that we've
-   defined. This will be fixed in later releases of Ferenda.
 		
 Se also :doc:`news`.
 

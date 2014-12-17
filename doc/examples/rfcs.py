@@ -320,31 +320,24 @@ class RFCs(DocumentRepository):
                      uri=row['uri'])]
 # end toc_item
 
-# begin news_criteria
-    def news_criteria(self):
-        from ferenda import Describer, NewsCriteria
-        from rdflib import Graph
-        
-        # function that returns a closure, which acts as a custom
-        # selector function for the NewsCriteria objects.
-        def selector_for(category):
-            def selector(entry):
-                graph = Graph()
-                graph.parse(self.store.distilled_path(entry.basefile))
-                desc = Describer(graph, entry.id)
-                return desc.getvalue(self.ns['dcterms'].subject) == category
-            return selector
-            
-        return [NewsCriteria('all','All RFCs'),
-                NewsCriteria('informational', 'Informational RFCs',
-                             selector=selector_for("Informational")),
-                NewsCriteria('bcp', 'Best Current Practice RFCs',
-                             selector=selector_for("Best Current Practice")),
-                NewsCriteria('experimental', 'Experimental RFCs',
-                             selector=selector_for("Experimental")),
-                NewsCriteria('standards', 'Standards Track RFCs',
-                             selector=selector_for("Standards Track"))]
-# end news_criteria
+# begin news_facets
+    def facets(self):
+        def select_rfcnum(row, binding, resource_graph):
+            # "RFC 6998" -> "6900"
+            return row[binding][4:-2] + "00"
+        from ferenda import Facet
+        return [Facet(self.ns['dcterms'].title),
+                Facet(self.ns['dcterms'].issued),
+                Facet(self.ns['dcterms'].subject,
+                      selector=Facet.defaultselector,
+                      identificator=Facet.defaultselector,
+                      key=Facet.defaultselector,
+                      use_for_feed=True),
+                Facet(self.ns['dcterms'].identifier,
+                      use_for_toc=True,
+                      selector=select_rfcnum,
+                      pagetitle="RFC %(selected)s00-%(selected)s99")]
+# end news_facets
 
 # begin frontpage_content
     def frontpage_content(self, primary=False):
