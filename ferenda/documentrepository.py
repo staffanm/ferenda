@@ -5,6 +5,7 @@ from collections import defaultdict
 from datetime import datetime
 from tempfile import mkstemp
 from io import BytesIO
+from operator import itemgetter
 from wsgiref.handlers import format_date_time as format_http_date
 from wsgiref.util import request_uri
 import codecs
@@ -25,7 +26,7 @@ from ferenda.compat import OrderedDict
 # 3rd party
 from lxml import etree
 from lxml.builder import ElementMaker
-from rdflib import Graph, Literal, Namespace, URIRef, RDF
+from rdflib import Graph, Literal, Namespace, URIRef, RDF, RDFS
 from rdflib.namespace import FOAF
 import bs4
 import lxml.html
@@ -2440,7 +2441,6 @@ WHERE {
 
         # to 1-dimensional dict (odict?): {(binding,value): [list-of-Elements]}
         res = {}
-        from pudb import set_trace; set_trace()
         qname_graph = self.make_graph()
         facets = [f for f in facets if f.use_for_toc]
         for pageset, facet in zip(pagesets, facets):
@@ -2569,20 +2569,12 @@ WHERE {
 
         """
         params = {}
-        # faceted_data employs caching 
-        data = self.faceted_data()
-
-        # transform list of dicts into a dict with the uri field as
-        # key and teh entire dict as value, for fast lookup in the next step
-        datadict = dict([(x['uri'], x) for x in data])
-
-        # decorate datadict with entries
-        for entry in self.news_entries():
-            # let's just hope that there always is one?
-            assert entry.id in datadict
-            d = datadict[entry.id]
-            for prop in ('updated', 'published', 'basefile', 'title', 'summary', 'content', 'link'):
-                d[prop] = getattr(entry, prop)
+        # faceted_data employs caching
+        with util.logtime(self.log.debug,
+                          "news: selected %(rowcount)s decorated rows (%(elapsed).3f sec)",
+                          params):
+            data = self.news_facet_entries()
+            params['rowcount'] = len(data)
 
         # create an object for each Atom feed. This should include a
         # "main" feed that will contain all (published) entries in the
@@ -2594,25 +2586,41 @@ WHERE {
         feeds = self.news_select_for_feeds(data, feedsets, facets)
 
         # generate them feeds
-        conffile = os.path.abspath(
-            os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
-        docroot = os.path.dirname(self.store.resourcepath('feed/foo.x'))
-        transformer = Transformer("XSLT", "res/xsl/atom.xsl", ["res/xsl"],
-                                  docroot, config=conffile)
-        for feedset in feedsets:
-            for feed in feedset.feeds:
-                # should reverse=True be configurable? For datetime
-                # properties it makes sense to use most recent first, but
-                # maybe other cases?
-                entries = sorted(feed.entries, key=feed.key, reverse=True)
-                self.log.info("feed %s: %s entries" % (feed.slug, len(entries)))
-                self.news_write_atom(entries,
-                                     feed.title,
-                                     feed.slug)
+        self.news_generate_feeds(feeds)
 
-                outfile = self.store.resourcepath('feed/%s.html' % feed.slug)
-                transformer.transform_file(self.store.atom_path(feed.slug),
-                                           outfile)
+
+    def news_facet_entries(self, keyfunc=itemgetter('updated'), reverse=True):
+        # there is no easy way to make this expensive function use
+        # cached data, as it needs to return proper DocumentEntries
+        # (with dict for properties), which only can be created by
+        # reading JSON files.
+        data = self.faceted_data()
+
+        # transform list of dicts into a dict with the uri field as
+        # key and teh entire dict as value, for fast lookup in the next step
+        datadict = dict([(x['uri'], x) for x in data])
+
+        ret = []
+        # decorate datadict with entries
+        for entry in self.news_entries():
+            # let's just hope that there always is one?
+            assert entry.id in datadict
+            d = datadict[entry.id]
+            # or maybe we should just stash the DocumentEntry object in the
+            # correct row of the faceted data? like:
+            # d['entry'] = entry
+            #
+            # note in particular that the row/dict will have both a
+            # uri and a url field (where the latter should be the URL
+            # where the browser-ready file is published wich may or
+            # may not be identical to the canonical URI of the
+            # document).
+            for prop in ('updated', 'published', 'basefile', 'title',
+                         'summary', 'content', 'link', 'url'):
+                d[prop] = getattr(entry, prop)
+            ret.append(d)
+        return sorted(ret, key=keyfunc, reverse=reverse)
+
 
     def news_feedsets(self, data, facets):
         """Calculate the set of needed feedsets based on facets and instance
@@ -2646,7 +2654,7 @@ WHERE {
 
             for row in data:
                 try:
-                    selected = selector(row, binding, self.commondata)
+                    selected = facet.selector(row, binding, self.commondata)
                     selector_values[selected] = True
                     selector_fragments[selected] = facet.identificator(row, binding, self.commondata)
                 except KeyError: # as e:
@@ -2655,12 +2663,22 @@ WHERE {
                     pass
             for value in sorted(list(selector_values.keys()), reverse=facet.selector_descending):
                 urlfragment = selector_fragments[value]
-                feedset.feeds.append(Feed(slug=value,
-                                          title=facet.pagetitle % {'term': term,
-                                                                   'selected': value},
+                slug = term + "/" + urlfragment.lower()
+                title = facet.pagetitle % {'term': term,
+                                           'selected': value}
+                feedset.feeds.append(Feed(slug=slug,
+                                          title=title,
                                           binding=binding,
                                           value=urlfragment))
             res.append(feedset)
+
+        # finally add the built-in All feedset, which has only one feed.
+        res.append(Feedset(label="All",
+                           feeds=[Feed(slug="main",
+                                       title="All documents",
+                                       binding=None,
+                                       value=None)]))
+                                       
         return res
 
     def news_select_for_feeds(self, data, feedsets, facets):
@@ -2669,17 +2687,24 @@ WHERE {
         appear in that feed
          
         :param data: List of dicts as returned by 
-                     :meth:`~ferenda.DocumentRepository.news_select`
-        :param feedsets: Result from 
+                     :meth:`~ferenda.DocumentRepository.news_facet_entries`
+        :param feedsets: List of feedset objects, the result from 
                          :meth:`~ferenda.DocumentRepository.news_feedsets`
         :param facets: Result from :meth:`~ferenda.DocumentRepository.facets`
         :returns: mapping between a (binding, value) tuple and entries for 
-                  that tuple
+                  that tuple!
         """
 
         res = {}
         qname_graph = self.make_graph()
         facets = [f for f in facets if f.use_for_feed]
+        # note: the last feedset will contain all published documents
+        # in the repo. There is no corresponding facet. So we fake one
+        # that accepts all and sorts everything in the same bucket
+        facets.append(Facet(rdftype=RDFS.Resource, # all the things
+                            identificator=lambda x, y, z: None,
+                            selector=lambda x, y, z: None,
+                            key=lambda row, binding, resource_graph: row['updated']))
         for feedset, facet in zip(feedsets, facets):
             documents = defaultdict(list)
             if facet.dimension_label:
@@ -2689,24 +2714,31 @@ WHERE {
             
             for row in data:
                 try:
-                    key = facet.selector(row, binding, self.commondata)
+                    key = facet.identificator(row, binding, self.commondata)
                     documents[key].append(row)
                 except KeyError:
                     pass
             for key in documents.keys():
-                # find appropriate page in feedset and read it's basefile
-                for page in feedset.feeds:
-                    if page.linktext == key:
+                # find appropriate feed in feedset and read it's basefile
+                for feed in feedset.feeds:
+                    if feed.value == key:
                         keyfunc = functools.partial(facet.key,
                                                     binding=binding,
                                                     resource_graph=self.commondata)
                         s = sorted(documents[key],
                                    key=keyfunc,
                                    reverse=facet.key_descending)
-                        res[(page.binding, page.value)] = [self.news_item(binding, row)
-                                                           for row in s]
-        return res
-        
+                        feed.entries = [self.news_item(binding, entry)
+                                        for entry in s]
+        return feedsets
+
+    # it's possible this should be a property on a Facet object like
+    # selector and indentificator are, but fow now this is congruent
+    # with toc_item
+    def news_item(self, binding, entry):
+        # the default impl doesn't change a thing, but other impls
+        # might fiddle with title and summary
+        return entry
 
     def news_entries(self):
         """Return a generator of all available (and published) DocumentEntry objects.
@@ -2763,6 +2795,29 @@ WHERE {
                 entry.save()
             yield entry
 
+    def news_generate_feeds(self, feeds, generate_html=True):
+        # generates Atom feeds AND HTML equivalents
+        if generate_html:
+            conffile = os.path.abspath(
+                os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
+            docroot = os.path.dirname(self.store.resourcepath('feed/foo.x'))
+            transformer = Transformer("XSLT", "res/xsl/atom.xsl", ["res/xsl"],
+                                      docroot, config=conffile)
+        for feedset in feedsets:
+            for feed in feedset.feeds:
+                # should reverse=True be configurable? For datetime
+                # properties it makes sense to use most recent first, but
+                # maybe other cases?
+                entries = sorted(feed.entries, key=feed.key, reverse=True)
+                self.log.info("feed %s: %s entries" % (feed.slug, len(entries)))
+                self.news_write_atom(entries,
+                                     feed.title,
+                                     feed.slug)
+                if generate_html:
+                    outfile = self.store.resourcepath('feed/%s.html' % feed.slug)
+                    transformer.transform_file(self.store.atom_path(feed.slug),
+                                               outfile)
+
     def news_write_atom(self, entries, title, slug, archivesize=1000):
         """Given a list of Atom entry-like objects, including links to RDF
         and PDF files (if applicable), create a rinfo-compatible Atom feed,
@@ -2780,7 +2835,10 @@ WHERE {
             # entries SHOULD at this point be a list of DocumentEntry
             # object, not (DocumentEntry, Graph).
             if entries:
-                updated = max(entries, key=lambda x: x.updated).updated
+                # entries should now not be DocumentEntries but rather
+                # dicts containing the same information
+                assert isinstance(entries[0], dict)
+                updated = max(entries, key=itemgetter('updated'))['updated']
             else:
                 updated = datetime.now()  # or never
             contents = [E.id(feedid),
@@ -2800,29 +2858,30 @@ WHERE {
                                         'href': nextarchive}))
 
             for entry in entries:
-                entrynodes = [E.title(entry.title),
-                              E.summary(str(entry.summary)),
-                              E.id(entry.id),
-                              E.published(util.rfc_3339_timestamp(entry.published)),
-                              E.updated(util.rfc_3339_timestamp(entry.updated)),
-                              E.link({'href': util.relurl(entry.url, feedurl)})]
-                if entry.link:
+                assert isinstance(entry, dict)
+                entrynodes = [E.title(entry['title']), # 
+                              E.summary(str(entry['summary'])),
+                              E.id(entry['uri']), # 
+                              E.published(util.rfc_3339_timestamp(entry['published'])),
+                              E.updated(util.rfc_3339_timestamp(entry['updated'])),
+                              E.link({'href': util.relurl(entry['url'], feedurl)})]
+                if entry['link']:
                     node = E.link({'rel': 'alternate',
-                                   'href': util.relurl(entry.link['href'],
+                                   'href': util.relurl(entry['link']['href'],
                                                        feedurl),
-                                   'type': entry.link['type'],
-                                   'length': str(entry.link['length']),
-                                   'hash': entry.link['hash']})
+                                   'type': entry['link']['type'],
+                                   'length': str(entry['link']['length']),
+                                   'hash': entry['link']['hash']})
                     entrynodes.append(node)
-                if entry.content and entry.content['markup']:
+                if entry['content'] and entry['content']['markup']:
                     node = E.content({'type': 'xhtml'},
-                                     etree.XML(entry.content['markup']))
+                                     etree.XML(entry['content']['markup']))
                     entrynodes.append(node)
-                elif entry.content and entry.content['src']:
-                    node = E.content({'src': util.relurl(entry.content['src'],
+                elif entry['content'] and entry['content']['src']:
+                    node = E.content({'src': util.relurl(entry['content']['src'],
                                                          feedurl),
-                                      'type': entry.content['type'],
-                                      'hash': entry.content['hash']})
+                                      'type': entry['content']['type'],
+                                      'hash': entry['content']['hash']})
                     entrynodes.append(node)
                 contents.append(E.entry(*list(entrynodes)))
             feed = E.feed(*contents)

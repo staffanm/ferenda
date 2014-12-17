@@ -3,7 +3,7 @@ from __future__ import unicode_literals, print_function
 
 import sys, os
 from datetime import datetime, timedelta
-from operator import attrgetter
+from operator import attrgetter, itemgetter
 
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 from ferenda.manager import setup_logger; setup_logger('CRITICAL')
@@ -27,29 +27,38 @@ from ferenda.elements import Link
 from ferenda import Facet, Feedset, Feed, DocumentEntry, Describer
 
 # two testcase classes: the first (News) mostly tests handling entries
-# and constructing Atom feeds from them. The second (Feedsets) mostly
-# tests creating the correct set of feeds from given facets and
-# indata.
+# and constructing Atom feeds from them. Test data is 25 very similar
+# entries.
+
+# The second (Feedsets) mostly tests creating the correct set of feeds
+# from given facets and indata. Test data is 4 entries that match data
+# from testToc.
+
 class News(RepoTester):
+
     def setUp(self):
         super(News, self).setUp()
+        self.faceted_data = []
         # create a bunch of DocumentEntry objects and save them
         basetime = datetime(2013,1,1,12,0)
         for basefile in range(25):
             v = {'id':self.repo.canonical_uri(basefile),
                  'title':"Doc #%s" % basefile}
+            self.faceted_data.append({'uri': v['id'],
+                                      'dcterms_title': v['title'],
+                                      'rdf_type': 'http://xmlns.com/foaf/0.1/Document'})
             de = DocumentEntry()
             de.orig_created = basetime + timedelta(hours=basefile)
-            de.orig_updated = basetime + timedelta(hours=basefile,minutes=10)
-            de.orig_checked = basetime + timedelta(hours=basefile,minutes=20)
-            de.published    = basetime + timedelta(hours=basefile,minutes=30)
-            de.updated      = basetime + timedelta(hours=basefile,minutes=40)
+            de.orig_updated = basetime + timedelta(hours=basefile, minutes=10)
+            de.orig_checked = basetime + timedelta(hours=basefile, minutes=20)
+            de.published    = basetime + timedelta(hours=basefile, minutes=30)
+            de.updated      = basetime + timedelta(hours=basefile, minutes=40)
             de.orig_url     = "http://source.example.org/doc/%s" % basefile
             de.title        = v['title']
             de.save(self.repo.store.documententry_path(str(basefile)))
 
             g = rdflib.Graph()
-            desc = Describer(g,self.repo.canonical_uri(basefile))
+            desc = Describer(g, self.repo.canonical_uri(basefile))
             dcterms = self.repo.ns['dcterms']
             desc.rdftype(self.repo.ns['foaf'].Document)
             desc.value(dcterms.title, "Invalid title")
@@ -81,19 +90,43 @@ class News(RepoTester):
     <h1>%(title)s</h1>
   </body>
 </html>""" % v)
-        
-
     def test_news(self):
         # should test the main method, not the helpers. That'll
         # require mocking most methods.
-        with patch("ferenda.documentrepository.Transformer"):
-            # FIXME: To test the entire news() body we need to put it
-            # in the fulltext index
-            for basefile in range(25):
-                self.repo.relate(str(basefile))
-            self.repo.news()
+        self.repo.news_facet_entries = MagicMock()
+        self.repo.facets = MagicMock()
+        self.repo.news_feedsets = Mock()
+        self.repo.news_select_for_feeds = Mock()
+        self.repo.news_generate_feeds = Mock()
 
-    def test_entries(self):
+        # this isn't really a good test -- it only verifies the
+        # internal implementation of the main method not the
+        # behaviour. But other tests verifieds behaviour of individual
+        # methods.
+        self.repo.news()
+        self.repo.news_facet_entries.assert_called()
+        self.repo.facets.assert_called()
+        self.repo.news_feedsets.assert_called()
+        self.repo.news_select_for_feeds.assert_called()
+        self.repo.news_generate_feeds.assert_called()
+
+
+    def test_news_facet_entries(self):
+        # setup makes sure that a bunch of DocumentEntry objects
+        # exists, and that repo.faceted_data returns a list of dict
+        # that corresponds with this
+        self.repo.faceted_data = Mock(return_value=self.faceted_data)
+        faceted_entries = self.repo.news_facet_entries()
+        self.assertEqual(faceted_entries[0]['title'], "Doc #24")
+        self.assertEqual(faceted_entries[-1]['title'], "Doc #0")
+        self.assertEqual(faceted_entries[-1]['uri'], "http://localhost:8000/res/base/0")
+        self.assertEqual(faceted_entries[-1]['dcterms_title'], "Doc #0")
+        self.assertEqual(faceted_entries[-1]['rdf_type'],
+                         "http://xmlns.com/foaf/0.1/Document")
+        self.assertEqual(faceted_entries[-1]['updated'],
+                         datetime(2013, 1, 1, 12, 40))
+
+    def test_news_entries(self):
         unsorted_entries = self.repo.news_entries() # not guaranteed particular order
         # sort so that most recently updated first
         entries = sorted(list(unsorted_entries),
@@ -103,8 +136,9 @@ class News(RepoTester):
         self.assertEqual(entries[-1].title, "Doc #0")
 
     def test_incomplete_entries(self):
-        # make our entries incomplete in various ways
+        self.repo.faceted_data = Mock(return_value=self.faceted_data)
 
+        # make our entries incomplete in various ways
         entry = DocumentEntry(self.repo.store.documententry_path("1"))
         entry.published = None
         entry.save()
@@ -127,6 +161,10 @@ class News(RepoTester):
         self.assertEqual(len(list(self.repo.news_entries())),
                          23)
 
+        # also make sure that corresponding faceted_entries do not
+        # show these non-published entries
+        self.assertEqual(len(self.repo.news_facet_entries()), 23)
+
     def test_republishsource(self):
         self.repo.config.republishsource = True
         for basefile in range(25):
@@ -138,14 +176,14 @@ class News(RepoTester):
         self.assertEqual(entries[0].content['src'],
                          self.repo.downloaded_url("24"))
 
-
     def test_write_atom(self):
+        self.repo.faceted_data = Mock(return_value=self.faceted_data)
         self.maxDiff = None
-        unsorted_entries = self.repo.news_entries()
-        # particular order sort so that most recently updated first
-        # (simplified ver of what news() does)
+        # facet_entries isn't guaranteed to have any particular
+        # ordering
+        unsorted_entries = self.repo.news_facet_entries()
         entries = sorted(list(unsorted_entries),
-                         key=lambda x: x.updated, reverse=True)
+                         key=itemgetter('updated'), reverse=True)
 
         paths = self.repo.news_write_atom(entries, 'New and updated documents', 'main',
                                   archivesize=6)
@@ -227,6 +265,7 @@ class News(RepoTester):
 
 
     def test_write_atom_inline(self):
+        self.repo.faceted_data = Mock(return_value=self.faceted_data)
         for basefile in range(25):
             de = DocumentEntry(self.repo.store.documententry_path(str(basefile)))
             util.writefile(self.repo.store.parsed_path(str(basefile)),
@@ -236,9 +275,9 @@ class News(RepoTester):
                            inline=True)
             de.save()
 
-        unsorted_entries = self.repo.news_entries()
+        unsorted_entries = self.repo.news_facet_entries()
         entries = sorted(list(unsorted_entries),
-                         key=lambda x: x.updated, reverse=True)
+                         key=itemgetter('updated'), reverse=True)
         self.repo.news_write_atom(entries,
                                   'New and updated documents',
                                   'main',
@@ -270,9 +309,6 @@ class News(RepoTester):
         self.assertEqual(link.get("href"), linksrc)
         self.assertEqual(link.get("type"),'application/rdf+xml')
 
-    def test_custom_facet(self):
-        self.fail("Implement a test for this to replace the old test_custom_facet")
-
 
 class Feedsets(RepoTester):
     results2 = json.load(open("test/files/datasets/results2-plus-entries.json"),
@@ -284,48 +320,72 @@ class Feedsets(RepoTester):
               Facet(rdftype=DCTERMS.publisher),
               Facet(rdftype=DCTERMS.issued)]
     
-    feedsets = [Feedset(label="By publisher",
-                        feeds=[Feed(title="Books published by Nature",
-                                    slug="publisher/nature",
-                                    binding="dcterms_publisher",
-                                    value="http://example.org/journals/nature"),
-                               Feed(title="Books published by Biochem",
-                                    slug="publisher/biochem",
-                                    binding="dcterms_publisher",
-                                    value="http://example.org/journals/biochem"),
-                               Feed(title="Books published by Analytical",
-                                    slug="publisher/analytical",
-                                    binding="dcterms_publisher",
-                                    value="http://example.org/journals/analytical")]),
-                Feedset(label="By document type",
-                        feeds=[Feed(title="bibo:Book",
-                                    slug="type/book",
-                                    binding="rdf_type",
-                                    value="http://purl.org/ontology/bibo/Book")]),
-                Feedset(label="main",
-                        feeds=[Feed(title="All documents in base",
-                                    slug="main",
-                                    binding=None,
-                                    value=None)])]
+    feedsets = [
+        Feedset(label="Sorted by type",
+                predicate=RDF.type,
+                feeds=[Feed(title="All Book documents",
+                            slug="type/book",
+                            binding="rdf_type",
+                            value="Book")]),
+        Feedset(label="Sorted by publisher",
+                predicate=DCTERMS.publisher,
+                feeds=[Feed(title="Documents published by Analytical Biochemistry",
+                            slug="publisher/analytical",
+                            binding="dcterms_publisher",
+                            value="analytical"),
+                       Feed(title="Documents published by Journal of Biological Chemistry",
+                            slug="publisher/biochem",
+                            binding="dcterms_publisher",
+                            value="biochem"),
+                       Feed(title="Documents published by Nature",
+                            slug="publisher/nature",
+                            binding="dcterms_publisher",
+                            value="nature")]),
+        Feedset(label="All",
+                predicate=None,
+                feeds=[Feed(title="All documents",  # "... in base" ? 
+                            slug="main",
+                            binding=None,
+                            value=None)])]
 
 
     def setUp(self):
-        super(News, self).setUp()
-
-    def test_news(self):
-        self.repo.news() # gmmm
+        super(Feedsets, self).setUp()
+        self.repo.news_facet_entries = Mock(return_value=self.results2)
+        self.repo._commondata = self.results2data
 
     def test_feedsets(self):
         got = self.repo.news_feedsets(self.results2, self.facets)
         want = self.feedsets
+
+        # make sure 3 feedsets were created and their labels
+        self.assertEqual(3, len(got))
+        self.assertEqual("Sorted by type", got[0].label)
+        self.assertEqual("Sorted by publisher", got[1].label)
+        self.assertEqual("All", got[2].label)
+
+        # make sure the title of the only feed in the first feedset
+        # turned out OK
+        self.assertEqual("All Book documents",
+                         got[0].feeds[0].title)
+
+        # make sure the publisher feedset has the correct things
+        self.assertEqual(3, len(got[1].feeds)) # 3 different journals
+        self.assertEqual("publisher/analytical", got[1].feeds[0].slug)
+        self.assertEqual("Documents published by Analytical Biochemistry",
+                         got[1].feeds[0].title)
+
+        # this test incorporates all of the above
         self.assertEqual(want, got)
 
     def test_select_for_feeds(self):
-        got = self.repo.news_select_for_feeds(self.results2, self.facets, self.feedsets)
-        # first feedset (main) only feed should contain all docs in
-        # correct order)
-        self.assertEquals(len(got[0].feeds, 1))
-        self.assertEquals(len(got[0].feeds[0].entries, 4))
-        self.assertEquals(got[0].feeds[0].entries.id, "http://...")
-        self.assertEquals(got[0].feeds[3].entries.id, "http://...")
+        got = self.repo.news_select_for_feeds(self.results2, self.feedsets, self.facets)
+        # last feedset (main) should have one single feed and it
+        # should contain all entries.
+        self.assertEquals(len(got[-1].feeds), 1)
+        self.assertEquals(len(got[-1].feeds[0].entries), 4)
+        self.assertEquals("http://example.org/articles/pm942051",
+                          got[-1].feeds[0].entries[0]['uri'])
+        self.assertEquals("http://example.org/articles/pm14907713",
+                          got[-1].feeds[0].entries[3]['uri'])
 

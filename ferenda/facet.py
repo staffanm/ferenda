@@ -313,6 +313,13 @@ class Facet(object):
         u = URIRef(row[binding])
         return resource_graph.qname(u)
 
+    @classmethod
+    def resourcelabel_or_qname(cls, row, binding='rdf_type', resource_graph=None):
+        res = cls.resourcelabel(row, binding, resource_graph)
+        if res == row[binding]:  # couldn't find a real label, try qname instead
+            res = cls.qname(row, binding, resource_graph)
+        return res
+
     # define a number of default values, used if the user does not
     # explicitly specify indexingtype/selector/key
     defaults = None
@@ -393,9 +400,10 @@ Facet.defaults = {RDF.type: {
                       'toplevel_only': False,
                       'use_for_toc': False,
                       'use_for_feed': True,
-                      'selector': Facet.qname,
+                      'selector': Facet.resourcelabel_or_qname,
                       'identificator': Facet.term,
-                      'dimension_type': "term"},
+                      'dimension_type': "term",
+                      'pagetitle': 'All %(selected)s documents'},
                   DCTERMS.title: {
                       'indexingtype': fulltextindex.Text(boost=4),
                       'toplevel_only': False,
@@ -436,6 +444,7 @@ Facet.defaults = {RDF.type: {
                       'key': Facet.resourcelabel,
                       'identificator': Facet.term,
                       'dimension_type': 'ref',
+                      'pagetitle': 'Documents published by %(selected)s' 
                   },
                   DCTERMS.references:{ # NB: this is a single URI reference w/o label
                       'indexingtype': fulltextindex.URI(),

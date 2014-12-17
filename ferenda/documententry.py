@@ -62,7 +62,7 @@ class DocumentEntry(object):
 
     url = None
     """The URL to the browser-ready version of the page, equivalent to what
-    :meth:`~ferenda.DocumentRepository.generated_url` returns."""
+    :meth:`~ferenda.DocumentStore.generated_url` returns."""
 
     title = None
     """A title/label for the document, as used in an Atom feed."""

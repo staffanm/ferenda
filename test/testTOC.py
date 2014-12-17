@@ -83,8 +83,6 @@ class TOC(RepoTester):
     def test_toc(self):
         # tests the main TOC method, not the helper methods (they are
         # tested separately)
-
-        # test1: toc_select finds no rows
         self.repo.facets = MagicMock()
         self.repo.facet_select = MagicMock()
         self.repo.facet_query = MagicMock()

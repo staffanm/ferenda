@@ -13,3 +13,9 @@
 :analytical a bibo:Journal;
     rdfs:label "Analytical Biochemistry";
     skos:altLabel "Anal. Biochem." . 
+
+# maybe this should be looked up in the repos ontologies
+bibo:Book rdfs:label "Book".
+    
+    
+    
