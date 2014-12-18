@@ -18,6 +18,8 @@ from six import BytesIO
 import tempfile
 from collections import defaultdict
 from copy import deepcopy
+from operator import attrgetter
+
 # 3rdparty libs
 import pkg_resources
 from rdflib import Namespace, URIRef, Graph, RDF, Literal
@@ -28,7 +30,7 @@ from bs4 import BeautifulSoup, NavigableString
 
 # my libs
 from ferenda import (Document, DocumentStore, Describer, WordReader, FSMParser,
-                     Facet, TocPage, TocPageset)
+                     Facet, TocPage, TocPageset, Feed, Feedset)
 from ferenda.decorators import managedparsing, newstate
 from ferenda import util, fulltextindex, errors
 from ferenda.sources.legal.se.legalref import LegalRef
@@ -2081,9 +2083,9 @@ class DV(SwedishLegalSource):
                       use_for_toc=True,
                       use_for_feed=True,
                       #selector=Facet.resourcelabel,
-                      selector=myselector,
+                      selector=myselector, # =>  ("ad", "2001"), ("nja", "1981")
                       key=Facet.resourcelabel,
-                      identificator=Facet.term,
+                      identificator=Facet.defaultselector,
                       dimension_type='ref'),
                 Facet(RDF.type,
                       use_for_toc=False),
@@ -2125,6 +2127,29 @@ class DV(SwedishLegalSource):
                                          binding=util.uri_leaf(pagesetid),
                                          value=value))
         return list(pagesetdict.values())
+
+    def news_feedsets(self, data, facets):
+        # works pretty much the same as toc_pagesets, but returns ONE
+        # feedset (not several) that has one feed per publisher
+        feeds = {}
+        facet = facets[0]  # should be the RPUBL.rattsfallspublikation one
+        for row in data:
+            feedid = row['rpubl_rattsfallspublikation']
+            if feedid not in feeds:
+                slug = Facet.term(row, 'rpubl_rattsfallspublikation')
+                term = Facet.resourcelabel(row, 'rpubl_rattsfallspublikation',
+                                           self.commondata)
+                title = facet.label % {'term': term}
+                feeds[feedid] = Feed(slug=slug,
+                                     title=title,
+                                     binding='rpubl_rattsfallspublikation',
+                                     value=feedid)
+        feeds = sorted(feeds.values(), key=attrgetter('value'))
+        return [Feedset(label="Rättsfallspublikation",
+                        predicate=facet.rdftype,
+                        feeds=feeds)]
+                        
+        
 
     def toc_select_for_pages(self, data, pagesets, facets):
         facet = facets[0]

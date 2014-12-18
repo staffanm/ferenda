@@ -1002,6 +1002,7 @@ class SFS(Trips):
                 rp.append(obs[uri])
 
         doc.body.append(reg)
+        from pudb import set_trace; set_trace()
         self.parse_entry_update(doc)
         return True
 

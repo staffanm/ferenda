@@ -8,6 +8,7 @@ from io import BytesIO
 from operator import itemgetter
 from wsgiref.handlers import format_date_time as format_http_date
 from wsgiref.util import request_uri
+from itertools import chain
 import codecs
 import logging
 import logging.handlers
@@ -2590,36 +2591,55 @@ WHERE {
 
 
     def news_facet_entries(self, keyfunc=itemgetter('updated'), reverse=True):
-        # there is no easy way to make this expensive function use
-        # cached data, as it needs to return proper DocumentEntries
-        # (with dict for properties), which only can be created by
-        # reading JSON files.
-        data = self.faceted_data()
+        cachepath = self.store.resourcepath("news/faceted_entries.json")
 
-        # transform list of dicts into a dict with the uri field as
-        # key and teh entire dict as value, for fast lookup in the next step
-        datadict = dict([(x['uri'], x) for x in data])
+        # create an iterable of all the dependencies. If any of these
+        # is newer than outfile (cachepath) the outfile_is_newer
+        # immediately returns false.
+        dependencies = chain(
+            [self.store.resourcepath("news/faceted_entries.json")],
+            util.list_dirs(self.store.resourcepath("entries"), ".json")
+        )
+        if ((not self.config.force) and
+            os.path.exists(cachepath) and
+            util.outfile_is_newer(dependencies, cachepath)):
 
-        ret = []
-        # decorate datadict with entries
-        for entry in self.news_entries():
-            # let's just hope that there always is one?
-            assert entry.id in datadict
-            d = datadict[entry.id]
-            # or maybe we should just stash the DocumentEntry object in the
-            # correct row of the faceted data? like:
-            # d['entry'] = entry
-            #
-            # note in particular that the row/dict will have both a
-            # uri and a url field (where the latter should be the URL
-            # where the browser-ready file is published wich may or
-            # may not be identical to the canonical URI of the
-            # document).
-            for prop in ('updated', 'published', 'basefile', 'title',
-                         'summary', 'content', 'link', 'url'):
-                d[prop] = getattr(entry, prop)
-            ret.append(d)
-        return sorted(ret, key=keyfunc, reverse=reverse)
+            self.log.debug("Loading faceted_entries from %s" % cachepath)
+            datehook = util.make_json_date_object_hook('published', 'updated')
+            ret = json.load(open(cachepath),
+                            object_hook=datehook)
+        else:
+            data = self.faceted_data()
+
+            # transform list of dicts into a dict with the uri field as
+            # key and teh entire dict as value, for fast lookup in the next step
+            datadict = dict([(x['uri'], x) for x in data])
+
+            ret = []
+            # decorate datadict with entries
+            for entry in self.news_entries():
+                # let's just hope that there always is one?
+                assert entry.id in datadict
+                d = datadict[entry.id]
+                # or maybe we should just stash the DocumentEntry object in the
+                # correct row of the faceted data? like:
+                # d['entry'] = entry
+                #
+                # note in particular that the row/dict will have both a
+                # uri and a url field (where the latter should be the URL
+                # where the browser-ready file is published wich may or
+                # may not be identical to the canonical URI of the
+                # document).
+                for prop in ('updated', 'published', 'basefile', 'title',
+                             'summary', 'content', 'link', 'url'):
+                    d[prop] = getattr(entry, prop)
+                ret.append(d)
+            ret = sorted(ret, key=keyfunc, reverse=reverse)
+            util.ensure_dir(cachepath)
+            with open(cachepath, "w") as fp:
+                self.log.debug("Saving faceted_entries to %s" % cachepath)
+                json.dump(ret, fp, indent=4, default=util.json_default_date)
+        return ret
 
 
     def news_feedsets(self, data, facets):
@@ -2795,7 +2815,7 @@ WHERE {
                 entry.save()
             yield entry
 
-    def news_generate_feeds(self, feeds, generate_html=True):
+    def news_generate_feeds(self, feedsets, generate_html=True):
         # generates Atom feeds AND HTML equivalents
         if generate_html:
             conffile = os.path.abspath(
@@ -2808,9 +2828,8 @@ WHERE {
                 # should reverse=True be configurable? For datetime
                 # properties it makes sense to use most recent first, but
                 # maybe other cases?
-                entries = sorted(feed.entries, key=feed.key, reverse=True)
-                self.log.info("feed %s: %s entries" % (feed.slug, len(entries)))
-                self.news_write_atom(entries,
+                self.log.info("feed %s: %s entries" % (feed.slug, len(feed.entries)))
+                self.news_write_atom(feed.entries,
                                      feed.title,
                                      feed.slug)
                 if generate_html:
