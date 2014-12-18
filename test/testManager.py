@@ -15,6 +15,21 @@ with standard_library.hooks():
     import configparser
 standard_library.remove_hooks()
 
+import os
+import sys
+if sys.version_info[:2] == (3,2): # remove when py32 support ends
+    import uprefix
+    uprefix.register_hook()
+    from future.builtins import *
+    uprefix.unregister_hook()
+else:
+    from future.builtins import *
+
+from future import standard_library
+with standard_library.hooks():
+    import configparser
+standard_library.remove_hooks()
+
 import json
 import logging
 import os

@@ -31,8 +31,11 @@ from lxml.builder import ElementMaker
 import rdflib
 import requests.exceptions
 
+<<<<<<< HEAD
 import six
 from six import text_type as str
+=======
+>>>>>>> 77ab862168463684f7f3964ac0017482380e097a
 from ferenda.compat import Mock, MagicMock, patch, call
 from bs4 import BeautifulSoup
 import doctest

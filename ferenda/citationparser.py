@@ -12,8 +12,6 @@ else:
 
 from copy import copy
 
-from six import text_type as str
-
 from ferenda.elements import LinkSubject
 
 class CitationParser(object):

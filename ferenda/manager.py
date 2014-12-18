@@ -50,18 +50,20 @@ import sys
 import tempfile
 import xml.etree.cElementTree as ET
 
-import six
-from six.moves.urllib_parse import urlsplit
-from six.moves import configparser
-input = six.moves.input
-from six import text_type as str
-
 # 3rd party
+from lxml import etree
+from rdflib import URIRef, Namespace, Literal
+import pkg_resources
 import requests
 import requests.exceptions
 
 # my modules
+<<<<<<< HEAD
 from ferenda import DocumentRepository  # needed for a doctest
+=======
+from ferenda import DocumentRepository
+from ferenda import FulltextIndex
+>>>>>>> 77ab862168463684f7f3964ac0017482380e097a
 from ferenda import LayeredConfig
 from ferenda import Transformer
 from ferenda import TripleStore

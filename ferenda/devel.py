@@ -14,6 +14,7 @@ from difflib import unified_diff
 from tempfile import mkstemp
 import inspect
 import codecs
+import os
 
 from rdflib import Graph, URIRef, RDF
 

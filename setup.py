@@ -19,7 +19,8 @@ install_requires = ['beautifulsoup4 >= 4.3.0',
                     'Whoosh >= 2.4.1',
                     'six >= 1.4.0',
                     'docutils >= 0.11',
-                    'grako >= 3.4.0']
+                    'grako >= 3.4.0',
+                    'future >= 0.11']
 
 if sys.version_info < (3,0,0):
     # not py3 compatible, but not essential either
