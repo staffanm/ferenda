@@ -2077,18 +2077,24 @@ class DV(SwedishLegalSource):
         def myselector(row, binding, resource_graph=None):
             return (util.uri_leaf(row['rpubl_rattsfallspublikation']),
                     row['rpubl_arsutgava'])
-            
+
+        def mykey(row, binding, resource_graph=None):
+            if binding == "main":
+                # we'd really like
+                # rpubl:VagledandeDomstolsavgorande/rpubl:avgorandedatum,
+                # but that requires modifying facet_query
+                return row['update']
+            else:
+                return util.split_numalpha(row['dcterms_identifier'])
+
         return [Facet(RPUBL.rattsfallspublikation,
                       indexingtype=fulltextindex.Resource(),
                       use_for_toc=True,
                       use_for_feed=True,
-                      #selector=Facet.resourcelabel,
                       selector=myselector, # =>  ("ad", "2001"), ("nja", "1981")
                       key=Facet.resourcelabel,
                       identificator=Facet.defaultselector,
                       dimension_type='ref'),
-                Facet(RDF.type,
-                      use_for_toc=False),
                 Facet(RPUBL.referatrubrik,
                       indexingtype=fulltextindex.Text(boost=4),
                       toplevel_only=True,
@@ -2100,7 +2106,13 @@ class DV(SwedishLegalSource):
                       use_for_toc=False,
                       selector=Facet.defaultselector,
                       key=Facet.defaultselector,
-                      dimension_type='value')
+                      dimension_type='value'),
+                Facet(RDF.type,
+                      use_for_toc=False,
+                      use_for_feed=True,
+                      dimension_label="main",
+                      key=
+                      identificator=lambda x, y, z: None)
                 ]
 
     def toc_pagesets(self, data, facets):
@@ -2147,9 +2159,12 @@ class DV(SwedishLegalSource):
         feeds = sorted(feeds.values(), key=attrgetter('value'))
         return [Feedset(label="Rättsfallspublikation",
                         predicate=facet.rdftype,
-                        feeds=feeds)]
-                        
-        
+                        feeds=feeds),
+                Feedset(label="All",
+                        feeds=[Feed(slug="main",
+                                    title="All documents",
+                                    binding=None,
+                                    value=None)])]
 
     def toc_select_for_pages(self, data, pagesets, facets):
         facet = facets[0]

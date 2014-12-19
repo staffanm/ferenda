@@ -2544,7 +2544,11 @@ WHERE {
         transformer = Transformer('XSLT', "res/xsl/toc.xsl", ["res/xsl"],
                                   config=conffile)
         # FIXME: This is a naive way of calculating the relative depth
-        # of the outfile
+        # of the outfile.
+
+        # FIXME: 2: transformer.transform_file should be able to
+        # handle this
+        
         depth = len(outfile[len(self.store.datadir) + 1:].split(os.sep))
         repos = [self] + otherrepos
         if self.config.staticsite:
@@ -2569,6 +2573,13 @@ WHERE {
         repository.
 
         """
+        
+        feedindex = self.store.resourcepath("news/main.atom")
+        faceted_data = self.store.resourcepath("toc/faceted_data.json")
+        if (not self.config.force) and util.outfile_is_newer([faceted_data], feedindex):
+            self.log.debug("Not regenerating feeds")
+            return
+
         params = {}
         # faceted_data employs caching
         with util.logtime(self.log.debug,
@@ -2591,13 +2602,13 @@ WHERE {
 
 
     def news_facet_entries(self, keyfunc=itemgetter('updated'), reverse=True):
-        cachepath = self.store.resourcepath("news/faceted_entries.json")
+        cachepath = self.store.resourcepath("feed/faceted_entries.json")
 
         # create an iterable of all the dependencies. If any of these
         # is newer than outfile (cachepath) the outfile_is_newer
         # immediately returns false.
         dependencies = chain(
-            [self.store.resourcepath("news/faceted_entries.json")],
+            [self.store.resourcepath("feed/faceted_entries.json")],
             util.list_dirs(self.store.resourcepath("entries"), ".json")
         )
         if ((not self.config.force) and
@@ -2718,13 +2729,16 @@ WHERE {
         res = {}
         qname_graph = self.make_graph()
         facets = [f for f in facets if f.use_for_feed]
-        # note: the last feedset will contain all published documents
-        # in the repo. There is no corresponding facet. So we fake one
-        # that accepts all and sorts everything in the same bucket
-        facets.append(Facet(rdftype=RDFS.Resource, # all the things
-                            identificator=lambda x, y, z: None,
-                            selector=lambda x, y, z: None,
-                            key=lambda row, binding, resource_graph: row['updated']))
+        from pudb import set_trace; set_trace()
+        if len(facets) < len(feedsets):
+            # note: the last feedset will contain all published
+            # documents in the repo. If there is no corresponding
+            # facet, we have to fake one that accepts all and sorts
+            # everything in the same bucket.
+            facets.append(Facet(rdftype=RDFS.Resource, # all the things
+                                identificator=lambda x, y, z: None,
+                                selector=lambda x, y, z: None,
+                                key=lambda row, binding, resource_graph: row['updated']))
         for feedset, facet in zip(feedsets, facets):
             documents = defaultdict(list)
             if facet.dimension_label:
@@ -2820,9 +2834,12 @@ WHERE {
         if generate_html:
             conffile = os.path.abspath(
                 os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
-            docroot = os.path.dirname(self.store.resourcepath('feed/foo.x'))
             transformer = Transformer("XSLT", "res/xsl/atom.xsl", ["res/xsl"],
-                                      docroot, config=conffile)
+                                      documentroot=self.config.datadir,
+                                      config=conffile)
+            repos = [self] #  FIXME: we must make otherrespos (passed
+                           #  to news()) available to this scope
+
         for feedset in feedsets:
             for feed in feedset.feeds:
                 # should reverse=True be configurable? For datetime
@@ -2833,11 +2850,16 @@ WHERE {
                                      feed.title,
                                      feed.slug)
                 if generate_html:
+                    infile = self.store.atom_path(feed.slug)
                     outfile = self.store.resourcepath('feed/%s.html' % feed.slug)
-                    transformer.transform_file(self.store.atom_path(feed.slug),
-                                               outfile)
+                    if self.config.staticsite:
+                        uritransform = self.get_url_transform_func(repos, os.path.dirname(outfile))
+                    else:
+                        uritransform = None
+                    transformer.transform_file(infile, outfile,
+                                               uritransform=uritransform)
 
-    def news_write_atom(self, entries, title, slug, archivesize=1000):
+    def news_write_atom(self, entries, title, slug, archivesize=100):
         """Given a list of Atom entry-like objects, including links to RDF
         and PDF files (if applicable), create a rinfo-compatible Atom feed,
         optionally splitting into archives."""
