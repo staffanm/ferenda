@@ -55,13 +55,6 @@ class Transformer(object):
         self.documentroot = documentroot
         self.config = config
 
-    # transform() always operate on the native datastructure -- this might
-    # be different depending on the transformer engine. For XSLT, which is
-    # implemented through lxml, its in- and outdata are lxml trees
-    #
-    # If you want engine-indepent apis, use transform_stream or
-    # transform_file instead
-    #
     # valid parameters
     # - annotationfile: intermediate/basefile.grit.xml
     def transform(self, indata, depth, parameters=None, uritransform=None):

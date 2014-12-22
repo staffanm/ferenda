@@ -1487,19 +1487,29 @@ with the *config* object as single parameter.
         docstore = DocumentStore(config.datadir + os.sep + cls.alias)
         dumppath = docstore.resourcepath("distilled/dump.nt")
 
+        log = cls._setup_logger(cls.alias)
+
         # check if we need to work at all.
         xhtmlfiles = (docstore.distilled_path(x) for x in docstore.list_basefiles_for("generate"))
         if (not config.force and util.outfile_is_newer(xhtmlfiles, dumppath)):
+            if 'upload' in config and config.upload:
+                log.info("Clearing context %s before uploading dump" % (
+                    context))
+                store = TripleStore.connect(config.storetype,
+                                            config.storelocation,
+                                            config.storerepository)
+                store.clear(context)
+                log.info("Adding %s to %s" % (dumppath, context))
+                store.add_serialized_file(dumppath, "nt", context)
             return False # signals to Manager that no work needs to be done
 
 
         if config.force:
+            log.info("Clearing context %s at repository %s" % (
+                context, config.storerepository))
             store = TripleStore.connect(config.storetype,
                                         config.storelocation,
                                         config.storerepository)
-            log = cls._setup_logger(cls.alias)
-            log.info("Clearing context %s at repository %s" % (
-                context, config.storerepository))
             store.clear(context)
 
         # FIXME: if config.fulltextindex, we should attempt to connect
@@ -1633,7 +1643,7 @@ with the *config* object as single parameter.
                     otherrepos.append(self)
                 self.relate_dependencies(basefile, otherrepos)
                 entry.indexed_dep = datetime.now()
-            
+
             if self.config.fulltextindex and relfulltext:
                 self.relate_fulltext(basefile, otherrepos)
                 entry.indexed_ft = datetime.now()
@@ -1779,6 +1789,8 @@ parsed document path to that documents dependency file."""
                 if resource.tag == "{http://www.w3.org/1999/xhtml}head":
                     continue
                 about = resource.get('about')
+                if not about:  # if the <body> element lacks @about
+                    continue
                 if isinstance(about, bytes):  # happens under py2
                     about = about.decode()    # pragma: no cover
                 desc.about(about) 
@@ -1932,8 +1944,10 @@ parsed document path to that documents dependency file."""
         >>> d.facet_query("http://example.org/ctx/base") == expected
         True
         """
+        g = self.make_graph()
         from_graph = "FROM <%s>" % context
         predicates = [f.rdftype for f in self.facets()]
+        bindings = [f.dimension_label if f.dimension_label else g.qname(f.rdftype).replace(":", "_") for f in self.facets()]
         rdftypes = self.rdf_type
         # assume that self.rdf_type normally is a list/iterable
         if isinstance(rdftypes, URIRef): 
@@ -1944,8 +1958,7 @@ parsed document path to that documents dependency file."""
         if self.ns['rdf'] not in namespaces:
             namespaces.append(self.ns['rdf'])
 
-        g = self.make_graph()
-        bindings = " ".join(["?" + g.qname(b).replace(":", "_") for b in predicates])
+        selectbindings = " ".join(["?" + b for b in bindings])
         # FIXME: the below whereclause is meant to select only
         # top-level documents (not documentparts), but does so by
         # requiring that all top-level documents should have rdf:type
@@ -1962,7 +1975,7 @@ parsed document path to that documents dependency file."""
             filterclause = "    FILTER (?type in (%s)) ." % ", ".join([g.qname(x) for x in rdftypes])
             
         optclauses = "".join(
-            ["    OPTIONAL { ?uri %s ?%s . }\n" % (g.qname(b), g.qname(b).replace(":", "_")) for b in predicates])[:-1]
+            ["    OPTIONAL { ?uri %s ?%s . }\n" % (g.qname(p), b) for p, b in zip(predicates, bindings)])[:-1]
 
 
         # FIXME: The above doctest looks like crap since all
@@ -1971,7 +1984,7 @@ parsed document path to that documents dependency file."""
         prefixes = "".join(["PREFIX %s: <%s>\n" % (p, u) for p, u in sorted(self.ns.items()) if u in namespaces])
             
         query = """%(prefixes)s
-SELECT DISTINCT ?uri %(bindings)s
+SELECT DISTINCT ?uri %(selectbindings)s
 %(from_graph)s
 WHERE {
     %(whereclause)s .
@@ -2380,6 +2393,7 @@ WHERE {
             selector_values = {}
             selector_fragments = {}
             selector = facet.selector
+            
             if facet.dimension_label:
                 binding = facet.dimension_label
                 term = facet.dimension_label
@@ -2499,20 +2513,24 @@ WHERE {
         """Generate the main page of TOC pages."""
         firstpage = pagesets[0].pages[0]  # has .binding and .value
         documents = pagecontent[(firstpage.binding, firstpage.value)]
-        # (binding,value), documents = sorted(pagecontent.items(), key=itemgetter(0))[0]
-        return self.toc_generate_page(firstpage.binding, firstpage.value, documents, pagesets, "index", otherrepos)
+        return self.toc_generate_page(firstpage.binding, firstpage.value,
+                                      documents, pagesets, "index", otherrepos)
 
-    def toc_generate_page(self, binding, value, documentlist, pagesets, effective_basefile=None, otherrepos=[]):
+    def toc_generate_page(self, binding, value, documentlist, pagesets,
+                          effective_basefile=None, otherrepos=[]):
         """Generate a single TOC page.
 
         :param binding: The binding used (eg. 'title' or 'issued')
         :param value: The value for the used binding (eg. 'a' or '2013'
-        :param documentlist: Result from :meth:`~ferenda.DocumentRepository.toc_select_for_pages`
-        :param pagesets: Result from :meth:`~ferenda.DocumentRepository.toc_pagesets`
-        :param effective_basefile: Place the resulting page somewhere else than ``toc/*binding*/*value*.html``
+        :param documentlist: Result from
+                       :meth:`~ferenda.DocumentRepository.toc_select_for_pages`
+        :param pagesets: Result from
+                       :meth:`~ferenda.DocumentRepository.toc_pagesets`
+        :param effective_basefile: Place the resulting page somewhere else
+                                   than ``toc/*binding*/*value*.html``
         :param otherrepos: A list of document repository instances
         """
-        if effective_basefile == None:
+        if effective_basefile is None:
             effective_basefile = binding + "/" + value
         outfile = self.store.resourcepath("toc/%s.html" % effective_basefile)
         doc = self.make_document()
@@ -2729,7 +2747,6 @@ WHERE {
         res = {}
         qname_graph = self.make_graph()
         facets = [f for f in facets if f.use_for_feed]
-        from pudb import set_trace; set_trace()
         if len(facets) < len(feedsets):
             # note: the last feedset will contain all published
             # documents in the repo. If there is no corresponding

@@ -191,12 +191,7 @@ class Facet(object):
         'ataleoftwocities'
 
         """
-        True
-        # ignore provided binding -- this key func sorts by
-        # dcterms:title, period.
-        # FIXME: Why was that, now again?
-        title = row['dcterms_title']
-        return util.title_sortkey(title)
+        return util.title_sortkey(row[binding])
 
     @classmethod
     def firstletter(cls, row, binding='dcterms_title', resource_graph=None):
@@ -269,8 +264,7 @@ class Facet(object):
         'chapmanhall'
         """
         row[binding] = cls.resourcelabel(row, binding, resource_graph)
-        # workaround the way titlesortkey works
-        return cls.titlesortkey({'dcterms_title': row[binding]}, binding)
+        return cls.titlesortkey(row, binding)
 
 
     @classmethod

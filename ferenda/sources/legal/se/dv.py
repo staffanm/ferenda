@@ -2111,7 +2111,7 @@ class DV(SwedishLegalSource):
                       use_for_toc=False,
                       use_for_feed=True,
                       dimension_label="main",
-                      key=
+                      # key=  # FIXME add useful key method for sorting docs
                       identificator=lambda x, y, z: None)
                 ]
 
@@ -2191,17 +2191,6 @@ class DV(SwedishLegalSource):
         if 'rpubl_referatrubrik' in row:
             r.append(row['rpubl_referatrubrik'])
         return r
-        
-    # gonna need this for news_criteria()
-    pubs = {'http://rinfo.lagrummet.se/ref/rff/nja': 'Högsta domstolen',
-            'http://rinfo.lagrummet.se/ref/rff/rh': 'Hovrätterna',
-            'http://rinfo.lagrummet.se/ref/rff/rk': 'Kammarrätterna',
-            'http://rinfo.lagrummet.se/ref/rff/ra': 'Regeringsrätten',
-            'http://rinfo.lagrummet.se/ref/rff/hfd': 'Högsta förvaltningsdomstolen',
-            'http://rinfo.lagrummet.se/ref/rff/ad': 'Arbetsdomstolen',
-            'http://rinfo.lagrummet.se/ref/rff/fod': 'Försäkringsöverdomstolen',
-            'http://rinfo.lagrummet.se/ref/rff/md': 'Marknadsdomstolen',
-            'http://rinfo.lagrummet.se/ref/rff/mig': 'Migrationsöverdomstolen',
-            'http://rinfo.lagrummet.se/ref/rff/mod': 'Miljööverdomstolen'
-            }
 
+    def tabs(self):
+        return [("Rättsfall", self.dataset_uri())]

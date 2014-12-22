@@ -274,6 +274,12 @@ class MediaWiki(DocumentRepository):
         # nor newsfeeds
         return
 
+    def tabs(self):
+        return []
+
+    def frontpage_content(self, primary=False):
+        return
+
 #    # differ from the default relate_triples in that it uses a different
 #    # context for every basefile and clears this beforehand.
 #    # Note that a basefile can contain statements

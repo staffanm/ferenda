@@ -26,7 +26,8 @@ from ferenda.compat import OrderedDict
 
 # 3rdparty libs
 import pkg_resources
-from rdflib import Namespace, URIRef, Literal
+from rdflib import Namespace, URIRef, Literal, RDF
+from rdflib.namespace import DCTERMS
 from lxml import etree
 from lxml.builder import ElementMaker
 import bs4
@@ -37,7 +38,7 @@ from layeredconfig import LayeredConfig
 from . import Trips
 # from trips import Trips
 from ferenda import DocumentEntry, DocumentStore, TripleStore
-from ferenda import TextReader, Describer
+from ferenda import TextReader, Describer, Facet
 from ferenda import decorators
 from ferenda.sources.legal.se import legaluri
 from ferenda import util
@@ -45,6 +46,7 @@ from ferenda.elements import CompoundElement
 from ferenda.elements import OrdinalElement
 from ferenda.elements import TemporalElement
 from ferenda.elements import UnicodeElement
+from ferenda.elements import Link
 from ferenda.errors import DocumentRemovedError, ParseError
 from ferenda.sources.legal.se.legalref import LegalRef, LinkSubject
 from ferenda.sources.legal.se import SwedishCitationParser
@@ -468,6 +470,15 @@ class SFS(Trips):
                 return "%s%s/konsolidering/%s" % (prefix, basefile, konsolidering)
         else:
             return "%s%s" % (prefix, basefile)
+
+    def basefile_from_uri(self, uri):
+        prefix = self.config.url + self.config.urlpath
+        # tell the difference btw "1998:204/konsolidering/2010:323"
+        # and "dom/nja/2008s42"
+        if uri.startswith(prefix) and uri[len(prefix)].isdigit():
+            rest = uri[len(prefix):].replace("_", " ")
+            return rest.split("/")[0]
+
 
     def download(self, basefile=None):
         if basefile:
@@ -1002,7 +1013,6 @@ class SFS(Trips):
                 rp.append(obs[uri])
 
         doc.body.append(reg)
-        from pudb import set_trace; set_trace()
         self.parse_entry_update(doc)
         return True
 
@@ -2945,214 +2955,73 @@ class SFS(Trips):
         else:
             raise ValueError('unknown form %s' % form)
 
-    def _file_to_basefile(self, f):
-        """Override of LegalSource._file_to_basefile, with special
-        handling of archived versions and two-part documents"""
-        # this transforms 'foo/bar/baz/HDO/1-01.doc' to 'HDO/1-01'
-        if '-' in f:
-            return None
-        basefile = "/".join(os.path.split(os.path.splitext(
-            os.sep.join(os.path.normpath(f).split(os.sep)[-2:]))[0]))
-        if basefile.endswith('_A') or basefile.endswith('_B'):
-            basefile = basefile[:-2]
-        return basefile
+    def _forfattningskey(self, title):
+        # these last examples should probably be handled in the parse step
+        title = re.sub("^/r1/ ", "", title)
+        if title.startswith("/Rubriken"):
+            m = re.match("/Rubriken upphör att gälla U:([^/]+)/ *([^/]+)/Rubriken träder i kraft I:([^/]+)/ *([^/]+)", title)
+            if m:
+                expdate = m.group(1)
+                oldtitle = m.group(2)
+                newtitle = m.group(4)
+                try:
+                    expdate = self.parse_iso_date(expdate)
+                    if expdate <= date.today():
+                        title = newtitle
+                    else:
+                        title = oldtitle
+                except:
+                    title = oldtitle
 
-    def _indexpages_predicates(self):
-        return [util.ns['dcterms'] + "title",
-                util.ns['rinfo'] + 'fsNummer',
-                util.ns['rdf'] + 'type',
-                util.ns['rinfo'] + 'KonsolideradGrundforfattning']
+        # these are for better sorting/selecting
+        title = re.sub('Kungl\. Maj:ts ','',title)
+        title = re.sub('^(Lag|Förordning|Tillkännagivande|[kK]ungörelse) ?\([^\)]+\) ?(av|om|med|angående) ','',title)
+        title = re.sub("^\d{4} års ", "", title)
 
-    def _build_indexpages(self, by_pred_obj, by_subj_pred):
-        documents = defaultdict(lambda: defaultdict(list))
-        pagetitles = {}
-        pagelabels = {}
-        fsnr_pred = util.ns['rinfo'] + 'fsNummer'
-        title_pred = util.ns['dcterms'] + 'title'
-        type_pred = util.ns['rdf'] + 'type'
-        type_obj = util.ns['rinfo'] + 'KonsolideradGrundforfattning'
-        year_lbl = 'Ordnade efter utgivningsår'
-        title_lbl = 'Ordnade efter titel'
-        # construct the 404 page - we should really do this in the
-        # form of a xht2 page that gets transformed using static.xsl,
-        # but it's tricky to get xslt to output a href attribute with
-        # an embedded (SSI) comment.
-        doc = '''<?xml version="1.0"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#" xmlns:xsd="http://www.w3.org/2001/XMLSchema#" xmlns:rinfoex="http://lagen.nu/terms#" xml:lang="sv" lang="sv"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>Författningstext saknas | Lagen.nu</title><script type="text/javascript" src="/js/jquery-1.2.6.min.js"></script><script type="text/javascript" src="/js/jquery.treeview.min.js"></script><script type="text/javascript" src="/js/base.js"></script><link rel="shortcut icon" href="/img/favicon.ico" type="image/x-icon" /><link rel="stylesheet" href="/css/screen.css" media="screen" type="text/css" /><link rel="stylesheet" href="/css/print.css" media="print" type="text/css" /></head><body><div id="vinjett"><h1><a href="/">lagen.nu</a></h1><ul id="navigation"><li><a href="/nyheter/">Nyheter</a></li><li><a href="/index/">Lagar</a></li><li><a href="/dom/index/">Domar</a></li><li><a href="/om/">Om</a></li></ul><form method="get" action="http://www.google.com/custom"><p><span class="accelerator">S</span>ök:<input type="text" name="q" id="q" size="40" maxlength="255" value="" accesskey="S" /><input type="hidden" name="cof" value="S:http://bself.log.tomtebo.org/;AH:center;AWFID:22ac01fa6655f6b6;" /><input type="hidden" name="domains" value="lagen.nu" /><input type="hidden" name="sitesearch" value="lagen.nu" checked="checked" /></p></form></div><div id="colmask" class="threecol"><div id="colmid"><div id="colleft"><div id="dokument">
+        return title
+        
+    def facets(self):
+        def forfattningskey(row, binding, resource_graph):
+            # "Lag (1994:1920) om allmän löneavgift" => "allmän löneavgift"
+            # "Lag (2012:318) om 1996 års Haagkonvention" => "Haagkonvention" (avoid leading year)
+            return self._forfattningskey(row[binding]).lower()
 
-    <h1>Författningstext saknas</h1>
-    <p>Det verkar inte finnas någon författning med SFS-nummer
-    <!--#echo var="REDIRECT_SFS" -->. Om den har funnits tidigare så
-    kanske den har blivit upphävd?</p>
-    <p>Om den har blivit upphävd kan den finnas i sin sista lydelse på
-    Regeringskansliets rättsdatabaser:
-    <a href="http://62.95.69.15/cgi-bin/thw?${HTML}=sfst_lst&amp;${OOHTML}=sfst_dok&amp;${SNHTML}=sfst_err&amp;${BASE}=SFST&amp;${TRIPSHOW}=format%3DTHW&amp;BET=<!--#echo var="REDIRECT_SFS" -->">Sök efter SFS <!--#echo var="REDIRECT_SFS" --></a>.</p>
+        def forfattningsselector(row, binding, resource_graph):
+            # "Lag (1994:1920) om allmän löneavgift" => "a"
+            return forfattningskey(row, binding, resource_graph)[0]
 
-  </div><div id="kommentarer"></div><div id="referenser"></div></div></div></div><div id="sidfot"><b>Lagen.nu</b> är en privat webbplats. Informationen här är  inte officiell och kan vara felaktig | <a href="/om/ansvarsfriskrivning.html">Ansvarsfriskrivning</a> | <a href="/om/kontakt.html">Kontaktinformation</a></div><script type="text/javascript">var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www."); document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));</script><script type="text/javascript">var pageTracker = _gat._getTracker("UA-172287-1"); pageTracker._trackPageview();</script></body></html>'''
+        return [Facet(RDF.type),
+                # for newsfeeds, do a facet that checks the type of
+                # the rpubl:konsoliderar object of this one
+                Facet(DCTERMS.title,
+                      label="Ordnade efter titel",
+                      pagetitle='Författningar som börjar på "%(selected)s"',
+                      selector=forfattningsselector,
+                      identificator=forfattningsselector,
+                      key=forfattningskey,
+                      dimension_label="titel"),      
+                Facet(DCTERMS.issued,
+                      label="Ordnade efter utgivningsår",
+                      pagetitle='Författningar utgivna %(selected)s',
+                      key=forfattningskey,
+                      dimension_label="utgiven")
+        ]
 
-        outfile = "%s/%s/generated/notfound.shtml" % (
-            self.config.datadir, self.alias)
-        fp = codecs.open(outfile, "w", encoding='utf-8')
-        fp.write(doc)
-        fp.close()
-        print(("wrote %s" % outfile))
 
-        # list all subjects that are of rdf:type rpubl:KonsolideradGrundforfattning
-        for subj in by_pred_obj[type_pred][type_obj]:
-            fsnr = by_subj_pred[subj][fsnr_pred]
-            title = by_subj_pred[subj][title_pred]
+    def tabs(self):
+        return [("Författningar", self.dataset_uri())]
 
-            sorttitle = re.sub(r'Kungl\. Maj:ts ', '', title)
-            sorttitle = re.sub(
-                r'^(Lag|Förordning|Tillkännagivande|[kK]ungörelse) ?\([^\)]+\) ?(av|om|med|angående) ', '', sorttitle)
-            year = fsnr.split(':')[0]
-            letter = sorttitle[0].lower()
 
-            pagetitles[year] = 'Författningar utgivna %s' % year
-            pagelabels[year] = year
-            documents[year_lbl][year].append({'uri': subj,
-                                              'sortkey': fsnr,
-                                              'title': title})
-
-            if letter.isalpha():
-                pagetitles[letter] = 'Författningar som börjar på "%s"' % letter.upper()
-                pagelabels[letter] = letter.upper()
-                documents[title_lbl][letter].append({'uri': subj,
-                                                     'sortkey': sorttitle.lower(),
-                                                     'title': sorttitle,
-                                                     'leader': title.replace(sorttitle, '')})
-
-        # FIXME: port the 'Nyckelbegrepp' code from 1.0
-        #        import the old etiketter data and make a tag cloud or something
-
-        for category in list(documents.keys()):
-            for pageid in list(documents[category].keys()):
-                outfile = "%s/%s/generated/index/%s.html" % (
-                    self.config.datadir, self.alias, pageid)
-                title = pagetitles[pageid]
-                if category == year_lbl:
-                    self._render_indexpage(
-                        outfile, title, documents, pagelabels, category, pageid, docsorter=util.numcmp)
-                else:
-                    self._render_indexpage(outfile, title, documents,
-                                           pagelabels, category, pageid)
-                    if pageid == 'a':  # make index.html
-                        outfile = "%s/%s/generated/index/index.html" % (
-                            self.config.datadir, self.alias)
-                        self._render_indexpage(outfile, title, documents,
-                                               pagelabels, category, pageid)
-
-    re_message = re.compile(r'(\d+:\d+) \[([^\]]*)\]')
-    re_qname = re.compile(r'(\{.*\})(\w+)')
-    re_sfsnr = re.compile(r'\s*(\(\d+:\d+\))')
-
-    def _build_newspages(self, messages):
-        changes = {}
-        all_entries = []
-        lag_entries = []
-        ovr_entries = []
-        for (timestamp, message) in messages:
-            m = self.re_message.match(message)
-            change = m.group(1)
-            if change in changes:
-                continue
-            changes[change] = True
-            bases = m.group(2).split(", ")
-            basefile = "%s/%s/parsed/%s.xht2" % (
-                self.config.datadir, self.alias, self.store.basefile_to_pathfrag(bases[0]))
-            # print "opening %s" % basefile
-            if not os.path.exists(basefile):
-                # om inte den parseade filen finns kan det bero på att
-                # författningen är upphävd _eller_ att det blev något
-                # fel vid parseandet.
-                self.log.warning("File %s not found" % basefile)
-                continue
-            tree, ids = etree.XMLID(open(basefile).read())
-
-            if (change != bases[0]) and (not 'L' + change in ids):
-                self.log.warning(
-                    "ID %s not found in %s" % ('L' + change, basefile))
-                continue
-
-            if change != bases[0]:
-                for e in ids['L' + change].findall(".//{http://www.w3.org/2002/06/xhtml2/}dd"):
-                    if 'property' in e.attrib and e.attrib['property'] == 'dcterms:title':
-                        title = e.text
-            else:
-                title = tree.find(
-                    ".//{http://www.w3.org/2002/06/xhtml2/}title").text
-
-            # use relative, non-rinfo uri:s here - since the atom
-            # transform wont go through xslt and use uri.xslt
-            uri = '/%s' % bases[0]
-
-            for node in ids['L' + change]:
-                m = self.re_qname.match(node.tag)
-                if m.group(2) == 'dl':
-                    content = self._element_to_string(node)
-
-            entry = {'title': title,
-                     'timestamp': timestamp,
-                     'id': change,
-                     'uri': uri,
-                     'content': '<p><a href="%s">Författningstext</a></p>%s' % (uri, content)}
-            all_entries.append(entry)
-
-            basetitle = self.re_sfsnr.sub('', title)
-            # print "%s: %s" % (change, basetitle)
-            if (basetitle.startswith('Lag ') or
-                (basetitle.endswith('lag') and not basetitle.startswith('Förordning')) or
-                    basetitle.endswith('balk')):
-                lag_entries.append(entry)
-            else:
-                ovr_entries.append(entry)
-
-        htmlfile = "%s/%s/generated/news/all.html" % (
-            self.config.datadir, self.alias)
-        atomfile = "%s/%s/generated/news/all.atom" % (
-            self.config.datadir, self.alias)
-        self._render_newspage(
-            htmlfile, atomfile, 'Nya och ändrade författningar', 'De senaste 30 dagarna', all_entries)
-
-        htmlfile = "%s/%s/generated/news/lagar.html" % (
-            self.config.datadir, self.alias)
-        atomfile = "%s/%s/generated/news/lagar.atom" % (
-            self.config.datadir, self.alias)
-        self._render_newspage(htmlfile, atomfile, 'Nya och ändrade lagar',
-                              'De senaste 30 dagarna', lag_entries)
-
-        htmlfile = "%s/%s/generated/news/forordningar.html" % (
-            self.config.datadir, self.alias)
-        atomfile = "%s/%s/generated/news/forordningar.atom" % (
-            self.config.datadir, self.alias)
-        self._render_newspage(
-            htmlfile, atomfile, 'Nya och ändrade förordningar och övriga författningar', 'De senaste 30 dagarna', ovr_entries)
-
-    def _element_to_string(self, e):
-        """Creates a XHTML1 string from a elementtree.Element,
-        removing namespaces and rel/propery attributes"""
-        m = self.re_qname.match(e.tag)
-        tag = m.group(2)
-
-        if list(e.attrib.keys()):
-            attributestr = " " + \
-                " ".join([x + '="' + e.attrib[x].replace('"', '&quot;') +
-                         '"' for x in list(e.attrib.keys()) if x not in ['rel', 'property']])
-        else:
-            attributestr = ""
-
-        childstr = ''
-        for child in e:
-            childstr += self._element_to_string(child)
-
-        text = ''
-        tail = ''
-        if e.text:
-            text = cgi.escape(e.text)
-        if e.tail:
-            tail = cgi.escape(e.tail)
-        return "<%s%s>%s%s%s</%s>" % (tag, attributestr, text, childstr, tail, tag)
-
+    def toc_item(self, binding, row):
+        """Returns a formatted version of row, using Element objects"""
+        title = self._forfattningskey(row['titel'])
+        res = []
+        if title in row['titel']:
+            idx = row['titel'].index(title)
+            if idx:
+                res.append(row['titel'][:idx])
+        res.append(Link(title, uri=row['uri']))
+        return res
 
     templ = [
         "downloaded/(?P<type>\w+)/(?P<byear>\d+)/(?P<bnum>[\d_s\.bih]+)\.html",

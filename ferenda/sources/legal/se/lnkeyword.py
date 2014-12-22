@@ -81,3 +81,6 @@ class LNKeyword(Keyword):
             id_node = etree.SubElement(rattsfall_node, ns("rdfs:label"))
             # id_node.text = "%s %s" % (l['uri'].split("#")[1], l['label'])
             id_node.text = self.sfsrepo.display_title(l['uri'])
+
+    def tabs(self):
+        return [("Begrepp", self.dataset_uri())]

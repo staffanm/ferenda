@@ -1,0 +1,75 @@
+# Licensed under the terms of http://www.apache.org/licenses/LICENSE-2.0
+
+## Basic Fuseki configuation file.
+## 
+## See also config-tdb.ttl for TDB specific examples.
+## See also config-examples.ttl for commented examples.
+
+@prefix :        <#> .
+@prefix fuseki:  <http://jena.apache.org/fuseki#> .
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix tdb:     <http://jena.hpl.hp.com/2008/tdb#> .
+@prefix ja:      <http://jena.hpl.hp.com/2005/11/Assembler#> .
+
+[] rdf:type fuseki:Server ;
+   fuseki:services (
+     <#default>
+     <#ferenda>
+     <#lagen>
+   ) .
+
+
+[] ja:loadClass "com.hp.hpl.jena.tdb.TDB" .
+tdb:DatasetTDB  rdfs:subClassOf  ja:RDFDataset .
+tdb:GraphTDB    rdfs:subClassOf  ja:Model .
+
+
+# All datasets (/ds, /ferenda and /lagen) must be updateable TDB
+# datasets (must support the urn:x-arq:UnionGraph graph)
+
+<#default> rdf:type fuseki:Service ;
+    # URI of the dataset -- http://host:port/ds
+    fuseki:name                        "dsxxx" ; 
+    fuseki:serviceQuery                "sparql" ;
+    fuseki:serviceQuery                "query" ;
+    fuseki:serviceUpdate               "update" ;
+    fuseki:serviceUpload               "upload" ;
+    fuseki:serviceReadWriteGraphStore  "data" ;     
+    fuseki:serviceReadGraphStore       "get" ;
+    fuseki:dataset                     <#defaultDataset> ;
+    .
+
+<#defaultDataset> rdf:type  tdb:DatasetTDB ;
+     tdb:location "defaultDB" .
+
+<#ferenda> rdf:type fuseki:Service ;
+    # URI of the dataset -- http://host:port/ferenda
+    fuseki:name                        "ferenda" ; 
+    fuseki:serviceQuery                "sparql" ;
+    fuseki:serviceQuery                "query" ;
+    fuseki:serviceUpdate               "update" ;
+    fuseki:serviceUpload               "upload" ;
+    fuseki:serviceReadWriteGraphStore  "data" ;     
+    fuseki:serviceReadGraphStore       "get" ;
+    fuseki:dataset                     <#ferendaDataset> ;
+    .
+
+<#ferendaDataset> rdf:type  tdb:DatasetTDB ;
+     tdb:location "ferendaDB" .
+
+<#lagen> rdf:type fuseki:Service ;
+    # URI of the dataset -- http://host:port/lagen
+    fuseki:name                        "lagen" ; 
+    fuseki:serviceQuery                "sparql" ;
+    fuseki:serviceQuery                "query" ;
+    fuseki:serviceUpdate               "update" ;
+    fuseki:serviceUpload               "upload" ;
+    fuseki:serviceReadWriteGraphStore  "data" ;     
+    fuseki:serviceReadGraphStore       "get" ;
+    fuseki:dataset                     <#lagenDataset> ;
+    .
+
+<#lagenDataset> rdf:type tdb:DatasetTDB ;
+     tdb:location "lagenDB" .

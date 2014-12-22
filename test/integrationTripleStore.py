@@ -279,7 +279,7 @@ class Fuseki(TripleStoreTestCase, unittest.TestCase):
             # directory of that script (which should also contain
             # fuseki-server.jar)
             # assume that the config.ttl from the fuseki distribution is
-            # used, creating an updateable in-memory dataset at /ds
+            # used, creating an updateable in-memory dataset at /ferenda
             subprocess.check_call("fuseki start > /dev/null", shell=True)
             # It seems to take a little while from the moment that `fuseki
             # start' returns to when the HTTP service actually is up and
@@ -293,8 +293,8 @@ class Fuseki(TripleStoreTestCase, unittest.TestCase):
         pass
 
     def setUp(self):       
-        self.store = TripleStore.connect(self.storetype, "http://localhost:3030/", "ds")
-        # print("Not clearing http://localhost:3030/ds")
+        self.store = TripleStore.connect(self.storetype, "http://localhost:3030/", "ferenda")
+        # print("Not clearing http://localhost:3030/ferenda")
         self.store.clear()
         self.loader = self.store
 
@@ -303,7 +303,7 @@ class Fuseki(TripleStoreTestCase, unittest.TestCase):
                  "Skipping Fuseki/curl tests")    
 class FusekiCurl(Fuseki):
     def setUp(self):       
-        self.store = TripleStore.connect(self.storetype, "http://localhost:3030/", "ds", curl=True)
+        self.store = TripleStore.connect(self.storetype, "http://localhost:3030/", "ferenda", curl=True)
         self.store.clear()
         self.loader = self.store
 
