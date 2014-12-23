@@ -18,8 +18,8 @@ class TestSwedishLegalSource(unittest.TestCase):
 
     def test_parse_iso_date(self):
         repo = SwedishLegalSource()
-        self.assertEqual(repo.parse_swedish_date("2010-02-03"),
+        self.assertEqual(repo.parse_iso_date("2010-02-03"),
                          datetime.date(2010, 2, 3))
         # handle spurious spaces
-        self.assertEqual(repo.parse_swedish_date("2010- 02 -03"),
+        self.assertEqual(repo.parse_iso_date("2010- 02 -03"),
                          datetime.date(2010, 2, 3))

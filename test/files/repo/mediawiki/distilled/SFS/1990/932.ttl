@@ -1,31 +1,31 @@
 @prefix : <http://www.w3.org/1999/xhtml> .
-@prefix bibo: <http://purl.org/ontology/bibo/> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
-@prefix foaf: <http://xmlns.com/foaf/0.1/> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix rinfoex: <http://lagen.nu/terms#> .
-@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
-@prefix xhv: <http://www.w3.org/1999/xhtml/vocab#> .
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix xsi: <http://www.w3.org/2001/XMLSchema-instance> .
 
 <http://localhost:8000/res/sfs/1990:932> a skos:Concept ;
     dcterms:description """
-      <p xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml"><a href="http://localhost:8000/res/sfs/1990:932">Konsumentköplagen</a> (KKöpL) är en skyddslagstiftning. </p>
+      <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+        <p><a href="http://localhost:8000/res/sfs/1990:932">Konsumentköplagen</a> (KKöpL) är en skyddslagstiftning. </p>
+      </div>
     """^^rdf:XMLLiteral ;
     dcterms:title "SFS/1990:932"@sv ;
-    prov:wasGeneratedBy "lnwiki.LNMediaWiki" .
+    prov:wasGeneratedBy "ferenda.sources.legal.se.lnwiki.LNMediaWiki" .
 
 <http://localhost:8000/res/sfs/1990:932#P1> dcterms:description """
-      <p xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml"><a href="https://lagen.nu/concept/Lös_sak">Lösa saker</a> är till exempel sådana varor som livsmedel, kläder, möbler och bilar. </p>
+      <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+        <p><a href="https://lagen.nu/concept/Lös_sak">Lösa saker</a> är till exempel sådana varor som livsmedel, kläder, möbler och bilar. </p>
+      </div>
     """^^rdf:XMLLiteral .
 
 <http://localhost:8000/res/sfs/1990:932#P2> dcterms:description """
-      <p xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">Vid tillverkningsavtal gäller KKöpL oavsett vem av parterna som tillhandahåller materialet.  </p>
+      <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+        <p>Vid tillverkningsavtal gäller KKöpL oavsett vem av parterna som tillhandahåller materialet.  </p>
+      </div>
     """^^rdf:XMLLiteral .
 

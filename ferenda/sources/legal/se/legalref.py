@@ -25,12 +25,13 @@ except ImportError:
     # Mimic the simpleparse interface (the very few parts we're using)
     # but call external python 2.7 processes behind the scene.
 
-    external_simpleparse_state = tempfile.mkdtemp()
     # external_simpleparse_state = "simpleparse.tmp"
     python_exe = os.environ.get("FERENDA_PYTHON2_FALLBACK",
                                 "python2.7")
-    buildtagger_script = external_simpleparse_state + os.sep + "buildtagger.py"
-    util.writefile(buildtagger_script, """import sys,os
+    def _setup_state():
+        state = tempfile.mkdtemp()
+        buildtagger_script = state + os.sep + "buildtagger.py"
+        util.writefile(buildtagger_script, """import sys,os
 if sys.version_info >= (3,0,0):
     raise OSError("This is python %s, not python 2.6 or 2.7!" % sys.version_info)
 declaration = sys.argv[1] # md5 sum of the entire content of declaration
@@ -46,8 +47,8 @@ t = p.buildTagger(production)
 with open(picklefile,"wb") as fp:
     pickle.dump(t,fp)""")
 
-    tagstring_script = external_simpleparse_state + os.sep + "tagstring.py"
-    util.writefile(tagstring_script, """import sys, os
+        tagstring_script = state + os.sep + "tagstring.py"
+        util.writefile(tagstring_script, """import sys, os
 if sys.version_info >= (3,0,0):
     raise OSError("This is python %s, not python 2.6 or 2.7!" % sys.version_info)
 pickled_tagger = sys.argv[1] # what buildtagger.py returned -- full path
@@ -67,14 +68,20 @@ tagged = tag(text, t, 0, len(text))
 with open(picklefile,"wb") as fp:
     pickle.dump(tagged,fp)
         """)
+        return state
+                       
+    external_simpleparse_state = _setup_state()
 
     class Parser(object):
 
         def __init__(self, declaration, root='root', prebuilts=(), definitionSources=[]):
+            global external_simpleparse_state
             # 2. dump declaration to a tmpfile read by the script
             c = hashlib.md5()
             c.update(declaration)
             self.declaration_md5 = c.hexdigest()
+            if not external_simpleparse_state:
+                external_simpleparse_state = _setup_state()
             declaration_filename = "%s/%s" % (external_simpleparse_state,
                                               self.declaration_md5)
             with open(declaration_filename, "wb") as fp:
@@ -95,7 +102,7 @@ with open(picklefile,"wb") as fp:
 
                 #    3. call the script with python 27 and production
                 cmdline = "%s %s %s/%s %s" % (python_exe,
-                                              buildtagger_script,
+                                              external_simpleparse_state + os.sep + "buildtagger.py",
                                               external_simpleparse_state,
                                               self.declaration_md5,
                                               production)
@@ -115,13 +122,14 @@ with open(picklefile,"wb") as fp:
             # 2. Dump text as string
             full_text_path = "%s/%s.txt" % (os.path.dirname(pickled_tagger),
                                             text_checksum)
+            util.ensure_dir(full_text_path)
             with open(full_text_path, "wb") as fp:
                 fp.write(text)
                 # 3. call script (that loads the pickled tagtable + string
                 # file, saves tagged text as pickle)
             util.runcmd("%s %s %s %s %s" %
                         (python_exe,
-                         tagstring_script,
+                         external_simpleparse_state + os.sep + "tagstring.py",
                          pickled_tagger,
                          full_text_path,
                          text_checksum),

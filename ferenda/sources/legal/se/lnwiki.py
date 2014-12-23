@@ -62,8 +62,11 @@ class LNMediaWiki(MediaWiki):
     def canonical_uri(self, basefile):
         if basefile.startswith("SFS/") or basefile.startswith("SFS:"):
             # "SFS/1998:204" -> "1998:204"
-            return self.sfsrepo.canonical_uri(basefile[4:])
+            basefile = basefile[4:].replace("/", ":")
+            return self.sfsrepo.canonical_uri(basefile)
         else:
+            if basefile.startswith("Kategori/"):
+                basefile = basefile.replace("/", ":", 1)
             return super(LNMediaWiki, self).canonical_uri(basefile)
         
     def postprocess(self, doc, xhtmltree):
@@ -73,11 +76,14 @@ class LNMediaWiki(MediaWiki):
         if doc.basefile.startswith("SFS/") or doc.basefile.startswith("SFS:"):
             self.postprocess_commentary(doc, xhtmltree)
             toplevel_property = False
+            allow_relative = True
         else:
             toplevel_property = True
+            allow_relative = False
         body = super(LNMediaWiki, self).postprocess(doc, xhtmltree,
                                                      toplevel_property=toplevel_property)
-        citparser = SwedishCitationParser(self.p, self.config.url)
+        citparser = SwedishCitationParser(self.p, self.config.url,
+                                          allow_relative=allow_relative)
         citparser.parse_recursive(body, predicate=None)
         return body
         

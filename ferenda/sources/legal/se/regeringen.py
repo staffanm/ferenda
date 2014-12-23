@@ -59,7 +59,7 @@ class Regeringen(SwedishLegalSource):
     downloaded_suffix = ".html"  # override PDFDocumentRepository
     source_encoding = "latin-1"
     storage_policy = "dir"
-
+    alias = "regeringen"
 
     session = None
     

@@ -1378,8 +1378,8 @@ class SFS(Trips):
                             (head, tail) = p.split(term, 1)
                             nodes = (head, termnode, tail)
                             idx = element.index(p)
-                        if idx:
-                            element[idx:idx + 1] = nodes
+                    if not idx is None:
+                        element[idx:idx + 1] = nodes
 
             # Konstruera IDs
             for p in element:

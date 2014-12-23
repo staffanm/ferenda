@@ -586,7 +586,8 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
          (parindent * 2 >= (prevbox.left - nextbox.left) >= parindent)
      )):
      return True
-    
+
+
 # (ab)use the CitationClass, with it's useful parse_recursive method,
 # to use a legalref based parser instead of a set of pyparsing
 # grammars.
@@ -620,10 +621,7 @@ class SwedishCitationParser(CitationParser):
             return super(SwedishCitationParser, self).parse_recursive(part, predicate)
         
     def parse_string(self, string, predicate="dcterms:references"):
-        try:
-            from sfs import UpphavtKapitel, UpphavdParagraf
-        except ImportError:
-            from ferenda.sources.legal.se.sfs import UpphavtKapitel, UpphavdParagraf
+        from ferenda.sources.legal.se.sfs import UpphavtKapitel, UpphavdParagraf
         if isinstance(string, (UpphavtKapitel, UpphavdParagraf)):
             return [string]
 

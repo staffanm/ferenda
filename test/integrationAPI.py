@@ -144,7 +144,7 @@ class SQLiteBase():
 class FusekiBase():
     storetype = 'FUSEKI'
     storelocation = 'http://localhost:3030/'
-    storerepository = 'ds'
+    storerepository = 'ferenda'
 
 class SesameBase():
     storetype = 'SESAME'
@@ -187,7 +187,7 @@ class AdvancedAPI(object):
 
     storetype = 'FUSEKI'
     storelocation = 'http://localhost:3030/'
-    storerepository = 'ds'
+    storerepository = 'ferenda'
     indextype = 'ELASTICSEARCH'
     indexlocation = 'http://localhost:9200/ferenda/'
     # repos = (DocRepo1(), DocRepo2(), DocRepo3())

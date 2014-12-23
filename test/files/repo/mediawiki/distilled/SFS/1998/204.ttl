@@ -1,52 +1,52 @@
 @prefix : <http://www.w3.org/1999/xhtml> .
-@prefix bibo: <http://purl.org/ontology/bibo/> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
-@prefix foaf: <http://xmlns.com/foaf/0.1/> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix rinfoex: <http://lagen.nu/terms#> .
-@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
-@prefix xhv: <http://www.w3.org/1999/xhtml/vocab#> .
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix xsi: <http://www.w3.org/2001/XMLSchema-instance> .
 
 <http://localhost:8000/res/sfs/1998:204> a skos:Concept ;
     dcterms:description """
-      <p xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-        <i>Huvudförfattare: <a href="https://lagen.nu/wiki/Användare:Staffan">Staffan Malmgren</a></i>
-      </p>
-      <p xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml"><a href="http://localhost:8000/res/sfs/1998:204">Personuppgiftslagen</a> (PUL) reglerar hur <a href="https://lagen.nu/concept/Juridisk_person">juridiska</a> och <a href="https://lagen.nu/concept/Fysisk_person">fysiska personer</a> (<a href="https://lagen.nu/concept/Myndighet">myndigheter</a>, <a href="https://lagen.nu/concept/Företag">företag</a>, <a href="https://lagen.nu/concept/Enskilda">enskilda</a>, m.fl.) får hantera <a href="https://lagen.nu/concept/Personuppgift">personuppgifter</a> och tar framförallt sikte på databehandling.   </p>
-      <p xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">Det finns fyra huvudsakliga frågor man måste undersöka:  </p>
-      <ol xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-        <li> Om PUL är <b>tillämplig</b> (<a href="http://localhost:8000/res/sfs/1998:204#P2">2</a>-<a href="http://localhost:8000/res/sfs/1998:204#P8">8 §§</a>) </li>
-        <li> om behandlingen är <b>tillåten</b> (<a href="http://localhost:8000/res/sfs/1998:204#P9">9</a>-<a href="http://localhost:8000/res/sfs/1998:204#P22">22 §§</a>) </li>
-        <li> om den är <b>anmälningspliktig</b> (<a href="http://localhost:8000/res/sfs/1998:204#P36">36</a>-<a href="http://localhost:8000/res/sfs/1998:204#P37">37 §§</a>) </li>
-        <li> vilka <b>krav</b> som ställs på behandlingen när den är igång (<a href="http://localhost:8000/res/sfs/1998:204#P9">9</a>, <a href="http://localhost:8000/res/sfs/1998:204#P23">23</a>-<a href="http://localhost:8000/res/sfs/1998:204#P35">35</a> och <a href="http://localhost:8000/res/sfs/1998:204#P42">42 §§</a>).  </li>
-      </ol>
-      <p xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">PUL kompletteras av <a href="http://localhost:8000/res/sfs/1998:1191">personuppgiftsförordningen (PUF)</a> och <a class="external text" href="http://www.datainspektionen.se/lagar-och-regler/datainspektionens-foreskrifter/" rel="nofollow">datainspektionens föreskrifter (DIFS)</a>. Härutöver gäller även ett stort antal <a href="https://lagen.nu/concept/Registerförfattning">registerförfattningar</a>, exempelvis <a href="http://localhost:8000/res/sfs/2001:640">förordningen (2001:640) om registerföring m.m. vid länsrätt med hjälp av automatiserad behandling</a>. Även <a href="https://lagen.nu/concept/Europakonventionen">europakonventionens</a> artikel 8 (rätt till privatliv) reglerar den personliga integriteten. </p>
-      <p xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-        <br/>
-        <small>
-          <a class="external text" href="http://www.sweden.gov.se/content/1/c6/01/55/42/b451922d.pdf" rel="nofollow">An unofficial translation of the Personal Data Act is available from the Government Offices</a>
-        </small>
-      </p>
-      <p xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
-        <br/>
-      </p>
+      <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+        <p>
+          <i>Huvudförfattare: <a href="https://lagen.nu/wiki/Användare:Staffan">Staffan Malmgren</a></i>
+        </p>
+        <p><a href="http://localhost:8000/res/sfs/1998:204">Personuppgiftslagen</a> (PUL) reglerar hur <a href="https://lagen.nu/concept/Juridisk_person">juridiska</a> och <a href="https://lagen.nu/concept/Fysisk_person">fysiska personer</a> (<a href="https://lagen.nu/concept/Myndighet">myndigheter</a>, <a href="https://lagen.nu/concept/Företag">företag</a>, <a href="https://lagen.nu/concept/Enskilda">enskilda</a>, m.fl.) får hantera <a href="https://lagen.nu/concept/Personuppgift">personuppgifter</a> och tar framförallt sikte på databehandling.   </p>
+        <p>Det finns fyra huvudsakliga frågor man måste undersöka:  </p>
+        <ol>
+          <li> Om PUL är <b>tillämplig</b> (<a href="http://localhost:8000/res/sfs/1998:204#P2">2</a>-<a href="http://localhost:8000/res/sfs/1998:204#P8">8 §§</a>) </li>
+          <li> om behandlingen är <b>tillåten</b> (<a href="http://localhost:8000/res/sfs/1998:204#P9">9</a>-<a href="http://localhost:8000/res/sfs/1998:204#P22">22 §§</a>) </li>
+          <li> om den är <b>anmälningspliktig</b> (<a href="http://localhost:8000/res/sfs/1998:204#P36">36</a>-<a href="http://localhost:8000/res/sfs/1998:204#P37">37 §§</a>) </li>
+          <li> vilka <b>krav</b> som ställs på behandlingen när den är igång (<a href="http://localhost:8000/res/sfs/1998:204#P9">9</a>, <a href="http://localhost:8000/res/sfs/1998:204#P23">23</a>-<a href="http://localhost:8000/res/sfs/1998:204#P35">35</a> och <a href="http://localhost:8000/res/sfs/1998:204#P42">42 §§</a>).  </li>
+        </ol>
+        <p>PUL kompletteras av <a href="http://localhost:8000/res/sfs/1998:1191">personuppgiftsförordningen (PUF)</a> och <a class="external text" href="http://www.datainspektionen.se/lagar-och-regler/datainspektionens-foreskrifter/" rel="nofollow">datainspektionens föreskrifter (DIFS)</a>. Härutöver gäller även ett stort antal <a href="https://lagen.nu/concept/Registerförfattning">registerförfattningar</a>, exempelvis <a href="http://localhost:8000/res/sfs/2001:640">förordningen (2001:640) om registerföring m.m. vid länsrätt med hjälp av automatiserad behandling</a>. Även <a href="https://lagen.nu/concept/Europakonventionen">europakonventionens</a> artikel 8 (rätt till privatliv) reglerar den personliga integriteten. </p>
+        <p>
+          <br/>
+          <small>
+            <a class="external text" href="http://www.sweden.gov.se/content/1/c6/01/55/42/b451922d.pdf" rel="nofollow">An unofficial translation of the Personal Data Act is available from the Government Offices</a>
+          </small>
+        </p>
+        <p>
+          <br/>
+        </p>
+      </div>
     """^^rdf:XMLLiteral ;
     dcterms:subject <https://lagen.nu/concept/Lagar_inom_IT-rätt> ;
     dcterms:title "SFS/1998:204"@sv ;
-    prov:wasGeneratedBy "lnwiki.LNMediaWiki" .
+    prov:wasGeneratedBy "ferenda.sources.legal.se.lnwiki.LNMediaWiki" .
 
 <http://localhost:8000/res/sfs/1998:204#P1> dcterms:description """
-      <p xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">I <a href="http://localhost:8000/res/sfs/1974:152#K2P3S2">2 kap 3 § 2 st. regeringsformen</a> stadgas att det ska finnas lagstöd för den personliga integriteten. Det är denna lag som avses. </p>
+      <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+        <p>I <a href="http://localhost:8000/res/sfs/1974:152#K2P3S2">2 kap 3 § 2 st. regeringsformen</a> stadgas att det ska finnas lagstöd för den personliga integriteten. Det är denna lag som avses. </p>
+      </div>
     """^^rdf:XMLLiteral .
 
 <http://localhost:8000/res/sfs/1998:204#P2> dcterms:description """
-      <p xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">Lagen är alltså <a href="https://lagen.nu/concept/Subsidiär_lag">subsidiär</a>. Ett exempel på en lag som delvis gäller framför PUL är <a href="http://localhost:8000/res/sfs/2001:99">lagen (2001:99) om den offentliga statistiken</a>. Även <a href="http://localhost:8000/res/sfs/1949:105">tryckfrihetsförordningen</a> har företräde framför PUL, dels på grund av denna paragraf och <a href="http://localhost:8000/res/sfs/1998:204#P7">7</a>-<a href="http://localhost:8000/res/sfs/1998:204#P8">8 §§</a>, men framförallt pga principen om <i><a href="https://lagen.nu/concept/Lex_superior">lex superior</a></i>. </p>
+      <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+        <p>Lagen är alltså <a href="https://lagen.nu/concept/Subsidiär_lag">subsidiär</a>. Ett exempel på en lag som delvis gäller framför PUL är <a href="http://localhost:8000/res/sfs/2001:99">lagen (2001:99) om den offentliga statistiken</a>. Även <a href="http://localhost:8000/res/sfs/1949:105">tryckfrihetsförordningen</a> har företräde framför PUL, dels på grund av denna paragraf och <a href="http://localhost:8000/res/sfs/1998:204#P7">7</a>-<a href="http://localhost:8000/res/sfs/1998:204#P8">8 §§</a>, men framförallt pga principen om <i><a href="https://lagen.nu/concept/Lex_superior">lex superior</a></i>. </p>
+      </div>
     """^^rdf:XMLLiteral .
 
