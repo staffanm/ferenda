@@ -8,14 +8,14 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <http://localhost:8000/res/dir/2005:96> a rpubl:Direktiv ;
-    dcterms:changed "2005-09-09T00:00:00"^^xsd:dateTime ;
+    dcterms:changed "2005-09-09"^^xsd:date ;
     dcterms:identifier "Dir. 2005:96" ;
-    dcterms:issued "2005-09-01T00:00:00"^^xsd:dateTime ;
-    dcterms:publisher <http://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:issued "2005-09-01"^^xsd:date ;
+    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
     dcterms:title "Tilläggsdirektiv till utredningen för en översyn av de ekonomiska aspekterna av patentering för företags tillväxt (N 2004:13)"@sv ;
     rpubl:arsutgava "2005" ;
-    rpubl:beslutsdatum "2005-09-01T00:00:00"^^xsd:dateTime ;
-    rpubl:departement <http://lagen.nu/org/2008/naringsdepartementet> ;
+    rpubl:beslutsdatum "2005-09-01"^^xsd:date ;
+    rpubl:departement <https://lagen.nu/org/2008/naringsdepartementet> ;
     rpubl:lopnummer "96" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dir/2005:96> ;
     prov:wasGeneratedBy "ferenda.sources.legal.se.direktiv.DirTrips" .

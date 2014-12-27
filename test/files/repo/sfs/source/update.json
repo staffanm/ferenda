@@ -5,5 +5,9 @@
     "http://rkrattsbaser.gov.se/cgi-bin/thw?%24%7BHTML%7D=sfsr_lst&%24%7BOOHTML%7D=sfsr_dok&%24%7BSNHTML%7D=sfsr_err&%24%7BMAXPAGE%7D=26&%24%7BBASE%7D=SFSR&%24%7BFORD%7D=FIND&%24%7BFREETEXT%7D=&BET=&%C4BET=2014%3A913&ORG=&INTE%28upph=%3C114-08-01+ELLER+bet%3Dn%24+ELLER+tidb%3C114-08-01%29&%24%7BSORT%7D=%C5%2CLPNR+" : {
 	"file": "resultlist-multiple.html",
 	"charset": "latin-1"
+    },
+    "http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfsr_dok&${HTML}=sfst_lst&${SNHTML}=sfsr_err&${BASE}=SFSR&${TRIPSHOW}=format=THW&BET=2014:913": {
+	"file": "resultlist-inteexisterande.html",
+	"charset": "latin-1"
     }
 }

@@ -32,6 +32,7 @@ from lxml import etree
 from lxml.builder import ElementMaker
 import bs4
 import requests
+import requests.exceptions
 from layeredconfig import LayeredConfig
 
 # my own libraries
@@ -457,6 +458,7 @@ class SFS(Trips):
         opts = super(SFS, self).get_default_options()
         opts['keepexpired'] = False
         opts['revisit'] = list
+        opts['next_sfsnr'] = str
         return opts
     
     def canonical_uri(self, basefile, konsolidering=False):
@@ -537,7 +539,7 @@ class SFS(Trips):
                 last_sfsnr = wanted_sfs_nr
             except InteUppdateradSFS:
                 revisit.append(wanted_sfs_nr)
-            except InteExisterandeSFS:
+            except (InteExisterandeSFS, requests.exceptions.HTTPError):
                 # try peeking at next number, or maybe next year, and
                 # if none are there, we're done
                 if not peek:

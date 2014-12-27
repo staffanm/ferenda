@@ -29,8 +29,6 @@ MW_NS = "{http://www.mediawiki.org/xml/export-0.3/}"
 class KeywordStore(DocumentStore):
     def basefile_to_pathfrag(self, basefile):
         # Shard all files under initial letter, eg "Avtal" => "a/Avtal"
-        # FIXME: This isn't a good fit for non-document related paths,
-        # eg the location of TOC pages, cache files etc.
         first = basefile[0].lower()
         return "%s/%s" % (first, basefile)
 
@@ -72,6 +70,19 @@ class Keyword(DocumentRepository):
         opts['mediawikiexport'] = 'http://localhost/wiki/Special:Export/%s(basefile)'
         opts['wikipediatitles'] = 'http://download.wikimedia.org/svwiki/latest/svwiki-latest-all-titles-in-ns0.gz'
         return opts
+
+    def canonical_uri(self, basefile):
+        # keywords often contain spaces -- convert to underscore to get nicer URIs
+        return super(Keyword, self).canonical_uri(basefile.replace(" ",  "_"))
+
+    def basefile_from_uri(self, uri):
+        # do the inverse conversion from canonical_uri. NOTE: if your
+        # Keyword-derived repo might handle keywords that contain "_",
+        # you need to have some other basefile <-> uri strategy.
+        ret = super(Keyword, self).basefile_from_uri
+        if ret:
+            ret = ret.replace("_", " ")
+        return ret
 
     def download(self, basefile=None):
         # Get all "term sets" (used dcterms:subject Objects, wiki pages

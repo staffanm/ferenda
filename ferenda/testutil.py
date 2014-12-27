@@ -27,6 +27,7 @@ import rdflib
 from rdflib.compare import graph_diff
 from rdflib.util import guess_format
 from lxml import etree
+import requests.exceptions
 
 from ferenda import DocumentRepository, TextReader
 from ferenda import elements, util
@@ -384,37 +385,63 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
 
     def download_test(self, specfile):
         def my_get(url, **kwargs):
-            urlspec = spec[url]
-            if isinstance(urlspec, str):
-                urlspec = {'file': urlspec}
-            if 'charset' not in urlspec:
-                urlspec['charset'] = 'utf-8'
-            url_location = os.path.join(os.path.dirname(specfile),
-                                        urlspec['file'])
             res = Mock()
-            # load the .content property
-            with open(url_location, "rb") as fp:
-                res.content = fp.read()
-            # but only load .text if a charset is present (note
-            # default value of 'utf-8' above -- set 'charset': null in
-            # the json file for binary files
-            if urlspec['charset']:
-                with codecs.open(url_location, "r", encoding=urlspec['charset']) as fp:
-                    res.text = fp.read()
-            # FIXME: Using a defaultdict ensures that we'll never trip
-            # over the non-existance of certain headers. WE should
-            # specify only the most basic headers to make sure calling
-            # code doesn't rely on eg. the etag header always being
-            # there, because it won't
-            res.headers = collections.defaultdict(lambda: None)
-            res.headers['X-These-Headers-Are'] = 'Faked'
-            res.status_code = 200
+            try:
+                urlspec = spec[url]
+                if isinstance(urlspec, str):
+                    urlspec = {'file': urlspec}
+                if 'charset' not in urlspec:
+                    urlspec['charset'] = 'utf-8'
+                url_location = os.path.join(os.path.dirname(specfile),
+                                            urlspec['file'])
+                # load the .content property
+                with open(url_location, "rb") as fp:
+                    res.content = fp.read()
+                # but only load .text if a charset is present (note
+                # default value of 'utf-8' above -- set 'charset': null in
+                # the json file for binary files
+                if urlspec['charset']:
+                    with codecs.open(url_location, "r", encoding=urlspec['charset']) as fp:
+                        res.text = fp.read()
+                # FIXME: Using a defaultdict ensures that we'll never trip
+                # over the non-existance of certain headers. WE should
+                # specify only the most basic headers to make sure calling
+                # code doesn't rely on eg. the etag header always being
+                # there, because it won't
+                res.headers = collections.defaultdict(lambda: None)
+                res.headers['X-These-Headers-Are'] = 'Faked'
+                res.status_code = 200
+            except KeyError:
+                # the given url was not provided in the specfile. What
+                # if we raise this as a 404?
+                res.status_code = 404
+                res.raise_for_status = Mock(side_effect=requests.exceptions.HTTPError)
             return res
+
         with codecs.open(specfile, encoding="utf-8") as fp:
             spec = json.load(fp)
+
+            # process the special '@settings' key (FIXME: didn't I already
+            # implement this somewhere else?)
+            #
+            # a @settings like this:
+            #     "@settings": {
+            # 	"config": {"next_sfsnr": "2014:913"}
+            #     },
+            #
+            # will have the effect of this:
+            #
+            # self.repo.config.next_sfsnr = "2014:913"
+            if '@settings' in spec:
+                for attribute in spec['@settings']:
+                    thing = getattr(self.repo, attribute)
+                    for key, value in spec['@settings'][attribute].items():
+                        setattr(thing, key, value)
+
         with patch('requests.sessions.Session.get', side_effect=my_get):
             with patch('requests.get', side_effect=my_get):
                 self.repo.download()
+
 
         # organize a temporary copy of files that we can compare our results to
         wantdir = "%s/%s-want" % (self.datadir, self.repoclass.alias)

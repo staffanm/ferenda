@@ -752,11 +752,15 @@ class DV(SwedishLegalSource):
                           Literal(patchdesc)))
         doc.body = self.format_body(rawbody, doc.basefile)
         self.parse_entry_update(doc)
-        
         return True
 
 
     def parse_entry_title(self, doc):
+        # FIXME: The primary use for entry.title is to generate
+        # feeds. Should we construct a feed-friendly title here
+        # (rpubl:referatrubrik is often too wordy, dctemr:identifier +
+        # dcterms:subject might be a better choice -- also notisfall
+        # does not have any rpubl:referatrubrik)
         title = doc.meta.value(URIRef(doc.uri), self.ns['rpubl'].referatrubrik)
         if title:
             return str(title)
@@ -794,7 +798,7 @@ class DV(SwedishLegalSource):
 
         iterator = soup.find_all(ptag)
         if coll == "HDO":
-            # keep in sync w extract_notis
+            # keep this in sync w extract_notis
             re_notisstart = re.compile("(?:Den (?P<avgdatum>\d+):[ae].\s+|)(?P<ordinal>\d+)\.[ \xa0]*\((?P<malnr>\w[ \xa0]\d+-\d+)\)", flags=re.UNICODE)
             re_avgdatum = re_malnr = re_notisstart
             re_lagrum = re_sokord = None
@@ -830,9 +834,8 @@ class DV(SwedishLegalSource):
                             header[-1].append(list(tmp.children)[0])
                         else:
                             header.append(tmp)
-
-        if not done:
-            raise errors.ParseError("Cannot find notis number in %s" % basefile)
+            if not done:
+                raise errors.ParseError("Cannot find notis number in %s" % basefile)
                                 
         if coll == "HDO":
             head['Domstol'] = "Högsta Domstolen"

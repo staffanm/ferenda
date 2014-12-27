@@ -30,6 +30,7 @@ except ImportError as e:
         raise e # dunno
         
 import unicodedata
+
 class MediaWikiStore(DocumentStore):
     def basefile_to_pathfrag(self, basefile):
         return basefile.replace(":", os.sep).replace(" ", "_")
@@ -69,7 +70,7 @@ class MediaWiki(DocumentRepository):
     documentstore_class = MediaWikiStore
     rdf_type = Namespace(util.ns['skos']).Concept
     keyword_class = Keyword
-    namespaces = ['skos', 'prov', 'dcterms']
+    namespaces = ['rdf', 'skos', 'prov', 'dcterms']
 
     def __init__(self, config=None, **kwargs):
         super(MediaWiki, self).__init__(config, **kwargs)
@@ -84,7 +85,8 @@ class MediaWiki(DocumentRepository):
         opts['mediawikiexport'] = 'http://localhost/wiki/Special:Export/%s(basefile)'
         opts['mediawikidump'] = 'http://localhost/wiki/allpages-dump.xml'
         opts['mediawikinamespaces'] = ['Category']
-            # process pages in this namespace (as well as pages in the default namespace)
+            # process pages in this namespace (as well as pages in the
+            # default namespace)
         return opts
 
     def download(self, basefile=None):

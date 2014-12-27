@@ -3,28 +3,29 @@ from __future__ import unicode_literals, print_function
 
 from collections import defaultdict
 from datetime import datetime
-from tempfile import mkstemp
+from ferenda.compat import OrderedDict
 from io import BytesIO
+from itertools import chain
 from operator import itemgetter
+from tempfile import mkstemp
 from wsgiref.handlers import format_date_time as format_http_date
 from wsgiref.util import request_uri
-from itertools import chain
+import calendar
 import codecs
+import difflib
+import filecmp
+import functools
+import inspect
+import json
 import logging
 import logging.handlers
 import os
 import re
-import time
-import calendar
-import filecmp
 import socket
-import inspect
-import difflib
-import functools
-import json
-from ferenda.compat import OrderedDict
+import time
 
 # 3rd party
+from layeredconfig import LayeredConfig, Defaults
 from lxml import etree
 from lxml.builder import ElementMaker
 from rdflib import Graph, Literal, Namespace, URIRef, RDF, RDFS
@@ -34,7 +35,6 @@ import lxml.html
 import pkg_resources
 import requests
 import requests.exceptions
-from layeredconfig import LayeredConfig, Defaults
 
 from six import text_type as str
 from six import binary_type as bytes
@@ -1398,10 +1398,19 @@ with the *config* object as single parameter.
         prefixes = dict([(str(x[1]), x[0]) for x in self.ns.items()])
         used = {"http://www.w3.org/1999/xhtml": None}
         for e in bodycontent.iter():
+            # Find the "jclark" syntax namespaces (eg "{http://www.cars.com/xml}part")
             if "}" in e.tag:
                 ns = e.tag.split("}",1)[0][1:]
                 if ns not in used:
                     used[ns] = prefixes[ns]
+            # Find undeclared prefixes and guess which NS they map to
+            # (similarly to the expansion of property/datatype/rel below):
+            if e.get('typeof') and ':' in e.get('typeof'):
+                prefix = e.get('typeof').split(":", 1)[0]
+                ns = str(self.ns[prefix])
+                if ns not in used:
+                    used[ns] = prefixes[ns]
+
         nsmap = dict([(x[1], x[0]) for x in used.items()])
 
         for e in headcontent.iter():
@@ -1426,7 +1435,6 @@ with the *config* object as single parameter.
 
         E = ElementMaker(namespace="http://www.w3.org/1999/xhtml",
                          nsmap=nsmap)
-        bodycontent = doc.body.as_xhtml(doc.uri)
         htmlattrs = {XSI_SCHEMALOC: "http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd",
                      "version": "XHTML+RDFa 1.1"}
         if doc.lang:

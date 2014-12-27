@@ -81,7 +81,7 @@ class Regeringen(SwedishLegalSource):
                   ('dateRangeToMonth', today.month),
                   ('dateRangeToYear', today.year - 1998), # 16
                   ('docTypes', self.document_type)])
-        if self.config.lastdownload and not self.config.refresh:
+        if 'lastdownload' in self.config and not self.config.refresh:
             last = self.config.lastdownload - timedelta(days=1)
             self.log.debug("Only downloading documents published on or after %s"
                            % last)

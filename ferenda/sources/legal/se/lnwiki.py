@@ -86,7 +86,7 @@ class LNMediaWiki(MediaWiki):
                                           allow_relative=allow_relative)
         citparser.parse_recursive(body, predicate=None)
         return body
-        
+
     def postprocess_commentary(self, doc, xhtmltree):
         uri = doc.uri
         body = xhtmltree.getchildren()[0]

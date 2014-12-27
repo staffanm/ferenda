@@ -46,7 +46,7 @@
     dcterms:issued "2013-10-17"^^xsd:date ;
     dcterms:title "Organisering av framtidens e-förvaltning"@sv ;
     rpubl:arsutgava "2013" ;
-    rpubl:departement <http://lagen.nu/org/2008/naringsdepartementet> ;
+    rpubl:departement <https://lagen.nu/org/2008/naringsdepartementet> ;
     rpubl:lopnummer "75" ;
     rpubl:utgarFran <http://localhost:8000/res/dir/2009:19>,
         <http://localhost:8000/res/dir/2010:32>,
