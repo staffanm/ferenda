@@ -337,9 +337,11 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
                        'rightmargin': 813,
                        'titlesize': 41,
                        'headingsize': 26,
+                       'headingfamily': 'TradeGothic Light',
                        'subheadingsize': 16,
                        'subheadingfamily': 'TradeGothic,Bold',
                        'subsubheadingsize': 14,
+                       'subsubheadingfamily': 'OrigGarmnd BT,Bold',  # Not 'TradeGothic,Bold' like one would think...
                        'textsize': 14
                    },
                'ds': {'header': 49, # or rather 49 + 15
@@ -352,6 +354,7 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
                       'subheadingsize': 16,
                       'subheadingfamily': 'TradeGothic,Bold',
                       'subsubheadingsize': 14,
+                      'subsubheadingfamily': 'OrigGarmnd BT,Bold',
                       'textsize': 14
                    }
                }
@@ -401,14 +404,14 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
                 return True
 
     def is_section(parser):
-        (ordinal, title) = analyze_sectionstart(parser)
+        (ordinal, headingtype, title) = analyze_sectionstart(parser)
         if ordinal:
-            return ordinal.count(".") == 0
+            return headingtype == "heading" and ordinal.count(".") == 0
 
     def is_subsection(parser):
-        (ordinal, title) = analyze_sectionstart(parser)
+        (ordinal, headingtype, title) = analyze_sectionstart(parser)
         if ordinal:
-            return ordinal.count(".") == 1
+            return headingtype == "subheading" and ordinal.count(".") == 1
 
     def is_unorderedsection(parser):
         # Subsections in "Författningskommentar" sections are
@@ -418,9 +421,9 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
                 chunk.getfont()['family'] == metrics['subheadingfamily'])
 
     def is_subsubsection(parser):
-        (ordinal, title) = analyze_sectionstart(parser)
+        (ordinal, headingtype, title) = analyze_sectionstart(parser)
         if ordinal:
-            return ordinal.count(".") == 2
+            return headingtype == "subsubheading" and ordinal.count(".") == 2
 
     def is_appendix(parser):
         chunk = parser.reader.peek()
@@ -494,7 +497,7 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
     # this is used for subsections and subsubsections as well --
     # probably wont work due to the newstate property
     def make_section(parser):
-        ordinal, title = analyze_sectionstart(parser, parser.reader.next())
+        ordinal, headingtype, title = analyze_sectionstart(parser, parser.reader.next())
         if ordinal:
             identifier = "Prop. %s, avsnitt %s" % (basefile, ordinal)
             s = Section(ordinal=ordinal, title=title)
@@ -515,18 +518,31 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
 
     re_sectionstart = re.compile("^(\d[\.\d]*) +(.*[^\.])$").match
     def analyze_sectionstart(parser, textbox=None):
+        """returns (ordinal, headingtype, text) if it looks like a section
+        heading, (None, None, textbox) otherwise.
+
+        """
+
         if not textbox:
             textbox = parser.reader.peek()
-        if not (metrics['headingsize'] >= int(textbox.getfont()['size']) >= metrics['subsubheadingsize']):
-            return (None, textbox)
+        # the font size and family should be defined
+        found = False
+        size = int(textbox.getfont()['size'])
+        family = textbox.getfont()['family']
+        for h in ('heading', 'subheading', 'subsubheading'):
+            if metrics[h+'size'] == size and (h+'family' not in metrics or
+                                              metrics[h+'family'] == family):
+                found = h
+        if not found:
+            return (None, None, textbox)
         txt = str(textbox)
         m = re_sectionstart(txt)
         if m:
             ordinal = m.group(1).rstrip(".")
             title = m.group(2)
-            return (ordinal, title.strip())
+            return (ordinal, found, title.strip())
         else:
-            return (None, textbox)
+            return (None, found, textbox)
 
     p = FSMParser()
 

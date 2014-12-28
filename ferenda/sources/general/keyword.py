@@ -79,7 +79,7 @@ class Keyword(DocumentRepository):
         # do the inverse conversion from canonical_uri. NOTE: if your
         # Keyword-derived repo might handle keywords that contain "_",
         # you need to have some other basefile <-> uri strategy.
-        ret = super(Keyword, self).basefile_from_uri
+        ret = super(Keyword, self).basefile_from_uri(uri)
         if ret:
             ret = ret.replace("_", " ")
         return ret
