@@ -21,7 +21,7 @@ from ferenda import FSMParser
 from ferenda import Describer
 from ferenda import util
 from ferenda.compat import OrderedDict
-from ferenda.elements import Body, Paragraph, Section, CompoundElement, SectionalElement
+from ferenda.elements import Body, Paragraph, Section, CompoundElement, SectionalElement, Link
 from ferenda.pdfreader import PDFReader
 from ferenda.pdfreader import Page, Textbox
 from ferenda.decorators import recordlastdownload, downloadmax
@@ -259,6 +259,7 @@ class Regeringen(SwedishLegalSource):
         d.value(self.ns['dcterms'].title, title, lang=doc.lang)
         identifier = self.sanitize_identifier(
             content.find("p", "lead").text)  # might need fixing up
+        
         d.value(self.ns['dcterms'].identifier, identifier)
 
         definitions = content.find("dl", "definitions")
@@ -279,12 +280,16 @@ class Regeringen(SwedishLegalSource):
                         self.log.warning(
                             "Could not parse %s as swedish date" % value)
                 elif key == "Avsändare:":
-                    if value.endswith("departementet"):
-                        d.rel(self.ns['rpubl'].departement,
-                              self.lookup_resource(value))
-                    else:
-                        d.rel(self.ns['dcterms'].publisher,
-                              self.lookup_resource(value))
+                    try:
+                        res = self.lookup_resource(value)
+                        if value.endswith("departementet"):
+                            d.rel(self.ns['rpubl'].departement,
+                                  res)
+                        else:
+                            d.rel(self.ns['dcterms'].publisher,
+                                  res)
+                    except KeyError:
+                        self.log.warning("%s: Could not find resource for Avsändare: '%s'" % (doc.basefile, value))
 
         if content.find("h2", text="Sammanfattning"):
             sums = content.find("h2", text="Sammanfattning").find_next_siblings("p")
@@ -356,11 +361,30 @@ class Regeringen(SwedishLegalSource):
                 #    d.value(RDFS.label, link.get_text(strip=True))
 
         self.infer_triples(d, doc.basefile)
-        # print doc.meta.serialize(format="turtle")
-
-        # find pdf file names in order
 
     def parse_document_from_soup(self, soup, doc):
+
+        # reset global state
+        PreambleSection.counter = 0
+        UnorderedSection.counter = 0
+
+        pdffiles = self.find_pdf_links(soup, doc.basefile)
+        if not pdffiles:
+            self.log.error(
+                "%s: No PDF documents found, can't parse anything" % doc.basefile)
+            return None
+        doc.body = self.parse_pdfs(doc.basefile, pdffiles)
+        if self.document_type == self.PROPOSITION:
+            self.post_process_proposition(doc)
+        return doc
+
+    def post_process_proposition(self, doc):
+        # do some post processing. First loop through leading
+        # textboxes and try to find dcterms:identifier, dcterms:title and
+        # dcterms:issued (these should already be present in doc.meta,
+        # but the values in the actual document should take
+        # precendence
+
         def _check_differing(describer, predicate, newval):
             if describer.getvalue(predicate) != newval:
                 self.log.warning("%s: HTML page: %s is %r, document: it's %r" %
@@ -374,36 +398,22 @@ class Regeringen(SwedishLegalSource):
                                 d.graph.value(d._current(), predicate)))
                 d.value(predicate, newval)
 
-        # reset global state
-        PreambleSection.counter = 0
-        UnorderedSection.counter = 0
-
-        pdffiles = self.find_pdf_links(soup, doc.basefile)
-        if not pdffiles:
-            self.log.error(
-                "%s: No PDF documents found, can't parse anything" % doc.basefile)
-            return None
-            
-        doc.body = self.parse_pdfs(doc.basefile, pdffiles)
-
-        # do some post processing. First loop through leading
-        # textboxes and try to find dcterms:identifier, dcterms:title and
-        # dcterms:issued (these should already be present in doc.meta,
-        # but the values in the actual document should take
-        # precendence
         d = Describer(doc.meta, doc.uri)
-        title_found = False
+        title_found = identifier_found = issued_found = False
         for idx, element in enumerate(doc.body):
             if not isinstance(element, Textbox):
                 continue
             str_element = str(element).strip()
-            # print("examining %s..." % str_element[:40])
+
             # dcterms:identifier
-            m = self.re_basefile_lax.search(str_element)
-            if m:
-                _check_differing(d, self.ns['dcterms'].identifier, "Prop. " + m.group(1))
+            if not identifier_found:
+                m = self.re_basefile_lax.search(str_element)
+                if m:
+                    _check_differing(d, self.ns['dcterms'].identifier, "Prop. " + m.group(1))
+                    identifier_found = True
+                
             # dcterms:title
-            if element.getfont()['size'] == '20' and not title_found:
+            if not title_found and element.getfont()['size'] == '20':
                 # sometimes part of the the dcterms:identifier (eg " Prop."
                 # or " 2013/14:51") gets mixed up in the title
                 # textbox. Remove those parts if we can find them.
@@ -413,10 +423,15 @@ class Regeringen(SwedishLegalSource):
                     str_element = self.re_basefile_lax.sub("", str_element)
                 _check_differing(d, self.ns['dcterms'].title, str_element)
                 title_found = True
+
             # dcterms:issued
-            if str_element.startswith("Stockholm den"):
+            if not issued_found and str_element.startswith("Stockholm den"):
                 pubdate = self.parse_swedish_date(str_element[13:])
                 _check_differing(d, self.ns['dcterms'].issued, pubdate)
+                issued_found = True
+
+            if title_found and identifier_found and issued_found:
+                break
 
         # then maybe look for the section named Författningskommentar
         # (or similar), identify each section and which proposed new
@@ -435,12 +450,9 @@ class Regeringen(SwedishLegalSource):
                             # CommentaryOn container)
                             pass
                             # print("%s,%s,%s: %s" % (i,j,k,repr(p)))
-                
-                
         # then maybe look for inline references ("Övervägandena finns
         # i avsnitt 5.1 och 6" using CitationParser)
                 
-        return doc
 
     def sanitize_identifier(self, identifier):
         pattern = {self.KOMMITTEDIREKTIV: "%s. %s:%s",
@@ -671,6 +683,15 @@ class Regeringen(SwedishLegalSource):
         # 2)
         return self.lookup_resource(label)
 
-    @classmethod
-    def tabs(cls, primary=False):
-        return [['Förarbeten', '/forarb/']]
+    def toc_item(self, binding, row):
+        return [row['dcterms_identifier']+": ",
+                Link(row['dcterms_title'],  # yes, ignore binding
+                     uri=row['uri'])]
+        
+    
+    def tabs(self, primary=False):
+        label = {self.DS: "Ds:ar",
+                 self.KOMMITTEDIREKTIV: "Kommittédirektiv",
+                 self.PROPOSITION: "Propositioner",
+                 self.SOU: "SOU:er"}.get(self.document_type, "Förarbete")
+        return [(label, self.dataset_uri())]

@@ -6,7 +6,7 @@ from __future__ import unicode_literals
 from datetime import datetime, date
 import re
 
-from rdflib import URIRef, RDF, Namespace
+from rdflib import URIRef, RDF, Namespace, Literal
 from six import text_type as str
 from layeredconfig import LayeredConfig
 
@@ -277,7 +277,13 @@ class SwedishLegalSource(DocumentRepository):
             # sanitize_identifier should prevent all preventable
             # occurrences of this.
             (doctype, arsutgava, lopnummer) = re.split("[ :]", identifier)
-        except (KeyError, ValueError):
+        except (KeyError, ValueError) as e:
+            if isinstance(e, ValueError):
+                # The existing identifier was incomplete. We should remove it.
+                # FIXME: depends on internal details of the
+                # rdflib.extras implementation in order to get the
+                # current URI
+                d.graph.remove((d._current(), self.ns['dcterms'].identifier, Literal(identifier)))
             # Create one from basefile. First guess prefix
             if self.rdf_type == self.ns['rpubl'].Direktiv:
                 prefix = "Dir. "
@@ -327,8 +333,9 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
                                'rightmargin': 628,
                                'headingsize': 20,
                                'subheadingsize': 17,
-                               'subheadingfamily': 'Times New Roman',
+                               'subheadingfamily': 'TimesNewRomanPSMT',  # not 'Times New Roman',
                                'subsubheadingsize': 15,
+                               'subsubheadingfamily': 'TimesNewRomanPS-BoldMT',
                                'textsize': 13},
                'sou': {'header': 49, # or rather 49 + 15
                        'header': 65, # make sure this is correct
