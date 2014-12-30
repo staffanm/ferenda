@@ -1,0 +1,50 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://localhost:8000/res/dir/2014:158#US1> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/dir/2014:158> ;
+    dcterms:title "Utvidgning av uppdraget"@sv .
+
+<http://localhost:8000/res/dir/2014:158#US3> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/dir/2014:158#US2> ;
+    dcterms:title "Internationella och nationella initiativ"@sv .
+
+<http://localhost:8000/res/dir/2014:158#US4> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/dir/2014:158#US2> ;
+    dcterms:title "Olika förvaltningsmetoder"@sv .
+
+<http://localhost:8000/res/dir/2014:158#US5> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/dir/2014:158> ;
+    dcterms:title "Uppdraget att föreslå åtgärder för att förbättra informationsgivningen och jämförbarheten kring hur fondförvaltare integrerar hållbarhetsaspekter i sin förvaltning"@sv .
+
+<http://localhost:8000/res/dir/2014:158#US6> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/dir/2014:158> ;
+    dcterms:title "Konsekvensbeskrivningar"@sv .
+
+<http://localhost:8000/res/dir/2014:158#US7> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/dir/2014:158> ;
+    dcterms:title "Samråd och redovisning av uppdraget"@sv .
+
+<http://localhost:8000/res/dir/2014:158#US2> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/dir/2014:158> ;
+    dcterms:title "Befintliga initiativ och metoder för arbete med hållbarhetsfrågor i kapitalförvaltning"@sv .
+
+<http://localhost:8000/res/dir/2014:158> a rpubl:Direktiv ;
+    dcterms:abstract "Regeringen beslutade den 30 oktober 2014 kommittédirektiv om en översyn av fondregelverket (dir. 2014:139). Regeringen ger nu utredaren i uppdrag att också föreslå åtgärder för att förbättra informationsgivningen och jämförbarheten kring hur fondförvaltare integrerar hållbarhetsaspekter i sin förvaltning, såsom miljö- och klimatfrågor, mänskliga rättigheter, arbetsvillkor och bekämpning av korruption. Uppdraget ska fortfarande slutredovisas senast den 31 december 2015."@sv ;
+    dcterms:identifier "Dir. 2014:158" ;
+    dcterms:issued "2014-12-18"^^xsd:date ;
+    dcterms:title "Tilläggsdirektiv till Utredningen om en översyn av fondregelverket"@sv ;
+    rpubl:arsutgava "2014" ;
+    rpubl:departement <https://lagen.nu/org/2008/finansdepartementet> ;
+    rpubl:lopnummer "158" ;
+    rdfs:seeAlso <http://www.regeringen.se/sb/d/19678/a/251933> ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/dir/2014:158> ;
+    prov:wasGeneratedBy "ferenda.sources.legal.se.direktiv.DirRegeringen" .
+
