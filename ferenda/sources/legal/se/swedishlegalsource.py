@@ -51,6 +51,20 @@ class PreambleSection(CompoundElement):
 
 
 class UnorderedSection(CompoundElement):
+    # FIXME: It'd be nice with some way of ordering nested unordered
+    # sections, like:
+    #  US1
+    #  US2
+    #    US2.1
+    #    US2.2
+    #  US3
+    #
+    # right now they'll appear as:
+    #  US1
+    #  US2
+    #    US3
+    #    US4
+    #  US5
     tagname = "div"
     classname = "unorderedsection"
     counter = 0
@@ -65,6 +79,7 @@ class UnorderedSection(CompoundElement):
         element.set('content', self.title)
         element.set('typeof', 'bibo:DocumentPart')
         return element
+
 
 
 class Appendix(SectionalElement): 
@@ -288,6 +303,10 @@ class SwedishLegalSource(DocumentRepository):
             if self.rdf_type == self.ns['rpubl'].Direktiv:
                 prefix = "Dir. "
             elif self.rdf_type == self.ns['rpubl'].Utredningsbetankande:
+                # FIXME: rpubl:utrSerie might have a site-specific URI
+                # which is not aligned with official Rinfo URIs (eg
+                # https://lagen.nu/dataset/ds). Also, rpubl:utrSerie
+                # is only set further down below in this very method.
                 if d.getvalue(self.ns['rpubl'].utrSerie) == "http://rinfo.lagrummet.se/serie/utr/ds":
                     prefix = "Ds "
                 else:
@@ -309,6 +328,10 @@ class SwedishLegalSource(DocumentRepository):
         d.value(self.ns['rpubl'].arsutgava, arsutgava)
         d.value(self.ns['rpubl'].lopnummer, lopnummer)
 
+        if self.rdf_type == self.ns['rpubl'].Utredningsbetankande:
+            d.rel(self.ns['rpubl'].utrSerie, self.dataset_uri())
+
+
 # can't really have a toc_item thats general for all kinds of swedish legal documents?
 # 
 #    def toc_item(self, binding, row):
@@ -323,19 +346,35 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
                        'leftmargin': 105,
                        'rightmargin': 566,
                        'headingsize': 14,
+                       'headingfamily': 'TimesNewRomanPS-BoldMT',
                        'subheadingsize': 14,
                        'subheadingfamily': 'TimesNewRomanPS-ItalicMT',
                        'subsubheadingsize': None,
                        'textsize': 14},
-               'proposition': {'footer': 920,
+               'proposition': {'type': 'proposition', # FIXME:
+                                                      # is_unorderedsection
+                                                      # uses this to
+                                                      # avoid creating
+                                                      # top-level
+                                                      # unordered
+                                                      # sections (they
+                                                      # get confused
+                                                      # with doc title
+                                                      # and identifier
+                                                      # on the first
+                                                      # page). Should
+                                                      # be handled
+                                                      # smarter.
+                               'footer': 920,
                                'header': 65, # make sure this is correct
                                'leftmargin': 160,
                                'rightmargin': 628,
                                'headingsize': 20,
+                               'headingfamily': 'TimesNewRomanPSMT',
                                'subheadingsize': 17,
-                               'subheadingfamily': 'TimesNewRomanPSMT',  # not 'Times New Roman',
+                               'subheadingfamily': 'TimesNewRomanPSMT',
                                'subsubheadingsize': 15,
-                               'subsubheadingfamily': 'TimesNewRomanPS-BoldMT',
+                               'subsubheadingfamily': 'TimesNewRomanPSMT', # In some cases maybe "TimesNewRomanPS-BoldMT"
                                'textsize': 13},
                'sou': {'header': 49, # or rather 49 + 15
                        'header': 65, # make sure this is correct
@@ -358,6 +397,7 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
                       'rightmargin': 813,
                       'titlesize': 41,
                       'headingsize': 26,
+                      'headingfamily': 'TradeGothic Light',
                       'subheadingsize': 16,
                       'subheadingfamily': 'TradeGothic,Bold',
                       'subsubheadingsize': 14,
@@ -421,6 +461,17 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
             return headingtype == "subheading" and ordinal.count(".") == 1
 
     def is_unorderedsection(parser):
+        # Frontpage textboxes (title, identifier and abstract heading)
+        # for this doctype should not be thought of as
+        # unorderedsections, even though they're set in the same type
+        # as normal sections.
+        if 'type' in metrics and metrics['type'] == 'proposition':
+            return False
+        chunk = parser.reader.peek()
+        return (int(chunk.getfont()['size']) == metrics['headingsize'] and
+                chunk.getfont()['family'] == metrics['headingfamily'])
+
+    def is_unorderedsubsection(parser):
         # Subsections in "Författningskommentar" sections are
         # not always numbered. As a backup, check font size and family as well
         chunk = parser.reader.peek()
@@ -481,6 +532,11 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
         return parser.make_children(s)
     setattr(make_unorderedsection, 'newstate', 'unorderedsection')
 
+    def make_unorderedsubsection(parser):
+        s = UnorderedSection(title=str(parser.reader.next()).strip())
+        return parser.make_children(s)
+    setattr(make_unorderedsubsection, 'newstate', 'unorderedsubsection')
+
     def make_appendix(parser):
         # now, an appendix can begin with either the actual
         # headline-like title, or by the sidenote in the
@@ -529,7 +585,7 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
         heading, (None, None, textbox) otherwise.
 
         """
-
+        
         if not textbox:
             textbox = parser.reader.peek()
         # the font size and family should be defined
@@ -562,11 +618,14 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
                       is_subsubsection,
                       is_preamblesection,
                       is_unorderedsection,
+                      is_unorderedsubsection,
                       is_paragraph)
-    commonstates = ("body","preamblesection","section", "subsection", "unorderedsection", "subsubsection", "appendix")
+    commonstates = ("body", "preamblesection", "section", "subsection",
+                    "unorderedsection", "unorderedsubsection", "subsubsection",
+                    "appendix")
+    
     p.set_transitions({(commonstates, is_nonessential): (skip_nonessential, None),
                        (commonstates, is_pagebreak): (skip_pagebreak, None),
-                       (commonstates, is_unorderedsection): (make_unorderedsection, "unorderedsection"),
                        (commonstates, is_paragraph): (make_paragraph, None),
                        ("body", is_coverpage): (make_coverpage, "coverpage"),
                        ("body", is_preamblesection): (make_preamblesection, "preamblesection"),
@@ -576,12 +635,21 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
                        ("preamblesection", is_preamblesection): (False, None),
                        ("preamblesection", is_section): (False, None),
                        ("body", is_section): (make_section, "section"),
+                       ("body", is_unorderedsection): (make_unorderedsection, "unorderedsection"),
                        ("section", is_section): (False, None),
                        ("section", is_subsection): (make_section, "subsection"),
-                       ("unorderedsection", is_preamblesection): (False, None),
-                       ("unorderedsection", is_unorderedsection): (False, None),
+                       ("section", is_unorderedsection): (make_unorderedsection, "unorderedsection"),
+                       ("section", is_unorderedsubsection): (make_unorderedsection, "unorderedsubsection"),
                        ("unorderedsection", is_section): (False, None),
                        ("unorderedsection", is_appendix): (False, None),
+                       ("unorderedsection", is_preamblesection): (False, None),
+                       ("unorderedsection", is_unorderedsection): (False, None),
+                       ("unorderedsection", is_unorderedsubsection): (make_unorderedsubsection, "unorderedsubsection"),
+                       ("unorderedsubsection", is_section): (False, None),
+                       ("unorderedsubsection", is_appendix): (False, None),
+                       ("unorderedsubsection", is_preamblesection): (False, None),
+                       ("unorderedsubsection", is_unorderedsection): (False, None),
+                       ("unorderedsubsection", is_unorderedsubsection): (False, None),
                        ("subsection", is_subsection): (False, None),
                        ("subsection", is_section): (False, None),
                        ("subsection", is_subsubsection): (make_section, "subsubsection"),

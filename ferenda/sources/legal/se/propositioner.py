@@ -36,7 +36,8 @@ class PropRegeringen(Regeringen):
         r'(?:Prop\.?|) ?(\d{4}/\d{2,4}:\d+)', re.IGNORECASE)
     rdf_type = RPUBL.Proposition
     document_type = Regeringen.PROPOSITION
-
+    # sparql_annotations = "res/sparql/prop-annotations.rq"
+    sparql_annotations = None # don't even bother creating an annotation file
 
 class PropTrips(Trips):
     alias = "proptrips"

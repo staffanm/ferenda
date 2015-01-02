@@ -18,5 +18,5 @@ class SOU(Regeringen):
     alias = "sou"
     re_basefile_strict = re.compile(r'SOU (\d{4}:\d+)')
     re_basefile_lax = re.compile(r'(?:SOU|) ?(\d{4}:\d+)', re.IGNORECASE)
-    rdf_type = RPUBL.Utredning
+    rdf_type = RPUBL.Utredningsbetankande
     document_type = Regeringen.SOU

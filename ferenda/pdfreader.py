@@ -714,6 +714,9 @@ all text in a Textbox has the same font and size.
 
     def getfont(self):
         """Returns a fontspec dict of all properties of the font used."""
+        #
+        # this would be a place to insert fontmapping functionality
+        # "TimesNewRomanPS-ItalicMT" => "Times New Roman,Italic"
         if self.font:
             return self.__fontspec[self.font]
         else:

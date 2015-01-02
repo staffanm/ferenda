@@ -17,5 +17,8 @@ from .propositioner import Propositioner
 from .sfs import SFS
 from .sou import SOU
 
+# these should be moved away from the "pure" swedish legal sources
+# docrepos and into a lagen.nu specific package
 from .lnkeyword import LNKeyword
 from .lnwiki import LNMediaWiki
+from .forarbeten import Forarbeten

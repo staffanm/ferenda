@@ -1,12 +1,75 @@
 @prefix bibo: <http://purl.org/ontology/bibo/> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix prov: <http://www.w3.org/ns/prov-o/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://localhost:8000/res/prop/2013/14:34#B1> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/prop/2013/14:34> ;
+    dcterms:title "Sammanfattning av departementspromemorian Straffavgift vid bristande kreditprövning (Ds 2013:17)"@sv ;
+    bibo:chapter "1"@sv .
+
+<http://localhost:8000/res/prop/2013/14:34#B2> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/prop/2013/14:34> ;
+    dcterms:title "Promemorians lagförslag"@sv ;
+    bibo:chapter "2"@sv .
+
+<http://localhost:8000/res/prop/2013/14:34#B3> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/prop/2013/14:34> ;
+    dcterms:title "Förteckning över remissinstanserna"@sv ;
+    bibo:chapter "3"@sv .
+
+<http://localhost:8000/res/prop/2013/14:34#B4> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/prop/2013/14:34> ;
+    dcterms:title "Lagrådets yttrande"@sv ;
+    bibo:chapter "4"@sv .
+
+<http://localhost:8000/res/prop/2013/14:34#PS1> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/prop/2013/14:34> ;
+    dcterms:title "Propositionens huvudsakliga innehåll"@sv .
+
+<http://localhost:8000/res/prop/2013/14:34#S1> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/prop/2013/14:34> ;
+    dcterms:title "Förslag till riksdagsbeslut"@sv ;
+    bibo:chapter "1"@sv .
+
+<http://localhost:8000/res/prop/2013/14:34#S2> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/prop/2013/14:34> ;
+    dcterms:title "Förslag till lag om ändring i konsumentkreditlagen (2010:1846)"@sv ;
+    bibo:chapter "2"@sv .
+
+<http://localhost:8000/res/prop/2013/14:34#S3> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/prop/2013/14:34> ;
+    dcterms:title "Ärendet och dess beredning"@sv ;
+    bibo:chapter "3"@sv .
+
+<http://localhost:8000/res/prop/2013/14:34#S4> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/prop/2013/14:34> ;
+    dcterms:title "Ett stärkt konsumentskydd vid kreditgivning"@sv ;
+    bibo:chapter "4"@sv .
+
+<http://localhost:8000/res/prop/2013/14:34#S5.1> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/prop/2013/14:34#S5> ;
+    dcterms:title "Konsumentverket ska få besluta om sanktionsavgift"@sv ;
+    bibo:chapter "5.1"@sv .
+
+<http://localhost:8000/res/prop/2013/14:34#US1> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/prop/2013/14:34#S9> ;
+    dcterms:title "Förslaget till lag om ändring i konsumentkreditlagen (2010:1846)"@sv .
+
+<http://localhost:8000/res/prop/2013/14:34#S5> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/prop/2013/14:34> ;
+    dcterms:title "Sanktionsavgift vid bristande kreditprövningar"@sv ;
+    bibo:chapter "5"@sv .
+
+<http://localhost:8000/res/prop/2013/14:34#S9> a bibo:DocumentPart ;
+    dcterms:isPartOf <http://localhost:8000/res/prop/2013/14:34> ;
+    dcterms:title "Författningskommentar"@sv ;
+    bibo:chapter "9"@sv .
 
 <http://localhost:8000/res/prop/2013/14:34> a rpubl:Proposition ;
     dcterms:abstract "I propositionen föreslår regeringen att Konsumentverket ska kunna ta ut en sanktionsavgift av näringsidkare som vid kreditgivning till konsumenter inte gör ordentliga kreditprövningar. Förslaget syftar till att stärka konsumentskyddet vid kreditgivning och därigenom minska överskuldsättningen bland konsumenter. Bakgrunden till förslaget är att konsumtionskrediter under senare år har blivit allt mer lättillgängliga, bl.a. genom möjlighet till s.k. sms-lån (snabblån). När tillgängligheten ökar ställs det också höga krav på kreditgivarna att noggrant undersöka den enskilda konsumentens förutsättningar att betala tillbaka lånet. Konsumentverkets tillsyn visar dock att det finns brister vid kreditprövningarna. I propositionen föreslås också att det införs tydliga kriterier för när Konsumentverket ska få förelägga en näringsidkare att upphöra med att lämna krediter. Lagändringarna föreslås träda i kraft den 1 april 2014."@sv ;
@@ -14,62 +77,9 @@
     dcterms:issued "2013-10-31"^^xsd:date ;
     dcterms:title "Sanktionsavgift vid bristande kreditprövningar"@sv ;
     rpubl:arsutgava "2013/14" ;
-    rpubl:departement <http://lagen.nu/org/2008/justitiedepartementet> ;
+    rpubl:departement <https://lagen.nu/org/2008/justitiedepartementet> ;
     rpubl:lopnummer "34" ;
     rpubl:utgarFran <http://localhost:8000/res/utr/ds/2013:17> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/prop/2013/14:34> ;
-    prov:wasGeneratedBy "ferenda.sources.legal.se.propositioner.PropPolo" .
-
-<http://localhost:8000/res/prop/2013/14:34#B1> a bibo:DocumentPart ;
-    dcterms:title "Sammanfattning av departementspromemorian Straffavgift vid bristande kreditprövning (Ds 2013:17)"@sv ;
-    bibo:chapter "1"@sv .
-
-<http://localhost:8000/res/prop/2013/14:34#B2> a bibo:DocumentPart ;
-    dcterms:title "Promemorians lagförslag"@sv ;
-    bibo:chapter "2"@sv .
-
-<http://localhost:8000/res/prop/2013/14:34#B3> a bibo:DocumentPart ;
-    dcterms:title "Förteckning över remissinstanserna"@sv ;
-    bibo:chapter "3"@sv .
-
-<http://localhost:8000/res/prop/2013/14:34#B4> a bibo:DocumentPart ;
-    dcterms:title "Lagrådets yttrande"@sv ;
-    bibo:chapter "4"@sv .
-
-<http://localhost:8000/res/prop/2013/14:34#PS1> a bibo:DocumentPart ;
-    dcterms:title "Propositionens huvudsakliga innehåll"@sv .
-
-<http://localhost:8000/res/prop/2013/14:34#S1> a bibo:DocumentPart ;
-    dcterms:title "Förslag till riksdagsbeslut"@sv ;
-    bibo:chapter "1"@sv .
-
-<http://localhost:8000/res/prop/2013/14:34#S2> a bibo:DocumentPart ;
-    dcterms:title "Förslag till lag om ändring i konsumentkreditlagen (2010:1846)"@sv ;
-    bibo:chapter "2"@sv .
-
-<http://localhost:8000/res/prop/2013/14:34#S3> a bibo:DocumentPart ;
-    dcterms:title "Ärendet och dess beredning"@sv ;
-    bibo:chapter "3"@sv .
-
-<http://localhost:8000/res/prop/2013/14:34#S4> a bibo:DocumentPart ;
-    dcterms:title "Ett stärkt konsumentskydd vid kreditgivning"@sv ;
-    bibo:chapter "4"@sv .
-
-<http://localhost:8000/res/prop/2013/14:34#S5> a bibo:DocumentPart ;
-    dcterms:title "Sanktionsavgift vid bristande kreditprövningar"@sv ;
-    bibo:chapter "5"@sv .
-
-<http://localhost:8000/res/prop/2013/14:34#S5.1> a bibo:DocumentPart ;
-    dcterms:title "Konsumentverket ska få besluta om sanktionsavgift"@sv ;
-    bibo:chapter "5.1"@sv .
-
-<http://localhost:8000/res/prop/2013/14:34#S9> a bibo:DocumentPart ;
-    dcterms:title "Författningskommentar"@sv ;
-    bibo:chapter "9"@sv .
-
-<http://localhost:8000/res/prop/2013/14:34#US1> a bibo:DocumentPart ;
-    dcterms:title "Förslaget till lag om ändring i konsumentkreditlagen (2010:1846)"@sv .
-
-<http://localhost:8000/res/prop/2013/14:34#US2> a bibo:DocumentPart ;
-    dcterms:title "Förslag till lag om ändring i konsumentkreditlagen (2010:1846)"@sv .
+    prov:wasGeneratedBy "ferenda.sources.legal.se.propositioner.PropRegeringen" .
 

@@ -29,6 +29,33 @@ from . import SwedishLegalSource
 from .swedishlegalsource import offtryck_parser, offtryck_gluefunc, PreambleSection, UnorderedSection
 
 
+class FontmappingPDFReader(PDFReader):
+    # Fonts in Propositioner get handled wierdly by pdf2xml
+    # -- sometimes they come out as "Times New
+    # Roman,Italic", sometimes they come out as
+    # "TimesNewRomanPS-ItalicMT". Might be caused by
+    # differences in the tool chain that creates the PDFs.
+    # Sizes seem to be consistent though.
+    #
+    # This subclass maps one class of fontnames to another by
+    # postprocessing the result of parse_xml
+    def _parse_xml(self, xmlfp, xmlfilename):
+        super(FontmappingPDFReader, self)._parse_xml(xmlfp, xmlfilename)
+        for key, val in self.fontspec.items():
+            if 'family' in val:
+                # Times New Roman => TimesNewRomanPSMT
+                # Times New Roman,Italic => TimesNewRomanPS-ItalicMT
+                if val['family'] == "Times New Roman":
+                    val['family'] = "TimesNewRomanPSMT"
+                if val['family'] == "Times New Roman,Italic":
+                    val['family'] = "TimesNewRomanPS-ItalicMT"
+                # Not 100% sure abt these last two
+                if val['family'] == "Times New Roman,Bold":
+                    val['family'] = "TimesNewRomanPS-BoldMT"
+                if val['family'] == "Times New Roman,BoldItalic":
+                    val['family'] = "TimesNewRomanPS-BoldItalicMT"
+        
+
 class Regeringen(SwedishLegalSource):
     DS = 1
     KOMMITTEDIREKTIV = 2
@@ -526,7 +553,7 @@ class Regeringen(SwedishLegalSource):
     
         
     def parse_pdf(self, pdffile, intermediatedir):
-        pdf = PDFReader()
+        pdf = FontmappingPDFReader()
         # By default, don't create and manage PDF backgrounds files
         # (takes forever, we don't use them yet)
         if self.config.compress == "bz2":

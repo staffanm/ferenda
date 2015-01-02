@@ -483,6 +483,8 @@ class SFS(Trips):
 
 
     def download(self, basefile=None):
+        if 'skipdownload' in self.config:
+            return
         if basefile:
             ret = self.download_single(basefile)
         # following is copied from supers' download

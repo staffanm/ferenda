@@ -2196,6 +2196,8 @@ WHERE {
 
         """
         # return self.store.annotation_path(basefile)
+        if not self.sparql_annotations:
+            return
         graph = self.construct_annotations(self.canonical_uri(basefile))
         if graph and len(graph) > 0:
             with self.store.open_annotation(basefile, "w") as fp:

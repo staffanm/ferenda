@@ -152,6 +152,7 @@ class FerendaTestCase(object):
             cl1 = want.getchildren()
             cl2 = got.getchildren()
             if len(cl1) != len(cl2):
+                from pudb import set_trace; set_trace()
                 reporter("children length differs, 'want': %i, 'got': %i"
                          % (len(cl1), len(cl2)))
                 return False

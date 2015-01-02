@@ -1,0 +1,21 @@
+PREFIX dcterms:<http://purl.org/dc/terms/>
+PREFIX rpubl:<http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
+
+
+CONSTRUCT {
+  ?part dcterms:isReferencedBy ?referer .
+  ?refererroot ?p ?o .
+}
+WHERE
+{
+    # find all triples that references the prop or some part of it
+    # note ?references may be any predicate, not just dcterms:references
+    ?referer ?references ?part .
+    ?refererroot ?p ?o .
+    ?part dcterms:isPartOf{,1} <%(uri)s> .
+    ?referer dcterms:isPartOf{,1} ?refererroot .
+    # This makes the query run faster by eliminating a lot of search
+    # space (presumably?)
+    FILTER(STRSTARTS(STR(?part), "%(uri)s"))
+    FILTER(STRSTARTS(STR(?referer), STR(?refererroot)))
+}
