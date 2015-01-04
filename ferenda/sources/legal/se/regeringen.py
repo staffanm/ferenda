@@ -95,8 +95,7 @@ class Regeringen(SwedishLegalSource):
         if basefile:
             return self.download_single(basefile)
 
-        # if self.config.lastdownloaded:
-        #     FIXME: use this to create a time-filtered start_url
+        
         today = datetime.today()
         # we use ordereddict and lists of 2-tuples to get a
         # predictable ordering of parameters when constructing the URL

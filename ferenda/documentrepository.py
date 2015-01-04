@@ -1584,12 +1584,21 @@ with the *config* object as single parameter.
         # then extract a new dumppath file (which should have the exact
         # same contents as the temppath file, but this comes directly from
         # the triplestore
-        with util.logtime(log.info,
-                          "Dumped %(triplecount)s triples from context %(context)s to %(dumpfile)s (%(elapsed).3f sec)",
-                          values):
-            store.get_serialized_file(dumppath, format="nt", context=context)
-            # just to report the number of dumped triples -- may be unneccesary
-            values['triplecount'] = sum(1 for line in open(dumppath))
+        try:
+            with util.logtime(log.info,
+                              "Dumped %(triplecount)s triples from context %(context)s to %(dumpfile)s (%(elapsed).3f sec)",
+                              values):
+                store.get_serialized_file(dumppath, format="nt", context=context)
+                # just to report the number of dumped triples -- may be unneccesary
+                values['triplecount'] = sum(1 for line in open(dumppath))
+        except requests.exceptions.HTTPError as e:
+            # probably the dataset URI didn't exist because no triples
+            # have been stored. Create a empty dumpfile.
+            log.warning("Couldn't get dataset, creating empty %s: %s" %
+                        (dumppath, e))
+            util.ensure_dir(dumppath)
+            with open(dumppath, "w"):
+                pass
         return True
 
     def relate(self, basefile, otherrepos=[]):
