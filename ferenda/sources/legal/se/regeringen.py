@@ -7,10 +7,12 @@ import os
 import re
 import codecs
 from datetime import datetime, timedelta, date
+from time import sleep
 from six import text_type as str
 from six.moves.urllib_parse import urljoin, urlencode
 
 import requests
+import lxml.html
 from bs4 import BeautifulSoup
 from rdflib import URIRef
 from rdflib import RDFS, XSD
@@ -71,18 +73,7 @@ class Regeringen(SwedishLegalSource):
     OVRIGA = 12
 
     document_type = None  # subclasses must override
-    start_url = None
-    start_url_template = 'http://www.regeringen.se/sb/d/107/a/136/action/showAll/sort/byDate/targetDepartment/archiveDepartment'
-    start_url_template_parameters = [('d', '107'),
-                                     ('a', '136'),
-                                     ('action', 'search'),
-                                     ('bottomQuery', ''),
-                                     ('dateRange', '1'),
-                                     ('query', ''),
-                                     ('queryLogic', '1'),
-                                     ('sortOrder', '1'),
-                                     ('sort', 'byDate'),
-                                     ('type', 'advanced')]
+    start_url = "http://www.regeringen.se/sb/d/107/a/136"
     downloaded_suffix = ".html"  # override PDFDocumentRepository
     source_encoding = "latin-1"
     storage_policy = "dir"
@@ -95,44 +86,72 @@ class Regeringen(SwedishLegalSource):
         if basefile:
             return self.download_single(basefile)
 
-        
+        self.session = requests.session()
+        resp = self.session.get(self.start_url)
+        searchpage = lxml.html.fromstring(resp.content)
+        searchpage.make_links_absolute(self.start_url)
+        # try to find the form we want -- might just as well use
+        # .forms[1]
+        for form in searchpage.forms:
+            if form.get('id') == "advancedSearch":
+                break
         today = datetime.today()
-        # we use ordereddict and lists of 2-tuples to get a
-        # predictable ordering of parameters when constructing the URL
-        p = OrderedDict(self.start_url_template_parameters)
-        p.update([('dateRangeFromDay', today.day), # 18b
-                  ('dateRangeFromMonth', today.month), # 3
-                  ('dateRangeFromYear', today.year - 1999), # 15
-                  ('dateRangeToDay', today.day),
-                  ('dateRangeToMonth', today.month),
-                  ('dateRangeToYear', today.year - 1998), # 16
-                  ('docTypes', self.document_type)])
+
         if 'lastdownload' in self.config and not self.config.refresh:
             last = self.config.lastdownload - timedelta(days=1)
             self.log.debug("Only downloading documents published on or after %s"
                            % last)
-            p.update([('dateRange', '4'),
-                      ('dateRangeFromDay', last.day),
-                      ('dateRangeFromMonth', last.month),
-                      ('dateRangeFromYear', last.year - 1998)])
-                      
-                      
-        start_url = self.start_url_template + "?" + urlencode(list(p.items()))
-        self.log.info("Starting at %s" % start_url)
-        self.session = requests.session()
-        for basefile, url in self.download_get_basefiles(start_url):
+            form.fields['dateRange'] = '4' # specify date interval
+            form.fields['dateRangeFromDay'] = str(last.day)
+            form.fields['dateRangeFromMonth'] = str(last.month)
+            # the dateRange{From,To}Year is a select list where the
+            # year 2000 is value 1, 2001 is 2 and so on (ie a offset
+            # of 1999). Therefore we subtract the offset from our
+            # initial starting year to arrive at the proper value
+            form.fields['dateRangeFromYear'] = str(last.year - 1999)
+        form.fields['docTypes'] = [str(self.document_type)]
+        params = urlencode(form.form_values())
+        
+        searchurl = form.action + "?" + params
+        self.log.info("Searching using %s" % searchurl)
+        # this'll take us to an intermediate page (showing results
+        # from both HTML pages and the "document database") -- we
+        # select the link that only gives us documents
+        resp = self.session.get(searchurl)
+        intermediatepage = lxml.html.fromstring(resp.content)
+        intermediatepage.make_links_absolute(searchurl)
+        realstarturl = searchurl
+        for elem, attrib, value, foo in intermediatepage.iterlinks():
+            if elem.get('class') == 'more' and 'publikationer' in elem.text:
+                realstarturl = elem.get('href')
+        for basefile, url in self.download_get_basefiles(realstarturl):
             self.download_single(basefile, url)
+            
 
     @downloadmax
     def download_get_basefiles(self, url):
         done = False
         pagecount = 1
-        # existing_cnt = 0
         while not done:
             self.log.info('Result page #%s (%s)' % (pagecount, url))
-            # resp = requests.get(url)
-            resp = self.session.get(url)
-            mainsoup = BeautifulSoup(resp.text)
+
+            # sometimes the search service returns a blank page when
+            # it shouldn't.
+            tries = 5
+            while tries:
+                resp = self.session.get(url)
+                # FIXME: this uses BeautifulSoup while the main download()
+                # uses lxml.html -- this is inconsistent.
+                mainsoup = BeautifulSoup(resp.text)
+                # check if there is any text (there should always be)
+                if mainsoup.find(id="body").get_text().strip():
+                    tries = 0 # ok we have good mainsoup now
+                else:
+                    self.log.warning('Result page #%s was blank, waiting and retrying' % pagecount)
+                    tries -= 1
+                    if tries:
+                        sleep(5-tries)
+
             for link in mainsoup.find_all(href=re.compile("/sb/d/108/a/")):
                 desc = link.find_next_sibling("span", "info").get_text(strip=True)
                 tmpurl = urljoin(url, link['href'])
@@ -174,8 +193,8 @@ class Regeringen(SwedishLegalSource):
                 yield basefile, urljoin(url, link['href'])
 
             pagecount += 1
-            # next = mainsoup.find("a", text="Nästa sida")
-            next = mainsoup.find("a", text=str(pagecount))
+            next = mainsoup.find("a", text="Nästa sida")
+            # next = mainsoup.find("a", text=str(pagecount))
             if next:
                 url = urljoin(url, next['href'])
             else:
