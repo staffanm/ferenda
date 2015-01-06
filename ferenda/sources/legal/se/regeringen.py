@@ -733,7 +733,7 @@ class Regeringen(SwedishLegalSource):
                 Link(row['dcterms_title'],  # yes, ignore binding
                      uri=row['uri'])]
         
-    def toc(self):
+    def toc(self, otherrepos=None):
         self.log.debug("Not generating TOC (let ferenda.sources.legal.se.Forarbeten do that instead")
         return
 
