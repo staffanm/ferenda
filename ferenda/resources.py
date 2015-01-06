@@ -160,13 +160,13 @@ class Resources(object):
         elements = []
         for repo in self.repos:
             for item in getattr(repo, methodname)():
-                    (label, url) = item
-                    alias = repo.alias
-                    self.log.debug(
-                        "Adding %(methodname)s %(label)s (%(url)s) from docrepo %(alias)s" % locals())
-                    elements.append(E.li(
-                        E.a({'href': url},
-                            label)))
+                (label, url) = item
+                alias = repo.alias
+                self.log.debug(
+                    "Adding %(methodname)s %(label)s (%(url)s) from docrepo %(alias)s" % locals())
+                elements.append(E.li(
+                    E.a({'href': url},
+                        label)))
         return elements
 
     
