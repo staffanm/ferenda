@@ -3,8 +3,11 @@ from __future__ import unicode_literals
 
 import os
 
+from layeredconfig import LayeredConfig
+
 from ferenda import DocumentRepository, DocumentStore
 from ferenda import util, errors
+
 
 class CompositeStore(DocumentStore):
 
@@ -38,54 +41,35 @@ class CompositeRepository(DocumentRepository):
     subrepos = ()  # list of classes
     documentstore_class = CompositeStore
 
-    def get_instance(self, instanceclass, options={}):
-        if not instanceclass in self._instances:
-            if options:
-                inst = instanceclass(**options)
+    def get_instance(self, instanceclass):
+        if instanceclass not in self._instances:
+            if hasattr(self, '_config'):
+                config = self.config
             else:
-                inst = instanceclass()
-                inst.config = self.config 
-            self._instances[instanceclass] = inst
-        return self._instances[instanceclass]
-
-    def __init__(self, **kwargs):
-        self._instances = {}
-        self.myoptions = kwargs
-        super(CompositeRepository, self).__init__(**kwargs)
-        # At this point, self._instances is empty. And we can't really
-        # populate it at this time, because we need access to the
-        # config object that manager._run_class will set after
-        # __init__ finishes, in order to properly initialize all our
-        # subrepos.
-
-        # when using API, we won't need an externally-provided config
-        # object, as whatever is passed in as **kwargs will populate
-        # an internallly-constructed config object. So if that's the
-        # case, let's go ahead and create instances and make a store
-        # right now.
-        if self.myoptions:
-            for c in self.subrepos: # populate self._instances
-                self.get_instance(c, self.myoptions)
-                
-            cls = self.documentstore_class
-            self.store = cls(self.config.datadir + os.sep + self.alias,
-                             downloaded_suffix=self.downloaded_suffix,
-                             storage_policy=self.storage_policy,
-                             docrepo_instances=self._instances)
+                config = None
+            inst = instanceclass(config)
+            # if we don't have a config object yet, the created
+            # instance is just temporary -- don't save it
+            if hasattr(self, '_config'):
+                self._instances[instanceclass] = inst
+            return inst
         else:
-            # no **kwargs were provided, delay the creation of
-            # self._instances (and self.store) until we have a proper
-            # config object (in the config.setter decorated stuff
-            pass
-            
+            return self._instances[instanceclass]
 
-    @property
-    def config(self):
-        return self._config
+    def __init__(self, config=None, **kwargs):
+        self._instances = {}
+        # after this, self.config WILL be set (regardless of whether a
+        # config object was provided or not
+        super(CompositeRepository, self).__init__(config, **kwargs)
 
-    @config.setter
-    def config(self, config):
-        self._config = config
+        for c in self.subrepos: # populate self._instances
+            self.get_instance(c)
+
+        cls = self.documentstore_class
+        self.store = cls(self.config.datadir + os.sep + self.alias,
+                         downloaded_suffix=self.downloaded_suffix,
+                         storage_policy=self.storage_policy,
+                         docrepo_instances=self._instances)
 
         for c in self.subrepos: # populate self._instances
             self.get_instance(c)
@@ -96,10 +80,19 @@ class CompositeRepository(DocumentRepository):
                          storage_policy=self.storage_policy,
                          docrepo_instances=self._instances)
         
+    def get_default_options(self):
+        # 1. Get options from superclass (NB: according to MRO...)
+        opts = super(CompositeRepository, self).get_default_options()
+        # 2. Add extra options that ONLY exists in subrepos
+        for c in self.subrepos:
+            for k, v in self.get_instance(c).get_default_options().items():
+                if k not in opts:
+                    opts[k] = v
+        return opts
 
     def download(self):
         for c in self.subrepos:
-            inst = self.get_instance(c, self.myoptions)
+            inst = self.get_instance(c)
             # make sure that our store has access to our now
             # initialized subrepo objects
             if c not in self.store.docrepo_instances:
@@ -118,7 +111,7 @@ class CompositeRepository(DocumentRepository):
                  self.config.parseforce is True)
         if not force:
             for c in self.subrepos:
-                inst = self.get_instance(c, self.myoptions)
+                inst = self.get_instance(c)
                 needed = inst.parseneeded(basefile)
                 if not needed and os.path.exists(self.store.parsed_path(basefile)):
                     self.log.debug("%s: Skipped" % basefile)
@@ -128,7 +121,7 @@ class CompositeRepository(DocumentRepository):
                           {'basefile': basefile}):
             ret = False
             for c in self.subrepos:
-                inst = self.get_instance(c, self.myoptions)
+                inst = self.get_instance(c)
                 try:
                     # each parse method should be smart about whether
                     # to re-parse or not (i.e. use the @managedparsing

@@ -226,6 +226,13 @@ class Regeringen(SwedishLegalSource):
                self.SO: "so"}
         return self.config.url + "res/%s/%s" % (seg[document_type], basefile)
 
+    def basefile_from_uri(self, uri):
+        # make sure this function is the reverse of the canonical_uri
+        # *in our subrepos* by special-handling the sou/ds cases
+        if "utr/ds" in uri or "utr/sou" in uri:
+            uri = uri.replace("/utr/", "/")
+        return super(Regeringen, self).basefile_from_uri(uri)
+
     def download_single(self, basefile, url=None):
         if not url:
             url = self.remote_url(basefile)

@@ -65,7 +65,7 @@ class CompositeExample(CompositeRepository):
 
     def custom(self):
         for c in self.subrepos:
-            inst = self.get_instance(c, self.myoptions)
+            inst = self.get_instance(c)
             ret = inst.custom()
             if ret:
                 return ret

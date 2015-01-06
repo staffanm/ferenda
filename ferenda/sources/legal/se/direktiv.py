@@ -336,6 +336,7 @@ class Direktiv(CompositeRepository, SwedishLegalSource):
     storage_policy = "dir"
     rdf_type = RPUBL.Direktiv
     documentstore_class = DirektivStore
+    sparql_annotations = None # don't even bother creating an annotation file
     
     @classmethod
     def tabs(cls, primary=False):

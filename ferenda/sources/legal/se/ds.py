@@ -16,3 +16,4 @@ class Ds(Regeringen):
     rdf_type = RPUBL.Utredningsbetankande
     document_type = Regeringen.DS
     sparql_annotations = None # don't even bother creating an annotation file
+
