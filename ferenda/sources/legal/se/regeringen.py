@@ -637,9 +637,10 @@ class Regeringen(SwedishLegalSource):
     def analyze_metrics(self, pdf, twopage=True):
         # if twopage, assume even and odd pages have differing
         # margins.
-        for box in pdf.textboxes
+        for box in pdf.textboxes:
             even = pageno % 2
             for textbox in page:
+                pass
                 
 
     def create_external_resources(self, doc):
