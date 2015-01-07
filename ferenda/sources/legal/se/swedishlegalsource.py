@@ -15,7 +15,8 @@ from ferenda import (DocumentRepository, DocumentStore, FSMParser,
 from ferenda import util
 from ferenda.sources.legal.se.legalref import Link
 from ferenda.elements.html import A, H1, H2, H3
-from ferenda.elements import (Paragraph, Section, Body, CompoundElement,
+from ferenda.elements import (Paragraph, Section, Body,
+                              OrdinalElement, CompoundElement,
                               SectionalElement)
 from ferenda.pdfreader import Page
 
@@ -33,6 +34,11 @@ class Stycke(Paragraph):
 class Sektion(Section):
     pass
 
+from ferenda.elements.elements import E
+class Sidbrytning(OrdinalElement):
+    def as_xhtml(self, uri, parent_uri=None):
+        return E("span", {'id': 'sid%s' % self.ordinal,
+                          'class': 'sidbrytning'})
 
 class PreambleSection(CompoundElement):
     tagname = "div"
@@ -340,6 +346,13 @@ class SwedishLegalSource(DocumentRepository):
 
 
 def offtryck_parser(basefile="0", preset="proposition", metrics={}):
+    # FIXME: Metrics for a particular document type might vary over
+    # time, depend on exact production chain particualrs, differ
+    # between right and left pages, and otherwise be unreliable. It
+    # would be much better to have a magic analyze phase that uses
+    # heuristics and statistics to guess margins, heading styles, and
+    # similar. The only problem is the magic.
+
     presets = {'default': {},
                'dir': {'footer': 920,
                        'header': 82,
@@ -351,31 +364,23 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
                        'subheadingfamily': 'TimesNewRomanPS-ItalicMT',
                        'subsubheadingsize': None,
                        'textsize': 14},
-               'proposition': {'type': 'proposition', # FIXME:
-                                                      # is_unorderedsection
-                                                      # uses this to
-                                                      # avoid creating
-                                                      # top-level
-                                                      # unordered
-                                                      # sections (they
-                                                      # get confused
-                                                      # with doc title
-                                                      # and identifier
-                                                      # on the first
-                                                      # page). Should
-                                                      # be handled
-                                                      # smarter.
-                               'footer': 920,
-                               'header': 65, # make sure this is correct
-                               'leftmargin': 160,
-                               'rightmargin': 628,
-                               'headingsize': 20,
-                               'headingfamily': 'TimesNewRomanPSMT',
-                               'subheadingsize': 17,
-                               'subheadingfamily': 'TimesNewRomanPSMT',
-                               'subsubheadingsize': 15,
-                               'subsubheadingfamily': 'TimesNewRomanPSMT', # In some cases maybe "TimesNewRomanPS-BoldMT"
-                               'textsize': 13},
+               'proposition': {
+                   # FIXME: is_unorderedsection needs 'type' to avoid
+                   # creating top-level unordered sections (they get
+                   # confused with doc title and identifier on the
+                   # first page). Should be handled smarter.
+                   'type': 'proposition', 
+                   'footer': 920,
+                   'header': 65, 
+                   'leftmargin': 168, # this is the *inner* of left+right
+                   'rightmargin': 523, # pages taken together.
+                   'headingsize': 20,
+                   'headingfamily': 'TimesNewRomanPSMT',
+                   'subheadingsize': 17,
+                   'subheadingfamily': 'TimesNewRomanPSMT',
+                   'subsubheadingsize': 15,
+                   'subsubheadingfamily': 'TimesNewRomanPSMT', # In some cases maybe "TimesNewRomanPS-BoldMT"
+                   'textsize': 13},
                'sou': {'header': 49, # or rather 49 + 15
                        'header': 65, # make sure this is correct
                        'footer': 940,
@@ -420,12 +425,15 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
     # page numbers, headings.
     def is_nonessential(parser):
         chunk = parser.reader.peek()
+        # if str(chunk).strip() == "Prop. 2014/15:37":
+        #     from pudb import set_trace; set_trace()
         if chunk.top > metrics['footer'] or chunk.bottom < metrics['header']:
             return True  # page numbers
         if (int(chunk.getfont()['size']) <= metrics['textsize'] and
-                (chunk.left < metrics['leftmargin'] or
+                (chunk.right < metrics['leftmargin'] or
                  chunk.left > metrics['rightmargin']) and
-            (15 <= len(str(chunk)) <= 29)): # matches both "Prop. 2013/14:1" and "Prop. 1999/2000:123 Bilaga 12"
+            str(chunk).strip().startswith(parser.current_identifier)):
+            # print("%s on p %s is deemed nonessential" % (str(chunk), state['pageno']))
             return True
 
     def is_coverpage(parser):
@@ -577,7 +585,9 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
         # increment pageno
         state['pageno'] += 1
         parser.reader.next()
-        return None
+        sb = Sidbrytning()
+        sb.ordinal = state['pageno']
+        return sb
 
     re_sectionstart = re.compile("^(\d[\.\d]*) +(.*[^\.])$").match
     def analyze_sectionstart(parser, textbox=None):
@@ -669,14 +679,20 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
 def offtryck_gluefunc(textbox, nextbox, prevbox):
     linespacing = int(nextbox.getfont()['size']) / 2
     parindent = int(nextbox.getfont()['size'])
+    # FIXME: if one textbox has family "TimesNewRomanPSMT@12" and
+    # another "TimesNewRomanPS-BoldMT@12", they should be considered
+    # the same family (and pdfreader/pdftohtml will wrap the latters'
+    # text in a <b> element). Maybe achiveable through
+    # FontmappingPDFReader?
     if (textbox.getfont()['size'] == nextbox.getfont()['size'] and
         textbox.getfont()['family'] == nextbox.getfont()['family'] and
         textbox.top + textbox.height + linespacing > nextbox.top and
+        prevbox.left < nextbox.right and
         ((prevbox.top + prevbox.height == nextbox.top + nextbox.height) or # compare baseline, not topline
          (prevbox.left == nextbox.left) or
          (parindent * 2 >= (prevbox.left - nextbox.left) >= parindent)
      )):
-     return True
+        return True
 
 
 # (ab)use the CitationClass, with it's useful parse_recursive method,

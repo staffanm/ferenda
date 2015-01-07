@@ -171,9 +171,12 @@ properties (such as ordinal label, date of enactment, etc)."""
 
     def as_xhtml(self, uri=None, parent_uri=None):
         res = super(UnicodeElement, self).as_xhtml(uri, parent_uri)
-        if self:
+        # elements with no actual text gets stripped
+        if str(self).strip():
             res.text = str(self)
-        return res
+            return res
+        else:
+            return None
         
 
 class CompoundElement(AbstractElement, list):
@@ -190,7 +193,6 @@ class CompoundElement(AbstractElement, list):
         return self.as_plaintext()
 
     def _cleanstring(self, s):
-
         # valid chars according to the XML spec
         def _valid(i):
             return (
@@ -199,7 +201,6 @@ class CompoundElement(AbstractElement, list):
                 or 0xE000 <= i <= 0xFFFD
                 or 0x10000 <= i <= 0x10FFFF
                 )
-            
         return ''.join(c for c in s if _valid(ord(c)))
 
     def as_plaintext(self):

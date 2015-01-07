@@ -92,7 +92,11 @@ WHERE {
                                          title="%s från %s" % (pageset.label, value),
                                          binding=pagesetid,
                                          value=value))
-        return list(pagesetdict.values())
+        sortorder = {'prop': 1,
+                     'sou': 2,
+                     'ds': 3,
+                     'dir': 4}
+        return sorted(pagesetdict.values(), key=lambda ps: sortorder[ps.predicate])
 
     def toc_select_for_pages(self, data, pagesets, facets):
         def sortkey(doc):

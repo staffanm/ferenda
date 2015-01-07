@@ -100,9 +100,12 @@ def render(f):
         res = []
         if hasattr(node, 'meta') and node.meta is not None:
             res.append(node.meta)
-        for subnode in node:
-            if not isinstance(subnode, six.string_types):
-                res.extend(iterate_graphs(subnode))
+        try:
+            for subnode in node:
+                if not isinstance(subnode, six.string_types):
+                    res.extend(iterate_graphs(subnode))
+        except TypeError: # node was not iterable
+            pass
         return res
 
     @functools.wraps(f)

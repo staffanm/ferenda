@@ -78,6 +78,7 @@ class Regeringen(SwedishLegalSource):
     source_encoding = "latin-1"
     storage_policy = "dir"
     alias = "regeringen"
+    xslt_template = "res/xsl/forarbete.xsl"
 
     session = None
     
@@ -425,7 +426,10 @@ class Regeringen(SwedishLegalSource):
             self.log.error(
                 "%s: No PDF documents found, can't parse anything" % doc.basefile)
             return None
-        doc.body = self.parse_pdfs(doc.basefile, pdffiles)
+        identifier = doc.meta.value(URIRef(doc.uri), self.ns['dcterms'].identifier)
+        if identifier:
+            identifier = str(identifier)
+        doc.body = self.parse_pdfs(doc.basefile, pdffiles, identifier)
         if self.document_type == self.PROPOSITION:
             self.post_process_proposition(doc)
         return doc
@@ -589,7 +593,7 @@ class Regeringen(SwedishLegalSource):
         return pdf
 
                 
-    def parse_pdfs(self, basefile, pdffiles):
+    def parse_pdfs(self, basefile, pdffiles, identifier=None):
         body = None
         gluefunc = offtryck_gluefunc
         for pdffile in pdffiles:
@@ -598,11 +602,16 @@ class Regeringen(SwedishLegalSource):
             intermediate_dir = os.path.dirname(intermediate_path)
             # case 1: intermediate path does not exist and that's ok
             # case 2: intermediate path exists alongside downloaded_path
+
             pdf = self.parse_pdf(pdf_path, intermediate_dir)
+
+            # metrics = analyze_metrics(pdf)
+
             debug = False
             if debug:
                 outputfile = pdf_path+".marked.pdf"
                 pdf.drawboxes(gluefunc, outputfile)
+
 
             if self.document_type == self.PROPOSITION:
                 preset = 'proposition'
@@ -616,11 +625,22 @@ class Regeringen(SwedishLegalSource):
                 preset = 'default'
             parser = offtryck_parser(preset=preset)
             parser.debug = os.environ.get('FERENDA_FSMDEBUG', False)
+            parser.current_identifier = identifier
+            # for x in pdf.textboxes(gluefunc, pageobjects=True):
+            #     print(repr(x))
             body = parser.parse(pdf.textboxes(gluefunc, pageobjects=True))
             pdf[:] = body[:]
             pdf.tagname = "body"
         return pdf
 
+
+    def analyze_metrics(self, pdf, twopage=True):
+        # if twopage, assume even and odd pages have differing
+        # margins.
+        for box in pdf.textboxes
+            even = pageno % 2
+            for textbox in page:
+                
 
     def create_external_resources(self, doc):
         """Optionally create external files that go together with the

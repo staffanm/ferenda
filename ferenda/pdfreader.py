@@ -689,7 +689,9 @@ all text in a Textbox has the same font and size.
         for e in other:
             if e.tag != c.tag:
                 self.append(c)
+                self.append(e)
                 c = Textelement(tag=e.tag)
+                # c = e
             else:
                 c = c + e
         self.append(c)

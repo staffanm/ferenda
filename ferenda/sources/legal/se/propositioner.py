@@ -371,7 +371,7 @@ class PropositionerStore(CompositeStore, SwedishLegalStore):
 class Propositioner(CompositeRepository, SwedishLegalSource):
     subrepos = PropRegeringen, PropTrips, PropRiksdagen
     alias = "prop"
-    xslt_template = "paged.xsl"
+    xslt_template = "res/xsl/forarbete.xsl"
     storage_policy = "dir"
     rdf_type = RPUBL.Proposition
     documentstore_class = PropositionerStore
