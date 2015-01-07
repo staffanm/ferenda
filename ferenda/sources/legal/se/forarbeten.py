@@ -95,6 +95,8 @@ WHERE {
         return list(pagesetdict.values())
 
     def toc_select_for_pages(self, data, pagesets, facets):
+        def sortkey(doc):
+            return util.split_numalpha(doc['dcterms_identifier'])
         # FIXME: Again, this mirrors the dv.py structure
         res = {}
         documents = {}
@@ -109,7 +111,7 @@ WHERE {
             pagesetdict[pageset.predicate] = pageset
         for (binding, value) in sorted(documents.keys()):
             pageset = pagesetdict[binding]
-            s = sorted(documents[(binding, value)], key=repr)
+            s = sorted(documents[(binding, value)], key=sortkey)
             res[(binding, value)] = [self.toc_item(binding, row)
                                      for row in s]
         return res
