@@ -5,6 +5,7 @@ import logging
 import re
 import itertools
 import codecs
+import tempfile
 from glob import glob
 from bz2 import BZ2File
 
@@ -22,11 +23,12 @@ from .elements import OrdinalElement
 class PDFReader(CompoundElement):
 
     """Parses PDF files and makes the content available as a object
-    hierarchy. After calling :py:meth:`~ferenda.PDFReader.read`, the
-    PDFReader itself is a list of :py:class:`ferenda.pdfreader.Page`
-    objects, which each is a list of
-    :py:class:`ferenda.pdfreader.Textbox` objects, which each is a
-    list of :py:class:`ferenda.pdfreader.Textelement` objects.
+    hierarchy. Calling the :py:meth:`~ferenda.PDFReader.read` method
+    returns a :py:class:`ferenda.pdfreader.PDFFile` object, which is a
+    list of :py:class:`ferenda.pdfreader.Page` objects, which each is
+    a list of :py:class:`ferenda.pdfreader.Textbox` objects, which
+    each is a list of :py:class:`ferenda.pdfreader.Textelement`
+    objects.
 
     .. note::
 
@@ -47,28 +49,37 @@ class PDFReader(CompoundElement):
 
     """
 
-    tagname = "div"
-    classname = "pdfreader"
-    def __init__(self, *args, **kwargs):
-        self.fontspec = {}
+    ################################################################
+    # properties and methods relating to the initialization of the
+    # PDFReader object
+    def __init__(self,
+                 filename,
+                 workdir=None,
+                 images=True,
+                 convert_to_pdf=False,
+                 keep_xml=True,
+                 ocr_lang=None):
+        # since this class derive from list, the first argument
+        # (filename) will be treated as an iterable, making our
+        # container filled with a bunch of things (one per letter of
+        # the filename). Erase those:
+        self[:] = []
         self.log = logging.getLogger('pdfreader')
-        if 'filename' in kwargs:
-            self.filename = kwargs['filename']
-        else:
-            self.filename = None
-        # super(PDFReader, self).__init__(*args, **kwargs)
-
-    def read(self, pdffile, workdir, images=True, convert_to_pdf=False, keep_xml=True, ocr_lang=None):
+        self.fontspec = {}
+        self.filename = filename
         """Initializes a PDFReader object from an existing PDF file. After
         initialization, the PDFReader contains a list of
         :py:class:`~ferenda.pdfreader.Page` objects.
 
-        :param pdffile: The full path to the PDF file (or, if
+        :param filename: The full path to the PDF file (or, if
                         ``convert_to_pdf`` is set, any other document
                         file)
-        :param workdir: A directory where intermediate files (particularly
-                        background PNG files) are stored
-        :param convert_to_pdf: If pdffile is any other type of
+        :param workdir: A directory where intermediate files
+                        (particularly background PNG files) are
+                        stored. If not provided, a temporary directory
+                        will be created and be available as the
+                        ``workdir`` property of the object.
+        :param convert_to_pdf: If filename is any other type of
                                document other than PDF, attempt to
                                first convert it to PDF using the
                                ``soffice`` command line tool (from
@@ -91,22 +102,22 @@ class PDFReader(CompoundElement):
         :param ocr_lang: str
 
         """
-        # start by removing all pages left behind by a previous read
-        self[:] = []
-        
+        self.workdir = workdir
+        if self.workdir is None:
+            self.workdir = tempfile.mkdtemp()
+            
         if convert_to_pdf:
-            newpdffile = workdir + os.sep + os.path.splitext(os.path.basename(pdffile))[0] + ".pdf"
-            if not os.path.exists(newpdffile):
-                util.ensure_dir(newpdffile)
-                cmdline = "soffice --headless -convert-to pdf -outdir '%s' %s" % (workdir, pdffile)
-                self.log.debug("%s: Converting to PDF: %s" % (pdffile, cmdline))
+            newfilename = workdir + os.sep + os.path.splitext(os.path.basename(filename))[0] + ".pdf"
+            if not os.path.exists(newfilename):
+                util.ensure_dir(newfilename)
+                cmdline = "soffice --headless -convert-to pdf -outdir '%s' %s" % (workdir, filename)
+                self.log.debug("%s: Converting to PDF: %s" % (filename, cmdline))
                 (ret, stdout, stderr) = util.runcmd(
                     cmdline, require_success=True)
-                pdffile = newpdffile
+                filename = newfilename
         
-        self.filename = pdffile
-        assert os.path.exists(pdffile), "PDF %s not found" % pdffile
-        basename = os.path.basename(pdffile)
+        assert os.path.exists(filename), "PDF %s not found" % filename
+        basename = os.path.basename(filename)
         stem = os.path.splitext(basename)[0]
 
         if ocr_lang:
@@ -126,19 +137,18 @@ class PDFReader(CompoundElement):
         else:
             real_convertedfile = convertedfile
 
-        
-        tmppdffile = os.sep.join([workdir, basename])
-        # copying the pdffile to the workdir is only needed if we use self._pdftohtml
+        tmpfilename = os.sep.join([workdir, basename])
+        # copying the filename to the workdir is only needed if we use
+        # PDFReader._pdftohtml
 
-        if not util.outfile_is_newer([pdffile], real_convertedfile):
-            util.copy_if_different(pdffile, tmppdffile)
+        if not util.outfile_is_newer([filename], real_convertedfile):
+            util.copy_if_different(filename, tmpfilename)
             # this is the expensive operation
-            res = converter(tmppdffile, workdir, **converter_extra)
+            res = converter(tmpfilename, workdir, **converter_extra)
             if keep_xml == "bz2":
                 with open(convertedfile, mode="rb") as rfp:
-                    # BZ2File supports the with
-                    # statement in py27+, but we
-                    # support py2.6
+                    # BZ2File supports the with statement in py27+,
+                    # but we support py2.6
                     wfp = BZ2File(real_convertedfile, "wb")
                     wfp.write(rfp.read())
                     wfp.close()
@@ -147,7 +157,8 @@ class PDFReader(CompoundElement):
                 pass
 
         if keep_xml == "bz2":
-            # FIXME: explicitly state that encoding is utf-8 (in a py26 compatible manner
+            # FIXME: explicitly state that encoding is utf-8 (in a
+            # py26 compatible manner
             fp = BZ2File(real_convertedfile)
         else:
             fp = codecs.open(real_convertedfile, encoding="utf-8")
@@ -158,119 +169,6 @@ class PDFReader(CompoundElement):
         if keep_xml == False:
             os.unlink(convertedfile)
         return res
-
-    def is_empty(self):
-        return 0 == sum([len(x) for x in self])
-
-    def textboxes(self, gluefunc=None, pageobjects=False, keepempty=False):
-        """Return an iterator of the textboxes available.
-
-        ``gluefunc`` should be a callable that is called with
-        (textbox, nextbox, prevbox), and returns True iff nextbox
-        should be appended to textbox.
-
-        If ``pageobjects``, the iterator can return Page objects to
-        signal that pagebreak has ocurred (these Page objects may or
-        may not have Textbox elements).
-
-        If ``keepempty``, process and return textboxes that have no
-        text content (these are filtered out by default)
-        """
-        textbox = None
-        prevbox = None
-        if gluefunc:
-            glue = gluefunc
-        else:
-            glue = self._default_glue
-        for page in self:
-            if pageobjects:
-                yield page
-            for nextbox in page:
-                if not (keepempty or str(nextbox).strip()):
-                    continue
-                if not textbox: # MUST glue
-                    textbox = nextbox
-                else:
-                    if glue(textbox, nextbox, prevbox):
-                        textbox += nextbox
-                    else:
-                        yield textbox
-                        textbox = nextbox
-                prevbox = nextbox
-            if textbox:
-                yield textbox
-                textbox = None
-
-    def drawboxes(self, outfile, gluefunc=None):
-        """Create a copy of the parsed PDF file, but with the textboxes
-        created by ``gluefunc`` clearly marked. Returns the name of
-        the created pdf file.
-
-        ..note::
-
-          This requires PyPDF2 and reportlab, which aren't installed
-          by default (and at least reportlab is not py3 compatible).
-
-        """
-        from PyPDF2 import PdfFileWriter, PdfFileReader
-        from reportlab.pdfgen import canvas
-        import StringIO
-
-        packet = None
-        output = PdfFileWriter()
-        existing_pdf = PdfFileReader(open(self.filename, "rb"))
-        pageidx = 0
-        sf = 2/3.0 # scaling factor
-        dirty = False
-        for tb in self.textboxes(gluefunc, pageobjects=True):
-            if isinstance(tb, Page):
-                if dirty:
-                    can.save()
-                    packet.seek(0)
-                    new_pdf = PdfFileReader(packet)
-                    self.log.debug("Getting page %s from existing pdf" % pageidx)
-                    page = existing_pdf.getPage(pageidx)
-                    page.mergePage(new_pdf.getPage(0))
-                    output.addPage(page)
-                    pageidx += 1
-                pagesize = (tb.width*sf, tb.height*sf)
-                # print("pagesize %s x %s" % pagesize)
-                packet = StringIO.StringIO()
-                can = canvas.Canvas(packet, pagesize=pagesize,
-                                    bottomup=False)
-                can.setStrokeColorRGB(0.2,0.5,0.3)
-                can.translate(0,0)
-            else:
-                dirty = True
-                # x = repr(tb)
-                # print(x)
-                can.rect(tb.left*sf, tb.top*sf,
-                         tb.width*sf, tb.height*sf)
-
-        packet.seek(0)
-        can.save()
-        new_pdf = PdfFileReader(packet)
-        self.log.debug("Getting last page %s from existing pdf" % pageidx)
-        page = existing_pdf.getPage(pageidx)
-        page.mergePage(new_pdf.getPage(0))
-        output.addPage(page)
-        outputStream = open(outfile, "wb")
-        output.write(outputStream)
-        outputStream.close()
-        self.log.debug("wrote %s" % outfile)
-        return outfile
-
-    @staticmethod
-    def _default_glue(textbox, nextbox, prevbox):
-        # default logic: if lines are next to each other
-        # horizontally, line up vertically, and have the same
-        # font, then they should be glued
-        linespacing = 1
-        if (textbox.getfont() == nextbox.getfont() and
-            textbox.left == nextbox.left and
-            textbox.top + textbox.height + linespacing >= nextbox.top):
-            return True
-
 
     def _tesseract(self, tmppdffile, workdir, lang):
         root = os.path.splitext(os.path.basename(tmppdffile))[0]
@@ -364,13 +262,13 @@ class PDFReader(CompoundElement):
             xmlfile = os.path.splitext(tmppdffile)[0] + ".xml"
             if stderr and not os.path.exists(xmlfile):
                 raise errors.ExternalCommandError(stderr)
-
-
         finally:
             os.unlink(tmppdffile)
             assert not os.path.exists(tmppdffile)
 
-    re_dimensions = re.compile("bbox (?P<left>\d+) (?P<top>\d+) (?P<right>\d+) (?P<bottom>\d+)").search
+    dims = "bbox (?P<left>\d+) (?P<top>\d+) (?P<right>\d+) (?P<bottom>\d+)"
+    re_dimensions = re.compile(dims).search
+
     def _parse_hocr(self, fp, filename):
         def dimensions(s):
             m = self.re_dimensions(s)
@@ -382,19 +280,24 @@ class PDFReader(CompoundElement):
                         width=int(dim['right']) - int(dim['left']),
                         height=int(dim['bottom']) - int(dim['top']),
                         background=None)
+            pageheight_in_mm = 242  # FIXME: get this from PDF
+            pointsize = 0.352777778 # constant
+            pageheight_in_points = pageheight_in_mm / pointsize
+            px_per_point = page.height / pageheight_in_points
+
             # we discard elements at the ocr_carea (content area?)
             # level, we're only concerned with paragraph-level
             # elements
-            for boxelement in pageelement.findall(".//{http://www.w3.org/1999/xhtml}p[@class='ocr_par']"):
-                dim = dimensions(boxelement.get('title'))
-                box = Textbox(top=int(dim['top']),
-                              left=int(dim['left']),
-                              width=int(dim['right']) - int(dim['left']),
-                              height=int(dim['bottom']) - int(dim['top']),
-                              font=None)
+            for boxelement in pageelement.findall(".//{http://www.w3.org/1999/xhtml}span[@class='ocr_line']"):
+                boxdim = dimensions(boxelement.get('title'))
+                textelements = []
                 for element in boxelement.findall(".//{http://www.w3.org/1999/xhtml}span[@class='ocrx_word']"):
                     dim = dimensions(element.get("title"))
                     t = "".join(element.itertext()) + element.tail
+                    if not t.strip():
+                        continue  # strip empty things
+                    t = t.replace("\n", " ")
+                    
                     if element.getchildren():  # probably a <em> or <strong> element
                         tag = {'{http://www.w3.org/1999/xhtml}em': 'i',
                                '{http://www.w3.org/1999/xhtml}strong': 'b'}[element.getchildren()[0].tag]
@@ -406,14 +309,37 @@ class PDFReader(CompoundElement):
                                        left=int(dim['left']),
                                        width=int(dim['right']) - int(dim['left']),
                                        height=int(dim['bottom']) - int(dim['top']),                    )
-                    box.append(text)
+                    textelements.append(text)
+                
+                # Now that we know all text elements that should be in
+                # the Textbox, we can guess the font size.
+                fontspec = {'family': "unknown",
+                            'size': str(int(round(text.height / px_per_point)))}
+
+                # find any previous definition of this fontspec
+                fontid = None
+                for specid, spec in self.fontspec.items():
+                    if fontspec == spec:
+                        fontid = specid
+                # None was found, create a new
+                if not fontid:
+                    fontid = str(len(self.fontspec)) # start at 0
+                    self.fontspec[fontid] = fontspec
+
+                # finally create the box and add all our elements
+                # (should not be more than one?) to it
+                box = Textbox(top=int(boxdim['top']),
+                              left=int(boxdim['left']),
+                              width=int(boxdim['right']) - int(boxdim['left']),
+                              height=int(boxdim['bottom']) - int(boxdim['top']),
+                              fontspec=self.fontspec,
+                              font=fontid)
+                for e in textelements:
+                    box.append(e)
                 page.append(box)
             self.append(page)
         self.log.debug("PDFReader initialized: %d pages" %
                        (len(self)))
-            
-            
-        
 
     def _parse_xml(self, xmlfp, xmlfilename):
         def txt(element_text):
@@ -438,14 +364,15 @@ class PDFReader(CompoundElement):
             if pageelement.tag == "outline":
                 # FIXME: we want to do something with this information
                 continue
-            page = Page(number=int(pageelement.attrib['number']),  # always int?
+            page = Page(number=int(pageelement.attrib['number']),  # alwaysint?
                         width=int(pageelement.attrib['width']),
                         height=int(pageelement.attrib['height']),
                         background=None)
             background = "%s%03d.png" % (
                 os.path.splitext(xmlfilename)[0], page.number)
 
-            # Reasons this file might not exist: it was blank and therefore removed, or We're running under RepoTester
+            # Reasons this file might not exist: it was blank and
+            # therefore removed, or We're running under RepoTester
             if os.path.exists(background):
                 page.background = background
 
@@ -467,6 +394,7 @@ class PDFReader(CompoundElement):
                         continue
 
                     attribs = dict(element.attrib)
+                    # all textboxes share the same fontspec dict
                     attribs['fontspec'] = self.fontspec
                     b = Textbox(**attribs)
 
@@ -481,12 +409,6 @@ class PDFReader(CompoundElement):
                         grandchildren = child.getchildren()
                         # special handling of the <i><b> construct
                         if grandchildren != []:
-                            # print "Grandchildren handling: %s '%s' '%s'" % (len(grandchildren),
-                            #                                                child.text,
-                            #                                                child.tail)
-                            # Handle '<text><i><b>FordonsÃ¥r</b>            <b>Faktor</b> </i></text>'
-                            # assert (len(grandchildren) == 1), "General grandchildren not supported"
-                            
                             if child.text:
                                 b.append(Textelement(txt(child.text), tag=child.tag))
                             b.append(Textelement(
@@ -506,6 +428,54 @@ class PDFReader(CompoundElement):
         self.log.debug("PDFReader initialized: %d pages, %d fontspecs" %
                        (len(self), len(self.fontspec)))
 
+    ################################################################
+    # Properties and methods relating to the initialized PDFReader
+    # object
+    tagname = "div"
+    classname = "pdfreader"
+
+    def is_empty(self):
+        return 0 == sum([len(x) for x in self])
+
+    def textboxes(self, gluefunc=None, pageobjects=False, keepempty=False):
+        """Return an iterator of the textboxes available.
+
+        ``gluefunc`` should be a callable that is called with
+        (textbox, nextbox, prevbox), and returns True iff nextbox
+        should be appended to textbox.
+
+        If ``pageobjects``, the iterator can return Page objects to
+        signal that pagebreak has ocurred (these Page objects may or
+        may not have Textbox elements).
+
+        If ``keepempty``, process and return textboxes that have no
+        text content (these are filtered out by default)
+        """
+        textbox = None
+        prevbox = None
+        if gluefunc:
+            glue = gluefunc
+        else:
+            glue = self._default_glue
+        for page in self:
+            if pageobjects:
+                yield page
+            for nextbox in page:
+                if not (keepempty or str(nextbox).strip()):
+                    continue
+                if not textbox: # MUST glue
+                    textbox = nextbox
+                else:
+                    if glue(textbox, nextbox, prevbox):
+                        textbox += nextbox
+                    else:
+                        yield textbox
+                        textbox = nextbox
+                prevbox = nextbox
+            if textbox:
+                yield textbox
+                textbox = None
+
     def median_box_width(self, threshold=0):
         """Returns the median box width of all pages."""
         boxwidths = []
@@ -518,13 +488,26 @@ class PDFReader(CompoundElement):
         boxwidths.sort()
         return boxwidths[int(len(boxwidths) / 2)]
 
+    @staticmethod
+    def _default_glue(textbox, nextbox, prevbox):
+        # default logic: if lines are next to each other
+        # horizontally, line up vertically, and have the same
+        # font, then they should be glued
+        linespacing = 1
+        if (textbox.getfont() == nextbox.getfont() and
+            textbox.left == nextbox.left and
+            textbox.top + textbox.height + linespacing >= nextbox.top):
+            return True
+
+
 class Page(CompoundElement, OrdinalElement):
 
     """Represents a Page in a PDF file. Has *width* and *height* properties."""
 
     tagname = "div"
     classname = "pdfpage"
-
+    margins = None
+    
     @property
     def id(self):
         # FIXME: this will only work for documents consisting of a
@@ -620,11 +603,12 @@ all text in a Textbox has the same font and size.
         self.bottom = self.top + self.height
 
         # self.__fontspecid = kwargs['font']
-        self.font = kwargs['font']
+        self._font = kwargs['font'] or 0
         if 'fontspec' in kwargs:
             self.__fontspec = kwargs['fontspec'] 
             del kwargs['fontspec']
-
+        else:
+            self.__fontspec = {}
         del kwargs['top']
         del kwargs['left']
         del kwargs['width']
@@ -666,7 +650,7 @@ all text in a Textbox has the same font and size.
                           other.top + other.height) - top
 
         res = Textbox(top=top, left=left, width=width, height=height,
-                      font=self.font,
+                      font=self._font,
                       fontspec=self.__fontspec)
         
         # add all text elements
@@ -719,11 +703,28 @@ all text in a Textbox has the same font and size.
         #
         # this would be a place to insert fontmapping functionality
         # "TimesNewRomanPS-ItalicMT" => "Times New Roman,Italic"
-        if self.font:
-            return self.__fontspec[self.font]
+        if self._font:
+            return self.__fontspec[self._font]
         else:
             return {}
-
+        
+# this doesnt work that well with the default __setattribute__
+# implementation of this class' superclass.
+# 
+#    @property
+#    def font(self):
+#        return self.getfont()
+#
+#    @font.setter
+#    def font(self, value):
+#        for fontspecid, fontspec in self.__fontspec.items():
+#            if value == fontspecid:
+#                self._font = fontspecid
+#        if self._font is None:   # ._font might have the valid value 0
+#            self._font = str(len(self.__fontspecid)) # start at 0
+#            self.__fontspec[self._font] = value
+#        
+#
 
 class Textelement(UnicodeElement):
     """Represent a single part of text where each letter has the exact

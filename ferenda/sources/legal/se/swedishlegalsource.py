@@ -352,7 +352,6 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
     # would be much better to have a magic analyze phase that uses
     # heuristics and statistics to guess margins, heading styles, and
     # similar. The only problem is the magic.
-
     presets = {'default': {},
                'dir': {'footer': 920,
                        'header': 82,
@@ -425,8 +424,6 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
     # page numbers, headings.
     def is_nonessential(parser):
         chunk = parser.reader.peek()
-        # if str(chunk).strip() == "Prop. 2014/15:37":
-        #     from pudb import set_trace; set_trace()
         if chunk.top > metrics['footer'] or chunk.bottom < metrics['header']:
             return True  # page numbers
         if (int(chunk.getfont()['size']) <= metrics['textsize'] and

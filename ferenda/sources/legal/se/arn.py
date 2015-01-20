@@ -280,18 +280,16 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
             linespacing = 7
             return (textbox.getfont() == nextbox.getfont() and 
                     textbox.top + textbox.height + linespacing >= nextbox.top)
-            
-        reader = PDFReader()
         convert_to_pdf = filetype != ".pdf"
         workdir = os.path.dirname(self.store.intermediate_path(doc.basefile))
         if self.config.compress == "bz2":
             keep_xml = "bz2"
         else:
             keep_xml = True
-        reader.read(filename, workdir,
-                    images=self.config.pdfimages,
-                    convert_to_pdf=convert_to_pdf,
-                    keep_xml=keep_xml)
+        reader = PDFReader(filename, workdir,
+                           images=self.config.pdfimages,
+                           convert_to_pdf=convert_to_pdf,
+                           keep_xml=keep_xml)
         textboxes = reader.textboxes(gluecondition)
         doc.body = Body(textboxes)
 

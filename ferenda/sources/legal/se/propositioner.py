@@ -77,12 +77,13 @@ class PropTrips(Trips):
             return r
 
 
+    def _basefile_to_base(self, basefile):
+        # 1992/93:23 -> "PROPARKIV9293"
+        # 1999/2000:23 -> "PROPARKIV9900"
+        (y1, y2, idx) = re.split("[:/]", basefile)
+        return "PROPARKIV%02d%02d" % (int(y1) % 100, int(y2) % 100)
+
     def download_get_basefiles_page(self, pagetree):
-        def basefile_to_base(basefile):
-            # 1992/93:23 -> "PROPARKIV9293"
-            # 1999/2000:23 -> "PROPARKIV9900"
-            (y1, y2, idx) = re.split("[:/]", basefile)
-            return "PROPARKIV%02d%02d" % (int(y1) % 100, int(y2) % 100)
 
         # feed the lxml tree into beautifulsoup by serializing it to a
         # string -- is there a better way?
@@ -114,7 +115,7 @@ class PropTrips(Trips):
             # assume entries are strictly sorted from ancient to
             # recent. Therefore, as soon as we encounter a new time
             # period (eg 1998/99) we can update self.config.lastbase
-            self.config.lastbase = basefile_to_base(basefile)
+            self.config.lastbase = self._basefile_to_base(basefile)
 
             url = td.a['href']
 
@@ -138,14 +139,33 @@ class PropTrips(Trips):
                 nextpage = link
         raise NoMoreLinks(nextpage)
 
-    def download_single(self, basefile, url):
+    document_url_template = ("http://rkrattsbaser.gov.se/cgi-bin/thw?"
+                             "${HTML}=prop_lst&${OOHTML}=prop_dok"
+                             "&${SNHTML}=prop_err&${HILITE}=1&${MAXPAGE}=26"
+                             "&${TRIPSHOW}=format=THW"
+                             "&${SAVEHTML}=/prop/prop_form2.html"
+                             "&${BASE}=%(base)s&${FREETEXT}=&${FREETEXT}="
+                             "&PRUB=&DOK=p&PNR=%(pnr)s&ORG=")
+
+    def remote_url(self, basefile):
+        base = self._basefile_to_base(basefile)
+        pnr = basefile.split(":")[1]
+        return self.document_url_template % {'base': base,
+                                             'pnr': pnr}
+    
+
+    def download_single(self, basefile, url=None):
+        if url is None:
+            url = self.remote_url(basefile)
+            if not url:  # remote_url failed
+                return
+            
         # unpack the tuples we may recieve instead of plain strings
+        mainattachment = None
         if isinstance(basefile, tuple):
             basefile, attachment = basefile
             if attachment:
                 mainattachment = attachment + ".html"
-            else:
-                mainattachment = None
         if isinstance(url, tuple):
             url, extraurls = url
         updated = created = False
@@ -303,9 +323,8 @@ class PropTrips(Trips):
                 self.log.debug("%s: Using %s" % (doc.basefile, pdffile))
                 intermediate_dir = os.path.dirname(
                     self.store.path(doc.basefile, 'intermediate', '.foo'))
-                pdfreader = PDFReader()
                 keep_xml = "bz2" if self.config.compress == "bz2" else True
-                pdfreader.read(pdffile, intermediate_dir, keep_xml=keep_xml)
+                pdfreader = PDFReader(pdffile, intermediate_dir, keep_xml=keep_xml)
                 self.parse_from_pdfreader(pdfreader, doc)
             else:
                 downloaded_path = self.store.downloaded_path(doc.basefile)
@@ -337,9 +356,7 @@ class PropTrips(Trips):
     def parse_from_pdfreader(self, pdfreader, doc):
         parser = offtryck_parser(preset='proposition')
         doc.body = parser.parse(pdfreader.textboxes(offtryck_gluefunc))
-        
 
-            
     def parse_from_textreader(self, textreader, doc):
         describer = Describer(doc.meta, doc.uri)
         for p in textreader.getiterator(textreader.readparagraph):

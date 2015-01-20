@@ -90,14 +90,22 @@ class CompositeRepository(DocumentRepository):
                     opts[k] = v
         return opts
 
-    def download(self):
+    def download(self, basefile=None):
         for c in self.subrepos:
             inst = self.get_instance(c)
             # make sure that our store has access to our now
             # initialized subrepo objects
             if c not in self.store.docrepo_instances:
                 self.store.docrepo_instances[c] = inst
-            inst.download()
+            try:
+                ret = inst.download(basefile)
+            except Exception as e:  # be resilient
+                self.log.error("download for c failed: %s" % e)
+                ret = False
+            if basefile and ret:
+                # we got the doc we want, we're done!
+                return
+                
 
     # NOTE: this impl should NOT use the @managedparsing decorator
     def parse(self, basefile):

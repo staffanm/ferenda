@@ -49,13 +49,16 @@ def timed(f):
 
 
 def recordlastdownload(f):
-    """Automatically stores current time in ``self.config.lastdownloaded``
+    """Automatically stores current time in ``self.config.lastdownload``
     """
     @functools.wraps(f)
     def wrapper(self, *args, **kwargs):
         ret = f(self, *args, **kwargs)
-        self.config.lastdownload = datetime.now()
-        LayeredConfig.write(self.config)
+        # only update the lastdownload for full downloads (if no
+        # specific basefile was specified)
+        if not args:
+            self.config.lastdownload = datetime.now()
+            LayeredConfig.write(self.config)
         return ret
     return wrapper
 

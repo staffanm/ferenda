@@ -6,10 +6,12 @@ import sys
 import os
 import re
 import codecs
+from operator import itemgetter
 from datetime import datetime, timedelta, date
 from time import sleep
 from six import text_type as str
 from six.moves.urllib_parse import urljoin, urlencode
+from collections import Counter
 
 import requests
 import lxml.html
@@ -204,17 +206,18 @@ class Regeringen(SwedishLegalSource):
     def remote_url(self, basefile):
         # do a search to find the proper url for the document
         templ = "http://www.regeringen.se/sb/d/107/a/136?query=%(basefile)s&docTypes=%(doctype)s&type=advanced&action=search"
-        url = templ % {'doctype': self.document_type,
-                       'basefile': basefile}
-        soup = BeautifulSoup(requests.get(url).text)
+        searchurl = templ % {'doctype': self.document_type,
+                             'basefile': basefile}
+        soup = BeautifulSoup(requests.get(searchurl).text)
+        docurl = None
         for link in soup.find_all(href=re.compile("/sb/d/108/a/")):
             desc = link.find_next_sibling("span", {'class': 'info'}).text
             if basefile in desc:
-                url = urljoin(url, link['href'])
-        if not url:
+                docurl = urljoin(searchurl, link['href'])
+        if not docurl:
             self.log.error(
                 "Could not find document with basefile %s" % basefile)
-        return url
+        return docurl
 
     def canonical_uri(self, basefile, document_type=None):
         if not document_type:
@@ -582,14 +585,13 @@ class Regeringen(SwedishLegalSource):
     
         
     def parse_pdf(self, pdffile, intermediatedir):
-        pdf = FontmappingPDFReader()
         # By default, don't create and manage PDF backgrounds files
         # (takes forever, we don't use them yet)
         if self.config.compress == "bz2":
             keep_xml = "bz2"
         else:
             keep_xml = True
-        pdf.read(pdffile, intermediatedir, images=self.config.pdfimages, keep_xml=keep_xml)
+        pdf = FontmappingPDFReader(pdffile, intermediatedir, images=self.config.pdfimages, keep_xml=keep_xml)
         return pdf
 
                 
@@ -605,13 +607,13 @@ class Regeringen(SwedishLegalSource):
 
             pdf = self.parse_pdf(pdf_path, intermediate_dir)
 
-            # metrics = analyze_metrics(pdf)
+            from ferenda.pdfanalyze import analyze_metrics
+            metrics = analyze_metrics(pdf)
 
             debug = False
             if debug:
                 outputfile = pdf_path+".marked.pdf"
                 pdf.drawboxes(gluefunc, outputfile)
-
 
             if self.document_type == self.PROPOSITION:
                 preset = 'proposition'
@@ -633,15 +635,6 @@ class Regeringen(SwedishLegalSource):
             pdf.tagname = "body"
         return pdf
 
-
-    def analyze_metrics(self, pdf, twopage=True):
-        # if twopage, assume even and odd pages have differing
-        # margins.
-        for box in pdf.textboxes:
-            even = pageno % 2
-            for textbox in page:
-                pass
-                
 
     def create_external_resources(self, doc):
         """Optionally create external files that go together with the
@@ -689,72 +682,6 @@ class Regeringen(SwedishLegalSource):
             fp.write("#page%03d { background: url('%s');}\n" %
                      (cnt, os.path.basename(dest)))
 
-    # Not used right now
-    def parse_pdf_complex(self, pdffile, intermediatedir):
-        pdf = PDFReader()
-        pdf.read(pdffile, intermediatedir)
-        res = CompoundElement
-        cnt = 0
-        for srcpage in pdf:
-            cnt += 1
-            # Page is a wonderful and magical class. Read the comments
-            # to find out exactly how awesome it is.
-            tgtpage = Page(ordinal=cnt)
-            # TODO: use magic to find the bounding box of actual page
-            # content. 510 is a rough cutoff that might not be
-            # appropriate for all page layouts.
-            boxes = srcpage.boundingbox(right=510)
-            for box in boxes:
-                print((box.getfont()))
-                print(("    [%dx%d][%dx%d][%s@%s] %s" %
-                      (box.top, box.left, box.bottom, box.right, box.getfont()['family'], box.getfont()['size'], str(box))))
-                # Heuristic: If something is in large type, it's a heading.
-                if int(box.getfont()['size']) > 12:
-                    if isinstance(ctx, Heading):
-                        if vertical_space(box, boxes.previous()) > 10:
-                            # Page.new closes the current context and
-                            # creates a new context of the given class
-                            tgtpage.new(Heading)
-
-                    # Heading is a DimensionedElement with top,
-                    # left, width, height props. Page.set creates a new
-                    # context, but only if needed.
-                    txtpage.set(Heading)
-
-                    # calls the current context's append() method. If
-                    # it's a DimensionedElement (it should be), it's
-                    # implementation of append() expands the bounding
-                    # box as new stuff is added (provided they have
-                    # top/left+width/height attribs
-                    txtpage.write(box)
-
-                    continue
-
-                # add more heuristicts here...
-
-                # Last resort: Everything that is not something else is a Paragraph
-                page.set(Paragraph)
-                if horizontal_diff(box, boxes.previous()) > 0:  # maybe something like 4-5
-                    page.new(Paragraph)
-                if vertical_space(box.boxes.previous()) > 5:
-                    page.new(Paragraph)
-
-        print((pdf.median_box_width(threshold=0)))
-
-    def find_resource(self, label):
-        # a number of possible implementation (in order of increasing
-        # coolness and effort)
-        #
-        # 1) Mangle resourcelabel into a URI
-        # 2) Lookup resourcelabel from a n3 file
-        # 3) Lookup resourcelabel from SPARQL db
-
-        # 1)
-        # label = label.replace(u"å","aa").replace(u"ä","ae").replace(u"ö","oe")
-        # return "http://rinfo.lagrummet.se/org/%s" % label.lower()
-
-        # 2)
-        return self.lookup_resource(label)
 
     def toc_item(self, binding, row):
         return [row['dcterms_identifier']+": ",

@@ -4,12 +4,13 @@ from __future__ import unicode_literals
 # A abstract base class for fetching documents from data.riksdagen.se
 
 import os
+import json
 import codecs
 
 import requests
 import requests.exceptions
 from bs4 import BeautifulSoup
-
+from rdflib import URIRef
 
 from . import SwedishLegalSource
 from .swedishlegalsource import offtryck_parser, offtryck_gluefunc, PreambleSection, UnorderedSection
@@ -98,6 +99,29 @@ class Riksdagen(SwedishLegalSource):
                 self.log.info("That was the last page")
                 done = True
 
+    def remote_url(self, basefile):
+        # FIXME: this should be easy
+        digits='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        if "/" in basefile:   # eg 1975/76:24
+            year = int(basefile.split("/")[0])
+            remainder = year - 1400
+        else:                 # eg 1975:6
+            year = int(basefile.split(":")[0])
+            remainder = year - 1401
+        pnr = basefile.split(":")[1]
+        base36year = ""
+        # since base36 year is guaranteed to be 2 digits, this could
+        # be simpler.
+        while remainder != 0:
+            remainder, i = divmod(remainder, len(digits))
+            base36year = digits[i] + base36year
+        # FIXME: Map more of these...
+        doctypecode = {self.PROPOSITION: "03",
+                       self.UTSKOTTSDOKUMENT: "01"}[self.document_type]
+        return "http://data.riksdagen.se/dokumentstatus/%s%s%s.xml" % (
+            base36year, doctypecode, pnr)
+
+                
     def download_single(self, basefile, url=None):
         attachment = None
         if isinstance(basefile, tuple):
@@ -184,13 +208,52 @@ class Riksdagen(SwedishLegalSource):
                                                          attachment=os.path.basename(pdffile))
         intermediate_dir = os.path.dirname(intermediate_path)
 
+        doc.uri = self.canonical_uri(doc.basefile)
+        self.log.debug("Set URI to %s (from %s)" % (doc.uri, doc.basefile))
+        d = Describer(doc.meta, doc.uri)
+        d.rdftype(self.rdf_type)
+        d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
+        xsoup = BeautifulSoup(open(self.store.downloaded_path(
+            doc.basefile)).read(), "xml")
+        d.value(self.ns['dcterms'].title, xsoup.dokument.titel.text, lang="sv")
+        d.value(self.ns['dcterms'].issued,
+                util.strptime(xsoup.dokument.publicerad.text,
+                              "%Y-%m-%d %H:%M:%S").date())
+        self.infer_triples(d, doc.basefile)
+        identifier = doc.meta.value(URIRef(doc.uri),
+                                    self.ns['dcterms'].identifier)
+        if identifier:
+            identifier = str(identifier)
+
         if os.path.exists(pdffile):
-            parser = offtryck_parser(preset='proposition')
-            pdf = PDFReader()
-            pdf.read(pdffile, workdir=intermediate_dir, images=False, keep_xml="bz2")
-            if pdf.is_empty():
-                self.log.debug("%s: %s contains no text, performing OCR" % (doc.basefile, pdffile))
-                pdf.read(pdffile, workdir=intermediate_dir, ocr_lang="swe", keep_xml="bz2")
+            from ferenda.pdfanalyze import analyze_metrics, drawboxes
+            hocr_path = self.store.path(doc.basefile, 'intermediate',
+                                        '.hocr.html.bz2')
+            metrics_path = self.store.path(doc.basefile, 'intermediate',
+                                           '.metrics.json')
+            # slight optimization: if we've already performed OCR,
+            # then the PDF won't contain regular text -- don't bother
+            # trying to parse it as a regular PDF.
+            if util.outfile_is_newer([pdffile], hocr_path):
+                pdf = PDFReader(pdffile, workdir=intermediate_dir,
+                                ocr_lang="swe", keep_xml="bz2")
+            else:
+                pdf = PDFReader(pdffile, workdir=intermediate_dir,
+                                images=False, keep_xml="bz2")
+                if pdf.is_empty():
+                    self.log.debug("%s: %s contains no text, performing OCR" %
+                                   (doc.basefile, pdffile))
+                    pdf = PDFReader(pdffile, workdir=intermediate_dir,
+                                    ocr_lang="swe", keep_xml="bz2")
+            # drawboxes(pdf, offtryck_gluefunc)
+            if util.outfile_is_newer([pdffile], metrics_path):
+                metrics = json.loads(util.readfile(metrics_path))
+            else:
+                metrics = analyze_metrics(pdf)
+                util.writefile(metrics_path, json.dumps(metrics))
+            parser = offtryck_parser(metrics=metrics)
+            parser.debug = os.environ.get('FERENDA_FSMDEBUG', False)
+            parser.current_identifier = identifier
             doc.body = parser.parse(pdf.textboxes(offtryck_gluefunc))
         else:
             self.log.debug("Loading soup from %s" % htmlfile)
@@ -199,16 +262,6 @@ class Riksdagen(SwedishLegalSource):
                     htmlfile, encoding='iso-8859-1', errors='replace').read(),
                 )
             self.parse_from_soup(soup, doc)
-        doc.uri = self.canonical_uri(doc.basefile)
-        self.log.debug("Set URI to %s (from %s)" % (doc.uri, doc.basefile))
-        d = Describer(doc.meta, doc.uri)
-        d.rdftype(self.rdf_type)
-        d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-        xsoup = BeautifulSoup(open(self.store.downloaded_path(doc.basefile)).read(), "xml")
-        d.value(self.ns['dcterms'].title, xsoup.dokument.titel.text, lang="sv")
-        d.value(self.ns['dcterms'].issued, util.strptime(xsoup.dokument.publicerad.text,
-                                                        "%Y-%m-%d %H:%M:%S").date())
-        self.infer_triples(d, doc.basefile)
         return True
 
     def parse_from_soup(self, soup, doc):

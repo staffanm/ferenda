@@ -81,7 +81,11 @@ class TransformError(Exception):
 class ExternalCommandError(Exception):
 
     """Raised whenever any invocation of an external commmand fails for
-    any reason (including if the command line program doesn't exist)."""
+    any reason."""
+
+class ExternalCommandNotFound(Exception):
+
+    """Raised whenever any invocation of an external commmand fails """
 
 
 class ConfigurationError(Exception):

@@ -36,15 +36,13 @@ class PDFDocumentRepository(DocumentRepository):
         # xml + png files that PDFReader will create
 
         intermediate_dir = os.path.dirname(self.store.intermediate_path(basefile))
-        pdf = PDFReader()
-
         if self.config.compress == "bz2":
             keep_xml = "bz2"
         else:
             keep_xml = True
-        pdf.read(pdffile, intermediate_dir,
-                 images=self.config.pdfimages,
-                 keep_xml=keep_xml)
+        pdf = PDFReader(pdffile, intermediate_dir,
+                        images=self.config.pdfimages,
+                        keep_xml=keep_xml)
         return pdf
 
     def parse_from_pdfreader(self, pdfreader, doc):
