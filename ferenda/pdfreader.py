@@ -53,19 +53,20 @@ class PDFReader(CompoundElement):
     # properties and methods relating to the initialization of the
     # PDFReader object
     def __init__(self,
-                 filename,
+                 pages=None,
+                 filename=None,
                  workdir=None,
                  images=True,
                  convert_to_pdf=False,
                  keep_xml=True,
-                 ocr_lang=None):
-        # since this class derive from list, the first argument
-        # (filename) will be treated as an iterable, making our
-        # container filled with a bunch of things (one per letter of
-        # the filename). Erase those:
-        self[:] = []
+                 ocr_lang=None,
+                 fontspec=None):
+        if pages: # special-case: The object has been initialized as a
+                  # regular list (by deserialize), we have no need to
+                  # parse and create pages.
+            return
         self.log = logging.getLogger('pdfreader')
-        self.fontspec = {}
+        self.fontspec = fontspec or {}
         self.filename = filename
         """Initializes a PDFReader object from an existing PDF file. After
         initialization, the PDFReader contains a list of
@@ -100,7 +101,7 @@ class PDFReader(CompoundElement):
                          or "en-GB", but rather whatever the
                          underlying ``tesseract`` program uses).
         :param ocr_lang: str
-
+        
         """
         self.workdir = workdir
         if self.workdir is None:
@@ -130,7 +131,6 @@ class PDFReader(CompoundElement):
             converter = self._pdftohtml
             converter_extra = {'images': images}
             parser = self._parse_xml
-
         convertedfile = os.sep.join([workdir, stem + suffix])
         if keep_xml == "bz2":
             real_convertedfile = convertedfile + ".bz2"
@@ -603,7 +603,7 @@ all text in a Textbox has the same font and size.
         self.bottom = self.top + self.height
 
         # self.__fontspecid = kwargs['font']
-        self._font = kwargs['font'] or 0
+        self.font = kwargs['font'] or 0
         if 'fontspec' in kwargs:
             self.__fontspec = kwargs['fontspec'] 
             del kwargs['fontspec']
@@ -650,7 +650,7 @@ all text in a Textbox has the same font and size.
                           other.top + other.height) - top
 
         res = Textbox(top=top, left=left, width=width, height=height,
-                      font=self._font,
+                      font=self.font,
                       fontspec=self.__fontspec)
         
         # add all text elements
@@ -703,8 +703,8 @@ all text in a Textbox has the same font and size.
         #
         # this would be a place to insert fontmapping functionality
         # "TimesNewRomanPS-ItalicMT" => "Times New Roman,Italic"
-        if self._font:
-            return self.__fontspec[self._font]
+        if self.font:
+            return self.__fontspec[self.font]
         else:
             return {}
         
@@ -719,10 +719,10 @@ all text in a Textbox has the same font and size.
 #    def font(self, value):
 #        for fontspecid, fontspec in self.__fontspec.items():
 #            if value == fontspecid:
-#                self._font = fontspecid
-#        if self._font is None:   # ._font might have the valid value 0
-#            self._font = str(len(self.__fontspecid)) # start at 0
-#            self.__fontspec[self._font] = value
+#                self.font = fontspecid
+#        if self.font is None:   # .font might have the valid value 0
+#            self.font = str(len(self.__fontspecid)) # start at 0
+#            self.__fontspec[self.font] = value
 #        
 #
 

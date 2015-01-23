@@ -40,7 +40,8 @@ class PDFDocumentRepository(DocumentRepository):
             keep_xml = "bz2"
         else:
             keep_xml = True
-        pdf = PDFReader(pdffile, intermediate_dir,
+        pdf = PDFReader(filename=pdffile,
+                        workdir=intermediate_dir,
                         images=self.config.pdfimages,
                         keep_xml=keep_xml)
         return pdf

@@ -29,12 +29,12 @@ class Read(unittest.TestCase):
 
     def test_basic(self):
         try:
-            reader = PDFReader("test/files/pdfreader/sample.pdf",
-                               self.datadir)
+            reader = PDFReader(filename="test/files/pdfreader/sample.pdf",
+                               workdir=self.datadir)
         except errors.ExternalCommandError:
             self._copy_sample()
-            reader = PDFReader("test/files/pdfreader/sample.pdf",
-                               self.datadir)
+            reader = PDFReader(filename="test/files/pdfreader/sample.pdf",
+                               workdir=self.datadir)
 
         # a temporary copy of the pdf file should not be lying around
         # in workdir
@@ -98,13 +98,13 @@ class Read(unittest.TestCase):
     def test_dontkeep(self):
         self.assertFalse(os.path.exists(self.datadir + os.sep + "sample.xml.bz2"))
         try:
-            reader = PDFReader("test/files/pdfreader/sample.pdf",
-                               self.datadir,
+            reader = PDFReader(filename="test/files/pdfreader/sample.pdf",
+                               workdir=self.datadir,
                                keep_xml=False)
         except errors.ExternalCommandError:
             self._copy_sample()
-            reader = PDFReader("test/files/pdfreader/sample.pdf",
-                               self.datadir,
+            reader = PDFReader(filename="test/files/pdfreader/sample.pdf",
+                               workdir=self.datadir,
                                keep_xml=False)
 
         # No XML file should exist
@@ -113,8 +113,8 @@ class Read(unittest.TestCase):
 
     def test_bz2(self):
         try:
-            reader = PDFReader("test/files/pdfreader/sample.pdf",
-                               self.datadir,
+            reader = PDFReader(filename="test/files/pdfreader/sample.pdf",
+                               workdir=self.datadir,
                                keep_xml="bz2")
         except errors.ExternalCommandError:
             self._copy_sample()
@@ -124,8 +124,8 @@ class Read(unittest.TestCase):
                 wfp.write(rfp.read())
                 wfp.close()
             os.unlink(self.datadir + os.sep + "sample.xml")
-            reader = PDFReader("test/files/pdfreader/sample.pdf",
-                               self.datadir,
+            reader = PDFReader(filename="test/files/pdfreader/sample.pdf",
+                               workdir=self.datadir,
                                keep_xml="bz2")
 
         # a temporary copy of the pdf file should not be lying around in workdir
@@ -138,8 +138,8 @@ class Read(unittest.TestCase):
         self.assertEqual("Document title ", str(reader[0][0]))
 
         # parsing again should reuse the existing sample.xml.bz2
-        reader = PDFReader("test/files/pdfreader/sample.pdf",
-                           self.datadir,
+        reader = PDFReader(filename="test/files/pdfreader/sample.pdf",
+                           workdir=self.datadir,
                            keep_xml="bz2")
 
     def test_convert(self):
@@ -150,13 +150,13 @@ class Read(unittest.TestCase):
         try:
             if not os.environ.get("FERENDA_TEST_TESSERACT"):
                 raise errors.ExternalCommandError
-            reader = PDFReader("test/files/pdfreader/scanned.pdf",
-                               self.datadir,
+            reader = PDFReader(filename="test/files/pdfreader/scanned.pdf",
+                               workdir=self.datadir,
                                ocr_lang="swe")
         except errors.ExternalCommandError:
             self._copy_sample()
-            reader = PDFReader("test/files/pdfreader/scanned.pdf",
-                               self.datadir,
+            reader = PDFReader(filename="test/files/pdfreader/scanned.pdf",
+                               workdir=self.datadir,
                                ocr_lang="swe")
 
         # assert that a hOCR file has been created
@@ -173,9 +173,12 @@ class Read(unittest.TestCase):
         self.assertEqual(72, reader[0][0][0].height)
         self.assertEqual(400, reader[0][0][0].width)
 
-        # assert that the third textbox (which has mostly normal text)
-        # is rendered correctly (note that we have a couple of OCR errors).
-        self.assertEqual("Regeringen föreslår riksdagen att anta de förslag som har tagits. upp i bifogade utdrag ur regeringsprotokollet den 31 oktober l99l.", util.normalize_space(str(reader[0][3])))
+        # assert that the <s>third</s>fifth textbox (which has mostly
+        # normal text) is rendered correctly (note that we have a
+        # couple of OCR errors).
+        # self.assertEqual("Regeringen föreslår riksdagen att anta de förslag som har tagits. upp i bifogade utdrag ur regeringsprotokollet den 31 oktober l99l.", util.normalize_space(str(reader[0][3])))
+        self.assertEqual("Regeringen föreslår riksdagen att anta de förslag som har tagits. upp i", util.normalize_space(str(reader[0][5])))
+        
 
     def test_fallback_ocr(self):
         try:
@@ -184,18 +187,18 @@ class Read(unittest.TestCase):
             # files that _copy_sample fixes for us.
             if not os.environ.get("FERENDA_TEST_TESSERACT"):
                 raise errors.ExternalCommandError
-            reader = PDFReader("test/files/pdfreader/scanned-ecma-99.pdf",
-                               self.datadir,
+            reader = PDFReader(filename="test/files/pdfreader/scanned-ecma-99.pdf",
+                               workdir=self.datadir,
                                images=False)
         except errors.ExternalCommandError:
             self._copy_sample()
-            reader = PDFReader("test/files/pdfreader/scanned-ecma-99.pdf",
-                               self.datadir,
+            reader = PDFReader(filename="test/files/pdfreader/scanned-ecma-99.pdf",
+                               workdir=self.datadir,
                                images=False)
 
         self.assertTrue(reader.is_empty())
-        reader = PDFReader("test/files/pdfreader/scanned-ecma-99.pdf",
-                           self.datadir,
+        reader = PDFReader(filename="test/files/pdfreader/scanned-ecma-99.pdf",
+                           workdir=self.datadir,
                            ocr_lang="eng")
         self.assertFalse(reader.is_empty())
         self.assertEqual(2, len(reader))

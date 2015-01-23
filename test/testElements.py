@@ -76,11 +76,10 @@ class Main(unittest.TestCase):
         from ferenda import PDFDocumentRepository, PDFReader
         d = PDFDocumentRepository()
         doc = d.make_document("sample")
-        reader = PDFReader()
         # make SURE that the intermediate files are newer than the pdf
         os.utime("test/files/pdfreader/intermediate/sample.xml", None)
-        reader.read("test/files/pdfreader/sample.pdf",
-                    "test/files/pdfreader/intermediate")
+        reader = PDFReader(filename="test/files/pdfreader/sample.pdf",
+                           workdir="test/files/pdfreader/intermediate")
         d.parse_from_pdfreader(reader, doc)
         jsondoc = serialize(doc, format="json")
         newdoc = deserialize(jsondoc, format="json")
