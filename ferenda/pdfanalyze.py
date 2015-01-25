@@ -119,8 +119,8 @@ def analyze_metrics(pdf, twopage=True):
                 text.isdigit()):
                 assert logical_pageno is None, "Found two logical pagenos on physical page %s: %s and %s" % (physical_pageno, logical_pageno, text)
                 logical_pageno = text
-            f = textbox.getfont()
-            styles[(f['family'], f['size'])] += len(text)
+            f = textbox.font
+            styles[(f.family, f.size)] += len(text)
     # find the probable left margin = the place where most textboxes start
     pagewidth = pagewidths.most_common()[0][0]
     plot = True
@@ -143,12 +143,12 @@ def analyze_metrics(pdf, twopage=True):
             plot.hist(series, bins=max(pagewidths), color='k')
             plot.set_title(label, fontdict={'fontsize': 7})
             (maxval, maxcnt) = Counter(series).most_common(1)[0]
-            print("analyze_metrics: %s: Top val %s (%s times)" % (label, maxval, maxcnt))
+            log.debug("analyze_metrics: %s: Top val %s (%s times)" % (label, maxval, maxcnt))
             plot.annotate(maxval, xy=(maxval, maxcnt),
                           xytext=(maxval*0.5, maxcnt*0.9),
                           arrowprops=dict(arrowstyle="->"))
         plot = plt.subplot2grid((2,3), (1,1), colspan=2)
-        stylenames = [x[0][0].replace("TimesNewRomanPS", "Times")+"@"+x[0][1] for x in styles.most_common()]
+        stylenames = [x[0][0].replace("TimesNewRomanPS", "Times")+"@"+str(x[0][1]) for x in styles.most_common()]
         stylecounts = [x[1] for x in styles.most_common()]
         plt.yticks(range(len(styles)), stylenames, fontproperties=FontProperties(size=8))
         plot.barh(range(len(styles)), stylecounts, log=True)

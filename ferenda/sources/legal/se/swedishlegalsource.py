@@ -389,12 +389,12 @@ def offtryck_parser(basefile="0", metrics=None, preset=None):
                 (chunk.right < metrics_leftmargin() or
                  chunk.left > metrics_rightmargin()) and
             str(chunk).strip().startswith(parser.current_identifier)):
-            # print("%s on p %s is deemed nonessential" % (str(chunk), state['pageno']))
+            # print("%s on p %s is deemed nonessential" % (str(chunk), state.pageno))
             return True
 
     def is_coverpage(parser):
         # first 2 pages of a SOU are coverpages
-        return isinstance(parser.reader.peek(), Page) and state['preset'] == "sou" and state['pageno'] < 2
+        return isinstance(parser.reader.peek(), Page) and state.preset == "sou" and state.pageno < 2
 
             
     def is_preamblesection(parser):
@@ -459,7 +459,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None):
             m = re.search("Bilaga (\d)", str(chunk))
             if m:
                 ordinal = int(m.group(1))
-                if ordinal != state['appendixno']:
+                if ordinal != state.appendixno:
                     return True
 
     def is_paragraph(parser):
@@ -475,7 +475,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None):
         return parser.reader.next()
 
     def make_coverpage(parser):
-        state['pageno'] += 1
+        state.pageno += 1
         parser.reader.next() # throwaway the Page object itself
         c = Coverpage()
         return parser.make_children(c)
@@ -513,11 +513,11 @@ def offtryck_parser(basefile="0", metrics=None, preset=None):
                 continue
             m = re.search("Bilaga (\d)", str(chunk))
             if m:
-                state['appendixno'] = int(m.group(1))
+                state.appendixno = int(m.group(1))
             if int(chunk.font.size) >= metrics.h2.size:
                 done = True
         s = Appendix(title=str(chunk).strip(),
-                     ordinal=str(state['appendixno']),
+                     ordinal=str(state.appendixno),
                      uri=None)
         return parser.make_children(s)
     setattr(make_appendix, 'newstate', 'appendix')
@@ -586,7 +586,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None):
 
     p = FSMParser()
 
-    recognizers = (is_pagebreak,
+    recognizers = [is_pagebreak,
                    is_appendix,
                    is_nonessential,
                    is_section,
@@ -595,7 +595,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None):
                    is_preamblesection,
                    is_unorderedsection,
                    is_unorderedsubsection,
-                   is_paragraph)
+                   is_paragraph]
     if preset == "sou":
         recognizers.insert(0, is_coverpage)
     p.set_recognizers(*recognizers)

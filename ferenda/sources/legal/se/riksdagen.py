@@ -235,10 +235,12 @@ class Riksdagen(SwedishLegalSource):
             # then the PDF won't contain regular text -- don't bother
             # trying to parse it as a regular PDF.
             if util.outfile_is_newer([pdffile], hocr_path):
-                pdf = PDFReader(pdffile, workdir=intermediate_dir,
+                pdf = PDFReader(filename=pdffile,
+                                workdir=intermediate_dir,
                                 ocr_lang="swe", keep_xml="bz2")
             else:
-                pdf = PDFReader(pdffile, workdir=intermediate_dir,
+                pdf = PDFReader(filename=pdffile,
+                                workdir=intermediate_dir,
                                 images=False, keep_xml="bz2")
                 if pdf.is_empty():
                     self.log.debug("%s: %s contains no text, performing OCR" %

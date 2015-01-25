@@ -610,13 +610,13 @@ all text in a Textbox has the same font and size.
         self.right = self.left + self.width
         self.bottom = self.top + self.height
 
-        # self.__fontspecid = kwargs['fontid']
+        # self._fontspecid = kwargs['fontid']
         self.fontid = kwargs['fontid'] or 0
         if 'fontspec' in kwargs:
-            self.__fontspec = kwargs['fontspec'] 
+            self._fontspec = kwargs['fontspec'] 
             del kwargs['fontspec']
         else:
-            self.__fontspec = {}
+            self._fontspec = {}
         del kwargs['top']
         del kwargs['left']
         del kwargs['width']
@@ -659,7 +659,7 @@ all text in a Textbox has the same font and size.
 
         res = Textbox(top=top, left=left, width=width, height=height,
                       fontid=self.fontid,
-                      fontspec=self.__fontspec)
+                      fontspec=self._fontspec)
         
         # add all text elements
         c = Textelement(tag=None)
@@ -706,30 +706,25 @@ all text in a Textbox has the same font and size.
         return element
 
 
-    def getfont(self):
-        """Returns a fontspec dict of all properties of the font used."""
-        #
-        # this would be a place to insert fontmapping functionality
-        # "TimesNewRomanPS-ItalicMT" => "Times New Roman,Italic"
 
     @property
     def font(self):
-        if self.fontid:
-            return LayeredConfig(Defaults(self.__fontspec[self.fontid]))
+        if self.fontid is not None:
+            return LayeredConfig(Defaults(self._fontspec[self.fontid]))
         else:
-            return {}
+            return LayeredConfig(Defaults({}))
 
 # this doesnt work that well with the default __setattribute__
 # implementation of this class' superclass.
 #
 #    @font.setter
 #    def font(self, value):
-#        for fontspecid, fontspec in self.__fontspec.items():
+#        for fontspecid, fontspec in self._fontspec.items():
 #            if value == fontspecid:
 #                self.font = fontspecid
 #        if self.font is None:   # .font might have the valid value 0
-#            self.font = str(len(self.__fontspecid)) # start at 0
-#            self.__fontspec[self.font] = value
+#            self.font = str(len(self._fontspecid)) # start at 0
+#            self._fontspec[self.font] = value
 #        
 #
 

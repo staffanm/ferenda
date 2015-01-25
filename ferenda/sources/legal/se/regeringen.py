@@ -50,15 +50,15 @@ class FontmappingPDFReader(PDFReader):
             if 'family' in val:
                 # Times New Roman => TimesNewRomanPSMT
                 # Times New Roman,Italic => TimesNewRomanPS-ItalicMT
-                if val.family == "Times New Roman":
-                    val.family = "TimesNewRomanPSMT"
-                if val.family == "Times New Roman,Italic":
-                    val.family = "TimesNewRomanPS-ItalicMT"
+                if val['family'] == "Times New Roman":
+                    val['family'] = "TimesNewRomanPSMT"
+                if val['family'] == "Times New Roman,Italic":
+                    val['family'] = "TimesNewRomanPS-ItalicMT"
                 # Not 100% sure abt these last two
-                if val.family == "Times New Roman,Bold":
-                    val.family = "TimesNewRomanPS-BoldMT"
-                if val.family == "Times New Roman,BoldItalic":
-                    val.family = "TimesNewRomanPS-BoldItalicMT"
+                if val['family'] == "Times New Roman,Bold":
+                    val['family'] = "TimesNewRomanPS-BoldMT"
+                if val['family'] == "Times New Roman,BoldItalic":
+                    val['family'] = "TimesNewRomanPS-BoldItalicMT"
         
 
 class Regeringen(SwedishLegalSource):
@@ -611,7 +611,6 @@ class Regeringen(SwedishLegalSource):
             intermediate_dir = os.path.dirname(intermediate_path)
             # case 1: intermediate path does not exist and that's ok
             # case 2: intermediate path exists alongside downloaded_path
-
             pdf = self.parse_pdf(pdf_path, intermediate_dir)
 
             from ferenda.pdfanalyze import analyze_metrics
@@ -667,7 +666,7 @@ class Regeringen(SwedishLegalSource):
         assert isinstance(pdf, PDFReader) # this is needed to get fontspecs and other things
         for spec in list(pdf.fontspec.values()):
             fp.write(".fontspec%s {font: %spx %s; color: %s;}\n" %
-                     (spec.id, spec.size, spec.family, spec.color))
+                     (spec['id'], spec['size'], spec['family'], spec['color']))
 
         # 2 Copy all created png files to their correct locations
         totcnt = 0

@@ -324,7 +324,9 @@ class PropTrips(Trips):
                 intermediate_dir = os.path.dirname(
                     self.store.path(doc.basefile, 'intermediate', '.foo'))
                 keep_xml = "bz2" if self.config.compress == "bz2" else True
-                pdfreader = PDFReader(pdffile, intermediate_dir, keep_xml=keep_xml)
+                pdfreader = PDFReader(filename=pdffile,
+                                      workdir=intermediate_dir,
+                                      keep_xml=keep_xml)
                 self.parse_from_pdfreader(pdfreader, doc)
             else:
                 downloaded_path = self.store.downloaded_path(doc.basefile)
