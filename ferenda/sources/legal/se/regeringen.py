@@ -6,6 +6,7 @@ import sys
 import os
 import re
 import codecs
+import json
 from operator import itemgetter
 from datetime import datetime, timedelta, date
 from time import sleep
@@ -49,15 +50,15 @@ class FontmappingPDFReader(PDFReader):
             if 'family' in val:
                 # Times New Roman => TimesNewRomanPSMT
                 # Times New Roman,Italic => TimesNewRomanPS-ItalicMT
-                if val['family'] == "Times New Roman":
-                    val['family'] = "TimesNewRomanPSMT"
-                if val['family'] == "Times New Roman,Italic":
-                    val['family'] = "TimesNewRomanPS-ItalicMT"
+                if val.family == "Times New Roman":
+                    val.family = "TimesNewRomanPSMT"
+                if val.family == "Times New Roman,Italic":
+                    val.family = "TimesNewRomanPS-ItalicMT"
                 # Not 100% sure abt these last two
-                if val['family'] == "Times New Roman,Bold":
-                    val['family'] = "TimesNewRomanPS-BoldMT"
-                if val['family'] == "Times New Roman,BoldItalic":
-                    val['family'] = "TimesNewRomanPS-BoldItalicMT"
+                if val.family == "Times New Roman,Bold":
+                    val.family = "TimesNewRomanPS-BoldMT"
+                if val.family == "Times New Roman,BoldItalic":
+                    val.family = "TimesNewRomanPS-BoldItalicMT"
         
 
 class Regeringen(SwedishLegalSource):
@@ -471,8 +472,11 @@ class Regeringen(SwedishLegalSource):
                     _check_differing(d, self.ns['dcterms'].identifier, "Prop. " + m.group(1))
                     identifier_found = True
                 
-            # dcterms:title
-            if not title_found and element.getfont()['size'] == '20':
+            # dcterms:title FIXME: The fontsize comparison should be
+            # done with respect to the resulting metrics (which we
+            # don't have a reference to here, since they were
+            # calculated in parse_pdf....)
+            if not title_found and element.font.size == 20:
                 # sometimes part of the the dcterms:identifier (eg " Prop."
                 # or " 2013/14:51") gets mixed up in the title
                 # textbox. Remove those parts if we can find them.
@@ -591,7 +595,10 @@ class Regeringen(SwedishLegalSource):
             keep_xml = "bz2"
         else:
             keep_xml = True
-        pdf = FontmappingPDFReader(pdffile, intermediatedir, images=self.config.pdfimages, keep_xml=keep_xml)
+        pdf = FontmappingPDFReader(filename=pdffile,
+                                   workdir=intermediatedir,
+                                   images=self.config.pdfimages,
+                                   keep_xml=keep_xml)
         return pdf
 
                 
@@ -608,7 +615,13 @@ class Regeringen(SwedishLegalSource):
             pdf = self.parse_pdf(pdf_path, intermediate_dir)
 
             from ferenda.pdfanalyze import analyze_metrics
-            metrics = analyze_metrics(pdf)
+            metrics_path = self.store.intermediate_path(basefile,
+                                                        attachment=os.path.splitext(os.path.basename(pdf_path))[0] + ".metrics.json")
+            if util.outfile_is_newer([pdffile], metrics_path):
+                metrics = json.loads(util.readfile(metrics_path))
+            else:
+                metrics = analyze_metrics(pdf)
+                util.writefile(metrics_path, json.dumps(metrics))
 
             debug = False
             if debug:
@@ -625,7 +638,7 @@ class Regeringen(SwedishLegalSource):
                 preset = 'dir'
             else:
                 preset = 'default'
-            parser = offtryck_parser(preset=preset)
+            parser = offtryck_parser(metrics=metrics, preset=preset)
             parser.debug = os.environ.get('FERENDA_FSMDEBUG', False)
             parser.current_identifier = identifier
             # for x in pdf.textboxes(gluefunc, pageobjects=True):
@@ -654,7 +667,7 @@ class Regeringen(SwedishLegalSource):
         assert isinstance(pdf, PDFReader) # this is needed to get fontspecs and other things
         for spec in list(pdf.fontspec.values()):
             fp.write(".fontspec%s {font: %spx %s; color: %s;}\n" %
-                     (spec['id'], spec['size'], spec['family'], spec['color']))
+                     (spec.id, spec.size, spec.family, spec.color))
 
         # 2 Copy all created png files to their correct locations
         totcnt = 0

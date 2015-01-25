@@ -178,3 +178,4 @@ def analyze_metrics(pdf, twopage=True):
                'odd_rightmargin': odd_right,
                'odd_parindent': odd_parindent}
     log.debug("Margins: %r" % margins)
+    return margins

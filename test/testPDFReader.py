@@ -82,10 +82,10 @@ class Read(unittest.TestCase):
         box = boxes[0]
 
         self.assertEqual("This is a simple document in PDF format. ", str(box))
-        self.assertEqual({'color': '#000000',
-                          'size': '16',
-                          'id': '1',
-                          'family': 'Cambria'}, box.getfont())
+        self.assertEqual('#000000', box.font.color)
+        self.assertEqual(16, box.font.size)
+        self.assertEqual('1', box.font.id)
+        self.assertEqual('Cambria', box.font.family)
                          
 
         # this box should have four text elements

@@ -13,6 +13,7 @@ from lxml import etree
 from six import text_type as str
 # from six import binary_type as bytes
 import six
+from layeredconfig import LayeredConfig, Defaults
 
 from ferenda import util, errors
 from .elements import UnicodeElement
@@ -313,8 +314,10 @@ class PDFReader(CompoundElement):
                 
                 # Now that we know all text elements that should be in
                 # the Textbox, we can guess the font size.
-                fontspec = {'family': "unknown",
-                            'size': str(int(round(text.height / px_per_point)))}
+
+                fontspec = LayeredConfig(Defaults(
+                    {'family': "unknown",
+                     'size': int(round(text.height / px_per_point))}))
 
                 # find any previous definition of this fontspec
                 fontid = None
@@ -333,7 +336,7 @@ class PDFReader(CompoundElement):
                               width=int(boxdim['right']) - int(boxdim['left']),
                               height=int(boxdim['bottom']) - int(boxdim['top']),
                               fontspec=self.fontspec,
-                              font=fontid)
+                              fontid=fontid)
                 for e in textelements:
                     box.append(e)
                 page.append(box)
@@ -379,13 +382,16 @@ class PDFReader(CompoundElement):
             assert pageelement.tag == "page", "Got <%s>, expected <page>" % page.tag
             for element in pageelement:
                 if element.tag == 'fontspec':
-                    fontid =  element.attrib['id']
+                    fontid = int(element.attrib['id'])
                     # make sure we always deal with a basic dict (not
                     # lxml.etree._Attrib) where all keys are str
                     # object (not bytes)
-                    self.fontspec[fontid] = dict([(k,str(v)) for k,v in element.attrib.items()])
-                    if "+" in element.attrib['family']:
-                        self.fontspec[fontid]['family'] = element.attrib['family'].split("+",1)[1]
+                    fspec = dict([(k,str(v)) for k,v in element.attrib.items()])
+                    # then make it more usable
+                    fspec['size'] = int(fspec['size'])
+                    if "+" in fspec['family']:
+                        fspec['family'] = fspec['family'].split("+",1)[1]
+                    self.fontspec[fontid] = fspec
                     
                 elif element.tag == 'text':
                     # eliminate "empty" textboxes
@@ -396,6 +402,8 @@ class PDFReader(CompoundElement):
                     attribs = dict(element.attrib)
                     # all textboxes share the same fontspec dict
                     attribs['fontspec'] = self.fontspec
+                    attribs['fontid'] = int(attribs['font']) 
+                    del attribs['font']
                     b = Textbox(**attribs)
 
                     if element.text and element.text.strip():
@@ -494,7 +502,7 @@ class PDFReader(CompoundElement):
         # horizontally, line up vertically, and have the same
         # font, then they should be glued
         linespacing = 1
-        if (textbox.getfont() == nextbox.getfont() and
+        if (textbox.font == nextbox.font and
             textbox.left == nextbox.left and
             textbox.top + textbox.height + linespacing >= nextbox.top):
             return True
@@ -578,7 +586,7 @@ class Textbox(CompoundElement):
 
     """A textbox is a amount of text on a PDF page, with *top*, *left*,
 *width* and *height* properties that specifies the bounding box of the
-text. The *font* property specifies the id of font used (use
+text. The *fontid* property specifies the id of font used (use
 :py:meth:`~ferenda.pdfreader.Textbox.getfont` to get a dict of all
 font properties). A textbox consists of a list of Textelements which
 may differ in basic formatting (bold and or italics), but otherwise
@@ -593,7 +601,7 @@ all text in a Textbox has the same font and size.
         assert 'left' in kwargs, "left attribute missing"
         assert 'width' in kwargs, "width attribute missing"
         assert 'height' in kwargs, "height attribute missing"
-        assert 'font' in kwargs, "font id attribute missing"
+        assert 'fontid' in kwargs, "font id attribute missing"
 
         self.top = int(kwargs['top'])
         self.left = int(kwargs['left'])
@@ -602,8 +610,8 @@ all text in a Textbox has the same font and size.
         self.right = self.left + self.width
         self.bottom = self.top + self.height
 
-        # self.__fontspecid = kwargs['font']
-        self.font = kwargs['font'] or 0
+        # self.__fontspecid = kwargs['fontid']
+        self.fontid = kwargs['fontid'] or 0
         if 'fontspec' in kwargs:
             self.__fontspec = kwargs['fontspec'] 
             del kwargs['fontspec']
@@ -613,7 +621,7 @@ all text in a Textbox has the same font and size.
         del kwargs['left']
         del kwargs['width']
         del kwargs['height']
-        del kwargs['font']
+        del kwargs['fontid']
 
         super(Textbox, self).__init__(*args, **kwargs)
 
@@ -630,9 +638,9 @@ all text in a Textbox has the same font and size.
         if six.PY2:
             # s = repr(s)
             s = s.encode('ascii', 'replace')
-        if self.getfont():
-            fontinfo = "%s@%s " % (self.getfont()['family'],
-                                  self.getfont()['size'])
+        if self.font:
+            fontinfo = "%s@%s " % (self.font.family,
+                                  self.font.size)
         else:
             fontinfo = ""
         return '<%s %sx%s+%s+%s %s"%s">' % (self.__class__.__name__,
@@ -650,7 +658,7 @@ all text in a Textbox has the same font and size.
                           other.top + other.height) - top
 
         res = Textbox(top=top, left=left, width=width, height=height,
-                      font=self.font,
+                      fontid=self.fontid,
                       fontspec=self.__fontspec)
         
         # add all text elements
@@ -703,17 +711,16 @@ all text in a Textbox has the same font and size.
         #
         # this would be a place to insert fontmapping functionality
         # "TimesNewRomanPS-ItalicMT" => "Times New Roman,Italic"
-        if self.font:
-            return self.__fontspec[self.font]
+
+    @property
+    def font(self):
+        if self.fontid:
+            return LayeredConfig(Defaults(self.__fontspec[self.fontid]))
         else:
             return {}
-        
+
 # this doesnt work that well with the default __setattribute__
 # implementation of this class' superclass.
-# 
-#    @property
-#    def font(self):
-#        return self.getfont()
 #
 #    @font.setter
 #    def font(self, value):
@@ -743,101 +750,3 @@ class Textelement(UnicodeElement):
 
     def __add__(self, other):
         return Textelement(str(self) + str(other), tag = self.tag)
-    
-
-# The below code fixes a error with incorrectly nested tags often
-# found in pdftohtml generated xml. Main problem is that this relies
-# on sgmllib which is not included in python3. This is commented out
-# in the hope that more recent pdftohtml versions fix this problem in
-# the right place
-
-# import sgmllib
-# from xml.sax.saxutils import escape as xml_escape
-# import unicodedata
-#
-# class PDFXMLFix(sgmllib.SGMLParser):
-#     selfclosing = ["fontspec"]
-#
-# preparations to remove invalid chars in handle_data
-#     all_chars = (unichr(i) for i in range(0x10000))
-#     control_chars = ''.join(
-#         c for c in all_chars if unicodedata.category(c) == 'Cc')
-# tab and newline are technically Control characters in
-# unicode, but we want to keep them.
-#     control_chars = control_chars.replace("\t", "").replace("\n", "")
-#     control_char_re = re.compile('[%s]' % re.escape(control_chars))
-#
-#     def __init__(self):
-#         sgmllib.SGMLParser.__init__(self)
-#         self.tags = []
-#         self.fp = None
-#
-#     def fix(self, filename):
-#         usetempfile = not self.fp
-#
-#         if usetempfile:
-#             tmpfile = mktemp()
-#             self.fp = open(tmpfile, "w")
-#
-#         self.fp.write('<?xml version="1.0" encoding="UTF-8"?>')
-#
-#         f = open(filename)
-#         while True:
-#             s = f.read(8192)
-#             if not s:
-#                 break
-#             self.feed(s)
-#         self.close()
-#
-#         if usetempfile:
-#             self.fp.close()
-#             if util.replace_if_different(tmpfile, filename):
-#                 print(("replaced %s with %s" % (filename, tmpfile)))
-#             else:
-#                 print(("%s was identical to %s" % (filename, tmpfile)))
-#
-#     def close(self):
-#         sgmllib.SGMLParser.close(self)
-#         if self.tags:
-#             sys.stderr.write(
-#                 "WARNING: opened tag(s) %s not closed" % self.tags)
-#             self.fp.write(
-#                 "".join(["</%s>" % x for x in reversed(self.tags)]))
-#
-#     def handle_decl(self, decl):
-# self.fp.write "Decl: ", decl
-#         self.fp.write("<!%s>" % decl)
-#
-#     def handle_data(self, data):
-#         len_before = len(data)
-#         data = xml_escape(self.control_char_re.sub('', data))
-#         len_after = len(data)
-# self.fp.write "Data: ", data.strip()
-# if len_before != len_after:
-# sys.stderr.write("WARNING: data changed from %s to %s chars: %r\n" % (len_before,len_after,data))
-#         self.fp.write(data)
-#
-#     def unknown_starttag(self, start, attrs):
-# self.fp.write "Start: ", start, attrs
-#         if start in self.selfclosing:
-#             close = "/"
-#         else:
-#             close = ""
-#             self.tags.append(start)
-# sys.stderr.write(repr(self.tags)+"\n")
-#         if attrs:
-#             fmt = ['%s="%s"' % (x[0], x[1]) for x in attrs]
-#             self.fp.write("<%s %s%s>" % (start, " ".join(fmt), close))
-#         else:
-#             self.fp.write("<%s>" % start)
-#
-#     def unknown_endtag(self, end):
-# sys.stderr.write(repr(self.tags)+"\n")
-#         start = self.tags.pop()
-#         if end != start and end in self.tags:
-# sys.stderr.write("%s is not %s, working around\n" % (end, start))
-#             self.fp.write("</%s>" % start)
-#             self.fp.write("</%s>" % end)
-#             self.fp.write("<%s>" % start)
-#         else:
-#             self.fp.write("</%s>" % end)

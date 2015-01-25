@@ -8,7 +8,7 @@ import re
 
 from rdflib import URIRef, RDF, Namespace, Literal
 from six import text_type as str
-from layeredconfig import LayeredConfig
+from layeredconfig import LayeredConfig, Defaults
 
 from ferenda import (DocumentRepository, DocumentStore, FSMParser,
                      CitationParser)
@@ -345,78 +345,37 @@ class SwedishLegalSource(DocumentRepository):
 #                'label': row['dcterms_identifier'] + ": " + row['dcterms_title']}
 
 
-def offtryck_parser(basefile="0", preset="proposition", metrics={}):
-    # FIXME: Metrics for a particular document type might vary over
-    # time, depend on exact production chain particualrs, differ
-    # between right and left pages, and otherwise be unreliable. It
-    # would be much better to have a magic analyze phase that uses
-    # heuristics and statistics to guess margins, heading styles, and
-    # similar. The only problem is the magic.
-    presets = {'default': {},
-               'dir': {'footer': 920,
-                       'header': 82,
-                       'leftmargin': 105,
-                       'rightmargin': 566,
-                       'headingsize': 14,
-                       'headingfamily': 'TimesNewRomanPS-BoldMT',
-                       'subheadingsize': 14,
-                       'subheadingfamily': 'TimesNewRomanPS-ItalicMT',
-                       'subsubheadingsize': None,
-                       'textsize': 14},
-               'proposition': {
-                   # FIXME: is_unorderedsection needs 'type' to avoid
-                   # creating top-level unordered sections (they get
-                   # confused with doc title and identifier on the
-                   # first page). Should be handled smarter.
-                   'type': 'proposition', 
-                   'footer': 920,
-                   'header': 65, 
-                   'leftmargin': 168, # this is the *inner* of left+right
-                   'rightmargin': 523, # pages taken together.
-                   'headingsize': 20,
-                   'headingfamily': 'TimesNewRomanPSMT',
-                   'subheadingsize': 17,
-                   'subheadingfamily': 'TimesNewRomanPSMT',
-                   'subsubheadingsize': 15,
-                   'subsubheadingfamily': 'TimesNewRomanPSMT', # In some cases maybe "TimesNewRomanPS-BoldMT"
-                   'textsize': 13},
-               'sou': {'header': 49, # or rather 49 + 15
-                       'header': 65, # make sure this is correct
-                       'footer': 940,
-                       'leftmargin': 84,
-                       'rightmargin': 813,
-                       'titlesize': 41,
-                       'headingsize': 26,
-                       'headingfamily': 'TradeGothic Light',
-                       'subheadingsize': 16,
-                       'subheadingfamily': 'TradeGothic,Bold',
-                       'subsubheadingsize': 14,
-                       'subsubheadingfamily': 'OrigGarmnd BT,Bold',  # Not 'TradeGothic,Bold' like one would think...
-                       'textsize': 14
-                   },
-               'ds': {'header': 49, # or rather 49 + 15
-                      'header': 65, # make sure this is correct
-                      'footer': 940,
-                      'leftmargin': 84,
-                      'rightmargin': 813,
-                      'titlesize': 41,
-                      'headingsize': 26,
-                      'headingfamily': 'TradeGothic Light',
-                      'subheadingsize': 16,
-                      'subheadingfamily': 'TradeGothic,Bold',
-                      'subsubheadingsize': 14,
-                      'subsubheadingfamily': 'OrigGarmnd BT,Bold',
-                      'textsize': 14
-                   }
-               }
-    if preset:
-        metrics = presets[preset]
+def offtryck_parser(basefile="0", metrics=None, preset=None):
+    # First: merge the metrics we're provided with with a set of
+    # defaults (for fallback), and wrap them in a LayeredConfig
+    # structure
+    if not metrics:
+        metrics = {}
+    defaultmetrics = {'header': 0, # fix these
+                      'footer': 1000, # -""-
+                      'odd_leftmargin': 172,
+                      'odd_parindent': 187,
+                      'odd_rightmargin': 619,
+                      'even_leftmargin': 278,
+                      'even_parindent': 293,
+                      'even_rightmargin': 725,
+                      'h1': {'family': 'TimesNewRomanPS-BoldMT', # should also be weight: bold? 
+                             'size': 20},
+                      'h2': {'family': 'TimesNewRomanPS-BoldMT', 
+                             'size': 17},
+                      'h3': {'family': 'TimesNewRomanPS-BoldMT', 
+                             'size': 15},
+                      'default': {'family': 'TimesNewRomanPSMT',
+                                  'size': 13}
+                      }
+    metrics = LayeredConfig(Defaults(defaultmetrics),
+                            Defaults(metrics))
 
-    # a mutable variable, which is accessible from the nested
+    # another mutable variable, which is accessible from the nested
     # functions
-    state = {'pageno': 0,
-             'appendixno': None,
-             'preset': preset}
+    state = LayeredConfig(Defaults({'pageno': 0,
+                                    'appendixno': None,
+                                    'preset': preset}))
 
     def is_pagebreak(parser):
         return isinstance(parser.reader.peek(), Page)
@@ -424,11 +383,11 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
     # page numbers, headings.
     def is_nonessential(parser):
         chunk = parser.reader.peek()
-        if chunk.top > metrics['footer'] or chunk.bottom < metrics['header']:
+        if chunk.top > metrics.footer or chunk.bottom < metrics.header:
             return True  # page numbers
-        if (int(chunk.getfont()['size']) <= metrics['textsize'] and
-                (chunk.right < metrics['leftmargin'] or
-                 chunk.left > metrics['rightmargin']) and
+        if (int(chunk.font.size) <= metrics.default.size and
+                (chunk.right < metrics_leftmargin() or
+                 chunk.left > metrics_rightmargin()) and
             str(chunk).strip().startswith(parser.current_identifier)):
             # print("%s on p %s is deemed nonessential" % (str(chunk), state['pageno']))
             return True
@@ -443,8 +402,8 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
         if isinstance(chunk, Page):
             return False
         txt = str(chunk).strip()
-        fontsize = int(chunk.getfont()['size'])
-        if not metrics['subheadingsize'] <= fontsize <= metrics['headingsize']:
+        fontsize = int(chunk.font.size)
+        if not metrics.h2.size <= fontsize <= metrics.h1.size:
             return False
 
         for validheading in ('Propositionens huvudsakliga innehåll',
@@ -458,44 +417,45 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
     def is_section(parser):
         (ordinal, headingtype, title) = analyze_sectionstart(parser)
         if ordinal:
-            return headingtype == "heading" and ordinal.count(".") == 0
+            return headingtype == "h1" and ordinal.count(".") == 0
 
     def is_subsection(parser):
         (ordinal, headingtype, title) = analyze_sectionstart(parser)
         if ordinal:
-            return headingtype == "subheading" and ordinal.count(".") == 1
+            return headingtype == "h2" and ordinal.count(".") == 1
 
     def is_unorderedsection(parser):
         # Frontpage textboxes (title, identifier and abstract heading)
         # for this doctype should not be thought of as
         # unorderedsections, even though they're set in the same type
         # as normal sections.
-        if 'type' in metrics and metrics['type'] == 'proposition':
+        if 'type' in metrics and metrics.type == 'proposition':
             return False
         chunk = parser.reader.peek()
-        return (int(chunk.getfont()['size']) == metrics['headingsize'] and
-                chunk.getfont()['family'] == metrics['headingfamily'])
+        return (chunk.font.size == metrics.h1.size and
+                chunk.font.family == metrics.h1.family)
 
     def is_unorderedsubsection(parser):
         # Subsections in "Författningskommentar" sections are
         # not always numbered. As a backup, check font size and family as well
         chunk = parser.reader.peek()
-        return (int(chunk.getfont()['size']) == metrics['subheadingsize'] and
-                chunk.getfont()['family'] == metrics['subheadingfamily'])
+        return (chunk.font.size == metrics.h2.size and
+                chunk.font.family == metrics.h2.family)
 
     def is_subsubsection(parser):
         (ordinal, headingtype, title) = analyze_sectionstart(parser)
         if ordinal:
-            return headingtype == "subsubheading" and ordinal.count(".") == 2
+            return headingtype == "h3" and ordinal.count(".") == 2
 
     def is_appendix(parser):
         chunk = parser.reader.peek()
         txt = str(chunk).strip()
-        if (chunk.getfont()['size'] == metrics['headingsize'] and txt.startswith("Bilaga ")):
+
+        if (chunk.font.size == metrics.h1.size and txt.startswith("Bilaga ")):
             return True
-        elif (int(chunk.getfont()['size']) == metrics['textsize'] and
-              (chunk.left < metrics['leftmargin'] or
-               chunk.left > metrics['rightmargin'])):
+        elif (int(chunk.font.size) == metrics.default.size and
+              (chunk.left < metrics_leftmargin() or
+               chunk.left > metrics_rightmargin())):
             m = re.search("Bilaga (\d)", str(chunk))
             if m:
                 ordinal = int(m.group(1))
@@ -554,7 +514,7 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
             m = re.search("Bilaga (\d)", str(chunk))
             if m:
                 state['appendixno'] = int(m.group(1))
-            if int(chunk.getfont()['size']) >= metrics['subheadingsize']:
+            if int(chunk.font.size) >= metrics.h2.size:
                 done = True
         s = Appendix(title=str(chunk).strip(),
                      ordinal=str(state['appendixno']),
@@ -580,10 +540,10 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
 
     def skip_pagebreak(parser):
         # increment pageno
-        state['pageno'] += 1
+        state.pageno += 1
         parser.reader.next()
         sb = Sidbrytning()
-        sb.ordinal = state['pageno']
+        sb.ordinal = state.pageno
         return sb
 
     re_sectionstart = re.compile("^(\d[\.\d]*) +(.*[^\.])$").match
@@ -597,11 +557,9 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
             textbox = parser.reader.peek()
         # the font size and family should be defined
         found = False
-        size = int(textbox.getfont()['size'])
-        family = textbox.getfont()['family']
-        for h in ('heading', 'subheading', 'subsubheading'):
-            if metrics[h+'size'] == size and (h+'family' not in metrics or
-                                              metrics[h+'family'] == family):
+        for h in ('h1', 'h2', 'h3'):
+            h_metrics = getattr(metrics, h)
+            if h_metrics.size == textbox.font.size and h_metrics.family == textbox.font.family:
                 found = h
         if not found:
             return (None, None, textbox)
@@ -614,19 +572,34 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
         else:
             return (None, found, textbox)
 
+    def metrics_leftmargin():
+        if state.pageno % 2 == 0:  # even page 
+            return metrics.even_leftmargin
+        else:
+            return metrics.odd_leftmargin
+
+    def metrics_rightmargin():
+        if state.pageno % 2 == 0:  # even page 
+            return metrics.even_rightmargin
+        else:
+            return metrics.odd_rightmargin
+
     p = FSMParser()
 
-    p.set_recognizers(is_coverpage,
-                      is_pagebreak,
-                      is_appendix,
-                      is_nonessential,
-                      is_section,
-                      is_subsection,
-                      is_subsubsection,
-                      is_preamblesection,
-                      is_unorderedsection,
-                      is_unorderedsubsection,
-                      is_paragraph)
+    recognizers = (is_pagebreak,
+                   is_appendix,
+                   is_nonessential,
+                   is_section,
+                   is_subsection,
+                   is_subsubsection,
+                   is_preamblesection,
+                   is_unorderedsection,
+                   is_unorderedsubsection,
+                   is_paragraph)
+    if preset == "sou":
+        recognizers.insert(0, is_coverpage)
+    p.set_recognizers(*recognizers)
+
     commonstates = ("body", "preamblesection", "section", "subsection",
                     "unorderedsection", "unorderedsubsection", "subsubsection",
                     "appendix")
@@ -674,15 +647,15 @@ def offtryck_parser(basefile="0", preset="proposition", metrics={}):
 
 
 def offtryck_gluefunc(textbox, nextbox, prevbox):
-    linespacing = int(nextbox.getfont()['size']) / 2
-    parindent = int(nextbox.getfont()['size'])
+    linespacing = nextbox.font.size / 2
+    parindent = nextbox.font.size
     # FIXME: if one textbox has family "TimesNewRomanPSMT@12" and
     # another "TimesNewRomanPS-BoldMT@12", they should be considered
     # the same family (and pdfreader/pdftohtml will wrap the latters'
     # text in a <b> element). Maybe achiveable through
     # FontmappingPDFReader?
-    if (textbox.getfont()['size'] == nextbox.getfont()['size'] and
-        textbox.getfont()['family'] == nextbox.getfont()['family'] and
+    if (textbox.font.size == nextbox.font.size and
+        textbox.font.family == nextbox.font.family and
         textbox.top + textbox.height + linespacing > nextbox.top and
         prevbox.left < nextbox.right and
         ((prevbox.top + prevbox.height == nextbox.top + nextbox.height) or # compare baseline, not topline
