@@ -613,14 +613,21 @@ class Regeringen(SwedishLegalSource):
             # case 2: intermediate path exists alongside downloaded_path
             pdf = self.parse_pdf(pdf_path, intermediate_dir)
 
-            from ferenda.pdfanalyze import analyze_metrics
+            from ferenda.pdfanalyze import analyze_metrics, default_style_analyzer
             metrics_path = self.store.intermediate_path(basefile,
                                                         attachment=os.path.splitext(os.path.basename(pdf_path))[0] + ".metrics.json")
             if util.outfile_is_newer([pdffile], metrics_path):
                 metrics = json.loads(util.readfile(metrics_path))
             else:
-                metrics = analyze_metrics(pdf)
-                util.writefile(metrics_path, json.dumps(metrics))
+                # we might need to supply a particular style analyzer function.
+                if self.document_type == self.KOMMITTEDIREKTIV:
+                    from ferenda.sources.legal.se.direktiv import dir_style_analyzer
+                    style_analyzer = dir_style_analyzer
+                else:
+                    style_analyzer = default_style_analyzer
+                
+                metrics = analyze_metrics(pdf, style_analyzer=style_analyzer)
+                util.writefile(metrics_path, json.dumps(metrics, indent=4))
 
             debug = False
             if debug:

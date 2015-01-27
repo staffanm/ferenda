@@ -72,7 +72,65 @@ def drawboxes(pdffile, gluefunc=None):
 
 # attempt to analyze a PDFReader object with statistical methods
 # to find out probable margins, section styles, etc.
-def analyze_metrics(pdf, twopage=True):
+
+def fontsize_key(fonttuple):
+    family, size = fonttuple
+    if "Bold" in family:
+        weight = 2
+    elif "Italic" in family:
+        weight = 1
+    else:
+        weight = 0
+    return (size, weight)
+
+
+def fontdict(fonttuple):
+    return {'family': fonttuple[0],
+            'size': fonttuple[1]}
+
+
+def make_stylecounter(styles):
+    # Given a list of (styleobject, charcount) tuples, returns a
+    # counter keyed on (style.family, style.size) mapped to the total
+    # amount of chars
+    stylecount = Counter()
+    for style, length in styles:
+        stylecount[(style.family, style.size)] += length
+    return stylecount
+
+def default_style_analyzer(styles, firstpagelen):
+    styledefs = {}
+    # styles: an list of (styleobject, charcount) tuples (cannot
+    # just be an iterable, we need to traverse it multiple times).
+    # firstpagelen: the number of such tuples on the first page
+    stylecount = make_stylecounter(styles)
+
+    # default style: the one that's most common
+    ds = stylecount.most_common(1)[0][0]
+    styledefs['default'] = fontdict(ds)
+
+    # title style: the largest style that exists on the frontpage style
+    # objects are (should be) sortable. for style objects at the same
+    # size, Bold > Italic > Regular
+    frontpagecount = make_stylecounter(styles[:firstpagelen])
+    frontpagestyles = frontpagecount.keys()
+    ts = sorted(frontpagestyles, key=fontsize_key, reverse=True)[0]
+    styledefs['title'] = fontdict(ts)
+
+    # h1 - h3: Take all styles larger than or equal to default, with
+    # significant use (each > 0.5 % of all chars from page 2 onwards,
+    # as the front page often uses nontypical styles), then order
+    # styles by font size.
+    restcount = make_stylecounter(styles[firstpagelen:])
+    significantuse = sum(restcount.values()) * 0.005
+    largestyles = [x for x in sorted(restcount, key=fontsize_key, reverse=True) if fontsize_key(x) > fontsize_key(ds) and stylecount[x] > significantuse]
+
+    for style in ('h1', 'h2', 'h3'):
+        if largestyles: # any left?
+            styledefs[style] = fontdict(largestyles.pop(0))
+    return styledefs
+    
+def analyze_metrics(pdf, twopage=True, style_analyzer=default_style_analyzer):
     log = logging.getLogger("pdfanalyze")
 
     # if twopage, assume even and odd pages have differing
@@ -88,8 +146,14 @@ def analyze_metrics(pdf, twopage=True):
         # do not keep different tabs for even/odd pages
         odd_leftmarg = even_leftmarg = []
         odd_rightmarg = even_rightmarg = []
-    styles = Counter()
-    pagewidths = Counter()
+
+    topmarg = Counter()
+    bottommarg = Counter()
+
+    styles = []
+    pagewidths = []
+    pageheights = []
+    firstpagelen = 0
     for (idx, page) in enumerate(pdf):
         physical_pageno = idx + 1
         logical_pageno = None
@@ -100,9 +164,12 @@ def analyze_metrics(pdf, twopage=True):
         # be footer information
         footer_zone = page.height * 0.9
 
-        pagewidths[page.width] += 1
+        pagewidths.append(page.width)
+        pageheights.append(page.height)
         # analyze the page margins for this particular page
         for textbox in page:
+            if idx == 0:
+                firstpagelen += 1
             text = str(textbox).strip()
             if lefthandpage:
                 even_leftmarg.append(textbox.left)
@@ -110,6 +177,9 @@ def analyze_metrics(pdf, twopage=True):
             else:
                 odd_leftmarg.append(textbox.left)
                 odd_rightmarg.append(textbox.right)
+
+            topmarg[textbox.top] += len(text)
+            bottommarg[textbox.top] += len(text)
 
             # if a TB is in the footer zone, suitably small (max
             # 5% of page width) and contains only a digit, assume
@@ -120,62 +190,124 @@ def analyze_metrics(pdf, twopage=True):
                 assert logical_pageno is None, "Found two logical pagenos on physical page %s: %s and %s" % (physical_pageno, logical_pageno, text)
                 logical_pageno = text
             f = textbox.font
-            styles[(f.family, f.size)] += len(text)
+            styles.append((f, len(text)))
+    pagewidth = Counter(pagewidths).most_common()[0][0]
+
+    bname = os.path.basename
+    filename = "plots/"+bname(pdf.filename).replace(".pdf", ".marginhist.png")
+    if os.environ.get("FERENDA_PLOTSTATS"):
+        print("Plotting stats")
+        _plot_stats(filename,
+                    even_leftmarg, odd_leftmarg, even_rightmarg, odd_rightmarg,
+                    topmarg, bottommarg,
+                    styles, pagewidths, pageheights)
+    else:
+        print("Not plotting stats")
+
     # find the probable left margin = the place where most textboxes start
-    pagewidth = pagewidths.most_common()[0][0]
-    plot = True
-    if plot:
-        import matplotlib
-        import matplotlib.pyplot as plt
-        # plt.style.use('ggplot')  # looks good but makes our histograms unreadable
-        from matplotlib.font_manager import FontProperties
-        matplotlib.rcParams.update({'font.size': 8})
-        # make a 2x3 grid of subplots where the last (5th) spans 2 cols
-        for (plot, data) in zip([plt.subplot2grid((2,3), (0,0)),
-                                 plt.subplot2grid((2,3), (0,1)),
-                                 plt.subplot2grid((2,3), (0,2)),
-                                 plt.subplot2grid((2,3), (1,0))],
-                                [(even_leftmarg, "Textbox left property (even-hand pages)"),
-                                 (odd_leftmarg, "Textbox left property (odd-hand pages)"),
-                                 (even_rightmarg, "Textbox right property (even-hand pages)"),
-                                 (odd_rightmarg, "Textbox right property (odd-hand pages)")]):
-            series, label = data
-            plot.hist(series, bins=max(pagewidths), color='k')
-            plot.set_title(label, fontdict={'fontsize': 7})
-            (maxval, maxcnt) = Counter(series).most_common(1)[0]
-            log.debug("analyze_metrics: %s: Top val %s (%s times)" % (label, maxval, maxcnt))
-            plot.annotate(maxval, xy=(maxval, maxcnt),
-                          xytext=(maxval*0.5, maxcnt*0.9),
-                          arrowprops=dict(arrowstyle="->"))
-        plot = plt.subplot2grid((2,3), (1,1), colspan=2)
-        stylenames = [x[0][0].replace("TimesNewRomanPS", "Times")+"@"+str(x[0][1]) for x in styles.most_common()]
-        stylecounts = [x[1] for x in styles.most_common()]
-        plt.yticks(range(len(styles)), stylenames, fontproperties=FontProperties(size=8))
-        plot.barh(range(len(styles)), stylecounts, log=True)
-        plot.set_title("Font usage", fontdict={'fontsize': 8})
-        filename = "plots/"+os.path.basename(pdf.filename).replace(".pdf", ".marginhist.png")
-        util.ensure_dir(filename)
-        plt.savefig(filename, dpi=300)
-        log.debug("analyze_metrics: Saved plot as %s" % filename)
     even_left = sorted(Counter(even_leftmarg).most_common(1), reverse=True)[0][0]
-    even_right = sorted(Counter(even_rightmarg).most_common(1), reverse=True)[0][0]
     odd_left = sorted(Counter(odd_leftmarg).most_common(1), reverse=True)[0][0]
+    # same with right margin (note that the effect won't be as
+    # pronounced, particularly if the text is not right-justified)
+    even_right = sorted(Counter(even_rightmarg).most_common(1), reverse=True)[0][0]
     odd_right = sorted(Counter(odd_rightmarg).most_common(1), reverse=True)[0][0]
 
     assert even_left < pagewidth / 2, "leftmargin shouldn't be on the right hand side of the page"
     assert odd_left < pagewidth / 2, "leftmargin shouldn't be on the right hand side of the page"
+
+    # now find probable header and footer zones. default algorithm:
+    # max 0.2 % of text content can be in the header/footer zone. (on
+    # a page of 2000 chars, only 4 can be in the footer)
+    #
+    # FIXME: this risks yielding too tight header/footer values for
+    # documents that don't actually have any header/footer text. In
+    # these cases, maxcount should be statically set to 1 (cutting the
+    # header/footer area before the very first occurrence of text)
+    maxcount = sum(topmarg.values()) * 0.002
+    charcount = 0
+    for i in range(max(pageheights)):
+        charcount += topmarg.get(i, 0)
+        if charcount >= maxcount:
+            header = i - 1
+            break
+    charcount = 0
+    maxcount = 1  # ie don't have any footer
+    for i in range(max(pageheights)-1, -1, -1):
+        charcount += bottommarg.get(i, 0)
+        if charcount >= maxcount:
+            footer = i + 1
+            break
+
     # possible_indents = filter(lambda x: x[0] > leftmargin,
     #                           sorted(boxleft.most_common(),
     #                                  key=itemgetter(0)))
-    # the preferred paragraph indent should be around
-    # page.width / 58 in from leftmargin
+    # the preferred paragraph indent should be around page.width / 58
+    # in from leftmargin. FIXME: look for the most significant bump in
+    # this region, don't just assume pagewith/58
+
     even_parindent = even_left + (pagewidth / 58)
     odd_parindent = odd_left + (pagewidth / 58)
-    margins = {'even_leftmargin': even_left,
+
+    metrics = {'even_leftmargin': even_left,
                'even_rightmargin': even_right,
                'even_parindent': even_parindent,
                'odd_leftmargin': odd_left,
                'odd_rightmargin': odd_right,
-               'odd_parindent': odd_parindent}
-    log.debug("Margins: %r" % margins)
-    return margins
+               'odd_parindent': odd_parindent,
+               'header': header,
+               'footer': footer}
+
+    styledefs = style_analyzer(styles, firstpagelen)
+    metrics.update(styledefs)
+    log.debug("Metrics: %r" % metrics)
+    return metrics
+
+
+def _plot_stats(filename,
+                even_leftmarg, odd_leftmarg, even_rightmarg, odd_rightmarg,
+                topmarg, bottommarg,
+                styles, pagewidths, pageheights):
+    import matplotlib
+    import matplotlib.pyplot as plt
+    log = logging.getLogger("pdfanalyze")
+    # plt.style.use('ggplot')  # looks good but makes our histograms unreadable
+    from matplotlib.font_manager import FontProperties
+    plt.figure(figsize=(15,8))  # width, height in inches
+    matplotlib.rcParams.update({'font.size': 8})
+    # make a 2x3 grid of subplots where the last (5th) spans 2 cols
+    maxweight = max(Counter(pagewidths))
+    maxheight = max(Counter(pageheights))
+    for (plot, data, bins) in zip([plt.subplot2grid((2,4), (0,0)),
+                                   plt.subplot2grid((2,4), (0,1)),
+                                   plt.subplot2grid((2,4), (0,2)),
+                                   plt.subplot2grid((2,4), (0,3)),
+                                   plt.subplot2grid((2,4), (1,0)),
+                                   plt.subplot2grid((2,4), (1,1))],
+                                  [(even_leftmarg, "Textbox left property (even-hand pages)"),
+                                   (odd_leftmarg, "Textbox left property (odd-hand pages)"),
+                                   (even_rightmarg, "Textbox right property (even-hand pages)"),
+                                   (odd_rightmarg, "Textbox right property (odd-hand pages)"),
+                                   (list(topmarg.elements()), "Textbox top property"),
+                                   (list(bottommarg.elements()), "Textbox bottom property")],
+                                  [maxweight, maxweight, maxweight, maxweight,
+                                   maxheight, maxheight]):
+        series, label = data
+        plot.hist(series, bins=bins, range=(0,bins), color='k')
+        plot.set_title(label, fontdict={'fontsize': 7})
+        (maxval, maxcnt) = Counter(series).most_common(1)[0]
+        log.debug("analyze_metrics: %s: Top val %s (%s times)" % (label, maxval, maxcnt))
+        plot.annotate(maxval, xy=(maxval, maxcnt),
+                      xytext=(maxval*0.5, maxcnt*0.9),
+                      arrowprops=dict(arrowstyle="->"))
+    plot = plt.subplot2grid((2,4), (1,2), colspan=2)
+    stylecount = Counter()
+    for style, length in styles:
+        stylecount[(style.family, style.size)] += length
+    stylenames = [style[0].replace("TimesNewRomanPS", "Times")+"@"+str(style[1]) for style, count in stylecount.most_common()]
+    stylecounts = [count for style, count in stylecount.most_common()]
+    plt.yticks(range(len(stylenames)), stylenames, fontproperties=FontProperties(size=8))
+    plot.barh(range(len(stylenames)), stylecounts, log=True)
+    plot.set_title("Font usage", fontdict={'fontsize': 8})
+    util.ensure_dir(filename)
+    plt.savefig(filename, dpi=300)
+    log.debug("analyze_metrics: Saved plot as %s" % filename)

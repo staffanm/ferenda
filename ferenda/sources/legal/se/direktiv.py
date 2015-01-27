@@ -28,6 +28,30 @@ from ferenda.elements import ListItem
 from ferenda.errors import DocumentRemovedError
 
 
+# custom style analyzer for use with pdfanalyze.analyze_metrics
+def dir_style_analyzer(styles, firstpagelen):
+    from ferenda.pdfanalyze import make_stylecounter, fontdict, fontsize_key
+    styledefs = {}
+    stylecount = make_stylecounter(styles)
+    ds = stylecount.most_common(1)[0][0]
+    styledefs['default'] = fontdict(ds)
+
+    # title style: the 2nd largest style on the frontpage 
+    frontpagecount = make_stylecounter(styles[:firstpagelen])
+    frontpagestyles = frontpagecount.keys()
+    ts = sorted(frontpagestyles, key=fontsize_key, reverse=True)[1]
+    styledefs['title'] = fontdict(ts)
+
+    # h1 - h2: the two styles just larger than ds (normally set in the
+    # same size but different weight)
+    restcount = make_stylecounter(styles[firstpagelen:])
+    largestyles = [x for x in sorted(restcount, key=fontsize_key) if fontsize_key(x) > fontsize_key(ds)]
+
+    for style in ('h2', 'h1'):
+        if largestyles: # any left?
+            styledefs[style] = fontdict(largestyles.pop(0))
+    return styledefs
+
 class Continuation(object):
     pass
 

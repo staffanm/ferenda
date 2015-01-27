@@ -429,7 +429,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None):
         # for this doctype should not be thought of as
         # unorderedsections, even though they're set in the same type
         # as normal sections.
-        if 'type' in metrics and metrics.type == 'proposition':
+        if state.preset == 'proposition':
             return False
         chunk = parser.reader.peek()
         return (chunk.font.size == metrics.h1.size and

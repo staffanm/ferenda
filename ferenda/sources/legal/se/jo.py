@@ -149,17 +149,17 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
                 
     def structure(self, doc, chunks):
         def is_heading(parser):
-            return parser.reader.peek().font.size == '17'
+            return parser.reader.peek().font.size == 17
 
         def is_dnr(parser):
             chunk = parser.reader.peek()
-            if (chunk.font.size == '12' and
+            if (chunk.font.size == 12 and
                 re.match('\d+-\d{2,4}', str(chunk))):
                 return True
 
         def is_datum(parser):
             chunk = parser.reader.peek()
-            if (chunk.font.size == '12' and
+            if (chunk.font.size == 12 and
                 re.match('\d{4}-\d{2}-\d{2}', str(chunk))):
                 return True
 
@@ -175,7 +175,7 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
         def is_section(parser):
             chunk = parser.reader.peek()
             strchunk = str(chunk)
-            if chunk.font.size == '14' and chunk[0].tag == "b" and not strchunk.endswith("."):
+            if chunk.font.size == 14 and chunk[0].tag == "b" and not strchunk.endswith("."):
                 return True
 
         def is_blockquote(parser):
