@@ -10,6 +10,109 @@ from six import text_type as str
 from .pdfreader import Page
 from ferenda import util
 
+#class PDFAnalyzer(object)
+#    twopage = True
+#    def __init__(self, pdf): pass
+#
+#
+#    def documents(self): 
+#        # -> [148, 14]  returns a list of pagecounts for different 
+#        # "documents" (differing margins/styles) within this file
+#
+#
+#    def metrics(self, plot=None, [metrics_path, startpage, pagecount]):
+#        # -> {'footer': 73, ...}, uses metrics_path as cache if provided
+#        if plot:
+#            self.plot(all_the_counters, markers_of_interest, also stylehistograms...)
+#
+#    
+#    def count_horizontal_margins(self, [startpage, pagecount]):
+#        # -> (leftmarg, rightmarg, leftmarg_even, rightmarg_even) (counter objects)
+#        # counter objects. topmarg/bottomarg have character counts,
+#        # others have textbox count
+#        for page in self.pdf[startpage:startpage+pagecount]:
+#            for textbox in page:
+#                rightmarg_even[textbox.right] += 1
+
+    
+#    def count_vertical_margins(self, [startpage, pagecount]):
+#        # -> (leftmarg, rightmarg, leftmarg_even, rightmarg_even) (counter objects)
+#        for page in self.pdf[startpage:startpage+pagecount]:
+#            for textbox in page:
+#                topmarg[textbox.top] += len(str(textbox))
+		
+
+#    def fontsize_key(fonttuple): pass
+#    def fontdict(fonttuple): pass 
+#    def make_stylecounter(styles): pass
+
+#    frontmatter_pagecount = 1 (maybe 2 for SOU?)
+#    def count_styles(self, [startpage, pagecount])
+#
+#        # -> (frontmatter_styles, rest_styles) (counter objects)
+#        for page in self.pdf[startpage:startpage+pagecount]:
+#            for textbox in page:
+#                fonttuple = (textbox.font.family, textbox.font.size)
+#                styles[
+#
+#    # this (and subparts) are suitable for overriding. The question is how to 
+#    # optimally structure this into the correct submethods to minimize the 
+#    # code by overriders. 
+#    def analyze_styles(self, frontmatter_styles, rest_styles):
+#        # -> {'default': {'family': 'TimesNewRoman', 'size': 12}, 
+#        #     'title': ... ['h1', 'h2', 'h3', 'footnote' etc] }
+#
+#    def analyze_vertical_margins(leftmarg, rightmarg, leftmarg_even, rightmarg_even)
+#        # -> {'leftmargin', 55, rightmargin: 698, 'leftmargin_even': 123, 'rightmargin_even': 755, ...}
+#        # 
+#        # subclasses can call the base implementation and then add other metrics (primary 'parindent' but 
+#        # also '2ndcolumn' and other stuff)
+#
+#    # this is suitable for overriding, eg if you know that no pagenumbers occur in the footer
+#    def analyze_horizontal_margins(topmarg, bottommarg):
+#        # -> {'header': ..., 'footer': ...}
+
+#    def drawboxes(self, gluefunc, outfilename, [startpage, pagecount, counters, metrics]):
+#        # for each page in pagespan:
+#        # load page from original pdf file
+#        # run gluefunc on page.textboxes
+#        # for each textbox draw a square 
+#        # add sequence number for textbox in lower right corner
+#        # if textbox style matches any in metrics, add the style name in upper left corner
+#        # for each metrics that's an integer
+#        #    if metric in ('header', 'footer') draw horizontal line
+#        #    otherwise draw vertical line
+#        #    label the line
+#        # for each area in header, footer, leftmarg[_even], rightmarg[_even]:
+#        #    select proper counter to draw in each area:
+#        #      (headercounter->left gutter, 
+#        #       footercounter->right gutter, 
+#        #       leftmargcounter->header,
+#        #       rightmargcounter->footer)
+#        #   find the most frequent value in the selected counter, normalize against the space in the area
+#        #   for each value of the counter draw single-width line at correct position 
+
+#    def plot(all_counters, metrics, filename):
+#          
+#        # make subplot grid based on the number of counters
+#        margin_plots = (plt.grid2subplot(...),
+#                        ...)
+#        margin_counters = all_counters - (frontmatter_styles, rest_styles)
+#        plot_margins(margin_plots, margin_counters, metrics)
+#
+#        style_plot = plt.grid2subplot(..., colspan=2)
+#        plot_styles(frontmatter_styles, rest_styles, metrics)
+#
+#        # save plt to filename
+
+
+#    def plot_margins(subplots, margin_counters, metrics):
+#        # one plot per counter (4 or 6)
+#        # map each metric (6+ ) to correct plot and point it out
+
+#    def plot_styles(subplot, frontmatter_styles, rest_styles, metrics)
+#	# do a additive vhist. label those styles identified in metrics
+
 def drawboxes(pdffile, gluefunc=None):
     """Create a copy of the parsed PDF file, but with the textboxes
     created by ``gluefunc`` clearly marked. Returns the name of
