@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 """A bunch of helper functions for analyzing pdf files."""
 import os
 import logging
+import json
 from collections import Counter
 
 from six import text_type as str
@@ -10,110 +11,348 @@ from six import text_type as str
 from .pdfreader import Page
 from ferenda import util
 
-#class PDFAnalyzer(object)
-#    twopage = True
-#    def __init__(self, pdf): pass
-#
-#
-#    def documents(self): 
-#        # -> [148, 14]  returns a list of pagecounts for different 
-#        # "documents" (differing margins/styles) within this file
-#
-#
-#    def metrics(self, plot=None, [metrics_path, startpage, pagecount]):
-#        # -> {'footer': 73, ...}, uses metrics_path as cache if provided
-#        if plot:
-#            self.plot(all_the_counters, markers_of_interest, also stylehistograms...)
-#
-#    
-#    def count_horizontal_margins(self, [startpage, pagecount]):
-#        # -> (leftmarg, rightmarg, leftmarg_even, rightmarg_even) (counter objects)
-#        # counter objects. topmarg/bottomarg have character counts,
-#        # others have textbox count
-#        for page in self.pdf[startpage:startpage+pagecount]:
-#            for textbox in page:
-#                rightmarg_even[textbox.right] += 1
+class PDFAnalyzer(object):
 
+    twopage = True
+    """Whether or not the document is expected to have different margins
+    depending on whether it's a even or odd page.
+
+    """
+
+    frontmatter = 1
+    """The amount of frontmatter pages which might have differing
+    typographic styles compared with the rest of the document. Affects
+    style analysis, particularly how the title style is determined.
+
+    """
+
+    style_significance_threshold = 0.005
+    """"The amount of use (as compared to the rest of the document that a
+    style must have to be considered significant.
+
+    """
+
+    header_significance_threshold = 0.002
+    """The maximum amount (expressed as part of the entire text amount) of
+    text that can occur on the top of the page for it to be considered
+    part of the header.
+
+    """
+
+    footer_significance_threshold = 0.002
+    """The maximum amount (expressed as part of the entire text amount) of
+    text that can occur on the bottom of the page for it to be
+    considered part of the footer.
+
+    """
+
+    frontmatter = 1
+    """The amount of pages to be considered frontmatter, which might have
+    different typography, special title font etc."""
     
-#    def count_vertical_margins(self, [startpage, pagecount]):
-#        # -> (leftmarg, rightmarg, leftmarg_even, rightmarg_even) (counter objects)
-#        for page in self.pdf[startpage:startpage+pagecount]:
-#            for textbox in page:
-#                topmarg[textbox.top] += len(str(textbox))
-		
+    def __init__(self, pdf):
+        """Create a analyzer for the given pdf file.
 
-#    def fontsize_key(fonttuple): pass
-#    def fontdict(fonttuple): pass 
-#    def make_stylecounter(styles): pass
+        :param pdf: The pdf file to analyze.
+        :type  pdf: ferenda.PDFReader
 
-#    frontmatter_pagecount = 1 (maybe 2 for SOU?)
-#    def count_styles(self, [startpage, pagecount])
-#
-#        # -> (frontmatter_styles, rest_styles) (counter objects)
-#        for page in self.pdf[startpage:startpage+pagecount]:
-#            for textbox in page:
-#                fonttuple = (textbox.font.family, textbox.font.size)
-#                styles[
-#
-#    # this (and subparts) are suitable for overriding. The question is how to 
-#    # optimally structure this into the correct submethods to minimize the 
-#    # code by overriders. 
-#    def analyze_styles(self, frontmatter_styles, rest_styles):
-#        # -> {'default': {'family': 'TimesNewRoman', 'size': 12}, 
-#        #     'title': ... ['h1', 'h2', 'h3', 'footnote' etc] }
-#
-#    def analyze_vertical_margins(leftmarg, rightmarg, leftmarg_even, rightmarg_even)
-#        # -> {'leftmargin', 55, rightmargin: 698, 'leftmargin_even': 123, 'rightmargin_even': 755, ...}
-#        # 
-#        # subclasses can call the base implementation and then add other metrics (primary 'parindent' but 
-#        # also '2ndcolumn' and other stuff)
-#
-#    # this is suitable for overriding, eg if you know that no pagenumbers occur in the footer
-#    def analyze_horizontal_margins(topmarg, bottommarg):
-#        # -> {'header': ..., 'footer': ...}
+        """
+        # FIXME: in time, we'd like to make it possible to specify
+        # multiple pdf files (either because a single logical document
+        # is split into several files, or because the user wants to
+        # analyze a bunch of docs in one go).
+        self.pdf = pdf
 
-#    def drawboxes(self, gluefunc, outfilename, [startpage, pagecount, counters, metrics]):
-#        # for each page in pagespan:
-#        # load page from original pdf file
-#        # run gluefunc on page.textboxes
-#        # for each textbox draw a square 
-#        # add sequence number for textbox in lower right corner
-#        # if textbox style matches any in metrics, add the style name in upper left corner
-#        # for each metrics that's an integer
-#        #    if metric in ('header', 'footer') draw horizontal line
-#        #    otherwise draw vertical line
-#        #    label the line
-#        # for each area in header, footer, leftmarg[_even], rightmarg[_even]:
-#        #    select proper counter to draw in each area:
-#        #      (headercounter->left gutter, 
-#        #       footercounter->right gutter, 
-#        #       leftmargcounter->header,
-#        #       rightmargcounter->footer)
-#        #   find the most frequent value in the selected counter, normalize against the space in the area
-#        #   for each value of the counter draw single-width line at correct position 
+    def documents(self):
+        """Attempts to distinguish different logical document (eg parts with
+        differing pagesizes/margins/styles etc) within this PDF.
 
-#    def plot(all_counters, metrics, filename):
-#          
-#        # make subplot grid based on the number of counters
-#        margin_plots = (plt.grid2subplot(...),
-#                        ...)
-#        margin_counters = all_counters - (frontmatter_styles, rest_styles)
-#        plot_margins(margin_plots, margin_counters, metrics)
-#
-#        style_plot = plt.grid2subplot(..., colspan=2)
-#        plot_styles(frontmatter_styles, rest_styles, metrics)
-#
-#        # save plt to filename
+        You should override this method if you want to provide your
+        own document segmentation logic.
+
+        :returns: Tuples (startpage, pagecount) for the different identified documents
+        :rtype: list
+
+        """
+        return [(0, len(self.pdf))]
 
 
-#    def plot_margins(subplots, margin_counters, metrics):
-#        # one plot per counter (4 or 6)
-#        # map each metric (6+ ) to correct plot and point it out
+    def metrics(self, metricspath=None, plotpath=None,
+                startpage=0, pagecount=None):
+        """Calculate and return the metrics for this analyzer.
 
-#    def plot_styles(subplot, frontmatter_styles, rest_styles, metrics)
-#	# do a additive vhist. label those styles identified in metrics
+        metrics is a set of named properties in the form of a
+        dict. The keys of the dict can represent margins or other
+        measurements of the document (left/right margins,
+        header/footer etc) or font styles used in the document (eg.
+        default, title, h1 -- h3). Style values are in turn dicts
+        themselves, with the keys 'family' and 'size'.
+
+        :param metricspath: The path of a JSON file used as cache for the 
+                             calculated metrics
+        :type  metricspath: str
+        :param plotpath: The path to write a PNG file with histograms for 
+                         different values (for debugging). 
+        :type plotpath: str
+        :param startpage: starting page for the analysis
+        :type startpage: int
+        :param startpage: number of pages to analyze (default: all available)
+        :type startpage: int
+        :returns: calculated metrics
+        :rtype: dict
+
+        The default implementation will try to find out values for the
+        following metrics:
+
+        ================== ===================================================
+        key                description
+        ================== ===================================================
+        leftmargin         position of left margin (for odd pages if 
+                           twopage = True)
+        rightmargin        position of right margin (for odd pages if
+                           twopage = True)
+        leftmargin_even    position of left margin for even pages
+
+        rightmargin_even   position of right margin for right pages
+
+        header             position of header zone
+        
+        footer             position of footer zone
+
+        default            style used for default text
+
+        title              style used for main document title (on front page)
+
+        h1                 style used for level 1 headings 
+
+        h2                 style used for level 2 headings 
+
+        h3                 style used for level 3 headings
+        ================== ===================================================
+
+        Subclasses might add (or remove) from the above.
+
+        """
+
+
+        if (metricspath and
+            util.outfile_is_newer([self.pdf.filename], metricspath)):
+            with open(metricspath) as fp:
+                return json.load(fp)
+
+        if pagecount is None:
+            pagecount = len(self.pdf) - startpage
+            
+        hcounters = self.count_horizontal_margins(startpage, pagecount)
+        vcounters = self.count_vertical_margins(startpage, pagecount)
+        stylecounters = self.count_styles(startpage, pagecount)
+
+        hmetrics = self.analyze_horizontal_margins(hcounters)
+        vmetrics = self.analyze_vertical_margins(vcounters)
+        stylemetrics = self.analyze_styles(stylecounters)
+
+        allcounters = dict(chain(hcounters.items(), vcounters.items(), stylecounters.items()))
+        allmetrics = dict(chain(hmetrics.items(), vmetrics.items(), stylemetrics.items()))
+
+        if plotpath:
+            self.plot(plotpath, allcounters, allmetrics)
+        if metricspath:
+            with open(metricspath, "w") as fp:
+                json.dump(fp, allmetrics)
+        return allmetrics
+
+    def textboxes(self, startpage, pagecount):
+        for page in self.pdf[startpage:startpage+pagecount]:
+            for textbox in page:
+                yield page.number, textbox
+    
+    def count_horizontal_margins(self, startpage, pagecount):
+        counters = self.setup_horizontal_counters()
+        for pagenumber, textbox in self.textboxes(startpage, pagecount):
+            self.count_horizontal_textbox(pagenumber, textbox, counters)
+        for page in self.pdf[startpage:startpage+pagecount]:
+            counters['pagewidth'] = page.width
+        return counters
+
+    def setup_horizontal_counters(self):
+        counters = {'leftmargin': Counter(),
+                    'rightmargin': Counter(),
+                    'pagewidth': Counter()}
+        if self.twopage:
+            counters['leftmargin_even'] = Counter()
+            counters['rightmargin_even'] = Counter()
+        return counters
+
+    def count_horizontal_textbox(self, pagenumber, textbox, counters):
+        if self.twopage and pagenumber % 2 == 0:
+            counters['leftmargin_even'][textbox.left] += 1
+            counters['rightmargin_even'][textbox.right] += 1
+        else:
+            counters['leftmargin'][textbox.left] += 1
+            counters['rightmargin'][textbox.right] += 1
+
+    def count_vertical_margins(self, startpage, pagecount):
+        counters = self.setup_vertical_counters()
+        for pagenumber, textbox in self.textboxes(startpage, pagecount):
+            self.count_vertical_textbox(pagenumber, textbox, counters)
+        for page in self.pdf[startpage:startpage+pagecount]:
+            counters['pageheight'][page.height] += 1
+        return counters
+
+    def setup_vertical_counters(self):
+        counters = {'topmargin': Counter(),
+                    'bottommargin': Counter(),
+                    'pageheight': Counter()}
+        return counters
+
+    def count_vertical_textbox(self, pagenumber, textbox, counters):
+        text = str(textbox).strip()
+        counters['topmargin'][textbox.top] += len(text)
+        counters['bottommargin'][textbox.bottom] += len(text)
+        
+    def count_styles(self, startpage, pagecount):
+        counters = {'frontmatter_styles': Counter(),
+                    'rest_styles': Counter()}
+        for pagenumber, textbox in self.textboxes(startpage, pagecount):
+            self.count_styles_textbox(pagenumber, textbox, counters)
+        return counters
+
+    def count_styles_textbox(self, pagenumber, textbox, counters):
+        text = str(textbox).strip()
+        fonttuple = (textbox.font.family, textbox.font.size)
+        if pagenumber <= self.frontmatter:
+            cid = "frontmatter_styles"
+        else:
+            cid = "rest_styles"
+        counters[cid][fonttuple] += len(text)
+
+    # this is suitable for overriding, eg if you know that no pagenumbers occur in the footer
+    def analyze_horizontal_margins(self, vcounters):
+        # now find probable header and footer zones. default algorithm:
+        # max 0.2 % of text content can be in the header/footer zone. (on
+        # a page of 2000 chars, only 4 can be in the footer)
+        maxcount = self.header_significance_threshold * sum(vcounters['topmargin'].values())
+        charcount = 0
+        for i in range(max(vcounters['pageheight'])):
+            charcount += vcounters['topmargin'].get(i, 0)
+            if charcount > maxcount:
+                header = i - 1
+                break
+        charcount = 0
+        maxcount = self.footer_significance_threshold * sum(vcounters['topmargin'].values())
+        for i in range(max(vcounters['pageheight'])-1, -1, -1):
+            charcount += vcounters['bottommargin'].get(i, 0)
+            if charcount > maxcount:
+                footer = i + 1
+                break
+        return {'header': header,
+                'footer': footer}
+
+    # subclasses can (should) add metrics like parindent and secondcolumn
+    def analyze_vertical_margins(self, vcounters):
+        # find the probable left margin = the place where most textboxes start
+        vmargins = {'leftmargin': vcounters['leftmargin'].most_common(1)[0][0],
+                    'rightmargin': vcounters['leftmargin'].most_common(1)[0][0]}
+        if self.twopage:
+            vmargins['leftmargin_even'] = vcounters['leftmargin_even'].most_common(1)[0][0]
+            vmargins['rightmargin_even'] = vcounters['leftmargin_even'].most_common(1)[0][0]
+
+        assert leftmargin < pagewidth / 2, "leftmargin shouldn't be on the right hand side of the page"
+        if self.twopage:
+            assert leftmargin_even < pagewidth / 2, "leftmargin shouldn't be on the right hand side of the page"
+
+        vmargins['pagewidth'] = max(vcounters['pagewidth'])
+
+        return vmargins
+
+    def fontsize_key(self, fonttuple): 
+        family, size = fonttuple
+        if "Bold" in family:
+            weight = 2
+        elif "Italic" in family:
+            weight = 1
+        else:
+            weight = 0
+        return (size, weight)
+
+
+    def fontdict(self, fonttuple):
+        return {'family': fonttuple[0],
+                'size': fonttuple[1]}
+
+
+    def analyze_styles(self, frontmatter_styles, rest_styles):
+        all_styles = frontmatter_styles + rest_styles
+
+        # default style: the one that's most common
+        ds = all_styles.most_common(1)[0][0]
+        styledefs['default'] = self.fontdict(ds)
+
+        # title style: the largest style that exists on the frontpage style
+        # objects are (should be) sortable. for style objects at the same
+        # size, Bold > Italic > Regular
+        ts = sorted(frontmatter_styles.keys(), key=self.fontsize_key, reverse=True)[0]
+        styledefs['title'] = fontdict(ts)
+
+        # h1 - h3: Take all styles larger than or equal to default, with
+        # significant use (each > 0.5 % of all chars from page 2 onwards,
+        # as the front page often uses nontypical styles), then order
+        # styles by font size.
+        significantuse = sum(restcount.values()) * 0.005
+        sortedstyles = sorted(restcount, key=self.fontsize_key, reverse=True)
+        largestyles = [x for x in sortedstyles if
+                       (fontsize_key(x) > self.fontsize_key(ds) and
+                        stylecount[x] > significantuse)]
+
+        for style in ('h1', 'h2', 'h3'):
+            if largestyles: # any left?
+                styledefs[style] = self.fontdict(largestyles.pop(0))
+        return styledefs
+
+
+    def drawboxes(self, outfilename, gluefunc=None, startpage=0, pagecount=None, counters=None, metrics=None):
+        # for each page in pagespan:
+        # load page from original pdf file
+        # run gluefunc on page.textboxes
+        # for each textbox draw a square 
+        # add sequence number for textbox in lower right corner
+        # if textbox style matches any in metrics, add the style name in upper lft corner
+        # for each metrics that's an integer
+        #    if metric in ('header', 'footer') draw horizontal line
+        #    otherwise draw vertical line
+        #    label the line
+        # for each area in header, footer, leftmarg[_even], rightmarg[_even]:
+        #    select proper counter to draw in each area:
+        #      (headercounter->left gutter, 
+        #       footercounter->right gutter, 
+        #       leftmargcounter->header,
+        #       rightmargcounter->footer)
+        #   find the most frequent value in the selected counter, normalize agaist the space in the area
+        #   for each value of the counter draw single-width line at correct posiion
+        pass
+
+    def plot(filename, counters, metrics):
+        # make subplot grid based on the number of counters
+        # margin_plots = (plt.grid2subplot(...),
+        #                 ...)
+        # margin_counters = all_counters - (frontmatter_styles, rest_styles)
+        # plot_margins(margin_plots, margin_counters, metrics)
+        # style_plot = plt.grid2subplot(..., colspan=2)
+        # plot_styles(frontmatter_styles, rest_styles, metrics)
+        # save plt to filename
+        pass
+
+    def plot_margins(subplots, margin_counters, metrics):
+        # one plot per counter (4 or 6)
+        # map each metric (6+ ) to correct plot and point it out
+        pass
+
+    def plot_styles(subplot, style_counters, metrics):
+	# do a additive vhist. label those styles identified in metrics
+        pass
 
 def drawboxes(pdffile, gluefunc=None):
+
     """Create a copy of the parsed PDF file, but with the textboxes
     created by ``gluefunc`` clearly marked. Returns the name of
     the created pdf file.
@@ -176,15 +415,6 @@ def drawboxes(pdffile, gluefunc=None):
 # attempt to analyze a PDFReader object with statistical methods
 # to find out probable margins, section styles, etc.
 
-def fontsize_key(fonttuple):
-    family, size = fonttuple
-    if "Bold" in family:
-        weight = 2
-    elif "Italic" in family:
-        weight = 1
-    else:
-        weight = 0
-    return (size, weight)
 
 
 def fontdict(fonttuple):
