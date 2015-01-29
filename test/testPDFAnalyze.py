@@ -22,6 +22,11 @@ class Analyze(unittest.TestCase):
                              workdir="test/files/pdfanalyze/")
         self.analyzer = PDFAnalyzer(self.pdf)
 
+    def tearDown(self):
+        util.robust_remove("test/files/pdfanalyze/lipsum.metrics.json")
+        util.robust_remove("test/files/pdfanalyze/lipsum.plot.png")
+        util.robust_remove("test/files/pdfanalyze/lipsum.debug.pdf")
+
     def test_documents(self):
         self.assertEquals([(0,3)], self.analyzer.documents())
 
@@ -55,50 +60,81 @@ class Analyze(unittest.TestCase):
                            ('Cambria,Bold', 17): 128,
                            ('Cambria,Bold', 19): 61})
 
-    @unittest.expectedFailure
     def test_analyze_hmargins(self):
         hcounters = self.analyzer.count_horizontal_margins(0, 3)
         hmetrics = self.analyzer.analyze_horizontal_margins(hcounters)
-        self.assertEquals(hmetrics, {})
+        self.assertEquals({'leftmargin': 135,
+                           'leftmargin_even': 108,
+                           'pagewidth': 892,
+                           'rightmargin': 784,
+                           'rightmargin_even': 748},
+                          hmetrics)
 
-    @unittest.expectedFailure
     def test_analyze_vmargins(self):
         vcounters = self.analyzer.count_vertical_margins(0, 3)
         vmetrics = self.analyzer.analyze_vertical_margins(vcounters)
-        self.assertEquals(vmetrics, {})
+        # this will miscalculate the header zone because the header is
+        # so wordy it's considered part of the main document text
+        self.assertEquals(vmetrics, {u'footer': 1149, u'header': 53})
 
-    @unittest.expectedFailure
+        # try again with double the thresholds
+        self.analyzer.header_significance_threshold = 0.004
+        vmetrics = self.analyzer.analyze_vertical_margins(vcounters)
+        self.assertEquals(vmetrics, {u'footer': 1149, u'header': 107})
+
     def test_analyze_styles(self):
         stylecounters = self.analyzer.count_styles(0, 3)
-        stylemetrics = self.analyzer.analyze_styles(stylecounters)
-        self.assertEquals(stylemetrics, {})
+        stylemetrics = self.analyzer.analyze_styles(stylecounters['frontmatter_styles'],
+                                                    stylecounters['rest_styles'])
+        self.assertEquals({'default': {'family': 'Comic Sans MS', 'size': 14},
+                           'h1': {'family': 'Cambria,Bold', 'size': 19},
+                           'h2': {'family': 'Cambria,Bold', 'size': 17},
+                           'h3': {'family': 'Cambria,Bold', 'size': 14},
+                           'title': {'family': 'Cambria', 'size': 37}},
+                          stylemetrics)
 
     # this is more of a functional test
-    @unittest.expectedFailure
     def test_margins(self):
         jsonpath = "test/files/pdfanalyze/lipsum.metrics.json"
         self.assertFalse(os.path.exists(jsonpath))
         metrics = self.analyzer.metrics(jsonpath)
-        self.assertEquals(metrics, {'marginleft': 135,
-                                    'marginright': 649})
+        self.assertEquals({'default': {'family': 'Comic Sans MS', 'size': 14},
+                           'footer': 1149,
+                           'h1': {'family': 'Cambria,Bold', 'size': 19},
+                           'h2': {'family': 'Cambria,Bold', 'size': 17},
+                           'h3': {'family': 'Cambria,Bold', 'size': 14},
+                           'header': 53,
+                           'leftmargin': 135,
+                           'leftmargin_even': 108,
+                           'pagewidth': 892,
+                           'rightmargin': 784,
+                           'rightmargin_even': 748,
+                           'title': {'family': 'Cambria', 'size': 37}},
+                          metrics)
         self.assertTrue(os.path.exists(jsonpath))
-        os.unlink(jsonpath)
 
-    @unittest.expectedFailure
     def test_margins_subdocument(self):
         self.analyzer.frontmatter = 0
+        # note that this will only analyze a single even page
         metrics = self.analyzer.metrics(startpage=1, pagecount=1)
-        self.assertEquals(metrics, {'marginleft': 135,
-                                    'marginright': 649})
+        self.assertEquals({'default': {'family': 'Comic Sans MS', 'size': 14},
+                           'footer': 1149,
+                           'h1': {'family': 'Cambria,Bold', 'size': 19},
+                           'h2': {'family': 'Cambria,Bold', 'size': 17},
+                           'h3': {'family': 'Cambria,Bold', 'size': 14},
+                           'header': 53,
+                           'leftmargin_even': 108,
+                           'pagewidth': 892,
+                           'rightmargin_even': 748},
+                          metrics)
 
     @unittest.expectedFailure
     def test_plot(self):
         # just test that a plot is created
-        plotpath = "test/files/pdfanalyze/lipsum.metrics.json"
+        plotpath = "test/files/pdfanalyze/lipsum.plot.png"
         self.assertFalse(os.path.exists(plotpath))
         self.analyzer.metrics(plotpath=plotpath)
         self.assertTrue(os.path.exists(plotpath))
-        os.unlink(plotpath)
 
     @unittest.expectedFailure
     def test_drawboxes(self):
@@ -107,4 +143,3 @@ class Analyze(unittest.TestCase):
         self.assertFalse(os.path.exists(pdfpath))
         self.analyzer.drawboxes(pdfpath)
         self.assertTrue(os.path.exists(pdfpath))
-        os.unlink(pdfpath)

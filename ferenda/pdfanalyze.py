@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import os
 import logging
 import json
+from itertools import chain
 from collections import Counter
 
 from six import text_type as str
@@ -149,7 +150,8 @@ class PDFAnalyzer(object):
 
         hmetrics = self.analyze_horizontal_margins(hcounters)
         vmetrics = self.analyze_vertical_margins(vcounters)
-        stylemetrics = self.analyze_styles(stylecounters)
+        stylemetrics = self.analyze_styles(stylecounters['frontmatter_styles'],
+                                           stylecounters['rest_styles'])
 
         allcounters = dict(chain(hcounters.items(), vcounters.items(), stylecounters.items()))
         allmetrics = dict(chain(hmetrics.items(), vmetrics.items(), stylemetrics.items()))
@@ -158,7 +160,7 @@ class PDFAnalyzer(object):
             self.plot(plotpath, allcounters, allmetrics)
         if metricspath:
             with open(metricspath, "w") as fp:
-                json.dump(fp, allmetrics)
+                json.dump(allmetrics, fp)
         return allmetrics
 
     def textboxes(self, startpage, pagecount):
@@ -171,7 +173,7 @@ class PDFAnalyzer(object):
         for pagenumber, textbox in self.textboxes(startpage, pagecount):
             self.count_horizontal_textbox(pagenumber, textbox, counters)
         for page in self.pdf[startpage:startpage+pagecount]:
-            counters['pagewidth'] = page.width
+            counters['pagewidth'][page.width] += 1
         return counters
 
     def setup_horizontal_counters(self):
@@ -227,7 +229,7 @@ class PDFAnalyzer(object):
         counters[cid][fonttuple] += len(text)
 
     # this is suitable for overriding, eg if you know that no pagenumbers occur in the footer
-    def analyze_horizontal_margins(self, vcounters):
+    def analyze_vertical_margins(self, vcounters):
         # now find probable header and footer zones. default algorithm:
         # max 0.2 % of text content can be in the header/footer zone. (on
         # a page of 2000 chars, only 4 can be in the footer)
@@ -249,20 +251,26 @@ class PDFAnalyzer(object):
                 'footer': footer}
 
     # subclasses can (should) add metrics like parindent and secondcolumn
-    def analyze_vertical_margins(self, vcounters):
+    def analyze_horizontal_margins(self, vcounters):
         # find the probable left margin = the place where most textboxes start
-        vmargins = {'leftmargin': vcounters['leftmargin'].most_common(1)[0][0],
-                    'rightmargin': vcounters['leftmargin'].most_common(1)[0][0]}
+        vmargins = {}
+        pagewidth = vcounters['pagewidth'].most_common(1)[0][0]
+        l = vcounters['leftmargin']
+        r = vcounters['rightmargin']
+        if l:
+            vmargins['leftmargin'] = l.most_common(1)[0][0]
+            assert vmargins['leftmargin'] < pagewidth / 2, "leftmargin shouldn't be on the right hand side of the page"
+        if r:
+            vmargins['rightmargin'] = r.most_common(1)[0][0]
         if self.twopage:
-            vmargins['leftmargin_even'] = vcounters['leftmargin_even'].most_common(1)[0][0]
-            vmargins['rightmargin_even'] = vcounters['leftmargin_even'].most_common(1)[0][0]
-
-        assert leftmargin < pagewidth / 2, "leftmargin shouldn't be on the right hand side of the page"
-        if self.twopage:
-            assert leftmargin_even < pagewidth / 2, "leftmargin shouldn't be on the right hand side of the page"
-
+            le = vcounters['leftmargin_even']
+            re = vcounters['rightmargin_even']
+            if le:
+                vmargins['leftmargin_even'] = le.most_common(1)[0][0]
+                assert vmargins['leftmargin_even'] < pagewidth / 2, "leftmargin shouldn't be on the right hand side of the page"
+            if re:
+                vmargins['rightmargin_even'] = re.most_common(1)[0][0]
         vmargins['pagewidth'] = max(vcounters['pagewidth'])
-
         return vmargins
 
     def fontsize_key(self, fonttuple): 
@@ -282,6 +290,7 @@ class PDFAnalyzer(object):
 
 
     def analyze_styles(self, frontmatter_styles, rest_styles):
+        styledefs = {}
         all_styles = frontmatter_styles + rest_styles
 
         # default style: the one that's most common
@@ -291,18 +300,19 @@ class PDFAnalyzer(object):
         # title style: the largest style that exists on the frontpage style
         # objects are (should be) sortable. for style objects at the same
         # size, Bold > Italic > Regular
-        ts = sorted(frontmatter_styles.keys(), key=self.fontsize_key, reverse=True)[0]
-        styledefs['title'] = fontdict(ts)
+        if frontmatter_styles:
+            ts = sorted(frontmatter_styles.keys(), key=self.fontsize_key, reverse=True)[0]
+            styledefs['title'] = fontdict(ts)
 
         # h1 - h3: Take all styles larger than or equal to default, with
         # significant use (each > 0.5 % of all chars from page 2 onwards,
         # as the front page often uses nontypical styles), then order
         # styles by font size.
-        significantuse = sum(restcount.values()) * 0.005
-        sortedstyles = sorted(restcount, key=self.fontsize_key, reverse=True)
+        significantuse = sum(rest_styles.values()) * 0.005
+        sortedstyles = sorted(rest_styles, key=self.fontsize_key, reverse=True)
         largestyles = [x for x in sortedstyles if
-                       (fontsize_key(x) > self.fontsize_key(ds) and
-                        stylecount[x] > significantuse)]
+                       (self.fontsize_key(x) > self.fontsize_key(ds) and
+                        rest_styles[x] > significantuse)]
 
         for style in ('h1', 'h2', 'h3'):
             if largestyles: # any left?
