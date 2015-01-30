@@ -63,6 +63,7 @@ Classes
    api/fulltextindex
    api/textreader
    api/pdfreader
+   api/pdfanalyzer
    api/wordreader
 ..  
    api/wsgiapp

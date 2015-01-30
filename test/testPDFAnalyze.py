@@ -35,7 +35,7 @@ class Analyze(unittest.TestCase):
         self.assertEquals(set(vcounters.keys()),
                           set(('bottommargin', 'topmargin', 'pageheight')))
         self.assertEquals(max(vcounters['pageheight']), 1262)
-        self.assertEquals(vcounters['bottommargin'][76], 22) # charcount of headers from 2 pages
+        self.assertEquals(vcounters['bottommargin'][76], 22) # charcount of topmargins from 2 pages
         self.assertEquals(vcounters['topmargin'][1167], 3) # pagenumbers on 3 pages 
         
     def test_hcounters(self):
@@ -75,12 +75,12 @@ class Analyze(unittest.TestCase):
         vmetrics = self.analyzer.analyze_vertical_margins(vcounters)
         # this will miscalculate the header zone because the header is
         # so wordy it's considered part of the main document text
-        self.assertEquals(vmetrics, {u'footer': 1149, u'header': 53})
+        self.assertEquals(vmetrics, {u'bottommargin': 1149, u'topmargin': 53})
 
         # try again with double the thresholds
         self.analyzer.header_significance_threshold = 0.004
         vmetrics = self.analyzer.analyze_vertical_margins(vcounters)
-        self.assertEquals(vmetrics, {u'footer': 1149, u'header': 107})
+        self.assertEquals(vmetrics, {u'bottommargin': 1149, u'topmargin': 107})
 
     def test_analyze_styles(self):
         stylecounters = self.analyzer.count_styles(0, 3)
@@ -99,11 +99,11 @@ class Analyze(unittest.TestCase):
         self.assertFalse(os.path.exists(jsonpath))
         metrics = self.analyzer.metrics(jsonpath)
         self.assertEquals({'default': {'family': 'Comic Sans MS', 'size': 14},
-                           'footer': 1149,
+                           'bottommargin': 1149,
                            'h1': {'family': 'Cambria,Bold', 'size': 19},
                            'h2': {'family': 'Cambria,Bold', 'size': 17},
                            'h3': {'family': 'Cambria,Bold', 'size': 14},
-                           'header': 53,
+                           'topmargin': 53,
                            'leftmargin': 135,
                            'leftmargin_even': 108,
                            'pagewidth': 892,
@@ -118,17 +118,16 @@ class Analyze(unittest.TestCase):
         # note that this will only analyze a single even page
         metrics = self.analyzer.metrics(startpage=1, pagecount=1)
         self.assertEquals({'default': {'family': 'Comic Sans MS', 'size': 14},
-                           'footer': 1149,
+                           'bottommargin': 1149,
                            'h1': {'family': 'Cambria,Bold', 'size': 19},
                            'h2': {'family': 'Cambria,Bold', 'size': 17},
                            'h3': {'family': 'Cambria,Bold', 'size': 14},
-                           'header': 53,
+                           'topmargin': 53,
                            'leftmargin_even': 108,
                            'pagewidth': 892,
                            'rightmargin_even': 748},
                           metrics)
 
-    @unittest.expectedFailure
     def test_plot(self):
         # just test that a plot is created
         plotpath = "test/files/pdfanalyze/lipsum.plot.png"
@@ -136,10 +135,10 @@ class Analyze(unittest.TestCase):
         self.analyzer.metrics(plotpath=plotpath)
         self.assertTrue(os.path.exists(plotpath))
 
-    @unittest.expectedFailure
     def test_drawboxes(self):
         # just test that a pdf is created
         pdfpath = "test/files/pdfanalyze/lipsum.debug.pdf"
         self.assertFalse(os.path.exists(pdfpath))
-        self.analyzer.drawboxes(pdfpath)
+        metrics = self.analyzer.metrics()
+        self.analyzer.drawboxes(pdfpath, metrics=metrics)
         self.assertTrue(os.path.exists(pdfpath))
