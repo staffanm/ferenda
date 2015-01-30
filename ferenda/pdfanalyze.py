@@ -178,7 +178,7 @@ class PDFAnalyzer(object):
             self.plot(plotpath, margincounters, stylecounters, allmetrics)
         if metricspath:
             with open(metricspath, "w") as fp:
-                json.dump(allmetrics, fp)
+                json.dump(allmetrics, fp, indent=4)
         return allmetrics
 
     def textboxes(self, startpage, pagecount):

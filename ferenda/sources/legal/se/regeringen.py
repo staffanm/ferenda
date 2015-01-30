@@ -24,11 +24,11 @@ from ferenda import PDFDocumentRepository
 from ferenda import DocumentEntry
 from ferenda import FSMParser
 from ferenda import Describer
+from ferenda import PDFAnalyzer
 from ferenda import util
 from ferenda.compat import OrderedDict
 from ferenda.elements import Body, Paragraph, Section, CompoundElement, SectionalElement, Link
-from ferenda.pdfreader import PDFReader
-from ferenda.pdfreader import Page, Textbox
+from ferenda.pdfreader import PDFReader, Page, Textbox
 from ferenda.decorators import recordlastdownload, downloadmax
 from . import SwedishLegalSource
 from .swedishlegalsource import offtryck_parser, offtryck_gluefunc, PreambleSection, UnorderedSection
@@ -613,26 +613,21 @@ class Regeringen(SwedishLegalSource):
             # case 2: intermediate path exists alongside downloaded_path
             pdf = self.parse_pdf(pdf_path, intermediate_dir)
 
-            from ferenda.pdfanalyze import analyze_metrics, default_style_analyzer
             metrics_path = self.store.intermediate_path(basefile,
                                                         attachment=os.path.splitext(os.path.basename(pdf_path))[0] + ".metrics.json")
-            if util.outfile_is_newer([pdffile], metrics_path):
-                metrics = json.loads(util.readfile(metrics_path))
+            plot_path = metrics_path.replace(".metrics.json", ".plot.png")
+            pdfdebug_path = metrics_path.replace(".metrics.json", ".debug.pdf")
+            # 1. Grab correct analyzer class
+            if self.document_type == self.KOMMITTEDIREKTIV:
+                from ferenda.sources.legal.se.direktiv import DirAnalyzer
+                analyzer = DirAnalyzer(pdf)
             else:
-                # we might need to supply a particular style analyzer function.
-                if self.document_type == self.KOMMITTEDIREKTIV:
-                    from ferenda.sources.legal.se.direktiv import dir_style_analyzer
-                    style_analyzer = dir_style_analyzer
-                else:
-                    style_analyzer = default_style_analyzer
-                
-                metrics = analyze_metrics(pdf, style_analyzer=style_analyzer)
-                util.writefile(metrics_path, json.dumps(metrics, indent=4))
+                analyzer = PDFAnalyzer(pdf)
 
-            debug = False
+            metrics = analyzer.metrics(metrics_path, plot_path)
+            debug = True
             if debug:
-                outputfile = pdf_path+".marked.pdf"
-                pdf.drawboxes(gluefunc, outputfile)
+                analyzer.drawboxes(pdfdebug_path, offtryck_gluefunc, metrics=metrics)
 
             if self.document_type == self.PROPOSITION:
                 preset = 'proposition'
