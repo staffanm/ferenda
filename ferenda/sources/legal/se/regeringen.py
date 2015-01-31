@@ -624,6 +624,7 @@ class Regeringen(SwedishLegalSource):
             else:
                 analyzer = PDFAnalyzer(pdf)
 
+            from pudb import set_trace; set_trace()
             metrics = analyzer.metrics(metrics_path, plot_path)
             debug = True
             if debug:

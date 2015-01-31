@@ -21,6 +21,7 @@ from ferenda import PDFDocumentRepository
 from ferenda import CompositeRepository, CompositeStore
 from ferenda import TextReader
 from ferenda import util
+from ferenda import PDFAnalyzer
 from ferenda.decorators import managedparsing, downloadmax, recordlastdownload
 from ferenda.elements import Paragraph
 from ferenda.elements import Heading
@@ -28,29 +29,27 @@ from ferenda.elements import ListItem
 from ferenda.errors import DocumentRemovedError
 
 
-# custom style analyzer for use with pdfanalyze.analyze_metrics
-def dir_style_analyzer(styles, firstpagelen):
-    from ferenda.pdfanalyze import make_stylecounter, fontdict, fontsize_key
-    styledefs = {}
-    stylecount = make_stylecounter(styles)
-    ds = stylecount.most_common(1)[0][0]
-    styledefs['default'] = fontdict(ds)
+# custom style analyzer 
+class DirAnalyzer(PDFAnalyzer):
+    def analyze_styles(self, frontmatter_styles, rest_styles):
+        all_styles = frontmatter_styles + rest_styles
+        ds = all_styles.most_common(1)[0][0]
+        styledefs['default'] = self.fontdict(ds)
 
-    # title style: the 2nd largest style on the frontpage 
-    frontpagecount = make_stylecounter(styles[:firstpagelen])
-    frontpagestyles = frontpagecount.keys()
-    ts = sorted(frontpagestyles, key=fontsize_key, reverse=True)[1]
-    styledefs['title'] = fontdict(ts)
+        # title style: the 2nd largest style on the frontpage 
+        if frontmatter_styles:
+            ts = sorted(frontmatter_styles.keys(), key=self.fontsize_key, reverse=True)[1]
+            styledefs['title'] = self.fontdict(ts)
 
-    # h1 - h2: the two styles just larger than ds (normally set in the
-    # same size but different weight)
-    restcount = make_stylecounter(styles[firstpagelen:])
-    largestyles = [x for x in sorted(restcount, key=fontsize_key) if fontsize_key(x) > fontsize_key(ds)]
-
-    for style in ('h2', 'h1'):
-        if largestyles: # any left?
-            styledefs[style] = fontdict(largestyles.pop(0))
-    return styledefs
+        # h1 - h2: the two styles just larger than ds (normally set in the
+        # same size but different weight)
+        sortedstyles = sorted(rest_styles, key=self.fontsize_key)
+        largestyles = [x for x in sortedstyles if
+                       self.fontsize_key(x) > self.fontsize_key(ds)]
+        for style in ('h2', 'h1'):
+            if largestyles: # any left?
+                styledefs[style] = fontdict(largestyles.pop(0))
+        return styledefs
 
 class Continuation(object):
     pass

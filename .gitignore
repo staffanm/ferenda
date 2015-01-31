@@ -2,6 +2,9 @@
 *.pyc
 *.log
 .DS_Store
+/defaultDB/
+/ferendaDB/
+/lagenDB/
 .ropeproject
 /.coverage
 /.tox
