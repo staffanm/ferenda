@@ -31,7 +31,10 @@ from ferenda.errors import DocumentRemovedError
 
 # custom style analyzer 
 class DirAnalyzer(PDFAnalyzer):
+    # direktiv has no footers
+    footer_significance_threshold = 0
     def analyze_styles(self, frontmatter_styles, rest_styles):
+        styledefs = {}
         all_styles = frontmatter_styles + rest_styles
         ds = all_styles.most_common(1)[0][0]
         styledefs['default'] = self.fontdict(ds)
@@ -48,7 +51,7 @@ class DirAnalyzer(PDFAnalyzer):
                        self.fontsize_key(x) > self.fontsize_key(ds)]
         for style in ('h2', 'h1'):
             if largestyles: # any left?
-                styledefs[style] = fontdict(largestyles.pop(0))
+                styledefs[style] = self.fontdict(largestyles.pop(0))
         return styledefs
 
 class Continuation(object):

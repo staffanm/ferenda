@@ -97,7 +97,7 @@ class PDFAnalyzer(object):
 
 
     def metrics(self, metricspath=None, plotpath=None,
-                startpage=0, pagecount=None):
+                startpage=0, pagecount=None, force=False):
         """Calculate and return the metrics for this analyzer.
 
         metrics is a set of named properties in the form of a
@@ -117,6 +117,8 @@ class PDFAnalyzer(object):
         :type startpage: int
         :param startpage: number of pages to analyze (default: all available)
         :type startpage: int
+        :param force: Perform analysis even if cached JSON metrics exists.
+        :type force: bool
         :returns: calculated metrics
         :rtype: dict
 
@@ -154,7 +156,8 @@ class PDFAnalyzer(object):
         """
 
 
-        if (metricspath and
+        if (not force and
+            metricspath and
             util.outfile_is_newer([self.pdf.filename], metricspath)):
             with open(metricspath) as fp:
                 return json.load(fp)

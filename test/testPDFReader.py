@@ -52,15 +52,14 @@ class Read(unittest.TestCase):
         title = str(reader[0][0])
         self.assertEqual("Document title ", title)
 
-        self.assertEqual(318, reader.median_box_width())
+        self.assertEqual(322, reader.median_box_width())
 
         page = reader[0]
         self.assertEqual("Page 1 (892 x 1263): 'Document title  This is a simple documen...'", str(page))
 
         
-
-        # an uncropped doc should have two textboxes
-        self.assertEqual(2, len(list(page.boundingbox())))
+        # an uncropped doc should have five textboxes
+        self.assertEqual(5, len(list(page.boundingbox())))
 
         # a smaller bounding box yields just one
         self.assertEqual(1,
@@ -204,6 +203,41 @@ class Read(unittest.TestCase):
         self.assertEqual(2, len(reader))
         self.assertEqual("EUROPEAN COMPUTER MANUFACTURERS ASSOCIATION",
                          util.normalize_space(str(reader[0][1])))
-        
 
-        
+    # should test that defaultglue works as expected and that it
+    # doesn't fuck up the raw textboxes
+    def test_textboxes(self):
+        try:
+            reader = PDFReader(filename="test/files/pdfreader/sample.pdf",
+                               workdir=self.datadir)
+        except errors.ExternalCommandError:
+            self._copy_sample()
+            reader = PDFReader(filename="test/files/pdfreader/sample.pdf",
+                               workdir=self.datadir)
+        # There should be seven raw (nonempty) textboxes
+        self.assertEqual(7, len(reader[0]))
+        self.assertEqual("This is a paragraph that spans three lines. These "
+                         "should be treated as three ", str(reader[0][2]))
+        # But only four logical paragraphs, according to the default
+        # glue function.
+        tbs = list(reader.textboxes())
+        self.assertEqual(4, len(tbs))
+        self.assertEqual(63, tbs[2].height)  # lineheight is 21, three
+                                             # lines == 63
+        self.assertEqual(602, tbs[2].width)  # max width of the three
+                                             # lines is 602
+
+        # the <b> tag will be present even though the font used for
+        # this paragraph is Cambria-Bold
+        self.assertEqual("This is a paragraph that is set entirely in bold. "
+                         "Pdftohtml will create a <b> element for the text in "
+                         "this paragraph. ", str(tbs[3]))
+        self.assertEqual(1, len(tbs[3]))  # should only contain a
+                                          # single TextElement, not a
+                                          # leading empty TE
+        self.assertEqual('b', tbs[3][0].tag)
+
+        # make sure no actual textboxes were harmed in the process
+        self.assertEqual("This is a paragraph that spans three lines. These "
+                         "should be treated as three ", str(reader[0][2]))
+        self.assertEqual(7, len(reader[0]))

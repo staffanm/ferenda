@@ -469,13 +469,18 @@ class PDFReader(CompoundElement):
             if pageobjects:
                 yield page
             for nextbox in page:
+                # from pudb import set_trace; set_trace()
                 if not (keepempty or str(nextbox).strip()):
                     continue
                 if not textbox: # MUST glue
                     textbox = nextbox
                 else:
                     if glue(textbox, nextbox, prevbox):
-                        textbox += nextbox
+                        # can't modify textbox in place -- this messes
+                        # things up if we want/need to run textboxes()
+                        # twice. Must create a new one.
+                        # textbox += nextbox
+                        textbox = textbox + nextbox
                     else:
                         yield textbox
                         textbox = nextbox
@@ -502,7 +507,8 @@ class PDFReader(CompoundElement):
         # horizontally, line up vertically, and have the same
         # font, then they should be glued
         linespacing = 1
-        if (textbox.font == nextbox.font and
+        if (textbox.font.family == nextbox.font.family and
+            textbox.font.size == nextbox.font.size and
             textbox.left == nextbox.left and
             textbox.top + textbox.height + linespacing >= nextbox.top):
             return True
@@ -649,6 +655,7 @@ all text in a Textbox has the same font and size.
                                             fontinfo,
                                             s)
     def __add__(self, other):
+        # from pudb import set_trace; set_trace()
         # expand dimensions
         top = min(self.top, other.top)
         left = min(self.left, other.left)
@@ -661,11 +668,14 @@ all text in a Textbox has the same font and size.
                       fontid=self.fontid,
                       fontspec=self._fontspec)
         
-        # add all text elements
-        c = Textelement(tag=None)
+        # add all TextElement objects, concatenating adjacent TE:s if
+        # their tags match
+        c = Textelement(tag=self[0].tag)
         for e in itertools.chain(self, other):
             if e.tag != c.tag:
-                res.append(c)
+                if c:
+                    res.append(c)
+                res.append(e)
                 c = Textelement(tag=e.tag)
             else:
                 c = c + e
@@ -680,7 +690,8 @@ all text in a Textbox has the same font and size.
             c = Textelement(tag=None)
         for e in other:
             if e.tag != c.tag:
-                self.append(c)
+                if c:
+                    self.append(c)
                 self.append(e)
                 c = Textelement(tag=e.tag)
                 # c = e

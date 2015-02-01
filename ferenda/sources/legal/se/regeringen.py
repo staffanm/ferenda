@@ -615,7 +615,10 @@ class Regeringen(SwedishLegalSource):
 
             metrics_path = self.store.intermediate_path(basefile,
                                                         attachment=os.path.splitext(os.path.basename(pdf_path))[0] + ".metrics.json")
-            plot_path = metrics_path.replace(".metrics.json", ".plot.png")
+            if os.environ.get("FERENDA_PLOTANALYSIS"):
+                plot_path = metrics_path.replace(".metrics.json", ".plot.png")
+            else:
+                plot_path = None
             pdfdebug_path = metrics_path.replace(".metrics.json", ".debug.pdf")
             # 1. Grab correct analyzer class
             if self.document_type == self.KOMMITTEDIREKTIV:
@@ -624,11 +627,10 @@ class Regeringen(SwedishLegalSource):
             else:
                 analyzer = PDFAnalyzer(pdf)
 
-            from pudb import set_trace; set_trace()
-            metrics = analyzer.metrics(metrics_path, plot_path)
-            debug = True
-            if debug:
+            metrics = analyzer.metrics(metrics_path, plot_path, force=self.config.force)
+            if os.environ.get("FERENDA_DEBUGANALYSIS"):
                 analyzer.drawboxes(pdfdebug_path, offtryck_gluefunc, metrics=metrics)
+            # metrics = json.loads(util.readfile(metrics_path))
 
             if self.document_type == self.PROPOSITION:
                 preset = 'proposition'
@@ -643,9 +645,8 @@ class Regeringen(SwedishLegalSource):
             parser = offtryck_parser(metrics=metrics, preset=preset)
             parser.debug = os.environ.get('FERENDA_FSMDEBUG', False)
             parser.current_identifier = identifier
-            # for x in pdf.textboxes(gluefunc, pageobjects=True):
-            #     print(repr(x))
-            body = parser.parse(pdf.textboxes(gluefunc, pageobjects=True))
+            tbs = list(pdf.textboxes(gluefunc, pageobjects=True))
+            body = parser.parse(tbs)
             pdf[:] = body[:]
             pdf.tagname = "body"
         return pdf
