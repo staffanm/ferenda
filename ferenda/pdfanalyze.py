@@ -381,25 +381,51 @@ class PDFAnalyzer(object):
         sf = 2/3.0 # scaling factor -- mapping between units produced by
                    # pdftohtml and units used by reportlab
         dirty = False
+
         for tb in self.pdf.textboxes(gluefunc, pageobjects=True):
             if isinstance(tb, Page):
                 if dirty:
                     canvas.save()
                     packet.seek(0)
                     new_pdf = PdfFileReader(packet)
-                    log.debug("Getting page %s from existing pdf" % pageidx)
-                    page = existing_pdf.getPage(pageidx)
-                    page.mergePage(new_pdf.getPage(0))
-                    output.addPage(page)
-                    pageidx += 1
-                pagesize = (tb.width*sf, tb.height*sf)
-                # print("pagesize %s x %s" % pagesize)
+                    # print("Merging a new page into %s" % id(existing_page))
+
+                    # this SHOULD place the new page (that only
+                    # contains boxes and lines) on top of the existing
+                    # page. Only problem is that the image (from the
+                    # existing page) obscures those lines (contrary to
+                    # documentation)
+                    existing_page.mergePage(new_pdf.getPage(0))
+                    output.addPage(existing_page)
+
+                    # alternate way: merge the existing page on top of
+                    # the new. This doesn't seem to work any better,
+                    # and creates issues with scaling.
+                    # 
+                    # new_page = new_pdf.getPage(0)
+                    # new_page.mergePage(existing_page)
+                    # output.addPage(new_page)
+
+                # print("Loading page %s" % pageidx)
+                existing_page = existing_pdf.getPage(pageidx)
+                pageidx += 1
+                mb = existing_page.mediaBox
+                horizontal_scale = float(mb.getHeight()) / tb.height
+                vertical_scale = float(mb.getWidth()) / tb.width
+                log.debug("Loaded page %s - Scaling %s, %s" % (pageidx, horizontal_scale, vertical_scale))
+                # print("Loadex page %s (%s): Dimensions (%.2f, %.2f) must be scaled (%.2f,%.2f) to fit pdfreader dimensions (%s,%s)" %
+                #       (pageidx, id(existing_page), mb.getHeight(), mb.getWidth(),
+                #        horizontal_scale, vertical_scale,
+                #        tb.width, tb.height))
+                
                 packet = BytesIO()
-                canvas = Canvas(packet, pagesize=pagesize,
+                canvas = Canvas(packet, pagesize=(tb.height, tb.width),
                                     bottomup=False)
-                canvas.translate(0,0)
-                canvas.scale(sf, sf) # now the canvas uses the same units as pdfreader
+                # not sure how the vertical value 50 is derived...
+                canvas.translate(0,50)
+                canvas.scale(horizontal_scale, vertical_scale)
                 canvas.setStrokeColorRGB(0.2,0.5,0.3)
+
                 # now draw margins on the page
                 for k, v in metrics.items():
                     if isinstance(v, int):
@@ -408,8 +434,8 @@ class PDFAnalyzer(object):
                             canvas.line(0, v, tb.width, v)
                             canvas.drawString(0, v, k)
                         else:
-                            if ((k.endswith("_even") and (pageidx + 1) % 2 == 0) or
-                                (not k.endswith("_even") and (pageidx +1) % 2 == 1) or
+                            if ((k.endswith("_even") and (pageidx + 1) % 2 == 1) or
+                                (not k.endswith("_even") and (pageidx +1) % 2 == 0) or
                                 (not self.twopage)):
                                 # vert line
                                 canvas.line(v, 0, v, tb.height)
@@ -439,10 +465,9 @@ class PDFAnalyzer(object):
         packet.seek(0)
         canvas.save()
         new_pdf = PdfFileReader(packet)
-        log.debug("Getting last page %s from existing pdf" % pageidx)
-        page = existing_pdf.getPage(pageidx)
-        page.mergePage(new_pdf.getPage(0))
-        output.addPage(page)
+        # print("Merging final new page into %s" % id(existing_page))
+        existing_page.mergePage(new_pdf.getPage(0))
+        output.addPage(existing_page)
         outputStream = open(outfilename, "wb")
         output.write(outputStream)
         outputStream.close()

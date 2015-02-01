@@ -18,7 +18,7 @@ from ferenda import util, errors
 from ferenda.decorators import managedparsing, downloadmax
 from ferenda.describer import Describer
 from ferenda.elements import Paragraph
-from ferenda import PDFReader
+from ferenda import PDFReader, PDFAnalyzer
 
 class Riksdagen(SwedishLegalSource):
     BILAGA = "bilaga"
@@ -226,11 +226,14 @@ class Riksdagen(SwedishLegalSource):
             identifier = str(identifier)
 
         if os.path.exists(pdffile):
-            from ferenda.pdfanalyze import analyze_metrics, drawboxes
             hocr_path = self.store.path(doc.basefile, 'intermediate',
                                         '.hocr.html.bz2')
             metrics_path = self.store.path(doc.basefile, 'intermediate',
                                            '.metrics.json')
+            plot_path = self.store.path(doc.basefile, 'intermediate',
+                                        '.plot.png')
+            pdfdebug_path = self.store.path(doc.basefile, 'intermediate',
+                                        '.debug.pdf')
             # slight optimization: if we've already performed OCR,
             # then the PDF won't contain regular text -- don't bother
             # trying to parse it as a regular PDF.
@@ -245,14 +248,19 @@ class Riksdagen(SwedishLegalSource):
                 if pdf.is_empty():
                     self.log.debug("%s: %s contains no text, performing OCR" %
                                    (doc.basefile, pdffile))
-                    pdf = PDFReader(pdffile, workdir=intermediate_dir,
+                    pdf = PDFReader(filename=pdffile, workdir=intermediate_dir,
                                     ocr_lang="swe", keep_xml="bz2")
-            # drawboxes(pdf, offtryck_gluefunc)
-            if util.outfile_is_newer([pdffile], metrics_path):
-                metrics = json.loads(util.readfile(metrics_path))
-            else:
-                metrics = analyze_metrics(pdf)
-                util.writefile(metrics_path, json.dumps(metrics))
+
+            # FIXME: add code to get a customized PDFAnalyzer class here
+            # if self.document_type = self.PROPOSITION: 
+            analyzer = PDFAnalyzer(pdf)
+            # metrics = analyzer.metrics(metrics_path, plot_path, force=self.config.force)
+            metrics = analyzer.metrics(metrics_path, plot_path)
+            if os.environ.get("FERENDA_DEBUGANALYSIS"):
+                self.log.debug("Creating debug version of PDF")
+                analyzer.drawboxes(pdfdebug_path, offtryck_gluefunc, metrics=metrics)
+            self.log.debug("Parsing with metrics %s" % metrics)
+
             parser = offtryck_parser(metrics=metrics)
             parser.debug = os.environ.get('FERENDA_FSMDEBUG', False)
             parser.current_identifier = identifier

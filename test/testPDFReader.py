@@ -58,8 +58,8 @@ class Read(unittest.TestCase):
         self.assertEqual("Page 1 (892 x 1263): 'Document title  This is a simple documen...'", str(page))
 
         
-        # an uncropped doc should have five textboxes
-        self.assertEqual(5, len(list(page.boundingbox())))
+        # an uncropped doc should have seven textboxes
+        self.assertEqual(7, len(list(page.boundingbox())))
 
         # a smaller bounding box yields just one
         self.assertEqual(1,

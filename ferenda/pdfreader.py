@@ -62,17 +62,14 @@ class PDFReader(CompoundElement):
                  keep_xml=True,
                  ocr_lang=None,
                  fontspec=None):
-        if pages: # special-case: The object has been initialized as a
-                  # regular list (by deserialize), we have no need to
-                  # parse and create pages.
-            return
-        self.log = logging.getLogger('pdfreader')
-        self.fontspec = fontspec or {}
-        self.filename = filename
         """Initializes a PDFReader object from an existing PDF file. After
         initialization, the PDFReader contains a list of
         :py:class:`~ferenda.pdfreader.Page` objects.
 
+
+        :param pages: Internal parameter. You should not specify
+                      this. Specify all other parameters using
+                      keywords.
         :param filename: The full path to the PDF file (or, if
                         ``convert_to_pdf`` is set, any other document
                         file)
@@ -102,8 +99,15 @@ class PDFReader(CompoundElement):
                          or "en-GB", but rather whatever the
                          underlying ``tesseract`` program uses).
         :param ocr_lang: str
-        
+
         """
+        if pages: # special-case: The object has been initialized as a
+                  # regular list (by deserialize), we have no need to
+                  # parse and create pages.
+            return
+        self.log = logging.getLogger('pdfreader')
+        self.fontspec = fontspec or {}
+        self.filename = filename
         self.workdir = workdir
         if self.workdir is None:
             self.workdir = tempfile.mkdtemp()
@@ -315,9 +319,8 @@ class PDFReader(CompoundElement):
                 # Now that we know all text elements that should be in
                 # the Textbox, we can guess the font size.
 
-                fontspec = LayeredConfig(Defaults(
-                    {'family': "unknown",
-                     'size': int(round(text.height / px_per_point))}))
+                fontspec = {'family': "unknown",
+                            'size': int(round(text.height / px_per_point))}
 
                 # find any previous definition of this fontspec
                 fontid = None
@@ -469,7 +472,6 @@ class PDFReader(CompoundElement):
             if pageobjects:
                 yield page
             for nextbox in page:
-                # from pudb import set_trace; set_trace()
                 if not (keepempty or str(nextbox).strip()):
                     continue
                 if not textbox: # MUST glue
@@ -506,11 +508,19 @@ class PDFReader(CompoundElement):
         # default logic: if lines are next to each other
         # horizontally, line up vertically, and have the same
         # font, then they should be glued
-        linespacing = 1
+        linespacing = 1.5
+#        a = str(textbox)
+#        b = str(nextbox)
+#        c = textbox.font.family == nextbox.font.family and textbox.font.size == nextbox.font.size
+#        d = textbox.top < nextbox.top
+#        e1 = textbox.bottom + (prevbox.height * linespacing) - prevbox.height
+#        e2 = nextbox.top
+#        e = e1 >= e2
         if (textbox.font.family == nextbox.font.family and
             textbox.font.size == nextbox.font.size and
             textbox.left == nextbox.left and
-            textbox.top + textbox.height + linespacing >= nextbox.top):
+            textbox.top < nextbox.top and
+            textbox.bottom + (prevbox.height * linespacing) - prevbox.height  >= nextbox.top):
             return True
 
 
@@ -655,7 +665,6 @@ all text in a Textbox has the same font and size.
                                             fontinfo,
                                             s)
     def __add__(self, other):
-        # from pudb import set_trace; set_trace()
         # expand dimensions
         top = min(self.top, other.top)
         left = min(self.left, other.left)
