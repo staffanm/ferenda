@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 import os
 import logging
 import json
-from collections import Counter
 from io import BytesIO, StringIO
 from itertools import chain
 
@@ -12,6 +11,7 @@ from six import text_type as str
 
 from .pdfreader import Page
 from ferenda import util
+from ferenda.compat import Counter
 
 class PDFAnalyzer(object):
     """Create a analyzer for the given pdf file. 
@@ -475,6 +475,8 @@ class PDFAnalyzer(object):
         fp.close()
 
     def plot(self, filename, margincounters, stylecounters, metrics):
+        import matplotlib
+        matplotlib.use('Agg')
         import matplotlib.pyplot as plt
         from matplotlib import rcParams
         from matplotlib.font_manager import FontProperties

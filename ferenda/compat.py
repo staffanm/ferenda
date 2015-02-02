@@ -15,6 +15,12 @@ except ImportError: # pragma: no cover
     # if on python 2.6
     from ordereddict import OrderedDict
 
+try:
+    from collections import Counter
+except ImportError: # pragma: no cover
+    # if on python 2.6
+    Counter = None
+    
 if sys.version_info < (2,7,0): # pragma: no cover
     try:
         import unittest2 as unittest

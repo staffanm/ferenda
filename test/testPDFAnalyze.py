@@ -15,6 +15,7 @@ from ferenda import PDFReader
 # SUT
 from ferenda import PDFAnalyzer
 
+@unittest.skipIf (sys.version_info < (2, 7, 0), "PDFAnalyzer not currently supported under Py26")
 class Analyze(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None
@@ -53,7 +54,7 @@ class Analyze(unittest.TestCase):
                            ('Cambria,Bold', 14): 68,
                            ('Cambria,Bold', 17): 64,
                            ('Cambria', 37): 55,
-                           (u'Cambria,Bold', 19): 28})
+                           ('Cambria,Bold', 19): 28})
         self.assertEquals(dict(stylecounters['rest_styles']),
                           {('Comic Sans MS', 14): 5922,
                            ('Cambria,Bold', 14): 133,
@@ -75,12 +76,12 @@ class Analyze(unittest.TestCase):
         vmetrics = self.analyzer.analyze_vertical_margins(vcounters)
         # this will miscalculate the header zone because the header is
         # so wordy it's considered part of the main document text
-        self.assertEquals(vmetrics, {u'bottommargin': 1149, u'topmargin': 53})
+        self.assertEquals(vmetrics, {'bottommargin': 1149, 'topmargin': 53})
 
         # try again with double the thresholds
         self.analyzer.header_significance_threshold = 0.004
         vmetrics = self.analyzer.analyze_vertical_margins(vcounters)
-        self.assertEquals(vmetrics, {u'bottommargin': 1149, u'topmargin': 107})
+        self.assertEquals(vmetrics, {'bottommargin': 1149, 'topmargin': 107})
 
     def test_analyze_styles(self):
         stylecounters = self.analyzer.count_styles(0, 3)
