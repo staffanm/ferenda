@@ -10,6 +10,7 @@ from glob import glob
 from bz2 import BZ2File
 
 from lxml import etree
+from lxml.builder import ElementMaker
 from six import text_type as str
 # from six import binary_type as bytes
 import six
@@ -19,6 +20,9 @@ from ferenda import util, errors
 from .elements import UnicodeElement
 from .elements import CompoundElement
 from .elements import OrdinalElement
+
+E = ElementMaker(namespace="http://www.w3.org/1999/xhtml",
+                 nsmap={None: "http://www.w3.org/1999/xhtml"})
 
 
 class PDFReader(CompoundElement):
@@ -505,6 +509,9 @@ class PDFReader(CompoundElement):
 
     @staticmethod
     def _default_glue(textbox, nextbox, prevbox):
+
+        def basefamily(family):
+            return family.replace("-", "").replace("Bold", "").replace("Italic", "")
         # default logic: if lines are next to each other
         # horizontally, line up vertically, and have the same
         # font, then they should be glued
@@ -516,12 +523,24 @@ class PDFReader(CompoundElement):
 #        e1 = textbox.bottom + (prevbox.height * linespacing) - prevbox.height
 #        e2 = nextbox.top
 #        e = e1 >= e2
-        if (textbox.font.family == nextbox.font.family and
+#        f = textbox.font.family
+#        g = nextbox.font.family
+
+        # Accept font families that are almost equal (only differ by a
+        # "Bold" or "Italic" in one but not the other). Otherwise
+        # common constructs like:
+        #
+            # <b>Lead text</b>: Lorem ipsum dolor sit amet, consectetur
+            # adipiscing elit. Donec suscipit nulla ut lorem dapibus.
+        # 
+        # wont be considered the same textbox.
+        if (basefamily(textbox.font.family) == basefamily(nextbox.font.family) and
             textbox.font.size == nextbox.font.size and
             textbox.left == nextbox.left and
             textbox.top < nextbox.top and
             textbox.bottom + (prevbox.height * linespacing) - prevbox.height  >= nextbox.top):
             return True
+
 
 
 class Page(CompoundElement, OrdinalElement):
@@ -676,7 +695,7 @@ all text in a Textbox has the same font and size.
         res = Textbox(top=top, left=left, width=width, height=height,
                       fontid=self.fontid,
                       fontspec=self._fontspec)
-        
+
         # add all TextElement objects, concatenating adjacent TE:s if
         # their tags match
         c = Textelement(tag=self[0].tag)
@@ -688,7 +707,12 @@ all text in a Textbox has the same font and size.
                 c = Textelement(tag=e.tag)
             else:
                 c = c + e
-        res.append(c)
+        # it MIGHT be the case that we need to merge c with the last
+        # Textelement added to res iff their tags match
+        if res and c.tag == res[-1].tag:
+            res[-1] = res[-1] + c
+        else:
+            res.append(c)
         return res
 
 
@@ -760,6 +784,14 @@ class Textelement(UnicodeElement):
             return self.tag
         else:
             return "span"
+
+    def as_xhtml(self, uri, parent_uri=None):
+        if self.tag in ("ib", "bi"):
+            return E(self.tag[0], {},
+                     E(self.tag[1], {}, str(self)))
+        else:
+            return super(Textelement, self).as_xhtml(uri, parent_uri)
+        
 
     tagname = property(_get_tagname)
 

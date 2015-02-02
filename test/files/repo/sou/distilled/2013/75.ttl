@@ -40,7 +40,7 @@
     dcterms:title "Regeringens målbild för e-förvaltningen"@sv ;
     bibo:chapter "2.1"@sv .
 
-<http://localhost:8000/res/utr/sou/2013:75> a rpubl:Utredning ;
+<http://localhost:8000/res/utr/sou/2013:75> a rpubl:Utredningsbetankande ;
     dcterms:abstract "E-delegationen har under fyra års tid arbetat för att stärka utvecklingen av e-förvaltning. Detta betänkande ger förslag på hur framtidens e-förvaltning kan organiseras och föras vidare i ett längre perspektiv."@sv ;
     dcterms:identifier "SOU 2013:75" ;
     dcterms:issued "2013-10-17"^^xsd:date ;
@@ -51,6 +51,7 @@
     rpubl:utgarFran <http://localhost:8000/res/dir/2009:19>,
         <http://localhost:8000/res/dir/2010:32>,
         <http://localhost:8000/res/dir/2013:40> ;
+    rpubl:utrSerie <http://localhost:8000/dataset/sou> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/utr/sou/2013:75> ;
     prov:wasGeneratedBy "ferenda.sources.legal.se.sou.SOU" .
 

@@ -3,11 +3,11 @@
 
 <pdf2xml producer="poppler" version="0.29.0">
 <page number="1" position="absolute" top="0" left="0" height="1263" width="892">
-	<fontspec id="0" size="21" family="KUTUDI+Calibri-Bold" color="#345a8a"/>
-	<fontspec id="1" size="16" family="RYDJMC+Cambria" color="#000000"/>
-	<fontspec id="2" size="16" family="GOSDVS+Cambria-Italic" color="#000000"/>
-	<fontspec id="3" size="16" family="FKSRDU+Cambria-BoldItalic" color="#000000"/>
-	<fontspec id="4" size="16" family="LPIAHR+Cambria-Bold" color="#000000"/>
+	<fontspec id="0" size="21" family="CCQUSK+Calibri-Bold" color="#345a8a"/>
+	<fontspec id="1" size="16" family="TAKDYF+Cambria" color="#000000"/>
+	<fontspec id="2" size="16" family="CPEVRM+Cambria-Italic" color="#000000"/>
+	<fontspec id="3" size="16" family="EZUHLY+Cambria-BoldItalic" color="#000000"/>
+	<fontspec id="4" size="16" family="JPLYVV+Cambria-Bold" color="#000000"/>
 <text top="146" left="135" width="155" height="29" font="0"><b>Document	  title	  </b></text>
 <text top="178" left="135" width="4" height="21" font="1">	  </text>
 <text top="199" left="135" width="322" height="21" font="1">This	  is	  a	  <i>simple	  <b>document</b></i>	  in	  PDF	  format.	  	  </text>
@@ -18,5 +18,8 @@
 <text top="304" left="135" width="4" height="21" font="1">	  </text>
 <text top="325" left="135" width="610" height="21" font="4"><b>This	  is	  a	  paragraph	  that	  is	  set	  entirely	  in	  bold.	  Pdftohtml	  will	  create	  a	  &lt;b&gt;	  </b></text>
 <text top="346" left="135" width="318" height="21" font="4"><b>element	  for	  the	  text	  in	  this	  paragraph.	  </b></text>
+<text top="367" left="135" width="4" height="21" font="1">	  </text>
+<text top="389" left="135" width="604" height="21" font="4"><b>This	  paragraph	  leads	  with	  bold.</b>	  But	  then	  it	  switches	  to	  regular.	  And	  it	  spans	  </text>
+<text top="410" left="135" width="570" height="21" font="1">more	  than	  one	  line,	  which	  requires	  a	  tricky	  merge	  of	  TextElement	  objects.	  </text>
 </page>
 </pdf2xml>

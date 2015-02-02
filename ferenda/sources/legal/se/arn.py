@@ -278,7 +278,8 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
     def parse_from_pdf(self, doc, filename, filetype=".pdf"):
         def gluecondition(textbox, nextbox, prevbox):
             linespacing = 7
-            res = (textbox.font == nextbox.font and 
+            res = (textbox.font.family == nextbox.font.family and
+                   textbox.font.size == nextbox.font.size and 
                    textbox.top + textbox.height + linespacing >= nextbox.top and
                    nextbox.top > prevbox.top)
             return res

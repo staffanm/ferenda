@@ -52,14 +52,14 @@ class Read(unittest.TestCase):
         title = str(reader[0][0])
         self.assertEqual("Document title ", title)
 
-        self.assertEqual(322, reader.median_box_width())
+        self.assertEqual(570, reader.median_box_width())
 
         page = reader[0]
         self.assertEqual("Page 1 (892 x 1263): 'Document title  This is a simple documen...'", str(page))
 
         
-        # an uncropped doc should have seven textboxes
-        self.assertEqual(7, len(list(page.boundingbox())))
+        # an uncropped doc should have nine nonempty textboxes
+        self.assertEqual(9, len(list(page.boundingbox())))
 
         # a smaller bounding box yields just one
         self.assertEqual(1,
@@ -214,14 +214,14 @@ class Read(unittest.TestCase):
             self._copy_sample()
             reader = PDFReader(filename="test/files/pdfreader/sample.pdf",
                                workdir=self.datadir)
-        # There should be seven raw (nonempty) textboxes
-        self.assertEqual(7, len(reader[0]))
+        # There should be nine raw (nonempty) textboxes
+        self.assertEqual(9, len(reader[0]))
         self.assertEqual("This is a paragraph that spans three lines. These "
                          "should be treated as three ", str(reader[0][2]))
-        # But only four logical paragraphs, according to the default
+        # But only five logical paragraphs, according to the default
         # glue function.
         tbs = list(reader.textboxes())
-        self.assertEqual(4, len(tbs))
+        self.assertEqual(5, len(tbs))
         self.assertEqual(63, tbs[2].height)  # lineheight is 21, three
                                              # lines == 63
         self.assertEqual(602, tbs[2].width)  # max width of the three
@@ -237,7 +237,13 @@ class Read(unittest.TestCase):
                                           # leading empty TE
         self.assertEqual('b', tbs[3][0].tag)
 
+        # the final paragraph should contain only two textelements
+        self.assertEqual('b', tbs[4][0].tag)
+        self.assertEqual(None, tbs[4][1].tag)
+        self.assertEqual(2, len(tbs[4]))
+        
+        
         # make sure no actual textboxes were harmed in the process
         self.assertEqual("This is a paragraph that spans three lines. These "
                          "should be treated as three ", str(reader[0][2]))
-        self.assertEqual(7, len(reader[0]))
+        self.assertEqual(9, len(reader[0]))

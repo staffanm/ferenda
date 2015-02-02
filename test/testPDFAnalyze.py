@@ -43,7 +43,7 @@ class Analyze(unittest.TestCase):
         self.assertEquals(set(hcounters.keys()),
                           set(('leftmargin', 'rightmargin', 'leftmargin_even', 'rightmargin_even', 'pagewidth')))
         self.assertEquals(set(hcounters['leftmargin'].keys()), set((135, 775, 778))) # 775, 778 are pagenumbers on pg 1 + 3
-        self.assertEquals(hcounters['leftmargin_even'].keys(), [108])
+        self.assertEquals(list(hcounters['leftmargin_even'].keys()), [108])
         self.assertEquals(hcounters['rightmargin'].most_common(1)[0][0], 784)
 
     def test_stylecounters(self):

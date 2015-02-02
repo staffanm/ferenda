@@ -624,6 +624,9 @@ class Regeringen(SwedishLegalSource):
             if self.document_type == self.KOMMITTEDIREKTIV:
                 from ferenda.sources.legal.se.direktiv import DirAnalyzer
                 analyzer = DirAnalyzer(pdf)
+            elif self.document_type == self.SOU:
+                from ferenda.sources.legal.se.sou import SOUAnalyzer
+                analyzer = SOUAnalyzer(pdf)
             else:
                 analyzer = PDFAnalyzer(pdf)
 

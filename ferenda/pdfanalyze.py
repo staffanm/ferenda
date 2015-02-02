@@ -63,6 +63,7 @@ class PDFAnalyzer(object):
 
     """
 
+    # this is suitable for overriding, eg if you know that no pagenumbers occur in the footer
     footer_significance_threshold = 0.002
     """The maximum amount (expressed as part of the entire text amount) of
     text that can occur on the bottom of the page for it to be
@@ -262,7 +263,6 @@ class PDFAnalyzer(object):
             cid = "rest_styles"
         counters[cid][fonttuple] += len(text)
 
-    # this is suitable for overriding, eg if you know that no pagenumbers occur in the footer
     def analyze_vertical_margins(self, vcounters):
         # now find probable header and footer zones. default algorithm:
         # max 0.2 % of text content can be in the header/footer zone. (on
@@ -519,8 +519,9 @@ class PDFAnalyzer(object):
         self.plot_styles(styleplot, stylecounters, metrics)
 
         util.ensure_dir(filename)
-        plt.savefig(filename, dpi=300)
-        # log.debug("Saved plot as %s" % filename)
+        plt.savefig(filename, dpi=150)
+        log = logging.getLogger("pdfanalyze")
+        log.debug("wrote %s" % filename)
 
     def plot_margins(self, subplots, margin_counters, metrics, pagewidth, pageheight):
         for (idx, counterkey) in enumerate(sorted(margin_counters.keys())):

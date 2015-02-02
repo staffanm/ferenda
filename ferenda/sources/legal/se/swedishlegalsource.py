@@ -383,24 +383,31 @@ def offtryck_parser(basefile="0", metrics=None, preset=None):
     # page numbers, headings.
     def is_nonessential(parser):
         chunk = parser.reader.peek()
+        strchunk = str(chunk).strip()
         # everything above or below these margins should be
         # pagenumbers -- always nonessential
         if chunk.top > metrics.bottommargin or chunk.bottom < metrics.topmargin:
             return True  
+
+        # pagenumbers can be in the left/right margin as well
+        if ((chunk.right < metrics_leftmargin() or
+             chunk.left > metrics_rightmargin()) and
+            strchunk.isdigit()):
+            return True
 
         # Propositioner has the identifier in the left or right
         # margin, set in the default style (or smaller) 
         if (int(chunk.font.size) <= metrics.default.size and
                 (chunk.right < metrics_leftmargin() or
                  chunk.left > metrics_rightmargin()) and
-            str(chunk).strip().startswith(parser.current_identifier)):
+            strchunk.startswith(parser.current_identifier)):
             # print("%s on p %s is deemed nonessential" % (str(chunk), state.pageno))
             return True
 
         # Direktiv first page has a similar identifier, but it starts
         # slightly before the right margin (hence +10), and is set in larger type.
         if (chunk.left + 10 < metrics_rightmargin() and
-            str(chunk).strip() == parser.current_identifier):
+            strchunk == parser.current_identifier):
             return True
         
 
@@ -624,6 +631,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None):
                        ("coverpage", is_coverpage): (False, None),
                        ("coverpage", is_preamblesection): (False, None),
                        ("coverpage", is_paragraph): (make_paragraph, None),
+                       ("coverpage", is_pagebreak): (False, None),
                        ("preamblesection", is_preamblesection): (False, None),
                        ("preamblesection", is_section): (False, None),
                        ("body", is_section): (make_section, "section"),
