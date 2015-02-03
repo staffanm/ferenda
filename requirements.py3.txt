@@ -14,7 +14,7 @@ pyparsing
 mock # not needed for py3.3 +
 coverage
 # bsddb3 
-# pyScss -- doesn't install on py3 until https://github.com/Kronuz/pyScss/issues/67 is released
+pyScss
 docutils
 wheel
 twine
@@ -24,3 +24,4 @@ grako
 matplotlib
 PyPDF2
 reportlab
+responses

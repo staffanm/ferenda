@@ -28,6 +28,7 @@ from rdflib.compare import graph_diff
 from rdflib.util import guess_format
 from lxml import etree
 import requests.exceptions
+import responses
 
 from ferenda import DocumentRepository, TextReader
 from ferenda import elements, util
@@ -383,7 +384,81 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         except:
             return "1"
 
+
+    @responses.activate
     def download_test(self, specfile):
+
+        with codecs.open(specfile, encoding="utf-8") as fp:
+            spec = json.load(fp)
+        
+        if os.environ.get("FERENDA_SET_TESTFILE"):
+            try:
+                requests_count = int(os.environ.get("FERENDA_SET_TESTFILE"))
+            except TypeError:
+                requests_count = 2 # search page, single payload
+            
+            def callback(req):
+                # make note of request.url
+                # make a real requests call somehow
+                responses.stop()
+                requests.get(req.url)
+                responses.start()
+                # create a filename (hash of content + suitable suffix)
+                # dump response.content to that
+                print("requested %s, saving as %s")
+                # make note of response.apperent_charset
+                spec[req.url] = filename
+                with open(specfile, "w") as fp:
+                    json.dumps(spec, fp)
+                requests_count -= 1
+                if not requests_count:
+                    # FIXME: choose a suitable exception
+                    raise requests.exceptions.HTTPError("we're done!")
+                return (resp.status, resp.headers, resp.content)
+        else:
+            def callback(requests):
+                try:
+                    urlspec = spec[url]
+                    if isinstance(urlspec, str):
+                        urlspec = {'file': urlspec}
+                    url_location = os.path.join(os.path.dirname(specfile),
+                                                urlspec['file'])
+                    # load the .content property
+                    with open(url_location, "rb") as fp:
+                        content = fp.read()
+                    headers = {'Content-type': 'text/html'}
+                    return (200, headers, content)
+                except KeyError:
+                    # the given url was not provided in the specfile. What
+                    # if we raise this as a 404?
+                    raise requests.exceptions.HTTPError("not found")
+            
+        responses.add_callback(responses.GET,
+                               re.compile("http://www.regeringen.se/(.*)"),
+                               callback)
+        self.repo.download()
+        
+        # organize a temporary copy of files that we can compare our results to
+        wantdir = "%s/%s-want" % (self.datadir, self.repoclass.alias)
+        expected = False
+        for url in spec:
+            if "expect" in spec[url]:
+                expected = True
+                sourcefile = os.path.join(os.path.dirname(specfile),
+                                          spec[url]['file'])
+                wantfile = "%s/%s" % (wantdir, spec[url]['expect'])
+
+                util.copy_if_different(sourcefile, wantfile)
+        if expected:
+            self.assertEqualDirs(wantdir,
+                                 "%s/%s" % (self.datadir,
+                                            self.repoclass.alias))
+        else:
+            self.fail('No files were marked as "expect" in specfile %s' %
+                      specfile)
+
+
+    def old_download_test(self, specfile):
         def my_get(url, **kwargs):
             res = Mock()
             try:
