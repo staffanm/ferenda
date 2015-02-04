@@ -1,53 +1,38 @@
-{"http://www.regeringen.se/sb/d/107/a/136": {
-     "file": "start.html",
-     "charset": "latin-1"
- },
- "http://www.regeringen.se/sb/d/107/a/136?query=&queryLogic=1&docTypes=6&dateRange=1&dateRangeFromDay=2&dateRangeFromMonth=2&dateRangeFromYear=15&dateRangeToDay=2&dateRangeToMonth=2&dateRangeToYear=16&type=advanced&action=search&sortOrder=1&bottomQuery=": {
-     "file": "proplist-1.html",
-     "charset": "latin-1"
- },
-"http://www.regeringen.se/sb/d/107/a/136/action/showAll/sort/byRank/targetDepartment/archiveDepartment?d=107&dateRangeToDay=2&action=search&dateRangeFromDay=2&dateRangeFromMonth=2&type=advanced&queryLogic=1&dateRange=1&dateRangeFromYear=15&sortOrder=1&dateRangeToMonth=2&query=&a=136&bottomQuery=&dateRangeToYear=16&docTypes=6&" : {
-    "file": "proplist-2.html",
-    "charset": "latin-1"
-},     
- "http://www.regeringen.se/sb/d/107/a/136/action/showPage/page/2": {
-     "file": "next.html",
-     "charset": "latin-1"
- },
- "http://www.regeringen.se/sb/d/108/a/220557": {
-     "file": "220557.html",
-     "expect": "downloaded/2012-13/182/index.html",
-     "charset": "latin-1"
- },
- "http://www.regeringen.se/content/1/c6/22/05/57/45db0861.pdf": {
-     "file": "45db0861.pdf",
-     "expect": "downloaded/2012-13/182/45db0861.pdf",
-     "charset": null
- },
- "http://www.regeringen.se/sb/d/108/a/220559": {
-     "file": "220559.html",
-     "expect": "downloaded/2012-13/187/index.html",
-     "charset": "latin-1"
- },
- "http://www.regeringen.se/content/1/c6/22/05/59/58623a80.pdf": {
-     "file": "58623a80.pdf",
-     "expect": "downloaded/2012-13/187/58623a80.pdf",
-     "charset": null
- },
- "http://www.regeringen.se/sb/d/108/a/111046": {
-     "file": "111046.html",
-     "expect": "downloaded/2008-09/5/index.html",
-     "charset": "latin-1"
- },
- "http://www.regeringen.se/content/1/c6/11/10/46/f690153e.pdf": {
-     "file": "f690153e.pdf",
-     "expect": "downloaded/2008-09/5/f690153e.pdf",
-     "charset": null
- },
- "http://www.regeringen.se/content/1/c6/11/10/46/1b5df88d.PDF": {
-     "file": "1b5df88d.PDF",
-     "expect": "downloaded/2008-09/5/1b5df88d.PDF",
-     "charset": null
- }
+{
+    "http://www.regeringen.se/sb/d/107/a/136/action/showNext": {
+        "file": "basic-5.html", 
+        "encoding": "ISO-8859-1"
+    }, 
+    "http://www.regeringen.se/sb/d/108/a/122755": {
+        "expect": "downloaded/2008-09/159/index.html", 
+        "file": "basic-3.html", 
+        "encoding": "ISO-8859-1"
+    }, 
+    "http://www.regeringen.se/sb/d/107/a/136/action/showAll/sort/byRank/targetDepartment/archiveDepartment?d=107&dateRangeToDay=4&action=search&dateRangeFromDay=4&dateRangeFromMonth=2&type=advanced&queryLogic=1&dateRange=1&dateRangeFromYear=15&sortOrder=1&dateRangeToMonth=2&query=&a=136&bottomQuery=&dateRangeToYear=16&docTypes=6&": {
+        "file": "basic-2.html", 
+        "encoding": "ISO-8859-1"
+    }, 
+    "http://www.regeringen.se/content/1/c6/12/27/55/69a5d7c2.pdf": {
+        "expect": "downloaded/2008-09/159/69a5d7c2.pdf", 
+        "file": "basic-4.pdf", 
+        "encoding": null
+    }, 
+    "http://www.regeringen.se/sb/d/107/a/136": {
+        "file": "basic-0.html", 
+        "encoding": "ISO-8859-1"
+    }, 
+    "http://www.regeringen.se/sb/d/107/a/136?query=&queryLogic=1&docTypes=6&dateRange=1&dateRangeFromDay=4&dateRangeFromMonth=2&dateRangeFromYear=15&dateRangeToDay=4&dateRangeToMonth=2&dateRangeToYear=16&type=advanced&action=search&sortOrder=1&bottomQuery=": {
+        "file": "basic-1.html", 
+        "encoding": "ISO-8859-1"
+    }, 
+    "http://www.regeringen.se/content/1/c6/23/59/23/63cb2de6.pdf": {
+        "expect": "downloaded/2013-14/104/63cb2de6.pdf", 
+        "file": "basic-7.pdf", 
+        "encoding": null
+    }, 
+    "http://www.regeringen.se/sb/d/108/a/235923": {
+        "expect": "downloaded/2013-14/104/index.html", 
+        "file": "basic-6.html", 
+        "encoding": "ISO-8859-1"
+    }
 }
- 

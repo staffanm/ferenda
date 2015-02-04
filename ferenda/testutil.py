@@ -7,6 +7,7 @@ import sys
 import tempfile
 import shutil
 import time
+import hashlib
 import json
 import codecs
 import collections
@@ -22,6 +23,7 @@ from ferenda.compat import Mock, patch
 import six
 from six import text_type as str
 from six import binary_type as bytes
+from six.moves import input
 
 import rdflib
 from rdflib.compare import graph_diff
@@ -32,7 +34,7 @@ import responses
 
 from ferenda import DocumentRepository, TextReader
 from ferenda import elements, util
-from ferenda.errors import ExternalCommandError
+from ferenda.errors import ExternalCommandError, MaxDownloadsReached
 
 
 class FerendaTestCase(object):
@@ -245,7 +247,7 @@ class FerendaTestCase(object):
             msg = "".join(diff) + "\n\nERRORS:" + "\n".join(errors)
             return self.fail(msg)
 
-    def assertEqualDirs(self, want, got, suffix=None, filterdir="entries"):
+    def assertEqualDirs(self, want, got, suffix=None, subset=False, filterdir="entries"):
         """Assert that two directory trees contains identical files
 
         :param want: The expected directory tree
@@ -254,6 +256,8 @@ class FerendaTestCase(object):
         :type  got: str
         :param suffix: If given, only check files ending in suffix (otherwise check all the files
         :type  suffix: str
+        :param subset: If True, require only that files in want is a subset of files in got (otherwise require that the sets are identical)
+        :type subset: bool
         :param filterdir: If given, don't compare the parts of the tree that starts with filterdir
         :type  suffix: str
         """
@@ -262,8 +266,11 @@ class FerendaTestCase(object):
         gotfiles = [x[len(got) + 1:]
                     for x in util.list_dirs(got, suffix) if not x.startswith(got + os.sep + filterdir)]
         self.maxDiff = None
-        self.assertEqual(wantfiles, gotfiles)  # or assertIn?
-        for f in gotfiles:
+        if subset:
+            self.assertTrue(set(wantfiles).issubset(set(gotfiles)))
+        else:
+            self.assertEqual(wantfiles, gotfiles)  # or assertIn?
+        for f in wantfiles:
             if not filecmp.cmp(os.path.join(want, f),
                                os.path.join(got, f),
                                shallow=False):
@@ -386,112 +393,28 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
 
 
     @responses.activate
-    def download_test(self, specfile):
-
-        with codecs.open(specfile, encoding="utf-8") as fp:
-            spec = json.load(fp)
-        
-        if os.environ.get("FERENDA_SET_TESTFILE"):
-            try:
-                requests_count = int(os.environ.get("FERENDA_SET_TESTFILE"))
-            except TypeError:
-                requests_count = 2 # search page, single payload
-            
-            def callback(req):
-                # make note of request.url
-                # make a real requests call somehow
-                responses.stop()
-                requests.get(req.url)
-                responses.start()
-                # create a filename (hash of content + suitable suffix)
-                # dump response.content to that
-                print("requested %s, saving as %s")
-                # make note of response.apperent_charset
-                spec[req.url] = filename
-                with open(specfile, "w") as fp:
-                    json.dumps(spec, fp)
-                requests_count -= 1
-                if not requests_count:
-                    # FIXME: choose a suitable exception
-                    raise requests.exceptions.HTTPError("we're done!")
-                return (resp.status, resp.headers, resp.content)
-        else:
-            def callback(requests):
-                try:
-                    urlspec = spec[url]
-                    if isinstance(urlspec, str):
-                        urlspec = {'file': urlspec}
-                    url_location = os.path.join(os.path.dirname(specfile),
-                                                urlspec['file'])
-                    # load the .content property
-                    with open(url_location, "rb") as fp:
-                        content = fp.read()
-                    headers = {'Content-type': 'text/html'}
-                    return (200, headers, content)
-                except KeyError:
-                    # the given url was not provided in the specfile. What
-                    # if we raise this as a 404?
-                    raise requests.exceptions.HTTPError("not found")
-            
-        responses.add_callback(responses.GET,
-                               re.compile("http://www.regeringen.se/(.*)"),
-                               callback)
-        self.repo.download()
-        
-        # organize a temporary copy of files that we can compare our results to
-        wantdir = "%s/%s-want" % (self.datadir, self.repoclass.alias)
-        expected = False
-        for url in spec:
-            if "expect" in spec[url]:
-                expected = True
-                sourcefile = os.path.join(os.path.dirname(specfile),
-                                          spec[url]['file'])
-                wantfile = "%s/%s" % (wantdir, spec[url]['expect'])
-
-                util.copy_if_different(sourcefile, wantfile)
-        if expected:
-            self.assertEqualDirs(wantdir,
-                                 "%s/%s" % (self.datadir,
-                                            self.repoclass.alias))
-        else:
-            self.fail('No files were marked as "expect" in specfile %s' %
-                      specfile)
-
-
-    def old_download_test(self, specfile):
-        def my_get(url, **kwargs):
-            res = Mock()
-            try:
-                urlspec = spec[url]
-                if isinstance(urlspec, str):
-                    urlspec = {'file': urlspec}
-                if 'charset' not in urlspec:
-                    urlspec['charset'] = 'utf-8'
-                url_location = os.path.join(os.path.dirname(specfile),
-                                            urlspec['file'])
-                # load the .content property
-                with open(url_location, "rb") as fp:
-                    res.content = fp.read()
-                # but only load .text if a charset is present (note
-                # default value of 'utf-8' above -- set 'charset': null in
-                # the json file for binary files
-                if urlspec['charset']:
-                    with codecs.open(url_location, "r", encoding=urlspec['charset']) as fp:
-                        res.text = fp.read()
-                # FIXME: Using a defaultdict ensures that we'll never trip
-                # over the non-existance of certain headers. WE should
-                # specify only the most basic headers to make sure calling
-                # code doesn't rely on eg. the etag header always being
-                # there, because it won't
-                res.headers = collections.defaultdict(lambda: None)
-                res.headers['X-These-Headers-Are'] = 'Faked'
-                res.status_code = 200
-            except KeyError:
-                # the given url was not provided in the specfile. What
-                # if we raise this as a 404?
-                res.status_code = 404
-                res.raise_for_status = Mock(side_effect=requests.exceptions.HTTPError)
-            return res
+    def download_test(self, specfile, basefile=None):
+        # this function can run in normal test mode or in
+        # SET_TESTFILES mode. In the latter, all the normal download
+        # code, including net access, is run. Calls to requests.get
+        # are intercepted and notes are made of which URLs are
+        # requested, and if this results in files on disk. The end
+        # result is a JSON file and a set of cached files, all under
+        # source/.
+        # this is used 
+        def add_downloaded_files(filelist, spec, url):
+            downloaddir = os.sep.join([self.datadir, self.repoclass.alias,
+                                       "downloaded"])
+            for f in list(util.list_dirs(downloaddir)):
+                if f.endswith(".etag"):
+                    continue  # FIXME: this is ugly
+                if f not in filelist:
+                    print("Fetching %s resulted in downloaded file %s" % (url, f))
+                    filelist.append(f)
+                    spec[url]['expect'] = "downloaded"+ f.replace(downloaddir, "")
+                    dest = os.path.join(os.path.dirname(specfile), "../downloaded/"+f)
+                    util.ensure_dir(dest)
+                    shutil.copy2(f, dest)
 
         with codecs.open(specfile, encoding="utf-8") as fp:
             spec = json.load(fp)
@@ -509,19 +432,101 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             # self.repo.config.next_sfsnr = "2014:913"
             if '@settings' in spec:
                 for attribute in spec['@settings']:
-                    thing = getattr(self.repo, attribute)
-                    for key, value in spec['@settings'][attribute].items():
-                        setattr(thing, key, value)
+                    if isinstance(spec['@settings'][attribute], dict):
+                        thing = getattr(self.repo, attribute)
+                        for key, value in spec['@settings'][attribute].items():
+                            setattr(thing, key, value)
+                    else:
+                        setattr(self.repo, attribute,
+                                spec['@settings'][attribute])
+        
+        if os.environ.get("FERENDA_SET_TESTFILE"):
+            downloaddir = os.sep.join([self.datadir, self.repoclass.alias,
+                                       "downloaded"])
+            state = {'downloaded':  list(util.list_dirs(downloaddir)),
+                     'previous_url': None,
+                     'requests': 0}
+            try:
+                rc = int(os.environ.get("FERENDA_SET_TESTFILE"))
+                state['total_requests'] = rc
+            except TypeError:
+                requests_count = 2 # search page, single payload
+                state['total_requests'] = 2
 
-        with patch('requests.sessions.Session.get', side_effect=my_get):
-            with patch('requests.get', side_effect=my_get):
-                self.repo.download()
+                       
+            def callback(req):
+                # clean up after last callback
+                add_downloaded_files(state['downloaded'], spec, state['previous_url'])
+                if state['requests'] == state['total_requests']:
+                    raise MaxDownloadsReached()
+                # make a real requests call somehow
+                responses.stop()
+                resp = requests.get(req.url)
+                responses.start()
+                # create a filename. use .html as suffix unless we
+                # should use something else
+                contenttype = resp.headers["Content-type"]
+                stem = os.path.splitext(specfile)[0]
+                suffix = {'application/pdf': 'pdf',
+                          'application/json': 'json',
+                          'text/plain': 'txt'}.get(contenttype, "html")
+                outfile = "%s-%s.%s" % (stem, state['requests'], suffix)
+                with open(outfile, "wb") as fp:
+                    fp.write(resp.content)
 
+                if suffix == "html":
+                    print("requested %s, saved as %s. Edit if needed, then press enter" % (req.url, outfile))
+                    x = input()
+                else:
+                    print("requested %s, saved %s" % (req.url, outfile))
 
+                with open(outfile, "rb") as fp:
+                    content = fp.read()
+                spec[req.url] = {'file': os.path.basename(outfile)}
+                if resp.encoding != 'utf-8':
+                    spec[req.url]['encoding'] = resp.encoding
+
+                state['requests'] += 1
+                state['previous_url'] = req.url
+                return (resp.status_code, resp.headers, content)
+        else:
+            def callback(req):
+                from pudb import set_trace; set_trace()
+                headers = {'Content-type': 'text/html'}
+                try:
+                    urlspec = spec[req.url]
+                    if isinstance(urlspec, str):
+                        urlspec = {'file': urlspec}
+                    url_location = os.path.join(os.path.dirname(specfile),
+                                                urlspec['file'])
+                    # load the .content property
+                    with open(url_location, "rb") as fp:
+                        content = fp.read()
+                    return (200, headers, content)
+                except KeyError:
+                    return (404, headers, "Not found")
+        responses.add_callback(responses.GET,
+                               re.compile("(.*)"),
+                               callback)
+        # PERFORM THE TEST
+        try:
+            self.repo.download(basefile)
+        except MaxDownloadsReached:
+            pass
+
+        if os.environ.get("FERENDA_SET_TESTFILE"):
+            # process final file and save specfile
+            add_downloaded_files(state['downloaded'], spec,
+                                 state['previous_url'])
+            with open(specfile, "wb") as fp:
+                json.dump(spec, fp, indent=4)
+        
         # organize a temporary copy of files that we can compare our results to
         wantdir = "%s/%s-want" % (self.datadir, self.repoclass.alias)
         expected = False
         for url in spec:
+            if url == "@settings":
+                continue
             if "expect" in spec[url]:
                 expected = True
                 sourcefile = os.path.join(os.path.dirname(specfile),
@@ -532,10 +537,15 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         if expected:
             self.assertEqualDirs(wantdir,
                                  "%s/%s" % (self.datadir,
-                                            self.repoclass.alias))
+                                            self.repoclass.alias),
+                                 subset=True)
         else:
-            self.fail('No files were marked as "expect" in specfile %s' %
-                      specfile)
+            # the test doesn't actually result in any downloaded file
+            if hasattr(self.repo, 'expect') and self.repo.expect is False:
+                pass
+            else:
+                self.fail('No files were marked as "expect" in specfile %s' %
+                          specfile)
 
     def distill_test(self, downloaded_file, rdf_file, docroot):
         basefile = self.filename_to_basefile(downloaded_file)

@@ -90,10 +90,6 @@ PROV = Namespace(util.ns['prov'])
 # body: [Paragraph(), Paragraph(), Paragraph(), ...]
 
 
-class MaxDownloadsReached(Exception):
-    pass
-
-
 class DVStore(DocumentStore):
 
     """Customized DocumentStore.
@@ -340,7 +336,7 @@ class DV(SwedishLegalSource):
             else:
                 self.log.warning("Config variable ftpuser not set, downloading from secondary source (https://lagen.nu/dv/downloaded/) instead")
                 self.download_www("", recurse)
-        except MaxDownloadsReached:  # ok we're done!
+        except errors.MaxDownloadsReached:  # ok we're done!
             pass
 
     def download_ftp(self, dirname, recurse, user=None, password=None, connection=None):
@@ -514,7 +510,7 @@ class DV(SwedishLegalSource):
                     if ('downloadmax' in self.config and
                         self.config.downloadmax and
                         self.downloadcount >= self.config.downloadmax):
-                        raise MaxDownloadsReached()
+                        raise errors.MaxDownloadsReached()
                 else:
                     self.log.warning('Could not interpret filename %r i %s' %
                                      (name, os.path.relpath(zipfilename)))

@@ -134,3 +134,11 @@ class SchemaMappingError(Exception):
        fulltextindex store.
 
     """
+
+
+class MaxDownloadsReached(Exception):
+    """Raised whenever a recursive download operation has reached a
+    globally set maximum number of requests.
+
+    """
+    pass

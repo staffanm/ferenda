@@ -273,6 +273,8 @@ def list_dirs(d, suffix=None, reverse=False):
     directories = [d]
     while directories:
         d = directories.pop()
+        if not os.path.exists(d):
+            continue
         for f in sorted(os.listdir(d), key=split_numalpha, reverse=reverse):
             f = "%s%s%s" % (d, os.path.sep, f)
             if os.path.isdir(f):
