@@ -12,7 +12,7 @@ In many cases, your source document will naturally be split up in a
 large number of "chunks". These chunks may be lines or paragraphs in a
 plaintext documents, or tags of a certain type in a certain location
 in a HTML document. Regardless, it is often easy to generate a list of
-such chunks.
+such chunks. See, in particular, :doc:`readers`.
 
 .. note:: 
 

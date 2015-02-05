@@ -19,6 +19,19 @@ Backwards-incompatible changes:
   arguments are then added to the config object. If you have
   overridden __init__ for your docrepo, you'll need to make sure to
   handle this first argument.
+* The Newscriteria class has been removed. The Facet framework is now
+  used to define news feeds (as well as TOC pages, the ReST API and
+  fulltext indexing)
+* The PDFReader constructor now takes, as first argument, a list of
+  pdfreader.Page objects. Normally, a client won't have these but must
+  instead provide a filename of a PDF file through the filename
+  argument (which used to be the first argument, but must now be
+  specified as a named argument).
+* the getfont() method of pdfreader.Textbox objects used to return a
+  straight dict of strings, but has now been replaced with a font
+  property that is now a LayeredConfig object with proper typing. Code
+  like "int(textbox.getfont()['size'])" should now be written like
+  "textbox.font.size".
 
 New features:
 -------------

@@ -35,3 +35,4 @@ __version__ = "0.2.1.dev10" #gets pulled into setup.py and docs/conf.py
 # dev8: LayeredConfig.set (used by manager._instantiate_class)
 # dev9: buildclient, buildqueue, --buildserver and --buildqueue support
 # dev10: LayeredConfig separate package, no longer bundled.
+# dev11: Feed functionality uses facets, New PDFAnalyzer, testutil.download_test supports FERENDA_SET_TESTFILES...

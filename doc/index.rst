@@ -25,6 +25,7 @@ documents, and republishing the results.
    elementclasses
    fsmparser
    citationparsing
+   readers
    facets
    toc
    news

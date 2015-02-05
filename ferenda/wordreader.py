@@ -16,8 +16,8 @@ from ferenda import errors, util
 class WordReader(object):
 
     """Reads .docx and .doc-files (the latter with support from `antiword
-    <http://www.winfield.demon.nl/>`_) and presents a slightly easier
-    API for dealing with them.
+    <http://www.winfield.demon.nl/>`_) and converts them to a XML form
+    that is slightly easier to deal with.
 
     """
 

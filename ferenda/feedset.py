@@ -5,16 +5,17 @@ from __future__ import unicode_literals
 class Feedset(object):
 
     """Represents a particular set of feeds, structured around some
-particular attribute(s) of documents, like title or publication date.
+    ke particular attribute(s) of documents, like title or publication
+    date.
 
-    :param label: A description of this set of feeds, like
-                  "By publisher"
+    :param label: A description of this set of feeds, like "By publisher"
     :type  label: str
     :param feeds: The set of :py:class:`~ferenda.Feed` objects that makes
                   up this page set.
     :type  feeds: list
-    :param predicate: The RDFLib predicate (if any) that this feedset is
+    :param predicate: The predicate (if any) that this feedset is
                       keyed on.
+    :type  predicate: rdflib.term.URIRef
 
     """
 
