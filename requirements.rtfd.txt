@@ -23,7 +23,7 @@ twine
 psutil
 layeredconfig
 grako
-matplotlib
-PyPDF2
-reportlab
+# matplotlib
+# PyPDF2
+# reportlab
 responses
