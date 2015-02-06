@@ -267,6 +267,7 @@ def skip_some_data_attributes(app, what, name, obj, skip, options):
         return True
     elif name == "documentstore_class":
         print("Skipping the attribute %r" % name)
+        return False
     else:
         return skip 
 

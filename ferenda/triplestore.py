@@ -20,7 +20,13 @@ import six
 from six import text_type as str
 from six.moves.urllib_parse import quote
 
-from ferenda.thirdparty import SQLite
+try:
+    from ferenda.thirdparty import SQLite
+except ImportError:
+    # not a required dependency
+    print("WARNING: cannot import SQLite but trying to go on anyway")
+    pass
+
 from ferenda import util, errors
 
 

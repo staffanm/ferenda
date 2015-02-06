@@ -80,9 +80,9 @@ class DocumentRepository(object):
 
     .. note::
 
-       This class has a ridiculous amount of methods that you can
-       override to control most of Ferendas behaviour in all
-       stages. For basic usage, you need only a fraction of
+       This class has a ridiculous amount of properties and methods
+       that you can override to control most of Ferendas behaviour in
+       all stages. For basic usage, you need only a fraction of
        them. Please don't be intimidated/horrified.
 
     """
@@ -400,7 +400,7 @@ class DocumentRepository(object):
         :param label: The textual label to lookup
         :type  label: str
         :param predicate: The RDF predicate to use when looking for the label
-        :type  predicate: rdflib.term.RIRef
+        :type  predicate: rdflib.term.URIRef
         :param cutoff: How fuzzy the matching may be (1 = must match
                        exactly, 0 = anything goes)
         :type  cutoff: float
@@ -408,7 +408,7 @@ class DocumentRepository(object):
                      performed
         :type  warn: bool
         :returns: The matching resource
-        :rtype: rdflib.URIRef
+        :rtype: rdflib.term.URIRef
 
         """
 
@@ -2154,6 +2154,16 @@ WHERE {
             docentry.save()
 
     def get_url_transform_func(self, repos, basedir):
+        """Returns a function that, when called with a URI, transforms that
+        URI to another suitable reference. This can be used to eg. map
+        between canonical URIs and local URIs. The function is run on
+        all URIs in a post-processing step after
+        :py:meth:`~ferenda.DocumentRepository.generate` runs. The
+        default implementatation maps URIs to local file paths, and is
+        only run if ``config.staticsite``is ``True``.
+
+        """
+
         # This implementation always transforms URLs to local file
         # paths (or if they can't be mapped, leaves them alone)
 
@@ -2191,6 +2201,7 @@ WHERE {
         return transform
 
     def prep_annotation_file(self, basefile):
+
         """Helper function used by
         :py:meth:`~ferenda.DocumentRepository.generate` -- prepares a
         RDF/XML file containing statements that in some way annotates
@@ -2638,7 +2649,22 @@ WHERE {
         self.news_generate_feeds(feeds)
 
 
-    def news_facet_entries(self, keyfunc=itemgetter('updated'), reverse=True):
+    def news_facet_entries(self, keyfunc=None, reverse=True):
+        """Returns a set of entries, decorated with information from
+        :py:meth:`~ferenda.DocumentRepository.faceted_data`, used for
+        feed generation.
+
+        :param keyfunc: Function that given a dict, returns an element 
+                        from that dict, used for sorting entries.
+        :type keyfunc: callable
+        :param reverse: The direction of the sorting
+        :type reverse:
+        :returns: entries, each represented as a dict
+        :rtype: list
+        """
+
+        if keyfunc is None:
+            keyfunc = itemgetter('updated')            
         cachepath = self.store.resourcepath("feed/faceted_entries.json")
 
         # create an iterable of all the dependencies. If any of these
@@ -2806,12 +2832,32 @@ WHERE {
     # selector and indentificator are, but fow now this is congruent
     # with toc_item
     def news_item(self, binding, entry):
+        """Returns a modified version of the news entry for use in a specific
+        feed.
+
+        You can override this if you eg. want to customize title or
+        summary of each entry in a particular feed. The default
+        implementation does not change the entry in any way.
+
+        :param binding: identifier for the feed being constructed, derived 
+                        from a facet object.
+        :type binding: str
+        :param entry:  The entry object to modify
+        :type entry: ferenda.DocumentEntry
+        :returns: The modified entry
+        :rtype: ferenda.DocumentEntry
+
+        """
+
+        
         # the default impl doesn't change a thing, but other impls
         # might fiddle with title and summary
         return entry
 
     def news_entries(self):
-        """Return a generator of all available (and published) DocumentEntry objects.
+        """Return a generator of all available (and published) DocumentEntry
+        objects.
+
         """
         directory = os.path.sep.join((self.config.datadir, self.alias, "entries"))
         for basefile in self.store.list_basefiles_for("news"):
@@ -2866,7 +2912,17 @@ WHERE {
             yield entry
 
     def news_generate_feeds(self, feedsets, generate_html=True):
-        # generates Atom feeds AND HTML equivalents
+        """Creates a set of Atom feeds (and optionally HTML equivalents) by
+        calling :py:meth:`~ferenda.DocumentRepository.news_write_atom`
+        for each feed in feedsets.
+
+        :param feedsets: the result of :py:meth:`~ferenda.DocumentRepository.news_feedsets`
+        :type feedsets: list
+        :param generate_html: Whether to generate HTML equivalents of
+                              the atom feeds
+        :type generate_html: bool
+        """
+
         if generate_html:
             conffile = os.path.abspath(
                 os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
@@ -2896,6 +2952,7 @@ WHERE {
                                                uritransform=uritransform)
 
     def news_write_atom(self, entries, title, slug, archivesize=100):
+
         """Given a list of Atom entry-like objects, including links to RDF
         and PDF files (if applicable), create a rinfo-compatible Atom feed,
         optionally splitting into archives."""
