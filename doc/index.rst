@@ -32,6 +32,7 @@ documents, and republishing the results.
    wsgi
    restapi
    external-dbs
+   testing
    advanced
 
    

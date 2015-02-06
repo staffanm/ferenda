@@ -2955,7 +2955,21 @@ WHERE {
 
         """Given a list of Atom entry-like objects, including links to RDF
         and PDF files (if applicable), create a rinfo-compatible Atom feed,
-        optionally splitting into archives."""
+        optionally splitting into archives.
+
+        :param entries: :py:class:`~ferenda.DocumentEntry` objects
+        :type  entries: list
+        :param title: feed title
+        :type  title: str
+        :param slug: used for constructing the path where the Atom files are
+                     stored and the URL where it's published. 
+        :type  slug: str
+        :param archivesize: The amount of entries in each archive
+                            file. The main file might contain up to 2
+                            x this amount.
+        :type archivesize: int
+
+        """
 
         # This nested func does most of heavy lifting, the main
         # function code only sets up basic constants and splits the
@@ -3065,19 +3079,31 @@ WHERE {
         return res
 
     def frontpage_content(self, primary=False):
-        """If the module wants to provide any particular content on
-        the frontpage, it can do so by returning a XHTML fragment (in
-        text form) here. If primary is true, the caller wants the
-        module to take primary responsibility for the frontpage
-        content. If primary is false, the caller only expects a
+        """If the module wants to provide any particular content on the
+        frontpage, it can do so by returning a XHTML fragment (in text
+        form) here.
+
+        :param primary: Whether the caller wants the module to take
+                        primary responsibility for the frontpage
+                        content. If ``False``, the caller only expects
+                        a smaller amount of content (like a smaller
+                        presentation of the repository and the
+                        document it contains).
+        :type primary: bool
+        :return: the XHTML fragment
+        :rtype: str
+        If primary is true, . If primary is false, the caller only expects a
         smaller amount of content (like a smaller presentation of the
-        repository and the document it contains)."""
+        repository and the document it contains).
+
+        """
         g = self.make_graph()
         if isinstance(self.rdf_type, (tuple, list)):
             qname = ", ".join([g.qname(x) for x in self.rdf_type])
         else:
             qname = g.qname(self.rdf_type)
-        return ("<h2><a href='%s'>Document repository '%s'</a></h2><p>Handles %s documents. "
+        return ("<h2><a href='%s'>Document repository '%s'</a></h2>"
+                "<p>Handles %s documents. "
                 "Contains %s published documents.</p>"
                 % (self.dataset_uri(), self.alias, qname,
                    len(list(self.store.list_basefiles_for("_postgenerate")))))
@@ -3125,7 +3151,12 @@ WHERE {
         # generated: None (143 needs generating)
     def get_status(self):
         """Returns basic data about the state about this repository, used by
-        :meth:`~ferenda.DocumentRepository.status`.
+        :meth:`~ferenda.DocumentRepository.status`. Returns a dict of
+        dicts, one per state ('download', 'parse' and 'generated'),
+        each containing lists under the 'exists' and 'todo' keys.
+
+        :returns: Status information
+        :rtype: dict
 
         """
         status = OrderedDict()
@@ -3167,14 +3198,15 @@ WHERE {
         return status
 
     def tabs(self):
-        """Get the navigation menu segment(s) provided by this docrepo
+        """Get the navigation menu segment(s) provided by this docrepo.
 
         Returns a list of tuples, where each tuple will be rendered
         as a tab in the main UI. First element of the tuple is the
         link text, and the second is the link destination. Normally, a
         module will only return a single tab.
 
-        :returns: List of tuples
+        :returns: (link text, link destination) tuples
+        :rtype: list
 
         Example:
 
