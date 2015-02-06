@@ -69,7 +69,7 @@ authors, included in accordance with their respective licenses:
 * `Grit XSLT stylesheets <http://code.google.com/p/oort/wiki/Grit>`_
   and `RDL service UI
   <https://github.com/rinfo/rdl/tree/master/packages/java/rinfo-service/src/main/webapp/ui>`_
-  by Niklas Lindström, BSD
+  by Niklas Lindstrom, BSD
 * `httpheader <http://deron.meranda.us/python/httpheader/>`_ by Deron
   Meranda, LGPL
 * `smc.mw <https://pypi.python.org/pypi/smc.mw>`_ by Marcus Brinkmann, BSD

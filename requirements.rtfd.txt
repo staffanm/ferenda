@@ -1,0 +1,29 @@
+# special set of reqs due to the fact that readthedocs fails to pip
+# install rdfextras due to utf-8 problems
+
+beautifulsoup4
+lxml
+rdflib
+rdflib-jsonld
+html5lib
+requests
+six
+jsmin
+cssmin
+whoosh
+pyparsing
+# sphinx
+mock # not needed for py3.3 +
+coverage
+# bsddb3 
+pyScss
+docutils
+wheel
+twine
+psutil
+layeredconfig
+grako
+matplotlib
+PyPDF2
+reportlab
+responses
