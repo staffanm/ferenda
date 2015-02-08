@@ -387,7 +387,6 @@ def run(argv, subcall=False):
                         # existing config object to run as an optional
                         # argument)
                         argscopy = argv[2:] # skip alias and action
-                        argscopy.extend(_filter_argv_options(argv))
                         argscopy.insert(0, action)
                         argscopy.insert(0, "all")
                         results[action] = run(argscopy, subcall=True)
@@ -572,6 +571,7 @@ def _load_config(filename=None, argv=None, defaults=None):
                     'processes': 1,
                     'datadir': 'data',
                     'force': False,
+                    'downloadmax': int,  # used strictly for typing
                     'combineresources': False,
                     'staticsite': False,
                     'sitename': 'MySite',

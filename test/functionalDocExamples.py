@@ -155,6 +155,13 @@ class Examples(unittest.TestCase, FerendaTestCase):
                     if cmdline.startswith("ferenda-setup"):
                         cmdline = cmdline.replace("ferenda-setup",
                                                   ferenda_setup)
+                    elif cmdline.endswith("--downloadmax=50"):
+                        # special ugly hack to make sure only three
+                        # docs are downloaded during testing
+                        cmdline = cmdline.replace("--downloadmax=50",
+                                                  "--downloadmax=3")
+                        print("no, '%s'" % cmdline, end=" ... ")
+
                     if cmdline.startswith("cd "):
                         # emulate this shell functionality in our control
                         # logic. note: no support for quoting and therefore

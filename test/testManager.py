@@ -707,6 +707,13 @@ class Run(RunBase, unittest.TestCase):
         self.maxDiff = None
         self.assertEqual(want,got)
         
+        # 7. add an unrelated command line flag and verify that this
+        # does not interfere with the processing
+        argv.append('--downloadmax=50')
+        got = manager.run(argv)
+        self.assertEqual(want,got)
+
+
     def test_run_single_allmethods(self):
         self._enable_repos()
         argv = ["test", "all"]
@@ -788,6 +795,7 @@ imgfiles = []
         }
         got = manager.run(['all', 'makeresources'])
         self.assertEqual(want,got)
+
 
     def test_run_makeresources_defaultconfig(self):
         util.resource_extract('res/scripts/ferenda.template.ini', "ferenda.ini",

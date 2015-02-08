@@ -286,6 +286,11 @@ class FerendaTestCase(object):
 
 
 class RepoTesterStore(object):
+    """This is an internal class used by RepoTester in order to control
+    where source documents are read from.
+
+    """
+    
     def __init__(self, origstore, downloaded_file=None):
         self.origstore = origstore
         self.downloaded_file = downloaded_file
@@ -394,6 +399,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
 
     @responses.activate
     def download_test(self, specfile, basefile=None):
+        """This test is run for each json file found in docroot/source."""
         # this function can run in normal test mode or in
         # SET_TESTFILES mode. In the latter, all the normal download
         # code, including net access, is run. Calls to requests.get
@@ -491,7 +497,6 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
                 return (resp.status_code, resp.headers, content)
         else:
             def callback(req):
-                from pudb import set_trace; set_trace()
                 headers = {'Content-type': 'text/html'}
                 try:
                     urlspec = spec[req.url]
@@ -548,6 +553,12 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
                           specfile)
 
     def distill_test(self, downloaded_file, rdf_file, docroot):
+        """This test is run once for each basefile found in
+        docroot/downloaded. It performs a full parse, and verifies that
+        the distilled RDF metadata is equal to the TTL files placed in
+        docroot/distilled/.
+
+        """
         basefile = self.filename_to_basefile(downloaded_file)
         origstore = self.repo.store
         self.repo.store = RepoTesterStore(origstore, downloaded_file)
@@ -568,6 +579,12 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             self.repo.store = origstore
 
     def parse_test(self, downloaded_file, xhtml_file, docroot):
+        """This test is run once for each basefile found in
+        docroot/downloaded. It performs a full parse, and verifies that
+        the resulting XHTML document is equal to the XHTML file placed in
+        docroot/parsed/.
+
+        """
         # patch method so we control where the downloaded doc is
         # loaded from.
         basefile = self.filename_to_basefile(downloaded_file)
@@ -689,7 +706,7 @@ def file_parametrize(cls, directory, suffix, filter=None, wrapper=None):
     :type  directory: str
     :param suffix: Suffix of the files that should be turned into tests (other files in the directory are ignored)
     :type  directory: str
-    :param filter: Will be called with the name of each matching file. If the ``filter`` callable returns True, no test is created
+    :param filter: A function to be called with the name of each found file. If this function returns True, no test is created
     :type  params: callable
     :param wrapper: A unittest decorator like :py:func:`unittest.skip` or :py:func:`unittest.expectedFailure`.
     :param wrapper: callable (decorator)
