@@ -129,6 +129,7 @@ class Analyze(unittest.TestCase):
                            'rightmargin_even': 748},
                           metrics)
 
+    @unittest.skipIf('TRAVIS' in os.environ or 'APPVEYOR' in os.environ, "Not using matplotlib-based tests on Travis/Appveyor")
     def test_plot(self):
         # just test that a plot is created
         plotpath = "test/files/pdfanalyze/lipsum.plot.png"
@@ -139,7 +140,7 @@ class Analyze(unittest.TestCase):
     # reportlab doesn't work with py3.2, current release of pyPDF2
     # (1.24) has a py3 bug that crashes page merging (patch exists at
     # https://github.com/mstamy2/PyPDF2/pull/172)
-    @unittest.skipIf(sys.version_info > (3, 0, 0), "pyPDF2 not working on py3")
+    @unittest.skipIf(sys.version_info > (3, 0, 0) or 'TRAVIS' in os.environ or 'APPVEYOR' in os.environ, "pyPDF2 not working on py3")
     def test_drawboxes(self):
         # just test that a pdf is created
         pdfpath = "test/files/pdfanalyze/lipsum.debug.pdf"
