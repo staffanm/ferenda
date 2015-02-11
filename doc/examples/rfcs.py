@@ -330,7 +330,7 @@ class RFCs(DocumentRepository):
                 Facet(self.ns['dcterms'].issued),
                 Facet(self.ns['dcterms'].subject,
                       selector=Facet.defaultselector,
-                      identificator=Facet.defaultselector,
+                      identificator=Facet.defaultidentificator,
                       key=Facet.defaultselector,
                       use_for_feed=True),
                 Facet(self.ns['dcterms'].identifier,
@@ -380,6 +380,7 @@ manager.makeresources([d])
 for basefile in d.store.list_basefiles_for("generate"):
    d.generate(basefile)
 d.toc()
+
 d.news()
 manager.frontpage([d])
 shutil.rmtree("data")

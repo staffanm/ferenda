@@ -36,6 +36,7 @@ all(*) RFCs and W3C recommended standards.
 Alternately, using the command line tools and the project framework:
  
 .. literalinclude:: examples/intro-example.sh
+  :lines:1-19,21-
 
 .. note::
 

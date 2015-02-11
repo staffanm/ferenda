@@ -10,6 +10,7 @@ from datetime import date, datetime, MAXYEAR, MINYEAR
 
 import six
 from six.moves.urllib_parse import quote
+from six import text_type as str
 import requests
 import requests.exceptions
 from bs4 import BeautifulSoup
@@ -712,7 +713,7 @@ class ElasticSearchIndex(RemoteIndex):
             elif isinstance(schema[k], Resource):
                 # also map k to "%s.iri" % k if k is Resource
                 k += ".iri"
-                
+
             if isinstance(v, str) and "*" in v:
                 # if v contains "*", make it a {'regexp': '.*/foo'} instead of a {'term'}
                 # also transform * to .*

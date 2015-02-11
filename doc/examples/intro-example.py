@@ -17,7 +17,7 @@ config = {'datadir':'netstandards/exampledata',
           'storerepository':'netstandards',
           'downloadmax': 50 # remove this to download everything
 }
-
+config['downloadmax'] = 3  # try to hide this line somehow
 setup_logger(level='DEBUG')
 
 # Set up two document repositories

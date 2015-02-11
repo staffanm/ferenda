@@ -24,6 +24,7 @@ import six
 from six import text_type as str
 from six import binary_type as bytes
 from six.moves import input
+from six.moves.urllib_parse import unquote
 
 import rdflib
 from rdflib.compare import graph_diff
@@ -424,6 +425,15 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
 
         with codecs.open(specfile, encoding="utf-8") as fp:
             spec = json.load(fp)
+        for k in list(spec.keys()):
+            # NB: This exposes the encoded, possibly non-ascii, values
+            # of the URL as byte strings. The encoding of these is
+            # unknown (and we cannot generally assume UTF-8. Let's see
+            # if this bites us.
+            nk = unquote(k)
+            if k != nk:
+                spec[nk] = spec[k]
+                del spec[k]
 
             # process the special '@settings' key (FIXME: didn't I already
             # implement this somewhere else?)
@@ -499,7 +509,10 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             def callback(req):
                 headers = {'Content-type': 'text/html'}
                 try:
-                    urlspec = spec[req.url]
+                    # normalize req.url. req.url will be a (byte)str
+                    # but keys in spec will be (and should be)
+                    # unicode. Assume that req.url is all ascii
+                    urlspec = spec[unquote(unicode(req.url))]
                     if isinstance(urlspec, str):
                         urlspec = {'file': urlspec}
                     url_location = os.path.join(os.path.dirname(specfile),

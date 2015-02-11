@@ -17,6 +17,7 @@ from ferenda.testutil import FerendaTestCase
 # imports needed by the scripts. I do not fully understand exactly how
 # imports are scoped when using exec, but this is the only way apart
 # from importing inside of the functions that use the code to work.
+import ferenda  # so that we may reload it
 from ferenda import elements, DocumentRepository, DocumentStore, TextReader
 from ferenda.decorators import downloadmax
 from bs4 import BeautifulSoup
@@ -36,8 +37,12 @@ class Examples(unittest.TestCase, FerendaTestCase):
         if not workingdir:
             workingdir = os.getcwd()
         oldwd = os.getcwd()
-        pycode = compile(util.readfile(pyfile), pyfile, 'exec')
+        # we must read this in binary mode since the source code
+        # contains encoding declarations
+        pytext = util.readfile(pyfile, mode="rb")
+        pycode = compile(pytext, pyfile, 'exec')
         os.chdir(workingdir)
+        reload(ferenda)  # so that ferenda.__file__ might return a abspath
         try:
             result = six.exec_(pycode, globals(), locals())
         finally:

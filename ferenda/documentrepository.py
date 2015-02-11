@@ -717,9 +717,9 @@ with the *config* object as single parameter.
         (basefile, link) for all document links found in *source*.
 
         """
-
+        yielded = set()
         for (element, attribute, link, pos) in source:
-            url = basefile = None
+            basefile = None
 
             # Two step process: First examine link text to see if
             # basefile_regex match. If not, examine link url to see
@@ -728,11 +728,14 @@ with the *config* object as single parameter.
                 element.text and
                     re.search(self.basefile_regex, element.text)):
                 m = re.search(self.basefile_regex, element.text)
-                yield(m.group("basefile"), link)
+                basefile = m.group("basefile")
             elif self.document_url_regex and re.match(self.document_url_regex, link):
                 m = re.match(self.document_url_regex, link)
                 if m:
-                    yield(m.group("basefile"), link)
+                    basefile = m.group("basefile")
+            if basefile and (basefile, link) not in yielded:
+                yielded.add((basefile, link))
+                yield (basefile, link)
 
     def download_single(self, basefile, url=None):
         """Downloads the document from the web (unless explicitly
@@ -2289,12 +2292,14 @@ WHERE {
 
     # the inverse of graph_to_annotation_file
     def annotation_file_to_graph(self, annotation_file):
-        """Converts a annotation file (using the Grit format) back into an RDFLib graph.
+        """Converts a annotation file (using the Grit format) back into an
+        RDFLib graph.
 
         :param graph: The filename of a serialized XML document with RDF statements
         :type  graph: str
         :returns: The RDF statements as a regular graph
         :rtype: rdflib.Graph
+
         """
         with open(annotation_file, "rb") as fp:
             intree = etree.parse(fp)

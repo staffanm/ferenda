@@ -139,6 +139,20 @@ class Facet(object):
         return row[binding]
 
     @classmethod
+    def defaultidentificator(cls, row, binding, resource_graph=None):
+        """This returns ``row[binding]`` run through a simple slug-like transformation.
+    
+        >>> row = {"rdf_type": "http://purl.org/ontology/bibo/Book",
+        ...        "dcterms_title": "A Tale of Two Cities",
+        ...        "dcterms_issued": "1859-04-30",
+        ...        "dcterms_publisher": "http://example.org/chapman_hall",
+        ...        "schema_free": "true"}
+        >>> Facet.defaultidentificator(row, "dcterms_title")
+        'a-tale-of-two-cities'
+        """
+        return row[binding].lower().replace(" ", "-")
+
+    @classmethod
     def year(cls, row, binding='dcterms_issued', resource_graph=None):
         """This returns the the year part of ``row[binding]``.
 
@@ -363,7 +377,7 @@ class Facet(object):
         self.indexingtype        = _finddefault(indexingtype, rdftype, 'indexingtype', fulltextindex.Text())
         self.selector            = _finddefault(selector, rdftype, 'selector', self.defaultselector)
         self.key                 = _finddefault(key, rdftype, 'key', self.defaultselector)
-        self.identificator       = _finddefault(identificator, rdftype, 'identificator', self.defaultselector)
+        self.identificator       = _finddefault(identificator, rdftype, 'identificator', self.defaultidentificator)
         self.toplevel_only       = _finddefault(toplevel_only, rdftype, 'toplevel_only', False)
         self.use_for_toc         = _finddefault(use_for_toc, rdftype, 'use_for_toc', False)
         self.use_for_feed        = _finddefault(use_for_feed, rdftype, 'use_for_feed', False)

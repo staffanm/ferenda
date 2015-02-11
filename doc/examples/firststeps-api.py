@@ -7,13 +7,14 @@ import os
 import shutil
 sys.path.append(os.environ['FERENDA_HOME']+"/doc/examples") # to find w3cstandards.py
 
-# begin download-status
+# begin download-status-1 # note: adjust line numbers in firststeps.rst
 from w3cstandards import W3CStandards
 repo = W3CStandards()
-repo.download()
+repo = W3CStandards(downloadmax=3) # not included in docs but needed for tests
+repo.download()  
 repo.status()
 # or use repo.get_status() to get all status information in a nested dict
-# end download-status
+# end download-status-2
 
 # make sure the basefile we use for examples is available
 repo.download("rdfa-core")

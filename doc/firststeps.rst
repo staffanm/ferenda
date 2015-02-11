@@ -157,9 +157,8 @@ We can get a overview of the status of our docrepo using the
    To do the same using the API:
 
    .. literalinclude:: examples/firststeps-api.py
-      :start-after: # begin download-status
-      :end-before: # end download-status
-
+     :lines: 11-12,14-16
+     
 Finally, if the logging information scrolls by too quickly and you
 want to read it again, take a look in the ``data/logs`` directory.
 Each invocation of ``ferenda-build.py`` creates a new log file

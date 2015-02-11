@@ -266,16 +266,11 @@ def downloadmax(f):
     @functools.wraps(f)
     def wrapper(self, params):
         if 'downloadmax' in self.config:
-            with open("/Users/staffan/wds/ferenda/status.txt", "a") as fp:
-                fp.write("Downloading max %d documents\n" %
-                         (self.config.downloadmax))
             self.log.info("Downloading max %d documents" %
                           (self.config.downloadmax))
             generator = itertools.islice(f(self, params),
                                          self.config.downloadmax)
         else:
-            with open("/Users/staffan/wds/ferenda/status.txt", "wa") as fp:
-                fp.write("Downloading all the docs")
             self.log.debug("Downloading all the docs")
             generator = f(self, params)
         for value in generator:

@@ -134,7 +134,9 @@ class Repo(RepoTester):
             mockresponse.text = fp.read()
         with patch('requests.get', return_value=mockresponse):
             self.assertTrue(d.download())
-        
+
+        # the index file relly has four eligble links, but one is a
+        # dupe -- make sure it's filtered out.
         self.assertEqual(d.download_single.call_count,3)
         d.download_single.assert_has_calls([call("123/a","http://example.org/docs/1.html"),
                                             call("123/b","http://example.org/docs/2.html"),

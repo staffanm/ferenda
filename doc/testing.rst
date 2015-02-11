@@ -1,5 +1,5 @@
-Testing your repo
-=================
+Testing your docrepo
+====================
 
 The module :py:mod:`~ferenda.testutil` contains an assortment of
 classes and functions that can be useful when testing code written
@@ -11,10 +11,20 @@ Extra assert methods
 The :py:class:`ferenda.testutil.FerendaTestCase` is intended to be
 used by your :py:class:`unittest.TestCase` based testcases. Your
 testcase inherits from both ``TestCase`` and ``FerendaTestCase``, and
-thus gains new assert methods to compare
-:py:class:`rdflib.graph.Graph` objects,XML documents, the entire
-contents of two directories and also the option to compare *almost
-equal* datetimes to a determined precision
+thus gains new assert methods:
+
+=====================================  ======================
+Method                                 Description
+=====================================  ======================
+:py:meth:`.assertEqualGraphs`          Compares two
+                                       :py:class:`~rdflib.graph.Graph` objects
+:py:meth:`.assertEqualXML`             Compares two XML documents (in string or
+                                       :py:mod:`lxml.etree` form)
+:py:meth:`.assertEqualDirs`            Compares the files and contents of those
+                                       files in two directories
+:py:meth:`.assertAlmostEqualDatetime`  Compares two datetime objects to a
+                                       specified precision
+=====================================  ======================
 
 Creating parametric tests
 -------------------------
@@ -50,9 +60,19 @@ The :py:class:`~ferenda.testutil.RepoTester` contains generic,
 parametric test for all three of these. In order to use them, you
 create test data in some directory of your choice, create a subclass
 of ``RepoTester`` specifying the location of your test data and the
-docrepo class you want to test, and finally call
+docrepo class you want to test: and finally call
 :py:func:`~ferenda.testutil.parametrize_repotester` in your top-level
-test code to set up one test for each test data file that you've created.
+test code to set up one test for each test data file that you've
+created.
+
+.. literalinclude:: repotester.py
+
+For each download test, you need to create a JSON file under the
+``source`` directory of your docroot, eg:
+``myrepo/tests/files/source/basic.json``. The content of that file
+should be a dict of ...
+
+.. literalinclude:: repotester-basic.json
 
 See docs for :py:class:`~ferenda.testutil.RepoTester.download_test`,
 :py:class:`~ferenda.testutil.RepoTester.distill_test` and

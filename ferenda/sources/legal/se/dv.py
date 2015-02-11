@@ -316,7 +316,9 @@ class DV(SwedishLegalSource):
     # on age isn't uncommon, maybe DocumentStore should support it natively
     # (like with optional suffix parameter to download_path)?
 
-    def download(self):
+    def download(self, basefile):
+        if basefile is not None:
+            raise ValueException("DV.download cannot process a basefile parameter")
         # recurse =~ download everything, which we do if force is
         # specified OR if we've never downloaded before
         recurse = False

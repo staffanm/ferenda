@@ -125,7 +125,6 @@ $ ./ferenda-build.py w3c parse --all --loglevel=DEBUG
 
 # begin relate-all
 $ ./ferenda-build.py w3c relate --all
-22:17:02 w3c INFO Clearing context http://localhost:8000/dataset/w3c at repository ferenda
 22:17:03 w3c INFO xml-entity-names: relate OK (0.618 sec)
 22:17:04 w3c INFO rdfa-core: relate OK (1.542 sec)
 22:17:06 w3c INFO emotionml: relate OK (1.647 sec)
@@ -179,6 +178,7 @@ $ ./ferenda-build.py w3c toc
 22:17:18 w3c INFO Created data/w3c/toc/index.html
 22:17:18 root INFO w3c toc finished in 2.059 sec
 $ ./ferenda-build.py w3c news
+21:43:55 w3c INFO feed type/document: 4 entries
 22:17:19 w3c INFO feed main: 4 entries
 22:17:19 root INFO w3c news finished in 0.115 sec
 $ ./ferenda-build.py w3c frontpage
@@ -198,19 +198,9 @@ $ ./ferenda-build.py w3c all
 22:17:25 root INFO w3cstandards.W3CStandards relate: Nothing to do!
 22:17:25 root INFO w3cstandards.W3CStandards relate finished in 0.025 sec
 22:17:25 root INFO Wrote data/rsrc/resources.xml
-22:17:29 w3c INFO xml-entity-names: generate OK (0.000 sec)
-22:17:29 w3c INFO rdfa-core: generate OK (0.000 sec)
-22:17:29 w3c INFO emotionml: generate OK (0.000 sec)
-22:17:29 w3c INFO MathML3: generate OK (0.000 sec)
 22:17:29 root INFO w3cstandards.W3CStandards generate finished in 0.006 sec
-22:17:32 w3c INFO Created data/w3c/toc/dcterms_issued/2013.html
-22:17:32 w3c INFO Created data/w3c/toc/dcterms_issued/2014.html
-22:17:32 w3c INFO Created data/w3c/toc/dcterms_title/e.html
-22:17:32 w3c INFO Created data/w3c/toc/dcterms_title/m.html
-22:17:32 w3c INFO Created data/w3c/toc/dcterms_title/r.html
-22:17:32 w3c INFO Created data/w3c/toc/dcterms_title/x.html
-22:17:32 w3c INFO Created data/w3c/toc/index.html
 22:17:32 root INFO w3cstandards.W3CStandards toc finished in 3.376 sec
+22:17:34 w3c INFO feed type/document: 4 entries
 22:17:32 w3c INFO feed main: 4 entries
 22:17:32 root INFO w3cstandards.W3CStandards news finished in 0.063 sec
 22:17:32 root INFO frontpage: wrote data/index.html (0.017 sec)
