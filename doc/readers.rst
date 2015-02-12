@@ -33,6 +33,8 @@ word document -- instead, it converts the document to a XML file which
 is either based on the ``docbook`` output of ``antiword``, or the raw
 OOXML found inside of the ``.docx`` file.
 
+.. _pdfreader:
+
 PDF documents
 -------------
 

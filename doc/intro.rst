@@ -30,13 +30,11 @@ tool. This code uses the Ferenda API to create a website containing
 all(*) RFCs and W3C recommended standards.
 
 .. literalinclude:: examples/intro-example.py
-   :start-after: # begin example		    
-   :end-before: # end example		    
+   :lines: 8-19,21-65
 
 Alternately, using the command line tools and the project framework:
  
 .. literalinclude:: examples/intro-example.sh
-  :lines:1-19,21-
 
 .. note::
 

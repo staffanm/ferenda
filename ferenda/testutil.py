@@ -628,6 +628,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
 # http://dirkjan.ochtman.nl/writing/2014/07/06/single-source-python-23-doctests.html
 import doctest
 class Py23DocChecker(doctest.OutputChecker):
+    """Checker to use in conjuction with :py:class:`doctest.DocTestSuite`."""
     def check_output(self, want, got, optionflags):
         if sys.version_info[0] < 3:
             # if running on py2, attempt to prefix all the strings

@@ -113,7 +113,15 @@ Document repositories
    docrepo/legal-eu
    docrepo/legal-se
    api/devel
-   
+
+
+Changes
+-------
+
+.. toctree::
+   :maxdepth: 1
+
+   changelog	     
 
 Indices and tables
 ==================
