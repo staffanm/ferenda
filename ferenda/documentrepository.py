@@ -853,7 +853,8 @@ with the *config* object as single parameter.
                         requests.exceptions.Timeout,
                         socket.timeout) as e:
                     self.log.warning(
-                        "Failed to fetch %s: error %s (%s remaining attempts)" % (url, e, remaining_attempts))
+                        "Failed to fetch %s: err %s (%s remaining attempts)" %
+                        (url, e, remaining_attempts))
                     remaining_attempts -= 1
                     time.sleep(sleep)
 

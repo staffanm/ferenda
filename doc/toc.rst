@@ -17,10 +17,11 @@ general process has three steps:
 3. Apply these criteria on the basic information from the database
 
 It should be noted that you don't need to do anything in order to get
-a very basic TOC. As long as your parse() step has extracted a
-``dcterms:title`` string and optionally a ``dcterms:issued`` date for each
-document, you'll get basic "Sorted by title" and "Sorted by date of
-publication" TOCs for free. But if you've been a
+a very basic TOC. As long as your
+:py:meth:`~ferenda.DocumentRepository.parse` step has extracted a
+``dcterms:title`` string and optionally a ``dcterms:issued`` date for
+each document, you'll get basic "Sorted by title" and "Sorted by date
+of publication" TOCs for free. 
 
 
 Defining facets for grouping and sorting
@@ -47,7 +48,8 @@ sorts each group by date of publication.
    :start-after: # begin facets
    :end-before: # end facets
 
-You can customize the behaviour of each Facet by providing extra arguments to
+You can customize the behaviour of each Facet by providing extra
+arguments to the constructor.
 
 The ``label`` and ``pagetitle`` parameters are useful to control the
 headings and labels for the generated pages. They should hopefully be
@@ -112,8 +114,8 @@ and a binding (same as used on the ``selector`` and ``key``
 functions), and is expected to return a list of
 :mod:`~ferenda.elements` objects.
 
-As an example, if you want to group by dcterms:identifier, but present
-each document with dcterms:identifier + dcterms:title:
+As an example, if you want to group by ``dcterms:identifier``, but present
+each document with ``dcterms:identifier`` + ``dcterms:title``:
 
 .. literalinclude:: examples/toc.py
    :start-after: # begin item

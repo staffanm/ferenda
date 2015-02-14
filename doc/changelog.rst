@@ -23,7 +23,8 @@ Backwards-incompatible changes:
   arguments are then added to the config object. If you have
   overridden __init__ for your docrepo, you'll need to make sure to
   handle this first argument.
-* The Newscriteria class has been removed. The Facet framework is now
+* The Newscriteria class has been removed, and
+  DocumentRepository.news_criteria with it. The Facet framework is now
   used to define news feeds (as well as TOC pages, the ReST API and
   fulltext indexing)
 * The PDFReader constructor now takes, as first argument, a list of
@@ -69,6 +70,12 @@ New features:
   mode) in order to produce easier-to-read diffs.
 * Transformer now outputs the equivalent xsltproc command if the
   environment variable FERENDA_TRANSFORMDEBUG is set.
+
+* The relate() action now uses dependency management to avoid costly
+  re-indexing if no changes have been made to a document.
+* TOC and newsfeed generation now uses dependency management to avoid
+  re-generating if no changes in the underlying data has occurred.
+* Documentation in general has been improved (readers, testing).
 
 Infrastructural changes:
 ------------------------

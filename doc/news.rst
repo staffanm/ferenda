@@ -7,24 +7,23 @@ formats. You can control which feeds are created, and which documents
 are included in each feed, by the facets defined for your repo. The
 process is similar to defining criteria for the TOC pages.
 
-Default behaviour
------------------
+The main differences are:
 
-- only rdf:type and dcterms:publisher are used for feeds
-
-How a facet is used by TOC and News
------------------------------------
-
-- create a list of dicts containing rdf statements abt each doc (and for News, including DocumentEntry things)
-- for each facet that should be used (use_for_toc, use_for_feed):
-- apply the selector and identificator fucntions to each such dict, yielding a string key (or none)
-- create a group for all documents whose selector/identificator is a particular string key
-- each such group becomes a TOC page or news feed
-
-Processing the entry in the Atom feed
--------------------------------------
-
-- Override news_item which is called with a dict and a binding (that
-  identifies a particular facet)
-- change the 'title' or 'summary' fields of the dict as needed
-- this only changes the Atom result, not the stored DocumentEntry
+* Most properties/RDF predicates of a document are not suitable as
+  facets for news feed (it makes little sense to have a feed for
+  eg. ``dcterms:title`` or ``dcterms:issued``). By default, only
+  ``rdf:type`` and ``dcterms:publisher`` based facets are used for news feed
+  generation. You can control this by specifying the ``use_for_feed``
+  constructor argument.
+* The dict that is passed to the selector and identificator functions
+  contains extra fields from the corresponding
+  :py:class:`.DocumentEntry` object. Particularly, the ``updated``
+  value might be used by your key func in order to sort all entries by
+  last-updated-date. The ``summary`` value might be used to contain a
+  human-readable summary/representation of the entire document.
+* Each row is passed through the :py:meth:`.news_item` method. You may
+  override this in order to change the ``title`` or ``summary`` of
+  each feed entry for the particular feed being constructed (as
+  determined by the ``binding`` argument).
+* A special feed, containing all entries within the docrepo, is always
+  created.

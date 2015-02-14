@@ -1,23 +1,36 @@
 Grouping documents with facets
 ==============================
 
-A collection of documents can typically be arranged in a set of
-groups, such as by year of publication, by document author, or by
-keyword. In ferenda, each such method of grouping is described in the
-form of a :py:class:`~ferenda.Facet`. By providing a list of Facet
-objects in its :py:meth:`~ferenda.DocumentRepository.facets` method,
-your docrepo can specify multiple ways of arranging the documents it's
+A collection of documents can be arranged in a set of groups, such as
+by year of publication, by document author, or by keyword. With Ferenda,
+each such method of grouping is described in the form of a
+:py:class:`~ferenda.Facet`. By providing a list of Facet objects in
+its :py:meth:`~ferenda.DocumentRepository.facets` method, your docrepo
+can specify multiple ways of arranging the documents it's
 handling. These facets are used to construct a static Table of
 contents for your site, as well as creating Atom feeds of all
 documents and defining the fields available for querying when using
 the REST API.
 
-A facet object is initialized with a set of parameters that together
-define the method of grouping. These include the RDF predicate that
-contains the data used for grouping, the datatype to be used for that
-data, functions (or other callables) that sorts the data into discrete
-groups, and other parameters that affect eg. the sorting order or if a
-particular facet is used in a particular context. 
+A facet object is initialized with a set of parameters that, taken
+together, define the method of grouping. These include the RDF
+predicate that contains the data used for grouping, the datatype to be
+used for that data, functions (or other callables) that sorts the data
+into discrete groups, and other parameters that affect eg. the sorting
+order or if a particular facet is used in a particular context. 
+
+Applying facets
+---------------
+
+Facets are used in several different contexts (see below) but the
+general steps for applying them are similar. First, all the data that
+might be needed by the total set of facets is collected. This is
+normally done by querying the triple store for it. Each facet contains
+information about which RDF predicate
+
+Once this set of data is retrieved, as a giant table with one row for
+each resource (document), each facet is used to create a set of groups
+and place each document in zero or more of these groups.
 
 Selectors and identificators
 ----------------------------
@@ -25,17 +38,19 @@ Selectors and identificators
 The grouping is primarily done through a *selector function*. The
 selector function recieves three arguments:
 
-* a dict with some basic information about one document,
+* a dict with some basic information about one document (corresponding
+  to one row),
 * the name of the current facet (binding), and
 * optionally some repo-dependent extra data in the form of an RDF graph.
 
-It should return a single string. The selector is called once for
-every document in the docrepo, and each document is sorted in one (or
-more, see below) group identified by that string. As a simple example,
-a selector may group documents into years of publication by finding
-the date of the ``dcterms:issued`` property and extracting the year
-part of it. The string returned by the should be suitable for end-user
-display. 
+It should return a single string, which should be a human-readable
+label for a grouping. The selector is called once for every document
+in the docrepo, and each document is sorted in one (or more, see
+below) group identified by that string. As a simple example, a
+selector may group documents into years of publication by finding the
+date of the ``dcterms:issued`` property and extracting the year part
+of it. The string returned by the should be suitable for end-user
+display.
 
 Each facet also has a similar function called the *identificator
 function*. It recieves the same arguments as the selector function,
@@ -77,6 +92,16 @@ The feeds are always sorted by the updated property (most recent
 updated first), taken from the corresponding
 :py:class:`~ferenda.DocumentEntry` object.
 
+
+The fulltext index
+^^^^^^^^^^^^^^^^^^
+
+The metadata that each facet uses is stored as a separate field in the
+fulltext index. Facet can specify exactly how a particular facet
+should be stored (ie if the field should be boosted in any particular
+way). Note that the data stored in the fulltext index is not passed
+through the selector function, the original RDF data is stored as-is.
+
 The ReST API
 ^^^^^^^^^^^^
 
@@ -87,14 +112,7 @@ requires that the defined facets don't clash, eg. that you don't have
 two facets based on ``dcterms:publisher`` where one uses URI
 references and the other uses.
 
-The fulltext index
-^^^^^^^^^^^^^^^^^^
 
-The metadata that each facet uses is stored as a separate field in the
-fulltext index. Facet can specify exactly how a particular facet
-should be stored (ie if the field should be boosted in any particular
-way). Note that the data stored in the fulltext index is not passed
-through the selector function, the original RDF data is stored as-is.
 
 Grouping a document in several groups
 -------------------------------------

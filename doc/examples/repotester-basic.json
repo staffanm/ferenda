@@ -1,0 +1,11 @@
+{
+    "http://www.ietf.org/download/rfc-index.txt": {
+	"file":"index.txt",
+	"content-type":"text/plain"
+    },
+    "http://tools.ietf.org/rfc/rfc6953.txt": {
+	"file":"rfc6953.txt",
+	"content-type": "text/plain",
+	"expect": "downloaded/6953.txt"
+    }
+}
