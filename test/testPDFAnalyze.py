@@ -135,7 +135,9 @@ class Analyze(unittest.TestCase):
     @patch('ferenda.pdfanalyze.Canvas')
     def test_drawboxes(self, canvasmock, pypdfmock):
         metrics = self.analyzer.metrics()
-        self.analyzer.drawboxes("foo/bar/baz", metrics=metrics)
+        pdfpath = "test/files/pdfanalyze/lipsum.debug.pdf"
+        self.analyzer.drawboxes(pdfpath, metrics=metrics)
         self.assertTrue(canvasmock.called)
         self.assertTrue(pypdfmock.PdfFileReader.called)
         self.assertTrue(pypdfmock.PdfFileWriter.called)
+        util.robust_remove(pdfpath)
