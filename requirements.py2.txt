@@ -25,6 +25,3 @@ psutil
 layeredconfig
 # grako -- doesn't support 2.6 at all
 responses
-# matplotlib
-# PyPDF2
-# reportlab -- these three are too heavy for travis-ci and optional

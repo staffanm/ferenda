@@ -9,6 +9,18 @@ from itertools import chain
 
 from six import text_type as str
 
+try:
+    import matplotlib
+    import matplotlib.pyplot as plt
+except ImportError:
+    matplotlib = plt = None
+
+try:
+    import PyPDF2
+    from reportlab.pdfgen.canvas import Canvas
+except ImportError:
+    PyPDF2 = Canvas = None
+
 from .pdfreader import Page
 from ferenda import util
 from ferenda.compat import Counter
@@ -365,17 +377,17 @@ class PDFAnalyzer(object):
            by default. Reportlab (3.*) only works on py27+ and py33+
 
         """
+        if PyPDF2 is None or Canvas is None:
+            raise ImportError("You need PyPDF2 and reportlab installed")
         styles = {}
         for k, v in metrics.items():
             if isinstance(v, dict):
                 styles[(v['family'], v['size'])] = k
-        from PyPDF2 import PdfFileWriter, PdfFileReader
-        from reportlab.pdfgen.canvas import Canvas
         log = logging.getLogger("pdfanalyze")
         packet = None
-        output = PdfFileWriter()
+        output = PyPDF2.PdfFileWriter()
         fp = open(self.pdf.filename, "rb")
-        existing_pdf = PdfFileReader(fp)
+        existing_pdf = PyPDF2.PdfFileReader(fp)
         pageidx = 0
         tbidx = 0
         sf = 2/3.0 # scaling factor -- mapping between units produced by
@@ -387,7 +399,7 @@ class PDFAnalyzer(object):
                 if dirty:
                     canvas.save()
                     packet.seek(0)
-                    new_pdf = PdfFileReader(packet)
+                    new_pdf = PyPDF2.PdfFileReader(packet)
                     # print("Merging a new page into %s" % id(existing_page))
 
                     # this SHOULD place the new page (that only
@@ -413,11 +425,6 @@ class PDFAnalyzer(object):
                 horizontal_scale = float(mb.getHeight()) / tb.height
                 vertical_scale = float(mb.getWidth()) / tb.width
                 log.debug("Loaded page %s - Scaling %s, %s" % (pageidx, horizontal_scale, vertical_scale))
-                # print("Loadex page %s (%s): Dimensions (%.2f, %.2f) must be scaled (%.2f,%.2f) to fit pdfreader dimensions (%s,%s)" %
-                #       (pageidx, id(existing_page), mb.getHeight(), mb.getWidth(),
-                #        horizontal_scale, vertical_scale,
-                #        tb.width, tb.height))
-                
                 packet = BytesIO()
                 canvas = Canvas(packet, pagesize=(tb.height, tb.width),
                                     bottomup=False)
@@ -464,7 +471,7 @@ class PDFAnalyzer(object):
                     canvas.drawString(tb.right, tb.bottom, styles[fonttuple])
         packet.seek(0)
         canvas.save()
-        new_pdf = PdfFileReader(packet)
+        new_pdf = PyPDF2.PdfFileReader(packet)
         # print("Merging final new page into %s" % id(existing_page))
         existing_page.mergePage(new_pdf.getPage(0))
         output.addPage(existing_page)
@@ -475,13 +482,11 @@ class PDFAnalyzer(object):
         fp.close()
 
     def plot(self, filename, margincounters, stylecounters, metrics):
-        import matplotlib
+        if matplotlib is None:
+            raise ImportError("You need matplotlib installed")
         matplotlib.use('Agg')
-        import matplotlib.pyplot as plt
-        from matplotlib import rcParams
-        from matplotlib.font_manager import FontProperties
         # plt.style.use('ggplot')  # looks good but makes our histograms unreadable
-        rcParams.update({'font.size': 8})
+        matplotlib.rcParams.update({'font.size': 8})
         plt.figure(figsize=((len(margincounters))*2, 7))  # width, height in inches
 
         # if 6 counters:
@@ -551,7 +556,6 @@ class PDFAnalyzer(object):
         allstyles = Counter(dict(chain(*[x.items() for x in stylecounters.values()])))
         stylenames = [style[0].replace("TimesNewRomanPS", "Times")+"@"+str(style[1]) for style, count in allstyles.most_common()]
         stylecounts = [count for style, count in allstyles.most_common()]
-        import matplotlib.pyplot as plt
-        plt.yticks(range(len(stylenames)), stylenames) # fontproperties=FontProperties(size=8))
+        plt.yticks(range(len(stylenames)), stylenames)
         plot.barh(range(len(stylenames)), stylecounts, log=True)
         plot.set_title("Font usage", fontdict={'fontsize': 8})

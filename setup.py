@@ -21,7 +21,6 @@ install_requires = ['beautifulsoup4 >= 4.3.0',
                     'Whoosh >= 2.4.1',
                     'six >= 1.4.0',
                     'docutils >= 0.11',
-                    'grako >= 3.4.0',
                     'layeredconfig >= 0.2.1',
                     'responses >= 0.3.0']
 
@@ -40,6 +39,9 @@ else:
 if sys.version_info < (2,7,0):
     install_requires.append('ordereddict >= 1.1')
 
+if sys.version_info >= (2,7,0):
+    # grako won't even install on py26
+    install_requires.append('grako >= 3.4.0')
 
 tests_require = ['psutil']
 

@@ -3,16 +3,16 @@ from __future__ import unicode_literals
 
 import sys, os, tempfile, shutil
 from lxml import etree
-from ferenda.compat import unittest
+from ferenda.compat import unittest, patch
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
 from bz2 import BZ2File
 from ferenda import errors, util
 from six import text_type as str
 
-from ferenda import PDFReader
 
 # SUT
+from ferenda import PDFReader
 from ferenda import PDFAnalyzer
 
 @unittest.skipIf (sys.version_info < (2, 7, 0), "PDFAnalyzer not currently supported under Py26")
@@ -22,11 +22,6 @@ class Analyze(unittest.TestCase):
         self.pdf = PDFReader(filename="test/files/pdfanalyze/lipsum.pdf",
                              workdir="test/files/pdfanalyze/")
         self.analyzer = PDFAnalyzer(self.pdf)
-
-    def tearDown(self):
-        util.robust_remove("test/files/pdfanalyze/lipsum.metrics.json")
-        util.robust_remove("test/files/pdfanalyze/lipsum.plot.png")
-        util.robust_remove("test/files/pdfanalyze/lipsum.debug.pdf")
 
     def test_documents(self):
         self.assertEquals([(0,3)], self.analyzer.documents())
@@ -113,6 +108,7 @@ class Analyze(unittest.TestCase):
                            'title': {'family': 'Cambria', 'size': 37}},
                           metrics)
         self.assertTrue(os.path.exists(jsonpath))
+        util.robust_remove(jsonpath)
 
     def test_margins_subdocument(self):
         self.analyzer.frontmatter = 0
@@ -129,22 +125,17 @@ class Analyze(unittest.TestCase):
                            'rightmargin_even': 748},
                           metrics)
 
-    @unittest.skipIf('TRAVIS' in os.environ or 'APPVEYOR' in os.environ, "Not using matplotlib-based tests on Travis/Appveyor")
-    def test_plot(self):
-        # just test that a plot is created
-        plotpath = "test/files/pdfanalyze/lipsum.plot.png"
-        self.assertFalse(os.path.exists(plotpath))
-        self.analyzer.metrics(plotpath=plotpath)
-        self.assertTrue(os.path.exists(plotpath))
+    @patch('ferenda.pdfanalyze.matplotlib')
+    @patch('ferenda.pdfanalyze.plt')
+    def test_plot(self, pltmock, matplotmock):
+        self.analyzer.metrics(plotpath="foo/bar/baz")
+        self.assertTrue(pltmock.savefig.called)
 
-    # reportlab doesn't work with py3.2, current release of pyPDF2
-    # (1.24) has a py3 bug that crashes page merging (patch exists at
-    # https://github.com/mstamy2/PyPDF2/pull/172)
-    @unittest.skipIf(sys.version_info > (3, 0, 0) or 'TRAVIS' in os.environ or 'APPVEYOR' in os.environ, "pyPDF2 not working on py3")
-    def test_drawboxes(self):
-        # just test that a pdf is created
-        pdfpath = "test/files/pdfanalyze/lipsum.debug.pdf"
-        self.assertFalse(os.path.exists(pdfpath))
+    @patch('ferenda.pdfanalyze.PyPDF2')
+    @patch('ferenda.pdfanalyze.Canvas')
+    def test_drawboxes(self, canvasmock, pypdfmock):
         metrics = self.analyzer.metrics()
-        self.analyzer.drawboxes(pdfpath, metrics=metrics)
-        self.assertTrue(os.path.exists(pdfpath))
+        self.analyzer.drawboxes("foo/bar/baz", metrics=metrics)
+        self.assertTrue(canvasmock.called)
+        self.assertTrue(pypdfmock.PdfFileReader.called)
+        self.assertTrue(pypdfmock.PdfFileWriter.called)
