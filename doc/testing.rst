@@ -105,7 +105,7 @@ tested. For example, this sets the ``next_sfsnr`` key of the
 Recording download tests
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-If the environment variable ``FERENDA_SET_TESTFILES`` is set, the
+If the environment variable ``FERENDA_SET_TESTFILE`` is set, the
 download code runs like normal (calls to requests.get et al are not
 intercepted) and instead each accessed URL is stored in the JSON
 file. URL accessses that results in downloaded files results in
@@ -135,7 +135,7 @@ should be placed under ``parsed/[basefile].xhtml``.
 Recording distill/parse tests
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-If the environment variable ``FERENDA_SET_TESTFILES`` is set, the
+If the environment variable ``FERENDA_SET_TESTFILE`` is set, the
 parse code runs like normal and the result of the parse is stored in
 eg. ``distilled/[basefile].ttl`` or ``parsed/[basefile].xhtml``. This
 is a quick way of recording existing behaviour as a baseline for your

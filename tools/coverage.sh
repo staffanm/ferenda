@@ -6,4 +6,9 @@ else
     PYTHONWARNINGS=i coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unittest discover test
 fi 
 coverage html
-open htmlcov/index.html
+if [ -n "$1" ]
+then
+    echo Done
+else
+    open htmlcov/index.html
+fi

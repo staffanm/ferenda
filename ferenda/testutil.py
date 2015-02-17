@@ -2,21 +2,23 @@
 """:py:mod:`unittest`-based classes and accompanying functions to
 create some types of ferenda-specific tests easier."""
 from __future__ import unicode_literals
-import os
-import sys
-import tempfile
-import shutil
-import time
-import hashlib
-import json
+from datetime import datetime
+from difflib import unified_diff
+from io import BytesIO
 import codecs
 import collections
 import filecmp
-import unicodedata
+import hashlib
+import inspect
+import json
+import os
 import re
-from io import BytesIO
-from difflib import unified_diff
-from datetime import datetime
+import shutil
+import sys
+import tempfile
+import time
+import unicodedata
+
 from ferenda.compat import unittest
 from ferenda.compat import Mock, patch
 
@@ -115,10 +117,11 @@ class FerendaTestCase(object):
         time1 = time.mktime(datetime1.timetuple())
         time2 = time.mktime(datetime2.timetuple())
         absdiff = abs(time1 - time2)
-        self.assertLessEqual(absdiff, delta, "Difference between %s and %s "
-                             "is %s seconds which is NOT almost equal" %
-                             (datetime1.isoformat(), datetime2.isoformat(),
-                              absdiff))
+        # FIXME: The "return" is due to a badly written testcase
+        return self.assertLessEqual(absdiff, delta, "Difference between %s and %s "
+                                    "is %s seconds which is NOT almost equal" %
+                                    (datetime1.isoformat(), datetime2.isoformat(),
+                                     absdiff))
 
     def assertEqualXML(self, want, got, namespace_aware=True, tidy_xhtml=False):
         """Assert that two xml trees are canonically identical.
@@ -148,7 +151,7 @@ class FerendaTestCase(object):
                              % name)
                     return False
             if not text_compare(want.text, got.text):
-                reporter("text: 'want': %r, 'got': %r" % (want.text, got.text))
+                reporter("text: 'want': %r != 'got': %r" % (want.text, got.text))
                 return False
             if not text_compare(want.tail, got.tail):
                 reporter("tail: 'want': %r != 'got': %r" % (want.tail, got.tail))
@@ -211,18 +214,6 @@ class FerendaTestCase(object):
             tmp = BytesIO()
             tree.write_c14n(tmp)
             return tmp.getvalue().decode('utf-8')
-
-        # strip all empty whitespace (but not space in things like
-        # <p>Name: <b>Foo</b></p>)
-        def strip_space(node):
-            if node.text and node.text.strip() == "":
-                node.text = None
-                for child in node:
-                    node.replace(child, strip_space(child))
-                        
-            if node.tail and node.tail.strip() == "":
-                node.tail = None
-            return node
 
         errors = []
         want_tree = treeify(want)
@@ -385,13 +376,22 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         try:
             # Adapted from DocumentStore.list_basefiles_for: Find out a
             # path fragment from the entire filename path.
-            relfilename = filename[filename.index("test/files/repo"):]
-            directory = os.sep.join(relfilename.split(os.sep)[:5])
             if self.repo.storage_policy == "file":
                 suffixlen = len(os.path.splitext(filename)[1]) # eg '.pdf'
             else:
                 suffixlen = len(os.path.basename(filename))+1
-            pathfrag = relfilename[len(directory) + 1:-suffixlen]
+
+            if "test/files/repo" in filename:
+                # take advantage of this well known direcotry structure
+                relfilename = filename[filename.index("test/files/repo"):]
+                directory = os.sep.join(relfilename.split(os.sep)[:5])
+                pathfrag = relfilename[len(directory) + 1:-suffixlen]
+            elif "downloaded" in filename.split(os.sep):
+                # find the first (or last?) segment named "downloaded"
+                idx = filename.index(os.sep+"downloaded"+os.sep)
+                pathfrag = filename[idx+12:-suffixlen]
+            else:
+                pathfrag = "1"
             basefile = self.repo.store.pathfrag_to_basefile(pathfrag)
             return basefile
         except:
@@ -406,9 +406,8 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         # code, including net access, is run. Calls to requests.get
         # are intercepted and notes are made of which URLs are
         # requested, and if this results in files on disk. The end
-        # result is a JSON file and a set of cached files, all under
-        # source/.
-        # this is used 
+        # result is a JSON file and a set of cached files, all placed under
+        # "source/"
         def add_downloaded_files(filelist, spec, url):
             downloaddir = os.sep.join([self.datadir, self.repoclass.alias,
                                        "downloaded"])
@@ -416,7 +415,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
                 if f.endswith(".etag"):
                     continue  # FIXME: this is ugly
                 if f not in filelist:
-                    print("Fetching %s resulted in downloaded file %s" % (url, f))
+                    # print("Fetching %s resulted in downloaded file %s" % (url, f))
                     filelist.append(f)
                     spec[url]['expect'] = "downloaded"+ f.replace(downloaddir, "")
                     dest = os.path.join(os.path.dirname(specfile), "../downloaded/"+f)
@@ -465,9 +464,8 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             try:
                 rc = int(os.environ.get("FERENDA_SET_TESTFILE"))
                 state['total_requests'] = rc
-            except TypeError:
-                requests_count = 2 # search page, single payload
-                state['total_requests'] = 2
+            except (ValueError, TypeError):
+                state['total_requests'] = 2  # search page, single payload
 
                        
             def callback(req):
@@ -477,7 +475,18 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
                     raise MaxDownloadsReached()
                 # make a real requests call somehow
                 responses.stop()
-                resp = requests.get(req.url)
+                # when testing this testing function
+                # (testTestutil.RepoTester.test_download_setfile) we
+                # still want to disable responses, but we don't want
+                # to make an actual HTTP call. Detect if we are
+                # running that test by examining the stack, and if so,
+                # mock the requests.get call in a different way.
+                frames = [f for f in inspect.stack() if f[3] == "test_download_setfile"]
+                if frames:
+                    frame = frames[0][0]
+                    resp = frame.f_locals['self']._myget(req.url)
+                else:
+                    resp = requests.get(req.url)
                 responses.start()
                 # create a filename. use .html as suffix unless we
                 # should use something else
@@ -490,11 +499,12 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
                 with open(outfile, "wb") as fp:
                     fp.write(resp.content)
 
-                if suffix == "html":
-                    print("requested %s, saved as %s. Edit if needed, then press enter" % (req.url, outfile))
-                    x = input()
-                else:
-                    print("requested %s, saved %s" % (req.url, outfile))
+                if not frames:
+                    if suffix == "html":
+                        print("requested %s, saved as %s. Edit if needed, then press enter" % (req.url, outfile))
+                        x = input()
+                    else:
+                        print("requested %s, saved %s" % (req.url, outfile))
 
                 with open(outfile, "rb") as fp:
                     content = fp.read()
@@ -509,10 +519,14 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             def callback(req):
                 headers = {'Content-type': 'text/html'}
                 try:
-                    # normalize req.url. req.url will be a (byte)str
+                    # normalize req.url. req.url might be a (byte)str
                     # but keys in spec will be (and should be)
                     # unicode. Assume that req.url is all ascii
-                    urlspec = spec[unquote(unicode(req.url))]
+                    if isinstance(req.url, bytes):
+                        url = req.url.decode()
+                    else:
+                        url = req.url
+                    urlspec = spec[unquote(url)]
                     if isinstance(urlspec, str):
                         urlspec = {'file': urlspec}
                     url_location = os.path.join(os.path.dirname(specfile),
@@ -536,7 +550,9 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             # process final file and save specfile
             add_downloaded_files(state['downloaded'], spec,
                                  state['previous_url'])
-            with open(specfile, "wb") as fp:
+
+            # FIXME: should mode be w or wb? w for py3 at least
+            with open(specfile, "w") as fp:
                 json.dump(spec, fp, indent=4)
         
         # organize a temporary copy of files that we can compare our results to
@@ -577,7 +593,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         self.repo.store = RepoTesterStore(origstore, downloaded_file)
         try:
             self.repo.parse(basefile)
-            if 'FERENDA_SET_TESTFILES' in os.environ:
+            if 'FERENDA_SET_TESTFILE' in os.environ:
                 print("Overwriting %r with result of parse (%r)" % (rdf_file, basefile))
                 g = rdflib.Graph()
                 g.parse(data=util.readfile(self.repo.store.distilled_path(basefile)))
@@ -606,7 +622,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         self.repo.store = RepoTesterStore(origstore, downloaded_file)
         try:
             self.repo.parse(basefile)
-            if 'FERENDA_SET_TESTFILES' in os.environ:
+            if 'FERENDA_SET_TESTFILE' in os.environ:
                 print("Overwriting %r with result of parse (%r)" % (xhtml_file, basefile))
                 util.robust_rename(xhtml_file, xhtml_file + "~")
                 shutil.copy2(self.repo.store.parsed_path(basefile), xhtml_file)
@@ -739,10 +755,16 @@ def file_parametrize(cls, directory, suffix, filter=None, wrapper=None):
         parametrize(cls, cls.parametric_test, name, (param,), wrapper)
 
 
-def parametrize_repotester(cls):
+def parametrize_repotester(cls, include_failures=True):
     """Helper function to activate a
-:py:class:`ferenda.testutil.RepoTester` based class (see the
-documentation for that class)."""
+    :py:class:`ferenda.testutil.RepoTester` based class (see the
+    documentation for that class).
+
+    :param cls: The RepoTester-based class to create tests on.
+    :type param: class
+    :param include_failures: Create parse/distill tests even if the corresponding xhtml/ttl files doesn't exist
+    :type include_failures: bool
+    """
     docroot = cls.docroot
     # 1. download tests
     if os.path.exists(docroot + "/source"):
@@ -770,14 +792,16 @@ documentation for that class)."""
         rdf_file = "%s/distilled/%s.ttl" % (docroot, pathfrag)
         testname = ("test_distill_" + basetest)
         wrapper = unittest.expectedFailure if not os.path.exists(rdf_file) else None
-        parametrize(cls, cls.distill_test, testname, (downloaded_file, rdf_file, docroot), wrapper)
+        if wrapper is None or include_failures:
+            parametrize(cls, cls.distill_test, testname, (downloaded_file, rdf_file, docroot), wrapper)
 
         # Test 2: is xhtml parsed correctly?
         xhtml_file = "%s/parsed/%s.xhtml" % (docroot, pathfrag)
         testname = ("test_parse_" + basetest)
 
         wrapper = unittest.expectedFailure if not os.path.exists(xhtml_file) else None
-        parametrize(cls, cls.parse_test, testname, (downloaded_file, xhtml_file, docroot), wrapper)
+        if wrapper is None or include_failures:
+            parametrize(cls, cls.parse_test, testname, (downloaded_file, xhtml_file, docroot), wrapper)
 
 
 def testparser(testcase, parser, filename):
