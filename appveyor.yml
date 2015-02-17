@@ -15,6 +15,7 @@ init:
   - ps: Invoke-WebRequest "https://raw.github.com/pypa/pip/master/contrib/get-pip.py" -OutFile "c:/get-pip.py"
   - ps: "git config --global core.autocrlf false" # always use unix lineendings
 install:
+  - "copy tools/win32/tidy.exe tidy.exe"
   - "%PYTHON%/python.exe c:/ez_setup.py > NUL"
   - "%PYTHON%/python.exe c:/get-pip.py"
   - "%PYTHON%/Scripts/easy_install.exe %LXML%"
