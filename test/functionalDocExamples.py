@@ -9,6 +9,7 @@ import shutil
 import re
 
 import six
+from six.moves import reload_module
 
 from ferenda import util
 from ferenda.compat import unittest
@@ -42,8 +43,8 @@ class Examples(unittest.TestCase, FerendaTestCase):
         pytext = util.readfile(pyfile, mode="rb")
         pycode = compile(pytext, pyfile, 'exec')
         os.chdir(workingdir)
-        reload(ferenda)  # so that ferenda.__file__ might return a abspath
         try:
+            reload_module(ferenda)  # so that ferenda.__file__ might return a abspath
             result = six.exec_(pycode, globals(), locals())
         finally:
             os.chdir(oldwd)

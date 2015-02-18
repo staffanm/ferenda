@@ -26,7 +26,8 @@ from ferenda.sources.legal.se.legalref import LegalRef
 
 
 class ARNStore(DocumentStore):
-    """Customized DocumentStore."""
+    """Customized DocumentStore that handles multiple download suffixes
+    and transforms YYYY-NNN basefiles to YYYY/NNN pathfrags"""
     def basefile_to_pathfrag(self, basefile):
         return basefile.replace("-", "/")
 

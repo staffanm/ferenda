@@ -28,6 +28,7 @@ for cls in (Keyword, Skeleton, MediaWiki, RFC, W3Standards, PEP,
             JO, Kommitte, MyndFskr, Propositioner, Regeringen,
             Riksdagen, SFS, SOU, SwedishLegalSource, PropRegeringen,
             DirTrips, DirRegeringen):
+# for cls in (ARN, MediaWiki):
     # Create a new class, based on RepoTester, on the fly.
     d = {'repoclass': cls,
          'docroot': os.path.dirname(__file__)+"/files/repo/" + cls.alias}

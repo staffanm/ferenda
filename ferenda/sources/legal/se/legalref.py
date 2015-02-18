@@ -70,6 +70,7 @@ with open(picklefile,"wb") as fp:
         """)
         return state
                        
+    # print("(__boot__): calling _setup_state to setup external_simpleparse_state")
     external_simpleparse_state = _setup_state()
 
     class Parser(object):
@@ -81,6 +82,7 @@ with open(picklefile,"wb") as fp:
             c.update(declaration)
             self.declaration_md5 = c.hexdigest()
             if not external_simpleparse_state:
+                # print("__init__: calling _setup_state to setup external_simpleparse_state")
                 external_simpleparse_state = _setup_state()
             declaration_filename = "%s/%s" % (external_simpleparse_state,
                                               self.declaration_md5)
@@ -91,6 +93,7 @@ with open(picklefile,"wb") as fp:
             global external_simpleparse_state
             if external_simpleparse_state and os.path.exists(external_simpleparse_state):
                 shutil.rmtree(external_simpleparse_state)
+                # print("__del__: setting external_simpleparse_state to None")
                 external_simpleparse_state = None
 
 
@@ -112,6 +115,10 @@ with open(picklefile,"wb") as fp:
             return pickled_tagger  # filename instead of tagtable struct
 
     def tag(text, tagtable, sliceleft, sliceright):
+        global external_simpleparse_state
+        # print("tag: external_simpleparse_state is %s" % external_simpleparse_state)
+        if external_simpleparse_state is None:
+            external_simpleparse_state = _setup_state()
         c = hashlib.md5()
         c.update(text)
         text_checksum = c.hexdigest()
