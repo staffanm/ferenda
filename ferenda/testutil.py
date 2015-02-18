@@ -374,6 +374,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
 
         """
         try:
+            filename = self.p(filename)
             # Adapted from DocumentStore.list_basefiles_for: Find out a
             # path fragment from the entire filename path.
             if self.repo.storage_policy == "file":
@@ -417,8 +418,12 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
                 if f not in filelist:
                     # print("Fetching %s resulted in downloaded file %s" % (url, f))
                     filelist.append(f)
-                    spec[url]['expect'] = "downloaded"+ f.replace(downloaddir, "")
-                    dest = os.path.join(os.path.dirname(specfile), "../downloaded/"+f)
+                    expect = "downloaded"+ f.replace(downloaddir, "")
+                    if os.sep != "/":
+                        expect = expect.replace(os.sep, "/")
+                    spec[url]['expect'] = expect
+                    reldest = os.path.relpath(".."+os.sep+"downloaded", os.path.dirname(f))
+                    dest = os.path.normpath(os.path.join(os.path.dirname(specfile), reldest))
                     util.ensure_dir(dest)
                     shutil.copy2(f, dest)
 
