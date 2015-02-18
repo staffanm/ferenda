@@ -1,4 +1,4 @@
-0.3.0 (released 2015-02-??)
+0.3.0 (released 2015-02-18)
 ===========================
 This release adds support for processing things in parallel, both by
 using multiple processes on a single machine, and also by running
