@@ -461,7 +461,7 @@ class SJVFS(MyndFskr):
         subsoup = BeautifulSoup(requests.get(url).text)
         submain = subsoup.find("div", "pagecontent")
         extrapages = []
-        for a in submain.findAll("a"):
+        for a in submain.find_all("a"):
             if a['href'].endswith(".pdf") or a['href'].endswith(".PDF"):
                 if re.search('\d{4}:\d+', a.text):
                     m = re.search('(\w+FS|) ?(\d{4}:\d+)', a.text)
@@ -474,17 +474,17 @@ class SJVFS(MyndFskr):
                         urljoin(url, a['href']))
                     self.download_single(basefile, url=suburl)
                 elif a.text == "Besult":
-                    basefile = a.findParent(
+                    basefile = a.find_parent(
                         "td").findPreviousSibling("td").find("a").text
                     self.log.debug(
                         "Will download beslut to %s (later)" % basefile)
                 elif a.text == "Bilaga":
-                    basefile = a.findParent(
+                    basefile = a.find_parent(
                         "td").findPreviousSibling("td").find("a").text
                     self.log.debug(
                         "Will download bilaga to %s (later)" % basefile)
                 elif a.text == "Rättelseblad":
-                    basefile = a.findParent(
+                    basefile = a.find_parent(
                         "td").findPreviousSibling("td").find("a").text
                     self.log.debug(
                         "Will download rättelseblad to %s (later)" % basefile)
@@ -513,88 +513,81 @@ class FFFS(MyndFskr):
     alias = "fffs"
     start_url = "http://www.fi.se/Regler/FIs-forfattningar/Forteckning-FFFS/"
     document_url = "http://www.fi.se/Regler/FIs-forfattningar/Samtliga-forfattningar/%s/"
+    storage_policy = "dir"  # must be able to handle attachments
 
     def download(self, basefile=None):
         soup = BeautifulSoup(requests.get(self.start_url).text)
-        main = soup.find(id="mainarea")
+        main = soup.find(id="fffs-searchresults")
         docs = []
-        for numberlabel in main.findAll(text='NUMMER'):
-            numberdiv = numberlabel.findParent('div').parent
-
-            typediv = numberdiv.findNextSibling()
-            if typediv.find('div', 'FFFSListAreaLeft').get_text(strip=True) != "TYP":
-                self.log.error("Expected TYP in div, found %s" %
+        for numberlabel in main.find_all(text=re.compile('\s*Nummer\s*')):
+            ndiv = numberlabel.find_parent('div').parent
+            typediv = ndiv.findNextSibling()
+            if typediv.find('div', 'FFFSListAreaLeft').get_text(strip=True) != "Typ":
+                Self.log.error("Expected 'Typ' in div, found %s" %
                                typediv.get_text(strip=True))
                 continue
 
             titlediv = typediv.findNextSibling()
-            if titlediv.find('div', 'FFFSListAreaLeft').get_text(strip=True) != "RUBRIK":
-                self.log.error("Expected RUBRIK in div, found %s" %
+            if titlediv.find('div', 'FFFSListAreaLeft').get_text(strip=True) != "Rubrik":
+                self.log.error("Expected 'Rubrik' in div, found %s" %
                                titlediv.get_text(strip=True))
                 continue
 
-            number = numberdiv.find('div', 'FFFSListAreaRight').get_text(strip=True)
+            number = ndiv.find('div', 'FFFSListAreaRight').get_text(strip=True)
             tmpfile = mktemp()
-            snippetfile = self.store.downloaded_path(
-                number).replace(".pdf", ".snippet.html")
-            fp = codecs.open(tmpfile, "w", encoding="utf-8")
-            fp.write(str(numberdiv))
-            fp.write(str(typediv))
-            fp.write(str(titlediv))
-            fp.close()
-            util.replace_if_different(tmpfile, snippetfile)
+            with self.store.open_downloaded(number, mode="w", attachment="snippet.html") as fp:
+                fp.write(str(ndiv))
+                fp.write(str(typediv))
+                fp.write(str(titlediv))
+            self.download_single(number)
 
-            self.download_single(number, usecache)
-
-    def download_single(self, basefile, usecache=False):
-        self.log.debug("%s: download_single..." % basefile)
+    def download_single(self, basefile):
         pdffile = self.store.downloaded_path(basefile)
-        existed = os.path.exists(pdffile)
-        if usecache and existed:
-            self.log.debug("%s: already exists, not downloading" % basefile)
-            return
-        snippetfile = pdffile.replace(".pdf", ".snippet.html")
-        descriptionfile = pdffile.replace(".pdf", ".html")
-
+        self.log.debug("%s: download_single..." % basefile)
+        snippetfile = self.store.downloaded_path(basefile, attachment="snippet.html")
         soup = BeautifulSoup(open(snippetfile))
-        href = soup.find(text="RUBRIK").findParent(
-            "div").findPreviousSibling().find('a')['href']
+        href = soup.find(text=re.compile("\s*Rubrik\s*")).find_parent("div", "FFFSListArea").a.get("href")
         url = urljoin("http://www.fi.se/Regler/FIs-forfattningar/Forteckning-FFFS/", href)
         if href.endswith(".pdf"):
-            if self.download_if_needed(url, pdffile):
-                if existed:
-                    self.log.info("%s: downloaded new version from %s" %
-                                  (basefile, url))
-                else:
-                    self.log.info("%s: downloaded from %s" % (basefile, url))
+            self.download_if_needed(url, basefile)
 
         elif "/Samtliga-forfattningar/" in href:
             self.log.debug("%s: Separate page" % basefile)
-            self.download_if_needed(url, descriptionfile)
+            self.download_if_needed(url, basefile,
+                                    filename=self.store.downloaded_path(basefile, attachment="description.html"))
+            descriptionfile = self.store.downloaded_path(basefile, attachment="description.html")
             soup = BeautifulSoup(open(descriptionfile))
-            for link in soup.find("div", id="mainarea").findAll("a"):
+            for link in soup.find("div", "maincontent").find_all("a"):
                 suburl = urljoin(url, link['href']).replace(" ", "%20")
-                if link.text == 'Grundförfattning':
-                    if self.download_if_needed(suburl, pdffile):
+                if link.text.strip().startswith('Grundförfattning'):
+                    if self.download_if_needed(suburl, basefile):
                         self.log.info("%s: downloaded main PDF" % basefile)
 
-                elif link.text == 'Konsoliderad version':
-                    conspdffile = pdffile.replace(".pdf", "_k.pdf")
-                    if self.download_if_needed(suburl, conspdffile):
+                elif link.text.strip().startswith('Konsoliderad version'):
+                    if self.download_if_needed(suburl, basefile,
+                                               filename=self.store.downloaded_path(basefile, attachment="konsoliderad.pdf")):
                         self.log.info(
                             "%s: downloaded consolidated PDF" % basefile)
 
-                elif link.text == 'Ändringsförfattning':
+                elif link.text.strip().startswith('Ändringsförfattning'):
                     self.log.info("Skipping change regulation")
                 elif link['href'].endswith(".pdf"):
                     filename = link['href'].split("/")[-1]
-                    otherpdffile = pdffile.replace(".pdf", "-" + filename)
-                    if self.download_if_needed(suburl, otherpdffile):
+                    if self.download_if_needed(suburl, basefile, self.store.downloaded_path(basefile, attachment=filename)):
                         self.log.info("%s: downloaded '%s' to %s" %
-                                      (basefile, link.text, otherpdffile))
+                                      (basefile, link.text, filename))
 
         else:
             self.log.warning("%s: No idea!" % basefile)
+
+    def basefile_from_uri(self, uri):
+        # this should map https://lagen.nu/sjvfs/2014:9 to basefile sjvfs/2014:9
+        # but also https://lagen.nu/dfs/2007:8 -> dfs/2007:8
+        prefix = self.config.url + self.config.urlpath
+        altprefix = self.config.url + self.config.altpath
+        if uri.startswith(prefix) or uri.startswith(altprefix):
+            basefile = uri[len(self.config.url):]
+            return basefile
 
 
 class ELSAKFS(MyndFskr):
