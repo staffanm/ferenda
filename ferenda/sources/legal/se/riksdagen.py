@@ -285,3 +285,9 @@ class Riksdagen(SwedishLegalSource):
         seg = {self.ns['rpubl'].Proposition: "prop",
                self.ns['rpubl'].Skrivelse: "skr"}
         return self.config.url + "res/%s/%s" % (seg[self.rdf_type], basefile)
+
+    def tabs(self, primary=False):
+        if 'tabs' not in self.config or self.config.tabs:
+            return super(Riksdagen, self).tabs(primary)
+        else:
+            return []

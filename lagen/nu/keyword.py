@@ -4,18 +4,18 @@ from __future__ import unicode_literals
 from lxml import etree
 
 from ferenda import TripleStore
-from ferenda.sources.general import Keyword
+from ferenda.sources.general import keyword
 from ferenda.sources.legal.se import SwedishLegalSource, SFS
 
 
-class LNKeyword(Keyword):
+class LNKeyword(keyword.Keyword):
     """Manages descriptions of legal concepts (Lagen.nu-version of Keyword)
     """
     namespaces = SwedishLegalSource.namespaces
     lang = "sv"
 
     def __init__(self, config=None, **kwargs):
-        super(Keyword, self).__init__(config, **kwargs)
+        super(LNKeyword, self).__init__(config, **kwargs)
         self.termset_funcs = []
         if self.config._parent and hasattr(self.config._parent, "sfs"):
             self.sfsrepo = SFS(self.config._parent.sfs)

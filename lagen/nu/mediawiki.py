@@ -12,10 +12,11 @@ from lxml import etree
 
 # mine
 from ferenda import DocumentStore
-from ferenda.sources.legal.se import SwedishLegalSource, SwedishCitationParser, SFS, LNKeyword
-from ferenda.sources.general.wiki import MediaWiki, MediaWikiStore, WikiSemantics, WikiSettings
+from ferenda.sources.legal.se import SwedishLegalSource, SwedishCitationParser, SFS
+from ferenda.sources.general import wiki
+from . import LNKeyword
 
-class LNMediaWikiStore(MediaWikiStore):
+class LNMediaWikiStore(wiki.MediaWikiStore):
 
     # the pathfrag mangling in MediaWikiStore is not suitable for the
     # content of the Lagen.nu wiki, which in practice has a highly
@@ -28,7 +29,7 @@ class LNMediaWikiStore(MediaWikiStore):
     def pathfrag_to_basefile(self, pathfrag):
         return unicodedata.normalize("NFC", pathfrag.replace(os.sep+"%3E", ":").replace("_", " "))
 
-class LNMediaWiki(MediaWiki):
+class LNMediaWiki(wiki.MediaWiki):
     """Managing commentary on legal sources (Lagen.nu-version of MediaWiki)
     """
     namespaces = SwedishLegalSource.namespaces
@@ -40,6 +41,7 @@ class LNMediaWiki(MediaWiki):
     p = LegalRef(LegalRef.LAGRUM, LegalRef.KORTLAGRUM,
                  LegalRef.FORARBETEN, LegalRef.RATTSFALL)
     lang = "sv"
+    # alias = "lnwiki"
     
     def __init__(self, config=None, **kwargs):
         super(LNMediaWiki, self).__init__(config, **kwargs)
@@ -124,15 +126,14 @@ class LNMediaWiki(MediaWiki):
                 currdiv[0].append(child)
         xhtmltree.remove(body)
         xhtmltree.append(newbody)
-        
 
-class LNSemantics(WikiSemantics):
+class LNSemantics(wiki.WikiSemantics):
     def internal_link(self, ast):
         el = super(LNSemantics, self).internal_link(ast)
         return el
 
 
-class LNSettings(WikiSettings):
+class LNSettings(wiki.WikiSettings):
     def __init__(self, lang="en"):
         super(LNSettings, self).__init__(lang)
         from ferenda.thirdparty.mw.settings import Namespace as MWNamespace
@@ -169,4 +170,3 @@ class LNSettings(WikiSettings):
             else:
                 uri = self.make_keyword_url(name[1])
         return uri
-        

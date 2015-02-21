@@ -706,16 +706,17 @@ class Regeringen(SwedishLegalSource):
         return [row['dcterms_identifier']+": ",
                 Link(row['dcterms_title'],  # yes, ignore binding
                      uri=row['uri'])]
-        
+
     def toc(self, otherrepos=None):
         self.log.debug("Not generating TOC (let ferenda.sources.legal.se.Forarbeten do that instead")
         return
 
     def tabs(self, primary=False):
-        label = {self.DS: "Ds:ar",
-                 self.KOMMITTEDIREKTIV: "Kommittédirektiv",
-                 self.PROPOSITION: "Propositioner",
-                 self.SOU: "SOU:er"}.get(self.document_type, "Förarbete")
-        # return [(label, self.dataset_uri())]
-        return []  # this override should really be customizable or
-                   # at least not here
+        if 'tabs' not in self.config or self.config.tabs:
+            label = {self.DS: "Ds:ar",
+                     self.KOMMITTEDIREKTIV: "Kommittédirektiv",
+                     self.PROPOSITION: "Propositioner",
+                     self.SOU: "SOU:er"}.get(self.document_type, "Förarbete")
+            return [(label, self.dataset_uri())]
+        else:
+            return []

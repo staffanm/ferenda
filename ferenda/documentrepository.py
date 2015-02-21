@@ -461,6 +461,7 @@ class DocumentRepository(object):
             'fulltextindex': True,
             'useragent': 'ferenda-bot',
             'republishsource': False,
+            'tabs': True,
             'class': self.qualified_class_name(),
 
             # FIXME: These only make sense at a global level, and
@@ -1010,7 +1011,7 @@ with the *config* object as single parameter.
     @decorators.managedparsing
     def parse(self, doc):
         """Parse downloaded documents into structured XML and RDF.
-       
+
         It will also save the same RDF statements in a separate
         RDF/XML file.
 

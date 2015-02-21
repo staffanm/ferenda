@@ -6,7 +6,7 @@ from rdflib import RDF
 from ferenda import util
 from ferenda import Facet, TocPageset, TocPage
 from ferenda.elements import Link
-from . import SwedishLegalSource, RPUBL
+from ferenda.sources.legal.se import SwedishLegalSource, RPUBL
 
 
 class Forarbeten(SwedishLegalSource):

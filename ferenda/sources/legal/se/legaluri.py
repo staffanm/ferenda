@@ -29,23 +29,26 @@ DCTERMS = Namespace(util.ns['dcterms'])
 # constructs, which in turn are modelled after production rule names
 # in the EBNF grammar.
 predicate = {"type": RDF.type,
-             "publikation": RPUBL["rattsfallspublikation"],
-             "artal": RPUBL["artal"],
-             "lopnummer": RPUBL["publikationsordinal"],
-             "sidnummer": RPUBL["sidnummer"],
-             "law": RPUBL["fsNummer"],
-             "chapter": RINFOEX["kapitelnummer"],
-             "section": RINFOEX["paragrafnummer"],
-             "piece": RINFOEX["styckenummer"],
-             "item": RINFOEX["punktnummer"],
-             "myndighet": DCTERMS["creator"],
-             "dnr": RPUBL["diarienummer"]}
+             "publikation": RPUBL.forfattningssamling,
+             "artal": RPUBL.artal,
+             "sidnummer": RPUBL.sidnummer,
+             "lopnummer": RPUBL.lopnummer,
+             "law": RPUBL.lopnummer,  # law really consists of artal:lopnummer
+             "chapter": RINFOEX.kapitelnummer,
+             "section": RINFOEX.paragrafnummer,
+             "piece": RINFOEX.styckenummer,
+             "item": RINFOEX.punktnummer,
+             "myndighet": DCTERMS.creator,
+             "dnr": RPUBL.diarienummer,
+             "celex": RPUBL.genomforDirektiv}
 
 dictkey = dict([[v, k] for k, v in list(predicate.items())])
 
-types = {LegalRef.RATTSFALL: RPUBL["Rattsfallsreferat"],
-         LegalRef.LAGRUM: RPUBL["KonsolideradGrundforfattning"],
-         LegalRef.MYNDIGHETSBESLUT: RPUBL["Myndighetsavgorande"]}
+types = {LegalRef.RATTSFALL: RPUBL.Rattsfallsreferat,
+         LegalRef.LAGRUM: RPUBL.KonsolideradGrundforfattning,
+         LegalRef.MYNDIGHETSBESLUT: RPUBL.Myndighetsavgorande,
+         LegalRef.FORESKRIFTER: RPUBL.Myndighetsforeskrift,
+         LegalRef.EULAGSTIFTNING: RINFOEX.EUDirektiv}
 
 dicttypes = dict([[v, k] for k, v in list(types.items())])
 
@@ -91,6 +94,17 @@ def _first_obj(graph, subject, predicate):
         return l[0]
 
 
+def _rpubl_uri_transform(s):
+    # Inspired by
+    # http://code.activestate.com/recipes/81330-single-pass-multiple-replace/
+    table = {'å': 'aa',
+             'ä': 'ae',
+             'ö': 'oe'}
+    r = re.compile("|".join(list(table.keys())))
+    # return r.sub(lambda f: table[f.string[f.start():f.end()]], s.lower())
+    return r.sub(lambda m: table[m.group(0)], s.lower())
+
+
 def construct_from_graph(graph):
     # assume every triple in the graph has the same bnode as subject
     bnode = list(graph)[0][0]
@@ -98,29 +112,29 @@ def construct_from_graph(graph):
 
     # maybe we should just move the triples into a dict keyed on predicate?
     rdftype = _first_obj(graph, bnode, RDF.type)
-    if rdftype == RPUBL["Rattsfallsreferat"]:
-        publ = _first_obj(graph, bnode, RPUBL["rattsfallspublikation"])
+    if rdftype == RPUBL.Rattsfallsreferat:
+        publ = _first_obj(graph, bnode, RPUBL.rattsfallspublikation)
         if str(publ) == "nja":
             uripart = "%s/%ss%s" % (publ,
-                                    _first_obj(graph, bnode, RPUBL["artal"]),
-                                    _first_obj(graph, bnode, RPUBL["sidnummer"]))
+                                    _first_obj(graph, bnode, RPUBL.artal),
+                                    _first_obj(graph, bnode, RPUBL.sidnummer))
         else:
             uripart = "%s/%s:%s" % (publ,
-                                    _first_obj(graph, bnode, RPUBL["artal"]),
-                                    _first_obj(graph, bnode, RPUBL["publikationsordinal"]))
+                                    _first_obj(graph, bnode, RPUBL.artal),
+                                    _first_obj(graph, bnode, RPUBL.lopnummer))
 
         return "http://rinfo.lagrummet.se/publ/rattsfall/%s" % uripart
-    elif rdftype == RPUBL["KonsolideradGrundforfattning"]:
+    elif rdftype == RPUBL.KonsolideradGrundforfattning:
         # print graph.serialize(format="n3")
-        attributeorder = [RINFOEX["kapitelnummer"],
-                          RINFOEX["paragrafnummer"],
-                          RINFOEX["styckenummer"],
-                          RINFOEX["punktnummer"]]
-        signs = {RINFOEX["kapitelnummer"]: 'K',
-                 RINFOEX["paragrafnummer"]: 'P',
-                 RINFOEX["styckenummer"]: 'S',
-                 RINFOEX["punktnummer"]: 'N'}
-        urifragment = _first_obj(graph, bnode, RPUBL["fsNummer"])
+        attributeorder = [RINFOEX.kapitelnummer,
+                          RINFOEX.paragrafnummer,
+                          RINFOEX.styckenummer,
+                          RINFOEX.punktnummer]
+        signs = {RINFOEX.kapitelnummer: 'K',
+                 RINFOEX.paragrafnummer: 'P',
+                 RINFOEX.styckenummer: 'S',
+                 RINFOEX.punktnummer: 'N'}
+        urifragment = _first_obj(graph, bnode, RPUBL.lopnummer)
         for key in attributeorder:
             if _first_obj(graph, bnode, key):
                 if "#" not in urifragment:
@@ -128,11 +142,21 @@ def construct_from_graph(graph):
                 urifragment += signs[key] + _first_obj(graph, bnode, key)
         return "http://rinfo.lagrummet.se/publ/sfs/%s" % urifragment
 
-    elif rdftype == RPUBL["Myndighetsavgorande"]:
+    elif rdftype == RPUBL.VagledandeMyndighetsavgorande:
         return "http://rinfo.lagrummet.se/publ/beslut/%s/%s" % \
-               (_first_obj(graph, bnode, DCTERMS["creator"]),
-                _first_obj(graph, bnode, RPUBL["diarienummer"]))
+               (_first_obj(graph, bnode, DCTERMS.creator),
+                _first_obj(graph, bnode, RPUBL.diarienummer))
 
+    elif rdftype == RPUBL.Myndighetsforeskrift:
+        return "http://rinfo.lagrummet.se/publ/%s/%s:%s" % \
+               (_rpubl_uri_transform(graph.value(bnode, RPUBL.forfattningssamling)),
+                graph.value(bnode, RPUBL.artal),
+                graph.value(bnode, RPUBL.lopnummer))
+
+
+    elif rdftype == RINFOEX.EUDirektiv:
+        return ("http://rinfo.lagrummet.se/ext/eur-lex/%s" %
+                graph.value(bnode, RPUBL.genomforDirektiv))
     else:
         raise ValueError("Don't know how to construct a uri for %s" % rdftype)
 

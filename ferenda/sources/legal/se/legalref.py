@@ -229,16 +229,16 @@ class LegalRef:
     # Kanske detta borde vara 1,2,4,8 osv, så att anroparen kan be om
     # LAGRUM | FORESKRIFTER, och så vi kan definera samlingar av
     # vanliga kombinationer (exv ALL_LAGSTIFTNING = LAGRUM |
-    # KORTLAGRUM | FORESKRIFTER | EGLAGSTIFTNING)
+    # KORTLAGRUM | FORESKRIFTER | EULAGSTIFTNING)
     LAGRUM = 1             # hänvisningar till lagrum i SFS
     KORTLAGRUM = 2         # SFS-hänvisningar på kortform
     FORESKRIFTER = 3       # hänvisningar till myndigheters författningssamlingar
-    EGLAGSTIFTNING = 4     # EG-fördrag, förordningar och direktiv
+    EULAGSTIFTNING = 4     # EU-fördrag, förordningar och direktiv
     INTLLAGSTIFTNING = 5   # Fördrag, traktat etc
     FORARBETEN = 6         # proppar, betänkanden, etc
     RATTSFALL = 7          # Rättsfall i svenska domstolar
     MYNDIGHETSBESLUT = 8   # Myndighetsbeslut (JO, ARN, DI...)
-    EGRATTSFALL = 9        # Rättsfall i EG-domstolen/förstainstansrätten
+    EURATTSFALL = 9        # Rättsfall i EG-domstolen/förstainstansrätten
     INTLRATTSFALL = 10     # Europadomstolen
 
     # re_urisegments = re.compile(r'([\w]+://[^/]+/[^\d]*)(\d+:(bih\.
@@ -305,7 +305,7 @@ class LegalRef:
             self.decl += lawdecl
             self.roots.insert(0, "kortlagrumref")
 
-        if self.EGLAGSTIFTNING in args:
+        if self.EULAGSTIFTNING in args:
             productions = self.load_ebnf(scriptdir + "/../../../res/etc/eglag.ebnf")
             for p in productions:
                 self.uriformatter[p] = self.eglag_format_uri
@@ -321,7 +321,7 @@ class LegalRef:
             for p in productions:
                 self.uriformatter[p] = self.rattsfall_format_uri
             self.roots.append("rattsfallref")
-        if self.EGRATTSFALL in args:
+        if self.EURATTSFALL in args:
             productions = self.load_ebnf(scriptdir + "/../../../res/etc/egratt.ebnf")
             for p in productions:
                 self.uriformatter[p] = self.egrattsfall_format_uri
@@ -1175,7 +1175,7 @@ class LegalRef:
         return [self.format_generic_link(root)]
 
     #
-    # KOD FÖR EGLAGSTIFTNING
+    # KOD FÖR EULAGSTIFTNING
     def eglag_format_uri(self, attributes):
         res = 'http://rinfo.lagrummet.se/ext/celex/'
         if not 'akttyp' in attributes:

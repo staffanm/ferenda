@@ -8,16 +8,24 @@ import codecs
 from tempfile import mktemp
 from xml.sax.saxutils import escape as xml_escape
 
-from rdflib import Graph, URIRef, Literal
+from rdflib import Graph, URIRef, Literal, Namespace
 from bs4 import BeautifulSoup
 import requests
 import six
+from six.moves.urllib_parse import urljoin, unquote
 
-from ferenda import TextReader
+from ferenda import TextReader, Describer
 from ferenda.sources.legal.se.legalref import LegalRef
-from ferenda import util
+from ferenda.sources.legal.se import legaluri
+from ferenda import util, decorators
+from ferenda.elements import Page, Preformatted
 from . import SwedishLegalSource
 
+from rdflib import RDF
+from rdflib.namespace import DCTERMS, SKOS
+from . import RPUBL
+PROV = Namespace(util.ns['prov'])
+RINFOEX = Namespace("http://lagen.nu/terms#")
 
 class MyndFskr(SwedishLegalSource):
 
@@ -29,6 +37,14 @@ special-case code, though.)"""
     source_encoding = "utf-8"
     downloaded_suffix = ".pdf"
     alias = 'myndfskr'
+
+    required_predicates = [RDF.type, DCTERMS.title, DCTERMS.issued,
+                           DCTERMS.identifier, RPUBL.arsutgava,
+                           DCTERMS.publisher, RPUBL.beslutadAv,
+                           RPUBL.beslutsdatum,
+                           RPUBL.forfattningssamling,
+                           RPUBL.ikrafttradandedatum, RPUBL.lopnummer,
+                           RPUBL.utkomFranTryck, PROV.wasGeneratedBy]
 
     def download(self, basefile=None):
         """Simple default implementation that downloads all PDF files
@@ -77,6 +93,15 @@ special-case code, though.)"""
             # fall back
             return super(MyndFskr, self).canonical_uri(basefile)
 
+    @decorators.action
+    @decorators.managedparsing
+    def parse(self, doc):
+        reader = self.textreader_from_basefile(doc.basefile, self.source_encoding)
+        self.parse_metadata_from_textreader(reader, doc)
+        self.parse_document_from_textreader(reader, doc)
+        self.parse_entry_update(doc)
+        return True  # Signals that everything is OK
+
     def textreader_from_basefile(self, basefile, encoding):
         infile = self.store.downloaded_path(basefile)
         tmpfile = self.store.path(basefile, 'intermediate', '.pdf')
@@ -87,45 +112,10 @@ special-case code, though.)"""
 
         return TextReader(outfile, encoding=encoding, linesep=TextReader.UNIX)
 
-    def rpubl_uri_transform(self, s):
-        # Inspired by
-        # http://code.activestate.com/recipes/81330-single-pass-multiple-replace/
-        table = {'å': 'aa',
-                 'ä': 'ae',
-                 'ö': 'oe'}
-        r = re.compile("|".join(list(table.keys())))
-        # return r.sub(lambda f: table[f.string[f.start():f.end()]], s.lower())
-        return r.sub(lambda m: table[m.group(0)], s.lower())
 
-    def download_resource_lists(self, resource_url, graph_path):
-        hdr = self._addheaders()
-        hdr['Accept'] = 'application/rdf+xml'
-        resp = requests.get(resource_url, headers=hdr)
-        g = Graph()
-        g.parse(data=resp.text, format="xml")
-        for subj in g.subjects(self.ns['rdf'].type,
-                               self.ns['rpubl'].Forfattningssamling):
-            resp = requests.get(str(subj), headers=hdr)
-            resp.encoding = "utf-8"
-            g.parse(data=resp.text, format="xml")
-        with open(graph_path, "wb") as fp:
-            data = g.serialize(format="xml")
-            fp.write(data)
 
-    def parse_from_textreader(self, reader, basefile):
-        tracelog = logging.getLogger("%s.tracelog" % self.alias)
-
-        doc = self.make_document(basefile)
+    def parse_metadata_from_textreader(self, reader, doc):
         g = doc.meta
-
-        # 1.2: Load known entities and their URIs (we have to add some
-        # that are not yet in the official resource lists
-        resource_list_file = self.store.path('resourcelist', 'intermediate', '.rdf')
-        if not os.path.exists(resource_list_file):
-            self.download_resource_lists("http://service.lagrummet.se/var/common",
-                                         resource_list_file)
-        resources = Graph()
-        resources.parse(resource_list_file, format="xml")
 
         # 1.3: Define regexps for the data we search for.
         fwdtests = {'dcterms:issn': ['^ISSN (\d+\-\d+)$'],
@@ -205,183 +195,176 @@ special-case code, though.)"""
                     m = re.search(test, page, re.MULTILINE | re.UNICODE)
                     if m:
                         props[prop] = util.normalize_space(m.group(1))
-                        # print u"%s: '%s' resulted in match '%s' at page %s from end" %
-                        # (prop,test,props[prop], cnt)
 
             # Single required propery. If we find this, we're done
             if 'rpubl:ikrafttradandedatum' in props:
                 break
 
-        # 3: Clean up data - converting strings to Literals or
-        # URIRefs, find legal references, etc
-        if 'dcterms:identifier' in props:
-            (publication, year, ordinal) = re.split('[ :]',
-                                                    props['dcterms:identifier'])
-            # FIXME: Read resources graph instead
-            fs = resources.value(predicate=self.ns['skos'].altLabel,
-                                 object=Literal(publication, lang='sv'))
-            props['rpubl:forfattningssamling'] = fs
-            publ = resources.value(subject=fs,
-                                   predicate=self.ns['dcterms'].publisher)
-            props['dcterms:publisher'] = publ
+        self.sanitize_metadata(props, doc)
+        self.polish_metadata(props, doc)
+        self.infer_triples(Describer(doc.meta, doc.uri), doc)
 
-            props['rpubl:arsutgava'] = Literal(
-                year)  # conversion to int, date not needed
-            props['rpubl:lopnummer'] = Literal(ordinal)
-            props['dcterms:identifier'] = Literal(props['dcterms:identifier'])
+        return doc
 
-            # Now we can mint the uri (should be done through LegalURI)
-            uri = ("http://rinfo.lagrummet.se/publ/%s/%s:%s" %
-                   (props['rpubl:forfattningssamling'].split('/')[-1],
-                    props['rpubl:arsutgava'],
-                    props['rpubl:lopnummer']))
-            self.log.debug("URI: %s" % uri)
-        else:
-            self.log.error(
-                "Couldn't find dcterms:identifier, cannot create URI, giving up")
-            return None
-
-        tracelog.info("Cleaning rpubl:beslutadAv")
-        if 'rpubl:beslutadAv' in props:
-            agency = resources.value(predicate=self.ns['foaf'].name,
-                                     object=Literal(props['rpubl:beslutadAv'],
-                                                    lang="sv"))
-            if agency:
-                props['rpubl:beslutadAv'] = agency
-            else:
-                self.log.warning(
-                    "Cannot find URI for rpubl:beslutadAv value %r" % props['rpubl:beslutadAv'])
-                del props['rpubl:beslutadAv']
-
-        tracelog.info("Cleaning dcterms:issn")
-        if 'dcterms:issn' in props:
-            props['dcterms:issn'] = Literal(props['dcterms:issn'])
-
-        tracelog.info("Cleaning dcterms:title")
+    def sanitize_metadata(self, props, doc):
+        """Correct those irregularities in the extracted metadata that we can
+           find"""
 
         # common false positive
-        if 'dcterms:title' in props and 'denna f\xf6rfattning har beslutats den' in props['dcterms:title']:
-            del props['dcterms:title']
-
         if 'dcterms:title' in props:
-            tracelog.info("Inspecting dcterms:title %r" % props['dcterms:title'])
-            # sometimes the title isn't separated with two newlines from the rest of the text
-            if "\nbeslutade den " in props['dcterms:title']:
+            if 'denna f\xf6rfattning har beslutats den' in props['dcterms:title']:
+                del props['dcterms:title']
+            elif "\nbeslutade den " in props['dcterms:title']:
+                # sometimes the title isn't separated with two
+                # newlines from the rest of the text
                 props['dcterms:title'] = props[
                     'dcterms:title'].split("\nbeslutade den ")[0]
-            props['dcterms:title'] = Literal(
-                util.normalize_space(props['dcterms:title']), lang="sv")
-
-            if re.search('^(Föreskrifter|[\w ]+s föreskrifter) om ändring i ', props['dcterms:title'], re.UNICODE):
-                tracelog.info("Finding rpubl:andrar in dcterms:title")
-                orig = re.search(
-                    '([A-ZÅÄÖ-]+FS \d{4}:\d+)', props['dcterms:title']).group(0)
-                (publication, year, ordinal) = re.split('[ :]', orig)
-                origuri = "http://rinfo.lagrummet.se/publ/%s/%s:%s" % (self.rpubl_uri_transform(publication),
-                                                                       year, ordinal)
-                props['rpubl:andrar'] = URIRef(origuri)
-                if 'rpubl:omtryckAv' in props:
-                    props['rpubl:omtryckAv'] = URIRef(origuri)
-            if (re.search('^(Föreskrifter|[\w ]+s föreskrifter) om upphävande av', props['dcterms:title'], re.UNICODE)
-                    and not 'rpubl:upphaver' in props):
-                tracelog.info("Finding rpubl:upphaver in dcterms:title")
-                props['rpubl:upphaver'] = six.text_type(
-                    props['dcterms:title'])  # cleaned below
-
-        tracelog.info("Cleaning date properties")
-        for prop in ('rpubl:utkomFranTryck', 'rpubl:beslutsdatum', 'rpubl:ikrafttradandedatum'):
-            if prop in props:
-                if (props[prop] == 'denna dag' and
-                        prop == 'rpubl:ikrafttradandedatum'):
-                    props[prop] = props['rpubl:beslutsdatum']
-                elif (props[prop] == 'utkom från trycket' and
-                      prop == 'rpubl:ikrafttradandedatum'):
-                    props[prop] = props['rpubl:utkomFranTryck']
-                else:
-                    props[prop] = Literal(
-                        self.parse_swedish_date(props[prop].lower()))
-
-        tracelog.info("Cleaning rpubl:genomforDirektiv")
-        if 'rpubl:genomforDirektiv' in props:
-            props['rpubl:genomforDirektiv'] = URIRef("http://rinfo.lagrummet.se/ext/eur-lex/%s" %
-                                                     props['rpubl:genomforDirektiv'])
-
-        tracelog.info("Cleaning rpubl:bemyndigande")
-        has_bemyndiganden = False
-
         if 'rpubl:bemyndigande' in props:
+            props['rpubl:bemyndigande'] = props[
+                'rpubl:bemyndigande'].replace('\u2013', '-')
+
+
+    def polish_metadata(self, props, doc):
+        """Clean up data, including converting a string->string dict to a
+        proper RDF graph.
+
+        """
+
+
+        # FIXME: this code should go into canonical_uri, if we can
+        # find a way to give it access to props['dcterms:identifier']
+        if 'dcterms:identifier' in props:
+            (pub, year, ordinal) = re.split('[ :]',
+                                            props['dcterms:identifier'])
+        else:
+            # simple inference from basefile
+            (pub, year, ordinal) = re.split('[ :]',
+                                            props['dcterms:identifier'])
+        uri = legaluri.construct({'type': LegalRef.FORESKRIFTER,
+                                  'publikation': pub,
+                                  'artal': year,
+                                  'lopnummer': ordinal})
+
+        if doc.uri is not None and uri != doc.uri:
+            self.log.warning("Assumed URI would be %s but it turns out to be %s"% (doc.uri, uri))
+        doc.uri = uri
+        desc = Describer(doc.meta, doc.uri)
+
+
+        fs = self.lookup_resource(pub, SKOS.altLabel)
+        desc.rel(RPUBL.forfattningssamling, fs)
+        # publisher for the series == publisher for the document
+        desc.rel(DCTERMS.publisher,
+                 self.commondata.value(fs, DCTERMS.publisher))
+                     
+        desc.value(RPUBL.arsutgava, year)
+        desc.value(RPUBL.lopnummer, ordinal)
+        desc.value(DCTERMS.identifier, props['dcterms:identifier'])
+
+        if 'rpubl:beslutadAv' in props:
+            desc.rel(RPUBL.beslutadAv,
+                     self.lookup_resource(props['rpubl:beslutadAv']))
+
+        if 'dcterms:issn' in props:
+            desc.value(DCTERMS.issn, props['dcterms:issn'])
+
+        if 'dcterms:title' in props:
+            desc.value(DCTERMS.title,
+                       Literal(util.normalize_space(
+                           props['dcterms:title']), lang="sv"))
+
+            if re.search('^(Föreskrifter|[\w ]+s föreskrifter) om ändring i ',
+                         props['dcterms:title'], re.UNICODE):
+                orig = re.search('([A-ZÅÄÖ-]+FS \d{4}:\d+)',
+                                 props['dcterms:title']).group(0)
+                (publication, year, ordinal) = re.split('[ :]', orig)
+                origuri = legaluri.construct({'type': LegalRef.FORESKRIFTER,
+                                              'publikation': pub,
+                                              'artal': year,
+                                              'lopnummer': ordinal})
+                desc.rel(RPUBL.andrar,
+                         URIRef(origuri))
+                # desc.rel(RPUBL.omtryckAv,
+                #          URIRef(origuri))
+
+            # FIXME:
+            if (re.search('^(Föreskrifter|[\w ]+s föreskrifter) om upphävande '
+                          'av', props['dcterms:title'], re.UNICODE)
+                    and not 'rpubl:upphaver' in props):
+                props['rpubl:upphaver'] = props['dcterms:title']
+
+        for key, pred in (('rpubl:utkomFranTryck', RPUBL.utkomFranTryck),
+                          ('rpubl:beslutsdatum', RPUBL.beslutsdatum),
+                          ('rpubl:ikrafttradandedatum', RPUBL.ikrafttradandedatum)):
+                # FIXME: how does this even work
+                if (props[key] == 'denna dag' and
+                        key == 'rpubl:ikrafttradandedatum'):
+                    desc.value(RPUBL.ikrafttradandedatum,
+                               self.parse_swedish_date(props['rpubl:beslutsdatum']))
+                elif (props[key] == 'utkom från trycket' and
+                      key == 'rpubl:ikrafttradandedatum'):
+                    desc.value(RPUBL.ikrafttradandedatum,
+                               self.parse_swedish_date(props['rpubl:utkomFranTryck']))
+                else:
+                    desc.value(pred,
+                               self.parse_swedish_date(props[key].lower()))
+
+        if 'rpubl:genomforDirektiv' in props:
+            diruri = legaluri.construct({'type': LegalRef.EULAGSTIFTNING,
+                                         'celex':
+                                         props['rpubl:genomforDirektiv']})
+            desc.rel(RPUBL.genomforDirektiv, diruri)
+
+        has_bemyndiganden = False
+        if 'rpubl:bemyndigande' in props:
+            # FIXME: move to sanitize_metadata
             # SimpleParse can't handle unicode endash sign, transform
             # into regular ascii hyphen
             props['rpubl:bemyndigande'] = props[
                 'rpubl:bemyndigande'].replace('\u2013', '-')
             parser = LegalRef(LegalRef.LAGRUM)
             result = parser.parse(props['rpubl:bemyndigande'])
-            bemyndigande_uris = [x.uri for x in result if hasattr(x, 'uri')]
+            bemyndiganden = [x.uri for x in result if hasattr(x, 'uri')]
 
             # some of these uris need to be filtered away due to
             # over-matching by parser.parse
-            filtered_bemyndigande_uris = []
-            for bem_uri in bemyndigande_uris:
+            filtered_bemyndiganden = []
+            for bem_uri in bemyndiganden:
                 keep = True
-                for compare in bemyndigande_uris:
+                for compare in bemyndiganden:
                     if (len(compare) > len(bem_uri) and
                             compare.startswith(bem_uri)):
                         keep = False
                 if keep:
-                    filtered_bemyndigande_uris.append(bem_uri)
+                    filtered_bemyndiganden.append(bem_uri)
 
-            for bem_uri in filtered_bemyndigande_uris:
-                g.add((URIRef(
-                    uri), self.ns['rpubl']['bemyndigande'], URIRef(bem_uri)))
-                has_bemyndiganden = True
-            del props['rpubl:bemyndigande']
+            for bem_uri in filtered_bemyndiganden:
+                desc.rel(RPUBL.bemyndigande, bem_uri)
 
-        tracelog.info("Cleaning rpubl:upphaver")
         if 'rpubl:upphaver' in props:
-            for upph in re.findall('([A-ZÅÄÖ-]+FS \d{4}:\d+)', util.normalize_space(props['rpubl:upphaver'])):
-                (publication, year, ordinal) = re.split('[ :]', upph)
-                upphuri = "http://rinfo.lagrummet.se/publ/%s/%s:%s" % (publication.lower(),
-                                                                       year, ordinal)
-                g.add((URIRef(
-                    uri), self.ns['rpubl']['upphaver'], URIRef(upphuri)))
-            del props['rpubl:upphaver']
+            for upph in re.findall('([A-ZÅÄÖ-]+FS \d{4}:\d+)',
+                                   util.normalize_space(props['rpubl:upphaver'])):
+                (pub, year, ordinal) = re.split('[ :]', upph)
+                upphuri = legaluri.construct({'type': LegalRef.FORESKRIFTER,
+                                              'publikation': pub,
+                                              'artal': year,
+                                              'lopnummer': ordinal})
+                desc.rel(RPUBL.upphaver, upphuri)
 
-        tracelog.info("Deciding rdf:type")
         if ('dcterms:title' in props and
             "allmänna råd" in props['dcterms:title'] and
-                not "föreskrifter" in props['dcterms:title']):
-            props['rdf:type'] = self.ns['rpubl']['AllmannaRad']
+                "föreskrifter" not in props['dcterms:title']):
+            rdftype = RPUBL.AllmannaRad
         else:
-            props['rdf:type'] = self.ns['rpubl']['Myndighetsforeskrift']
+            rdftype = RPUBL.Myndighetsforeskrift
+        desc.rdftype(rdftype)
 
-        # 3.5: Check to see that we have all properties that we expect
-        # (should maybe be done elsewhere later?)
-        tracelog.info("Checking required properties")
-        for prop in ('dcterms:identifier', 'dcterms:title', 'rpubl:arsutgava',
-                     'dcterms:publisher', 'rpubl:beslutadAv', 'rpubl:beslutsdatum',
-                     'rpubl:forfattningssamling', 'rpubl:ikrafttradandedatum',
-                     'rpubl:lopnummer', 'rpubl:utkomFranTryck'):
-            if not prop in props:
-                self.log.warning("%s: Failed to find %s" % (basefile, prop))
+        if rdftype == RPUBL.Myndighetsforeskrift:
+            self.required_predicates.append(RPUBL.bemyndigande)
 
-        tracelog.info("Checking rpubl:bemyndigande")
-        if props['rdf:type'] == self.ns['rpubl']['Myndighetsforeskrift']:
-            if not has_bemyndiganden:
-                self.log.warning(
-                    "%s: Failed to find rpubl:bemyndigande" % (basefile))
 
-        # 4: Add the cleaned data to a RDFLib Graph
-        # (maybe we should do that as early as possible?)
-        tracelog.info("Adding items to rdflib.Graph")
-        for (prop, value) in list(props.items()):
-            (prefix, term) = prop.split(":", 1)
-            p = self.ns[prefix][term]
-            if not (isinstance(value, URIRef) or isinstance(value, Literal)):
-                self.log.warning("%s: %s is a %s, not a URIRef or Literal" %
-                                 (basefile, prop, type(value)))
-            g.add((URIRef(uri), p, value))
-
-        # 5: Create data for the body, removing various control characters
+    def parse_document_from_textreader(self, reader, doc):
+        # Create data for the body, removing various control characters
         # TODO: Use pdftohtml to create a nice viewable HTML
         # version instead of this plaintext stuff
         reader.seek(0)
@@ -401,18 +384,18 @@ special-case code, though.)"""
         control_chars = control_chars.replace("\t", "").replace("\n", "")
 
         control_char_re = re.compile('[%s]' % re.escape(control_chars))
-        for page in reader.getiterator(reader.readpage):
+        for idx, page in enumerate(reader.getiterator(reader.readpage)):
             text = xml_escape(control_char_re.sub('', page))
-            body.append("<pre>%s</pre>\n\n" % text)
+            p = Page(ordinal=idx+1)
+            p.append(Preformatted(text))
+            body.append(p)
 
-        # 5: Done!
-        #
-        doc.body = body
-        doc.uri = uri
-        return doc
+        
 
-    def tabs(cls, primary=False):
-        return [['Myndighetsföreskrifter', '/myndfskr/']]
+
+
+    def tabs(self, primary=False):
+        return [('Myndighetsföreskrifter', self.dataset_uri())]
 
 
 class SJVFS(MyndFskr):
@@ -421,24 +404,19 @@ class SJVFS(MyndFskr):
 
     def download(self, basefile=None):
         soup = BeautifulSoup(requests.get(self.start_url).text)
-        main = soup.find("ul", "c112")
+        main = soup.find_all("li", "active")
+        assert len(main) == 1
         extra = []
-        for a in list(main.findAll("a")):
-            url = urllib.parse.urljoin(self.start_url, a['href'])
-            self.log.info("Fetching %s %s" % (a.text, url))
-            extra.extend(self.download_indexpage(url, usecache=usecache))
+        for a in list(main[0].ul.find_all("a")):
+            # only fetch subsections that start with a year, not
+            # "Allmänna råd"/"Notiser"/"Meddelanden"
+            if a.text.split()[0].isdigit():
+                url = urljoin(self.start_url, a['href'])
+                self.log.info("Fetching %s %s" % (a.text, url))
+                extra.extend(self.download_indexpage(url))
 
-        extra2 = []
-        for url in list(set(extra)):
-            self.log.info("Extrafetching %s" % (url))
-            extra2.extend(self.download_indexpage(url, usecache=usecache))
-
-        for url in list(set(extra2)):
-            self.log.info("Extra2fetching %s" % (url))
-            self.download_indexpage(url, usecache=usecache)
 
     def download_indexpage(self, url):
-
         subsoup = BeautifulSoup(requests.get(url).text)
         submain = subsoup.find("div", "pagecontent")
         extrapages = []
@@ -451,10 +429,9 @@ class SJVFS(MyndFskr):
                     if not fs:
                         fs = "sjvfs"
                     basefile = "%s/%s" % (fs, fsnr)
-                    suburl = urllib.parse.unquote(
-                        urllib.parse.urljoin(url, a['href'])).encode('utf-8')
-                    self.download_single(
-                        basefile, usecache=usecache, url=suburl)
+                    suburl = unquote(
+                        urljoin(url, a['href']))
+                    self.download_single(basefile, url=suburl)
                 elif a.text == "Besult":
                     basefile = a.findParent(
                         "td").findPreviousSibling("td").find("a").text

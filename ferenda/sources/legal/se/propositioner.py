@@ -396,4 +396,4 @@ class Propositioner(CompositeRepository, SwedishLegalSource):
     documentstore_class = PropositionerStore
     sparql_annotations = None # don't even bother creating an annotation file
     def tabs(self, primary=False):
-        return [('Förarbeten', self.dataset_uri())]
+        return [('Propositioner', self.dataset_uri())]

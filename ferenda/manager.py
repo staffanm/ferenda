@@ -574,6 +574,7 @@ def _load_config(filename=None, argv=None, defaults=None):
                     'downloadmax': int,  # used strictly for typing
                     'combineresources': False,
                     'staticsite': False,
+                    'tabs': True,
                     'sitename': 'MySite',
                     'sitedescription': 'Just another Ferenda site',
                     'cssfiles': ['http://fonts.googleapis.com/css?family=Raleway:200,100',
