@@ -296,6 +296,7 @@ special-case code, though.)"""
         for key, pred in (('rpubl:utkomFranTryck', RPUBL.utkomFranTryck),
                           ('rpubl:beslutsdatum', RPUBL.beslutsdatum),
                           ('rpubl:ikrafttradandedatum', RPUBL.ikrafttradandedatum)):
+            if key in props:
                 # FIXME: how does this even work
                 if (props[key] == 'denna dag' and
                         key == 'rpubl:ikrafttradandedatum'):

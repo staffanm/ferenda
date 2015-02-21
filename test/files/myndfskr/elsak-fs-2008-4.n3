@@ -12,5 +12,5 @@
     rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/elsaek-fs>;
     rpubl:ikrafttradandedatum "2008-09-30"^^xsd:date;
     rpubl:lopnummer "4";
-    rpubl:upphaver <http://rinfo.lagrummet.se/publ/elsäk-fs/1999:5>;
+    rpubl:upphaver <http://rinfo.lagrummet.se/publ/elsaek-fs/1999:5>;
     rpubl:utkomFranTryck "2008-03-28"^^xsd:date .
