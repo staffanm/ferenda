@@ -14,12 +14,13 @@ import requests
 import six
 from six.moves.urllib_parse import urljoin, unquote
 
-from ferenda import TextReader, Describer
+from ferenda import TextReader, Describer, Facet
+from ferenda import util, decorators
+from ferenda.elements import Body, Page, Preformatted, Link
 from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda.sources.legal.se import legaluri
-from ferenda import util, decorators
-from ferenda.elements import Body, Page, Preformatted
 from . import SwedishLegalSource
+from .swedishlegalsource import SwedishCitationParser
 
 from rdflib import RDF
 from rdflib.namespace import DCTERMS, SKOS
@@ -207,7 +208,6 @@ special-case code, though.)"""
         self.sanitize_metadata(props, doc)
         self.polish_metadata(props, doc)
         self.infer_triples(Describer(doc.meta, doc.uri), doc)
-
         return doc
 
     def sanitize_metadata(self, props, doc):
@@ -233,7 +233,8 @@ special-case code, though.)"""
         proper RDF graph.
 
         """
-
+        # leverage localize_uri
+        cp = SwedishCitationParser(None, self.config.url, self.config.urlpath)
 
         # FIXME: this code should go into canonical_uri, if we can
         # find a way to give it access to props['dcterms:identifier']
@@ -244,10 +245,12 @@ special-case code, though.)"""
             # simple inference from basefile
             (pub, year, ordinal) = re.split('[ :]',
                                             props['dcterms:identifier'])
-        uri = legaluri.construct({'type': LegalRef.FORESKRIFTER,
-                                  'publikation': pub,
-                                  'artal': year,
-                                  'lopnummer': ordinal})
+        uri = cp.localize_uri(
+            legaluri.construct({'type': LegalRef.FORESKRIFTER,
+                                'publikation': pub,
+                                'artal': year,
+                                'lopnummer': ordinal})
+            )
 
         if doc.uri is not None and uri != doc.uri:
             self.log.warning("Assumed URI would be %s but it turns out to be %s"% (doc.uri, uri))
@@ -282,10 +285,12 @@ special-case code, though.)"""
                 orig = re.search('([A-ZÅÄÖ-]+FS \d{4}:\d+)',
                                  props['dcterms:title']).group(0)
                 (publication, year, ordinal) = re.split('[ :]', orig)
-                origuri = legaluri.construct({'type': LegalRef.FORESKRIFTER,
-                                              'publikation': pub,
-                                              'artal': year,
-                                              'lopnummer': ordinal})
+                origuri = cp.localize_uri(
+                    legaluri.construct({'type': LegalRef.FORESKRIFTER,
+                                        'publikation': pub,
+                                        'artal': year,
+                                        'lopnummer': ordinal})
+                    )
                 desc.rel(RPUBL.andrar,
                          URIRef(origuri))
                 # desc.rel(RPUBL.omtryckAv,
@@ -315,9 +320,11 @@ special-case code, though.)"""
                                self.parse_swedish_date(props[key].lower()))
 
         if 'rpubl:genomforDirektiv' in props:
-            diruri = legaluri.construct({'type': LegalRef.EULAGSTIFTNING,
-                                         'celex':
-                                         props['rpubl:genomforDirektiv']})
+            diruri = cp.localize_uri(
+                legaluri.construct({'type': LegalRef.EULAGSTIFTNING,
+                                    'celex':
+                                    props['rpubl:genomforDirektiv']})
+                )
             desc.rel(RPUBL.genomforDirektiv, diruri)
 
         has_bemyndiganden = False
@@ -398,8 +405,38 @@ special-case code, though.)"""
             body.append(p)
         doc.body = body
 
+    def facets(self):
+        return [Facet(RDF.type),
+                Facet(DCTERMS.title),
+                Facet(DCTERMS.publisher),
+                Facet(DCTERMS.identifier),
+                Facet(RPUBL.arsutgava,
+                      use_for_toc=True)]
+
+    def basefile_from_uri(self, uri):
+        prefix = self.config.url + self.config.urlpath
+        if uri.startswith(prefix) and uri[len(prefix)].isdigit():
+            rest = uri[len(prefix):].replace("_", " ")
+            return rest.split("/")[0]
+
+    def toc_item(self, binding, row):
+        """Returns a formatted version of row, using Element objects"""
+        # more defensive version of DocumentRepository.toc_item
+        label = ""
+        if 'dcterms_identifier' in row:
+            label = row['dcterms_identifier']
+        else:
+            self.log.warning("No dcterms:identifier for %s" % row['uri'])
+            
+        if 'dcterms_title' in row:
+            label += ": " + row['dcterms_title']
+        else:
+            self.log.warning("No dcterms:title for %s" % row['uri'])
+            label = "URI: " + row['uri']
+        return [Link(label, uri=row['uri'])]
+
     def tabs(self, primary=False):
-        return [('Myndighetsföreskrifter', self.dataset_uri())]
+        return [(self.__class__.__name__, self.dataset_uri())]
 
 
 class SJVFS(MyndFskr):
@@ -457,6 +494,15 @@ class SJVFS(MyndFskr):
                 suburl = urljoin(url, a['href'])
                 extrapages.append(suburl)
         return extrapages
+
+    def basefile_from_uri(self, uri):
+        # this should map https://lagen.nu/sjvfs/2014:9 to basefile sjvfs/2014:9
+        # but also https://lagen.nu/dfs/2007:8 -> dfs/2007:8
+        prefix = self.config.url + self.config.urlpath
+        altprefix = self.config.url + self.config.altpath
+        if uri.startswith(prefix) or uri.startswith(altprefix):
+            basefile = uri[len(self.config.url):]
+            return basefile
 
 
 class DVFS(MyndFskr):

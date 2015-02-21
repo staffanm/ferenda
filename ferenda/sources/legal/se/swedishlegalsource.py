@@ -689,17 +689,23 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
 # to use a legalref based parser instead of a set of pyparsing
 # grammars.
 class SwedishCitationParser(CitationParser):
-    def __init__(self, legalrefparser, baseurl, allow_relative=False):
+    def __init__(self, legalrefparser, baseurl, urlpath=None, allow_relative=False):
         self._legalrefparser = legalrefparser
         self._baseurl = baseurl
         self._currenturl = self._baseurl
         self._allow_relative = allow_relative
         if self._baseurl == "https://lagen.nu/":
-            self._urlpath = ''
+            if urlpath is None:
+                self._urlpath = ''
+            else:
+                self._urlpath = urlpath
             self._dvpath = 'dom/'
             self._sfspath = ''
         else:
-            self._urlpath = 'res/'
+            if urlpath is None:
+                self._urlpath = 'res/'
+            else:
+                self._urlpath = urlpath
             self._dvpath = 'dv/'
             self._sfspath = 'sfs/'
 
@@ -764,5 +770,8 @@ class SwedishCitationParser(CitationParser):
         elif "publ/rskr" in uri:
             return uri.replace("http://rinfo.lagrummet.se/publ/rskr/",
                                self._baseurl + self._urlpath + "rskr/")
+        elif "publ/" in uri:
+            return uri.replace("http://rinfo.lagrummet.se/publ/",
+                               self._baseurl + self._urlpath)
         else:
             return uri

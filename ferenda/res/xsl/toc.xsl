@@ -13,7 +13,7 @@ It's a generic template for TOC pages (assumes that there exists a <ul role="nav
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		exclude-result-prefixes="xhtml rdf dcterms rinfo rinfoex">
 
-  <xsl:import href="uri.xsl"/>
+  <!-- <xsl:import href="uri.xsl"/> -->
   <xsl:include href="base.xsl"/>
 
 
@@ -33,12 +33,13 @@ It's a generic template for TOC pages (assumes that there exists a <ul role="nav
 
 
   <xsl:template match="xhtml:ul[@role='navigation']"><!-- do nothing, this part of the source document is processed during mode='toc' --></xsl:template>
-  
+
+  <!--
   <xsl:template match="xhtml:a">
-    <!-- calling link templ -->
     <xsl:call-template name="link"/>
   </xsl:template>
-
+  -->
+  
   <xsl:template match="xhtml:ul[@role='navigation']" mode="toc">
     <xsl:comment>Navigation toc rule applied</xsl:comment>
     <xsl:apply-templates/>
