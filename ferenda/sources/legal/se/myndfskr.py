@@ -18,7 +18,7 @@ from ferenda import TextReader, Describer
 from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda.sources.legal.se import legaluri
 from ferenda import util, decorators
-from ferenda.elements import Page, Preformatted
+from ferenda.elements import Body, Page, Preformatted
 from . import SwedishLegalSource
 
 from rdflib import RDF
@@ -29,6 +29,8 @@ RINFOEX = Namespace("http://lagen.nu/terms#")
 
 class MyndFskr(SwedishLegalSource):
 
+    rdf_type = (RPUBL.Myndighetsforeskrift, RPUBL.AllmannaRad)  # subclasses override this
+
     """A abstract base class for fetching and parsing regulations from
 various swedish government agencies. These PDF documents often have
 a similar structure both graphically and linguistically, enabling us
@@ -38,13 +40,15 @@ special-case code, though.)"""
     downloaded_suffix = ".pdf"
     alias = 'myndfskr'
 
-    required_predicates = [RDF.type, DCTERMS.title, DCTERMS.issued,
+    required_predicates = [RDF.type, DCTERMS.title,
                            DCTERMS.identifier, RPUBL.arsutgava,
                            DCTERMS.publisher, RPUBL.beslutadAv,
                            RPUBL.beslutsdatum,
                            RPUBL.forfattningssamling,
                            RPUBL.ikrafttradandedatum, RPUBL.lopnummer,
                            RPUBL.utkomFranTryck, PROV.wasGeneratedBy]
+
+    sparql_annotations = None  # until we can speed things up
 
     def download(self, basefile=None):
         """Simple default implementation that downloads all PDF files
@@ -156,7 +160,7 @@ special-case code, though.)"""
             if 'rpubl:beslutsdatum' in props:
                 break
             self.log.warning("%s: Couldn't find required props on page %s" %
-                             (basefile, pagecount))
+                             (doc.basefile, pagecount))
 
         # 2.2 Find some of the properties on the last 'real' page (not
         # counting appendicies)
@@ -359,7 +363,9 @@ special-case code, though.)"""
         else:
             rdftype = RPUBL.Myndighetsforeskrift
         desc.rdftype(rdftype)
-
+        desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
+        if RPUBL.bemyndigande in self.required_predicates:
+            self.required_predicates.pop(self.required_predicates.index(RPUBL.bemyndigande))
         if rdftype == RPUBL.Myndighetsforeskrift:
             self.required_predicates.append(RPUBL.bemyndigande)
 
@@ -369,7 +375,7 @@ special-case code, though.)"""
         # TODO: Use pdftohtml to create a nice viewable HTML
         # version instead of this plaintext stuff
         reader.seek(0)
-        body = []
+        body = Body()
 
         # A fairly involved way of filtering out all control
         # characters from a string
@@ -390,10 +396,7 @@ special-case code, though.)"""
             p = Page(ordinal=idx+1)
             p.append(Preformatted(text))
             body.append(p)
-
-        
-
-
+        doc.body = body
 
     def tabs(self, primary=False):
         return [('Myndighetsföreskrifter', self.dataset_uri())]
