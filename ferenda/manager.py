@@ -271,6 +271,7 @@ def setup_logger(level='INFO', filename=None,
     # turn of some library loggers we're not interested in
     for logname in ['requests.packages.urllib3.connectionpool',
                     'rdflib.plugins.sleepycat',
+                    'rdflib.plugins.parsers.pyRdfa',
                     'ferenda.thirdparty.patch']:
         log = logging.getLogger(logname)
         log.propagate = False

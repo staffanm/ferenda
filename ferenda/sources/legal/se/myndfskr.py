@@ -13,8 +13,9 @@ from bs4 import BeautifulSoup
 import requests
 import six
 from six.moves.urllib_parse import urljoin, unquote
+import lxml.html
 
-from ferenda import TextReader, Describer, Facet
+from ferenda import TextReader, Describer, Facet, DocumentRepository
 from ferenda import util, decorators
 from ferenda.elements import Body, Page, Preformatted, Link
 from ferenda.sources.legal.se.legalref import LegalRef
@@ -30,17 +31,20 @@ RINFOEX = Namespace("http://lagen.nu/terms#")
 
 class MyndFskr(SwedishLegalSource):
 
-    rdf_type = (RPUBL.Myndighetsforeskrift, RPUBL.AllmannaRad)  # subclasses override this
-
     """A abstract base class for fetching and parsing regulations from
-various swedish government agencies. These PDF documents often have
-a similar structure both graphically and linguistically, enabling us
-to parse them in a generalized way. (Downloading them often requires
-special-case code, though.)"""
+    various swedish government agencies. These documents often have a
+    similar structure both linguistically and graphically (most of the
+    time they are in similar PDF documents), enabling us to parse them
+    in a generalized way. (Downloading them often requires
+    special-case code, though.)
+
+    """
     source_encoding = "utf-8"
     downloaded_suffix = ".pdf"
     alias = 'myndfskr'
 
+
+    rdf_type = (RPUBL.Myndighetsforeskrift, RPUBL.AllmannaRad) 
     required_predicates = [RDF.type, DCTERMS.title,
                            DCTERMS.identifier, RPUBL.arsutgava,
                            DCTERMS.publisher, RPUBL.beslutadAv,
@@ -48,36 +52,85 @@ special-case code, though.)"""
                            RPUBL.forfattningssamling,
                            RPUBL.ikrafttradandedatum, RPUBL.lopnummer,
                            RPUBL.utkomFranTryck, PROV.wasGeneratedBy]
-
     sparql_annotations = None  # until we can speed things up
 
-    def download(self, basefile=None):
-        """Simple default implementation that downloads all PDF files
-        from self.start_url that look like regulation document
-        numbers."""
-        resp = requests.get(self.start_url)
-        # regex to search the link url, text or title for something
-        # looking like a FS number
-        re_fsnr = re.compile('(\d{4})[:/_-](\d+)(|\.\w+)$')
-        tree = lxml.html.document_fromstring(resp.text)
-        tree.make_links_absolute(url, resolve_base_href=True)
-        for element, attribute, link, pos in tree.iterlinks():
-            if link[-4:].lower() != ".pdf":
-                continue
-            done = False
-            # print "Examining %s"  % link
-            attrs = dict(link.attrs)
-            flds = [link.url, link.text]
-            if 'title' in attrs:
-                flds.append(attrs['title'])
-            for fld in flds:
-                if re_fsnr.search(fld) and not done:
-                    m = re_fsnr.search(fld)
-                    # Make sure we end up with "2011:4" rather than
-                    # "2011:04"
-                    basefile = "%s:%s" % (m.group(1), int(m.group(2)))
-                    self.download_single(basefile, usecache, link.absolute_url)
-                    done = True
+    basefile_regex = re.compile('(?P<basefile>\d{4}[:/_-]\d+)(?:|\.\w+)$')
+    document_url_regex = re.compile('(?P<basefile>\d{4}[:/_-]\d+)(?:|\.\w+)$')
+
+    nextpage_regex = None
+    nextpage_url_regex = None
+    download_rewrite_url = False # iff True, use remote_url to rewrite
+                                 # download links instead of accepting
+                                 # found links as-is
+    download_formid = None # if the paging uses forms, POSTs and other
+                           # forms of insanity
+
+    def forfattningssamlingar(self):
+        return [self.alias]
+
+
+    @decorators.downloadmax
+    def download_get_basefiles(self, source):
+        # this is an extended version of
+        # DocumentRepository.download_get_basefiles which handles
+        # "next page" navigation and also ensures that the default
+        # basefilepattern is "myndfs/2015:1", not just "2015:1"
+        yielded = set()
+        while source:
+            nextform = nexturl = None
+            for (element, attribute, link, pos) in source:
+                basefile = None
+
+                # Two step process: First examine link text to see if
+                # basefile_regex match. If not, examine link url to see
+                # if document_url_regex
+                if (self.basefile_regex and
+                    element.text and
+                        re.search(self.basefile_regex, element.text)):
+                    m = re.search(self.basefile_regex, element.text)
+                    basefile = m.group("basefile")
+                elif self.document_url_regex and re.match(self.document_url_regex, link):
+                    m = re.match(self.document_url_regex, link)
+                    if m:
+                        basefile = m.group("basefile")
+
+                if basefile:
+                    if not any((basefile.startswith(fs+"/") for fs in self.forfattningssamlingar())):
+                        basefile = self.forfattningssamlingar()[0] + "/" + basefile
+
+                    if self.download_rewrite_url:
+                        link = self.remote_url(basefile)
+                    if basefile not in yielded:
+                        yield (basefile, link)
+                        yielded.add(basefile)
+                if (self.nextpage_regex and element.text and
+                    re.search(element.text, self.nextpage_regex)):
+                    nexturl = link
+                elif (self.nextpage_url_regex and
+                      re.search(link, self.nextpage_url_regex)):
+                    nexturl = link
+                if (self.download_formid and
+                    element.tag == "form" and
+                    element.get("id") == self.download_formid):
+                    nextform = element
+            if nextform is not None and nexturl is not None:
+                resp = self.download_post_form(nextform, nexturl)
+            elif nexturl is not None:
+                resp = self.session.get(nexturl)
+            else:
+                resp = None
+                source = None
+
+            if resp:
+                tree = lxml.html.document_fromstring(resp.text)
+                tree.make_links_absolute(nextform.get("action"),
+                                         resolve_base_href=True)
+                source = tree.iterlinks()
+
+
+    def download_post_form(self, form, url):
+        raise NotImplementedError
+
 
     def canonical_uri(self, basefile):
         # The canonical URI for these documents cannot always be
@@ -88,68 +141,81 @@ special-case code, though.)"""
 
         g = Graph()
         g.parse(self.store.distilled_path(basefile))
-        subjects = list(g.subject_objects(self.ns['rdf']['type']))
+        subjects = list(g.subject_objects(RDF.type))
 
         if subjects:
             return str(subjects[0][0])
         else:
             self.log.warning(
                 "No canonical uri in %s" % (self.distilled_path(basefile)))
-            # fall back
-            return super(MyndFskr, self).canonical_uri(basefile)
-
+            return None
+            
     @decorators.action
     @decorators.managedparsing
     def parse(self, doc):
-        reader = self.textreader_from_basefile(doc.basefile, self.source_encoding)
+        # This has a similar structure to DocumentRepository.parse but
+        # works on PDF docs converted to plaintext, instead of HTML
+        # trees.
+        reader = self.textreader_from_basefile(doc.basefile)
         self.parse_metadata_from_textreader(reader, doc)
         self.parse_document_from_textreader(reader, doc)
         self.parse_entry_update(doc)
         return True  # Signals that everything is OK
 
-    def textreader_from_basefile(self, basefile, encoding):
+    def textreader_from_basefile(self, basefile):
         infile = self.store.downloaded_path(basefile)
         tmpfile = self.store.path(basefile, 'intermediate', '.pdf')
         outfile = self.store.path(basefile, 'intermediate', '.txt')
         util.copy_if_different(infile, tmpfile)
+        # this command will create a file named as the val of outfile
         util.runcmd("pdftotext %s" % tmpfile, require_success=True)
         util.robust_remove(tmpfile)
+        return TextReader(outfile, self.source_encoding,
+                          linesep=TextReader.UNIX)
 
-        return TextReader(outfile, encoding=encoding, linesep=TextReader.UNIX)
+    def fwdtests(self):
+        return {'dcterms:issn': ['^ISSN (\d+\-\d+)$'],
+                'dcterms:title':
+                ['((?:Föreskrifter|[\w ]+s (?:föreskrifter|allmänna råd)).*?)\n\n'],
+                'dcterms:identifier': ['^([A-ZÅÄÖ-]+FS\s\s?\d{4}:\d+)$'],
+                'rpubl:utkomFranTryck':
+                ['Utkom från\strycket\s+den\s(\d+ \w+ \d{4})'],
+                'rpubl:omtryckAv': ['^(Omtryck)$'],
+                'rpubl:genomforDirektiv': ['Celex (3\d{2,4}\w\d{4})'],
+                'rpubl:beslutsdatum':
+                ['(?:har beslutats|beslutade|beslutat) den (\d+ \w+ \d{4})'],
+                'rpubl:beslutadAv':
+                ['\n([A-ZÅÄÖ][\w ]+?)\d? (?:meddelar|lämnar|föreskriver)',
+                 '\s(?:meddelar|föreskriver) ([A-ZÅÄÖ][\w ]+?)\d?\s'],
+                'rpubl:bemyndigande':
+                [' ?(?:meddelar|föreskriver|Föreskrifterna meddelas|Föreskrifterna upphävs)\d?,? (?:följande |)med stöd av\s(.*?) ?(?:att|efter\ssamråd|dels|följande|i fråga om|och lämnar allmänna råd|och beslutar följande allmänna råd|\.\n)',
+                 '^Med stöd av (.*)\s(?:meddelar|föreskriver)']
+            }
 
-
+    def revtests(self):
+        return {'rpubl:ikrafttradandedatum':
+                ['(?:Denna författning|Dessa föreskrifter|Dessa allmänna råd|Dessa föreskrifter och allmänna råd)\d* träder i ?kraft den (\d+ \w+ \d{4})',
+                 'Dessa föreskrifter träder i kraft, (?:.*), i övrigt den (\d+ \w+ \d{4})',
+                 'ska(?:ll|)\supphöra att gälla (?:den |)(\d+ \w+ \d{4}|denna dag|vid utgången av \w+ \d{4})',
+                 'träder i kraft den dag då författningen enligt uppgift på den (utkom från trycket)'],
+                'rpubl:upphaver':
+                ['träder i kraft den (?:\d+ \w+ \d{4}), då(.*)ska upphöra att gälla',
+                 'ska(?:ll|)\supphöra att gälla vid utgången av \w+ \d{4}, nämligen(.*?)\n\n',
+                 'att (.*) skall upphöra att gälla (denna dag|vid utgången av \w+ \d{4})']
+        }
 
     def parse_metadata_from_textreader(self, reader, doc):
         g = doc.meta
 
-        # 1.3: Define regexps for the data we search for.
-        fwdtests = {'dcterms:issn': ['^ISSN (\d+\-\d+)$'],
-                    'dcterms:title': ['((?:Föreskrifter|[\w ]+s (?:föreskrifter|allmänna råd)).*?)\n\n'],
-                    'dcterms:identifier': ['^([A-ZÅÄÖ-]+FS\s\s?\d{4}:\d+)$'],
-                    'rpubl:utkomFranTryck': ['Utkom från\strycket\s+den\s(\d+ \w+ \d{4})'],
-                    'rpubl:omtryckAv': ['^(Omtryck)$'],
-                    'rpubl:genomforDirektiv': ['Celex (3\d{2,4}\w\d{4})'],
-                    'rpubl:beslutsdatum': ['(?:har beslutats|beslutade|beslutat) den (\d+ \w+ \d{4})'],
-                    'rpubl:beslutadAv': ['\n([A-ZÅÄÖ][\w ]+?)\d? (?:meddelar|lämnar|föreskriver)',
-                                         '\s(?:meddelar|föreskriver) ([A-ZÅÄÖ][\w ]+?)\d?\s'],
-                    'rpubl:bemyndigande': [' ?(?:meddelar|föreskriver|Föreskrifterna meddelas|Föreskrifterna upphävs)\d?,? (?:följande |)med stöd av\s(.*?) ?(?:att|efter\ssamråd|dels|följande|i fråga om|och lämnar allmänna råd|och beslutar följande allmänna råd|\.\n)',
-                                           '^Med stöd av (.*)\s(?:meddelar|föreskriver)']
-                    }
-
-        # 2: Find metadata properties
-
-        # 2.1 Find some of the properties on the first page (or the
-        # 2nd, or 3rd... continue past TOC pages, cover pages etc
-        # until the "real" first page is found) NB: FFFS 2007:1 has
-        # ten (10) TOC pages!
+        # 1. Find some of the properties on the first page (or the
+        #    2nd, or 3rd... continue past TOC pages, cover pages etc
+        #    until the "real" first page is found) NB: FFFS 2007:1
+        #    has ten (10) TOC pages!
         pagecount = 0
         for page in reader.getiterator(reader.readpage):
-            # replace single newlines with spaces, but keep double
-            # newlines
-            # page = "\n\n".join([util.normalize_space(x) for x in page.split("\n\n")])
             pagecount += 1
             props = {}
-            for (prop, tests) in list(fwdtests.items()):
+            for (prop, tests) in list(self.fwdtests().items()):
                 if prop in props:
                     continue
                 for test in tests:
@@ -163,25 +229,15 @@ special-case code, though.)"""
             self.log.warning("%s: Couldn't find required props on page %s" %
                              (doc.basefile, pagecount))
 
-        # 2.2 Find some of the properties on the last 'real' page (not
-        # counting appendicies)
+        # 2. Find some of the properties on the last 'real' page (not
+        #    counting appendicies)
         reader.seek(0)
         pagesrev = reversed(list(reader.getiterator(reader.readpage)))
         # The language used to expres these two properties differ
         # quite a lot, more than what is reasonable to express in a
         # single regex. We therefore define a set of possible
         # expressions and try them in turn.
-        revtests = {'rpubl:ikrafttradandedatum':
-                    ['(?:Denna författning|Dessa föreskrifter|Dessa allmänna råd|Dessa föreskrifter och allmänna råd)\d* träder i ?kraft den (\d+ \w+ \d{4})',
-                     'Dessa föreskrifter träder i kraft, (?:.*), i övrigt den (\d+ \w+ \d{4})',
-                     'ska(?:ll|)\supphöra att gälla (?:den |)(\d+ \w+ \d{4}|denna dag|vid utgången av \w+ \d{4})',
-                     'träder i kraft den dag då författningen enligt uppgift på den (utkom från trycket)'],
-                    'rpubl:upphaver':
-                    ['träder i kraft den (?:\d+ \w+ \d{4}), då(.*)ska upphöra att gälla',
-                     'ska(?:ll|)\supphöra att gälla vid utgången av \w+ \d{4}, nämligen(.*?)\n\n',
-                     'att (.*) skall upphöra att gälla (denna dag|vid utgången av \w+ \d{4})']
-                    }
-
+        revtests = self.revtests()
         cnt = 0
         for page in pagesrev:
             cnt += 1
@@ -233,9 +289,14 @@ special-case code, though.)"""
         proper RDF graph.
 
         """
-        # leverage localize_uri
-        cp = SwedishCitationParser(None, self.config.url, self.config.urlpath)
-
+        if self.config.localizeuri:
+            f = SwedishCitationParser(None, self.config.url,
+                                      self.config.urlpath).localize_uri
+            def makeurl(data):
+                return f(legaluri.construct(data))
+        else:
+            makeurl = legaluri.construct
+            
         # FIXME: this code should go into canonical_uri, if we can
         # find a way to give it access to props['dcterms:identifier']
         if 'dcterms:identifier' in props:
@@ -245,12 +306,10 @@ special-case code, though.)"""
             # simple inference from basefile
             (pub, year, ordinal) = re.split('[ :]',
                                             props['dcterms:identifier'])
-        uri = cp.localize_uri(
-            legaluri.construct({'type': LegalRef.FORESKRIFTER,
-                                'publikation': pub,
-                                'artal': year,
-                                'lopnummer': ordinal})
-            )
+        uri = makeurl({'type': LegalRef.FORESKRIFTER,
+                       'publikation': pub,
+                       'artal': year,
+                       'lopnummer': ordinal})
 
         if doc.uri is not None and uri != doc.uri:
             self.log.warning("Assumed URI would be %s but it turns out to be %s"% (doc.uri, uri))
@@ -285,18 +344,14 @@ special-case code, though.)"""
                 orig = re.search('([A-ZÅÄÖ-]+FS \d{4}:\d+)',
                                  props['dcterms:title']).group(0)
                 (publication, year, ordinal) = re.split('[ :]', orig)
-                origuri = cp.localize_uri(
-                    legaluri.construct({'type': LegalRef.FORESKRIFTER,
-                                        'publikation': pub,
-                                        'artal': year,
-                                        'lopnummer': ordinal})
-                    )
+                origuri = makeurl({'type': LegalRef.FORESKRIFTER,
+                                   'publikation': pub,
+                                   'artal': year,
+                                   'lopnummer': ordinal})
                 desc.rel(RPUBL.andrar,
                          URIRef(origuri))
-                # desc.rel(RPUBL.omtryckAv,
-                #          URIRef(origuri))
 
-            # FIXME:
+            # FIXME: is this a sensible value for rpubl:upphaver
             if (re.search('^(Föreskrifter|[\w ]+s föreskrifter) om upphävande '
                           'av', props['dcterms:title'], re.UNICODE)
                     and not 'rpubl:upphaver' in props):
@@ -320,11 +375,9 @@ special-case code, though.)"""
                                self.parse_swedish_date(props[key].lower()))
 
         if 'rpubl:genomforDirektiv' in props:
-            diruri = cp.localize_uri(
-                legaluri.construct({'type': LegalRef.EULAGSTIFTNING,
-                                    'celex':
-                                    props['rpubl:genomforDirektiv']})
-                )
+            makeurl({'type': LegalRef.EULAGSTIFTNING,
+                     'celex':
+                     props['rpubl:genomforDirektiv']})
             desc.rel(RPUBL.genomforDirektiv, diruri)
 
         has_bemyndiganden = False
@@ -414,10 +467,11 @@ special-case code, though.)"""
                       use_for_toc=True)]
 
     def basefile_from_uri(self, uri):
-        prefix = self.config.url + self.config.urlpath
-        if uri.startswith(prefix) and uri[len(prefix)].isdigit():
-            rest = uri[len(prefix):].replace("_", " ")
-            return rest.split("/")[0]
+        for fs in self.forfattningssamlingar():
+            prefix = self.config.url + fs + "/"
+            if uri.startswith(prefix) and uri[len(prefix)].isdigit():
+                rest = uri[len(prefix):].replace("_", " ")
+                return rest.split("/")[0]
 
     def toc_item(self, binding, row):
         """Returns a formatted version of row, using Element objects"""
@@ -441,10 +495,13 @@ special-case code, though.)"""
 
 class SJVFS(MyndFskr):
     alias = "sjvfs"
+    forfattningssamlingar = ["sjvfs", "dfs"]
     start_url = "http://www.jordbruksverket.se/forfattningar/forfattningssamling.4.5aec661121e2613852800012537.html"
+    
 
     def download(self, basefile=None):
-        soup = BeautifulSoup(requests.get(self.start_url).text)
+        self.session = requests.session()
+        soup = BeautifulSoup(self.session.get(self.start_url).text)
         main = soup.find_all("li", "active")
         assert len(main) == 1
         extra = []
@@ -458,7 +515,7 @@ class SJVFS(MyndFskr):
 
 
     def download_indexpage(self, url):
-        subsoup = BeautifulSoup(requests.get(url).text)
+        subsoup = BeautifulSoup(self.session.get(url).text)
         submain = subsoup.find("div", "pagecontent")
         extrapages = []
         for a in submain.find_all("a"):
@@ -505,10 +562,6 @@ class SJVFS(MyndFskr):
             return basefile
 
 
-class DVFS(MyndFskr):
-    alias = "dvfs"
-
-
 class FFFS(MyndFskr):
     alias = "fffs"
     start_url = "http://www.fi.se/Regler/FIs-forfattningar/Forteckning-FFFS/"
@@ -516,14 +569,15 @@ class FFFS(MyndFskr):
     storage_policy = "dir"  # must be able to handle attachments
 
     def download(self, basefile=None):
-        soup = BeautifulSoup(requests.get(self.start_url).text)
+        self.session = requests.session()
+        soup = BeautifulSoup(self.session.get(self.start_url).text)
         main = soup.find(id="fffs-searchresults")
         docs = []
         for numberlabel in main.find_all(text=re.compile('\s*Nummer\s*')):
             ndiv = numberlabel.find_parent('div').parent
             typediv = ndiv.findNextSibling()
             if typediv.find('div', 'FFFSListAreaLeft').get_text(strip=True) != "Typ":
-                Self.log.error("Expected 'Typ' in div, found %s" %
+                self.log.error("Expected 'Typ' in div, found %s" %
                                typediv.get_text(strip=True))
                 continue
 
@@ -534,13 +588,15 @@ class FFFS(MyndFskr):
                 continue
 
             number = ndiv.find('div', 'FFFSListAreaRight').get_text(strip=True)
+            basefile = "fffs/"+number
             tmpfile = mktemp()
-            with self.store.open_downloaded(number, mode="w", attachment="snippet.html") as fp:
+            with self.store.open_downloaded(basefile, mode="w", attachment="snippet.html") as fp:
                 fp.write(str(ndiv))
                 fp.write(str(typediv))
                 fp.write(str(titlediv))
-            self.download_single(number)
+            self.download_single(basefile)
 
+    # FIXME: This should create/update the documententry!!
     def download_single(self, basefile):
         pdffile = self.store.downloaded_path(basefile)
         self.log.debug("%s: download_single..." % basefile)
@@ -580,14 +636,6 @@ class FFFS(MyndFskr):
         else:
             self.log.warning("%s: No idea!" % basefile)
 
-    def basefile_from_uri(self, uri):
-        # this should map https://lagen.nu/sjvfs/2014:9 to basefile sjvfs/2014:9
-        # but also https://lagen.nu/dfs/2007:8 -> dfs/2007:8
-        prefix = self.config.url + self.config.urlpath
-        altprefix = self.config.url + self.config.altpath
-        if uri.startswith(prefix) or uri.startswith(altprefix):
-            basefile = uri[len(self.config.url):]
-            return basefile
 
 
 class ELSAKFS(MyndFskr):
@@ -610,7 +658,8 @@ class STAFS(MyndFskr):
     start_url = "http://www.swedac.se/sv/Det-handlar-om-fortroende/Lagar-och-regler/Alla-foreskrifter-i-nummerordning/"
 
     def download(self, basefile=None):
-        soup = BeautifulSoup(requests.get(self.start_url).text)
+        self.session = requests.session()
+        soup = BeautifulSoup(self.session.get(self.start_url).text)
         for link in list(soup.find_all("a", href=re.compile('/STAFS/'))):
             basefile = re.search('\d{4}:\d+', link.text).group(0)
             self.download_single(basefile, urljoin(self.start_url, link['href']))
@@ -619,7 +668,7 @@ class STAFS(MyndFskr):
         self.log.info("%s: %s" % (basefile, url))
         consolidated_link = None
         newest = None
-        soup = BeautifulSoup(requests.get(url).text)
+        soup = BeautifulSoup(self.session.get(url).text)
         for link in soup.find_all("a", text=self.re_identifier):
             self.log.info("   %s: %s %s" % (basefile, link.text, link.url))
             if "konso" in link.text:
@@ -643,7 +692,7 @@ class STAFS(MyndFskr):
                             "%s not larger than %s" % (basefile, newest))
                 else:
                     # not pdf - link to yet another pg
-                    subsoup = BeautifulSoup(requests.get(link).text)
+                    subsoup = BeautifulSoup(self.session.get(link).text)
                     for sublink in soup.find_all("a", text=self.re_identifier):
                         self.log.info("   Sub %s: %s %s" %
                                       (basefile, sublink.text, sublink['href']))
@@ -678,7 +727,8 @@ class SKVFS(MyndFskr):
     def download(self, basefile=None):
         self.log.info("Starting at %s" % self.start_url)
         years = {}
-        soup = BeautifulSoup(requests.get(self.start_url).text)
+        self.session = requests.session()
+        soup = BeautifulSoup(self.session.get(self.start_url).text)
         for link in sorted(list(soup.find_all("a", text=re.compile('^\d{4}$'))),
                            key=attrgetter('text')):
             year = int(link.text)
@@ -694,14 +744,14 @@ class SKVFS(MyndFskr):
     # just download the most recent year
     def download_new(self):
         self.log.info("Starting at %s" % self.start_url)
-        soup = BeautifulSoup(requests.get(self.start_url).text)
+        soup = BeautifulSoup(self.session.get(self.start_url).text)
         link = sorted(list(soup.find_all("a", text=re.compile('^\d{4}$'))),
                       key=attrgetter('text'), reverse=True)[0]
         self.download_year(int(link.text), link.absolute_url, usecache=True)
 
     def download_year(self, year, url):
         self.log.info("Downloading year %s from %s" % (year, url))
-        soup = BeautifulSoup(requests.get(self.start_url).text)
+        soup = BeautifulSoup(self.session.get(self.start_url).text)
         for link in soup.find_all("a", text=re.compile('FS \d+:\d+')):
             if "bilaga" in link.text:
                 self.log.warning("Skipping attachment in %s" % link.text)
@@ -739,3 +789,152 @@ class SKVFS(MyndFskr):
                 return False
         else:
             return html_downloaded
+
+class DIFS(MyndFskr):
+    alias = "difs"
+    start_url = "http://www.datainspektionen.se/lagar-och-regler/datainspektionens-foreskrifter/"
+    
+
+class SOSFS(MyndFskr):
+    alias = "sosfs"
+    start_url = "http://www.socialstyrelsen.se/sosfs"
+    storage_policy = "dir"  # must be able to handle attachments
+    download_iterlinks = False
+
+    def _basefile_from_text(self, linktext):
+        if linktext:
+            m = re.search("SOSFS\s+(\d+:\d+)", linktext)
+            if m:
+                return m.group(1)
+
+    @decorators.downloadmax
+    def download_get_basefiles(self, source):
+        soup = BeautifulSoup(source)
+        for td in soup.find_all("td", "col3"):
+            txt = td.get_text().strip()
+            basefile = self._basefile_from_text(txt)
+            if basefile is None:
+                continue
+            link_el = td.find_previous_sibling("td").a
+            link = urljoin(self.start_url, link_el.get("href"))
+            if link.startswith("javascript:"):
+                continue
+            # If a base act has no changes, only type 1 links will be
+            # on the front page. If it has any changes, only a type 2
+            # link will be on the front page, but type 1 links will be
+            # on that subsequent page.
+            if (txt.startswith("Grundförfattning") or
+                txt.startswith("Ändringsförfattning")):
+                # 1) links to HTML pages describing (and linking to) a
+                # base act, eg for SOSFS 2014:10 
+                # http://www.socialstyrelsen.se/publikationer2014/2014-10-12
+                yield(basefile, link)
+            elif txt.startswith("Konsoliderad"):
+                # 2) links to HTML pages containing a consolidated act
+                # (with links to type 1 base and change acts), eg for
+                # SOSFS 2011:13
+                # http://www.socialstyrelsen.se/sosfs/2011-13 - fetch
+                # page, yield all type 1 links, also find basefile form
+                # element.text
+                soup = BeautifulSoup(self.session.get(link).text)
+                self.log.debug("%s: Downloading all base/change acts" % basefile)
+                for link_el in soup.find(text="Ladda ner eller beställ").find_parent("div").find_all("a"):
+                    if '/publikationer' in link_el.get("href"):
+                        subbasefile = self._basefile_from_text(link_el.get_text())
+                        if subbasefile:
+                            yield(subbasefile,
+                                  urljoin(link, link_el.get("href")))
+                # then save page itself as grundforf/konsoldering.html
+                konsfile = self.store.downloaded_path(basefile, attachment="konsolidering.html")
+                self.log.debug("%s: Downloading consolidated version" % basefile)
+                self.download_if_needed(link, basefile, filename=konsfile)
+
+    # FIXME: update documententry!
+    def download_single(self, basefile, url):
+        resp = self.session.get(url)
+        soup = BeautifulSoup(self.session.get(url).text)
+        link_el = soup.find("a", text="Ladda ner")
+        link = urljoin(url, link_el.get("href"))
+        self.log.info("%s: Downloading from %s" % (basefile,link))
+        return self.download_if_needed(link, basefile)
+
+    def fwdtests(self):
+        t = super(SOSFS, self).fwdtests()
+        t["dcterms:identifier"] = ['^([A-ZÅÄÖ-]+FS\s\s?\d{4}:\d+)'],
+        return t
+
+    def parse_metadata_from_textreader(self, reader, doc):
+        # cue past the first cover pages until we find the first real page
+        page = 1
+        while "Ansvarig utgivare" not in reader.peekchunk('\f'):
+            self.log.debug("%s: Skipping cover page %s" % (doc.basefile, page))
+            reader.readpage()
+            page += 1
+        return super(SOSFS, self).parse_metadata_from_textreader(reader, doc)
+    
+class DVFS(MyndFskr):
+    alias = "dvfs"
+    start_url = "http://www.domstol.se/Ladda-ner--bestall/Verksamhetsstyrning/DVFS/DVFS1/"
+    downloaded_suffix = ".html"
+
+    nextpage_regex = ">"
+    nextpage_url_regex = None
+    basefile_regex = "^\s*(?P<basefile>\d{4}:\d+)"
+    download_rewrite_url = True
+    download_formid = "aspnetForm"
+
+    def remote_url(self, basefile):
+        return "http://www.domstol.se/Ladda-ner--bestall/Verksamhetsstyrning/DVFS/DVFS2/%s/" % basefile.replace(":","")
+
+    def download_post_form(self, form, url):
+        # nexturl == "javascript:__doPostBack('ctl00$MainRegion$"
+        #            "MainContentRegion$LeftContentRegion$ctl01$"
+        #            "epiNewsList$ctl09$PagingID15','')"
+        etgt, earg = [m.group(1) for m in re.finditer("'([^']*)'", url)]
+        fields = dict(form.fields)
+
+        # requests seem to prefer that keys and values to the
+        # files argument should be str (eg bytes) on py2 and
+        # str (eg unicode) on py3. But we use unicode_literals
+        # for this file, so we define a wrapper to convert
+        # unicode strs in the appropriate way
+        if six.PY2:
+            f = six.binary_type
+        else:
+            f = lambda x: x
+        fields[f('__EVENTTARGET')] = etgt
+        fields[f('__EVENTARGUMENT')] = earg
+        for k, v in fields.items(): 
+            if v is None:
+                fields[k] = f('')
+        # using the files argument to requests.post forces the
+        # multipart/form-data encoding
+        req = requests.Request(
+            "POST", form.get("action"), cookies=self.session.cookies, files=fields).prepare()
+        # Then we need to remove filename from req.body in an
+        # unsupported manner in order not to upset the
+        # sensitive server
+        body = req.body
+        if isinstance(body, bytes):
+            body = body.decode() # should be pure ascii
+        req.body = re.sub(
+            '; filename="[\w\-\/]+"', '', body).encode()
+        req.headers['Content-Length'] = str(len(req.body))
+        # self.log.debug("posting to event %s" % etgt)
+        resp = self.session.send(req, allow_redirects=True)
+        return resp
+
+    def textreader_from_basefile(self, basefile, encoding):
+        infile = self.store.downloaded_path(basefile)
+        soup = BeautifulSoup(util.readfile(infile))
+        main = soup.find("div", id="readme")
+        main.find("div", "rs_skip").decompose()
+        maintext = main.get_text("\n\n", strip=True)
+        outfile = self.store.path(basefile, 'intermediate', '.txt')
+        util.writefile(outfile, maintext)
+        return TextReader(string=maintext)
+
+    def fwdtests(self):
+        t = super(DVFS, self).fwdtests()
+        t["dcterms:identifier"] = ['(DVFS\s\s?\d{4}:\d+)']
+        return t

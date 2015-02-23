@@ -214,6 +214,9 @@ class DocumentRepository(object):
     named group ``basefile``, just like
     :py:data:`~ferenda.DocumentRepository.document_url_template`."""
 
+    download_iterlinks = True
+    """TBW"""
+
     #
     # parse() specific class properties
     rdf_type = Namespace(util.ns['foaf']).Document
@@ -674,6 +677,7 @@ with the *config* object as single parameter.
         :returns: True if any document was downloaded, False otherwise.
         :rtype: bool
         """
+        self.session = requests.session()
         if basefile:
             if self.document_url_template:
                 return self.download_single(basefile)
@@ -699,10 +703,14 @@ with the *config* object as single parameter.
 
         self.log.debug("Starting at %s" % self.start_url)
         updated = False
-        resp = requests.get(self.start_url)
-        tree = lxml.html.document_fromstring(resp.text)
-        tree.make_links_absolute(self.start_url, resolve_base_href=True)
-        for (basefile, link) in self.download_get_basefiles(tree.iterlinks()):
+        resp = self.session.get(self.start_url)
+        if self.download_iterlinks:
+            tree = lxml.html.document_fromstring(resp.text)
+            tree.make_links_absolute(self.start_url, resolve_base_href=True)
+            source = tree.iterlinks()
+        else:
+            source = resp.text 
+        for (basefile, link) in self.download_get_basefiles(source):
             if (refresh or
                     (not os.path.exists(self.store.downloaded_path(basefile)))):
                 ret = self.download_single(basefile, link)
@@ -844,7 +852,7 @@ with the *config* object as single parameter.
         try:
             while (not fetched) and (remaining_attempts > 0):
                 try:
-                    response = requests.get(url, headers=headers, timeout=10)
+                    response = self.session.get(url, headers=headers, timeout=10)
                     fetched = True
                 # socket.timeout ought to be caught by requests and
                 # repackaged as requests.exceptions.Timeout, but in

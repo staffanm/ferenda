@@ -180,12 +180,12 @@ class SwedishLegalSource(DocumentRepository):
         super(SwedishLegalSource, self).__init__(config, **kwargs)
         if type(self) != SwedishLegalSource:
             assert self.alias != "swedishlegalsource", "Subclasses must override self.alias!"
-        if not 'urlpath' in self.config:
-            LayeredConfig.set(self.config, 'urlpath', "res/%s/" % self.alias)
 
     def get_default_options(self):
         opts = super(SwedishLegalSource, self).get_default_options()
         opts['pdfimages'] = False 
+        opts['localizeuri'] = False
+        opts['urlpath'] = "res/%s/" % self.alias
         return opts
 
     def _swedish_ordinal(self, s):
