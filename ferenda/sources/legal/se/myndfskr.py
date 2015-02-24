@@ -6,6 +6,7 @@ import re
 import logging
 import codecs
 from tempfile import mktemp
+from operator import attrgetter
 from xml.sax.saxutils import escape as xml_escape
 
 from rdflib import Graph, URIRef, Literal, Namespace
@@ -68,6 +69,12 @@ class MyndFskr(SwedishLegalSource):
     def forfattningssamlingar(self):
         return [self.alias]
 
+    def download_sanitize_basefile(self, basefile):
+        basefile = basefile.lower().replace(" ", "/")
+        if not any((basefile.startswith(fs+"/") for fs in self.forfattningssamlingar())):
+            return self.forfattningssamlingar()[0] + "/" + basefile
+        else:
+            return basefile
 
     @decorators.downloadmax
     def download_get_basefiles(self, source):
@@ -84,10 +91,11 @@ class MyndFskr(SwedishLegalSource):
                 # Two step process: First examine link text to see if
                 # basefile_regex match. If not, examine link url to see
                 # if document_url_regex
+                elementtext = " ".join(element.itertext())
                 if (self.basefile_regex and
-                    element.text and
-                        re.search(self.basefile_regex, element.text)):
-                    m = re.search(self.basefile_regex, element.text)
+                    elementtext and
+                    re.search(self.basefile_regex, elementtext)):
+                    m = re.search(self.basefile_regex, elementtext)
                     basefile = m.group("basefile")
                 elif self.document_url_regex and re.match(self.document_url_regex, link):
                     m = re.match(self.document_url_regex, link)
@@ -95,19 +103,17 @@ class MyndFskr(SwedishLegalSource):
                         basefile = m.group("basefile")
 
                 if basefile:
-                    if not any((basefile.startswith(fs+"/") for fs in self.forfattningssamlingar())):
-                        basefile = self.forfattningssamlingar()[0] + "/" + basefile
-
+                    basefile = self.download_sanitize_basefile(basefile)
                     if self.download_rewrite_url:
                         link = self.remote_url(basefile)
                     if basefile not in yielded:
                         yield (basefile, link)
                         yielded.add(basefile)
-                if (self.nextpage_regex and element.text and
-                    re.search(element.text, self.nextpage_regex)):
+                if (self.nextpage_regex and elementtext and
+                    re.search(self.nextpage_regex, elementtext)):
                     nexturl = link
                 elif (self.nextpage_url_regex and
-                      re.search(link, self.nextpage_url_regex)):
+                      re.search(self.nextpage_url_regex, link)):
                     nexturl = link
                 if (self.download_formid and
                     element.tag == "form" and
@@ -123,7 +129,7 @@ class MyndFskr(SwedishLegalSource):
 
             if resp:
                 tree = lxml.html.document_fromstring(resp.text)
-                tree.make_links_absolute(nextform.get("action"),
+                tree.make_links_absolute(resp.url,
                                          resolve_base_href=True)
                 source = tree.iterlinks()
 
@@ -149,7 +155,15 @@ class MyndFskr(SwedishLegalSource):
             self.log.warning(
                 "No canonical uri in %s" % (self.distilled_path(basefile)))
             return None
-            
+
+    def basefile_from_uri(self, uri):
+        # this should map https://lagen.nu/sjvfs/2014:9 to basefile sjvfs/2014:9
+        # but also https://lagen.nu/dfs/2007:8 -> dfs/2007:8
+        for fs in self.forfattningssamlingar():
+            if uri.startswith(self.config.url + "/" + fs + "/"):
+                basefile = uri[len(self.config.url):]
+                return basefile    
+
     @decorators.action
     @decorators.managedparsing
     def parse(self, doc):
@@ -375,9 +389,9 @@ class MyndFskr(SwedishLegalSource):
                                self.parse_swedish_date(props[key].lower()))
 
         if 'rpubl:genomforDirektiv' in props:
-            makeurl({'type': LegalRef.EULAGSTIFTNING,
-                     'celex':
-                     props['rpubl:genomforDirektiv']})
+            diruri = makeurl({'type': LegalRef.EULAGSTIFTNING,
+                              'celex':
+                              props['rpubl:genomforDirektiv']})
             desc.rel(RPUBL.genomforDirektiv, diruri)
 
         has_bemyndiganden = False
@@ -466,13 +480,6 @@ class MyndFskr(SwedishLegalSource):
                 Facet(RPUBL.arsutgava,
                       use_for_toc=True)]
 
-    def basefile_from_uri(self, uri):
-        for fs in self.forfattningssamlingar():
-            prefix = self.config.url + fs + "/"
-            if uri.startswith(prefix) and uri[len(prefix)].isdigit():
-                rest = uri[len(prefix):].replace("_", " ")
-                return rest.split("/")[0]
-
     def toc_item(self, binding, row):
         """Returns a formatted version of row, using Element objects"""
         # more defensive version of DocumentRepository.toc_item
@@ -495,31 +502,35 @@ class MyndFskr(SwedishLegalSource):
 
 class SJVFS(MyndFskr):
     alias = "sjvfs"
-    forfattningssamlingar = ["sjvfs", "dfs"]
     start_url = "http://www.jordbruksverket.se/forfattningar/forfattningssamling.4.5aec661121e2613852800012537.html"
-    
+    download_iterlinks = False
 
-    def download(self, basefile=None):
-        self.session = requests.session()
-        soup = BeautifulSoup(self.session.get(self.start_url).text)
+    def forfattningssamlingar(self):
+        return  ["sjvfs", "dfs"]
+
+    @decorators.downloadmax
+    def download_get_basefiles(self, source):
+        soup = BeautifulSoup(source)
         main = soup.find_all("li", "active")
         assert len(main) == 1
         extra = []
         for a in list(main[0].ul.find_all("a")):
             # only fetch subsections that start with a year, not
             # "Allmänna råd"/"Notiser"/"Meddelanden"
-            if a.text.split()[0].isdigit():
-                url = urljoin(self.start_url, a['href'])
-                self.log.info("Fetching %s %s" % (a.text, url))
-                extra.extend(self.download_indexpage(url))
-
-
-    def download_indexpage(self, url):
-        subsoup = BeautifulSoup(self.session.get(url).text)
-        submain = subsoup.find("div", "pagecontent")
-        extrapages = []
-        for a in submain.find_all("a"):
-            if a['href'].endswith(".pdf") or a['href'].endswith(".PDF"):
+            label = a.text.split()[0]
+            if not label.isdigit():
+                continue
+            # if lastdownload was 2015-02-24, dont download 2014
+            # and earlier
+            if (not self.config.refresh and
+                self.config.lastdownload and
+                self.config.lastdownload.year > int(label)):
+                continue
+            url = urljoin(self.start_url, a['href'])
+            self.log.debug("Fetching index page for %s" % (a.text))
+            subsoup = BeautifulSoup(self.session.get(url).text)
+            submain = subsoup.find("div", "pagecontent")
+            for a in submain.find_all("a", href=re.compile(".pdf$", re.I)):
                 if re.search('\d{4}:\d+', a.text):
                     m = re.search('(\w+FS|) ?(\d{4}:\d+)', a.text)
                     fs = m.group(1).lower()
@@ -527,40 +538,8 @@ class SJVFS(MyndFskr):
                     if not fs:
                         fs = "sjvfs"
                     basefile = "%s/%s" % (fs, fsnr)
-                    suburl = unquote(
-                        urljoin(url, a['href']))
-                    self.download_single(basefile, url=suburl)
-                elif a.text == "Besult":
-                    basefile = a.find_parent(
-                        "td").findPreviousSibling("td").find("a").text
-                    self.log.debug(
-                        "Will download beslut to %s (later)" % basefile)
-                elif a.text == "Bilaga":
-                    basefile = a.find_parent(
-                        "td").findPreviousSibling("td").find("a").text
-                    self.log.debug(
-                        "Will download bilaga to %s (later)" % basefile)
-                elif a.text == "Rättelseblad":
-                    basefile = a.find_parent(
-                        "td").findPreviousSibling("td").find("a").text
-                    self.log.debug(
-                        "Will download rättelseblad to %s (later)" % basefile)
-                else:
-                    self.log.debug("I don't know what to do with %s" % a.text)
-            else:
-                suburl = urljoin(url, a['href'])
-                extrapages.append(suburl)
-        return extrapages
-
-    def basefile_from_uri(self, uri):
-        # this should map https://lagen.nu/sjvfs/2014:9 to basefile sjvfs/2014:9
-        # but also https://lagen.nu/dfs/2007:8 -> dfs/2007:8
-        prefix = self.config.url + self.config.urlpath
-        altprefix = self.config.url + self.config.altpath
-        if uri.startswith(prefix) or uri.startswith(altprefix):
-            basefile = uri[len(self.config.url):]
-            return basefile
-
+                    suburl = unquote(urljoin(url, a['href']))
+                    yield(basefile, suburl)
 
 class FFFS(MyndFskr):
     alias = "fffs"
@@ -594,7 +573,9 @@ class FFFS(MyndFskr):
                 fp.write(str(ndiv))
                 fp.write(str(typediv))
                 fp.write(str(titlediv))
-            self.download_single(basefile)
+            if (self.config.refresh or
+                (not os.path.exists(self.store.downloaded_path(basefile)))):
+                self.download_single(basefile)
 
     # FIXME: This should create/update the documententry!!
     def download_single(self, basefile):
@@ -641,46 +622,93 @@ class FFFS(MyndFskr):
 class ELSAKFS(MyndFskr):
     alias = "elsakfs"  # real name is ELSÄK-FS, but avoid swedchars, uppercase and dashes
     uri_slug = "elsaek-fs"  # for use in
+    start_url = "http://www.elsakerhetsverket.se/om-oss/lag-och-ratt/gallande-regler/Elsakerhetsverkets-foreskrifter-listade-i-nummerordning/"
+    download_rewrite_url = True
+    
+    def remote_url(self, basefile):
+        if "/" in basefile:
+            basefile = basefile.split("/")[1]
+        return "http://www.elsakerhetsverket.se/globalassets/foreskrifter/elsak-fs-%s.pdf" % basefile.replace(":", "-")
 
-    start_url = "http://www.elsakerhetsverket.se/sv/Lag-och-ratt/Foreskrifter/Elsakerhetsverkets-foreskrifter-listade-i-nummerordning/"
 
 
 class NFS(MyndFskr):
     alias = "nfs"
+    start_url = "http://www.naturvardsverket.se/nfs"
+    basefile_regex = "^(?P<basefile>S?NFS \d+:\d+)$"
+    nextpage_regex = "Nästa"
+    storage_policy = "dir"
+    
+    def download_single(self, basefile, url):
+        if url.endswith(".pdf") and "/Nerladdningssida/?fileType=pdf" not in url:
+            # munge the URL for reasons unknown
+            url = url.replace("http://www.naturvardsverket.se/",
+                              "http://www.naturvardsverket.se/Nerladdningssida/?fileType=pdf&downloadUrl=/")
+            return super(NFS, self).download_single(basefile, url)
 
-    start_url = "http://www.naturvardsverket.se/sv/Start/Lagar-och-styrning/Foreskrifter-och-allmanna-rad/Foreskrifter/"
-
+        # NB: the basefile we got might be a later change act. first
+        # order of business is to identify the base act basefile
+        soup = BeautifulSoup(self.session.get(url).text)
+        basehead = soup.find("h3", text=re.compile("Grundföreskrift$"))
+        if not basehead:
+            realbasefile = basefile
+        else:
+            m = re.match("(S?NFS)\s+(\d+:\d+)", basehead.get_text())
+            realbasefile = m.group(1).lower() + "/" + m.group(2)
+        self.log.info("%s: Downloaded index %s, real basefile was %s" % (basefile, url, realbasefile))
+        basefile = realbasefile
+        descpath = self.store.downloaded_path(basefile,
+                                              attachment="description.html")
+        self.download_if_needed(url, basefile, filename=descpath)
+        soup = BeautifulSoup(util.readfile(descpath))
+        seen_consolidated = False
+        # find all pdf links, identify consolidated version if present
+        # [1:] in order to skip header
+        for tr in soup.find("table", "regulations-table").find_all("tr")[1:]:
+            head = tr.find("h3")
+            link = tr.find("a", href=re.compile("\.pdf$", re.I))
+            if not link:
+                continue
+            if "Konsoliderad" in head.get_text() or "-k" in link.get("href"):
+                assert not seen_consolidated
+                conspath = self.store.downloaded_path(basefile,
+                                                      attachment="consolidated.pdf")
+                consurl = urljoin(url, link.get("href"))
+                self.log.info("%s: Downloading consolidated version from %s" % (basefile, consurl))
+                self.download_if_needed(consurl, basefile, filename=conspath)
+                seen_consolidated = True
+            else:
+                m = re.match("(S?NFS)\s+(\d+:\d+)", head.get_text())
+                subbasefile = m.group(1).lower() + "/" + m.group(2)
+                suburl = urljoin(url, link.get("href"))
+                self.download_single(subbasefile, suburl)
 
 class STAFS(MyndFskr):
     alias = "stafs"
+    start_url = "http://www.swedac.se/sv/Det-handlar-om-fortroende/Lagar-och-regler/Gallande-foreskrifter-i-nummerordning/"
+    basefile_regex = "^STAFS (?P<basefile>\d{4}:\d+)$"
+    storage_policy = "dir"
+    
     re_identifier = re.compile('STAFS (\d{4})[:/_-](\d+)')
 
-    start_url = "http://www.swedac.se/sv/Det-handlar-om-fortroende/Lagar-och-regler/Alla-foreskrifter-i-nummerordning/"
-
-    def download(self, basefile=None):
-        self.session = requests.session()
-        soup = BeautifulSoup(self.session.get(self.start_url).text)
-        for link in list(soup.find_all("a", href=re.compile('/STAFS/'))):
-            basefile = re.search('\d{4}:\d+', link.text).group(0)
-            self.download_single(basefile, urljoin(self.start_url, link['href']))
-
-    def download_single(self, basefile, url):
-        self.log.info("%s: %s" % (basefile, url))
+    def download_single(self, basefile, mainurl):
+        self.log.info("%s: %s" % (basefile, mainurl))
         consolidated_link = None
         newest = None
-        soup = BeautifulSoup(self.session.get(url).text)
+        soup = BeautifulSoup(self.session.get(mainurl).text)
         for link in soup.find_all("a", text=self.re_identifier):
-            self.log.info("   %s: %s %s" % (basefile, link.text, link.url))
+            url = urljoin(mainurl, link.get("href"))
+            self.log.info("   %s: %s %s" % (basefile, link.text, url))
             if "konso" in link.text:
-                consolidated_link = link
+                consolidated_link = url
             else:
                 m = self.re_identifier.search(link.text)
                 assert m
-                if link.url.endswith(".pdf"):
+                if url.endswith(".pdf"):
                     basefile = m.group(1) + ":" + m.group(2)
                     filename = self.store.downloaded_path(basefile)
                     self.log.info("        Downloading to %s" % filename)
-                    self.download_if_needed(link.absolute_url, filename)
+                    self.download_if_needed(url, filename)
                     if basefile > newest:
                         self.log.debug(
                             "%s larger than %s" % (basefile, newest))
@@ -698,15 +726,16 @@ class STAFS(MyndFskr):
                                       (basefile, sublink.text, sublink['href']))
                         m = self.re_identifier.search(sublink.text)
                         assert m
-                        if sublink.url.endswith(".pdf"):
+                        suburl = urljoin(url, sublink.get("href"))
+                        if suburl.endswith(".pdf"):
                             subbasefile = m.group(1) + ":" + m.group(2)
-                            self.download_if_needed(urljoin(link, sublink['href'], subbasefile))
+                            self.download_if_needed(suburl, subbasefile)
 
         if consolidated_link:
             filename = self.store.downloaded_path(consolidated_basefile)
             self.log.info("        Downloading consd to %s" % filename)
             self.download_if_needed(
-                consolidated_link.absolute_url, consolidated_basefile, filename=filename)
+                consolidated_link, consolidated_basefile, filename=filename)
 
 
 class SKVFS(MyndFskr):
@@ -828,7 +857,7 @@ class SOSFS(MyndFskr):
                 # 1) links to HTML pages describing (and linking to) a
                 # base act, eg for SOSFS 2014:10 
                 # http://www.socialstyrelsen.se/publikationer2014/2014-10-12
-                yield(basefile, link)
+                yield("sosfs/"+basefile, link)
             elif txt.startswith("Konsoliderad"):
                 # 2) links to HTML pages containing a consolidated act
                 # (with links to type 1 base and change acts), eg for
@@ -836,18 +865,23 @@ class SOSFS(MyndFskr):
                 # http://www.socialstyrelsen.se/sosfs/2011-13 - fetch
                 # page, yield all type 1 links, also find basefile form
                 # element.text
-                soup = BeautifulSoup(self.session.get(link).text)
-                self.log.debug("%s: Downloading all base/change acts" % basefile)
-                for link_el in soup.find(text="Ladda ner eller beställ").find_parent("div").find_all("a"):
-                    if '/publikationer' in link_el.get("href"):
-                        subbasefile = self._basefile_from_text(link_el.get_text())
-                        if subbasefile:
-                            yield(subbasefile,
-                                  urljoin(link, link_el.get("href")))
-                # then save page itself as grundforf/konsoldering.html
                 konsfile = self.store.downloaded_path(basefile, attachment="konsolidering.html")
-                self.log.debug("%s: Downloading consolidated version" % basefile)
-                self.download_if_needed(link, basefile, filename=konsfile)
+                if (self.config.refresh or (not os.path.exists(konsfile))):
+                    soup = BeautifulSoup(self.session.get(link).text)
+                    self.log.debug("%s: Downloading all base/change acts" % basefile)
+                    linkhead = soup.find(text=re.compile("(Ladda ner eller beställ|Beställ eller ladda ner)"))
+                    if linkhead:
+                        for link_el in linkhead.find_parent("div").find_all("a"):
+                            if '/publikationer' in link_el.get("href"):
+                                subbasefile = self._basefile_from_text(link_el.get_text())
+                                if subbasefile:
+                                    yield("sosfs/"+subbasefile,
+                                          urljoin(link, link_el.get("href")))
+                    else:
+                        self.log.warning("%s: Can't find links to base/change acts" % basefile)
+                    # then save page itself as grundforf/konsoldering.html
+                    self.log.debug("%s: Downloading consolidated version" % basefile)
+                    self.download_if_needed(link, basefile, filename=konsfile)
 
     # FIXME: update documententry!
     def download_single(self, basefile, url):
@@ -860,7 +894,7 @@ class SOSFS(MyndFskr):
 
     def fwdtests(self):
         t = super(SOSFS, self).fwdtests()
-        t["dcterms:identifier"] = ['^([A-ZÅÄÖ-]+FS\s\s?\d{4}:\d+)'],
+        t["dcterms:identifier"] = ['^([A-ZÅÄÖ-]+FS\s\s?\d{4}:\d+)']
         return t
 
     def parse_metadata_from_textreader(self, reader, doc):
@@ -884,6 +918,8 @@ class DVFS(MyndFskr):
     download_formid = "aspnetForm"
 
     def remote_url(self, basefile):
+        if "/" in basefile:
+            basefile = basefile.split("/")[1]
         return "http://www.domstol.se/Ladda-ner--bestall/Verksamhetsstyrning/DVFS/DVFS2/%s/" % basefile.replace(":","")
 
     def download_post_form(self, form, url):
@@ -924,7 +960,7 @@ class DVFS(MyndFskr):
         resp = self.session.send(req, allow_redirects=True)
         return resp
 
-    def textreader_from_basefile(self, basefile, encoding):
+    def textreader_from_basefile(self, basefile):
         infile = self.store.downloaded_path(basefile)
         soup = BeautifulSoup(util.readfile(infile))
         main = soup.find("div", id="readme")
