@@ -17,7 +17,7 @@ from six.moves.urllib_parse import urljoin, unquote
 import lxml.html
 
 from ferenda import TextReader, Describer, Facet, DocumentRepository
-from ferenda import util, decorators
+from ferenda import util, decorators, errors
 from ferenda.elements import Body, Page, Preformatted, Link
 from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda.sources.legal.se import legaluri
@@ -29,6 +29,7 @@ from rdflib.namespace import DCTERMS, SKOS
 from . import RPUBL
 PROV = Namespace(util.ns['prov'])
 RINFOEX = Namespace("http://lagen.nu/terms#")
+
 
 class MyndFskr(SwedishLegalSource):
 
@@ -56,7 +57,8 @@ class MyndFskr(SwedishLegalSource):
     sparql_annotations = None  # until we can speed things up
 
     basefile_regex = re.compile('(?P<basefile>\d{4}[:/_-]\d+)(?:|\.\w+)$')
-    document_url_regex = re.compile('(?P<basefile>\d{4}[:/_-]\d+)(?:|\.\w+)$')
+    document_url_regex = re.compile('.*(?P<basefile>\d{4}[:/_-]\d+).pdf$')
+    download_accept_404 = True  # because the occasional 404 is to be expected
 
     nextpage_regex = None
     nextpage_url_regex = None
@@ -82,6 +84,7 @@ class MyndFskr(SwedishLegalSource):
         # DocumentRepository.download_get_basefiles which handles
         # "next page" navigation and also ensures that the default
         # basefilepattern is "myndfs/2015:1", not just "2015:1"
+        # (through download_sanitize_basefile)
         yielded = set()
         while source:
             nextform = nexturl = None
@@ -500,46 +503,134 @@ class MyndFskr(SwedishLegalSource):
         return [(self.__class__.__name__, self.dataset_uri())]
 
 
-class SJVFS(MyndFskr):
-    alias = "sjvfs"
-    start_url = "http://www.jordbruksverket.se/forfattningar/forfattningssamling.4.5aec661121e2613852800012537.html"
-    download_iterlinks = False
+class AFS(MyndFskr):
+    alias = "afs"
+    start_url = "http://www.av.se/lagochratt/afs/nummerordning.aspx"
+    basefile_regex = None
+    document_url_regex = ".*(afs|AFS)(?P<basefile>\d+_\d+)\.pdf$"
 
-    def forfattningssamlingar(self):
-        return  ["sjvfs", "dfs"]
+    def download_sanitize_basefile(self, basefile):
+        return super(AFS, self).download_sanitize_basefile(basefile.replace("_", ":"))
+    
 
-    @decorators.downloadmax
-    def download_get_basefiles(self, source):
-        soup = BeautifulSoup(source)
-        main = soup.find_all("li", "active")
-        assert len(main) == 1
-        extra = []
-        for a in list(main[0].ul.find_all("a")):
-            # only fetch subsections that start with a year, not
-            # "Allmänna råd"/"Notiser"/"Meddelanden"
-            label = a.text.split()[0]
-            if not label.isdigit():
-                continue
-            # if lastdownload was 2015-02-24, dont download 2014
-            # and earlier
-            if (not self.config.refresh and
-                self.config.lastdownload and
-                self.config.lastdownload.year > int(label)):
-                continue
-            url = urljoin(self.start_url, a['href'])
-            self.log.debug("Fetching index page for %s" % (a.text))
-            subsoup = BeautifulSoup(self.session.get(url).text)
-            submain = subsoup.find("div", "pagecontent")
-            for a in submain.find_all("a", href=re.compile(".pdf$", re.I)):
-                if re.search('\d{4}:\d+', a.text):
-                    m = re.search('(\w+FS|) ?(\d{4}:\d+)', a.text)
-                    fs = m.group(1).lower()
-                    fsnr = m.group(2)
-                    if not fs:
-                        fs = "sjvfs"
-                    basefile = "%s/%s" % (fs, fsnr)
-                    suburl = unquote(urljoin(url, a['href']))
-                    yield(basefile, suburl)
+class BOLFS(MyndFskr):
+    # FIXME: The id is not linked, and the link does not *reliably*
+    # contain the id: given link, one should get
+    # link.parent.parent.parent.div.h3.text for the basefile. Most of
+    # the time, the ID is deductible from the link though.
+    alias = "bolfs"
+    start_url = "http://www.bolagsverket.se/om/oss/verksamhet/styr/forfattningssamling"
+
+
+class DIFS(MyndFskr):
+    alias = "difs"
+    start_url = "http://www.datainspektionen.se/lagar-och-regler/datainspektionens-foreskrifter/"
+    
+
+class DVFS(MyndFskr):
+    alias = "dvfs"
+    start_url = "http://www.domstol.se/Ladda-ner--bestall/Verksamhetsstyrning/DVFS/DVFS1/"
+    downloaded_suffix = ".html"
+
+    nextpage_regex = ">"
+    nextpage_url_regex = None
+    basefile_regex = "^\s*(?P<basefile>\d{4}:\d+)"
+    download_rewrite_url = True
+    download_formid = "aspnetForm"
+
+    def remote_url(self, basefile):
+        if "/" in basefile:
+            basefile = basefile.split("/")[1]
+        return "http://www.domstol.se/Ladda-ner--bestall/Verksamhetsstyrning/DVFS/DVFS2/%s/" % basefile.replace(":","")
+
+    def download_post_form(self, form, url):
+        # nexturl == "javascript:__doPostBack('ctl00$MainRegion$"
+        #            "MainContentRegion$LeftContentRegion$ctl01$"
+        #            "epiNewsList$ctl09$PagingID15','')"
+        etgt, earg = [m.group(1) for m in re.finditer("'([^']*)'", url)]
+        fields = dict(form.fields)
+
+        # requests seem to prefer that keys and values to the
+        # files argument should be str (eg bytes) on py2 and
+        # str (eg unicode) on py3. But we use unicode_literals
+        # for this file, so we define a wrapper to convert
+        # unicode strs in the appropriate way
+        if six.PY2:
+            f = six.binary_type
+        else:
+            f = lambda x: x
+        fields[f('__EVENTTARGET')] = etgt
+        fields[f('__EVENTARGUMENT')] = earg
+        for k, v in fields.items(): 
+            if v is None:
+                fields[k] = f('')
+        # using the files argument to requests.post forces the
+        # multipart/form-data encoding
+        req = requests.Request(
+            "POST", form.get("action"), cookies=self.session.cookies, files=fields).prepare()
+        # Then we need to remove filename from req.body in an
+        # unsupported manner in order not to upset the
+        # sensitive server
+        body = req.body
+        if isinstance(body, bytes):
+            body = body.decode() # should be pure ascii
+        req.body = re.sub(
+            '; filename="[\w\-\/]+"', '', body).encode()
+        req.headers['Content-Length'] = str(len(req.body))
+        # self.log.debug("posting to event %s" % etgt)
+        resp = self.session.send(req, allow_redirects=True)
+        return resp
+
+    def textreader_from_basefile(self, basefile):
+        infile = self.store.downloaded_path(basefile)
+        soup = BeautifulSoup(util.readfile(infile))
+        main = soup.find("div", id="readme")
+        if main:
+            main.find("div", "rs_skip").decompose()
+            maintext = main.get_text("\n\n", strip=True)
+            outfile = self.store.path(basefile, 'intermediate', '.txt')
+            util.writefile(outfile, maintext)
+            return TextReader(string=maintext)
+        elif soup.find("title").text == "Sveriges Domstolar - 404":
+            e = errors.DocumentRemovedError()
+            e.dummyfile = self.store.parsed_path(basefile)
+            raise e
+            
+    def fwdtests(self):
+        t = super(DVFS, self).fwdtests()
+        t["dcterms:identifier"] = ['(DVFS\s\s?\d{4}:\d+)']
+        return t
+
+
+class EIFS(MyndFskr):
+    alias = "eifs"
+    start_url = "http://www.ei.se/sv/Publikationer/Foreskrifter/"
+    basefile_regex = None
+    document_url_regex = re.compile('.*(?P<basefile>EIFS_\d{4}_\d+).pdf$')
+
+    def download_sanitize_basefile(self, basefile):
+        basefile = basefile.replace("_", "/", 1)
+        basefile = basefile.replace("_", ":", 1)
+        return super(EIFS, self).download_sanitize_basefile(basefile)
+        
+
+class ELSAKFS(MyndFskr):
+    alias = "elsakfs"  # real name is ELSÄK-FS, but avoid swedchars, uppercase and dashes
+    uri_slug = "elsaek-fs"  # for use in
+    start_url = "http://www.elsakerhetsverket.se/om-oss/lag-och-ratt/gallande-regler/Elsakerhetsverkets-foreskrifter-listade-i-nummerordning/"
+    download_rewrite_url = True
+    
+    def remote_url(self, basefile):
+        if "/" in basefile:
+            basefile = basefile.split("/")[1]
+        return "http://www.elsakerhetsverket.se/globalassets/foreskrifter/elsak-fs-%s.pdf" % basefile.replace(":", "-")
+
+
+class Ehalso(MyndFskr):
+    alias = "ehalso"
+    # Ehälsomyndigheten publicerar i TLVFS
+    start_url = "http://www.ehalsomyndigheten.se/Om-oss-/Foreskrifter/"
+    
 
 class FFFS(MyndFskr):
     alias = "fffs"
@@ -617,19 +708,71 @@ class FFFS(MyndFskr):
         else:
             self.log.warning("%s: No idea!" % basefile)
 
+class FFS(MyndFskr):
+    alias = "ffs"
+    start_url = "http://www.forsvarsmakten.se/sv/om-myndigheten/dokument/lagrum"
 
 
-class ELSAKFS(MyndFskr):
-    alias = "elsakfs"  # real name is ELSÄK-FS, but avoid swedchars, uppercase and dashes
-    uri_slug = "elsaek-fs"  # for use in
-    start_url = "http://www.elsakerhetsverket.se/om-oss/lag-och-ratt/gallande-regler/Elsakerhetsverkets-foreskrifter-listade-i-nummerordning/"
-    download_rewrite_url = True
-    
-    def remote_url(self, basefile):
-        if "/" in basefile:
-            basefile = basefile.split("/")[1]
-        return "http://www.elsakerhetsverket.se/globalassets/foreskrifter/elsak-fs-%s.pdf" % basefile.replace(":", "-")
+class FMI(MyndFskr):
+    alias = "fmi"
+    # Fastighetsmäklarinspektionen publicerar i KAMFS
+    start_url = "http://www.fmi.se/gallande-foreskrifter"
 
+
+class FoHMFS(MyndFskr):
+    alias = "fohmfs"
+    start_url = "http://www.folkhalsomyndigheten.se/publicerat-material/foreskrifter-och-allmanna-rad/"
+                
+
+class KFMFS(MyndFskr):
+    alias = "kfmfs"
+    start_url = "http://www.kronofogden.se/Foreskrifter.html"
+
+
+class KOVFS(MyndFskr):
+    alias = "kovfs"
+    start_url = "http://publikationer.konsumentverket.se/sv/publikationer/lagarregler/forfattningssamling-kovfs/"
+
+
+class KVFS(MyndFskr):
+    alias = "kvfs"
+    start_url = "//www.kriminalvarden.se/om-kriminalvarden/publikationer/regelverk"
+    # (finns även konsoliderade på http://www.kriminalvarden.se/om-kriminalvarden/styrning-och-regelverk/lagar-forordningar-och-foreskrifter)
+
+
+class LMFS(MyndFskr):
+    alias = "lmfs"
+    start_url = "http://www.lantmateriet.se/Om-Lantmateriet/Rattsinformation/Foreskrifter/"
+
+
+class LIFS(MyndFskr):
+    alias = "lifs"
+    start_url = "http://www.lotteriinspektionen.se/sv/Lagar-och-villkor/Foreskrifter/"
+
+
+class LVFS(MyndFskr):
+    alias = "lvfs"
+    start_url = "http://www.lakemedelsverket.se/overgripande/Lagar--regler/Lakemedelsverkets-foreskrifter---LVFS/"
+
+
+class MIGRFS(MyndFskr):
+    alias = "migrfs"
+    start_url = "http://www.migrationsverket.se/info/1082.html"
+
+
+class MRTVFS(MyndFskr):
+    alias = "mrtvfs"
+    start_url = "http://www.radioochtv.se/Publikationer-Blanketter/Foreskrifter/"
+
+class MSBFS(MyndFskr):
+    alias = "msbfs"
+    start_url = "https://www.msb.se/sv/Om-MSB/Lag-och-ratt/ (efter POST)"
+
+
+class MYHFS(MyndFskr):
+    #  (id vs länk)
+    alias = "myhfs"
+    start_url = "https://www.myh.se/Lagar-regler-och-tillsyn/Foreskrifter/"
 
 
 class NFS(MyndFskr):
@@ -638,6 +781,9 @@ class NFS(MyndFskr):
     basefile_regex = "^(?P<basefile>S?NFS \d+:\d+)$"
     nextpage_regex = "Nästa"
     storage_policy = "dir"
+
+    def forfattningssamlingar(self):
+        return ["nfs", "snfs"]
     
     def download_single(self, basefile, url):
         if url.endswith(".pdf") and "/Nerladdningssida/?fileType=pdf" not in url:
@@ -683,59 +829,64 @@ class NFS(MyndFskr):
                 suburl = urljoin(url, link.get("href"))
                 self.download_single(subbasefile, suburl)
 
-class STAFS(MyndFskr):
-    alias = "stafs"
-    start_url = "http://www.swedac.se/sv/Det-handlar-om-fortroende/Lagar-och-regler/Gallande-foreskrifter-i-nummerordning/"
-    basefile_regex = "^STAFS (?P<basefile>\d{4}:\d+)$"
-    storage_policy = "dir"
-    
-    re_identifier = re.compile('STAFS (\d{4})[:/_-](\d+)')
 
-    def download_single(self, basefile, mainurl):
-        self.log.info("%s: %s" % (basefile, mainurl))
-        consolidated_link = None
-        newest = None
-        soup = BeautifulSoup(self.session.get(mainurl).text)
-        for link in soup.find_all("a", text=self.re_identifier):
-            url = urljoin(mainurl, link.get("href"))
-            self.log.info("   %s: %s %s" % (basefile, link.text, url))
-            if "konso" in link.text:
-                consolidated_link = url
-            else:
-                m = self.re_identifier.search(link.text)
-                assert m
-                if url.endswith(".pdf"):
-                    basefile = m.group(1) + ":" + m.group(2)
-                    filename = self.store.downloaded_path(basefile)
-                    self.log.info("        Downloading to %s" % filename)
-                    self.download_if_needed(url, filename)
-                    if basefile > newest:
-                        self.log.debug(
-                            "%s larger than %s" % (basefile, newest))
-                        consolidated_basefile = basefile + \
-                            "/konsoliderad/" + basefile
-                        newest = basefile
-                    else:
-                        self.log.debug(
-                            "%s not larger than %s" % (basefile, newest))
-                else:
-                    # not pdf - link to yet another pg
-                    subsoup = BeautifulSoup(self.session.get(link).text)
-                    for sublink in soup.find_all("a", text=self.re_identifier):
-                        self.log.info("   Sub %s: %s %s" %
-                                      (basefile, sublink.text, sublink['href']))
-                        m = self.re_identifier.search(sublink.text)
-                        assert m
-                        suburl = urljoin(url, sublink.get("href"))
-                        if suburl.endswith(".pdf"):
-                            subbasefile = m.group(1) + ":" + m.group(2)
-                            self.download_if_needed(suburl, subbasefile)
+class RNFS(MyndFskr):
+    alias = "rnfs"
+    start_url = "http://www.revisorsnamnden.se/rn/om_rn/regler/kronologi.html"
 
-        if consolidated_link:
-            filename = self.store.downloaded_path(consolidated_basefile)
-            self.log.info("        Downloading consd to %s" % filename)
-            self.download_if_needed(
-                consolidated_link, consolidated_basefile, filename=filename)
+
+class RAFS(MyndFskr):
+    #  (efter POST)
+    alias = "rafs"
+    start_url = "http://riksarkivet.se/rafs"
+
+
+class RGKFS(MyndFskr):
+    # (id vs länk)
+    alias = "rgkfs"
+    start_url = "https://www.riksgalden.se/sv/omriksgalden/Pressrum/publicerat/Foreskrifter/"
+
+
+class SJVFS(MyndFskr):
+    alias = "sjvfs"
+    start_url = "http://www.jordbruksverket.se/forfattningar/forfattningssamling.4.5aec661121e2613852800012537.html"
+    download_iterlinks = False
+
+    def forfattningssamlingar(self):
+        return  ["sjvfs", "dfs"]
+
+    @decorators.downloadmax
+    def download_get_basefiles(self, source):
+        soup = BeautifulSoup(source)
+        main = soup.find_all("li", "active")
+        assert len(main) == 1
+        extra = []
+        for a in list(main[0].ul.find_all("a")):
+            # only fetch subsections that start with a year, not
+            # "Allmänna råd"/"Notiser"/"Meddelanden"
+            label = a.text.split()[0]
+            if not label.isdigit():
+                continue
+            # if lastdownload was 2015-02-24, dont download 2014
+            # and earlier
+            if (not self.config.refresh and
+                self.config.lastdownload and
+                self.config.lastdownload.year > int(label)):
+                continue
+            url = urljoin(self.start_url, a['href'])
+            self.log.debug("Fetching index page for %s" % (a.text))
+            subsoup = BeautifulSoup(self.session.get(url).text)
+            submain = subsoup.find("div", "pagecontent")
+            for a in submain.find_all("a", href=re.compile(".pdf$", re.I)):
+                if re.search('\d{4}:\d+', a.text):
+                    m = re.search('(\w+FS|) ?(\d{4}:\d+)', a.text)
+                    fs = m.group(1).lower()
+                    fsnr = m.group(2)
+                    if not fs:
+                        fs = "sjvfs"
+                    basefile = "%s/%s" % (fs, fsnr)
+                    suburl = unquote(urljoin(url, a['href']))
+                    yield(basefile, suburl)
 
 
 class SKVFS(MyndFskr):
@@ -819,11 +970,6 @@ class SKVFS(MyndFskr):
         else:
             return html_downloaded
 
-class DIFS(MyndFskr):
-    alias = "difs"
-    start_url = "http://www.datainspektionen.se/lagar-och-regler/datainspektionens-foreskrifter/"
-    
-
 class SOSFS(MyndFskr):
     alias = "sosfs"
     start_url = "http://www.socialstyrelsen.se/sosfs"
@@ -905,72 +1051,69 @@ class SOSFS(MyndFskr):
             reader.readpage()
             page += 1
         return super(SOSFS, self).parse_metadata_from_textreader(reader, doc)
+
+
+class STAFS(MyndFskr):
+    alias = "stafs"
+    start_url = "http://www.swedac.se/sv/Det-handlar-om-fortroende/Lagar-och-regler/Gallande-foreskrifter-i-nummerordning/"
+    basefile_regex = "^STAFS (?P<basefile>\d{4}:\d+)$"
+    storage_policy = "dir"
     
-class DVFS(MyndFskr):
-    alias = "dvfs"
-    start_url = "http://www.domstol.se/Ladda-ner--bestall/Verksamhetsstyrning/DVFS/DVFS1/"
-    downloaded_suffix = ".html"
+    re_identifier = re.compile('STAFS (\d{4})[:/_-](\d+)')
 
-    nextpage_regex = ">"
-    nextpage_url_regex = None
-    basefile_regex = "^\s*(?P<basefile>\d{4}:\d+)"
-    download_rewrite_url = True
-    download_formid = "aspnetForm"
+    def download_single(self, basefile, mainurl):
+        self.log.info("%s: %s" % (basefile, mainurl))
+        consolidated_link = None
+        newest = None
+        soup = BeautifulSoup(self.session.get(mainurl).text)
+        for link in soup.find_all("a", text=self.re_identifier):
+            url = urljoin(mainurl, link.get("href"))
+            self.log.info("   %s: %s %s" % (basefile, link.text, url))
+            if "konso" in link.text:
+                consolidated_link = url
+            else:
+                m = self.re_identifier.search(link.text)
+                assert m
+                if url.endswith(".pdf"):
+                    basefile = m.group(1) + ":" + m.group(2)
+                    filename = self.store.downloaded_path(basefile)
+                    self.log.info("        Downloading to %s" % filename)
+                    self.download_if_needed(url, filename)
+                    if basefile > newest:
+                        self.log.debug(
+                            "%s larger than %s" % (basefile, newest))
+                        consolidated_basefile = basefile + \
+                            "/konsoliderad/" + basefile
+                        newest = basefile
+                    else:
+                        self.log.debug(
+                            "%s not larger than %s" % (basefile, newest))
+                else:
+                    # not pdf - link to yet another pg
+                    subsoup = BeautifulSoup(self.session.get(link).text)
+                    for sublink in soup.find_all("a", text=self.re_identifier):
+                        self.log.info("   Sub %s: %s %s" %
+                                      (basefile, sublink.text, sublink['href']))
+                        m = self.re_identifier.search(sublink.text)
+                        assert m
+                        suburl = urljoin(url, sublink.get("href"))
+                        if suburl.endswith(".pdf"):
+                            subbasefile = m.group(1) + ":" + m.group(2)
+                            self.download_if_needed(suburl, subbasefile)
 
-    def remote_url(self, basefile):
-        if "/" in basefile:
-            basefile = basefile.split("/")[1]
-        return "http://www.domstol.se/Ladda-ner--bestall/Verksamhetsstyrning/DVFS/DVFS2/%s/" % basefile.replace(":","")
+        if consolidated_link:
+            filename = self.store.downloaded_path(consolidated_basefile)
+            self.log.info("        Downloading consd to %s" % filename)
+            self.download_if_needed(
+                consolidated_link, consolidated_basefile, filename=filename)
 
-    def download_post_form(self, form, url):
-        # nexturl == "javascript:__doPostBack('ctl00$MainRegion$"
-        #            "MainContentRegion$LeftContentRegion$ctl01$"
-        #            "epiNewsList$ctl09$PagingID15','')"
-        etgt, earg = [m.group(1) for m in re.finditer("'([^']*)'", url)]
-        fields = dict(form.fields)
 
-        # requests seem to prefer that keys and values to the
-        # files argument should be str (eg bytes) on py2 and
-        # str (eg unicode) on py3. But we use unicode_literals
-        # for this file, so we define a wrapper to convert
-        # unicode strs in the appropriate way
-        if six.PY2:
-            f = six.binary_type
-        else:
-            f = lambda x: x
-        fields[f('__EVENTTARGET')] = etgt
-        fields[f('__EVENTARGUMENT')] = earg
-        for k, v in fields.items(): 
-            if v is None:
-                fields[k] = f('')
-        # using the files argument to requests.post forces the
-        # multipart/form-data encoding
-        req = requests.Request(
-            "POST", form.get("action"), cookies=self.session.cookies, files=fields).prepare()
-        # Then we need to remove filename from req.body in an
-        # unsupported manner in order not to upset the
-        # sensitive server
-        body = req.body
-        if isinstance(body, bytes):
-            body = body.decode() # should be pure ascii
-        req.body = re.sub(
-            '; filename="[\w\-\/]+"', '', body).encode()
-        req.headers['Content-Length'] = str(len(req.body))
-        # self.log.debug("posting to event %s" % etgt)
-        resp = self.session.send(req, allow_redirects=True)
-        return resp
+class STFS(MyndFskr):
+    # (id vs länk)
+    alias = "stfs"
+    start_url = "http://www.sametinget.se/1014?cat_id=52"
 
-    def textreader_from_basefile(self, basefile):
-        infile = self.store.downloaded_path(basefile)
-        soup = BeautifulSoup(util.readfile(infile))
-        main = soup.find("div", id="readme")
-        main.find("div", "rs_skip").decompose()
-        maintext = main.get_text("\n\n", strip=True)
-        outfile = self.store.path(basefile, 'intermediate', '.txt')
-        util.writefile(outfile, maintext)
-        return TextReader(string=maintext)
 
-    def fwdtests(self):
-        t = super(DVFS, self).fwdtests()
-        t["dcterms:identifier"] = ['(DVFS\s\s?\d{4}:\d+)']
-        return t
+class SvKFS(MyndFskr):
+    alias = "svkfs"
+    start_url = "http://www.svk.se/Tekniska-krav/Foreskrifter/"

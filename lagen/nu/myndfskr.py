@@ -20,9 +20,39 @@ from ferenda.sources.legal.se import RPUBL
 
 class CompositeMyndFskr(CompositeRepository, SwedishLegalSource):
     alias = "myndfs"
-    subrepos = [myndfskr.SJVFS, myndfskr.FFFS, myndfskr.ELSAKFS,
-                myndfskr.NFS, myndfskr.STAFS, myndfskr.SKVFS, myndfskr.DIFS,
-                myndfskr.SOSFS, myndfskr.DVFS]
+    subrepos = [
+        myndfskr.AFS,
+        myndfskr.BOLFS,
+        myndfskr.DIFS,
+        myndfskr.DVFS,
+        myndfskr.EIFS,
+        myndfskr.ELSAKFS,
+        myndfskr.Ehalso,
+        myndfskr.FFFS,
+        myndfskr.FFS,
+        myndfskr.FMI,
+        myndfskr.FoHMFS,
+        myndfskr.KFMFS,
+        myndfskr.KOVFS,
+        myndfskr.KVFS,
+        myndfskr.LIFS,
+        myndfskr.LMFS,
+        myndfskr.LVFS,
+        myndfskr.MIGRFS,
+        myndfskr.MRTVFS,
+        myndfskr.MSBFS,
+        myndfskr.MYHFS,
+        myndfskr.NFS,
+        myndfskr.RAFS,
+        myndfskr.RGKFS,
+        myndfskr.RNFS,
+        myndfskr.SJVFS,
+        myndfskr.SKVFS,
+        myndfskr.SOSFS,
+        myndfskr.STAFS,
+        myndfskr.STFS,
+        myndfskr.SvKFS,
+    ]
     rdf_type = (RPUBL.Myndighetsforeskrift, RPUBL.AllmannaRad)
     namespaces = ['rdf', 'rdfs', 'xsd', 'dcterms', 'skos', 'foaf',
                   'xhv', 'xsi', 'owl', 'prov', 'bibo',

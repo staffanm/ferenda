@@ -217,6 +217,9 @@ class DocumentRepository(object):
     download_iterlinks = True
     """TBW"""
 
+    download_accept_404 = False
+    """TBW"""
+
     #
     # parse() specific class properties
     rdf_type = Namespace(util.ns['foaf']).Document
@@ -713,7 +716,14 @@ with the *config* object as single parameter.
         for (basefile, link) in self.download_get_basefiles(source):
             if (refresh or
                     (not os.path.exists(self.store.downloaded_path(basefile)))):
-                ret = self.download_single(basefile, link)
+                try:
+                    ret = self.download_single(basefile, link)
+                except requests.exceptions.HTTPError as e:
+                    if self.download_accept_404 and e.response.status_code == 404:
+                        self.log.error("%s: %s %s" % (basefile, link, e))
+                        ret = False
+                    else:
+                        raise e
                 updated = updated or ret
         self.config.lastdownload = datetime.now()
         return updated

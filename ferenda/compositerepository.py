@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 import os
+import time
 from collections import defaultdict
 
 from layeredconfig import LayeredConfig
@@ -131,52 +132,51 @@ class CompositeRepository(DocumentRepository):
                     self.log.debug("%s: Skipped" % basefile)
                     return True # signals everything OK
 
-        with util.logtime(self.log.info, "%(basefile)s OK (%(elapsed).3f sec)",
-                          {'basefile': basefile}):
-            ret = False
-            for c in self.subrepos:
-                # FIXME: for optimization, it'd be nice if we only
-                # tried those subrepos that have the possibility of
-                # parsing basefile, ie they have the correct
-                # downloaded file. But the only way to do that is to
-                # call list_basefiles_for. Which CompositeStore has
-                # already done. Hmmm.
-                if not self.store.basefiles:
-                    list(self.store.list_basefiles_for("parse"))
-                if basefile in self.store.basefiles[c]:
-                    inst = self.get_instance(c)
-                    try:
-                        # each parse method should be smart about whether
-                        # to re-parse or not (i.e. use the @managedparsing
-                        # decorator).
-                        ret = inst.parse(basefile)
 
-                    # Any error thrown (errors.ParseError or something
-                    # else) means we try next subrepo -- unless we want to
-                    # fail fast with a nice stacktrace during debugging.
-                    except Exception as e: 
-                        if self.config.failfast:
-                            raise
-                        else:
-                            self.log.debug("%s: parse with %s failed: %s" %
-                                           (basefile,
-                                            inst.qualified_class_name(),
-                                            str(e)))
-                            ret = False
-                    if ret:
-                        break
-            if ret:
-                self.copy_parsed(basefile, inst)
+        start = time.time()
+        ret = False
+        for c in self.subrepos:
+            # FIXME: for optimization, it'd be nice if we only
+            # tried those subrepos that have the possibility of
+            # parsing basefile, ie they have the correct
+            # downloaded file. But the only way to do that is to
+            # call list_basefiles_for. Which CompositeStore has
+            # already done. Hmmm.
+            if not self.store.basefiles:
+                list(self.store.list_basefiles_for("parse"))
+            if basefile in self.store.basefiles[c]:
+                inst = self.get_instance(c)
+                try:
+                    # each parse method should be smart about whether
+                    # to re-parse or not (i.e. use the @managedparsing
+                    # decorator).
+                    ret = inst.parse(basefile)
+
+                # Any error thrown (errors.ParseError or something
+                # else) means we try next subrepo -- unless we want to
+                # fail fast with a nice stacktrace during debugging.
+                except Exception as e: 
+                    if self.config.failfast:
+                        raise
+                    else:
+                        self.log.debug("%s: parse with %s failed: %s" %
+                                       (basefile,
+                                        inst.qualified_class_name(),
+                                        str(e)))
+                        ret = False
+                if ret:
+                    break
         if ret:
+            self.copy_parsed(basefile, inst)
+            self.log.info("%(basefile)s OK (%(elapsed).3f sec)",
+                          {'basefile': basefile,
+                           'elapsed': time.time() - start})
             return ret
         else:
-            # NOTE: even when this happens, util.logtime will have
-            # printed a "everything OK" message.
-            # 
             # FIXME: maybe subrepos should only contain those repos
             # that actually had a chance of parsing (basefile in
             # self.store.basefiles[c])
-            subrepos = ", ".join([self.get_instance(x).qualified_class_name() for x in self.subrepos])
+            subrepos = ", ".join([self.get_instance(x).qualified_class_name() for x in self.subrepos if basefile in self.store.basefiles[x]])
             raise errors.ParseError("No instance of %s was able to parse %s" % (subrepos, basefile))
 
 
