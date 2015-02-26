@@ -712,7 +712,7 @@ with the *config* object as single parameter.
             tree.make_links_absolute(self.start_url, resolve_base_href=True)
             source = tree.iterlinks()
         else:
-            source = resp.text 
+            source = resp.text
         for (basefile, link) in self.download_get_basefiles(source):
             if (refresh or
                     (not os.path.exists(self.store.downloaded_path(basefile)))):

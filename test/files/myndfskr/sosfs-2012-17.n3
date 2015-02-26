@@ -17,6 +17,5 @@
     rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/sosfs> ;
     rpubl:ikrafttradandedatum "2013-01-01"^^xsd:date ;
     rpubl:lopnummer "17" ;
-    rpubl:utkomFranTryck "2012-12-04"^^xsd:date ;
-    prov:wasGeneratedBy "ferenda.sources.legal.se.myndfskr.MyndFskr" .
+    rpubl:utkomFranTryck "2012-12-04"^^xsd:date .
 

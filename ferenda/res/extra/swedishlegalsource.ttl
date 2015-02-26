@@ -1429,3 +1429,7 @@
 <http://rinfo.lagrummet.se/org/statens_jordbruksverk> a foaf:Organization ;
     foaf:name "Statens jordbruksverk"@sv .
 
+<http://rinfo.lagrummet.se/org/patentombudsnaemden> a foaf:Organization ;
+    rdfs:comment "Not an official resource URI";
+    foaf:name "Patentombudsnämnden"@sv  .
+    

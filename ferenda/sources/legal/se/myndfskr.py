@@ -16,7 +16,7 @@ import six
 from six.moves.urllib_parse import urljoin, unquote
 import lxml.html
 
-from ferenda import TextReader, Describer, Facet, DocumentRepository
+from ferenda import TextReader, Describer, Facet, DocumentRepository, PDFReader
 from ferenda import util, decorators, errors
 from ferenda.elements import Body, Page, Preformatted, Link
 from ferenda.sources.legal.se.legalref import LegalRef
@@ -73,7 +73,8 @@ class MyndFskr(SwedishLegalSource):
 
     def download_sanitize_basefile(self, basefile):
         basefile = basefile.lower().replace(" ", "/")
-        if not any((basefile.startswith(fs+"/") for fs in self.forfattningssamlingar())):
+        if not any((basefile.startswith(fs+"/") for fs
+                    in self.forfattningssamlingar())):
             return self.forfattningssamlingar()[0] + "/" + basefile
         else:
             return basefile
@@ -183,13 +184,29 @@ class MyndFskr(SwedishLegalSource):
         infile = self.store.downloaded_path(basefile)
         tmpfile = self.store.path(basefile, 'intermediate', '.pdf')
         outfile = self.store.path(basefile, 'intermediate', '.txt')
-        util.copy_if_different(infile, tmpfile)
-        # this command will create a file named as the val of outfile
-        util.runcmd("pdftotext %s" % tmpfile, require_success=True)
+        if not util.outfile_is_newer([infile], outfile):
+            util.copy_if_different(infile, tmpfile)
+            # this command will create a file named as the val of outfile
+            util.runcmd("pdftotext %s" % tmpfile, require_success=True)
+            # check to see if the outfile actually contains any text. It
+            # might just be a series of scanned images.
+            if not util.readfile(outfile).strip():
+                os.unlink(outfile)
+                # OK, it's scanned images. We extract these, put them in a
+                # tif file, and OCR them with tesseract.
+                p = PDFReader()
+                p._tesseract(tmpfile, os.path.dirname(outfile), "swe", False)
+                tmptif = self.store.path(basefile, 'intermediate', '.tif')
+                util.robust_remove(tmptif)
         util.robust_remove(tmpfile)
-        return TextReader(outfile, self.source_encoding,
+        text = self.sanitize_text(util.readfile(outfile), basefile)
+        return TextReader(string=text, encoding=self.source_encoding,
                           linesep=TextReader.UNIX)
 
+    def sanitize_text(self, text, basefile):
+        return text
+    
+    
     def fwdtests(self):
         return {'dcterms:issn': ['^ISSN (\d+\-\d+)$'],
                 'dcterms:title':
@@ -202,7 +219,7 @@ class MyndFskr(SwedishLegalSource):
                 'rpubl:beslutsdatum':
                 ['(?:har beslutats|beslutade|beslutat) den (\d+ \w+ \d{4})'],
                 'rpubl:beslutadAv':
-                ['\n([A-ZÅÄÖ][\w ]+?)\d? (?:meddelar|lämnar|föreskriver)',
+                ['\n\s*([A-ZÅÄÖ][\w ]+?)\d? (?:meddelar|lämnar|föreskriver|beslutar)',
                  '\s(?:meddelar|föreskriver) ([A-ZÅÄÖ][\w ]+?)\d?\s'],
                 'rpubl:bemyndigande':
                 [' ?(?:meddelar|föreskriver|Föreskrifterna meddelas|Föreskrifterna upphävs)\d?,? (?:följande |)med stöd av\s(.*?) ?(?:att|efter\ssamråd|dels|följande|i fråga om|och lämnar allmänna råd|och beslutar följande allmänna råd|\.\n)',
@@ -277,7 +294,7 @@ class MyndFskr(SwedishLegalSource):
             # Single required propery. If we find this, we're done
             if 'rpubl:ikrafttradandedatum' in props:
                 break
-
+            
         self.sanitize_metadata(props, doc)
         self.polish_metadata(props, doc)
         self.infer_triples(Describer(doc.meta, doc.uri), doc)
@@ -291,11 +308,12 @@ class MyndFskr(SwedishLegalSource):
         if 'dcterms:title' in props:
             if 'denna f\xf6rfattning har beslutats den' in props['dcterms:title']:
                 del props['dcterms:title']
-            elif "\nbeslutade den " in props['dcterms:title']:
+            elif ("\nbeslutade den " in props['dcterms:title'] or
+                  "; beslutade den " in props['dcterms:title']):
                 # sometimes the title isn't separated with two
                 # newlines from the rest of the text
                 props['dcterms:title'] = props[
-                    'dcterms:title'].split("\nbeslutade den ")[0]
+                    'dcterms:title'].split("beslutade den ")[0]
         if 'rpubl:bemyndigande' in props:
             props['rpubl:bemyndigande'] = props[
                 'rpubl:bemyndigande'].replace('\u2013', '-')
@@ -509,6 +527,52 @@ class AFS(MyndFskr):
     basefile_regex = None
     document_url_regex = ".*(afs|AFS)(?P<basefile>\d+_\d+)\.pdf$"
 
+    # This handles the case when pdftotext confuses the metadata in
+    # the right margin on the frontpage, eg:
+    #    Arbetsmiljöverkets föreskrifter om upphävande AFS 2014:44
+    #    Utkom från trycket
+    #    av föreskrifterna (AFS 2005:19) om förebyggande den 20 januari 2014
+    #    av allvarliga kemikalieolyckor;
+    # and converts it to
+    #    Arbetsmiljöverkets föreskrifter om upphävande
+    #    av föreskrifterna (AFS 2005:19) om förebyggande
+    #    av allvarliga kemikalieolyckor;
+    #
+    #    AFS 2014:44
+    #    Utkom från trycket
+    #    den 20 januari 2014
+    
+    def sanitize_text(self, text, basefile):
+        # 'afs/2014:39' -> 'AFS 2014:39'
+        probable_id = basefile.upper().replace("/", " ")
+        newtext = ""
+        margin = ""
+        inmargin = False
+        datematch = re.compile("den \d+ \w+ \d{4}$").search
+        for line in text.split("\n"):
+            newline = True
+            if line.endswith(probable_id) and not margin and len(line) > len(probable_id): # and possibly other sanity checks
+                inmargin = True
+                margin += probable_id + "\n"
+                newline = line[:line.index(probable_id)]
+            elif inmargin and line.endswith("Utkom från trycket"):
+                margin += "Utkom från trycket\n"
+                newline = line[:line.index("Utkom från trycket")]
+            elif inmargin and datematch(line):
+                m = datematch(line)
+                margin += m.group(0) + "\n"
+                newline = line[:m.start()]
+            elif inmargin and line == "":
+                inmargin = False
+                newline = "\n"+margin+"\n"
+            else:
+                newline = line
+            if newline:
+                if newline is True:
+                    newline = ""
+                newtext += newline + "\n"
+        return newtext
+    
     def download_sanitize_basefile(self, basefile):
         return super(AFS, self).download_sanitize_basefile(basefile.replace("_", ":"))
     
@@ -625,7 +689,13 @@ class ELSAKFS(MyndFskr):
             basefile = basefile.split("/")[1]
         return "http://www.elsakerhetsverket.se/globalassets/foreskrifter/elsak-fs-%s.pdf" % basefile.replace(":", "-")
 
+    # FIXME: The crappy webserver returns status code 200 when it
+    # really is a 404, eg
+    # "http://www.elsakerhetsverket.se/globalassets/foreskrifter/1998-1.pdf". We
+    # should handle this in download_single and not store error pages
+    # when we expected documents
 
+    
 class Ehalso(MyndFskr):
     alias = "ehalso"
     # Ehälsomyndigheten publicerar i TLVFS
@@ -970,6 +1040,7 @@ class SKVFS(MyndFskr):
         else:
             return html_downloaded
 
+
 class SOSFS(MyndFskr):
     alias = "sosfs"
     start_url = "http://www.socialstyrelsen.se/sosfs"
@@ -980,7 +1051,7 @@ class SOSFS(MyndFskr):
         if linktext:
             m = re.search("SOSFS\s+(\d+:\d+)", linktext)
             if m:
-                return m.group(1)
+                return self.download_sanitize_basefile(m.group(1))
 
     @decorators.downloadmax
     def download_get_basefiles(self, source):
@@ -998,12 +1069,11 @@ class SOSFS(MyndFskr):
             # on the front page. If it has any changes, only a type 2
             # link will be on the front page, but type 1 links will be
             # on that subsequent page.
-            if (txt.startswith("Grundförfattning") or
-                txt.startswith("Ändringsförfattning")):
+            if txt.startswith("Grundförfattning"):
                 # 1) links to HTML pages describing (and linking to) a
-                # base act, eg for SOSFS 2014:10 
+                # base act, eg for SOSFS 2014:10
                 # http://www.socialstyrelsen.se/publikationer2014/2014-10-12
-                yield("sosfs/"+basefile, link)
+                yield(basefile, link)
             elif txt.startswith("Konsoliderad"):
                 # 2) links to HTML pages containing a consolidated act
                 # (with links to type 1 base and change acts), eg for
@@ -1011,32 +1081,60 @@ class SOSFS(MyndFskr):
                 # http://www.socialstyrelsen.se/sosfs/2011-13 - fetch
                 # page, yield all type 1 links, also find basefile form
                 # element.text
-                konsfile = self.store.downloaded_path(basefile, attachment="konsolidering.html")
+                konsfile = self.store.downloaded_path(
+                    basefile, attachment="konsolidering.html")
                 if (self.config.refresh or (not os.path.exists(konsfile))):
                     soup = BeautifulSoup(self.session.get(link).text)
-                    self.log.debug("%s: Downloading all base/change acts" % basefile)
-                    linkhead = soup.find(text=re.compile("(Ladda ner eller beställ|Beställ eller ladda ner)"))
+                    self.log.debug("%s: Has had changes -- downloading base act and all changes" %
+                                   basefile)
+                    
+                    linkhead = soup.find(text=re.compile(
+                        "(Ladda ner eller beställ|Beställ eller ladda ner)"))
                     if linkhead:
                         for link_el in linkhead.find_parent("div").find_all("a"):
                             if '/publikationer' in link_el.get("href"):
                                 subbasefile = self._basefile_from_text(link_el.get_text())
                                 if subbasefile:
-                                    yield("sosfs/"+subbasefile,
+                                    yield(subbasefile,
                                           urljoin(link, link_el.get("href")))
                     else:
-                        self.log.warning("%s: Can't find links to base/change acts" % basefile)
+                        self.log.warning("%s: Can't find links to base/change"
+                                         " acts" % basefile)
                     # then save page itself as grundforf/konsoldering.html
-                    self.log.debug("%s: Downloading consolidated version" % basefile)
+                    self.log.debug("%s: Downloading consolidated version" %
+                                   basefile)
                     self.download_if_needed(link, basefile, filename=konsfile)
+            elif txt.startswith("Ändringsförfattning"):
+                if (self.config.refresh or (not os.path.exists(self.store.downloaded_path(basefile)))):
+                    self.log.debug("%s: Downloading updated consolidated version of base" % basefile)
+                    self.log.debug("%s:    first getting %s" % (basefile, link))
+                    soup = BeautifulSoup(self.session.get(link).text)
+                    konsbasefileregex = re.compile("Senaste version av SOSFS (?P<basefile>\d+:\d+)")
+                    konslinkel = soup.find("a", text=konsbasefileregex)
+                    if konslinkel:
+                        konsbasefile = self.download_sanitize_basefile(konsbasefileregex.search(konslinkel.text).group("basefile"))
+                        konsfile = self.store.downloaded_path(konsbasefile, attachment="konsolidering.html")
+                        konslink = urljoin(link, konslinkel.get("href"))
+                        self.log.debug("%s:    now downloading consolidated %s" % (konsbasefile, konslink))
+                        self.download_if_needed(konslink, basefile, filename=konsfile)
+                    else:
+                        self.log.warning("%s:    Couldn't find link to consolidated version" % basefile)
+                yield(basefile, link)
 
-    # FIXME: update documententry!
     def download_single(self, basefile, url):
-        resp = self.session.get(url)
+        # the url will be to a HTML landing page. We extract the link
+        # to the actual PDF file and then call default impl of
+        # download_single in order to update documententry. This'll
+        # mean that the orig_url is set to the PDF link, not this HTML
+        # landing page.
         soup = BeautifulSoup(self.session.get(url).text)
-        link_el = soup.find("a", text="Ladda ner")
-        link = urljoin(url, link_el.get("href"))
-        self.log.info("%s: Downloading from %s" % (basefile,link))
-        return self.download_if_needed(link, basefile)
+        link_el = soup.find("a", text=re.compile("^\s*Ladda ner\s*$"))
+        if link_el:
+            link = urljoin(url, link_el.get("href"))
+            return super(SOSFS, self).download_single(basefile, link)
+        else:
+            self.log.warning("%s: No link to PDF file found at %s" % (basefile, url))
+            return False
 
     def fwdtests(self):
         t = super(SOSFS, self).fwdtests()
@@ -1055,7 +1153,8 @@ class SOSFS(MyndFskr):
 
 class STAFS(MyndFskr):
     alias = "stafs"
-    start_url = "http://www.swedac.se/sv/Det-handlar-om-fortroende/Lagar-och-regler/Gallande-foreskrifter-i-nummerordning/"
+    start_url = ("http://www.swedac.se/sv/Det-handlar-om-fortroende/"
+                 "Lagar-och-regler/Gallande-foreskrifter-i-nummerordning/")
     basefile_regex = "^STAFS (?P<basefile>\d{4}:\d+)$"
     storage_policy = "dir"
     

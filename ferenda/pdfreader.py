@@ -110,6 +110,10 @@ class PDFReader(CompoundElement):
                   # parse and create pages.
             return
         self.log = logging.getLogger('pdfreader')
+        if not filename:
+            return  # another specialcase: create an empty object so
+                    # that we can call the ._tesseract in other
+                    # scenarios
         self.fontspec = fontspec or {}
         self.filename = filename
         self.workdir = workdir
@@ -179,7 +183,7 @@ class PDFReader(CompoundElement):
             os.unlink(convertedfile)
         return res
 
-    def _tesseract(self, tmppdffile, workdir, lang):
+    def _tesseract(self, tmppdffile, workdir, lang, hocr=True):
         root = os.path.splitext(os.path.basename(tmppdffile))[0]
 
         # step 1: find the number of pages
@@ -222,7 +226,9 @@ class PDFReader(CompoundElement):
         # Note that -psm 1 (automatic page segmentation with
         # orientation and script detection) requires the installation
         # of tesseract-ocr-3.01.osd.tar.gz
-        cmd = "tesseract %(workdir)s/%(root)s.tif %(workdir)s/%(root)s.hocr -l %(lang)s -psm 1 hocr" % locals()
+        usehocr = "hocr" if hocr else ""
+        suffix = ".hocr" if hocr else ""
+        cmd = "tesseract %(workdir)s/%(root)s.tif %(workdir)s/%(root)s%(suffix)s -l %(lang)s -psm 1 %(usehocr)s" % locals()
         self.log.debug("running " + cmd)
         (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
 
