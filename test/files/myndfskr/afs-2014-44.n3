@@ -1,0 +1,29 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rinfoex: <http://lagen.nu/terms#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xhv: <http://www.w3.org/1999/xhtml/vocab#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix xsi: <http://www.w3.org/2001/XMLSchema-instance> .
+
+<http://rinfo.lagrummet.se/publ/afs/2014:44> a rpubl:Myndighetsforeskrift ;
+    dcterms:identifier "AFS 2014:44" ;
+    dcterms:publisher <http://rinfo.lagrummet.se/org/arbetsmiljoverket> ;
+    dcterms:title "Arbetsmiljöverkets föreskrifter om upphävande av föreskrifterna (AFS 2005:19) om förebyggande av allvarliga kemikalieolyckor;"@sv ;
+    rpubl:arsutgava "2014" ;
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/1977:1166#P18> ;
+    rpubl:beslutadAv <http://rinfo.lagrummet.se/org/arbetsmiljoeverket> ;
+    rpubl:beslutsdatum "2014-12-18"^^xsd:date ;
+    rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/aafs> ;
+    rpubl:ikrafttradandedatum "2015-05-31"^^xsd:date ;
+    rpubl:lopnummer "44" ;
+    rpubl:upphaver <http://rinfo.lagrummet.se/publ/afs/2005:19> ;
+    rpubl:utkomFranTryck "2014-01-20"^^xsd:date .
+

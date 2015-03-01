@@ -56,8 +56,8 @@ class MyndFskr(SwedishLegalSource):
                            RPUBL.utkomFranTryck, PROV.wasGeneratedBy]
     sparql_annotations = None  # until we can speed things up
 
-    basefile_regex = re.compile('(?P<basefile>\d{4}[:/_-]\d+)(?:|\.\w+)$')
-    document_url_regex = re.compile('.*(?P<basefile>\d{4}[:/_-]\d+).pdf$')
+    basefile_regex = re.compile('(?P<basefile>\d{4}[:/_-]\d{1,3})(?:|\.\w+)$')
+    document_url_regex = re.compile('.*(?P<basefile>\d{4}[:/_-]\d{1,3}).pdf$')
     download_accept_404 = True  # because the occasional 404 is to be expected
 
     nextpage_regex = None
@@ -72,7 +72,13 @@ class MyndFskr(SwedishLegalSource):
         return [self.alias]
 
     def download_sanitize_basefile(self, basefile):
-        basefile = basefile.lower().replace(" ", "/")
+        segments = re.split('[/:_-]', basefile.lower())
+        # force "01" to "1" (and check integerity (not integrity))
+        segments[-1] = str(int(segments[-1]))
+        if len(segments) == 2:
+            basefile = "%s:%s" % tuple(segments)
+        elif len(segments) == 3:
+            basefile = "%s/%s:%s" % tuple(segments)
         if not any((basefile.startswith(fs+"/") for fs
                     in self.forfattningssamlingar())):
             return self.forfattningssamlingar()[0] + "/" + basefile
@@ -190,7 +196,8 @@ class MyndFskr(SwedishLegalSource):
             util.runcmd("pdftotext %s" % tmpfile, require_success=True)
             # check to see if the outfile actually contains any text. It
             # might just be a series of scanned images.
-            if not util.readfile(outfile).strip():
+            text = util.readfile(outfile)
+            if not text.strip():
                 os.unlink(outfile)
                 # OK, it's scanned images. We extract these, put them in a
                 # tif file, and OCR them with tesseract.
@@ -198,8 +205,15 @@ class MyndFskr(SwedishLegalSource):
                 p._tesseract(tmpfile, os.path.dirname(outfile), "swe", False)
                 tmptif = self.store.path(basefile, 'intermediate', '.tif')
                 util.robust_remove(tmptif)
+        text = util.readfile(outfile)
+        # if there's less than 50 chars on each page, chances are it's
+        # just watermarks or leftovers from the scanning toolchain,
+        # and that the real text is in non-OCR:ed images.
+        if len(text) / (text.count("\x0c")+1) < 50:
+            self.log.warning("%s: Extracted text from PDF is suspiciously short (%s bytes per page, %s total)" %
+                             (basefile, len(text) / text.count("\x0c")+1, len(text)))
         util.robust_remove(tmpfile)
-        text = self.sanitize_text(util.readfile(outfile), basefile)
+        text = self.sanitize_text(text, basefile)
         return TextReader(string=text, encoding=self.source_encoding,
                           linesep=TextReader.UNIX)
 
@@ -217,7 +231,8 @@ class MyndFskr(SwedishLegalSource):
                 'rpubl:omtryckAv': ['^(Omtryck)$'],
                 'rpubl:genomforDirektiv': ['Celex (3\d{2,4}\w\d{4})'],
                 'rpubl:beslutsdatum':
-                ['(?:har beslutats|beslutade|beslutat) den (\d+ \w+ \d{4})'],
+                ['(?:har beslutats|beslutade|beslutat) den (\d+ \w+ \d{4})',
+                 'Beslutade av (?:[A-ZÅÄÖ][\w ]+) den (\d+ \w+ \d{4}).'],
                 'rpubl:beslutadAv':
                 ['\n\s*([A-ZÅÄÖ][\w ]+?)\d? (?:meddelar|lämnar|föreskriver|beslutar)',
                  '\s(?:meddelar|föreskriver) ([A-ZÅÄÖ][\w ]+?)\d?\s'],
@@ -260,8 +275,11 @@ class MyndFskr(SwedishLegalSource):
             # Single required propery. If we find this, we're done
             if 'rpubl:beslutsdatum' in props:
                 break
-            self.log.warning("%s: Couldn't find required props on page %s" %
+            self.log.debug("%s: Couldn't find required props on page %s" %
                              (doc.basefile, pagecount))
+
+        if 'rpubl:beslutsdatum' not in props:
+            raise errors.ParseError("%s: Couldn't find required properties on any page, giving up" % doc.basefile)
 
         # 2. Find some of the properties on the last 'real' page (not
         #    counting appendicies)
@@ -338,9 +356,11 @@ class MyndFskr(SwedishLegalSource):
             (pub, year, ordinal) = re.split('[ :]',
                                             props['dcterms:identifier'])
         else:
-            # simple inference from basefile
-            (pub, year, ordinal) = re.split('[ :]',
-                                            props['dcterms:identifier'])
+            # do a a simple inference from basefile and populate props
+            (pub, year, ordinal) = re.split('[/:_]', doc.basefile.upper())
+            props['dcterms:identifier'] = "%s %s:%s" % (pub, year, ordinal)
+            self.log.warning("%s: Couldn't find dcterms:identifier, inferred %s from basefile" %
+                             (doc.basefile, props['dcterms:identifier']))
         uri = makeurl({'type': LegalRef.FORESKRIFTER,
                        'publikation': pub,
                        'artal': year,
@@ -361,7 +381,6 @@ class MyndFskr(SwedishLegalSource):
         desc.value(RPUBL.arsutgava, year)
         desc.value(RPUBL.lopnummer, ordinal)
         desc.value(DCTERMS.identifier, props['dcterms:identifier'])
-
         if 'rpubl:beslutadAv' in props:
             desc.rel(RPUBL.beslutadAv,
                      self.lookup_resource(props['rpubl:beslutadAv']))
@@ -376,9 +395,21 @@ class MyndFskr(SwedishLegalSource):
 
             if re.search('^(Föreskrifter|[\w ]+s föreskrifter) om ändring i ',
                          props['dcterms:title'], re.UNICODE):
-                orig = re.search('([A-ZÅÄÖ-]+FS \d{4}:\d+)',
-                                 props['dcterms:title']).group(0)
-                (publication, year, ordinal) = re.split('[ :]', orig)
+                # There should be something like FOOFS 2013:42 (or
+                # possibly just 2013:42) in the title
+                m = re.search('([A-ZÅÄÖ-]+FS |)\d{4}:\d+',
+                              props['dcterms:title'])
+                if not m:
+                    raise errors.ParseError("%s: Couldn't find reference to change act in title %r" %
+                                            (doc.basefile, props['dcterms:title']))
+                orig = m.group(0)
+                if " " in orig:
+                    (publication, year, ordinal) = re.split('[ :]', orig)
+                else:
+                    # No FS given for the base act, assume that it's
+                    # the same as this change act
+                    (year, ordinal) = re.split('[ :]', orig)
+                    pub = props['dcterms:identifier'].split(" ")[0]
                 origuri = makeurl({'type': LegalRef.FORESKRIFTER,
                                    'publikation': pub,
                                    'artal': year,
@@ -474,6 +505,8 @@ class MyndFskr(SwedishLegalSource):
 
         # A fairly involved way of filtering out all control
         # characters from a string
+
+        # FIXME: should go in sanitize_text
         import unicodedata
         if six.PY3:
             all_chars = (chr(i) for i in range(0x10000))
@@ -590,6 +623,8 @@ class DIFS(MyndFskr):
     alias = "difs"
     start_url = "http://www.datainspektionen.se/lagar-och-regler/datainspektionens-foreskrifter/"
     
+    # def sanitize_text(self, text, basefile):
+
 
 class DVFS(MyndFskr):
     alias = "dvfs"
@@ -781,7 +816,11 @@ class FFFS(MyndFskr):
 class FFS(MyndFskr):
     alias = "ffs"
     start_url = "http://www.forsvarsmakten.se/sv/om-myndigheten/dokument/lagrum"
-
+    # FIXME: document_url_regex should match
+    #   http://www.forsvarsmakten.se/siteassets/4-om-myndigheten/dokumentfiler/lagrum/gallande-ffs-1995-2011/ffs-2010-8.pdf
+    #   http://www.forsvarsmakten.se/siteassets/4-om-myndigheten/dokumentfiler/lagrum/gallande-ffs-1995-2011/ffs2010-10.pdf
+    # but not 
+    #   http://www.forsvarsmakten.se/siteassets/4-om-myndigheten/dokumentfiler/lagrum/gallande-fib/fib2001-4.pdf
 
 class FMI(MyndFskr):
     alias = "fmi"
@@ -912,7 +951,6 @@ class RAFS(MyndFskr):
 
 
 class RGKFS(MyndFskr):
-    # (id vs länk)
     alias = "rgkfs"
     start_url = "https://www.riksgalden.se/sv/omriksgalden/Pressrum/publicerat/Foreskrifter/"
 
@@ -962,7 +1000,8 @@ class SJVFS(MyndFskr):
 class SKVFS(MyndFskr):
     alias = "skvfs"
     source_encoding = "utf-8"
-    downloaded_suffix = ".pdf"
+    storage_policy = "dir"
+    downloaded_suffix = ".html"
 
     # start_url = "http://www.skatteverket.se/rattsinformation/foreskrifter/tidigarear.4.1cf57160116817b976680001670.html"
     # This url contains slightly more (older) links (and a different layout)?
@@ -971,69 +1010,52 @@ class SKVFS(MyndFskr):
     # also consolidated versions
     # http://www.skatteverket.se/rattsinformation/lagrummet/foreskrifterkonsoliderade/aldrear.4.19b9f599116a9e8ef3680004242.html
 
+    def forfattningssamlingar(self):
+        return ["skvfs", "rsfs"]
+    
     # URL's are highly unpredictable. We must find the URL for every
     # resource we want to download, we cannot transform the resource
     # id into a URL
-    def download(self, basefile=None):
-        self.log.info("Starting at %s" % self.start_url)
-        years = {}
-        self.session = requests.session()
-        soup = BeautifulSoup(self.session.get(self.start_url).text)
-        for link in sorted(list(soup.find_all("a", text=re.compile('^\d{4}$'))),
-                           key=attrgetter('text')):
-            year = int(link.text)
-            # Documents for the years 1985-2003 are all on one page
-            # (with links leading to different anchors). To avoid
-            # re-downloading stuff when usecache=False, make sure we
-            # haven't seen this url (sans fragment) before
-            url = link.absolute_url.split("#")[0]
-            if year not in years and url not in list(years.values()):
-                self.download_year(year, url)
-                years[year] = url
+    @decorators.recordlastdownload
+    def download_get_basefiles(self, source):
+        startyear = str(self.config.lastdownload.year) if 'lastdownload' in self.config and not self.config.refresh else "0"
 
-    # just download the most recent year
-    def download_new(self):
-        self.log.info("Starting at %s" % self.start_url)
-        soup = BeautifulSoup(self.session.get(self.start_url).text)
-        link = sorted(list(soup.find_all("a", text=re.compile('^\d{4}$'))),
-                      key=attrgetter('text'), reverse=True)[0]
-        self.download_year(int(link.text), link.absolute_url, usecache=True)
-
-    def download_year(self, year, url):
-        self.log.info("Downloading year %s from %s" % (year, url))
-        soup = BeautifulSoup(self.session.get(self.start_url).text)
-        for link in soup.find_all("a", text=re.compile('FS \d+:\d+')):
-            if "bilaga" in link.text:
-                self.log.warning("Skipping attachment in %s" % link.text)
+        for (element, attribute, link, pos) in source:
+            if not attribute == "href" or not element.text or not re.match('\d{4}', element.text):
                 continue
-
-            # sanitize trailing junk
-            linktext = re.match("\w+FS \d+:\d+", link.text).group(0)
-            # something like skvfs/2010/23 or rsfs/1996/9
-            basefile = linktext.strip(
-            ).lower().replace(" ", "/").replace(":", "/")
-            self.download_single(
-                basefile, link.absolute_url)
+            year = element.text
+            if year >= startyear:   # string comparison is ok in this case
+                self.log.debug("SKVFS: Downloading year %s from %s" % (year, link))
+                resp = self.session.get(link)
+                tree = lxml.html.document_fromstring(resp.text)
+                tree.make_links_absolute(link, resolve_base_href=True)
+                for (docelement, docattribute, doclink, docpos) in tree.iterlinks():
+                    if not docelement.text or not re.match('\w+FS \d+:\d+', docelement.text):
+                        continue
+                    linktext = re.match("\w+FS \d+:\d+", docelement.text).group(0)
+                    basefile = self.download_sanitize_basefile(linktext.replace(" ", "/"))
+                    if "bilaga" in element.text:
+                        self.log.warning("%s: Skipping attachment in %s" % (basefile, element.text))
+                        continue
+                    yield(basefile, doclink)
 
     def download_single(self, basefile, url):
-        self.log.info("Downloading %s from %s" % (basefile, url))
-        self.document_url = url + "#%s"
-        html_downloaded = super(
-            SKVFS, self).download_single(basefile)
-        year = int(basefile.split("/")[1])
-        if year >= 2007:  # download pdf as well
-            filename = self.store.downloaded_path(basefile)
-            pdffilename = os.path.splitext(filename)[0] + ".pdf"
-            if not os.path.exists(pdffilename):
-                soup = self.soup_from_basefile(basefile)
-                pdflink = soup.find(href=re.compile('\.pdf$'))
-                if not pdflink:
-                    self.log.debug("No PDF file could be found")
-                    return html_downloaded
-                pdftext = pdflink.get_text(strip=True)
-                pdfurl = urljoin(url, pdflink['href'])
-                self.log.debug("Found %s at %s" % (pdftext, pdfurl))
-                pdf_downloaded = self.download_if_needed(pdfurl, pdffilename)
+        # The HTML version is the one we always can count on being
+        # present. The PDF version exists for acts 2007 or
+        # later. Treat the HTML version as the main version and the
+        # eventual PDF as an attachment
+        # this also updates the docentry
+        html_downloaded = super(SKVFS, self).download_single(basefile, url)
+        # try to find link to a PDF in what was just downloaded
+        soup = BeautifulSoup(util.readfile(self.store.downloaded_path(basefile)))
+        pdffilename = self.store.downloaded_path(basefile,
+                                                 attachment="index.pdf")
+        if (self.config.refresh or not(os.path.exists(pdffilename))):
+            pdflinkel = soup.find(href=re.compile('\.pdf$'))
+            if pdflinkel:
+                pdflink = urljoin(url, pdflinkel.get("href"))
+                self.log.debug("%s: Found PDF at %s" % (basefile, pdflink))
+                pdf_downloaded = self.download_if_needed(pdflink, basefile, filename=pdffilename)
                 return html_downloaded and pdf_downloaded
             else:
                 return False
@@ -1144,10 +1166,13 @@ class SOSFS(MyndFskr):
     def parse_metadata_from_textreader(self, reader, doc):
         # cue past the first cover pages until we find the first real page
         page = 1
-        while "Ansvarig utgivare" not in reader.peekchunk('\f'):
-            self.log.debug("%s: Skipping cover page %s" % (doc.basefile, page))
-            reader.readpage()
-            page += 1
+        try:
+            while "Ansvarig utgivare" not in reader.peekchunk('\f'):
+                self.log.debug("%s: Skipping cover page %s" % (doc.basefile, page))
+                reader.readpage()
+                page += 1
+        except IOError:   # read past end of file
+            raise errors.ParseError("%s: Could not find a proper first page" % doc.basefile)
         return super(SOSFS, self).parse_metadata_from_textreader(reader, doc)
 
 
@@ -1158,53 +1183,50 @@ class STAFS(MyndFskr):
     basefile_regex = "^STAFS (?P<basefile>\d{4}:\d+)$"
     storage_policy = "dir"
     
-    re_identifier = re.compile('STAFS (\d{4})[:/_-](\d+)')
+    re_identifier = re.compile('STAFS (\d{4}[:/_-]\d+)')
 
     def download_single(self, basefile, mainurl):
-        self.log.info("%s: %s" % (basefile, mainurl))
         consolidated_link = None
-        newest = None
-        soup = BeautifulSoup(self.session.get(mainurl).text)
-        for link in soup.find_all("a", text=self.re_identifier):
-            url = urljoin(mainurl, link.get("href"))
-            self.log.info("   %s: %s %s" % (basefile, link.text, url))
-            if "konso" in link.text:
-                consolidated_link = url
-            else:
-                m = self.re_identifier.search(link.text)
-                assert m
-                if url.endswith(".pdf"):
-                    basefile = m.group(1) + ":" + m.group(2)
-                    filename = self.store.downloaded_path(basefile)
-                    self.log.info("        Downloading to %s" % filename)
-                    self.download_if_needed(url, filename)
-                    if basefile > newest:
-                        self.log.debug(
-                            "%s larger than %s" % (basefile, newest))
-                        consolidated_basefile = basefile + \
-                            "/konsoliderad/" + basefile
-                        newest = basefile
-                    else:
-                        self.log.debug(
-                            "%s not larger than %s" % (basefile, newest))
+        self.log.debug("%s: Downloading from %s" % (basefile, mainurl))
+        try:
+            soup = BeautifulSoup(self.session.get(mainurl).text)
+            for linkel in soup.find_all("a", text=self.re_identifier):
+                url = urljoin(mainurl, linkel.get("href"))
+                if "konso" in linkel.text:
+                    consolidated_link = url
                 else:
-                    # not pdf - link to yet another pg
-                    subsoup = BeautifulSoup(self.session.get(link).text)
-                    for sublink in soup.find_all("a", text=self.re_identifier):
-                        self.log.info("   Sub %s: %s %s" %
-                                      (basefile, sublink.text, sublink['href']))
-                        m = self.re_identifier.search(sublink.text)
-                        assert m
-                        suburl = urljoin(url, sublink.get("href"))
-                        if suburl.endswith(".pdf"):
-                            subbasefile = m.group(1) + ":" + m.group(2)
-                            self.download_if_needed(suburl, subbasefile)
+                    m = self.re_identifier.search(linkel.text)
+                    assert m
+                    if url.endswith(".pdf"):
+                        newbasefile = self.download_sanitize_basefile(m.group(1))
+                        if basefile != newbasefile:
+                            # incorrectly labeled file -- no way of knowing which label is correct
+                            self.log.warning("Expected %s but got %s, skipping this" % (basefile, newbasefile))
+                            continue
+                        self.log.debug("%s:    Downloading directly from %s" % (basefile, url))
+                        self.download_if_needed(url, basefile)
+                    else:
+                        # not pdf - link to yet another pg
+                        self.log.debug("%s:    Fetching landing page %s" % (basefile, url))
+                        subsoup = BeautifulSoup(self.session.get(url).text)
+                        for sublink in soup.find_all("a", text=self.re_identifier):
+                            m = self.re_identifier.search(sublink.text)
+                            assert m
+                            suburl = urljoin(url, sublink.get("href"))
+                            if suburl.endswith(".pdf"):
+                                subbasefile = self.download_sanitize_basefile(m.group(1))
+                                self.log.debug("%s:    Downloading change %s from %s" %
+                                              (basefile, subbasefile, suburl))
+                                self.download_if_needed(suburl, subbasefile)
 
-        if consolidated_link:
-            filename = self.store.downloaded_path(consolidated_basefile)
-            self.log.info("        Downloading consd to %s" % filename)
-            self.download_if_needed(
-                consolidated_link, consolidated_basefile, filename=filename)
+            if consolidated_link:
+                filename = self.store.downloaded_path(basefile, attachment="consolidated.pdf")
+                self.log.debug("%s:    Downloading consolidated  to %s" % (basefile, filename))
+                self.download_if_needed(
+                    consolidated_link, basefile, filename=filename)
+            self.log.info("%s: Downloaded from %s" % (basefile, mainurl))
+        except requests.exceptions.ConnectionError as e:
+            self.log.error("%s: Failure fetching %s (or some sub-URL): %s" % (basefile, mainurl, e))
 
 
 class STFS(MyndFskr):

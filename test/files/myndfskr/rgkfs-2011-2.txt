@@ -1,0 +1,586 @@
+Riksgäldskontorets författningssamling
+Utgivare: chefsjuristen Charlotte Rydin, Riksgäldskontoret, 103 74 Stockholm
+ISSN 1403-9346
+
+Riksgäldskontorets föreskrifter om instituts skyldighet att
+lämna uppgifter om insättare och deras insättningar;
+
+RGKFS 2011:2
+
+Utkom från trycket
+den 29 december 2011
+
+Beslutade av Riksgäldskontoret den 14 december 2011.
+Riksgäldskontoret föreskriver följande med stöd av 3 § förordningen
+(2011:834) om insättningsgaranti.
+
+Föreskrifternas tillämpningsområde
+1 §  Dessa föreskrifter gäller för sådana institut som omfattas av insättningsgarantin enligt lagen (1995:1571) om insättningsgaranti. Föreskrifterna gäller vissa uppgifter om insättare och deras insättningar som dessa institut ska
+lämna till Riksgäldskontoret.
+
+Definitioner
+2 §  De definitioner som anges i 2 § lagen (1995:1571) om insättningsgaranti ska ha samma betydelse i dessa föreskrifter. Därutöver avses i dessa
+föreskrifter med
+1. arbetsdag: dag som inte är allmän helgdag, lördag, midsommarafton,
+julafton eller nyårsafton.
+2. dag 1: dagen för ersättningsrättens inträde enligt 8 § lagen om insättningsgaranti,
+3. dag 4: den arbetsdag som infaller tre arbetsdagar efter dag 1,
+4. informationsfilerna: de elektroniska filer med information om insättare
+och deras insättningar som anges i 6–7 §§,
+5. transaktionsfil 1: den transaktionsfil som ska sändas vid den tidpunkt
+som anges i 8 § 1, och
+6. transaktionsfil 2: den transaktionsfil som ska sändas vid den tidpunkt
+som anges i 8 § 2.
+
+Informationsskyldigheten
+3 §  Ett institut som tar emot insättningar ska vid var tidpunkt ha förmåga att
+sända informationsfilerna elektroniskt till Riksgäldskontoret i enlighet med
+dessa föreskrifter. Informationsfilerna ska sändas till Riksgäldskontoret vid
+de tidpunkter som anges i 8–9 §§.
+4 §  Informationsfilerna ska sändas till Riksgäldskontoret i arkiverad och
+komprimerad form enligt vad som närmare anges i dessa föreskrifter. Infor1
+
+RGKFS 2011:2
+
+mationsfilerna ska vidare vara krypterade och försedda med elektronisk signatur på det sätt som anges i dessa föreskrifter.
+5 §  Om ett institut har försatts i konkurs, gäller uppgiftsskyldigheten i dessa
+föreskrifter även för institutets konkursförvaltare.
+Beskrivning av informationsfilerna
+6 §  Informationsfilerna utgörs av en kundfil, en kontofil, en kontofördelningsfil samt transaktionsfilerna (transaktionsfil 1 och transaktionsfil 2).
+Informationsfilerna ska ha det format och den tekniska utformning som anges
+i bilagan till dessa föreskrifter.
+7 §  Informationsfilerna ska ha följande innehåll:
+1. Kundfilen ska innehålla en förteckning över samtliga insättare i institutet.
+2. Kontofilen ska innehålla en förteckning över samtliga konton som institutet tillhandahåller och som omfattas av insättningsgarantin.
+3. Kontofördelningsfilen ska innehålla information om ägarförhållandet
+för samtliga konton som finns med i kontofilen.
+4. Transaktionsfilerna ska innehålla information om alla transaktioner som
+berör de konton som finns i kontofilen.
+Informationen i kundfilen, kontofilen, kontofördelningsfilen och transaktionsfil 1 ska avse förhållandena vid slutet av dag 1. Informationen i transaktionsfil 2 ska avse förhållandena vid slutet av dag 4, för transaktioner som har
+påbörjats senast dag 1.
+Informationsfilerna ska ha det närmare innehåll och den struktur som anges
+i bilagan till dessa föreskrifter.
+
+Tidpunkt för sändande av informationsfilerna
+8 §  Ett institut ska i händelse av ett ersättningsfall sända informationsfilerna
+i enlighet med 15 § till Riksgäldskontoret vid följande tidpunkter:
+1. Kundfilen, kontofilen, kontofördelningsfilen och transaktionsfil 1 ska
+sändas senast den arbetsdag som inträffar närmast efter dag 1.
+2. Transaktionsfil 2 ska sändas senast den arbetsdag som inträffar närmast
+efter dag 4.
+Om det finns särskilda skäl får Riksgäldskontoret medge att informationsfilerna sänds en arbetsdag senare än den dag som anges i 1 respektive 2.
+9 §  Ett institut ska även sända informationsfilerna till Riksgäldskontoret på
+Riksgäldskontorets begäran. Informationsfilerna ska då sändas inom de tidfrister som anges i 8 §. Dagen för Riksgäldskontorets begäran ska då räknas
+som dag 1, om inte Riksgäldskontoret meddelar annat.
+Arkivering och komprimering av informationsfilerna
+10 §  Informationsfilerna ska arkiveras och komprimeras enligt de krav som
+anges i bilagan till dessa föreskrifter.
+2
+
+Kryptering och signering av informationsfilerna
+
+RGKFS 2011:2
+
+11 §  De komprimerade informationsfilerna ska krypteras och förses med
+elektronisk signatur. Krypteringen och signeringen ska uppfylla de krav som
+anges i bilagan till dessa föreskrifter.
+12 §  Vid kryptering och signering ska institutet använda de certifikat som
+Riksgäldskontoret eller tredje man utsedd av Riksgäldskontoret, sänder till
+institutet. Krypteringen ska göras med Riksgäldskontorets publika certifikat
+och signeringen ska göras med institutets privata certifikat.
+13 §  För att erhålla det privata certifikatet ska institutet skicka in en skriftlig
+ansökan till Riksgäldskontoret. När institutets ansökan har godkänts av Riksgäldskontoret erhåller institutet även Riksgäldskontorets publika certifikat.
+Institutet ska vid var tidpunkt ha ett giltigt privat certifikat så att institutet
+kan uppfylla sina skyldigheter enligt 3 §. Institutet ska senast tre månader
+före utgången av det privata certifikatets giltighetsperiod ansöka om ett nytt
+certifikat. Om Riksgäldskontorets publika certifikat byts ut ansvarar Riksgäldskontoret för att skicka ut det nya certifikatet till institutet.
+14 §  När institutet ansöker enligt 13 § ska institutet ange en eller flera, dock
+maximalt fem, unika IP-adresser (internetprotokoll-adress) till Riksgäldskontoret. Endast dessa IP-adresser kan användas som avsändare när informationsfilerna sänds till Riksgäldskontoret. Om institutet önskar ändra någon
+av dessa IP-adresser, ska institutet i god tid innan förändringen skriftligen
+anmäla detta till Riksgäldskontoret.
+IP-adresserna ska ha det tekniska format som anges i bilagan till dessa
+föreskrifter.
+
+Sändande av informationsfilerna till Riksgäldskontoret
+15 §  Informationsfilerna ska sändas elektroniskt till Riksgäldskontoret via
+den webbadress som anges av Riksgäldskontoret.
+Informationsfilerna får endast sändas till Riksgäldskontoret i samband med
+ett ersättningsfall enligt 8 § eller efter Riksgäldskontorets begäran enligt 9 §.
+
+Dispens
+16 §  Riksgäldskontoret får besluta om dispens från kraven enligt dessa
+föreskrifter om det finns synnerliga skäl. Ett institut som önskar sådan dispens ska ansöka om detta skriftligen.
+Riksgäldskontoret får förena beslut om dispens med särskilda villkor för
+hur institut som omfattas av dispensen ska lämna information om insättare
+och deras insättningar.
+
+3
+
+RGKFS 2011:2
+
+Dessa föreskrifter träder ikraft den 1 februari 2012.
+På Riksgäldskontorets vägnar
+BO LUNDGREN
+	
+
+4
+
+Magnus Thor
+
+RGKFS 2011:2
+
+Bilaga
+Informationsfilernas format och tekniska utformning
+  Informationsfilerna ska vara textfiler som skapas i ett flatfilsformat med
+teckenuppsättningen Windows-1252. Filnamnen ska vara ”kund.txt” för
+kundfilen, ”konto.txt” för kontofilen, ”kontofordelning.txt” för kontofördelningsfilen samt ”transaktion.txt” för transaktionsfilerna.
+I filerna ska varje rad separeras med radbrytning (CR-LF). Radbrytning
+får endast användas mellan varje rad. Radbrytning får inte användas efter den
+sista raden.
+Varje kolumn ska separeras med ett s.k. pipe-tecken (”|”, byte kod 0x7c).
+Pipe-tecken får endast användas mellan varje kolumn. Pipe-tecken får inte
+användas efter den sista kolumnen.
+Det ska alltid finnas ett pipe-tecken som separerar varje kolumn, även när
+värdet i en viss kolumn är tomt.
+Första raden i filerna ska alltid innehålla namnen på respektive kolumn.
+Informationsfilernas innehåll och struktur
+Informationsfilerna ska ha det innehåll och den struktur som framgår av tabellerna nedan.
+Tabell 1  Kundfilen
+Kolumnnamn
+
+Beskrivning
+
+Antal tecken
+
+Dataformat
+
+Kundnummer
+
+Ett unikt nummer för insättaren.
+
+Maximalt 50 tecken
+
+Alfanumeriska tecken inom
+Windows-1252.
+
+Namn
+
+Samtliga namn (för fysiska
+personer) eller fullständig
+firma (för juridiska personer)
+på insättaren. Namnen ska
+skiljas med mellanslag.
+
+Maximalt 150
+tecken
+
+För insättare som är svenska
+privatpersoner ska fältet
+innehålla personnummer.
+
+Maximalt 50 tecken
+
+Får ej vara tomt.
+
+PersonOrgNummer
+
+För insättare som är svensk
+juridisk person ska organisationsnummer användas.
+
+Alfanumeriska tecken inom
+Windows-1252.
+Får ej vara tomt.
+För personnummer ska 12 numeriska tecken användas, enligt
+ÅÅÅÅMMDDNNNN.
+För organisationsnummer ska
+10 numeriska tecken användas.
+För utländska insättare får anges ett
+globalt referensnummer. Detta ska
+börja med tecknen ”REF” och kan
+sedan innehålla maximalt 47 alfanumeriska tecken.
+
+5
+
+RGKFS 2011:2
+Kolumnnamn
+
+Beskrivning
+
+Antal tecken
+
+För utländska insättare kan
+ett s.k. globalt referensnummer användas om sådant
+finns.
+Utdelningsadress
+
+Utdelningsadressen till
+insättaren.
+
+Dataformat
+Utländska insättare får ha ett tomt
+värde här om både person-/org.nummer och ett globalt referensnummer
+saknas.
+
+Maximalt 250
+tecken
+
+Alfanumeriska tecken inom
+Windows-1252.
+Får vara tomt.
+
+Postnummer
+
+Postnummer till insättaren.
+
+Maximalt 250
+tecken
+
+Alfanumeriska tecken inom
+Windows-1252.
+Får vara tomt.
+
+Ort
+
+Postort till insättaren.
+
+Maximalt 250
+tecken
+
+Alfanumeriska tecken inom
+Windows-1252.
+Får vara tomt.
+
+Postland
+
+Land till insättaren. Anges
+bara om annat land än Sverige.
+
+Maximalt 250
+tecken
+
+Landskod
+
+ISO-koden för landet som
+insättaren är registrerad i.
+
+2 tecken
+
+C/O-namn om sådant finns.
+
+Maximalt 250
+tecken
+
+CONamn
+
+Alfanumeriska tecken inom
+Windows-1252.
+Får vara tomt.
+Landskod enligt ISO 3166-1.
+Får ej vara tomt.
+Alfanumeriska tecken inom
+Windows-1252.
+Får vara tomt.
+
+TIN
+
+Tax Identification Number.
+Skatteregistreringsnummer
+för insättare som är skattepliktiga i utlandet.
+
+Maximalt 100
+tecken
+
+Alfanumeriska tecken inom
+Windows-1252.
+
+Kolumnnamn
+
+Beskrivning
+
+Antal tecken
+
+Dataformat
+
+Kontonummer
+
+Kontots nummer. Kontonumret ska vara unikt.
+
+Maximalt 50 tecken.
+
+Numeriska eller ickenumeriska
+tecken.
+
+Får vara tomt för insättare som är
+skattepliktiga i Sverige.
+
+Tabell 2 	Kontofilen
+
+Om clearingnummer finns så ska det
+anges tillsammans med kontonumret
+utan extra tecken.
+Får ej vara tomt.
+Valuta
+
+6
+
+Valutakod enligt ISO 4217.
+
+3 tecken
+
+Treställig valutakod enligt ISO 4217.
+Får ej vara tomt.
+
+RGKFS 2011:2
+Kolumnnamn
+
+Beskrivning
+
+Antal tecken
+
+Dataformat
+
+Kapital
+
+Det saldo som finns bokfört
+på kontot. Anges i den valuta
+som kontot är i. Ska inte
+innehålla upplupen ränta.
+
+Maximalt 26 tecken
+
+Decimaltal med komma (,) som decimalavskiljare. Kan innehålla värden
+från -2^63 till 2^63 med en precision
+på 1/10000.
+Får ej vara tomt.
+
+UpplupenRänta
+
+Den upplupna räntan fram
+till den dag då ersättningsrätt
+inträder.
+
+Maximalt 26 tecken
+
+Decimaltal med komma (,) som decimalavskiljare. Kan innehålla värden
+från -2^63 till 2^63 med en precision
+på 1/10000.
+
+Pantsatt
+
+”Ja” om kontot är pantsatt,
+”Nej” om konton inte är
+pantsatt.
+
+Maximalt 3 tecken
+
+”Ja” om kontot är spärrat för
+utbetalning till kontohavaren
+och ”Nej” om konton inte är
+spärrat.
+
+Maximalt 3 tecken
+
+Får ej vara tomt.
+
+Spärrat
+
+”Ja” eller ”Nej”.
+Får ej vara tomt.
+”Ja” eller ”Nej”.
+Får ej vara tomt.
+
+Tabell 3  Kontofördelningsfilen
+Kolumnnamn
+
+Beskrivning
+
+Antal tecken
+
+Dataformat
+
+Kontonummer
+
+Används för koppling mellan
+konton och insättare.
+
+Maximalt 50 tecken
+
+Ska matcha kontonummer i kontofilen.
+
+Kundnummer
+
+Används för koppling mellan
+konton och insättare.
+
+Maximalt 50 tecken
+
+Får ej vara tomt.
+Ska matcha kundnummer i kundfilen.
+Får ej vara tomt.
+KundensAndel
+
+Andel i decimalform där 1 är
+högst och 0,0001 är lägst.
+
+Maximalt 6 tecken
+
+Anges med fyra decimalers noggrannhet.
+Får ej vara tomt.
+
+Samma kundnummer och kontonummer får förekomma flera gånger i kontofördelningsfilen, men kombinationer av kundnummer och kontonummer ska
+vara unika.
+
+7
+
+RGKFS 2011:2
+Tabell 4  Transaktionsfilen
+Kolumnnamn
+
+Beskrivning
+
+Antal tecken
+
+Dataformat
+
+Kontonummer
+
+Används för koppling mellan
+transaktioner och konto.
+
+Maximalt 50 tecken
+
+Ska matcha kontonummer i kontofilen.
+
+Transaktionsdatum
+
+Datum och tidpunkt för
+transaktionen.
+
+Maximalt 20 tecken
+
+Bokföringsdatum
+
+Datum och tidpunkt för
+bokföringen.
+
+Maximalt 20 tecken
+
+Får ej vara tomt.
+Anges i formatet: ”ÅÅÅÅ-MM-DD
+TT:MM:SS”.
+Får ej vara tomt.
+Anges i formatet: ”ÅÅÅÅ-MM-DD
+TT:MM:SS”.
+Ska vara tomt i första filen.
+Får ej vara tomt i andra filen.
+Referens
+
+Belopp
+
+Vem som är transaktionens
+betalningsavsändare eller
+betalningsmottagare.
+
+Maximalt 50 tecken
+
+Belopp på transaktionen.
+
+Maximalt 26 tecken
+
+Alfanumeriska tecken inom Windows-1252.
+Får vara tomt
+Ska vara i samma valuta som kontot
+avser.
+Decimaltal med komma (,) som decimalavskiljare. Kan innehålla värden
+från -2^63 till 2^63 med en precision
+på 1/10000.
+Får ej vara tomt.
+
+Transaktionsfil 1 ska visa transaktioner som vid slutet av dag 1 är registrerade men inte bokförda på de konton som finns i kontofilen.
+Transaktionsfil 2 ska visa de transaktioner som faktiskt bokförts på de konton som finns i kontofilen från och med dag 2 till och med dag 4, och som
+avser tiden fram till och med dag 1.
+Arkivering och komprimering av informationsfilerna
+  Informationsfilerna ska arkiveras och komprimeras till ett s.k. 7z-arkiv
+med programvaran 7-zip. Filformatet för 7z-arkivet ska följa specifikationen
+i källkoden till 7-zip.
+Kryptering och signering av informationsfilerna
+
+8
+
+  Det komprimerade arkivet ska krypteras och signeras med programvaran
+GnuPG/gpgsm, OpenSSL eller annan programvara som är kompatibel med
+följande krav:
+1. Kryptering ska ske med krypteringsalgoritmen AES256.
+2. Signering ska ske med hashalgoritmen SHA512.
+3. Meddelandeformatet ska följa CMS (RFC5652).
+
+4. Anonyma metoder för nyckelutbyte får inte användas.
+5. Minsta tillåtna längd på kryptografiska nycklar för asymmetriska algoritmer är 2048 bitar.
+6. Väl kända och granskade implementeringar av kryptografiska programvaror ska användas.
+7. Det kryptografiska systemet ska ha skydd mot angrepp såsom (i) att
+någon ställer sig som mellanhand mellan server och klient och på så sätt obehörigen tar del av information (s.k. man-in-the-middle), (ii) repetition och
+(iii) fördröjningsattacker.
+
+RGKFS 2011:2
+
+Tekniska krav på institutets unika IP-adress
+  Den eller de IP-adresser som institutet uppger till Riksgäldskontoret ska
+vara adresser enligt formatet IPv4.
+Förklaringar av tekniska begrepp som används i denna bilaga
+7-zip
+
+Ett komprimeringsprogram som finns tillgängligt
+som fri programvara med öppen källkod och som
+kan laddas ner på internetadressen 7-zip.org.
+
+AES256
+
+En krypteringsalgoritm enligt standarden FIPS PUB
+197 publicerad av National Institute of Standards
+and Technology (NIST).
+
+CMS
+
+Förkortning för Cryptographic Message Syntax som
+är ett format (angivet i dokumentet RFC 5652) för
+kryptografiskt skyddade meddelanden, fastställt av
+Internet Engineering Task Force (IETF).
+
+hashalgoritm
+
+Matematisk funktion eller algoritm som bland annat
+kan användas vid signering av data.
+
+GnuPG/Gpgsm
+
+Programvara för digital kryptering och signering,
+som ingår i programpaketet GnuPG.
+
+IPv4
+
+Internet Protocol version 4 (IPv4) är idag den version
+som Internet i huvudsak baseras på.
+
+krypteringsalgoritm Matematisk funktion eller algoritm som användas
+vid kryptering av data.
+OpenSSL
+
+Programvara för digital kryptering och signering,
+som är tillgänglig som öppen källkod och som kan
+laddas ner på internetadressen www.openssl.org.
+
+SHA512
+
+En hashalgoritm enligt standarden FIPS PUB 1803 publicerad av National Institute of Standards and
+Technology (NIST).
+
+Windows-1252
+
+En teckenkodning för det latinska alfabetet som
+används i operativsystemet Microsoft Windows.
+
+9
+
+Elanders Sverige AB, 2011
+
+

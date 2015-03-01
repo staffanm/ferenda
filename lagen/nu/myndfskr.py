@@ -3,10 +3,10 @@ from __future__ import unicode_literals, print_function
 
 # from ferenda.sources.legal.se import MyndFskr as OrigMyndFskr
 from ferenda.sources.legal.se import myndfskr
-from ferenda import CompositeRepository, Facet, TocPageset, TocPage
+from ferenda import CompositeRepository, CompositeStore, Facet, TocPageset, TocPage
 from ferenda import util
 from ferenda.elements import Link
-from ferenda.sources.legal.se import SwedishLegalSource
+from ferenda.sources.legal.se import SwedishLegalSource, SwedishLegalStore, SwedishCitationParser
 
 from rdflib import RDF
 from rdflib.namespace import DCTERMS
@@ -15,8 +15,10 @@ from ferenda.sources.legal.se import RPUBL
 # class MyndFskr(OrigMyndFskr):
 #     pass
 
-# might need to override CompositeStore to provide better
-# basefile_to_pathfrag implemnentation
+# inherit list_basefiles_for from CompositeStore, basefile_to_pathfrag
+# from SwedishLegalStore)
+class CompositeMyndFskrStore(CompositeStore, SwedishLegalStore):
+    pass
 
 class CompositeMyndFskr(CompositeRepository, SwedishLegalSource):
     alias = "myndfs"
@@ -58,10 +60,15 @@ class CompositeMyndFskr(CompositeRepository, SwedishLegalSource):
                   'xhv', 'xsi', 'owl', 'prov', 'bibo',
                   ('rpubl', 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#'),
                   ('rinfoex', 'http://lagen.nu/terms#')]
-
-
+    sparql_annotations = None  # until we can speed things up
+    documentstore_class = CompositeMyndFskrStore
     
     def facets(self):
+        # maybe if each entry in the list could be a tuple or a single
+        # element. If it's a tuple, then the first elements' selector
+        # values (eg organizations) become top level facets, the
+        # second elements' selector values become subsection
+        # underneath, and possibly more levels.
         return [Facet(RPUBL.forfattningssamling,
                       selector=Facet.resourcelabel,
                       identificator=Facet.term,
@@ -137,3 +144,11 @@ class CompositeMyndFskr(CompositeRepository, SwedishLegalSource):
 
     def tabs(self):
         return [("Myndighetsföreskrifter", self.dataset_uri())]
+
+    def basefile_from_uri(self, uri):
+        # if our parse has been done without setting self.config.localizeuri = True%
+        if uri.startswith("http://rinfo.lagrummet.se/"):
+            f = SwedishCitationParser(None, self.config.url,
+                                  self.config.urlpath).localize_uri
+            uri = f(uri)
+        return super(CompositeMyndFskr, self).basefile_from_uri(uri)

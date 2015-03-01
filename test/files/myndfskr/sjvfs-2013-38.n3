@@ -1,0 +1,31 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rinfoex: <http://lagen.nu/terms#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xhv: <http://www.w3.org/1999/xhtml/vocab#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix xsi: <http://www.w3.org/2001/XMLSchema-instance> .
+
+<http://rinfo.lagrummet.se/publ/sjvfs/2014:15> a rpubl:Myndighetsforeskrift ;
+    dcterms:identifier "SJVFS 2014:15" ;
+    dcterms:issn "1102-0970" ;
+    dcterms:publisher <http://rinfo.lagrummet.se/org/statens_jordbruksverk> ;
+    dcterms:title "Föreskrifter om ändring i Statens jordbruksverks föreskrifter (2013:38) om växtskadegörare som omfattas av Europeiska kommissionens genomförandebeslut;"@sv ;
+    rpubl:andrar <http://rinfo.lagrummet.se/publ/sjvfs/2013:38> ;
+    rpubl:arsutgava "2014" ;
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2006:817#P10>,
+        <http://rinfo.lagrummet.se/publ/sfs/2006:817#P27> ;
+    rpubl:beslutadAv <http://rinfo.lagrummet.se/org/statens_jordbruksverk> ;
+    rpubl:beslutsdatum "2014-05-05"^^xsd:date ;
+    rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/sjvfs> ;
+    rpubl:ikrafttradandedatum "2013-11-27"^^xsd:date ;
+    rpubl:lopnummer "15" ;
+    rpubl:utkomFranTryck "2014-05-06"^^xsd:date .
+

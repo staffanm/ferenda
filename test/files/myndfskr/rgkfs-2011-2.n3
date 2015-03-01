@@ -1,0 +1,28 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rinfoex: <http://lagen.nu/terms#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xhv: <http://www.w3.org/1999/xhtml/vocab#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix xsi: <http://www.w3.org/2001/XMLSchema-instance> .
+
+<http://rinfo.lagrummet.se/publ/rgkfs/2011:2> a rpubl:Myndighetsforeskrift ;
+    dcterms:identifier "RGKFS 2011:2" ;
+    dcterms:issn "1403-9346" ;
+    dcterms:publisher <http://rinfo.lagrummet.se/org/riksgaldskontoret> ;
+    dcterms:title "Riksgäldskontorets föreskrifter om instituts skyldighet att lämna uppgifter om insättare och deras insättningar;"@sv ;
+    rpubl:arsutgava "2011" ;
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2011:834#P3> ;
+    rpubl:beslutadAv <http://rinfo.lagrummet.se/org/riksgaeldskontoret> ;
+    rpubl:beslutsdatum "2011-12-14"^^xsd:date ;
+    rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/rgkfs> ;
+    rpubl:ikrafttradandedatum "2012-02-01"^^xsd:date ;
+    rpubl:lopnummer "2" ;
+    rpubl:utkomFranTryck "2011-12-29"^^xsd:date .
