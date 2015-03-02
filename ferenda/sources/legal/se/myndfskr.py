@@ -845,7 +845,7 @@ class KOVFS(MyndFskr):
 
 class KVFS(MyndFskr):
     alias = "kvfs"
-    start_url = "//www.kriminalvarden.se/om-kriminalvarden/publikationer/regelverk"
+    start_url = "http://www.kriminalvarden.se/om-kriminalvarden/publikationer/regelverk"
     # (finns även konsoliderade på http://www.kriminalvarden.se/om-kriminalvarden/styrning-och-regelverk/lagar-forordningar-och-foreskrifter)
 
 
@@ -891,10 +891,16 @@ class NFS(MyndFskr):
     nextpage_regex = "Nästa"
     storage_policy = "dir"
 
+    def download_sanitize_basefile(self, basefile):
+        basefile = basefile.replace(" ", "/")
+        return super(NFS, self).download_sanitize_basefile(basefile)
+    
+
     def forfattningssamlingar(self):
         return ["nfs", "snfs"]
     
     def download_single(self, basefile, url):
+        from pudb import set_trace; set_trace()
         if url.endswith(".pdf") and "/Nerladdningssida/?fileType=pdf" not in url:
             # munge the URL for reasons unknown
             url = url.replace("http://www.naturvardsverket.se/",
@@ -1062,6 +1068,22 @@ class SKVFS(MyndFskr):
         else:
             return html_downloaded
 
+    # adapted from DVFS
+    def textreader_from_basefile(self, basefile):
+        infile = self.store.downloaded_path(basefile)
+        soup = BeautifulSoup(util.readfile(infile))
+        # the DOM tree for SKVFS HTML are a real mess -- let's hope
+        # this captures the relevant content. Maybe we should look for
+        # a "index.pdf" attachment and prefer that one?
+        h = soup.find("h1", text=re.compile("(Rikss|S)katteverkets författningssamling"))
+        main = h.find_parent("div").find_parent("div").find_parent("div")
+        if main:
+            maintext = main.get_text("\n\n", strip=True)
+            outfile = self.store.path(basefile, 'intermediate', '.txt')
+            util.writefile(outfile, maintext)
+            return TextReader(string=maintext)
+        else:
+            raise ParseError("%s: Didn't find a suitable header" % basefile)
 
 class SOSFS(MyndFskr):
     alias = "sosfs"
@@ -1183,13 +1205,15 @@ class STAFS(MyndFskr):
     basefile_regex = "^STAFS (?P<basefile>\d{4}:\d+)$"
     storage_policy = "dir"
     
-    re_identifier = re.compile('STAFS (\d{4}[:/_-]\d+)')
+    re_identifier = re.compile('STAFS[ _]+(\d{4}[:/_-]\d+)')
 
     def download_single(self, basefile, mainurl):
         consolidated_link = None
-        self.log.debug("%s: Downloading from %s" % (basefile, mainurl))
         try:
             soup = BeautifulSoup(self.session.get(mainurl).text)
+            if not soup.find_all("a", text=self.re_identifier):
+                self.log.error("%s: Couldn't find any document links at %s" % (basefile, mainurl))
+                return False
             for linkel in soup.find_all("a", text=self.re_identifier):
                 url = urljoin(mainurl, linkel.get("href"))
                 if "konso" in linkel.text:
@@ -1200,11 +1224,13 @@ class STAFS(MyndFskr):
                     if url.endswith(".pdf"):
                         newbasefile = self.download_sanitize_basefile(m.group(1))
                         if basefile != newbasefile:
-                            # incorrectly labeled file -- no way of knowing which label is correct
+                            # incorrectly labeled file -- no way of
+                            # knowing which label is correct
                             self.log.warning("Expected %s but got %s, skipping this" % (basefile, newbasefile))
                             continue
-                        self.log.debug("%s:    Downloading directly from %s" % (basefile, url))
-                        self.download_if_needed(url, basefile)
+                        # download directly - but call baseclass
+                        # method to ensure DocumentEntry updates
+                        super(STAFS, self).download_single(basefile, url)
                     else:
                         # not pdf - link to yet another pg
                         self.log.debug("%s:    Fetching landing page %s" % (basefile, url))
@@ -1224,7 +1250,6 @@ class STAFS(MyndFskr):
                 self.log.debug("%s:    Downloading consolidated  to %s" % (basefile, filename))
                 self.download_if_needed(
                     consolidated_link, basefile, filename=filename)
-            self.log.info("%s: Downloaded from %s" % (basefile, mainurl))
         except requests.exceptions.ConnectionError as e:
             self.log.error("%s: Failure fetching %s (or some sub-URL): %s" % (basefile, mainurl, e))
 

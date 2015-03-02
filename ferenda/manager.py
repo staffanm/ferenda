@@ -299,7 +299,7 @@ def shutdown_logger():
             existing_handler.close()
         l.removeHandler(existing_handler)
 
-    
+
 
 def run(argv, subcall=False):
     """Runs a particular action for either a particular class or all
@@ -422,7 +422,7 @@ def run(argv, subcall=False):
     finally:
         if not subcall:
             _shutdown_buildserver()
-        shutdown_logger()
+            shutdown_logger()
 
 def enable(classname):
     """Registers a class by creating a section for it in the
