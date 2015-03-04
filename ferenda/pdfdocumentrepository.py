@@ -18,8 +18,9 @@ class PDFDocumentRepository(DocumentRepository):
     storage_policy = "dir"
     downloaded_suffix = ".pdf"
 
-    def get_default_options(self):
-        opts = super(PDFDocumentRepository, self).get_default_options()
+    @classmethod
+    def get_default_options(cls):
+        opts = super(PDFDocumentRepository, cls).get_default_options()
         opts['pdfimages'] = True
         return opts
 

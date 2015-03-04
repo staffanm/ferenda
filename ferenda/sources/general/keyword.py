@@ -64,8 +64,10 @@ class Keyword(DocumentRepository):
         self.termset_funcs = [self.download_termset_mediawiki,
                               self.download_termset_wikipedia]
 
-    def get_default_options(self):
-        opts = super(Keyword, self).get_default_options()
+
+    @classmethod
+    def get_default_options(cls):
+        opts = super(Keyword, cls).get_default_options()
         # The API endpoint URLs change with MW language
         opts['mediawikiexport'] = 'http://localhost/wiki/Special:Export/%s(basefile)'
         opts['wikipediatitles'] = 'http://download.wikimedia.org/svwiki/latest/svwiki-latest-all-titles-in-ns0.gz'

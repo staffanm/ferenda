@@ -132,7 +132,8 @@ class Repo(RepoTester):
         with open("%s/files/base/downloaded/index.htm" %
                   os.path.dirname(__file__)) as fp:
             mockresponse.text = fp.read()
-        with patch('requests.get', return_value=mockresponse):
+        with patch.object(d.session, 'get', return_value=mockresponse):
+        # with patch('requests.get', return_value=mockresponse):
             self.assertTrue(d.download())
 
         # the index file relly has four eligble links, but one is a
@@ -151,7 +152,8 @@ class Repo(RepoTester):
         mockresponse = Mock()
         with open("%s/files/base/downloaded/index2.htm" % os.path.dirname(__file__)) as fp:
             mockresponse.text = fp.read()
-        with patch('requests.get',return_value=mockresponse):
+        with patch.object(d.session, 'get', return_value=mockresponse):
+        # with patch('requests.get',return_value=mockresponse):
             self.assertTrue(d.download())
         
         self.assertEqual(d.download_single.call_count,3)
@@ -171,14 +173,16 @@ class Repo(RepoTester):
 
         with open("%s/files/base/downloaded/index.htm" % os.path.dirname(__file__)) as fp:
             mockresponse.text = fp.read()
-        with patch('requests.get',return_value=mockresponse):
+        with patch.object(d.session, 'get', return_value=mockresponse):
+        # with patch('requests.get',return_value=mockresponse):
             self.assertTrue(d.download())
         d.download_single.assert_called_once_with("124/a","http://example.org/docs/3.html")
         d.download_single.reset_mock()
         
         # test3: set refresh = True, make sure download_single is hit thrice again.
         d.config.refresh = True
-        with patch('requests.get',return_value=mockresponse):
+        with patch.object(d.session, 'get', return_value=mockresponse):
+        # with patch('requests.get',return_value=mockresponse):
             self.assertTrue(d.download())
         self.assertEqual(d.download_single.call_count,3)
         d.download_single.assert_has_calls([call("123/a","http://example.org/docs/1.html"),
@@ -192,13 +196,15 @@ class Repo(RepoTester):
         open(self.datadir+"/base/downloaded/124/a.html","w").close()
         d.download_single.return_value = False
         d.config.refresh = False
-        with patch('requests.get',return_value=mockresponse):
+        with patch.object(d.session, 'get', return_value=mockresponse):
+        # with patch('requests.get',return_value=mockresponse):
             self.assertFalse(d.download())
         self.assertFalse(d.download_single.error.called)
         d.download_single.reset_mock()
 
         # test5: basefile parameter
-        with patch('requests.get',return_value=mockresponse):
+        with patch.object(d.session, 'get', return_value=mockresponse):
+        # with patch('requests.get',return_value=mockresponse):
             self.assertFalse(d.download("123/a"))
 
         # test6: basefile parameter w/o document_url_template
@@ -227,7 +233,8 @@ class Repo(RepoTester):
         # the url will be dynamically constructed using the
         # document_url template
 
-        with patch('requests.get',side_effect = my_get) as mock_get:
+        with patch.object(d.session, 'get', side_effect = my_get) as mock_get:
+        # with patch('requests.get',side_effect = my_get) as mock_get:
             self.assertTrue(d.download_single("123/a")) 
             self.assertEqual(mock_get.call_args[0][0],
                              "http://example.org/docs/123/a.html")
@@ -246,7 +253,8 @@ class Repo(RepoTester):
         # test2: updated file
         time.sleep(0.1) 
         url_location = "test/files/base/downloaded/123/a-version2.htm"
-        with patch('requests.get',side_effect = my_get) as mock_get:
+        with patch.object(d.session, 'get', side_effect = my_get) as mock_get:
+        # with patch('requests.get',side_effect = my_get) as mock_get:
             self.assertTrue(d.download_single("123/a", "http://example.org/very/specific/url"))
             self.assertEqual(mock_get.call_args[0][0],
                              "http://example.org/very/specific/url")
@@ -269,7 +277,8 @@ class Repo(RepoTester):
         time.sleep(0.1)
         url_location = "test/files/base/downloaded/123/a-version2.htm" # same as above, ie unchanged
         # d.browser.retrieve.return_value = util.readfile("test/files/base/downloaded/123/a-version2.htm")
-        with patch('requests.get',side_effect = my_get) as mock_get:
+        with patch.object(d.session, 'get', side_effect = my_get) as mock_get:
+        # with patch('requests.get',side_effect = my_get) as mock_get:
             self.assertFalse(d.download_single("123/a", "http://example.org/123/a.htm"))
             self.assertEqual(mock_get.call_args[0][0],
                              "http://example.org/123/a.htm")
@@ -283,8 +292,8 @@ class Repo(RepoTester):
                          util.readfile("test/files/base/downloaded/123/a-version2.htm"))
 
 
-    @patch('requests.get')
-    def test_download_if_needed(self, mock_get):
+    # @patch('requests.get')
+    def test_download_if_needed(self):
 
         def my_get(url,headers, timeout=None):
             # observes the scoped variables "last_modified" (should
@@ -333,154 +342,154 @@ class Repo(RepoTester):
             resp.headers = headers
             return resp
 
-        url_location =  None
-        last_modified = None
-        etag =          None
-        expect_if_modified_since = False
-        expect_if_none_match     = False
-        mock_get.side_effect = my_get
         d = DocumentRepository(loglevel='CRITICAL',datadir=self.datadir)
+        with patch.object(d.session, 'get', side_effect = my_get) as mock_get:
+            url_location =  None
+            last_modified = None
+            etag =          None
+            expect_if_modified_since = False
+            expect_if_none_match     = False
+            mock_get.side_effect = my_get
 
-        # test1: file does not exist, we should not send a
-        # if-modified-since, recieve a last-modified header and verify
-        # file mtime
-        last_modified = "Mon, 4 Aug 1997 02:14:00 EST"
-        etag = None
-        expect_if_modified_since = False
-        expect_if_none_match = False
-        url_location = "test/files/base/downloaded/123/a-version1.htm"
-        self.assertFalse(os.path.exists(self.datadir+"/base/downloaded/example.html"))
+            # test1: file does not exist, we should not send a
+            # if-modified-since, recieve a last-modified header and verify
+            # file mtime
+            last_modified = "Mon, 4 Aug 1997 02:14:00 EST"
+            etag = None
+            expect_if_modified_since = False
+            expect_if_none_match = False
+            url_location = "test/files/base/downloaded/123/a-version1.htm"
+            self.assertFalse(os.path.exists(self.datadir+"/base/downloaded/example.html"))
 
-        self.assertTrue(d.download_if_needed("http://example.org/document",
-                                             "example"))
-        self.assertTrue(mock_get.called)
-        self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html"))
-        self.assertFalse(os.path.exists(self.datadir+"/base/downloaded/example.html.etag"))
-        self.assertEqual(os.stat(self.datadir+"/base/downloaded/example.html").st_mtime,
-                         calendar.timegm((1997,8,4,2,14,0,0,0,0)) + (60*60*5)) # EST = UTC-5
-        mock_get.reset_mock()
 
-        # test2: file exists, we use if-modified-since, we recieve a 304
-        last_modified = "Mon, 4 Aug 1997 02:14:00 EST"
-        etag = None
-        url_location = "test/files/base/downloaded/123/a-version1.htm"
-        expect_if_modified_since = True # since file now exists since test1
-        expect_if_none_match = False # since no .etag file was created by test1
-        self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html"))
-        self.assertFalse(d.download_if_needed("http://example.org/document",
-                                              "example"))
-        self.assertTrue(mock_get.called)
-        self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html"))
-        self.assertFalse(os.path.exists(self.datadir+"/base/downloaded/example.html.etag"))
-        self.assertEqual(os.stat(self.datadir+"/base/downloaded/example.html").st_mtime,
-                         calendar.timegm((1997,8,4,2,14,0,0,0,0)) + (60*60*5)) # EST = UTC-5
-        mock_get.reset_mock()
-        
-        # test3: file exists, we use if-modified-since, we recieve a
-        # 200 with later last-modified. Also test the setting of an
-        # etag from the server
-        last_modified = "Tue, 5 Aug 1997 02:14:00 EST"
-        etag = "this-is-my-etag-v1" # will be used in test4
-        url_location = "test/files/base/downloaded/123/a-version2.htm"
-        expect_if_modified_since = True # since file now exists since test1
-        expect_if_none_match = False # since no .etag file was created by test1
-        self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html"))
-        self.assertTrue(d.download_if_needed("http://example.org/document",
-                                             "example"))
-        self.assertTrue(mock_get.called)
-        self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html")) # since etag is set
-        self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html.etag"))
-        self.assertEqual(os.stat(self.datadir+"/base/downloaded/example.html").st_mtime,
-                         calendar.timegm((1997,8,5,2,14,0,0,0,0)) + (60*60*5)) # EST = UTC-5
-        self.assertEqual(etag, util.readfile(self.datadir+"/base/downloaded/example.html.etag"))
-        mock_get.reset_mock()
-        
-        # test4: file and etag exists, we use if-none-match and if-modified_since, we recieve a 304
-        last_modified = None
-        etag = "this-is-my-etag-v1"
-        url_location = "test/files/base/downloaded/123/a-version2.htm"
-        expect_if_modified_since = True 
-        expect_if_none_match = True
-        self.assertFalse(d.download_if_needed("http://example.org/document",
-                                              "example"))
-        self.assertTrue(mock_get.called)
-        self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html"))
-        self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html.etag"))
-        self.assertEqual(etag, util.readfile(self.datadir+"/base/downloaded/example.html.etag"))
-        mock_get.reset_mock()
-        
-        # test5: file and etag exists, we use if-none-match, we recieve a 200 with a new etag
-        last_modified = None
-        etag = "this-is-my-etag-v2"
-        url_location = "test/files/base/downloaded/123/a-version1.htm"
-        expect_if_modified_since = True
-        expect_if_none_match = True
-        self.assertTrue(d.download_if_needed("http://example.org/document",
-                                             "example"))
-        self.assertTrue(mock_get.called)
-        self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html"))
-        self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html.etag"))
-        self.assertEqual(etag, util.readfile(self.datadir+"/base/downloaded/example.html.etag"))
-        os.unlink(self.datadir+"/base/downloaded/example.html.etag")
-        mock_get.reset_mock()
-                  
-        # test6: file exists, conditionalget is False, document hasn't changed
-        d.config.conditionalget = False
-        last_modified = None
-        etag = None
-        url_location = "test/files/base/downloaded/123/a-version1.htm"
-        expect_if_modified_since = False
-        expect_if_none_match = False
-        self.assertFalse(d.download_if_needed("http://example.org/document",
-                                              "example"))
-        self.assertTrue(mock_get.called)
-        self.assertFalse(os.path.exists(self.datadir+"/base/downloaded/example.html.etag"))
-        self.assertEqual(util.readfile("test/files/base/downloaded/123/a-version1.htm"),
-                         util.readfile(self.datadir+"/base/downloaded/example.html"))
-        mock_get.reset_mock()
-        
-        # test7: file exists, conditionalget is False, document has changed
-        d.config.conditionalget = False
-        last_modified = None
-        etag = None
-        url_location = "test/files/base/downloaded/123/a-version2.htm"
-        expect_if_modified_since = False
-        expect_if_none_match = False
-        self.assertTrue(d.download_if_needed("http://example.org/document",
-                                             "example"))
-        self.assertTrue(mock_get.called)
-        self.assertEqual(util.readfile("test/files/base/downloaded/123/a-version2.htm"),
-                         util.readfile(self.datadir+"/base/downloaded/example.html"))
-        mock_get.reset_mock()
+            self.assertTrue(d.download_if_needed("http://example.org/document",
+                                                 "example"))
+            self.assertTrue(mock_get.called)
+            self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html"))
+            self.assertFalse(os.path.exists(self.datadir+"/base/downloaded/example.html.etag"))
+            self.assertEqual(os.stat(self.datadir+"/base/downloaded/example.html").st_mtime,
+                             calendar.timegm((1997,8,4,2,14,0,0,0,0)) + (60*60*5)) # EST = UTC-5
+            mock_get.reset_mock()
 
-        # test8: 404 Not Found / catch something
-        url_location = "test/files/base/downloaded/non-existent"
-        with self.assertRaises(requests.exceptions.HTTPError):
-            d.download_if_needed("http://example.org/document",
-                                 "example")
-        mock_get.reset_mock()
+            # test2: file exists, we use if-modified-since, we recieve a 304
+            last_modified = "Mon, 4 Aug 1997 02:14:00 EST"
+            etag = None
+            url_location = "test/files/base/downloaded/123/a-version1.htm"
+            expect_if_modified_since = True # since file now exists since test1
+            expect_if_none_match = False # since no .etag file was created by test1
+            self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html"))
+            self.assertFalse(d.download_if_needed("http://example.org/document",
+                                                  "example"))
+            self.assertTrue(mock_get.called)
+            self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html"))
+            self.assertFalse(os.path.exists(self.datadir+"/base/downloaded/example.html.etag"))
+            self.assertEqual(os.stat(self.datadir+"/base/downloaded/example.html").st_mtime,
+                             calendar.timegm((1997,8,4,2,14,0,0,0,0)) + (60*60*5)) # EST = UTC-5
+            mock_get.reset_mock()
 
-        # test9: ConnectionError
-        mock_get.side_effect = requests.exceptions.ConnectionError
-        self.assertFalse(d.download_if_needed("http://example.org/document",
-                                              "example",
-                                              sleep=0))
-        self.assertEqual(mock_get.call_count, 5)
-        mock_get.reset_mock()
+            # test3: file exists, we use if-modified-since, we recieve a
+            # 200 with later last-modified. Also test the setting of an
+            # etag from the server
+            last_modified = "Tue, 5 Aug 1997 02:14:00 EST"
+            etag = "this-is-my-etag-v1" # will be used in test4
+            url_location = "test/files/base/downloaded/123/a-version2.htm"
+            expect_if_modified_since = True # since file now exists since test1
+            expect_if_none_match = False # since no .etag file was created by test1
+            self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html"))
+            self.assertTrue(d.download_if_needed("http://example.org/document",
+                                                 "example"))
+            self.assertTrue(mock_get.called)
+            self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html")) # since etag is set
+            self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html.etag"))
+            self.assertEqual(os.stat(self.datadir+"/base/downloaded/example.html").st_mtime,
+                             calendar.timegm((1997,8,5,2,14,0,0,0,0)) + (60*60*5)) # EST = UTC-5
+            self.assertEqual(etag, util.readfile(self.datadir+"/base/downloaded/example.html.etag"))
+            mock_get.reset_mock()
 
-        # test10: RequestException
-        mock_get.side_effect = requests.exceptions.RequestException
-        with self.assertRaises(requests.exceptions.RequestException):
-            d.download_if_needed("http://example.org/document",
-                                 "example")
-        mock_get.reset_mock()
+            # test4: file and etag exists, we use if-none-match and if-modified_since, we recieve a 304
+            last_modified = None
+            etag = "this-is-my-etag-v1"
+            url_location = "test/files/base/downloaded/123/a-version2.htm"
+            expect_if_modified_since = True 
+            expect_if_none_match = True
+            self.assertFalse(d.download_if_needed("http://example.org/document",
+                                                  "example"))
+            self.assertTrue(mock_get.called)
+            self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html"))
+            self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html.etag"))
+            self.assertEqual(etag, util.readfile(self.datadir+"/base/downloaded/example.html.etag"))
+            mock_get.reset_mock()
 
-        
+            # test5: file and etag exists, we use if-none-match, we recieve a 200 with a new etag
+            last_modified = None
+            etag = "this-is-my-etag-v2"
+            url_location = "test/files/base/downloaded/123/a-version1.htm"
+            expect_if_modified_since = True
+            expect_if_none_match = True
+            self.assertTrue(d.download_if_needed("http://example.org/document",
+                                                 "example"))
+            self.assertTrue(mock_get.called)
+            self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html"))
+            self.assertTrue(os.path.exists(self.datadir+"/base/downloaded/example.html.etag"))
+            self.assertEqual(etag, util.readfile(self.datadir+"/base/downloaded/example.html.etag"))
+            os.unlink(self.datadir+"/base/downloaded/example.html.etag")
+            mock_get.reset_mock()
+
+            # test6: file exists, conditionalget is False, document hasn't changed
+            d.config.conditionalget = False
+            last_modified = None
+            etag = None
+            url_location = "test/files/base/downloaded/123/a-version1.htm"
+            expect_if_modified_since = False
+            expect_if_none_match = False
+            self.assertFalse(d.download_if_needed("http://example.org/document",
+                                                  "example"))
+            self.assertTrue(mock_get.called)
+            self.assertFalse(os.path.exists(self.datadir+"/base/downloaded/example.html.etag"))
+            self.assertEqual(util.readfile("test/files/base/downloaded/123/a-version1.htm"),
+                             util.readfile(self.datadir+"/base/downloaded/example.html"))
+            mock_get.reset_mock()
+
+            # test7: file exists, conditionalget is False, document has changed
+            d.config.conditionalget = False
+            last_modified = None
+            etag = None
+            url_location = "test/files/base/downloaded/123/a-version2.htm"
+            expect_if_modified_since = False
+            expect_if_none_match = False
+            self.assertTrue(d.download_if_needed("http://example.org/document",
+                                                 "example"))
+            self.assertTrue(mock_get.called)
+            self.assertEqual(util.readfile("test/files/base/downloaded/123/a-version2.htm"),
+                             util.readfile(self.datadir+"/base/downloaded/example.html"))
+            mock_get.reset_mock()
+
+            # test8: 404 Not Found / catch something
+            url_location = "test/files/base/downloaded/non-existent"
+            with self.assertRaises(requests.exceptions.HTTPError):
+                d.download_if_needed("http://example.org/document",
+                                     "example")
+            mock_get.reset_mock()
+
+            # test9: ConnectionError
+            mock_get.side_effect = requests.exceptions.ConnectionError
+            self.assertFalse(d.download_if_needed("http://example.org/document",
+                                                  "example",
+                                                  sleep=0))
+            self.assertEqual(mock_get.call_count, 5)
+            mock_get.reset_mock()
+
+            # test10: RequestException
+            mock_get.side_effect = requests.exceptions.RequestException
+            with self.assertRaises(requests.exceptions.RequestException):
+                d.download_if_needed("http://example.org/document",
+                                     "example")
+            mock_get.reset_mock()
 
 
     def test_remote_url(self):
         d = DocumentRepository()
-        d.config = LayeredConfig(Defaults(d.get_default_options()),
+        d.config = LayeredConfig(Defaults(DocumentRepository.get_default_options()),
                                  INIFile("ferenda.ini"),
                                  cascade=True)
         self.assertEqual(d.remote_url("123/a"), "http://example.org/docs/123/a.html")
@@ -497,7 +506,7 @@ class Repo(RepoTester):
         # test1: make sure that default parsing of a document w/o
         # title and lang tags work
         d = DocumentRepository(loglevel="CRITICAL", datadir=self.datadir)
-        config = LayeredConfig(Defaults(d.get_default_options()),
+        config = LayeredConfig(Defaults(DocumentRepository.get_default_options()),
                                INIFile("ferenda.ini"),
                                cascade=True)
         config.datadir = self.datadir
@@ -1572,7 +1581,8 @@ class Archive(RepoTester):
             res.status_code = 200
             return res
 
-        with patch('requests.get',side_effect = my_get) as mock_get:
+        with patch.object(self.repo.session, 'get', side_effect = my_get) as mock_get:
+        # with patch('requests.get',side_effect = my_get) as mock_get:
             self.url_location = "test/files/base/downloaded/123/a-version1.htm"
             self.assertTrue(self.repo.download_single("123/a")) 
             self.url_location = "test/files/base/downloaded/123/a-version2.htm"

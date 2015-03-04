@@ -240,9 +240,9 @@ class DV(SwedishLegalSource):
         return super(cls, DV).relate_all_setup(config)
 
     # def relate(self, basefile, otherrepos): pass
-        
-    def get_default_options(self):
-        opts = super(DV, self).get_default_options()
+    @classmethod    
+    def get_default_options(cls):
+        opts = super(DV, cls).get_default_options()
         opts['ftpuser'] = None
         opts['ftppassword'] = None
         opts['parsebodyrefs'] = True

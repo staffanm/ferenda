@@ -50,8 +50,9 @@ class SubrepoB(DocumentRepository):
         else:
             raise errors.ParseError("No can do!")
 
-    def get_default_options(self):
-        opts = super(SubrepoB, self).get_default_options()
+    @classmethod
+    def get_default_options(cls):
+        opts = super(SubrepoB, cls).get_default_options()
         opts['customproperty'] = "Hello world!"
         return opts
 
@@ -88,14 +89,11 @@ class TestComposite(RepoTester):
 
     def test_list_basefiles_for(self):
         self.repo.download()
-        # This doesn't work since self.repo.store.docrepos has
-        # uninitialized classes, not objects
         self.assertEqual(set(["3", "2", "1"]),
                          set(self.repo.store.list_basefiles_for("parse")))
 
     def test_parse(self):
-        # we already know list_basefiles_for("parse") will return
-        # ["3", "2", "1"]
+        self.repo.download()
         self.assertTrue(self.repo.parse("1")) # both A and B can handle this
         # but B should win
         self.assertEqual("basefile 1, parsed by b",

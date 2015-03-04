@@ -204,11 +204,12 @@ class SwedishLegalSource(DocumentRepository):
         if type(self) != SwedishLegalSource:
             assert self.alias != "swedishlegalsource", "Subclasses must override self.alias!"
 
-    def get_default_options(self):
-        opts = super(SwedishLegalSource, self).get_default_options()
+    @classmethod
+    def get_default_options(cls):
+        opts = super(SwedishLegalSource, cls).get_default_options()
         opts['pdfimages'] = False 
         opts['localizeuri'] = False
-        opts['urlpath'] = "res/%s/" % self.alias
+        opts['urlpath'] = "res/%s/" % cls.alias
         return opts
 
     def _swedish_ordinal(self, s):

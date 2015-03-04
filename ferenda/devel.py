@@ -168,7 +168,7 @@ class Devel(object):
         repo = repocls()
         repo.config = getattr(mainconfig, alias)
         # work in all parameters from get_default_options
-        for key, val in repo.get_default_options().items():
+        for key, val in repocls.get_default_options().items():
             if key not in repo.config:
                 LayeredConfig.set(repo.config, key, val, "defaults")
         repo.store = repo.documentstore_class(
@@ -418,7 +418,8 @@ class Devel(object):
     downloaded_suffix = ".html"
     storage_policy = "file"
 
-    def get_default_options(self):
+    @classmethod
+    def get_default_options(cls):
         return {}  # pragma: no cover
 
     def download(self):

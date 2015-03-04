@@ -32,7 +32,7 @@ class WSGIApp(object):
     def __init__(self, repos, inifile=None, **kwargs):
         self.repos = repos
         # FIXME: need to specify documentroot?
-        defaults = DocumentRepository().get_default_options()
+        defaults = DocumentRepository.get_default_options()
         # NB: If both inifile and kwargs are specified, the latter
         # will take precedence. I think this is the expected
         # behaviour.

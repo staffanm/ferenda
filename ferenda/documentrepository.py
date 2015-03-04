@@ -304,6 +304,13 @@ class DocumentRepository(object):
                 # assume that any standalone prefix is well known
                 self.ns[prefix] = Namespace(util.ns[prefix])
 
+        # Only the download* methods needs this, but having it
+        # available on every created objects makes patching easier
+        # when testing. FIXME: A better alternative would be to use
+        # the responses library to mock calls to requests.
+        self.session = requests.session()
+
+
     @property
     def ontologies(self):
         """Provides a :py:class:`~rdflib.graph.Graph` loaded with the
@@ -434,8 +441,9 @@ class DocumentRepository(object):
         else:
             raise KeyError("No good match for '%s'" % label)
 
-        
-    def get_default_options(self):
+
+    @classmethod
+    def get_default_options(cls):
 
         """Returns the class' configuration default configuration
         properties. These can be overridden by a configution file, or
@@ -468,8 +476,7 @@ class DocumentRepository(object):
             'useragent': 'ferenda-bot',
             'republishsource': False,
             'tabs': True,
-            'class': self.qualified_class_name(),
-
+            'class': cls.__module__ + "." + cls.__name__,
             # FIXME: These only make sense at a global level, and
             # furthermore are duplicated in manager._load_config
             'cssfiles': ['http://fonts.googleapis.com/css?family=Raleway:200,100',
@@ -680,7 +687,6 @@ with the *config* object as single parameter.
         :returns: True if any document was downloaded, False otherwise.
         :rtype: bool
         """
-        self.session = requests.session()
         if basefile:
             if self.document_url_template:
                 return self.download_single(basefile)

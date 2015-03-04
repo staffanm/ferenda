@@ -33,7 +33,6 @@ class CompositeStore(DocumentStore):
                 for basefile in inst.store.list_basefiles_for("parse"):
                     self.basefiles[cls].add(basefile)
                     if basefile not in documents:
-                        # print("Adding %s from instance %s" % (basefile, inst))
                         documents.add(basefile)
                         yield basefile
         else:
@@ -83,13 +82,14 @@ class CompositeRepository(DocumentRepository):
                          downloaded_suffix=self.downloaded_suffix,
                          storage_policy=self.storage_policy,
                          docrepo_instances=self._instances)
-        
-    def get_default_options(self):
+
+    @classmethod
+    def get_default_options(cls):
         # 1. Get options from superclass (NB: according to MRO...)
-        opts = super(CompositeRepository, self).get_default_options()
+        opts = super(CompositeRepository, cls).get_default_options()
         # 2. Add extra options that ONLY exists in subrepos
-        for c in self.subrepos:
-            for k, v in self.get_instance(c).get_default_options().items():
+        for c in cls.subrepos:
+            for k, v in c.get_default_options().items():
                 if k not in opts:
                     opts[k] = v
         # 3. add the extra 'failfast' option
@@ -135,15 +135,16 @@ class CompositeRepository(DocumentRepository):
 
         start = time.time()
         ret = False
+
+        # We only try those subrepos that have the possibility of
+        # parsing basefile, ie they have the correct downloaded
+        # file. CompositeStore stores a set of existing downloaded
+        # files when its list_basefiles_for method is called, so we
+        # make sure to do that if needed.
+        if not self.store.basefiles[c]:
+            x = list(self.store.list_basefiles_for("parse"))
+        
         for c in self.subrepos:
-            # FIXME: for optimization, it'd be nice if we only
-            # tried those subrepos that have the possibility of
-            # parsing basefile, ie they have the correct
-            # downloaded file. But the only way to do that is to
-            # call list_basefiles_for. Which CompositeStore has
-            # already done. Hmmm.
-            if not self.store.basefiles:
-                list(self.store.list_basefiles_for("parse"))
             if basefile in self.store.basefiles[c]:
                 inst = self.get_instance(c)
                 try:
@@ -151,7 +152,6 @@ class CompositeRepository(DocumentRepository):
                     # to re-parse or not (i.e. use the @managedparsing
                     # decorator).
                     ret = inst.parse(basefile)
-
                 # Any error thrown (errors.ParseError or something
                 # else) means we try next subrepo -- unless we want to
                 # fail fast with a nice stacktrace during debugging.

@@ -78,9 +78,10 @@ class MediaWiki(DocumentRepository):
             self.keywordrepo = self.keyword_class(self.config._parent.keyword)
         else:
             self.keywordrepo = self.keyword_class()
-    
-    def get_default_options(self):
-        opts = super(MediaWiki, self).get_default_options()
+
+    @classmethod
+    def get_default_options(cls):
+        opts = super(MediaWiki, cls).get_default_options()
         # The API endpoint URLs change with MW language
         opts['mediawikiexport'] = 'http://localhost/wiki/Special:Export/%s(basefile)'
         opts['mediawikidump'] = 'http://localhost/wiki/allpages-dump.xml'

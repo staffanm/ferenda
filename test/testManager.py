@@ -76,14 +76,14 @@ class staticmockclass(DocumentRepository):
     @classmethod
     def teardown(cls, action, config): pass
         
-        
-    def get_default_options(self):
-        opts = super(staticmockclass, self).get_default_options()
+    @classmethod
+    def get_default_options(cls):
+        opts = super(staticmockclass, cls).get_default_options()
         opts.update({'datadir': 'data',
                      'loglevel': 'DEBUG',
-                     'cssfiles': [self.resourcebase + '/test.css'],
-                     'imgfiles': [self.resourcebase + '/test.png'],
-                     'jsfiles': [self.resourcebase + '/test.js']})
+                     'cssfiles': [cls.resourcebase + '/test.css'],
+                     'imgfiles': [cls.resourcebase + '/test.png'],
+                     'jsfiles': [cls.resourcebase + '/test.js']})
         return opts
                     
     
@@ -472,8 +472,9 @@ class Testrepo(DocumentRepository):
     documentstore_class = Teststore
     namespaces = ('foaf', 'rdfs', 'rdf', 'owl', 'skos')
         
-    def get_default_options(self):
-        opts = super(Testrepo, self).get_default_options()
+    @classmethod
+    def get_default_options(cls):
+        opts = super(Testrepo, cls).get_default_options()
         opts.update({'datadir': 'data',
                      'cssfiles': ['test.css'],
                      'jsfiles': ['test.js'],

@@ -31,7 +31,7 @@ class Resources(object):
         # FIXME: document what kwargs could be (particularly 'combineresources')
         self.repos = repos
         self.resourcedir = resourcedir
-        defaults = DocumentRepository().get_default_options()
+        defaults = DocumentRepository.get_default_options()
         defaults.update(kwargs)
         self.config = LayeredConfig(Defaults(defaults))
         from ferenda.manager import setup_logger

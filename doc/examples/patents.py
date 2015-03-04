@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
+import tempfile
 
 # mock methods
 def download_from_api(): pass
@@ -74,9 +75,13 @@ class CompositePatents(CompositeRepository):
 # end composite
     def do_the_work(self, basefile): pass
 
-# w/o this, d.subrepos is (None, None, None) ?!
+    
 CompositePatents.subrepos = XMLPatents, HTMLPatents, ScannedPatents
-d = CompositePatents()
+datadir = tempfile.mkdtemp()
+d = CompositePatents(datadir=datadir)
+# make sure the files and methods we need actually exists
+util.writefile(datadir+"/patxml/downloaded/5723765.html", "hello world")
+setattr(XMLPatents, 'transform_patent_xml_to_xhtml', lambda x, y: True)
 d.parse("5723765")
 d.generate("5723765")
 return_value = True

@@ -52,8 +52,9 @@ class PropTrips(Trips):
 
     storage_policy = "dir"
 
-    def get_default_options(self):
-        opts = super(PropTrips, self).get_default_options()
+    @classmethod
+    def get_default_options(cls):
+        opts = super(PropTrips, cls).get_default_options()
         opts['lastbase'] = "THWALLAPROP"
         return opts
 

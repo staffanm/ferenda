@@ -435,8 +435,9 @@ class SFS(Trips):
                                                            self.config.url)
         return self._forarbete_parser
 
-    def get_default_options(self):
-        opts = super(SFS, self).get_default_options()
+    @classmethod
+    def get_default_options(cls):
+        opts = super(SFS, cls).get_default_options()
         opts['keepexpired'] = False
         opts['revisit'] = list
         opts['next_sfsnr'] = str
