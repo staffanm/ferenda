@@ -1,7 +1,13 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, print_function
 
+from rdflib import RDF
+from rdflib.namespace import DCTERMS
+
+from ferenda import Facet
+from ferenda import fulltextindex
 from ferenda.sources.legal.se import DV as OrigDV
+from ferenda.sources.legal.se import RPUBL
 
 class DV(OrigDV):
     

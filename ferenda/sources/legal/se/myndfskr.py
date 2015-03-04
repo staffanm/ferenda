@@ -902,7 +902,6 @@ class NFS(MyndFskr):
         return ["nfs", "snfs"]
     
     def download_single(self, basefile, url):
-        from pudb import set_trace; set_trace()
         if url.endswith(".pdf") and "/Nerladdningssida/?fileType=pdf" not in url:
             # munge the URL for reasons unknown
             url = url.replace("http://www.naturvardsverket.se/",
