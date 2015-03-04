@@ -19,9 +19,8 @@ from ferenda.elements import (Paragraph, Section, Body,
                               OrdinalElement, CompoundElement,
                               SectionalElement)
 from ferenda.pdfreader import Page
+from . import RPUBL, legaluri
 
-from . import RPUBL
-# RPUBL = Namespace('http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
 DCTERMS = Namespace(util.ns['dcterms'])
 PROV = Namespace(util.ns['prov'])
 FOAF = Namespace(util.ns['foaf'])
@@ -178,6 +177,30 @@ class SwedishLegalSource(DocumentRepository):
 
     def __init__(self, config=None, **kwargs):
         super(SwedishLegalSource, self).__init__(config, **kwargs)
+
+        # URIs for documents or references to documents come in two flavours
+        # * canonical: http://rinfo.lagrummet.se/publ/sfs/1999:175
+        # * localized: http://localhost:8000/res/sfs/1999:175 (or
+        #   https://lagen.nu/1999:175, depending on config.url and
+        #   config.urlpath)
+        #
+        # The method legaluri.construct takes a dict and always
+        # returns a canonical URI. The
+        # SwedishCitationParser.localize_uri method converts a
+        # canonical URI to a localized.
+        #
+        # The class method makeurl wraps legaluri.construct with
+        # localize_uri if appropriate. If config.localizeuri is True,
+        # it returns localized URIs, otherwise canonicals
+        if self.config.localizeuri:
+            f = SwedishCitationParser(None, self.config.url,
+                                      self.config.urlpath).localize_uri
+            def makeurl(data):
+                return f(legaluri.construct(data))
+            self.makeurl = makeurl
+        else:
+            self.makeurl = legaluri.construct
+        
         if type(self) != SwedishLegalSource:
             assert self.alias != "swedishlegalsource", "Subclasses must override self.alias!"
 

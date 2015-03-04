@@ -231,7 +231,7 @@ class MyndFskr(SwedishLegalSource):
                 'rpubl:omtryckAv': ['^(Omtryck)$'],
                 'rpubl:genomforDirektiv': ['Celex (3\d{2,4}\w\d{4})'],
                 'rpubl:beslutsdatum':
-                ['(?:har beslutats|beslutade|beslutat) den (\d+ \w+ \d{4})',
+                ['(?:har beslutats|beslutade|beslutat|Beslutad) den (\d+ \w+ \d{4})',
                  'Beslutade av (?:[A-ZÅÄÖ][\w ]+) den (\d+ \w+ \d{4}).'],
                 'rpubl:beslutadAv':
                 ['\n\s*([A-ZÅÄÖ][\w ]+?)\d? (?:meddelar|lämnar|föreskriver|beslutar)',
@@ -342,6 +342,8 @@ class MyndFskr(SwedishLegalSource):
         proper RDF graph.
 
         """
+        # FIXME: replace this with just using self.makeurl once we've
+        # verified that it works
         if self.config.localizeuri:
             f = SwedishCitationParser(None, self.config.url,
                                       self.config.urlpath).localize_uri

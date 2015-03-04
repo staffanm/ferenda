@@ -1,6 +1,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, print_function
 
+from operator import attrgetter
+
+from rdflib import RDF, URIRef
+from rdflib.namespace import DCTERMS, SKOS
+from ferenda.sources.legal.se import RPUBL
+
 # from ferenda.sources.legal.se import MyndFskr as OrigMyndFskr
 from ferenda.sources.legal.se import myndfskr
 from ferenda import CompositeRepository, CompositeStore, Facet, TocPageset, TocPage
@@ -8,9 +14,7 @@ from ferenda import util
 from ferenda.elements import Link
 from ferenda.sources.legal.se import SwedishLegalSource, SwedishLegalStore, SwedishCitationParser
 
-from rdflib import RDF
-from rdflib.namespace import DCTERMS
-from ferenda.sources.legal.se import RPUBL
+from six import text_type as str
 
 # class MyndFskr(OrigMyndFskr):
 #     pass
@@ -69,8 +73,15 @@ class CompositeMyndFskr(CompositeRepository, SwedishLegalSource):
         # values (eg organizations) become top level facets, the
         # second elements' selector values become subsection
         # underneath, and possibly more levels.
+        def altlabel(row, binding, resource_graph):
+            uri = URIRef(row[binding])
+            if resource_graph.value(uri, SKOS.altLabel):
+                return str(resource_graph.value(uri, SKOS.altLabel))
+            else:
+                return row[binding]
+            
         return [Facet(RPUBL.forfattningssamling,
-                      selector=Facet.resourcelabel,
+                      selector=altlabel,
                       identificator=Facet.term,
                       use_for_toc=True),
                 Facet(RPUBL.arsutgava,
@@ -102,7 +113,7 @@ class CompositeMyndFskr(CompositeRepository, SwedishLegalSource):
                                          title="%s från %s" % (pageset.label, value),
                                          binding=pagesetid,
                                          value=value))
-        return pagesetdict.values()
+        return sorted(pagesetdict.values(), key=attrgetter('label'))
 
     def toc_select_for_pages(self, data, pagesets, facets):
         def sortkey(doc):

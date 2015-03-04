@@ -3,17 +3,18 @@ from __future__ import unicode_literals
 
 # From python stdlib
 import re, os
+from datetime import datetime, timedelta
 
 # 3rd party modules
 import lxml.html
 import requests
 from six import text_type as str
 from rdflib import Literal
-from datetime import datetime, timedelta
+from bs4 import BeautifulSoup
 
 # My own stuff
 from ferenda import decorators
-from ferenda import PDFDocumentRepository, FSMParser, Describer
+from ferenda import PDFDocumentRepository, FSMParser, Describer, DocumentStore
 from . import SwedishLegalSource, RPUBL
 from .swedishlegalsource import UnorderedSection
 from ferenda.elements import CompoundElement, Body, Paragraph, Heading
@@ -28,6 +29,16 @@ class Blockquote(CompoundElement):
 
 class Meta(CompoundElement):
     pass
+
+class JOStore(DocumentStore):
+    def basefile_to_pathfrag(self, basefile):
+        # 2371-2014 -> 2014/2371
+        return "/".join(basefile.split("-")[::-1])
+
+    def pathfrag_to_basefile(self, pathfrag):
+        # 2014/2371 -> 2371-2014
+        return "-".join(pathfrag.split("/")[::-1])
+
     
 class JO(SwedishLegalSource, PDFDocumentRepository):
     """Hanterar beslut från Riksdagens Ombudsmän, www.jo.se
@@ -44,12 +55,16 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
 
     storage_policy = "dir"
+    documentstore_class = JOStore
     downloaded_suffix = ".pdf" # might need to change
 
     @decorators.action
     @decorators.recordlastdownload
     def download(self, basefile=None):
-        if self.config.lastdownload and not self.config.refresh:
+        self.session = requests.session()
+        if ('lastdownload' in self.config and
+            self.config.lastdownload and
+            not self.config.refresh):
             startdate = self.config.lastdownload - timedelta(days=30)
             self.start_url += "&from=%s" % datetime.strftime(startdate, "%Y-%m-%d")
         for basefile, url in self.download_get_basefiles(self.start_url):
@@ -90,8 +105,14 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
             headnote_url = self.headnote_url_template % {'basefile':basefile}
             resp = requests.get(headnote_url)
             if "1 totalt antal träffar" in resp.text:
+                # don't save the entire 100+ KB HTML mess when we only
+                # want a litle 6 KB piece. Disk space is cheap but not
+                # infinite
+                soup = BeautifulSoup(resp.text).find("div", "MidContent")
+                soup.find("ol", "breadcrumb").decompose()
+                soup.find("div", id="SearchSettings").decompose()
                 with self.store.open_downloaded(basefile, mode="wb", attachment="headnote.html") as fp:
-                    fp.write(resp.content)
+                    fp.write(soup.prettify().encode("utf-8"))
                 self.log.debug("%s: downloaded headnote from %s" %
                                (basefile, headnote_url))
             else:
@@ -110,7 +131,6 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
                     textbox.top + textbox.height + linespacing >= nextbox.top)
 
         reader = self.pdfreader_from_basefile(doc.basefile)
-        # bloxed = reader.drawboxes("glued.pdf", gluecondition)
         iterator = reader.textboxes(gluecondition)
         desc = Describer(doc.meta, doc.uri)
         doc.body = self.removemeta(self.structure(doc, iterator),
@@ -128,6 +148,8 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
         # if the headnote is present, do more (incl replacing title?)
         if "headnote.html" in list(self.store.list_attachments(doc.basefile, "downloaded")):
             self.parse_headnote(desc)
+
+        self.parse_entry_update(doc)
         return True
 
     def parse_headnote(self, desc):

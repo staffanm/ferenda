@@ -46,7 +46,7 @@ dictkey = dict([[v, k] for k, v in list(predicate.items())])
 
 types = {LegalRef.RATTSFALL: RPUBL.Rattsfallsreferat,
          LegalRef.LAGRUM: RPUBL.KonsolideradGrundforfattning,
-         LegalRef.MYNDIGHETSBESLUT: RPUBL.Myndighetsavgorande,
+         LegalRef.MYNDIGHETSBESLUT: RPUBL.VagledandeMyndighetsavgorande,
          LegalRef.FORESKRIFTER: RPUBL.Myndighetsforeskrift,
          LegalRef.EULAGSTIFTNING: RINFOEX.EUDirektiv}
 
@@ -143,7 +143,7 @@ def construct_from_graph(graph):
         return "http://rinfo.lagrummet.se/publ/sfs/%s" % urifragment
 
     elif rdftype == RPUBL.VagledandeMyndighetsavgorande:
-        return "http://rinfo.lagrummet.se/publ/beslut/%s/%s" % \
+        return "http://rinfo.lagrummet.se/publ/avg/%s/%s" % \
                (_first_obj(graph, bnode, DCTERMS.creator),
                 _first_obj(graph, bnode, RPUBL.diarienummer))
 
@@ -152,8 +152,6 @@ def construct_from_graph(graph):
                (_rpubl_uri_transform(graph.value(bnode, RPUBL.forfattningssamling)),
                 graph.value(bnode, RPUBL.artal),
                 graph.value(bnode, RPUBL.lopnummer))
-
-
     elif rdftype == RINFOEX.EUDirektiv:
         return ("http://rinfo.lagrummet.se/ext/eur-lex/%s" %
                 graph.value(bnode, RPUBL.genomforDirektiv))

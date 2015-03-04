@@ -842,10 +842,12 @@ with the *config* object as single parameter.
 
         """
         if not filename:
-            filename = self.store.downloaded_path(basefile)
+            assumedfilename = self.store.downloaded_path(basefile)
+        else:
+            assumedfilename = filename
         if self.config.conditionalget:
             # sets if-none-match and/or if-modified-since headers
-            headers = self._addheaders(filename)
+            headers = self._addheaders(assumedfilename)
         else:
             headers = self._addheaders()
 
@@ -892,6 +894,11 @@ with the *config* object as single parameter.
         with open(tmpfile, "wb") as fp:
             fp.write(response.content)
 
+        if not filename:
+            filename = self.download_name_file(tmpfile,
+                                               basefile,
+                                               assumedfilename)
+
         if not os.path.exists(filename):
             util.robust_rename(tmpfile, filename)
             updated = True
@@ -917,6 +924,9 @@ with the *config* object as single parameter.
                 with open(filename + ".etag", "w") as fp:
                     fp.write(response.headers["etag"])
         return updated
+
+    def download_name_file(self, tmpfile, basefile, assumedfile):
+        return assumedfile
 
     def download_is_different(self, existing, new):
         """Returns True if the new file is semantically different from the

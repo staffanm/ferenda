@@ -17,6 +17,7 @@ from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda.sources.legal.se import legaluri
 from ferenda.elements import Body, CompoundElement
 
+
 class Sektion(CompoundElement):
     tagname = "div"
 
@@ -29,7 +30,11 @@ class JK(SwedishLegalSource):
     
     @recordlastdownload
     def download(self, basefile=None):
-        if self.config.lastdownload and not self.config.refresh:
+        self.session = requests.session()
+        if ('lastdownload' in self.config and
+            self.config.lastdownload and
+            not self.config.refresh):
+
             # allow for 30 day window between decision date and publishing
             startdate = self.config.lastdownload - timedelta(days=30)
             start_url = self.start_url % {'date':
@@ -71,6 +76,10 @@ class JK(SwedishLegalSource):
                 new_soup.find("div", id="mainContent"))
 
     def parse_metadata_from_soup(self, soup, doc):
+        # this maybe goes in self.canonical_uri, but cannot be generalized
+        doc.uri = self.makeurl({'type': LegalRef.MYNDIGHETSBESLUT,
+                                'myndighet': 'jk',
+                                'dnr': doc.basefile})
         desc = Describer(doc.meta, doc.uri)
         # 1. static same-for-all metadata
         desc.rdftype(self.rdf_type)
@@ -82,15 +91,16 @@ class JK(SwedishLegalSource):
         datestr = soup.find("span", class_="label",
                             text="Beslutsdatum").find_next_sibling("span").get_text()
         desc.value(self.ns['rpubl'].beslutsdatum,
-                   datetime.strptime(datestr, '%Y-%m-%d'))
+                   datetime.strptime(datestr, '%Y-%m-%d').date())
         desc.value(self.ns['rpubl'].diarienummer,
                    soup.find("span", class_="label",
                              text="Diarienummer").find_next_sibling("span").get_text())
-        desc.rel(self.ns['owl'].sameAs,
-                 legaluri.construct({'type': LegalRef.MYNDIGHETSBESLUT,
-                                     'myndighet': 'jk',
-                                     'dnr': doc.basefile}))
-                
+        if self.config.localizeuri:
+            desc.rel(self.ns['owl'].sameAs,
+                     legaluri.construct({'type': LegalRef.MYNDIGHETSBESLUT,
+                                         'myndighet': 'jk',
+                                         'dnr': doc.basefile}))
+
     def parse_document_from_soup(self, soup, doc):
 
         # 3: Process the actual text of the document
@@ -110,6 +120,8 @@ class JK(SwedishLegalSource):
                                LegalRef.KORTLAGRUM,
                                LegalRef.RATTSFALL,
                                LegalRef.FORARBETEN)
+
+        # FIXME: citparser should respect self.config.localizeuri
         citparser = SwedishCitationParser(self.ref_parser, self.config.url)
         doc.body = citparser.parse_recursive(body)
 

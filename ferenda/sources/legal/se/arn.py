@@ -91,7 +91,9 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
         soup = BeautifulSoup(resp.text)
         action = soup.find("form")["action"]
 
-        if self.config.lastdownload and not self.config.refresh:
+        if ('lastdownload' in self.config and
+            self.config.lastdownload and
+            not self.config.refresh):
             d = self.config.lastdownload
             datefrom = '%d-%02d-%02d' % (d.year, d.month, d.day)
             dateto = '%d-01-01' % (d.year+1)
@@ -193,9 +195,8 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
                     soup = BeautifulSoup(resp.text)
                     action = soup.find("form")["action"]
 
-    
-    def guess_type(self, filename):
-        with open(filename, "rb") as fp:
+    def download_name_file(self, tmpfile, basefile, assumedfile):
+        with open(tmpfile, "rb") as fp:
             sig = fp.read(4)
             if sig == b'\xffWPC':
                 doctype = ".wpd"
@@ -211,25 +212,17 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
                 self.log.warning(
                     "%s has unknown signature %r -- don't know what kind of file it is" % (filename, sig))
                 doctype = ".pdf"  # don't do anything
-        return doctype
-        
-                    
+        return self.store.path(basefile, 'downloaded', doctype)
+
     def download_single(self, basefile, url, fragment):
         ret = super(ARN, self).download_single(basefile, url)
-        # after downloading: see if our PDF in reality was something else
-        # FIXME: we should do this prior to .download_if_needed...
         if ret:
-            d = self.store.downloaded_path(basefile)
-            if os.path.exists(d) and not d.endswith(".pdf"):
-                doctype = self.guess_type(d)
-                if doctype != '.pdf':
-                    util.robust_rename(d, d.replace(".pdf", doctype))
-
             # the HTML fragment from the search result page contains
             # metadata not available in the main document, so save it
             # as fragment.html
-            with self.store.open_downloaded(basefile, mode="w", attachment="fragment.html") as fp:
-                fp.write(str(fragment))
+            with self.store.open_downloaded(basefile, mode="wb",
+                                            attachment="fragment.html") as fp:
+                fp.write(str(fragment).encode("utf-8"))
         return ret
         
     @managedparsing
@@ -257,23 +250,12 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
         desc.value(self.ns['dcterms'].issued,
                 desc.getvalue(self.ns['rpubl'].avgorandedatum))
         filetype = os.path.splitext(downloaded)[1]
-        if filetype == ".pdf":
-            # make sure it really is a PDF
-            doctype = self.guess_type(downloaded)
-            if doctype != ".pdf":
-                util.robust_rename(downloaded,
-                                   downloaded.replace(".pdf", doctype))
-                downloaded = downloaded.replace(".pdf", doctype)
-                filetype = doctype
-
-            self.parse_from_pdf(doc, downloaded, filetype=filetype)
-
         # for uniformity, we try to treat everything as PDF by
         # converting, even .doc/.docx documents are converted to PDF
         # elif filetype in (".doc", ".docx"):
         # self.parse_from_word(doc, downloaded)
-        else:
-            self.parse_from_pdf(doc, downloaded, filetype=filetype)
+        self.parse_from_pdf(doc, downloaded, filetype=filetype)
+        self.parse_entry_update(doc)
         return True
 
     def parse_from_pdf(self, doc, filename, filetype=".pdf"):

@@ -12,6 +12,7 @@ import six
 from six import text_type as str
 from layeredconfig import LayeredConfig
 
+from ferenda.compat import OrderedDict
 from ferenda import TextReader, TripleStore, FulltextIndex
 from ferenda.elements import serialize
 from ferenda import decorators, util
@@ -394,11 +395,21 @@ class Devel(object):
         print("%s index at %s destroyed" % (self.config.indextype,
                                             self.config.indexlocation))
 
+    @decorators.action
+    def report(self, alias):
+        repo = self._repo_from_alias(alias)
+        status = repo.get_status()
+        results = OrderedDict()
+        for key in status:
+            pass
+        # create a odict {basefile: {"download", ...}, {"parse": ...}}
+
+
+
     # FIXME: These are dummy implementations of methods and class
     # variables that manager.py expects all docrepos to have. We don't
     # want to have coverage counting these as missing lines, hence the
     # pragma: no cover comments.
-
     def __init__(self, config=None, **kwargs):
         self.store = DummyStore(None)
         self.config = config

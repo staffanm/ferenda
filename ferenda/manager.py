@@ -316,6 +316,7 @@ def run(argv, subcall=False):
                  prefixed with ``--``, e.g. ``--loglevel=INFO``, or
                  positional arguments to the specified action).
     """
+    from pudb import set_trace; set_trace()
     config = _load_config(_find_config_file(), argv)
     # if logfile is set to True (the default), autogenerate logfile
     # name from current datetime. Otherwise assume logfile is set to
@@ -754,7 +755,12 @@ def _run_class(enabled, argv, config):
             otherrepos = []
             for othercls in _classes_from_classname(enabled, 'all'):
                 if othercls != inst.__class__:
-                    otherrepos.append(_instantiate_class(othercls, argv=argv))
+                    print("Creating class %s (%r)" % (othercls, argv), end="... ")
+                    if othercls.__name__ == "LNMediaWiki":
+                        from pudb import set_trace; set_trace()
+                    obj = _instantiate_class(othercls, argv=argv)
+                    otherrepos.append(obj)
+                    print("Succeeded")
             kwargs['otherrepos'] = otherrepos
 
         if 'all' in inst.config and inst.config.all == True:
