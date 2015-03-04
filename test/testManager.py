@@ -815,15 +815,18 @@ imgfiles = []
                          s.join(['rsrc','api','terms.json'])],
                 'img': [s.join(['rsrc', 'img', 'navmenu-small-black.png']),
                         s.join(['rsrc', 'img', 'navmenu.png']),
-                        s.join(['rsrc', 'img', 'search.png'])],
+                        s.join(['rsrc', 'img', 'search.png']),
+                        s.join(['rsrc', 'img', 'test.png'])],
                 'css': ['http://fonts.googleapis.com/css?family=Raleway:200,100',
                         s.join(['rsrc', 'css', 'normalize-1.1.3.css']),
                         s.join(['rsrc', 'css', 'main.css']),
-                        s.join(['rsrc', 'css', 'ferenda.css'])],
+                        s.join(['rsrc', 'css', 'ferenda.css']),
+                        s.join(['rsrc', 'css', 'test.css'])],
                 'js': [s.join(['rsrc', 'js', 'jquery-1.10.2.js']),
                        s.join(['rsrc', 'js', 'modernizr-2.6.3.js']),
                        s.join(['rsrc', 'js', 'respond-1.3.0.js']),
-                       s.join(['rsrc', 'js', 'ferenda.js'])]}
+                       s.join(['rsrc', 'js', 'ferenda.js']),
+                       s.join(['rsrc', 'js', 'test.js'])]}
         self.assertEqual(want, got)
 
     def test_delayed_config(self):

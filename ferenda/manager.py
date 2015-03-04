@@ -562,10 +562,9 @@ def _load_config(filename=None, argv=None, defaults=None):
        line arguments.
 
     """
-
     # FIXME: Expand on this list of defaults? Note that it only
     # pertains to global configuration, not docrepo configuration
-    # (those have the get_default_options() method).
+    # (those have the get_default_options() classmethod).
     if not defaults:
         defaults = {'loglevel': 'DEBUG',
                     'logfile': True,
@@ -593,9 +592,15 @@ def _load_config(filename=None, argv=None, defaults=None):
                     'fulltextindex': True,
                     'serverport': 5555,
                     'authkey': b'secret'}
+
+        for alias, classname in _enabled_classes(inifile=filename).items():
+            assert alias not in defaults, "Collision on key %s" % alias
+            defaults[alias] = _load_class(classname).get_default_options()
+
     sources = [Defaults(defaults)]
     if filename:
         sources.append(INIFile(filename))
+
     sources.append(Environment(prefix="FERENDA_"))
     if argv:
         parser = argparse.ArgumentParser()
@@ -754,12 +759,8 @@ def _run_class(enabled, argv, config):
             otherrepos = []
             for othercls in _classes_from_classname(enabled, 'all'):
                 if othercls != inst.__class__:
-                    # print("Creating class %s (%r)" % (othercls, argv), end="... ")
-                    # if othercls.__name__ == "LNMediaWiki":
-                    #     from pudb import set_trace; set_trace()
-                    obj = _instantiate_class(othercls, argv=argv)
+                    obj = _instantiate_class(othercls, config, argv=argv)
                     otherrepos.append(obj)
-                    # print("Succeeded")
             kwargs['otherrepos'] = otherrepos
 
         if 'all' in inst.config and inst.config.all == True:
