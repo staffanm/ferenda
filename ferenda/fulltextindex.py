@@ -19,6 +19,7 @@ from ferenda import util, errors
 
 
 class FulltextIndex(object):
+
     """This is the abstract base class for a fulltext index. You use it by
        calling the static method FulltextIndex.connect, passing a
        string representing the underlying fulltext engine you wish to
@@ -26,7 +27,7 @@ class FulltextIndex(object):
        methods.
 
     """
-    
+
     @staticmethod
     def connect(indextype, location, repos):
         """Open a fulltext index (creating it if it doesn't already exists).
@@ -55,7 +56,7 @@ class FulltextIndex(object):
     def make_schema(self, repos):
         s = self.get_default_schema()
         for repo in repos:
-            g = repo.make_graph() # for qname lookup
+            g = repo.make_graph()  # for qname lookup
             for facet in repo.facets():
                 if facet.dimension_label:
                     fld = facet.dimension_label
@@ -66,7 +67,9 @@ class FulltextIndex(object):
                     # multiple repos can provide the same indexed
                     # properties ONLY if the indextype match
                     if s[fld] != idxtype:
-                        raise errors.SchemaConflictError("Repo %s wanted to add a field named %s, but it was already present with a different IndexType" % (repo, fld))
+                        raise errors.SchemaConflictError(
+                            "Repo %s wanted to add a field named %s, but it was already present with a different IndexType" %
+                            (repo, fld))
                 else:
                     s[fld] = idxtype
         return s
@@ -79,7 +82,7 @@ class FulltextIndex(object):
                 # 'title': Text(boost=4),
                 # 'identifier': Label(boost=16),
                 'text': Text()
-        }
+                }
 
     def exists(self):
         """Whether the fulltext index exists."""
@@ -121,7 +124,7 @@ class FulltextIndex(object):
         :type  basefile: str
         :param title: User-displayable title of resource (if applicable).
                       Should not contain the same information as
-                      ``identifier``. 
+                      ``identifier``.
         :type  title: str
         :param identifier: User-displayable short identifier for resource (if applicable)
         :type  identifier: str
@@ -192,12 +195,13 @@ class FulltextIndex(object):
         class), convert to the corresponding native type for the
         fulltextindex in use.
         """
-    
+
         for abstractfield, nativefield in self.fieldmapping:
             if fieldobject == abstractfield:
                 return nativefield
-        raise errors.SchemaMappingError("Field %s cannot be mapped to a native field" % fieldobject)
-        
+        raise errors.SchemaMappingError(
+            "Field %s cannot be mapped to a native field" %
+            fieldobject)
 
     def from_native_field(self, fieldobject):
         """Given a fulltextindex native type, convert to the corresponding
@@ -206,8 +210,8 @@ class FulltextIndex(object):
             # whoosh field objects do not implement __eq__ sanely --
             # whoosh.fields.ID() == whoosh.fields.DATETIME() is true
             # -- so we do an extra check on the type as well.
-            if (type(fieldobject) == type(nativefield) and
-                fieldobject == nativefield):
+            if (isinstance(fieldobject, type(nativefield)) and
+                    fieldobject == nativefield):
                 return abstractfield
         raise errors.SchemaMappingError("Native field %s cannot be mapped" % fieldobject)
 
@@ -241,6 +245,7 @@ class IndexedType(object):
 
 
 class Identifier(IndexedType):
+
     """An identifier is a string, normally in the form of a URI, which uniquely identifies an indexed document."""
     pass
 
@@ -258,6 +263,7 @@ class Label(IndexedType):
 
 
 class Keyword(IndexedType):
+
     """A keyword is a single string from a controlled vocabulary."""
     pass
 
@@ -267,11 +273,13 @@ class Boolean(IndexedType):
 
 
 class URI(IndexedType):
+
     """Any URI (except the URI that identifies a indexed document -- use Identifier for that)."""
     pass
 
 
 class Resource(IndexedType):
+
     """A fulltextindex.Resource is a URI that also has a human-readable
        label.
 
@@ -281,20 +289,27 @@ class Resource(IndexedType):
 
 
 class SearchModifier(object):
+
     def __init__(self, *values):
         self.values = values
 
+
 class Less(SearchModifier):
+
     def __init__(self, max):
         super(Less, self).__init__(*[max])
         self.max = max
 
+
 class More(SearchModifier):
+
     def __init__(self, min):
         super(More, self).__init__(*[min])
         self.min = min
 
+
 class Between(SearchModifier):
+
     def __init__(self, min, max):
         super(Between, self).__init__(*[min, max])
         self.min = min
@@ -316,7 +331,8 @@ class ElementsFormatter(whoosh.highlight.Formatter):
 
     """Returns a tree of ferenda.elements representing the formatted hit."""
 
-    def __init__(self, wrapelement=html.P, hitelement=html.Strong, classname="match", between=" ... "):
+    def __init__(self, wrapelement=html.P, hitelement=html.Strong,
+                 classname="match", between=" ... "):
         self.wrapelement = wrapelement
         self.hitelement = hitelement
         self.classname = classname
@@ -356,13 +372,13 @@ class WhooshIndex(FulltextIndex):
                     (Label(),         whoosh.fields.ID(stored=True)),
                     (Label(boost=16), whoosh.fields.ID(field_boost=16, stored=True)),
                     (Text(boost=4),   whoosh.fields.TEXT(field_boost=4, stored=True,
-                                                           analyzer=whoosh.analysis.StemmingAnalyzer(
-                                                           ))),
+                                                         analyzer=whoosh.analysis.StemmingAnalyzer(
+                                                         ))),
                     (Text(boost=2),   whoosh.fields.TEXT(field_boost=2, stored=True,
-                                                           analyzer=whoosh.analysis.StemmingAnalyzer(
-                                                           ))),
+                                                         analyzer=whoosh.analysis.StemmingAnalyzer(
+                                                         ))),
                     (Text(),          whoosh.fields.TEXT(stored=True,
-                                                           analyzer=whoosh.analysis.StemmingAnalyzer())),
+                                                         analyzer=whoosh.analysis.StemmingAnalyzer())),
                     (Datetime(),      whoosh.fields.DATETIME(stored=True)),
                     (Boolean(),       whoosh.fields.BOOLEAN(stored=True)),
                     (URI(),           whoosh.fields.ID(stored=True, field_boost=1.1)),
@@ -378,7 +394,7 @@ class WhooshIndex(FulltextIndex):
         # contain multiple values. FIXME: v. similar to the code in
         # make_schema
         for repo in repos:
-            g = repo.make_graph() # for qname lookup
+            g = repo.make_graph()  # for qname lookup
             for facet in repo.facets():
                 if facet.dimension_label:
                     fld = facet.dimension_label
@@ -424,19 +440,19 @@ class WhooshIndex(FulltextIndex):
                 # might be multiple values, in which case we create a
                 # n-element list, still stored as IDLIST
                 if isinstance(kwargs[key], list):
-                # or if self._multiple[key]:
-                    kwargs[key] = list(itertools.chain.from_iterable([(x['iri'], x['label'])for x in kwargs[key]]))
+                    # or if self._multiple[key]:
+                    kwargs[key] = list(
+                        itertools.chain.from_iterable([(x['iri'], x['label'])for x in kwargs[key]]))
                 else:
                     kwargs[key] = [kwargs[key]['iri'],
                                    kwargs[key]['label']]
             elif isinstance(s[key], Datetime):
                 if (isinstance(kwargs[key], date) and
-                    not isinstance(kwargs[key], datetime)):
+                        not isinstance(kwargs[key], datetime)):
                     # convert date to datetime
                     kwargs[key] = datetime(kwargs[key].year,
                                            kwargs[key].month,
                                            kwargs[key].day)
-
 
         self._writer.update_document(uri=uri,
                                      repo=repo,
@@ -486,7 +502,7 @@ class WhooshIndex(FulltextIndex):
                 filter.append(whoosh.query.Wildcard(k, v))
             else:
                 # exact field match
-                # 
+                #
                 # Things to handle: Keyword, Boolean, Resource (must
                 # be able to match on iri only)
                 filter.append(whoosh.query.Term(k, v))
@@ -501,7 +517,7 @@ class WhooshIndex(FulltextIndex):
                 if isinstance(fldtype, whoosh.fields.TEXT):
                     searchfields.append(fldname)
             mparser = whoosh.qparser.MultifieldParser(searchfields,
-                                                  self.index.schema)
+                                                      self.index.schema)
             freetext = mparser.parse(q)
 
         if filter:
@@ -547,7 +563,8 @@ class WhooshIndex(FulltextIndex):
                     # otherwise... (note that just examining if
                     # len(fields[key]) == 2 isn't enough)
                     if self._multiple[key]:
-                        fields[key] = [{'iri': x[0], 'label': x[1]} for x in zip(fields[key][0::2], fields[key][1::2])]
+                        fields[key] = [{'iri': x[0], 'label': x[1]}
+                                       for x in zip(fields[key][0::2], fields[key][1::2])]
                     else:
                         fields[key] = {'iri': fields[key][0],
                                        'label': fields[key][1]}
@@ -580,12 +597,11 @@ class RemoteIndex(FulltextIndex):
     def schema(self):
         relurl, payload = self._get_schema_payload()
         res = requests.get(self.location + relurl)  # payload is
-                                                    # probably never
-                                                    # used
+        # probably never
+        # used
         # print("GET %s" % relurl)
         # print(json.dumps(res.json(), indent=4))
         return self._decode_schema(res)
-
 
     def update(self, uri, repo, basefile, text, **kwargs):
         relurl, payload = self._update_payload(
@@ -642,7 +658,7 @@ class ElasticSearchIndex(RemoteIndex):
                     (Label(),
                      {"type": "string", "index": "not_analyzed", }),  # repo, basefile
                     (Label(boost=16),
-                     {"type": "string", "boost": 16.0, "index": "not_analyzed", "norms": {"enabled": True}}),# identifier
+                     {"type": "string", "boost": 16.0, "index": "not_analyzed", "norms": {"enabled": True}}),  # identifier
                     (Text(boost=4),
                      {"type": "string", "boost": 4.0, "index": "not_analyzed", "norms": {"enabled": True}}),  # title
                     (Text(boost=2),
@@ -681,7 +697,7 @@ class ElasticSearchIndex(RemoteIndex):
             # python 2.7 handles it, but may fail later on. FIXME: We
             # should create a shim as ferenda.compat.quote and use
             # that
-            safe = safe.encode('ascii') # pragma: no cover
+            safe = safe.encode('ascii')  # pragma: no cover
 
         # quote (in python 2) only handles characters from 0x0 - 0xFF,
         # and basefile might contain characters outside of that (eg
@@ -737,7 +753,7 @@ class ElasticSearchIndex(RemoteIndex):
         # 3: If freetext param given, search on that
         match = {}
         if q:
-            # NOTE: 
+            # NOTE:
             match['_all'] = q
 
         if filterterms or filterregexps or filterranges:
@@ -762,7 +778,7 @@ class ElasticSearchIndex(RemoteIndex):
                 query = {"match": match}
             else:
                 query = {"match_all": match}
-            
+
         payload = {'query': query}
         if q:
             payload['highlight'] = {'fields': {'text': {}},
@@ -850,7 +866,7 @@ class ElasticSearchIndex(RemoteIndex):
             "mappings": {}
         }
         for repo in repos:
-            g = repo.make_graph() # for qname lookup
+            g = repo.make_graph()  # for qname lookup
             es_fields = {}
             schema = self.get_default_schema()
             for facet in repo.facets():
@@ -860,7 +876,7 @@ class ElasticSearchIndex(RemoteIndex):
                     fld = g.qname(facet.rdftype).replace(":", "_")
                 idxtype = facet.indexingtype
                 schema[fld] = idxtype
-            
+
             for key, fieldtype in schema.items():
                 if key == "repo":
                     continue  # not really needed for ES, as type == repo.alias

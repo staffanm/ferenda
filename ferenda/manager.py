@@ -57,6 +57,8 @@ from ferenda import util
 
 # NOTE: This is part of the published API and must be callable in
 # scenarios without configfile or logger.
+
+
 def makeresources(repos,
                   resourcedir="data/rsrc",
                   combine=False,
@@ -92,6 +94,7 @@ def makeresources(repos,
                      sitename=sitename,
                      sitedescription=sitedescription,
                      url=url).make()
+
 
 def frontpage(repos,
               path="data/index.html",
@@ -154,7 +157,7 @@ def frontpage(repos,
 
 
 def runserver(repos,
-              port=8000, # now that we require url, we don't need this
+              port=8000,  # now that we require url, we don't need this
               documentroot="data",  # relative to cwd
               apiendpoint="/api/",
               searchendpoint="/search/",
@@ -217,7 +220,7 @@ def make_wsgi_app(inifile=None, **kwargs):
         args = _setup_runserver_args(config, inifile)
     else:
         args = kwargs  # sanity check: is documentroot, searchendpoint and
-                       # apiendpoint defined?
+        # apiendpoint defined?
 
     # if we have an inifile, we should provide that instead of the
     # **args we've got from _setup_runserver_args()
@@ -280,7 +283,7 @@ def setup_logger(level='INFO', filename=None,
                 log.addHandler(logging.NullHandler())
             else:  # pragma: no cover
                 # py26 compatibility
-                class NullHandler(logging.Handler): 
+                class NullHandler(logging.Handler):
 
                     def emit(self, record):
                         pass
@@ -292,13 +295,12 @@ def setup_logger(level='INFO', filename=None,
 def shutdown_logger():
     """Shuts down the configured logger. In particular, closes any
     FileHandlers, which is needed on win32."""
-    
+
     l = logging.getLogger()  # get the root logger
     for existing_handler in list(l.handlers):
         if isinstance(existing_handler, logging.FileHandler):
             existing_handler.close()
         l.removeHandler(existing_handler)
-
 
 
 def run(argv, subcall=False):
@@ -387,7 +389,7 @@ def run(argv, subcall=False):
                         # better way would perhaps be to pass the
                         # existing config object to run as an optional
                         # argument)
-                        argscopy = argv[2:] # skip alias and action
+                        argscopy = argv[2:]  # skip alias and action
                         argscopy.insert(0, action)
                         argscopy.insert(0, "all")
                         results[action] = run(argscopy, subcall=True)
@@ -397,7 +399,7 @@ def run(argv, subcall=False):
                             alias = enabled_aliases[classname]
                             argscopy = argv[2:]
                             if (action in ("parse", "relate", "generate") and
-                                "--all" not in argscopy):
+                                    "--all" not in argscopy):
                                 argscopy.append("--all")
                             argscopy.insert(0, action)
                             argscopy.insert(0, classname)
@@ -424,6 +426,7 @@ def run(argv, subcall=False):
             _shutdown_buildserver()
             shutdown_logger()
 
+
 def enable(classname):
     """Registers a class by creating a section for it in the
     configuration file (``ferenda.ini``). Returns the short-form
@@ -439,7 +442,7 @@ def enable(classname):
     :rtype: str
     """
     cls = _load_class(classname)  # eg ferenda.DocumentRepository
-                                 # throws error if unsuccessful
+    # throws error if unsuccessful
     cfg = configparser.ConfigParser()
     configfilename = _find_config_file(create=True)
     cfg.read([configfilename])
@@ -452,10 +455,11 @@ def enable(classname):
     log.info("Enabled class %s (alias '%s')" % (classname, alias))
     return alias
 
+
 def runsetup():
     """Runs :func:`setup` and exits with a non-zero status if setup
     failed in any way
-    
+
     .. note::
 
        The ``ferenda-setup`` script that gets installed with ferenda is
@@ -468,12 +472,12 @@ def runsetup():
     unattended = ('--unattended' in sys.argv)
     if not setup(sys.argv, force, verbose, unattended):
         sys.exit(-1)
-        
+
 
 def setup(argv=None, force=False, verbose=False, unattended=False):
     """Creates a project, complete with configuration file and
     ferenda-build tool.
-    
+
     Checks to see that all required python modules and command line
     utilities are present. Also checks which triple store(s) are
     available and selects the best one (in order of preference:
@@ -509,7 +513,8 @@ def setup(argv=None, force=False, verbose=False, unattended=False):
         if unattended:
             answer = "n"
         else:
-            log.info("There were some errors when checking your environment. Proceed anyway? (y/N)")
+            log.info(
+                "There were some errors when checking your environment. Proceed anyway? (y/N)")
             answer = input()
         if answer != "y":
             return False
@@ -647,7 +652,7 @@ def _setup_makeresources_args(config):
     """Given a config object, returns a dict with some of those
     configuration options, but suitable as arguments for
     :py:func:`ferenda.Manager.makeresources`.
-    
+
     :param config: An initialized config object with data from a ferenda.ini
                    file
     :type config: layered.LayeredConfig
@@ -665,7 +670,7 @@ def _setup_makeresources_args(config):
             'sitedescription': config.sitedescription,
             'url':         config.url,
             'legacyapi':   config.legacyapi
-    }
+            }
 
 
 def _setup_classnames(enabled, classname):
@@ -676,7 +681,7 @@ def _setup_classnames(enabled, classname):
     Note: a list is always returned, even when the classname ``'all'``
     is not used. If a fully qualified classname is provided, a list
     with the same string is returned.
-    
+
     :param enabled: The currently enabled repo classes, as returned by
                     :py:func:`~ferenda.Manager._enabled_classes`
     :type  enabled: dict
@@ -695,15 +700,17 @@ def _setup_classnames(enabled, classname):
             classname = enabled[classname]
         return [classname]
 
+
 class _WrappedKeyboardInterrupt(Exception):
+
     """Internal class. Wraps a KeyboardInterrupt (which does not inherit
     from :py:exc:`Exception`, but rather :py:exc:`BaseException`) so
     that it can be passed between processes by :py:mod:`multiprocessing`.
     """
     pass
-    
-def _run_class(enabled, argv, config):
 
+
+def _run_class(enabled, argv, config):
     """Runs a particular action for a particular class.
 
     :param enabled: The currently enabled repo classes, as returned by
@@ -773,7 +780,7 @@ def _run_class(enabled, argv, config):
             else:
                 # Now we have a list of jobs in the iterable. They can
                 # be processed in four different ways:
-                # 
+                #
                 if LayeredConfig.get(config, 'buildserver'):
                     # - start an internal jobqueue to which buildclients
                     #   connect, and send jobs to it (and read results
@@ -788,11 +795,22 @@ def _run_class(enabled, argv, config):
                     # - start a number of processess which read from a
                     #   shared jobqueue, and send jobs to that queue (and
                     #   read results from a shared resultqueue)
-                    res = _parallelizejobs(iterable, inst, classname, config.action, config, argv)
+                    res = _parallelizejobs(
+                        iterable,
+                        inst,
+                        classname,
+                        config.action,
+                        config,
+                        argv)
                 else:
                     # - run the jobs, one by one, in the current process
                     for basefile in inst.store.list_basefiles_for(config.action):
-                        res.append(_run_class_with_basefile(clbl, basefile, kwargs, config.action))
+                        res.append(
+                            _run_class_with_basefile(
+                                clbl,
+                                basefile,
+                                kwargs,
+                                config.action))
                 cls.teardown(config.action, inst.config)
         else:
             # The only thing that kwargs may contain is a
@@ -814,24 +832,28 @@ def _run_class(enabled, argv, config):
 # __make_server_manager, _run_jobqueue_multiprocessing and
 # _build_worker are based on the examples in
 # http://eli.thegreenplace.net/2012/01/24/distributed-computing-in-python-with-multiprocessing/
+
+
 def runbuildclient(clientname,
-                    serverhost,
-                    serverport,
-                    authkey,
-                    processes):
+                   serverhost,
+                   serverport,
+                   authkey,
+                   processes):
 
     done = False
-    while not done:  # _run_jobqueue_multiprocessing > _build_worker might throw an exception,
+    # _run_jobqueue_multiprocessing > _build_worker might throw an exception,
+    while not done:
                      # which is how we exit
         manager = _make_client_manager(serverhost,
-                                  serverport,
-                                  authkey)
+                                       serverport,
+                                       authkey)
         job_q = manager.jobqueue()
         result_q = manager.resultqueue()
         _run_jobqueue_multiprocessing(job_q, result_q, processes, clientname)
         # getlog().debug("Client: [pid %s] All done with one run, _run_jobqueue_multiprocessing returned happily" % os.getpid())
         done = True
-        
+
+
 def _make_client_manager(ip, port, authkey):
     """Create a manager for a client. This manager connects to a server
         on the given address and exposes the jobqueue and
@@ -865,6 +887,7 @@ def _make_client_manager(ip, port, authkey):
             # print("Client: %s: sleeping and retrying..." % e)
             sleep(2)
 
+
 def _run_jobqueue_multiprocessing(jobqueue, resultqueue, nprocs, clientname):
     """ Split the work with jobs in jobqueue and results in
         resultqueue into several processes. Launch each process with
@@ -874,6 +897,7 @@ def _run_jobqueue_multiprocessing(jobqueue, resultqueue, nprocs, clientname):
     procs = _start_multiprocessing(jobqueue, resultqueue, nprocs, clientname)
     _finish_multiprocessing(procs)
 
+
 def _start_multiprocessing(jobqueue, resultqueue, nprocs, clientname):
     procs = []
     log = getlog()
@@ -881,8 +905,8 @@ def _start_multiprocessing(jobqueue, resultqueue, nprocs, clientname):
     for i in range(nprocs):
 
         p = multiprocessing.Process(
-                target=_build_worker,
-                args=(jobqueue, resultqueue, clientname))
+            target=_build_worker,
+            args=(jobqueue, resultqueue, clientname))
         procs.append(p)
         # sleep(1)
         p.start()
@@ -900,7 +924,7 @@ def _finish_multiprocessing(procs, join=True):
             # getlog().debug("Server: killing proc %s" % p.pid)
             p.terminate()
 
-        
+
 def _build_worker(jobqueue, resultqueue, clientname):
     """A worker function to be launched in a separate process. Takes jobs
         from jobqueue - each job a dict. When the job is done, the
@@ -911,20 +935,20 @@ def _build_worker(jobqueue, resultqueue, clientname):
     # create the inst with a default config
     # (_instantiate_class will try to read ferenda.ini)
     inst = None
-    logstream  = StringIO()
+    logstream = StringIO()
     log = getlog()
     log.debug("Client: [pid %s] _build_worker ready to process job queue" % os.getpid())
     while True:
-        job = jobqueue.get() # get() blocks -- wait until a job or the
-                          # DONE/SHUTDOWN signal comes
-        if job == "DONE": # or a more sensible value
+        job = jobqueue.get()  # get() blocks -- wait until a job or the
+        # DONE/SHUTDOWN signal comes
+        if job == "DONE":  # or a more sensible value
             # getlog().debug("Client: [pid %s] Got DONE signal" % os.getpid())
             return  # back to runbuildclient
         if job == "SHUTDOWN":
             # getlog().debug("Client: Got SHUTDOWN signal")
             # kill the entire thing
             raise Exception("OK we're done now")
-        if inst == None:
+        if inst is None:
             inst = _instantiate_and_configure(job['classname'],
                                               job['config'],
                                               logstream,
@@ -948,13 +972,15 @@ def _build_worker(jobqueue, resultqueue, clientname):
                    'client': clientname}
         resultqueue.put(outdict)
         # log.debug("Client: [pid %s] Put '%s' on the queue" % (os.getpid(), outdict['result']))
-        
+
 
 def _instantiate_and_configure(classname, config, logstream, clientname):
     log = getlog()
-    log.debug("Client: [pid %s] instantiating and configuring %s" % (os.getpid(), classname))
+    log.debug(
+        "Client: [pid %s] instantiating and configuring %s" %
+        (os.getpid(), classname))
     inst = _instantiate_class(_load_class(classname))
-    for k,v in config.items():
+    for k, v in config.items():
         # log.debug("Client: [pid %s] setting config value %s to %r" % (os.getpid(), k, v))
         LayeredConfig.set(inst.config, k, v)
 
@@ -966,7 +992,7 @@ def _instantiate_and_configure(classname, config, logstream, clientname):
         for handler in log.handlers:
             log.removeHandler(handler)
         handler = logging.StreamHandler(logstream)
-        fmt = clientname+" %(asctime)s %(name)s %(levelname)s %(message)s"
+        fmt = clientname + " %(asctime)s %(name)s %(levelname)s %(message)s"
         formatter = logging.Formatter(fmt, datefmt="%H:%M:%S")
         handler.setFormatter(formatter)
         handler.setLevel(loglevels[inst.config.loglevel])
@@ -977,20 +1003,20 @@ def _instantiate_and_configure(classname, config, logstream, clientname):
         pass
         # FIXME: change the logformat to include pid
     return inst
-    
+
 
 def _queuejobs(iterable, inst, classname, command):
     # Start a shared manager server and access its queues
     # NOTE: _make_server_manager reuses existing buildserver if there is one
     manager = _make_server_manager(port=inst.config.serverport,
-                                  authkey=inst.config.authkey)
+                                   authkey=inst.config.authkey)
     return _queue_jobs(manager, iterable, inst, classname, command)
 
 
 def _queuejobs_to_queue(iterable, inst, classname, command):
     manager = _make_client_manager(inst.config.buildqueue,
-                                  inst.config.serverport,
-                                  inst.config.authkey)
+                                   inst.config.serverport,
+                                   inst.config.authkey)
     return _queue_jobs(manager, iterable, inst, classname, command)
 
 
@@ -1039,7 +1065,7 @@ def _queue_jobs(manager, iterable, inst, classname, command):
                'config': client_config}
         # print("putting %r into jobqueue" %  job)
         jobqueue.put(job)
-    number_of_jobs = idx+1
+    number_of_jobs = idx + 1
     log.debug("Server: Put %s jobs into job queue" % number_of_jobs)
     # FIXME: only one of the clients will read this DONE package, and
     # we have no real way of knowing how many clients there will be
@@ -1054,12 +1080,16 @@ def _queue_jobs(manager, iterable, inst, classname, command):
         elif isinstance(r['result'], tuple) and isinstance(r['result'], Exception):
             r['except_type'] = r['result'][0]
             r['except_value'] = r['result'][1]
-            log.error("Server: %(client)s failed %(basefile)s: %(except_type)s: %(except_value)s" % r)
+            log.error(
+                "Server: %(client)s failed %(basefile)s: %(except_type)s: %(except_value)s" %
+                r)
             print("".join(traceback.format_list(r['result'][2])))
         else:
             for line in [x.strip() for x in r['log'].split("\n") if x.strip()]:
                 print("   %s" % line)
-            log.debug("Server: client %(client)s processed %(basefile)s: Result (%(result)s): OK" % r)
+            log.debug(
+                "Server: client %(client)s processed %(basefile)s: Result (%(result)s): OK" %
+                r)
         if 'result' in r:
             res.append(r['result'])
         numres += 1
@@ -1071,7 +1101,7 @@ def _queue_jobs(manager, iterable, inst, classname, command):
     # that
     # manager.shutdown()
 
-    
+
 buildmanager = None
 if six.PY2:
     jobqueue_id = b'jobqueue'
@@ -1079,9 +1109,9 @@ if six.PY2:
 else:
     jobqueue_id = 'jobqueue'
     resultqueue_id = 'resultqueue'
-    
-def _make_server_manager(port, authkey, start=True):
 
+
+def _make_server_manager(port, authkey, start=True):
     """ Create a manager for the server, listening on the given port.
         Return a manager object with jobqueue and resultqueue methods.
     """
@@ -1106,19 +1136,22 @@ def _make_server_manager(port, authkey, start=True):
             authkey = authkey.encode("utf-8")
 
         buildmanager = JobQueueManager(address=('', port), authkey=authkey)
-        getlog().debug("Server: Process %s created new buildmanager at %s" % (os.getpid(), id(buildmanager)))
-        if start: # runbuildqueue wants to control this itself
+        getlog().debug(
+            "Server: Process %s created new buildmanager at %s" %
+            (os.getpid(), id(buildmanager)))
+        if start:  # runbuildqueue wants to control this itself
             buildmanager.start()
             getlog().debug('Server: Started at port %s' % port)
-        
+
     return buildmanager
+
 
 def runbuildqueue(serverport, authkey):
     # NB: This never returns!
     manager = _make_server_manager(serverport, authkey, start=False)
     getlog().debug("Queue: Starting server manager with .serve_forever()")
     manager.get_server().serve_forever()
-    
+
 
 def _shutdown_buildserver():
     global buildmanager
@@ -1127,6 +1160,7 @@ def _shutdown_buildserver():
         buildmanager.shutdown()
         buildmanager = None
         sleep(1)
+
 
 def _parallelizejobs(iterable, inst, classname, command, config, argv):
     jobqueue = multiprocessing.Queue()
@@ -1139,6 +1173,7 @@ def _parallelizejobs(iterable, inst, classname, command, config, argv):
     finally:
         _finish_multiprocessing(procs, join=False)
 
+
 def _process_resultqueue(resultqueue, basefiles):
     res = {}
     queuelength = len(basefiles)
@@ -1150,7 +1185,7 @@ def _process_resultqueue(resultqueue, basefiles):
     # return the results in the same order as they were queued
     return [res[x] for x in basefiles]
 
-    
+
 def _run_class_with_basefile(clbl, basefile, kwargs, command, wrapctrlc=False):
     try:
         return clbl(basefile, **kwargs)
@@ -1159,28 +1194,28 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command, wrapctrlc=False):
             if not os.path.exists(e.dummyfile):
                 util.writefile(e.dummyfile, "")
             return None  # is what DocumentRepository.parse returns
-                         # when everyting's ok
+            # when everyting's ok
         else:
             errmsg = str(e)
             getlog().error("%s of %s failed: %s" %
-                                 (command, basefile, errmsg))
+                           (command, basefile, errmsg))
             exc_type, exc_value, tb = sys.exc_info()
             return exc_type, exc_value, traceback.extract_tb(tb)
     except Exception as e:
         errmsg = str(e)
         getlog().error("%s of %s failed: %s" %
-                             (command, basefile, errmsg))
+                       (command, basefile, errmsg))
         exc_type, exc_value, tb = sys.exc_info()
         return exc_type, exc_value, traceback.extract_tb(tb)
     except KeyboardInterrupt as e:   # KeyboardInterrupt is not an Exception
         if wrapctrlc:
             except_type, except_value, tb = sys.exc_info()
-            return _WrappedKeyboardInterrupt, _WrappedKeyboardInterrupt(), traceback.extract_tb(tb)
+            return _WrappedKeyboardInterrupt, _WrappedKeyboardInterrupt(
+            ), traceback.extract_tb(tb)
         else:
             raise
 
 
-        
 def _instantiate_class(cls, config=None, argv=[]):
     """Given a class object, instantiate that class and make sure the
        instance is properly configured given it's own defaults, a
@@ -1237,7 +1272,7 @@ def _enabled_classes(inifile=None):
     :type inifile: str
     :returns: A mapping between alias and classname for all registered classes.
     :rtype: dict
-    
+
     """
 
     cfg = configparser.ConfigParser()
@@ -1255,7 +1290,7 @@ def _enabled_classes(inifile=None):
 def _print_usage():
     """Prints out general usage information for the ``ferenda-build.py`` tool."""
     # general info, enabled classes
-    executable = sys.argv[0] 
+    executable = sys.argv[0]
     print("""Usage: %(executable)s [class-or-alias] [action] <arguments> <options>
    e.g. '%(executable)s ferenda.sources.EurlexCaselaw enable'
         '%(executable)s ecj parse 62008J0042'
@@ -1279,7 +1314,7 @@ def _list_enabled_classes():
 
     :returns: a mapping (alias -> description) for all registered classes
     :rtype: dict
-    
+
     """
     res = OrderedDict()
     for (alias, classname) in _enabled_classes().items():
@@ -1315,7 +1350,7 @@ def _list_class_usage(cls):
 
     Note: Descriptions are taken from the first line of the action
     methods' docstring.
-    
+
     :param cls: The class to list usage for.
     :type cls: class
     :return: a mapping of (action -> description) for a specified class.
@@ -1392,7 +1427,7 @@ def _setup_runserver_args(config, inifilename):
     """Given a config object, returns a dict with some of those
        configuration options, but suitable as arguments for
        :py:func:`ferenda.Manager.runserver`.
-    
+
     :param config: An initialized config object with data from a ferenda.ini
                    file
     :type config: layeredconfig.LayeredConfig
@@ -1400,12 +1435,11 @@ def _setup_runserver_args(config, inifilename):
     :rtype: dict
 
     """
-    from pudb import set_trace; set_trace()
     if 'develurl' in config:
         url = config.develurl
     else:
         url = config.url
-        
+
     port = urlsplit(url).port or 80
     relativeroot = os.path.join(os.path.dirname(inifilename), config.datadir)
 
@@ -1453,6 +1487,7 @@ def _setup_frontpage_args(config, argv):
             'staticsite': config.staticsite,
             'repos': repos}
 
+
 def _setup_buildclient_args(config):
     import socket
     return {'clientname': LayeredConfig.get(config, 'clientname',
@@ -1463,7 +1498,7 @@ def _setup_buildclient_args(config):
             'processes':  LayeredConfig.get(config, 'processes',
                                             multiprocessing.cpu_count())
             }
-            
+
 
 def _setup_buildqueue_args(config):
     import socket
@@ -1535,7 +1570,7 @@ def _preflight_check(log, verbose=False):
             elif util.numcmp(version, ver) < 0:
                 if required:
                     log.error("Module %s has version %s, need %s" %
-                          (mod, version, ver))
+                              (mod, version, ver))
                     success = False
                 else:
                     log.warning(
@@ -1552,9 +1587,9 @@ def _preflight_check(log, verbose=False):
                 log.warning("Missing (non-essential) module %s" % mod)
 
     # a thing needed by testManager.Setup.test_preflight
-    if  (MagicMock is not None and
-         isinstance(__import__, MagicMock) and
-         __import__.side_effect is not None):
+    if (MagicMock is not None and
+            isinstance(__import__, MagicMock) and
+            __import__.side_effect is not None):
         __import__.side_effect = None
 
     # 3: Check binaries
@@ -1635,8 +1670,8 @@ def _select_triplestore(sitename, log, verbose=False):
     # 3. RDFLib + SQLite
     try:
         tmp = tempfile.mkdtemp()
-        
-        t = TripleStore.connect("SQLITE", tmp+os.sep+"test.sqlite", "ferenda")
+
+        t = TripleStore.connect("SQLITE", tmp + os.sep + "test.sqlite", "ferenda")
         t.close()
         if verbose:
             log.info("SQLite-backed RDFLib triplestore seems to work")
@@ -1650,7 +1685,7 @@ def _select_triplestore(sitename, log, verbose=False):
     # 4. RDFLib + Sleepycat
     try:
         tmp = tempfile.mkdtemp()
-        t = TripleStore.connect("SLEEPYCAT", tmp+os.sep+"test.db", "ferenda")
+        t = TripleStore.connect("SLEEPYCAT", tmp + os.sep + "test.db", "ferenda")
         # No boom?
         if verbose:
             log.info("Sleepycat-backed RDFLib triplestore seems to work")
@@ -1661,7 +1696,8 @@ def _select_triplestore(sitename, log, verbose=False):
     finally:
         shutil.rmtree(tmp)
 
-    log.info("No usable triplestores, the actions 'relate', 'generate' and 'toc' won't work")
+    log.info(
+        "No usable triplestores, the actions 'relate', 'generate' and 'toc' won't work")
     return (None, None, None)
 
 
@@ -1682,7 +1718,7 @@ def _select_fulltextindex(log, sitename, verbose=False):
                 requests.exceptions.ConnectionError) as e:
             if verbose:
                 log.info("... Elasticsearch not available at %s: %s" %
-                      (fulltextindex, e))
+                         (fulltextindex, e))
             pass
     # 2. Whoosh (just assume that it works)
     return ("WHOOSH", "data/whooshindex")

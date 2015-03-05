@@ -19,7 +19,7 @@ class DocumentStore(object):
     """
     Unifies handling of reading and writing of various data files
     during the ``download``, ``parse`` and ``generate`` stages.
-    
+
     :param datadir: The root directory (including docrepo path
                     segment) where files are stored.
     :type datadir: str
@@ -68,14 +68,14 @@ class DocumentStore(object):
             fp = open(filename, mode)
             yield fp
 
-
     # TODO: Maybe this is a worthwhile extension to the API? Could ofc
     # easily be done everywhere where a non-document related path is
     # needed.
     def resourcepath(self, resourcename):
         return self.datadir + os.sep + resourcename.replace("/", os.sep)
 
-    def path(self, basefile, maindir, suffix, version=None, attachment=None, storage_policy=None):
+    def path(self, basefile, maindir, suffix, version=None, attachment=None,
+             storage_policy=None):
         """Calculate a full filesystem path for the given parameters.
 
         :param basefile: The basefile of the resource we're calculating a filename for
@@ -85,7 +85,7 @@ class DocumentStore(object):
         :param suffix: Appropriate file suffix, e.g. ``.txt`` or ``.pdf``
         :param version: Optional. The archived version id
         :type  version: str
-        :param attachment: Optional. Any associated file needed by the main file. 
+        :param attachment: Optional. Any associated file needed by the main file.
         :type  attachment: str
         :param storage_policy: Optional. Used to override `storage_policy` if needed
         :type  attachment: str
@@ -97,7 +97,7 @@ class DocumentStore(object):
            storage policy, you should use methods like
            :meth:`~ferenda.DocumentStore.downloaded_path` or :meth:`~ferenda.DocumentStore.parsed_path` when
            possible.
-        
+
         Example:
 
         >>> d = DocumentStore(datadir="/tmp/base")
@@ -111,7 +111,7 @@ class DocumentStore(object):
         >>> d.path('123/a', 'downloaded', None, 'r4711', 'appendix.txt') == '/tmp/base/archive/downloaded/123/a/r4711/appendix.txt'
         True
         >>> os.sep = realsep
-        
+
         :param basefile: The basefile for which to calculate the path
         :type  basefile: str
         :param  maindir: The processing stage directory (normally ``downloaded``, ``parsed``, or ``generated``)
@@ -130,7 +130,7 @@ class DocumentStore(object):
 
         if not storage_policy:
             storage_policy = self.storage_policy
-        
+
         if version:
             v_pathfrag = self.basefile_to_pathfrag(version)
             segments = [self.datadir,
@@ -148,7 +148,7 @@ class DocumentStore(object):
             else:
                 segments.append("index" + suffix)
         else:
-            if attachment != None:
+            if attachment is not None:
                 raise errors.AttachmentPolicyError(
                     "Can't add attachments (name %s) if "
                     "storage_policy != 'dir'" % attachment)
@@ -170,7 +170,7 @@ class DocumentStore(object):
         :meth:`~ferenda.DocumentStore.open_parsed` et al if possible.
 
         Example:
-        
+
         >>> store = DocumentStore(datadir="/tmp/base")
         >>> with store.open('123/a', 'parsed', '.xhtml', mode="w") as fp:
         ...     res = fp.write("hello world")
@@ -249,7 +249,6 @@ class DocumentStore(object):
         if not os.path.exists(directory):
             return
 
-
         # FIXME: Some stores need a more sophisticated way of filtering than this.
         for x in util.list_dirs(directory, suffix, reverse=True):
             # ignore empty files placed by download (which may
@@ -258,7 +257,7 @@ class DocumentStore(object):
             if os.path.exists(x) and os.path.getsize(x) > 0:
                 # get a pathfrag from full path
                 # suffixlen = len(suffix) if self.storage_policy == "file" else len(suffix) + 1
-                suffixlen = len(suffix) 
+                suffixlen = len(suffix)
                 x = x[len(directory) + 1:-suffixlen]
                 yield self.pathfrag_to_basefile(x)
 
@@ -276,7 +275,8 @@ class DocumentStore(object):
         """
 
         if action:
-            assert action in ('downloaded', 'parsed', 'generated'), "Action %s invalid" % action
+            assert action in (
+                'downloaded', 'parsed', 'generated'), "Action %s invalid" % action
             actions = (action,)
         else:
             actions = ('downloaded', 'parsed', 'generated')
@@ -324,12 +324,13 @@ class DocumentStore(object):
         :type  basefile: str
         :param version: The version of the basefile to list attachments for. If None, list attachments for the current version.
         :type  version: str
-        :returns: All available attachments for the basefile 
+        :returns: All available attachments for the basefile
         :rtype: generator
         """
         if self.storage_policy != "dir":
-            raise errors.AttachmentPolicyError("Can't list attachments if storage_policy != 'dir'")
-        
+            raise errors.AttachmentPolicyError(
+                "Can't list attachments if storage_policy != 'dir'")
+
         basedir = self.datadir
         # pathfrag = self.pathfrag_to_basefile(basefile) # that can't be right?
         pathfrag = self.basefile_to_pathfrag(basefile)
@@ -387,8 +388,8 @@ class DocumentStore(object):
             # values for the safe parameter). FIXME: We should create
             # a shim as ferenda.compat.quote and use that
             basefile = basefile.encode('utf-8')
-            safe = safe.encode('ascii') # pragma: no cover
-            
+            safe = safe.encode('ascii')  # pragma: no cover
+
         return quote(basefile, safe=safe).replace('%', os.sep + '%')
 
     def pathfrag_to_basefile(self, pathfrag):
@@ -449,7 +450,7 @@ class DocumentStore(object):
         :type  basefile: str
         :param  version: Optional. The archived version id
         :type   version: str
-        :param attachment: Optional. Any associated file needed by the main file. 
+        :param attachment: Optional. Any associated file needed by the main file.
         :type  attachment: str
         :returns: The full filesystem path
         :rtype:   str
@@ -590,7 +591,7 @@ class DocumentStore(object):
         :type  basefile: str
         :param  version: Optional. The archived version id
         :type   version: str
-        :param attachment: Optional. Any associated file needed by the main file. 
+        :param attachment: Optional. Any associated file needed by the main file.
         :type  attachment: str
         :returns: The full filesystem path
         :rtype:   str

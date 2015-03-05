@@ -24,19 +24,20 @@ class W3Standards(DocumentRepository):
     rdf_type = Namespace("http://example.org/ontology/w3c/").Recommendation
     document_url_regex = "http://www.w3.org/TR/(?P<year>\d{4})/REC-(?P<basefile>.*)-(?P<date>\d+)"
     document_url_template = None  # no simple way of creating a url
-                                 # from a basefile alone (we also need
-                                 # the published date)
+    # from a basefile alone (we also need
+    # the published date)
     basefile_regex = None  # Link text on index page do not contain basefile
     parse_content_selector = "body"
     parse_filter_selectors = ["div.toc", "div.head"]
     namespaces = ('rdf',  # always needed
-                  'dcterms',  # title, identifier, etc (could be replaced by equiv bibo prop?)
+                  'dcterms',
+                  # title, identifier, etc (could be replaced by equiv bibo prop?)
                   'bibo',  # Standard and DocumentPart classes, chapter prop
                   'xsd',  # datatypes
-                  'prov', # for :wasGeneratedBy
-                  ('w3c', 'http://example.org/ontology/w3c/')  # custom (nonstandard) ontology
+                  'prov',  # for :wasGeneratedBy
+                  # custom (nonstandard) ontology
+                  ('w3c', 'http://example.org/ontology/w3c/')
                   )
-
 
     # NOTES:
     #
@@ -301,14 +302,13 @@ class W3Standards(DocumentRepository):
         for subpart in part:
             self.decorate_bodyparts(subpart, baseuri)
 
-    def facets(self): 
-        return [Facet(RDF.type),           
-                Facet(DCTERMS.title),      
+    def facets(self):
+        return [Facet(RDF.type),
+                Facet(DCTERMS.title),
                 # Facet(DCTERMS.publisher), -- is always w3c
                 Facet(DCTERMS.identifier),
                 Facet(DCTERMS.issued)
-        ]     
-       
+                ]
 
     def tabs(self):
         return [("W3C standards", self.dataset_uri())]

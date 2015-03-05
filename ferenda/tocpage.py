@@ -5,7 +5,7 @@ from __future__ import unicode_literals
 class TocPage(object):
 
     """Represents a particular TOC page.
-    
+
     :param linktext: The text used for TOC links *to* this page, like "a" or "2013".
     :param linktext: str
     :param label: A description of this page, like "Documents starting with 'a'"

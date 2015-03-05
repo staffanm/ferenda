@@ -71,7 +71,6 @@ class Main(unittest.TestCase):
                         "And now we're done."
                         ])
                     ])
-        
         want = serialize(doc)
 
         # first test a blank CitationParser, w/o patterns or formatter

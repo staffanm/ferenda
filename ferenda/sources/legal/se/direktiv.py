@@ -29,17 +29,18 @@ from ferenda.elements import ListItem
 from ferenda.errors import DocumentRemovedError
 
 
-# custom style analyzer 
+# custom style analyzer
 class DirAnalyzer(PDFAnalyzer):
     # direktiv has no footers
     footer_significance_threshold = 0
+
     def analyze_styles(self, frontmatter_styles, rest_styles):
         styledefs = {}
         all_styles = frontmatter_styles + rest_styles
         ds = all_styles.most_common(1)[0][0]
         styledefs['default'] = self.fontdict(ds)
 
-        # title style: the 2nd largest style on the frontpage 
+        # title style: the 2nd largest style on the frontpage
         if frontmatter_styles:
             ts = sorted(frontmatter_styles.keys(), key=self.fontsize_key, reverse=True)[1]
             styledefs['title'] = self.fontdict(ts)
@@ -50,9 +51,10 @@ class DirAnalyzer(PDFAnalyzer):
         largestyles = [x for x in sortedstyles if
                        self.fontsize_key(x) > self.fontsize_key(ds)]
         for style in ('h2', 'h1'):
-            if largestyles: # any left?
+            if largestyles:  # any left?
                 styledefs[style] = self.fontdict(largestyles.pop(0))
         return styledefs
+
 
 class Continuation(object):
     pass
@@ -111,7 +113,7 @@ class DirTrips(Trips):
         # key-value headers when both keys and headers may be
         # continuated. The below, which relies on HTML tags enclosing
         # the value, is much simpler.
-        # 
+        #
         # header = re.compile("([^:]+):\s*<b>([^<]*)</b>")
         # for m in header.finditer(header_chunk):
         #    yield [util.normalize_space(x) for x in m.groups()]
@@ -135,8 +137,8 @@ class DirTrips(Trips):
                         yield(n(ck), n(cv))
                     ck = line
                     cv = ""
-        yield(n(ck),n(cv))
-                
+        yield(n(ck), n(cv))
+
     def make_meta(self, chunk, meta, uri, basefile):
         d = Describer(meta, uri)
         dcterms = self.ns['dcterms']
@@ -241,8 +243,8 @@ class DirTrips(Trips):
             return ListItem
         elif (p[0].upper() != p[0]):
             return Continuation  # magic value, used to glue together
-                                 # paragraphs that have been
-                                 # inadvertently divided.
+            # paragraphs that have been
+            # inadvertently divided.
         else:
             return Paragraph
 
@@ -277,7 +279,7 @@ class DirAsp(SwedishLegalSource, PDFDocumentRepository):
             # avoid even calling download_single if we already have
             # the doc.
             if ((not self.config.refresh) and
-                (not os.path.exists(self.store.downloaded_path(basefile)))):
+                    (not os.path.exists(self.store.downloaded_path(basefile)))):
                 self.download_single(basefile, url)
 
     @downloadmax
@@ -327,7 +329,7 @@ class DirRegeringen(Regeringen):
     re_basefile_lax = re.compile(r'(?:[Dd]ir\.?|) ?(\d{4}:\d+)')
     rdf_type = RPUBL.Direktiv
     document_type = Regeringen.KOMMITTEDIREKTIV
-    sparql_annotations = None # don't even bother creating an annotation file
+    sparql_annotations = None  # don't even bother creating an annotation file
 
     def sanitize_identifier(self, identifier):
         # "Dir.1994:111" -> "Dir. 1994:111"
@@ -339,10 +341,12 @@ class DirRegeringen(Regeringen):
 
 # inherit list_basefiles_for from CompositeStore, basefile_to_pathfrag
 # from SwedishLegalStore)
+
+
 class DirektivStore(CompositeStore, SwedishLegalStore):
     pass
 
-        
+
 # Does parsing, generating etc from base files:
 class Direktiv(CompositeRepository, SwedishLegalSource):
 
@@ -353,4 +357,4 @@ class Direktiv(CompositeRepository, SwedishLegalSource):
     storage_policy = "dir"
     rdf_type = RPUBL.Direktiv
     documentstore_class = DirektivStore
-    sparql_annotations = None # don't even bother creating an annotation file
+    sparql_annotations = None  # don't even bother creating an annotation file

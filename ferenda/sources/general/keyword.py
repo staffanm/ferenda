@@ -21,12 +21,12 @@ from ferenda.decorators import managedparsing
 from ferenda.elements import Body
 
 
-
 # FIXME: Use MW_NS = "{%s}" % xml.getroot().nsmap[None]
 MW_NS = "{http://www.mediawiki.org/xml/export-0.3/}"
 
 
 class KeywordStore(DocumentStore):
+
     def basefile_to_pathfrag(self, basefile):
         # Shard all files under initial letter, eg "Avtal" => "a/Avtal"
         first = basefile[0].lower()
@@ -64,13 +64,13 @@ class Keyword(DocumentRepository):
         self.termset_funcs = [self.download_termset_mediawiki,
                               self.download_termset_wikipedia]
 
-
     @classmethod
     def get_default_options(cls):
         opts = super(Keyword, cls).get_default_options()
         # The API endpoint URLs change with MW language
         opts['mediawikiexport'] = 'http://localhost/wiki/Special:Export/%s(basefile)'
-        opts['wikipediatitles'] = 'http://download.wikimedia.org/svwiki/latest/svwiki-latest-all-titles-in-ns0.gz'
+        opts[
+            'wikipediatitles'] = 'http://download.wikimedia.org/svwiki/latest/svwiki-latest-all-titles-in-ns0.gz'
         return opts
 
     def canonical_uri(self, basefile):
@@ -100,7 +100,7 @@ class Keyword(DocumentRepository):
         PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
 
         SELECT DISTINCT ?subject ?label
-        WHERE { {?uri dcterms:subject ?subject . } 
+        WHERE { {?uri dcterms:subject ?subject . }
                 OPTIONAL {?subject rdfs:label ?label . } }
         """
         store = TripleStore.connect(self.config.storetype,
@@ -210,7 +210,8 @@ class Keyword(DocumentRepository):
             uniongraph = True
         return store.select(sq, "python", uniongraph=uniongraph)
 
-    def time_store_select(self, store, query_template, basefile, context=None, label="things"):
+    def time_store_select(
+            self, store, query_template, basefile, context=None, label="things"):
         values = {'basefile': basefile,
                   'label': label,
                   'count': None}
@@ -226,8 +227,6 @@ class Keyword(DocumentRepository):
                                        context)
             values['count'] = len(result)
         return result
-        
-            
 
     # FIXME: translate this to be consistent with construct_annotations
     # (e.g. return a RDF graph through one or a few SPARQL queries),
@@ -249,8 +248,8 @@ class Keyword(DocumentRepository):
                                           basefile,
                                           None,
                                           "descriptions")
-        
-        # compatibility hack to enable lxml to process qnames for namespaces 
+
+        # compatibility hack to enable lxml to process qnames for namespaces
         def ns(string):
             if ":" in string:
                 prefix, tag = string.split(":", 1)
@@ -275,7 +274,7 @@ class Keyword(DocumentRepository):
         # subclasses override this to add extra annotations from other
         # sources
         self.prep_annotation_file_termsets(basefile, main_node)
-        
+
         treestring = etree.tostring(root_node,
                                     encoding="utf-8",
                                     pretty_print=True)
@@ -285,6 +284,3 @@ class Keyword(DocumentRepository):
 
     def prep_annotation_file_termsets(self, basefile, main_node):
         pass
-
-        
-

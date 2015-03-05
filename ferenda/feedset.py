@@ -28,5 +28,8 @@ class Feedset(object):
         return self.__dict__ == other.__dict__
 
     def __repr__(self):
-        dictrepr = "".join((" %s=%s" % (k, v) for k, v in sorted(self.__dict__.items()) if not callable(v)))
+        dictrepr = "".join(
+            (" %s=%s" %
+             (k, v) for k, v in sorted(
+                 self.__dict__.items()) if not callable(v)))
         return ("<%s%s>" % (self.__class__.__name__, dictrepr))

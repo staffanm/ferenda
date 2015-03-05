@@ -66,7 +66,7 @@ def elements_from_soup(soup,
         else:
             #print("%sChild %s" % (depth*". ",soup.name))
             subelement = elements_from_soup(child, remove_tags, keep_attributes)
-            if subelement != None:
+            if subelement is not None:
                 element.append(subelement)
     return element
 

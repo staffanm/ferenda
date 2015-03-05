@@ -105,31 +105,33 @@ class PDFReader(CompoundElement):
         :param ocr_lang: str
 
         """
-        if pages: # special-case: The object has been initialized as a
+        if pages:  # special-case: The object has been initialized as a
                   # regular list (by deserialize), we have no need to
                   # parse and create pages.
             return
         self.log = logging.getLogger('pdfreader')
         if not filename:
             return  # another specialcase: create an empty object so
-                    # that we can call the ._tesseract in other
-                    # scenarios
+            # that we can call the ._tesseract in other
+            # scenarios
         self.fontspec = fontspec or {}
         self.filename = filename
         self.workdir = workdir
         if self.workdir is None:
             self.workdir = tempfile.mkdtemp()
-            
+
         if convert_to_pdf:
-            newfilename = workdir + os.sep + os.path.splitext(os.path.basename(filename))[0] + ".pdf"
+            newfilename = workdir + os.sep + \
+                os.path.splitext(os.path.basename(filename))[0] + ".pdf"
             if not os.path.exists(newfilename):
                 util.ensure_dir(newfilename)
-                cmdline = "soffice --headless -convert-to pdf -outdir '%s' %s" % (workdir, filename)
+                cmdline = "soffice --headless -convert-to pdf -outdir '%s' %s" % (
+                    workdir, filename)
                 self.log.debug("%s: Converting to PDF: %s" % (filename, cmdline))
                 (ret, stdout, stderr) = util.runcmd(
                     cmdline, require_success=True)
                 filename = newfilename
-        
+
         assert os.path.exists(filename), "PDF %s not found" % filename
         basename = os.path.basename(filename)
         stem = os.path.splitext(basename)[0]
@@ -166,7 +168,7 @@ class PDFReader(CompoundElement):
                     wfp.write(rfp.read())
                     wfp.close()
                 os.unlink(convertedfile)
-            else: # keep_xml = True
+            else:  # keep_xml = True
                 pass
 
         if keep_xml == "bz2":
@@ -200,8 +202,9 @@ class PDFReader(CompoundElement):
             topage = min((i + 1) * 10, number_of_pages)
             if frompage > topage:
                 continue
-            cmd = "pdfimages -p -f %(frompage)s -l %(topage)s %(tmppdffile)s %(workdir)s/%(root)s" % locals()
-            self.log.debug("- running "+cmd)
+            cmd = "pdfimages -p -f %(frompage)s -l %(topage)s %(tmppdffile)s %(workdir)s/%(root)s" % locals(
+            )
+            self.log.debug("- running " + cmd)
             (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
             # step 2.1: Combine the recently extracted images and
             # into a new tif (so that we add 10
@@ -209,7 +212,8 @@ class PDFReader(CompoundElement):
             # create a number of pretty large files for each page,
             # so converting 200 images will fill 10 G of your temp
             # space -- which we'd like to avoid)
-            cmd = "convert %(workdir)s/%(root)s-*.pbm -compress Zip %(workdir)s/%(root)s-tmp%(idx)04d.tif" % locals()
+            cmd = "convert %(workdir)s/%(root)s-*.pbm -compress Zip %(workdir)s/%(root)s-tmp%(idx)04d.tif" % locals(
+            )
             self.log.debug("- running " + cmd)
             (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
             # step 2.2: Remove pbm files now that they're in the .tif
@@ -220,15 +224,15 @@ class PDFReader(CompoundElement):
         cmd = "tiffcp -c zip %(workdir)s/%(root)s-tmp*.tif %(workdir)s/%(root)s.tif" % locals()
         self.log.debug("- running " + cmd)
         (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
-        
-                
+
         # Step 3: OCR the giant tif file to create a .hocr.html file
         # Note that -psm 1 (automatic page segmentation with
         # orientation and script detection) requires the installation
         # of tesseract-ocr-3.01.osd.tar.gz
         usehocr = "hocr" if hocr else ""
         suffix = ".hocr" if hocr else ""
-        cmd = "tesseract %(workdir)s/%(root)s.tif %(workdir)s/%(root)s%(suffix)s -l %(lang)s -psm 1 %(usehocr)s" % locals()
+        cmd = "tesseract %(workdir)s/%(root)s.tif %(workdir)s/%(root)s%(suffix)s -l %(lang)s -psm 1 %(usehocr)s" % locals(
+        )
         self.log.debug("running " + cmd)
         (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
 
@@ -247,7 +251,7 @@ class PDFReader(CompoundElement):
                 cmd = "pdftohtml -nodrm -c %s" % tmppdffile
                 self.log.debug("Converting: %s" % cmd)
                 (returncode, stdout, stderr) = util.runcmd(cmd,
-                                                          require_success=True)
+                                                           require_success=True)
                 # we won't need the html files, or the blank PNG files
                 for f in os.listdir(workdir):
                     if f.startswith(root) and f.endswith(".html"):
@@ -256,7 +260,8 @@ class PDFReader(CompoundElement):
                         # this checks the number of unique colors in the
                         # bitmap. If there's only one color, we don't need
                         # the file
-                        (returncode, stdout, stderr) = util.runcmd('convert %s -format "%%k" info:' % (workdir + os.sep + f))
+                        (returncode, stdout, stderr) = util.runcmd(
+                            'convert %s -format "%%k" info:' % (workdir + os.sep + f))
                         if stdout.strip() == "1":
                             os.unlink(workdir + os.sep + f)
                         else:
@@ -289,30 +294,33 @@ class PDFReader(CompoundElement):
             m = self.re_dimensions(s)
             return m.groupdict()
         tree = etree.parse(fp)
-        for pageelement in tree.findall("//{http://www.w3.org/1999/xhtml}div[@class='ocr_page']"):
+        for pageelement in tree.findall(
+                "//{http://www.w3.org/1999/xhtml}div[@class='ocr_page']"):
             dim = dimensions(pageelement.get('title'))
             page = Page(number=int(pageelement.get('id')[5:]),
                         width=int(dim['right']) - int(dim['left']),
                         height=int(dim['bottom']) - int(dim['top']),
                         background=None)
             pageheight_in_mm = 242  # FIXME: get this from PDF
-            pointsize = 0.352777778 # constant
+            pointsize = 0.352777778  # constant
             pageheight_in_points = pageheight_in_mm / pointsize
             px_per_point = page.height / pageheight_in_points
 
             # we discard elements at the ocr_carea (content area?)
             # level, we're only concerned with paragraph-level
             # elements
-            for boxelement in pageelement.findall(".//{http://www.w3.org/1999/xhtml}span[@class='ocr_line']"):
+            for boxelement in pageelement.findall(
+                    ".//{http://www.w3.org/1999/xhtml}span[@class='ocr_line']"):
                 boxdim = dimensions(boxelement.get('title'))
                 textelements = []
-                for element in boxelement.findall(".//{http://www.w3.org/1999/xhtml}span[@class='ocrx_word']"):
+                for element in boxelement.findall(
+                        ".//{http://www.w3.org/1999/xhtml}span[@class='ocrx_word']"):
                     dim = dimensions(element.get("title"))
                     t = "".join(element.itertext()) + element.tail
                     if not t.strip():
                         continue  # strip empty things
                     t = t.replace("\n", " ")
-                    
+
                     if element.getchildren():  # probably a <em> or <strong> element
                         tag = {'{http://www.w3.org/1999/xhtml}em': 'i',
                                '{http://www.w3.org/1999/xhtml}strong': 'b'}[element.getchildren()[0].tag]
@@ -323,9 +331,9 @@ class PDFReader(CompoundElement):
                                        top=int(dim['top']),
                                        left=int(dim['left']),
                                        width=int(dim['right']) - int(dim['left']),
-                                       height=int(dim['bottom']) - int(dim['top']),                    )
+                                       height=int(dim['bottom']) - int(dim['top']),)
                     textelements.append(text)
-                
+
                 # Now that we know all text elements that should be in
                 # the Textbox, we can guess the font size.
 
@@ -339,7 +347,7 @@ class PDFReader(CompoundElement):
                         fontid = specid
                 # None was found, create a new
                 if not fontid:
-                    fontid = str(len(self.fontspec)) # start at 0
+                    fontid = str(len(self.fontspec))  # start at 0
                     self.fontspec[fontid] = fontspec
 
                 # finally create the box and add all our elements
@@ -360,13 +368,15 @@ class PDFReader(CompoundElement):
     def _parse_xml(self, xmlfp, xmlfilename):
         def txt(element_text):
             return re.sub(r"[\s\xa0\xc2]+", " ", str(element_text))
-            
+
         self.log.debug("Loading %s" % xmlfilename)
 
         try:
             tree = etree.parse(xmlfp)
         except etree.XMLSyntaxError as e:
-            self.log.warning("pdftohtml created incorrect markup, trying to fix using BeautifulSoup: %s" % e)
+            self.log.warning(
+                "pdftohtml created incorrect markup, trying to fix using BeautifulSoup: %s" %
+                e)
             xmlfp.seek(0)
             from bs4 import BeautifulSoup
             from io import BytesIO
@@ -399,23 +409,24 @@ class PDFReader(CompoundElement):
                     # make sure we always deal with a basic dict (not
                     # lxml.etree._Attrib) where all keys are str
                     # object (not bytes)
-                    fspec = dict([(k,str(v)) for k,v in element.attrib.items()])
+                    fspec = dict([(k, str(v)) for k, v in element.attrib.items()])
                     # then make it more usable
                     fspec['size'] = int(fspec['size'])
                     if "+" in fspec['family']:
-                        fspec['family'] = fspec['family'].split("+",1)[1]
+                        fspec['family'] = fspec['family'].split("+", 1)[1]
                     self.fontspec[fontid] = fspec
-                    
+
                 elif element.tag == 'text':
                     # eliminate "empty" textboxes
-                    if element.text and txt(element.text).strip() == "" and not element.getchildren():
+                    if element.text and txt(
+                            element.text).strip() == "" and not element.getchildren():
                         # print "Skipping empty box"
                         continue
 
                     attribs = dict(element.attrib)
                     # all textboxes share the same fontspec dict
                     attribs['fontspec'] = self.fontspec
-                    attribs['fontid'] = int(attribs['font']) 
+                    attribs['fontid'] = int(attribs['font'])
                     del attribs['font']
                     b = Textbox(**attribs)
 
@@ -484,7 +495,7 @@ class PDFReader(CompoundElement):
             for nextbox in page:
                 if not (keepempty or str(nextbox).strip()):
                     continue
-                if not textbox: # MUST glue
+                if not textbox:  # MUST glue
                     textbox = nextbox
                 else:
                     if glue(textbox, nextbox, prevbox):
@@ -536,17 +547,16 @@ class PDFReader(CompoundElement):
         # "Bold" or "Italic" in one but not the other). Otherwise
         # common constructs like:
         #
-            # <b>Lead text</b>: Lorem ipsum dolor sit amet, consectetur
-            # adipiscing elit. Donec suscipit nulla ut lorem dapibus.
-        # 
+        # <b>Lead text</b>: Lorem ipsum dolor sit amet, consectetur
+        # adipiscing elit. Donec suscipit nulla ut lorem dapibus.
+        #
         # wont be considered the same textbox.
         if (basefamily(textbox.font.family) == basefamily(nextbox.font.family) and
-            textbox.font.size == nextbox.font.size and
-            textbox.left == nextbox.left and
-            textbox.top < nextbox.top and
-            textbox.bottom + (prevbox.height * linespacing) - prevbox.height  >= nextbox.top):
+                textbox.font.size == nextbox.font.size and
+                textbox.left == nextbox.left and
+                textbox.top < nextbox.top and
+                textbox.bottom + (prevbox.height * linespacing) - prevbox.height >= nextbox.top):
             return True
-
 
 
 class Page(CompoundElement, OrdinalElement):
@@ -556,7 +566,7 @@ class Page(CompoundElement, OrdinalElement):
     tagname = "div"
     classname = "pdfpage"
     margins = None
-    
+
     @property
     def id(self):
         # FIXME: this will only work for documents consisting of a
@@ -616,12 +626,14 @@ class Page(CompoundElement, OrdinalElement):
 
     def __str__(self):
         textexcerpt = " ".join([str(x) for x in self])
-        return "Page %d (%d x %d): '%s...'" % (self.number, self.width, self.height, str(textexcerpt[:40]))
+        return "Page %d (%d x %d): '%s...'" % (
+            self.number, self.width, self.height, str(textexcerpt[:40]))
 
     def __repr__(self):
         return '<%s %d (%dx%d): %d textboxes>' % (self.__class__.__name__,
-                                                   self.number, self.width, self.height,
-                                                   len(self))
+                                                  self.number, self.width, self.height,
+                                                  len(self))
+
 
 class Textbox(CompoundElement):
 
@@ -636,7 +648,7 @@ all text in a Textbox has the same font and size.
     """
     tagname = "p"
     classname = "textbox"
-    
+
     def __init__(self, *args, **kwargs):
         assert 'top' in kwargs, "top attribute missing"
         assert 'left' in kwargs, "left attribute missing"
@@ -654,7 +666,7 @@ all text in a Textbox has the same font and size.
         # self._fontspecid = kwargs['fontid']
         self.fontid = kwargs['fontid'] or 0
         if 'fontspec' in kwargs:
-            self._fontspec = kwargs['fontspec'] 
+            self._fontspec = kwargs['fontspec']
             del kwargs['fontspec']
         else:
             self._fontspec = {}
@@ -681,7 +693,7 @@ all text in a Textbox has the same font and size.
             s = s.encode('ascii', 'replace')
         if self.font:
             fontinfo = "%s@%s " % (self.font.family,
-                                  self.font.size)
+                                   self.font.size)
         else:
             fontinfo = ""
         return '<%s %sx%s+%s+%s %s"%s">' % (self.__class__.__name__,
@@ -689,14 +701,15 @@ all text in a Textbox has the same font and size.
                                             self.left, self.top,
                                             fontinfo,
                                             s)
+
     def __add__(self, other):
         # expand dimensions
         top = min(self.top, other.top)
         left = min(self.left, other.left)
         width = max(self.left + self.width,
-                        other.left + other.width) - left
+                    other.left + other.width) - left
         height = max(self.top + self.height,
-                          other.top + other.height) - top
+                     other.top + other.height) - top
 
         res = Textbox(top=top, left=left, width=width, height=height,
                       fontid=self.fontid,
@@ -721,7 +734,6 @@ all text in a Textbox has the same font and size.
             res.append(c)
         return res
 
-
     def __iadd__(self, other):
         if len(self):
             c = self.pop()
@@ -744,7 +756,7 @@ all text in a Textbox has the same font and size.
         self.height = max(self.top + self.height,
                           other.top + other.height) - self.top
         return self
-        
+
     def as_xhtml(self, uri, parent_uri=None):
         element = super(Textbox, self).as_xhtml(uri, parent_uri)
         # FIXME: we should output these positioned style attributes
@@ -752,10 +764,10 @@ all text in a Textbox has the same font and size.
         # positioned fashion. Possibly do some translation from PDF
         # points (which is what self.top, .left etc is using) and
         # pixels (which is what the CSS uses)
-        element.set('style', 'top: %spx, left: %spx, height: %spx, width: %spx' % (self.top, self.left, self.height, self.width))
+        element.set(
+            'style', 'top: %spx, left: %spx, height: %spx, width: %spx' %
+            (self.top, self.left, self.height, self.width))
         return element
-
-
 
     @property
     def font(self):
@@ -775,16 +787,18 @@ all text in a Textbox has the same font and size.
 #        if self.font is None:   # .font might have the valid value 0
 #            self.font = str(len(self._fontspecid)) # start at 0
 #            self._fontspec[self.font] = value
-#        
+#
 #
 
+
 class Textelement(UnicodeElement):
+
     """Represent a single part of text where each letter has the exact
     same formatting. The ``tag`` property specifies whether the text
     as a whole is bold (``'b'``) , italic(``'i'`` bold + italic
     (``'bi'``) or regular (``None``).
     """
-    
+
     def _get_tagname(self):
         if self.tag:
             return self.tag
@@ -797,9 +811,8 @@ class Textelement(UnicodeElement):
                      E(self.tag[1], {}, str(self)))
         else:
             return super(Textelement, self).as_xhtml(uri, parent_uri)
-        
 
     tagname = property(_get_tagname)
 
     def __add__(self, other):
-        return Textelement(str(self) + str(other), tag = self.tag)
+        return Textelement(str(self) + str(other), tag=self.tag)

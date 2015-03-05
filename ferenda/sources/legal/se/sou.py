@@ -8,7 +8,6 @@ from ferenda import PDFAnalyzer
 from . import Regeringen, RPUBL
 
 
-
 # are there other sources? www.sou.gov.se directs here,
 # anyway. Possibly
 # https://www.riksdagen.se/Webbnav/index.aspx?nid=3282, but it's
@@ -18,7 +17,7 @@ from . import Regeringen, RPUBL
 # has that regeringen.se doesn't
 
 class SOUAnalyzer(PDFAnalyzer):
-    # SOU running headers can contain quite a bit of text, 2 % 
+    # SOU running headers can contain quite a bit of text, 2 %
     header_significance_threshold = 0.02
     # footers less so (but more than the default .2%), 1 %
     footer_significance_threshold = 0.01
@@ -36,11 +35,12 @@ class SOUAnalyzer(PDFAnalyzer):
     def count_horizontal_textbox(self, pagenumber, textbox, counters):
         if pagenumber >= self.frontmatter:
             super(SOUAnalyzer, self).count_horizontal_textbox(pagenumber, textbox, counters)
-    
+
+
 class SOU(Regeringen):
     alias = "sou"
     re_basefile_strict = re.compile(r'SOU (\d{4}:\d+)')
     re_basefile_lax = re.compile(r'(?:SOU|) ?(\d{4}:\d+)', re.IGNORECASE)
     rdf_type = RPUBL.Utredningsbetankande
     document_type = Regeringen.SOU
-    sparql_annotations = None # don't even bother creating an annotation file
+    sparql_annotations = None  # don't even bother creating an annotation file

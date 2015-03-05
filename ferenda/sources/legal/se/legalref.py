@@ -28,6 +28,7 @@ except ImportError:
     # external_simpleparse_state = "simpleparse.tmp"
     python_exe = os.environ.get("FERENDA_PYTHON2_FALLBACK",
                                 "python2.7")
+
     def _setup_state():
         state = tempfile.mkdtemp()
         buildtagger_script = state + os.sep + "buildtagger.py"
@@ -52,9 +53,9 @@ with open(picklefile,"wb") as fp:
 if sys.version_info >= (3,0,0):
     raise OSError("This is python %s, not python 2.6 or 2.7!" % sys.version_info)
 pickled_tagger = sys.argv[1] # what buildtagger.py returned -- full path
-full_text_path = sys.argv[2] 
+full_text_path = sys.argv[2]
 text_checksum = sys.argv[3] # md5 sum of text, just the filename
-picklefile = "%s-%s.pickle" % (pickled_tagger, text_checksum) 
+picklefile = "%s-%s.pickle" % (pickled_tagger, text_checksum)
 
 from simpleparse.stt.TextTools.TextTools import tag
 
@@ -69,7 +70,7 @@ with open(picklefile,"wb") as fp:
     pickle.dump(tagged,fp)
         """)
         return state
-                       
+
     # print("(__boot__): calling _setup_state to setup external_simpleparse_state")
     external_simpleparse_state = _setup_state()
 
@@ -96,7 +97,6 @@ with open(picklefile,"wb") as fp:
                 # print("__del__: setting external_simpleparse_state to None")
                 external_simpleparse_state = None
 
-
         def buildTagger(self, production=None, processor=None):
             pickled_tagger = "%s/%s-%s.pickle" % (external_simpleparse_state,
                                                   self.declaration_md5,
@@ -105,7 +105,8 @@ with open(picklefile,"wb") as fp:
 
                 #    3. call the script with python 27 and production
                 cmdline = "%s %s %s/%s %s" % (python_exe,
-                                              external_simpleparse_state + os.sep + "buildtagger.py",
+                                              external_simpleparse_state +
+                                              os.sep + "buildtagger.py",
                                               external_simpleparse_state,
                                               self.declaration_md5,
                                               production)
@@ -188,13 +189,14 @@ class NodeTree:
             if l:
                 for p in l:
                     res.append(NodeTree(p, self.data[p[1] -
-                               self.offset:p[2] - self.offset], p[1], False))
+                                                     self.offset:p[2] - self.offset], p[1], False))
             return res
         else:
             raise AttributeError
 
 
-class RefParseError(Exception): pass
+class RefParseError(Exception):
+    pass
 
 # Lite om hur det hela funkar: Att hitta referenser i löptext är en
 # tvåstegsprocess.
@@ -510,7 +512,7 @@ class LegalRef:
                 d[current_part_tag[:-5]] = part.text.strip()
                 if self.verbose:
                     print((". " * self.depth +
-                          "find_attributes: d is now %s" % d))
+                           "find_attributes: d is now %s" % d))
 
             if part.nodes:
                 d.update(self.find_attributes(part.nodes, d))
@@ -586,7 +588,7 @@ class LegalRef:
 
         if res is None:
             print(((". " * self.depth) +
-                  "something wrong with this:\n" + self.prettyprint(part)))
+                   "something wrong with this:\n" + self.prettyprint(part)))
         self.depth -= 1
         return res
 
@@ -601,7 +603,7 @@ class LegalRef:
 
         if self.verbose:
             print(((". " * self.depth) +
-                  "format_tokentree: called for %s" % part.tag))
+                   "format_tokentree: called for %s" % part.tag))
         # this is like the bottom case, or something
         if (not part.nodes) and (not part.tag.endswith("RefID")):
             res.append(part.text)
@@ -692,7 +694,8 @@ class LegalRef:
         # '1736:0123.2'. This fixes that.
         sfsid = re.sub(r'(\d+:\d+)\.(\d)', r'\1 \2', sfsid)
         sfsid = sfsid.replace("\n", " ")
-        # return sfsid.replace('s. ','').replace('s.','') # more advanced normalizations to come...
+        # return sfsid.replace('s. ','').replace('s.','') # more advanced
+        # normalizations to come...
         return sfsid
 
     def normalize_lawname(self, lawname):
@@ -874,7 +877,7 @@ class LegalRef:
                     if key == 'law':
                         val = self.normalize_sfsid(val)
                         val = val.replace(" ", "_")
-                        val = val.replace("\xa0", "_") # nonbreakable space
+                        val = val.replace("\xa0", "_")  # nonbreakable space
                         res += val
                         addfragment = True
                     else:
@@ -882,7 +885,7 @@ class LegalRef:
                             res += justincase
                             justincase = None
                         val = val.replace(" ", "")
-                        val = val.replace("\xa0", "") # Non-breakable space
+                        val = val.replace("\xa0", "")  # Non-breakable space
                         val = val.replace("\n", "")
                         val = val.replace("\r", "")
                         res += '%s%s' % (keymapping[key], val)
@@ -969,7 +972,8 @@ class LegalRef:
     # all things to all people.
     def format_ExternalRefs(self, root):
         assert(root.tag == 'ExternalRefs')
-        # print "DEBUG: start of format_ExternalRefs; self.currentlaw is %s" % self.currentlaw
+        # print "DEBUG: start of format_ExternalRefs; self.currentlaw is %s" %
+        # self.currentlaw
 
         lawrefid_node = self.find_node(root, 'LawRefID')
         if lawrefid_node is None:
@@ -1003,9 +1007,11 @@ class LegalRef:
                 # print "remember that %s is %s!" % (namedlaw, self.currentlaw)
                 self.currentlynamedlaws[namedlaw] = self.currentlaw
 
-        # print "DEBUG: middle of format_ExternalRefs; self.currentlaw is %s" % self.currentlaw
+        # print "DEBUG: middle of format_ExternalRefs; self.currentlaw is %s" %
+        # self.currentlaw
         if self.lastlaw is None:
-            # print "DEBUG: format_ExternalRefs: setting self.lastlaw to %s" % self.currentlaw
+            # print "DEBUG: format_ExternalRefs: setting self.lastlaw to %s" %
+            # self.currentlaw
             self.lastlaw = self.currentlaw
 
         # if the node tree only contains a single reference, it looks
@@ -1086,10 +1092,12 @@ class LegalRef:
                     self.find_node(root, 'NamedLaw').text)
                 # print "remember that %s is %s!" % (namedlaw, self.currentlaw)
                 self.currentlynamedlaws[namedlaw] = self.currentlaw
-            # print "format_NamedExternalLawRef: self.currentlaw is now %r"  % self.currentlaw
+            # print "format_NamedExternalLawRef: self.currentlaw is now %r"  %
+            # self.currentlaw
 
         # print "format_NamedExternalLawRef: self.baseuri is %r" % self.baseuri
-        if self.currentlaw is None:  # if we can't find a ID for this law, better not <link> it
+        # if we can't find a ID for this law, better not <link> it
+        if self.currentlaw is None:
             res = [root.text]
         else:
             res = [self.format_generic_link(root)]
@@ -1232,7 +1240,7 @@ class LegalRef:
                        'MD': '/publ/rattsfall/md/',
                        'FÖD': '/publ/rattsfall/fod/',
                        'HFD': '/publ/rattsfall/hfd/',
-        }
+                       }
 
         # res = self.baseuri_attributes['baseuri']
         if 'nja' in attributes:
@@ -1246,7 +1254,8 @@ class LegalRef:
         if 'lopnr' in attributes and ":" in attributes['lopnr']:
             (attributes['ar'], attributes['lopnr']) = lopnr.split(":", 1)
 
-        rf = attributes['njarattsfall'] if 'njarattsfall' in attributes else attributes['rattsfall']
+        rf = attributes[
+            'njarattsfall'] if 'njarattsfall' in attributes else attributes['rattsfall']
         if "not" in rf:
             ordinal = attributes['sidnr'] if 'sidnr' in attributes else attributes['lopnr']
             res += "%s/not/%s" % (attributes['ar'], ordinal)

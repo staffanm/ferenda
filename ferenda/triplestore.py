@@ -171,7 +171,7 @@ SQLite and Sleepycat/BerkeleyDB backends are supported).
         :type query: str
 
         """
-        raise NotImplementedError # pragma: no cover
+        raise NotImplementedError  # pragma: no cover
 
     def triple_count(self, context=None):
         """Returns the number of triples in the repository."""
@@ -278,7 +278,7 @@ class RDFLibStore(TripleStore):
         if not self.closed:
             try:
                 import sqlite3
-            except: # sometimes a TypeError is thrown deep in frozen
+            except:  # sometimes a TypeError is thrown deep in frozen
                     # importlib._bootstrap
                 return
             try:
@@ -324,6 +324,8 @@ class SQLiteStore(RDFLibStore):
 # -----------------
 # For servers implementing the SPARQL 1.1 Graph Store HTTP Protocol
 # http://www.w3.org/TR/sparql11-http-rdf-update/
+
+
 class RemoteStore(TripleStore):
 
     def close(self):
@@ -458,7 +460,7 @@ class RemoteStore(TripleStore):
             # elif format == "json":
             #     return results.json()
             else:
-                return results.content # not .text -- should return raw bytestring response
+                return results.content  # not .text -- should return raw bytestring response
         except requests.exceptions.HTTPError as e:
             raise errors.SparqlError(e)
 
@@ -485,7 +487,7 @@ class RemoteStore(TripleStore):
         url = self._update_url()
         # url += "?query=" + quote(query.replace("\n", " ")).replace("/", "%2F")
         try:
-            resp = requests.post(url, data={'update':query})
+            resp = requests.post(url, data={'update': query})
             resp.raise_for_status()
         except requests.exceptions.ConnectionError as e:
             raise errors.TriplestoreError(
@@ -517,7 +519,6 @@ class RemoteStore(TripleStore):
     # context/graph in the query instead.
     def _endpoint_url(self):
         return "%s/%s/query" % (self.location, self.repository)
-        
 
     def _run_curl(self, options):
         if options['method'] == 'GET':
@@ -606,7 +607,8 @@ class SesameStore(RemoteStore):
 
     def _statements_url(self, context):
         if context:
-            return "%s/repositories/%s/statements?context=<%s>" % (self.location, self.repository, context)
+            return "%s/repositories/%s/statements?context=<%s>" % (
+                self.location, self.repository, context)
         else:
             return "%s/repositories/%s/statements" % (self.location, self.repository)
 
@@ -616,12 +618,12 @@ class SesameStore(RemoteStore):
     def _update_url(self):
         return self._endpoint_url()
 
+
 class FusekiStore(RemoteStore):
 
     def _update_url(self):
         return "%s/%s/update" % (self.location, self.repository)
 
-        
     def triple_count(self, context=None):
         # Fuseki doesn't provide a HTTP API for retrieving the size of
         # a repository. We do one or two SPARQL COUNT() queries to
@@ -651,7 +653,7 @@ class FusekiStore(RemoteStore):
             self.update("CLEAR ALL")
         else:
             super(FusekiStore, self).clear(context)
-            
+
     re_construct_query = re.compile(r"}\s+WHERE\s+{", flags=re.MULTILINE)
 
     def construct(self, query, uniongraph=True):
@@ -660,23 +662,23 @@ class FusekiStore(RemoteStore):
         # graph. Not very pretty...
         if uniongraph:
             query = self.re_construct_query.sub("} WHERE { GRAPH <urn:x-arq:UnionGraph> {",
-                                           query)
+                                                query)
             query += " }"
-            
+
         return super(FusekiStore, self).construct(query)
 
     re_select_query = re.compile(r"\s+WHERE\s+{", flags=re.MULTILINE)
 
     def select(self, query, format="sparql", uniongraph=True):
         if (not self.re_fromgraph.search(query) and uniongraph and
-            self.re_select_query.search(query)):
+                self.re_select_query.search(query)):
             query = self.re_select_query.sub(" WHERE { GRAPH <urn:x-arq:UnionGraph> {",
-                           query)
+                                             query)
             # add an extra } after the last }x
-            qparts = query.rsplit("}",1)
+            qparts = query.rsplit("}", 1)
             assert len(qparts) == 2, "Failed to patch the query %s" % query
             query = "%s } } %s" % (qparts[0], qparts[1])
-            
+
         return super(FusekiStore, self).select(query, format)
 
     def initialize_repository(self):
@@ -725,10 +727,9 @@ class FusekiStore(RemoteStore):
                 buf.write('\\u%04X' % ord(char))
             else:
                 buf.write('\\U%08X' % ord(char))
-        res = buf.getvalue().encode() # should not contain any non-ascii chars
+        res = buf.getvalue().encode()  # should not contain any non-ascii chars
         buf.close()
         return res
-        
 
     def get_serialized_file(self, filename, format="nt", context=None):
         ret = super(FusekiStore, self).get_serialized_file(filename, format, context)
@@ -744,7 +745,7 @@ class FusekiStore(RemoteStore):
             with open(filename, "wb") as fp:
                 fp.write(self._nt_encode(unescaped))
         return ret
-       
+
 #        if context is not None:
 #            return ret
 #        else:

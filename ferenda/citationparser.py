@@ -7,6 +7,7 @@ from six import text_type as str
 
 from ferenda.elements import LinkSubject
 
+
 class CitationParser(object):
 
     """Finds citations to documents and other resources in text
@@ -14,7 +15,7 @@ class CitationParser(object):
     `pyparsing <http://pyparsing.wikispaces.com/Documentation>`_
     grammar, and for each found citation a URI can be constructed
     using a :py:class:`~ferenda.URIFormatter` object.
-    
+
     :param grammars: The grammar(s) for the citations that this
                       parser should find, in order of priority.
     :type  grammars: list of ``pyparsing.ParserElement`` objects
@@ -48,7 +49,7 @@ class CitationParser(object):
     def set_formatter(self, formatter):
         """Specify how found citations are to be formatted when using
         :py:meth:`~ferenda.CitationParser.parse_recursive`
-        
+
         :param formatter: The formatter object to use for all citations
         :type  formatter: :py:class:`~ferenda.URIFormatter`
         """
@@ -64,7 +65,7 @@ class CitationParser(object):
 
     def parse_string(self, string, predicate="dcterms:references"):
         """Find any citations in a text string, using the configured grammars.
-        
+
         :param string: Text to parse for citations
         :type string: str
         :returns: strings (for parts of the input text that do not contain
@@ -75,7 +76,7 @@ class CitationParser(object):
         # Returns a list of strings and/or tuples, where each tuple is
         # (string,pyparsing.ParseResult)
         nodes = [string]
-        res = nodes # if self._grammars is None
+        res = nodes  # if self._grammars is None
         for grammar in self._grammars:
             res = []
             for node in nodes:
@@ -101,7 +102,7 @@ class CitationParser(object):
         up as :py:class:`~ferenda.elements.Link` elements with the uri
         constructed by the :py:class:`~ferenda.URIFormatter` set by
         :py:meth:`~ferenda.CitationParser.set_formatter`.
-        
+
         :param part: The root element of the structure to parse
         :type  part: list
         :returns: a correspondingly nested structure.
@@ -114,7 +115,8 @@ class CitationParser(object):
                     res.extend(self.parse_recursive(subpart, predicate))
                 else:
                     res.append(self.parse_recursive(subpart, predicate))
-            # replace our exising subparts/children with the combined result of parse_recursive
+            # replace our exising subparts/children with the combined result of
+            # parse_recursive
             part[:] = res[:]
             return part
 

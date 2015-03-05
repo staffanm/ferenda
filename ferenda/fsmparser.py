@@ -52,7 +52,7 @@ class FSMParser():
         """Set the transition table for the state matchine.
 
         :param transitions: The transition table, in the form of a mapping between two tuples. The first tuple should be the current state (or a list of possible current states) and a callable function that determines if a particular symbol is recognized ``(currentstate, recognizer)``. The second tuple should be a constructor function (or `False```) and the new state to transition into.
-        
+
         """
         self.transitions = {}
         for (before, after) in transitions.items():
@@ -80,7 +80,7 @@ class FSMParser():
         """Parse a document in the form of an iterable of suitable
         chunks -- often lines or elements.  each chunk should be a
         string or a string-like obje ct.  Some examples::
-        
+
           p = FSMParser()
           reader = TextReader("foo.txt")
           body = p.parse(reader.getiterator(reader.readparagraph),"body", make_body)
@@ -126,7 +126,8 @@ class FSMParser():
             self._debug("We're done!")
             return None
 
-        applicable_tmp = [x[1] for x in self.transitions.keys() if x[0] == self._state_stack[-1]]
+        applicable_tmp = [x[1]
+                          for x in self.transitions.keys() if x[0] == self._state_stack[-1]]
         # Create correct sorting of applicable_recognizers
         applicable_recognizers = []
         for recognizer in self.recognizers:
@@ -141,11 +142,14 @@ class FSMParser():
                              recognizer.__name__))
                 # self._debug("%r -> %s" % (chunk, recognizer.__name__))
                 return recognizer
-        raise FSMStateError("No recognizer match for %s (tried %s)" % (chunk, applicable_display))
+        raise FSMStateError(
+            "No recognizer match for %s (tried %s)" %
+            (chunk, applicable_display))
 
     def transition(self, currentstate, symbol):
         """Internal function used by make_children()"""
-        assert (currentstate, symbol) in self.transitions, "(%r, %r) should be in self.transitions" % (currentstate, symbol)
+        assert (currentstate, symbol) in self.transitions, "(%r, %r) should be in self.transitions" % (
+            currentstate, symbol)
 
         t = self.transitions[(currentstate, symbol)]
         if callable(t):
@@ -176,7 +180,7 @@ class FSMParser():
                        (preferrably a subclass of
                        :py:class:`ferenda.elements.CompoundElement`)
         :returns: The same ``parent`` object.
-        
+
         """
         self._debug("Making children for %s" % parent.__class__.__name__)
         while True:  # we'll break out of this when transition()
@@ -218,13 +222,15 @@ class FSMParser():
                 # FIXME: we have no regular test case for this path,
                 # but integrationRFC excercises it
                 if newstate:
-                    self._debug("Changing the state we'll return to (self._state_stack[-2])")
+                    self._debug(
+                        "Changing the state we'll return to (self._state_stack[-2])")
                     self._debug("  (from %r to %r)" % (self._state_stack[-2], newstate))
                     self._state_stack[-2] = newstate
                 return parent
 
 
-# inspired by recipe 19.18 in the python cookbook. A implementation detail helper for FSMParser.
+# inspired by recipe 19.18 in the python cookbook. A implementation detail
+# helper for FSMParser.
 class Peekable(six.Iterator):
 
     def __init__(self, iterable):

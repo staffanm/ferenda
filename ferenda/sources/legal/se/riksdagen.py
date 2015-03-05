@@ -20,6 +20,7 @@ from ferenda.describer import Describer
 from ferenda.elements import Paragraph
 from ferenda import PDFReader, PDFAnalyzer
 
+
 class Riksdagen(SwedishLegalSource):
     BILAGA = "bilaga"
     DS = "ds"
@@ -101,7 +102,7 @@ class Riksdagen(SwedishLegalSource):
 
     def remote_url(self, basefile):
         # FIXME: this should be easy
-        digits='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        digits = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
         if "/" in basefile:   # eg 1975/76:24
             year = int(basefile.split("/")[0])
             remainder = year - 1400
@@ -121,7 +122,6 @@ class Riksdagen(SwedishLegalSource):
         return "http://data.riksdagen.se/dokumentstatus/%s%s%s.xml" % (
             base36year, doctypecode, pnr)
 
-                
     def download_single(self, basefile, url=None):
         attachment = None
         if isinstance(basefile, tuple):
@@ -176,7 +176,9 @@ class Riksdagen(SwedishLegalSource):
                 continue
             if b.filtyp is None:
                 # apparantly this can happen sometimes? Very intermitently, though.
-                self.log.warning("Couldn't find filtyp for bilaga %s in %s" % (b.dok_id.text, xmlfile))
+                self.log.warning(
+                    "Couldn't find filtyp for bilaga %s in %s" %
+                    (b.dok_id.text, xmlfile))
                 continue
             filetype = "." + b.filtyp.text
             filename = self.store.downloaded_path(basefile, attachment=docname + filetype)
@@ -184,7 +186,8 @@ class Riksdagen(SwedishLegalSource):
             try:
                 r = self.download_if_needed(b.fil_url.text, basefile, filename=filename)
             except requests.exceptions.HTTPError as e:
-                # occasionally we get a 404 even though we shouldn't. Report and hope it goes better next time.
+                # occasionally we get a 404 even though we shouldn't. Report and hope it
+                # goes better next time.
                 self.log.error("   Failed: %s" % e)
                 continue
             fileupdated = fileupdated or r
@@ -202,7 +205,7 @@ class Riksdagen(SwedishLegalSource):
         if not os.path.exists(filename):
             raise errors.NoDownloadedFileError("File '%s' not found" % filename)
         htmlfile = self.store.path(doc.basefile, 'downloaded', '.html')
-        pdffile  = self.store.path(doc.basefile, 'downloaded', '.pdf')
+        pdffile = self.store.path(doc.basefile, 'downloaded', '.pdf')
 
         intermediate_path = self.store.intermediate_path(doc.basefile,
                                                          attachment=os.path.basename(pdffile))
@@ -233,7 +236,7 @@ class Riksdagen(SwedishLegalSource):
             plot_path = self.store.path(doc.basefile, 'intermediate',
                                         '.plot.png')
             pdfdebug_path = self.store.path(doc.basefile, 'intermediate',
-                                        '.debug.pdf')
+                                            '.debug.pdf')
             # slight optimization: if we've already performed OCR,
             # then the PDF won't contain regular text -- don't bother
             # trying to parse it as a regular PDF.
@@ -252,7 +255,7 @@ class Riksdagen(SwedishLegalSource):
                                     ocr_lang="swe", keep_xml="bz2")
 
             # FIXME: add code to get a customized PDFAnalyzer class here
-            # if self.document_type = self.PROPOSITION: 
+            # if self.document_type = self.PROPOSITION:
             analyzer = PDFAnalyzer(pdf)
             # metrics = analyzer.metrics(metrics_path, plot_path, force=self.config.force)
             metrics = analyzer.metrics(metrics_path, plot_path)
@@ -270,7 +273,7 @@ class Riksdagen(SwedishLegalSource):
             soup = BeautifulSoup(
                 codecs.open(
                     htmlfile, encoding='iso-8859-1', errors='replace').read(),
-                )
+            )
             self.parse_from_soup(soup, doc)
         return True
 
@@ -285,4 +288,3 @@ class Riksdagen(SwedishLegalSource):
         seg = {self.ns['rpubl'].Proposition: "prop",
                self.ns['rpubl'].Skrivelse: "skr"}
         return self.config.url + "res/%s/%s" % (seg[self.rdf_type], basefile)
-

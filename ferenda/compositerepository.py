@@ -65,7 +65,7 @@ class CompositeRepository(DocumentRepository):
         # config object was provided or not
         super(CompositeRepository, self).__init__(config, **kwargs)
 
-        for c in self.subrepos: # populate self._instances
+        for c in self.subrepos:  # populate self._instances
             self.get_instance(c)
 
         cls = self.documentstore_class
@@ -74,7 +74,7 @@ class CompositeRepository(DocumentRepository):
                          storage_policy=self.storage_policy,
                          docrepo_instances=self._instances)
 
-        for c in self.subrepos: # populate self._instances
+        for c in self.subrepos:  # populate self._instances
             self.get_instance(c)
 
         cls = self.documentstore_class
@@ -96,7 +96,6 @@ class CompositeRepository(DocumentRepository):
         opts['failfast'] = False
         return opts
 
-
     def download(self, basefile=None):
         for c in self.subrepos:
             inst = self.get_instance(c)
@@ -112,7 +111,6 @@ class CompositeRepository(DocumentRepository):
             if basefile and ret:
                 # we got the doc we want, we're done!
                 return
-                
 
     # NOTE: this impl should NOT use the @managedparsing decorator
     def parse(self, basefile):
@@ -130,8 +128,7 @@ class CompositeRepository(DocumentRepository):
                 needed = inst.parseneeded(basefile)
                 if not needed and os.path.exists(self.store.parsed_path(basefile)):
                     self.log.debug("%s: Skipped" % basefile)
-                    return True # signals everything OK
-
+                    return True  # signals everything OK
 
         start = time.time()
         ret = False
@@ -143,7 +140,7 @@ class CompositeRepository(DocumentRepository):
         # make sure to do that if needed.
         if not self.store.basefiles[c]:
             x = list(self.store.list_basefiles_for("parse"))
-        
+
         for c in self.subrepos:
             if basefile in self.store.basefiles[c]:
                 inst = self.get_instance(c)
@@ -155,7 +152,7 @@ class CompositeRepository(DocumentRepository):
                 # Any error thrown (errors.ParseError or something
                 # else) means we try next subrepo -- unless we want to
                 # fail fast with a nice stacktrace during debugging.
-                except Exception as e: 
+                except Exception as e:
                     if self.config.failfast:
                         raise
                     else:
@@ -176,9 +173,11 @@ class CompositeRepository(DocumentRepository):
             # FIXME: maybe subrepos should only contain those repos
             # that actually had a chance of parsing (basefile in
             # self.store.basefiles[c])
-            subrepos = ", ".join([self.get_instance(x).qualified_class_name() for x in self.subrepos if basefile in self.store.basefiles[x]])
-            raise errors.ParseError("No instance of %s was able to parse %s" % (subrepos, basefile))
-
+            subrepos = ", ".join([self.get_instance(x).qualified_class_name()
+                                  for x in self.subrepos if basefile in self.store.basefiles[x]])
+            raise errors.ParseError(
+                "No instance of %s was able to parse %s" %
+                (subrepos, basefile))
 
     def copy_parsed(self, basefile, instance):
         # If the distilled and parsed links are recent, assume that

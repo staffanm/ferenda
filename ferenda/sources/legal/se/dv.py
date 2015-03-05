@@ -95,7 +95,6 @@ class DVStore(DocumentStore):
     """Customized DocumentStore.
     """
 
-    
     def basefile_to_pathfrag(self, basefile):
         return basefile
 
@@ -133,7 +132,9 @@ class DVStore(DocumentStore):
             for x in super(DVStore, self).list_basefiles_for(action, basedir):
                 yield x
 
+
 class OrderedParagraph(Paragraph, OrdinalElement):
+
     def as_xhtml(self, baseuri, parent_uri=None):
         element = super(OrderedParagraph, self).as_xhtml(baseuri, parent_uri)
         # FIXME: id needs to be unique in document by prepending a
@@ -141,9 +142,11 @@ class OrderedParagraph(Paragraph, OrdinalElement):
         # element.set('id', self.ordinal)
         return element
 
+
 class DomElement(CompoundElement):
     tagname = "div"
     prop = None
+
     def _get_classname(self):
         return self.__class__.__name__.lower()
     classname = property(_get_classname)
@@ -154,30 +157,51 @@ class DomElement(CompoundElement):
             # ie if self.prop = ('ordinal', 'dcterms:identifier'), then
             # dcterms:identifier = self.ordinal
             if (hasattr(self, self.prop[0]) and
-                getattr(self, self.prop[0]) and
-                isinstance(getattr(self, self.prop[0]), str)):
+                    getattr(self, self.prop[0]) and
+                    isinstance(getattr(self, self.prop[0]), str)):
                 element.set('content', getattr(self, self.prop[0]))
                 element.set('property', self.prop[1])
         return element
 
+
 class Delmal(DomElement):
     prop = ('ordinal', 'dcterms:identifier')
-    
+
+
 class Instans(DomElement):
     prop = ('court', 'dcterms:creator')
-        
+
+
 class Dom(DomElement):
     prop = ('malnr', 'dcterms:identifier')
-    
-class Domskal(DomElement): pass 
-class Domslut(DomElement): pass # dcterms:author <- names of judges
-class Betankande(DomElement): pass # dcterms:author <- referent
-class Skiljaktig(DomElement): pass # dcterms:author <- name
-class Tillagg(DomElement): pass # dcterms:author <- name
-class Endmeta(DomElement): pass
+
+
+class Domskal(DomElement):
+    pass
+
+
+class Domslut(DomElement):
+    pass  # dcterms:author <- names of judges
+
+
+class Betankande(DomElement):
+    pass  # dcterms:author <- referent
+
+
+class Skiljaktig(DomElement):
+    pass  # dcterms:author <- name
+
+
+class Tillagg(DomElement):
+    pass  # dcterms:author <- name
+
+
+class Endmeta(DomElement):
+    pass
 
 
 class DV(SwedishLegalSource):
+
     """Handles legal cases, in report form, from primarily final instance courts.
 
     Cases are fetched from Domstolsverkets FTP server for "Vägledande
@@ -197,11 +221,10 @@ class DV(SwedishLegalSource):
     # thinking, we remove RPUBL.referatrubrik as it's not present (or
     # required) for rpubl:Rattsfallsnotis
     required_predicates = [RDF.type, DCTERMS.identifier, PROV.wasGeneratedBy]
-    
+
     DCTERMS = Namespace(util.ns['dcterms'])
     sparql_annotations = "res/sparql/dv-annotations.rq"
     xslt_template = "res/xsl/dv.xsl"
-
 
     @classmethod
     def relate_all_setup(cls, config):
@@ -221,17 +244,19 @@ class DV(SwedishLegalSource):
             util.ensure_dir(mapfile)
             # FIXME: Not sure utf-8 is the correct codec for us -- it
             # might be iso-8859-1 (it's to be used by mod_rewrite).
-            with codecs.open(mapfile+".new", "w", encoding="utf-8") as fp:
+            with codecs.open(mapfile + ".new", "w", encoding="utf-8") as fp:
                 for f in util.list_dirs(parsed_dir, ".xhtml"):
                     # get basefile from f in the simplest way
-                    basefile = f[len(parsed_dir)+1:-6]
+                    basefile = f[len(parsed_dir) + 1:-6]
                     head = codecs.open(f, encoding='utf-8').read(1024)
                     m = re_xmlbase.search(head)
                     if m:
                         fp.write("%s\t%s\n" % (m.group(1), basefile))
                         cnt += 1
                     else:
-                        log.warning("%s: Could not find valid head[@about] in %s" % (basefile, f))
+                        log.warning(
+                            "%s: Could not find valid head[@about] in %s" %
+                            (basefile, f))
             util.robust_rename(mapfile + ".new", mapfile)
             log.info("uri.map created, %s entries" % cnt)
         else:
@@ -240,7 +265,7 @@ class DV(SwedishLegalSource):
         return super(cls, DV).relate_all_setup(config)
 
     # def relate(self, basefile, otherrepos): pass
-    @classmethod    
+    @classmethod
     def get_default_options(cls):
         opts = super(DV, cls).get_default_options()
         opts['ftpuser'] = None
@@ -266,7 +291,8 @@ class DV(SwedishLegalSource):
         with self.store.open_distilled(basefile) as fp:
             g = Graph().parse(data=fp.read())
         for uri, rdftype in g.subject_objects(predicate=self.ns["rdf"].type):
-            if rdftype in (self.ns['rpubl'].Rattsfallsreferat, self.ns['rpubl'].Rattsfallsnotis):
+            if rdftype in (self.ns['rpubl'].Rattsfallsreferat,
+                           self.ns['rpubl'].Rattsfallsnotis):
                 return str(uri)
         raise ValueError("Can't find canonical URI for basefile %s in %s" % (basefile, p))
 
@@ -276,9 +302,9 @@ class DV(SwedishLegalSource):
         doc = Document()
         doc.basefile = basefile
         doc.meta = self.make_graph()
-        doc.lang = self.lang 
+        doc.lang = self.lang
         doc.body = Body()
-        doc.uri = None # can't know this yet
+        doc.uri = None  # can't know this yet
         return doc
 
     # override DocumentRepository.basefile_from_uri to account for the
@@ -307,8 +333,8 @@ class DV(SwedishLegalSource):
                 self.log.warning("%s: Could not find corresponding basefile" % uri)
                 return None
         else:
-            pass # The URI didn't start with our expected prefix, it's not a Rattsfall URI
-            
+            pass  # The URI didn't start with our expected prefix, it's not a Rattsfall URI
+
     # FIXME: store.list_basefiles_for("parse") must be fixed to handle two
     # different suffixes. Maybe store.downloaded_path() as well, so that
     # it returns .docx if a .docx file indeed exists, and .doc otherwise.
@@ -329,14 +355,15 @@ class DV(SwedishLegalSource):
             recurse = True
 
         self.downloadcount = 0  # number of files extracted from zip files
-                               # (not number of zip files)
+        # (not number of zip files)
         try:
             if self.config.ftpuser:
                 self.download_ftp("", recurse,
                                   self.config.ftpuser,
                                   self.config.ftppassword)
             else:
-                self.log.warning("Config variable ftpuser not set, downloading from secondary source (https://lagen.nu/dv/downloaded/) instead")
+                self.log.warning(
+                    "Config variable ftpuser not set, downloading from secondary source (https://lagen.nu/dv/downloaded/) instead")
                 self.download_www("", recurse)
         except errors.MaxDownloadsReached:  # ok we're done!
             pass
@@ -428,8 +455,8 @@ class DV(SwedishLegalSource):
         try:
             zipf = zipfile.ZipFile(zipfilename, "r")
         except zipfile.BadZipfile as e:
-            self.log.error("%s is not a valid zip file: %s" % (zipfilename,e))
-            return 
+            self.log.error("%s is not a valid zip file: %s" % (zipfilename, e))
+            return
         for bname in zipf.namelist():
             if not isinstance(bname, str):  # py2
                 # Files in the zip file are encoded using codepage 437
@@ -510,15 +537,14 @@ class DV(SwedishLegalSource):
                         self.downloadcount += 1
                     # fix HERE
                     if ('downloadmax' in self.config and
-                        self.config.downloadmax and
-                        self.downloadcount >= self.config.downloadmax):
+                            self.config.downloadmax and
+                            self.downloadcount >= self.config.downloadmax):
                         raise errors.MaxDownloadsReached()
                 else:
                     self.log.warning('Could not interpret filename %r i %s' %
                                      (name, os.path.relpath(zipfilename)))
         self.log.debug('Processed %s, created %s, replaced %s, removed %s, untouched %s files' %
                        (os.path.relpath(zipfilename), created, replaced, removed, untouched))
-
 
     def extract_notis(self, docfile, year, coll="HDO"):
         def find_month_in_previous(basefile):
@@ -527,7 +553,9 @@ class DV(SwedishLegalSource):
             # current month by examining the previous notis
             # (belonging to a previous word file)
 
-            self.log.warning("No month specified in %s, attempting to look in previous file" % basefile)
+            self.log.warning(
+                "No month specified in %s, attempting to look in previous file" %
+                basefile)
             # HDO/2009_not_26 -> HDO/2009_not_25
             tmpfunc = lambda x: str(int(x.group(0)) - 1)
             prev_basefile = re.sub('\d+$', tmpfunc, basefile)
@@ -539,17 +567,24 @@ class DV(SwedishLegalSource):
                 if re_avdstart.match(tmp.get_text().strip()):
                     avd_p = tmp
             if not avd_p:
-                raise errors.ParseError("Cannot find value for month in %s (looked in %s" % (basefile, prev_path))
+                raise errors.ParseError(
+                    "Cannot find value for month in %s (looked in %s" %
+                    (basefile, prev_path))
             return avd_p
 
         # Given a word document containing a set of "notisfall" from
         # either HD or HFD (earlier RegR), spit out a intermediate XML
         # file for each notis.
         if coll == "HDO":
-            re_notisstart = re.compile("(?P<day>Den \d+:[ae]. |)(?P<ordinal>\d+)\s*\.\s*\((?P<malnr>\w\s\d+-\d+)\)", flags=re.UNICODE)
-            re_avdstart = re.compile("(Januari|Februari|Mars|April|Maj|Juni|Juli|Augusti|September|Oktober|November|December)$")
-        else: # REG / HFD
-            re_notisstart = re.compile("[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)", flags=re.UNICODE)
+            re_notisstart = re.compile(
+                "(?P<day>Den \d+:[ae]. |)(?P<ordinal>\d+)\s*\.\s*\((?P<malnr>\w\s\d+-\d+)\)",
+                flags=re.UNICODE)
+            re_avdstart = re.compile(
+                "(Januari|Februari|Mars|April|Maj|Juni|Juli|Augusti|September|Oktober|November|December)$")
+        else:  # REG / HFD
+            re_notisstart = re.compile(
+                "[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)",
+                flags=re.UNICODE)
             re_avdstart = None
         created = untouched = 0
         intermediatefile = os.path.splitext(docfile)[0] + ".xml"
@@ -602,16 +637,20 @@ class DV(SwedishLegalSource):
                 basefile = "%(coll)s/%(year)s_not_%(ordinal)s" % locals()
                 self.log.info("%s: Extracting from %s file" % (basefile, filetype))
                 created += 1
-                downloaded_path = self.store.path(basefile, 'downloaded', '.'+filetype)
-                with self.store._open(downloaded_path, "w"): 
-                    pass # just create an empty placeholder file
+                downloaded_path = self.store.path(basefile, 'downloaded', '.' + filetype)
+                with self.store._open(downloaded_path, "w"):
+                    pass  # just create an empty placeholder file
                 if fp:
                     fp.write("</body>\n")
                     fp.close()
                     if filetype == "docx":
-                        self._simplify_ooxml(self.store.intermediate_path(previous_basefile))
+                        self._simplify_ooxml(
+                            self.store.intermediate_path(previous_basefile))
                 util.ensure_dir(self.store.intermediate_path(basefile))
-                fp = codecs.open(self.store.intermediate_path(basefile), "w", encoding="utf-8")
+                fp = codecs.open(
+                    self.store.intermediate_path(basefile),
+                    "w",
+                    encoding="utf-8")
                 fp.write('<body%s>' % xmlns)
                 if filetype != "docx":
                     fp.write("\n")
@@ -623,14 +662,14 @@ class DV(SwedishLegalSource):
                 fp.write(str(p))
                 if filetype != "docx":
                     fp.write("\n")
-        if fp: # should always be the case
+        if fp:  # should always be the case
             fp.write("</body>\n")
             fp.close()
             if filetype == "docx":
                 self._simplify_ooxml(self.store.intermediate_path(basefile))
         else:
             self.log.error("%s/%s: No notis were extracted (%s)" %
-                           (coll,year,docfile))
+                           (coll, year, docfile))
         return created, untouched
 
     re_delimSplit = re.compile("[;,] ?").split
@@ -752,7 +791,6 @@ class DV(SwedishLegalSource):
         self.parse_entry_update(doc)
         return True
 
-
     def parse_entry_title(self, doc):
         # FIXME: The primary use for entry.title is to generate
         # feeds. Should we construct a feed-friendly title here
@@ -772,8 +810,7 @@ class DV(SwedishLegalSource):
                 yield two
             else:
                 yield section
-                
-        
+
     def parse_not(self, text, basefile, filetype):
         basefile_regex = re.compile("(?P<type>\w+)/(?P<year>\d+)_not_(?P<ordinal>\d+)")
         referat_templ = {'REG': 'RÅ %(year)s not %(ordinal)s',
@@ -797,19 +834,22 @@ class DV(SwedishLegalSource):
         iterator = soup.find_all(ptag)
         if coll == "HDO":
             # keep this in sync w extract_notis
-            re_notisstart = re.compile("(?:Den (?P<avgdatum>\d+):[ae].\s+|)(?P<ordinal>\d+)\.[ \xa0]*\((?P<malnr>\w[ \xa0]\d+-\d+)\)", flags=re.UNICODE)
+            re_notisstart = re.compile(
+                "(?:Den (?P<avgdatum>\d+):[ae].\s+|)(?P<ordinal>\d+)\.[ \xa0]*\((?P<malnr>\w[ \xa0]\d+-\d+)\)",
+                flags=re.UNICODE)
             re_avgdatum = re_malnr = re_notisstart
             re_lagrum = re_sokord = None
             # headers consist of the first two chunks (month, then
             # date+ordinal+malnr)
-            header = iterator.pop(0), iterator[0] # need to re-read
-                                                  # the second chunk
-                                                  # later
+            header = iterator.pop(0), iterator[0]  # need to re-read
+            # the second chunk
+            # later
             curryear = m['year']
             currmonth = self.swedish_months[header[0].get_text().strip().lower()]
-        else: # "REG", "HFD"
+        else:  # "REG", "HFD"
             # keep in sync like above
-            re_notisstart = re.compile("[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)")
+            re_notisstart = re.compile(
+                "[\w\: ]*Lnr:(?P<court>\w+) ?(?P<year>\d+) ?not ?(?P<ordinal>\d+)")
             re_malnr = re.compile(r"D:(?P<malnr>\d+\-\d+)")
             # the avgdatum regex attempts to include valid dates, eg
             # not "2770-71-12"
@@ -827,14 +867,14 @@ class DV(SwedishLegalSource):
                 else:
                     tmp = iterator.pop(0)
                     if tmp.get_text().strip():
-                        # REG specialcase 
+                        # REG specialcase
                         if header and header[-1].get_text() == "Lagrum:":
                             header[-1].append(list(tmp.children)[0])
                         else:
                             header.append(tmp)
             if not done:
                 raise errors.ParseError("Cannot find notis number in %s" % basefile)
-                                
+
         if coll == "HDO":
             head['Domstol'] = "Högsta Domstolen"
         elif coll == "HFD":
@@ -850,16 +890,18 @@ class DV(SwedishLegalSource):
                                   ('Avgörandedatum', 'avgdatum', re_avgdatum),
                                   ('Lagrum', 'lagrum', re_lagrum),
                                   ('Sökord', 'sokord', re_sokord)):
-                if not rex: continue
+                if not rex:
+                    continue
                 m = rex.search(t)
                 if m and m.group(key):
-                    if fld in ('Lagrum'): # Sökord is split by sanitize_metadata
+                    if fld in ('Lagrum'):  # Sökord is split by sanitize_metadata
                         head[fld] = self.re_delimSplit(m.group(key))
                     else:
                         head[fld] = m.group(key)
 
         if coll == "HDO" and 'Avgörandedatum' in head:
-            head['Avgörandedatum'] = "%s-%02d-%02d" % (curryear, currmonth, int(head['Avgörandedatum']))
+            head[
+                'Avgörandedatum'] = "%s-%02d-%02d" % (curryear, currmonth, int(head['Avgörandedatum']))
 
         # Do a basic conversion of the rest (bodytext) to Element objects
         #
@@ -871,13 +913,13 @@ class DV(SwedishLegalSource):
             elif filetype == "docx":
                 subiterator = node.find_all("w:r")
             for part in subiterator:
-                if part.name:  
+                if part.name:
                     t = part.get_text()
                 else:
                     t = str(part)  # convert NavigableString to pure string
                 # if not t.strip():
                 #     continue
-                if filetype == "doc" and part.name == "emphasis": # docbook
+                if filetype == "doc" and part.name == "emphasis":  # docbook
                     if part.get("role") == "bold":
                         if line and isinstance(line[-1], Strong):
                             line[-1][-1] += t
@@ -888,7 +930,8 @@ class DV(SwedishLegalSource):
                             line[-1][-1] += t
                         else:
                             line.append(Em([t]))
-                elif filetype == "docx" and part.find("w:rpr") and part.find("w:rpr").find(["w:b", "w:i"]): # ooxml
+                # ooxml
+                elif filetype == "docx" and part.find("w:rpr") and part.find("w:rpr").find(["w:b", "w:i"]):
                     if part.rpr.b:
                         if line and isinstance(line[-1], Strong):
                             line[-1][-1] += t
@@ -907,13 +950,13 @@ class DV(SwedishLegalSource):
             if line:
                 body.append(line)
         return head, body
-        
+
     def parse_ooxml(self, text, basefile):
         soup = BeautifulSoup(text)
         soup = self._merge_ooxml(soup)
 
         head = {}
-        
+
         # Högst uppe på varje domslut står domstolsnamnet ("Högsta
         # domstolen") följt av referatnumret ("NJA 1987
         # s. 113").
@@ -935,7 +978,7 @@ class DV(SwedishLegalSource):
                 # FIXME: should warn for missing Målnummer iff
                 # Domsnummer is not present, and vice versa. But at
                 # this point we don't have all fields
-                if key not in ('Diarienummer', 'Domsnummer', 'Avdelning', 'Målnummer'): 
+                if key not in ('Diarienummer', 'Domsnummer', 'Avdelning', 'Målnummer'):
                     self.log.warning("%s: Couldn't find field %r" % (basefile, key))
                 continue
 
@@ -960,7 +1003,8 @@ class DV(SwedishLegalSource):
 
         # The main text body of the verdict
         body = []
-        for p in soup.find(text=re.compile('EFERAT')).find_parent('w:tr').find_next_sibling('w:tr').find_all('w:p'):
+        for p in soup.find(text=re.compile('EFERAT')).find_parent(
+                'w:tr').find_next_sibling('w:tr').find_all('w:p'):
             ptext = ''
             for e in p.find_all("w:t"):
                 ptext += e.string
@@ -1007,7 +1051,8 @@ class DV(SwedishLegalSource):
         for key in self.labels:
             node = soup.find(text=re.compile(key + ':'))
             if node:
-                txt = node.find_parent('entry').find_next_sibling('entry').get_text(strip=True)
+                txt = node.find_parent('entry').find_next_sibling(
+                    'entry').get_text(strip=True)
                 if txt:
                     head[key] = txt
 
@@ -1023,7 +1068,8 @@ class DV(SwedishLegalSource):
                         head[key].append(line)
 
         body = []
-        for p in soup.find(text=re.compile('REFERAT')).find_parent('tgroup').find_next_sibling('tgroup').find('entry').get_text(strip=True).split("\n\n"):
+        for p in soup.find(text=re.compile('REFERAT')).find_parent('tgroup').find_next_sibling(
+                'tgroup').find('entry').get_text(strip=True).split("\n\n"):
             body.append(p)
 
         # Hitta sammansatta metadata i sidfoten
@@ -1039,19 +1085,22 @@ class DV(SwedishLegalSource):
     # correct broken/missing metadata
     def sanitize_metadata(self, head, basefile):
         basefile_regex = re.compile('(?P<type>\w+)/(?P<year>\d+)-(?P<ordinal>\d+)')
-        nja_regex = re.compile("NJA ?(\d+) ?s\.? ?(\d+) ?\( ?(?:NJA|) ?[ :]?(\d+) ?: ?(\d+)")
+        nja_regex = re.compile(
+            "NJA ?(\d+) ?s\.? ?(\d+) ?\( ?(?:NJA|) ?[ :]?(\d+) ?: ?(\d+)")
         date_regex = re.compile("(\d+)[^\d]+(\d+)[^\d]+(\d+)")
-        referat_regex = re.compile("(?P<type>[A-ZÅÄÖ]+)[^\d]*(?P<year>\d+)[^\d]+(?P<ordinal>\d+)")
+        referat_regex = re.compile(
+            "(?P<type>[A-ZÅÄÖ]+)[^\d]*(?P<year>\d+)[^\d]+(?P<ordinal>\d+)")
         referat_templ = {'ADO': 'AD %(year)s nr %(ordinal)s',
                          'AD': '%(type)s %(year)s nr %(ordinal)s',
                          'MDO': 'MD %(year)s:%(ordinal)s',
                          'NJA': '%(type)s %(year)s s. %(ordinal)s',
                          None: '%(type)s %(year)s:%(ordinal)s'
-        }
+                         }
 
         # 1. Attempt to fix missing Referat
         if not head.get("Referat"):
-            # For some courts (MDO, ADO) it's possible to reconstruct a missing Referat from the basefile
+            # For some courts (MDO, ADO) it's possible to reconstruct a missing
+            # Referat from the basefile
             m = basefile_regex.match(basefile)
             if m and m.group("type") in ('ADO', 'MDO'):
                 head["Referat"] = referat_templ[m.group("type")] % (m.groupdict())
@@ -1081,7 +1130,7 @@ class DV(SwedishLegalSource):
                     if v.strip():
                         res.append(v.strip())
                 head['Målnummer'] = res
-        
+
         # 4. Create a general term for Målnummer or Domsnummer to act
         # as a local identifier
         if head.get("Målnummer"):
@@ -1111,7 +1160,7 @@ class DV(SwedishLegalSource):
         # "AD2011 nr 17", "HFD_2012 ref.58", "RH 2012_121", "RH2010
         # :180", "MD:2012:5", "MIG2011:14", "-MÖD 2010:32" and many
         # MANY more
-        if " not " not in head["Referat"]: # notiser always have OK Referat
+        if " not " not in head["Referat"]:  # notiser always have OK Referat
             m = referat_regex.search(head["Referat"])
             if m:
                 if m.group("type") in referat_templ:
@@ -1121,7 +1170,7 @@ class DV(SwedishLegalSource):
             else:
                 raise errors.ParseError("Unparseable ref '%s'" % head["Referat"])
 
-        # 7. Convert Sökord string to an actual list 
+        # 7. Convert Sökord string to an actual list
         res = []
         if head.get("Sökord"):
             for s in self.re_delimSplit(head["Sökord"]):
@@ -1145,10 +1194,10 @@ class DV(SwedishLegalSource):
         m = date_regex.match(head["Avgörandedatum"])
         if m:
             if len(m.group(1)) < 4:
-                if int(m.group(1) <= '80'): # '80-01-01' => '1980-01-01',
-                    year = '19' + m.group(1) 
+                if int(m.group(1) <= '80'):  # '80-01-01' => '1980-01-01',
+                    year = '19' + m.group(1)
                 else:                     # '79-01-01' => '2079-01-01',
-                    year = '20' + m.group(1) 
+                    year = '20' + m.group(1)
             else:
                 year = m.group(1)
             head["Avgörandedatum"] = "%s-%s-%s" % (year, m.group(2), m.group(3))
@@ -1182,13 +1231,13 @@ class DV(SwedishLegalSource):
             else:
                 sfsprefix = "res/sfs/"
             if "publ/rattsfall" in uri:
-                
+
                 return uri.replace("http://rinfo.lagrummet.se/publ/rattsfall/",
                                    self.config.url + self.config.urlpath)
             elif "publ/sfs/" in uri:
                 return uri.replace("http://rinfo.lagrummet.se/publ/sfs/",
                                    self.config.url + sfsprefix)
-                
+
         def split_nja(value):
             return [x[:-1] for x in value.split("(")]
 
@@ -1199,9 +1248,8 @@ class DV(SwedishLegalSource):
         # 1. mint uris and create the two Describers we'll use
         refuri = ref_to_uri(head["Referat"])
 
-            
         refdesc = Describer(doc.meta, refuri)
-        
+
         domuri = dom_to_uri(head["Domstol"],
                             head["_localid"],
                             head["Avgörandedatum"])
@@ -1209,7 +1257,7 @@ class DV(SwedishLegalSource):
 
         # 2. convert all strings in head to proper RDF
         #
-        # 
+        #
         for label, value in head.items():
             if label == "Rubrik":
                 value = util.normalize_space(value)
@@ -1241,7 +1289,7 @@ class DV(SwedishLegalSource):
                         if pred == 'rattsfallspublikation':
                             # "NJA" -> "http://localhost:8000/coll/dv/nja"
                             # "RÅ" -> "http://localhost:8000/coll/dv/rå" <-- FIXME, should be .../dv/ra
-                            if self.config.url == "https://lagen.nu/":  #FIXME!
+                            if self.config.url == "https://lagen.nu/":  # FIXME!
                                 uri = "https://lagen.nu/dataset/" + m.group(1).lower()
                             else:
                                 uri = self.config.url + "coll/dv/" + m.group(1).lower()
@@ -1303,9 +1351,9 @@ class DV(SwedishLegalSource):
 #                                                                   head["_localid"],
 #                                                                   head["Avgörandedatum"])
 #
-        
+
         # 6. assert that we have everything we need
-        
+
         # 7. done!
         return refuri
 
@@ -1339,7 +1387,7 @@ class DV(SwedishLegalSource):
             baseurl = "http://example.org/sfs/9999:999"
             citparser = SwedishCitationParser(self.ref_parser, self.config.url)
             b = citparser.parse_recursive(b)
-            
+
         # convert the unstructured list of Paragraphs to a
         # hierarchical tree of instances, domslut, domskäl, etc
         try:
@@ -1354,7 +1402,8 @@ class DV(SwedishLegalSource):
 
     @staticmethod
     def get_parser(basefile):
-        re_courtname = re.compile("^(Högsta domstolen|Hovrätten (över|för) [A-ZÅÄÖa-zåäö ]+|([A-ZÅÄÖ][a-zåäö]+ )(tingsrätt|hovrätt))(|, mark- och miljödomstolen|, Mark- och miljööverdomstolen)$")
+        re_courtname = re.compile(
+            "^(Högsta domstolen|Hovrätten (över|för) [A-ZÅÄÖa-zåäö ]+|([A-ZÅÄÖ][a-zåäö]+ )(tingsrätt|hovrätt))(|, mark- och miljödomstolen|, Mark- och miljööverdomstolen)$")
 
 #         productions = {'karande': '..',
 #                        'court': '..',
@@ -1381,7 +1430,7 @@ class DV(SwedishLegalSource):
              'method': 'match',
              'type': ('dom',),
              'court': ('REG', 'HFD', 'MIG')},
-            
+
             {'name': 'tr-dom',
              're': '(?P<court>TR:n|Tingsrätten|HovR:n|Hovrätten|Mark- och miljödomstolen) \((?P<constitution>[\w\.\- ,]+)\) (anförde|fastställde|stadfäste|meddelade) (följande i |i beslut i |i |)(dom|beslut) (d\.|d|den) (?P<date>\d+ \w+\.? \d+)',
              'method': 'match',
@@ -1531,7 +1580,7 @@ class DV(SwedishLegalSource):
             {'name': 'överklag-5',
              're': '(?!Även )(?P<karanden>[\w\.\(\)\- ]+?) överklagade '
                    '(?P<prevcourt>\w+)s (dom|domar)',
-             'method': 'match', 
+             'method': 'match',
              'type': ('instans',)},
             {'name': 'överklag-6',
              're': '(?P<karanden>[\w\.\(\)\- ]+) överklagade domen till '
@@ -1552,7 +1601,7 @@ class DV(SwedishLegalSource):
              're': "(Tingsrätten|TR[:\.]n|Hovrätten|HD|Högsta förvaltningsdomstolen) \([^)]*\) (meddelade|anförde|fastställde|yttrade)",
              'method': 'match',
              'type': ('domskal',)},
-            {'name': 'domskal-dom-fr', # a simplified copy of fr-överkl
+            {'name': 'domskal-dom-fr',  # a simplified copy of fr-överkl
              're': '(?P<court>(Förvaltningsrätten|'
                    'Länsrätten|Kammarrätten) i \w+(| län)'
                    '(|, migrationsdomstolen|, Migrationsöverdomstolen)|'
@@ -1576,20 +1625,24 @@ class DV(SwedishLegalSource):
             if 'court' not in pat or court in pat['court']:
                 for t in pat['type']:
                     # print("Adding pattern %s to %s" %  (pat['name'], t))
-                    matchers[t].append(getattr(re.compile(pat['re'], re.UNICODE), pat['method']))
+                    matchers[t].append(
+                        getattr(
+                            re.compile(
+                                pat['re'],
+                                re.UNICODE),
+                            pat['method']))
                     matchersname[t].append(pat['name'])
-            
-            
+
         def is_delmal(parser):
             # should handle "IV" and "I (UM1001-08)"
             strchunk = str(parser.reader.peek())
             if (len(strchunk) < 20 and
-                not strchunk.endswith(".") and
-                strchunk.split(" ",1)[0] in ("I", "II", "III", "IV")):
-                return {'id': strchunk.split(" ",1)[0]}
+                    not strchunk.endswith(".") and
+                    strchunk.split(" ", 1)[0] in ("I", "II", "III", "IV")):
+                return {'id': strchunk.split(" ", 1)[0]}
             else:
                 return {}
-                
+
         def is_instans(parser, chunk=None):
             """Determines whether the current position starts a new instans part of the report.
 
@@ -1602,10 +1655,10 @@ class DV(SwedishLegalSource):
                 # in some referats, two subsequent chunks both matches
                 # analyze_instans, even though they refer to the _same_
                 # instans. Check to see if that is the case
-                
+
                 if (hasattr(parser, 'current_instans') and
                     hasattr(parser.current_instans, 'court') and
-                    parser.current_instans.court and 
+                    parser.current_instans.court and
                     is_equivalent_court(res['court'],
                                         parser.current_instans.court)):
                     return {}
@@ -1634,10 +1687,11 @@ class DV(SwedishLegalSource):
 
         def canonicalize_court(courtname):
             if isinstance(courtname, bool):
-                return courtname # we have no idea which court this
-                                 # is, only that it is A court
+                return courtname  # we have no idea which court this
+                # is, only that it is A court
             else:
-                return courtname.replace("HD", "Högsta domstolen").replace("HovR", "Hovrätt")
+                return courtname.replace(
+                    "HD", "Högsta domstolen").replace("HovR", "Hovrätt")
 
         def is_heading(parser):
             chunk = parser.reader.peek()
@@ -1649,12 +1703,11 @@ class DV(SwedishLegalSource):
             return len(strchunk) < 140 and not (strchunk.endswith(".") or
                                                 strchunk.endswith(":") or
                                                 strchunk.startswith("”"))
-                                            
 
         def is_betankande(parser):
             strchunk = str(parser.reader.peek())
             return strchunk == "Målet avgjordes efter föredragning."
-            
+
         def is_dom(parser):
             strchunk = str(parser.reader.peek())
             res = analyze_dom(strchunk)
@@ -1668,14 +1721,16 @@ class DV(SwedishLegalSource):
         def is_domslut(parser):
             strchunk = str(parser.reader.peek())
             return analyze_domslut(strchunk)
-            
+
         def is_skiljaktig(parser):
             strchunk = str(parser.reader.peek())
-            return re.match("(Justitie|Kammarrätts)råde[nt] ([^\.]*) var (skiljaktig|av skiljaktig mening)", strchunk)
+            return re.match(
+                "(Justitie|Kammarrätts)råde[nt] ([^\.]*) var (skiljaktig|av skiljaktig mening)", strchunk)
 
         def is_tillagg(parser):
             strchunk = str(parser.reader.peek())
-            return re.match("Justitieråde[nt] ([^\.]*) (tillade för egen del|gjorde för egen del ett tillägg)", strchunk)
+            return re.match(
+                "Justitieråde[nt] ([^\.]*) (tillade för egen del|gjorde för egen del ett tillägg)", strchunk)
 
         def is_endmeta(parser):
             strchunk = str(parser.reader.peek())
@@ -1712,11 +1767,10 @@ class DV(SwedishLegalSource):
                 # <Instans name="HD"><str>H.T. sökte revision och yrkade att <PredicateSubject rel="HD" uri="http://lagen.nu/org/2008/hogsta-domstolen/">HD>/PredicateSubject>
                 # <div class="instans" rel="dc:creator" href="..."
 
-                
                 # the needed sentence is usually 1st or 2nd
                 # (occassionally 3rd), searching more yields risk of
                 # false positives.
-                
+
                 for sentence in split_sentences(strchunk)[:3]:
                     for (r, rname) in zip(matchers['instans'], matchersname['instans']):
                         m = r(sentence)
@@ -1727,7 +1781,7 @@ class DV(SwedishLegalSource):
                                 res['court'] = mg['court'].strip()
                             else:
                                 res['court'] = True
-                            #if 'prevcourt' in mg and mg['prevcourt']:
+                            # if 'prevcourt' in mg and mg['prevcourt']:
                             #    res['prevcourt'] = mg['prevcourt'].strip()
                             if 'date' in mg and mg['date']:
                                 parse_swed = DV().parse_swedish_date
@@ -1759,13 +1813,13 @@ class DV(SwedishLegalSource):
                             try:
                                 res['date'] = parse_swed(mg['date'])
                             except ValueError:
-                                try: 
+                                try:
                                     res['date'] = parse_iso(mg['date'])
                                 except ValueError:
                                     pass
                                     # or res['date'] = mg['date']??
-                                
-                        #if 'constitution' in mg:
+
+                        # if 'constitution' in mg:
                         #    res['constitution'] = parse_constitution(mg['constitution'])
                         return res
             return res
@@ -1781,7 +1835,7 @@ class DV(SwedishLegalSource):
                         res['domskal'] = True
                         return res
             return res
-            
+
         def analyze_domslut(strchunk):
             res = {}
             # only 1st sentence
@@ -1912,11 +1966,11 @@ class DV(SwedishLegalSource):
             m = Endmeta()
             m.append(parser.reader.next())
             return parser.make_children(m)
-            
+
         def make_paragraph(parser):
             chunk = parser.reader.next()
             strchunk = str(chunk)
-            if not strchunk.strip(): # filter out empty things
+            if not strchunk.strip():  # filter out empty things
                 return None
             if ordered(strchunk):
                 # FIXME: Cut the ordinal from chunk somehow
@@ -1927,7 +1981,7 @@ class DV(SwedishLegalSource):
             else:
                 if isinstance(chunk, Paragraph):
                     p = chunk
-                else: 
+                else:
                     p = Paragraph([chunk])
             return p
 
@@ -1945,7 +1999,7 @@ class DV(SwedishLegalSource):
             else:
                 # here's where we pop the stack
                 return False, None
-                
+
         p = FSMParser()
         p.set_recognizers(is_delmal,
                           is_endmeta,
@@ -1964,8 +2018,17 @@ class DV(SwedishLegalSource):
         # start of dom in such a way that we can't transition into
         # domskal right away (eg HovR:s dom in HDO/B10-86_1 and prob
         # countless others)
-        commonstates = ("body", "delmal", "instans", "dom", "domskal", "domslut", "betankande", "skiljaktig", "tillagg")
-        
+        commonstates = (
+            "body",
+            "delmal",
+            "instans",
+            "dom",
+            "domskal",
+            "domslut",
+            "betankande",
+            "skiljaktig",
+            "tillagg")
+
         p.set_transitions({
             ("body", is_delmal): (make_delmal, "delmal"),
             ("body", is_instans): (make_instans, "instans"),
@@ -1981,32 +2044,33 @@ class DV(SwedishLegalSource):
             ("instans", is_tillagg): (make_tillagg, "tillagg"),
             ("instans", is_delmal): (False, None),
             ("instans", is_endmeta): (False, None),
-            ("betankande", is_domskal): transition_domskal, # either (make_domskal, "domskal") or (False, None)
+            # either (make_domskal, "domskal") or (False, None)
+            ("betankande", is_domskal): transition_domskal,
             ("betankande", is_domslut): (make_domslut, "domslut"),
             ("betankande", is_dom): (False, None),
-            ("__done__", is_domskal): (False, None), 
-            ("__done__", is_skiljaktig): (False, None), 
-            ("__done__", is_tillagg): (False, None), 
-            ("__done__", is_delmal): (False, None), 
-            ("__done__", is_endmeta): (False, None), 
+            ("__done__", is_domskal): (False, None),
+            ("__done__", is_skiljaktig): (False, None),
+            ("__done__", is_tillagg): (False, None),
+            ("__done__", is_delmal): (False, None),
+            ("__done__", is_endmeta): (False, None),
             ("__done__", is_domslut): (make_domslut, "domslut"),
             ("dom", is_domskal): (make_domskal, "domskal"),
             ("dom", is_domslut): (make_domslut, "domslut"),
             ("dom", is_instans): (False, None),
-            ("dom", is_skiljaktig): (False, None), # Skiljaktig mening is not considered
-                                                   # part of the dom, but rather an appendix
-            ("dom", is_tillagg): (False, None), 
+            ("dom", is_skiljaktig): (False, None),  # Skiljaktig mening is not considered
+            # part of the dom, but rather an appendix
+            ("dom", is_tillagg): (False, None),
             ("dom", is_endmeta): (False, None),
-            ("domskal", is_delmal): (False, None), 
+            ("domskal", is_delmal): (False, None),
             ("domskal", is_domslut): (False, None),
-            ("domskal", is_instans): (False, None), 
-            ("domslut", is_delmal): (False, None), 
+            ("domskal", is_instans): (False, None),
+            ("domslut", is_delmal): (False, None),
             ("domslut", is_instans): (False, None),
             ("domslut", is_domskal): (False, None),
-            ("domslut", is_skiljaktig): (False, None), 
+            ("domslut", is_skiljaktig): (False, None),
             ("domslut", is_tillagg): (False, None),
             ("domslut", is_endmeta): (False, None),
-            ("domslut", is_dom): (False, None), 
+            ("domslut", is_dom): (False, None),
             ("skiljaktig", is_domslut): (False, None),
             ("skiljaktig", is_instans): (False, None),
             ("skiljaktig", is_skiljaktig): (False, None),
@@ -2018,7 +2082,7 @@ class DV(SwedishLegalSource):
             ("endmeta", is_paragraph): (make_paragraph, None),
             (commonstates, is_heading): (make_heading, None),
             (commonstates, is_paragraph): (make_paragraph, None),
-                       })
+        })
         p.initial_state = "body"
         p.initial_constructor = make_body
         p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
@@ -2041,8 +2105,11 @@ class DV(SwedishLegalSource):
         fp.close()
         resulttree = transform(intree)
         with open(filename, "wb") as fp:
-            fp.write(etree.tostring(resulttree, pretty_print=pretty_print, encoding="utf-8"))
-
+            fp.write(
+                etree.tostring(
+                    resulttree,
+                    pretty_print=pretty_print,
+                    encoding="utf-8"))
 
     def _merge_ooxml(self, soup):
         # this is a similar step to _simplify_ooxml, but merges w:p

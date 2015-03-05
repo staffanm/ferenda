@@ -16,4 +16,3 @@ from .myndfskr import MyndFskr
 from .propositioner import Propositioner
 from .sfs import SFS
 from .sou import SOU
-

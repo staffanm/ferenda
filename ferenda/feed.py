@@ -6,7 +6,7 @@ class Feed(object):
 
     """Represents a particular Feed of new or updated items selected by
     some criteria.
-    
+
     :param label: A description of this feed, like "Documents published by XYZ"
     :type  label: str
     :param binding: The variable binding used for defining this feed, like

@@ -50,7 +50,8 @@ class TextReader(object):
         else:
             self.linesep = os.linesep
 
-        # can be changed through getiterator, if we want to iterate over anything else but lines
+        # can be changed through getiterator, if we want to iterate over anything
+        # else but lines
         self.iterfunc = self.readline
         self.iterargs = []
         self.iterkwargs = {}
@@ -176,11 +177,11 @@ two or more consecutive line separators)."""
         """Reads and returns the next page (all text up to next form feed, ``"\\f"``)"""
 
         return self.readchunk('\f')  # form feed - pdftotext generates
-                                    # these to indicate page breaks
-                                    # (other ascii oriented formats,
-                                    # like the GPL, RFCs and even some
-                                    # python source code, uses it as
-                                    # well)
+        # these to indicate page breaks
+        # (other ascii oriented formats,
+        # like the GPL, RFCs and even some
+        # python source code, uses it as
+        # well)
 
     def readchunk(self, delimiter):
         """Reads and returns the next chunk of text up to *delimiter*"""

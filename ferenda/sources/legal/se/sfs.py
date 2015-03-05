@@ -122,7 +122,7 @@ class Strecksatslista (CompoundElement):
 
 class NumreradLista (CompoundElement):
     tagname = "ul"  # These list are not always monotonically
-                   # increasing, which a <ol> requrires
+    # increasing, which a <ol> requrires
     classname = "numreradlista"
 
 
@@ -168,11 +168,11 @@ class Kapitel(CompoundElement, OrdinalElement):
     fragment_label = "K"
     tagname = "div"
     typeof = "rpubl:Kapitel"  # FIXME: This is qname string, not
-                             # rdflib.URIRef (which would be better),
-                             # since as_xhtml doesn't have access to
-                             # a graph with namespace bindings, which
-                             # is required to turn a URIRef to a
-                             # qname
+    # rdflib.URIRef (which would be better),
+    # since as_xhtml doesn't have access to
+    # a graph with namespace bindings, which
+    # is required to turn a URIRef to a
+    # qname
 
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
@@ -269,6 +269,7 @@ class Registerpost(CompoundElement):
         # property -- should be parsed and linked)
         return super(Registerpost, self).as_xhtml()
 
+
 class IckeSFS(ParseError):
 
     """Slängs när en författning som inte är en egentlig
@@ -281,6 +282,7 @@ class UpphavdForfattning(DocumentRemovedError):
 
 class IdNotFound(DocumentRemovedError):
     pass
+
 
 class InteUppdateradSFS(Exception):
     pass
@@ -316,7 +318,6 @@ class SFSDocumentStore(DocumentStore):
     def intermediate_path(self, basefile):
         return self.path(basefile, "intermediate", ".txt")
 
-    
 
 class SFS(Trips):
 
@@ -331,7 +332,7 @@ class SFS(Trips):
     ./ferenda-build.py sfs parse 2009:924 --force --sfs-trace-rubrik
 
     (sets the sfs.rubrik logger level to DEBUG) or
-    
+
     ./ferenda-build.py sfs parse 2009:924 --force --sfs-trace-tabell=INFO
 
     """
@@ -359,7 +360,7 @@ class SFS(Trips):
          'start': '2009',
          'end': str(datetime.today().year)}
     ]
-    
+
     document_url_template = (
         "http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfst_dok&"
         "${HTML}=sfst_lst&${SNHTML}=sfst_err&${BASE}=SFST&"
@@ -376,7 +377,7 @@ class SFS(Trips):
         "${TRIPSHOW}=format=THW&%%C4BET=%(basefile)s")
 
     xslt_template = "res/xsl/sfs.xsl"
-    
+
     documentstore_class = SFSDocumentStore
 
     def __init__(self, config=None, **kwargs):
@@ -389,7 +390,7 @@ class SFS(Trips):
         # IP-based ones. The hack hade to be sidabled since the
         # IP-based URLs stopped working. Fortunaltely the DNS-based
         # ones has been sped up.
-        
+
 #        for p in ('document_url_template',
 #                  'document_sfsr_url_template',
 #                  'document_sfsr_change_url_template'):
@@ -412,10 +413,6 @@ class SFS(Trips):
             else:
                 # shut up logger
                 self.trace[logname].propagate = False
-
-
-
-        
 
     # make sure our EBNF-based parsers (which are expensive to create)
     # only gets created if they are demanded.
@@ -442,7 +439,7 @@ class SFS(Trips):
         opts['revisit'] = list
         opts['next_sfsnr'] = str
         return opts
-    
+
     def canonical_uri(self, basefile, konsolidering=False):
         prefix = self.config.url + self.config.urlpath
         basefile = basefile.replace(" ", "_")
@@ -462,7 +459,6 @@ class SFS(Trips):
         if uri.startswith(prefix) and uri[len(prefix)].isdigit():
             rest = uri[len(prefix):].replace("_", " ")
             return rest.split("/")[0]
-
 
     def download(self, basefile=None):
         if 'skipdownload' in self.config:
@@ -528,7 +524,9 @@ class SFS(Trips):
                 # if none are there, we're done
                 if not peek:
                     peek = True
-                    self.log.info('Peeking for SFS %s:%s' % (year, nr+1)) # increments below
+                    self.log.info(
+                        'Peeking for SFS %s:%s' %
+                        (year, nr + 1))  # increments below
                 elif datetime.today().year > year:
                     peek = False
                     year = datetime.today().year
@@ -564,7 +562,7 @@ class SFS(Trips):
                     # this is OK only if the act is revoked (upphavd)
                     if self._find_upphavts_genom(filename):
                         self.log.debug("    Text only updated to %s, "
-                                       "but slated for revocation by %s" % 
+                                       "but slated for revocation by %s" %
                                        (uppdaterad_tom,
                                         self._find_upphavts_genom(filename)))
                     else:
@@ -573,7 +571,7 @@ class SFS(Trips):
                         raise InteUppdateradSFS(wanted_sfs_nr)
         else:
             raise InteExisterandeSFS(wanted_sfs_nr)
-        
+
     def _check_for_sfs(self, year, nr):
         """Givet ett SFS-nummer, returnera en lista med alla
         SFS-numret för dess grundförfattningar. Normalt sett har en
@@ -583,7 +581,7 @@ class SFS(Trips):
         # Titta först efter grundförfattning
         self.log.debug('    Looking for base act')
         grundforf = []
-        basefile = "%s:%s" % (year,nr)
+        basefile = "%s:%s" % (year, nr)
         url = self.document_sfsr_url_template % {'basefile': basefile}
         t = TextReader(string=requests.get(url).text)
         try:
@@ -617,7 +615,6 @@ class SFS(Trips):
                                    % grundforf[-1])
                 return grundforf
 
-
     def download_single(self, basefile, url=None):
         """Laddar ner senaste konsoliderade versionen av
         grundförfattningen med angivet SFS-nr. Om en tidigare version
@@ -626,7 +623,10 @@ class SFS(Trips):
         self.log.debug('Attempting to download %s' % (basefile))
 
         sfst_url = self.document_url_template % {'basefile': basefile.replace(" ", "+")}
-        sfsr_url = self.document_sfsr_url_template % {'basefile': basefile.replace(" ", "+")}
+        sfsr_url = self.document_sfsr_url_template % {
+            'basefile': basefile.replace(
+                " ",
+                "+")}
         # FIXME: a lot of code duplication compared to
         # DocumentRepository.download_single. Maybe particularly the
         # DocumentEntry juggling should go into download_if_needed()?
@@ -645,7 +645,7 @@ class SFS(Trips):
         # The method used by download_new does not allow us to
         # discover the magic URL to the database view containing
         # metadata
-        if url: 
+        if url:
             metadatafilename = self.store.metadata_path(basefile)
             self.download_if_needed(url, basefile, archive=False, filename=metadatafilename)
         regfilename = self.store.register_path(basefile)
@@ -924,7 +924,7 @@ class SFS(Trips):
         desc.rel(self.ns['rpubl'].konsoliderar, self.canonical_uri(doc.basefile))
         desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
         de = DocumentEntry(docentry_file)
-        
+
         desc.value(self.ns['rinfoex'].senastHamtad, de.orig_updated)
         desc.value(self.ns['rinfoex'].senastKontrollerad, de.orig_checked)
 
@@ -1036,7 +1036,7 @@ class SFS(Trips):
         notfound = soup.find(text="Sökningen gav ingen träff!")
         if notfound:
             raise IdNotFound(str(notfound))
-        
+
         d = OrderedDict()
         rubrik = util.normalize_space(soup.body('table')[2].text)
         changes = soup.body('table')[3:-2]
@@ -1120,7 +1120,7 @@ class SFS(Trips):
                               changecat.startswith('tillägg')):
                             pred = self.ns['rpubl'].inforsI
                         elif (changecat.startswith('nuvarande') or
-                              changecat.startswith('rubr. närmast') or 
+                              changecat.startswith('rubr. närmast') or
                               changecat in ('begr. giltighet', 'Omtryck',
                                             'omtryck', 'forts.giltighet',
                                             'forts. giltighet',
@@ -1132,7 +1132,9 @@ class SFS(Trips):
                             # före 10 §"
                             pred = None
                         else:
-                            self.log.warning("%s: Okänd omfattningstyp %r" % (self.id, changecat))
+                            self.log.warning(
+                                "%s: Okänd omfattningstyp %r" %
+                                (self.id, changecat))
                             pred = None
                         old_currenturl = self.lagrum_parser._currenturl
                         self.lagrum_parser._currenturl = docuri
@@ -1186,7 +1188,7 @@ class SFS(Trips):
         # to avoid "Assuming that" warnings, autoremove sub-org ids,
         # ie "Finansdepartementet S3" -> "Finansdepartementet"
         # loop until done to handle "Justitiedepartementet DOM, L5 och Å"
-        
+
         cleaned = None
         while True:
             cleaned = re.sub(",? (och|[A-ZÅÄÖ\d]{1,5})$", "", val)
@@ -1194,7 +1196,6 @@ class SFS(Trips):
                 break
             val = cleaned
         return cleaned
-        
 
     def _find_utfardandedatum(self, sfsnr):
         # FIXME: Code to instantiate a SFSTryck object and muck about goes here
@@ -1299,7 +1300,8 @@ class SFS(Trips):
                                         termdelimiter = " - "
                                 m = self.re_SearchSfsId(elementtext)
 
-                                if termdelimiter == ":" and m and m.start() < elementtext.index(":"):
+                                if termdelimiter == ":" and m and m.start() < elementtext.index(
+                                        ":"):
                                     termdelimiter = " "
 
                                 if termdelimiter in elementtext:
@@ -1800,7 +1802,8 @@ class SFS(Trips):
     def eof(self):
         return None
 
-    def makeOvergangsbestammelser(self, rubrik_saknas=False):  # svenska: övergångsbestämmelser
+    # svenska: övergångsbestämmelser
+    def makeOvergangsbestammelser(self, rubrik_saknas=False):
         # det kan diskuteras om dessa ska ses som en del av den
         # konsoliderade lagtexten öht, men det verkar vara kutym att
         # ha med åtminstone de som kan ha relevans för gällande rätt
@@ -1895,7 +1898,7 @@ class SFS(Trips):
                     else:
                         dates[key] = m.group(1)
                     line = regex.sub('', line)
-                except ValueError: # eg if datestring was
+                except ValueError:  # eg if datestring was
                                    # "2014-081-01" or something
                                    # similarly invalid - result in no
                                    # match, eg unaffected line
@@ -2017,12 +2020,15 @@ class SFS(Trips):
         if m:
             # even though something might look like the start of a chapter, it's often just the
             # start of a paragraph in a section that lists the names of chapters. These following
-            # attempts to filter these out by looking for some typical line endings for those cases
+            # attempts to filter these out by looking for some typical line endings
+            # for those cases
             if (p.endswith(",") or
                 p.endswith(";") or
                 # p.endswith(")") or  # but in some cases, a chapter actually ends in ),
                 # eg 1932:131
-                p.endswith(" och") or  # in unlucky cases, a chapter heading might span two lines in a way that the first line ends with "och" (eg 1998:808 kap. 3)
+                # in unlucky cases, a chapter heading might span two lines in a way that
+                # the first line ends with "och" (eg 1998:808 kap. 3)
+                p.endswith(" och") or
                 p.endswith(" om") or
                 p.endswith(" samt") or
                 (p.endswith(".") and not
@@ -2075,7 +2081,8 @@ class SFS(Trips):
             return False
 
         # self.trace['rubrik'].debug("isRubrik: p=%s" % p)
-        if len(p) > 110:  # it shouldn't be too long, but some headlines are insanely verbose
+        # it shouldn't be too long, but some headlines are insanely verbose
+        if len(p) > 110:
             self.trace['rubrik'].debug("isRubrik (%s): too long" % (p[:50]))
             return False
 
@@ -2398,7 +2405,7 @@ class SFS(Trips):
             return Tabellcell([util.normalize_space(text)])
 
         cols = ['', '', '', '', '', '', '', '']
-            # Ingen tabell kommer nånsin ha mer än åtta kolumner
+        # Ingen tabell kommer nånsin ha mer än åtta kolumner
         if tabstops:
             statictabstops = True  # Använd de tabbstoppositioner vi fick förra raden
         else:
@@ -2635,7 +2642,7 @@ class SFS(Trips):
         assert "sfs" in sfsdataset
         dvdataset = sfsdataset.replace("sfs", "dv")
         wikidataset = sfsdataset.replace("sfs", "mediawiki")
-        
+
         # this is old legacy code. The new nice way would be to create
         # one giant SPARQL CONSTRUCT query file and just set
         # self.sparql_annotations to that file. But you know, this works.
@@ -2699,7 +2706,8 @@ class SFS(Trips):
                 filtered.append(r)
         stuff[baseuri]['rattsfall'] = filtered
 
-        # 2. all law sections that has a dcterms:references that matches this (using dcterms:isPartOf).
+        # 2. all law sections that has a dcterms:references that matches this
+        # (using dcterms:isPartOf).
         inboundlinks = self.time_store_select(store,
                                               "res/sparql/sfs_inboundlinks.rq",
                                               basefile,
@@ -2745,7 +2753,7 @@ class SFS(Trips):
         wikidesc = self.time_store_select(store,
                                           "res/sparql/sfs_wikientries.rq",
                                           basefile,
-                                          None, # need both mediawiki and sfs contexts
+                                          None,  # need both mediawiki and sfs contexts
                                           "wiki comments")
 
         for row in wikidesc:
@@ -2762,7 +2770,8 @@ class SFS(Trips):
         # (4. eurlex.nu data (mapping CELEX ids to titles))
         # (5. Propositionstitlar)
         # 6. change entries for each section
-        # NOTE: The SFS RDF data does not yet contain change entries, this query always returns 0 rows
+        # NOTE: The SFS RDF data does not yet contain change entries, this query
+        # always returns 0 rows
         changes = self.time_store_select(store,
                                          "res/sparql/sfs_changes.rq",
                                          basefile,
@@ -2809,7 +2818,8 @@ class SFS(Trips):
         # </rdf:RDF>
 
         start = time()
-        # compatibility hack to enable lxml to process qnames for namespaces 
+        # compatibility hack to enable lxml to process qnames for namespaces
+
         def ns(string):
             if ":" in string:
                 prefix, tag = string.split(":", 1)
@@ -2887,7 +2897,8 @@ class SFS(Trips):
                     id_node.text = r['id']
             if 'desc' in stuff[l]:
                 desc_node = etree.SubElement(lagrum_node, ns("dcterms:description"))
-                xhtmlstr = "<div xmlns='http://www.w3.org/1999/xhtml'>%s</div>" % stuff[l]['desc']
+                xhtmlstr = "<div xmlns='http://www.w3.org/1999/xhtml'>%s</div>" % stuff[
+                    l]['desc']
                 desc_node.append(etree.fromstring(xhtmlstr.encode('utf-8')))
 
         # tree = etree.ElementTree(root_node)
@@ -2903,15 +2914,15 @@ class SFS(Trips):
         # inverse of SwedishLegalSource.localize_uri()
         prefix = self.config.url + self.config.urlpath
         return uri.replace(prefix, "http://rinfo.lagrummet.se/publ/sfs/")
-        
+
     def display_title(self, uri, form="absolute"):
         # "https://lagen.nu/2010:1770#K1P2S1" => "Lag (2010:1770) om blahonga, 1 kap. 2 § 1 st."
         parts = legaluri.parse(self._unlocalize_uri(uri))
         res = ""
         for (field, label) in (('chapter', 'kap.'),
-                              ('section', '\xa7'),
-                              ('piece', 'st'),
-                              ('item', 'p')):
+                               ('section', '\xa7'),
+                               ('piece', 'st'),
+                               ('item', 'p')):
             if field in parts and not (field == 'piece' and
                                        parts[field] == '1' and
                                        'item' not in parts):
@@ -2925,7 +2936,11 @@ class SFS(Trips):
                                             self.config.storelocation,
                                             self.config.storerepository)
 
-                changes = self.store_select(store, "res/sparql/sfs_title.rq", uri, self.dataset_uri())
+                changes = self.store_select(
+                    store,
+                    "res/sparql/sfs_title.rq",
+                    uri,
+                    self.dataset_uri())
                 if changes:
                     self._document_name_cache[parts[
                         'law']] = changes[0]['title']
@@ -2946,7 +2961,9 @@ class SFS(Trips):
         # these last examples should probably be handled in the parse step
         title = re.sub("^/r1/ ", "", title)
         if title.startswith("/Rubriken"):
-            m = re.match("/Rubriken upphör att gälla U:([^/]+)/ *([^/]+)/Rubriken träder i kraft I:([^/]+)/ *([^/]+)", title)
+            m = re.match(
+                "/Rubriken upphör att gälla U:([^/]+)/ *([^/]+)/Rubriken träder i kraft I:([^/]+)/ *([^/]+)",
+                title)
             if m:
                 expdate = m.group(1)
                 oldtitle = m.group(2)
@@ -2961,12 +2978,15 @@ class SFS(Trips):
                     title = oldtitle
 
         # these are for better sorting/selecting
-        title = re.sub('Kungl\. Maj:ts ','',title)
-        title = re.sub('^(Lag|Förordning|Tillkännagivande|[kK]ungörelse) ?\([^\)]+\) ?(av|om|med|angående) ','',title)
+        title = re.sub('Kungl\. Maj:ts ', '', title)
+        title = re.sub(
+            '^(Lag|Förordning|Tillkännagivande|[kK]ungörelse) ?\([^\)]+\) ?(av|om|med|angående) ',
+            '',
+            title)
         title = re.sub("^\d{4} års ", "", title)
 
         return title
-        
+
     def facets(self):
         def forfattningskey(row, binding, resource_graph):
             # "Lag (1994:1920) om allmän löneavgift" => "allmän löneavgift"
@@ -2986,18 +3006,16 @@ class SFS(Trips):
                       selector=forfattningsselector,
                       identificator=forfattningsselector,
                       key=forfattningskey,
-                      dimension_label="titel"),      
+                      dimension_label="titel"),
                 Facet(DCTERMS.issued,
                       label="Ordnade efter utgivningsår",
                       pagetitle='Författningar utgivna %(selected)s',
                       key=forfattningskey,
                       dimension_label="utgiven")
-        ]
-
+                ]
 
     def tabs(self):
         return [("Författningar", self.dataset_uri())]
-
 
     def toc_item(self, binding, row):
         """Returns a formatted version of row, using Element objects"""
@@ -3016,5 +3034,4 @@ class SFS(Trips):
         "downloaded/sfst/(?P<byear>\d+)/(?P<bnum>[\d_s\.bih]+)-(?P<vyear>\d+)-(?P<vnum>[\d_s\.bih]+)\.html",
         "downloaded/sfst/(?P<byear>\d+)/(?P<bnum>[\d_s\.bih]+)-(?P<vyear>first)-(?P<vnum>version)\.html",
         "downloaded/sfst/(?P<byear>\d+)/(?P<bnum>[\d_s\.bih]+)-(?P<vyear>\d+)-(?P<vnum>[\d_s\.bih]+)-checksum-(?P<vcheck>[\w\d]+)\.html"
-        ]
-
+    ]

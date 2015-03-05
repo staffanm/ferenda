@@ -22,13 +22,16 @@ from ferenda import DocumentRepository, FulltextIndex, Transformer, Facet
 from ferenda import fulltextindex, util, elements
 from ferenda.elements import html
 
+
 class WSGIApp(object):
+
     """Implements a WSGI app.
 
     This class is not yet part of the public API -- clients should use
     manager.make_wsgi_app for now.
 
     """
+
     def __init__(self, repos, inifile=None, **kwargs):
         self.repos = repos
         # FIXME: need to specify documentroot?
@@ -47,7 +50,7 @@ class WSGIApp(object):
 
     ################################################################
     # Main entry point
-    
+
     def __call__(self, environ, start_response):
         path = environ['PATH_INFO']
         # url = request_uri(environ)
@@ -62,7 +65,7 @@ class WSGIApp(object):
 
     ################################################################
     # WSGI methods
-    
+
     def search(self, environ, start_response):
         """WSGI method, called by the wsgi app for requests that matches
            ``searchendpoint``."""
@@ -167,7 +170,7 @@ class WSGIApp(object):
                 break
         # no repo handled the path
         if not fp:
-            if self.config.legacyapi: # rewrite the path to some resources. FIXME:
+            if self.config.legacyapi:  # rewrite the path to some resources. FIXME:
                           # shouldn't hardcode the "rsrc" path of the path
                 if environ['PATH_INFO'] == "/json-ld/context.json":
                     fullpath = self.config.documentroot + "/rsrc/api/context.json"
@@ -207,8 +210,8 @@ class WSGIApp(object):
     # API Helper methods
     def stats(self, resultset=()):
         res = {"type": "DataSet",
-               "slices" : []
-        }
+               "slices": []
+               }
         # 1. Fetch all the data we will need from all of the
         # repositories. While at it, collect all relevant facets,
         # namespace bindings and commondata as well.
@@ -224,8 +227,8 @@ class WSGIApp(object):
                 resource_graph.bind(prefix, ns)
             resource_graph += repo.commondata
             repodata = repo.faceted_data()
-            data.extend(repodata) # assume that no two repos ever have
-                                  # data about the same URI
+            data.extend(repodata)  # assume that no two repos ever have
+            # data about the same URI
             for facet in repo.facets():
                 if facet not in facets:
                     facets.append(facet)
@@ -237,7 +240,6 @@ class WSGIApp(object):
             for r in resultset:
                 hits[r['iri']] = True
             data = [r for r in data if r['uri'] in hits]
-
 
         # 2. For each facet that makes sense (ie those that has .dimension
         # != None), collect the available observations and the count for
@@ -255,21 +257,26 @@ class WSGIApp(object):
 
             dimension_type = facet.dimension_type
             if (self.config.legacyapi and
-                dimension_type == "value"):
+                    dimension_type == "value"):
                 # legacyapi doesn't support the value type, we must
                 # convert it into ref, and convert all string values to
                 # fake resource ref URIs
                 dimension_type = "ref"
-                transformer = lambda x: ("http://example.org/fake-resource/%s" % x).replace(" ", "_")
+                transformer = lambda x: (
+                    "http://example.org/fake-resource/%s" %
+                    x).replace(
+                    " ",
+                    "_")
             elif self.config.legacyapi and dimension_type == "term":
-                # legacyapi expects "Standard" over "bibo:Standard", which is what Facet.qname returns
+                # legacyapi expects "Standard" over "bibo:Standard", which is what
+                # Facet.qname returns
                 transformer = lambda x: x.split(":")[1]
             else:
                 transformer = lambda x: x
 
             observations = {}
-            observed = {} # one file per uri+observation  seen -- avoid
-                          # double-counting
+            observed = {}  # one file per uri+observation  seen -- avoid
+            # double-counting
             for row in data:
                 try:
                     # maybe if facet.dimension_type == "ref", selector
@@ -280,11 +287,15 @@ class WSGIApp(object):
                     if facet.dimension_type == "ref":
                         observation = transformer(Facet.defaultselector(row, binding))
                     else:
-                        observation = transformer(facet.selector(row, binding, resource_graph))
+                        observation = transformer(
+                            facet.selector(
+                                row,
+                                binding,
+                                resource_graph))
 
                     if not observation in observations:
-                        observations[observation] = {dimension_type:observation,
-                                                     "count":0}
+                        observations[observation] = {dimension_type: observation,
+                                                     "count": 0}
                     if (row['uri'], observation) not in observed:
                         observed[(row['uri'], observation)] = True
                         observations[observation]["count"] += 1
@@ -293,7 +304,7 @@ class WSGIApp(object):
             res["slices"].append({"dimension": dimension_label,
                                   "observations": sorted(observations.values(), key=itemgetter(dimension_type))})
         return res
-        
+
     def query(self, environ):
 
         def _elements_to_html(elements):
@@ -309,7 +320,8 @@ class WSGIApp(object):
                                     self.config.indexlocation,
                                     self.repos)
         schema = idx.schema()
-        q, param, pagenum, pagelen, stats = self.parse_parameters(environ['QUERY_STRING'], schema)
+        q, param, pagenum, pagelen, stats = self.parse_parameters(
+            environ['QUERY_STRING'], schema)
         res, pager = idx.query(q=q,
                                pagenum=pagenum,
                                pagelen=pagelen,
@@ -323,7 +335,7 @@ class WSGIApp(object):
                 if self.config.legacyapi:
                     if "_" in k:
                         # drop prefix (dcterms_issued -> issued)
-                        k = k.split("_",1)[1]
+                        k = k.split("_", 1)[1]
                 if k == "uri":
                     k = "iri"
                 if k == "text":
@@ -339,7 +351,7 @@ class WSGIApp(object):
         res = {"startIndex": pager['firstresult'] - 1,
                "itemsPerPage": int(param.get('_pageSize', '10')),
                "totalResults": pager['totalresults'],
-               "duration": None, # none
+               "duration": None,  # none
                "current": environ['PATH_INFO'] + "?" + environ['QUERY_STRING'],
                "items": mangled}
 
@@ -348,16 +360,18 @@ class WSGIApp(object):
             res["statistics"] = self.stats(mangled)
         return res
 
-
     def parse_parameters(self, querystring, schema):
         def _guess_real_fieldname(k, schema):
             for fld in schema:
                 if fld.endswith(k):
                     return fld
-            raise KeyError("Couldn't find anything that endswith(%s) in fulltextindex schema" % k)
+            raise KeyError(
+                "Couldn't find anything that endswith(%s) in fulltextindex schema" %
+                k)
 
         param = dict(parse_qsl(querystring))
-        filtered = dict([(k,v) for k,v in param.items() if not (k.startswith("_") or k == "q")])
+        filtered = dict([(k, v)
+                         for k, v in param.items() if not (k.startswith("_") or k == "q")])
         # Range: some parameters have additional parameters, eg
         # "min-dcterms_issued=2014-01-01&max-dcterms_issued=2014-02-01"
         newfiltered = {}
@@ -368,10 +382,10 @@ class WSGIApp(object):
                                             "max-": "min-"}[op])
                 k = k[4:]
                 if compliment in filtered:
-                    start = filtered["min-"+k]
-                    stop = filtered["max-"+k]
+                    start = filtered["min-" + k]
+                    stop = filtered["max-" + k]
                     newfiltered[k] = fulltextindex.Between(datetime.strptime(start, "%Y-%m-%d"),
-                                                        datetime.strptime(stop, "%Y-%m-%d"))
+                                                           datetime.strptime(stop, "%Y-%m-%d"))
                 else:
                     cls = {"min-": fulltextindex.More,
                            "max-": fulltextindex.Less}[op]
@@ -382,8 +396,8 @@ class WSGIApp(object):
                 # eg for year-dcterms_issued=2013, interpret as
                 # Between(2012-12-31 and 2014-01-01)
                 k = k[5:]
-                newfiltered[k] = fulltextindex.Between(date(int(v)-1, 12, 31),
-                                                       date(int(v)+1, 1, 1))
+                newfiltered[k] = fulltextindex.Between(date(int(v) - 1, 12, 31),
+                                                       date(int(v) + 1, 1, 1))
             else:
                 newfiltered[k] = v
         filtered = newfiltered
@@ -407,7 +421,8 @@ class WSGIApp(object):
                     if k not in schema and "_" not in k and k not in ("uri"):
                         k = _guess_real_fieldname(k, schema)
 
-                    if v.startswith("*/") and not isinstance(schema[k], fulltextindex.Resource):
+                    if v.startswith(
+                            "*/") and not isinstance(schema[k], fulltextindex.Resource):
                         v = v[2:]
                 if k not in schema and "_" not in k and k not in ("uri"):
                     k = _guess_real_fieldname(k, schema)
@@ -415,7 +430,6 @@ class WSGIApp(object):
                 else:
                     newfiltered[k] = v
             filtered = newfiltered
-
 
         # 2.1 some values need to be converted, based upon the
         # fulltextindex schema.
@@ -428,7 +442,7 @@ class WSGIApp(object):
                 if isinstance(fld, fulltextindex.Datetime):
                     filtered[k] = datetime.strptime(filtered[k], "%Y-%m-%d")
                 elif isinstance(fld, fulltextindex.Boolean):
-                    filtered[k] = (filtered[k] == "true") # only "true" is True
+                    filtered[k] = (filtered[k] == "true")  # only "true" is True
                 elif k == "rdf_type" and re.match("\w+:[\w\-_]+", filtered[k]):
                     # expand prefix ("bibo:Standard" -> "http://purl.org/ontology/bibo/")
                     (prefix, term) = re.match("(\w+):([\w\-_]+)", filtered[k]).groups()
@@ -442,22 +456,20 @@ class WSGIApp(object):
                 elif k == "rdf_type" and self.config.legacyapi and re.match("[\w\-\_]+", filtered[k]):
                     filtered[k] = "*" + filtered[k]
 
-
         q = param['q'] if 'q' in param else None
 
         # find out if we need to get all results (needed when stats=on) or
         # just the first page
         if param.get("_stats") == "on":
-            pagenum=1
-            pagelen=100000
+            pagenum = 1
+            pagelen = 100000
             stats = True
         else:
-            pagenum=int(param.get('_page', '0'))+1
-            pagelen=int(param.get('_pageSize', '10'))
+            pagenum = int(param.get('_page', '0')) + 1
+            pagelen = int(param.get('_pageSize', '10'))
             stats = False
 
         return q, filtered, pagenum, pagelen, stats
-            
 
     def _str(self, s, encoding="ascii"):
         """If running under python2, return byte string version of the
@@ -470,4 +482,3 @@ class WSGIApp(object):
             return s.encode("ascii")  # pragma: no cover
         else:
             return s
-        

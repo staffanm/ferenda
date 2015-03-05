@@ -44,6 +44,7 @@ class FontmappingPDFReader(PDFReader):
     #
     # This subclass maps one class of fontnames to another by
     # postprocessing the result of parse_xml
+
     def _parse_xml(self, xmlfp, xmlfilename):
         super(FontmappingPDFReader, self)._parse_xml(xmlfp, xmlfilename)
         for key, val in self.fontspec.items():
@@ -59,7 +60,7 @@ class FontmappingPDFReader(PDFReader):
                     val['family'] = "TimesNewRomanPS-BoldMT"
                 if val['family'] == "Times New Roman,BoldItalic":
                     val['family'] = "TimesNewRomanPS-BoldItalicMT"
-        
+
 
 class Regeringen(SwedishLegalSource):
     DS = 1
@@ -84,7 +85,7 @@ class Regeringen(SwedishLegalSource):
     xslt_template = "res/xsl/forarbete.xsl"
 
     session = None
-    
+
     @recordlastdownload
     def download(self, basefile=None):
         if basefile:
@@ -105,7 +106,7 @@ class Regeringen(SwedishLegalSource):
             last = self.config.lastdownload - timedelta(days=1)
             self.log.debug("Only downloading documents published on or after %s"
                            % last)
-            form.fields['dateRange'] = '4' # specify date interval
+            form.fields['dateRange'] = '4'  # specify date interval
             form.fields['dateRangeFromDay'] = str(last.day)
             form.fields['dateRangeFromMonth'] = str(last.month)
             # the dateRange{From,To}Year is a select list where the
@@ -115,7 +116,7 @@ class Regeringen(SwedishLegalSource):
             form.fields['dateRangeFromYear'] = str(last.year - 1999)
         form.fields['docTypes'] = [str(self.document_type)]
         params = urlencode(form.form_values())
-        
+
         searchurl = form.action + "?" + params
         self.log.info("Searching using %s" % searchurl)
         # this'll take us to an intermediate page (showing results
@@ -130,7 +131,6 @@ class Regeringen(SwedishLegalSource):
                 realstarturl = elem.get('href')
         for basefile, url in self.download_get_basefiles(realstarturl):
             self.download_single(basefile, url)
-            
 
     @downloadmax
     def download_get_basefiles(self, url):
@@ -149,12 +149,14 @@ class Regeringen(SwedishLegalSource):
                 mainsoup = BeautifulSoup(resp.text)
                 # check if there is any text (there should always be)
                 if mainsoup.find(id="body").get_text().strip():
-                    tries = 0 # ok we have good mainsoup now
+                    tries = 0  # ok we have good mainsoup now
                 else:
-                    self.log.warning('Result page #%s was blank, waiting and retrying' % pagecount)
+                    self.log.warning(
+                        'Result page #%s was blank, waiting and retrying' %
+                        pagecount)
                     tries -= 1
                     if tries:
-                        sleep(5-tries)
+                        sleep(5 - tries)
 
             for link in mainsoup.find_all(href=re.compile("/sb/d/108/a/")):
                 desc = link.find_next_sibling("span", "info").get_text(strip=True)
@@ -257,7 +259,7 @@ class Regeringen(SwedishLegalSource):
                     self.log.debug("%s: %s is unchanged, checking PDF files" %
                                    (basefile, filename))
             else:
-                        self.log.info("%s: downloaded from %s" % (basefile, url))
+                self.log.info("%s: downloaded from %s" % (basefile, url))
 
             soup = BeautifulSoup(codecs.open(filename, encoding=self.source_encoding))
             cnt = 0
@@ -302,7 +304,7 @@ class Regeringen(SwedishLegalSource):
         entry.save()
 
         return updated or pdfupdated
-        
+
     def parse_metadata_from_soup(self, soup, doc):
         d = Describer(doc.meta, doc.uri)
         d.rdftype(self.rdf_type)
@@ -316,7 +318,7 @@ class Regeringen(SwedishLegalSource):
         d.value(self.ns['dcterms'].title, title, lang=doc.lang)
         identifier = self.sanitize_identifier(
             content.find("p", "lead").text)  # might need fixing up
-        
+
         d.value(self.ns['dcterms'].identifier, identifier)
 
         definitions = content.find("dl", "definitions")
@@ -327,12 +329,15 @@ class Regeringen(SwedishLegalSource):
                 if key == "Utgiven:":
                     try:
                         dateval = self.parse_swedish_date(value)
-                        if type(dateval) == date:
+                        if isinstance(dateval, date):
                             d.value(self.ns['dcterms'].issued, dateval)
                         else:
                             datatype = {util.gYearMonth: XSD.gYearMonth,
                                         util.gYear: XSD.gYear}[type(dateval)]
-                            d.value(self.ns['dcterms'].issued, str(dateval), datatype=datatype)
+                            d.value(
+                                self.ns['dcterms'].issued,
+                                str(dateval),
+                                datatype=datatype)
                     except ValueError as e:
                         self.log.warning(
                             "Could not parse %s as swedish date" % value)
@@ -346,7 +351,9 @@ class Regeringen(SwedishLegalSource):
                             d.rel(self.ns['dcterms'].publisher,
                                   res)
                     except KeyError:
-                        self.log.warning("%s: Could not find resource for Avsändare: '%s'" % (doc.basefile, value))
+                        self.log.warning(
+                            "%s: Could not find resource for Avsändare: '%s'" %
+                            (doc.basefile, value))
 
         if content.find("h2", text="Sammanfattning"):
             sums = content.find("h2", text="Sammanfattning").find_next_siblings("p")
@@ -469,9 +476,13 @@ class Regeringen(SwedishLegalSource):
             if not identifier_found:
                 m = self.re_basefile_lax.search(str_element)
                 if m:
-                    _check_differing(d, self.ns['dcterms'].identifier, "Prop. " + m.group(1))
+                    _check_differing(
+                        d,
+                        self.ns['dcterms'].identifier,
+                        "Prop. " +
+                        m.group(1))
                     identifier_found = True
-                
+
             # dcterms:title FIXME: The fontsize comparison should be
             # done with respect to the resulting metrics (which we
             # don't have a reference to here, since they were
@@ -503,7 +514,9 @@ class Regeringen(SwedishLegalSource):
             if isinstance(element, Section) and (element.title == "Författningskommentar"):
                 for j, subsection in enumerate(element):
                     if hasattr(subsection, 'title'):
-                        law = subsection.title # well, find out the id (URI) from the title -- possibly using legalref
+                        # well, find out the id (URI) from the title -- possibly using
+                        # legalref
+                        law = subsection.title
                         for k, p in enumerate(subsection):
                             # find out individual paragraphs, create uris for
                             # them, and annotate the first textbox that might
@@ -515,7 +528,6 @@ class Regeringen(SwedishLegalSource):
                             # print("%s,%s,%s: %s" % (i,j,k,repr(p)))
         # then maybe look for inline references ("Övervägandena finns
         # i avsnitt 5.1 och 6" using CitationParser)
-                
 
     def sanitize_identifier(self, identifier):
         pattern = {self.KOMMITTEDIREKTIV: "%s. %s:%s",
@@ -524,8 +536,8 @@ class Regeringen(SwedishLegalSource):
                    self.SKRIVELSE: "%s. %s/%s:%s",
                    self.SOU: "%s %s:%s",
                    self.SO: "%s %s:%s"}
-        
-        try: 
+
+        try:
             parts = re.split("[\.:/ ]+", identifier.strip())
             return pattern[self.document_type] % tuple(parts)
         except:
@@ -544,9 +556,10 @@ class Regeringen(SwedishLegalSource):
                 pdfbasefile = m.group(1)
                 pdffiles.append((pdfbasefile, link.string))
         selected = self.select_pdfs(pdffiles)
-        self.log.debug("selected %s out of %d pdf files" % (", ".join(selected), len(pdffiles)))
+        self.log.debug(
+            "selected %s out of %d pdf files" %
+            (", ".join(selected), len(pdffiles)))
         return selected
-
 
     def select_pdfs(self, pdffiles):
         """Given a list of (pdffile, linktext) tuples, return only those pdf
@@ -557,19 +570,19 @@ class Regeringen(SwedishLegalSource):
         # 1. Simplest case: One file obviously contains all of the text
         for pdffile, linktext in pdffiles:
             if "hela dokumentet" in linktext or "hela betänkandet" in linktext:
-                return [pdffile] # we're immediately done
+                return [pdffile]  # we're immediately done
 
         # 2. Filter out obviously extraneous files
         for pdffile, linktext in pdffiles:
             if "hela dokumentet" in linktext or "hela betänkandet" in linktext:
-                return [pdffile] # we're immediately done
+                return [pdffile]  # we're immediately done
             if (linktext.startswith("Sammanfattning ") or
-                linktext.startswith("Remissammanställning") or
-                linktext.startswith("Sammanställning över remiss") or
-                "remissinstanser" in linktext):
-                pass # don't add to cleanfiles
+                    linktext.startswith("Remissammanställning") or
+                    linktext.startswith("Sammanställning över remiss") or
+                    "remissinstanser" in linktext):
+                pass  # don't add to cleanfiles
             else:
-                cleanfiles.append((pdffile,linktext))
+                cleanfiles.append((pdffile, linktext))
 
         # 3. Attempt to see if we have one complete file + several
         # files with split-up content
@@ -586,8 +599,7 @@ class Regeringen(SwedishLegalSource):
 
         # 4. Base case: We return it all
         return [x[0] for x in cleanfiles]
-    
-        
+
     def parse_pdf(self, pdffile, intermediatedir):
         # By default, don't create and manage PDF backgrounds files
         # (takes forever, we don't use them yet)
@@ -601,7 +613,6 @@ class Regeringen(SwedishLegalSource):
                                    keep_xml=keep_xml)
         return pdf
 
-                
     def parse_pdfs(self, basefile, pdffiles, identifier=None):
         body = None
         gluefunc = offtryck_gluefunc
@@ -654,7 +665,6 @@ class Regeringen(SwedishLegalSource):
             pdf.tagname = "body"
         return pdf
 
-
     def create_external_resources(self, doc):
         """Optionally create external files that go together with the
         parsed file (stylesheets, images, etc). """
@@ -670,7 +680,8 @@ class Regeringen(SwedishLegalSource):
         # 1.3 create css for fontspecs and pages
         # for pdf in doc.body:
         pdf = doc.body
-        assert isinstance(pdf, PDFReader) # this is needed to get fontspecs and other things
+        # this is needed to get fontspecs and other things
+        assert isinstance(pdf, PDFReader)
         for spec in list(pdf.fontspec.values()):
             fp.write(".fontspec%s {font: %spx %s; color: %s;}\n" %
                      (spec['id'], spec['size'], spec['family'], spec['color']))
@@ -701,14 +712,14 @@ class Regeringen(SwedishLegalSource):
             fp.write("#page%03d { background: url('%s');}\n" %
                      (cnt, os.path.basename(dest)))
 
-
     def toc_item(self, binding, row):
-        return [row['dcterms_identifier']+": ",
+        return [row['dcterms_identifier'] + ": ",
                 Link(row['dcterms_title'],  # yes, ignore binding
                      uri=row['uri'])]
 
     def toc(self, otherrepos=None):
-        self.log.debug("Not generating TOC (let ferenda.sources.legal.se.Forarbeten do that instead")
+        self.log.debug(
+            "Not generating TOC (let ferenda.sources.legal.se.Forarbeten do that instead")
         return
 
     def tabs(self, primary=False):

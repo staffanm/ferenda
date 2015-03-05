@@ -25,7 +25,8 @@ class StaticStore(DocumentStore):
     ``[datadir]/static/{parsed,distilled,generated,...}/``
     """
 
-    def __init__(self, datadir, downloaded_suffix=".rst", storage_policy="file", staticdir="static"):
+    def __init__(self, datadir, downloaded_suffix=".rst",
+                 storage_policy="file", staticdir="static"):
         super(StaticStore, self).__init__(datadir, downloaded_suffix, storage_policy)
         if os.path.exists(staticdir):
             self.staticdir = staticdir
@@ -99,7 +100,8 @@ class Static(DocumentRepository):
         stack = []
         root = self._transform(doctree, stack)
         if isinstance(root[0], elements.Title):
-            doc.meta.add((URIRef(doc.uri), self.ns['dcterms'].title, Literal(str(root[0]), doc.lang)))
+            doc.meta.add(
+                (URIRef(doc.uri), self.ns['dcterms'].title, Literal(str(root[0]), doc.lang)))
             root.pop(0)
         doc.body = root
         return True

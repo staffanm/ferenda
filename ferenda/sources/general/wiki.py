@@ -25,13 +25,17 @@ try:
 except ImportError as e:
     import sys
     if sys.version_info < (2, 7):
-        raise RuntimeError("ferenda.sources.general.Wiki is not supported under python 2.6: %s" % str(e))
+        raise RuntimeError(
+            "ferenda.sources.general.Wiki is not supported under python 2.6: %s" %
+            str(e))
     else:
-        raise e # dunno
-        
+        raise e  # dunno
+
 import unicodedata
 
+
 class MediaWikiStore(DocumentStore):
+
     def basefile_to_pathfrag(self, basefile):
         return basefile.replace(":", os.sep).replace(" ", "_")
 
@@ -86,8 +90,8 @@ class MediaWiki(DocumentRepository):
         opts['mediawikiexport'] = 'http://localhost/wiki/Special:Export/%s(basefile)'
         opts['mediawikidump'] = 'http://localhost/wiki/allpages-dump.xml'
         opts['mediawikinamespaces'] = ['Category']
-            # process pages in this namespace (as well as pages in the
-            # default namespace)
+        # process pages in this namespace (as well as pages in the
+        # default namespace)
         return opts
 
     def download(self, basefile=None):
@@ -102,7 +106,7 @@ class MediaWiki(DocumentRepository):
                     fp.write(resp.content)
             except Exception:
                 # try to loa
-                pass 
+                pass
             # xml = etree.parse(resp.content)
             xml = etree.parse(xmldumppath)
         else:
@@ -141,7 +145,7 @@ class MediaWiki(DocumentRepository):
                     fp.write(newcontent)
                     self.log.info("%s: extracting from XML dump" % basefile)
                 written += 1
-            
+
             if basefile in basefiles:
                 del basefiles[basefiles.index(basefile)]
             total += 1
@@ -162,7 +166,6 @@ class MediaWiki(DocumentRepository):
     re_anchor = re.compile('<a[^>]*>(.*)</a>', re.DOTALL)
     re_tags = re.compile('(</?[^>]*>)', re.DOTALL)
 
-
     # NOTE: What is this thing, really? Is it a wiki document by
     # itself, or is it metadata about a concept identified by a
     # keyword / label?
@@ -172,15 +175,15 @@ class MediaWiki(DocumentRepository):
         doc.meta.remove((URIRef(doc.uri),
                          self.ns['dcterms'].identifier,
                          Literal(doc.basefile)))
-    
+
     def parse_document_from_soup(self, soup, doc):
-        
+
         wikitext = soup.find("text").text
         parser = self.get_wikiparser()
         settings = self.get_wikisettings()
         semantics = self.get_wikisemantics(parser, settings)
         preprocessor = self.get_wikipreprocessor(settings)
-        
+
         # the main responsibility of the preprocessor is to expand templates
         wikitext = preprocessor.expand(doc.basefile, wikitext)
 
@@ -202,7 +205,7 @@ class MediaWiki(DocumentRepository):
 
     def get_wikisemantics(self, parser, settings):
         return WikiSemantics(parser, settings)
-        
+
     def get_wikisettings(self):
         return WikiSettings(lang=self.lang)
 
@@ -243,7 +246,7 @@ class MediaWiki(DocumentRepository):
         return root[0]
 
     def elements_from_node(self, node):
-        
+
         from ferenda.elements.html import _tagmap
         assert node.tag in _tagmap
         element = _tagmap[node.tag](**node.attrib)
@@ -271,7 +274,7 @@ class MediaWiki(DocumentRepository):
 
     def toc(self, otherrepos=[]):
         # and no toc either
-        return 
+        return
 
     def news(self, otherrepos=[]):
         # nor newsfeeds
@@ -313,8 +316,7 @@ class WikiSemantics(Semantics):
         if toc is not None:
             toc.getparent().remove(toc)
         return html
-            
-    
+
     def internal_link(self, ast):
         el = super(WikiSemantics, self).internal_link(ast)
         target = "".join(ast.target).strip()
@@ -325,12 +327,14 @@ class WikiSemantics(Semantics):
 
 
 class WikiSettings(Settings):
+
     def make_url(self, name, **kwargs):
         uri = super(WikiSettings, self).make_url(name, **kwargs)
         return uri
 
 
 class WikiPreprocessor(Preprocessor):
+
     def get_template(self, namespace, pagename):
         # FIXME: This is a special hack for supporting
         # {{DISPLAYTITLE}} (not a proper template? Check if smc.mw is

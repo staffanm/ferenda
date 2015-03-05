@@ -57,9 +57,10 @@ class WordReader(object):
             # docbook or a OOXML file
             if filetype == "doc":
                 with codecs.open(intermediatefile, encoding="utf-8") as fp:
-                    if 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"' in fp.read(1024):
+                    if 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"' in fp.read(
+                            1024):
                         filetype = "docx"
-                        
+
             pass
         return (intermediatefile, filetype)
 
@@ -77,7 +78,7 @@ class WordReader(object):
         # make sure HOME is set even on win32 -- antiword seems to require it?
         if 'HOME' not in os.environ and 'USERPROFILE' in os.environ:
             os.environ['HOME'] = os.environ['USERPROFILE']
-        
+
         self.log.debug("Executing %s" % cmd)
         (ret, stdout, stderr) = util.runcmd(cmd)
 
@@ -119,7 +120,7 @@ class WordReader(object):
 
 # hard to test, hard to get working, will always be platform
 # dependent, but saved here for posterity
-# 
+#
 #    def word_to_html(indoc, outhtml):
 #        """Converts a word document (any version) to a HTML document by remote
 #        controlling Microsoft Word to open and save the doc as HTML.

@@ -72,7 +72,7 @@ class FerendaTestCase(object):
             g = rdflib.Graph()
             # we must read the data ourself, providing a non-ascii
             # filename to Graph.parse fails deep in rdflib internals
-            format=guess_format(filename)
+            format = guess_format(filename)
             if format == "nt":
                 data = util.readfile(filename, "r", encoding="utf-8")
             else:
@@ -202,7 +202,8 @@ class FerendaTestCase(object):
             stdout, stderr = p.communicate(treestr)
             if stdout.strip():
                 rawres = stdout
-                cookedres = stdout.decode("utf-8").replace("&nbsp;", "&#160;").encode("utf-8")
+                cookedres = stdout.decode(
+                    "utf-8").replace("&nbsp;", "&#160;").encode("utf-8")
                 newtree = etree.parse(BytesIO(cookedres))
                 return newtree
             elif p.returncode and stderr:
@@ -271,18 +272,19 @@ class FerendaTestCase(object):
 
     def assertRegex(self, test, expected_regexp, msg=None):
         # in older versions of unittest, this method was named assertRegexpMatches
-        if sys.version_info < (3, 2, 0): 
+        if sys.version_info < (3, 2, 0):
             return self.assertRegexpMatches(test, expected_regexp, msg)
         else:
             return super(FerendaTestCase, self).assertRegex(test, expected_regexp, msg)
 
 
 class RepoTesterStore(object):
+
     """This is an internal class used by RepoTester in order to control
     where source documents are read from.
 
     """
-    
+
     def __init__(self, origstore, downloaded_file=None):
         self.origstore = origstore
         self.downloaded_file = downloaded_file
@@ -292,14 +294,15 @@ class RepoTesterStore(object):
         self.storage_policy = origstore.storage_policy
 
     def list_attachments(self, basefile, action, version=None):
-        if action=="downloaded":
+        if action == "downloaded":
             for f in os.listdir(os.path.dirname(self.downloaded_file)):
                 if f != os.path.basename(self.downloaded_file):
                     yield f
         else:
-            for x in super(self, RepoTesterStore).list_attachments(basefile, action, version):
+            for x in super(self, RepoTesterStore).list_attachments(
+                    basefile, action, version):
                 yield x
-            
+
     def downloaded_path(self, basefile, version=None, attachment=None):
         if attachment:
             return os.path.dirname(self.downloaded_file) + os.sep + attachment
@@ -307,7 +310,10 @@ class RepoTesterStore(object):
             return self.downloaded_file
 
     def intermediate_path(self, basefile, version=None, attachment=None):
-        p = os.path.splitext(self.downloaded_file.replace("downloaded", "intermediate"))[0] + ".xml"
+        p = os.path.splitext(
+            self.downloaded_file.replace(
+                "downloaded",
+                "intermediate"))[0] + ".xml"
         if attachment:
             p = os.path.dirname(p) + os.sep + attachment
         return p
@@ -317,7 +323,7 @@ class RepoTesterStore(object):
     def __getattr__(self, name):
         return getattr(self.origstore, name)
 
-            
+
 class RepoTester(unittest.TestCase, FerendaTestCase):
 
     """A unittest.TestCase-based convenience class for creating file-based
@@ -330,7 +336,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
            class TestRFC(RepoTester):
                repoclass = RFC  # the docrepo class to test
                docroot = os.path.dirname(__file__)+"/files/repo/rfc"
-           
+
            parametrize_repotester(TestRFC)
 
     """
@@ -341,7 +347,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
     repoclass = DocumentRepository
     """The actual documentrepository class to be tested. Must be
        overridden when creating a testcase class."""
-    
+
     docroot = '/tmp'
     """The location of test files to create tests from. Must be overridden
        when creating a testcase class"""
@@ -366,7 +372,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         attempts to find out basefile from the repoclass being tested
         (or rather it's documentstore), but returns a hard-coded
         basefile if it fails.
-        
+
         :param filename: The test file
         :type filename: str
         :returns: Corresponding basefile
@@ -378,9 +384,9 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             # Adapted from DocumentStore.list_basefiles_for: Find out a
             # path fragment from the entire filename path.
             if self.repo.storage_policy == "file":
-                suffixlen = len(os.path.splitext(filename)[1]) # eg '.pdf'
+                suffixlen = len(os.path.splitext(filename)[1])  # eg '.pdf'
             else:
-                suffixlen = len(os.path.basename(filename))+1
+                suffixlen = len(os.path.basename(filename)) + 1
 
             if "test/files/repo" in filename:
                 # take advantage of this well known direcotry structure
@@ -389,15 +395,14 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
                 pathfrag = relfilename[len(directory) + 1:-suffixlen]
             elif "downloaded" in filename.split(os.sep):
                 # find the first (or last?) segment named "downloaded"
-                idx = filename.index(os.sep+"downloaded"+os.sep)
-                pathfrag = filename[idx+12:-suffixlen]
+                idx = filename.index(os.sep + "downloaded" + os.sep)
+                pathfrag = filename[idx + 12:-suffixlen]
             else:
                 pathfrag = "1"
             basefile = self.repo.store.pathfrag_to_basefile(pathfrag)
             return basefile
         except:
             return "1"
-
 
     @responses.activate
     def download_test(self, specfile, basefile=None):
@@ -418,12 +423,19 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
                 if f not in filelist:
                     # print("Fetching %s resulted in downloaded file %s" % (url, f))
                     filelist.append(f)
-                    expect = "downloaded"+ f.replace(downloaddir, "")
+                    expect = "downloaded" + f.replace(downloaddir, "")
                     if os.sep != "/":
                         expect = expect.replace(os.sep, "/")
                     spec[url]['expect'] = expect
-                    reldest = os.path.relpath(".."+os.sep+"downloaded", os.path.dirname(f))
-                    dest = os.path.normpath(os.path.join(os.path.dirname(specfile), reldest))
+                    reldest = os.path.relpath(
+                        ".." +
+                        os.sep +
+                        "downloaded",
+                        os.path.dirname(f))
+                    dest = os.path.normpath(
+                        os.path.join(
+                            os.path.dirname(specfile),
+                            reldest))
                     util.ensure_dir(dest)
                     shutil.copy2(f, dest)
 
@@ -459,7 +471,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
                     else:
                         setattr(self.repo, attribute,
                                 spec['@settings'][attribute])
-        
+
         if os.environ.get("FERENDA_SET_TESTFILE"):
             downloaddir = os.sep.join([self.datadir, self.repoclass.alias,
                                        "downloaded"])
@@ -472,7 +484,6 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             except (ValueError, TypeError):
                 state['total_requests'] = 2  # search page, single payload
 
-                       
             def callback(req):
                 # clean up after last callback
                 add_downloaded_files(state['downloaded'], spec, state['previous_url'])
@@ -506,7 +517,9 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
 
                 if not frames:
                     if suffix == "html":
-                        print("requested %s, saved as %s. Edit if needed, then press enter" % (req.url, outfile))
+                        print(
+                            "requested %s, saved as %s. Edit if needed, then press enter" %
+                            (req.url, outfile))
                         x = input()
                     else:
                         print("requested %s, saved %s" % (req.url, outfile))
@@ -559,7 +572,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             # FIXME: should mode be w or wb? w for py3 at least
             with open(specfile, "w") as fp:
                 json.dump(spec, fp, indent=4)
-        
+
         # organize a temporary copy of files that we can compare our results to
         wantdir = "%s/%s-want" % (self.datadir, self.repoclass.alias)
         expected = False
@@ -635,7 +648,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             self.assertEqualXML(util.readfile(xhtml_file),
                                 util.readfile(self.repo.store.parsed_path(basefile)),
                                 tidy_xhtml=True)
-                                
+
         finally:
             self.repo.store = origstore
 
@@ -648,16 +661,22 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
 # Adapted from
 # http://dirkjan.ochtman.nl/writing/2014/07/06/single-source-python-23-doctests.html
 import doctest
+
+
 class Py23DocChecker(doctest.OutputChecker):
+
     """Checker to use in conjuction with :py:class:`doctest.DocTestSuite`."""
+
     def check_output(self, want, got, optionflags):
         if sys.version_info[0] < 3:
             # if running on py2, attempt to prefix all the strings
             # with a u (since all our apis use unicode strings)
             want = re.sub("'(.*?)'", "u'\\1'", want)
-            # want = re.sub('"(.*?)"', 'u"\\1"', want) -- doctest strings always (?) only use singlequoted strings
+            # want = re.sub('"(.*?)"', 'u"\\1"', want) -- doctest strings always (?)
+            # only use singlequoted strings
         return doctest.OutputChecker.check_output(self, want, got, optionflags)
-        
+
+
 def parametrize(cls, template_method, name, params, wrapper=None):
     """Creates a new test method on a TestCase class, which calls a
     specific template method with the given parameters (ie. a
@@ -678,7 +697,7 @@ def parametrize(cls, template_method, name, params, wrapper=None):
 
         test_one (test_parametric.MyTest) ... ok
         test_two (test_parametric.MyTest) ... FAIL
-        
+
         ======================================================================
         FAIL: test_two (test_parametric.MyTest)
         ----------------------------------------------------------------------
@@ -690,7 +709,7 @@ def parametrize(cls, template_method, name, params, wrapper=None):
         AssertionError: 'world' != 'hello'
         - world
         + hello
-        
+
     :param cls: The ``TestCase`` class to add the parametrized test to.
     :param template_method: The method to use for parametrization
     :param name: The name for the new test method
@@ -723,14 +742,14 @@ def file_parametrize(cls, directory, suffix, filter=None, wrapper=None):
     """Creates a test for each file in a given directory. Call with any
     class that subclasses unittest.TestCase and which has a method
     called `` parametric_test``, eg::
-    
+
         class MyTest(unittest.TestCase):
             def parametric_test(self,filename):
                 self.assertTrue(os.path.exists(filename))
 
         from ferenda.testutil import file_parametrize
         file_parametrize(Parse,"test/files/legaluri",".txt")
- 
+
     For each .txt file in the directory ``test/files/legaluri``, a
     corresponding test is created, which calls ``parametric_test``
     with the full path to the .txt file as parameter.
@@ -789,7 +808,17 @@ def parametrize_repotester(cls, include_failures=True):
         filename = store.downloaded_path(basefile)
         filename = filename[len(basedir) + 1:]
         downloaded_file = "%s/downloaded/%s" % (docroot, filename)
-        basetest = basefile.replace("-", "_").replace(os.sep,"_").replace("/", "_").replace(":", "_").replace(" ", "_")
+        basetest = basefile.replace(
+            "-",
+            "_").replace(
+            os.sep,
+            "_").replace(
+            "/",
+            "_").replace(
+                ":",
+                "_").replace(
+                    " ",
+            "_")
         # transliterate basetest (ie å -> a)
         basetest = "".join((c for c in unicodedata.normalize('NFKD', basetest)
                             if not unicodedata.combining(c)))
@@ -798,7 +827,14 @@ def parametrize_repotester(cls, include_failures=True):
         testname = ("test_distill_" + basetest)
         wrapper = unittest.expectedFailure if not os.path.exists(rdf_file) else None
         if wrapper is None or include_failures:
-            parametrize(cls, cls.distill_test, testname, (downloaded_file, rdf_file, docroot), wrapper)
+            parametrize(
+                cls,
+                cls.distill_test,
+                testname,
+                (downloaded_file,
+                 rdf_file,
+                 docroot),
+                wrapper)
 
         # Test 2: is xhtml parsed correctly?
         xhtml_file = "%s/parsed/%s.xhtml" % (docroot, pathfrag)
@@ -806,7 +842,14 @@ def parametrize_repotester(cls, include_failures=True):
 
         wrapper = unittest.expectedFailure if not os.path.exists(xhtml_file) else None
         if wrapper is None or include_failures:
-            parametrize(cls, cls.parse_test, testname, (downloaded_file, xhtml_file, docroot), wrapper)
+            parametrize(
+                cls,
+                cls.parse_test,
+                testname,
+                (downloaded_file,
+                 xhtml_file,
+                 docroot),
+                wrapper)
 
 
 def testparser(testcase, parser, filename):

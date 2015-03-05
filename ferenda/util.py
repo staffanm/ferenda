@@ -31,6 +31,7 @@ from . import errors
 
 
 class gYearMonth(datetime.date):
+
     def __new__(cls, *args, **kwargs):
         if len(args) == 1 and isinstance(args[0], str):
             args = [int(x) for x in args[0].split("-")]
@@ -40,12 +41,15 @@ class gYearMonth(datetime.date):
         return super(gYearMonth, cls).__new__(cls, *args, **kwargs)
 
     def __repr__(self):
-        return "%s.%s(%s, %s)" % (self.__class__.__module__, self.__class__.__name__, self.year, self.month)
+        return "%s.%s(%s, %s)" % (
+            self.__class__.__module__, self.__class__.__name__, self.year, self.month)
 
     def __str__(self):
         return "%04d-%02d" % (self.year, self.month)
 
+
 class gYear(datetime.date):
+
     def __new__(cls, *args, **kwargs):
         if len(args) == 1 and isinstance(args[0], str):
             args = [int(args[0])]
@@ -60,7 +64,6 @@ class gYear(datetime.date):
 
     def __str__(self):
         return "%04d-%02d" % (self.year, self.month)
-
 
 
 # util.Namespaces
@@ -129,6 +132,8 @@ def robust_remove(filename):
         os.unlink(filename)
 
 # util.string
+
+
 def relurl(url, starturl):
     """Works like :py:func:`os.path.relpath`, but for urls
 
@@ -219,7 +224,7 @@ def runcmd(cmdline, require_success=False, cwd=None,
     """
     if sys.platform == "win32" and six.PY2:
         cmdline_encoding = "windows-1252"
-        
+
     if cmdline_encoding:
         cmdline = cmdline.encode(cmdline_encoding)
 
@@ -266,7 +271,7 @@ def list_dirs(d, suffix=None, reverse=False):
     :param type:
     :returns: the full path (starting from d) of each matching file
     :rtype: generator
-    
+
     """
     # inspired by http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/161542
 
@@ -286,12 +291,14 @@ def list_dirs(d, suffix=None, reverse=False):
                     yield f
 
 # util.File
+
+
 def replace_if_different(src, dst, archivefile=None):
     """Like :py:func:`shutil.move`, except the *src* file isn't moved if the
     *dst* file already exists and is identical to *src*. Also doesn't
     require that the directory of *dst* exists beforehand.
 
-    **Note**: regardless of whether it was moved or not, *src* is always deleted. 
+    **Note**: regardless of whether it was moved or not, *src* is always deleted.
 
     :param src: The source file to move
     :type  src: str
@@ -437,8 +444,8 @@ def strptime(datestr, format):
     """
     with c_locale():
         return datetime.datetime.strptime(datestr, format)
-        
-    
+
+
 # Util.file
 def readfile(filename, mode="r", encoding="utf-8"):
     """Opens *filename*, reads it's contents and returns them as a string."""
@@ -451,6 +458,8 @@ def readfile(filename, mode="r", encoding="utf-8"):
             return fp.read()
 
 # util.file
+
+
 def writefile(filename, contents, encoding="utf-8"):
     """Create *filename* and write *contents* to it."""
     ensure_dir(filename)
@@ -472,7 +481,7 @@ def extract_text(html, start, end, decode_entities=True, strip_tags=True):
     ...              "<div>", "</div>", strip_tags=False) == '<b>Hello</b> <i>World</i>™'
     True
 
-    
+
     """
     startidx = html.index(start)
     endidx = html.rindex(end)
@@ -480,7 +489,11 @@ def extract_text(html, start, end, decode_entities=True, strip_tags=True):
     if decode_entities:
         from six.moves import html_entities
         entities = re.compile("&(\w+?);")
-        text = entities.sub(lambda m: six.unichr(html_entities.name2codepoint[m.group(1)]), text)
+        text = entities.sub(
+            lambda m: six.unichr(
+                html_entities.name2codepoint[
+                    m.group(1)]),
+            text)
     if strip_tags:
         # http://stackoverflow.com/a/1732454
         tags = re.compile("</?\w+>")
@@ -558,7 +571,7 @@ def uri_leaf(uri):
     >>> uri_leaf("http://www.w3.org/2004/02/skos/core#Concept") == 'Concept'
     True
     >>> uri_leaf("http://www.w3.org/2004/02/skos/core#") # returns None
-    
+
     """
     for char in ('#', '/', ':'):
         if uri.endswith(char):
@@ -577,7 +590,7 @@ def uri_leaf(uri):
 def logtime(method, format="The operation took %(elapsed).3f sec", values={}):
     """A context manager that uses the supplied method and format string
     to log the elapsed time::
-    
+
         with util.logtime(log.debug,
                           "Basefile %(basefile)s took %(elapsed).3f s",
                           {'basefile':'foo'}):
@@ -619,7 +632,7 @@ def from_roman(s):
 
     >>> from_roman("MCMLXXXIV")
     1984
-    
+
     """
     roman_numeral_map = (('M', 1000),
                          ('CM', 900),
@@ -677,15 +690,16 @@ def parseresults_as_xml(parseres, depth=0):
     for k, v in sorted(tocdict.items(), key=lambda i: i[1][0][1]):
         if k == parseres.getName():
             continue
-        
+
         if isinstance(v[0][0], str):
-            res += "%s<%s>%s</%s>\n" % ("  "*(depth+1),k,v[0][0],k)
+            res += "%s<%s>%s</%s>\n" % ("  " * (depth + 1), k, v[0][0], k)
         elif v[0][0][1] == {}:
-            res += "%s<%s>%s</%s>\n" % ("  "*(depth+1),k,v[0][0][0][0],k)
+            res += "%s<%s>%s</%s>\n" % ("  " * (depth + 1), k, v[0][0][0][0], k)
         # else: call parseresults_as_xml again somehow -- but we don't
         # have any 3-level grammar productions to test with
-        
-    return "%s<%s>%s</%s>\n" % ("  "*depth, parseres.getName(), res, parseres.getName())
+
+    return "%s<%s>%s</%s>\n" % ("  " * depth, parseres.getName(), res, parseres.getName())
+
 
 def json_default_date(obj):
     if isinstance(obj, (datetime.datetime, datetime.date)):
@@ -695,6 +709,8 @@ def json_default_date(obj):
 # return a callable that you can pass as the object_hook to
 # json.load. Any field that is given in *fields will be converted to a
 # datetime.
+
+
 def make_json_date_object_hook(*fields):
     def myhook(d):
         strp = datetime.datetime.strptime
@@ -708,7 +724,7 @@ def make_json_date_object_hook(*fields):
                     try:
                         # no fractional part
                         d[key] = strp(d[key], '%Y-%m-%dT%H:%M:%S')
-                    except: #
+                    except:
                         pass
         return d
     return myhook

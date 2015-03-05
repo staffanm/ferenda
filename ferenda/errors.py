@@ -39,14 +39,17 @@ class DocumentRemovedError(Exception):
 
 
 class PatchError(ParseError):
+
     """Raised if a patch cannot be applied by
 :py:meth:`~ferenda.DocumentRepository.patch_if_needed`."""
 
+
 class NoDownloadedFileError(ParseError):
+
     """Raised on an attempt to parse a basefile for which there doesn't
-exist a downloaded file.""" 
-    
-    
+exist a downloaded file."""
+
+
 class AttachmentNameError(ValueError):
 
     """Raised whenever an invalid attachment name is used with any method
@@ -63,7 +66,7 @@ class AttachmentPolicyError(ValueError):
 
 class ArchivingError(Exception):
 
-    """Raised whenever an attempt to archive a document version using :py:meth:`~ferenda.DocumentStore.archive` fails (for example, because the archive version 
+    """Raised whenever an attempt to archive a document version using :py:meth:`~ferenda.DocumentStore.archive` fails (for example, because the archive version
 already exists)."""
 
 
@@ -82,6 +85,7 @@ class ExternalCommandError(Exception):
 
     """Raised whenever any invocation of an external commmand fails for
     any reason."""
+
 
 class ExternalCommandNotFound(Exception):
 
@@ -118,6 +122,7 @@ class SearchingError(Exception):
 
     """Raised whenever an attempt to do a full-text search fails."""
 
+
 class SchemaConflictError(Exception):
 
     """Raised whenever a fulltext index is opened with repo arguments that
@@ -126,6 +131,7 @@ class SchemaConflictError(Exception):
        recreating.
 
     """
+
 
 class SchemaMappingError(Exception):
 
@@ -137,6 +143,7 @@ class SchemaMappingError(Exception):
 
 
 class MaxDownloadsReached(Exception):
+
     """Raised whenever a recursive download operation has reached a
     globally set maximum number of requests.
 

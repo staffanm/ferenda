@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import re, os
+import re
+import os
 from datetime import datetime, timedelta
 from six.moves.urllib_parse import urljoin
 
@@ -21,26 +22,27 @@ from ferenda.elements import Body, CompoundElement
 class Sektion(CompoundElement):
     tagname = "div"
 
+
 class JK(SwedishLegalSource):
     alias = "jk"
 
     start_url = "http://www.jk.se/Beslut.aspx?query=&type=all&dateFrom=%(date)s&dateTo=2100-01-01&dnr="
     document_url_regex = "http://www.jk.se/Beslut/(?P<kategori>[\w\-]+)/(?P<basefile>\d+\-\d+\-\d+).aspx"
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
-    
+
     @recordlastdownload
     def download(self, basefile=None):
         self.session = requests.session()
         if ('lastdownload' in self.config and
-            self.config.lastdownload and
-            not self.config.refresh):
+                self.config.lastdownload and
+                not self.config.refresh):
 
             # allow for 30 day window between decision date and publishing
             startdate = self.config.lastdownload - timedelta(days=30)
             start_url = self.start_url % {'date':
                                           datetime.strftime(startdate, "%Y-%m-%d")}
         else:
-            start_url = self.start_url % {'date':"1998-01-01"}
+            start_url = self.start_url % {'date': "1998-01-01"}
 
         for basefile, url in self.download_get_basefiles(start_url):
             self.download_single(basefile, url)
@@ -70,7 +72,10 @@ class JK(SwedishLegalSource):
         # HTML pages many contain ASP.Net crap (__VIEWSTATE and
         # __EVENTVALIDATION) that differ from request to request. Only
         # compare div#mainContent
-        existing_soup = BeautifulSoup(util.readfile(existing, encoding=self.source_encoding))
+        existing_soup = BeautifulSoup(
+            util.readfile(
+                existing,
+                encoding=self.source_encoding))
         new_soup = BeautifulSoup(util.readfile(new, encoding=self.source_encoding))
         return (existing_soup.find("div", id="mainContent") !=
                 new_soup.find("div", id="mainContent"))
@@ -117,9 +122,9 @@ class JK(SwedishLegalSource):
 
         # linkify
         self.ref_parser = LegalRef(LegalRef.LAGRUM,
-                               LegalRef.KORTLAGRUM,
-                               LegalRef.RATTSFALL,
-                               LegalRef.FORARBETEN)
+                                   LegalRef.KORTLAGRUM,
+                                   LegalRef.RATTSFALL,
+                                   LegalRef.FORARBETEN)
 
         # FIXME: citparser should respect self.config.localizeuri
         citparser = SwedishCitationParser(self.ref_parser, self.config.url)
@@ -129,10 +134,13 @@ class JK(SwedishLegalSource):
     def make_parser():
         def is_section(parser):
             return parser.reader.peek().name == "h1"
+
         def is_subsection(parser):
             return parser.reader.peek().name == "h2"
+
         def is_subsubsection(parser):
             return parser.reader.peek().name == "h3"
+
         def is_paragraph(parser):
             return True
 
@@ -158,7 +166,7 @@ class JK(SwedishLegalSource):
         def make_paragraph(parser):
             # FIXME: this strips out formatting tags
             return Stycke([parser.reader.next().get_text()])
-            
+
         p = FSMParser()
         p.set_recognizers(is_section,
                           is_subsection,
@@ -180,4 +188,3 @@ class JK(SwedishLegalSource):
         p.initial_constructor = make_body
         p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
         return p
-             

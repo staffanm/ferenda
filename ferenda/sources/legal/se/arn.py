@@ -26,13 +26,15 @@ from ferenda.sources.legal.se.legalref import LegalRef
 
 
 class ARNStore(DocumentStore):
+
     """Customized DocumentStore that handles multiple download suffixes
     and transforms YYYY-NNN basefiles to YYYY/NNN pathfrags"""
+
     def basefile_to_pathfrag(self, basefile):
         return basefile.replace("-", "/")
 
     def pathfrag_to_basefile(self, pathfrag):
-        return pathfrag.replace("/","-", 1)
+        return pathfrag.replace("/", "-", 1)
 
     def downloaded_path(self, basefile, version=None, attachment=None, suffix=None):
         if not suffix:
@@ -62,12 +64,13 @@ class ARNStore(DocumentStore):
                                             util.list_dirs(d, ".doc"),
                                             util.list_dirs(d, ".docx"),
                                             util.list_dirs(d, ".pdf"))):
-                suffix = "/index"+ os.path.splitext(x)[1]
+                suffix = "/index" + os.path.splitext(x)[1]
                 pathfrag = x[len(d) + 1:-len(suffix)]
                 yield self.pathfrag_to_basefile(pathfrag)
         else:
             for x in super(ARNStore, self).list_basefiles_for(action, basedir):
                 yield x
+
 
 class ARN(SwedishLegalSource, PDFDocumentRepository):
 
@@ -83,7 +86,7 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
     start_url = "http://adokweb.arn.se/digiforms/sessionInitializer?processName=SearchRefCasesProcess"
     documentstore_class = ARNStore
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
-    
+
     @recordlastdownload
     def download(self, basefile=None):
         self.session = requests.Session()
@@ -92,16 +95,16 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
         action = soup.find("form")["action"]
 
         if ('lastdownload' in self.config and
-            self.config.lastdownload and
-            not self.config.refresh):
+                self.config.lastdownload and
+                not self.config.refresh):
             d = self.config.lastdownload
             datefrom = '%d-%02d-%02d' % (d.year, d.month, d.day)
-            dateto = '%d-01-01' % (d.year+1)
+            dateto = '%d-01-01' % (d.year + 1)
         else:
             # only fetch one year at a time
             datefrom = '1992-01-01'
             dateto = '1993-01-01'
-        
+
         params = {
             '/root/searchTemplate/decision': 'obegransad',
             '/root/searchTemplate/decisionDateFrom': datefrom,
@@ -137,7 +140,7 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
             # upset the sensitive server
             body = req.body
             if isinstance(body, bytes):
-                body = body.decode() # should be pure ascii
+                body = body.decode()  # should be pure ascii
             req.body = re.sub(
                 '; filename="[\w\-\/]+"', '', body).encode()
             req.headers['Content-Length'] = str(len(req.body))
@@ -153,10 +156,13 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
                         "Failed to POST %s: error %s (%s remaining attempts)" % (action, e, remaining_attempts))
                     remaining_attempts -= 1
                     time.sleep(1)
-                        
+
             soup = BeautifulSoup(resp.text)
-            for link in soup.find_all("input", "standardlink", onclick=re.compile("javascript:window.open")):
-                url = link['onclick'][24:-2]  # remove 'javascript:window.open' call around the url
+            for link in soup.find_all(
+                    "input", "standardlink", onclick=re.compile("javascript:window.open")):
+                url = link['onclick'][
+                    24:-
+                    2]  # remove 'javascript:window.open' call around the url
                 # this probably wont break...
                 fragment = link.find_parent("table").find_parent("table")
                 basefile = fragment.find_all("div", "strongstandardtext")[1].text
@@ -172,8 +178,10 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
                     done = True
                 else:
                     # advance one year
-                    params['/root/searchTemplate/decisionDateFrom'] = "%s-01-01" % str(fromYear+1)
-                    params['/root/searchTemplate/decisionDateTo'] = "%s-01-01" % str(fromYear+2)
+                    params[
+                        '/root/searchTemplate/decisionDateFrom'] = "%s-01-01" % str(fromYear + 1)
+                    params[
+                        '/root/searchTemplate/decisionDateTo'] = "%s-01-01" % str(fromYear + 2)
                     self.log.debug("Now retrieving all results from %s to %s" %
                                    (params['/root/searchTemplate/decisionDateFrom'],
                                     params['/root/searchTemplate/decisionDateTo']))
@@ -224,7 +232,7 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
                                             attachment="fragment.html") as fp:
                 fp.write(str(fragment).encode("utf-8"))
         return ret
-        
+
     @managedparsing
     def parse(self, doc):
         def nextcell(key):
@@ -248,7 +256,7 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
         desc.value(self.ns['dcterms'].title, title.strip(), lang="sv")
         # dcterms:issued is required, but we only have rpubl.avgorandedatum
         desc.value(self.ns['dcterms'].issued,
-                desc.getvalue(self.ns['rpubl'].avgorandedatum))
+                   desc.getvalue(self.ns['rpubl'].avgorandedatum))
         filetype = os.path.splitext(downloaded)[1]
         # for uniformity, we try to treat everything as PDF by
         # converting, even .doc/.docx documents are converted to PDF
@@ -262,7 +270,7 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
         def gluecondition(textbox, nextbox, prevbox):
             linespacing = 7
             res = (textbox.font.family == nextbox.font.family and
-                   textbox.font.size == nextbox.font.size and 
+                   textbox.font.size == nextbox.font.size and
                    textbox.top + textbox.height + linespacing >= nextbox.top and
                    nextbox.top > prevbox.top)
             return res
@@ -281,7 +289,10 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
         doc.body = Body(textboxes)
 
         if not hasattr(self, 'ref_parser'):
-            self.ref_parser = LegalRef(LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN)
+            self.ref_parser = LegalRef(
+                LegalRef.RATTSFALL,
+                LegalRef.LAGRUM,
+                LegalRef.FORARBETEN)
         citparser = SwedishCitationParser(self.ref_parser, self.config.url)
         citparser.parse_recursive(doc.body)
 

@@ -2,7 +2,8 @@
 from __future__ import unicode_literals
 
 # From python stdlib
-import re, os
+import re
+import os
 from datetime import datetime, timedelta
 
 # 3rd party modules
@@ -20,17 +21,22 @@ from .swedishlegalsource import UnorderedSection
 from ferenda.elements import CompoundElement, Body, Paragraph, Heading
 from ferenda.elements.html import Span
 
+
 class Abstract(CompoundElement):
     tagname = "div"
     classname = "beslutikorthet"
 
+
 class Blockquote(CompoundElement):
     tagname = "blockquote"
+
 
 class Meta(CompoundElement):
     pass
 
+
 class JOStore(DocumentStore):
+
     def basefile_to_pathfrag(self, basefile):
         # 2371-2014 -> 2014/2371
         return "/".join(basefile.split("-")[::-1])
@@ -39,8 +45,9 @@ class JOStore(DocumentStore):
         # 2014/2371 -> 2371-2014
         return "-".join(pathfrag.split("/")[::-1])
 
-    
+
 class JO(SwedishLegalSource, PDFDocumentRepository):
+
     """Hanterar beslut från Riksdagens Ombudsmän, www.jo.se
 
     Modulen hanterar hämtande av beslut från JOs webbplats i PDF samt
@@ -56,15 +63,15 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
 
     storage_policy = "dir"
     documentstore_class = JOStore
-    downloaded_suffix = ".pdf" # might need to change
+    downloaded_suffix = ".pdf"  # might need to change
 
     @decorators.action
     @decorators.recordlastdownload
     def download(self, basefile=None):
         self.session = requests.session()
         if ('lastdownload' in self.config and
-            self.config.lastdownload and
-            not self.config.refresh):
+                self.config.lastdownload and
+                not self.config.refresh):
             startdate = self.config.lastdownload - timedelta(days=30)
             self.start_url += "&from=%s" % datetime.strftime(startdate, "%Y-%m-%d")
         for basefile, url in self.download_get_basefiles(self.start_url):
@@ -102,7 +109,7 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
     def download_single(self, basefile, url):
         ret = super(JO, self).download_single(basefile, url)
         if ret or self.config.refresh:
-            headnote_url = self.headnote_url_template % {'basefile':basefile}
+            headnote_url = self.headnote_url_template % {'basefile': basefile}
             resp = requests.get(headnote_url)
             if "1 totalt antal träffar" in resp.text:
                 # don't save the entire 100+ KB HTML mess when we only
@@ -120,14 +127,14 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
                               (basefile, headnote_url))
         return ret
 
-        
     @decorators.managedparsing
     def parse(self, doc):
         # reset global state
         UnorderedSection.counter = 0
+
         def gluecondition(textbox, nextbox, prevbox):
-            linespacing = nextbox.height / 1.5 # allow for large linespacing
-            return (textbox.font.size == nextbox.font.size and 
+            linespacing = nextbox.height / 1.5  # allow for large linespacing
+            return (textbox.font.size == nextbox.font.size and
                     textbox.top + textbox.height + linespacing >= nextbox.top)
 
         reader = self.pdfreader_from_basefile(doc.basefile)
@@ -142,9 +149,8 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
         desc.value(self.ns['dcterms'].identifier, "JO dnr %s" % doc.basefile)
         # dcterms:issued is required, but we only have rpubl.avgorandedatum
         desc.value(self.ns['dcterms'].issued,
-                desc.getvalue(self.ns['rpubl'].avgorandedatum))
+                   desc.getvalue(self.ns['rpubl'].avgorandedatum))
 
-        
         # if the headnote is present, do more (incl replacing title?)
         if "headnote.html" in list(self.store.list_attachments(doc.basefile, "downloaded")):
             self.parse_headnote(desc)
@@ -154,12 +160,12 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
 
     def parse_headnote(self, desc):
         pass
-        
+
     def removemeta(self, tree, desc):
         tmp = []
         for node in tree:
             if isinstance(node, Meta):
-                for el in node: # should contain a list of RDF Literal objects
+                for el in node:  # should contain a list of RDF Literal objects
                     desc.value(node.predicate, el)
             elif isinstance(node, list):
                 tmp.append(self.removemeta(node, desc))
@@ -167,8 +173,7 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
                 tmp.append(node)
         tree[:] = tmp[:]
         return tree
-            
-                
+
     def structure(self, doc, chunks):
         def is_heading(parser):
             return parser.reader.peek().font.size == 17
@@ -176,20 +181,20 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
         def is_dnr(parser):
             chunk = parser.reader.peek()
             if (chunk.font.size == 12 and
-                re.match('\d+-\d{2,4}', str(chunk))):
+                    re.match('\d+-\d{2,4}', str(chunk))):
                 return True
 
         def is_datum(parser):
             chunk = parser.reader.peek()
             if (chunk.font.size == 12 and
-                re.match('\d{4}-\d{2}-\d{2}', str(chunk))):
+                    re.match('\d{4}-\d{2}-\d{2}', str(chunk))):
                 return True
 
         def is_nonessential(parser):
             chunk = parser.reader.peek()
             if chunk.top >= 1159 or chunk.top <= 146:
                 return True
-            
+
         def is_abstract(parser):
             if str(parser.reader.peek()).startswith("Beslutet i korthet:"):
                 return True
@@ -209,14 +214,14 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
             chunk = parser.reader.peek()
             if chunk.left < 255:
                 return True
-            
+
         def is_paragraph(parser):
             return True
 
         @decorators.newstate("body")
         def make_body(parser):
             return parser.make_children(Body())
-            
+
         def make_heading(parser):
             # h = Heading(str(parser.reader.next()).strip())
             h = Meta([Literal(str(parser.reader.next()).strip(), lang="sv")],
@@ -252,7 +257,7 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
             return Meta(ds, predicate=self.ns['rpubl'].diarienummer)
 
         def skip_nonessential(parser):
-            parser.reader.next() # return nothing
+            parser.reader.next()  # return nothing
 
         p = FSMParser()
         p.initial_state = "body"
@@ -260,7 +265,7 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
         p.set_recognizers(is_datum,
                           is_dnr,
                           is_nonessential,
-                          is_heading, 
+                          is_heading,
                           is_abstract,
                           is_section,
                           is_normal,
@@ -288,7 +293,7 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
                            ("blockquote", is_normal): (False, None),
                            ("blockquote", is_datum): (make_datum, None),
                            ("blockquote", is_dnr): (make_dnr, None),
-                       })
+                           })
         p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
         return p.parse(chunks)
 

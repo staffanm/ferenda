@@ -25,8 +25,10 @@ from .pdfreader import Page
 from ferenda import util
 from ferenda.compat import Counter
 
+
 class PDFAnalyzer(object):
-    """Create a analyzer for the given pdf file. 
+
+    """Create a analyzer for the given pdf file.
 
     The primary purpose of an analyzer is to determine margins and
     other spatial metrics of a document, and identifiy common
@@ -75,7 +77,8 @@ class PDFAnalyzer(object):
 
     """
 
-    # this is suitable for overriding, eg if you know that no pagenumbers occur in the footer
+    # this is suitable for overriding, eg if you know that no pagenumbers
+    # occur in the footer
     footer_significance_threshold = 0.002
     """The maximum amount (expressed as part of the entire text amount) of
     text that can occur on the bottom of the page for it to be
@@ -86,7 +89,7 @@ class PDFAnalyzer(object):
     frontmatter = 1
     """The amount of pages to be considered frontmatter, which might have
     different typography, special title font etc."""
-    
+
     def __init__(self, pdf):
         # FIXME: in time, we'd like to make it possible to specify
         # multiple pdf files (either because a single logical document
@@ -101,13 +104,12 @@ class PDFAnalyzer(object):
         You should override this method if you want to provide your
         own document segmentation logic.
 
-        :returns: Tuples (startpage, pagecount) for the different identified 
+        :returns: Tuples (startpage, pagecount) for the different identified
                   documents
         :rtype: list
 
         """
         return [(0, len(self.pdf))]
-
 
     def metrics(self, metricspath=None, plotpath=None,
                 startpage=0, pagecount=None, force=False):
@@ -120,11 +122,11 @@ class PDFAnalyzer(object):
         default, title, h1 -- h3). Style values are in turn dicts
         themselves, with the keys 'family' and 'size'.
 
-        :param metricspath: The path of a JSON file used as cache for the 
+        :param metricspath: The path of a JSON file used as cache for the
                              calculated metrics
         :type  metricspath: str
-        :param plotpath: The path to write a PNG file with histograms for 
-                         different values (for debugging). 
+        :param plotpath: The path to write a PNG file with histograms for
+                         different values (for debugging).
         :type plotpath: str
         :param startpage: starting page for the analysis
         :type startpage: int
@@ -141,7 +143,7 @@ class PDFAnalyzer(object):
         ================== ===================================================
         key                description
         ================== ===================================================
-        leftmargin         position of left margin (for odd pages if 
+        leftmargin         position of left margin (for odd pages if
                            twopage = True)
         rightmargin        position of right margin (for odd pages if
                            twopage = True)
@@ -150,16 +152,16 @@ class PDFAnalyzer(object):
         rightmargin_even   position of right margin for right pages
 
         topmargin          position of header zone
-        
+
         bottommargin       position of footer zone
 
         default            style used for default text
 
         title              style used for main document title (on front page)
 
-        h1                 style used for level 1 headings 
+        h1                 style used for level 1 headings
 
-        h2                 style used for level 2 headings 
+        h2                 style used for level 2 headings
 
         h3                 style used for level 3 headings
         ================== ===================================================
@@ -168,16 +170,15 @@ class PDFAnalyzer(object):
 
         """
 
-
         if (not force and
-            metricspath and
-            util.outfile_is_newer([self.pdf.filename], metricspath)):
+                metricspath and
+                util.outfile_is_newer([self.pdf.filename], metricspath)):
             with open(metricspath) as fp:
                 return json.load(fp)
 
         if pagecount is None:
             pagecount = len(self.pdf) - startpage
-            
+
         hcounters = self.count_horizontal_margins(startpage, pagecount)
         vcounters = self.count_vertical_margins(startpage, pagecount)
         stylecounters = self.count_styles(startpage, pagecount)
@@ -202,14 +203,14 @@ class PDFAnalyzer(object):
         pages/textboxes from startpage to pagecount.
 
         """
-        for page in self.pdf[startpage:startpage+pagecount]:
+        for page in self.pdf[startpage:startpage + pagecount]:
             for textbox in page:
                 yield page.number, textbox
-    
+
     def count_horizontal_margins(self, startpage, pagecount):
         """Return a dict of Counter objects for all the horizontally oriented
         textbox properties (number of textboxes starting/ending at different
-        positions). 
+        positions).
 
         The set of counters is determined by setup_horizontal_counters.
         """
@@ -217,7 +218,7 @@ class PDFAnalyzer(object):
         counters = self.setup_horizontal_counters()
         for pagenumber, textbox in self.textboxes(startpage, pagecount):
             self.count_horizontal_textbox(pagenumber, textbox, counters)
-        for page in self.pdf[startpage:startpage+pagecount]:
+        for page in self.pdf[startpage:startpage + pagecount]:
             counters['pagewidth'][page.width] += 1
         return counters
 
@@ -244,7 +245,7 @@ class PDFAnalyzer(object):
         counters = self.setup_vertical_counters()
         for pagenumber, textbox in self.textboxes(startpage, pagecount):
             self.count_vertical_textbox(pagenumber, textbox, counters)
-        for page in self.pdf[startpage:startpage+pagecount]:
+        for page in self.pdf[startpage:startpage + pagecount]:
             counters['pageheight'][page.height] += 1
         return counters
 
@@ -258,7 +259,7 @@ class PDFAnalyzer(object):
         text = str(textbox).strip()
         counters['topmargin'][textbox.top] += len(text)
         counters['bottommargin'][textbox.bottom] += len(text)
-        
+
     def count_styles(self, startpage, pagecount):
         counters = {'frontmatter_styles': Counter(),
                     'rest_styles': Counter()}
@@ -288,7 +289,7 @@ class PDFAnalyzer(object):
                 break
         charcount = 0
         maxcount = self.footer_significance_threshold * sum(vcounters['topmargin'].values())
-        for i in range(max(vcounters['pageheight'])-1, -1, -1):
+        for i in range(max(vcounters['pageheight']) - 1, -1, -1):
             charcount += vcounters['bottommargin'].get(i, 0)
             if charcount > maxcount:
                 footer = i + 1
@@ -305,7 +306,8 @@ class PDFAnalyzer(object):
         r = vcounters['rightmargin']
         if l:
             vmargins['leftmargin'] = l.most_common(1)[0][0]
-            assert vmargins['leftmargin'] < pagewidth / 2, "leftmargin shouldn't be on the right hand side of the page"
+            assert vmargins['leftmargin'] < pagewidth / \
+                2, "leftmargin shouldn't be on the right hand side of the page"
         if r:
             vmargins['rightmargin'] = r.most_common(1)[0][0]
         if self.twopage:
@@ -313,13 +315,14 @@ class PDFAnalyzer(object):
             re = vcounters['rightmargin_even']
             if le:
                 vmargins['leftmargin_even'] = le.most_common(1)[0][0]
-                assert vmargins['leftmargin_even'] < pagewidth / 2, "leftmargin shouldn't be on the right hand side of the page"
+                assert vmargins['leftmargin_even'] < pagewidth / \
+                    2, "leftmargin shouldn't be on the right hand side of the page"
             if re:
                 vmargins['rightmargin_even'] = re.most_common(1)[0][0]
         vmargins['pagewidth'] = max(vcounters['pagewidth'])
         return vmargins
 
-    def fontsize_key(self, fonttuple): 
+    def fontsize_key(self, fonttuple):
         family, size = fonttuple
         if "Bold" in family:
             weight = 2
@@ -329,11 +332,9 @@ class PDFAnalyzer(object):
             weight = 0
         return (size, weight)
 
-
     def fontdict(self, fonttuple):
         return {'family': fonttuple[0],
                 'size': fonttuple[1]}
-
 
     def analyze_styles(self, frontmatter_styles, rest_styles):
         styledefs = {}
@@ -361,12 +362,12 @@ class PDFAnalyzer(object):
                         rest_styles[x] > significantuse)]
 
         for style in ('h1', 'h2', 'h3'):
-            if largestyles: # any left?
+            if largestyles:  # any left?
                 styledefs[style] = self.fontdict(largestyles.pop(0))
         return styledefs
 
-
-    def drawboxes(self, outfilename, gluefunc=None, startpage=0, pagecount=None, counters=None, metrics=None):
+    def drawboxes(self, outfilename, gluefunc=None, startpage=0,
+                  pagecount=None, counters=None, metrics=None):
         """Create a copy of the parsed PDF file, but with the textboxes
         created by ``gluefunc`` clearly marked, and metrics shown on
         the page.
@@ -390,8 +391,8 @@ class PDFAnalyzer(object):
         existing_pdf = PyPDF2.PdfFileReader(fp)
         pageidx = 0
         tbidx = 0
-        sf = 2/3.0 # scaling factor -- mapping between units produced by
-                   # pdftohtml and units used by reportlab
+        sf = 2 / 3.0  # scaling factor -- mapping between units produced by
+        # pdftohtml and units used by reportlab
         dirty = False
 
         for tb in self.pdf.textboxes(gluefunc, pageobjects=True):
@@ -413,7 +414,7 @@ class PDFAnalyzer(object):
                     # alternate way: merge the existing page on top of
                     # the new. This doesn't seem to work any better,
                     # and creates issues with scaling.
-                    # 
+                    #
                     # new_page = new_pdf.getPage(0)
                     # new_page.mergePage(existing_page)
                     # output.addPage(new_page)
@@ -424,14 +425,16 @@ class PDFAnalyzer(object):
                 mb = existing_page.mediaBox
                 horizontal_scale = float(mb.getHeight()) / tb.height
                 vertical_scale = float(mb.getWidth()) / tb.width
-                log.debug("Loaded page %s - Scaling %s, %s" % (pageidx, horizontal_scale, vertical_scale))
+                log.debug(
+                    "Loaded page %s - Scaling %s, %s" %
+                    (pageidx, horizontal_scale, vertical_scale))
                 packet = BytesIO()
                 canvas = Canvas(packet, pagesize=(tb.height, tb.width),
-                                    bottomup=False)
+                                bottomup=False)
                 # not sure how the vertical value 50 is derived...
-                canvas.translate(0,50)
+                canvas.translate(0, 50)
                 canvas.scale(horizontal_scale, vertical_scale)
-                canvas.setStrokeColorRGB(0.2,0.5,0.3)
+                canvas.setStrokeColorRGB(0.2, 0.5, 0.3)
 
                 # now draw margins on the page
                 for k, v in metrics.items():
@@ -442,16 +445,16 @@ class PDFAnalyzer(object):
                             canvas.drawString(0, v, k)
                         else:
                             if ((k.endswith("_even") and (pageidx + 1) % 2 == 1) or
-                                (not k.endswith("_even") and (pageidx +1) % 2 == 0) or
-                                (not self.twopage)):
+                                    (not k.endswith("_even") and (pageidx + 1) % 2 == 0) or
+                                    (not self.twopage)):
                                 # vert line
                                 canvas.line(v, 0, v, tb.height)
-                                canvas.drawString(v, tb.height-2, k)
+                                canvas.drawString(v, tb.height - 2, k)
                 # for k, v in counters:
                 # for each area in header, footer, leftmarg[_even], rightmarg[_even]:
                 #    select proper counter to draw in each area:
-                #      (headercounter->left gutter, 
-                #       footercounter->right gutter, 
+                #      (headercounter->left gutter,
+                #       footercounter->right gutter,
                 #       leftmargcounter->header,
                 #       rightmargcounter->footer)
                 #   find the most frequent value in the selected counter, normalize agaist the space in the area
@@ -460,11 +463,12 @@ class PDFAnalyzer(object):
             else:
                 tbidx += 1
                 dirty = True
-                # for each textbox draw a square 
+                # for each textbox draw a square
                 # add sequence number for textbox in lower right corner
-                # if textbox style matches any in metrics, add the style name in upper lft corner
+                # if textbox style matches any in metrics, add the style name in upper lft
+                # corner
                 canvas.rect(tb.left, tb.top,
-                         tb.width, tb.height)
+                            tb.width, tb.height)
                 canvas.drawString(tb.left, tb.top, str(tbidx))
                 fonttuple = (tb.font.family, tb.font.size)
                 if fonttuple in styles:
@@ -487,7 +491,7 @@ class PDFAnalyzer(object):
         matplotlib.use('Agg')
         # plt.style.use('ggplot')  # looks good but makes our histograms unreadable
         matplotlib.rcParams.update({'font.size': 8})
-        plt.figure(figsize=((len(margincounters))*2, 7))  # width, height in inches
+        plt.figure(figsize=((len(margincounters)) * 2, 7))  # width, height in inches
 
         # if 6 counters:
         # +0,0--+ +0,1--+ +0,2--+ +0,3--+
@@ -496,11 +500,11 @@ class PDFAnalyzer(object):
         # +1,0--+ +1,1--+ +1,2 colspan=2+
         # | TM  | | BM  | |    Styles   |
         # +-----+ +-----+ +-------------+
-        # 
+        #
         # if 4 counters:
-        # +0,0--+ +0,1--+ +0,2--+ 
-        # | LM  | | RM  | | TM  | 
-        # +-----+ +-----+ +-----+ 
+        # +0,0--+ +0,1--+ +0,2--+
+        # | LM  | | RM  | | TM  |
+        # +-----+ +-----+ +-----+
         # +1,0--+ +1,1 colspan=2+
         # | BM  | |    Styles   |
         # +-----+ +-------------+
@@ -511,11 +515,11 @@ class PDFAnalyzer(object):
         pageheight = max(margincounters['pageheight'])
         del margincounters['pageheight']
         if len(margincounters) == 4:
-            coords = ((0,0), (0,1), (0,2), (1,0), (1,1))
-            grid = (2,3)
+            coords = ((0, 0), (0, 1), (0, 2), (1, 0), (1, 1))
+            grid = (2, 3)
         elif len(margincounters) == 6:
-            coords = ((0,0), (0,1), (0,2), (0,3), (1,0), (1,1), (1,2))
-            grid = (2,4)
+            coords = ((0, 0), (0, 1), (0, 2), (0, 3), (1, 0), (1, 1), (1, 2))
+            grid = (2, 4)
         else:
             # FIXME: make this dynamic
             raise ValueError("Can't layout other # of counters than 4 or 6")
@@ -543,18 +547,20 @@ class PDFAnalyzer(object):
             bins = plot.hist(series, bins=size, range=(0, size))
             plot.set_title(counterkey)
             for k, v in metrics.items():
-                if counterkey == k: # FIXME: How annotate parindent, 2col etc ?
-                    label = "%s=%s" % (k, v) # leftmargin=102
+                if counterkey == k:  # FIXME: How annotate parindent, 2col etc ?
+                    label = "%s=%s" % (k, v)  # leftmargin=102
                     # print("   plotting annotation %s" % label)
                     plot.annotate(label, xy=(v, 100),
-                                  xytext=(v*0.5, 100),
+                                  xytext=(v * 0.5, 100),
                                   arrowprops={'arrowstyle': '->'})
 
     def plot_styles(self, plot, stylecounters, metrics):
-	# do a additive vhist. FIXME: label those styles identified in
-	# metrics
+        # do a additive vhist. FIXME: label those styles identified in
+        # metrics
         allstyles = Counter(dict(chain(*[x.items() for x in stylecounters.values()])))
-        stylenames = [style[0].replace("TimesNewRomanPS", "Times")+"@"+str(style[1]) for style, count in allstyles.most_common()]
+        stylenames = [style[0].replace("TimesNewRomanPS",
+                                       "Times") + "@" + str(style[1]) for style,
+                      count in allstyles.most_common()]
         stylecounts = [count for style, count in allstyles.most_common()]
         plt.yticks(range(len(stylenames)), stylenames)
         plot.barh(range(len(stylenames)), stylecounts, log=True)

@@ -34,16 +34,21 @@ class Sektion(Section):
     pass
 
 from ferenda.elements.elements import E
+
+
 class Sidbrytning(OrdinalElement):
+
     def as_xhtml(self, uri, parent_uri=None):
         return E("span", {'id': 'sid%s' % self.ordinal,
                           'class': 'sidbrytning'})
+
 
 class PreambleSection(CompoundElement):
     tagname = "div"
     classname = "preamblesection"
     counter = 0
     uri = None
+
     def as_xhtml(self, uri, parent_uri=None):
         if not self.uri:
             self.__class__.counter += 1
@@ -74,6 +79,7 @@ class UnorderedSection(CompoundElement):
     classname = "unorderedsection"
     counter = 0
     uri = None
+
     def as_xhtml(self, uri, parent_uri=None):
         if not self.uri:
             self.__class__.counter += 1
@@ -86,10 +92,10 @@ class UnorderedSection(CompoundElement):
         return element
 
 
-
-class Appendix(SectionalElement): 
+class Appendix(SectionalElement):
     tagname = "div"
     classname = "appendix"
+
     def as_xhtml(self, uri, parent_uri=None):
         if not self.uri:
             self.uri = uri + "#B%s" % self.ordinal
@@ -195,19 +201,20 @@ class SwedishLegalSource(DocumentRepository):
         if self.config.localizeuri:
             f = SwedishCitationParser(None, self.config.url,
                                       self.config.urlpath).localize_uri
+
             def makeurl(data):
                 return f(legaluri.construct(data))
             self.makeurl = makeurl
         else:
             self.makeurl = legaluri.construct
-        
-        if type(self) != SwedishLegalSource:
+
+        if not isinstance(self, SwedishLegalSource):
             assert self.alias != "swedishlegalsource", "Subclasses must override self.alias!"
 
     @classmethod
     def get_default_options(cls):
         opts = super(SwedishLegalSource, cls).get_default_options()
-        opts['pdfimages'] = False 
+        opts['pdfimages'] = False
         opts['localizeuri'] = False
         # this controls URI localization
         opts['urlpath'] = "res/%s/" % cls.alias
@@ -233,21 +240,21 @@ class SwedishLegalSource(DocumentRepository):
         #     "http://rinfo.lagrummet.se/publ/dir/2012:35",
         # "http://localhost:8000/res/dv/hfd/2012:35" =>
         #     "http://rinfo.lagrummet.se/publ/rattsfall/hfd/2012:35"
-        # 
+        #
         # but also:
         #
         # "https://lagen.nu/dom/hfd/2012:35" =>
         #     "http://rinfo.lagrummet.se/publ/rattsfall/hfd/2012:35"
         # "http://lagen.nu/1998:204" =>
         #     "http://rinfo.lagrummet.se/publ/sfs/1998:204"
-        
+
         assert uri.startswith(self.config.url)
-        
+
         # NOTE: This hardcodes what we can guess about other repos
         # and their .config.url + .config.urlpath
-        maps = ((self.config.url+"res/dv/",
+        maps = ((self.config.url + "res/dv/",
                  "http://rinfo.lagrummet.se/publ/rattsfall/"),
-                (self.config.url+"res/",
+                (self.config.url + "res/",
                  "http://rinfo.lagrummet.se/publ/"),
                 # Special hacky SFS handling (always starts digits 1 or 2)
                 ("https://lagen.nu/1",
@@ -265,15 +272,15 @@ class SwedishLegalSource(DocumentRepository):
     def parse_iso_date(self, datestr):
         # only handles YYYY-MM-DD now. Look into dateutil or isodate
         # for more complete support of all ISO 8601 variants
-        datestr = datestr.replace(" ","") # Data cleaning occasionally
-                                          # needed. Maybe this isn't
-                                          # the right place?
+        datestr = datestr.replace(" ", "")  # Data cleaning occasionally
+        # needed. Maybe this isn't
+        # the right place?
         return datetime.strptime(datestr, "%Y-%m-%d").date()
 
     def parse_swedish_date(self, datestr):
         """Parses a number of common forms of expressing swedish dates with
         varying precision.
-        
+
         >>> parse_swedish_date("3 februari 2010")
         datetime.date(2010, 2, 3)
         >>> parse_swedish_date("vid utgången av december 1999")
@@ -295,7 +302,7 @@ class SwedishLegalSource(DocumentRepository):
             day = calendar.monthrange(year, month)[1]
         else:
             # assume strings on the form "3 februari 2010", "8 dec. 1997"
-            components =  datestr.split()
+            components = datestr.split()
             year = int(components[-1])
             if len(components) >= 2:
                 if components[-2].endswith("."):
@@ -330,7 +337,10 @@ class SwedishLegalSource(DocumentRepository):
                 # FIXME: depends on internal details of the
                 # rdflib.extras implementation in order to get the
                 # current URI
-                d.graph.remove((d._current(), self.ns['dcterms'].identifier, Literal(identifier)))
+                d.graph.remove(
+                    (d._current(),
+                     self.ns['dcterms'].identifier,
+                        Literal(identifier)))
             # Create one from basefile. First guess prefix
             if self.rdf_type == self.ns['rpubl'].Direktiv:
                 prefix = "Dir. "
@@ -339,7 +349,8 @@ class SwedishLegalSource(DocumentRepository):
                 # which is not aligned with official Rinfo URIs (eg
                 # https://lagen.nu/dataset/ds). Also, rpubl:utrSerie
                 # is only set further down below in this very method.
-                if d.getvalue(self.ns['rpubl'].utrSerie) == "http://rinfo.lagrummet.se/serie/utr/ds":
+                if d.getvalue(
+                        self.ns['rpubl'].utrSerie) == "http://rinfo.lagrummet.se/serie/utr/ds":
                     prefix = "Ds "
                 else:
                     prefix = "SOU "
@@ -348,9 +359,11 @@ class SwedishLegalSource(DocumentRepository):
             elif self.rdf_type == self.ns['rpubl'].Forordningsmotiv:
                 prefix = "Fm "
             else:
-                raise ValueError("Cannot create dcterms:identifier for rdf_type %r" % self.rdf_type)
+                raise ValueError(
+                    "Cannot create dcterms:identifier for rdf_type %r" %
+                    self.rdf_type)
             identifier = "%s%s" % (prefix, basefile)
-            
+
             self.log.warning(
                 "%s: No dcterms:identifier, assuming %s" % (basefile, identifier))
             d.value(self.ns['dcterms'].identifier, identifier)
@@ -362,16 +375,16 @@ class SwedishLegalSource(DocumentRepository):
 
         if self.rdf_type == self.ns['rpubl'].Utredningsbetankande:
             d.rel(self.ns['rpubl'].utrSerie, self.dataset_uri())
- 
+
     def tabs(self, primary=False):
         if self.config.tabs:
             return super(SwedishLegalSource, self).tabs(primary)
         else:
             return []
-   
+
 
 # can't really have a toc_item thats general for all kinds of swedish legal documents?
-# 
+#
 #    def toc_item(self, binding, row):
 #        return {'uri': row['uri'],
 #                'label': row['dcterms_identifier'] + ": " + row['dcterms_title']}
@@ -383,19 +396,19 @@ def offtryck_parser(basefile="0", metrics=None, preset=None):
     # structure
     if not metrics:
         metrics = {}
-    defaultmetrics = {'header': 0, # fix these
-                      'footer': 1000, # -""-
+    defaultmetrics = {'header': 0,  # fix these
+                      'footer': 1000,  # -""-
                       'odd_leftmargin': 172,
                       'odd_parindent': 187,
                       'odd_rightmargin': 619,
                       'even_leftmargin': 278,
                       'even_parindent': 293,
                       'even_rightmargin': 725,
-                      'h1': {'family': 'TimesNewRomanPS-BoldMT', # should also be weight: bold? 
+                      'h1': {'family': 'TimesNewRomanPS-BoldMT',  # should also be weight: bold?
                              'size': 20},
-                      'h2': {'family': 'TimesNewRomanPS-BoldMT', 
+                      'h2': {'family': 'TimesNewRomanPS-BoldMT',
                              'size': 17},
-                      'h3': {'family': 'TimesNewRomanPS-BoldMT', 
+                      'h3': {'family': 'TimesNewRomanPS-BoldMT',
                              'size': 15},
                       'default': {'family': 'TimesNewRomanPSMT',
                                   'size': 13}
@@ -419,35 +432,34 @@ def offtryck_parser(basefile="0", metrics=None, preset=None):
         # everything above or below these margins should be
         # pagenumbers -- always nonessential
         if chunk.top > metrics.bottommargin or chunk.bottom < metrics.topmargin:
-            return True  
+            return True
 
         # pagenumbers can be in the left/right margin as well
         if ((chunk.right < metrics_leftmargin() or
              chunk.left > metrics_rightmargin()) and
-            strchunk.isdigit()):
+                strchunk.isdigit()):
             return True
 
         # Propositioner has the identifier in the left or right
-        # margin, set in the default style (or smaller) 
+        # margin, set in the default style (or smaller)
         if (int(chunk.font.size) <= metrics.default.size and
-                (chunk.right < metrics_leftmargin() or
-                 chunk.left > metrics_rightmargin()) and
-            strchunk.startswith(parser.current_identifier)):
+            (chunk.right < metrics_leftmargin() or
+             chunk.left > metrics_rightmargin()) and
+                strchunk.startswith(parser.current_identifier)):
             # print("%s on p %s is deemed nonessential" % (str(chunk), state.pageno))
             return True
 
         # Direktiv first page has a similar identifier, but it starts
         # slightly before the right margin (hence +10), and is set in larger type.
         if (chunk.left + 10 < metrics_rightmargin() and
-            strchunk == parser.current_identifier):
+                strchunk == parser.current_identifier):
             return True
-        
 
     def is_coverpage(parser):
         # first 2 pages of a SOU are coverpages
-        return isinstance(parser.reader.peek(), Page) and state.preset == "sou" and state.pageno < 2
+        return isinstance(
+            parser.reader.peek(), Page) and state.preset == "sou" and state.pageno < 2
 
-            
     def is_preamblesection(parser):
         chunk = parser.reader.peek()
         if isinstance(chunk, Page):
@@ -527,21 +539,19 @@ def offtryck_parser(basefile="0", metrics=None, preset=None):
 
     def make_coverpage(parser):
         state.pageno += 1
-        parser.reader.next() # throwaway the Page object itself
+        parser.reader.next()  # throwaway the Page object itself
         c = Coverpage()
         return parser.make_children(c)
     setattr(make_coverpage, 'newstate', 'coverpage')
-        
 
     def make_preamblesection(parser):
         s = PreambleSection(title=str(parser.reader.next()).strip())
         if s.title == "Innehållsförteckning":
-            parser.make_children(s) # throw away
+            parser.make_children(s)  # throw away
             return None
         else:
             return parser.make_children(s)
     setattr(make_preamblesection, 'newstate', 'preamblesection')
-
 
     def make_unorderedsection(parser):
         s = UnorderedSection(title=str(parser.reader.next()).strip())
@@ -598,12 +608,13 @@ def offtryck_parser(basefile="0", metrics=None, preset=None):
         return sb
 
     re_sectionstart = re.compile("^(\d[\.\d]*) +(.*[^\.])$").match
+
     def analyze_sectionstart(parser, textbox=None):
         """returns (ordinal, headingtype, text) if it looks like a section
         heading, (None, None, textbox) otherwise.
 
         """
-        
+
         if not textbox:
             textbox = parser.reader.peek()
         # the font size and family should be defined
@@ -624,13 +635,13 @@ def offtryck_parser(basefile="0", metrics=None, preset=None):
             return (None, found, textbox)
 
     def metrics_leftmargin():
-        if state.pageno % 2 == 0:  # even page 
+        if state.pageno % 2 == 0:  # even page
             return metrics.even_leftmargin
         else:
             return metrics.odd_leftmargin
 
     def metrics_rightmargin():
-        if state.pageno % 2 == 0:  # even page 
+        if state.pageno % 2 == 0:  # even page
             return metrics.even_rightmargin
         else:
             return metrics.odd_rightmargin
@@ -654,7 +665,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None):
     commonstates = ("body", "preamblesection", "section", "subsection",
                     "unorderedsection", "unorderedsubsection", "subsubsection",
                     "appendix")
-    
+
     p.set_transitions({(commonstates, is_nonessential): (skip_nonessential, None),
                        (commonstates, is_pagebreak): (skip_pagebreak, None),
                        (commonstates, is_paragraph): (make_paragraph, None),
@@ -689,7 +700,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None):
                        ("subsubsection", is_subsection): (False, None),
                        ("subsubsection", is_section): (False, None),
                        ("body", is_appendix): (make_appendix, "appendix"),
-                       (("appendix","subsubsection", "subsection", "section"), is_appendix):
+                       (("appendix", "subsubsection", "subsection", "section"), is_appendix):
                        (False, None)
                        })
 
@@ -710,10 +721,10 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
         textbox.font.family == nextbox.font.family and
         textbox.top + textbox.height + linespacing > nextbox.top and
         prevbox.left < nextbox.right and
-        ((prevbox.top + prevbox.height == nextbox.top + nextbox.height) or # compare baseline, not topline
+        ((prevbox.top + prevbox.height == nextbox.top + nextbox.height) or  # compare baseline, not topline
          (prevbox.left == nextbox.left) or
          (parindent * 2 >= (prevbox.left - nextbox.left) >= parindent)
-     )):
+         )):
         return True
 
 
@@ -721,6 +732,7 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
 # to use a legalref based parser instead of a set of pyparsing
 # grammars.
 class SwedishCitationParser(CitationParser):
+
     def __init__(self, legalrefparser, baseurl, urlpath=None, allow_relative=False):
         self._legalrefparser = legalrefparser
         self._baseurl = baseurl
@@ -748,13 +760,13 @@ class SwedishCitationParser(CitationParser):
             self._currenturl = part.uri
         if isinstance(part, (Link, A, H1, H2, H3)):
             # don't process text that's already a link (or a heading)
-            if isinstance(part, str): # caller expects a list
+            if isinstance(part, str):  # caller expects a list
                 return [part]
             else:
                 return part
         else:
             return super(SwedishCitationParser, self).parse_recursive(part, predicate)
-        
+
     def parse_string(self, string, predicate="dcterms:references"):
         from ferenda.sources.legal.se.sfs import UpphavtKapitel, UpphavdParagraf
         if isinstance(string, (UpphavtKapitel, UpphavdParagraf)):

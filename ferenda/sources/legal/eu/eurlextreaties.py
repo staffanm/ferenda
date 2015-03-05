@@ -38,7 +38,8 @@ from ferenda.elements import CompoundElement, OrdinalElement
 #                  <ListItem> C
 #                <OrderedList type="letter"> CO
 
-# or should we have a class method ontology_uri, complimentary to canonical_uri/dataset_uri ?
+# or should we have a class method ontology_uri, complimentary to
+# canonical_uri/dataset_uri ?
 vocab_uri = "http://lagen.nu/eurlex#"
 
 

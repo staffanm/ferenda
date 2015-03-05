@@ -455,7 +455,8 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
                     cite['obj'] = cite['obj'].split("-")[0]
 
                 if not cite['obj'] in cases:
-                    # print "Case %s (cited in %s) does not exist!\n" % (cite['obj'], cite['subj'])
+                    # print "Case %s (cited in %s) does not exist!\n" % (cite['obj'],
+                    # cite['subj'])
                     missingcases[cite['obj']] = True
                     continue
 
@@ -591,7 +592,7 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
         styles = []
         for i in range(1, 5):
             for j in (['-', '--', '-.', ':']):
-            # for j in (['-','-','-','-','-']):
+                # for j in (['-','-','-','-','-']):
                 styles.append((i, j))
 
         cnt = 0
@@ -680,7 +681,7 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
     def evaluate(self):
         result_cache = self.generic_path("result_cache", "eval", ".py")
         if os.path.exists(result_cache):
-        # if False:
+            # if False:
             self.log.info("Using result cache in %s" % result_cache)
             sets = eval(open(result_cache).read())
         else:
@@ -718,7 +719,7 @@ SELECT DISTINCT ?subj ?pred ?obj ?celexnum WHERE {
 
         aps_cache = self.generic_path("aps_cache", "eval", ".py")
         if os.path.exists(aps_cache):
-        # if False:
+            # if False:
             self.log.info("Using avg precision cache in %s" % aps_cache)
             avg_precisions = eval(open(aps_cache).read())
         else:

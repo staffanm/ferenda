@@ -31,7 +31,7 @@ class URIFormatter(object):
         self._formatters = dict(formatters)
 
     def format(self, parseresult):
-        """Given a pyparsing.ParseResult object, finds a appropriate formatter for that 
+        """Given a pyparsing.ParseResult object, finds a appropriate formatter for that
         result, and formats the result into a URI using that formatter."""
         formatter = self.formatterfor(parseresult.getName())
         if formatter:

@@ -42,6 +42,7 @@ log = logging.getLogger(__name__)
 E = ElementMaker(namespace="http://www.w3.org/1999/xhtml",
                  nsmap={None: "http://www.w3.org/1999/xhtml"})
 
+
 def serialize(root, format="xml"):
     """Given any :py:class:`~ferenda.elements.AbstractElement` *root*
     object, returns a XML serialization of *root*, recursively.
@@ -78,15 +79,15 @@ def deserialize(xmlstr, format="xml", caller_globals=None):
         if (isinstance(xmlstr, str)):
             xmlstr = xmlstr.encode('utf-8')
         t = ET.fromstring(xmlstr)
-        return  __deserialize_xml(t, caller_globals)
-    elif format=="json":
+        return __deserialize_xml(t, caller_globals)
+    elif format == "json":
         root = json.loads(xmlstr)
         t = __deserialize_json(root)
         return t
-        
 
 
 class AbstractElement(object):
+
     """Base class for all elements. You should only inherit from this if
     you define new types directly based on python types.
 
@@ -119,7 +120,9 @@ class AbstractElement(object):
                 object.__getattribute__(self, name)
                 object.__setattr__(self, name, value)
             except AttributeError:
-                raise AttributeError("Can't set attribute '%s' on object '%s' after initialization" % (name, self.__class__.__name__))
+                raise AttributeError(
+                    "Can't set attribute '%s' on object '%s' after initialization" %
+                    (name, self.__class__.__name__))
         else:
             # Still in initialization phase -- ok to create new
             # attributes
@@ -135,7 +138,7 @@ class AbstractElement(object):
     classname = None
     """If set, this property gets converted to a ``@class`` attribute in
     the resulting XHTML."""
-    
+
     partrelation = DCTERMS.isPartOf
     """The default relationship between this element and any other element
 that includes this element."""
@@ -152,10 +155,11 @@ that includes this element."""
                         'href', 'name', 'alt', 'role'):
             if hasattr(self, stdattr):
                 attrs[stdattr] = getattr(self, stdattr)
-        return E(self.tagname, attrs) 
+        return E(self.tagname, attrs)
 
-        
+
 class UnicodeElement(AbstractElement, str):
+
     """Based on :py:class:`str`, but can also have other
 properties (such as ordinal label, date of enactment, etc)."""
 
@@ -165,7 +169,7 @@ properties (such as ordinal label, date of enactment, etc)."""
         if not isinstance(arg, str):
             raise TypeError("%r is not a str" % arg)
         # obj = str.__new__(cls, arg)
-        obj = str.__new__(cls,arg)
+        obj = str.__new__(cls, arg)
         object.__setattr__(obj, '__initialized', False)
         return obj
 
@@ -177,9 +181,10 @@ properties (such as ordinal label, date of enactment, etc)."""
             return res
         else:
             return None
-        
+
 
 class CompoundElement(AbstractElement, list):
+
     """Based on :py:class:`list` and contains other :py:class:`AbstractElement` objects, but can also have properties of it's own."""
     def __new__(cls, arg=[], *args, **kwargs):
         # ideally, we'd like to do just "obj = list.__new__(cls,arg)"
@@ -196,11 +201,11 @@ class CompoundElement(AbstractElement, list):
         # valid chars according to the XML spec
         def _valid(i):
             return (
-                0x20 <= i <= 0xD7FF 
+                0x20 <= i <= 0xD7FF
                 or i in (0x9, 0xA, 0xD)
                 or 0xE000 <= i <= 0xFFFD
                 or 0x10000 <= i <= 0x10FFFF
-                )
+            )
         return ''.join(c for c in s if _valid(ord(c)))
 
     def as_plaintext(self):
@@ -218,16 +223,16 @@ class CompoundElement(AbstractElement, list):
         return " ".join(filter(None, res))
 
     # body uri="http://ex.org/"
-    # section ordinal="1" uri=body.uri+"#S"+ordinal, ispartof=parent.uri 
-    # subsection ordinal="1.1" uri=body.uri+"#S"+ordinal, ispartof=parent.uri 
-    # subsubsection ordinal="1.1.1" uri=body.uri+"#S"+ordinal, ispartof=parent.uri 
+    # section ordinal="1" uri=body.uri+"#S"+ordinal, ispartof=parent.uri
+    # subsection ordinal="1.1" uri=body.uri+"#S"+ordinal, ispartof=parent.uri
+    # subsubsection ordinal="1.1.1" uri=body.uri+"#S"+ordinal, ispartof=parent.uri
     def as_xhtml(self, uri=None, parent_uri=None):
         children = []
         # start by handling all children recursively
 
         for subpart in self:
             if (isinstance(subpart, AbstractElement) or
-                hasattr(subpart, 'as_xhtml')):
+                    hasattr(subpart, 'as_xhtml')):
 
                 # this is the difficult part - p must be eg
                 # "http://ex.org/#S1" but self doesn't have uri
@@ -258,9 +263,9 @@ class CompoundElement(AbstractElement, list):
         # Then massage a list of attributes for the main node
         attrs = {}
 
-        if self.classname  is not None:
+        if self.classname is not None:
             attrs['class'] = self.classname
-            
+
         # copy (a subset of) standard xhtml attributes (including some
         # RDFa ones)
         for stdattr in ('class', 'id', 'dir', 'lang', 'src',
@@ -275,7 +280,8 @@ class CompoundElement(AbstractElement, list):
             attrs['about'] = self.uri
 
             if hasattr(self, 'meta') and self.meta:
-                assert isinstance(self.meta,Graph), "self.meta is %r, not rdflib.Graph" % type(self.meta)
+                assert isinstance(
+                    self.meta, Graph), "self.meta is %r, not rdflib.Graph" % type(self.meta)
                 # we use sorted() to get the triples in a predictable
                 # order (by predicate, then subject, then object)
                 for (s, p, o) in sorted(self.meta, key=itemgetter(1, 0, 2)):
@@ -292,14 +298,13 @@ class CompoundElement(AbstractElement, list):
                         # triples in this way? Maybe we should do a
                         # children.append instead
                         children.insert(0, self._span(s, p, o, self.meta))
-                
+
             if self.partrelation and parent_uri:
                 children.insert(0,
                                 E('span', {'rel':
                                            self._qname(self.partrelation),
                                            'href': parent_uri}))
             # parent_uri = self.uri
-
 
         # for each childen that is a string, make sure it doesn't
         # contain any XML illegal characters
@@ -351,7 +356,7 @@ class CompoundElement(AbstractElement, list):
         # we need to get hold of the root namespace mapping. But that
         # aint available. Or we could get hold of a graph from
         # docrepo.make_graph, but docrepo aint available. Gah!
-        # FIXME: 
+        # FIXME:
         if predicate == Namespace("http://schema.org/").isPartOf:
             return "schema:isPartOf"
         else:
@@ -360,7 +365,10 @@ class CompoundElement(AbstractElement, list):
 
 # Abstract classes intendet to use with multiple inheritance, which
 # adds common properties
+
+
 class TemporalElement(AbstractElement):
+
     """A TemporalElement has a number of temporal properties
     (``entryintoforce``, ``expires``) which states the temporal frame
     of the object.
@@ -381,7 +389,7 @@ class TemporalElement(AbstractElement):
     """
     # can't initialize these 2 fields, since they get serialized, and
     # this clashes with test case files.
-    
+
 #     def __init__(self, *args, **kwargs):
 #         self.entryintoforce = None
 #         self.expires = None
@@ -391,13 +399,16 @@ class TemporalElement(AbstractElement):
         """Returns True if the object is in effect at *date*."""
         return (date >= self.entryintoforce) and (date <= self.expires)
 
+
 class PredicateElement(AbstractElement):
+
     """Inheriting from this gives the subclass a ``predicate`` attribute,
     which describes the RDF predicate to which the class is the RDF
     subject (eg. if you want to model the title of a document, you
     would inherit from UnicodeElement and this, and then set
     ```predicate`` to ``rdflib.URIRef('http://purl.org/dc/elements/1.1/title')``.
     """
+
     def __init__(self, *args, **kwargs):
         if 'predicate' in kwargs:
             self.predicate = kwargs['predicate']
@@ -410,9 +421,10 @@ class PredicateElement(AbstractElement):
                     predicateuri = kwargs['predicate']
                     kwargs['predicate'] = kwargs[
                         'predicate'].replace(ns, prefix + ":")
-                    # print "Shorten predicate %s to: %s" % (predicateuri, kwargs['predicate'])
+                    # print "Shorten predicate %s to: %s" % (predicateuri,
+                    # kwargs['predicate'])
                     shorten = True
-            #if not shorten:
+            # if not shorten:
             #   print "Couldn't shorten predicate: %s" % self.predicate
         else:
             # From the RDF Schema spec: 'This is the class of
@@ -424,6 +436,7 @@ class PredicateElement(AbstractElement):
 
 
 class OrdinalElement(AbstractElement):
+
     """A OrdinalElement has a explicit ordinal number. The ordinal does
     not need to be strictly numerical, but can be eg. '6 a' (which is
     larger than 6, but smaller than 7). Classes inherited from this
@@ -471,13 +484,15 @@ class OrdinalElement(AbstractElement):
         return util.numcmp(self.ordinal, other.ordinal) >= 0
 
 
-class Link(UnicodeElement): 
+class Link(UnicodeElement):
+
     """A unicode string with also has a ``.uri`` attribute"""
     tagname = 'a'
 
     # FIXME: can __repr__ on PY2 return unicode data?
     def __repr__(self):
-        # convoluted way around a UnicodeEncode error on py2 when self contains non-ascii characters
+        # convoluted way around a UnicodeEncode error on py2 when self contains
+        # non-ascii characters
         if six.PY2:
             rep = repr(str(self))[2:-1]
         else:
@@ -486,26 +501,29 @@ class Link(UnicodeElement):
 
     def as_xhtml(self, uri, parent_uri=None):
         element = super(Link, self).as_xhtml(uri, parent_uri)
-        if hasattr(self,'uri'):
+        if hasattr(self, 'uri'):
             element.set('href', self.uri)
         return element
-        
+
 
 class LinkSubject(PredicateElement, Link):
+
     """A unicode string that has both ``predicate`` and ``uri``
     attributes, i.e. a typed link. Note that predicate should be a
     string that represents a Qname, eg 'dcterms:references', not a proper
     rdflib object.
 
     """
+
     def as_xhtml(self, uri, parent_uri=None):
         element = super(LinkSubject, self).as_xhtml(uri, parent_uri)
-        if hasattr(self,'predicate'):
+        if hasattr(self, 'predicate'):
             element.set('rel', self.predicate)
         return element
 
 
 class Body(CompoundElement):
+
     def as_xhtml(self, uri, parent_uri=None):
         # A body should always be called with a uri. This becomes the
         # parent_uri for all subsections
@@ -513,11 +531,20 @@ class Body(CompoundElement):
         element = super(Body, self).as_xhtml(uri, parent_uri)
         element.set('about', uri)
         return element
-class Title(CompoundElement): pass
+
+
+class Title(CompoundElement):
+    pass
+
+
 class Page(CompoundElement, OrdinalElement):
     tagname = "div"
     classname = "page"
-class Nav(CompoundElement): pass
+
+
+class Nav(CompoundElement):
+    pass
+
 
 class SectionalElement(CompoundElement):
     tagname = "div"
@@ -572,35 +599,50 @@ class SectionalElement(CompoundElement):
                 element.text = None
 
         return element
-    
 
-class Section(SectionalElement): pass
 
-class Subsection(SectionalElement): pass
+class Section(SectionalElement):
+    pass
 
-class Subsubsection(SectionalElement): pass
+
+class Subsection(SectionalElement):
+    pass
+
+
+class Subsubsection(SectionalElement):
+    pass
+
 
 class Paragraph(CompoundElement):
     tagname = 'p'
-    
+
+
 class Preformatted(Paragraph):
     tagname = 'pre'
 
-class Heading(CompoundElement, OrdinalElement):
-    tagname = 'h1' # fixme: take level into account
 
-class Footnote(CompoundElement): pass
+class Heading(CompoundElement, OrdinalElement):
+    tagname = 'h1'  # fixme: take level into account
+
+
+class Footnote(CompoundElement):
+    pass
+
+
 class OrderedList(CompoundElement):
     tagname = 'ol'
-    
+
+
 class UnorderedList(CompoundElement):
     tagname = 'ul'
-# 
+#
 # class DefinitionList(CompoundElement):
 #     tagname = 'dl'
-#     
+#
 # class Term(CompoundElement): pass
 # class Definition(CompoundElement): pass
+
+
 class ListItem(CompoundElement, OrdinalElement):
     tagname = 'li'
 
@@ -612,17 +654,19 @@ def __serialize_json(node):
     if type(node) in (str, int, bool):
         return node
     # NOTE: this transforms bytes into str's (even though on py2 these will be labeled as "str")
-    # elif type(node) == bytes: 
+    # elif type(node) == bytes:
     #     return node.decode()
     # lists and dicts gets returned as-is, but the values in those
     # containers are transformed if need be
     elif type(node) == list:
         return [__serialize_json(x) for x in node]
     elif type(node) == dict:
-        return dict([(k, __serialize_json(v)) for k,v in node.items()])
+        return dict([(k, __serialize_json(v)) for k, v in node.items()])
     else:
         if node.__class__.__module__ in ('builtins', '__builtin__'):
-            if type(node) == str:  # py2 workaround -- we want a str to be known as 'str' always, but py2 thinks they're called 'unicode'...
+            # py2 workaround -- we want a str to be known as 'str' always, but py2
+            # thinks they're called 'unicode'...
+            if type(node) == str:
                 typename = "str"
             elif type(node) == bytes:
                 typename = "bytes"
@@ -658,7 +702,7 @@ def __serialize_json(node):
             e['@content'] = repr(node)
         elif isinstance(node, Graph):
             i = node.identifier
-            e['@content'] = node.serialize().decode('utf-8') # default compact RDF/XML
+            e['@content'] = node.serialize().decode('utf-8')  # default compact RDF/XML
             e['identifier'] = {'@class': i.__class__.__module__ + "." + i.__class__.__name__,
                                '@content': str(i)}
         else:
@@ -667,6 +711,8 @@ def __serialize_json(node):
         return e
 
 _state = {'fontspec': None}
+
+
 def __deserialize_json(node):
     from ferenda.pdfreader import PDFReader, Textbox
     from ferenda import Document
@@ -681,12 +727,13 @@ def __deserialize_json(node):
             m = sys.modules[modulename]
             for name, cls in inspect.getmembers(m, inspect.isclass):
                 if name == classname:
-                    break # setting cls to what we want
-        except ValueError: # "need more than 1 value to unpack": we have a builtin type like str, int, bool
-            cls = {'str':str,
-                   'int':int,
-                   'bool':bool,
-                   'bytes':bytes}[nodetype]
+                    break  # setting cls to what we want
+        # "need more than 1 value to unpack": we have a builtin type like str, int, bool
+        except ValueError:
+            cls = {'str': str,
+                   'int': int,
+                   'bool': bool,
+                   'bytes': bytes}[nodetype]
         content = node['@content']
     else:
         # native objects (int, str, bool, list, dict (which is
@@ -698,25 +745,24 @@ def __deserialize_json(node):
     # 2. get any possible attributes
     attribs = {}
     if hasattr(node, 'items'):
-        attribs = dict([(k,__deserialize_json(v)) for k, v in node.items() if not k.startswith("@")])
+        attribs = dict([(k, __deserialize_json(v))
+                        for k, v in node.items() if not k.startswith("@")])
 
     # hack for deserializing pdfreader objects -- store the current
     # fontspecs dict as soon as we see it, we'll be needing it every
     # time we create a pdfreader.Textbox
 
-
     if issubclass(cls, PDFReader):
-        _state['fontspec'] =  attribs['fontspec']
+        _state['fontspec'] = attribs['fontspec']
 
     # 3. initialize the class
 
-    
     if issubclass(cls, list):
         if issubclass(cls, Textbox):
             attribs['fontspec'] = _state['fontspec']
         o = cls([__deserialize_json(x) for x in content], **attribs)
     elif issubclass(cls, dict):
-        o = cls([(k, __deserialize_json(v)) for k,v in content.items()], **attribs)
+        o = cls([(k, __deserialize_json(v)) for k, v in content.items()], **attribs)
     elif issubclass(cls, bytes):
         # assume only ascii
         o = cls(content.encode(), **attribs)
@@ -738,7 +784,7 @@ def __deserialize_json(node):
         i = __deserialize_json(node['identifier'])
         o = cls(identifier=i).parse(data=content)
     elif issubclass(cls, Document):
-        o = cls(**attribs) # no actual content, only attributes/properties
+        o = cls(**attribs)  # no actual content, only attributes/properties
     else:
         o = cls(content, **attribs)
     return o
@@ -763,11 +809,12 @@ def __serialize_xml(node, serialize_hidden_attrs=False):
         nodename = node.__class__.__name__
     e = ET.Element(nodename)
     if hasattr(node, '__dict__'):
-        for key in [x for x in list(node.__dict__.keys()) if serialize_hidden_attrs or not x.startswith('_')]:
+        for key in [
+                x for x in list(node.__dict__.keys()) if serialize_hidden_attrs or not x.startswith('_')]:
             val = node.__dict__[key]
             if val is None:
                 continue
-            if (isinstance(val, (str,bytes))):
+            if (isinstance(val, (str, bytes))):
                 e.set(key, val)
             else:
                 e.set(key, repr(val))
@@ -787,6 +834,7 @@ def __serialize_xml(node, serialize_hidden_attrs=False):
         e.text = repr(node)
         # raise TypeError("Can't serialize %r (%r)" % (type(node), node))
     return e
+
 
 def __deserialize_xml(elem, caller_globals):
     # print "element %r, attrs %r" % (elem.tag, elem.attrib)
@@ -836,6 +884,8 @@ def __deserialize_xml(elem, caller_globals):
 
 # in-place prettyprint formatter
 # http://infix.se/2007/02/06/gentlemen-_indentElement-your-xml
+
+
 def _indentTree(elem, level=0):
     i = "\n" + level * "  "
     if len(elem) > 0:
@@ -865,5 +915,3 @@ def _indentElement(elem, level=0):
     else:
         if level and (not elem.tail or not elem.tail.strip()):
             elem.tail = i
-
-

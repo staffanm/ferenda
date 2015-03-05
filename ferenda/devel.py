@@ -17,6 +17,7 @@ from ferenda import TextReader, TripleStore, FulltextIndex, WSGIApp
 from ferenda.elements import serialize
 from ferenda import decorators, util
 
+
 class DummyStore(object):
 
     def __init__(self, path, **kwargs):
@@ -116,7 +117,7 @@ class Devel(object):
         :type  alias: str
         """
         predicates = ['basefile',
-                      'subobjects', # sections that have rdf:type
+                      'subobjects',  # sections that have rdf:type
                       'rdf:type',
                       'dcterms:identifier',
                       'dcterms:title',
@@ -132,10 +133,10 @@ class Devel(object):
             delimiter = ';'
             out = codecs.getwriter("latin-1")(sys.stdout.detach())
             out.errors = "replace"
-        
+
         writer = csv.DictWriter(out, predicates, delimiter=delimiter)
         repo = self._repo_from_alias(alias)
-        writer.writerow(dict([(p,p) for p in predicates]))
+        writer.writerow(dict([(p, p) for p in predicates]))
         for basefile in repo.store.list_basefiles_for("relate"):
             baseuri = URIRef(repo.canonical_uri(basefile))
             with repo.store.open_distilled(basefile) as fp:
@@ -176,7 +177,7 @@ class Devel(object):
             downloaded_suffix=repo.downloaded_suffix,
             storage_policy=repo.storage_policy)
         return repo
-        
+
     @decorators.action
     def mkpatch(self, alias, basefile, description):
         """Create a patch file from downloaded or intermediate files. Before
@@ -204,7 +205,7 @@ class Devel(object):
         """
         # 1. initialize the docrepo indicated by "alias"
         repo = self._repo_from_alias(alias)
-        
+
         # 2. find out if there is an intermediate file or downloaded
         # file for basefile
         if os.path.exists(repo.store.intermediate_path(basefile)):
@@ -218,24 +219,24 @@ class Devel(object):
         fileno, stash = mkstemp()
         with os.fdopen(fileno, "wb") as fp:
             fp.write(util.readfile(outfile, mode="rb"))
-        
+
         # 2.1 if intermediate: stash a copy, run
         # parse(config.force=True) to regenerate the intermediate file
         if stage == "intermediate":
             repo.config.force = True
-            try: 
-                repo.parse(basefile)  
+            try:
+                repo.parse(basefile)
             except:
                 # maybe this throws an error (hopefully after creating
                 # the intermediate file)? may be the reason for
                 # patching in the first place?
                 pass
-            
+
         # 2.2 if only downloaded: stash a copy, run download_single(config.refresh=True)
         else:
             repo.config.refresh = True
             repo.download_single(basefile)
-            
+
         # 3. calculate the diff using difflib.
 
         # Assume that intermediate files use the same encoding as
@@ -256,17 +257,17 @@ class Devel(object):
         # 3.1 If comment is single-line, append it on the first hunks
         # @@-control line
         if description.count("\n") == 0:
-            for idx,line in enumerate(difflines):
+            for idx, line in enumerate(difflines):
                 if line.startswith("@@") and line.endswith("@@\n"):
                     difflines[idx] = difflines[idx].replace("@@\n",
-                                                            "@@ "+description+"\n")
+                                                            "@@ " + description + "\n")
                     break
         else:
             # 4.2 if comment is not single-line, write the rest
             # in corresponding .desc file
             descpath = patchstore.path(basefile, "patches", ".desc")
             util.writefile(descpath, description)
-            
+
         # 4.1 write patch
         patchcontent = "".join(difflines)
         if patchcontent:
@@ -289,7 +290,7 @@ class Devel(object):
         :type  citationpattern: str
         :param uriformatter: The fully qualified name of a uriformatter
         :type  uriformatter: str
-        
+
         .. note::
 
            This is not implemented yet
@@ -299,7 +300,7 @@ class Devel(object):
             ./ferenda-build.py devel parsestring \\
                 "According to direktiv 2007/42/EU, ..." \\
                 ferenda.citationpatterns.eulaw
-        
+
         """
         raise NotImplementedError
 
@@ -322,7 +323,7 @@ class Devel(object):
         for name, cls in inspect.getmembers(m, inspect.isclass):
             if name == classname:
                 break
-        method = getattr(cls,methodname)
+        method = getattr(cls, methodname)
         parser = method()
         parser.debug = True
         tr = TextReader(source)
@@ -409,10 +410,17 @@ class Devel(object):
         """Runs WSGI calls in-process."""
         globalconfig = self.config._parent
         from ferenda import manager
-        classnames = [getattr(repoconfig, 'class') for repoconfig in globalconfig._subsections.values() if hasattr(repoconfig, 'class')]
-        repos = [manager._instantiate_class(manager._load_class(x), globalconfig) for x in classnames if x != 'ferenda.Devel']
+        classnames = [
+            getattr(
+                repoconfig,
+                'class') for repoconfig in globalconfig._subsections.values() if hasattr(
+                repoconfig,
+                'class')]
+        repos = [
+            manager._instantiate_class(
+                manager._load_class(x),
+                globalconfig) for x in classnames if x != 'ferenda.Devel']
         url = globalconfig.develurl if 'develurl' in globalconfig else globalconfig.url
-        from pudb import set_trace; set_trace()
         app = WSGIApp(repos, manager._find_config_file(), url=url)
         DEFAULT_HTTP_ACCEPT = 'text/xml, application/xml, application/xhtml+xml, text/html;q=0.9, text/plain;q=0.8, image/png,*/*;q=0.5'
         environ = {'HTTP_ACCEPT': DEFAULT_HTTP_ACCEPT,
@@ -421,10 +429,9 @@ class Devel(object):
                    'SERVER_PORT': '8000',
                    'QUERY_STRING': '',
                    'wsgi.url_scheme': 'http'
-        }
+                   }
 
         start_response = Mock()
-        from pudb import set_trace; set_trace()
         for chunk in app(environ, start_response):
             sys.stdout.write(chunk)
 
@@ -435,7 +442,7 @@ class Devel(object):
     def __init__(self, config=None, **kwargs):
         self.store = DummyStore(None)
         self.config = config
-    
+
     documentstore_class = DummyStore
     downloaded_suffix = ".html"
     storage_policy = "file"

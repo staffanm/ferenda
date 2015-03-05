@@ -56,14 +56,16 @@ class EurlexCaselaw(DocumentRepository):
             while not done:
                 pagecount += 1
                 self.log.debug("Result page #%s" % pagecount)
-                # Don't parse using BeautifulSoup etc -- just search the whole damn text blob
+                # Don't parse using BeautifulSoup etc -- just search the whole damn text
+                # blob
                 celexnos = self.re_celexno.findall(res.text)
                 # FIXME: support for config.downloadmax
                 for celexno in itertools.chain(celexnos):
                     # the number will be split up in components - concatenate
                     celexno = "".join(celexno)
                     # only download actual judgements and orders
-                    # FIXME: the below is outdated -- now "TA" and "CN" (amongst others?) are used
+                    # FIXME: the below is outdated -- now "TA" and "CN" (amongst others?)
+                    # are used
 
                     # J: Judgment of the Court
                     # A: Judgment of the Court of First Instance
@@ -292,7 +294,9 @@ class EurlexCaselaw(DocumentRepository):
                             elif node.string == "Instruments cited in case law:":
                                 predicate = "cites"
                             else:
-                                self.log.warning("Don't know how to handle key '%s'" % node.string)
+                                self.log.warning(
+                                    "Don't know how to handle key '%s'" %
+                                    node.string)
                         elif node.name == "a" and predicate:
                             p = predicate
                             if subpredicate:

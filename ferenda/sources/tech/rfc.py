@@ -65,10 +65,11 @@ class RFC(DocumentRepository):
     document_url_regex = "http://tools.ietf.org/rfc/rfc(?P<basefile>\w+).txt"
     downloaded_suffix = ".txt"
     namespaces = ('rdf',  # always needed
-                  'dcterms',  # title, identifier, etc (could be replaced by equiv bibo prop?)
+                  'dcterms',
+                  # title, identifier, etc (could be replaced by equiv bibo prop?)
                   'bibo',  # Standard and DocumentPart classes, chapter prop
                   'xsd',  # datatypes
-                  'prov', # for :wasGeneratedBy
+                  'prov',  # for :wasGeneratedBy
                   ('rfc', 'http://example.org/ontology/rfc/')  # custom (fake) ontology
                   )
     sparql_annotations = "res/sparql/rfc-annotations.rq"
@@ -77,7 +78,7 @@ class RFC(DocumentRepository):
                 URIRef("http://example.org/ontology/rfc/BCP"),
                 URIRef("http://example.org/ontology/rfc/STD"),
                 URIRef("http://example.org/ontology/rfc/FYI")]
-                
+
     # NOTES:
     #
     # Like many large document collections that has existed for a long
@@ -96,7 +97,6 @@ class RFC(DocumentRepository):
     #           headings are centered (can be handled by alternate
     #           recognizer)
 
-
     @action
     @recordlastdownload
     def download(self, basefile=None):
@@ -105,7 +105,9 @@ class RFC(DocumentRepository):
             return self.download_single(basefile)
         res = requests.get(self.start_url)
         indextext = res.text
-        reader = TextReader(string=indextext, linesep=TextReader.UNIX)  # see TextReader class
+        reader = TextReader(
+            string=indextext,
+            linesep=TextReader.UNIX)  # see TextReader class
         iterator = reader.getiterator(reader.readparagraph)
         for (basefile, url) in self.download_get_basefiles(iterator):
             try:
@@ -284,7 +286,10 @@ class RFC(DocumentRepository):
             return Preformatted([chunk], **{'class': 'bnf'})
 
         def make_section(parser):
-            (secnumber, title, identifier) = analyze_sectionstart(parser, parser.reader.next())
+            (secnumber,
+             title,
+             identifier) = analyze_sectionstart(parser,
+                                                parser.reader.next())
             s = Section(ordinal=secnumber,
                         title=title,
                         identifier=identifier)
@@ -292,7 +297,10 @@ class RFC(DocumentRepository):
         setattr(make_section, 'newstate', 'section')
 
         def make_subsection(parser):
-            (secnumber, title, identifier) = analyze_sectionstart(parser, parser.reader.next())
+            (secnumber,
+             title,
+             identifier) = analyze_sectionstart(parser,
+                                                parser.reader.next())
             s = Subsection(ordinal=secnumber,
                            title=title,
                            identifier=identifier)
@@ -300,7 +308,10 @@ class RFC(DocumentRepository):
         setattr(make_subsection, 'newstate', 'subsection')
 
         def make_subsubsection(parser):
-            (secnumber, title, identifier) = analyze_sectionstart(parser, parser.reader.next())
+            (secnumber,
+             title,
+             identifier) = analyze_sectionstart(parser,
+                                                parser.reader.next())
             s = Subsubsection(ordinal=secnumber,
                               title=title,
                               identifier=identifier)
@@ -426,7 +437,10 @@ class RFC(DocumentRepository):
             nums + ".").setResultsName("Sec")).setResultsName("SecRef")
         rfc_citation = (
             Optional("[") + "RFC" + Word(nums).setResultsName("RFC") + Optional("]")).setResultsName("RFCRef")
-        section_rfc_citation = (section_citation + "of" + rfc_citation).setResultsName("SecRFCRef")
+        section_rfc_citation = (
+            section_citation +
+            "of" +
+            rfc_citation).setResultsName("SecRFCRef")
         citparser = CitationParser(section_rfc_citation,
                                    section_citation,
                                    rfc_citation)
@@ -434,7 +448,6 @@ class RFC(DocumentRepository):
                                              ("SecRef", rfc_uriformatter),
                                              ("RFCRef", rfc_uriformatter)))
         return citparser
-
 
     @action
     @managedparsing
@@ -541,13 +554,13 @@ class RFC(DocumentRepository):
         publisher_label = left[0]
         try:
             desc.rel(self.ns['dcterms'].publisher,
-                       self.lookup_resource(publisher_label))
+                     self.lookup_resource(publisher_label))
         except KeyError:
             self.log.warn("Couldn't look up a proper resource URI for %s" %
                           publisher_label)
             desc.value(self.ns['dcterms'].publisher,
                        publisher_label)
-            
+
         # following lefthand side are key-value headers
         for line in left[1:]:
             if line.strip() == "":
@@ -568,7 +581,7 @@ class RFC(DocumentRepository):
             elif key == "Category":
                 try:
                     desc.rel(self.ns['dcterms'].subject,
-                               self.lookup_resource(value, predicate=self.ns['bibo'].identifier))
+                             self.lookup_resource(value, predicate=self.ns['bibo'].identifier))
                 except KeyError:
                     self.log.warn("Couldn't look up a proper resource URI for %s" %
                                   value)
@@ -623,7 +636,7 @@ class RFC(DocumentRepository):
         def select_rfcnum(row, binding, resource_graph):
             # "RFC 6998" -> "6900"
             return row[binding][4:-2] + "00"
-            
+
         return [Facet(self.ns['rdf'].type),
                 Facet(self.ns['dcterms'].identifier,
                       label="Sorted by RFC #",

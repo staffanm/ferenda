@@ -17,7 +17,7 @@ class Describer(OrigDescriber):
     :type  graph: :py:class:`~rdflib.graph.Graph`
     :param about: the current subject to use
     :type  about: string or :py:class:`~rdflib.term.Identifier`
-    :param base: Base URI for any relative URIs used with :py:meth:`~ferenda.Describer.about`, :py:meth:`~ferenda.Describer.rel` or :py:meth:`~ferenda.Describer.rev`, 
+    :param base: Base URI for any relative URIs used with :py:meth:`~ferenda.Describer.about`, :py:meth:`~ferenda.Describer.rel` or :py:meth:`~ferenda.Describer.rev`,
     :type  base: string
     """
 
@@ -33,7 +33,8 @@ class Describer(OrigDescriber):
         :rtype: list of strings (or other appropriate python type if the
                 literal has a datatype)
         """
-        return [x.toPython() for x in self.graph.objects(self._current(), p) if isinstance(x, Literal)]
+        return [x.toPython()
+                for x in self.graph.objects(self._current(), p) if isinstance(x, Literal)]
 
     def getrels(self, p):
         """Get a list (possibly empty) of all URIs for the
@@ -46,7 +47,8 @@ class Describer(OrigDescriber):
         :returns: The  matching URIs
         :rtype: list of strings
         """
-        return [str(x) for x in self.graph.objects(self._current(), p) if isinstance(x, URIRef)]
+        return [str(x)
+                for x in self.graph.objects(self._current(), p) if isinstance(x, URIRef)]
 
     def getrdftype(self):
         """Get the `rdf:type` of the current subject.
@@ -68,7 +70,7 @@ class Describer(OrigDescriber):
            that this method has is that it converts the return value
            to a plain python object instead of a
            :py:class:`rdflib.term.Literal` object.
-        
+
         :param p: The property of the sought literal.
         :type  p: :py:class:`rdflib.term.URIRef`
         :returns: The sought literal

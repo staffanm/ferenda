@@ -82,7 +82,6 @@ class DocumentEntry(object):
     #           'last-modified': '<isodatestring>',
     #           'etag': '234242323424'}]
 
-    
     def __init__(self, path=None):
         if path and os.path.exists(path):
             with open(path) as fp:

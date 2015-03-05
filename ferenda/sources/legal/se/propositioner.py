@@ -29,6 +29,7 @@ from . import RPUBL
 from . import SwedishLegalSource, SwedishLegalStore
 from .swedishlegalsource import offtryck_parser, offtryck_gluefunc
 
+
 class PropRegeringen(Regeringen):
     alias = "propregeringen"
     re_basefile_strict = re.compile(r'Prop. (\d{4}/\d{2,4}:\d+)')
@@ -37,7 +38,8 @@ class PropRegeringen(Regeringen):
     rdf_type = RPUBL.Proposition
     document_type = Regeringen.PROPOSITION
     # sparql_annotations = "res/sparql/prop-annotations.rq"
-    sparql_annotations = None # don't even bother creating an annotation file
+    sparql_annotations = None  # don't even bother creating an annotation file
+
 
 class PropTrips(Trips):
     alias = "proptrips"
@@ -65,18 +67,20 @@ class PropTrips(Trips):
             return super(PropTrips, self).download(basefile)
         else:
             if ('lastbase' in self.config and
-                self.config.lastbase and
-                not self.config.refresh):
+                    self.config.lastbase and
+                    not self.config.refresh):
                 now = datetime.now()
-                maxbase = "PROPARKIV%s%s" % (now.year % 100, (now.year+1) % 100)
+                maxbase = "PROPARKIV%s%s" % (now.year % 100, (now.year + 1) % 100)
                 while self.config.lastbase != maxbase:
-                    self.download_params[0]['base'] = self.config.lastbase  # override "THWALLAPROP" with eg "PROPARKIV0809"
-                    r = super(PropTrips, self).download() # download_get_basefiles_page sets lastbase as it goes along
+                    # override "THWALLAPROP" with eg "PROPARKIV0809"
+                    self.download_params[0]['base'] = self.config.lastbase
+                    r = super(
+                        PropTrips,
+                        self).download()  # download_get_basefiles_page sets lastbase as it goes along
             else:
                 r = super(PropTrips, self).download()
             LayeredConfig.write(self.config)      # assume we have data to write
             return r
-
 
     def _basefile_to_base(self, basefile):
         # 1992/93:23 -> "PROPARKIV9293"
@@ -153,14 +157,13 @@ class PropTrips(Trips):
         pnr = basefile.split(":")[1]
         return self.document_url_template % {'base': base,
                                              'pnr': pnr}
-    
 
     def download_single(self, basefile, url=None):
         if url is None:
             url = self.remote_url(basefile)
             if not url:  # remote_url failed
                 return
-            
+
         # unpack the tuples we may recieve instead of plain strings
         mainattachment = None
         if isinstance(basefile, tuple):
@@ -180,10 +183,10 @@ class PropTrips(Trips):
         # avoid even calling download_if_needed if we already have
         # the doc.
         if (os.path.exists(self.store.downloaded_path(basefile))
-            and not self.config.refresh):
+                and not self.config.refresh):
             self.log.debug("%s: already exists" % basefile)
             return
-        
+
         if self.download_if_needed(url, basefile, filename=filename):
             if created:
                 self.log.info("%s: downloaded from %s" % (basefile, url))
@@ -230,11 +233,14 @@ class PropTrips(Trips):
                     filename = self.store.downloaded_path(
                         basefile, attachment=attachment + doctype)
                 else:
-                    filename = self.store.downloaded_path(basefile, attachment="index" + doctype)
+                    filename = self.store.downloaded_path(
+                        basefile,
+                        attachment="index" +
+                        doctype)
                 self.log.debug("%s: downloading attachment %s" % (basefile, filename))
                 self.download_if_needed(url, basefile, filename=filename)
 
-        if mainattachment == None:
+        if mainattachment is None:
             entry = DocumentEntry(self.store.documententry_path(basefile))
             now = datetime.now()
             entry.orig_url = url
@@ -282,23 +288,26 @@ class PropTrips(Trips):
             # prefer PDF or Word files over the plaintext-containing HTML files
             # FIXME: PDF or Word files are now stored as attachments
             htmlfile = self.store.downloaded_path(doc.basefile)
-            
+
             pdffile = self.store.path(doc.basefile, 'downloaded', '.pdf')
-            
+
             wordfiles = (self.store.path(doc.basefile, 'downloaded', '.doc'),
                          self.store.path(doc.basefile, 'downloaded', '.docx'),
                          self.store.path(doc.basefile, 'downloaded', '.wpd'),
                          self.store.path(doc.basefile, 'downloaded', '.rtf'))
 
             # check if ANY of these exist
-            if not filter(None, [os.path.exists(f) for f in wordfiles + (htmlfile, pdffile)]):
-                raise errors.NoDownloadedFileError("File '%s' (or any .pdf/.doc/.docx/.wpd/.rdf variant) not found" % htmlfile)
-            
+            if not filter(None, [os.path.exists(f)
+                                 for f in wordfiles + (htmlfile, pdffile)]):
+                raise errors.NoDownloadedFileError(
+                    "File '%s' (or any .pdf/.doc/.docx/.wpd/.rdf variant) not found" %
+                    htmlfile)
+
             wordfile = None
             for f in wordfiles:
                 if os.path.exists(f):
                     wordfile = f
-            
+
             doc.uri = self.canonical_uri(doc.basefile)
             d = Describer(doc.meta, doc.uri)
             d.rdftype(self.rdf_type)
@@ -334,7 +343,7 @@ class PropTrips(Trips):
                 intermediate_path = self.store.path(
                     doc.basefile, 'intermediate', '.txt')
                 self.log.debug("%s: Using %s (%s)" % (doc.basefile,
-                               downloaded_path, intermediate_path))
+                                                      downloaded_path, intermediate_path))
                 if not os.path.exists(intermediate_path):
                     html = codecs.open(
                         downloaded_path, encoding="iso-8859-1").read()
@@ -385,8 +394,11 @@ class PropRiksdagen(Riksdagen):
 
 # inherit list_basefiles_for from CompositeStore, basefile_to_pathfrag
 # from SwedishLegalStore)
+
+
 class PropositionerStore(CompositeStore, SwedishLegalStore):
     pass
+
 
 class Propositioner(CompositeRepository, SwedishLegalSource):
     subrepos = PropRegeringen, PropTrips, PropRiksdagen
@@ -395,7 +407,7 @@ class Propositioner(CompositeRepository, SwedishLegalSource):
     storage_policy = "dir"
     rdf_type = RPUBL.Proposition
     documentstore_class = PropositionerStore
-    sparql_annotations = None # don't even bother creating an annotation file
+    sparql_annotations = None  # don't even bother creating an annotation file
 
     def tabs(self, primary=False):
         if self.config.tabs:

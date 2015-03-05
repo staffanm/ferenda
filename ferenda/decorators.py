@@ -25,6 +25,7 @@ from ferenda import DocumentEntry
 from ferenda.errors import DocumentRemovedError, ParseError
 from ferenda.elements import serialize
 
+
 def timed(f):
     """Automatically log a statement of how long the function call takes"""
     @functools.wraps(f)
@@ -41,7 +42,11 @@ def timed(f):
         # log. But maybe the util.logtime context manager is better
         # suited for this usecase?
         if isinstance(self.config.processes, int) and self.config.processes > 1:
-            self.log.info('%s: parse OK (%.3f sec) [pid %s]', doc.basefile, time.time() - start, os.getpid())
+            self.log.info(
+                '%s: parse OK (%.3f sec) [pid %s]',
+                doc.basefile,
+                time.time() - start,
+                os.getpid())
         else:
             self.log.info('%s: parse OK (%.3f sec)', doc.basefile, time.time() - start)
         return ret
@@ -98,7 +103,7 @@ def render(f):
     # validates taht the documententry file has been properly filled,
     # which is sort of outside of the responsibility of this func,
     # but...
-    
+
     def iterate_graphs(node):
         res = []
         if hasattr(node, 'meta') and node.meta is not None:
@@ -107,7 +112,7 @@ def render(f):
             for subnode in node:
                 if not isinstance(subnode, six.string_types):
                     res.extend(iterate_graphs(subnode))
-        except TypeError: # node was not iterable
+        except TypeError:  # node was not iterable
             pass
         return res
 
@@ -118,13 +123,21 @@ def render(f):
         # now render thath doc data as files (JSON, XHTML, RDF/XML)
         if self.config.serializejson == True:
             with self.store.open_serialized(doc.basefile, "wb") as fp:
-                r = serialize(doc, format="json") # should be a (unicode) str
+                r = serialize(doc, format="json")  # should be a (unicode) str
                 fp.write(r.encode('utf-8'))
-            self.log.debug("%s: Created %s" % (doc.basefile, self.store.serialized_path(doc.basefile)))
+            self.log.debug(
+                "%s: Created %s" %
+                (doc.basefile,
+                 self.store.serialized_path(
+                     doc.basefile)))
 
         updated = self.render_xhtml(doc, self.store.parsed_path(doc.basefile))
         if updated:
-            self.log.debug("%s: Created %s" % (doc.basefile, self.store.parsed_path(doc.basefile)))
+            self.log.debug(
+                "%s: Created %s" %
+                (doc.basefile,
+                 self.store.parsed_path(
+                     doc.basefile)))
 
         # css file + background images + png renderings of text
         self.create_external_resources(doc)
@@ -136,7 +149,6 @@ def render(f):
                          encoding="utf-8") as fp:  # unicode
             distilled_graph.parse(data=fp.read(), format="rdfa",
                                   publicID=doc.uri)
-
 
         # The act of parsing from RDFa binds a lot of namespaces
         # in the graph in an unneccesary manner. Particularly it

@@ -20,13 +20,14 @@ from ferenda import util, errors
 
 
 class Resources(object):
+
     """Creates and manages various assets/resources needed for web serving.
 
     This class is not yet part of the public API -- clients should use
     manager.makeresources for now.
 
     """
-    
+
     def __init__(self, repos, resourcedir, **kwargs):
         # FIXME: document what kwargs could be (particularly 'combineresources')
         self.repos = repos
@@ -36,7 +37,6 @@ class Resources(object):
         self.config = LayeredConfig(Defaults(defaults))
         from ferenda.manager import setup_logger
         self.log = setup_logger()
-
 
     def make(self,
              css=True,
@@ -54,7 +54,7 @@ class Resources(object):
         if img:
             res['img'] = self.make_img()
         if xml:
-            res['xml'] = self.make_resources_xml(res.get('css',[]), res.get('js',[]))
+            res['xml'] = self.make_resources_xml(res.get('css', []), res.get('js', []))
         if api:
             res['json'] = self.make_api_files()
 
@@ -75,8 +75,9 @@ class Resources(object):
         import cssmin
         combinefile = None
         if self.config.combineresources:
-            combinefile  = os.sep.join([self.resourcedir, 'css', 'combined.css'])
-        return self._make_files('cssfiles', self.resourcedir+os.sep+'css', combinefile, cssmin.cssmin)
+            combinefile = os.sep.join([self.resourcedir, 'css', 'combined.css'])
+        return self._make_files(
+            'cssfiles', self.resourcedir + os.sep + 'css', combinefile, cssmin.cssmin)
 
     def make_js(self):
         # slimit provides better perf, but isn't py3 compatible
@@ -86,14 +87,15 @@ class Resources(object):
         import jsmin
         combinefile = None
         if self.config.combineresources:
-            combinefile  = os.sep.join([self.resourcedir, 'js', 'combined.js'])
-        return self._make_files('jsfiles', self.resourcedir+os.sep+'js', combinefile, jsmin.jsmin)
+            combinefile = os.sep.join([self.resourcedir, 'js', 'combined.js'])
+        return self._make_files(
+            'jsfiles', self.resourcedir + os.sep + 'js', combinefile, jsmin.jsmin)
 
     def make_img(self):
         return self._make_files('imgfiles', self.resourcedir + os.sep + 'img')
-            
+
     def make_resources_xml(self, cssfiles, jsfiles):
-        E = ElementMaker() # namespace = None, nsmap={None: ...}
+        E = ElementMaker()  # namespace = None, nsmap={None: ...}
         root = E.configuration(
             E.sitename(self.config.sitename),
             E.sitedescription(self.config.sitedescription),
@@ -104,8 +106,8 @@ class Resources(object):
                          'href': '#menu'},
                         E.img({'src': 'rsrc/img/navmenu.png'})),
                     E.ul(*self._links('tabs'))
-                    )
-                ),
+                )
+            ),
             E.footerlinks(
                 E.nav(
                     E.ul(*self._links('footer'))
@@ -115,11 +117,11 @@ class Resources(object):
                 E.a({'class': 'tocbutton',
                      'href': '#menu'},
                     E.img({'src': 'rsrc/img/navmenu-small-black.png'})
-                )
-            ), 
+                    )
+            ),
             E.stylesheets(*self._li_wrap(cssfiles, 'link', 'href', rel="stylesheet")),
             E.javascripts(*self._li_wrap(jsfiles, 'script', 'src', text=" "))
-            )
+        )
 
         if not self.config.staticsite:
             root.append(
@@ -132,16 +134,20 @@ class Resources(object):
                            E.a({'href': '#search',
                                 'class': 'searchbutton'},
                                E.img({'src': 'rsrc/img/search.png'})
+                               )
                            )
-                       )
                 )
             )
-                                    
+
         outfile = self.resourcedir + os.sep + "resources.xml"
-        util.writefile(outfile, etree.tostring(root, encoding="utf-8", pretty_print=True).decode("utf-8"))
+        util.writefile(
+            outfile,
+            etree.tostring(
+                root,
+                encoding="utf-8",
+                pretty_print=True).decode("utf-8"))
         self.log.info("Wrote %s" % outfile)
         return [self._filepath_to_urlpath(outfile, 1)]
-
 
     # FIXME: When creating <script> elements, must take care not to
     # create self-closing tags (like by creating a single space text
@@ -169,13 +175,12 @@ class Resources(object):
                         label)))
         return elements
 
-    
     def _make_files(self, option, filedir, combinefile=None, combinefunc=None):
         urls = []
         buf = six.BytesIO()
         processed = set()
         # eg. self.config.cssfiles
-        if getattr(self.config, option): # it's possible to set eg
+        if getattr(self.config, option):  # it's possible to set eg
                                          # cssfiles=None when creating
                                          # the Resources object
             for f in getattr(self.config, option):
@@ -221,7 +226,7 @@ class Resources(object):
         # FIXME: extend this through a load-path mechanism?
         if os.path.exists(filename):
             self.log.debug("Process file found %s as a file relative to %s" %
-                      (filename, os.getcwd()))
+                           (filename, os.getcwd()))
             fp = open(filename, "rb")
         elif pkg_resources.resource_exists('ferenda', filename):
             self.log.debug("Found %s as a resource" % filename)
@@ -268,13 +273,13 @@ class Resources(object):
         if self.config.legacyapi:
             self.log.info("Creating API files for legacyapi")
             contextpath = "/json-ld/context.json"
-            termspath   = "/var/terms"
-            commonpath  = "/var/common"
+            termspath = "/var/terms"
+            commonpath = "/var/common"
         else:
             # FIXME: create correct URL path
             contextpath = "/rsrc/api/context.json"
-            termspath   = "/rsrc/api/terms.json"
-            commonpath  = "/rsrc/api/common.json"
+            termspath = "/rsrc/api/terms.json"
+            commonpath = "/rsrc/api/common.json"
         util.ensure_dir(context)
         with open(context, "w") as fp:
             contextdict = self._get_json_context()
@@ -296,30 +301,39 @@ class Resources(object):
             if self.config.legacyapi:
                 d = self._convert_legacy_jsonld(d, self.config.url + urlpath[1:])
             with open(filename, "w") as fp:
-                    json.dump(d, fp, indent=4, sort_keys=True)
+                json.dump(d, fp, indent=4, sort_keys=True)
             files.append(self._filepath_to_urlpath(filename, 2))
 
         if self.config.legacyapi:
             # copy ui explorer app to <url>/rsrc/ui/ -- this does not get
             # included in files
-            util.ensure_dir(os.sep.join([self.resourcedir,"ui","dummy.txt"]))
+            util.ensure_dir(os.sep.join([self.resourcedir, "ui", "dummy.txt"]))
             try:
                 for f in pkg_resources.resource_listdir("ferenda", "res/ui"):
                     src = pkg_resources.resource_stream("ferenda", "res/ui/" + f)
-                    with open(os.sep.join([self.resourcedir,"ui", f]), "wb") as dest:
+                    with open(os.sep.join([self.resourcedir, "ui", f]), "wb") as dest:
                         dest.write(src.read())
-            except OSError as e: # happens on travis-ci
+            except OSError as e:  # happens on travis-ci
                 x = pkg_resources.get_provider("ferenda")
-                print("Got error '%s'. Provider %s, .module_path %s" % (str(e), x, x.module_path))
-                print("Does %s/res/ui exist? %s (wd %s, os.listdir: %r)" % (x.module_path, os.path.exists(x.module_path + "/res/ui"), os.getcwd(), os.listdir(".")))
+                print(
+                    "Got error '%s'. Provider %s, .module_path %s" %
+                    (str(e), x, x.module_path))
+                print(
+                    "Does %s/res/ui exist? %s (wd %s, os.listdir: %r)" %
+                    (x.module_path,
+                     os.path.exists(
+                         x.module_path +
+                         "/res/ui"),
+                        os.getcwd(),
+                        os.listdir(".")))
                 try:
                     fp = pkg_resources.resource_stream('ferenda', "res/ui/index.html")
                     print("Got hold of res/ui/index.html through .resource_stream")
                 except Exception as sub_e:
                     print("Couldn't get a res stream either: %s" % sub_e)
-                raise e # or pass
+                raise e  # or pass
         return files
-        
+
     def _convert_legacy_jsonld(self, indata, rooturi):
         # the json structure should be a top node containing only
         # @context, iri (localhost:8000/var/terms), type (foaf:Document)
@@ -329,7 +343,7 @@ class Resources(object):
         #  "comment" : "Anger vilken referatserie som referatet eventuellt tillhör.",
         #  "label" : "Referatserie",
         #  "type" : "DatatypeProperty"}
-        out  = {}
+        out = {}
         topics = []
 
         # the property containing the id/uri for the
@@ -353,13 +367,15 @@ class Resources(object):
                     break
 
         if not wantedlist:
-            self.log.warning("Couldn't find list of mappings in %s, topics will be empty" % indata)
+            self.log.warning(
+                "Couldn't find list of mappings in %s, topics will be empty" %
+                indata)
         else:
             shortened = {}
             for subject in sorted(wantedlist, key=lambda x: x["iri"]):
                 if subject[idfld] == rooturi:
-                    for key,value in subject.items():
-                        if key in  (idfld, 'foaf:topic'):
+                    for key, value in subject.items():
+                        if key in (idfld, 'foaf:topic'):
                             continue
                         out[key] = value
                 else:
@@ -375,23 +391,24 @@ class Resources(object):
                     # requires that we define contexts for this. Which
                     # we don't (yet)
                     if ("iri" in subject and
-                        ":" in subject["iri"] and
-                        "://" not in subject["iri"]):
-                        short = subject["iri"].split(":",1)[1]
+                            ":" in subject["iri"] and
+                            "://" not in subject["iri"]):
+                        short = subject["iri"].split(":", 1)[1]
                         if short in shortened:
-                            self.log.warning("Cannot shorten IRI %s -> %s, already defined (%s)" % (subject["iri"], short, shortened[short]))
-                            del subject["iri"] # skips adding this to topics
+                            self.log.warning(
+                                "Cannot shorten IRI %s -> %s, already defined (%s)" %
+                                (subject["iri"], short, shortened[short]))
+                            del subject["iri"]  # skips adding this to topics
                         else:
                             shortened[short] = subject["iri"]
                             subject["iri"] = short
                     if "iri" in subject and subject["iri"]:
                         topics.append(subject)
-                    
 
         # make sure the triples are in a predictable order, so we can
         # compare on the JSON level for testing
         out['topic'] = sorted(topics, key=lambda x: x[idfld])
-        out['iri']  = rooturi
+        out['iri'] = rooturi
         if '@context' in indata:
             out['@context'] = indata['@context']
         return out
@@ -402,7 +419,8 @@ class Resources(object):
         for repo in self.repos:
             for (prefix, ns) in repo.ns.items():
                 if prefix in data:
-                    assert data[prefix] == str(ns), "Conflicting URIs for prefix %s" % prefix
+                    assert data[prefix] == str(
+                        ns), "Conflicting URIs for prefix %s" % prefix
                 else:
                     data[prefix] = str(ns)
 
@@ -420,8 +438,8 @@ class Resources(object):
             data['name'] = 'foaf:name'
             data['altLabel'] = 'skos:altLabel'
             # data["@language"] = "en" # how to set this? majority vote of
-                                       # repos / documents? note that it's
-                                       # only a default.
+            # repos / documents? note that it's
+            # only a default.
         return data
 
     def _get_term_graph(self, graphuri):
@@ -447,14 +465,14 @@ class Resources(object):
                     g.bind(prefix, uri)
             # foaf: must always be bound
             g.bind("foaf", "http://xmlns.com/foaf/0.1/")
-            for (s,p,o) in repo.ontologies:
+            for (s, p, o) in repo.ontologies:
                 if isinstance(s, BNode):
                     continue
                 if p in (RDF.type, RDFS.label, RDFS.comment):
-                    g.add((root, FOAF.topic, s)) # unless we've already added it?
-                    if isinstance(o, Literal): # remove language typing info
+                    g.add((root, FOAF.topic, s))  # unless we've already added it?
+                    if isinstance(o, Literal):  # remove language typing info
                         o = Literal(str(o))
-                    g.add((s,p,o)) # control duplicates somehow
+                    g.add((s, p, o))  # control duplicates somehow
                     # print(g.serialize(format="json-ld", context=context, indent=4).decode())
         return g
 
@@ -467,7 +485,7 @@ class Resources(object):
         g.bind("foaf", FOAF)
         g.add((root, RDF.type, FOAF.Document))
         for repo in self.repos:
-            for (s,p,o) in repo.commondata: # should work like
+            for (s, p, o) in repo.commondata:  # should work like
                                             # repo.ontologies, but read
                                             # one file per repo
                                             # ("res/extra/rfc.ttl",
@@ -475,7 +493,7 @@ class Resources(object):
                                             # a controlled way)
                 if p in (FOAF.name, SKOS.prefLabel, SKOS.altLabel, BIBO.identifier):
                     g.add((root, FOAF.topic, s))
-                    g.add((s,p,o))
+                    g.add((s, p, o))
                     # try to find a type
                     g.add((s, RDF.type, repo.commondata.value(s, RDF.type)))
         return g
@@ -492,7 +510,3 @@ class Resources(object):
         urlpath = "/".join(path.split("/")[-(keep_segments + 1):])
         # print("_filepath_to_urlpath (%s): %s -> %s" % (keep_segments, path, urlpath))
         return urlpath
-
-
-
-

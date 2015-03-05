@@ -60,6 +60,7 @@ class Trips(SwedishLegalSource):
     #                     'base': base,
     #                     'start': '2009',
     #                     'end': str(datetime.today().year)}]
+
     def download(self, basefile=None):
         if basefile:
             return self.download_single(basefile)
@@ -120,7 +121,10 @@ class Trips(SwedishLegalSource):
     def download_is_different(self, existing, new):
         # load both existing and new into a BeautifulSoup object, then
         # compare the first <pre> element
-        existing_soup = BeautifulSoup(util.readfile(existing, encoding=self.source_encoding))
+        existing_soup = BeautifulSoup(
+            util.readfile(
+                existing,
+                encoding=self.source_encoding))
         new_soup = BeautifulSoup(util.readfile(new, encoding=self.source_encoding))
         return existing_soup.pre != new_soup.pre
 
@@ -128,6 +132,7 @@ class Trips(SwedishLegalSource):
         return self.document_url_template % {'basefile': quote(basefile),
                                              'app': self.app,
                                              'base': self.base}
+
     def canonical_uri(self, basefile):
         seg = {'dir': 'dir',
                'prop': 'prop',

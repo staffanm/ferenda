@@ -83,7 +83,7 @@ class Transformer(object):
 
         """
 
-        if parameters == None:
+        if parameters is None:
             parameters = {}
 
         # the provided configuration (might be a file or a python dict
@@ -128,7 +128,7 @@ class Transformer(object):
                        parameters=None, uritransform=None):
         """Accepts two filenames, reads from *infile*, writes to *outfile*."""
         depth = self._depth(os.path.dirname(outfile),
-                            self.documentroot+os.sep+"index.html")
+                            self.documentroot + os.sep + "index.html")
         helpful = os.environ.get('FERENDA_TRANSFORMDEBUG', False)
         if helpful:
             import logging
@@ -138,7 +138,9 @@ class Transformer(object):
                     xslfile = self.t.orig_template
                 else:
                     import pkg_resources
-                    xslfile = pkg_resources.resource_filename('ferenda', self.t.orig_template)
+                    xslfile = pkg_resources.resource_filename(
+                        'ferenda',
+                        self.t.orig_template)
                 p = parameters.copy()
                 for key, value in p.items():
                     if key.endswith("file"):
@@ -146,13 +148,14 @@ class Transformer(object):
                                                  os.path.dirname(xslfile))
                 p['configurationfile'] = self.t.getconfig(self.config, depth)
                 log.debug("Equiv: xsltproc --nonet %s %s %s > %s" %
-                            (" ".join(['--stringparam %s "%s"' % (x, p[x]) for x in p]),
-                             os.path.relpath(xslfile,
-                                             os.getcwd()),
-                             infile, outfile))
+                          (" ".join(['--stringparam %s "%s"' % (x, p[x]) for x in p]),
+                           os.path.relpath(xslfile,
+                                           os.getcwd()),
+                           infile, outfile))
             else:
-                log.warning("self.config not set, cannot construct equivalent xsltproc command line")
-                
+                log.warning(
+                    "self.config not set, cannot construct equivalent xsltproc command line")
+
         self.t.native_to_file(self.transform(self.t.file_to_native(infile),
                                              depth,
                                              parameters,
@@ -174,7 +177,7 @@ class XSLTTransform(TransformerEngine):
 
     def __init__(self, template, templatedirs, **kwargs):
         self.orig_template = template
-        self.orig_templatedirs = templatedirs # ?
+        self.orig_templatedirs = templatedirs  # ?
         self.format = True  # FIXME: make configurable
         self.templdir = self._setup_templates(template, templatedirs)
         worktemplate = self.templdir + os.sep + os.path.basename(template)
