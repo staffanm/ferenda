@@ -209,7 +209,9 @@ class SwedishLegalSource(DocumentRepository):
         opts = super(SwedishLegalSource, cls).get_default_options()
         opts['pdfimages'] = False 
         opts['localizeuri'] = False
+        # this controls URI localization
         opts['urlpath'] = "res/%s/" % cls.alias
+        opts['tabs'] = True
         return opts
 
     def _swedish_ordinal(self, s):
@@ -360,7 +362,13 @@ class SwedishLegalSource(DocumentRepository):
 
         if self.rdf_type == self.ns['rpubl'].Utredningsbetankande:
             d.rel(self.ns['rpubl'].utrSerie, self.dataset_uri())
-
+ 
+    def tabs(self, primary=False):
+        if self.config.tabs:
+            return super(SwedishLegalSource, self).tabs(primary)
+        else:
+            return []
+   
 
 # can't really have a toc_item thats general for all kinds of swedish legal documents?
 # 

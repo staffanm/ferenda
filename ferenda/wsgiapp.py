@@ -33,16 +33,17 @@ class WSGIApp(object):
         self.repos = repos
         # FIXME: need to specify documentroot?
         defaults = DocumentRepository.get_default_options()
-        # NB: If both inifile and kwargs are specified, the latter
-        # will take precedence. I think this is the expected
-        # behaviour.
-        defaults.update(kwargs)
         if inifile:
             assert os.path.exists(
                 inifile), "INI file %s doesn't exist (relative to %s)" % (inifile, os.getcwd())
 
+        # NB: If both inifile and kwargs are specified, the latter
+        # will take precedence. I think this is the expected
+        # behaviour.
         self.config = LayeredConfig(Defaults(defaults),
-                                    INIFile(inifile), cascade=True)
+                                    INIFile(inifile),
+                                    Defaults(kwargs),
+                                    cascade=True)
 
     ################################################################
     # Main entry point
@@ -212,10 +213,10 @@ class WSGIApp(object):
         # repositories. While at it, collect all relevant facets,
         # namespace bindings and commondata as well.
         data = []
-        facets = [] # will contain all unique facets
+        facets = []  # will contain all unique facets
         qname_graph = Graph()
         resource_graph = Graph()
-                        
+
         for repo in self.repos:
             for prefix, ns in repo.make_graph().namespaces():
                 # print("repo %s: binding %s to %s" % (repo.alias, prefix, ns))

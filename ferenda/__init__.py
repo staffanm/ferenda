@@ -9,7 +9,6 @@ from .wordreader import WordReader
 from .triplestore import TripleStore
 from .fulltextindex import FulltextIndex
 from .documententry import DocumentEntry
-from .devel import Devel
 from .fsmparser import FSMParser
 from .tocpageset import TocPageset
 from .tocpage import TocPage
@@ -24,4 +23,5 @@ from .pdfdocumentrepository import PDFDocumentRepository
 from .compositerepository import CompositeRepository, CompositeStore
 from .resources import Resources
 from .wsgiapp import WSGIApp
+from .devel import Devel
 __version__ = "0.3.1.dev1"  # gets pulled into setup.py and docs/conf.py -- but appveyor.yml is separate

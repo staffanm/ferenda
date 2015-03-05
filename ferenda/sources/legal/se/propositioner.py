@@ -396,5 +396,9 @@ class Propositioner(CompositeRepository, SwedishLegalSource):
     rdf_type = RPUBL.Proposition
     documentstore_class = PropositionerStore
     sparql_annotations = None # don't even bother creating an annotation file
+
     def tabs(self, primary=False):
-        return [('Propositioner', self.dataset_uri())]
+        if self.config.tabs:
+            return [('Propositioner', self.dataset_uri())]
+        else:
+            return []

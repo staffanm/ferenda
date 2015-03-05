@@ -257,10 +257,6 @@ class DirTrips(Trips):
     def canonical_uri(self, basefile):
         return self.config.url + "res/dir/" + basefile
 
-    @classmethod
-    def tabs(cls, primary=False):
-        return [['Förarbeten', '/forarb/']]
-
 
 class DirAsp(SwedishLegalSource, PDFDocumentRepository):
 
@@ -320,10 +316,6 @@ class DirAsp(SwedishLegalSource, PDFDocumentRepository):
         self.infer_triples(d, doc.basefile)
         return doc
 
-    @classmethod
-    def tabs(cls, primary=False):
-        return [['Förarbeten', '/forarb/']]
-
 
 class DirRegeringen(Regeringen):
 
@@ -362,7 +354,3 @@ class Direktiv(CompositeRepository, SwedishLegalSource):
     rdf_type = RPUBL.Direktiv
     documentstore_class = DirektivStore
     sparql_annotations = None # don't even bother creating an annotation file
-    
-    @classmethod
-    def tabs(cls, primary=False):
-        return [['Förarbeten', '/forarb/']]

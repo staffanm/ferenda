@@ -12,8 +12,8 @@ import six
 from six import text_type as str
 from layeredconfig import LayeredConfig
 
-from ferenda.compat import OrderedDict
-from ferenda import TextReader, TripleStore, FulltextIndex
+from ferenda.compat import OrderedDict, Mock
+from ferenda import TextReader, TripleStore, FulltextIndex, WSGIApp
 from ferenda.elements import serialize
 from ferenda import decorators, util
 
@@ -404,7 +404,29 @@ class Devel(object):
             pass
         # create a odict {basefile: {"download", ...}, {"parse": ...}}
 
+    @decorators.action
+    def wsgi(self, path="/"):
+        """Runs WSGI calls in-process."""
+        globalconfig = self.config._parent
+        from ferenda import manager
+        classnames = [getattr(repoconfig, 'class') for repoconfig in globalconfig._subsections.values() if hasattr(repoconfig, 'class')]
+        repos = [manager._instantiate_class(manager._load_class(x), globalconfig) for x in classnames if x != 'ferenda.Devel']
+        url = globalconfig.develurl if 'develurl' in globalconfig else globalconfig.url
+        from pudb import set_trace; set_trace()
+        app = WSGIApp(repos, manager._find_config_file(), url=url)
+        DEFAULT_HTTP_ACCEPT = 'text/xml, application/xml, application/xhtml+xml, text/html;q=0.9, text/plain;q=0.8, image/png,*/*;q=0.5'
+        environ = {'HTTP_ACCEPT': DEFAULT_HTTP_ACCEPT,
+                   'PATH_INFO':   path,
+                   'SERVER_NAME': 'localhost',
+                   'SERVER_PORT': '8000',
+                   'QUERY_STRING': '',
+                   'wsgi.url_scheme': 'http'
+        }
 
+        start_response = Mock()
+        from pudb import set_trace; set_trace()
+        for chunk in app(environ, start_response):
+            sys.stdout.write(chunk)
 
     # FIXME: These are dummy implementations of methods and class
     # variables that manager.py expects all docrepos to have. We don't

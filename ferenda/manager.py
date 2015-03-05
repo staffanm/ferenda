@@ -1400,7 +1400,13 @@ def _setup_runserver_args(config, inifilename):
     :rtype: dict
 
     """
-    port = urlsplit(config.url).port or 80
+    from pudb import set_trace; set_trace()
+    if 'develurl' in config:
+        url = config.develurl
+    else:
+        url = config.url
+        
+    port = urlsplit(url).port or 80
     relativeroot = os.path.join(os.path.dirname(inifilename), config.datadir)
 
     # create an instance of every enabled repo

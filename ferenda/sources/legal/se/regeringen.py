@@ -712,7 +712,7 @@ class Regeringen(SwedishLegalSource):
         return
 
     def tabs(self, primary=False):
-        if 'tabs' not in self.config or self.config.tabs:
+        if self.config.tabs:
             label = {self.DS: "Ds:ar",
                      self.KOMMITTEDIREKTIV: "Kommittédirektiv",
                      self.PROPOSITION: "Propositioner",
