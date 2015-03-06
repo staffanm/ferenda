@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, print_function
 
-import os
-import sys
-import json
-from wsgiref.util import FileWrapper
-import mimetypes
-from operator import itemgetter
 from datetime import date, datetime
+from operator import itemgetter
+from wsgiref.util import FileWrapper
+import inspect
+import json
+import logging
+import mimetypes
+import os
 import re
+import sys
+from collections import defaultdict
 
 import six
 from six.moves.urllib_parse import parse_qsl, urlencode
@@ -16,6 +19,7 @@ from six import text_type as str
 from rdflib import URIRef, Namespace, Literal, Graph
 from lxml import etree
 from layeredconfig import LayeredConfig, Defaults, INIFile
+import pkg_resources
 
 from ferenda.compat import OrderedDict
 from ferenda import DocumentRepository, FulltextIndex, Transformer, Facet
@@ -215,26 +219,72 @@ class WSGIApp(object):
         # 1. Fetch all the data we will need from all of the
         # repositories. While at it, collect all relevant facets,
         # namespace bindings and commondata as well.
-        data = []
+        datadict = defaultdict(list)
         facets = []  # will contain all unique facets
         qname_graph = Graph()
         resource_graph = Graph()
 
+        ttlfiles = set()
+        namespaces = {}
+
+        log = logging.getLogger("wsgi")
+        
         for repo in self.repos:
             for prefix, ns in repo.make_graph().namespaces():
-                # print("repo %s: binding %s to %s" % (repo.alias, prefix, ns))
-                qname_graph.bind(prefix, ns)
-                resource_graph.bind(prefix, ns)
-            resource_graph += repo.commondata
-            repodata = repo.faceted_data()
-            data.extend(repodata)  # assume that no two repos ever have
-            # data about the same URI
+                assert ns not in namespaces or namespaces[ns] == prefix, "Conflicting prefixes for ns %s" % ns
+                namespaces[ns] = prefix
+
+                for cls in inspect.getmro(repo.__class__):
+                    if hasattr(cls, "alias"):
+                        commonpath = "res/extra/%s.ttl" % cls.alias
+                        if os.path.exists(commonpath):
+                            ttlfiles.add(commonpath)
+                        elif pkg_resources.resource_exists('ferenda', commonpath):
+                            ttlfiles.add(pkg_resources.resource_filename('ferenda', commonpath))
+
+            dupesallowed = False
             for facet in repo.facets():
                 if facet not in facets:
+                    print("%s: adding facet %s/%s" %
+                          (repo.alias, str(facet.rdftype), facet.selector))
                     facets.append(facet)
+                    if facet.multiple_values:
+                        log.info("%s: dupes allowed because of %s facet" %
+                                 (repo.alias, facet.rdftype))
+                        dupesallowed = True
+                else:
+                    pass
+                    # print("%s: a facet like %s/%s exists" %
+                    #       (repo.alias, str(facet.rdftype), facet.selector))
+            print("%s: Now %s facets collected" % (repo.alias, len(facets)))
+            if not dupesallowed:
+                log.info("%s: dupes are NOT allowed" % repo.alias)
+
+            # Make soure that no two repos have data about the same URI:
+            for row in repo.faceted_data():
+                if not dupesallowed:
+                    # assert row['uri'] not in datadict, "%s had a duplicate row for %s, first seen in the %s repo" % (repo.alias, row['uri'], datadict[row['uri']]['_repo_alias'])
+                    if row['uri'] in datadict:
+                        log.warning("%s had a duplicate row for %s, first seen in the %s repo" % (repo.alias, row['uri'], datadict[row['uri']][0]['_repo_alias']))
+                row['_repo_alias'] = repo.alias
+                datadict[row['uri']].append(row)
+
+
+        for ns, prefix in namespaces.items():
+            qname_graph.bind(prefix, ns)
+            resource_graph.bind(prefix, ns)
+        print("About to load files %s" % list(ttlfiles))
+        for filename in ttlfiles:
+            resource_graph.parse(filename, format="turtle")
+        pkg_resources.cleanup_resources()
+        data = datadict.values()
 
         # if used in the resultset mode, only calculate stats for those
         # resources/documents that are in the resultset.
+        # NB: this means that after we ask each repo for its faceted
+        # data, we throw most of it out again. We could analyze common
+        # resultset iri prefixes and then only call faceted_data for
+        # some (or one) repo.
         if resultset:
             hits = {}
             for r in resultset:

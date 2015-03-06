@@ -272,6 +272,9 @@ class MediaWiki(DocumentRepository):
         # signify that no work needs to be done
         return False
 
+    def faceted_data(self):
+        return []
+    
     def toc(self, otherrepos=[]):
         # and no toc either
         return

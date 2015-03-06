@@ -39,7 +39,7 @@ from ferenda.elements import (Body, Paragraph, CompoundElement, OrdinalElement,
 
 from ferenda.elements.html import Strong, Em
 from . import SwedishLegalSource, SwedishCitationParser, RPUBL
-# from swedishlegalsource import SwedishLegalSource, SwedishCitationParser, RPUBL
+
 DCTERMS = Namespace(util.ns['dcterms'])
 PROV = Namespace(util.ns['prov'])
 
@@ -262,7 +262,7 @@ class DV(SwedishLegalSource):
         else:
             log.debug("Not regenerating uri.map")
             pass
-        return super(cls, DV).relate_all_setup(config)
+        return super(DV, cls).relate_all_setup(config)
 
     # def relate(self, basefile, otherrepos): pass
     @classmethod
