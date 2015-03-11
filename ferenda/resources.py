@@ -493,6 +493,9 @@ class Resources(object):
                                             # a controlled way)
                 if p in (FOAF.name, SKOS.prefLabel, SKOS.altLabel, BIBO.identifier):
                     g.add((root, FOAF.topic, s))
+                    # strip any typing/langtagging (because of reasons)
+                    if isinstance(o, Literal):
+                        o = Literal(str(o))
                     g.add((s, p, o))
                     # try to find a type
                     g.add((s, RDF.type, repo.commondata.value(s, RDF.type)))

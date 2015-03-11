@@ -357,10 +357,10 @@ class WSGIApp(object):
                                           facet.selector.__name__)
                 else:
                     # probably a lambda function
-                    fname = facet.selector.name
+                    fname = facet.selector.__name__
                 # FIXME: do we need the repo name here to provide useful
                 # messages?
-                self.log.warning("facet %s (%s) fails for row %s : %s %s" % (binding, fname, row['uri'], e.__class__.__name__, str(e)))
+                # self.log.warning("facet %s (%s) fails for row %s : %s %s" % (binding, fname, row['uri'], e.__class__.__name__, str(e)))
 
                 pass
             if observation is not None:
