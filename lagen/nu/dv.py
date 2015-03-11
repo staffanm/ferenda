@@ -50,7 +50,10 @@ class DV(OrigDV):
                 Facet(RDF.type,
                       use_for_toc=False,
                       use_for_feed=True,
-                      dimension_label="main",
+                      # dimension_label="main", # FIXME:
+                      # dimension_label must be calculated as rdf_type
+                      # or else the data from faceted_data() won't be
+                      # usable by wsgi.stats
                       # key=  # FIXME add useful key method for sorting docs
                       identificator=lambda x, y, z: None)
                 ]

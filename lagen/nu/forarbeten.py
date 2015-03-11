@@ -49,6 +49,8 @@ WHERE {
         def select(row, binding, extra):
             return labels[ident(row, binding, extra)]
 
+
+        # This is a selector that can CLEARLY not run on arbirtrary rows
         def ident(row, binding, extra):
             rdftype = row[binding]
             if rdftype == str(self.ns['rpubl'].Utredningsbetankande):
@@ -62,7 +64,8 @@ WHERE {
             elif rdftype == str(self.ns['rpubl'].Proposition):
                 return "prop"
             else:
-                self.log.error("Row for %s has unrecognized type %s" % (row['uri'], row['rdf_type']))
+                pass
+                # self.log.error("Row for %s has unrecognized type %s" % (row['uri'], row['rdf_type']))
         return [Facet(RDF.type,
                       selector=select,
                       identificator=ident),

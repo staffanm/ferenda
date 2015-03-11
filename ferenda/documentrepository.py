@@ -2015,6 +2015,10 @@ parsed document path to that documents dependency file."""
         g = self.make_graph()
         from_graph = "FROM <%s>" % context
         predicates = [f.rdftype for f in self.facets()]
+        # FIXME: is it a good idea to let the bindings be affected by
+        # a defined dimension_label? Particularly if the RDF.type
+        # facet has a dimension_label, that means we can't rely on a
+        # 'rdf_type' key always being present.
         bindings = [
             f.dimension_label if f.dimension_label else g.qname(
                 f.rdftype).replace(

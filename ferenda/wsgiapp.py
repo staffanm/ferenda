@@ -12,6 +12,7 @@ import os
 import re
 import sys
 from collections import defaultdict
+from itertools import chain
 
 import six
 from six.moves.urllib_parse import parse_qsl, urlencode
@@ -228,7 +229,6 @@ class WSGIApp(object):
         namespaces = {}
 
         log = logging.getLogger("wsgi")
-        
         for repo in self.repos:
             for prefix, ns in repo.make_graph().namespaces():
                 assert ns not in namespaces or namespaces[ns] == prefix, "Conflicting prefixes for ns %s" % ns
@@ -245,25 +245,21 @@ class WSGIApp(object):
             dupesallowed = False
             for facet in repo.facets():
                 if facet not in facets:
-                    print("%s: adding facet %s/%s" %
-                          (repo.alias, str(facet.rdftype), facet.selector))
+                    log.debug("%s: adding facet %s/%s" %
+                              (repo.alias, str(facet.rdftype), facet.selector))
                     facets.append(facet)
                     if facet.multiple_values:
                         log.info("%s: dupes allowed because of %s facet" %
                                  (repo.alias, facet.rdftype))
                         dupesallowed = True
-                else:
-                    pass
-                    # print("%s: a facet like %s/%s exists" %
-                    #       (repo.alias, str(facet.rdftype), facet.selector))
-            print("%s: Now %s facets collected" % (repo.alias, len(facets)))
+            log.debug("%s: Now %s facets collectd" % (repo.alias, len(facets)))
             if not dupesallowed:
                 log.info("%s: dupes are NOT allowed" % repo.alias)
 
-            # Make soure that no two repos have data about the same URI:
+            # Make soure that no two repos have data about the same
+            # URI (unless that repo permits it as determined above) :
             for row in repo.faceted_data():
                 if not dupesallowed:
-                    # assert row['uri'] not in datadict, "%s had a duplicate row for %s, first seen in the %s repo" % (repo.alias, row['uri'], datadict[row['uri']]['_repo_alias'])
                     if row['uri'] in datadict:
                         log.warning("%s had a duplicate row for %s, first seen in the %s repo" % (repo.alias, row['uri'], datadict[row['uri']][0]['_repo_alias']))
                 row['_repo_alias'] = repo.alias
@@ -273,11 +269,12 @@ class WSGIApp(object):
         for ns, prefix in namespaces.items():
             qname_graph.bind(prefix, ns)
             resource_graph.bind(prefix, ns)
-        print("About to load files %s" % list(ttlfiles))
+        log.debug("stats: Loading resources %s into a common resource graph" %
+                  list(ttlfiles))
         for filename in ttlfiles:
             resource_graph.parse(filename, format="turtle")
         pkg_resources.cleanup_resources()
-        data = datadict.values()
+        data = list(chain.from_iterable(datadict.values()))
 
         # if used in the resultset mode, only calculate stats for those
         # resources/documents that are in the resultset.
@@ -325,9 +322,11 @@ class WSGIApp(object):
                 transformer = lambda x: x
 
             observations = {}
-            observed = {}  # one file per uri+observation  seen -- avoid
+            # one file per uri+observation seen -- avoid
             # double-counting
+            observed = {}  
             for row in data:
+                observation = None
                 try:
                     # maybe if facet.dimension_type == "ref", selector
                     # should always be Facet.defaultselector?  NOTE:
@@ -343,14 +342,30 @@ class WSGIApp(object):
                                 binding,
                                 resource_graph))
 
+                except Exception as e:
+                    # most of the time, we should swallow this
+                    # exception since it's a selector that relies on
+                    # information that is just not present in the rows
+                    # from some repos. I think.
+#                    if hasattr(facet.selector, 'im_self'):
+#                        # try to find the location of the selector
+#                        # function for easier debugging
+#                        fname = "%s.%s.%s" % (facet.selector.__module__,
+#                                              facet.selector.im_self.__name__,
+#                                              facet.selector.__name__)
+#                    else:
+#                        # probably a lambda function
+#                        fname = facet.selector.name
+#                    log.warning("%s facet %s (%s) fails for row %s : %s %s" % (row['_repo_alias'], binding, fname, row['uri'], e.__class__.__name__, str(e)))
+#
+                    pass
+                if observation is not None:
                     if not observation in observations:
                         observations[observation] = {dimension_type: observation,
                                                      "count": 0}
                     if (row['uri'], observation) not in observed:
                         observed[(row['uri'], observation)] = True
                         observations[observation]["count"] += 1
-                except:
-                    pass
             res["slices"].append({"dimension": dimension_label,
                                   "observations": sorted(observations.values(), key=itemgetter(dimension_type))})
         return res
