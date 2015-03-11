@@ -11,7 +11,7 @@ import mimetypes
 import os
 import re
 import sys
-from collections import defaultdict
+from collections import defaultdict, Counter
 from itertools import chain
 
 import six
@@ -39,6 +39,8 @@ class WSGIApp(object):
 
     def __init__(self, repos, inifile=None, **kwargs):
         self.repos = repos
+        self.log = logging.getLogger("wsgi")
+
         # FIXME: need to specify documentroot?
         defaults = DocumentRepository.get_default_options()
         if inifile:
@@ -214,26 +216,23 @@ class WSGIApp(object):
     ################################################################
     # API Helper methods
     def stats(self, resultset=()):
-        res = {"type": "DataSet",
-               "slices": []
-               }
-        # 1. Fetch all the data we will need from all of the
-        # repositories. While at it, collect all relevant facets,
-        # namespace bindings and commondata as well.
+        slices = OrderedDict()
+
         datadict = defaultdict(list)
-        facets = []  # will contain all unique facets
-        qname_graph = Graph()
-        resource_graph = Graph()
 
+        # 1: Create a giant RDF graph consisting of all triples of all
+        #    repos' commondata. To avoid parsing the same RDF files
+        #    over and over, this section duplicates the logic of
+        #    DocumentRepository.commondata to make sure each RDF
+        #    file is loaded only once.
         ttlfiles = set()
+        resource_graph = Graph()
         namespaces = {}
-
-        log = logging.getLogger("wsgi")
         for repo in self.repos:
             for prefix, ns in repo.make_graph().namespaces():
                 assert ns not in namespaces or namespaces[ns] == prefix, "Conflicting prefixes for ns %s" % ns
                 namespaces[ns] = prefix
-
+                resource_graph.bind(prefix, ns)
                 for cls in inspect.getmro(repo.__class__):
                     if hasattr(cls, "alias"):
                         commonpath = "res/extra/%s.ttl" % cls.alias
@@ -242,133 +241,134 @@ class WSGIApp(object):
                         elif pkg_resources.resource_exists('ferenda', commonpath):
                             ttlfiles.add(pkg_resources.resource_filename('ferenda', commonpath))
 
-            dupesallowed = False
-            for facet in repo.facets():
-                if facet not in facets:
-                    log.debug("%s: adding facet %s/%s" %
-                              (repo.alias, str(facet.rdftype), facet.selector))
-                    facets.append(facet)
-                    if facet.multiple_values:
-                        log.info("%s: dupes allowed because of %s facet" %
-                                 (repo.alias, facet.rdftype))
-                        dupesallowed = True
-            log.debug("%s: Now %s facets collectd" % (repo.alias, len(facets)))
-            if not dupesallowed:
-                log.info("%s: dupes are NOT allowed" % repo.alias)
-
-            # Make soure that no two repos have data about the same
-            # URI (unless that repo permits it as determined above) :
-            for row in repo.faceted_data():
-                if not dupesallowed:
-                    if row['uri'] in datadict:
-                        log.warning("%s had a duplicate row for %s, first seen in the %s repo" % (repo.alias, row['uri'], datadict[row['uri']][0]['_repo_alias']))
-                row['_repo_alias'] = repo.alias
-                datadict[row['uri']].append(row)
-
-
-        for ns, prefix in namespaces.items():
-            qname_graph.bind(prefix, ns)
-            resource_graph.bind(prefix, ns)
-        log.debug("stats: Loading resources %s into a common resource graph" %
-                  list(ttlfiles))
+        self.log.debug("stats: Loading resources %s into a common resource graph" %
+                       list(ttlfiles))
         for filename in ttlfiles:
             resource_graph.parse(filename, format="turtle")
         pkg_resources.cleanup_resources()
-        data = list(chain.from_iterable(datadict.values()))
 
-        # if used in the resultset mode, only calculate stats for those
+
+        # 2: if used in the resultset mode, only calculate stats for those
         # resources/documents that are in the resultset.
-        # NB: this means that after we ask each repo for its faceted
-        # data, we throw most of it out again. We could analyze common
-        # resultset iri prefixes and then only call faceted_data for
-        # some (or one) repo.
+        resultsetmembers = set()
         if resultset:
-            hits = {}
             for r in resultset:
-                hits[r['iri']] = True
-            data = [r for r in data if r['uri'] in hits]
+                resultsetmembers.add(r['iri'])
 
-        # 2. For each facet that makes sense (ie those that has .dimension
-        # != None), collect the available observations and the count for
-        # each
-        for facet in facets:
-            if not facet.dimension_type:
-                continue
-            binding = qname_graph.qname(facet.rdftype).replace(":", "_")
-            if facet.dimension_label:
-                dimension_label = facet.dimension_label
-            elif self.config.legacyapi:
-                dimension_label = util.uri_leaf(str(facet.rdftype))
-            else:
-                dimension_label = binding
+        # 3: using each repo's faceted_data and its defined facet
+        # selectors, create a set of observations for that repo
+        # 
+        # FIXME: If in resultset mode, we might ask a repo for its
+        # faceted data and then use exactly none of it since it
+        # doesn't match anything in resultsetmembers. We COULD analyze
+        # common resultset iri prefixes and then only call
+        # faceted_data for some (or one) repo.
+        for repo in self.repos:
+            data = repo.faceted_data()
+            if resultsetmembers:
+                data = [r for r in data if r['uri'] in resultsetmembers]
 
-            dimension_type = facet.dimension_type
-            if (self.config.legacyapi and
-                    dimension_type == "value"):
-                # legacyapi doesn't support the value type, we must
-                # convert it into ref, and convert all string values to
-                # fake resource ref URIs
-                dimension_type = "ref"
-                transformer = lambda x: (
-                    "http://example.org/fake-resource/%s" %
-                    x).replace(
-                    " ",
-                    "_")
-            elif self.config.legacyapi and dimension_type == "term":
-                # legacyapi expects "Standard" over "bibo:Standard", which is what
-                # Facet.qname returns
-                transformer = lambda x: x.split(":")[1]
-            else:
-                transformer = lambda x: x
+            for facet in repo.facets():
+                if not facet.dimension_type:
+                    continue
+                dimension, obs = self.stats_slice(data, facet, resource_graph)
+                if dimension in slices:
+                    # since observations is a Counter not a regular
+                    # dict, if slices[dimensions] and observations
+                    # have common keys this will add the counts not
+                    # replace them.
+                    slices[dimension].update(obs)
+                else:
+                    slices[dimension] = obs
 
-            observations = {}
-            # one file per uri+observation seen -- avoid
-            # double-counting
-            observed = {}  
-            for row in data:
-                observation = None
-                try:
-                    # maybe if facet.dimension_type == "ref", selector
-                    # should always be Facet.defaultselector?  NOTE:
-                    # we look at facet.dimension_type, not
-                    # dimension_type, as the latter may be altered if
-                    # legacyapi == True
-                    if facet.dimension_type == "ref":
-                        observation = transformer(Facet.defaultselector(row, binding))
-                    else:
-                        observation = transformer(
-                            facet.selector(
-                                row,
-                                binding,
-                                resource_graph))
-
-                except Exception as e:
-                    # most of the time, we should swallow this
-                    # exception since it's a selector that relies on
-                    # information that is just not present in the rows
-                    # from some repos. I think.
-#                    if hasattr(facet.selector, 'im_self'):
-#                        # try to find the location of the selector
-#                        # function for easier debugging
-#                        fname = "%s.%s.%s" % (facet.selector.__module__,
-#                                              facet.selector.im_self.__name__,
-#                                              facet.selector.__name__)
-#                    else:
-#                        # probably a lambda function
-#                        fname = facet.selector.name
-#                    log.warning("%s facet %s (%s) fails for row %s : %s %s" % (row['_repo_alias'], binding, fname, row['uri'], e.__class__.__name__, str(e)))
-#
-                    pass
-                if observation is not None:
-                    if not observation in observations:
-                        observations[observation] = {dimension_type: observation,
-                                                     "count": 0}
-                    if (row['uri'], observation) not in observed:
-                        observed[(row['uri'], observation)] = True
-                        observations[observation]["count"] += 1
-            res["slices"].append({"dimension": dimension_label,
-                                  "observations": sorted(observations.values(), key=itemgetter(dimension_type))})
+        # 4. Transform our easily-updated data structures to the list
+        # of dicts of lists that we're supposed to return.
+        res = {"type": "DataSet",
+               "slices": []
+               }
+        for k, v in slices.items():
+            observations = []
+            for ok, ov in v.items():
+                observations.append({ok[0]: ok[1],
+                                     "count": ov})
+            res['slices'].append({"dimension": k,
+                                  "observations": observations})
         return res
+
+    def stats_slice(self, data, facet, resource_graph):
+        binding = resource_graph.qname(facet.rdftype).replace(":", "_")
+        if facet.dimension_label:
+            dimension_label = facet.dimension_label
+        elif self.config.legacyapi:
+            dimension_label = util.uri_leaf(str(facet.rdftype))
+        else:
+            dimension_label = binding
+
+        dimension_type = facet.dimension_type
+        if (self.config.legacyapi and
+                dimension_type == "value"):
+            # legacyapi doesn't support the value type, we must
+            # convert it into ref, and convert all string values to
+            # fake resource ref URIs
+            dimension_type = "ref"
+            transformer = lambda x: (
+                "http://example.org/fake-resource/%s" %
+                x).replace(
+                " ",
+                "_")
+        elif self.config.legacyapi and dimension_type == "term":
+            # legacyapi expects "Standard" over "bibo:Standard", which is what
+            # Facet.qname returns
+            transformer = lambda x: x.split(":")[1]
+        else:
+            transformer = lambda x: x
+
+        observations = Counter()
+        # one file per uri+observation seen -- avoid
+        # double-counting
+        observed = {}  
+        for row in data:
+            observation = None
+            try:
+                # maybe if facet.dimension_type == "ref", selector
+                # should always be Facet.defaultselector?  NOTE:
+                # we look at facet.dimension_type, not
+                # dimension_type, as the latter may be altered if
+                # legacyapi == True
+                if facet.dimension_type == "ref":
+                    observation = transformer(Facet.defaultselector(row, binding))
+                else:
+                    observation = transformer(
+                        facet.selector(
+                            row,
+                            binding,
+                            resource_graph))
+
+            except Exception as e:
+                # most of the time, we should swallow this
+                # exception since it's a selector that relies on
+                # information that is just not present in the rows
+                # from some repos. I think.
+                if hasattr(facet.selector, 'im_self'):
+                    # try to find the location of the selector
+                    # function for easier debugging
+                    fname = "%s.%s.%s" % (facet.selector.__module__,
+                                          facet.selector.im_self.__name__,
+                                          facet.selector.__name__)
+                else:
+                    # probably a lambda function
+                    fname = facet.selector.name
+                # FIXME: do we need the repo name here to provide useful
+                # messages?
+                self.log.warning("facet %s (%s) fails for row %s : %s %s" % (binding, fname, row['uri'], e.__class__.__name__, str(e)))
+
+                pass
+            if observation is not None:
+                k = (facet.dimension_type, observation)
+                if (row['uri'], observation) not in observed:
+                    observed[(row['uri'], observation)] = True
+                    observations[k] += 1
+        return dimension_label, observations
 
     def query(self, environ):
 
