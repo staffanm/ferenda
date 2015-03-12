@@ -326,7 +326,7 @@ class WSGIApp(object):
         observations = Counter()
         # one file per uri+observation seen -- avoid
         # double-counting
-        observed = {}  
+        observed = {}
         for row in data:
             observation = None
             try:
@@ -336,7 +336,8 @@ class WSGIApp(object):
                 # dimension_type, as the latter may be altered if
                 # legacyapi == True
                 if facet.dimension_type == "ref":
-                    observation = transformer(Facet.defaultselector(row, binding))
+                    observation = transformer(Facet.defaultselector(
+                        row, binding))
                 else:
                     observation = transformer(
                         facet.selector(

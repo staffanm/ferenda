@@ -123,6 +123,7 @@ class Facet(object):
     '2014'
 
     """
+    _resourcecache = {}
 
     @classmethod
     def defaultselector(cls, row, binding, resource_graph=None):
@@ -248,13 +249,21 @@ class Facet(object):
         >>> Facet.resourcelabel(row, "dcterms_publisher", resources)
         'Chapman & Hall'
         """
+        # FIXME: if the graph changes in between calls, the cache
+        # won't be invalidated and give incorrrect results
+        k = (row[binding], resource_graph.identifier)
+        if k in cls._resourcecache:
+            return cls._resourcecache[k]
+
         uri = URIRef(row[binding])
         for pred in (RDFS.label, SKOS.prefLabel, SKOS.altLabel, DCTERMS.title,
                      DCTERMS.alternative, FOAF.name, BIBO.identifier):
             if resource_graph.value(uri, pred):
-                return str(resource_graph.value(uri, pred))
+                cls._resourcecache[k] = str(resource_graph.value(uri, pred))
+                return cls._resourcecache[k]
         else:
-            return row[binding]
+            cls._resourcecache[k] = row[binding]
+            return cls._resourcecache[k]
 
     @classmethod
     def sortresource(cls, row, binding='dcterms_publisher', resource_graph=None):

@@ -423,11 +423,15 @@ class Devel(object):
         url = globalconfig.develurl if 'develurl' in globalconfig else globalconfig.url
         app = WSGIApp(repos, manager._find_config_file(), url=url)
         DEFAULT_HTTP_ACCEPT = 'text/xml, application/xml, application/xhtml+xml, text/html;q=0.9, text/plain;q=0.8, image/png,*/*;q=0.5'
+        if "?" in path:
+            pathinfo, querystring = path.split("?", 1)
+        else:
+            pathinfo, querystring = path, ""
         environ = {'HTTP_ACCEPT': DEFAULT_HTTP_ACCEPT,
-                   'PATH_INFO':   path,
+                   'PATH_INFO':   pathinfo,
                    'SERVER_NAME': 'localhost',
                    'SERVER_PORT': '8000',
-                   'QUERY_STRING': '',
+                   'QUERY_STRING': querystring,
                    'wsgi.url_scheme': 'http'
                    }
 

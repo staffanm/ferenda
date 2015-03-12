@@ -9,18 +9,6 @@ from itertools import chain
 
 from six import text_type as str
 
-try:
-    import matplotlib
-    import matplotlib.pyplot as plt
-except ImportError:
-    matplotlib = plt = None
-
-try:
-    import PyPDF2
-    from reportlab.pdfgen.canvas import Canvas
-except ImportError:
-    PyPDF2 = Canvas = None
-
 from .pdfreader import Page
 from ferenda import util
 from ferenda.compat import Counter
@@ -378,7 +366,10 @@ class PDFAnalyzer(object):
            by default. Reportlab (3.*) only works on py27+ and py33+
 
         """
-        if PyPDF2 is None or Canvas is None:
+        try:
+            import PyPDF2
+            from reportlab.pdfgen.canvas import Canvas
+        except ImportError:
             raise ImportError("You need PyPDF2 and reportlab installed")
         styles = {}
         for k, v in metrics.items():
@@ -486,7 +477,10 @@ class PDFAnalyzer(object):
         fp.close()
 
     def plot(self, filename, margincounters, stylecounters, metrics):
-        if matplotlib is None:
+        try:
+            import matplotlib
+            import matplotlib.pyplot as plt
+        except ImportError:
             raise ImportError("You need matplotlib installed")
         matplotlib.use('Agg')
         # plt.style.use('ggplot')  # looks good but makes our histograms unreadable

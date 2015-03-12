@@ -125,12 +125,16 @@ class Analyze(unittest.TestCase):
                            'rightmargin_even': 748},
                           metrics)
 
+    # FIXME: the import of plt occurs inside of metrics() -- how to
+    # patch?
     @patch('ferenda.pdfanalyze.matplotlib')
     @patch('ferenda.pdfanalyze.plt')
     def test_plot(self, pltmock, matplotmock):
         self.analyzer.metrics(plotpath="foo/bar/baz")
         self.assertTrue(pltmock.savefig.called)
 
+    # FIXME: the imoport of PyPDF2/Canvas occcurs inside of
+    # drawboxes() -- how to patch?
     @patch('ferenda.pdfanalyze.PyPDF2')
     @patch('ferenda.pdfanalyze.Canvas')
     def test_drawboxes(self, canvasmock, pypdfmock):
