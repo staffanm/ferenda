@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 import sys, os, tempfile, shutil
 from lxml import etree
-from ferenda.compat import unittest, patch
+from ferenda.compat import unittest, patch, MagicMock
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
 from bz2 import BZ2File
@@ -125,23 +125,26 @@ class Analyze(unittest.TestCase):
                            'rightmargin_even': 748},
                           metrics)
 
-    # FIXME: the import of plt occurs inside of metrics() -- how to
-    # patch?
-    @patch('ferenda.pdfanalyze.matplotlib')
-    @patch('ferenda.pdfanalyze.plt')
-    def test_plot(self, pltmock, matplotmock):
-        self.analyzer.metrics(plotpath="foo/bar/baz")
-        self.assertTrue(pltmock.savefig.called)
+    def test_plot(self):
+        matplotmock = MagicMock()
+        mocks = {'matplotlib': matplotmock,
+                 'matplotlib.pyplot': MagicMock()}
+        with patch.dict('sys.modules', mocks):
+            self.analyzer.metrics(plotpath="foo/bar/baz")
+            self.assertTrue(matplotmock.pyplot.savefig.called)
 
-    # FIXME: the imoport of PyPDF2/Canvas occcurs inside of
-    # drawboxes() -- how to patch?
-    @patch('ferenda.pdfanalyze.PyPDF2')
-    @patch('ferenda.pdfanalyze.Canvas')
-    def test_drawboxes(self, canvasmock, pypdfmock):
-        metrics = self.analyzer.metrics()
-        pdfpath = "test/files/pdfanalyze/lipsum.debug.pdf"
-        self.analyzer.drawboxes(pdfpath, metrics=metrics)
-        self.assertTrue(canvasmock.called)
+    def test_drawboxes(self):
+        pypdfmock = MagicMock()
+        canvasmock = MagicMock()
+        mocks = {'PyPDF2': pypdfmock,
+                 'reportlab': MagicMock(),
+                 'reportlab.pdfgen': MagicMock(),
+                 'reportlab.pdfgen.canvas': canvasmock}
+        with patch.dict('sys.modules', mocks):
+            metrics = self.analyzer.metrics()
+            pdfpath = "test/files/pdfanalyze/lipsum.debug.pdf"
+            self.analyzer.drawboxes(pdfpath, metrics=metrics)
+        self.assertTrue(canvasmock.Canvas.called)
         self.assertTrue(pypdfmock.PdfFileReader.called)
         self.assertTrue(pypdfmock.PdfFileWriter.called)
         util.robust_remove(pdfpath)

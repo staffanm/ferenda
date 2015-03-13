@@ -483,9 +483,10 @@ class PDFAnalyzer(object):
         except ImportError:
             raise ImportError("You need matplotlib installed")
         matplotlib.use('Agg')
-        # plt.style.use('ggplot')  # looks good but makes our histograms unreadable
+        # plt.style.use('ggplot')  # looks good but makes histograms unreadable
         matplotlib.rcParams.update({'font.size': 8})
-        plt.figure(figsize=((len(margincounters)) * 2, 7))  # width, height in inches
+        # width, height in inches
+        plt.figure(figsize=((len(margincounters)) * 2, 7)) 
 
         # if 6 counters:
         # +0,0--+ +0,1--+ +0,2--+ +0,3--+
@@ -518,17 +519,19 @@ class PDFAnalyzer(object):
             # FIXME: make this dynamic
             raise ValueError("Can't layout other # of counters than 4 or 6")
         marginplots = [plt.subplot2grid(grid, pos) for pos in coords[:-1]]
-        self.plot_margins(marginplots, margincounters, metrics, pagewidth, pageheight)
+        self.plot_margins(marginplots, margincounters, metrics,
+                          pagewidth, pageheight)
 
         styleplot = plt.subplot2grid(grid, coords[-1], colspan=2)
-        self.plot_styles(styleplot, stylecounters, metrics)
+        self.plot_styles(styleplot, stylecounters, metrics, plt)
 
         util.ensure_dir(filename)
         plt.savefig(filename, dpi=150)
         log = logging.getLogger("pdfanalyze")
         log.debug("wrote %s" % filename)
 
-    def plot_margins(self, subplots, margin_counters, metrics, pagewidth, pageheight):
+    def plot_margins(self, subplots, margin_counters, metrics,
+                     pagewidth, pageheight):
         for (idx, counterkey) in enumerate(sorted(margin_counters.keys())):
             # print("Making plot for %s" % counterkey)
             # leftmargin_even => left
@@ -541,14 +544,15 @@ class PDFAnalyzer(object):
             bins = plot.hist(series, bins=size, range=(0, size))
             plot.set_title(counterkey)
             for k, v in metrics.items():
-                if counterkey == k:  # FIXME: How annotate parindent, 2col etc ?
+                 # FIXME: How annotate parindent, 2col etc ?
+                if counterkey == k: 
                     label = "%s=%s" % (k, v)  # leftmargin=102
                     # print("   plotting annotation %s" % label)
                     plot.annotate(label, xy=(v, 100),
                                   xytext=(v * 0.5, 100),
                                   arrowprops={'arrowstyle': '->'})
 
-    def plot_styles(self, plot, stylecounters, metrics):
+    def plot_styles(self, plot, stylecounters, metrics, plt):
         # do a additive vhist. FIXME: label those styles identified in
         # metrics
         allstyles = Counter(dict(chain(*[x.items() for x in stylecounters.values()])))
@@ -556,6 +560,7 @@ class PDFAnalyzer(object):
                                        "Times") + "@" + str(style[1]) for style,
                       count in allstyles.most_common()]
         stylecounts = [count for style, count in allstyles.most_common()]
+        # need access to plt.
         plt.yticks(range(len(stylenames)), stylenames)
         plot.barh(range(len(stylenames)), stylecounts, log=True)
         plot.set_title("Font usage", fontdict={'fontsize': 8})
