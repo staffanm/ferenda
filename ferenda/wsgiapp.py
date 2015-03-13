@@ -11,7 +11,7 @@ import mimetypes
 import os
 import re
 import sys
-from collections import defaultdict, Counter
+from collections import defaultdict
 from itertools import chain
 
 import six
@@ -22,7 +22,7 @@ from lxml import etree
 from layeredconfig import LayeredConfig, Defaults, INIFile
 import pkg_resources
 
-from ferenda.compat import OrderedDict
+from ferenda.compat import OrderedDict, Counter
 from ferenda import DocumentRepository, FulltextIndex, Transformer, Facet
 from ferenda import fulltextindex, util, elements
 from ferenda.elements import html
@@ -288,7 +288,7 @@ class WSGIApp(object):
                }
         for k, v in slices.items():
             observations = []
-            for ok, ov in v.items():
+            for ok, ov in sorted(v.items()):
                 observations.append({ok[0]: ok[1],
                                      "count": ov})
             res['slices'].append({"dimension": k,
