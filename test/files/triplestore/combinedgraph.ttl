@@ -1,4 +1,4 @@
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 
-<http://localhost/publ/dir/2012:36> a <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Direktiv> .
-<http://localhost/publ/dir/2012:35> a <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Direktiv> .
+<http://localhost/publ/dir/2012:36> a <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Kommittedirektiv> .
+<http://localhost/publ/dir/2012:35> a <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Kommittedirektiv> .

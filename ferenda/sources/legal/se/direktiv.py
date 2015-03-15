@@ -72,7 +72,7 @@ class DirTrips(Trips):
     # overrides Trips.document_url_template
     document_url_template = "http://rkrattsbaser.gov.se/cgi-bin/thw?${APPL}=DIR&${BASE}=DIR&${HTML}=dir_dok&${TRIPSHOW}=format=THW&BET=%(basefile)s"
 
-    rdf_type = RPUBL.Direktiv
+    rdf_type = RPUBL.Kommittedirektiv
 
     @recordlastdownload
     def download(self, basefile=None):
@@ -267,7 +267,7 @@ class DirAsp(SwedishLegalSource, PDFDocumentRepository):
     start_url = "http://rkrattsdb.gov.se/kompdf/search.asp"
     document_url = "http://62.95.69.24/KOMdoc/%(yy)02d/%(yy)02d%(num)04d.PDF"
     source_encoding = "iso-8859-1"
-    rdf_type = RPUBL.Direktiv
+    rdf_type = RPUBL.Kommittedirektiv
 
     def download(self):
         resp = requests.get(self.start_url)
@@ -327,7 +327,7 @@ class DirRegeringen(Regeringen):
     jsfiles = ['../ferenda/res/js/pdfviewer.js']
     re_basefile_strict = re.compile(r'Dir\. (\d{4}:\d+)')
     re_basefile_lax = re.compile(r'(?:[Dd]ir\.?|) ?(\d{4}:\d+)')
-    rdf_type = RPUBL.Direktiv
+    rdf_type = RPUBL.Kommittedirektiv
     document_type = Regeringen.KOMMITTEDIREKTIV
     sparql_annotations = None  # don't even bother creating an annotation file
 
@@ -355,6 +355,6 @@ class Direktiv(CompositeRepository, SwedishLegalSource):
     alias = "dir"
     xslt_template = "res/xsl/forarbete.xsl"
     storage_policy = "dir"
-    rdf_type = RPUBL.Direktiv
+    rdf_type = RPUBL.Kommittedirektiv
     documentstore_class = DirektivStore
     sparql_annotations = None  # don't even bother creating an annotation file

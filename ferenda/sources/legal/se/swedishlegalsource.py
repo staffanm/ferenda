@@ -342,7 +342,7 @@ class SwedishLegalSource(DocumentRepository):
                      self.ns['dcterms'].identifier,
                         Literal(identifier)))
             # Create one from basefile. First guess prefix
-            if self.rdf_type == self.ns['rpubl'].Direktiv:
+            if self.rdf_type == self.ns['rpubl'].Kommittedirektiv:
                 prefix = "Dir. "
             elif self.rdf_type == self.ns['rpubl'].Utredningsbetankande:
                 # FIXME: rpubl:utrSerie might have a site-specific URI

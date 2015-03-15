@@ -34,7 +34,7 @@ WHERE {
     OPTIONAL { ?uri dcterms:identifier ?dcterms_identifier . }
     OPTIONAL { ?uri rpubl:utrSerie ?rpubl_utrSerie . }
     OPTIONAL { ?uri rpubl:arsutgava ?rpubl_arsutgava . }
-    FILTER (?type in (rpubl:Direktiv, rpubl:Utredningsbetankande, rpubl:Proposition)) .
+    FILTER (?type in (rpubl:Kommittedirektiv, rpubl:Utredningsbetankande, rpubl:Proposition)) .
 } """
 
     def facets(self):
@@ -42,7 +42,7 @@ WHERE {
                   'sou': 'SOU',
                   'ds': 'Ds',
                   'prop': 'Propositioner'}
-        # rdf:type rpubl:Direktiv => "Kommittédirektiv"
+        # rdf:type rpubl:Kommittedirektiv => "Kommittédirektiv"
         # rdf:type rpubl:Utredningsbetankande, rpubl:utrSerie .*sou => "SOU"
         # rdf:type rpubl:Utredningsbetankande, rpubl:utrSerie .*ds => "Ds"
         # rdf:type rpubl:Proposition => "Propositioner"
@@ -59,7 +59,7 @@ WHERE {
                     return util.uri_leaf(row['rpubl_utrSerie'])
                 else:
                     self.log.error("Row for %s is rpubl:Utredning but lacks rpubl:utrSerie" % row['uri'])
-            elif rdftype == str(self.ns['rpubl'].Direktiv):
+            elif rdftype == str(self.ns['rpubl'].Kommittedirektiv):
                 return "dir"
             elif rdftype == str(self.ns['rpubl'].Proposition):
                 return "prop"

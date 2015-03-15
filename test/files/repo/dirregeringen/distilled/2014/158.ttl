@@ -36,7 +36,7 @@
     dcterms:isPartOf <http://localhost:8000/res/dir/2014:158> ;
     dcterms:title "Befintliga initiativ och metoder för arbete med hållbarhetsfrågor i kapitalförvaltning"@sv .
 
-<http://localhost:8000/res/dir/2014:158> a rpubl:Direktiv ;
+<http://localhost:8000/res/dir/2014:158> a rpubl:Kommittedirektiv ;
     dcterms:abstract "Regeringen beslutade den 30 oktober 2014 kommittédirektiv om en översyn av fondregelverket (dir. 2014:139). Regeringen ger nu utredaren i uppdrag att också föreslå åtgärder för att förbättra informationsgivningen och jämförbarheten kring hur fondförvaltare integrerar hållbarhetsaspekter i sin förvaltning, såsom miljö- och klimatfrågor, mänskliga rättigheter, arbetsvillkor och bekämpning av korruption. Uppdraget ska fortfarande slutredovisas senast den 31 december 2015."@sv ;
     dcterms:identifier "Dir. 2014:158" ;
     dcterms:issued "2014-12-18"^^xsd:date ;
