@@ -269,7 +269,7 @@ class DirAsp(SwedishLegalSource, PDFDocumentRepository):
     source_encoding = "iso-8859-1"
     rdf_type = RPUBL.Kommittedirektiv
 
-    def download(self):
+    def download(self, basefile=None):
         resp = requests.get(self.start_url)
         soup = BeautifulSoup(resp.text)
         depts = [opt['value'] for opt in soup.find_all("option", value=True)]

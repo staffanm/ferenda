@@ -17,6 +17,7 @@ from itertools import chain
 import six
 from six.moves.urllib_parse import parse_qsl, urlencode
 from six import text_type as str
+from six import binary_type as bytes
 from rdflib import URIRef, Namespace, Literal, Graph
 from lxml import etree
 from layeredconfig import LayeredConfig, Defaults, INIFile
@@ -381,7 +382,6 @@ class WSGIApp(object):
                 else:
                     res += '<em class="match">%s</em>' % str(e)
             return res
-
         idx = FulltextIndex.connect(self.config.indextype,
                                     self.config.indexlocation,
                                     self.repos)
@@ -434,6 +434,11 @@ class WSGIApp(object):
             raise KeyError(
                 "Couldn't find anything that endswith(%s) in fulltextindex schema" %
                 k)
+
+        if isinstance(querystring, bytes):
+            # Assume utf-8 encoded URL -- when is this assumption
+            # incorrect?
+            querystring = querystring.decode("utf-8")
 
         param = dict(parse_qsl(querystring))
         filtered = dict([(k, v)
