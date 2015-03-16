@@ -19,7 +19,7 @@ if sys.version_info < (3,):
 TRANS = str.maketrans("åäö ", "aao_")
     
 URIMAP = {}
-
+URISPACE = rdflib.Namespace("http://rinfo.lagrummet.se/sys/uri/space#")
 
 def import_org(sourcegraph, targetgraph):
     # print("Adding triples in %s to targetgraph" % filename)
@@ -73,7 +73,12 @@ def import_dataset(sourcegraph, targetgraph):
             print("    Asserting res %s owl:sameAs %s " % (targeturi, sourceuri))
         URIMAP[sourceuri] = targeturi
 
-
+def import_slugs(sourcegraph, targetgraph):
+    for (sourceuri, abbr) in sourcegraph.subject_objects(predicate=URISPACE.abbrSlug):
+        if sourceuri in URIMAP:
+            targeturi = URIMAP[sourceuri]
+            targetgraph.add((targeturi, URISPACE.abbrSlug, abbr))
+        
 def load_n3(path, graph=None):
     # loads all the n3 files directly with in a given path (does not
     # recurse) into graph.
@@ -82,14 +87,24 @@ def load_n3(path, graph=None):
     print("loading all n3 files in %s" % path)
     for f in os.listdir(path):
         if f.endswith("n3"):
-            print("    loading %s" % f)
-            graph.parse(open(path+os.sep+f), format="n3")
+            load_file(path+os.sep+f, graph)
+    return graph
+
+def load_file(path, graph=None, bindings={}):
+    if graph is None:
+        graph = rdflib.Graph()
+    print("    loading %s" % path)
+    graph.parse(open(path), format="n3")
+    for prefix, ns in bindings.items():
+        graph.bind(prefix, ns)
     return graph
 
 def concatgraph(base, dest):
     g = rdflib.Graph()
     load_n3(base+os.sep+"org", g)
     load_n3(base+os.sep+"serie", g)
+    load_file(base+"/../sys/uri/slugs.n3", g,
+              {"urispace": "http://rinfo.lagrummet.se/sys/uri/space#"})
     with open(dest, "wb") as fp:
         header = "# Automatically concatenated from sources at %s\n\n" % datetime.now().isoformat()
         fp.write(header.encode("utf-8"))
@@ -102,6 +117,10 @@ def mapgraph(base, customresources, dest):
     len_before = len(targetgraph)
     import_org(load_n3(base+os.sep+"org"), targetgraph)
     import_dataset(load_n3(base+os.sep+"serie"), targetgraph) 
+    import_slugs(load_file(base+"/../sys/uri/slugs.n3"),
+                 targetgraph)
+    targetgraph.bind("urispace", "http://rinfo.lagrummet.se/sys/uri/space#")
+
     with open(dest, "wb") as fp:
         header = "# Automatically transformed from sources at %s\n\n" % datetime.now().isoformat()
         fp.write(header.encode("utf-8"))

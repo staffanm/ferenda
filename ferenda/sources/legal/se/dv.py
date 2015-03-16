@@ -18,7 +18,6 @@ from six import BytesIO
 import tempfile
 from collections import defaultdict
 from copy import deepcopy
-from operator import attrgetter
 
 # 3rdparty libs
 import pkg_resources
@@ -29,16 +28,15 @@ from lxml import etree
 from bs4 import BeautifulSoup, NavigableString
 
 # my libs
-from ferenda import (Document, DocumentStore, Describer, WordReader, FSMParser,
-                     Facet, TocPage, TocPageset, Feed, Feedset)
+from ferenda import (Document, DocumentStore, Describer, WordReader, FSMParser)
 from ferenda.decorators import managedparsing, newstate
-from ferenda import util, fulltextindex, errors
+from ferenda import util, errors
 from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda.elements import (Body, Paragraph, CompoundElement, OrdinalElement,
                               Heading, Link)
 
 from ferenda.elements.html import Strong, Em
-from . import SwedishLegalSource, SwedishCitationParser, RPUBL
+from . import legaluri, SwedishLegalSource, SwedishCitationParser, RPUBL
 
 DCTERMS = Namespace(util.ns['dcterms'])
 PROV = Namespace(util.ns['prov'])
@@ -1214,36 +1212,33 @@ class DV(SwedishLegalSource):
     # create nice RDF from the sanitized metadata
     def polish_metadata(self, head, doc):
 
+        # FIXME: This setup (parser instance and makeurl function) could
+        # probably be shared between many repos
+        parser = SwedishCitationParser(LegalRef(LegalRef.LAGRUM),
+                                       self.config.url,
+                                       # '',  # shld be self.config.urlpath, but
+                                       localizeuri=self.config.localizeuri)
+        if self.config.localizeuri:
+            def makeurl(data):
+                return parser.localize_uri(legaluri.construct(data))
+        else:
+            makeurl = legaluri.construct
+
         def ref_to_uri(ref):
             # FIXME: We'd like to retire legalref and replace it with
             # pyparsing grammars.
             nodes = self.rattsfall_parser.parse(ref)
             assert isinstance(nodes[0], Link), "Couldn't make URI from ref %s" % ref
             uri = nodes[0].uri
-            return localize_uri(uri)
+            return parser.localize_uri(uri)
 
         def dom_to_uri(domstol, malnr, avg):
             prefix = self.config.url + self.config.urlpath
+            # "Högsta förvaltningsdomstolen" => "hfd"
             slug = self.slugs[domstol.lower()]
             # FIXME: We should create multiple urls if we have multiple malnummers?
             first_malnr = malnr[0]
             return "%(prefix)s%(slug)s/%(first_malnr)s/%(avg)s" % locals()
-
-# Code that's dependent on this func should use
-# SwedishCitationParser.localize_uri instead
-# 
-#        def localize_uri(uri):
-#            if self.config.url == "https://lagen.nu/":
-#                sfsprefix = ""
-#            else:
-#                sfsprefix = "res/sfs/"
-#            if "publ/rattsfall" in uri:
-#
-#                return uri.replace("http://rinfo.lagrummet.se/publ/rattsfall/",
-#                                   self.config.url + self.config.urlpath)
-#            elif "publ/sfs/" in uri:
-#                return uri.replace("http://rinfo.lagrummet.se/publ/sfs/",
-#                                   self.config.url + sfsprefix)
 
         def split_nja(value):
             return [x[:-1] for x in value.split("(")]
@@ -1324,13 +1319,13 @@ class DV(SwedishLegalSource):
                     for node in self.lagrum_parser.parse(i):
                         if isinstance(node, Link):
                             domdesc.rel(self.ns['rpubl'].lagrum,
-                                        localize_uri(node.uri))
+                                        parser.localize_uri(node.uri))
             elif label == "Rättsfall":
                 for i in value:
                     for node in self.rattsfall_parser.parse(i):
                         if isinstance(node, Link):
                             domdesc.rel(self.ns['rpubl'].rattsfall,
-                                        localize_uri(node.uri))
+                                        parser.localize_uri(node.uri))
             elif label == "Litteratur":
                 for i in value.split(";"):
                     domdesc.value(self.ns['dcterms'].relation, util.normalize_space(i))
