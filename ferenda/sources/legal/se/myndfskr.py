@@ -375,7 +375,7 @@ class MyndFskr(SwedishLegalSource):
                              (doc.basefile, props['dcterms:identifier']))
         uri = makeurl({'type': LegalRef.FORESKRIFTER,
                        'publikation': pub,
-                       'artal': year,
+                       'arsutgava': year,
                        'lopnummer': ordinal})
 
         if doc.uri is not None and uri != doc.uri:

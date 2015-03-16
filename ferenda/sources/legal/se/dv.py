@@ -692,61 +692,65 @@ class DV(SwedishLegalSource):
                    'Sökord': DCTERMS['subject']
                    }
 
-    # Listan härledd från containers.n3/rattsfallsforteckningar.n3 i
-    # rinfoprojektets källkod - en ambitiösare lösning vore att
-    # läsa in de faktiska N3-filerna i en rdflib-graf.
-    publikationsuri = {'NJA': 'http://rinfo.lagrummet.se/ref/rff/nja',
-                       'RH': 'http://rinfo.lagrummet.se/ref/rff/rh',
-                       'MÖD': 'http://rinfo.lagrummet.se/ref/rff/mod',
-                       'RÅ': 'http://rinfo.lagrummet.se/ref/rff/ra',
-                       'RK': 'http://rinfo.lagrummet.se/ref/rff/rk',
-                       'MIG': 'http://rinfo.lagrummet.se/ref/rff/mig',
-                       'AD': 'http://rinfo.lagrummet.se/ref/rff/ad',
-                       'MD': 'http://rinfo.lagrummet.se/ref/rff/md',
-                       'FÖD': 'http://rinfo.lagrummet.se/ref/rff/fod'}
-
-    domstolsforkortningar = {'ADO': 'http://lagen.nu/org/2008/arbetsdomstolen',
-                             'HDO': 'http://lagen.nu/org/2008/hogsta-domstolen',
-                             'HGO': 'http://lagen.nu/org/2008/gota-hovratt',
-                             'HNN': 'http://lagen.nu/org/2008/hovratten-for-nedre-norrland',
-                             'HON': 'http://lagen.nu/org/2008/hovratten-for-ovre-norrland',
-                             'HSB': 'http://lagen.nu/org/2008/hovratten-over-skane-och-blekinge',
-                             'HSV': 'http://lagen.nu/org/2008/svea-hovratt',
-                             'HVS': 'http://lagen.nu/org/2008/hovratten-for-vastra-sverige',
-                             'MDO': 'http://lagen.nu/org/2008/marknadsdomstolen',
-                             'MIG': 'http://lagen.nu/org/2008/migrationsoverdomstolen',
-                             'MÖD': 'http://lagen.nu/org/2008/miljooverdomstolen',
-                             'REG': 'http://lagen.nu/org/2008/regeringsratten',
-                             'KST': 'http://lagen.nu/org/2008/kammarratten-i-stockholm'}
-
-    # This is information you can get from RDL, but we hardcode it for
-    # now.
-    slugs = {'arbetsdomstolen': 'ad',
-             'domstolsverket': 'dv',
-             'göta hovrätt': 'hgo',
-             'högsta domstolen': 'hd',
-             'högsta förvaltningsdomstolen': 'hfd',
-             'hovrätten för nedre norrland': 'hnn',
-             'hovrätten för övre norrland': 'hon',
-             'hovrätten för västra sverige': 'hvs',
-             'hovrätten över skåne och blekinge': 'hsb',
-             'justitiekanslern': 'jk',
-             'kammarrätten i göteborg': 'kgg',
-             'kammarrätten i jönköping': 'kjo',
-             'kammarrätten i stockholm': 'kst',
-             'kammarrätten i sundsvall': 'ksu',
-             'marknadsdomstolen': 'md',
-             'migrationsöverdomstolen': 'mig',
-             'miljööverdomstolen': 'mod',
-             'mark- och miljööverdomstolen': 'mod',
-             'patentbesvärsrätten': 'pbr',
-             'rättshjälpsnämnden': 'rhn',
-             'regeringsrätten': 'regr',
-             'statens ansvarsnämnd': 'san',
-             'svea hovrätt': 'hsv'}
+# This crap has got to go, to be replaced with self.lookup_resource or
+# self.commondata
+#
+#    publikationsuri = {'NJA': 'http://rinfo.lagrummet.se/ref/rff/nja',
+#                       'RH': 'http://rinfo.lagrummet.se/ref/rff/rh',
+#                       'MÖD': 'http://rinfo.lagrummet.se/ref/rff/mod',
+#                       'RÅ': 'http://rinfo.lagrummet.se/ref/rff/ra',
+#                       'RK': 'http://rinfo.lagrummet.se/ref/rff/rk',
+#                       'MIG': 'http://rinfo.lagrummet.se/ref/rff/mig',
+#                       'AD': 'http://rinfo.lagrummet.se/ref/rff/ad',
+#                       'MD': 'http://rinfo.lagrummet.se/ref/rff/md',
+#                       'FÖD': 'http://rinfo.lagrummet.se/ref/rff/fod'}
+#
+#    domstolsforkortningar = {'ADO': 'http://lagen.nu/org/2008/arbetsdomstolen',
+#                             'HDO': 'http://lagen.nu/org/2008/hogsta-domstolen',
+#                             'HGO': 'http://lagen.nu/org/2008/gota-hovratt',
+#                             'HNN': 'http://lagen.nu/org/2008/hovratten-for-nedre-norrland',
+#                             'HON': 'http://lagen.nu/org/2008/hovratten-for-ovre-norrland',
+#                             'HSB': 'http://lagen.nu/org/2008/hovratten-over-skane-och-blekinge',
+#                             'HSV': 'http://lagen.nu/org/2008/svea-hovratt',
+#                             'HVS': 'http://lagen.nu/org/2008/hovratten-for-vastra-sverige',
+#                             'MDO': 'http://lagen.nu/org/2008/marknadsdomstolen',
+#                             'MIG': 'http://lagen.nu/org/2008/migrationsoverdomstolen',
+#                             'MÖD': 'http://lagen.nu/org/2008/miljooverdomstolen',
+#                             'REG': 'http://lagen.nu/org/2008/regeringsratten',
+#                             'KST': 'http://lagen.nu/org/2008/kammarratten-i-stockholm'}
+#
+#    # This is information you can get from RDL, but we hardcode it for
+#    # now.
+#    slugs = {'arbetsdomstolen': 'ad',
+#             'domstolsverket': 'dv',
+#             'göta hovrätt': 'hgo',
+#             'högsta domstolen': 'hd',
+#             'högsta förvaltningsdomstolen': 'hfd',
+#             'hovrätten för nedre norrland': 'hnn',
+#             'hovrätten för övre norrland': 'hon',
+#             'hovrätten för västra sverige': 'hvs',
+#             'hovrätten över skåne och blekinge': 'hsb',
+#             'justitiekanslern': 'jk',
+#             'kammarrätten i göteborg': 'kgg',
+#             'kammarrätten i jönköping': 'kjo',
+#             'kammarrätten i stockholm': 'kst',
+#             'kammarrätten i sundsvall': 'ksu',
+#             'marknadsdomstolen': 'md',
+#             'migrationsöverdomstolen': 'mig',
+#             'miljööverdomstolen': 'mod',
+#             'mark- och miljööverdomstolen': 'mod',
+#             'patentbesvärsrätten': 'pbr',
+#             'rättshjälpsnämnden': 'rhn',
+#             'regeringsrätten': 'regr',
+#             'statens ansvarsnämnd': 'san',
+#             'svea hovrätt': 'hsv'}
 
     @managedparsing
     def parse(self, doc):
+
+        # FIXME: These parsers should be SwedishCitationParser
+        # instances who wrap a LegalRef instance, but are configured
+        # to localize uris on demand
         if not hasattr(self, 'lagrum_parser'):
             self.lagrum_parser = LegalRef(LegalRef.LAGRUM)
         if not hasattr(self, 'rattsfall_parser'):
@@ -1225,18 +1229,21 @@ class DV(SwedishLegalSource):
             first_malnr = malnr[0]
             return "%(prefix)s%(slug)s/%(first_malnr)s/%(avg)s" % locals()
 
-        def localize_uri(uri):
-            if self.config.url == "https://lagen.nu/":
-                sfsprefix = ""
-            else:
-                sfsprefix = "res/sfs/"
-            if "publ/rattsfall" in uri:
-
-                return uri.replace("http://rinfo.lagrummet.se/publ/rattsfall/",
-                                   self.config.url + self.config.urlpath)
-            elif "publ/sfs/" in uri:
-                return uri.replace("http://rinfo.lagrummet.se/publ/sfs/",
-                                   self.config.url + sfsprefix)
+# Code that's dependent on this func should use
+# SwedishCitationParser.localize_uri instead
+# 
+#        def localize_uri(uri):
+#            if self.config.url == "https://lagen.nu/":
+#                sfsprefix = ""
+#            else:
+#                sfsprefix = "res/sfs/"
+#            if "publ/rattsfall" in uri:
+#
+#                return uri.replace("http://rinfo.lagrummet.se/publ/rattsfall/",
+#                                   self.config.url + self.config.urlpath)
+#            elif "publ/sfs/" in uri:
+#                return uri.replace("http://rinfo.lagrummet.se/publ/sfs/",
+#                                   self.config.url + sfsprefix)
 
         def split_nja(value):
             return [x[:-1] for x in value.split("(")]
@@ -1316,7 +1323,6 @@ class DV(SwedishLegalSource):
                 for i in value:  # better be list not string
                     for node in self.lagrum_parser.parse(i):
                         if isinstance(node, Link):
-
                             domdesc.rel(self.ns['rpubl'].lagrum,
                                         localize_uri(node.uri))
             elif label == "Rättsfall":
@@ -1384,6 +1390,9 @@ class DV(SwedishLegalSource):
             # method of filtering relative SFS links (which shouldn't
             # occur in a court report, and if it does, it's a sign
             # that our parser has missed the root SFS reference).
+            #
+            # FIXME: The above must have been written before there was
+            # a allow_relative parameter to SwedishCitationParser. 
             baseurl = "http://example.org/sfs/9999:999"
             citparser = SwedishCitationParser(self.ref_parser, self.config.url)
             b = citparser.parse_recursive(b)

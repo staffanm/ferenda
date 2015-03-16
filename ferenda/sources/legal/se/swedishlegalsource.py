@@ -9,7 +9,8 @@ import os
 import re
 
 from layeredconfig import LayeredConfig, Defaults
-from rdflib import URIRef, RDF, Namespace, Literal, Graph
+from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
+from rdflib.namespace import OWL
 from six import text_type as str
 import pkg_resources
 
@@ -276,6 +277,13 @@ class SwedishLegalSource(DocumentRepository):
         else:
             return str(val)
 
+    # FIXME: The purpose of this method is to map from localized
+    # (lagen.nu) URIs to canonical (Rpubl) URIs. But current approach
+    # is to use canonical URIs as the base (it's what legalref.Parser
+    # uses) and localize those URIs when finalizing document
+    # metadata. With that approach, this method isn't really needed,
+    # just avoid localizing the URI for the current document when
+    # setting the owl:sameAs triple.
     def sameas_uri(self, uri):
         # "http://localhost:8000/res/dir/2012:35" =>
         #     "http://rinfo.lagrummet.se/publ/dir/2012:35",
@@ -362,7 +370,12 @@ class SwedishLegalSource(DocumentRepository):
         else:
             return util.gYear(year)
 
-    def infer_triples(self, d, basefile):
+    def infer_triples(self, d, basefile=None):
+        """Try to infer any missing metadata from what we already have.
+
+        :param d: A configured Describer instance
+        :param basefile: The basefile for the doc we want to infer from 
+        """
         try:
             identifier = d.getvalue(self.ns['dcterms'].identifier)
             # if the identifier is incomplete, eg "2010/11:68" instead
@@ -416,6 +429,16 @@ class SwedishLegalSource(DocumentRepository):
 
         if self.rdf_type == self.ns['rpubl'].Utredningsbetankande:
             d.rel(self.ns['rpubl'].utrSerie, self.dataset_uri())
+
+        if self.config.localizeuri:
+            # construct a new anonymized graph to pass to construct_from_graph
+            g = Graph()
+            bnode = BNode()
+            for (s, p, o) in d.graph:
+                if s == d._current():
+                    g.add((bnode, p, o))
+            from pudb import set_trace; set_trace()
+            d.rel(OWL.sameAs, legaluri.construct_from_graph(g))
 
     def tabs(self, primary=False):
         if self.config.tabs:
