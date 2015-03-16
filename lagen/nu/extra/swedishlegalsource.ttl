@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2014-05-12T22:51:42.763901
+# Automatically transformed from sources at 2015-03-16T14:22:28.287054
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -157,6 +157,13 @@
     skos:altLabel "25FS"@sv ;
     skos:prefLabel "Norrbottens läns författningssamling"@sv .
 
+<https://lagen.nu/dataset/aafs> a rpubl:Forfattningssamling ;
+    dcterms:publisher <https://lagen.nu/org/2014/aklagarmyndigheten> ;
+    rdfs:seeAlso <http://www.aklagare.se/Dokument/Foreskrifter-och-riktlinjer/> ;
+    owl:sameAs <http://rinfo.lagrummet.se/serie/fs/aafs> ;
+    skos:altLabel "ÅFS"@sv ;
+    skos:prefLabel "Åklagarmyndighetens författningssamling"@sv .
+
 <https://lagen.nu/dataset/ad> a rpubl:Rattsfallspublikation ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/rf/ad> ;
     skos:altLabel "AD"@sv ;
@@ -171,8 +178,7 @@
 <https://lagen.nu/dataset/afs> a rpubl:Forfattningssamling ;
     dcterms:publisher <https://lagen.nu/org/2014/arbetsmiljoverket> ;
     rdfs:seeAlso <http://www.av.se/lagochratt/index.aspx> ;
-    owl:sameAs <http://rinfo.lagrummet.se/serie/fs/aafs>,
-        <http://rinfo.lagrummet.se/serie/fs/afs> ;
+    owl:sameAs <http://rinfo.lagrummet.se/serie/fs/afs> ;
     skos:altLabel "AFS"@sv ;
     skos:prefLabel "Arbetsmiljöverkets författningssamling"@sv .
 
@@ -202,8 +208,7 @@
 <https://lagen.nu/dataset/bfnar> a rpubl:AllmannaRadSerie ;
     dcterms:publisher <https://lagen.nu/org/2014/bokforingsnamnden> ;
     rdfs:seeAlso <http://www.bfn.se/index.asp?/redovisning/inledning.asp> ;
-    owl:sameAs <http://rinfo.lagrummet.se/serie/ar/bfnarr>,
-        <http://rinfo.lagrummet.se/serie/fs/bfnar> ;
+    owl:sameAs <http://rinfo.lagrummet.se/serie/ar/bfnar> ;
     skos:altLabel "bfnar"@sv ;
     skos:prefLabel "Bokföringsnämndens allmänna råd"@sv .
 
@@ -916,38 +921,31 @@
     foaf:name "Finansdepartementet"@sv .
 
 <https://lagen.nu/org/2008/forsvarsdepartementet> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/foersvarsdepartementet>,
-        <http://rinfo.lagrummet.se/org/forsvarsdepartementet> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/foersvarsdepartementet> ;
     foaf:name "Försvarsdepartementet"@sv .
 
 <https://lagen.nu/org/2008/gota-hovratt> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/goeta_hovraett>,
-        <http://rinfo.lagrummet.se/org/gota-hovratt> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/goeta_hovraett> ;
     foaf:name "Göta hovrätt"@sv .
 
 <https://lagen.nu/org/2008/hogsta-domstolen> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/hoegsta_domstolen>,
-        <http://rinfo.lagrummet.se/org/hogsta-domstolen> ;
-    foaf:name "Högsta Domstolen"@sv .
+    owl:sameAs <http://rinfo.lagrummet.se/org/hoegsta_domstolen> ;
+    foaf:name "Högsta domstolen"@sv .
 
 <https://lagen.nu/org/2008/hovratten-for-nedre-norrland> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/hovraetten_foer_nedre_norrland>,
-        <http://rinfo.lagrummet.se/org/hovratten-for-nedre-norrland> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/hovraetten_foer_nedre_norrland> ;
     foaf:name "Hovrätten för Nedre Norrland"@sv .
 
 <https://lagen.nu/org/2008/hovratten-for-ovre-norrland> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/hovraetten_foer_oevre_norrland>,
-        <http://rinfo.lagrummet.se/org/hovratten-for-ovre-norrland> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/hovraetten_foer_oevre_norrland> ;
     foaf:name "Hovrätten för Övre Norrland"@sv .
 
 <https://lagen.nu/org/2008/hovratten-for-vastra-sverige> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/hovraetten_foer_vaestra_sverige>,
-        <http://rinfo.lagrummet.se/org/hovratten-for-vastra-sverige> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/hovraetten_foer_vaestra_sverige> ;
     foaf:name "Hovrätten för Västra Sverige"@sv .
 
 <https://lagen.nu/org/2008/hovratten-over-skane-och-blekinge> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/hovraetten_oever_skaane_och_blekinge>,
-        <http://rinfo.lagrummet.se/org/hovratten-over-skane-och-blekinge> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/hovraetten_oever_skaane_och_blekinge> ;
     foaf:name "Hovrätten över Skåne och Blekinge"@sv .
 
 <https://lagen.nu/org/2008/industridepartementet> a foaf:Organization ;
@@ -959,8 +957,7 @@
     foaf:name "Inrikesdepartementet"@sv .
 
 <https://lagen.nu/org/2008/integrations-och-jamstalldhetsdepartementet> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/integrations-_och_jaemstaelldhetsdepartementet>,
-        <http://rinfo.lagrummet.se/org/integrations-och-jamstalldhetsdepartementet> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/integrations-_och_jaemstaelldhetsdepartementet> ;
     foaf:name "Integrations- och jämställdhetsdepartementet"@sv .
 
 <https://lagen.nu/org/2008/justitiedepartementet> a foaf:Organization ;
@@ -968,23 +965,19 @@
     foaf:name "Justitiedepartementet"@sv .
 
 <https://lagen.nu/org/2008/kammarratten-i-goteborg> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/kammarraetten_i_goeteborg>,
-        <http://rinfo.lagrummet.se/org/kammarratten-i-goteborg> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/kammarraetten_i_goeteborg> ;
     foaf:name "Kammarrätten i Göteborg"@sv .
 
 <https://lagen.nu/org/2008/kammarratten-i-jonkoping> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/kammarraetten_i_joenkoeping>,
-        <http://rinfo.lagrummet.se/org/kammarratten-i-jonkoping> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/kammarraetten_i_joenkoeping> ;
     foaf:name "Kammarrätten i Jönköping"@sv .
 
 <https://lagen.nu/org/2008/kammarratten-i-stockholm> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/kammarraetten_i_stockholm>,
-        <http://rinfo.lagrummet.se/org/kammarratten-i-stockholm> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/kammarraetten_i_stockholm> ;
     foaf:name "Kammarrätten i Stockholm"@sv .
 
 <https://lagen.nu/org/2008/kammarratten-i-sundsvall> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/kammarraetten_i_sundsvall>,
-        <http://rinfo.lagrummet.se/org/kammarratten-i-sundsvall> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/kammarraetten_i_sundsvall> ;
     foaf:name "Kammarrätten i Sundsvall"@sv .
 
 <https://lagen.nu/org/2008/kommunikationsdepartementet> a foaf:Organization ;
@@ -1000,8 +993,7 @@
     foaf:name "Marknadsdomstolen"@sv .
 
 <https://lagen.nu/org/2008/migrationsoverdomstolen> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/migrationsoeverdomstolen>,
-        <http://rinfo.lagrummet.se/org/migrationsoverdomstolen> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/migrationsoeverdomstolen> ;
     foaf:name "Migrationsöverdomstolen"@sv .
 
 <https://lagen.nu/org/2008/miljo-och-departementet> a foaf:Organization ;
@@ -1009,58 +1001,47 @@
     foaf:name "Miljö- och departementet"@sv .
 
 <https://lagen.nu/org/2008/miljo-och-energidepartementet> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/miljo-och-energidepartementet>,
-        <http://rinfo.lagrummet.se/org/miljoe-_och_energidepartementet> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/miljoe-_och_energidepartementet> ;
     foaf:name "Miljö- och energidepartementet"@sv .
 
 <https://lagen.nu/org/2008/miljo-och-naturresursdepartementet> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/miljo-och-naturresursdepartementet>,
-        <http://rinfo.lagrummet.se/org/miljoe-_och_naturresursdepartementet> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/miljoe-_och_naturresursdepartementet> ;
     foaf:name "Miljö- och naturresursdepartementet"@sv .
 
 <https://lagen.nu/org/2008/miljo-och-samhallsbyggnadsdepartementet> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/miljo-och-samhallsbyggnadsdepartementet>,
-        <http://rinfo.lagrummet.se/org/miljoe-_och_samhaellsbyggnadsdepartementet> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/miljoe-_och_samhaellsbyggnadsdepartementet> ;
     foaf:name "Miljö- och samhällsbyggnadsdepartementet"@sv .
 
 <https://lagen.nu/org/2008/miljodepartementet> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/miljodepartementet>,
-        <http://rinfo.lagrummet.se/org/miljoedepartementet> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/miljoedepartementet> ;
     foaf:name "Miljödepartementet"@sv .
 
 <https://lagen.nu/org/2008/miljooverdomstolen> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/miljoeoeverdomstolen>,
-        <http://rinfo.lagrummet.se/org/miljooverdomstolen> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/miljoeoeverdomstolen> ;
     foaf:name "Miljööverdomstolen"@sv .
 
 <https://lagen.nu/org/2008/narings-och-handelsdepartementet> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/naerings-_och_handelsdepartementet>,
-        <http://rinfo.lagrummet.se/org/narings-och-handelsdepartementet> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/naerings-_och_handelsdepartementet> ;
     foaf:name "Närings- och handelsdepartementet"@sv .
 
 <https://lagen.nu/org/2008/naringsdepartementet> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/naeringsdepartementet>,
-        <http://rinfo.lagrummet.se/org/naringsdepartementet> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/naeringsdepartementet> ;
     foaf:name "Näringsdepartementet"@sv .
 
 <https://lagen.nu/org/2008/patentbesvarsratten> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/patentbesvaersraetten>,
-        <http://rinfo.lagrummet.se/org/patentbesvarsratten> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/patentbesvaersraetten> ;
     foaf:name "Patentbesvärsrätten"@sv .
 
 <https://lagen.nu/org/2008/rattshjalpsnamnden> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/raettshjaelpsnaemnden>,
-        <http://rinfo.lagrummet.se/org/rattshjalpsnamnden> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/raettshjaelpsnaemnden> ;
     foaf:name "Rättshjälpsnämnden"@sv .
 
 <https://lagen.nu/org/2008/regeringsratten> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/regeringsraetten>,
-        <http://rinfo.lagrummet.se/org/regeringsratten> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/regeringsraetten> ;
     foaf:name "Regeringsrätten"@sv .
 
 <https://lagen.nu/org/2008/riksaklagaren> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/riksaaklagaren>,
-        <http://rinfo.lagrummet.se/org/riksaklagaren> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/riksaaklagaren> ;
     foaf:name "Riksåklagaren"@sv .
 
 <https://lagen.nu/org/2008/riksbanken> a foaf:Organization ;
@@ -1068,8 +1049,7 @@
     foaf:name "Riksbanken"@sv .
 
 <https://lagen.nu/org/2008/riksforsakringsverket> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/riksfoersaekringsverket>,
-        <http://rinfo.lagrummet.se/org/riksforsakringsverket> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/riksfoersaekringsverket> ;
     foaf:name "Riksförsäkringsverket"@sv .
 
 <https://lagen.nu/org/2008/riksrevisionsverket> a foaf:Organization ;
@@ -1077,8 +1057,7 @@
     foaf:name "Riksrevisionsverket"@sv .
 
 <https://lagen.nu/org/2008/riksskattenamnden> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/riksskattenaemnden>,
-        <http://rinfo.lagrummet.se/org/riksskattenamnden> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/riksskattenaemnden> ;
     foaf:name "Riksskattenämnden"@sv .
 
 <https://lagen.nu/org/2008/socialdepartementet> a foaf:Organization ;
@@ -1086,13 +1065,11 @@
     foaf:name "Socialdepartementet"@sv .
 
 <https://lagen.nu/org/2008/statens-bostadskreditnamnd> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/statens-bostadskreditnamnd>,
-        <http://rinfo.lagrummet.se/org/statens_bostadskreditnaemnd> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/statens_bostadskreditnaemnd> ;
     foaf:name "Statens bostadskreditnämnd"@sv .
 
 <https://lagen.nu/org/2008/statens-provningsanstalt> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/statens-provningsanstalt>,
-        <http://rinfo.lagrummet.se/org/statens_provningsanstalt> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/statens_provningsanstalt> ;
     foaf:name "Statens provningsanstalt"@sv .
 
 <https://lagen.nu/org/2008/statskontoret> a foaf:Organization ;
@@ -1104,13 +1081,11 @@
     foaf:name "Statsrådsberedningen"@sv .
 
 <https://lagen.nu/org/2008/svea-hovratt> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/svea-hovratt>,
-        <http://rinfo.lagrummet.se/org/svea_hovraett> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/svea_hovraett> ;
     foaf:name "Svea hovrätt"@sv .
 
 <https://lagen.nu/org/2008/utbildnings-och-kulturdepartementet> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/utbildnings-_och_kulturdepartementet>,
-        <http://rinfo.lagrummet.se/org/utbildnings-och-kulturdepartementet> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/utbildnings-_och_kulturdepartementet> ;
     foaf:name "Utbildnings- och kulturdepartementet"@sv .
 
 <https://lagen.nu/org/2008/utbildningsdepartementet> a foaf:Organization ;
@@ -1123,30 +1098,28 @@
 
 <https://lagen.nu/org/2011/hogsta-forvaltningsdomstolen> a foaf:Organization ;
     rdfs:seeAlso <http://rinfo.lagrummet.se/org/regeringsraetten> ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/hoegsta_foervaltningsdomstolen>,
-        <http://rinfo.lagrummet.se/org/hogsta-forvaltningsdomstolen> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/hoegsta_foervaltningsdomstolen> ;
     foaf:name "Högsta förvaltningsdomstolen"@sv .
 
 <https://lagen.nu/org/2011/mark-och-miljooverdomstolen> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/mark-och-miljooverdomstolen> ;
-    foaf:name "Mark- och Miljööverdomstolen"@sv .
+    rdfs:seeAlso <http://rinfo.lagrummet.se/org/miljoeoeverdomstolen> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/mark-_och_miljoeoeverdomstolen> ;
+    foaf:name "Mark- och miljööverdomstolen"@sv .
 
 <https://lagen.nu/org/2012/kungen> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/kungen> ;
-    foaf:name "H.M. Konungen"@sv .
+    owl:sameAs <http://rinfo.lagrummet.se/org/h_m_konungen> ;
+    foaf:name "H M Konungen"@sv,
+        "H.M. Konungen"@sv .
 
 <https://lagen.nu/org/2012/landsbygdsdepartementet> a foaf:Organization ;
     dcterms:replaces <https://lagen.nu/org/2008/jordbruksdepartementet> ;
     owl:sameAs <http://rinfo.lagrummet.se/org/landsbygdsdepartementet> ;
     foaf:name "Landsbygdsdepartementet"@sv .
 
-<https://lagen.nu/org/2014/aklagarmyndigheten> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/aaklagarmyndigheten> ;
-    foaf:name "Åklagarmyndigheten"@sv .
-
 <https://lagen.nu/org/2014/allmannna_reklamationsnamnden> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/allmaennna_reklamationsnaemnden> ;
-    foaf:name "Allmännna reklamationsnämnden"@sv .
+    owl:sameAs <http://rinfo.lagrummet.se/org/allmaenna_reklamationsnaemnden> ;
+    skos:altLabel "ARN" ;
+    foaf:name "Allmänna reklamationsnämnden"@sv .
 
 <https://lagen.nu/org/2014/armeintendenturforvaltningen> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/armeintendenturfoervaltningen> ;
@@ -1183,10 +1156,6 @@
 <https://lagen.nu/org/2014/fortifikationsverket> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/fortifikationsverket> ;
     foaf:name "Fortifikationsverket"@sv .
-
-<https://lagen.nu/org/2014/h_m_konungen> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/h_m_konungen> ;
-    foaf:name "H M Konungen"@sv .
 
 <https://lagen.nu/org/2014/handelsdepartementet> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/handelsdepartementet> ;
@@ -1261,6 +1230,10 @@
 <https://lagen.nu/org/2014/overklagandenamnden_for_studiestod> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/oeverklagandenaemnden_foer_studiestod> ;
     foaf:name "Överklagandenämnden för studiestöd"@sv .
+
+<https://lagen.nu/org/2014/patentombudsnamnden> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/patentombudsnaemnden> ;
+    foaf:name "Patentombudsnämnden"@sv .
 
 <https://lagen.nu/org/2014/presstodsnamnden> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/presstoedsnaemnden> ;
@@ -1370,18 +1343,20 @@
     foaf:name "Kammarkollegiet"@sv .
 
 <https://lagen.nu/org/2008/riksgaldskontoret> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/riksgaeldskontoret>,
-        <http://rinfo.lagrummet.se/org/riksgaldskontoret> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/riksgaeldskontoret> ;
     foaf:name "Riksgäldskontoret"@sv .
 
 <https://lagen.nu/org/2008/statistiska-centralbyran> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/statistiska-centralbyran>,
-        <http://rinfo.lagrummet.se/org/statistiska_centralbyraan> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/statistiska_centralbyraan> ;
     foaf:name "Statistiska centralbyrån"@sv .
 
 <https://lagen.nu/org/2014/affarsverket_svenska_kraftnat> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/affaersverket_svenska_kraftnaet> ;
     foaf:name "Affärsverket svenska kraftnät"@sv .
+
+<https://lagen.nu/org/2014/aklagarmyndigheten> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/aaklagarmyndigheten> ;
+    foaf:name "Åklagarmyndigheten"@sv .
 
 <https://lagen.nu/org/2014/arbetsformedlingen> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/arbetsfoermedlingen> ;
@@ -1432,7 +1407,7 @@
     foaf:name "Djurskyddsmyndigheten"@sv .
 
 <https://lagen.nu/org/2014/elsaekerhetsverket> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/elsakerhetsverket> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/elsaekerhetsverket> ;
     foaf:name "Elsäkerhetsverket"@sv .
 
 <https://lagen.nu/org/2014/energimarknadsinspektionen> a foaf:Organization ;
@@ -1734,8 +1709,7 @@
     foaf:name "Vetenskapsrådet"@sv .
 
 <https://lagen.nu/org/2008/forsakringskassan> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/foersaekringskassan>,
-        <http://rinfo.lagrummet.se/org/forsakringskassan> ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/foersaekringskassan> ;
     foaf:name "Försäkringskassan"@sv .
 
 <https://lagen.nu/org/2014/forsvarsmakten> a foaf:Organization ;

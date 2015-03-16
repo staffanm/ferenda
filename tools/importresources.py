@@ -1,6 +1,10 @@
-# sync data from rdl/resources/base/datasets into what's already defined in swedishlegalsource.ttl
+# -*- coding: utf-8 -*-
+# sync data from rdl/resources/base/datasets into what's already
+# defined in swedishlegalsource.ttl
+from __future__ import unicode_literals
 
-import sys,os
+import sys
+import os
 sys.path.append(os.getcwd())
 from datetime import datetime
 
@@ -9,15 +13,17 @@ from rdflib.namespace import SKOS, FOAF, OWL, DCTERMS
 
 from ferenda import util
 
-
+if sys.version_info < (3,):
+    raise RuntimeError("Only works on py3")
 
 TRANS = str.maketrans("åäö ", "aao_")
+    
 URIMAP = {}
 
-def import_org(filename, targetgraph):
-    print("Adding triples in %s to targetgraph" % filename)
-    sourcegraph = rdflib.Graph()
-    sourcegraph.parse(open(filename), format="n3")
+
+def import_org(sourcegraph, targetgraph):
+    # print("Adding triples in %s to targetgraph" % filename)
+
     # iterate through all named things (using foaf:name)
     for (sourceuri, name) in sourcegraph.subject_objects(predicate=FOAF.name):
         targeturi = targetgraph.value(predicate=FOAF.name, object=name)
@@ -31,15 +37,17 @@ def import_org(filename, targetgraph):
             if not targetgraph.value(targeturi, p): # we don't know the value for this pred
                 print("    Adding: %s %s %s" % (targeturi, sourcegraph.qname(p), o))
                 targetgraph.add((targeturi, p, o))
-        # finally add owl:sameAs (should we check to see if it exists?)
-        targetgraph.add((targeturi, OWL.sameAs, sourceuri))
+        # finally add owl:sameAs if not already there
+        if sourceuri not in targetgraph.objects(targeturi, OWL.sameAs):
+            targetgraph.add((targeturi, OWL.sameAs, sourceuri))
+            print("    Asserting org %s owl:sameAs %s " % (targeturi, sourceuri))
         URIMAP[sourceuri] = targeturi
-        print("    Asserting owl:sameAs %s " % sourceuri)
 
-def import_dataset(filename, targetgraph):
-    print("Adding triples in %s to targetgraph" % filename)
-    sourcegraph = rdflib.Graph()
-    sourcegraph.parse(open(filename), format="n3")
+
+def import_dataset(sourcegraph, targetgraph):
+    # print("Adding triples in %s to targetgraph" % filename)
+    # sourcegraph = rdflib.Graph()
+    # sourcegraph.parse(open(filename), format="n3")
     # iterate through all named things (using skos:prefLabel)
     for (sourceuri, name) in sourcegraph.subject_objects(predicate=SKOS.prefLabel):
         targeturi = targetgraph.value(predicate=SKOS.prefLabel, object=name)
@@ -59,28 +67,54 @@ def import_dataset(filename, targetgraph):
                     o = URIMAP[o] 
                 print("    Adding: %s %s %s" % (targeturi, sourcegraph.qname(p), o))
                 targetgraph.add((targeturi, p, o))
-        # finally add owl:sameAs (should we check to see if it exists?)
-        targetgraph.add((targeturi, OWL.sameAs, sourceuri))
+        # finally add owl:sameAs if not already there
+        if sourceuri not in targetgraph.objects(targeturi, OWL.sameAs):
+            targetgraph.add((targeturi, OWL.sameAs, sourceuri))
+            print("    Asserting res %s owl:sameAs %s " % (targeturi, sourceuri))
         URIMAP[sourceuri] = targeturi
-        print("    Asserting owl:sameAs %s " % sourceuri)
-    
 
-def main():
+
+def load_n3(path, graph=None):
+    # loads all the n3 files directly with in a given path (does not
+    # recurse) into graph.
+    if graph is None:
+        graph = rdflib.Graph()
+    print("loading all n3 files in %s" % path)
+    for f in os.listdir(path):
+        if f.endswith("n3"):
+            print("    loading %s" % f)
+            graph.parse(open(path+os.sep+f), format="n3")
+    return graph
+
+def concatgraph(base, dest):
+    g = rdflib.Graph()
+    load_n3(base+os.sep+"org", g)
+    load_n3(base+os.sep+"serie", g)
+    with open(dest, "wb") as fp:
+        header = "# Automatically concatenated from sources at %s\n\n" % datetime.now().isoformat()
+        fp.write(header.encode("utf-8"))
+        g.serialize(fp, format="turtle")
+    print("Concatenated %s triples" % (len(g)))
+
+def mapgraph(base, customresources, dest):
     targetgraph = rdflib.Graph()
-    targetgraph.parse(open("ferenda/res/extra/swedishlegalsource.ttl"), format="turtle")
+    targetgraph.parse(open(customresources), format="turtle")
     len_before = len(targetgraph)
-    import_org("../rdl/resources/base/datasets/org/departement.n3", targetgraph)
-    import_org("../rdl/resources/base/datasets/org/domstolar.n3", targetgraph)
-    import_org("../rdl/resources/base/datasets/org/lansstyrelser.n3", targetgraph)
-    import_org("../rdl/resources/base/datasets/org/myndigheter.n3", targetgraph)
-    import_dataset("../rdl/resources/base/datasets/serie/ar.n3", targetgraph) 
-    import_dataset("../rdl/resources/base/datasets/serie/fs.n3", targetgraph) 
-    import_dataset("../rdl/resources/base/datasets/serie/rf.n3", targetgraph) 
-    import_dataset("../rdl/resources/base/datasets/serie/utr.n3", targetgraph) 
-    with open("ferenda/res/extra/swedishlegalsource.auto.ttl", "wb") as fp:
+    import_org(load_n3(base+os.sep+"org"), targetgraph)
+    import_dataset(load_n3(base+os.sep+"serie"), targetgraph) 
+    with open(dest, "wb") as fp:
         header = "# Automatically transformed from sources at %s\n\n" % datetime.now().isoformat()
         fp.write(header.encode("utf-8"))
         targetgraph.serialize(fp, format="turtle")
     len_after = len(targetgraph)
     print("Added %s triples (%s -> %s)" % (len_after-len_before, len_before, len_after))
-main()
+
+def main():
+    concatgraph("../rdl/resources/base/datasets",
+                "ferenda/res/extra/swedishlegalsource.auto.ttl")
+    mapgraph("../rdl/resources/base/datasets",
+             "lagen/nu/extra/swedishlegalsource.ttl",
+             "lagen/nu/extra/swedishlegalsource.auto.ttl")
+
+if __name__ == '__main__':
+    main()
