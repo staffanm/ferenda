@@ -339,14 +339,26 @@ class MyndFskr(SwedishLegalSource):
         proper RDF graph.
 
         """
-        # FIXME: replace this with just using self.makeurl once we've
-        # verified that it works
+        # FIXME: by setting urlpath to '', instead of default
+        # 'res/myndfs', we get localized uris like
+        # https://lagen.nu/sosfs/2013:20 and
+        # https://lagen.nu/1969:624#P6 (for references) instead of
+        # https://lagen.nu/res/myndfs/sosfs/2013:20 and
+        # https://lagen.nu/res/myndfs/1969:624#P6 (for references,
+        # CLEARLY wrong).
+        #
+        # A proper solution that handles both this repo and the SFS
+        # repo would require full access to sfs.config, which we don't
+        # have at the parse step, and probably multiple
+        # SwedishCitationParser instances. Instead we optimize for the
+        # common case of either lagen.nu URIs or canonical URIs.
+        parser = SwedishCitationParser(LegalRef(LegalRef.LAGRUM),
+                                       self.config.url,
+                                       # '',  # shld be self.config.urlpath, but
+                                       localizeuri=self.config.localizeuri)
         if self.config.localizeuri:
-            f = SwedishCitationParser(None, self.config.url,
-                                      self.config.urlpath).localize_uri
-
             def makeurl(data):
-                return f(legaluri.construct(data))
+                return parser.localize_uri(legaluri.construct(data))
         else:
             makeurl = legaluri.construct
 
@@ -449,13 +461,7 @@ class MyndFskr(SwedishLegalSource):
 
         has_bemyndiganden = False
         if 'rpubl:bemyndigande' in props:
-            # FIXME: move to sanitize_metadata
-            # SimpleParse can't handle unicode endash sign, transform
-            # into regular ascii hyphen
-            props['rpubl:bemyndigande'] = props[
-                'rpubl:bemyndigande'].replace('\u2013', '-')
-            parser = LegalRef(LegalRef.LAGRUM)
-            result = parser.parse(props['rpubl:bemyndigande'])
+            result = parser.parse_string(props['rpubl:bemyndigande'])
             bemyndiganden = [x.uri for x in result if hasattr(x, 'uri')]
 
             # some of these uris need to be filtered away due to

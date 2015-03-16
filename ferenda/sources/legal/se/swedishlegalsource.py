@@ -4,11 +4,14 @@ from __future__ import unicode_literals
 # for handling data sources of swedish law.
 
 from datetime import datetime, date
+import inspect
+import os
 import re
 
-from rdflib import URIRef, RDF, Namespace, Literal
-from six import text_type as str
 from layeredconfig import LayeredConfig, Defaults
+from rdflib import URIRef, RDF, Namespace, Literal, Graph
+from six import text_type as str
+import pkg_resources
 
 from ferenda import (DocumentRepository, DocumentStore, FSMParser,
                      CitationParser)
@@ -210,6 +213,44 @@ class SwedishLegalSource(DocumentRepository):
 
         if not isinstance(self, SwedishLegalSource):
             assert self.alias != "swedishlegalsource", "Subclasses must override self.alias!"
+
+    @property
+    def commondata(self):
+        # override to make sure we use the lagen.nu versions of
+        # resource files iff localize_uri is True
+        if not self.config.localizeuri:
+            return super(SwedishLegalSource, self).commondata
+        if hasattr(self, '_commondata'):
+            return self._commondata
+        self._commondata = Graph()
+        for cls in inspect.getmro(self.__class__):
+            if not hasattr(cls, 'alias'):
+                continue
+            # NB: This is almost a load-path mechanism!
+            for loadpath in ('lagen/nu/extra', 'ferenda/res/extra'):
+                package, commonpath = loadpath.split("/", 1)
+                loadpath = loadpath + "/%s.ttl" % cls.alias
+                commonpath = commonpath + "/%s.ttl" % cls.alias
+                fp = None
+                if os.path.exists(loadpath):
+                    self.log.debug("%s: Loading resources from file %s" %
+                                   (self.alias, loadpath))
+                elif os.path.exists(commonpath):
+                    self.log.debug("%s: Loading resources from path %s" %
+                                   (self.alias, commonpath))
+                    fp = open(commonpath, 'rb')
+                elif pkg_resources.resource_exists(package, commonpath):
+                    self.log.debug("%s: Loading resources from %s:%s" %
+                                   (self.alias, package, commonpath))
+                    fp = pkg_resources.resource_stream(package, commonpath)
+                else:
+                    pass  # warn?
+                if fp:
+                    self._commondata.parse(data=fp.read(), format="turtle")
+                    fp.close()
+                    break  # out of the inner look to skip any
+                           # remaining loadpath candidates
+        return self._commondata
 
     @classmethod
     def get_default_options(cls):
@@ -733,11 +774,12 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
 # grammars.
 class SwedishCitationParser(CitationParser):
 
-    def __init__(self, legalrefparser, baseurl, urlpath=None, allow_relative=False):
+    def __init__(self, legalrefparser, baseurl, urlpath=None, allow_relative=False, localizeuri=True):
         self._legalrefparser = legalrefparser
         self._baseurl = baseurl
         self._currenturl = self._baseurl
         self._allow_relative = allow_relative
+        self._localizeuri = localizeuri
         if self._baseurl == "https://lagen.nu/":
             if urlpath is None:
                 self._urlpath = ''
@@ -785,7 +827,7 @@ class SwedishCitationParser(CitationParser):
             if isinstance(node, Link) and "sfs/9999:999" in node.uri:
                 filtered.append(str(node))
             else:
-                if isinstance(node, Link):
+                if isinstance(node, Link) and self._localizeuri:
                     node.uri = self.localize_uri(node.uri)
                 filtered.append(node)
         return filtered
