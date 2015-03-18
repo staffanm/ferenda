@@ -21,7 +21,8 @@ from copy import deepcopy
 
 # 3rdparty libs
 import pkg_resources
-from rdflib import Namespace, URIRef, Graph, RDF, Literal
+from rdflib import Namespace, URIRef, Graph, RDF, RDFS, Literal
+from rdflib.namespace import DCTERMS, OWL
 import requests
 import lxml.html
 from lxml import etree
@@ -36,9 +37,8 @@ from ferenda.elements import (Body, Paragraph, CompoundElement, OrdinalElement,
                               Heading, Link)
 
 from ferenda.elements.html import Strong, Em
-from . import legaluri, SwedishLegalSource, SwedishCitationParser, RPUBL
+from . import legaluri, SwedishLegalSource, SwedishCitationParser, RPUBL, URISPACE
 
-DCTERMS = Namespace(util.ns['dcterms'])
 PROV = Namespace(util.ns['prov'])
 
 # Objektmodellen för rättsfall:
@@ -288,9 +288,9 @@ class DV(SwedishLegalSource):
 
         with self.store.open_distilled(basefile) as fp:
             g = Graph().parse(data=fp.read())
-        for uri, rdftype in g.subject_objects(predicate=self.ns["rdf"].type):
-            if rdftype in (self.ns['rpubl'].Rattsfallsreferat,
-                           self.ns['rpubl'].Rattsfallsnotis):
+        for uri, rdftype in g.subject_objects(predicate=RDF.type):
+            if rdftype in (RPUBL.Rattsfallsreferat,
+                           RPUBL.Rattsfallsnotis):
                 return str(uri)
         raise ValueError("Can't find canonical URI for basefile %s in %s" % (basefile, p))
 
@@ -672,96 +672,23 @@ class DV(SwedishLegalSource):
 
     re_delimSplit = re.compile("[;,] ?").split
     labels = {'Rubrik': DCTERMS.description,
-              'Domstol': DCTERMS['creator'],  # konvertera till auktoritetspost
-              'Målnummer': RPUBL['malnummer'],
-              'Domsnummer': RPUBL['domsnummer'],
-              'Diarienummer': RPUBL['diarienummer'],
-              'Avdelning': RPUBL['domstolsavdelning'],
-              'Referat': DCTERMS['identifier'],
-              'Avgörandedatum': RPUBL['avgorandedatum'],  # konvertera till xsd:date
+              'Domstol': DCTERMS.creator,
+              'Målnummer': RPUBL.malnummer,
+              'Domsnummer': RPUBL.domsnummer,
+              'Diarienummer': RPUBL.diarienummer,
+              'Avdelning': RPUBL.domstolsavdelning,
+              'Referat': DCTERMS.identifier,
+              'Avgörandedatum': RPUBL.avgorandedatum,
               }
-
-    # Metadata som kan innehålla noll eller flera poster.
-    # Litteratur/sökord har ingen motsvarighet i RPUBL-vokabulären
-    multilabels = {'Lagrum': RPUBL['lagrum'],
-                   'Rättsfall': RPUBL['rattsfallshanvisning'],
-                   # dcterms:references vore bättre, men sådana ska inte ha literalvärden
-                   'Litteratur': DCTERMS['relation'],
-                   'Sökord': DCTERMS['subject']
-                   }
-
-# This crap has got to go, to be replaced with self.lookup_resource or
-# self.commondata
-#
-#    publikationsuri = {'NJA': 'http://rinfo.lagrummet.se/ref/rff/nja',
-#                       'RH': 'http://rinfo.lagrummet.se/ref/rff/rh',
-#                       'MÖD': 'http://rinfo.lagrummet.se/ref/rff/mod',
-#                       'RÅ': 'http://rinfo.lagrummet.se/ref/rff/ra',
-#                       'RK': 'http://rinfo.lagrummet.se/ref/rff/rk',
-#                       'MIG': 'http://rinfo.lagrummet.se/ref/rff/mig',
-#                       'AD': 'http://rinfo.lagrummet.se/ref/rff/ad',
-#                       'MD': 'http://rinfo.lagrummet.se/ref/rff/md',
-#                       'FÖD': 'http://rinfo.lagrummet.se/ref/rff/fod'}
-#
-#    domstolsforkortningar = {'ADO': 'http://lagen.nu/org/2008/arbetsdomstolen',
-#                             'HDO': 'http://lagen.nu/org/2008/hogsta-domstolen',
-#                             'HGO': 'http://lagen.nu/org/2008/gota-hovratt',
-#                             'HNN': 'http://lagen.nu/org/2008/hovratten-for-nedre-norrland',
-#                             'HON': 'http://lagen.nu/org/2008/hovratten-for-ovre-norrland',
-#                             'HSB': 'http://lagen.nu/org/2008/hovratten-over-skane-och-blekinge',
-#                             'HSV': 'http://lagen.nu/org/2008/svea-hovratt',
-#                             'HVS': 'http://lagen.nu/org/2008/hovratten-for-vastra-sverige',
-#                             'MDO': 'http://lagen.nu/org/2008/marknadsdomstolen',
-#                             'MIG': 'http://lagen.nu/org/2008/migrationsoverdomstolen',
-#                             'MÖD': 'http://lagen.nu/org/2008/miljooverdomstolen',
-#                             'REG': 'http://lagen.nu/org/2008/regeringsratten',
-#                             'KST': 'http://lagen.nu/org/2008/kammarratten-i-stockholm'}
-#
-#    # This is information you can get from RDL, but we hardcode it for
-#    # now.
-#    slugs = {'arbetsdomstolen': 'ad',
-#             'domstolsverket': 'dv',
-#             'göta hovrätt': 'hgo',
-#             'högsta domstolen': 'hd',
-#             'högsta förvaltningsdomstolen': 'hfd',
-#             'hovrätten för nedre norrland': 'hnn',
-#             'hovrätten för övre norrland': 'hon',
-#             'hovrätten för västra sverige': 'hvs',
-#             'hovrätten över skåne och blekinge': 'hsb',
-#             'justitiekanslern': 'jk',
-#             'kammarrätten i göteborg': 'kgg',
-#             'kammarrätten i jönköping': 'kjo',
-#             'kammarrätten i stockholm': 'kst',
-#             'kammarrätten i sundsvall': 'ksu',
-#             'marknadsdomstolen': 'md',
-#             'migrationsöverdomstolen': 'mig',
-#             'miljööverdomstolen': 'mod',
-#             'mark- och miljööverdomstolen': 'mod',
-#             'patentbesvärsrätten': 'pbr',
-#             'rättshjälpsnämnden': 'rhn',
-#             'regeringsrätten': 'regr',
-#             'statens ansvarsnämnd': 'san',
-#             'svea hovrätt': 'hsv'}
 
     @managedparsing
     def parse(self, doc):
-
-        # FIXME: These parsers should be SwedishCitationParser
-        # instances who wrap a LegalRef instance, but are configured
-        # to localize uris on demand
-        if not hasattr(self, 'lagrum_parser'):
-            self.lagrum_parser = LegalRef(LegalRef.LAGRUM)
-        if not hasattr(self, 'rattsfall_parser'):
-            self.rattsfall_parser = LegalRef(LegalRef.RATTSFALL)
         docfile = self.store.downloaded_path(doc.basefile)
-
         intermediatefile = self.store.intermediate_path(doc.basefile)
         r = WordReader()
         intermediatefile, filetype = r.read(docfile, intermediatefile)
-
         if filetype == "docx":
             self._simplify_ooxml(intermediatefile)
-
         with codecs.open(intermediatefile, encoding="utf-8") as fp:
             patchedtext, patchdesc = self.patch_if_needed(doc.basefile,
                                                           fp.read())
@@ -799,7 +726,7 @@ class DV(SwedishLegalSource):
         # (rpubl:referatrubrik is often too wordy, dctemr:identifier +
         # dcterms:subject might be a better choice -- also notisfall
         # does not have any rpubl:referatrubrik)
-        title = doc.meta.value(URIRef(doc.uri), self.ns['rpubl'].referatrubrik)
+        title = doc.meta.value(URIRef(doc.uri), RPUBL.referatrubrik)
         if title:
             return str(title)
 
@@ -1214,10 +1141,15 @@ class DV(SwedishLegalSource):
 
         # FIXME: This setup (parser instance and makeurl function) could
         # probably be shared between many repos
-        parser = SwedishCitationParser(LegalRef(LegalRef.LAGRUM),
+        parser = SwedishCitationParser(LegalRef(LegalRef.RATTSFALL),
                                        self.config.url,
-                                       # '',  # shld be self.config.urlpath, but
+                                       '',
                                        localizeuri=self.config.localizeuri)
+
+        lparser = SwedishCitationParser(LegalRef(LegalRef.LAGRUM),
+                                        self.config.url,
+                                        '', 
+                                        localizeuri=self.config.localizeuri)
         if self.config.localizeuri:
             def makeurl(data):
                 return parser.localize_uri(legaluri.construct(data))
@@ -1225,25 +1157,28 @@ class DV(SwedishLegalSource):
             makeurl = legaluri.construct
 
         def ref_to_uri(ref):
-            # FIXME: We'd like to retire legalref and replace it with
-            # pyparsing grammars.
-            nodes = self.rattsfall_parser.parse(ref)
+            nodes = parser.parse_string(ref)
             assert isinstance(nodes[0], Link), "Couldn't make URI from ref %s" % ref
             uri = nodes[0].uri
             return parser.localize_uri(uri)
 
-        def dom_to_uri(domstol, malnr, avg):
-            prefix = self.config.url + self.config.urlpath
-            # "Högsta förvaltningsdomstolen" => "hfd"
-            slug = self.slugs[domstol.lower()]
-            # FIXME: We should create multiple urls if we have multiple malnummers?
-            first_malnr = malnr[0]
-            return "%(prefix)s%(slug)s/%(first_malnr)s/%(avg)s" % locals()
+#        def dom_to_uri(domstol, malnr, avg):
+#            # FIXME: Shouldn't legaluri.construct be able to handle this?
+#            prefix = self.config.url + self.config.urlpath
+#            # "Högsta förvaltningsdomstolen" => "hfd"
+#            slug = self.lookup_label(self.lookup_resource(domstol),
+#                                     predicate=URISPACE.abbrSlug)
+#
+#            # FIXME: We should create multiple urls if we have
+#            # multiple malnummers?
+#            first_malnr = malnr[0]
+#            return "%(prefix)s%(slug)s/%(first_malnr)s/%(avg)s" % locals()
 
         def split_nja(value):
             return [x[:-1] for x in value.split("(")]
 
         def sokord_uri(value):
+            # only used when self.config.localizeuri is set
             baseuri = self.config.url + "concept/"
             return baseuri + util.ucfirst(value).replace(' ', '_')
 
@@ -1251,11 +1186,14 @@ class DV(SwedishLegalSource):
         refuri = ref_to_uri(head["Referat"])
 
         refdesc = Describer(doc.meta, refuri)
-
-        domuri = dom_to_uri(head["Domstol"],
-                            head["_localid"],
-                            head["Avgörandedatum"])
-        domdesc = Describer(doc.meta, domuri)
+        slug = self.lookup_label(self.lookup_resource(head["Domstol"]),
+                                 predicate=URISPACE.abbrSlug)
+        for malnummer in head['_localid']:
+            domuri = makeurl({'type': LegalRef.DOMSTOLSAVGORANDEN,
+                              'malnummer': malnummer,
+                              'domstol': slug,
+                              'avgorandedatum': head['Avgörandedatum']})
+            domdesc = Describer(doc.meta, domuri)
 
         # 2. convert all strings in head to proper RDF
         #
@@ -1263,24 +1201,24 @@ class DV(SwedishLegalSource):
         for label, value in head.items():
             if label == "Rubrik":
                 value = util.normalize_space(value)
-                refdesc.value(self.ns['rpubl'].referatrubrik, value, lang="sv")
-                domdesc.value(self.ns['dcterms'].title, value, lang="sv")
+                refdesc.value(RPUBL.referatrubrik, value, lang="sv")
+                domdesc.value(DCTERMS.title, value, lang="sv")
 
             elif label == "Domstol":
-                domdesc.rel(self.ns['dcterms'].publisher, self.lookup_resource(value))
+                domdesc.rel(DCTERMS.publisher, self.lookup_resource(value))
             elif label == "Målnummer":
                 for v in value:
                     # FIXME: In these cases (multiple målnummer, which
                     # primarily occurs with AD), we should really
                     # create separate domdesc objects (there are two
                     # verdicts, just summarized in one document)
-                    domdesc.value(self.ns['rpubl'].malnummer, v)
+                    domdesc.value(RPUBL.malnummer, v)
             elif label == "Domsnummer":
-                domdesc.value(self.ns['rpubl'].domsnummer, value)
+                domdesc.value(RPUBL.domsnummer, value)
             elif label == "Diarienummer":
-                domdesc.value(self.ns['rpubl'].diarienummer, value)
+                domdesc.value(RPUBL.diarienummer, value)
             elif label == "Avdelning":
-                domdesc.value(self.ns['rpubl'].avdelning, value)
+                domdesc.value(RPUBL.avdelning, value)
             elif label == "Referat":
                 for pred, regex in {'rattsfallspublikation': r'([^ ]+)',
                                     'arsutgava': r'(\d{4})',
@@ -1295,60 +1233,71 @@ class DV(SwedishLegalSource):
                                 uri = "https://lagen.nu/dataset/" + m.group(1).lower()
                             else:
                                 uri = self.config.url + "coll/dv/" + m.group(1).lower()
-                            refdesc.rel(self.ns['rpubl'][pred], uri)
+                            refdesc.rel(RPUBL[pred], uri)
                         else:
-                            refdesc.value(self.ns['rpubl'][pred], m.group(1))
-                refdesc.value(self.ns['dcterms'].identifier, value)
+                            refdesc.value(RPUBL[pred], m.group(1))
+                refdesc.value(DCTERMS.identifier, value)
 
             elif label == "_nja_ordinal":
-                refdesc.value(self.ns['dcterms'].bibliographicCitation,
+                refdesc.value(DCTERMS.bibliographicCitation,
                               value)
                 m = re.search(r'\d{4}(?:\:| nr | not )(\d+)', value)
                 if m:
-                    refdesc.value(self.ns['rpubl'].lopnummer, m.group(1))
+                    refdesc.value(RPUBL.lopnummer, m.group(1))
 
-                refdesc.rel(self.ns['owl'].sameAs,
+                refdesc.rel(OWL.sameAs,
                             (self.config.url + self.config.urlpath +
                              "nja/" + value.split(" ")[1]))
 
             elif label == "Avgörandedatum":
-                domdesc.value(self.ns['rpubl'].avgorandedatum, self.parse_iso_date(value))
+                domdesc.value(RPUBL.avgorandedatum, self.parse_iso_date(value))
 
             elif label == "Lagrum":
                 for i in value:  # better be list not string
-                    for node in self.lagrum_parser.parse(i):
+                    for node in lparser.parse_string(i):
                         if isinstance(node, Link):
-                            domdesc.rel(self.ns['rpubl'].lagrum,
-                                        parser.localize_uri(node.uri))
+                            domdesc.rel(RPUBL.lagrum,
+                                        node.uri)
             elif label == "Rättsfall":
                 for i in value:
-                    for node in self.rattsfall_parser.parse(i):
+                    for node in parser.parse_string(i):
                         if isinstance(node, Link):
-                            domdesc.rel(self.ns['rpubl'].rattsfall,
-                                        parser.localize_uri(node.uri))
+                            domdesc.rel(RPUBL.rattsfall,
+                                        node.uri)
             elif label == "Litteratur":
                 for i in value.split(";"):
-                    domdesc.value(self.ns['dcterms'].relation, util.normalize_space(i))
+                    domdesc.value(DCTERMS.relation, util.normalize_space(i))
             elif label == "Sökord":
                 for s in value:
-                    domdesc.rel(self.ns['dcterms'].subject, sokord_uri(s))
+                    if self.config.localizeuri:
+                        domdesc.rel(DCTERMS.subject, sokord_uri(s))
+                    else:
+                        # Canonical uris don't define a URI space for
+                        # keywords/concepts. Instead refer to bnodes
+                        # with rdfs:label set (cf. rdl/documentation/exempel/
+                        # documents/publ/Domslut/HD/2009/T_170-08.rdf)
+                        with domdesc.rel(DCTERMS.subject):
+                            domdesc.value(RDFS.label, s, lang=self.lang)
 
-        # 3. mint some owl:sameAs URIs
-        refdesc.rel(self.ns['owl'].sameAs, self.sameas_uri(refuri))
-        domdesc.rel(self.ns['owl'].sameAs, self.sameas_uri(domuri))
+
+        # 3. mint some owl:sameAs URIs -- but only if not using canonical URIs
+        if self.config.localizeuri:
+            refdesc.rel(OWL.sameAs, self.sameas_uri(refuri))
+            # FIXME: could be multiple domuris
+            domdesc.rel(OWL.sameAs, self.sameas_uri(domuri))
 
         # 4. Add some same-for-everyone properties
-        refdesc.rel(self.ns['dcterms'].publisher, self.lookup_resource('Domstolsverket'))
+        refdesc.rel(DCTERMS.publisher, self.lookup_resource('Domstolsverket'))
         if 'not' in head['Referat']:
-            refdesc.rdftype(self.ns['rpubl'].Rattsfallsnotis)
+            refdesc.rdftype(RPUBL.Rattsfallsnotis)
         else:
-            refdesc.rdftype(self.ns['rpubl'].Rattsfallsreferat)
-        domdesc.rdftype(self.ns['rpubl'].VagledandeDomstolsavgorande)
-        refdesc.rel(self.ns['rpubl'].referatAvDomstolsavgorande, domuri)
-        refdesc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
+            refdesc.rdftype(RPUBL.Rattsfallsreferat)
+        domdesc.rdftype(RPUBL.VagledandeDomstolsavgorande)
+        refdesc.rel(RPUBL.referatAvDomstolsavgorande, domuri)
+        refdesc.value(PROV.wasGeneratedBy, self.qualified_class_name())
 # FIXME: implement this
 #        # 5. Create a meaningful identifier for the verdict itself (ie. "Göta hovrätts dom den 42 september 2340 i mål B 1234-42")
-#        domdesc.value(self.ns['dcterms'].identifier, dom_to_identifier(head["Domstol"],
+#        domdesc.value(DCTERMS.identifier, dom_to_identifier(head["Domstol"],
 #                                                                   head["_localid"],
 #                                                                   head["Avgörandedatum"])
 #

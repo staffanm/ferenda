@@ -4,6 +4,9 @@ from __future__ import unicode_literals
 of that document. Alternatively, given a URI for a document, parse the
 different properties for the document"""
 
+# As features pile up, this module is starting to look more and more
+# like a imperative version of rdl/resources/base/sys/uri/space.n3
+
 # system libs
 import re
 
@@ -33,19 +36,23 @@ predicate = {"type": RDF.type,
              "arsutgava": RPUBL.arsutgava,
              "sidnummer": RPUBL.sidnummer,
              "lopnummer": RPUBL.lopnummer,
-             "law": RPUBL.lopnummer,  # law really consists of arsutgava:lopnummer
+             "law": RPUBL.lopnummer,  # really consists of arsutgava:lopnummer
              "chapter": RINFOEX.kapitelnummer,
              "section": RINFOEX.paragrafnummer,
              "piece": RINFOEX.styckenummer,
              "item": RINFOEX.punktnummer,
              "myndighet": DCTERMS.creator,
+             "domstol": DCTERMS.creator,  # probably?
              "dnr": RPUBL.diarienummer,
+             "malnummer": RPUBL.malnummer,
+             "avgorandedatum": RPUBL.avgorandedatum,
              "celex": RPUBL.genomforDirektiv}
 
 dictkey = dict([[v, k] for k, v in list(predicate.items())])
 
 types = {LegalRef.RATTSFALL: RPUBL.Rattsfallsreferat,
          LegalRef.LAGRUM: RPUBL.KonsolideradGrundforfattning,
+         LegalRef.DOMSTOLSAVGORANDEN: RPUBL.VagledandeDomstolsavgorande,
          LegalRef.MYNDIGHETSBESLUT: RPUBL.VagledandeMyndighetsavgorande,
          LegalRef.FORESKRIFTER: RPUBL.Myndighetsforeskrift,
          LegalRef.EULAGSTIFTNING: RINFOEX.EUDirektiv}
@@ -138,6 +145,12 @@ def construct_from_graph(graph):
         return "http://rinfo.lagrummet.se/publ/avg/%s/%s" % \
                (graph.value(bnode, DCTERMS.creator),
                 graph.value(bnode, RPUBL.diarienummer))
+
+    elif rdftype == RPUBL.VagledandeDomstolsavgorande:
+        return "http://rinfo.lagrummet.se/publ/dom/%s/%s/%s" % \
+               (graph.value(bnode, DCTERMS.creator),
+                graph.value(bnode, RPUBL.malnummer),
+                graph.value(bnode, RPUBL.avgorandedatum))
 
     elif rdftype == RPUBL.Myndighetsforeskrift:
         return "http://rinfo.lagrummet.se/publ/%s/%s:%s" % \

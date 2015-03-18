@@ -18,6 +18,7 @@ import time
 
 import six
 from rdflib import Graph, URIRef
+from rdflib.compare import graph_diff
 from layeredconfig import LayeredConfig
 
 from ferenda import util
@@ -184,16 +185,13 @@ def render(f):
         for g in iterate_graphs(doc.body):
             doc.meta += g
 
-        for triple in distilled_graph:
-            # len_before = len(doc.meta)
-            doc.meta.remove(triple)
-            # len_after = len(doc.meta)
+        (in_both, in_first, in_second) = graph_diff(doc.meta, distilled_graph)
 
-        if doc.meta:
+        if in_first:  # original metadata not present in the XHTML filee
+            msg = "\n".join(["s.n3(), p.n3(), o.n3()" for (s, p, o) in sorted(in_first)])
             self.log.warning("%s: %d triple(s) from the original metadata was "
                              "not found in the serialized XHTML file:\n%s",
-                             doc.basefile, len(doc.meta),
-                             doc.meta.serialize(format="nt").decode('utf-8').strip())
+                             doc.basefile, len(in_first), msg)
 
         # Validate that entry.title and entry.id has been filled
         # (might be from doc.meta and doc.uri, might be other things

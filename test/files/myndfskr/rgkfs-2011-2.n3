@@ -16,7 +16,7 @@
 <http://rinfo.lagrummet.se/publ/rgkfs/2011:2> a rpubl:Myndighetsforeskrift ;
     dcterms:identifier "RGKFS 2011:2" ;
     dcterms:issn "1403-9346" ;
-    dcterms:publisher <http://rinfo.lagrummet.se/org/riksgaldskontoret> ;
+    dcterms:publisher <http://rinfo.lagrummet.se/org/riksgaeldskontoret> ;
     dcterms:title "Riksgäldskontorets föreskrifter om instituts skyldighet att lämna uppgifter om insättare och deras insättningar;"@sv ;
     rpubl:arsutgava "2011" ;
     rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2011:834#P3> ;

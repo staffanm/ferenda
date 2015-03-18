@@ -29,7 +29,7 @@ import time
 from layeredconfig import LayeredConfig, Defaults
 from lxml import etree
 from lxml.builder import ElementMaker
-from rdflib import Graph, Literal, Namespace, URIRef, RDF, RDFS
+from rdflib import Graph, Literal, Namespace, URIRef, BNode, RDF, RDFS
 from rdflib.namespace import FOAF
 import bs4
 import lxml.html
@@ -1416,6 +1416,31 @@ with the *config* object as single parameter.
                     if revlink:
                         children.append(E.link({'rev': g.qname(pred),
                                                 'href': str(subj)}))
+                elif isinstance(obj, BNode):
+                    # serialize this triple and any other triples
+                    # where this BNode is a subject of a triple with a
+                    # URIRef or Literal asobject (bnodes pointing to
+                    # bnodes not supported)
+                    children.append(E.link({'rel': g.qname(pred),
+                                            'resource': obj.n3()}))
+                    if not revlink:
+                        children[-1].set('about', uri)
+                    for (p, o) in sorted(g.predicate_objects(obj)):
+                        if isinstance(o, URIRef):
+                            children.append(E.link({'about': obj.n3(),
+                                                    'rel': g.qname(p),
+                                                    'href': str(o)}))
+                        elif isinstance(o, Literal):
+                            attr = {'about': obj.n3(),
+                                    'property': g.qname(p),
+                                    'content': str(o)}
+                            if o.datatype:
+                                attr['datatype'] = g.qname(o.datatype)
+                            if o.language:
+                                attr[XML_LANG] = o.language
+                            children.append(E.meta(attr))
+                        else:
+                            raise errors.ParseError("Can't serialize a BNode-%s triple" % o.__class__.__name__)
                 elif obj.datatype:
                     children.append(E.meta({'property': g.qname(pred),
                                             'datatype': g.qname(obj.datatype),

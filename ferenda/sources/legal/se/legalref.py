@@ -242,6 +242,7 @@ class LegalRef:
     MYNDIGHETSBESLUT = 8   # Myndighetsbeslut (JO, ARN, DI...)
     EURATTSFALL = 9        # Rättsfall i EG-domstolen/förstainstansrätten
     INTLRATTSFALL = 10     # Europadomstolen
+    DOMSTOLSAVGORANDEN = 11# Underliggande beslut i ett rättsfallsreferat
 
     # re_urisegments = re.compile(r'([\w]+://[^/]+/[^\d]*)(\d+:(bih\.
     # |N|)?\d+( s\.\d+|))#?(K(\d+)|)(P(\d+)|)(S(\d+)|)(N(\d+)|)')

@@ -1,6 +1,7 @@
 # flake8: noqa
 from rdflib import Namespace
 RPUBL = Namespace('http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
+URISPACE = Namespace('http://rinfo.lagrummet.se/sys/uri/space#')
 from .swedishlegalsource import SwedishLegalSource, SwedishLegalStore, SwedishCitationParser
 from .regeringen import Regeringen
 from .riksdagen import Riksdagen

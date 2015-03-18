@@ -425,7 +425,7 @@ class MyndFskr(SwedishLegalSource):
                     pub = props['dcterms:identifier'].split(" ")[0]
                 origuri = makeurl({'type': LegalRef.FORESKRIFTER,
                                    'publikation': pub,
-                                   'artal': year,
+                                   'arsutgava': year,
                                    'lopnummer': ordinal})
                 desc.rel(RPUBL.andrar,
                          URIRef(origuri))
@@ -485,7 +485,7 @@ class MyndFskr(SwedishLegalSource):
                 (pub, year, ordinal) = re.split('[ :]', upph)
                 upphuri = legaluri.construct({'type': LegalRef.FORESKRIFTER,
                                               'publikation': pub,
-                                              'artal': year,
+                                              'arsutgava': year,
                                               'lopnummer': ordinal})
                 desc.rel(RPUBL.upphaver, upphuri)
 

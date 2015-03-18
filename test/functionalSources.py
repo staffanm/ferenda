@@ -14,7 +14,8 @@ from ferenda.testutil import RepoTester, parametrize_repotester
 from ferenda.sources.general import Keyword, Skeleton #, MediaWiki
 # test cases right now expects to see literals language-typed as @sv,
 # therefore we use the derived Lagen.nu-specific subclass.
-from ferenda.sources.legal.se import LNMediaWiki as MediaWiki
+
+from lagen.nu import LNMediaWiki as MediaWiki
 
 from ferenda.sources.tech import RFC, W3Standards, PEP
 from ferenda.sources.legal.eu import EurlexCaselaw, EurlexTreaties
