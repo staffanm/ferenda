@@ -11,7 +11,7 @@ from six.moves.urllib_parse import quote
 
 
 def generic(d):
-    """Converts any dict into a URL. The domain (netlog) is always
+    """Converts any dict into a URL. The domain ('netloc') is always
 example.org, and all keys/values of the dict is turned into a
 querystring.
 

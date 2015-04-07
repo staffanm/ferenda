@@ -1,0 +1,162 @@
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix coin: <http://purl.org/court/def/2009/coin#> .
+@prefix : <http://rinfo.lagrummet.se/sys/uri/space#> .
+
+# Rättsinformationsdokumentstyper
+rpubl:Proposition :abbrSlug "prop" .
+rpubl:Skrivelse :abbrSlug "skr" .
+rpubl:Forordningsmotiv :abbrSlug "fm" .
+rpubl:Kommittedirektiv :abbrSlug "dir" .
+rpubl:InternationellOverenskommelse :abbrSlug "so" .
+#rpubl:AllmannaRad :abbrSlug "ar" .
+
+# Myndigheter
+## Förvaltningsmyndigheter
+<http://rinfo.lagrummet.se/org/domstolsverket> :abbrSlug "dv" .
+<http://rinfo.lagrummet.se/org/justitiekanslern> :abbrSlug "jk" .
+## Domstolar
+<http://rinfo.lagrummet.se/org/hoegsta_domstolen> :abbrSlug "hd" .
+<http://rinfo.lagrummet.se/org/svea_hovraett> :abbrSlug "hsv" .
+<http://rinfo.lagrummet.se/org/goeta_hovraett> :abbrSlug "hgo" .
+<http://rinfo.lagrummet.se/org/hovraetten_oever_skaane_och_blekinge> :abbrSlug "hsb" .
+<http://rinfo.lagrummet.se/org/hovraetten_foer_vaestra_sverige> :abbrSlug "hvs" .
+<http://rinfo.lagrummet.se/org/hovraetten_foer_nedre_norrland> :abbrSlug "hnn" .
+<http://rinfo.lagrummet.se/org/hovraetten_foer_oevre_norrland> :abbrSlug "hon" .
+<http://rinfo.lagrummet.se/org/miljoeoeverdomstolen> :abbrSlug "mod" .
+<http://rinfo.lagrummet.se/org/mark-_och_miljoeoeverdomstolen> :abbrSlug "mmd" .
+<http://rinfo.lagrummet.se/org/hoegsta_foervaltningsdomstolen> :abbrSlug "hfd" .
+<http://rinfo.lagrummet.se/org/regeringsraetten> :abbrSlug "regr" .
+<http://rinfo.lagrummet.se/org/kammarraetten_i_stockholm> :abbrSlug "kst" .
+<http://rinfo.lagrummet.se/org/kammarraetten_i_goeteborg> :abbrSlug "kgg" .
+<http://rinfo.lagrummet.se/org/kammarraetten_i_sundsvall> :abbrSlug "ksu" .
+<http://rinfo.lagrummet.se/org/kammarraetten_i_joenkoeping> :abbrSlug "kjo" .
+<http://rinfo.lagrummet.se/org/migrationsoeverdomstolen> :abbrSlug "mig" .
+<http://rinfo.lagrummet.se/org/raettshjaelpsnaemnden> :abbrSlug "rhn" .
+<http://rinfo.lagrummet.se/org/arbetsdomstolen> :abbrSlug "ad" .
+<http://rinfo.lagrummet.se/org/marknadsdomstolen> :abbrSlug "md" .
+<http://rinfo.lagrummet.se/org/patentbesvaersraetten> :abbrSlug "pbr" .
+<http://rinfo.lagrummet.se/org/statens_ansvarsnaemnd> :abbrSlug "san" .
+
+# Utredningsserier
+<http://rinfo.lagrummet.se/serie/utr/ds> :abbrSlug "ds" .
+<http://rinfo.lagrummet.se/serie/utr/sou> :abbrSlug "sou" .
+
+# Författningssamlingar
+<http://rinfo.lagrummet.se/serie/fs/01fs> :abbrSlug "01fs" .
+<http://rinfo.lagrummet.se/serie/fs/03fs> :abbrSlug "03fs" .
+<http://rinfo.lagrummet.se/serie/fs/04fs> :abbrSlug "04fs" .
+<http://rinfo.lagrummet.se/serie/fs/05fs> :abbrSlug "05fs" .
+<http://rinfo.lagrummet.se/serie/fs/06fs> :abbrSlug "06fs" .
+<http://rinfo.lagrummet.se/serie/fs/07fs> :abbrSlug "07fs" .
+<http://rinfo.lagrummet.se/serie/fs/08fs> :abbrSlug "08fs" .
+<http://rinfo.lagrummet.se/serie/fs/09fs> :abbrSlug "09fs" .
+<http://rinfo.lagrummet.se/serie/fs/10fs> :abbrSlug "10fs" .
+<http://rinfo.lagrummet.se/serie/fs/12fs> :abbrSlug "12fs" .
+<http://rinfo.lagrummet.se/serie/fs/13fs> :abbrSlug "13fs" .
+<http://rinfo.lagrummet.se/serie/fs/14fs> :abbrSlug "14fs" .
+<http://rinfo.lagrummet.se/serie/fs/17fs> :abbrSlug "17fs" .
+<http://rinfo.lagrummet.se/serie/fs/18fs> :abbrSlug "18fs" .
+<http://rinfo.lagrummet.se/serie/fs/19fs> :abbrSlug "19fs" .
+<http://rinfo.lagrummet.se/serie/fs/20fs> :abbrSlug "20fs" .
+<http://rinfo.lagrummet.se/serie/fs/21fs> :abbrSlug "21fs" .
+<http://rinfo.lagrummet.se/serie/fs/22fs> :abbrSlug "22fs" .
+<http://rinfo.lagrummet.se/serie/fs/23fs> :abbrSlug "23fs" .
+<http://rinfo.lagrummet.se/serie/fs/24fs> :abbrSlug "24fs" .
+<http://rinfo.lagrummet.se/serie/fs/25fs> :abbrSlug "25fs" .
+<http://rinfo.lagrummet.se/serie/fs/afs> :abbrSlug "afs" .
+<http://rinfo.lagrummet.se/serie/fs/aafs> :abbrSlug "aafs" .
+<http://rinfo.lagrummet.se/serie/fs/agvfs> :abbrSlug "agvfs" .
+<http://rinfo.lagrummet.se/serie/fs/affs> :abbrSlug "affs" .
+<http://rinfo.lagrummet.se/serie/fs/amsfs> :abbrSlug "amsfs" .
+<http://rinfo.lagrummet.se/serie/fs/bolfs> :abbrSlug "bolfs" .
+<http://rinfo.lagrummet.se/serie/fs/bv-fs> :abbrSlug "bv-fs" .
+<http://rinfo.lagrummet.se/serie/fs/csnfs> :abbrSlug "csnfs" .
+<http://rinfo.lagrummet.se/serie/fs/difs> :abbrSlug "difs" .
+<http://rinfo.lagrummet.se/serie/fs/dvfs> :abbrSlug "dvfs" .
+<http://rinfo.lagrummet.se/serie/fs/elsaek-fs> :abbrSlug "elsaek-fs" .
+<http://rinfo.lagrummet.se/serie/fs/emfs> :abbrSlug "emfs" .
+<http://rinfo.lagrummet.se/serie/fs/fffs> :abbrSlug "fffs" .
+<http://rinfo.lagrummet.se/serie/fs/ffs> :abbrSlug "ffs" .
+<http://rinfo.lagrummet.se/serie/fs/fhifs> :abbrSlug "fhifs" .
+<http://rinfo.lagrummet.se/serie/fs/fifs> :abbrSlug "fifs" .
+<http://rinfo.lagrummet.se/serie/fs/fkfs> :abbrSlug "fkfs" .
+<http://rinfo.lagrummet.se/serie/fs/hsvfs> :abbrSlug "hsvfs" .
+<http://rinfo.lagrummet.se/serie/fs/hvmfs> :abbrSlug "hvmfs" .
+<http://rinfo.lagrummet.se/serie/fs/iaffs> :abbrSlug "iaffs" .
+<http://rinfo.lagrummet.se/serie/fs/itpsfs> :abbrSlug "itpsfs" .
+<http://rinfo.lagrummet.se/serie/fs/jvsfs> :abbrSlug "jvsfs" .
+<http://rinfo.lagrummet.se/serie/fs/kamfs> :abbrSlug "kamfs" .
+<http://rinfo.lagrummet.se/serie/fs/kbmfs> :abbrSlug "kbmfs" .
+<http://rinfo.lagrummet.se/serie/fs/kfmfs> :abbrSlug "kfmfs" .
+<http://rinfo.lagrummet.se/serie/fs/kfs> :abbrSlug "kfs" .
+<http://rinfo.lagrummet.se/serie/fs/kifs> :abbrSlug "kifs" .
+<http://rinfo.lagrummet.se/serie/fs/kkvfs> :abbrSlug "kkvfs" .
+<http://rinfo.lagrummet.se/serie/fs/kovfs> :abbrSlug "kovfs" .
+<http://rinfo.lagrummet.se/serie/fs/krfs> :abbrSlug "krfs" .
+<http://rinfo.lagrummet.se/serie/fs/kvfs> :abbrSlug "kvfs" .
+<http://rinfo.lagrummet.se/serie/fs/lfnfs> :abbrSlug "lfnfs" .
+<http://rinfo.lagrummet.se/serie/fs/lfs> :abbrSlug "lfs" .
+<http://rinfo.lagrummet.se/serie/fs/lifs> :abbrSlug "lifs" .
+<http://rinfo.lagrummet.se/serie/fs/livsfs> :abbrSlug "livsfs" .
+<http://rinfo.lagrummet.se/serie/fs/lmvfs> :abbrSlug "lmvfs" .
+<http://rinfo.lagrummet.se/serie/fs/lvfs> :abbrSlug "lvfs" .
+<http://rinfo.lagrummet.se/serie/fs/migrfs> :abbrSlug "migrfs" .
+<http://rinfo.lagrummet.se/serie/fs/nfs> :abbrSlug "nfs" .
+<http://rinfo.lagrummet.se/serie/fs/nutfs> :abbrSlug "nutfs" .
+<http://rinfo.lagrummet.se/serie/fs/prvfs> :abbrSlug "prvfs" .
+<http://rinfo.lagrummet.se/serie/fs/ptsfs> :abbrSlug "ptsfs" .
+<http://rinfo.lagrummet.se/serie/fs/ra-fs> :abbrSlug "ra-fs" .
+<http://rinfo.lagrummet.se/serie/fs/rgkfs> :abbrSlug "rgkfs" .
+<http://rinfo.lagrummet.se/serie/fs/rnfs> :abbrSlug "rnfs" .
+<http://rinfo.lagrummet.se/serie/fs/rpsfs> :abbrSlug "rpsfs" .
+<http://rinfo.lagrummet.se/serie/fs/rtvfs> :abbrSlug "rtvfs" .
+<http://rinfo.lagrummet.se/serie/fs/saeifs> :abbrSlug "saeifs" .
+<http://rinfo.lagrummet.se/serie/fs/scb-fs> :abbrSlug "scb-fs" .
+<http://rinfo.lagrummet.se/serie/fs/sfs> :abbrSlug "sfs" .
+<http://rinfo.lagrummet.se/serie/fs/sgu-fs> :abbrSlug "sgu-fs" .
+<http://rinfo.lagrummet.se/serie/fs/sjoefs> :abbrSlug "sjoefs" .
+<http://rinfo.lagrummet.se/serie/fs/sjvfs> :abbrSlug "sjvfs" .
+<http://rinfo.lagrummet.se/serie/fs/skifs> :abbrSlug "skifs" .
+<http://rinfo.lagrummet.se/serie/fs/skolfs> :abbrSlug "skolfs" .
+<http://rinfo.lagrummet.se/serie/fs/sksfs> :abbrSlug "sksfs" .
+<http://rinfo.lagrummet.se/serie/fs/skvfs> :abbrSlug "skvfs" .
+<http://rinfo.lagrummet.se/serie/fs/sosfs> :abbrSlug "sosfs" .
+<http://rinfo.lagrummet.se/serie/fs/srvfs> :abbrSlug "srvfs" .
+<http://rinfo.lagrummet.se/serie/fs/ssifs> :abbrSlug "ssifs" .
+<http://rinfo.lagrummet.se/serie/fs/stafs> :abbrSlug "stafs" .
+<http://rinfo.lagrummet.se/serie/fs/stemfs> :abbrSlug "stemfs" .
+<http://rinfo.lagrummet.se/serie/fs/svkfs> :abbrSlug "svkfs" .
+<http://rinfo.lagrummet.se/serie/fs/tfs> :abbrSlug "tfs" .
+<http://rinfo.lagrummet.se/serie/fs/tpvfs> :abbrSlug "tpvfs" .
+<http://rinfo.lagrummet.se/serie/fs/tsfs> :abbrSlug "tsfs" .
+<http://rinfo.lagrummet.se/serie/fs/tvfs> :abbrSlug "tvfs" .
+<http://rinfo.lagrummet.se/serie/fs/valfs> :abbrSlug "valfs" .
+<http://rinfo.lagrummet.se/serie/fs/vrfs> :abbrSlug "vrfs" .
+<http://rinfo.lagrummet.se/serie/fs/vvfs> :abbrSlug "vvfs" .
+
+# Författningssamlingar för upphävda myndigheter
+<http://rinfo.lagrummet.se/serie/fs/amsfs> :abbrSlug "amsfs" .
+<http://rinfo.lagrummet.se/serie/fs/bfs> :abbrSlug "bfs" .
+<http://rinfo.lagrummet.se/serie/fs/dfs> :abbrSlug "dfs" .
+<http://rinfo.lagrummet.se/serie/fs/saeifs> :abbrSlug "saeifs" .
+<http://rinfo.lagrummet.se/serie/fs/vervafs> :abbrSlug "vervafs" .
+
+
+# Rättsfallsförteckningar
+<http://rinfo.lagrummet.se/serie/rf/nja> :abbrSlug "nja" .
+<http://rinfo.lagrummet.se/serie/rf/rh> :abbrSlug "rh" .
+<http://rinfo.lagrummet.se/serie/rf/rk> :abbrSlug "rk" .
+<http://rinfo.lagrummet.se/serie/rf/mod> :abbrSlug "mod" .
+<http://rinfo.lagrummet.se/serie/rf/ra> :abbrSlug "ra" .
+<http://rinfo.lagrummet.se/serie/rf/hfd> :abbrSlug "hfd" .
+<http://rinfo.lagrummet.se/serie/rf/mig> :abbrSlug "mig" .
+<http://rinfo.lagrummet.se/serie/rf/ad> :abbrSlug "ad" .
+<http://rinfo.lagrummet.se/serie/rf/md> :abbrSlug "md" .
+<http://rinfo.lagrummet.se/serie/rf/fod> :abbrSlug "fod" .
+
+# Allmänna råd-serier (inte komplett)
+<http://rinfo.lagrummet.se/serie/ar/bfnar> :abbrSlug "bfnar" .
+<http://rinfo.lagrummet.se/serie/ar/far> :abbrSlug "far" .
+<http://rinfo.lagrummet.se/serie/ar/fkar> :abbrSlug "fkar" .
+<http://rinfo.lagrummet.se/serie/ar/nar> :abbrSlug "nar" .
+<http://rinfo.lagrummet.se/serie/ar/nrr> :abbrSlug "nrr" .

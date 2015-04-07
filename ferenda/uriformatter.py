@@ -40,7 +40,8 @@ class URIFormatter(object):
             return None
 
     def addformatter(self, key, func):
-        """Add a single formatter to the list of registered formatters after initialization."""
+        """Add a single formatter to the list of registered formatters after
+        initialization."""
         self._formatters[key] = func
 
     # wrapper around dict.get to allow for future lookup mechanisms. Maybe unneccesary?

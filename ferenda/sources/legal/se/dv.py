@@ -22,7 +22,7 @@ from copy import deepcopy
 # 3rdparty libs
 import pkg_resources
 from rdflib import Namespace, URIRef, Graph, RDF, RDFS, Literal
-from rdflib.namespace import DCTERMS, OWL
+from rdflib.namespace import DCTERMS, OWL, SKOS
 import requests
 import lxml.html
 from lxml import etree
@@ -340,7 +340,7 @@ class DV(SwedishLegalSource):
     # on age isn't uncommon, maybe DocumentStore should support it natively
     # (like with optional suffix parameter to download_path)?
 
-    def download(self, basefile):
+    def download(self, basefile=None):
         if basefile is not None:
             raise ValueException("DV.download cannot process a basefile parameter")
         # recurse =~ download everything, which we do if force is
@@ -1159,20 +1159,8 @@ class DV(SwedishLegalSource):
         def ref_to_uri(ref):
             nodes = parser.parse_string(ref)
             assert isinstance(nodes[0], Link), "Couldn't make URI from ref %s" % ref
-            uri = nodes[0].uri
-            return parser.localize_uri(uri)
+            return nodes[0].uri
 
-#        def dom_to_uri(domstol, malnr, avg):
-#            # FIXME: Shouldn't legaluri.construct be able to handle this?
-#            prefix = self.config.url + self.config.urlpath
-#            # "Högsta förvaltningsdomstolen" => "hfd"
-#            slug = self.lookup_label(self.lookup_resource(domstol),
-#                                     predicate=URISPACE.abbrSlug)
-#
-#            # FIXME: We should create multiple urls if we have
-#            # multiple malnummers?
-#            first_malnr = malnr[0]
-#            return "%(prefix)s%(slug)s/%(first_malnr)s/%(avg)s" % locals()
 
         def split_nja(value):
             return [x[:-1] for x in value.split("(")]
@@ -1183,7 +1171,20 @@ class DV(SwedishLegalSource):
             return baseuri + util.ucfirst(value).replace(' ', '_')
 
         # 1. mint uris and create the two Describers we'll use
-        refuri = ref_to_uri(head["Referat"])
+        if self.config.localizeuri or '_nja_ordinal' not in head:
+            refuri = ref_to_uri(head["Referat"])
+        else:
+            # Canonical URIs for NJA are not based on the
+            # dct:identifier (NJA 1997 s. 522) but on the alternative
+            # (NJA 1997:91). ref_to_uri doesn't handle these
+            rf = URIRef(self.lookup_resource("NJA", SKOS.altLabel))
+            m = re.search(r'(\d{4}):(\d+)', head["_nja_ordinal"])
+            refuri = makeurl({'type': LegalRef.RATTSFALL,
+                              'rattsfallspublikation': rf,
+                              'arsutgava': m.group(1),
+                              'lopnummer': m.group(2)})
+
+
 
         refdesc = Describer(doc.meta, refuri)
         slug = self.lookup_label(self.lookup_resource(head["Domstol"]),
@@ -1227,12 +1228,9 @@ class DV(SwedishLegalSource):
                     m = re.search(regex, value)
                     if m:
                         if pred == 'rattsfallspublikation':
-                            # "NJA" -> "http://localhost:8000/coll/dv/nja"
-                            # "RÅ" -> "http://localhost:8000/coll/dv/rå" <-- FIXME, should be .../dv/ra
-                            if self.config.url == "https://lagen.nu/":  # FIXME!
-                                uri = "https://lagen.nu/dataset/" + m.group(1).lower()
-                            else:
-                                uri = self.config.url + "coll/dv/" + m.group(1).lower()
+                            uri = self.lookup_resource(m.group(1),
+                                                       predicate=SKOS.altLabel,
+                                                       cutoff=1)
                             refdesc.rel(RPUBL[pred], uri)
                         else:
                             refdesc.value(RPUBL[pred], m.group(1))
@@ -1244,11 +1242,6 @@ class DV(SwedishLegalSource):
                 m = re.search(r'\d{4}(?:\:| nr | not )(\d+)', value)
                 if m:
                     refdesc.value(RPUBL.lopnummer, m.group(1))
-
-                refdesc.rel(OWL.sameAs,
-                            (self.config.url + self.config.urlpath +
-                             "nja/" + value.split(" ")[1]))
-
             elif label == "Avgörandedatum":
                 domdesc.value(RPUBL.avgorandedatum, self.parse_iso_date(value))
 
@@ -1282,9 +1275,25 @@ class DV(SwedishLegalSource):
 
         # 3. mint some owl:sameAs URIs -- but only if not using canonical URIs
         if self.config.localizeuri:
+            from pudb import set_trace; set_trace()
             refdesc.rel(OWL.sameAs, self.sameas_uri(refuri))
             # FIXME: could be multiple domuris
             domdesc.rel(OWL.sameAs, self.sameas_uri(domuri))
+            if '_nja_ordinal' in head:
+                # <sidnummer-based> owl:sameAs <lopnummer based>
+                altattribs = {'type': LegalRef.RATTSFALL,
+                              'rattsfallspublikation': 'nja',
+                              'arsutgava': refdesc.getvalue(RPUBL.arsutgava),
+                              'lopnummer': refdesc.getvalue(RPUBL.lopnummer)}
+                refdesc.rel(OWL.sameAs, makeurl(altattribs))
+        else:
+            # Canonical URIs are based on lopnummer. add a sameas ref
+            # back to the sidnummer based URI
+            altattribs = {'type': LegalRef.RATTSFALL,
+                          'rattsfallspublikation': 'nja',
+                          'arsutgava': refdesc.getvalue(RPUBL.arsutgava),
+                          'lopnummer': refdesc.getvalue(RPUBL.sidnummer)}
+            refdesc.rel(OWL.sameAs, makeurl(altattribs))
 
         # 4. Add some same-for-everyone properties
         refdesc.rel(DCTERMS.publisher, self.lookup_resource('Domstolsverket'))
@@ -1324,22 +1333,13 @@ class DV(SwedishLegalSource):
         # references to statutory law and caselaw -- if we don't parse
         # body, we don't have nothing.
         if self.config.parsebodyrefs:
-            if not hasattr(self, 'ref_parser'):
-                self.ref_parser = LegalRef(LegalRef.RATTSFALL,
-                                           LegalRef.LAGRUM,
-                                           LegalRef.FORARBETEN)
-            # You'd think we should initialize citparser with
-            # self.config.url as the baseurl parameter. But by using
-            # this special value we activate SwedishCitationParser's
-            # method of filtering relative SFS links (which shouldn't
-            # occur in a court report, and if it does, it's a sign
-            # that our parser has missed the root SFS reference).
-            #
-            # FIXME: The above must have been written before there was
-            # a allow_relative parameter to SwedishCitationParser. 
-            baseurl = "http://example.org/sfs/9999:999"
-            citparser = SwedishCitationParser(self.ref_parser, self.config.url)
-            b = citparser.parse_recursive(b)
+            parser = SwedishCitationParser(LegalRef(LegalRef.RATTSFALL,
+                                                    LegalRef.LAGRUM,
+                                                    LegalRef.FORARBETEN),
+                                           self.config.url,
+                                           '',
+                                           localizeuri=self.config.localizeuri)
+            b = parser.parse_recursive(b)
 
         # convert the unstructured list of Paragraphs to a
         # hierarchical tree of instances, domslut, domskäl, etc

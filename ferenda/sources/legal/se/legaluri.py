@@ -12,13 +12,10 @@ import re
 
 # 3rdparty libs
 
-from rdflib import Literal
-from rdflib import Namespace
-from rdflib import URIRef
+from rdflib import Literal, Namespace, URIRef, Graph, BNode
+from rdflib.term import Identifier
 from rdflib import RDF
-from rdflib import Graph
-from rdflib import BNode
-
+from rdflib.namespace import DCTERMS
 
 # my own libraries
 from ferenda.sources.legal.se.legalref import LegalRef
@@ -26,9 +23,8 @@ from ferenda import util
 
 RPUBL = Namespace('http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
 RINFOEX = Namespace("http://lagen.nu/terms#")
-DCTERMS = Namespace(util.ns['dcterms'])
 
-# Maps keys used by the internal dictionaries that LegalRef
+# This dict maps keys used by the internal dictionaries that LegalRef
 # constructs, which in turn are modelled after production rule names
 # in the EBNF grammar.
 predicate = {"type": RDF.type,
@@ -43,6 +39,7 @@ predicate = {"type": RDF.type,
              "item": RINFOEX.punktnummer,
              "myndighet": DCTERMS.creator,
              "domstol": DCTERMS.creator,  # probably?
+             "rattsfallspublikation": RPUBL.rattsfallspublikation,  # probably?
              "dnr": RPUBL.diarienummer,
              "malnummer": RPUBL.malnummer,
              "avgorandedatum": RPUBL.avgorandedatum,
@@ -84,12 +81,15 @@ def construct(dictionary):
     graph = Graph()
     bnode = BNode()
     for key in dictionary:
-        if key == "type":
-            graph.add((bnode, RDF.type, URIRef(types[dictionary[key]])))
+        if isinstance(dictionary[key], Identifier):
+            val = dictionary[key]
+        elif key == "type":
+            val = URIRef(types[dictionary[key]])
         else:
-            graph.add((bnode, predicate[key], Literal(dictionary[key])))
-    # print graph.serialize(format="nt")
+            val = Literal(dictionary[key])
+        graph.add((bnode, predicate[key], val))
     return construct_from_graph(graph)
+    # return coinstruct_from_graph(graph)
 
 
 def _rpubl_uri_transform(s):
@@ -103,6 +103,17 @@ def _rpubl_uri_transform(s):
     return r.sub(lambda m: table[m.group(0)], s.lower())
 
 
+def coinstruct_from_graph(graph):
+    from .coin import URIMinter, COIN
+    configgraph = Graph()
+    # FIXME: The configgraph should only be loaded once, but be
+    # configurable ie load the correct COIN n3 config
+    configgraph.parse("../ferenda/res/uri/space.n3", format="n3")
+    graph.parse("../ferenda/res/uri/slugs.n3", format="n3")
+    minter = URIMinter(configgraph, URIRef("http://rinfo.lagrummet.se/sys/uri/space#"))
+    results = minter.compute_uris(graph)
+    return results.values()[0][0]
+
 def construct_from_graph(graph):
     # assume every triple in the graph has the same bnode as subject
     bnode = list(graph)[0][0]
@@ -113,7 +124,9 @@ def construct_from_graph(graph):
     if rdftype == RPUBL.Rattsfallsreferat:
         publ = graph.value(bnode, RPUBL.rattsfallspublikation,
                            any=True)
-        if str(publ) == "nja":
+        if str(publ) == "nja" and graph.value(bnode, RPUBL.sidnummer):
+            # this creates URIs on the form
+            # http://rinfo.lagrummet.se/publ/rf/nja/2005/s_523
             uripart = "%s/%ss%s" % (publ,
                                     graph.value(bnode, RPUBL.arsutgava),
                                     graph.value(bnode, RPUBL.sidnummer))
@@ -172,9 +185,7 @@ def parse(uri):
             dictionary["type"] = dicttypes[obj]
         else:
             dictionary[dictkey[pred]] = str(obj)
-
     return dictionary
-
 
 def parse_to_graph(uri):
     dictionary = None

@@ -1,0 +1,245 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix coin: <http://purl.org/court/def/2009/coin#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix : <http://rinfo.lagrummet.se/sys/uri/space#> .
+
+
+: a coin:URISpace;
+    coin:base "http://rinfo.lagrummet.se";
+    coin:fragmentSeparator "-";
+    rdfs:seeAlso <http://rinfo.lagrummet.se/sys/uri/slugs>;
+    coin:slugTransform [
+            coin:apply coin:ToLowerCase;
+            coin:apply coin:ToBaseChar; # TODO: remove when replace works!
+            coin:replace "é e", "å aa", "ä ae", "ö oe";
+            coin:spaceReplacement "_";
+        ];
+
+    # FSDokument:s
+    coin:template [
+        # TODO: priority rules? ("most components win"?)
+        coin:uriTemplate "/publ/{fs}/{arsutgava}:{lopnummer}_s_{sidnummer}";
+        coin:binding [ coin:variable "fs";
+                coin:property rpubl:forfattningssamling;
+                coin:slugFrom :abbrSlug;
+            ], [ coin:variable "arsutgava";
+                coin:property rpubl:arsutgava
+            ], [ coin:variable "lopnummer";
+                coin:property rpubl:lopnummer
+            ], [ coin:variable "sidnummer";
+                coin:property rpubl:sidnummer
+            ]
+    ], [
+        coin:uriTemplate "/publ/{fs}/{arsutgava}:{lopnummer}";
+        coin:binding [ coin:variable "fs";
+                coin:property rpubl:forfattningssamling;
+                coin:slugFrom :abbrSlug
+            ], [
+                coin:variable "arsutgava";
+                coin:property rpubl:arsutgava
+            ], [
+                coin:variable "lopnummer";
+                coin:property rpubl:lopnummer#, rpubl:hanvisning
+            ]
+    # NOTE: Vi avvvaktar med att introducera :platsangivelse tills reellt behov uppstår.
+    #], [ # TODO: arsutgava + platsangivelse?
+    #    coin:uriTemplate "/publ/{fs}/{platsangivelse}";
+    #    coin:binding [ coin:variable "fs";
+    #            coin:property rpubl:forfattningssamling;
+    #            coin:slugFrom :abbrSlug;
+    #        ], [ coin:property rpubl:platsangivelse ]
+    ], [
+        coin:uriTemplate "/publ/{fs}/{arsutgava}:bih_{bihang}_s_{sidnummer}";
+        coin:binding [ coin:variable "fs";
+                coin:property rpubl:forfattningssamling;
+                coin:slugFrom :abbrSlug;
+            ], [ coin:variable "arsutgava";
+                coin:property rpubl:arsutgava
+            ], [ coin:variable "bihang";
+                coin:property rpubl:bihangsnummer
+            ], [ coin:variable "sidnummer";
+                coin:property rpubl:sidnummer
+            ]
+    ], [
+        coin:uriTemplate "/publ/{fs}/{arsutgava}:bih_{bihang}";
+        coin:binding [ coin:variable "fs";
+                coin:property rpubl:forfattningssamling;
+                coin:slugFrom :abbrSlug;
+            ], [ coin:variable "arsutgava";
+                coin:property rpubl:arsutgava
+            ], [ coin:variable "bihang";
+                coin:property rpubl:bihangsnummer
+            ]
+    ],
+
+    # Allmänna råd utgivna i egen serie
+    [
+        coin:uriTemplate "/publ/ar/{serie}/{arsutgava}:{lopnummer}";
+        coin:binding [ coin:variable "serie";
+                coin:property rpubl:allmannaRadSerie;
+                coin:slugFrom :abbrSlug;
+            ], [
+                coin:property rpubl:arsutgava
+            ], [
+                coin:property rpubl:lopnummer
+            ]
+    ],
+
+    # Here we have done one "risky" move by pushing short names for document
+    # types into the same "directory" ("segment space") as some series' names.
+    # But this directly reflects how these documents are formally referred to
+    # in text, and the series' names are controllably coined. So in practise
+    # that should never become a problem.
+    # So for these, their types are their "series"..
+
+    [
+        coin:uriTemplate "/publ/{rtype}/{arsutgava}:{lopnummer}";
+        coin:binding [ coin:variable "rtype";
+                coin:property rdf:type;
+                coin:slugFrom :abbrSlug;
+            ], [
+                coin:property rpubl:arsutgava
+            ], [
+                coin:property rpubl:lopnummer
+            ]
+    ],
+
+    [
+        coin:uriTemplate "/publ/utr/{serie}/{arsutgava}:{lopnummer}";
+        coin:binding [ coin:variable "serie";
+                coin:property rpubl:utrSerie;
+                coin:slugFrom :abbrSlug;
+            ], [
+                coin:property rpubl:arsutgava
+            ], [
+                coin:property rpubl:lopnummer
+            ]
+    ],
+
+    # Rattsfall
+    [
+        coin:uriTemplate "/publ/rf/{serie}/{arsutgava}/not/{notisserie}_{lopnummer}";
+        coin:forType rpubl:Rattsfallsnotis;
+        coin:binding [ coin:variable "serie";
+                coin:property rpubl:rattsfallspublikation;
+                coin:slugFrom :abbrSlug;
+            ], [
+                coin:property rpubl:arsutgava
+            ], [
+                coin:property rpubl:notisserie
+            ], [
+                coin:property rpubl:lopnummer
+            ]
+    ], [
+        coin:uriTemplate "/publ/rf/{serie}/{arsutgava}/not/{lopnummer}";
+        coin:forType rpubl:Rattsfallsnotis;
+        coin:binding [ coin:variable "serie";
+                coin:property rpubl:rattsfallspublikation;
+                coin:slugFrom :abbrSlug;
+            ], [
+                coin:property rpubl:arsutgava
+            ], [
+                coin:property rpubl:lopnummer
+            ]
+    ], [
+        coin:uriTemplate "/publ/rf/{serie}/{arsutgava}_{referatserie}:{lopnummer}";
+        coin:binding [ coin:variable "serie";
+                coin:property rpubl:rattsfallspublikation;
+                coin:slugFrom :abbrSlug;
+            ], [
+                coin:property rpubl:arsutgava
+            ], [
+                coin:property rpubl:referatserie
+            ], [
+                coin:property rpubl:lopnummer
+            ]
+    ], [
+        coin:uriTemplate "/publ/rf/{serie}/{arsutgava}:{lopnummer}";
+        coin:binding [ coin:variable "serie";
+                coin:property rpubl:rattsfallspublikation;
+                coin:slugFrom :abbrSlug;
+            ], [
+                coin:property rpubl:arsutgava
+            ], [
+                coin:property rpubl:lopnummer
+            ]
+    ], [
+        coin:uriTemplate "/publ/rf/{serie}/{arsutgava}/s_{sidnummer}";
+        coin:priority 1;
+        coin:binding [ coin:variable "serie";
+                coin:property rpubl:rattsfallspublikation;
+                coin:slugFrom :abbrSlug;
+            ], [
+                coin:property rpubl:arsutgava
+            ], [
+                coin:property rpubl:sidnummer
+            ]
+    ],
+
+    # These have publisher-local identifiers
+    [
+        coin:uriTemplate "/publ/avg/{publisher}/{diarienummer}";
+        coin:forType rpubl:VagledandeMyndighetsavgorande;
+        coin:binding [ coin:variable "publisher";
+                coin:property dct:publisher;
+                coin:slugFrom :abbrSlug;
+            ] , [ coin:variable "diarienummer";
+                coin:property rpubl:diarienummer
+            ]
+    ], [
+        coin:uriTemplate "/publ/dom/{publisher}/{malnummer}/{avgorandedatum}";
+        coin:forType rpubl:VagledandeDomstolsavgorande;
+        coin:binding [ coin:variable "publisher";
+                coin:property dct:publisher;
+                coin:slugFrom :abbrSlug;
+            ], [ coin:variable "malnummer";
+                coin:property rpubl:malnummer
+            ], [ coin:variable "avgorandedatum";
+                coin:property rpubl:avgorandedatum
+            ]
+    ],
+
+    # these get base from relation to other doc
+    [
+        coin:relToBase rpubl:konsoliderar;
+        # TODO: appendTemplate?
+        coin:uriTemplate "{+base}/konsolidering/{issued}";
+        coin:binding [ coin:property dct:issued ]
+    ], [
+        coin:relToBase rpubl:rattningAv;
+        # TODO: appendTemplate?
+        coin:uriTemplate "{+base}/rattelse/{issued}";
+        coin:binding [ coin:property dct:issued ]
+    ], [
+        coin:relFromBase rpubl:paragraf;
+        coin:fragmentTemplate "p_{paragrafnummer}";
+        coin:binding [ coin:property rpubl:paragrafnummer ]
+    ], [
+        coin:relFromBase rpubl:kapitel;
+        coin:fragmentTemplate "k_{kapitelnummer}";
+        coin:binding [ coin:property rpubl:kapitelnummer ]
+    ], [
+        coin:relFromBase rpubl:bilaga;
+        coin:fragmentTemplate "bilaga_{repr}";
+        # TODO: externally provided ordinal..
+        coin:binding [ coin:variable "repr"; coin:property dct:title, rdfs:label ]
+    ],
+
+    # other (non core publication) resources
+    [
+        coin:uriTemplate "/ext/eur-lex/{celexNummer}";
+        coin:binding [ coin:property rpubl:celexNummer ]
+    ], [
+        coin:uriTemplate "/org/{name}";
+        coin:forType foaf:Organization;
+        coin:binding [ coin:property foaf:name ]
+
+    ] .
+
+:abbrSlug a rdf:Property;
+    rdfs:subPropertyOf coin:abbrSlug;
+    rdfs:isDefinedBy : .
+

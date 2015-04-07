@@ -188,10 +188,9 @@ def render(f):
         (in_both, in_first, in_second) = graph_diff(doc.meta, distilled_graph)
 
         if in_first:  # original metadata not present in the XHTML filee
-            msg = "\n".join(["s.n3(), p.n3(), o.n3()" for (s, p, o) in sorted(in_first)])
             self.log.warning("%s: %d triple(s) from the original metadata was "
                              "not found in the serialized XHTML file:\n%s",
-                             doc.basefile, len(in_first), msg)
+                             doc.basefile, len(in_first), in_first.serialize(format="n3"))
 
         # Validate that entry.title and entry.id has been filled
         # (might be from doc.meta and doc.uri, might be other things
