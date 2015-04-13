@@ -26,3 +26,7 @@ reason or another, couldn't be directly fetched by setup.py from pypi.
   (https://pypi.python.org/pypi/smc.mw). Included since the released
   0.3 version isn't compatible with recent grako releases, instead
   using a GIT snapshot (4e339f0b82). BSD License.
+
+* coin, part of court, by Niklas Lindström
+  (https://code.google.com/p/court/source/checkout?repo=python). Included
+  since the package isn't on pypi. BSD License.

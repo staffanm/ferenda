@@ -66,10 +66,12 @@ authors, included in accordance with their respective licenses:
   Higgins, BSD
 * `patch <https://code.google.com/p/python-patch/>`_ by Anatoly
   Techtonik, MIT
-* `Grit XSLT stylesheets <http://code.google.com/p/oort/wiki/Grit>`_
-  and `RDL service UI
+* `Grit XSLT stylesheets <http://code.google.com/p/oort/wiki/Grit>`_,
+  `RDL service UI
   <https://github.com/rinfo/rdl/tree/master/packages/java/rinfo-service/src/main/webapp/ui>`_
-  by Niklas Lindstrom, BSD
+  and `coin.py
+  <https://code.google.com/p/court/source/checkout?repo=python>`_ by
+  Niklas Lindstrom, BSD
 * `httpheader <http://deron.meranda.us/python/httpheader/>`_ by Deron
   Meranda, LGPL
 * `smc.mw <https://pypi.python.org/pypi/smc.mw>`_ by Marcus Brinkmann, BSD
