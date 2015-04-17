@@ -20,6 +20,7 @@ from rdflib.namespace import DCTERMS
 # my own libraries
 from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda import util
+from ferenda.thirdparty.coin import URIMinter, COIN
 
 RPUBL = Namespace('http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
 RINFOEX = Namespace("http://lagen.nu/terms#")
@@ -37,8 +38,8 @@ predicate = {"type": RDF.type,
              "section": RINFOEX.paragrafnummer,
              "piece": RINFOEX.styckenummer,
              "item": RINFOEX.punktnummer,
-             "myndighet": DCTERMS.creator,
-             "domstol": DCTERMS.creator,  # probably?
+             "myndighet": DCTERMS.publisher,  # or DCTERMS.creator?
+             "domstol": DCTERMS.publisher,
              "rattsfallspublikation": RPUBL.rattsfallspublikation,  # probably?
              "dnr": RPUBL.diarienummer,
              "malnummer": RPUBL.malnummer,
@@ -88,8 +89,8 @@ def construct(dictionary):
         else:
             val = Literal(dictionary[key])
         graph.add((bnode, predicate[key], val))
-    return construct_from_graph(graph)
-    # return coinstruct_from_graph(graph)
+    # return construct_from_graph(graph)
+    return coinstruct_from_graph(graph, bnode)
 
 
 def _rpubl_uri_transform(s):
@@ -103,16 +104,18 @@ def _rpubl_uri_transform(s):
     return r.sub(lambda m: table[m.group(0)], s.lower())
 
 
-def coinstruct_from_graph(graph):
-    from .coin import URIMinter, COIN
+def coinstruct_from_graph(graph, subject):
     configgraph = Graph()
     # FIXME: The configgraph should only be loaded once, but be
     # configurable ie load the correct COIN n3 config
-    configgraph.parse("../ferenda/res/uri/space.n3", format="n3")
-    graph.parse("../ferenda/res/uri/slugs.n3", format="n3")
-    minter = URIMinter(configgraph, URIRef("http://rinfo.lagrummet.se/sys/uri/space#"))
-    results = minter.compute_uris(graph)
-    return results.values()[0][0]
+    configgraph.parse("ferenda/res/uri/space.n3", format="n3")
+    configgraph.parse("ferenda/res/uri/slugs.n3", format="n3")
+    minter = URIMinter(configgraph,
+                       URIRef("http://rinfo.lagrummet.se/sys/uri/space#"))
+    results = minter.space.coin_uris(graph.resource(subject))
+    assert len(results), "Could not coin any URIs from the given graph"
+    # results = minter.compute_uris(graph)
+    return results[0]
 
 def construct_from_graph(graph):
     # assume every triple in the graph has the same bnode as subject

@@ -1192,7 +1192,7 @@ class DV(SwedishLegalSource):
         for malnummer in head['_localid']:
             domuri = makeurl({'type': LegalRef.DOMSTOLSAVGORANDEN,
                               'malnummer': malnummer,
-                              'domstol': slug,
+                              'domstol': slug,  # should be resource instead
                               'avgorandedatum': head['Avgörandedatum']})
             domdesc = Describer(doc.meta, domuri)
 

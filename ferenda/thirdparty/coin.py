@@ -1,6 +1,7 @@
-# -*- coding: UTF-8 -*-
+# -*- coding: utf-8 -*-
 __metaclass__ = type
 import re
+from operator import attrgetter
 import urlparse
 from rdflib import Graph, Literal, Namespace, URIRef, RDF, RDFS
 
@@ -13,7 +14,7 @@ class URIMinter:
     def __init__(self, config, scheme_uri):
         self.space = URISpace(config.resource(scheme_uri))
 
-    def compute_uris(self, data):
+    def compute_uris(self, data, reporter=None):
         results = {}
         for s in set(data.subjects()):
             uris = self.space.coin_uris(data.resource(s))
@@ -32,8 +33,11 @@ class URISpace:
 
     def coin_uris(self, resource):
         uris = []
-        for template in self.templates:
-            # TODO: order by specificity (number of non-shared vars per template)
+        for template in sorted(self.templates,
+                               key=attrgetter("priority"),
+                               reverse=True):
+            # TODO: secondary order by specificity (number of
+            # non-shared vars per template)
             uri = template.coin_uri(resource)
             if uri:
                 uris.append(uri)
@@ -87,6 +91,8 @@ class Template:
 
     def __init__(self, space, resource):
         self.space = space
+        self.resource = resource
+        self.priority = int(resource.value(COIN.priority) or 0)
         self.forType = resource.value(COIN.forType)
         self.uriTemplate = resource.value(COIN.uriTemplate)
         self.relToBase = resource.value(COIN.relToBase)
@@ -96,7 +102,11 @@ class Template:
         # IMPROVE: if not template and variable bindings correspond: TemplateException
 
     def coin_uri(self, resource):
-        if self.forType and not self.forType in resource.objects(RDF.type):
+        # self.forType is bound to the space graph, resource is bound
+        # to the content graph so we can't just compare graphs
+        # if self.forType and not self.forType in resource.objects(RDF.type):
+        if self.forType and self.forType.identifier not in [
+                x.identifier for x in resource.objects(RDF.type)]:
             return None
         matches = {}
         for binding in self.bindings:
@@ -150,7 +160,14 @@ class Binding:
         if self.slugFrom:
             if not value:
                 return None
-            return value.value(self.slugFrom.identifier)
+            if value.value(self.slugFrom.identifier):
+                # the graph from where value is taken might contain only
+                # metadata about the resource, not the database of slugs.
+                return value.value(self.slugFrom.identifier)
+            else:
+                # as a fallback, look for the slug in the space graph.
+                space = self.template.resource.graph.resource(value.identifier)
+                return space.value(self.slugFrom.identifier)
         else:
             return value
 
