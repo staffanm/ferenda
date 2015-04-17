@@ -34,7 +34,7 @@ class URISpace:
     def coin_uris(self, resource):
         uris = []
         for template in sorted(self.templates,
-                               key=attrgetter("priority"),
+                               key=lambda x: (x.priority, len(x.bindings)),
                                reverse=True):
             # TODO: secondary order by specificity (number of
             # non-shared vars per template)
