@@ -19,7 +19,7 @@ class Construct(unittest.TestCase):
             testanswer = fp.read().strip()
         # All test case writers are honorable, noble and thorough
         # persons, but just in case, let's make eval somewhat safer.
-        # FIXME: use ast.literal_eval instead
+        # FIXME: use JSON instead
         testdata = testdata.strip().replace("\r\n", " ")
         d = eval(testdata,{"__builtins__":None},globals())
         uri = construct(d)
@@ -38,6 +38,7 @@ class Parse(unittest.TestCase):
 class Coinstruct(unittest.TestCase):
     atomfile = "test/files/legaluri/publ.atom"
     space = ["ferenda/res/uri/space.n3", "ferenda/res/uri/slugs.n3"]
+
     def setUp(self):
         # load space
         pass
@@ -48,7 +49,7 @@ class Coinstruct(unittest.TestCase):
         self.assertEqual(len(subjects), 1)
         coined_uri = coinstruct_from_graph(resourcegraph, subjects.pop())
         self.assertEqual(uri, coined_uri)
-        
+
 # class CoinstructCanonical(Coinstruct):
 #     def parametric_test(self, filename):
 #         pass

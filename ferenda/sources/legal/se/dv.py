@@ -1190,10 +1190,17 @@ class DV(SwedishLegalSource):
         slug = self.lookup_label(self.lookup_resource(head["Domstol"]),
                                  predicate=URISPACE.abbrSlug)
         for malnummer in head['_localid']:
-            domuri = makeurl({'type': LegalRef.DOMSTOLSAVGORANDEN,
-                              'malnummer': malnummer,
-                              'domstol': slug,  # should be resource instead
-                              'avgorandedatum': head['Avgörandedatum']})
+            dtmp = Describer(Graph()) # without a 2nd arg, should use a bnode
+            dtmp.rdftype(RPUBL.VagledandeDomstolsavgorande)
+            dtmp.value(RPUBL.malnummer, malnummer)
+            # is head['Avgörandedatum'] a real date? Not essential here though.
+            dtmp.value(RPUBL.avgorandedatum, head['Avgörandedatum'])
+            dtmp.rel(DCTERMS.publisher, self.lookup_resource(head["Domstol"]))
+            domuri = self.minter.space.coin_uri(dtmp.graph.resource(dtmp._current()))
+            # domuri = makeurl({'type': LegalRef.DOMSTOLSAVGORANDEN,
+            #                   'malnummer': malnummer,
+            #                   'domstol': slug,  # should be resource instead
+            #                   'avgorandedatum': head['Avgörandedatum']})
             domdesc = Describer(doc.meta, domuri)
 
         # 2. convert all strings in head to proper RDF
@@ -1275,7 +1282,6 @@ class DV(SwedishLegalSource):
 
         # 3. mint some owl:sameAs URIs -- but only if not using canonical URIs
         if self.config.localizeuri:
-            from pudb import set_trace; set_trace()
             refdesc.rel(OWL.sameAs, self.sameas_uri(refuri))
             # FIXME: could be multiple domuris
             domdesc.rel(OWL.sameAs, self.sameas_uri(domuri))
@@ -1286,14 +1292,14 @@ class DV(SwedishLegalSource):
                               'arsutgava': refdesc.getvalue(RPUBL.arsutgava),
                               'lopnummer': refdesc.getvalue(RPUBL.lopnummer)}
                 refdesc.rel(OWL.sameAs, makeurl(altattribs))
-        else:
-            # Canonical URIs are based on lopnummer. add a sameas ref
-            # back to the sidnummer based URI
-            altattribs = {'type': LegalRef.RATTSFALL,
-                          'rattsfallspublikation': 'nja',
-                          'arsutgava': refdesc.getvalue(RPUBL.arsutgava),
-                          'lopnummer': refdesc.getvalue(RPUBL.sidnummer)}
-            refdesc.rel(OWL.sameAs, makeurl(altattribs))
+            else:
+                # Canonical URIs are based on lopnummer. add a sameas ref
+                # back to the sidnummer based URI
+                altattribs = {'type': LegalRef.RATTSFALL,
+                              'rattsfallspublikation': 'nja',
+                              'arsutgava': refdesc.getvalue(RPUBL.arsutgava),
+                              'lopnummer': refdesc.getvalue(RPUBL.sidnummer)}
+                refdesc.rel(OWL.sameAs, makeurl(altattribs))
 
         # 4. Add some same-for-everyone properties
         refdesc.rel(DCTERMS.publisher, self.lookup_resource('Domstolsverket'))

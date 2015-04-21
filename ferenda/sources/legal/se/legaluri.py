@@ -33,12 +33,12 @@ predicate = {"type": RDF.type,
              "arsutgava": RPUBL.arsutgava,
              "sidnummer": RPUBL.sidnummer,
              "lopnummer": RPUBL.lopnummer,
-             "law": RPUBL.lopnummer,  # really consists of arsutgava:lopnummer
+             "law": RPUBL.platsangivelse,  # FIXME: This pred is only proposed
              "chapter": RINFOEX.kapitelnummer,
              "section": RINFOEX.paragrafnummer,
              "piece": RINFOEX.styckenummer,
              "item": RINFOEX.punktnummer,
-             "myndighet": DCTERMS.publisher,  # or DCTERMS.creator?
+             "myndighet": DCTERMS.creator, # ??
              "domstol": DCTERMS.publisher,
              "rattsfallspublikation": RPUBL.rattsfallspublikation,  # probably?
              "dnr": RPUBL.diarienummer,
@@ -82,13 +82,29 @@ def construct(dictionary):
     graph = Graph()
     bnode = BNode()
     for key in dictionary:
-        if isinstance(dictionary[key], Identifier):
-            val = dictionary[key]
-        elif key == "type":
-            val = URIRef(types[dictionary[key]])
+        if key == "law":
+            # need to split any RPUBL.platsangivelse to
+            # RPUBL.arsutgava + RPUBL.lopnummer since there is no uri
+            # template for RPUBL.platsangivelse
+            arsutgava, lopnummer = dictionary[key].split(":")
+            graph.add((bnode, RPUBL.arsutgava, Literal(arsutgava)))
+            graph.add((bnode, RPUBL.lopnummer, Literal(lopnummer)))
+            # how to get the URI for eg SFS? It could be
+            # <http://rinfo.lagrummet.se/serie/fs/sfs> or
+            # <https://lagen.nu/dataset/sfs> (or really anything). The
+            # truth is in slugs.n3 (which should be loaded in a
+            # URIMinter object, but we don't have that. Let's hardcode
+            # for now.
+            graph.add((bnode, RPUBL.forfattningssamling,
+                       URIRef("http://rinfo.lagrummet.se/serie/fs/sfs")))
         else:
-            val = Literal(dictionary[key])
-        graph.add((bnode, predicate[key], val))
+            if isinstance(dictionary[key], Identifier):
+                val = dictionary[key]
+            elif key == "type":
+                val = URIRef(types[dictionary[key]])
+            else:
+                val = Literal(dictionary[key])
+            graph.add((bnode, predicate[key], val))
     # return construct_from_graph(graph)
     return coinstruct_from_graph(graph, bnode)
 
@@ -104,18 +120,18 @@ def _rpubl_uri_transform(s):
     return r.sub(lambda m: table[m.group(0)], s.lower())
 
 
-def coinstruct_from_graph(graph, subject):
-    configgraph = Graph()
-    # FIXME: The configgraph should only be loaded once, but be
-    # configurable ie load the correct COIN n3 config
-    configgraph.parse("ferenda/res/uri/space.n3", format="n3")
-    configgraph.parse("ferenda/res/uri/slugs.n3", format="n3")
-    minter = URIMinter(configgraph,
-                       URIRef("http://rinfo.lagrummet.se/sys/uri/space#"))
+def coinstruct_from_graph(graph, subject, minter=None):
+    if not minter:
+        configgraph = Graph()
+        # FIXME: The configgraph should only be loaded once, but be
+        # configurable ie load the correct COIN n3 config
+        configgraph.parse("ferenda/res/uri/space.n3", format="n3")
+        configgraph.parse("ferenda/res/uri/slugs.n3", format="n3")
+        minter = URIMinter(configgraph,
+                           URIRef("http://rinfo.lagrummet.se/sys/uri/space#"))
     results = minter.space.coin_uris(graph.resource(subject))
     assert len(results), "Could not coin any URIs from the given graph"
-    # results = minter.compute_uris(graph)
-    return results[0]
+    return results[0]   # only return the "best" ie most prioritized template
 
 def construct_from_graph(graph):
     # assume every triple in the graph has the same bnode as subject

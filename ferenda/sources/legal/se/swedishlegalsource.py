@@ -23,6 +23,7 @@ from ferenda.elements import (Paragraph, Section, Body,
                               OrdinalElement, CompoundElement,
                               SectionalElement)
 from ferenda.pdfreader import Page
+from ferenda.thirdparty.coin import URIMinter
 from . import RPUBL, legaluri
 
 DCTERMS = Namespace(util.ns['dcterms'])
@@ -202,6 +203,9 @@ class SwedishLegalSource(DocumentRepository):
         # The class method makeurl wraps legaluri.construct with
         # localize_uri if appropriate. If config.localizeuri is True,
         # it returns localized URIs, otherwise canonicals
+        #
+        # FIXME: This should be scrapped and exchanged with
+        # self.minter configured below
         if self.config.localizeuri:
             f = SwedishCitationParser(None, self.config.url,
                                       self.config.urlpath).localize_uri
@@ -212,6 +216,16 @@ class SwedishLegalSource(DocumentRepository):
         else:
             self.makeurl = legaluri.construct
 
+        # This provides for a better (more RDFish) method of makning URIs
+        # if self.config.localizeuri
+        #     load a different urispace graph, slugs etc into self.minter
+        # else:  # canonical uris
+        # FIXME: This is an expensive setup that's only needed by parse()
+        cfg = Graph().parse("ferenda/res/uri/space.n3", format="n3")
+        cfg.parse("ferenda/res/uri/slugs.n3", format="n3")
+        minter = URIMinter(cfg,
+                           URIRef("http://rinfo.lagrummet.se/sys/uri/space#"))
+        self.minter = minter
         if not isinstance(self, SwedishLegalSource):
             assert self.alias != "swedishlegalsource", "Subclasses must override self.alias!"
 

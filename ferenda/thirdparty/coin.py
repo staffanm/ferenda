@@ -32,7 +32,6 @@ class URISpace:
         self.slugTransform = SlugTransformer(resource.value(COIN.slugTransform))
 
     def coin_uris(self, resource):
-        uris = []
         for template in sorted(self.templates,
                                key=lambda x: (x.priority, len(x.bindings)),
                                reverse=True):
@@ -40,8 +39,13 @@ class URISpace:
             # non-shared vars per template)
             uri = template.coin_uri(resource)
             if uri:
-                uris.append(uri)
-        return uris
+                yield uri
+
+    def coin_uri(self, resource):
+        try:
+            return next(self.coin_uris(resource))
+        except:  # maybe StopIteration?
+            raise ValueError("Couldn't mint uri from %s" % resource)
 
     def transform_value(self, value):
         return self.slugTransform(value)
