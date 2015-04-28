@@ -15,6 +15,7 @@ from .tocpage import TocPage
 from .facet import Facet
 from .feedset import Feedset
 from .feed import Feed
+from .resourceloader import ResourceLoader
 from .transformer import Transformer
 from .document import Document
 from .documentstore import DocumentStore

@@ -1,32 +1,48 @@
+import logging
+import pkg_resources
+from contextlib import contextmanager
+
+from ferenda.errors import ResourceNotFound
+
+
 class ResourceLoader(object):
     def __init__(self, *loadpath, **kwargs):
         self.loadpath = loadpath
         self.use_pkg_resources = kwargs.get("use_pkg_resources", True)
         self.modulename = "ferenda"
+        self.log = logging.getLogger(__name__)
 
     def exists(self, resourcename):
         try:
-            self.extract(resourcename)
+            self.filename(resourcename)
             return True
         except ResourceNotFound:
             return False
-            
+
     def load(self, resourcename, binary=False):
-        mode = "rb" if binary else "r"
-        with open(self.extract(resourcename), mode=mode) as fp:
+        with open(self.filename(resourcename), mode=mode) as fp:
             return fp.read()
-    
+
+    @contextmanager
     def open(self, resourcename, binary=False):
-        # should preferably work both as classic open() and as a context manager
-        pass
+        # should preferably work both as classic open() and as a
+        # context manager
+        mode = "rb" if binary else "r"
+        try:
+            fp = open(self.filename(resourcename), mode=mode)
+            yield fp
+        finally:
+            fp.close()
+
         
-    def extract(self, resourcename):
+    def filename(self, resourcename):
         for path in self.loadpath:
             candidate = self.loadpath + os.sep + resourcename
             if os.path.exists(candidate):
                 return candidate
-        if self.use_pkg_resources and pkg_resources.resource_exists(self.modulename, resourcename):
-            return pkg_resources.resource_extract(self.modulename, resourcename)
+        if (self.use_pkg_resources and
+            pkg_resources.resource_exists(self.modulename, resourcename)):
+            return pkg_resources.resource_filename(self.modulename, resourcename)
         raise ResourceNotFound(resourcename) # should contain a list of places we searched?
                 
     

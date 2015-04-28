@@ -21,7 +21,7 @@ from copy import deepcopy
 
 # 3rdparty libs
 import pkg_resources
-from rdflib import Namespace, URIRef, Graph, RDF, RDFS, Literal
+from rdflib import Namespace, URIRef, Graph, RDF, RDFS, Literal, BNode
 from rdflib.namespace import DCTERMS, OWL, SKOS
 import requests
 import lxml.html
@@ -1150,11 +1150,6 @@ class DV(SwedishLegalSource):
                                         self.config.url,
                                         '', 
                                         localizeuri=self.config.localizeuri)
-        if self.config.localizeuri:
-            def makeurl(data):
-                return parser.localize_uri(legaluri.construct(data))
-        else:
-            makeurl = legaluri.construct
 
         def ref_to_uri(ref):
             nodes = parser.parse_string(ref)
@@ -1190,17 +1185,20 @@ class DV(SwedishLegalSource):
         slug = self.lookup_label(self.lookup_resource(head["Domstol"]),
                                  predicate=URISPACE.abbrSlug)
         for malnummer in head['_localid']:
-            dtmp = Describer(Graph()) # without a 2nd arg, should use a bnode
+            bnodetmp = BNode()
+            gtmp = Graph()
+            from pudb import set_trace; set_trace()
+            gtmp.bind("rpubl", RPUBL)
+            gtmp.bind("dcterms", DCTERMS)
+            
+            dtmp = Describer(gtmp, bnodetmp)
             dtmp.rdftype(RPUBL.VagledandeDomstolsavgorande)
             dtmp.value(RPUBL.malnummer, malnummer)
-            # is head['Avgörandedatum'] a real date? Not essential here though.
             dtmp.value(RPUBL.avgorandedatum, head['Avgörandedatum'])
             dtmp.rel(DCTERMS.publisher, self.lookup_resource(head["Domstol"]))
-            domuri = self.minter.space.coin_uri(dtmp.graph.resource(dtmp._current()))
-            # domuri = makeurl({'type': LegalRef.DOMSTOLSAVGORANDEN,
-            #                   'malnummer': malnummer,
-            #                   'domstol': slug,  # should be resource instead
-            #                   'avgorandedatum': head['Avgörandedatum']})
+            resource = dtmp.graph.resource(bnodetmp)
+            from pudb import set_trace; set_trace()
+            domuri = self.minter.space.coin_uri(resource)
             domdesc = Describer(doc.meta, domuri)
 
         # 2. convert all strings in head to proper RDF

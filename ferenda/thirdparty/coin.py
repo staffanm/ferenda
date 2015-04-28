@@ -44,7 +44,7 @@ class URISpace:
     def coin_uri(self, resource):
         try:
             return next(self.coin_uris(resource))
-        except:  # maybe StopIteration?
+        except StopIteration: 
             raise ValueError("Couldn't mint uri from %s" % resource)
 
     def transform_value(self, value):

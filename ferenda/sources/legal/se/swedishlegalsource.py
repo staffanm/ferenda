@@ -188,47 +188,20 @@ class SwedishLegalSource(DocumentRepository):
 
     def __init__(self, config=None, **kwargs):
         super(SwedishLegalSource, self).__init__(config, **kwargs)
-
-        # URIs for documents or references to documents come in two flavours
-        # * canonical: http://rinfo.lagrummet.se/publ/sfs/1999:175
-        # * localized: http://localhost:8000/res/sfs/1999:175 (or
-        #   https://lagen.nu/1999:175, depending on config.url and
-        #   config.urlpath)
-        #
-        # The method legaluri.construct takes a dict and always
-        # returns a canonical URI. The
-        # SwedishCitationParser.localize_uri method converts a
-        # canonical URI to a localized.
-        #
-        # The class method makeurl wraps legaluri.construct with
-        # localize_uri if appropriate. If config.localizeuri is True,
-        # it returns localized URIs, otherwise canonicals
-        #
-        # FIXME: This should be scrapped and exchanged with
-        # self.minter configured below
-        if self.config.localizeuri:
-            f = SwedishCitationParser(None, self.config.url,
-                                      self.config.urlpath).localize_uri
-
-            def makeurl(data):
-                return f(legaluri.construct(data))
-            self.makeurl = makeurl
-        else:
-            self.makeurl = legaluri.construct
-
-        # This provides for a better (more RDFish) method of makning URIs
-        # if self.config.localizeuri
-        #     load a different urispace graph, slugs etc into self.minter
-        # else:  # canonical uris
-        # FIXME: This is an expensive setup that's only needed by parse()
-        cfg = Graph().parse("ferenda/res/uri/space.n3", format="n3")
-        cfg.parse("ferenda/res/uri/slugs.n3", format="n3")
-        minter = URIMinter(cfg,
-                           URIRef("http://rinfo.lagrummet.se/sys/uri/space#"))
-        self.minter = minter
         if not isinstance(self, SwedishLegalSource):
             assert self.alias != "swedishlegalsource", "Subclasses must override self.alias!"
 
+    @property
+    def minter(self):
+        if not hasattr(self, '_minter'):
+            spacefile = "ferenda/res/uri/swedishlegalsource.space.n3"
+            slugsfile = "ferenda/res/uri/swedishlegalsource.slugs.n3"
+            spaceuri = "http://localhost:8000/sys/uri/space#"
+            cfg = Graph().parse(spacefile, format="n3")
+            cfg.parse(slugsfile, format="n3")
+            self._minter = URIMinter(cfg, URIRef(spaceuri))
+        return self._minter
+        
     @property
     def commondata(self):
         # override to make sure we use the lagen.nu versions of
@@ -271,7 +244,8 @@ class SwedishLegalSource(DocumentRepository):
     def get_default_options(cls):
         opts = super(SwedishLegalSource, cls).get_default_options()
         opts['pdfimages'] = False
-        opts['localizeuri'] = False
+        opts['localizeuri'] = False   # FIXME: these two control the
+        opts['canonicaluri'] = False  # same thing!
         # this controls URI localization
         opts['urlpath'] = "res/%s/" % cls.alias
         opts['tabs'] = True

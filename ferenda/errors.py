@@ -149,3 +149,8 @@ class MaxDownloadsReached(Exception):
 
     """
     pass
+
+class ResourceNotFound(Exception):
+    """Raised when :py:class:`~ferenda.ResourceLoader` method is called
+    with the name of a non-existing resource. """
+    pass
