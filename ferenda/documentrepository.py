@@ -33,7 +33,6 @@ from rdflib import Graph, Literal, Namespace, URIRef, BNode, RDF, RDFS
 from rdflib.namespace import FOAF
 import bs4
 import lxml.html
-import pkg_resources
 import requests
 import requests.exceptions
 
@@ -49,7 +48,8 @@ from ferenda import util, errors, decorators, fulltextindex
 
 from ferenda import (Describer, TripleStore, FulltextIndex, Document,
                      DocumentEntry, TocPageset, TocPage,
-                     DocumentStore, Transformer, Facet, Feed, Feedset)
+                     DocumentStore, Transformer, Facet, Feed, Feedset,
+                     ResourceLoader)
 from ferenda.elements import (Body, Link,
                               UnorderedList, ListItem, Paragraph)
 from ferenda.elements.html import elements_from_soup
@@ -321,6 +321,10 @@ class DocumentRepository(object):
         # when testing. FIXME: A better alternative would be to use
         # the responses library to mock calls to requests.
         self.session = requests.session()
+        
+        # loadpath should be cwd, then dirname(__file__)+"/res" for each class in the inheritance chain
+        # eg '.', 'lagen/nu/res', 'ferenda/sources/swedishlegalsources/res', 'ferenda/res'
+        self.resourceloader = ResourceLoader()
 
     @property
     def ontologies(self):
@@ -347,18 +351,10 @@ class DocumentRepository(object):
                 if prefix in ("rdf", "rdfs", "owl"):
                     continue
                 ontopath = "res/vocab/%s.ttl" % prefix
-                fp = None
-                if os.path.exists(ontopath):
-                    fp = open(ontopath, 'rb')
-                elif pkg_resources.resource_exists('ferenda', ontopath):
-                    fp = pkg_resources.resource_stream('ferenda', ontopath)
-                else:
-                    pass  # warn?
-                if fp:
-                    # print("loading %s" % ontopath)
-                    self._ontologies.parse(data=fp.read(), format="turtle")
-                    self._ontologies.bind(prefix, uri)
-                    fp.close()
+                if self.resourceloader.exists(ontopath):
+                    with self.resourceloader.open(ontopath) as fp:
+                        self._ontologies.parse(data=fp.read(), format="turtle")                 
+                        self._ontologies.bind(prefix, uri)
         return self._ontologies
 
     @property
@@ -374,17 +370,9 @@ class DocumentRepository(object):
             for cls in inspect.getmro(self.__class__):
                 if hasattr(cls, "alias"):
                     commonpath = "res/extra/%s.ttl" % cls.alias
-                    fp = None
-                    if os.path.exists(commonpath):
-                        fp = open(commonpath, 'rb')
-                    elif pkg_resources.resource_exists('ferenda', commonpath):
-                        fp = pkg_resources.resource_stream('ferenda', commonpath)
-                    else:
-                        pass  # warn?
-                    if fp:
-                        # print("loading %s" % commonpath)
-                        self._commondata.parse(data=fp.read(), format="turtle")
-                        fp.close()
+                    if self.resourceloader.exists(commonpath):
+                        with self.resourceloader.open(commonpath) as fp:                 
+                            self._commondata.parse(data=fp.read(), format="turtle")                 
         return self._commondata
 
     @property
@@ -2343,15 +2331,9 @@ WHERE {
         """
 
         query_template = self.sparql_annotations
-        if os.path.exists(query_template):
-            fp = open(query_template, 'rb')
-        elif pkg_resources.resource_exists('ferenda', query_template):
-            fp = pkg_resources.resource_stream('ferenda', query_template)
-        else:
-            raise ValueError("query template %s not found" % query_template)
-        params = {'uri': uri}
-        sq = fp.read().decode('utf-8') % params
-        fp.close()
+        with self.resourceloader.open(query_template) as fp:
+            params = {'uri': uri}
+            sq = fp.read().decode('utf-8') % params
         return sq
 
     # helper for the prep_annotation_file helper -- it expects a
@@ -2369,8 +2351,8 @@ WHERE {
         """
         fp = BytesIO(graph.serialize(format="xml"))
         intree = etree.parse(fp)
-        fp = pkg_resources.resource_stream('ferenda', "res/xsl/rdfxml-grit.xsl")
-        transform = etree.XSLT(etree.parse(fp))
+        with self.resourceloader.open("res/xsl/rdfxml-grit.xsl") as fp:
+            transform = etree.XSLT(etree.parse(fp))
         resulttree = transform(intree)
         res = etree.tostring(resulttree, pretty_print=format)
         return res.decode('utf-8')
@@ -2388,8 +2370,8 @@ WHERE {
         """
         with open(annotation_file, "rb") as fp:
             intree = etree.parse(fp)
-        fp = pkg_resources.resource_stream('ferenda', "res/xsl/grit-grddl.xsl")
-        transform = etree.XSLT(etree.parse(fp))
+        with self.resourceloader.open("res/xsl/grit-grddl.xsl") as fp:
+            transform = etree.XSLT(etree.parse(fp))
         resulttree = transform(intree)
         res = etree.tostring(resulttree, pretty_print=format)
         g = Graph()
