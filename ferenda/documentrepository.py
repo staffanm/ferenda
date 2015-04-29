@@ -322,9 +322,10 @@ class DocumentRepository(object):
         # the responses library to mock calls to requests.
         self.session = requests.session()
         
-        # loadpath should be cwd, then dirname(__file__)+"/res" for each class in the inheritance chain
-        # eg '.', 'lagen/nu/res', 'ferenda/sources/swedishlegalsources/res', 'ferenda/res'
-        self.resourceloader = ResourceLoader()
+        loadpath = ResourceLoader.make_loadpath(self)
+        if self.config.loadpath:
+            loadpath = self.config.loadpath + loadpath
+        self.resourceloader = ResourceLoader(loadpath)
 
     @property
     def ontologies(self):

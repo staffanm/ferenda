@@ -1,3 +1,4 @@
+import os
 import logging
 import pkg_resources
 from contextlib import contextmanager
@@ -6,6 +7,18 @@ from ferenda.errors import ResourceNotFound
 
 
 class ResourceLoader(object):
+
+    # should perhaps have a corresponding make_modulepath for use with
+    # pkg_resources.resource_stream et al
+    @staticmethod
+    def make_loadpath(instance, suffix="res"):
+        res = []
+        for cls in instance.__class__.getmro():
+            candidate = os.path.dirname(cls.__file__)
+            if os.path.exists(candidate):
+                res.append(candidate)
+        return res
+
     def __init__(self, *loadpath, **kwargs):
         self.loadpath = loadpath
         self.use_pkg_resources = kwargs.get("use_pkg_resources", True)
@@ -28,16 +41,23 @@ class ResourceLoader(object):
         # should preferably work both as classic open() and as a
         # context manager
         mode = "rb" if binary else "r"
+        fp = None
         try:
             fp = open(self.filename(resourcename), mode=mode)
             yield fp
         finally:
-            fp.close()
+            if fp:
+                fp.close()
 
-        
+
     def filename(self, resourcename):
+        if os.path.isabs(resourcename):  # don't examine the loadpath
+            if os.path.exists(resourcename):
+                return resourcename
+            else:
+                raise ResourceNotFound(resourcename)
         for path in self.loadpath:
-            candidate = self.loadpath + os.sep + resourcename
+            candidate = path + os.sep + resourcename
             if os.path.exists(candidate):
                 return candidate
         if (self.use_pkg_resources and

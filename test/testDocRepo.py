@@ -1362,7 +1362,7 @@ class Generate(RepoTester):
         tree = self._generate_complex(sparql=queryfile)
         os.unlink(self.repo.store.generated_path("a"))
         # but try it with a non-existing file and it should go boom
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ResourceNotFound):
             tree = self._generate_complex(sparql="nonexistent.rq")
             
         

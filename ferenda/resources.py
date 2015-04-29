@@ -11,7 +11,6 @@ from lxml.builder import ElementMaker
 from rdflib import URIRef, Literal, BNode, Graph, Namespace, RDF, RDFS
 from rdflib.namespace import FOAF, SKOS
 BIBO = Namespace("http://purl.org/ontology/bibo/")
-import pkg_resources
 
 from layeredconfig import LayeredConfig, Defaults
 
@@ -37,6 +36,10 @@ class Resources(object):
         self.config = LayeredConfig(Defaults(defaults))
         from ferenda.manager import setup_logger
         self.log = setup_logger()
+
+        # FIXME: How should we set up a global loadpath from the
+        # individual repos?
+        self.resourceloader = ResourceLoader()
 
     def make(self,
              css=True,
@@ -213,41 +216,30 @@ class Resources(object):
         under the web root directory.
 
         :param filename: The name (relative to the ferenda package) of the file
-        :param buf: A buffer into which the contents of the file is written (if combineresources == True)
-        :param destdir: The directory into which the file will be copied (unless combineresources == True)
-        :param origin: The source of the configuration that specifies this files
-        :returns: The URL path of the resulting file, relative to the web root (or None if combineresources == True)
+        :param buf: A buffer into which the contents of the file is written
+                    (if combineresources == True)
+        :param destdir: The directory into which the file will be copied
+                        (unless combineresources == True)
+        :param origin: The source of the configuration that specifies this file
+        :returns: The URL path of the resulting file, relative to the web root
+                  (or None if combineresources == True)
         :rtype: str
         """
-        # disabled until pyScss is usable on py3 again
-        # mapping = {'.scss': {'transform': _transform_scss,
-        #                     'suffix': '.css'}
-        #            }
-        # FIXME: extend this through a load-path mechanism?
-        if os.path.exists(filename):
-            self.log.debug("Process file found %s as a file relative to %s" %
-                           (filename, os.getcwd()))
-            fp = open(filename, "rb")
-        elif pkg_resources.resource_exists('ferenda', filename):
-            self.log.debug("Found %s as a resource" % filename)
-            fp = pkg_resources.resource_stream('ferenda', filename)
-        elif filename.startswith("http://") or filename.startswith("https://"):
+        if filename.startswith("http://") or filename.startswith("https://"):
             if self.config.combineresources:
                 raise errors.ConfigurationError(
                     "makeresources: Can't use combineresources=True in combination with external js/css URLs (%s)" % filename)
             self.log.debug("Using external url %s" % filename)
             return filename
-        else:
-            self.log.warning(
-                "file %(filename)s (specified in %(origin)s) doesn't exist" % locals())
+        try: 
+            fp = self.resourceloader.open(filename)
+        except errors.ResourceNotFound:
+            self.log.warning("file %(filename)s (specified in %(origin)s)"
+                             " doesn't exist" % locals())
             return None
 
         (base, ext) = os.path.splitext(filename)
-        # disabled until pyScss is usable on py3 again
-        # if ext in mapping:
-        #     outfile = base + mapping[ext]['suffix']
-        #     mapping[ext]['transform'](filename, outfile)
-        #     filename = outfile
+
         if self.config.combineresources:
             self.log.debug("combining %s into buffer" % filename)
             buf.write(fp.read())
@@ -309,6 +301,8 @@ class Resources(object):
             # included in files
             util.ensure_dir(os.sep.join([self.resourcedir, "ui", "dummy.txt"]))
             try:
+                # this requires that resourceloader should have a
+                # readdir method
                 for f in pkg_resources.resource_listdir("ferenda", "res/ui"):
                     src = pkg_resources.resource_stream("ferenda", "res/ui/" + f)
                     with open(os.sep.join([self.resourcedir, "ui", f]), "wb") as dest:

@@ -1,7 +1,11 @@
 import tempfile
 import shutil
+import os
 
 from ferenda.compat import unittest
+from ferenda.testutil import FerendaTestCase
+from ferenda.errors import ResourceNotFound
+from ferenda import util
 
 # SUT
 from ferenda import ResourceLoader
@@ -11,7 +15,7 @@ class SubTestCase(unittest.TestCase):
     pass
 
 
-def testResourceLoader(SubTestCase):
+class Main(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.mkdtemp()
         loadpath = [self.tempdir + "/primary", self.tempdir + "/secondary"]
@@ -20,14 +24,14 @@ def testResourceLoader(SubTestCase):
         self.resourceloader = ResourceLoader(*loadpath)
     
     def tearDown(self):
-        shutil.removedir(self.tempdir)  
+        shutil.rmtree(self.tempdir)  
     
     def test_loadpath(self):
         self.assertEqual(ResourceLoader.make_loadpath(self),
                          ["test/res",  # from test.testResourceLoader.SubTestCase
                           "ferenda/res" # from ferenda.compat.unittest.TestCase
-                          ]
-                          
+                          ])
+
     def test_exists(self):
         self.assertTrue(self.resourceloader.exists("primaryresource.txt"))
         self.assertTrue(self.resourceloader.exists("secondaryresource.txt"))
@@ -36,25 +40,33 @@ def testResourceLoader(SubTestCase):
 
     def test_open(self):
         with self.resourceloader.open("primaryresource.txt") as fp:
-            self.assertEqual("Hello", fp.read())    
+            self.assertEqual("Hello", fp.read())
         with self.resourceloader.open("secondaryresource.txt") as fp:
             self.assertEqual("World", fp.read())
         with self.assertRaises(ResourceNotFound):
             fp = self.resourceloader.open("nonexistent.txt")
-        with self.resourceloader.open("robots.txt") as fp:  # should be available through the pkg_resources API
+
+        # should be available through the pkg_resources API
+        with self.resourceloader.open("robots.txt") as fp:
             self.assertStartswith(fp.read(), "# robotstxt.org/")
             
     def test_read(self):
-        self.assertEqual("Hello", self.resourceloader.read("primaryresource.txt"))
-        self.assertEqual("World", self.resourceloader.read("secondaryresource.txt"))
-        self.assertStartsWith(self.resourceloader.read("robots.txt"), "# robotstxt.org/")
+        self.assertEqual("Hello",
+                         self.resourceloader.load("primaryresource.txt"))
+        self.assertEqual("World",
+                         self.resourceloader.load("secondaryresource.txt"))
+        self.assertStartsWith(self.resourceloader.load("robots.txt"),
+                              "# robotstxt.org/")
         with self.assertRaises(ResourceNotFound):
-            self.resourceloader.read("nonexistent.txt"))
+            self.resourceloader.load("nonexistent.txt")
             
     def test_filename(self):
-        self.assertEqual(self.tempdir + "/primary/primaryresource.txt", self.resourceloader.filename("primaryresource.txt"))
-        self.assertEqual(self.tempdir + "/secondary/secondaryresource.txt", self.resourceloader.filename("secondaryresource.txt"))
-        self.assertEqual("ferenda/res/robots.txt", self.resourceloader.filename("robots.txt"))
+        self.assertEqual(self.tempdir + "/primary/primaryresource.txt",
+                         self.resourceloader.filename("primaryresource.txt"))
+        self.assertEqual(self.tempdir + "/secondary/secondaryresource.txt",
+                         self.resourceloader.filename("secondaryresource.txt"))
+        self.assertEqual("ferenda/res/robots.txt",
+                         self.resourceloader.filename("robots.txt"))
         with self.assertRaises(ResourceNotFound):
-            self.resourceloader.filename("nonexistent.txt"))
+            self.resourceloader.filename("nonexistent.txt")
     
