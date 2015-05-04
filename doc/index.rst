@@ -50,6 +50,7 @@ Classes
    api/documententry
    api/documentstore
    api/facet
+   api/resourceloader
    api/tocpage
    api/tocpageset
    api/feed
@@ -67,9 +68,8 @@ Classes
    api/pdfreader
    api/pdfanalyzer
    api/wordreader
-..  
    api/wsgiapp
-   api/resources -- these are not yet public api
+   api/resources
    
 Modules
 -------
