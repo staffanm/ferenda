@@ -16,9 +16,6 @@ from layeredconfig import LayeredConfig, Defaults
 from ferenda import DocumentRepository, ResourceLoader
 from ferenda import util, errors
 
-# FIXME: remove this once all uses of pkg_resources are gone
-import pkg_resources
-
 class Resources(object):
 
     """Creates and manages various assets/resources needed for web serving.
@@ -304,40 +301,10 @@ class Resources(object):
             files.append(self._filepath_to_urlpath(filename, 2))
 
         if self.config.legacyapi:
-            # FIXME: This should be possible:
-            # for f in resourceloader.distdir("ui"):
-            #     shutil.copy(resourceloader.filename(f),
-            #                 os.sep.join([self.resourcedir, "ui", f]))
-            # p
             # copy ui explorer app to <url>/rsrc/ui/ -- this does not get
             # included in files
-            util.ensure_dir(os.sep.join([self.resourcedir, "ui", "dummy.txt"]))
-            try:
-                # this requires that resourceloader should have a
-                # readdir method
-                for f in pkg_resources.resource_listdir("ferenda", "res/ui"):
-                    src = pkg_resources.resource_stream("ferenda", "res/ui/" + f)
-                    with open(os.sep.join([self.resourcedir, "ui", f]), "wb") as dest:
-                        dest.write(src.read())
-            except OSError as e:  # happens on travis-ci
-                x = pkg_resources.get_provider("ferenda")
-                print(
-                    "Got error '%s'. Provider %s, .module_path %s" %
-                    (str(e), x, x.module_path))
-                print(
-                    "Does %s/res/ui exist? %s (wd %s, os.listdir: %r)" %
-                    (x.module_path,
-                     os.path.exists(
-                         x.module_path +
-                         "/res/ui"),
-                        os.getcwd(),
-                        os.listdir(".")))
-                try:
-                    fp = pkg_resources.resource_stream('ferenda', "res/ui/index.html")
-                    print("Got hold of res/ui/index.html through .resource_stream")
-                except Exception as sub_e:
-                    print("Couldn't get a res stream either: %s" % sub_e)
-                raise e  # or pass
+            targetdir = os.sep.join([self.resourcedir, "ui"])
+            self.resourceloader.extractdir("ui", targetdir)
         return files
 
     def _convert_legacy_jsonld(self, indata, rooturi):
