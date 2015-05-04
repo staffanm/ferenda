@@ -127,4 +127,27 @@ class ResourceLoader(object):
             return pkg_resources.resource_filename(self.modulename, self.resourceprefix + os.sep + resourcename)
         raise ResourceNotFound(resourcename) # should contain a list of places we searched?
                 
-    
+    def extractdir(self, resourcedir, target):
+        """Extract all file resources directly contained in the specified resource directory. 
+        
+        Searches all loadpaths and optionally the Resources API for any file contained within.
+        This means the target dir may end up with eg. one file from a high-priority path and 
+        other files from the system dirs/resources. This in turns makes it easy to just override
+        a single file in a larger set of resource files.
+        """
+        extracted = set()
+        for path in self.loadpath:
+            for f in os.listdir(self.loadpath+os.sep+resourcedir):
+                src = self.loadpath+os.sep+resourcedir + os.sep + f
+                dest = target + os.sep + resourcedir + os.sep + f
+                if dest not in extracted and os.isfile(src):
+                    shutil.copy2(src, dest)
+                    extracted.add(dest)
+        if self.use_pkg_resources:
+            for f in pkg_resources.resource_listdir(self.modulename, self.resourceprefix + os.sep + resourcedir):
+                src = self.resourceprefix + os.sep + resourcedir + os.sep + f
+                dest = target + os.sep + resourcedir + os.sep + f
+                if dest not in extracted and os.isfile(src):
+                    # FIXME: use proper API
+                    pkg_resources.resource_extract(self.module, src, dest)
+                    extracted.add(dest)
