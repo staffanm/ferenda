@@ -20,7 +20,6 @@ from collections import defaultdict
 from copy import deepcopy
 
 # 3rdparty libs
-import pkg_resources
 from rdflib import Namespace, URIRef, Graph, RDF, RDFS, Literal, BNode
 from rdflib.namespace import DCTERMS, OWL, SKOS
 import requests
@@ -2057,7 +2056,7 @@ class DV(SwedishLegalSource):
                 data = data.replace(b"\xc2\x81", b"\xc3\x85")
             intree = etree.parse(BytesIO(data))
             # intree = etree.parse(fp)
-        fp = pkg_resources.resource_stream('ferenda', "res/xsl/simplify-ooxml.xsl")
+        fp = self.resourceloader.openfp("xsl/simplify-ooxml.xsl")
         transform = etree.XSLT(etree.parse(fp))
         fp.close()
         resulttree = transform(intree)
