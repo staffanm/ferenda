@@ -13,6 +13,14 @@ class ResourceLoader(object):
     # pkg_resources.resource_stream et al
     @staticmethod
     def make_loadpath(instance, suffix="res"):
+        """Given an object instance, returns a list of path locations corresponding 
+        to the physical location of the implementation of that instance, with
+        a specified suffix. 
+        
+        ie. if provided an ``Foo`` instance, whose class is defined in project/subclass/foo.py, 
+        and ``Foo`` derives from ``Bar``, whose class is defined in project/bar.py, the returned
+        make_loadpath will return ``['project/subclass/res', 'project/res']`` 
+        """
         res = []
         for cls in inspect.getmro(instance.__class__):
             if cls == object:
@@ -26,6 +34,16 @@ class ResourceLoader(object):
         return res
 
     def __init__(self, *loadpath, **kwargs):
+        """
+        :param loadpath: A list of directories to search for by the instance methods (in priority order). 
+        :param kwargs: Any other named parameters to initialize the object with. The 
+                       only named parameter defined is ``use_pkg_resources`` (default: 
+                       True) for specifying whether to use the 
+                       `<https://pythonhosted.org/setuptools/pkg_resources.html#resourcemanager-api> ResourceManager API`_
+                       in addition to regular file operations. If set, the ResourceManager
+                       API is queried only after all directories in loadpath are searched.
+                       
+        """
         self.loadpath = loadpath
         self.use_pkg_resources = kwargs.get("use_pkg_resources", True)
         self.modulename = "ferenda"
@@ -33,6 +51,8 @@ class ResourceLoader(object):
         self.log = logging.getLogger(__name__)
 
     def exists(self, resourcename):
+        """Returns True iff the named resource can be found anywhere in any
+        place where this loader searches, False otherwise"""
         try:
             self.filename(resourcename)
             return True
@@ -40,6 +60,11 @@ class ResourceLoader(object):
             return False
 
     def load(self, resourcename, binary=False):
+        """Returns the contents of the resource, either as a string or a bytes
+        object, depending on whether ``binary`` is False or True.
+        
+        Might raise ResourceNotFound.
+        """
         mode = "rb" if binary else "r"
         with open(self.filename(resourcename), mode=mode) as fp:
             return fp.read()
@@ -49,6 +74,11 @@ class ResourceLoader(object):
     # fp.read()
     # fp.close()
     def openfp(self, resourcename, binary=False):
+        """Opens the specified resource and returns a open file object. 
+        Caller must call .close() on this object when done.
+
+        Might raise ResourceNotFound.
+        """
         mode = "rb" if binary else "r"
         return open(self.filename(resourcename), mode=mode)
 
@@ -57,6 +87,13 @@ class ResourceLoader(object):
     #     fp.read()
     @contextmanager
     def open(self, resourcename, binary=False):
+        """Opens the specified resource as a context manager, ie call with ``with``:
+        >>> loader = ResourceLoader()
+        >>> with resource.open("robots.txt") as fp:
+        ...     fp.read()
+
+        Might raise ResourceNotFound.
+        """
         mode = "rb" if binary else "r"
         fp = None
         try:
@@ -69,6 +106,12 @@ class ResourceLoader(object):
                 fp.close()
 
     def filename(self, resourcename):
+        """Return a filename pointing to the physical location of the resource.
+        If the resource is only found using the ResourceManager API, extract '
+        the resource to a temporary file and return its path.
+        
+        Might raise ResourceNotFound.
+        """
         if os.path.isabs(resourcename):  # don't examine the loadpath
             if os.path.exists(resourcename):
                 return resourcename
@@ -84,17 +127,4 @@ class ResourceLoader(object):
             return pkg_resources.resource_filename(self.modulename, self.resourceprefix + os.sep + resourcename)
         raise ResourceNotFound(resourcename) # should contain a list of places we searched?
                 
-    
-if __name__ == "__main__":
-    rl = ResourceLoader()  # default loadpath: cwd + pkg_resources('ferenda')
-    rl = ResourceLoader(os.getcwd, os.path.dirname(__file__), use_pkg_resources=False)
-    rq = rl.load("sparql/construct.rq") 
-    # rq is now a string containing the contents of construct.rq
-    fp = rl.open("sparql/construct.rq")
-    # fp is now an open filehandle from which the contents of construct.rq can be read
-    fname = rl.extract("sparql/construct.rq")
-    # fname is now the path to a filename (might be in a temp dir, or could be the original place) containing construct.rq
-    
-    # possibly also rl.cleanup() that removes any temp files created by extract
-    
     
