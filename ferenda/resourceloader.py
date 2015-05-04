@@ -1,3 +1,4 @@
+import inspect
 import os
 import logging
 import pkg_resources
@@ -13,16 +14,22 @@ class ResourceLoader(object):
     @staticmethod
     def make_loadpath(instance, suffix="res"):
         res = []
-        for cls in instance.__class__.getmro():
-            candidate = os.path.dirname(cls.__file__)
-            if os.path.exists(candidate):
-                res.append(candidate)
+        for cls in inspect.getmro(instance.__class__):
+            if cls == object:
+                continue
+            path = os.path.relpath(inspect.getfile(cls))
+            candidate = os.path.dirname(path) + os.sep + suffix
+            if candidate not in res and os.path.exists(candidate):
+               res.append(candidate)
+
+        # uniquify loadpath
         return res
 
     def __init__(self, *loadpath, **kwargs):
         self.loadpath = loadpath
         self.use_pkg_resources = kwargs.get("use_pkg_resources", True)
         self.modulename = "ferenda"
+        self.resourceprefix = "res"
         self.log = logging.getLogger(__name__)
 
     def exists(self, resourcename):
@@ -33,22 +40,33 @@ class ResourceLoader(object):
             return False
 
     def load(self, resourcename, binary=False):
+        mode = "rb" if binary else "r"
         with open(self.filename(resourcename), mode=mode) as fp:
             return fp.read()
 
+    # this works like old-style open, eg.
+    # fp = loader.open(...)
+    # fp.read()
+    # fp.close()
+    def openfp(self, resourcename, binary=False):
+        mode = "rb" if binary else "r"
+        return open(self.filename(resourcename), mode=mode)
+
+    # this is used with 'with', eg.
+    # with loader.open(...) as fp:
+    #     fp.read()
     @contextmanager
     def open(self, resourcename, binary=False):
-        # should preferably work both as classic open() and as a
-        # context manager
         mode = "rb" if binary else "r"
         fp = None
         try:
             fp = open(self.filename(resourcename), mode=mode)
             yield fp
+        except ResourceNotFound:
+            raise
         finally:
             if fp:
                 fp.close()
-
 
     def filename(self, resourcename):
         if os.path.isabs(resourcename):  # don't examine the loadpath
@@ -61,8 +79,9 @@ class ResourceLoader(object):
             if os.path.exists(candidate):
                 return candidate
         if (self.use_pkg_resources and
-            pkg_resources.resource_exists(self.modulename, resourcename)):
-            return pkg_resources.resource_filename(self.modulename, resourcename)
+            pkg_resources.resource_exists(self.modulename,
+                                          self.resourceprefix + os.sep + resourcename)):
+            return pkg_resources.resource_filename(self.modulename, self.resourceprefix + os.sep + resourcename)
         raise ResourceNotFound(resourcename) # should contain a list of places we searched?
                 
     

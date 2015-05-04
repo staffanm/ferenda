@@ -757,23 +757,23 @@ class Run(RunBase, unittest.TestCase):
     def test_run_makeresources(self):
         # 1. setup test_run_enable
         # 2. run('all', 'makeresources')
-        # 3. verify that all css/jss files specified by default and in Testrepo gets copied
-        #    (remove rsrc)
+        # 3. verify that all css/jss files specified by default and in
+        #    Testrepo gets copied (remove rsrc)
         # 4. run('all', 'makeresources', '--combine')
         # 5. verify that single css and js file is created
         self._enable_repos()
         s = os.sep
-        want = {'css':[s.join(['rsrc', 'css','test.css']),
-                       s.join(['rsrc', 'css','other.css'])],
-                'js':[s.join(['rsrc', 'js','test.js'])],
+        want = {'css': [s.join(['rsrc', 'css', 'test.css']),
+                        s.join(['rsrc', 'css', 'other.css'])],
+                'js': [s.join(['rsrc', 'js', 'test.js'])],
                 'img': [s.join(['rsrc', 'img', 'test.png'])],
-                'json': [s.join(['rsrc','api','context.json']),
-                         s.join(['rsrc','api','common.json']),
-                         s.join(['rsrc','api','terms.json'])],
-                'xml':[s.join(['rsrc', 'resources.xml'])]
-        }
+                'json': [s.join(['rsrc', 'api', 'context.json']),
+                         s.join(['rsrc', 'api', 'common.json']),
+                         s.join(['rsrc', 'api', 'terms.json'])],
+                'xml': [s.join(['rsrc', 'resources.xml'])]}
+        from pudb import set_trace; set_trace()
         got = manager.run(['all', 'makeresources'])
-        self.assertEqual(want,got)
+        self.assertEqual(want, got)
 
         # 6. alter the ferenda.ini so that it doesn't specify any css/js files
         util.writefile("ferenda.ini", """[__root__]

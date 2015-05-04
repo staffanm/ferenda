@@ -270,7 +270,7 @@ class DocumentRepository(object):
 
     #
     # generate() specific class properties
-    xslt_template = "res/xsl/generic.xsl"
+    xslt_template = "xsl/generic.xsl"
     """A template used by
     :py:meth:`~ferenda.DocumentRepository.generate` to transform the
     XML file into browser-ready HTML. If your document type is
@@ -278,7 +278,7 @@ class DocumentRepository(object):
     transform). You should include ``base.xslt`` in that template,
     though."""
 
-    sparql_annotations = "res/sparql/annotations.rq"
+    sparql_annotations = "sparql/annotations.rq"
     """A template SPARQL CONSTRUCT query for document annotations."""
 
     # FIXME: Sphinx really wants to treat this class as a reference,
@@ -323,9 +323,9 @@ class DocumentRepository(object):
         self.session = requests.session()
         
         loadpath = ResourceLoader.make_loadpath(self)
-        if self.config.loadpath:
+        if 'loadpath' in self.config:
             loadpath = self.config.loadpath + loadpath
-        self.resourceloader = ResourceLoader(loadpath)
+        self.resourceloader = ResourceLoader(*loadpath)
 
     @property
     def ontologies(self):
@@ -334,8 +334,8 @@ class DocumentRepository(object):
         :py:data:`~ferenda.DocumentRepository.namespaces`` property).
 
         If you're using your own vocabularies, you can place them (in
-        Turtle format) as ``res/vocab/[prefix].ttl`` to have them
-        loaded into the graph.
+        Turtle format) as ``vocab/[prefix].ttl`` somewhere in your
+        resource loadpath to have them loaded into the graph.
 
         .. note::
 
@@ -351,7 +351,7 @@ class DocumentRepository(object):
                 # , "foaf", "skos", "dcterms", "bibo", "prov"):
                 if prefix in ("rdf", "rdfs", "owl"):
                     continue
-                ontopath = "res/vocab/%s.ttl" % prefix
+                ontopath = "vocab/%s.ttl" % prefix
                 if self.resourceloader.exists(ontopath):
                     with self.resourceloader.open(ontopath) as fp:
                         self._ontologies.parse(data=fp.read(), format="turtle")                 
@@ -364,13 +364,13 @@ class DocumentRepository(object):
         documents in this docrepo -- this can be information about
         different entities that publishes the documents, the printed
         series in which they're published, and so on. The data is
-        taken from ``res/extra/[repoalias].ttl``.
+        taken from ``extra/[repoalias].ttl``.
         """
         if not hasattr(self, '_commondata'):
             self._commondata = Graph()
             for cls in inspect.getmro(self.__class__):
                 if hasattr(cls, "alias"):
-                    commonpath = "res/extra/%s.ttl" % cls.alias
+                    commonpath = "extra/%s.ttl" % cls.alias
                     if self.resourceloader.exists(commonpath):
                         with self.resourceloader.open(commonpath) as fp:                 
                             self._commondata.parse(data=fp.read(), format="turtle")                 
@@ -478,16 +478,16 @@ class DocumentRepository(object):
             # FIXME: These only make sense at a global level, and
             # furthermore are duplicated in manager._load_config
             'cssfiles': ['http://fonts.googleapis.com/css?family=Raleway:200,100',
-                         'res/css/normalize-1.1.3.css',
-                         'res/css/main.css',
-                         'res/css/ferenda.css'],
-            'jsfiles': ['res/js/jquery-1.10.2.js',
-                        'res/js/modernizr-2.6.3.js',
-                        'res/js/respond-1.3.0.js',
-                        'res/js/ferenda.js'],
-            'imgfiles': ['res/img/navmenu-small-black.png',
-                         'res/img/navmenu.png',
-                         'res/img/search.png'],
+                         'css/normalize-1.1.3.css',
+                         'css/main.css',
+                         'css/ferenda.css'],
+            'jsfiles': ['js/jquery-1.10.2.js',
+                        'js/modernizr-2.6.3.js',
+                        'js/respond-1.3.0.js',
+                        'js/ferenda.js'],
+            'imgfiles': ['img/navmenu-small-black.png',
+                         'img/navmenu.png',
+                         'img/search.png'],
             'storetype': 'SQLITE',
             'storelocation': 'data/ferenda.sqlite',
             'storerepository': 'ferenda',
@@ -2204,6 +2204,13 @@ WHERE {
                               {'basefile': basefile}):
                 conffile = os.path.abspath(
                     os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
+
+                # FIXME: the "res/xsl" path refers to a filesystem
+                # path, which is needed to get
+                # transformer.XSLTTransform._setup_templates to find
+                # them. Once _setup_templates is rewritten to
+                # use/resuse a resourceloader, this should be changed
+                # to just "xsl" ie drop the now-implied "res/"
                 transformer = Transformer('XSLT', self.xslt_template,
                                           ["res/xsl"], config=conffile,
                                           documentroot=self.config.datadir)
@@ -2330,7 +2337,6 @@ WHERE {
         :data:`~ferenda.DocumentRepository.sparql_annotations`
 
         """
-
         query_template = self.sparql_annotations
         with self.resourceloader.open(query_template) as fp:
             params = {'uri': uri}
@@ -2352,7 +2358,7 @@ WHERE {
         """
         fp = BytesIO(graph.serialize(format="xml"))
         intree = etree.parse(fp)
-        with self.resourceloader.open("res/xsl/rdfxml-grit.xsl") as fp:
+        with self.resourceloader.open("xsl/rdfxml-grit.xsl") as fp:
             transform = etree.XSLT(etree.parse(fp))
         resulttree = transform(intree)
         res = etree.tostring(resulttree, pretty_print=format)
@@ -2371,7 +2377,7 @@ WHERE {
         """
         with open(annotation_file, "rb") as fp:
             intree = etree.parse(fp)
-        with self.resourceloader.open("res/xsl/grit-grddl.xsl") as fp:
+        with self.resourceloader.open("xsl/grit-grddl.xsl") as fp:
             transform = etree.XSLT(etree.parse(fp))
         resulttree = transform(intree)
         res = etree.tostring(resulttree, pretty_print=format)

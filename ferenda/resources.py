@@ -11,12 +11,13 @@ from lxml.builder import ElementMaker
 from rdflib import URIRef, Literal, BNode, Graph, Namespace, RDF, RDFS
 from rdflib.namespace import FOAF, SKOS
 BIBO = Namespace("http://purl.org/ontology/bibo/")
-
 from layeredconfig import LayeredConfig, Defaults
 
-from ferenda import DocumentRepository
+from ferenda import DocumentRepository, ResourceLoader
 from ferenda import util, errors
 
+# FIXME: remove this once all uses of pkg_resources are gone
+import pkg_resources
 
 class Resources(object):
 
@@ -39,7 +40,13 @@ class Resources(object):
 
         # FIXME: How should we set up a global loadpath from the
         # individual repos?
-        self.resourceloader = ResourceLoader()
+        loadpaths = [ResourceLoader.make_loadpath(repo) for repo in repos]
+        loadpath = []
+        for subpath in loadpaths:
+            for p in subpath:
+                if p not in loadpath:
+                    loadpath.append(p)
+        self.resourceloader = ResourceLoader(*loadpath)
 
     def make(self,
              css=True,
@@ -232,7 +239,7 @@ class Resources(object):
             self.log.debug("Using external url %s" % filename)
             return filename
         try: 
-            fp = self.resourceloader.open(filename)
+            fp = self.resourceloader.openfp(filename)
         except errors.ResourceNotFound:
             self.log.warning("file %(filename)s (specified in %(origin)s)"
                              " doesn't exist" % locals())
@@ -297,6 +304,11 @@ class Resources(object):
             files.append(self._filepath_to_urlpath(filename, 2))
 
         if self.config.legacyapi:
+            # FIXME: This should be possible:
+            # for f in resourceloader.distdir("ui"):
+            #     shutil.copy(resourceloader.filename(f),
+            #                 os.sep.join([self.resourcedir, "ui", f]))
+            # p
             # copy ui explorer app to <url>/rsrc/ui/ -- this does not get
             # included in files
             util.ensure_dir(os.sep.join([self.resourcedir, "ui", "dummy.txt"]))

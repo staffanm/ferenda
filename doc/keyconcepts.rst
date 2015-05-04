@@ -386,4 +386,14 @@ Note that only some of the ``*_path`` / ``open_*`` methods supports the
 ``attachment`` parameter (it doesn't make sense to have attachments for
 DocumentEntry files or distilled RDF/XML files).
 
+Resources and the loadpath
+--------------------------
 
+Whenever ferenda needs any *resource file*, eg. an XSLT stylesheet, a
+SPARQL query template or some RDF triples in a Turtle (``.ttl``) file,
+it uses a :py:class:`~ferenda.ResourceLoader` instance to look in a
+series of different "system" directories.
+
+By placing files in the correct directories, and optionally
+configuring the ``loadpath`` config option, you can substitute your
+own resource file if the system versions aren't to your liking.
