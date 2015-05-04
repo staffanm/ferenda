@@ -8,7 +8,6 @@ import filecmp
 import hashlib
 import locale
 import os
-import pkg_resources
 import posixpath
 import re
 import shutil
@@ -524,17 +523,16 @@ def merge_dict_recursive(base, other):
     return base
 
 
-def resource_extract(resource_name, outfile, params={}):
-    """Copy a file from the ferenda package resources to a specified path, optionally performing variable substitutions on the contents of the file.
+def resource_extract(resourceloader, name, outfile, params):
+    """Extract a resource from a configured ResourceLoader and perform variable substitutions on the contents of the resource.
 
-    :param resource_name: The named resource (eg 'res/sparql/annotations.rq')
+    :param resourceloader: A :py:class:`~ferenda.ResourceLoader` instance
+    :param name: The named resource (eg 'sparql/annotations.rq')
     :param outfile: Path to extract the resource to
     :param params: A dict of parameters, to be used with regular string subtitutions in the resource file.
     """
-    fp = pkg_resources.resource_stream('ferenda', resource_name)
-    resource = fp.read().decode('utf-8')
-    if params:
-        resource = resource % params
+    with resourceloader.open(name) as fp:
+        resource = fp.read().decode('utf-8') % params
     ensure_dir(outfile)
     with codecs.open(outfile, "w") as fp:
         fp.write(resource)
