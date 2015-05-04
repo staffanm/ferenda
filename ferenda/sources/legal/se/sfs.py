@@ -25,7 +25,6 @@ from six import text_type as str
 from ferenda.compat import OrderedDict
 
 # 3rdparty libs
-import pkg_resources
 from rdflib import Namespace, URIRef, Literal, RDF
 from rdflib.namespace import DCTERMS
 from lxml import etree
@@ -2601,16 +2600,10 @@ class SFS(Trips):
     _document_name_cache = {}
 
     def store_select(self, store, query_template, uri, context=None):
-        if os.path.exists(query_template):
-            fp = open(query_template, 'rb')
-        elif pkg_resources.resource_exists('ferenda', query_template):
-            fp = pkg_resources.resource_stream('ferenda', query_template)
-        else:
-            raise ValueError("query template %s not found" % query_template)
         params = {'uri': uri,
                   'context': context}
-        sq = fp.read().decode('utf-8') % params
-        fp.close()
+        with self.resourceloader(query_template):
+            sq = fp.read() % params
         # FIXME: Only FusekiStore.select supports (or needs) uniongraph
         if context:
             uniongraph = False
