@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 import os
 
 from rdflib import URIRef, Graph, Literal
-import pkg_resources
+
 
 from docutils.core import publish_doctree
 
@@ -32,8 +32,7 @@ class StaticStore(DocumentStore):
             self.staticdir = staticdir
         else:
             # find out the path of our resourcedir
-            p = pkg_resources.resource_filename('ferenda',
-                                                'res/static-content/README')
+            p = self.resourceloader.filename('static-content/README')
             self.staticdir = os.path.dirname(p)
 
     def downloaded_path(self, basefile, version=None, attachment=None):
