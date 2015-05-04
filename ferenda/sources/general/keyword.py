@@ -8,7 +8,6 @@ from collections import defaultdict
 from time import time
 
 # 3rdparty libs
-import pkg_resources
 import requests
 from lxml import etree
 from lxml.builder import ElementMaker
@@ -193,16 +192,10 @@ class Keyword(DocumentRepository):
     # FIXME: This is copied verbatim from sfs.py -- maybe it could go
     # into DocumentRepository or util? (or possibly triplestore?)
     def store_select(self, store, query_template, uri, context=None):
-        if os.path.exists(query_template):
-            fp = open(query_template, 'rb')
-        elif pkg_resources.resource_exists('ferenda', query_template):
-            fp = pkg_resources.resource_stream('ferenda', query_template)
-        else:
-            raise ValueError("query template %s not found" % query_template)
         params = {'uri': uri,
                   'context': context}
-        sq = fp.read().decode('utf-8') % params
-        fp.close()
+        with self.resourceloader.open(query_template) as fp:
+            sq = fp.read().decode('utf-8') % params
         # FIXME: Only FusekiStore.select supports (or needs) uniongraph
         if context:
             uniongraph = False
