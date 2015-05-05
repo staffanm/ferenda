@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function, unicode_literals
 __metaclass__ = type
 import re
 from operator import attrgetter
-import urlparse
 from rdflib import Graph, Literal, Namespace, URIRef, RDF, RDFS
-
+from six.moves.urllib_parse import urljoin
 
 COIN = Namespace("http://purl.org/court/def/2009/coin#")
 
@@ -132,7 +132,7 @@ class Template:
         for var, value in matches.items():
             slug = self.space.transform_value(value)
             expanded = expanded.replace("{%s}" % var, slug)
-        return urlparse.urljoin(base, expanded)
+        return urljoin(base, expanded)
 
     def get_base(self, resource):
         base = self.space.base
@@ -203,13 +203,13 @@ if __name__ == '__main__':
         parse_file(instance_data, source)
 
     for space_uri in coin_graph.subjects(RDF.type, COIN.URISpace):
-        print "URI Space <%s>:" % space_uri
+        print("URI Space <%s>:" % space_uri)
         minter = URIMinter(coin_graph, space_uri)
         for subj, uris in minter.compute_uris(instance_data).items():
             if unicode(subj) in uris:
-                print "Found <%s> in" % subj,
+                print("Found <%s> in" % subj,)
             else:
-                print "Did not find <%s> in" % subj,
-            print ", ".join(("<%s>" % uri) for uri in uris)
+                print("Did not find <%s> in" % subj,)
+            print(", ".join(("<%s>" % uri) for uri in uris))
 
 

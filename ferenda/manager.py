@@ -55,10 +55,6 @@ from ferenda import Resources
 from ferenda import errors
 from ferenda import util
 
-# NOTE: This is part of the published API and must be callable in
-# scenarios without configfile or logger.
-
-
 def makeresources(repos,
                   resourcedir="data/rsrc",
                   combine=False,
@@ -84,6 +80,8 @@ def makeresources(repos,
     :returns: All created/copied css, js and resources.xml files
     :rtype: dict of lists
     """
+    import warnings
+    warnings.warn("manager.makeresources is deprecated; use ferenda.Resources().make() instead")
     return Resources(repos, resourcedir,
                      combineresources=combine,
                      cssfiles=cssfiles,
@@ -145,7 +143,8 @@ def frontpage(repos,
         docroot = os.path.dirname(path)
         conffile = os.path.abspath(
             os.sep.join([docroot, 'rsrc', 'resources.xml']))
-        transformer = Transformer('XSLT', stylesheet, ["res/xsl"],
+        transformer = Transformer('XSLT', stylesheet, "xsl",
+                                  resourceloader=self.resourceloader,
                                   config=conffile,
                                   documentroot=docroot)
         if staticsite:
@@ -213,6 +212,8 @@ def make_wsgi_app(inifile=None, **kwargs):
     :rtype: callable
 
     """
+    import warnings
+    warnings.warn("manager.make_wsgi_app is deprecated; use ferenda.WSGIApp() instead")
     if inifile:
         assert os.path.exists(
             inifile), "INI file %s doesn't exist (relative to %s)" % (inifile, os.getcwd())

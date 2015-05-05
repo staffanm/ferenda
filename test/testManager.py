@@ -771,7 +771,6 @@ class Run(RunBase, unittest.TestCase):
                          s.join(['rsrc', 'api', 'common.json']),
                          s.join(['rsrc', 'api', 'terms.json'])],
                 'xml': [s.join(['rsrc', 'resources.xml'])]}
-        from pudb import set_trace; set_trace()
         got = manager.run(['all', 'makeresources'])
         self.assertEqual(want, got)
 

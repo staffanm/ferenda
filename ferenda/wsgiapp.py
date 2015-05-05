@@ -32,10 +32,6 @@ from ferenda.elements import html
 class WSGIApp(object):
 
     """Implements a WSGI app.
-
-    This class is not yet part of the public API -- clients should use
-    manager.make_wsgi_app for now.
-
     """
 
     def __init__(self, repos, inifile=None, **kwargs):
@@ -123,8 +119,10 @@ class WSGIApp(object):
                                                            'href': url}))
         doc.body.append(html.Div(pages, **{'class': 'pager'}))
         # Transform that XHTML into HTML5
-        conffile = os.sep.join([self.config.documentroot, 'rsrc', 'resources.xml'])
-        transformer = Transformer('XSLT', "res/xsl/search.xsl", ["res/xsl"],
+        conffile = os.sep.join([self.config.documentroot, 'rsrc',
+                                'resources.xml'])
+        transformer = Transformer('XSLT', "xsl/search.xsl", "xsl",
+                                  resourceloader=self.resourceloader,
                                   config=conffile)
         # '/mysearch/' = depth 1
         depth = len(self.config.searchendpoint.split("/")) - 2

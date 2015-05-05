@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, print_function
 
@@ -2205,14 +2204,9 @@ WHERE {
                 conffile = os.path.abspath(
                     os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
 
-                # FIXME: the "res/xsl" path refers to a filesystem
-                # path, which is needed to get
-                # transformer.XSLTTransform._setup_templates to find
-                # them. Once _setup_templates is rewritten to
-                # use/resuse a resourceloader, this should be changed
-                # to just "xsl" ie drop the now-implied "res/"
-                transformer = Transformer('XSLT', self.xslt_template,
-                                          ["res/xsl"], config=conffile,
+                transformer = Transformer('XSLT', self.xslt_template, "xsl",
+                                          resourceloader=self.resourceloader,
+                                          config=conffile,
                                           documentroot=self.config.datadir)
                 urltransform = None
                 if self.config.staticsite:
@@ -2340,7 +2334,7 @@ WHERE {
         query_template = self.sparql_annotations
         with self.resourceloader.open(query_template) as fp:
             params = {'uri': uri}
-            sq = fp.read().decode('utf-8') % params
+            sq = fp.read() % params
         return sq
 
     # helper for the prep_annotation_file helper -- it expects a
@@ -2671,7 +2665,8 @@ WHERE {
 
         conffile = os.path.abspath(
             os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
-        transformer = Transformer('XSLT', "res/xsl/toc.xsl", ["res/xsl"],
+        transformer = Transformer('XSLT', "xsl/toc.xsl", "xsl",
+                                  resourceloader=self.resourceloader,
                                   config=conffile)
         # FIXME: This is a naive way of calculating the relative depth
         # of the outfile.
@@ -3012,7 +3007,8 @@ WHERE {
         if generate_html:
             conffile = os.path.abspath(
                 os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
-            transformer = Transformer("XSLT", "res/xsl/atom.xsl", ["res/xsl"],
+            transformer = Transformer("XSLT", "xsl/atom.xsl", "xsl",
+                                      resourceloader=self.resourceloader,
                                       documentroot=self.config.datadir,
                                       config=conffile)
             repos = [self]  # FIXME: we must make otherrespos (passed

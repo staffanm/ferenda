@@ -31,7 +31,7 @@ class Transform(RepoTester):
 
         with open(base+"infile.xml","w") as fp:
             fp.write("""<doc><title>Document title</title></doc>""")
-        t = Transformer("XSLT", base+"teststyle.xslt", ["res/xsl"], "")
+        t = Transformer("XSLT", base+"teststyle.xslt", "xsl", None, "")
         t.transform_file(base+"infile.xml", base+"outfile.xml",
                          {'value':'blahonga',
                           'file':base+'paramfile.xml'})
@@ -49,7 +49,7 @@ class Transform(RepoTester):
     def test_depth(self):
         xsltfile = self.datadir+os.sep+"notused.xslt"
         util.writefile(xsltfile, '<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"/>')
-        t = Transformer("XSLT", xsltfile, ["res/xsl"], "data")
+        t = Transformer("XSLT", xsltfile, "xsl", None, "data")
         self.assertEqual(0, t._depth("data", "data/index.html"))
         self.assertEqual(1, t._depth("data/repo", "data/index.html"))
         self.assertEqual(3, t._depth("data/repo/toc/title", "data/index.html"))

@@ -19,10 +19,6 @@ from ferenda import util, errors
 class Resources(object):
 
     """Creates and manages various assets/resources needed for web serving.
-
-    This class is not yet part of the public API -- clients should use
-    manager.makeresources for now.
-
     """
 
     def __init__(self, repos, resourcedir, **kwargs):
@@ -253,7 +249,7 @@ class Resources(object):
             self.log.debug("writing %s out to %s" % (filename, destdir))
             outfile = destdir + os.sep + os.path.basename(filename)
             util.ensure_dir(outfile)
-            with open(outfile, "wb") as fp2:
+            with open(outfile, "w") as fp2:
                 fp2.write(fp.read())
             fp.close()
             return self._filepath_to_urlpath(outfile, 2)

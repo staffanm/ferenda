@@ -9,6 +9,7 @@ from lxml import etree
 from lxml.etree import XSLT
 
 from ferenda import errors, util
+from ferenda import ResourceLoader
 
 # assumption: A transformer is initialized with a single template. If
 # you want to use a different template, create a different
@@ -23,10 +24,12 @@ class Transformer(object):
 
     :param transformertype: The engine to be used for transforming. Right now only ``"XSLT"`` is supported.
     :type  transformertype: str
-    :param template: The main template file.
+    :param resourceloader: The :py:class:`~ferenda.ResourceLoader` instance used to find template files.
+    :type template: ferenda.ResourceLoader
+    :param template: The name of the main template file.
     :type  template: str
-    :param templatedirs: Directories that may contain supporting templates used by the main template.
-    :type  templatedirs: str
+    :param templatedir: Directory for supporting templates to the main template.
+    :type  templatedir: str
     :param documentroot: The base directory for all generated files -- used to make relative references to CSS/JS files correct.
     :type  documentroot: str
     :param config: Any configuration information used by the
@@ -43,14 +46,18 @@ class Transformer(object):
 
     """
 
-    def __init__(self, transformertype,
+    def __init__(self,
+                 transformertype,
                  template,
-                 templatedirs,
+                 templatedir,  # within the resourceloader
+                 resourceloader=None,
                  documentroot=None,
                  config=None):
         cls = {'XSLT': XSLTTransform,
                'JINJA': JinjaTransform}[transformertype]
-        self.t = cls(template, templatedirs)
+        if not resourceloader:
+            resourceloader = ResourceLoader()
+        self.t = cls(template, templatedir, resourceloader)
         self.documentroot = documentroot
         self.config = config
 
@@ -162,17 +169,18 @@ class Transformer(object):
 
 class TransformerEngine(object):
 
-    def __init__(self, template, templatedirs):
+    def __init__(self, template, templatedir):
         pass
 
 
 class XSLTTransform(TransformerEngine):
 
-    def __init__(self, template, templatedirs, **kwargs):
+    def __init__(self, template, templatedir, resourceloader, **kwargs):
         self.orig_template = template
-        self.orig_templatedirs = templatedirs  # ?
+        self.orig_templatedir = templatedir  # ?
         self.format = True  # FIXME: make configurable
-        self.templdir = self._setup_templates(template, templatedirs)
+        self.resourceloader = resourceloader
+        self.templdir = self._setup_templates(template, templatedir)
         worktemplate = self.templdir + os.sep + os.path.basename(template)
         assert os.path.exists(worktemplate)
         parser = etree.XMLParser(remove_blank_text=self.format)
@@ -190,13 +198,11 @@ class XSLTTransform(TransformerEngine):
     # purpose: get all XSLT files (main and supporting) into one place
     #   (should support zipped eggs, even if setup.py don't)
     # template:     full path to actual template to be used
-    # templatedirs: directory of supporting XSLT templates
+    # templatedir: directory of supporting XSLT templates
     # returns:      directory name of the place where all files ended up
-    def _setup_templates(self, template, templatedirs):
+    def _setup_templates(self, template, templatedir):
         workdir = mkdtemp()
-        # copy everything to this temp dir
-        for d in templatedirs:
-            self.resourceloader.extractdir(d, workdir)
+        self.resourceloader.extractdir(templatedir, workdir)
         if os.path.basename(template) not in os.listdir(workdir):
             shutil.copy2(template, workdir)
         return workdir
@@ -298,7 +304,7 @@ class JinjaTransform(TransformerEngine):
 #
 # transformer = TemplateTransformer(transformertype="XSLT",
 #                                   template="res/xsl/generic.xsl",
-#                                   templatedirs=["res/xsl"],
+#                                   templatedir=["res/xsl"],
 #                                   documentroot="/var/www/site")
 #
 # newtree = transformer.transform_tree(doc.body.as_xhtml(),

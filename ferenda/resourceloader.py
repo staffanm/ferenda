@@ -2,8 +2,10 @@ import inspect
 import os
 import logging
 import pkg_resources
+import shutil
 from contextlib import contextmanager
 
+from ferenda import util
 from ferenda.errors import ResourceNotFound
 
 
@@ -128,26 +130,44 @@ class ResourceLoader(object):
         raise ResourceNotFound(resourcename) # should contain a list of places we searched?
                 
     def extractdir(self, resourcedir, target):
-        """Extract all file resources directly contained in the specified resource directory. 
+        """Extract all file resources directly contained in the specified
+        resource directory.
         
-        Searches all loadpaths and optionally the Resources API for any file contained within.
-        This means the target dir may end up with eg. one file from a high-priority path and 
-        other files from the system dirs/resources. This in turns makes it easy to just override
-        a single file in a larger set of resource files.
+        Searches all loadpaths and optionally the Resources API for
+        any file contained within. This means the target dir may end
+        up with eg. one file from a high-priority path and other files
+        from the system dirs/resources. This in turns makes it easy to
+        just override a single file in a larger set of resource files.
+
         """
         extracted = set()
         for path in self.loadpath:
-            for f in os.listdir(self.loadpath+os.sep+resourcedir):
-                src = self.loadpath+os.sep+resourcedir + os.sep + f
-                dest = target + os.sep + resourcedir + os.sep + f
-                if dest not in extracted and os.isfile(src):
+            if resourcedir:
+                path = path+os.sep+resourcedir
+            if not os.path.exists(path):
+                continue
+            for f in os.listdir(path):
+                src = os.sep.join([path, f])
+                dest = os.sep.join([target, f])
+                if dest not in extracted and os.path.isfile(src):
                     shutil.copy2(src, dest)
                     extracted.add(dest)
         if self.use_pkg_resources:
-            for f in pkg_resources.resource_listdir(self.modulename, self.resourceprefix + os.sep + resourcedir):
-                src = self.resourceprefix + os.sep + resourcedir + os.sep + f
-                dest = target + os.sep + resourcedir + os.sep + f
-                if dest not in extracted and os.isfile(src):
-                    # FIXME: use proper API
-                    pkg_resources.resource_extract(self.module, src, dest)
+            path = self.resourceprefix
+            if resourcedir:
+                path = path + os.sep + resourcedir
+            for f in pkg_resources.resource_listdir(self.modulename, path):
+                src = path + os.sep + f
+                dest = target
+                if resourcedir:
+                    dest = target + os.sep + resourcedir
+                dest += os.sep + f
+                if (dest not in extracted and not
+                    pkg_resources.resource_isdir(self.modulename,
+                                                 self.resourceprefix + os.sep + f)):
+                    util.ensure_dir(dest)
+                    with open(dest, "wb") as fp:
+                        readfp = pkg_resources.resource_stream(self.modulename,
+                                                               src)
+                        fp.write(readfp.read())
                     extracted.add(dest)

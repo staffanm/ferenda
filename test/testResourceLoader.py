@@ -86,4 +86,11 @@ class Main(SubTestCase, DocumentEntry):
                          self.resourceloader.filename("robots.txt"))
         with self.assertRaises(ResourceNotFound):
             self.resourceloader.filename("nonexistent.txt")
-    
+
+    def test_extractdir(self):
+        dest = self.tempdir + os.sep + "dest"
+        os.mkdir(dest)
+        self.resourceloader.extractdir(None, dest)
+        self.assertEqual(set(os.listdir(dest)),
+                         set(["primaryresource.txt", "secondaryresource.txt",
+                              "robots.txt", "humans.txt"]))
