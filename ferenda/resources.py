@@ -34,7 +34,7 @@ class Resources(object):
         # FIXME: How should we set up a global loadpath from the
         # individual repos?
         loadpaths = [ResourceLoader.make_loadpath(repo) for repo in repos]
-        loadpath = []
+        loadpath = ["."]  # cwd always has priority -- makes sense?
         for subpath in loadpaths:
             for p in subpath:
                 if p not in loadpath:
@@ -232,7 +232,7 @@ class Resources(object):
             self.log.debug("Using external url %s" % filename)
             return filename
         try: 
-            fp = self.resourceloader.openfp(filename)
+            fp = self.resourceloader.openfp(filename, binary=True)
         except errors.ResourceNotFound:
             self.log.warning("file %(filename)s (specified in %(origin)s)"
                              " doesn't exist" % locals())
@@ -242,14 +242,15 @@ class Resources(object):
 
         if self.config.combineresources:
             self.log.debug("combining %s into buffer" % filename)
-            buf.write(fp.read())
+            d = fp.read()
+            buf.write(d)
             fp.close()
             return None
         else:
             self.log.debug("writing %s out to %s" % (filename, destdir))
             outfile = destdir + os.sep + os.path.basename(filename)
             util.ensure_dir(outfile)
-            with open(outfile, "w") as fp2:
+            with open(outfile, "wb") as fp2:
                 fp2.write(fp.read())
             fp.close()
             return self._filepath_to_urlpath(outfile, 2)

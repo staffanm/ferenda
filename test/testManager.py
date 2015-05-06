@@ -31,7 +31,7 @@ import requests.exceptions
 from layeredconfig import LayeredConfig, Defaults
 
 from ferenda import manager, decorators, util, errors
-from ferenda import DocumentRepository, DocumentStore
+from ferenda import DocumentRepository, DocumentStore, ResourceLoader
 
 class staticmockstore(DocumentStore):
     def list_basefiles_for(cls,action):
@@ -798,7 +798,9 @@ imgfiles = []
 
 
     def test_run_makeresources_defaultconfig(self):
-        util.resource_extract('res/scripts/ferenda.template.ini', "ferenda.ini",
+        util.resource_extract(ResourceLoader(),
+                              'scripts/ferenda.template.ini',
+                              "ferenda.ini",
                               {'storetype': 'SQLITE',
                                'storelocation': 'data/ferenda.sqlite',
                                'storerepository': 'ferenda',

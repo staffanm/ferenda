@@ -12,11 +12,9 @@ else, for you.
 """
 from __future__ import unicode_literals, print_function
 # system
-from ast import literal_eval
 from datetime import datetime
 from ferenda.compat import OrderedDict, MagicMock
-from functools import partial, wraps
-from io import StringIO, BytesIO
+from io import StringIO
 from multiprocessing.managers import SyncManager
 from time import sleep
 from wsgiref.simple_server import make_server
@@ -36,7 +34,7 @@ import traceback
 from six import text_type as str
 from six.moves import configparser
 from six.moves.urllib_parse import urlsplit
-from six.moves.queue import Queue, Empty
+from six.moves.queue import Queue
 import six
 input = six.moves.input
 
@@ -50,6 +48,7 @@ from layeredconfig import (LayeredConfig, Defaults, INIFile, Commandline,
 from ferenda import DocumentRepository  # needed for a doctest
 from ferenda import Transformer
 from ferenda import TripleStore
+from ferenda import ResourceLoader
 from ferenda import WSGIApp
 from ferenda import Resources
 from ferenda import errors
@@ -81,7 +80,8 @@ def makeresources(repos,
     :rtype: dict of lists
     """
     import warnings
-    warnings.warn("manager.makeresources is deprecated; use ferenda.Resources().make() instead")
+    warnings.warn("manager.makeresources is deprecated; "
+                  "use ferenda.Resources().make() instead")
     return Resources(repos, resourcedir,
                      combineresources=combine,
                      cssfiles=cssfiles,
@@ -96,12 +96,13 @@ def makeresources(repos,
 
 def frontpage(repos,
               path="data/index.html",
-              stylesheet="res/xsl/frontpage.xsl",
+              stylesheet="xsl/frontpage.xsl",
               sitename="MySite",
               staticsite=False):
     """Create a suitable frontpage.
 
-    :param repos: The repositories to list on the frontpage, as instantiated and configured docrepo objects
+    :param repos: The repositories to list on the frontpage, as instantiated
+                  and configured docrepo objects
     :type repos: list
     :param path: the filename to create.
     :type  path: str
@@ -143,8 +144,17 @@ def frontpage(repos,
         docroot = os.path.dirname(path)
         conffile = os.path.abspath(
             os.sep.join([docroot, 'rsrc', 'resources.xml']))
+
+        # FIXME: Cut-n-paste of the method in Resources.__init__
+        loadpaths = [ResourceLoader.make_loadpath(repo) for repo in repos]
+        loadpath = ["."]  # cwd always has priority -- makes sense?
+        for subpath in loadpaths:
+            for p in subpath:
+                if p not in loadpath:
+                    loadpath.append(p)
+
         transformer = Transformer('XSLT', stylesheet, "xsl",
-                                  resourceloader=self.resourceloader,
+                                  resourceloader=ResourceLoader(*loadpath),
                                   config=conffile,
                                   documentroot=docroot)
         if staticsite:
@@ -213,7 +223,8 @@ def make_wsgi_app(inifile=None, **kwargs):
 
     """
     import warnings
-    warnings.warn("manager.make_wsgi_app is deprecated; use ferenda.WSGIApp() instead")
+    warnings.warn("manager.make_wsgi_app is deprecated; "
+                  "use ferenda.WSGIApp() instead")
     if inifile:
         assert os.path.exists(
             inifile), "INI file %s doesn't exist (relative to %s)" % (inifile, os.getcwd())
@@ -540,21 +551,30 @@ def setup(argv=None, force=False, verbose=False, unattended=False):
         os.makedirs(projdir)
 
     # step 1: create buildscript
+    loader = ResourceLoader(".")
     buildscript = projdir + os.sep + "ferenda-build.py"
-    util.resource_extract('res/scripts/ferenda-build.py', buildscript)
+    util.resource_extract(loader,
+                          'scripts/ferenda-build.py',
+                          buildscript,
+                          {})
     mode = os.stat(buildscript)[stat.ST_MODE]
     os.chmod(buildscript, mode | stat.S_IXUSR)
 
     # step 2: create config file
     configfile = projdir + os.sep + "ferenda.ini"
-    util.resource_extract('res/scripts/ferenda.template.ini', configfile,
+    util.resource_extract(loader,
+                          'scripts/ferenda.template.ini',
+                          configfile,
                           locals())
 
     log.info("Project created in %s" % projdir)
 
     # step 3: create WSGI app
     wsgifile = projdir + os.sep + "wsgi.py"
-    util.resource_extract('res/scripts/wsgi.py', wsgifile)
+    util.resource_extract(loader,
+                          'scripts/wsgi.py',
+                          wsgifile,
+                          {})
     shutdown_logger()
     return True
 
@@ -584,16 +604,16 @@ def _load_config(filename=None, argv=None, defaults=None):
                     'sitename': 'MySite',
                     'sitedescription': 'Just another Ferenda site',
                     'cssfiles': ['http://fonts.googleapis.com/css?family=Raleway:200,100',
-                                 'res/css/normalize-1.1.3.css',
-                                 'res/css/main.css',
-                                 'res/css/ferenda.css'],
-                    'jsfiles': ['res/js/jquery-1.10.2.js',
-                                'res/js/modernizr-2.6.3.js',
-                                'res/js/respond-1.3.0.js',
-                                'res/js/ferenda.js'],
-                    'imgfiles': ['res/img/navmenu-small-black.png',
-                                 'res/img/navmenu.png',
-                                 'res/img/search.png'],
+                                 'css/normalize-1.1.3.css',
+                                 'css/main.css',
+                                 'css/ferenda.css'],
+                    'jsfiles': ['js/jquery-1.10.2.js',
+                                'js/modernizr-2.6.3.js',
+                                'js/respond-1.3.0.js',
+                                'js/ferenda.js'],
+                    'imgfiles': ['img/navmenu-small-black.png',
+                                 'img/navmenu.png',
+                                 'img/search.png'],
                     'legacyapi': False,
                     'fulltextindex': True,
                     'serverport': 5555,

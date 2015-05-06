@@ -126,7 +126,8 @@ class ResourceLoader(object):
         if (self.use_pkg_resources and
             pkg_resources.resource_exists(self.modulename,
                                           self.resourceprefix + os.sep + resourcename)):
-            return pkg_resources.resource_filename(self.modulename, self.resourceprefix + os.sep + resourcename)
+            abspath = pkg_resources.resource_filename(self.modulename, self.resourceprefix + os.sep + resourcename)
+            return os.path.relpath(abspath)
         raise ResourceNotFound(resourcename) # should contain a list of places we searched?
                 
     def extractdir(self, resourcedir, target):
@@ -150,6 +151,7 @@ class ResourceLoader(object):
                 src = os.sep.join([path, f])
                 dest = os.sep.join([target, f])
                 if dest not in extracted and os.path.isfile(src):
+                    util.ensure_dir(dest)
                     shutil.copy2(src, dest)
                     extracted.add(dest)
         if self.use_pkg_resources:

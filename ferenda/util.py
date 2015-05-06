@@ -532,7 +532,9 @@ def resource_extract(resourceloader, name, outfile, params):
     :param params: A dict of parameters, to be used with regular string subtitutions in the resource file.
     """
     with resourceloader.open(name) as fp:
-        resource = fp.read().decode('utf-8') % params
+        resource = fp.read()
+        if params:
+            resource = resource % params
     ensure_dir(outfile)
     with codecs.open(outfile, "w") as fp:
         fp.write(resource)

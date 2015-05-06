@@ -130,12 +130,12 @@ republishsource   Whether the Atom files should contain      False
 combineresources  Whether to combine and minify all css and  False
                   js files into a single file each
 cssfiles          A list of all required css files           ['http://fonts.googleapis.com/css?family=Raleway:200,100',
-                                                             'res/css/normalize.css',
-                                                             'res/css/main.css',
-						             'res/css/ferenda.css']
-jsfiles           A list of all required js files            ['res/js/jquery-1.9.0.js',
-                                                             'res/js/modernizr-2.6.2-respond-1.1.0.min.js',
-                                                             'res/js/ferenda.js']
+                                                             'css/normalize.css',
+                                                             'css/main.css',
+						             'css/ferenda.css']
+jsfiles           A list of all required js files            ['js/jquery-1.9.0.js',
+                                                             'js/modernizr-2.6.2-respond-1.1.0.min.js',
+                                                             'js/ferenda.js']
 staticsite        Whether to generate static HTML files      False
                   suitable for offline usage (removes
 		  search and uses relative file paths

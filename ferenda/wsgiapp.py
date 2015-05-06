@@ -24,7 +24,7 @@ from layeredconfig import LayeredConfig, Defaults, INIFile
 import pkg_resources
 
 from ferenda.compat import OrderedDict, Counter
-from ferenda import DocumentRepository, FulltextIndex, Transformer, Facet
+from ferenda import DocumentRepository, FulltextIndex, Transformer, Facet, ResourceLoader
 from ferenda import fulltextindex, util, elements
 from ferenda.elements import html
 
@@ -38,6 +38,14 @@ class WSGIApp(object):
         self.repos = repos
         self.log = logging.getLogger("wsgi")
 
+        # FIXME: Cut-n-paste of the method in Resources.__init__
+        loadpaths = [ResourceLoader.make_loadpath(repo) for repo in repos]
+        loadpath = ["."]  # cwd always has priority -- makes sense?
+        for subpath in loadpaths:
+            for p in subpath:
+                if p not in loadpath:
+                    loadpath.append(p)
+        self.resourceloader = ResourceLoader(*loadpath)
         # FIXME: need to specify documentroot?
         defaults = DocumentRepository.get_default_options()
         if inifile:

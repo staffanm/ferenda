@@ -323,8 +323,8 @@ class DirRegeringen(Regeringen):
 
     """Downloads Direktiv in PDF format from http://www.regeringen.se/"""
     alias = "dirregeringen"
-    cssfiles = ['../ferenda/res/css/pdfview.css']
-    jsfiles = ['../ferenda/res/js/pdfviewer.js']
+    cssfiles = ['pdfview.css']
+    jsfiles = ['pdfviewer.js']
     re_basefile_strict = re.compile(r'Dir\. (\d{4}:\d+)')
     re_basefile_lax = re.compile(r'(?:[Dd]ir\.?|) ?(\d{4}:\d+)')
     rdf_type = RPUBL.Kommittedirektiv
