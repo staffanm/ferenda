@@ -369,7 +369,7 @@ method. Just use the optional attachment parameter to the appropriate
 
 .. literalinclude:: examples/keyconcepts-attachments.py
    :language: python		    
-   :lines: 2-14,18-22	    
+   :lines: 2-14,18-22   
 
 .. note:: 
 

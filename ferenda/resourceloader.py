@@ -65,7 +65,7 @@ class ResourceLoader(object):
         """Returns the contents of the resource, either as a string or a bytes
         object, depending on whether ``binary`` is False or True.
         
-        Might raise ResourceNotFound.
+        Might raise :py:exc:`~ferenda.errors.ResourceNotFound`.
         """
         mode = "rb" if binary else "r"
         with open(self.filename(resourcename), mode=mode) as fp:
@@ -79,7 +79,7 @@ class ResourceLoader(object):
         """Opens the specified resource and returns a open file object. 
         Caller must call .close() on this object when done.
 
-        Might raise ResourceNotFound.
+        Might raise :py:exc:`~ferenda.errors.ResourceNotFound`.
         """
         mode = "rb" if binary else "r"
         return open(self.filename(resourcename), mode=mode)
@@ -89,12 +89,15 @@ class ResourceLoader(object):
     #     fp.read()
     @contextmanager
     def open(self, resourcename, binary=False):
-        """Opens the specified resource as a context manager, ie call with ``with``:
-        >>> loader = ResourceLoader()
-        >>> with resource.open("robots.txt") as fp:
-        ...     fp.read()
+        """Opens the specified resource as a context manager, ie call with
+        ``with``:
 
-        Might raise ResourceNotFound.
+            >>> loader = ResourceLoader()
+            >>> with resource.open("robots.txt") as fp:
+            ...     fp.read()
+
+        Might raise :py:exc:`~ferenda.errors.ResourceNotFound`.
+
         """
         mode = "rb" if binary else "r"
         fp = None
@@ -112,7 +115,7 @@ class ResourceLoader(object):
         If the resource is only found using the ResourceManager API, extract '
         the resource to a temporary file and return its path.
         
-        Might raise ResourceNotFound.
+        Might raise :py:exc:`~ferenda.errors.ResourceNotFound`.
         """
         if os.path.isabs(resourcename):  # don't examine the loadpath
             if os.path.exists(resourcename):

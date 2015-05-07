@@ -21,6 +21,7 @@ TRANS = str.maketrans("åäö ", "aao_")
 URIMAP = {}
 URISPACE = rdflib.Namespace("http://rinfo.lagrummet.se/sys/uri/space#")
 
+
 def import_org(sourcegraph, targetgraph):
     # print("Adding triples in %s to targetgraph" % filename)
 
@@ -73,67 +74,110 @@ def import_dataset(sourcegraph, targetgraph):
             print("    Asserting res %s owl:sameAs %s " % (targeturi, sourceuri))
         URIMAP[sourceuri] = targeturi
 
+
 def import_slugs(sourcegraph, targetgraph):
     for (sourceuri, abbr) in sourcegraph.subject_objects(predicate=URISPACE.abbrSlug):
         if sourceuri in URIMAP:
             targeturi = URIMAP[sourceuri]
             targetgraph.add((targeturi, URISPACE.abbrSlug, abbr))
-        
-def load_n3(path, graph=None):
-    # loads all the n3 files directly with in a given path (does not
-    # recurse) into graph.
+
+
+def load_files(path, graph=None):
+    # loads all the n3 files found under path into a graph
     if graph is None:
         graph = rdflib.Graph()
-    print("loading all n3 files in %s" % path)
-    for f in os.listdir(path):
-        if f.endswith("n3"):
-            load_file(path+os.sep+f, graph)
-    return graph
+    if os.path.isfile(path):
+        return load_file(path, graph)
+    elif os.path.isdir(path):
+        print("loading all n3 files in %s" % path)
+        for f in util.list_dirs(path, suffix=".n3"):
+            # FIXME: ugly hack to avoid reading one particular n3 file
+            if f.endswith("sources.n3"):
+                continue
+            load_file(f, graph)
+        return graph
+    else:
+        print("ERROR: can't load %s" % path)
 
 def load_file(path, graph=None, bindings={}):
     if graph is None:
         graph = rdflib.Graph()
     print("    loading %s" % path)
-    graph.parse(open(path), format="n3")
+    graph.parse(open(path, mode="rb"), format="n3")
     for prefix, ns in bindings.items():
         graph.bind(prefix, ns)
     return graph
 
+
 def concatgraph(base, dest):
     g = rdflib.Graph()
-    load_n3(base+os.sep+"org", g)
-    load_n3(base+os.sep+"serie", g)
-    load_file(base+"/../sys/uri/slugs.n3", g,
-              {"urispace": "http://rinfo.lagrummet.se/sys/uri/space#"})
+    load_files(base, g)
     with open(dest, "wb") as fp:
         header = "# Automatically concatenated from sources at %s\n\n" % datetime.now().isoformat()
         fp.write(header.encode("utf-8"))
         g.serialize(fp, format="turtle")
-    print("Concatenated %s triples" % (len(g)))
+    print("Concatenated %s triples to %s" % (len(g), dest))
+
 
 def mapgraph(base, customresources, dest):
     targetgraph = rdflib.Graph()
     targetgraph.parse(open(customresources), format="turtle")
     len_before = len(targetgraph)
-    import_org(load_n3(base+os.sep+"org"), targetgraph)
-    import_dataset(load_n3(base+os.sep+"serie"), targetgraph) 
-    import_slugs(load_file(base+"/../sys/uri/slugs.n3"),
-                 targetgraph)
+    import_org(load_files(base+os.sep+"org"), targetgraph)
+    import_dataset(load_files(base+os.sep+"serie"), targetgraph) 
     targetgraph.bind("urispace", "http://rinfo.lagrummet.se/sys/uri/space#")
+    writegraph(targetgraph, dest)
+    len_after = len(targetgraph)
+    print("Added %s triples (%s -> %s)" % (len_after-len_before, len_before, len_after))
 
+
+def mapslugs(base, customresources, dest):
+    basegraph = load_file(base)
+    targetgraph = load_files(customresources)
+    import_slugs(basegraph, targetgraph)
+    writegraph(targetgraph, dest)
+
+
+
+def writegraph(graph, dest):
+    util.ensure_dir(dest) 
     with open(dest, "wb") as fp:
         header = "# Automatically transformed from sources at %s\n\n" % datetime.now().isoformat()
         fp.write(header.encode("utf-8"))
-        targetgraph.serialize(fp, format="turtle")
-    len_after = len(targetgraph)
-    print("Added %s triples (%s -> %s)" % (len_after-len_before, len_before, len_after))
+        graph.serialize(fp, format="turtle")
+        print("Wrote %s triples to %s" % (len(graph), dest))
+        
+
+def mapspace(base, dest):
+    graph = load_file(base)
+    # change root <http://rinfo.lagrummet.se/sys/uri/space#> of entire
+    # space into eg <https://lagen.nu/sys/uri/space#>
+
+    # change
+    # : coin:base "http://rinfo.lagrummet.se/" => "http://rinfo.lagrummet.se/"
+    # : coin:template * coin:uriTemplate "/publ/{fs}" => "/{fs}"
+    # and so on
+    writegraph(graph, dest)
+    print("Mapped %s triples to URISpace definitions" % len(graph))
+
 
 def main():
     concatgraph("../rdl/resources/base/datasets",
                 "ferenda/res/extra/swedishlegalsource.auto.ttl")
+    concatgraph("../rdl/resources/base/sys/uri/slugs.n3",
+                "ferenda/res/uri/slugs.ttl")
+    concatgraph("../rdl/resources/base/sys/uri/space.n3",
+                "ferenda/res/uri/space.ttl")
+
     mapgraph("../rdl/resources/base/datasets",
              "lagen/nu/extra/swedishlegalsource.ttl",
              "lagen/nu/extra/swedishlegalsource.auto.ttl")
+    mapslugs("../rdl/resources/base/sys/uri/slugs.n3",
+             "lagen/nu/extra/swedishlegalsource.ttl",
+             "lagen/nu/uri/slugs.ttl")
+    mapspace("../rdl/resources/base/sys/uri/space.n3",
+             "lagen/nu/uri/space.ttl")
+    
 
 if __name__ == '__main__':
     main()
