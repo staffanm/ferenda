@@ -149,7 +149,7 @@ def writegraph(graph, dest):
     with open(dest, "wb") as fp:
         header = "# Automatically transformed from sources at %s\n\n" % datetime.now().isoformat()
         fp.write(header.encode("utf-8"))
-        graph.serialize(fp, format="turtle")
+        fp.write(graph.serialize(format="turtle"))
         print("Wrote %s triples to %s" % (len(graph), dest))
         
 
@@ -175,15 +175,16 @@ def main():
 #    concatgraph("../rdl/resources/base/sys/uri/space.n3",
 #                "ferenda/res/uri/swedishlegalsource.space.ttl")
 #
-#    mapgraph("../rdl/resources/base/datasets",
-#             "lagen/nu/res/extra/swedishlegalsource.ttl",
-#             "lagen/nu/res/extra/swedishlegalsource.ttl")
-    mapslugs("../rdl/resources/base/sys/uri/slugs.n3",
+    from pudb import set_trace; set_trace()
+    mapgraph("../rdl/resources/base/datasets",
              "lagen/nu/res/extra/swedishlegalsource.ttl",
-             "lagen/nu/res/uri/swedishlegalsource.slugs.ttl")
-    mapspace("../rdl/resources/base/sys/uri/space.n3",
-             "lagen/nu/res/uri/swedishlegalsource.space.ttl")
-    
+             "lagen/nu/res/extra/swedishlegalsource.ttl")
+#    mapslugs("../rdl/resources/base/sys/uri/slugs.n3",
+#             "lagen/nu/res/extra/swedishlegalsource.ttl",
+#             "lagen/nu/res/uri/swedishlegalsource.slugs.ttl")
+#    mapspace("../rdl/resources/base/sys/uri/space.n3",
+#             "lagen/nu/res/uri/swedishlegalsource.space.ttl")
+#    
 
 if __name__ == '__main__':
     main()
