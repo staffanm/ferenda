@@ -68,7 +68,9 @@ class ResourceLoader(object):
         Might raise :py:exc:`~ferenda.errors.ResourceNotFound`.
         """
         mode = "rb" if binary else "r"
-        with open(self.filename(resourcename), mode=mode) as fp:
+        filename = self.filename(resourcename)
+        self.log.debug("Loading %s" % filename)
+        with open(filename, mode=mode) as fp:
             return fp.read()
 
     # this works like old-style open, eg.
@@ -82,7 +84,9 @@ class ResourceLoader(object):
         Might raise :py:exc:`~ferenda.errors.ResourceNotFound`.
         """
         mode = "rb" if binary else "r"
-        return open(self.filename(resourcename), mode=mode)
+        filename = self.filename(resourcename)
+        self.log.debug("Opening fp %s" % filename)
+        return open(filename, mode=mode)
 
     # this is used with 'with', eg.
     # with loader.open(...) as fp:
@@ -102,7 +106,9 @@ class ResourceLoader(object):
         mode = "rb" if binary else "r"
         fp = None
         try:
-            fp = open(self.filename(resourcename), mode=mode)
+            filename = self.filename(resourcename)
+            self.log.debug("Opening %s" % filename)
+            fp = open(filename, mode=mode)
             yield fp
         except ResourceNotFound:
             raise

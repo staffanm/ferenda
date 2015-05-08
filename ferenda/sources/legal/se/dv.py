@@ -1186,7 +1186,6 @@ class DV(SwedishLegalSource):
         for malnummer in head['_localid']:
             bnodetmp = BNode()
             gtmp = Graph()
-            from pudb import set_trace; set_trace()
             gtmp.bind("rpubl", RPUBL)
             gtmp.bind("dcterms", DCTERMS)
             
@@ -1196,7 +1195,6 @@ class DV(SwedishLegalSource):
             dtmp.value(RPUBL.avgorandedatum, head['Avgörandedatum'])
             dtmp.rel(DCTERMS.publisher, self.lookup_resource(head["Domstol"]))
             resource = dtmp.graph.resource(bnodetmp)
-            from pudb import set_trace; set_trace()
             domuri = self.minter.space.coin_uri(resource)
             domdesc = Describer(doc.meta, domuri)
 

@@ -80,7 +80,9 @@ def import_slugs(sourcegraph, targetgraph):
         if sourceuri in URIMAP:
             targeturi = URIMAP[sourceuri]
             targetgraph.add((targeturi, URISPACE.abbrSlug, abbr))
-
+    for (s, p, o) in targetgraph:
+        if p != URISPACE.abbrSlug:
+            targetgraph.remove((s, p, o))
 
 def load_files(path, graph=None):
     # loads all the n3 files found under path into a graph
@@ -110,16 +112,18 @@ def load_file(path, graph=None, bindings={}):
 
 
 def concatgraph(base, dest):
+    print("Concatenating everything in %s to %s" % (base, dest))
     g = rdflib.Graph()
     load_files(base, g)
     with open(dest, "wb") as fp:
         header = "# Automatically concatenated from sources at %s\n\n" % datetime.now().isoformat()
         fp.write(header.encode("utf-8"))
         g.serialize(fp, format="turtle")
-    print("Concatenated %s triples to %s" % (len(g), dest))
+    print("  Concatenated %s triples to %s" % (len(g), dest))
 
 
 def mapgraph(base, customresources, dest):
+    print("Mapping everything in %s, using %s, to %s" % (base, customresources, dest))
     targetgraph = rdflib.Graph()
     targetgraph.parse(open(customresources), format="turtle")
     len_before = len(targetgraph)
@@ -128,12 +132,13 @@ def mapgraph(base, customresources, dest):
     targetgraph.bind("urispace", "http://rinfo.lagrummet.se/sys/uri/space#")
     writegraph(targetgraph, dest)
     len_after = len(targetgraph)
-    print("Added %s triples (%s -> %s)" % (len_after-len_before, len_before, len_after))
+    print("  Added %s triples (%s -> %s)" % (len_after-len_before, len_before, len_after))
 
 
 def mapslugs(base, customresources, dest):
+    print("Mapping slugs from %s, using %s, to %s" % (base, customresources, dest))
     basegraph = load_file(base)
-    targetgraph = load_files(customresources)
+    targetgraph = load_file(customresources)
     import_slugs(basegraph, targetgraph)
     writegraph(targetgraph, dest)
 
@@ -149,6 +154,7 @@ def writegraph(graph, dest):
         
 
 def mapspace(base, dest):
+    print("Mapping URISpace in %s to %s" % (base, dest))
     graph = load_file(base)
     # change root <http://rinfo.lagrummet.se/sys/uri/space#> of entire
     # space into eg <https://lagen.nu/sys/uri/space#>
@@ -162,21 +168,21 @@ def mapspace(base, dest):
 
 
 def main():
-    concatgraph("../rdl/resources/base/datasets",
-                "ferenda/res/extra/swedishlegalsource.auto.ttl")
-    concatgraph("../rdl/resources/base/sys/uri/slugs.n3",
-                "ferenda/res/uri/slugs.ttl")
-    concatgraph("../rdl/resources/base/sys/uri/space.n3",
-                "ferenda/res/uri/space.ttl")
-
-    mapgraph("../rdl/resources/base/datasets",
-             "lagen/nu/extra/swedishlegalsource.ttl",
-             "lagen/nu/extra/swedishlegalsource.auto.ttl")
+#    concatgraph("../rdl/resources/base/datasets",
+#                "ferenda/res/extra/swedishlegalsource.ttl")
+#    concatgraph("../rdl/resources/base/sys/uri/slugs.n3",
+#                "ferenda/res/uri/swedishlegalsource.slugs.ttl")
+#    concatgraph("../rdl/resources/base/sys/uri/space.n3",
+#                "ferenda/res/uri/swedishlegalsource.space.ttl")
+#
+#    mapgraph("../rdl/resources/base/datasets",
+#             "lagen/nu/res/extra/swedishlegalsource.ttl",
+#             "lagen/nu/res/extra/swedishlegalsource.ttl")
     mapslugs("../rdl/resources/base/sys/uri/slugs.n3",
-             "lagen/nu/extra/swedishlegalsource.ttl",
-             "lagen/nu/uri/slugs.ttl")
+             "lagen/nu/res/extra/swedishlegalsource.ttl",
+             "lagen/nu/res/uri/swedishlegalsource.slugs.ttl")
     mapspace("../rdl/resources/base/sys/uri/space.n3",
-             "lagen/nu/uri/space.ttl")
+             "lagen/nu/res/uri/swedishlegalsource.space.ttl")
     
 
 if __name__ == '__main__':

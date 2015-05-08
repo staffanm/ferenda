@@ -194,12 +194,18 @@ class SwedishLegalSource(DocumentRepository):
     @property
     def minter(self):
         if not hasattr(self, '_minter'):
-            spacefile = "ferenda/res/uri/swedishlegalsource.space.n3"
-            slugsfile = "ferenda/res/uri/swedishlegalsource.slugs.n3"
-            spaceuri = "http://localhost:8000/sys/uri/space#"
-            cfg = Graph().parse(spacefile, format="n3")
-            cfg.parse(slugsfile, format="n3")
-            self._minter = URIMinter(cfg, URIRef(spaceuri))
+            filename = self.resourceloader.filename
+            spacefile = filename("uri/swedishlegalsource.space.ttl")
+            slugsfile = filename("uri/swedishlegalsource.slugs.ttl")
+            self.log.debug("Loading URISpace from %s" % spacefile)
+            cfg = Graph().parse(spacefile,
+                                format="turtle").parse(slugsfile,
+                                                       format="turtle")
+            COIN = Namespace("http://purl.org/court/def/2009/coin#")
+            # select correct URI for the URISpace definition by
+            # finding a single coin:URISpace object
+            spaceuri = cfg.value(predicate=RDF.type, object=COIN.URISpace)
+            self._minter = URIMinter(cfg, spaceuri)
         return self._minter
         
     @property

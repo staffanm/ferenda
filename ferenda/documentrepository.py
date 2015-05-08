@@ -320,7 +320,7 @@ class DocumentRepository(object):
         # when testing. FIXME: A better alternative would be to use
         # the responses library to mock calls to requests.
         self.session = requests.session()
-        
+
         loadpath = ResourceLoader.make_loadpath(self)
         if 'loadpath' in self.config:
             loadpath = self.config.loadpath + loadpath
