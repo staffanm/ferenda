@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2015-05-08T07:55:39.786784
+# Automatically transformed from sources at 2015-05-09T09:46:44.055843
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -59,8 +59,7 @@
 
 <https://lagen.nu/dataset/affs> urispace:abbrSlug "affs" .
 
-<https://lagen.nu/dataset/afs> urispace:abbrSlug "aafs",
-        "afs" .
+<https://lagen.nu/dataset/afs> urispace:abbrSlug "afs" .
 
 <https://lagen.nu/dataset/agvfs> urispace:abbrSlug "agvfs" .
 
@@ -274,43 +273,9 @@
 
 <https://lagen.nu/org/2011/mark-och-miljooverdomstolen> urispace:abbrSlug "mmd" .
 
-<https://lagen.nu/org/2014/gota_hovratt> urispace:abbrSlug "hgo" .
-
-<https://lagen.nu/org/2014/hogsta_domstolen> urispace:abbrSlug "hd" .
-
-<https://lagen.nu/org/2014/hogsta_forvaltningsdomstolen> urispace:abbrSlug "hfd" .
-
-<https://lagen.nu/org/2014/hovratten_for_nedre_norrland> urispace:abbrSlug "hnn" .
-
-<https://lagen.nu/org/2014/hovratten_for_ovre_norrland> urispace:abbrSlug "hon" .
-
-<https://lagen.nu/org/2014/hovratten_for_vastra_sverige> urispace:abbrSlug "hvs" .
-
-<https://lagen.nu/org/2014/hovratten_over_skane_och_blekinge> urispace:abbrSlug "hsb" .
-
 <https://lagen.nu/org/2014/justitiekanslern> urispace:abbrSlug "jk" .
-
-<https://lagen.nu/org/2014/kammarratten_i_goteborg> urispace:abbrSlug "kgg" .
-
-<https://lagen.nu/org/2014/kammarratten_i_jonkoping> urispace:abbrSlug "kjo" .
-
-<https://lagen.nu/org/2014/kammarratten_i_stockholm> urispace:abbrSlug "kst" .
-
-<https://lagen.nu/org/2014/kammarratten_i_sundsvall> urispace:abbrSlug "ksu" .
 
 <https://lagen.nu/org/2014/mark-_och_miljooverdomstolen> urispace:abbrSlug "mmd" .
 
-<https://lagen.nu/org/2014/migrationsoverdomstolen> urispace:abbrSlug "mig" .
-
-<https://lagen.nu/org/2014/miljooverdomstolen> urispace:abbrSlug "mod" .
-
-<https://lagen.nu/org/2014/patentbesvarsratten> urispace:abbrSlug "pbr" .
-
-<https://lagen.nu/org/2014/rattshjalpsnamnden> urispace:abbrSlug "rhn" .
-
-<https://lagen.nu/org/2014/regeringsratten> urispace:abbrSlug "regr" .
-
 <https://lagen.nu/org/2014/statens_ansvarsnamnd> urispace:abbrSlug "san" .
-
-<https://lagen.nu/org/2014/svea_hovratt> urispace:abbrSlug "hsv" .
 

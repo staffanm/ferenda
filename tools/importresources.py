@@ -5,6 +5,7 @@ from __future__ import unicode_literals
 
 import sys
 import os
+import codecs
 sys.path.append(os.getcwd())
 from datetime import datetime
 
@@ -79,7 +80,10 @@ def import_slugs(sourcegraph, targetgraph):
     for (sourceuri, abbr) in sourcegraph.subject_objects(predicate=URISPACE.abbrSlug):
         if sourceuri in URIMAP:
             targeturi = URIMAP[sourceuri]
+            # print("Mapping %s -> %s for slug %s" % (sourceuri, targeturi, abbr))
             targetgraph.add((targeturi, URISPACE.abbrSlug, abbr))
+        else:
+            print("WARNING: Can't find %s in URIMAP" % sourceuri)
     for (s, p, o) in targetgraph:
         if p != URISPACE.abbrSlug:
             targetgraph.remove((s, p, o))
@@ -105,7 +109,10 @@ def load_file(path, graph=None, bindings={}):
     if graph is None:
         graph = rdflib.Graph()
     print("    loading %s" % path)
-    graph.parse(open(path, mode="rb"), format="n3")
+    
+    with open(path) as fp:
+        data = fp.read()
+        graph.parse(data=data, format="n3")
     for prefix, ns in bindings.items():
         graph.bind(prefix, ns)
     return graph
@@ -115,10 +122,7 @@ def concatgraph(base, dest):
     print("Concatenating everything in %s to %s" % (base, dest))
     g = rdflib.Graph()
     load_files(base, g)
-    with open(dest, "wb") as fp:
-        header = "# Automatically concatenated from sources at %s\n\n" % datetime.now().isoformat()
-        fp.write(header.encode("utf-8"))
-        g.serialize(fp, format="turtle")
+    writegraph(g, dest, "concatenated")
     print("  Concatenated %s triples to %s" % (len(g), dest))
 
 
@@ -144,12 +148,12 @@ def mapslugs(base, customresources, dest):
 
 
 
-def writegraph(graph, dest):
-    util.ensure_dir(dest) 
-    with open(dest, "wb") as fp:
-        header = "# Automatically transformed from sources at %s\n\n" % datetime.now().isoformat()
-        fp.write(header.encode("utf-8"))
-        fp.write(graph.serialize(format="turtle"))
+def writegraph(graph, dest, operation="transformed"):
+    util.ensure_dir(dest)
+    with open(dest, "w") as fp:
+        header = "# Automatically %s from sources at %s\n\n" % (operation, datetime.now().isoformat())
+        fp.write(header)
+        fp.write(graph.serialize(format="turtle").decode("utf-8"))
         print("Wrote %s triples to %s" % (len(graph), dest))
         
 
@@ -168,23 +172,22 @@ def mapspace(base, dest):
 
 
 def main():
-#    concatgraph("../rdl/resources/base/datasets",
-#                "ferenda/res/extra/swedishlegalsource.ttl")
-#    concatgraph("../rdl/resources/base/sys/uri/slugs.n3",
-#                "ferenda/res/uri/swedishlegalsource.slugs.ttl")
-#    concatgraph("../rdl/resources/base/sys/uri/space.n3",
-#                "ferenda/res/uri/swedishlegalsource.space.ttl")
-#
-    from pudb import set_trace; set_trace()
+    concatgraph("../rdl/resources/base/datasets",
+                "ferenda/res/extra/swedishlegalsource.ttl")
+    concatgraph("../rdl/resources/base/sys/uri/slugs.n3",
+                "ferenda/res/uri/swedishlegalsource.slugs.ttl")
+    concatgraph("../rdl/resources/base/sys/uri/space.n3",
+                "ferenda/res/uri/swedishlegalsource.space.ttl")
+
     mapgraph("../rdl/resources/base/datasets",
              "lagen/nu/res/extra/swedishlegalsource.ttl",
              "lagen/nu/res/extra/swedishlegalsource.ttl")
-#    mapslugs("../rdl/resources/base/sys/uri/slugs.n3",
-#             "lagen/nu/res/extra/swedishlegalsource.ttl",
-#             "lagen/nu/res/uri/swedishlegalsource.slugs.ttl")
-#    mapspace("../rdl/resources/base/sys/uri/space.n3",
-#             "lagen/nu/res/uri/swedishlegalsource.space.ttl")
-#    
+    mapslugs("../rdl/resources/base/sys/uri/slugs.n3",
+             "lagen/nu/res/extra/swedishlegalsource.ttl",
+             "lagen/nu/res/uri/swedishlegalsource.slugs.ttl")
+    mapspace("../rdl/resources/base/sys/uri/space.n3",
+             "lagen/nu/res/uri/swedishlegalsource.space.ttl")
+    
 
 if __name__ == '__main__':
     main()
