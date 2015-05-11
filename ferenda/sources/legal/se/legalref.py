@@ -150,6 +150,7 @@ with open(picklefile,"wb") as fp:
 
 import six
 from six.moves import cPickle as pickle
+import six.text_type as str
 
 from rdflib import Graph
 from rdflib import Namespace
@@ -260,6 +261,8 @@ class LegalRef:
     re_xmlcharref = re.compile("&#\d+;")
 
     def __init__(self, *args):
+        # FIXME: We'd like to make the EBNF/N3 loading parts use 
+        # ResourceLoader instead of hardcoded paths
         if not os.path.sep in __file__:
             scriptdir = os.getcwd()
         else:
@@ -368,39 +371,29 @@ class LegalRef:
             d[six.text_type(subj)] = six.text_type(obj)
         return d
 
-    def parse(self, indata,
-              baseuri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K9P9S9P9",
+    def parse(self, 
+              indata,
+              minter,
+              baseuri_attributes=None,
               predicate=None,
               allow_relative=True):
-        assert isinstance(indata, six.text_type)
+        assert isinstance(indata, str)
         if indata == "":
             return indata  # this actually triggered a bug...
         self.predicate = predicate
-        self.baseuri = baseuri
         self.allow_relative = allow_relative
-        if baseuri:
-            m = self.re_urisegments.match(baseuri)
-            if m:
-                self.baseuri_attributes = {'baseuri': m.group(1),
-                                           'law': m.group(2),
-                                           'chapter': m.group(6),
-                                           'section': m.group(8),
-                                           'piece': m.group(10),
-                                           'item': m.group(12)}
-            else:
-                self.baseuri_attributes = {'baseuri': baseuri}
+        if baseuri_attributes:
+            # Might contain 'baseuri', 'law', 'chapter', 'section', 'piece', 'item'
+            self.baseuri_attributes = baseuri_attributes
         else:
             self.baseuri_attributes = {}
+
         # Det är svårt att få EBNF-grammatiken att känna igen
         # godtyckliga ord som slutar på ett givet suffix (exv
         # 'bokföringslagen' med suffixet 'lagen'). Därför förbehandlar
         # vi indatasträngen och stoppar in ett '|'-tecken innan vissa
         # suffix. Vi transformerar även 'Radio- och TV-lagen' till
         # 'Radio-_och_TV-lagen'
-        #
-        # FIXME: Obviously, this shouldn't be done in a general class,
-        # but rather in a subclas or via proxy/adapter
-
         fixedindata = indata  # FIXME: Nonsensical
         if self.LAGRUM in self.args:
             fixedindata = self.re_escape_compound.sub(
@@ -818,6 +811,10 @@ class LegalRef:
                     "(unknown): I don't know the ID of named law [%s]" % text)
             return None
 
+    def graph_from_attributes(self, attributes):
+        # FIXME: is this even called that?
+        return LegalURI.graph_from_attributes(attributes)
+
     def sfs_format_uri(self, attributes):
         if 'law' not in attributes and not self.allow_relative:
             return None
@@ -830,70 +827,13 @@ class LegalRef:
                          'sjunde': '7',
                          'åttonde': '8',
                          'nionde': '9'}
-        keymapping = {'lawref': 'L',
-                      'chapter': 'K',
-                      'section': 'P',
-                      'piece': 'S',
-                      'item': 'N',
-                      'itemnumeric': 'N',
-                      'element': 'O',
-                      'sentence': 'M',  # is this ever used?
-                      }
-        attributeorder = ['law', 'lawref', 'chapter', 'section',
-                          'element', 'piece', 'item', 'itemnumeric', 'sentence']
+        # possibly do something smart with piecemappings
+        
+        g = self.graph_from_attributes(attributes)
+        return self.minter.space.coin_uri(g)
 
-        if 'law' in attributes:
-            if attributes['law'].startswith('http://'):
-                res = ''
-            else:
-                res = 'http://rinfo.lagrummet.se/publ/sfs/'
-
-        else:
-            if 'baseuri' in self.baseuri_attributes:
-                res = self.baseuri_attributes['baseuri']
-            else:
-                res = ''
-        resolvetobase = True
-        addfragment = False
-        justincase = None
-        for key in attributeorder:
-            if key in attributes:
-                resolvetobase = False
-                val = attributes[key]
-            elif (resolvetobase and key in self.baseuri_attributes):
-                val = self.baseuri_attributes[key]
-            else:
-                val = None
-
-            if val:
-                if not isinstance(val, six.text_type):
-                    val = val.decode(SP_CHARSET)
-                if addfragment:
-                    res += '#'
-                    addfragment = False
-                if (key in ['piece', 'itemnumeric', 'sentence'] and val in piecemappings):
-                    res += '%s%s' % (
-                        keymapping[key], piecemappings[val.lower()])
-                else:
-                    if key == 'law':
-                        val = self.normalize_sfsid(val)
-                        val = val.replace(" ", "_")
-                        val = val.replace("\xa0", "_")  # nonbreakable space
-                        res += val
-                        addfragment = True
-                    else:
-                        if justincase:
-                            res += justincase
-                            justincase = None
-                        val = val.replace(" ", "")
-                        val = val.replace("\xa0", "")  # Non-breakable space
-                        val = val.replace("\n", "")
-                        val = val.replace("\r", "")
-                        res += '%s%s' % (keymapping[key], val)
-            else:
-                if key == 'piece':
-                    justincase = "S1"
-        return res
+        # attributeorder = ['law', 'lawref', 'chapter', 'section',
+        #                   'element', 'piece', 'item', 'itemnumeric', 'sentence']
 
     def format_ChapterSectionRefs(self, root):
         assert(root.tag == 'ChapterSectionRefs')
@@ -1074,7 +1014,8 @@ class LegalRef:
     def format_SFSNr(self, root):
         if self.baseuri is None:
             sfsid = self.find_node(root, 'LawRefID').data
-            baseuri = 'http://rinfo.lagrummet.se/publ/sfs/%s#' % sfsid.decode(SP_CHARSET)
+            g = self.graph_from_attributes({'law': sfsid})
+            baseuri = self.minter.space.compute_uri(g)
             self.baseuri_attributes = {'baseuri': baseuri}
 
         return self.format_tokentree(root)
@@ -1116,8 +1057,10 @@ class LegalRef:
                                            'piece': m.group(10),
                                            'item': m.group(12)}
             else:
+                g = self.graph_from_attributes({'law': self.currentlaw})
                 self.baseuri_attributes = {
-                    'baseuri': 'http://rinfo.lagrummet.se/publ/sfs/' + self.currentlaw + '#'}
+                    'baseuri': self.minter.space.compute_uri(g)
+                    }
 
         if resetcurrentlaw:
             if self.currentlaw is not None:
@@ -1158,25 +1101,8 @@ class LegalRef:
     #
     # KOD FÖR FORARBETEN
     def forarbete_format_uri(self, attributes):
-        # res = self.baseuri_attributes['baseuri']
-        res = 'http://rinfo.lagrummet.se/'
-        resolvetobase = True
-        addfragment = False
-        for key, val in list(attributes.items()):
-            if key == 'prop':
-                res += "publ/prop/%s" % val
-            elif key == 'bet':
-                res += "publ/bet/%s" % val
-            elif key == 'skrivelse':
-                res += "publ/rskr/%s" % val
-            elif key == 'celex':
-                if len(val) == 8:  # incorrectly formatted, uses YY instead of YYYY
-                    val = val[0] + '19' + val[1:]
-                res += "ext/eur-lex/%s" % val
-        if 'sidnr' in attributes:
-            res += "#s%s" % attributes['sidnr']
-
-        return res
+        g = self.graph_from_attributes(attributes)
+        return self.minter.space.compute_uri(g)
 
     def format_ChapterSectionRef(self, root):
         assert(root.nodes[0].nodes[0].tag == 'ChapterRefID')
@@ -1186,62 +1112,19 @@ class LegalRef:
     #
     # KOD FÖR EULAGSTIFTNING
     def eglag_format_uri(self, attributes):
-        res = 'http://rinfo.lagrummet.se/ext/celex/'
         if not 'akttyp' in attributes:
             if 'forordning' in attributes:
                 attributes['akttyp'] = 'förordning'
             elif 'direktiv' in attributes:
                 attributes['akttyp'] = 'direktiv'
-
         if 'akttyp' not in attributes:
             raise AttributeError("Akttyp saknas")
-        # Om hur CELEX-nummer konstrueras
-        # https://www.infotorg.sema.se/infotorg/itweb/handbook/rb/hlp_celn.htm
-        # https://www.infotorg.sema.se/infotorg/itweb/handbook/rb/hlp_celf.htm
-        # Om hur länkning till EURLEX ska se ut:
-        # http://eur-lex.europa.eu/sv/tools/help_syntax.htm
-        # Absolut URI?
-        if 'ar' in attributes and 'lopnummer' in attributes:
-            sektor = '3'
-            rattslig_form = {'direktiv': 'L',
-                             'förordning': 'R'}
+        g = self.graph_from_attributes(attributes)
+        return self.minter.space.compute_uri(g)
 
-            if len(attributes['ar']) == 2:
-                attributes['ar'] = '19' + attributes['ar']
-            res += "%s%s%s%04d" % (sektor, attributes['ar'],
-                                   rattslig_form[attributes['akttyp']],
-                                   int(attributes['lopnummer']))
-        else:
-            if not self.baseuri_attributes['baseuri'].startswith(res):
-                # FIXME: should we warn about this?
-                # print "Relative reference, but base context %s is not a celex context" %
-                # self.baseuri_attributes['baseuri']
-                return None
 
-        if 'artikel' in attributes:
-            res += "#%s" % attributes['artikel']
-            if 'underartikel' in attributes:
-                res += ".%s" % attributes['underartikel']
-
-        return res
-
-    #
     # KOD FÖR RATTSFALL
     def rattsfall_format_uri(self, attributes):
-        # Listan härledd från containers.n3/rattsfallsforteckningar.n3 i
-        # rinfoprojektets källkod - en ambitiösare lösning vore att läsa
-        # in de faktiska N3-filerna i en rdflib-graf.
-        containerid = {'NJA': '/publ/rattsfall/nja/',
-                       'RH': '/publ/rattsfall/rh/',
-                       'MÖD': '/publ/rattsfall/mod/',
-                       'RÅ': '/publ/rattsfall/ra/',
-                       'RK': '/publ/rattsfall/rk/',
-                       'MIG': '/publ/rattsfall/mig/',
-                       'AD': '/publ/rattsfall/ad/',
-                       'MD': '/publ/rattsfall/md/',
-                       'FÖD': '/publ/rattsfall/fod/',
-                       'HFD': '/publ/rattsfall/hfd/',
-                       }
 
         # res = self.baseuri_attributes['baseuri']
         if 'nja' in attributes:
@@ -1250,26 +1133,9 @@ class LegalRef:
         assert 'domstol' in attributes, "No court provided"
         assert attributes[
             'domstol'] in containerid, "%s is an unknown court" % attributes['domstol']
-        res = "http://rinfo.lagrummet.se" + containerid[attributes['domstol']]
-
-        if 'lopnr' in attributes and ":" in attributes['lopnr']:
-            (attributes['ar'], attributes['lopnr']) = lopnr.split(":", 1)
-
-        rf = attributes[
-            'njarattsfall'] if 'njarattsfall' in attributes else attributes['rattsfall']
-        if "not" in rf:
-            ordinal = attributes['sidnr'] if 'sidnr' in attributes else attributes['lopnr']
-            res += "%s/not/%s" % (attributes['ar'], ordinal)
-        elif attributes['domstol'] == 'NJA':
-            # FIXME: URIs should be based on publikationsordinal, not
-            # pagenumber (which this in effect is) - but this requires
-            # a big lookup table/database/graph with
-            # pagenumber-to-ordinal-mappings
-            res += '%ss%s' % (attributes['ar'], attributes['sidnr'])
-        else:
-            res += '%s:%s' % (attributes['ar'], attributes['lopnr'])
-
-        return res
+        
+        g = self.graph_from_attributes(attributes)
+        return self.minter.space.compute_uri(g)
 
     #
     # KOD FÖR EGRÄTTSFALL
@@ -1290,5 +1156,5 @@ class LegalRef:
 
         serial = '%04d' % int(attributes['serial'])
         descriptor = descriptormap[attributes['decision']]
-        uri = "http://lagen.nu/ext/celex/6%s%s%s" % (year, descriptor, serial)
-        return uri
+        g = self.graph_from_attributes(year, descriptor, serial)
+        return self.minter.compute_uri(g)
