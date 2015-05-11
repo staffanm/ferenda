@@ -271,47 +271,6 @@ class SwedishLegalSource(DocumentRepository):
         else:
             return str(val)
 
-    # FIXME: The purpose of this method is to map from localized
-    # (lagen.nu) URIs to canonical (Rpubl) URIs. But current approach
-    # is to use canonical URIs as the base (it's what legalref.Parser
-    # uses) and localize those URIs when finalizing document
-    # metadata. With that approach, this method isn't really needed,
-    # just avoid localizing the URI for the current document when
-    # setting the owl:sameAs triple.
-    def sameas_uri(self, uri):
-        # "http://localhost:8000/res/dir/2012:35" =>
-        #     "http://rinfo.lagrummet.se/publ/dir/2012:35",
-        # "http://localhost:8000/res/dv/hfd/2012:35" =>
-        #     "http://rinfo.lagrummet.se/publ/rattsfall/hfd/2012:35"
-        #
-        # but also:
-        #
-        # "https://lagen.nu/dom/hfd/2012:35" =>
-        #     "http://rinfo.lagrummet.se/publ/rattsfall/hfd/2012:35"
-        # "http://lagen.nu/1998:204" =>
-        #     "http://rinfo.lagrummet.se/publ/sfs/1998:204"
-
-        assert uri.startswith(self.config.url)
-
-        # NOTE: This hardcodes what we can guess about other repos
-        # and their .config.url + .config.urlpath
-        maps = ((self.config.url + "res/dv/",
-                 "http://rinfo.lagrummet.se/publ/rattsfall/"),
-                (self.config.url + "res/",
-                 "http://rinfo.lagrummet.se/publ/"),
-                # Special hacky SFS handling (always starts digits 1 or 2)
-                ("https://lagen.nu/1",
-                 "http://rinfo.lagrummet.se/publ/sfs/1"),
-                ("https://lagen.nu/2",
-                 "http://rinfo.lagrummet.se/publ/sfs/2"),
-                ("https://lagen.nu/dom",
-                 "http://rinfo.lagrummet.se/publ/rattsfall"),
-                ("https://lagen.nu/",
-                 "http://rinfo.lagrummet.se/publ/"))
-        for fr, to in maps:
-            if uri.startswith(fr):
-                return uri.replace(fr, to)
-
     def parse_iso_date(self, datestr):
         # only handles YYYY-MM-DD now. Look into dateutil or isodate
         # for more complete support of all ISO 8601 variants
@@ -370,6 +329,8 @@ class SwedishLegalSource(DocumentRepository):
         :param d: A configured Describer instance
         :param basefile: The basefile for the doc we want to infer from 
         """
+        # Lagen.nu specific subclasses (ie classes that mints lagen.nu-owned URIs) 
+        # should inherit this and create suitable owl:sameAs semantics
         try:
             identifier = d.getvalue(self.ns['dcterms'].identifier)
             # if the identifier is incomplete, eg "2010/11:68" instead
@@ -791,26 +752,11 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
 # grammars.
 class SwedishCitationParser(CitationParser):
 
-    def __init__(self, legalrefparser, baseurl, urlpath=None, allow_relative=False, localizeuri=True):
+    def __init__(self, legalrefparser, minter, allow_relative=False):
         self._legalrefparser = legalrefparser
-        self._baseurl = baseurl
-        self._currenturl = self._baseurl
+        self._minter = minter
+        self._currenturl = None
         self._allow_relative = allow_relative
-        self._localizeuri = localizeuri
-        if self._baseurl == "https://lagen.nu/":
-            if urlpath is None:
-                self._urlpath = ''
-            else:
-                self._urlpath = urlpath
-            self._dvpath = 'dom/'
-            self._sfspath = ''
-        else:
-            if urlpath is None:
-                self._urlpath = 'res/'
-            else:
-                self._urlpath = urlpath
-            self._dvpath = 'dv/'
-            self._sfspath = 'sfs/'
 
     def parse_recursive(self, part, predicate="dcterms:references"):
         if hasattr(part, 'about'):
@@ -833,48 +779,9 @@ class SwedishCitationParser(CitationParser):
 
         # basic normalization without stripping
         string = string.replace("\r\n", " ").replace("\n", " ")
-        unfiltered = self._legalrefparser.parse(string,
-                                                baseuri=self._currenturl,
-                                                predicate=predicate,
-                                                allow_relative=self._allow_relative)
-        # remove those references that we cannot fully resolve (should
-        # be an option in LegalRef, but...
-        filtered = []
-        for node in unfiltered:
-            if isinstance(node, Link) and "sfs/9999:999" in node.uri:
-                filtered.append(str(node))
-            else:
-                if isinstance(node, Link) and self._localizeuri:
-                    node.uri = self.localize_uri(node.uri)
-                filtered.append(node)
-        return filtered
-
-    # a more complete version of DV.polish_metadata.localize_url
-    # (which is used only on metadata fields, not body text)
-    def localize_uri(self, uri):
-        if "publ/rattsfall" in uri:
-            return uri.replace("http://rinfo.lagrummet.se/publ/rattsfall/",
-                               self._baseurl + self._urlpath + self._dvpath)
-        elif "publ/sfs/" in uri:
-            return uri.replace("http://rinfo.lagrummet.se/publ/sfs/",
-                               self._baseurl + self._urlpath + self._sfspath)
-        elif "publ/prop" in uri:
-            return uri.replace("http://rinfo.lagrummet.se/publ/prop/",
-                               self._baseurl + self._urlpath + "prop/")
-        elif "publ/utr/sou" in uri:
-            return uri.replace("http://rinfo.lagrummet.se/publ/utr/sou",
-                               self._baseurl + self._urlpath + "sou/")
-        elif "publ/utr/ds" in uri:
-            return uri.replace("http://rinfo.lagrummet.se/publ/utr/ds",
-                               self._baseurl + self._urlpath + "ds/")
-        elif "publ/bet" in uri:
-            return uri.replace("http://rinfo.lagrummet.se/publ/bet/",
-                               self._baseurl + self._urlpath + "bet/")
-        elif "publ/rskr" in uri:
-            return uri.replace("http://rinfo.lagrummet.se/publ/rskr/",
-                               self._baseurl + self._urlpath + "rskr/")
-        elif "publ/" in uri:
-            return uri.replace("http://rinfo.lagrummet.se/publ/",
-                               self._baseurl + self._urlpath)
-        else:
-            return uri
+        # transform self._currenturl => attributes
+        return self._legalrefparser.parse(string,
+                                          minter=minter,
+                                          baseuri_attributes=attributes,
+                                          predicate=predicate,
+                                          allow_relative=self._allow_relative)
