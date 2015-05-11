@@ -10,8 +10,8 @@ sys.path.append(os.getcwd())
 from datetime import datetime
 
 import rdflib
-from rdflib.namespace import SKOS, FOAF, OWL, DCTERMS
-
+from rdflib.namespace import SKOS, FOAF, OWL, DCTERMS, RDFS
+COIN=rdflib.Namespace("http://purl.org/court/def/2009/coin#")
 from ferenda import util
 
 if sys.version_info < (3,):
@@ -160,13 +160,25 @@ def writegraph(graph, dest, operation="transformed"):
 def mapspace(base, dest):
     print("Mapping URISpace in %s to %s" % (base, dest))
     graph = load_file(base)
-    # change root <http://rinfo.lagrummet.se/sys/uri/space#> of entire
-    # space into eg <https://lagen.nu/sys/uri/space#>
-
-    # change
-    # : coin:base "http://rinfo.lagrummet.se/" => "http://rinfo.lagrummet.se/"
-    # : coin:template * coin:uriTemplate "/publ/{fs}" => "/{fs}"
-    # and so on
+    for (s, p, o) in list(graph):
+        # remove every triple so that we can add an adjusted version
+        graph.remove((s, p, o))
+        if s == rdflib.URIRef("http://rinfo.lagrummet.se/sys/uri/space#"):
+            # change root <http://rinfo.lagrummet.se/sys/uri/space#> of entire
+            # space into eg <https://lagen.nu/sys/uri/space#>
+            s = rdflib.URIRef("https://lagen.nu/sys/uri/space#")
+        if p == COIN.base:
+            # change coin:base
+            o = rdflib.Literal("https://lagen.nu")
+        elif (p == RDFS.seeAlso and
+              o == rdflib.URIRef("http://rinfo.lagrummet.se/sys/uri/slugs")):
+            s, p, o == None
+        elif p == COIN.uriTemplate:
+            # : coin:template * coin:uriTemplate "/publ/{fs}" => "/{fs}"
+            # general case: remove leading /publ/
+            o = rdflib.Literal(str(o).replace("/publ/", "/"))
+        if s:
+            graph.add((s, p, o))
     writegraph(graph, dest)
     print("Mapped %s triples to URISpace definitions" % len(graph))
 
@@ -178,7 +190,6 @@ def main():
                 "ferenda/res/uri/swedishlegalsource.slugs.ttl")
     concatgraph("../rdl/resources/base/sys/uri/space.n3",
                 "ferenda/res/uri/swedishlegalsource.space.ttl")
-
     mapgraph("../rdl/resources/base/datasets",
              "lagen/nu/res/extra/swedishlegalsource.ttl",
              "lagen/nu/res/extra/swedishlegalsource.ttl")
