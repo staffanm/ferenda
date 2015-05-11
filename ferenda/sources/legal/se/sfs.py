@@ -419,8 +419,8 @@ class SFS(Trips):
     def lagrum_parser(self):
         if not hasattr(self, '_lagrum_parser'):
             self._lagrum_parser = SwedishCitationParser(LegalRef(LegalRef.LAGRUM,
-                                                                 LegalRef.EGLAGSTIFTNING),
-                                                        self.config.url,
+                                                                 LegalRef.EULAGSTIFTNING),
+                                                        self.minter,
                                                         allow_relative=True)
         return self._lagrum_parser
 

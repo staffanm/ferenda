@@ -392,7 +392,6 @@ class SwedishLegalSource(DocumentRepository):
             for (s, p, o) in d.graph:
                 if s == d._current():
                     g.add((bnode, p, o))
-            from pudb import set_trace; set_trace()
             d.rel(OWL.sameAs, legaluri.construct_from_graph(g))
 
     def tabs(self, primary=False):
@@ -753,6 +752,7 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
 class SwedishCitationParser(CitationParser):
 
     def __init__(self, legalrefparser, minter, allow_relative=False):
+        assert isinstance(minter, URIMinter)
         self._legalrefparser = legalrefparser
         self._minter = minter
         self._currenturl = None
@@ -780,8 +780,9 @@ class SwedishCitationParser(CitationParser):
         # basic normalization without stripping
         string = string.replace("\r\n", " ").replace("\n", " ")
         # transform self._currenturl => attributes
+        attributes = {}
         return self._legalrefparser.parse(string,
-                                          minter=minter,
+                                          minter=self._minter,
                                           baseuri_attributes=attributes,
                                           predicate=predicate,
                                           allow_relative=self._allow_relative)

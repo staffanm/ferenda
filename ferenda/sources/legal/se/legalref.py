@@ -150,7 +150,7 @@ with open(picklefile,"wb") as fp:
 
 import six
 from six.moves import cPickle as pickle
-import six.text_type as str
+from six import text_type as str
 
 from rdflib import Graph
 from rdflib import Namespace
@@ -269,18 +269,18 @@ class LegalRef:
             scriptdir = os.path.dirname(__file__)
 
         self.graph = Graph()
-        n3file = os.path.relpath(scriptdir + "/../../../res/etc/sfs-extra.n3")
+        n3file = os.path.relpath(scriptdir + "/res/extra/sfs.ttl")
         # print "loading n3file %s" % n3file
         self.graph.load(n3file, format="n3")
         self.roots = []
         self.uriformatter = {}
         self.decl = ""  # try to make it unicode clean all the way
         self.namedlaws = {}
-        self.load_ebnf(scriptdir + "/../../../res/etc/base.ebnf")
+        self.load_ebnf(scriptdir + "/res/ebnf/base.ebnf")
 
         self.args = args
         if self.LAGRUM in args:
-            productions = self.load_ebnf(scriptdir + "/../../../res/etc/lagrum.ebnf")
+            productions = self.load_ebnf(scriptdir + "/res/ebnf/lagrum.ebnf")
             for p in productions:
                 self.uriformatter[p] = self.sfs_format_uri
             self.namedlaws.update(self.get_relations(RDFS.label))
@@ -292,10 +292,10 @@ class LegalRef:
             # nu, eftersom kortlagrum.ebnf beror på produktioner som
             # definerats där
             if not self.LAGRUM in args:
-                self.load_ebnf(scriptdir + "/../../../res/etc/lagrum.ebnf")
+                self.load_ebnf(scriptdir + "/res/ebnf/lagrum.ebnf")
 
             productions = self.load_ebnf(
-                scriptdir + "/../../../res/etc/kortlagrum.ebnf")
+                scriptdir + "/res/ebnf/kortlagrum.ebnf")
             for p in productions:
                 self.uriformatter[p] = self.sfs_format_uri
             DCTERMS = Namespace("http://purl.org/dc/terms/")
@@ -312,23 +312,23 @@ class LegalRef:
             self.roots.insert(0, "kortlagrumref")
 
         if self.EULAGSTIFTNING in args:
-            productions = self.load_ebnf(scriptdir + "/../../../res/etc/eglag.ebnf")
+            productions = self.load_ebnf(scriptdir + "/res/ebnf/eglag.ebnf")
             for p in productions:
                 self.uriformatter[p] = self.eglag_format_uri
             self.roots.append("eglagref")
         if self.FORARBETEN in args:
             productions = self.load_ebnf(
-                scriptdir + "/../../../res/etc/forarbeten.ebnf")
+                scriptdir + "/res/ebnf/forarbeten.ebnf")
             for p in productions:
                 self.uriformatter[p] = self.forarbete_format_uri
             self.roots.append("forarbeteref")
         if self.RATTSFALL in args:
-            productions = self.load_ebnf(scriptdir + "/../../../res/etc/rattsfall.ebnf")
+            productions = self.load_ebnf(scriptdir + "/res/ebnf/rattsfall.ebnf")
             for p in productions:
                 self.uriformatter[p] = self.rattsfall_format_uri
             self.roots.append("rattsfallref")
         if self.EURATTSFALL in args:
-            productions = self.load_ebnf(scriptdir + "/../../../res/etc/egratt.ebnf")
+            productions = self.load_ebnf(scriptdir + "/res/ebnf/egratt.ebnf")
             for p in productions:
                 self.uriformatter[p] = self.egrattsfall_format_uri
             self.roots.append("ecjcaseref")

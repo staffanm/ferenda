@@ -37,7 +37,6 @@ class Parse(unittest.TestCase):
         # NB: parse_recursive filters out references that end in
         # 9999:999, that's why we use :998 above...
         p.lagrum_parser.parse_recursive(b)
-        
 
         self._remove_uri_for_testcases(b)
         resultfilename = filename.replace(".txt", ".xml")

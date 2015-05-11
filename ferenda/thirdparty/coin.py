@@ -5,6 +5,7 @@ import re
 from operator import attrgetter
 from rdflib import Graph, Literal, Namespace, URIRef, RDF, RDFS
 from six.moves.urllib_parse import urljoin
+from six import text_type as str
 
 COIN = Namespace("http://purl.org/court/def/2009/coin#")
 
@@ -26,7 +27,7 @@ class URIMinter:
 class URISpace:
 
     def __init__(self, resource):
-        self.base = unicode(resource.value(COIN.base))
+        self.base = str(resource.value(COIN.base))
         self.templates = [Template(self, template_resource)
                 for template_resource in resource.objects(COIN.template)]
         self.slugTransform = SlugTransformer(resource.value(COIN.slugTransform))
@@ -61,10 +62,10 @@ class SlugTransformer:
         self.spaceRepl = resource and resource.value(
                 COIN.spaceReplacement) or u'+'
         self.stripPattern = resource and re.compile(
-                unicode(resource.value(COIN.stripPattern))) or None
+                str(resource.value(COIN.stripPattern))) or None
 
     def __call__(self, value):
-        value = unicode(value)
+        value = str(value)
         for transform in self.applyTransforms:
             if transform.identifier == COIN.ToLowerCase:
                 value = value.lower()
@@ -83,7 +84,7 @@ class SlugTransformer:
 
 
 def replacer(replacements):
-    char_pairs = [unicode(repl).split(u' ') for repl in replacements]
+    char_pairs = [str(repl).split(u' ') for repl in replacements]
     def replace(value):
         for char, repl in char_pairs:
             value = value.replace(char, repl)
@@ -127,7 +128,7 @@ class Template:
             return None
         if not self.uriTemplate:
             return None # TODO: one value, fragmentTemplate etc..
-        expanded = unicode(self.uriTemplate)
+        expanded = str(self.uriTemplate)
         expanded = expanded.replace("{+base}", base)
         for var, value in matches.items():
             slug = self.space.transform_value(value)
@@ -138,7 +139,7 @@ class Template:
         base = self.space.base
         def guarded_base(b):
             if b:
-                s = unicode(b.identifier)
+                s = str(b.identifier)
                 if s.startswith(base):
                     return s
         if self.relToBase:
@@ -206,7 +207,7 @@ if __name__ == '__main__':
         print("URI Space <%s>:" % space_uri)
         minter = URIMinter(coin_graph, space_uri)
         for subj, uris in minter.compute_uris(instance_data).items():
-            if unicode(subj) in uris:
+            if str(subj) in uris:
                 print("Found <%s> in" % subj,)
             else:
                 print("Did not find <%s> in" % subj,)
