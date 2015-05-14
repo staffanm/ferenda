@@ -152,14 +152,15 @@ import six
 from six.moves import cPickle as pickle
 from six import text_type as str
 
-from rdflib import Graph
-from rdflib import Namespace
-from rdflib import RDFS
+from rdflib import Graph, Namespace, Literal, BNode, RDFS, RDF
+COIN = Namespace("http://purl.org/court/def/2009/coin#")
 
 # my own libraries
 
 from ferenda.elements import Link
 from ferenda.elements import LinkSubject
+from ferenda.thirdparty.coin import URIMinter
+from . import RPUBL
 
 # The charset used for the bytestrings that is sent to/from
 # simpleparse (which does not handle unicode)
@@ -378,15 +379,21 @@ class LegalRef:
               predicate=None,
               allow_relative=True):
         assert isinstance(indata, str)
+        assert isinstance(minter, URIMinter)
         if indata == "":
             return indata  # this actually triggered a bug...
         self.predicate = predicate
+        self.minter = minter
         self.allow_relative = allow_relative
         if baseuri_attributes:
             # Might contain 'baseuri', 'law', 'chapter', 'section', 'piece', 'item'
             self.baseuri_attributes = baseuri_attributes
         else:
-            self.baseuri_attributes = {}
+            self.baseuri_attributes = {"law": "9999:999",
+                                       "chapter": "9",
+                                       "section": "9",
+                                       "piece": "9",
+                                       "items": "9"}
 
         # Det är svårt att få EBNF-grammatiken att känna igen
         # godtyckliga ord som slutar på ett givet suffix (exv
@@ -482,7 +489,6 @@ class LegalRef:
         return normres
 
     def unescape_xmlcharref(self, m):
-        # print "Changing %r to a %r" % (m.group(0)[2:-1], unichr(int(m.group(0)[2:-1])))
         return chr(int(m.group(0)[2:-1]))
 
     def find_attributes(self, parts, extra={}):
@@ -638,13 +644,13 @@ class LegalRef:
         except AttributeError:
             # Normal error from eglag_format_uri
             return part.text
-        except:
-            exc = sys.exc_info()
-            # If something else went wrong, just return the plaintext
-            log.warning("(unknown): Unable to format link for text %s (production %s)" %
-                        (part.text, part.tag))
-            return part.text
-
+#        except Exception as e:
+#            # FIXME: We should maybe not swallow all other errors...
+#            # If something else went wrong, just return the plaintext
+#            log.warning("(unknown): Unable to format link for text %s (production %s): %s: %s" %
+#                        (part.text, part.tag, type(e).__name__, e))
+#            return part.text
+#
         if self.verbose:
             print((
                 (". " * self.depth) + "format_generic_link: uri is %s" % uri))
@@ -811,10 +817,23 @@ class LegalRef:
                     "(unknown): I don't know the ID of named law [%s]" % text)
             return None
 
-    def graph_from_attributes(self, attributes):
-        # FIXME: is this even called that?
-        return LegalURI.graph_from_attributes(attributes)
+    attributemap = {"year": RPUBL.arsutgava,
+                    "no": RPUBL.lopnummer,
+                    "chapter": RPUBL.kapitelnummer,
+                    "section": RPUBL.paragrafnummer
+                    }
 
+    def graph_from_attributes(self, attributes):
+        g = Graph()
+        b = BNode()
+        for k, v in attributes.items():
+            if k in self.attributemap:
+                g.add((b, self.attributemap[k], Literal(v)))
+            else:
+                self.log.error("Can't map attribute %s to RDF predicate" % k)
+        return g, b
+
+    
     def sfs_format_uri(self, attributes):
         if 'law' not in attributes and not self.allow_relative:
             return None
@@ -828,12 +847,37 @@ class LegalRef:
                          'åttonde': '8',
                          'nionde': '9'}
         # possibly do something smart with piecemappings
-        
-        g = self.graph_from_attributes(attributes)
-        return self.minter.space.coin_uri(g)
 
-        # attributeorder = ['law', 'lawref', 'chapter', 'section',
-        #                   'element', 'piece', 'item', 'itemnumeric', 'sentence']
+        attributeorder = ['law', 'chapter', 'section',
+                          'element', 'piece', 'item', 'itemnumeric', 'sentence']
+
+        # possibly complete attributes with data from
+        # baseuri_attributes as needed
+        if self.allow_relative:
+            specificity = False
+            for a in attributeorder:
+                if a in attributes:
+                    specificity = True  # don't complete further than this
+                elif not specificity:
+                    attributes[a] = self.baseuri_attributes[a]
+        # munge graph a little further to be able to map to RDF
+        if "law" in attributes:
+            attributes["year"], attributes["no"] = attributes["law"].split(":")
+            del attributes["law"]
+        g, b = self.graph_from_attributes(attributes)
+        # need also to add a rpubl:forfattningssamling triple -- i
+        # think this is the place to do it. Problem is how we get
+        # access to the URI for SFS -- it can be
+        # <https://lagen.nu/dataset/sfs> or
+        # <http://rinfo.lagrummet.se/serie/fs/sfs>. The information is
+        # available in the config graph, which isn't easily
+        # retrievable from self.minter. So we do it the hard way.
+        rg = self.minter.space.templates[0].resource.graph
+        # get the abbrSlug subproperty. FIXME: do this properly
+        abbrSlug = rg.value(predicate=RDF.type, object=RDF.Property)
+        fsuri = rg.value(predicate=abbrSlug, object=Literal("sfs"))
+        g.add((b, RPUBL.forfattningssamling, fsuri))
+        return self.minter.space.coin_uri(g.resource(b))
 
     def format_ChapterSectionRefs(self, root):
         assert(root.tag == 'ChapterSectionRefs')

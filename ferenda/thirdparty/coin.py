@@ -4,6 +4,7 @@ __metaclass__ = type
 import re
 from operator import attrgetter
 from rdflib import Graph, Literal, Namespace, URIRef, RDF, RDFS
+from rdflib.resource import Resource
 from six.moves.urllib_parse import urljoin
 from six import text_type as str
 
@@ -43,6 +44,7 @@ class URISpace:
                 yield uri
 
     def coin_uri(self, resource):
+        assert isinstance(resource, Resource), "coin_uri got a %s object, not a rdflib.resource.Resource" % type(resource)
         try:
             return next(self.coin_uris(resource))
         except StopIteration: 
@@ -106,6 +108,10 @@ class Template:
                 for binding in resource.objects(COIN.binding)]
         # IMPROVE: if not template and variable bindings correspond: TemplateException
 
+
+    def __repr__(self):
+        return "<Template %s>" % self.uriTemplate
+
     def coin_uri(self, resource):
         # self.forType is bound to the space graph, resource is bound
         # to the content graph so we can't just compare graphs
@@ -159,6 +165,9 @@ class Binding:
         self.p = resource.value(COIN.property).identifier
         self.variable = resource.value(COIN.variable) or uri_leaf(self.p)
         self.slugFrom = resource.value(COIN.slugFrom)
+
+    def __repr__(self):
+        return "<Binding %s>" % self.template.resource.graph.qname(self.p)
 
     def find_match(self, resource):
         value = resource.value(self.p)

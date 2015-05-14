@@ -7,11 +7,14 @@ if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
 import codecs
 import re
-    
+
+from rdflib import Namespace, Graph, RDF
+
+from ferenda import ResourceLoader
 from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda.elements import serialize
 from ferenda.testutil import file_parametrize
-
+from ferenda.thirdparty.coin import URIMinter
 
 @unittest.skipIf('SKIP_SIMPLEPARSE_TESTS' in os.environ,
                  "Skipping SimpleParser dependent tests")    
@@ -31,15 +34,30 @@ class TestLegalRef(unittest.TestCase):
         # p.currentlynamedlaws = {} # needed?
         test_paras = re.split('\r?\n---\r?\n',testdata)
         got_paras = []
+
+        space = "ferenda/sources/legal/se/res/uri/swedishlegalsource.space.ttl"
+        slugs = "ferenda/sources/legal/se/res/uri/swedishlegalsource.slugs.ttl"
+        cfg = Graph().parse(space,
+                            format="turtle").parse(slugs, format="turtle")
+        COIN = Namespace("http://purl.org/court/def/2009/coin#")
+        # select correct URI for the URISpace definition by
+        # finding a single coin:URISpace object
+        spaceuri = cfg.value(predicate=RDF.type, object=COIN.URISpace)
+        minter = URIMinter(cfg, spaceuri)
+        import logging
+        r = logging.getLogger()
+        h = logging.StreamHandler()
+        h.setFormatter(logging.Formatter("%(name)s %(levelname)s %(message)s"))
+        r.addHandler(h)
+        r.setLevel(logging.DEBUG)
         for para in test_paras:
             if para.startswith("RESET:"):
                 parser.currentlynamedlaws.clear()
             if para.startswith("NOBASE:"):
-                baseuri = None
+                baseuri_attributes = {}
             else:
-                baseuri = 'http://rinfo.lagrummet.se/publ/sfs/9999:999'
-            # print("Parsing %r" % para)
-            nodes = parser.parse(para, baseuri)
+                baseuri_attributes = {'law': '9999:999'}
+            nodes = parser.parse(para, minter, baseuri_attributes)
             got_paras.append(serialize(nodes).strip())
         got = "\n---\n".join(got_paras).replace("\r\n","\n").strip()
         self.maxDiff = None

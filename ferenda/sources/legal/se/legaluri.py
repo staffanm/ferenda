@@ -125,13 +125,12 @@ def coinstruct_from_graph(graph, subject, minter=None):
         configgraph = Graph()
         # FIXME: The configgraph should only be loaded once, but be
         # configurable ie load the correct COIN n3 config
-        configgraph.parse("ferenda/res/uri/space.n3", format="n3")
-        configgraph.parse("ferenda/res/uri/slugs.n3", format="n3")
+        configgraph.parse("ferenda/sources/legal/se/res/uri/swedishlegalsource.space.ttl", format="n3")
+        configgraph.parse("ferenda/sources/legal/se/res/uri/swedishlegalsource.slugs.ttl", format="n3")
         minter = URIMinter(configgraph,
                            URIRef("http://rinfo.lagrummet.se/sys/uri/space#"))
-    results = minter.space.coin_uris(graph.resource(subject))
-    assert len(results), "Could not coin any URIs from the given graph"
-    return results[0]   # only return the "best" ie most prioritized template
+    result = minter.space.coin_uri(graph.resource(subject))
+    return result   # only return the "best" ie most prioritized template
 
 def construct_from_graph(graph):
     # assume every triple in the graph has the same bnode as subject
