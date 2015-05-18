@@ -11,7 +11,11 @@ from datetime import datetime
 
 import rdflib
 from rdflib.namespace import SKOS, FOAF, OWL, DCTERMS, RDFS
+from rdflib.extras.describer import Describer
 COIN=rdflib.Namespace("http://purl.org/court/def/2009/coin#")
+RPUBL=rdflib.Namespace('http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
+RINFOEX=rdflib.Namespace("http://lagen.nu/terms#")
+
 from ferenda import util
 
 if sys.version_info < (3,):
@@ -179,6 +183,30 @@ def mapspace(base, dest):
             o = rdflib.Literal(str(o).replace("/publ/", "/"))
         if s:
             graph.add((s, p, o))
+
+    # now create a bunch of fine-grained templates that can mint uris
+    # for sections, paragraphs etc. This doesn't need to be
+    # dynamically generated, we could just add the 30 or so triples
+    # neeeded statically. But we shave the yak this way.
+    desc = Describer(graph, "https://lagen.nu/sys/uri/space#")
+    bindings = [RPUBL.forfattningssamling, RPUBL.arsutgava, RPUBL.lopnummer]
+    uritemplate = "/{fs}/{arsutgava}:{lopnummer}#"  # add stringmunging
+    for p, fragletter in ((RPUBL.kapitelnummer, "K"),
+                          (RPUBL.paragrafnummer, "P"),
+                          (RINFOEX.styckenummer, "S"),
+                          (RINFOEX.punktnummer, "N")):
+        with desc.rel(COIN.template):
+            uritemplate += fragletter + "{" + util.uri_leaf(p) + "}"
+            desc.value(COIN.uriTemplate, uritemplate)
+            bindings.append(p)
+            for b in bindings:
+                with desc.rel(COIN.binding):
+                    desc.rel(COIN.property, b)
+                    if b == RPUBL.forfattningssamling:
+                        desc.value(COIN.variable, "fs")
+                        desc.rel(COIN.slugFrom, "https://lagen.nu/sys/uri/space#abbrSlug")
+                    else:
+                        desc.value(COIN.variable, util.uri_leaf(b))
     writegraph(graph, dest)
     print("Mapped %s triples to URISpace definitions" % len(graph))
 
@@ -188,6 +216,8 @@ def main():
                 "ferenda/res/extra/swedishlegalsource.ttl")
     concatgraph("../rdl/resources/base/sys/uri/slugs.n3",
                 "ferenda/res/uri/swedishlegalsource.slugs.ttl")
+    # NB: we might need to add a few templates dynamically to this one
+    # (like mapspace does):
     concatgraph("../rdl/resources/base/sys/uri/space.n3",
                 "ferenda/res/uri/swedishlegalsource.space.ttl")
     mapgraph("../rdl/resources/base/datasets",

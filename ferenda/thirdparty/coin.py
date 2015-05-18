@@ -30,15 +30,16 @@ class URISpace:
     def __init__(self, resource):
         self.base = str(resource.value(COIN.base))
         self.templates = [Template(self, template_resource)
-                for template_resource in resource.objects(COIN.template)]
+                          for template_resource in resource.objects(
+                                  COIN.template)]
+        # primary sort order by :priority
+        # secondary sort order by specificity (number of vars per template)
+        self.templates.sort(key=lambda x: (x.priority, len(x.bindings)),
+                            reverse=True)
         self.slugTransform = SlugTransformer(resource.value(COIN.slugTransform))
 
     def coin_uris(self, resource):
-        for template in sorted(self.templates,
-                               key=lambda x: (x.priority, len(x.bindings)),
-                               reverse=True):
-            # TODO: secondary order by specificity (number of
-            # non-shared vars per template)
+        for template in self.templates:
             uri = template.coin_uri(resource)
             if uri:
                 yield uri
@@ -102,6 +103,7 @@ class Template:
         self.priority = int(resource.value(COIN.priority) or 0)
         self.forType = resource.value(COIN.forType)
         self.uriTemplate = resource.value(COIN.uriTemplate)
+        self.fragmentTemplate = resource.value(COIN.fragmentTemplate)
         self.relToBase = resource.value(COIN.relToBase)
         self.relFromBase = resource.value(COIN.relFromBase)
         self.bindings = [Binding(self, binding)
@@ -110,7 +112,12 @@ class Template:
 
 
     def __repr__(self):
-        return "<Template %s>" % self.uriTemplate
+        if self.uriTemplate:
+            return "<Template %s>" % self.uriTemplate
+        elif self.fragmentTemplate:
+            return "<Template #%s>" % self.fragmentTemplate
+        else:
+            return "<Template>"
 
     def coin_uri(self, resource):
         # self.forType is bound to the space graph, resource is bound
@@ -133,8 +140,15 @@ class Template:
         if not base:
             return None
         if not self.uriTemplate:
-            return None # TODO: one value, fragmentTemplate etc..
+            if self.fragmentTemplate:
+                print("Do something smart with #%s" % self.fragmentTemplate)
+                return None
+            else:
+                return None # TODO: one value
         expanded = str(self.uriTemplate)
+        if "{+base}" in expanded:
+            pass
+
         expanded = expanded.replace("{+base}", base)
         for var, value in matches.items():
             slug = self.space.transform_value(value)
