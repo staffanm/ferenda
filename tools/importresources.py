@@ -122,44 +122,49 @@ def load_file(path, graph=None, bindings={}):
     return graph
 
 
-def concatgraph(base, dest):
+def concatgraph(base, dest, adjustfunc=None):
     print("Concatenating everything in %s to %s" % (base, dest))
     g = rdflib.Graph()
     load_files(base, g)
+    if adjustfunc:
+        adjustfunc(g)
     writegraph(g, dest, "concatenated")
     print("  Concatenated %s triples to %s" % (len(g), dest))
 
 
 def mapgraph(base, customresources, dest):
-    print("Mapping everything in %s, using %s, to %s" % (base, customresources, dest))
+    print("Mapping everything in %s, using %s, to %s" %
+          (base, customresources, dest))
     targetgraph = rdflib.Graph()
     targetgraph.parse(open(customresources), format="turtle")
     len_before = len(targetgraph)
     import_org(load_files(base+os.sep+"org"), targetgraph)
-    import_dataset(load_files(base+os.sep+"serie"), targetgraph) 
+    import_dataset(load_files(base+os.sep+"serie"), targetgraph)
     targetgraph.bind("urispace", "http://rinfo.lagrummet.se/sys/uri/space#")
     writegraph(targetgraph, dest)
     len_after = len(targetgraph)
-    print("  Added %s triples (%s -> %s)" % (len_after-len_before, len_before, len_after))
+    print("  Added %s triples (%s -> %s)" %
+          (len_after-len_before, len_before, len_after))
 
 
 def mapslugs(base, customresources, dest):
-    print("Mapping slugs from %s, using %s, to %s" % (base, customresources, dest))
+    print("Mapping slugs from %s, using %s, to %s" %
+          (base, customresources, dest))
     basegraph = load_file(base)
     targetgraph = load_file(customresources)
     import_slugs(basegraph, targetgraph)
     writegraph(targetgraph, dest)
 
 
-
 def writegraph(graph, dest, operation="transformed"):
     util.ensure_dir(dest)
     with open(dest, "w") as fp:
-        header = "# Automatically %s from sources at %s\n\n" % (operation, datetime.now().isoformat())
+        header = "# Automatically %s from sources at %s\n\n" % (
+            operation, datetime.now().isoformat())
         fp.write(header)
         fp.write(graph.serialize(format="turtle").decode("utf-8"))
         print("Wrote %s triples to %s" % (len(graph), dest))
-        
+
 
 def mapspace(base, dest):
     print("Mapping URISpace in %s to %s" % (base, dest))
@@ -176,7 +181,7 @@ def mapspace(base, dest):
             o = rdflib.Literal("https://lagen.nu")
         elif (p == RDFS.seeAlso and
               o == rdflib.URIRef("http://rinfo.lagrummet.se/sys/uri/slugs")):
-            s, p, o == None
+            s = p = o = None
         elif p == COIN.uriTemplate:
             # : coin:template * coin:uriTemplate "/publ/{fs}" => "/{fs}"
             # general case: remove leading /publ/
@@ -184,48 +189,84 @@ def mapspace(base, dest):
         if s:
             graph.add((s, p, o))
 
-    # now create a bunch of fine-grained templates that can mint uris
-    # for sections, paragraphs etc. This doesn't need to be
-    # dynamically generated, we could just add the 30 or so triples
-    # neeeded statically. But we shave the yak this way.
+    # now create ~10 bunch of fine-grained templates that can mint
+    # uris for sections, paragraphs etc. This doesn't need to be
+    # dynamically generated, we could just add the 100 or so triples
+    # neeeded statically. But now we shave the yak this way.
+    #
+    # "#K{kapnr}",
+    # "#K{kapnr}P{parnr}"
+    # "#K{kapnr}P{parnr}S{stnr}"
+    # "#K{kapnr}P{parnr}S{stnr}N{pnr}"
+    # "#P{parnr}"
+    # "#P{parnr}S{stnr}"
+    # "#P{parnr}S{stnr}N{pnr}"
+    # "#S{stnr}"
+    # "#S{stnr}N{pnr}"
     desc = Describer(graph, "https://lagen.nu/sys/uri/space#")
-    bindings = [RPUBL.forfattningssamling, RPUBL.arsutgava, RPUBL.lopnummer]
-    uritemplate = "/{fs}/{arsutgava}:{lopnummer}#"  # add stringmunging
-    for p, fragletter in ((RPUBL.kapitelnummer, "K"),
-                          (RPUBL.paragrafnummer, "P"),
-                          (RINFOEX.styckenummer, "S"),
-                          (RINFOEX.punktnummer, "N")):
-        with desc.rel(COIN.template):
-            uritemplate += fragletter + "{" + util.uri_leaf(p) + "}"
-            desc.value(COIN.uriTemplate, uritemplate)
+    from pudb import set_trace; set_trace()
+    for root in (RPUBL.kapitelnummer,
+                 RPUBL.paragrafnummer,
+                 RINFOEX.styckenummer):
+        bindings = [RPUBL.forfattningssamling, RPUBL.arsutgava, RPUBL.lopnummer]
+        uritemplate = "/{fs}/{arsutgava}:{lopnummer}#"  # add stringmunging
+        for p, fragletter in ((RPUBL.kapitelnummer, "K"),
+                              (RPUBL.paragrafnummer, "P"),
+                              (RINFOEX.styckenummer, "S"),
+                              (RINFOEX.punktnummer, "N")):
             bindings.append(p)
-            for b in bindings:
-                with desc.rel(COIN.binding):
-                    desc.rel(COIN.property, b)
-                    if b == RPUBL.forfattningssamling:
-                        desc.value(COIN.variable, "fs")
-                        desc.rel(COIN.slugFrom, "https://lagen.nu/sys/uri/space#abbrSlug")
-                    else:
-                        desc.value(COIN.variable, util.uri_leaf(b))
+            if root in bindings:
+                with desc.rel(COIN.template):
+                    uritemplate += fragletter + "{" + util.uri_leaf(p) + "}"
+                    print("adding uritemplate %s" % uritemplate)
+                    desc.value(COIN.uriTemplate, uritemplate)
+                    add_bindings(desc, bindings,
+                                 "https://lagen.nu/sys/uri/space#abbrSlug")
     writegraph(graph, dest)
     print("Mapped %s triples to URISpace definitions" % len(graph))
 
 
+def add_canonical_templates(graph):
+    desc = Describer(graph, URISPACE)
+    bindings = [RPUBL.forfattningssamling, RPUBL.arsutgava, RPUBL.lopnummer]
+    uritemplate = "/{fs}/{arsutgava}:{lopnummer}#"
+    for p, fragletter in ((RPUBL.kapitelnummer, "k_"),
+                          (RPUBL.paragrafnummer, "p_")):
+        with desc.rel(COIN.template):
+            uritemplate += fragletter + "{" + util.uri_leaf(p) + "}"
+            desc.value(COIN.uriTemplate, uritemplate)
+            bindings.append(p)
+            add_bindings(desc, bindings,
+                         "https://lagen.nu/sys/uri/space#abbrSlug")
+
+
+def add_bindings(desc, bindings, slugFrom):
+    for b in bindings:
+        with desc.rel(COIN.binding):
+            desc.rel(COIN.property, b)
+            if b == RPUBL.forfattningssamling:
+                desc.value(COIN.variable, "fs")
+                desc.rel(COIN.slugFrom, slugFrom)
+            else:
+                desc.value(COIN.variable, util.uri_leaf(b))
+
+    
+
 def main():
-    concatgraph("../rdl/resources/base/datasets",
-                "ferenda/res/extra/swedishlegalsource.ttl")
-    concatgraph("../rdl/resources/base/sys/uri/slugs.n3",
-                "ferenda/res/uri/swedishlegalsource.slugs.ttl")
-    # NB: we might need to add a few templates dynamically to this one
-    # (like mapspace does):
-    concatgraph("../rdl/resources/base/sys/uri/space.n3",
-                "ferenda/res/uri/swedishlegalsource.space.ttl")
-    mapgraph("../rdl/resources/base/datasets",
-             "lagen/nu/res/extra/swedishlegalsource.ttl",
-             "lagen/nu/res/extra/swedishlegalsource.ttl")
-    mapslugs("../rdl/resources/base/sys/uri/slugs.n3",
-             "lagen/nu/res/extra/swedishlegalsource.ttl",
-             "lagen/nu/res/uri/swedishlegalsource.slugs.ttl")
+#    concatgraph("../rdl/resources/base/datasets",
+#                "ferenda/sources/legal/se/res/extra/swedishlegalsource.ttl")
+#    concatgraph("../rdl/resources/base/sys/uri/slugs.n3",
+#                "ferenda/sources/legal/se/res/uri/swedishlegalsource.slugs.ttl")
+#    # NB: we might need to add a few templates dynamically to this one
+#    # (like mapspace does):
+#    concatgraph("../rdl/resources/base/sys/uri/space.n3",
+#                "ferenda/sources/legal/se/res/uri/swedishlegalsource.space.ttl")
+#    mapgraph("../rdl/resources/base/datasets",
+#             "lagen/nu/res/extra/swedishlegalsource.ttl",
+#             "lagen/nu/res/extra/swedishlegalsource.ttl")
+#    mapslugs("../rdl/resources/base/sys/uri/slugs.n3",
+#             "lagen/nu/res/extra/swedishlegalsource.ttl",
+#             "lagen/nu/res/uri/swedishlegalsource.slugs.ttl")
     mapspace("../rdl/resources/base/sys/uri/space.n3",
              "lagen/nu/res/uri/swedishlegalsource.space.ttl")
     
