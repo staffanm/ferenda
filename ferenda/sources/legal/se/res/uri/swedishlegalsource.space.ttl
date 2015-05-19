@@ -1,4 +1,4 @@
-# Automatically concatenated from sources at 2015-05-19T07:14:32.735649
+# Automatically concatenated from sources at 2015-05-19T16:47:42.242967
 
 @prefix : <http://rinfo.lagrummet.se/sys/uri/space#> .
 @prefix coin: <http://purl.org/court/def/2009/coin#> .
@@ -20,7 +20,39 @@
                 "é e",
                 "ö oe" ;
             coin:spaceReplacement "_" ] ;
-    coin:template [ coin:binding [ coin:property rpubl:utrSerie ;
+    coin:template [ coin:binding [ coin:property rpubl:arsutgava ;
+                    coin:variable "arsutgava" ],
+                [ coin:property rpubl:lopnummer ;
+                    coin:variable "lopnummer" ],
+                [ coin:property rpubl:forfattningssamling ;
+                    coin:slugFrom :abbrSlug ;
+                    coin:variable "fs" ],
+                [ coin:property rpubl:paragrafnummer ;
+                    coin:variable "paragrafnummer" ],
+                [ coin:property rpubl:kapitelnummer ;
+                    coin:variable "kapitelnummer" ] ;
+            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#k_{kapitelnummer}p_{paragrafnummer}" ],
+        [ coin:binding [ coin:property rpubl:lopnummer ;
+                    coin:variable "lopnummer" ],
+                [ coin:property rpubl:paragrafnummer ;
+                    coin:variable "paragrafnummer" ],
+                [ coin:property rpubl:forfattningssamling ;
+                    coin:slugFrom :abbrSlug ;
+                    coin:variable "fs" ],
+                [ coin:property rpubl:arsutgava ;
+                    coin:variable "arsutgava" ] ;
+            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#p_{paragrafnummer}" ],
+        [ coin:binding [ coin:property rpubl:lopnummer ;
+                    coin:variable "lopnummer" ],
+                [ coin:property rpubl:kapitelnummer ;
+                    coin:variable "kapitelnummer" ],
+                [ coin:property rpubl:forfattningssamling ;
+                    coin:slugFrom :abbrSlug ;
+                    coin:variable "fs" ],
+                [ coin:property rpubl:arsutgava ;
+                    coin:variable "arsutgava" ] ;
+            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#k_{kapitelnummer}" ],
+        [ coin:binding [ coin:property rpubl:utrSerie ;
                     coin:slugFrom :abbrSlug ;
                     coin:variable "serie" ],
                 [ coin:property rpubl:arsutgava ],

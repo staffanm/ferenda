@@ -169,6 +169,8 @@ def writegraph(graph, dest, operation="transformed"):
 def mapspace(base, dest):
     print("Mapping URISpace in %s to %s" % (base, dest))
     graph = load_file(base)
+    graph.bind("rinfoex", str(RINFOEX))
+    graph.bind("space", "https://lagen.nu/sys/uri/space#", override=True)
     for (s, p, o) in list(graph):
         # remove every triple so that we can add an adjusted version
         graph.remove((s, p, o))
@@ -176,6 +178,8 @@ def mapspace(base, dest):
             # change root <http://rinfo.lagrummet.se/sys/uri/space#> of entire
             # space into eg <https://lagen.nu/sys/uri/space#>
             s = rdflib.URIRef("https://lagen.nu/sys/uri/space#")
+        elif s == rdflib.URIRef("http://rinfo.lagrummet.se/sys/uri/space#abbrSlug"):
+            s = rdflib.URIRef("https://lagen.nu/sys/uri/space#abbrSlug")
         if p == COIN.base:
             # change coin:base
             o = rdflib.Literal("https://lagen.nu")
@@ -186,6 +190,10 @@ def mapspace(base, dest):
             # : coin:template * coin:uriTemplate "/publ/{fs}" => "/{fs}"
             # general case: remove leading /publ/
             o = rdflib.Literal(str(o).replace("/publ/", "/"))
+        elif (p == COIN.slugFrom and
+              o == rdflib.URIRef("http://rinfo.lagrummet.se/sys/uri/space#abbrSlug")):
+            o = rdflib.URIRef("https://lagen.nu/sys/uri/space#abbrSlug")
+        
         if s:
             graph.add((s, p, o))
 
@@ -204,41 +212,43 @@ def mapspace(base, dest):
     # "#S{stnr}"
     # "#S{stnr}N{pnr}"
     desc = Describer(graph, "https://lagen.nu/sys/uri/space#")
-    from pudb import set_trace; set_trace()
-    for root in (RPUBL.kapitelnummer,
-                 RPUBL.paragrafnummer,
-                 RINFOEX.styckenummer):
+    proptuples = [(RPUBL.kapitelnummer, "K"),
+                  (RPUBL.paragrafnummer, "P"),
+                  (RINFOEX.styckenummer, "S"),
+                  (RINFOEX.punktnummer, "N")]
+    while len(proptuples) > 1:
         bindings = [RPUBL.forfattningssamling, RPUBL.arsutgava, RPUBL.lopnummer]
         uritemplate = "/{fs}/{arsutgava}:{lopnummer}#"  # add stringmunging
-        for p, fragletter in ((RPUBL.kapitelnummer, "K"),
-                              (RPUBL.paragrafnummer, "P"),
-                              (RINFOEX.styckenummer, "S"),
-                              (RINFOEX.punktnummer, "N")):
+        for p, fragletter in proptuples:
             bindings.append(p)
-            if root in bindings:
-                with desc.rel(COIN.template):
-                    uritemplate += fragletter + "{" + util.uri_leaf(p) + "}"
-                    print("adding uritemplate %s" % uritemplate)
-                    desc.value(COIN.uriTemplate, uritemplate)
-                    add_bindings(desc, bindings,
-                                 "https://lagen.nu/sys/uri/space#abbrSlug")
+            with desc.rel(COIN.template):
+                uritemplate += fragletter + "{" + util.uri_leaf(p) + "}"
+                # print("adding uritemplate %s" % uritemplate)
+                desc.value(COIN.uriTemplate, uritemplate)
+                add_bindings(desc, bindings,
+                             "https://lagen.nu/sys/uri/space#abbrSlug")
+        proptuples.pop(0)
+        
     writegraph(graph, dest)
     print("Mapped %s triples to URISpace definitions" % len(graph))
 
 
 def add_canonical_templates(graph):
     desc = Describer(graph, URISPACE)
-    bindings = [RPUBL.forfattningssamling, RPUBL.arsutgava, RPUBL.lopnummer]
-    uritemplate = "/{fs}/{arsutgava}:{lopnummer}#"
-    for p, fragletter in ((RPUBL.kapitelnummer, "k_"),
-                          (RPUBL.paragrafnummer, "p_")):
-        with desc.rel(COIN.template):
-            uritemplate += fragletter + "{" + util.uri_leaf(p) + "}"
-            desc.value(COIN.uriTemplate, uritemplate)
-            bindings.append(p)
-            add_bindings(desc, bindings,
-                         "https://lagen.nu/sys/uri/space#abbrSlug")
-
+    proptuples = [(RPUBL.kapitelnummer, "k_"),
+                  (RPUBL.paragrafnummer, "p_")]
+    while proptuples:
+        bindings = [RPUBL.forfattningssamling, RPUBL.arsutgava, RPUBL.lopnummer]
+        uritemplate = "/{fs}/{arsutgava}:{lopnummer}#"
+        for p, fragletter in proptuples:
+            with desc.rel(COIN.template):
+                uritemplate += fragletter + "{" + util.uri_leaf(p) + "}"
+                # print("adding uritemplate %s" % uritemplate)
+                desc.value(COIN.uriTemplate, uritemplate)
+                bindings.append(p)
+                add_bindings(desc, bindings,
+                             "http://rinfo.lagrummet.se/sys/uri/space#abbrSlug")
+        proptuples.pop(0)
 
 def add_bindings(desc, bindings, slugFrom):
     for b in bindings:
@@ -253,23 +263,23 @@ def add_bindings(desc, bindings, slugFrom):
     
 
 def main():
-#    concatgraph("../rdl/resources/base/datasets",
-#                "ferenda/sources/legal/se/res/extra/swedishlegalsource.ttl")
-#    concatgraph("../rdl/resources/base/sys/uri/slugs.n3",
-#                "ferenda/sources/legal/se/res/uri/swedishlegalsource.slugs.ttl")
-#    # NB: we might need to add a few templates dynamically to this one
-#    # (like mapspace does):
-#    concatgraph("../rdl/resources/base/sys/uri/space.n3",
-#                "ferenda/sources/legal/se/res/uri/swedishlegalsource.space.ttl")
-#    mapgraph("../rdl/resources/base/datasets",
-#             "lagen/nu/res/extra/swedishlegalsource.ttl",
-#             "lagen/nu/res/extra/swedishlegalsource.ttl")
-#    mapslugs("../rdl/resources/base/sys/uri/slugs.n3",
-#             "lagen/nu/res/extra/swedishlegalsource.ttl",
-#             "lagen/nu/res/uri/swedishlegalsource.slugs.ttl")
+    concatgraph("../rdl/resources/base/datasets",
+                "ferenda/sources/legal/se/res/extra/swedishlegalsource.ttl")
+    concatgraph("../rdl/resources/base/sys/uri/slugs.n3",
+                "ferenda/sources/legal/se/res/uri/swedishlegalsource.slugs.ttl")
+    # NB: we might need to add a few templates dynamically to this one
+    # (like mapspace does):
+    concatgraph("../rdl/resources/base/sys/uri/space.n3",
+                "ferenda/sources/legal/se/res/uri/swedishlegalsource.space.ttl",
+                add_canonical_templates)
+    mapgraph("../rdl/resources/base/datasets",
+             "lagen/nu/res/extra/swedishlegalsource.ttl",
+             "lagen/nu/res/extra/swedishlegalsource.ttl")
+    mapslugs("../rdl/resources/base/sys/uri/slugs.n3",
+             "lagen/nu/res/extra/swedishlegalsource.ttl",
+             "lagen/nu/res/uri/swedishlegalsource.slugs.ttl")
     mapspace("../rdl/resources/base/sys/uri/space.n3",
              "lagen/nu/res/uri/swedishlegalsource.space.ttl")
-    
 
 if __name__ == '__main__':
     main()
