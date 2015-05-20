@@ -37,9 +37,8 @@ except ImportError:
 
 from ferenda import TripleStore
 from ferenda import util
-
-DCTERMS = Namespace(util.ns['dcterms'])
-RINFOEX = Namespace('http://lagen.nu/terms#')
+from rdflib.namespace import DCTERMS
+from ferenda.sources.legal.se import RINFOEX
 
 
 class GraphAnalyze(object):

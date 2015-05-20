@@ -160,7 +160,9 @@ COIN = Namespace("http://purl.org/court/def/2009/coin#")
 from ferenda.elements import Link
 from ferenda.elements import LinkSubject
 from ferenda.thirdparty.coin import URIMinter
-from . import RPUBL
+from . import RPUBL, RINFOEX
+
+
 
 # The charset used for the bytestrings that is sent to/from
 # simpleparse (which does not handle unicode)
@@ -820,7 +822,12 @@ class LegalRef:
     attributemap = {"year": RPUBL.arsutgava,
                     "no": RPUBL.lopnummer,
                     "chapter": RPUBL.kapitelnummer,
-                    "section": RPUBL.paragrafnummer
+                    "section": RPUBL.paragrafnummer,
+                    "element": RINFOEX.momentnummer,
+                    "piece": RINFOEX.styckenummer,
+                    "item": RINFOEX.punktnummer,
+                    "itemnumeric": RINFOEX.punktnummer,
+                    "sentence": RINFOEX.meningnummer
                     }
 
     def graph_from_attributes(self, attributes):
@@ -830,7 +837,7 @@ class LegalRef:
             if k in self.attributemap:
                 g.add((b, self.attributemap[k], Literal(v)))
             else:
-                self.log.error("Can't map attribute %s to RDF predicate" % k)
+                log.error("Can't map attribute %s to RDF predicate" % k)
         return g, b
 
     
@@ -858,12 +865,15 @@ class LegalRef:
             for a in attributeorder:
                 if a in attributes:
                     specificity = True  # don't complete further than this
-                elif not specificity:
+                elif (not specificity) and a in self.baseuri_attributes:
                     attributes[a] = self.baseuri_attributes[a]
         # munge graph a little further to be able to map to RDF
         if "law" in attributes:
             attributes["year"], attributes["no"] = attributes["law"].split(":")
             del attributes["law"]
+        for k in attributes:
+            if attributes[k] in piecemappings:
+                attributes[k] = piecemappings[attributes[k]]
         g, b = self.graph_from_attributes(attributes)
         # need also to add a rpubl:forfattningssamling triple -- i
         # think this is the place to do it. Problem is how we get
@@ -1090,7 +1100,7 @@ class LegalRef:
             res = [self.format_generic_link(root)]
 
         # print "format_NamedExternalLawRef: self.baseuri is %r" % self.baseuri
-        if self.baseuri is None and self.currentlaw is not None:
+        if 'law' not in self.baseuri_attributes and self.currentlaw is not None:
             # print "format_NamedExternalLawRef: setting baseuri_attributes"
             # use this as the new baseuri_attributes
             m = self.re_urisegments.match(self.currentlaw)

@@ -21,9 +21,7 @@ from rdflib.namespace import DCTERMS
 from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda import util
 from ferenda.thirdparty.coin import URIMinter, COIN
-
-RPUBL = Namespace('http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
-RINFOEX = Namespace("http://lagen.nu/terms#")
+from . import RPUBL, RINFOEX
 
 # This dict maps keys used by the internal dictionaries that LegalRef
 # constructs, which in turn are modelled after production rule names

@@ -12,9 +12,9 @@ from datetime import datetime
 import rdflib
 from rdflib.namespace import SKOS, FOAF, OWL, DCTERMS, RDFS
 from rdflib.extras.describer import Describer
-COIN=rdflib.Namespace("http://purl.org/court/def/2009/coin#")
-RPUBL=rdflib.Namespace('http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
-RINFOEX=rdflib.Namespace("http://lagen.nu/terms#")
+
+from ferenda.thirdparty.coin import COIN
+from ferenda.sources.legal.se import RPUBL, RINFOEX
 
 from ferenda import util
 

@@ -26,9 +26,8 @@ from .swedishlegalsource import SwedishCitationParser
 
 from rdflib import RDF
 from rdflib.namespace import DCTERMS, SKOS
-from . import RPUBL
+from . import RPUBL, RINFOEX
 PROV = Namespace(util.ns['prov'])
-RINFOEX = Namespace("http://lagen.nu/terms#")
 
 
 class MyndFskr(SwedishLegalSource):

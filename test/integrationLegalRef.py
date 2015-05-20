@@ -58,6 +58,7 @@ class TestLegalRef(unittest.TestCase):
             if para.startswith("NOBASE:"):
                 baseuri_attributes = {}
             else:
+                # do we need to set 'chapter' also?
                 baseuri_attributes = {'law': '9999:999'}
             nodes = parser.parse(para, minter, baseuri_attributes)
             got_paras.append(serialize(nodes).strip())

@@ -26,7 +26,7 @@ from ferenda.compat import OrderedDict
 
 # 3rdparty libs
 from rdflib import Namespace, URIRef, Literal, RDF
-from rdflib.namespace import DCTERMS
+from rdflib.namespace import DCTERMS, XSD
 from lxml import etree
 from lxml.builder import ElementMaker
 import bs4
@@ -49,8 +49,8 @@ from ferenda.elements import UnicodeElement
 from ferenda.elements import Link
 from ferenda.errors import DocumentRemovedError, ParseError
 from ferenda.sources.legal.se.legalref import LegalRef, LinkSubject
-from ferenda.sources.legal.se import SwedishCitationParser
-RPUBL = Namespace('http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
+from . import SwedishCitationParser
+from . import RPUBL, RINFOEX
 
 
 E = ElementMaker(namespace="http://www.w3.org/1999/xhtml")
@@ -291,9 +291,6 @@ class InteExisterandeSFS(Exception):
     pass  # same as IdNotFound?
 
 
-DCTERMS = Namespace(util.ns['dcterms'])
-XSD = Namespace(util.ns['xsd'])
-RINFOEX = Namespace("http://lagen.nu/terms#")
 
 
 class SFSDocumentStore(DocumentStore):
