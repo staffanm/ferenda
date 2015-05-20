@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2015-05-19T16:47:44.746417
+# Automatically transformed from sources at 2015-05-20T07:41:19.818277
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -7,273 +7,274 @@
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix space: <https://lagen.nu/sys/uri/space#> .
 @prefix urispace: <http://rinfo.lagrummet.se/sys/uri/space#> .
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/dataset/01fs> urispace:abbrSlug "01fs" .
+<https://lagen.nu/dataset/01fs> space:abbrSlug "01fs" .
 
-<https://lagen.nu/dataset/03fs> urispace:abbrSlug "03fs" .
+<https://lagen.nu/dataset/03fs> space:abbrSlug "03fs" .
 
-<https://lagen.nu/dataset/04fs> urispace:abbrSlug "04fs" .
+<https://lagen.nu/dataset/04fs> space:abbrSlug "04fs" .
 
-<https://lagen.nu/dataset/05fs> urispace:abbrSlug "05fs" .
+<https://lagen.nu/dataset/05fs> space:abbrSlug "05fs" .
 
-<https://lagen.nu/dataset/06fs> urispace:abbrSlug "06fs" .
+<https://lagen.nu/dataset/06fs> space:abbrSlug "06fs" .
 
-<https://lagen.nu/dataset/07fs> urispace:abbrSlug "07fs" .
+<https://lagen.nu/dataset/07fs> space:abbrSlug "07fs" .
 
-<https://lagen.nu/dataset/08fs> urispace:abbrSlug "08fs" .
+<https://lagen.nu/dataset/08fs> space:abbrSlug "08fs" .
 
-<https://lagen.nu/dataset/09fs> urispace:abbrSlug "09fs" .
+<https://lagen.nu/dataset/09fs> space:abbrSlug "09fs" .
 
-<https://lagen.nu/dataset/10fs> urispace:abbrSlug "10fs" .
+<https://lagen.nu/dataset/10fs> space:abbrSlug "10fs" .
 
-<https://lagen.nu/dataset/12fs> urispace:abbrSlug "12fs" .
+<https://lagen.nu/dataset/12fs> space:abbrSlug "12fs" .
 
-<https://lagen.nu/dataset/13fs> urispace:abbrSlug "13fs" .
+<https://lagen.nu/dataset/13fs> space:abbrSlug "13fs" .
 
-<https://lagen.nu/dataset/14fs> urispace:abbrSlug "14fs" .
+<https://lagen.nu/dataset/14fs> space:abbrSlug "14fs" .
 
-<https://lagen.nu/dataset/17fs> urispace:abbrSlug "17fs" .
+<https://lagen.nu/dataset/17fs> space:abbrSlug "17fs" .
 
-<https://lagen.nu/dataset/18fs> urispace:abbrSlug "18fs" .
+<https://lagen.nu/dataset/18fs> space:abbrSlug "18fs" .
 
-<https://lagen.nu/dataset/19fs> urispace:abbrSlug "19fs" .
+<https://lagen.nu/dataset/19fs> space:abbrSlug "19fs" .
 
-<https://lagen.nu/dataset/20fs> urispace:abbrSlug "20fs" .
+<https://lagen.nu/dataset/20fs> space:abbrSlug "20fs" .
 
-<https://lagen.nu/dataset/21fs> urispace:abbrSlug "21fs" .
+<https://lagen.nu/dataset/21fs> space:abbrSlug "21fs" .
 
-<https://lagen.nu/dataset/22fs> urispace:abbrSlug "22fs" .
+<https://lagen.nu/dataset/22fs> space:abbrSlug "22fs" .
 
-<https://lagen.nu/dataset/23fs> urispace:abbrSlug "23fs" .
+<https://lagen.nu/dataset/23fs> space:abbrSlug "23fs" .
 
-<https://lagen.nu/dataset/24fs> urispace:abbrSlug "24fs" .
+<https://lagen.nu/dataset/24fs> space:abbrSlug "24fs" .
 
-<https://lagen.nu/dataset/25fs> urispace:abbrSlug "25fs" .
+<https://lagen.nu/dataset/25fs> space:abbrSlug "25fs" .
 
-<https://lagen.nu/dataset/aafs> urispace:abbrSlug "aafs" .
+<https://lagen.nu/dataset/aafs> space:abbrSlug "aafs" .
 
-<https://lagen.nu/dataset/ad> urispace:abbrSlug "ad" .
+<https://lagen.nu/dataset/ad> space:abbrSlug "ad" .
 
-<https://lagen.nu/dataset/affs> urispace:abbrSlug "affs" .
+<https://lagen.nu/dataset/affs> space:abbrSlug "affs" .
 
-<https://lagen.nu/dataset/afs> urispace:abbrSlug "afs" .
+<https://lagen.nu/dataset/afs> space:abbrSlug "afs" .
 
-<https://lagen.nu/dataset/agvfs> urispace:abbrSlug "agvfs" .
+<https://lagen.nu/dataset/agvfs> space:abbrSlug "agvfs" .
 
-<https://lagen.nu/dataset/amsfs> urispace:abbrSlug "amsfs" .
+<https://lagen.nu/dataset/amsfs> space:abbrSlug "amsfs" .
 
-<https://lagen.nu/dataset/bfnar> urispace:abbrSlug "bfnar" .
+<https://lagen.nu/dataset/bfnar> space:abbrSlug "bfnar" .
 
-<https://lagen.nu/dataset/bfs> urispace:abbrSlug "bfs" .
+<https://lagen.nu/dataset/bfs> space:abbrSlug "bfs" .
 
-<https://lagen.nu/dataset/bolfs> urispace:abbrSlug "bolfs" .
+<https://lagen.nu/dataset/bolfs> space:abbrSlug "bolfs" .
 
-<https://lagen.nu/dataset/bv-fs> urispace:abbrSlug "bv-fs" .
+<https://lagen.nu/dataset/bv-fs> space:abbrSlug "bv-fs" .
 
-<https://lagen.nu/dataset/csnfs> urispace:abbrSlug "csnfs" .
+<https://lagen.nu/dataset/csnfs> space:abbrSlug "csnfs" .
 
-<https://lagen.nu/dataset/dfs> urispace:abbrSlug "dfs" .
+<https://lagen.nu/dataset/dfs> space:abbrSlug "dfs" .
 
-<https://lagen.nu/dataset/difs> urispace:abbrSlug "difs" .
+<https://lagen.nu/dataset/difs> space:abbrSlug "difs" .
 
-<https://lagen.nu/dataset/ds> urispace:abbrSlug "ds" .
+<https://lagen.nu/dataset/ds> space:abbrSlug "ds" .
 
-<https://lagen.nu/dataset/dvfs> urispace:abbrSlug "dvfs" .
+<https://lagen.nu/dataset/dvfs> space:abbrSlug "dvfs" .
 
-<https://lagen.nu/dataset/elsak-fs> urispace:abbrSlug "elsaek-fs" .
+<https://lagen.nu/dataset/elsak-fs> space:abbrSlug "elsaek-fs" .
 
-<https://lagen.nu/dataset/emfs> urispace:abbrSlug "emfs" .
+<https://lagen.nu/dataset/emfs> space:abbrSlug "emfs" .
 
-<https://lagen.nu/dataset/far> urispace:abbrSlug "far" .
+<https://lagen.nu/dataset/far> space:abbrSlug "far" .
 
-<https://lagen.nu/dataset/fffs> urispace:abbrSlug "fffs" .
+<https://lagen.nu/dataset/fffs> space:abbrSlug "fffs" .
 
-<https://lagen.nu/dataset/ffs> urispace:abbrSlug "ffs" .
+<https://lagen.nu/dataset/ffs> space:abbrSlug "ffs" .
 
-<https://lagen.nu/dataset/fhifs> urispace:abbrSlug "fhifs" .
+<https://lagen.nu/dataset/fhifs> space:abbrSlug "fhifs" .
 
-<https://lagen.nu/dataset/fifs> urispace:abbrSlug "fifs" .
+<https://lagen.nu/dataset/fifs> space:abbrSlug "fifs" .
 
-<https://lagen.nu/dataset/fkar> urispace:abbrSlug "fkar" .
+<https://lagen.nu/dataset/fkar> space:abbrSlug "fkar" .
 
-<https://lagen.nu/dataset/fkfs> urispace:abbrSlug "fkfs" .
+<https://lagen.nu/dataset/fkfs> space:abbrSlug "fkfs" .
 
-<https://lagen.nu/dataset/fod> urispace:abbrSlug "fod" .
+<https://lagen.nu/dataset/fod> space:abbrSlug "fod" .
 
-<https://lagen.nu/dataset/hfd> urispace:abbrSlug "hfd" .
+<https://lagen.nu/dataset/hfd> space:abbrSlug "hfd" .
 
-<https://lagen.nu/dataset/hsvfs> urispace:abbrSlug "hsvfs" .
+<https://lagen.nu/dataset/hsvfs> space:abbrSlug "hsvfs" .
 
-<https://lagen.nu/dataset/hvmfs> urispace:abbrSlug "hvmfs" .
+<https://lagen.nu/dataset/hvmfs> space:abbrSlug "hvmfs" .
 
-<https://lagen.nu/dataset/iaffs> urispace:abbrSlug "iaffs" .
+<https://lagen.nu/dataset/iaffs> space:abbrSlug "iaffs" .
 
-<https://lagen.nu/dataset/itpsfs> urispace:abbrSlug "itpsfs" .
+<https://lagen.nu/dataset/itpsfs> space:abbrSlug "itpsfs" .
 
-<https://lagen.nu/dataset/jvsfs> urispace:abbrSlug "jvsfs" .
+<https://lagen.nu/dataset/jvsfs> space:abbrSlug "jvsfs" .
 
-<https://lagen.nu/dataset/kamfs> urispace:abbrSlug "kamfs" .
+<https://lagen.nu/dataset/kamfs> space:abbrSlug "kamfs" .
 
-<https://lagen.nu/dataset/kbmfs> urispace:abbrSlug "kbmfs" .
+<https://lagen.nu/dataset/kbmfs> space:abbrSlug "kbmfs" .
 
-<https://lagen.nu/dataset/kfmfs> urispace:abbrSlug "kfmfs" .
+<https://lagen.nu/dataset/kfmfs> space:abbrSlug "kfmfs" .
 
-<https://lagen.nu/dataset/kfs> urispace:abbrSlug "kfs" .
+<https://lagen.nu/dataset/kfs> space:abbrSlug "kfs" .
 
-<https://lagen.nu/dataset/kifs> urispace:abbrSlug "kifs" .
+<https://lagen.nu/dataset/kifs> space:abbrSlug "kifs" .
 
-<https://lagen.nu/dataset/kkvfs> urispace:abbrSlug "kkvfs" .
+<https://lagen.nu/dataset/kkvfs> space:abbrSlug "kkvfs" .
 
-<https://lagen.nu/dataset/kovfs> urispace:abbrSlug "kovfs" .
+<https://lagen.nu/dataset/kovfs> space:abbrSlug "kovfs" .
 
-<https://lagen.nu/dataset/krfs> urispace:abbrSlug "krfs" .
+<https://lagen.nu/dataset/krfs> space:abbrSlug "krfs" .
 
-<https://lagen.nu/dataset/kvfs> urispace:abbrSlug "kvfs" .
+<https://lagen.nu/dataset/kvfs> space:abbrSlug "kvfs" .
 
-<https://lagen.nu/dataset/lfnfs> urispace:abbrSlug "lfnfs" .
+<https://lagen.nu/dataset/lfnfs> space:abbrSlug "lfnfs" .
 
-<https://lagen.nu/dataset/lfs> urispace:abbrSlug "lfs" .
+<https://lagen.nu/dataset/lfs> space:abbrSlug "lfs" .
 
-<https://lagen.nu/dataset/lifs> urispace:abbrSlug "lifs" .
+<https://lagen.nu/dataset/lifs> space:abbrSlug "lifs" .
 
-<https://lagen.nu/dataset/livsfs> urispace:abbrSlug "livsfs" .
+<https://lagen.nu/dataset/livsfs> space:abbrSlug "livsfs" .
 
-<https://lagen.nu/dataset/lmvfs> urispace:abbrSlug "lmvfs" .
+<https://lagen.nu/dataset/lmvfs> space:abbrSlug "lmvfs" .
 
-<https://lagen.nu/dataset/lvfs> urispace:abbrSlug "lvfs" .
+<https://lagen.nu/dataset/lvfs> space:abbrSlug "lvfs" .
 
-<https://lagen.nu/dataset/md> urispace:abbrSlug "md" .
+<https://lagen.nu/dataset/md> space:abbrSlug "md" .
 
-<https://lagen.nu/dataset/mig> urispace:abbrSlug "mig" .
+<https://lagen.nu/dataset/mig> space:abbrSlug "mig" .
 
-<https://lagen.nu/dataset/migrfs> urispace:abbrSlug "migrfs" .
+<https://lagen.nu/dataset/migrfs> space:abbrSlug "migrfs" .
 
-<https://lagen.nu/dataset/mod> urispace:abbrSlug "mod" .
+<https://lagen.nu/dataset/mod> space:abbrSlug "mod" .
 
-<https://lagen.nu/dataset/nar> urispace:abbrSlug "nar" .
+<https://lagen.nu/dataset/nar> space:abbrSlug "nar" .
 
-<https://lagen.nu/dataset/nfs> urispace:abbrSlug "nfs" .
+<https://lagen.nu/dataset/nfs> space:abbrSlug "nfs" .
 
-<https://lagen.nu/dataset/nja> urispace:abbrSlug "nja" .
+<https://lagen.nu/dataset/nja> space:abbrSlug "nja" .
 
-<https://lagen.nu/dataset/nrr> urispace:abbrSlug "nrr" .
+<https://lagen.nu/dataset/nrr> space:abbrSlug "nrr" .
 
-<https://lagen.nu/dataset/nutfs> urispace:abbrSlug "nutfs" .
+<https://lagen.nu/dataset/nutfs> space:abbrSlug "nutfs" .
 
-<https://lagen.nu/dataset/prvfs> urispace:abbrSlug "prvfs" .
+<https://lagen.nu/dataset/prvfs> space:abbrSlug "prvfs" .
 
-<https://lagen.nu/dataset/ra> urispace:abbrSlug "ra" .
+<https://lagen.nu/dataset/ra> space:abbrSlug "ra" .
 
-<https://lagen.nu/dataset/ra-fs> urispace:abbrSlug "ra-fs" .
+<https://lagen.nu/dataset/ra-fs> space:abbrSlug "ra-fs" .
 
-<https://lagen.nu/dataset/rgkfs> urispace:abbrSlug "rgkfs" .
+<https://lagen.nu/dataset/rgkfs> space:abbrSlug "rgkfs" .
 
-<https://lagen.nu/dataset/rh> urispace:abbrSlug "rh" .
+<https://lagen.nu/dataset/rh> space:abbrSlug "rh" .
 
-<https://lagen.nu/dataset/rk> urispace:abbrSlug "rk" .
+<https://lagen.nu/dataset/rk> space:abbrSlug "rk" .
 
-<https://lagen.nu/dataset/rnfs> urispace:abbrSlug "rnfs" .
+<https://lagen.nu/dataset/rnfs> space:abbrSlug "rnfs" .
 
-<https://lagen.nu/dataset/rpsfs> urispace:abbrSlug "rpsfs" .
+<https://lagen.nu/dataset/rpsfs> space:abbrSlug "rpsfs" .
 
-<https://lagen.nu/dataset/rtvfs> urispace:abbrSlug "rtvfs" .
+<https://lagen.nu/dataset/rtvfs> space:abbrSlug "rtvfs" .
 
-<https://lagen.nu/dataset/saifs> urispace:abbrSlug "saeifs" .
+<https://lagen.nu/dataset/saifs> space:abbrSlug "saeifs" .
 
-<https://lagen.nu/dataset/scb-fs> urispace:abbrSlug "scb-fs" .
+<https://lagen.nu/dataset/scb-fs> space:abbrSlug "scb-fs" .
 
-<https://lagen.nu/dataset/sfs> urispace:abbrSlug "sfs" .
+<https://lagen.nu/dataset/sfs> space:abbrSlug "sfs" .
 
-<https://lagen.nu/dataset/sgu-fs> urispace:abbrSlug "sgu-fs" .
+<https://lagen.nu/dataset/sgu-fs> space:abbrSlug "sgu-fs" .
 
-<https://lagen.nu/dataset/sjofs> urispace:abbrSlug "sjoefs" .
+<https://lagen.nu/dataset/sjofs> space:abbrSlug "sjoefs" .
 
-<https://lagen.nu/dataset/sjvfs> urispace:abbrSlug "sjvfs" .
+<https://lagen.nu/dataset/sjvfs> space:abbrSlug "sjvfs" .
 
-<https://lagen.nu/dataset/skifs> urispace:abbrSlug "skifs" .
+<https://lagen.nu/dataset/skifs> space:abbrSlug "skifs" .
 
-<https://lagen.nu/dataset/skolfs> urispace:abbrSlug "skolfs" .
+<https://lagen.nu/dataset/skolfs> space:abbrSlug "skolfs" .
 
-<https://lagen.nu/dataset/sksfs> urispace:abbrSlug "sksfs" .
+<https://lagen.nu/dataset/sksfs> space:abbrSlug "sksfs" .
 
-<https://lagen.nu/dataset/skvfs> urispace:abbrSlug "skvfs" .
+<https://lagen.nu/dataset/skvfs> space:abbrSlug "skvfs" .
 
-<https://lagen.nu/dataset/sosfs> urispace:abbrSlug "sosfs" .
+<https://lagen.nu/dataset/sosfs> space:abbrSlug "sosfs" .
 
-<https://lagen.nu/dataset/sou> urispace:abbrSlug "sou" .
+<https://lagen.nu/dataset/sou> space:abbrSlug "sou" .
 
-<https://lagen.nu/dataset/srvfs> urispace:abbrSlug "srvfs" .
+<https://lagen.nu/dataset/srvfs> space:abbrSlug "srvfs" .
 
-<https://lagen.nu/dataset/ssifs> urispace:abbrSlug "ssifs" .
+<https://lagen.nu/dataset/ssifs> space:abbrSlug "ssifs" .
 
-<https://lagen.nu/dataset/stafs> urispace:abbrSlug "stafs" .
+<https://lagen.nu/dataset/stafs> space:abbrSlug "stafs" .
 
-<https://lagen.nu/dataset/stemfs> urispace:abbrSlug "stemfs" .
+<https://lagen.nu/dataset/stemfs> space:abbrSlug "stemfs" .
 
-<https://lagen.nu/dataset/svkf> urispace:abbrSlug "svkfs" .
+<https://lagen.nu/dataset/svkf> space:abbrSlug "svkfs" .
 
-<https://lagen.nu/dataset/tfs> urispace:abbrSlug "tfs" .
+<https://lagen.nu/dataset/tfs> space:abbrSlug "tfs" .
 
-<https://lagen.nu/dataset/tpvfs> urispace:abbrSlug "tpvfs" .
+<https://lagen.nu/dataset/tpvfs> space:abbrSlug "tpvfs" .
 
-<https://lagen.nu/dataset/tsfs> urispace:abbrSlug "tsfs" .
+<https://lagen.nu/dataset/tsfs> space:abbrSlug "tsfs" .
 
-<https://lagen.nu/dataset/tvfs> urispace:abbrSlug "tvfs" .
+<https://lagen.nu/dataset/tvfs> space:abbrSlug "tvfs" .
 
-<https://lagen.nu/dataset/valfs> urispace:abbrSlug "valfs" .
+<https://lagen.nu/dataset/valfs> space:abbrSlug "valfs" .
 
-<https://lagen.nu/dataset/vervafs> urispace:abbrSlug "vervafs" .
+<https://lagen.nu/dataset/vervafs> space:abbrSlug "vervafs" .
 
-<https://lagen.nu/dataset/vrfs> urispace:abbrSlug "vrfs" .
+<https://lagen.nu/dataset/vrfs> space:abbrSlug "vrfs" .
 
-<https://lagen.nu/dataset/vvfs> urispace:abbrSlug "vvfs" .
+<https://lagen.nu/dataset/vvfs> space:abbrSlug "vvfs" .
 
-<https://lagen.nu/org/2008/arbetsdomstolen> urispace:abbrSlug "ad" .
+<https://lagen.nu/org/2008/arbetsdomstolen> space:abbrSlug "ad" .
 
-<https://lagen.nu/org/2008/domstolsverket> urispace:abbrSlug "dv" .
+<https://lagen.nu/org/2008/domstolsverket> space:abbrSlug "dv" .
 
-<https://lagen.nu/org/2008/gota-hovratt> urispace:abbrSlug "hgo" .
+<https://lagen.nu/org/2008/gota-hovratt> space:abbrSlug "hgo" .
 
-<https://lagen.nu/org/2008/hogsta-domstolen> urispace:abbrSlug "hd" .
+<https://lagen.nu/org/2008/hogsta-domstolen> space:abbrSlug "hd" .
 
-<https://lagen.nu/org/2008/hovratten-for-nedre-norrland> urispace:abbrSlug "hnn" .
+<https://lagen.nu/org/2008/hovratten-for-nedre-norrland> space:abbrSlug "hnn" .
 
-<https://lagen.nu/org/2008/hovratten-for-ovre-norrland> urispace:abbrSlug "hon" .
+<https://lagen.nu/org/2008/hovratten-for-ovre-norrland> space:abbrSlug "hon" .
 
-<https://lagen.nu/org/2008/hovratten-for-vastra-sverige> urispace:abbrSlug "hvs" .
+<https://lagen.nu/org/2008/hovratten-for-vastra-sverige> space:abbrSlug "hvs" .
 
-<https://lagen.nu/org/2008/hovratten-over-skane-och-blekinge> urispace:abbrSlug "hsb" .
+<https://lagen.nu/org/2008/hovratten-over-skane-och-blekinge> space:abbrSlug "hsb" .
 
-<https://lagen.nu/org/2008/kammarratten-i-goteborg> urispace:abbrSlug "kgg" .
+<https://lagen.nu/org/2008/kammarratten-i-goteborg> space:abbrSlug "kgg" .
 
-<https://lagen.nu/org/2008/kammarratten-i-jonkoping> urispace:abbrSlug "kjo" .
+<https://lagen.nu/org/2008/kammarratten-i-jonkoping> space:abbrSlug "kjo" .
 
-<https://lagen.nu/org/2008/kammarratten-i-stockholm> urispace:abbrSlug "kst" .
+<https://lagen.nu/org/2008/kammarratten-i-stockholm> space:abbrSlug "kst" .
 
-<https://lagen.nu/org/2008/kammarratten-i-sundsvall> urispace:abbrSlug "ksu" .
+<https://lagen.nu/org/2008/kammarratten-i-sundsvall> space:abbrSlug "ksu" .
 
-<https://lagen.nu/org/2008/marknadsdomstolen> urispace:abbrSlug "md" .
+<https://lagen.nu/org/2008/marknadsdomstolen> space:abbrSlug "md" .
 
-<https://lagen.nu/org/2008/migrationsoverdomstolen> urispace:abbrSlug "mig" .
+<https://lagen.nu/org/2008/migrationsoverdomstolen> space:abbrSlug "mig" .
 
-<https://lagen.nu/org/2008/miljooverdomstolen> urispace:abbrSlug "mod" .
+<https://lagen.nu/org/2008/miljooverdomstolen> space:abbrSlug "mod" .
 
-<https://lagen.nu/org/2008/patentbesvarsratten> urispace:abbrSlug "pbr" .
+<https://lagen.nu/org/2008/patentbesvarsratten> space:abbrSlug "pbr" .
 
-<https://lagen.nu/org/2008/rattshjalpsnamnden> urispace:abbrSlug "rhn" .
+<https://lagen.nu/org/2008/rattshjalpsnamnden> space:abbrSlug "rhn" .
 
-<https://lagen.nu/org/2008/regeringsratten> urispace:abbrSlug "regr" .
+<https://lagen.nu/org/2008/regeringsratten> space:abbrSlug "regr" .
 
-<https://lagen.nu/org/2008/svea-hovratt> urispace:abbrSlug "hsv" .
+<https://lagen.nu/org/2008/svea-hovratt> space:abbrSlug "hsv" .
 
-<https://lagen.nu/org/2011/hogsta-forvaltningsdomstolen> urispace:abbrSlug "hfd" .
+<https://lagen.nu/org/2011/hogsta-forvaltningsdomstolen> space:abbrSlug "hfd" .
 
-<https://lagen.nu/org/2011/mark-och-miljooverdomstolen> urispace:abbrSlug "mmd" .
+<https://lagen.nu/org/2014/justitiekanslern> space:abbrSlug "jk" .
 
-<https://lagen.nu/org/2014/justitiekanslern> urispace:abbrSlug "jk" .
+<https://lagen.nu/org/2014/mark-_och_miljooverdomstolen> space:abbrSlug "mmd" .
 
-<https://lagen.nu/org/2014/statens_ansvarsnamnd> urispace:abbrSlug "san" .
+<https://lagen.nu/org/2014/statens_ansvarsnamnd> space:abbrSlug "san" .
 

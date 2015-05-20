@@ -4,8 +4,8 @@ enligt 3 § fjärde stycket 2 eller femte stycket kommer [...]
 <list>
   <str>Om teckningen av aktier innebär att någon som inte har prövats
 enligt </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P3S4N2">3 § fjärde stycket 2</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P3S4N2">3 § fjärde stycket 2</Link>
   <str> eller </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P3S5">femte stycket</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P3S5">femte stycket</Link>
   <str> kommer [...]</str>
 </list>

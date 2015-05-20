@@ -3,8 +3,8 @@ får förenas endast med direkt skadeförsäkringsrörelse. ändr. 1 kap 5 §
 
 <list>
   <str>Rörelse som avses i </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K2P3b">2 kap. 3 b §</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#K2P3b">2 kap. 3 b §</Link>
   <str> (direkt livförsäkringsrörelse)
 får förenas endast med direkt skadeförsäkringsrörelse. ändr. </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K1P5">1 kap 5 §</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#K1P5">1 kap 5 §</Link>
 </list>

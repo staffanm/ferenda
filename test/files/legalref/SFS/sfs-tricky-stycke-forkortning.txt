@@ -1,10 +1,10 @@
 4 § 3 st och 39 § lagen (1982:80) om anställningsskydd
 
 <list>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1982:80#P4S3">4 § 3 st</Link>
+  <Link uri="https://lagen.nu/sfs/1982:80#P4S3">4 § 3 st</Link>
   <str> och </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1982:80#P39">39 §</Link>
+  <Link uri="https://lagen.nu/sfs/1982:80#P39">39 §</Link>
   <str> lagen (</str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1982:80">1982:80</Link>
+  <Link uri="https://lagen.nu/sfs/1982:80">1982:80</Link>
   <str>) om anställningsskydd</str>
 </list>

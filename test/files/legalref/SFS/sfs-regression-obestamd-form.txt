@@ -1,8 +1,8 @@
 1 § förordning (1999:704) om förordnande av sakkunniga ledamöter i miljödomstol
 
 <list>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1999:704#P1">1 §</Link>
+  <Link uri="https://lagen.nu/sfs/1999:704#P1">1 §</Link>
   <str> förordning (</str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1999:704">1999:704</Link>
+  <Link uri="https://lagen.nu/sfs/1999:704">1999:704</Link>
   <str>) om förordnande av sakkunniga ledamöter i miljödomstol</str>
 </list>

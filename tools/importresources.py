@@ -25,7 +25,7 @@ TRANS = str.maketrans("åäö ", "aao_")
     
 URIMAP = {}
 URISPACE = rdflib.Namespace("http://rinfo.lagrummet.se/sys/uri/space#")
-
+MAPPEDSPACE = rdflib.Namespace("https://lagen.nu/sys/uri/space#")
 
 def import_org(sourcegraph, targetgraph):
     # print("Adding triples in %s to targetgraph" % filename)
@@ -81,15 +81,16 @@ def import_dataset(sourcegraph, targetgraph):
 
 
 def import_slugs(sourcegraph, targetgraph):
+    targetgraph.bind("space", MAPPEDSPACE)
     for (sourceuri, abbr) in sourcegraph.subject_objects(predicate=URISPACE.abbrSlug):
         if sourceuri in URIMAP:
             targeturi = URIMAP[sourceuri]
             # print("Mapping %s -> %s for slug %s" % (sourceuri, targeturi, abbr))
-            targetgraph.add((targeturi, URISPACE.abbrSlug, abbr))
+            targetgraph.add((targeturi, MAPPEDSPACE.abbrSlug, abbr))
         else:
             print("WARNING: Can't find %s in URIMAP" % sourceuri)
     for (s, p, o) in targetgraph:
-        if p != URISPACE.abbrSlug:
+        if p != MAPPEDSPACE.abbrSlug:
             targetgraph.remove((s, p, o))
 
 def load_files(path, graph=None):
@@ -193,7 +194,8 @@ def mapspace(base, dest):
         elif (p == COIN.slugFrom and
               o == rdflib.URIRef("http://rinfo.lagrummet.se/sys/uri/space#abbrSlug")):
             o = rdflib.URIRef("https://lagen.nu/sys/uri/space#abbrSlug")
-        
+        elif (p == COIN.spaceReplacement):
+            o = rdflib.Literal("")
         if s:
             graph.add((s, p, o))
 
@@ -239,12 +241,12 @@ def add_canonical_templates(graph):
                   (RPUBL.paragrafnummer, "p_")]
     while proptuples:
         bindings = [RPUBL.forfattningssamling, RPUBL.arsutgava, RPUBL.lopnummer]
-        uritemplate = "/{fs}/{arsutgava}:{lopnummer}#"
+        uritemplate = "/publ/{fs}/{arsutgava}:{lopnummer}#"
         for p, fragletter in proptuples:
             with desc.rel(COIN.template):
-                uritemplate += fragletter + "{" + util.uri_leaf(p) + "}"
+                uritemplate += fragletter + "{" + util.uri_leaf(p) + "}-"
                 # print("adding uritemplate %s" % uritemplate)
-                desc.value(COIN.uriTemplate, uritemplate)
+                desc.value(COIN.uriTemplate, uritemplate[:-1])
                 bindings.append(p)
                 add_bindings(desc, bindings,
                              "http://rinfo.lagrummet.se/sys/uri/space#abbrSlug")

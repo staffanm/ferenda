@@ -876,6 +876,7 @@ class LegalRef:
         # get the abbrSlug subproperty. FIXME: do this properly
         abbrSlug = rg.value(predicate=RDF.type, object=RDF.Property)
         fsuri = rg.value(predicate=abbrSlug, object=Literal("sfs"))
+        assert fsuri, "Couldn't find URI for forfattningssamling 'sfs'"
         g.add((b, RPUBL.forfattningssamling, fsuri))
         return self.minter.space.coin_uri(g.resource(b))
 

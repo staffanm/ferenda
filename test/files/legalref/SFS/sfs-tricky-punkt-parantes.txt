@@ -2,12 +2,12 @@
 14 § 1 st. 6) och 6 § varumärkeslagen (1960:644)
 
 <list>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:644#P14S1N6">14 § 1 st. 6) varumärkeslagen (1960:644)</Link>
+  <Link uri="https://lagen.nu/sfs/1960:644#P14S1N6">14 § 1 st. 6) varumärkeslagen (1960:644)</Link>
   <str>
 </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:644#P14S1N6">14 § 1 st. 6)</Link>
+  <Link uri="https://lagen.nu/sfs/1960:644#P14S1N6">14 § 1 st. 6)</Link>
   <str> och </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:644#P6">6 §</Link>
+  <Link uri="https://lagen.nu/sfs/1960:644#P6">6 §</Link>
   <str> </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:644">varumärkeslagen (1960:644)</Link>
+  <Link uri="https://lagen.nu/sfs/1960:644">varumärkeslagen (1960:644)</Link>
 </list>

@@ -5,17 +5,17 @@ upphovsrättslagen. 12 § körkortsförordningen. 23 § okändalagen.
 
 <list>
   <str>Det är är en referens till en lag som finns: (</str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1982:713">1982:713</Link>
+  <Link uri="https://lagen.nu/sfs/1982:713">1982:713</Link>
   <str>). Det här
 är en referens till en lag som inte finns: (</str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1492:123">1492:123</Link>
+  <Link uri="https://lagen.nu/sfs/1492:123">1492:123</Link>
   <str>). Det här är
 en referens till en lag utan paranteser: </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1982:713">1982:713</Link>
+  <Link uri="https://lagen.nu/sfs/1982:713">1982:713</Link>
   <str>. </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:729#P42">42 §
+  <Link uri="https://lagen.nu/sfs/1960:729#P42">42 §
 upphovsrättslagen</Link>
   <str>. </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1998:980#P12">12 § körkortsförordningen</Link>
+  <Link uri="https://lagen.nu/sfs/1998:980#P12">12 § körkortsförordningen</Link>
   <str>. 23 § okändalagen.</str>
 </list>

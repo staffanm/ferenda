@@ -9,26 +9,26 @@ värde, får de dock bevaras i Statens ljud- och bildarkiv.
 
 <list>
   <str>Var och en får återge verk, vilka ingår i de handlingar som avses i </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P9S1">9
+  <Link uri="https://lagen.nu/sfs/9999:999#P9S1">9
 § första stycket</Link>
   <str> och är av de slag som anges i </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P9S2">9 § andra stycket</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P9S2">9 § andra stycket</Link>
   <str>
 </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P9S2N2">2</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P9S2N2">2</Link>
   <str>-</str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P9S2N4">4.</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P9S2N4">4.</Link>
   <str> Detta gäller dock inte ett sådant verk som avses i </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P9S3">9 § tredje
+  <Link uri="https://lagen.nu/sfs/9999:999#P9S3">9 § tredje
 stycket</Link>
   <str>. Upphovsmannen har rätt till ersättning</str>
 </list>
 ---
 <list>
   <str>Upptagningar som avses i </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#S1">första stycket</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#S1">första stycket</Link>
   <str> och </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#S1N3">3</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#S1N3">3</Link>
   <str> får användas endast för
 de ändamål som anges där. Om sådana upptagningar har dokumentariskt
 värde, får de dock bevaras i Statens ljud- och bildarkiv.</str>

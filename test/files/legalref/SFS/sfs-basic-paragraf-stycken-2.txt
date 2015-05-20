@@ -1,9 +1,9 @@
 1 § 2 st. och 13 § 1 st. varumärkeslagen (1960:644)
 
 <list>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:644#P1S2">1 § 2 st.</Link>
+  <Link uri="https://lagen.nu/sfs/1960:644#P1S2">1 § 2 st.</Link>
   <str> och </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:644#P13S1">13 § 1 st.</Link>
+  <Link uri="https://lagen.nu/sfs/1960:644#P13S1">13 § 1 st.</Link>
   <str> </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:644">varumärkeslagen (1960:644)</Link>
+  <Link uri="https://lagen.nu/sfs/1960:644">varumärkeslagen (1960:644)</Link>
 </list>    

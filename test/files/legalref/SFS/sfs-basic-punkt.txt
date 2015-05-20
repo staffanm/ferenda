@@ -1,8 +1,8 @@
 1 § andra stycket andra punkten lagen (1982:80) om anställningsskydd
 
 <list>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1982:80#P1S2N2">1 § andra stycket andra punkten</Link>
+  <Link uri="https://lagen.nu/sfs/1982:80#P1S2N2">1 § andra stycket andra punkten</Link>
   <str> lagen (</str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1982:80">1982:80</Link>
+  <Link uri="https://lagen.nu/sfs/1982:80">1982:80</Link>
   <str>) om anställningsskydd</str>
 </list>

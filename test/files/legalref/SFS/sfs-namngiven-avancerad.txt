@@ -10,21 +10,21 @@ RESET: Sjätte omnämnandet av påhittadelagen.
 <list>
   <str>Nollte omnämnandet av påhittadelagen. Första omnämnandet av
 </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:729">påhittadelagen (1960:729)</Link>
+  <Link uri="https://lagen.nu/sfs/1960:729">påhittadelagen (1960:729)</Link>
   <str>. Andra omnämnandet av </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:729">påhittadelagen</Link>
+  <Link uri="https://lagen.nu/sfs/1960:729">påhittadelagen</Link>
   <str>.</str>
 </list>
 ---
 <list>
   <str>Det här är en föreslagen ändring, som görs om anslagen
 beviljas. Tredje omnämnandet av </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1960:729">påhittadelagen</Link>
+  <Link uri="https://lagen.nu/sfs/1960:729">påhittadelagen</Link>
   <str>. Fjärde omnämnandet av
 </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1962:700">påhittadelagen (1962:700)</Link>
+  <Link uri="https://lagen.nu/sfs/1962:700">påhittadelagen (1962:700)</Link>
   <str>. Femte omnämnandet av </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1962:700">påhittadelagen</Link>
+  <Link uri="https://lagen.nu/sfs/1962:700">påhittadelagen</Link>
   <str>. </str>
 </list>
 ---

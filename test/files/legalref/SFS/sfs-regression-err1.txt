@@ -10,8 +10,8 @@ Försäkringsrörelse får drivas endast av
 försäkringsaktiebolag och ömsesidiga försäkringsbolag som fått
 tillstånd (koncession) till detta enligt denna lag, om inte
 annat följer av </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P2">2 §</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P2">2 §</Link>
   <str> eller </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P10S3">10 § tredje stycket</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P10S3">10 § tredje stycket</Link>
   <str>. </str>
 </list>

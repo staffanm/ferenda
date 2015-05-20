@@ -1,13 +1,13 @@
 3 §, 5 §, 10 § f och 22 § personuppgiftslagen (1998:204)
 
 <list>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1998:204#P3">3 §</Link>
+  <Link uri="https://lagen.nu/sfs/1998:204#P3">3 §</Link>
   <str>, </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1998:204#P5">5 §</Link>
+  <Link uri="https://lagen.nu/sfs/1998:204#P5">5 §</Link>
   <str>, </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1998:204#P10S1Nf">10 § f</Link>
+  <Link uri="https://lagen.nu/sfs/1998:204#P10S1Nf">10 § f</Link>
   <str> och </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1998:204#P22">22 §</Link>
+  <Link uri="https://lagen.nu/sfs/1998:204#P22">22 §</Link>
   <str> </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1998:204">personuppgiftslagen (1998:204)</Link>
+  <Link uri="https://lagen.nu/sfs/1998:204">personuppgiftslagen (1998:204)</Link>
 </list>

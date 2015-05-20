@@ -5,33 +5,33 @@ möjligtvis 4, 5, 8-10, 12, 13-16, 17 och 32 §§ tillämpas.
 <list>
   <str>[...] sedan den gränsöverskridande verksamheten inletts, skall
 bestämmelserna i </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P4">4</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P4">4</Link>
   <str> och </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P5">5 §§</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P5">5 §§</Link>
   <str>, eller kanske </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P22">22</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P22">22</Link>
   <str>, </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P23">23</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P23">23</Link>
   <str> och </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P26">26 §§</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P26">26 §§</Link>
   <str>, eller
 möjligtvis </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P4">4</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P4">4</Link>
   <str>, </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P5">5</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P5">5</Link>
   <str>, </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P8">8</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P8">8</Link>
   <str>-</str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P10">10</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P10">10</Link>
   <str>, </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P12">12</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P12">12</Link>
   <str>, </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P13">13</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P13">13</Link>
   <str>-</str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P16">16</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P16">16</Link>
   <str>, </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P17">17</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P17">17</Link>
   <str> och </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#P32">32 §§</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#P32">32 §§</Link>
   <str> tillämpas.</str>
 </list>

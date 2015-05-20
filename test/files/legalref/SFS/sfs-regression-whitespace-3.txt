@@ -9,19 +9,19 @@
      (1949:105)
 
 <list>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1991:1469#K5P1">5 kap. 1 §</Link>
+  <Link uri="https://lagen.nu/sfs/1991:1469#K5P1">5 kap. 1 §</Link>
   <str> och </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1991:1469#K5P4">4 §</Link>
+  <Link uri="https://lagen.nu/sfs/1991:1469#K5P4">4 §</Link>
   <str>, </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1991:1469#K6">6 kap.</Link>
+  <Link uri="https://lagen.nu/sfs/1991:1469#K6">6 kap.</Link>
   <str> </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1991:1469#K6P2S3">2 § 3 st.</Link>
+  <Link uri="https://lagen.nu/sfs/1991:1469#K6P2S3">2 § 3 st.</Link>
   <str> och </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1991:1469#K6P2S4">4 st.</Link>
+  <Link uri="https://lagen.nu/sfs/1991:1469#K6P2S4">4 st.</Link>
   <str> samt </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1991:1469#K10P1">10 kap. 1 §</Link>
+  <Link uri="https://lagen.nu/sfs/1991:1469#K10P1">10 kap. 1 §</Link>
   <str> </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1991:1469">yttrandefrihetsgrundlagen
+  <Link uri="https://lagen.nu/sfs/1991:1469">yttrandefrihetsgrundlagen
      
      (1991:1469)</Link>
   <str>
@@ -29,7 +29,7 @@
      i lydelsen före den 1 januari 1999
                  
      </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1949:105#K7P4S1N13">7 kap. 4 § 13 tryckfrihetsförordningen
+  <Link uri="https://lagen.nu/sfs/1949:105#K7P4S1N13">7 kap. 4 § 13 tryckfrihetsförordningen
      
      (1949:105)</Link>
 </list>

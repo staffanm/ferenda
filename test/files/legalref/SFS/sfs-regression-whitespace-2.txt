@@ -8,7 +8,7 @@
 
 <list>
   <str>                </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1995:521#P20">20 §
+  <Link uri="https://lagen.nu/sfs/1995:521#P20">20 §
             
              förordningen (
             

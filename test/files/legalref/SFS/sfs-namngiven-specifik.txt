@@ -10,10 +10,10 @@ inträder och enligt 6 § räntelagen för tiden därefter.
 avkastning som belöper på tiden efter det att återvinning påkallades.
 Utgöres egendomen av penningbelopp eller skall ersättning utges för
 egendomens värde, utgår ränta enligt </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1975:635#P5">5 § räntelagen (1975:635)</Link>
+  <Link uri="https://lagen.nu/sfs/1975:635#P5">5 § räntelagen (1975:635)</Link>
   <str> till och
 med den dag då skyldighet att återbära beloppet eller utge ersättningen
 inträder och enligt </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1975:635#P6">6 § räntelagen</Link>
+  <Link uri="https://lagen.nu/sfs/1975:635#P6">6 § räntelagen</Link>
   <str> för tiden därefter. </str>
 </list>

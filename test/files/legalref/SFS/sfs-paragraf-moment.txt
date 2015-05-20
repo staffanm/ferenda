@@ -2,13 +2,13 @@
 3 § 12 mom. lagen  (1947:576)  om statlig inkomstskatt
 
 <list>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1947:576#P7O5">7 § 5 mom.</Link>
+  <Link uri="https://lagen.nu/sfs/1947:576#P7O5">7 § 5 mom.</Link>
   <str> lagen  (</str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1947:576">1947:576</Link>
+  <Link uri="https://lagen.nu/sfs/1947:576">1947:576</Link>
   <str>)  om statlig inkomstskatt
 </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1947:576#P3O12">3 § 12 mom.</Link>
+  <Link uri="https://lagen.nu/sfs/1947:576#P3O12">3 § 12 mom.</Link>
   <str> lagen  (</str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1947:576">1947:576</Link>
+  <Link uri="https://lagen.nu/sfs/1947:576">1947:576</Link>
   <str>)  om statlig inkomstskatt</str>
 </list>

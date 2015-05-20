@@ -15,43 +15,43 @@ avses där att uppgiften röjs vid förhandlingen.
 <list>
   <str>Kan det antas att det vid förhandling kommer att förebringas uppgift,
 för vilken hos domstolen gäller sekretess som avses i </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:100">sekretesslagen
+  <Link uri="https://lagen.nu/sfs/1980:100">sekretesslagen
 (1980:100)</Link>
   <str>, får rätten, om det bedöms vara av synnerlig vikt att
 uppgiften inte röjs, förordna att förhandlingen i vad den angår
 uppgiften skall hållas inom stängda dörrar. Även i annat fall får
 förhandling hållas inom stängda dörrar, om sekretessen gäller enligt </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:100#K7">7
+  <Link uri="https://lagen.nu/sfs/1980:100#K7">7
 kap.</Link>
   <str> </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:100#K7P22">22</Link>
+  <Link uri="https://lagen.nu/sfs/1980:100#K7P22">22</Link>
   <str> eller </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:100#K7P23">23 §</Link>
+  <Link uri="https://lagen.nu/sfs/1980:100#K7P23">23 §</Link>
   <str>, </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:100#K8P17">8 kap. 17 §</Link>
+  <Link uri="https://lagen.nu/sfs/1980:100#K8P17">8 kap. 17 §</Link>
   <str> eller </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:100#K9">9 kap.</Link>
+  <Link uri="https://lagen.nu/sfs/1980:100#K9">9 kap.</Link>
   <str>  </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:100#K9P15">15</Link>
+  <Link uri="https://lagen.nu/sfs/1980:100#K9P15">15</Link>
   <str> eller </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:100#K9P16">16 §</Link>
+  <Link uri="https://lagen.nu/sfs/1980:100#K9P16">16 §</Link>
   <str>
 </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:100">sekretesslagen</Link>
+  <Link uri="https://lagen.nu/sfs/1980:100">sekretesslagen</Link>
   <str> eller, i vad avser domstolsförhandling under
 förundersökning i brottmål eller därmed likställt mål eller ärende,
 enligt </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:100#K5">5 kap.</Link>
+  <Link uri="https://lagen.nu/sfs/1980:100#K5">5 kap.</Link>
   <str> </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:100#K5P1">1</Link>
+  <Link uri="https://lagen.nu/sfs/1980:100#K5P1">1</Link>
   <str> eller </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:100#K5P7">7 §</Link>
+  <Link uri="https://lagen.nu/sfs/1980:100#K5P7">7 §</Link>
   <str> eller </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:100#K9P17">9 kap. 17 §</Link>
+  <Link uri="https://lagen.nu/sfs/1980:100#K9P17">9 kap. 17 §</Link>
   <str> samma lag. Förhandling
 skall alltid hållas inom stängda dörrar, om sekretessen gäller enligt
 </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:100#K9P3S2">9 kap. 3 § andra stycket samma lag</Link>
+  <Link uri="https://lagen.nu/sfs/1980:100#K9P3S2">9 kap. 3 § andra stycket samma lag</Link>
   <str> och det skulle strida mot avtal som
 avses där att uppgiften röjs vid förhandlingen.</str>
 </list>

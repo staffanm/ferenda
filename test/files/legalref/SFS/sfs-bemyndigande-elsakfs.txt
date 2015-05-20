@@ -3,15 +3,15 @@ föreskriver Elsäkerhetsverket
 
 <list>
   <str>Med stöd av </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1990:806#P4">4</Link>
+  <Link uri="https://lagen.nu/sfs/1990:806#P4">4</Link>
   <str>, </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1990:806#P8">8</Link>
+  <Link uri="https://lagen.nu/sfs/1990:806#P8">8</Link>
   <str>, </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1990:806#P9">9</Link>
+  <Link uri="https://lagen.nu/sfs/1990:806#P9">9</Link>
   <str> och </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1990:806#P15">15 §§</Link>
+  <Link uri="https://lagen.nu/sfs/1990:806#P15">15 §§</Link>
   <str> i </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1990:806">elinstallatörsförordningen (1990:806)</Link>
+  <Link uri="https://lagen.nu/sfs/1990:806">elinstallatörsförordningen (1990:806)</Link>
   <str>
 föreskriver Elsäkerhetsverket</str>
 </list>

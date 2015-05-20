@@ -4,10 +4,10 @@ att...
 
 <list>
   <str>Bestämmelser om begäran om indrivning m.m. finns i </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1993:1229#P4">4 §
+  <Link uri="https://lagen.nu/sfs/1993:1229#P4">4 §
 indrivningsförordningen (1993:1229)</Link>
   <str>. Av </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1993:1229#P3">3 § samma förordning</Link>
+  <Link uri="https://lagen.nu/sfs/1993:1229#P3">3 § samma förordning</Link>
   <str> framgår
 att...</str>
 </list>

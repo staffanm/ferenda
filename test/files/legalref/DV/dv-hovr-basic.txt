@@ -1,5 +1,5 @@
 RH 2007:108
 
 <list>
-  <Link uri="http://rinfo.lagrummet.se/publ/rattsfall/rh/2007:108">RH 2007:108</Link>
+  <Link uri="https://lagen.nu/rattsfall/rh/2007:108">RH 2007:108</Link>
 </list>

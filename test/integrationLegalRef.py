@@ -35,8 +35,10 @@ class TestLegalRef(unittest.TestCase):
         test_paras = re.split('\r?\n---\r?\n',testdata)
         got_paras = []
 
-        space = "ferenda/sources/legal/se/res/uri/swedishlegalsource.space.ttl"
-        slugs = "ferenda/sources/legal/se/res/uri/swedishlegalsource.slugs.ttl"
+        # this particular test method is set up to use lagen.nu style
+        # URIs because the canonical URIs are significantly different.
+        space = "lagen/nu/res/uri/swedishlegalsource.space.ttl"
+        slugs = "lagen/nu/res/uri/swedishlegalsource.slugs.ttl"
         cfg = Graph().parse(space,
                             format="turtle").parse(slugs, format="turtle")
         COIN = Namespace("http://purl.org/court/def/2009/coin#")

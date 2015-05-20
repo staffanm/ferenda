@@ -3,10 +3,10 @@ kap 15 §
 
 <list>
   <str>upph. </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K3P14">3 kap 14 §</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#K3P14">3 kap 14 §</Link>
   <str>, rubr. närmast före </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K3P14">3 kap 14 §</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#K3P14">3 kap 14 §</Link>
   <str>; ny rubr. närmast före </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K3P15">3
+  <Link uri="https://lagen.nu/sfs/9999:999#K3P15">3
 kap 15 §</Link>
 </list>

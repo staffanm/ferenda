@@ -62,8 +62,11 @@ class SlugTransformer:
                 resource.objects(COIN.apply)) or []
         self.replace = resource and replacer(
                 resource.objects(COIN['replace'])) or None
+        # NB: we must allow for spaceReplacement to be set to ""
         self.spaceRepl = resource and resource.value(
-                COIN.spaceReplacement) or u'+'
+                COIN.spaceReplacement)
+        if self.spaceRepl is None:
+            self.spaceRepl = u'+'
         self.stripPattern = resource and re.compile(
                 str(resource.value(COIN.stripPattern))) or None
 
@@ -79,7 +82,7 @@ class SlugTransformer:
                 pass
         if self.replace:
             value = self.replace(value)
-        if self.spaceRepl:
+        if self.spaceRepl is not None:
             value = value.replace(" ", self.spaceRepl)
         if self.stripPattern:
             value = self.stripPattern.sub(u'', value)

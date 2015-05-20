@@ -5,21 +5,21 @@ får förenas endast med direkt skadeförsäkringsrörelse. 2 kap. 2 §,
 
 <list>
   <str>Rörelse som avses i </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/9999:999#K2P3b">2 kap. 3 b §</Link>
+  <Link uri="https://lagen.nu/sfs/9999:999#K2P3b">2 kap. 3 b §</Link>
   <str> (direkt livförsäkringsrörelse)
 får förenas endast med direkt skadeförsäkringsrörelse. </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:424#K2P2">2 kap. 2 §</Link>
+  <Link uri="https://lagen.nu/sfs/1980:424#K2P2">2 kap. 2 §</Link>
   <str>,
 </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:424#K6P2a">6 kap. 2 a §</Link>
+  <Link uri="https://lagen.nu/sfs/1980:424#K6P2a">6 kap. 2 a §</Link>
   <str> samt </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:424#K8P1">8 kap. 1 §</Link>
+  <Link uri="https://lagen.nu/sfs/1980:424#K8P1">8 kap. 1 §</Link>
   <str>, </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:424#K8P2">2 §</Link>
+  <Link uri="https://lagen.nu/sfs/1980:424#K8P2">2 §</Link>
   <str> och </str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:424#K8P6">6 §</Link>
+  <Link uri="https://lagen.nu/sfs/1980:424#K8P6">6 §</Link>
   <str> lagen (</str>
-  <Link uri="http://rinfo.lagrummet.se/publ/sfs/1980:424">1980:424</Link>
+  <Link uri="https://lagen.nu/sfs/1980:424">1980:424</Link>
   <str>) om
 åtgärder mot förorening från</str>
 </list>
