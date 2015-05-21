@@ -190,12 +190,16 @@ def mapspace(base, dest):
         elif p == COIN.uriTemplate:
             # : coin:template * coin:uriTemplate "/publ/{fs}" => "/{fs}"
             # general case: remove leading /publ/
-            o = rdflib.Literal(str(o).replace("/publ/", "/"))
+            o = rdflib.Literal(str(o).replace("/publ/", "/").replace(
+                "/ext/eur-lex/", "/ext/celex/"))
         elif (p == COIN.slugFrom and
               o == rdflib.URIRef("http://rinfo.lagrummet.se/sys/uri/space#abbrSlug")):
             o = rdflib.URIRef("https://lagen.nu/sys/uri/space#abbrSlug")
         elif (p == COIN.spaceReplacement):
             o = rdflib.Literal("")
+        if o == COIN.ToLowerCase:  # yeah we don't want this since our
+                                   # CELEX uris contains uppercase
+            s = p = o = None
         if s:
             graph.add((s, p, o))
 
@@ -230,7 +234,17 @@ def mapspace(base, dest):
                 add_bindings(desc, bindings,
                              "https://lagen.nu/sys/uri/space#abbrSlug")
         proptuples.pop(0)
-        
+
+    # also one additional for eurlex documents with article fragments
+    with desc.rel(COIN.template):
+        desc.value(COIN.uriTemplate, "/ext/celex/{celexNummer}#{artikelnummer}")
+        with desc.rel(COIN.binding):
+            desc.rel(COIN.property, RPUBL.celexNummer)
+            desc.value(COIN.variable, "celexNummer")
+        with desc.rel(COIN.binding):
+            desc.rel(COIN.property, RINFOEX.artikelnummer)
+            desc.value(COIN.variable, "artikelnummer")
+
     writegraph(graph, dest)
     print("Mapped %s triples to URISpace definitions" % len(graph))
 

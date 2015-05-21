@@ -827,7 +827,9 @@ class LegalRef:
                     "piece": RINFOEX.styckenummer,
                     "item": RINFOEX.punktnummer,
                     "itemnumeric": RINFOEX.punktnummer,
-                    "sentence": RINFOEX.meningnummer
+                    "sentence": RINFOEX.meningnummer,
+                    "celex": RPUBL.celexNummer,
+                    "artikel": RINFOEX.artikelnummer,
                     }
 
     def graph_from_attributes(self, attributes):
@@ -1070,7 +1072,7 @@ class LegalRef:
         if self.baseuri is None:
             sfsid = self.find_node(root, 'LawRefID').data
             g = self.graph_from_attributes({'law': sfsid})
-            baseuri = self.minter.space.compute_uri(g)
+            baseuri = self.minter.space.coin_uri(g)
             self.baseuri_attributes = {'baseuri': baseuri}
 
         return self.format_tokentree(root)
@@ -1114,7 +1116,7 @@ class LegalRef:
             else:
                 g = self.graph_from_attributes({'law': self.currentlaw})
                 self.baseuri_attributes = {
-                    'baseuri': self.minter.space.compute_uri(g)
+                    'baseuri': self.minter.space.coin_uri(g)
                     }
 
         if resetcurrentlaw:
@@ -1157,7 +1159,7 @@ class LegalRef:
     # KOD FÖR FORARBETEN
     def forarbete_format_uri(self, attributes):
         g = self.graph_from_attributes(attributes)
-        return self.minter.space.compute_uri(g)
+        return self.minter.space.coin_uri(g)
 
     def format_ChapterSectionRef(self, root):
         assert(root.nodes[0].nodes[0].tag == 'ChapterRefID')
@@ -1167,6 +1169,9 @@ class LegalRef:
     #
     # KOD FÖR EULAGSTIFTNING
     def eglag_format_uri(self, attributes):
+        # this is a bit simplistic -- we just compute the CELEX number
+        # and be done with it. The logic to compute CELEX numbers
+        # could be done using coin, but...
         if not 'akttyp' in attributes:
             if 'forordning' in attributes:
                 attributes['akttyp'] = 'förordning'
@@ -1174,8 +1179,37 @@ class LegalRef:
                 attributes['akttyp'] = 'direktiv'
         if 'akttyp' not in attributes:
             raise AttributeError("Akttyp saknas")
-        g = self.graph_from_attributes(attributes)
-        return self.minter.space.compute_uri(g)
+        # Om hur CELEX-nummer konstrueras
+        # https://www.infotorg.sema.se/infotorg/itweb/handbook/rb/hlp_celn.htm
+        # https://www.infotorg.sema.se/infotorg/itweb/handbook/rb/hlp_celf.htm
+        # Om hur länkning till EURLEX ska se ut:
+        # http://eur-lex.europa.eu/sv/tools/help_syntax.htm
+        # Absolut URI?
+        fixed = {}
+        if 'ar' in attributes and 'lopnummer' in attributes:
+            sektor = '3'
+            rattslig_form = {'direktiv': 'L',
+                             'förordning': 'R'}
+
+            if len(attributes['ar']) == 2:
+                attributes['ar'] = '19' + attributes['ar']
+            fixed['celex'] = "%s%s%s%04d" % (sektor, attributes['ar'],
+                                             rattslig_form[attributes['akttyp']],
+                                             int(attributes['lopnummer']))
+        else:
+            if not self.baseuri_attributes['baseuri'].startswith(res):
+                # FIXME: should we warn about this?
+                # print "Relative reference, but base context %s is not a celex context" %
+                # self.baseuri_attributes['baseuri']
+                return None
+
+        if 'artikel' in attributes:
+            fixed['artikel'] = attributes['artikel']
+            if 'underartikel' in attributes:
+                fixed['artikel'] += ".%s" % attributes['underartikel']
+
+        g, b = self.graph_from_attributes(fixed)
+        return self.minter.space.coin_uri(g.resource(b))
 
 
     # KOD FÖR RATTSFALL
@@ -1190,7 +1224,7 @@ class LegalRef:
             'domstol'] in containerid, "%s is an unknown court" % attributes['domstol']
         
         g = self.graph_from_attributes(attributes)
-        return self.minter.space.compute_uri(g)
+        return self.minter.space.coin_uri(g)
 
     #
     # KOD FÖR EGRÄTTSFALL
@@ -1212,4 +1246,4 @@ class LegalRef:
         serial = '%04d' % int(attributes['serial'])
         descriptor = descriptormap[attributes['decision']]
         g = self.graph_from_attributes(year, descriptor, serial)
-        return self.minter.compute_uri(g)
+        return self.minter.coin_uri(g)

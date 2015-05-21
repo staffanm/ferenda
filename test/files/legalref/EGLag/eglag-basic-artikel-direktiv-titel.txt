@@ -9,7 +9,7 @@ flödet av sådana uppgifter, eller
   <str>om och i den utsträckning Europeiska gemenskapernas kommission har
 konstaterat att landet har en adekvat nivå för skyddet av
 personuppgifter i enlighet med </str>
-  <Link uri="http://rinfo.lagrummet.se/ext/celex/31995L0046#25.6">artikel 25.6 i Europaparlamentets och
+  <Link uri="https://lagen.nu/ext/celex/31995L0046#25.6">artikel 25.6 i Europaparlamentets och
 rådets direktiv 95/46/EG av den 24 oktober 1995</Link>
   <str> om skydd för enskilda
 personer med avseende på behandling av personuppgifter och om det fria

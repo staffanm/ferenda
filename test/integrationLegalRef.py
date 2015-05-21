@@ -98,7 +98,7 @@ class Rattsfall(TestLegalRef):
                  "Skipping SimpleParser dependent tests")    
 class EULaw(TestLegalRef):
     def parametric_test(self,datafile):
-        p = LegalRef(LegalRef.EGLAGSTIFTNING)
+        p = LegalRef(LegalRef.EULAGSTIFTNING)
         return self._test_parser(datafile, p)
 
 @unittest.skipIf('SKIP_SIMPLEPARSE_TESTS' in os.environ,

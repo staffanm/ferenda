@@ -5,7 +5,7 @@ livsmedel.
 
 <list>
   <str>I denna förordning ges föreskrifter som kompletterar </str>
-  <Link uri="http://rinfo.lagrummet.se/ext/celex/31991R2092">rådets förordning
+  <Link uri="https://lagen.nu/ext/celex/31991R2092">rådets förordning
 (EEG) nr 2092/91 av den 24 juni 1991</Link>
   <str> om ekologisk produktion av
 jordbruksprodukter och uppgifter därom på jordbruksprodukter och
