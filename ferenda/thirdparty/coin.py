@@ -137,6 +137,7 @@ class Template:
         if len(matches) < len(self.bindings):
             return None
         # IMPROVE: store and return partial success (for detailed feedback)
+        # from pudb import set_trace; set_trace()
         return self.build_uri(self.get_base(resource), matches)
 
     def build_uri(self, base, matches):

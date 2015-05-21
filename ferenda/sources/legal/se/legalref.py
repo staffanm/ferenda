@@ -1071,8 +1071,8 @@ class LegalRef:
     def format_SFSNr(self, root):
         if self.baseuri is None:
             sfsid = self.find_node(root, 'LawRefID').data
-            g = self.graph_from_attributes({'law': sfsid})
-            baseuri = self.minter.space.coin_uri(g)
+            g, b = self.graph_from_attributes({'law': sfsid})
+            baseuri = self.minter.space.coin_uri(g.resource(b))
             self.baseuri_attributes = {'baseuri': baseuri}
 
         return self.format_tokentree(root)
@@ -1114,9 +1114,9 @@ class LegalRef:
                                            'piece': m.group(10),
                                            'item': m.group(12)}
             else:
-                g = self.graph_from_attributes({'law': self.currentlaw})
+                g, b = self.graph_from_attributes({'law': self.currentlaw})
                 self.baseuri_attributes = {
-                    'baseuri': self.minter.space.coin_uri(g)
+                    'baseuri': self.minter.space.coin_uri(g.resource(b))
                     }
 
         if resetcurrentlaw:
@@ -1158,8 +1158,11 @@ class LegalRef:
     #
     # KOD FÖR FORARBETEN
     def forarbete_format_uri(self, attributes):
-        g = self.graph_from_attributes(attributes)
-        return self.minter.space.coin_uri(g)
+        # split {'prop': '1996/97:85'} to {'type': 'Proposition,
+        #                                  'arsutgava': '1996/97',
+        #                                  'lopnummer':' 85'}
+        g, b = self.graph_from_attributes(attributes)
+        return self.minter.space.coin_uri(g.resource(b))
 
     def format_ChapterSectionRef(self, root):
         assert(root.nodes[0].nodes[0].tag == 'ChapterRefID')
@@ -1214,17 +1217,15 @@ class LegalRef:
 
     # KOD FÖR RATTSFALL
     def rattsfall_format_uri(self, attributes):
-
         # res = self.baseuri_attributes['baseuri']
         if 'nja' in attributes:
             attributes['domstol'] = attributes['nja']
-
         assert 'domstol' in attributes, "No court provided"
         assert attributes[
             'domstol'] in containerid, "%s is an unknown court" % attributes['domstol']
         
-        g = self.graph_from_attributes(attributes)
-        return self.minter.space.coin_uri(g)
+        g, b = self.graph_from_attributes(attributes)
+        return self.minter.space.coin_uri(g.resource(b))
 
     #
     # KOD FÖR EGRÄTTSFALL
@@ -1245,5 +1246,5 @@ class LegalRef:
 
         serial = '%04d' % int(attributes['serial'])
         descriptor = descriptormap[attributes['decision']]
-        g = self.graph_from_attributes(year, descriptor, serial)
-        return self.minter.coin_uri(g)
+        g, b = self.graph_from_attributes(year, descriptor, serial)
+        return self.minter.coin_uri(g.resource(b))
