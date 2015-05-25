@@ -10,7 +10,7 @@ sys.path.append(os.getcwd())
 from datetime import datetime
 
 import rdflib
-from rdflib.namespace import SKOS, FOAF, OWL, DCTERMS, RDFS
+from rdflib.namespace import SKOS, FOAF, OWL, DCTERMS, RDFS, RDF
 from rdflib.extras.describer import Describer
 
 from ferenda.thirdparty.coin import COIN
@@ -89,6 +89,9 @@ def import_slugs(sourcegraph, targetgraph):
             targetgraph.add((targeturi, MAPPEDSPACE.abbrSlug, abbr))
         else:
             print("WARNING: Can't find %s in URIMAP" % sourceuri)
+            # This is PROBABLY a rdf class like rpubl:Proposition, we
+            # don't have mapped uris for those, just add the triple
+            targetgraph.add((sourceuri, MAPPEDSPACE.abbrSlug, abbr))
     for (s, p, o) in targetgraph:
         if p != MAPPEDSPACE.abbrSlug:
             targetgraph.remove((s, p, o))
@@ -153,7 +156,10 @@ def mapslugs(base, customresources, dest):
           (base, customresources, dest))
     basegraph = load_file(base)
     targetgraph = load_file(customresources)
+    targetgraph.bind("rinfoex", str(RINFOEX))
     import_slugs(basegraph, targetgraph)
+    targetgraph.add((RINFOEX.Utskottsbetankande, MAPPEDSPACE.abbrSlug, rdflib.Literal("bet")))
+    targetgraph.add((RINFOEX.Riksdagsskrivelse, MAPPEDSPACE.abbrSlug, rdflib.Literal("rskr")))
     writegraph(targetgraph, dest)
 
 
@@ -218,6 +224,7 @@ def mapspace(base, dest):
     # "#S{stnr}"
     # "#S{stnr}N{pnr}"
     desc = Describer(graph, "https://lagen.nu/sys/uri/space#")
+    abbrslug = "https://lagen.nu/sys/uri/space#abbrSlug"
     proptuples = [(RPUBL.kapitelnummer, "K"),
                   (RPUBL.paragrafnummer, "P"),
                   (RINFOEX.styckenummer, "S"),
@@ -231,8 +238,8 @@ def mapspace(base, dest):
                 uritemplate += fragletter + "{" + util.uri_leaf(p) + "}"
                 # print("adding uritemplate %s" % uritemplate)
                 desc.value(COIN.uriTemplate, uritemplate)
-                add_bindings(desc, bindings,
-                             "https://lagen.nu/sys/uri/space#abbrSlug")
+                add_bindings(desc, bindings, abbrslug)
+                             
         proptuples.pop(0)
 
     # also one additional for eurlex documents with article fragments
@@ -244,7 +251,11 @@ def mapspace(base, dest):
         with desc.rel(COIN.binding):
             desc.rel(COIN.property, RINFOEX.artikelnummer)
             desc.value(COIN.variable, "artikelnummer")
-
+    # and for general docs with page numbers
+    with desc.rel(COIN.template):
+        desc.value(COIN.uriTemplate, "/{rtype}/{arsutgava}:{lopnummer}#s{sidnummer}")
+        add_bindings(desc, (RDF.type, RPUBL.arsutgava, RPUBL.lopnummer,
+                            RPUBL.sidnummer), abbrslug)
     writegraph(graph, dest)
     print("Mapped %s triples to URISpace definitions" % len(graph))
 
@@ -266,12 +277,16 @@ def add_canonical_templates(graph):
                              "http://rinfo.lagrummet.se/sys/uri/space#abbrSlug")
         proptuples.pop(0)
 
+
 def add_bindings(desc, bindings, slugFrom):
     for b in bindings:
         with desc.rel(COIN.binding):
             desc.rel(COIN.property, b)
             if b == RPUBL.forfattningssamling:
                 desc.value(COIN.variable, "fs")
+                desc.rel(COIN.slugFrom, slugFrom)
+            elif b == RDF.type:
+                desc.value(COIN.variable, "rtype")
                 desc.rel(COIN.slugFrom, slugFrom)
             else:
                 desc.value(COIN.variable, util.uri_leaf(b))

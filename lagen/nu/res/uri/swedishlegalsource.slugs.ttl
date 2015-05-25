@@ -1,16 +1,33 @@
-# Automatically transformed from sources at 2015-05-21T07:51:08.350954
+# Automatically transformed from sources at 2015-05-25T07:38:32.411133
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rinfoex: <http://lagen.nu/terms#> .
 @prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix space: <https://lagen.nu/sys/uri/space#> .
 @prefix urispace: <http://rinfo.lagrummet.se/sys/uri/space#> .
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+rinfoex:Riksdagsskrivelse space:abbrSlug "rskr" .
+
+rinfoex:Utskottsbetankande space:abbrSlug "bet" .
+
+rpubl:Forordningsmotiv space:abbrSlug "fm" .
+
+rpubl:InternationellOverenskommelse space:abbrSlug "so" .
+
+rpubl:Kommittedirektiv space:abbrSlug "dir" .
+
+rpubl:Proposition space:abbrSlug "prop" .
+
+rpubl:Skrivelse space:abbrSlug "skr" .
+
+<http://rinfo.lagrummet.se/serie/fs/ptsfs> space:abbrSlug "ptsfs" .
 
 <https://lagen.nu/dataset/01fs> space:abbrSlug "01fs" .
 

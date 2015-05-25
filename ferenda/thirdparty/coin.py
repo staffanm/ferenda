@@ -190,6 +190,10 @@ class Binding:
     def find_match(self, resource):
         value = resource.value(self.p)
         if self.slugFrom:
+            if self.p == RDF.type:
+                # from pudb import set_trace; set_trace()
+                # print("FOIND!")
+                pass
             if not value:
                 return None
             if value.value(self.slugFrom.identifier):

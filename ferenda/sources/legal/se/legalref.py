@@ -152,7 +152,7 @@ import six
 from six.moves import cPickle as pickle
 from six import text_type as str
 
-from rdflib import Graph, Namespace, Literal, BNode, RDFS, RDF
+from rdflib import Graph, Namespace, Literal, BNode, RDFS, RDF, URIRef
 COIN = Namespace("http://purl.org/court/def/2009/coin#")
 
 # my own libraries
@@ -273,7 +273,6 @@ class LegalRef:
 
         self.graph = Graph()
         n3file = os.path.relpath(scriptdir + "/res/extra/sfs.ttl")
-        # print "loading n3file %s" % n3file
         self.graph.load(n3file, format="n3")
         self.roots = []
         self.uriformatter = {}
@@ -834,17 +833,21 @@ class LegalRef:
                     "sentence": RINFOEX.meningnummer,
                     "celex": RPUBL.celexNummer,
                     "artikel": RINFOEX.artikelnummer,
+                    "sidnr": RPUBL.sidnummer,
+                    "type": RDF.type,
                     }
 
-    def graph_from_attributes(self, attributes):
+    def attributes_to_resource(self, attributes):
         g = Graph()
         b = BNode()
         for k, v in attributes.items():
             if k in self.attributemap:
-                g.add((b, self.attributemap[k], Literal(v)))
+                if not isinstance(v, URIRef):
+                    v = Literal(v)
+                g.add((b, self.attributemap[k], v))
             else:
                 log.error("Can't map attribute %s to RDF predicate" % k)
-        return g, b
+        return g.resource(b)
 
     
     def sfs_format_uri(self, attributes):
@@ -880,7 +883,7 @@ class LegalRef:
         for k in attributes:
             if attributes[k] in piecemappings:
                 attributes[k] = piecemappings[attributes[k]]
-        g, b = self.graph_from_attributes(attributes)
+        res = self.attributes_to_resource(attributes)
         # need also to add a rpubl:forfattningssamling triple -- i
         # think this is the place to do it. Problem is how we get
         # access to the URI for SFS -- it can be
@@ -893,8 +896,8 @@ class LegalRef:
         abbrSlug = rg.value(predicate=RDF.type, object=RDF.Property)
         fsuri = rg.value(predicate=abbrSlug, object=Literal("sfs"))
         assert fsuri, "Couldn't find URI for forfattningssamling 'sfs'"
-        g.add((b, RPUBL.forfattningssamling, fsuri))
-        return self.minter.space.coin_uri(g.resource(b))
+        res.add(RPUBL.forfattningssamling, fsuri)
+        return self.minter.space.coin_uri(res)
 
     def format_ChapterSectionRefs(self, root):
         assert(root.tag == 'ChapterSectionRefs')
@@ -1074,8 +1077,8 @@ class LegalRef:
     def format_SFSNr(self, root):
         if not self.baseuri_attributes:
             sfsid = self.find_node(root, 'LawRefID').data
-            g, b = self.graph_from_attributes({'law': sfsid})
-            baseuri = self.minter.space.coin_uri(g.resource(b))
+            res = self.attributes_to_resource({'law': sfsid})
+            baseuri = self.minter.space.coin_uri(res)
             self.baseuri_attributes = {'baseuri': baseuri}
 
         return self.format_tokentree(root)
@@ -1117,10 +1120,10 @@ class LegalRef:
                                            'piece': m.group(10),
                                            'item': m.group(12)}
             else:
-                g, b = self.graph_from_attributes({'law': self.currentlaw})
+                res = self.attributes_to_resource({'law': self.currentlaw})
                 self.baseuri_attributes = {
-                    'baseuri': self.minter.space.coin_uri(g.resource(b))
-                    }
+                    'baseuri': self.minter.space.coin_uri(res)
+                }
 
         if resetcurrentlaw:
             if self.currentlaw is not None:
@@ -1158,14 +1161,34 @@ class LegalRef:
         self.currentlaw = None
         return res
 
-    #
+
     # KOD FÖR FORARBETEN
     def forarbete_format_uri(self, attributes):
+        a = attributes
+        for key, val in list(a.items()):
+            if key == 'prop':
+                a['type'] = RPUBL.Proposition
+                a['year'], a['no'] = val.split(":")
+                del a[key]
+            elif key == 'bet':
+                a['type'] = RINFOEX.Utskottsbetankande
+                a['year'], a['no'] = val.split(":")
+                del a[key]
+            elif key == 'skrivelse':
+                # NB: this is different from rpubl:Skrivelse
+                a['type'] = RINFOEX.Riksdagsskrivelse
+                a['year'], a['no'] = val.split(":")
+                del a[key]
+            elif key == 'celex':
+                if len(val) == 8:  # incorrectly formatted, uses YY instead of YYYY
+                    a[key]= val[0] + '19' + val[1:]
+
         # split {'prop': '1996/97:85'} to {'type': 'Proposition,
-        #                                  'arsutgava': '1996/97',
-        #                                  'lopnummer':' 85'}
-        g, b = self.graph_from_attributes(attributes)
-        return self.minter.space.coin_uri(g.resource(b))
+        #                                  'year': '1996/97',
+        #                                  'no':' 85'}
+
+        res = self.attributes_to_resource(a)
+        return self.minter.space.coin_uri(res)
 
     def format_ChapterSectionRef(self, root):
         assert(root.nodes[0].nodes[0].tag == 'ChapterRefID')
@@ -1214,8 +1237,8 @@ class LegalRef:
             if 'underartikel' in attributes:
                 fixed['artikel'] += ".%s" % attributes['underartikel']
 
-        g, b = self.graph_from_attributes(fixed)
-        return self.minter.space.coin_uri(g.resource(b))
+        res = self.attributes_to_resource(fixed)
+        return self.minter.space.coin_uri(res)
 
 
     # KOD FÖR RATTSFALL
@@ -1226,9 +1249,8 @@ class LegalRef:
         assert 'domstol' in attributes, "No court provided"
         assert attributes[
             'domstol'] in containerid, "%s is an unknown court" % attributes['domstol']
-        
-        g, b = self.graph_from_attributes(attributes)
-        return self.minter.space.coin_uri(g.resource(b))
+        res = self.attributes_to_resource(attributes)
+        return self.minter.space.coin_uri(res)
 
     #
     # KOD FÖR EGRÄTTSFALL
@@ -1247,7 +1269,8 @@ class LegalRef:
         else:
             year = attributes['year']
 
-        serial = '%04d' % int(attributes['serial'])
-        descriptor = descriptormap[attributes['decision']]
-        g, b = self.graph_from_attributes(year, descriptor, serial)
-        return self.minter.coin_uri(g.resource(b))
+        attributes['year'] = year
+        attributes['serial'] = '%04d' % int(attributes['serial'])
+        attributes['descriptor'] = descriptormap[attributes['decision']]
+        res = self.graph_from_attributes(attributes)
+        return self.minter.coin_uri(res)
