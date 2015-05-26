@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2015-05-25T07:38:32.619210
+# Automatically transformed from sources at 2015-05-26T17:02:27.026367
 
 @prefix : <http://rinfo.lagrummet.se/sys/uri/space#> .
 @prefix coin: <http://purl.org/court/def/2009/coin#> .
@@ -21,98 +21,74 @@ space: a coin:URISpace ;
                 "é e",
                 "ö oe" ;
             coin:spaceReplacement "" ] ;
-    coin:template [ coin:binding [ coin:property rpubl:arsutgava ;
-                    coin:variable "arsutgava" ],
+    coin:template [ coin:binding [ coin:property rpubl:paragrafnummer ;
+                    coin:variable "paragrafnummer" ],
                 [ coin:property rpubl:forfattningssamling ;
                     coin:slugFrom space:abbrSlug ;
                     coin:variable "fs" ],
                 [ coin:property rpubl:lopnummer ;
                     coin:variable "lopnummer" ],
-                [ coin:property rpubl:paragrafnummer ;
-                    coin:variable "paragrafnummer" ] ;
-            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#P{paragrafnummer}" ],
-        [ coin:binding [ coin:property rpubl:forfattningssamling ;
-                    coin:slugFrom space:abbrSlug ;
-                    coin:variable "fs" ],
-                [ coin:property rinfoex:styckenummer ;
-                    coin:variable "styckenummer" ],
-                [ coin:property rpubl:lopnummer ;
-                    coin:variable "lopnummer" ],
+                [ coin:property rpubl:kapitelnummer ;
+                    coin:variable "kapitelnummer" ],
                 [ coin:property rpubl:arsutgava ;
                     coin:variable "arsutgava" ] ;
-            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#S{styckenummer}" ],
-        [ coin:binding [ coin:property rpubl:paragrafnummer ;
-                    coin:variable "paragrafnummer" ],
-                [ coin:property rinfoex:styckenummer ;
-                    coin:variable "styckenummer" ],
-                [ coin:property rpubl:forfattningssamling ;
-                    coin:slugFrom space:abbrSlug ;
-                    coin:variable "fs" ],
-                [ coin:property rpubl:arsutgava ;
-                    coin:variable "arsutgava" ],
-                [ coin:property rpubl:lopnummer ;
-                    coin:variable "lopnummer" ] ;
-            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#P{paragrafnummer}S{styckenummer}" ],
-        [ coin:binding [ coin:property rpubl:arsutgava ;
-                    coin:variable "arsutgava" ],
-                [ coin:property rpubl:lopnummer ;
-                    coin:variable "lopnummer" ],
+            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#K{kapitelnummer}P{paragrafnummer}" ],
+        [ coin:binding [ coin:property rpubl:sidnummer ;
+                    coin:variable "sidnummer" ],
                 [ coin:property rdf:type ;
                     coin:slugFrom space:abbrSlug ;
                     coin:variable "rtype" ],
-                [ coin:property rpubl:sidnummer ;
-                    coin:variable "sidnummer" ] ;
+                [ coin:property rpubl:arsutgava ;
+                    coin:variable "arsutgava" ],
+                [ coin:property rpubl:lopnummer ;
+                    coin:variable "lopnummer" ] ;
             coin:uriTemplate "/{rtype}/{arsutgava}:{lopnummer}#s{sidnummer}" ],
         [ coin:binding [ coin:property rpubl:lopnummer ;
                     coin:variable "lopnummer" ],
-                [ coin:property rpubl:kapitelnummer ;
-                    coin:variable "kapitelnummer" ],
-                [ coin:property rpubl:forfattningssamling ;
-                    coin:slugFrom space:abbrSlug ;
-                    coin:variable "fs" ],
-                [ coin:property rpubl:arsutgava ;
-                    coin:variable "arsutgava" ],
-                [ coin:property rpubl:paragrafnummer ;
-                    coin:variable "paragrafnummer" ] ;
-            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#K{kapitelnummer}P{paragrafnummer}" ],
-        [ coin:binding [ coin:property rinfoex:punktnummer ;
-                    coin:variable "punktnummer" ],
-                [ coin:property rpubl:arsutgava ;
-                    coin:variable "arsutgava" ],
-                [ coin:property rpubl:paragrafnummer ;
-                    coin:variable "paragrafnummer" ],
                 [ coin:property rpubl:forfattningssamling ;
                     coin:slugFrom space:abbrSlug ;
                     coin:variable "fs" ],
                 [ coin:property rinfoex:styckenummer ;
                     coin:variable "styckenummer" ],
-                [ coin:property rpubl:lopnummer ;
-                    coin:variable "lopnummer" ] ;
-            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#P{paragrafnummer}S{styckenummer}N{punktnummer}" ],
-        [ coin:binding [ coin:property rpubl:paragrafnummer ;
-                    coin:variable "paragrafnummer" ],
-                [ coin:property rpubl:lopnummer ;
-                    coin:variable "lopnummer" ],
                 [ coin:property rpubl:arsutgava ;
-                    coin:variable "arsutgava" ],
-                [ coin:property rpubl:kapitelnummer ;
-                    coin:variable "kapitelnummer" ],
-                [ coin:property rinfoex:styckenummer ;
-                    coin:variable "styckenummer" ],
-                [ coin:property rpubl:forfattningssamling ;
-                    coin:slugFrom space:abbrSlug ;
-                    coin:variable "fs" ] ;
-            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#K{kapitelnummer}P{paragrafnummer}S{styckenummer}" ],
+                    coin:variable "arsutgava" ] ;
+            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#S{styckenummer}" ],
         [ coin:binding [ coin:property rpubl:lopnummer ;
                     coin:variable "lopnummer" ],
-                [ coin:property rpubl:kapitelnummer ;
-                    coin:variable "kapitelnummer" ],
-                [ coin:property rpubl:arsutgava ;
-                    coin:variable "arsutgava" ],
+                [ coin:property rpubl:paragrafnummer ;
+                    coin:variable "paragrafnummer" ],
                 [ coin:property rpubl:forfattningssamling ;
                     coin:slugFrom space:abbrSlug ;
-                    coin:variable "fs" ] ;
-            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#K{kapitelnummer}" ],
+                    coin:variable "fs" ],
+                [ coin:property rinfoex:styckenummer ;
+                    coin:variable "styckenummer" ],
+                [ coin:property rpubl:arsutgava ;
+                    coin:variable "arsutgava" ] ;
+            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#P{paragrafnummer}S{styckenummer}" ],
+        [ coin:binding [ coin:property rpubl:kapitelnummer ;
+                    coin:variable "kapitelnummer" ],
+                [ coin:property rpubl:forfattningssamling ;
+                    coin:slugFrom space:abbrSlug ;
+                    coin:variable "fs" ],
+                [ coin:property rpubl:arsutgava ;
+                    coin:variable "arsutgava" ],
+                [ coin:property rinfoex:styckenummer ;
+                    coin:variable "styckenummer" ],
+                [ coin:property rpubl:paragrafnummer ;
+                    coin:variable "paragrafnummer" ],
+                [ coin:property rpubl:lopnummer ;
+                    coin:variable "lopnummer" ] ;
+            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#K{kapitelnummer}P{paragrafnummer}S{styckenummer}" ],
+        [ coin:binding [ coin:property rpubl:forfattningssamling ;
+                    coin:slugFrom space:abbrSlug ;
+                    coin:variable "fs" ],
+                [ coin:property rpubl:arsutgava ;
+                    coin:variable "arsutgava" ],
+                [ coin:property rpubl:paragrafnummer ;
+                    coin:variable "paragrafnummer" ],
+                [ coin:property rpubl:lopnummer ;
+                    coin:variable "lopnummer" ] ;
+            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#P{paragrafnummer}" ],
         [ coin:binding [ coin:property rinfoex:artikelnummer ;
                     coin:variable "artikelnummer" ],
                 [ coin:property rpubl:celexNummer ;
@@ -120,32 +96,56 @@ space: a coin:URISpace ;
             coin:uriTemplate "/ext/celex/{celexNummer}#{artikelnummer}" ],
         [ coin:binding [ coin:property rinfoex:styckenummer ;
                     coin:variable "styckenummer" ],
-                [ coin:property rpubl:forfattningssamling ;
-                    coin:slugFrom space:abbrSlug ;
-                    coin:variable "fs" ],
                 [ coin:property rpubl:arsutgava ;
                     coin:variable "arsutgava" ],
-                [ coin:property rpubl:paragrafnummer ;
-                    coin:variable "paragrafnummer" ],
-                [ coin:property rinfoex:punktnummer ;
-                    coin:variable "punktnummer" ],
-                [ coin:property rpubl:lopnummer ;
-                    coin:variable "lopnummer" ],
-                [ coin:property rpubl:kapitelnummer ;
-                    coin:variable "kapitelnummer" ] ;
-            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#K{kapitelnummer}P{paragrafnummer}S{styckenummer}N{punktnummer}" ],
-        [ coin:binding [ coin:property rinfoex:styckenummer ;
-                    coin:variable "styckenummer" ],
                 [ coin:property rpubl:lopnummer ;
                     coin:variable "lopnummer" ],
                 [ coin:property rinfoex:punktnummer ;
                     coin:variable "punktnummer" ],
-                [ coin:property rpubl:arsutgava ;
-                    coin:variable "arsutgava" ],
                 [ coin:property rpubl:forfattningssamling ;
                     coin:slugFrom space:abbrSlug ;
                     coin:variable "fs" ] ;
             coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#S{styckenummer}N{punktnummer}" ],
+        [ coin:binding [ coin:property rpubl:forfattningssamling ;
+                    coin:slugFrom space:abbrSlug ;
+                    coin:variable "fs" ],
+                [ coin:property rinfoex:punktnummer ;
+                    coin:variable "punktnummer" ],
+                [ coin:property rpubl:paragrafnummer ;
+                    coin:variable "paragrafnummer" ],
+                [ coin:property rinfoex:styckenummer ;
+                    coin:variable "styckenummer" ],
+                [ coin:property rpubl:kapitelnummer ;
+                    coin:variable "kapitelnummer" ],
+                [ coin:property rpubl:lopnummer ;
+                    coin:variable "lopnummer" ],
+                [ coin:property rpubl:arsutgava ;
+                    coin:variable "arsutgava" ] ;
+            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#K{kapitelnummer}P{paragrafnummer}S{styckenummer}N{punktnummer}" ],
+        [ coin:binding [ coin:property rpubl:forfattningssamling ;
+                    coin:slugFrom space:abbrSlug ;
+                    coin:variable "fs" ],
+                [ coin:property rpubl:arsutgava ;
+                    coin:variable "arsutgava" ],
+                [ coin:property rpubl:lopnummer ;
+                    coin:variable "lopnummer" ],
+                [ coin:property rpubl:kapitelnummer ;
+                    coin:variable "kapitelnummer" ] ;
+            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#K{kapitelnummer}" ],
+        [ coin:binding [ coin:property rinfoex:punktnummer ;
+                    coin:variable "punktnummer" ],
+                [ coin:property rpubl:lopnummer ;
+                    coin:variable "lopnummer" ],
+                [ coin:property rinfoex:styckenummer ;
+                    coin:variable "styckenummer" ],
+                [ coin:property rpubl:arsutgava ;
+                    coin:variable "arsutgava" ],
+                [ coin:property rpubl:paragrafnummer ;
+                    coin:variable "paragrafnummer" ],
+                [ coin:property rpubl:forfattningssamling ;
+                    coin:slugFrom space:abbrSlug ;
+                    coin:variable "fs" ] ;
+            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}#P{paragrafnummer}S{styckenummer}N{punktnummer}" ],
         [ coin:binding [ coin:property rpubl:utrSerie ;
                     coin:slugFrom space:abbrSlug ;
                     coin:variable "serie" ],
@@ -186,7 +186,7 @@ space: a coin:URISpace ;
                 [ coin:property rpubl:arsutgava ],
                 [ coin:property rpubl:sidnummer ] ;
             coin:priority 1 ;
-            coin:uriTemplate "/rf/{serie}/{arsutgava}/s_{sidnummer}" ],
+            coin:uriTemplate "/rf/{serie}/{arsutgava}s{sidnummer}" ],
         [ coin:binding [ coin:property dct:publisher ;
                     coin:slugFrom space:abbrSlug ;
                     coin:variable "publisher" ],

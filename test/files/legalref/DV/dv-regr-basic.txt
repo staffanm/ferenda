@@ -1,5 +1,5 @@
 RÅ 1986 ref. 116
 
 <list>
-  <Link uri="https://lagen.nu/rattsfall/ra/1986:116">RÅ 1986 ref. 116</Link>
+  <Link uri="https://lagen.nu/rf/ra/1986:116">RÅ 1986 ref. 116</Link>
 </list>

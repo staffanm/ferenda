@@ -1,5 +1,5 @@
 AD 2008 nr 28
 
 <list>
-  <Link uri="https://lagen.nu/rattsfall/ad/2008:28">AD 2008 nr 28</Link>
+  <Link uri="https://lagen.nu/rf/ad/2008:28">AD 2008 nr 28</Link>
 </list>

@@ -21,7 +21,6 @@ from ferenda.thirdparty.coin import URIMinter
 class TestLegalRef(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        print("Setting up minter and metadata")
         # this particular test method is set up to use lagen.nu style
         # URIs because the canonical URIs are significantly different.
         space = "lagen/nu/res/uri/swedishlegalsource.space.ttl"

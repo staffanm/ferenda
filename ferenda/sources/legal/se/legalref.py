@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, print_function
 
+import logging
+import os
+import re
+
+# thirdparty
 try:
     from simpleparse.parser import Parser
     from simpleparse.stt.TextTools.TextTools import tag
 except ImportError:
     from ._simpleparseFallback import Parser, tag
-
-# thirdparty
 import six
 from six import text_type as str
 from rdflib import Graph, Namespace, Literal, BNode, RDFS, RDF, URIRef
@@ -19,8 +22,6 @@ from ferenda import ResourceLoader
 from ferenda.elements import Link, LinkSubject
 from ferenda.thirdparty.coin import URIMinter
 from . import RPUBL, RINFOEX
-
-
 
 # The charset used for the bytestrings that is sent to/from
 # simpleparse (which does not handle unicode)
@@ -101,6 +102,7 @@ class LegalRef:
         self.decl = ""
         self.namedlaws = {}
         self.namedseries = {}
+        self.lawlist = []
         
         self.load_ebnf(fname("res/ebnf/base.ebnf"))
 
@@ -150,8 +152,11 @@ class LegalRef:
 
         rootprod = "root ::= (%s/plain)+\n" % "/".join(self.roots)
         self.decl += rootprod
-        self.tagger = Parser(self.decl.encode(
-            SP_CHARSET), "root").buildTagger("root")
+        # if KORTLAGRUM, delay the construction of teh parser until we
+        # can construct the LawAbbreviation production (see parse())
+        if self.KORTLAGRUM not in self.args:
+            self.tagger = Parser(self.decl.encode(
+                SP_CHARSET), "root").buildTagger("root")
         self.verbose = False
         self.depth = 0
 
@@ -207,7 +212,7 @@ class LegalRef:
                                                          self.metadata_graph))
 
         if self.KORTLAGRUM in self.args and not self.lawlist:
-            d = get_relations(DCTERMS.alternate, self.metadata_graph)
+            d = self.get_relations(DCTERMS.alternate, self.metadata_graph)
             self.namedlaws.update(d)
             self.lawlist = list(d.keys())
             # Make sure longer law abbreviations come before shorter
@@ -1085,10 +1090,13 @@ class LegalRef:
 
     # KOD FÖR RATTSFALL
     def rattsfall_format_uri(self, attributes):
+        if 'nja' in attributes:
+            attributes['domstol'] = attributes['nja']
         attributes['rattsfallspublikation'] = URIRef(
             self.namedseries[attributes['domstol']])
-        del attributes['rattsfall']
-        del attributes['domstol']
+        for crap in ('nja', 'njarattsfall', 'rattsfall', 'domstol'):
+            if crap in attributes:
+                del attributes[crap]
         res = self.attributes_to_resource(attributes)
         return self.minter.space.coin_uri(res)
 

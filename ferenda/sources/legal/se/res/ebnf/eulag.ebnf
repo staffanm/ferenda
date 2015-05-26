@@ -2,7 +2,7 @@
 # ------------ eglag.ebnf ----------------
 
 # EG-LAGSTIFTNING - Rättsakter som direktiv, förordningar och själva fördraget
-eglagref ::= (ArtikelRattsaktRef/RattsaktRef/ArtikelRef)+
+eulagref ::= (ArtikelRattsaktRef/RattsaktRef/ArtikelRef)+
 
 
 # "artikel 25.6"

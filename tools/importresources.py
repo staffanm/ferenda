@@ -3,20 +3,18 @@
 # defined in swedishlegalsource.ttl
 from __future__ import unicode_literals
 
-import sys
-import os
-import codecs
-sys.path.append(os.getcwd())
 from datetime import datetime
+import os
+import sys
 
-import rdflib
-from rdflib.namespace import SKOS, FOAF, OWL, DCTERMS, RDFS, RDF
 from rdflib.extras.describer import Describer
+from rdflib.namespace import SKOS, FOAF, OWL, DCTERMS, RDFS, RDF
+import rdflib
 
-from ferenda.thirdparty.coin import COIN
-from ferenda.sources.legal.se import RPUBL, RINFOEX
-
+sys.path.append(os.getcwd())
 from ferenda import util
+from ferenda.sources.legal.se import RPUBL, RINFOEX
+from ferenda.thirdparty.coin import COIN
 
 if sys.version_info < (3,):
     raise RuntimeError("Only works on py3")
@@ -194,10 +192,13 @@ def mapspace(base, dest):
               o == rdflib.URIRef("http://rinfo.lagrummet.se/sys/uri/slugs")):
             s = p = o = None
         elif p == COIN.uriTemplate:
-            # : coin:template * coin:uriTemplate "/publ/{fs}" => "/{fs}"
-            # general case: remove leading /publ/
-            o = rdflib.Literal(str(o).replace("/publ/", "/").replace(
-                "/ext/eur-lex/", "/ext/celex/"))
+            strtemplate = str(o)
+            # general case
+            strtemplate = strtemplate.replace("/publ/", "/")
+            # a couple of special cases
+            strtemplate = strtemplate.replace("/ext/eur-lex/", "/ext/celex/")
+            strtemplate = strtemplate.replace("/rf/{serie}/{arsutgava}/s_{sidnummer}", "/rf/{serie}/{arsutgava}s{sidnummer}")
+            o = rdflib.Literal(strtemplate)
         elif (p == COIN.slugFrom and
               o == rdflib.URIRef("http://rinfo.lagrummet.se/sys/uri/space#abbrSlug")):
             o = rdflib.URIRef("https://lagen.nu/sys/uri/space#abbrSlug")

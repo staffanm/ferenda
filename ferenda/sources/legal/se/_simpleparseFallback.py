@@ -39,8 +39,8 @@ t = p.buildTagger(production)
 with open(picklefile,"wb") as fp:
     pickle.dump(t,fp)""")
 
-        tagstring_script = state + os.sep + "tagstring.py"
-        util.writefile(tagstring_script, """import sys, os
+    tagstring_script = state + os.sep + "tagstring.py"
+    util.writefile(tagstring_script, """import sys, os
 if sys.version_info >= (3,0,0):
     raise OSError("This is python %s, not python 2.6 or 2.7!" % sys.version_info)
 pickled_tagger = sys.argv[1] # what buildtagger.py returned -- full path
