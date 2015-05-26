@@ -19,6 +19,25 @@ from ferenda.thirdparty.coin import URIMinter
 @unittest.skipIf('SKIP_SIMPLEPARSE_TESTS' in os.environ,
                  "Skipping SimpleParser dependent tests")    
 class TestLegalRef(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        print("Setting up minter and metadata")
+        # this particular test method is set up to use lagen.nu style
+        # URIs because the canonical URIs are significantly different.
+        space = "lagen/nu/res/uri/swedishlegalsource.space.ttl"
+        slugs = "lagen/nu/res/uri/swedishlegalsource.slugs.ttl"
+        extra = ["lagen/nu/res/extra/swedishlegalsource.ttl",
+                 "lagen/nu/res/extra/sfs.ttl"]
+        cfg = Graph().parse(space,
+                            format="turtle").parse(slugs, format="turtle")
+        cls.metadata = Graph()
+        for ttl in extra:
+            cls.metadata.parse(ttl, format="turtle")
+        COIN = Namespace("http://purl.org/court/def/2009/coin#")
+        # select correct URI for the URISpace definition by
+        # finding a single coin:URISpace object
+        spaceuri = cfg.value(predicate=RDF.type, object=COIN.URISpace)
+        cls.minter = URIMinter(cfg, spaceuri)
     
     def _test_parser(self, testfile, parser):
         encoding = 'iso-8859-1'
@@ -35,17 +54,6 @@ class TestLegalRef(unittest.TestCase):
         test_paras = re.split('\r?\n---\r?\n',testdata)
         got_paras = []
 
-        # this particular test method is set up to use lagen.nu style
-        # URIs because the canonical URIs are significantly different.
-        space = "lagen/nu/res/uri/swedishlegalsource.space.ttl"
-        slugs = "lagen/nu/res/uri/swedishlegalsource.slugs.ttl"
-        cfg = Graph().parse(space,
-                            format="turtle").parse(slugs, format="turtle")
-        COIN = Namespace("http://purl.org/court/def/2009/coin#")
-        # select correct URI for the URISpace definition by
-        # finding a single coin:URISpace object
-        spaceuri = cfg.value(predicate=RDF.type, object=COIN.URISpace)
-        minter = URIMinter(cfg, spaceuri)
         import logging
         r = logging.getLogger()
         h = logging.StreamHandler()
@@ -60,7 +68,8 @@ class TestLegalRef(unittest.TestCase):
             else:
                 # do we need to set 'chapter' also?
                 baseuri_attributes = {'law': '9999:999'}
-            nodes = parser.parse(para, minter, baseuri_attributes)
+            nodes = parser.parse(para, self.minter, self.metadata,
+                                 baseuri_attributes)
             got_paras.append(serialize(nodes).strip())
         got = "\n---\n".join(got_paras).replace("\r\n","\n").strip()
         self.maxDiff = None

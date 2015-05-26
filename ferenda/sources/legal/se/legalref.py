@@ -153,12 +153,12 @@ from six.moves import cPickle as pickle
 from six import text_type as str
 
 from rdflib import Graph, Namespace, Literal, BNode, RDFS, RDF, URIRef
+from rdflib.namespace import DCTERMS, SKOS
 COIN = Namespace("http://purl.org/court/def/2009/coin#")
 
 # my own libraries
-
-from ferenda.elements import Link
-from ferenda.elements import LinkSubject
+from ferenda import ResourceLoader
+from ferenda.elements import Link, LinkSubject
 from ferenda.thirdparty.coin import URIMinter
 from . import RPUBL, RINFOEX
 
@@ -264,28 +264,26 @@ class LegalRef:
     re_xmlcharref = re.compile("&#\d+;")
 
     def __init__(self, *args):
-        # FIXME: We'd like to make the EBNF/N3 loading parts use 
-        # ResourceLoader instead of hardcoded paths
         if not os.path.sep in __file__:
             scriptdir = os.getcwd()
         else:
             scriptdir = os.path.dirname(__file__)
 
-        self.graph = Graph()
-        n3file = os.path.relpath(scriptdir + "/res/extra/sfs.ttl")
-        self.graph.load(n3file, format="n3")
+        resourceloader = ResourceLoader(scriptdir)
+        fname = resourceloader.filename
         self.roots = []
         self.uriformatter = {}
         self.decl = ""  # try to make it unicode clean all the way
         self.namedlaws = {}
-        self.load_ebnf(scriptdir + "/res/ebnf/base.ebnf")
+        self.namedseries = {}
+        
+        self.load_ebnf(fname("res/ebnf/base.ebnf"))
 
         self.args = args
         if self.LAGRUM in args:
-            productions = self.load_ebnf(scriptdir + "/res/ebnf/lagrum.ebnf")
+            productions = self.load_ebnf(fname("res/ebnf/lagrum.ebnf"))
             for p in productions:
                 self.uriformatter[p] = self.sfs_format_uri
-            self.namedlaws.update(self.get_relations(RDFS.label))
             self.roots.append("sfsrefs")
             self.roots.append("sfsref")
 
@@ -294,54 +292,41 @@ class LegalRef:
             # nu, eftersom kortlagrum.ebnf beror på produktioner som
             # definerats där
             if not self.LAGRUM in args:
-                self.load_ebnf(scriptdir + "/res/ebnf/lagrum.ebnf")
+                self.load_ebnf(fname("res/ebnf/lagrum.ebnf"))
 
-            productions = self.load_ebnf(
-                scriptdir + "/res/ebnf/kortlagrum.ebnf")
+            productions = self.load_ebnf(fname("res/ebnf/kortlagrum.ebnf"))
             for p in productions:
                 self.uriformatter[p] = self.sfs_format_uri
-            DCTERMS = Namespace("http://purl.org/dc/terms/")
-            d = self.get_relations(DCTERMS['alternate'])
-            self.namedlaws.update(d)
-            # lawlist = [x.encode(SP_CHARSET) for x in list(d.keys())]
-            lawlist = list(d.keys())
-            # Make sure longer law abbreviations come before shorter
-            # ones (so that we don't mistake "3 § MBL" for "3 § MB"+"L")
-            # lawlist.sort(cmp=lambda x, y: len(y) - len(x))
-            lawlist.sort(key=len, reverse=True)
-            lawdecl = "LawAbbreviation ::= ('%s')\n" % "'/'".join(lawlist)
-            self.decl += lawdecl
-            self.roots.insert(0, "kortlagrumref")
+            self.roots.insert(0, "kortlagrumref")  # must be the first root
 
         if self.EULAGSTIFTNING in args:
-            productions = self.load_ebnf(scriptdir + "/res/ebnf/eglag.ebnf")
+            productions = self.load_ebnf(fname("res/ebnf/eglag.ebnf"))
             for p in productions:
                 self.uriformatter[p] = self.eglag_format_uri
             self.roots.append("eglagref")
+
         if self.FORARBETEN in args:
-            productions = self.load_ebnf(
-                scriptdir + "/res/ebnf/forarbeten.ebnf")
+            productions = self.load_ebnf(fname("res/ebnf/forarbeten.ebnf"))
             for p in productions:
                 self.uriformatter[p] = self.forarbete_format_uri
             self.roots.append("forarbeteref")
+
         if self.RATTSFALL in args:
-            productions = self.load_ebnf(scriptdir + "/res/ebnf/rattsfall.ebnf")
+            productions = self.load_ebnf(fname("res/ebnf/rattsfall.ebnf"))
             for p in productions:
                 self.uriformatter[p] = self.rattsfall_format_uri
             self.roots.append("rattsfallref")
+
         if self.EURATTSFALL in args:
-            productions = self.load_ebnf(scriptdir + "/res/ebnf/egratt.ebnf")
+            productions = self.load_ebnf(fname("res/ebnf/egratt.ebnf"))
             for p in productions:
                 self.uriformatter[p] = self.egrattsfall_format_uri
             self.roots.append("ecjcaseref")
 
         rootprod = "root ::= (%s/plain)+\n" % "/".join(self.roots)
         self.decl += rootprod
-
-        self.parser = Parser(self.decl.encode(SP_CHARSET), "root")
-        self.tagger = self.parser.buildTagger("root")
-        # util.writefile("tagger.tmp", repr(self.tagger), SP_CHARSET)
-        # print "tagger length: %d" % len(repr(self.tagger))
+        self.tagger = Parser(self.decl.encode(
+            SP_CHARSET), "root").buildTagger("root")
         self.verbose = False
         self.depth = 0
 
@@ -365,29 +350,58 @@ class LegalRef:
         content = f.read(os.stat(file).st_size).decode(SP_CHARSET)
         self.decl += content
         f.close()
-        return [x.group(1) for x in re.finditer(r'(\w+(Ref|RefID))\s*::=', content)]
+        return [x.group(1) for x in re.finditer(r'(\w+(Ref|RefID))\s*::=',
+                                                content)]
 
-    def get_relations(self, predicate):
+    def get_relations(self, predicate, graph):
         d = {}
-        for obj, subj in self.graph.subject_objects(predicate):
+        for obj, subj in graph.subject_objects(predicate):
             d[six.text_type(subj)] = six.text_type(obj)
         return d
 
     def parse(self, 
               indata,
               minter,
+              metadata_graph=None,
               baseuri_attributes=None,
               predicate=None,
               allow_relative=True):
         assert isinstance(indata, str)
         assert isinstance(minter, URIMinter)
+        assert isinstance(metadata_graph, Graph)
         if indata == "":
             return indata  # this actually triggered a bug...
         self.predicate = predicate
         self.minter = minter
+        self.metadata_graph = metadata_graph if metadata_graph else Graph()
         self.allow_relative = allow_relative
+
+        if ((self.LAGRUM in self.args or
+             self.KORTLAGRUM in self.args) and not self.namedlaws):
+                self.namedlaws.update(self.get_relations(RDFS.label,
+                                                         self.metadata_graph))
+
+        if self.KORTLAGRUM in self.args and not self.lawlist:
+            d = get_relations(DCTERMS.alternate, self.metadata_graph)
+            self.namedlaws.update(d)
+            self.lawlist = list(d.keys())
+            # Make sure longer law abbreviations come before shorter
+            # ones (so that we don't mistake "3 § MBL" for "3 § MB"+"L")
+            self.lawlist.sort(key=len, reverse=True)
+
+            # re-do the parser now that we have all law abbrevs (which
+            # must be present in the supplied graph)
+            lawdecl = "LawAbbreviation ::= ('%s')\n" % "'/'".join(
+                self.lawlist)
+            self.decl += lawdecl
+            self.tagger = Parser(self.decl.encode(
+                SP_CHARSET), "root").buildTagger("root")
+            
+        if self.RATTSFALL in self.args and not self.namedseries:
+            self.namedseries.update(self.get_relations(SKOS.altLabel,
+                                                       self.metadata_graph))
+
         if baseuri_attributes:
-            # Might contain 'baseuri', 'law', 'chapter', 'section', 'piece', 'item'
             self.baseuri_attributes = baseuri_attributes
         else:
             self.baseuri_attributes = {"law": "9999:999",
@@ -835,6 +849,9 @@ class LegalRef:
                     "artikel": RINFOEX.artikelnummer,
                     "sidnr": RPUBL.sidnummer,
                     "type": RDF.type,
+                    "lopnr": RPUBL.lopnummer,
+                    "rattsfallspublikation": RPUBL.rattsfallspublikation,
+                    "ar": RPUBL.arsutgava,
                     }
 
     def attributes_to_resource(self, attributes):
@@ -1243,12 +1260,10 @@ class LegalRef:
 
     # KOD FÖR RATTSFALL
     def rattsfall_format_uri(self, attributes):
-        # res = self.baseuri_attributes['baseuri']
-        if 'nja' in attributes:
-            attributes['domstol'] = attributes['nja']
-        assert 'domstol' in attributes, "No court provided"
-        assert attributes[
-            'domstol'] in containerid, "%s is an unknown court" % attributes['domstol']
+        attributes['rattsfallspublikation'] = URIRef(
+            self.namedseries[attributes['domstol']])
+        del attributes['rattsfall']
+        del attributes['domstol']
         res = self.attributes_to_resource(attributes)
         return self.minter.space.coin_uri(res)
 

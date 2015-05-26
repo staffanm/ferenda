@@ -137,7 +137,6 @@ class Template:
         if len(matches) < len(self.bindings):
             return None
         # IMPROVE: store and return partial success (for detailed feedback)
-        # from pudb import set_trace; set_trace()
         return self.build_uri(self.get_base(resource), matches)
 
     def build_uri(self, base, matches):
@@ -190,10 +189,6 @@ class Binding:
     def find_match(self, resource):
         value = resource.value(self.p)
         if self.slugFrom:
-            if self.p == RDF.type:
-                # from pudb import set_trace; set_trace()
-                # print("FOIND!")
-                pass
             if not value:
                 return None
             if value.value(self.slugFrom.identifier):
