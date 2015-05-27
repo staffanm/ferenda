@@ -19,6 +19,7 @@ COIN = Namespace("http://purl.org/court/def/2009/coin#")
 
 # my own libraries
 from ferenda import ResourceLoader
+from ferenda import util
 from ferenda.elements import Link, LinkSubject
 from ferenda.thirdparty.coin import URIMinter
 from . import RPUBL, RINFOEX
@@ -684,16 +685,39 @@ class LegalRef:
                     "ar": RPUBL.arsutgava,
                     }
 
-    def attributes_to_resource(self, attributes):
+    def attributes_to_resource(self, attributes, rest=()):
         g = Graph()
         b = BNode()
+        current = b
+
+        # first, try to create any needed sub-nodes representing
+        # fragments of a document, starting with the most fine-grained
+        # object. It is this subnode that we'll return in the end
+        for k in ("sentence", "item", "itemnumeric", "piece",
+                  "element", "section", "chapter"):
+            p = self.attributemap[k]
+            leaf = util.uri_leaf(p)
+            rel = URIRef(str(p).replace("nummer", ""))
+            if k in attributes:
+                g.add((current, p, Literal(attributes[k])))
+                del attributes[k]
+                new = BNode()
+                g.add((new, rel, current))
+                current = new
+
+        # now, the remaining metadata must be attached to a top-level
+        # object (representing a whole document)
         for k, v in attributes.items():
             if k in self.attributemap:
                 if not isinstance(v, URIRef):
                     v = Literal(v)
-                g.add((b, self.attributemap[k], v))
+                    g.add((current, self.attributemap[k], v))
             else:
                 log.error("Can't map attribute %s to RDF predicate" % k)
+
+        # add any extra stuff
+        for (p, o) in rest:
+            g.add((current, p, o))
         return g.resource(b)
 
     
@@ -709,7 +733,6 @@ class LegalRef:
                          'sjunde': '7',
                          'åttonde': '8',
                          'nionde': '9'}
-        # possibly do something smart with piecemappings
 
         attributeorder = ['law', 'chapter', 'section',
                           'element', 'piece', 'item', 'itemnumeric', 'sentence']
@@ -727,10 +750,12 @@ class LegalRef:
         if "law" in attributes:
             attributes["year"], attributes["no"] = attributes["law"].split(":")
             del attributes["law"]
+            if "s" in attributes["no"]:
+                attributes["no"], attributes["sidnr"] = re.split("\s*s\.?\s*", attributes["no"])
         for k in attributes:
             if attributes[k] in piecemappings:
                 attributes[k] = piecemappings[attributes[k]]
-        res = self.attributes_to_resource(attributes)
+
         # need also to add a rpubl:forfattningssamling triple -- i
         # think this is the place to do it. Problem is how we get
         # access to the URI for SFS -- it can be
@@ -743,7 +768,8 @@ class LegalRef:
         abbrSlug = rg.value(predicate=RDF.type, object=RDF.Property)
         fsuri = rg.value(predicate=abbrSlug, object=Literal("sfs"))
         assert fsuri, "Couldn't find URI for forfattningssamling 'sfs'"
-        res.add(RPUBL.forfattningssamling, fsuri)
+        rest =  [(RPUBL.forfattningssamling, fsuri)]
+        res = self.attributes_to_resource(attributes, rest)
         return self.minter.space.coin_uri(res)
 
     def format_ChapterSectionRefs(self, root):
@@ -1120,7 +1146,7 @@ class LegalRef:
         attributes['year'] = year
         attributes['serial'] = '%04d' % int(attributes['serial'])
         attributes['descriptor'] = descriptormap[attributes['decision']]
-        res = self.graph_from_attributes(attributes)
+        res = self.attributes_to_resource(attributes)
         return self.minter.coin_uri(res)
 
 class NodeTree:

@@ -123,6 +123,7 @@ class Template:
             return "<Template>"
 
     def coin_uri(self, resource):
+        from pudb import set_trace; set_trace()
         # self.forType is bound to the space graph, resource is bound
         # to the content graph so we can't just compare graphs
         # if self.forType and not self.forType in resource.objects(RDF.type):

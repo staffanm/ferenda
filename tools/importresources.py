@@ -176,6 +176,8 @@ def mapspace(base, dest):
     graph = load_file(base)
     graph.bind("rinfoex", str(RINFOEX))
     graph.bind("space", "https://lagen.nu/sys/uri/space#", override=True)
+    desc = Describer(graph, "https://lagen.nu/sys/uri/space#")
+    abbrslug = "https://lagen.nu/sys/uri/space#abbrSlug"
     for (s, p, o) in list(graph):
         # remove every triple so that we can add an adjusted version
         graph.remove((s, p, o))
@@ -184,7 +186,7 @@ def mapspace(base, dest):
             # space into eg <https://lagen.nu/sys/uri/space#>
             s = rdflib.URIRef("https://lagen.nu/sys/uri/space#")
         elif s == rdflib.URIRef("http://rinfo.lagrummet.se/sys/uri/space#abbrSlug"):
-            s = rdflib.URIRef("https://lagen.nu/sys/uri/space#abbrSlug")
+            s = rdflib.URIRef(abbrslug)
         if p == COIN.base:
             # change coin:base
             o = rdflib.Literal("https://lagen.nu")
@@ -210,38 +212,11 @@ def mapspace(base, dest):
         if s:
             graph.add((s, p, o))
 
-    # now create ~10 bunch of fine-grained templates that can mint
-    # uris for sections, paragraphs etc. This doesn't need to be
-    # dynamically generated, we could just add the 100 or so triples
-    # neeeded statically. But now we shave the yak this way.
-    #
-    # "#K{kapnr}",
-    # "#K{kapnr}P{parnr}"
-    # "#K{kapnr}P{parnr}S{stnr}"
-    # "#K{kapnr}P{parnr}S{stnr}N{pnr}"
-    # "#P{parnr}"
-    # "#P{parnr}S{stnr}"
-    # "#P{parnr}S{stnr}N{pnr}"
-    # "#S{stnr}"
-    # "#S{stnr}N{pnr}"
-    desc = Describer(graph, "https://lagen.nu/sys/uri/space#")
-    abbrslug = "https://lagen.nu/sys/uri/space#abbrSlug"
-    proptuples = [(RPUBL.kapitelnummer, "K"),
-                  (RPUBL.paragrafnummer, "P"),
-                  (RINFOEX.styckenummer, "S"),
-                  (RINFOEX.punktnummer, "N")]
-    while len(proptuples) > 1:
-        bindings = [RPUBL.forfattningssamling, RPUBL.arsutgava, RPUBL.lopnummer]
-        uritemplate = "/{fs}/{arsutgava}:{lopnummer}#"  # add stringmunging
-        for p, fragletter in proptuples:
-            bindings.append(p)
-            with desc.rel(COIN.template):
-                uritemplate += fragletter + "{" + util.uri_leaf(p) + "}"
-                # print("adding uritemplate %s" % uritemplate)
-                desc.value(COIN.uriTemplate, uritemplate)
-                add_bindings(desc, bindings, abbrslug)
-                             
-        proptuples.pop(0)
+        # the finegrained approach causes a combinatorial explosion of
+        # templates -- need to do this right
+        # 
+        # if str(o).startswith("/{fs}/"):
+        #      add_finegrained(desc, str(o), abbrslug)
 
     # also one additional for eurlex documents with article fragments
     with desc.rel(COIN.template):
@@ -254,7 +229,8 @@ def mapspace(base, dest):
             desc.value(COIN.variable, "artikelnummer")
     # and for general docs with page numbers
     with desc.rel(COIN.template):
-        desc.value(COIN.uriTemplate, "/{rtype}/{arsutgava}:{lopnummer}#s{sidnummer}")
+        desc.value(COIN.uriTemplate,
+                   "/{rtype}/{arsutgava}:{lopnummer}#s{sidnummer}")
         add_bindings(desc, (RDF.type, RPUBL.arsutgava, RPUBL.lopnummer,
                             RPUBL.sidnummer), abbrslug)
     writegraph(graph, dest)
@@ -278,6 +254,36 @@ def add_canonical_templates(graph):
                              "http://rinfo.lagrummet.se/sys/uri/space#abbrSlug")
         proptuples.pop(0)
 
+def add_finegrained(desc, template, abbrslug):
+    # now create ~10 bunch of fine-grained templates for each
+    # fs-template that can mint uris for sections, paragraphs
+    # etc. 
+    # "#K{kapnr}",
+    # "#K{kapnr}P{parnr}"
+    # "#K{kapnr}P{parnr}S{stnr}"
+    # "#K{kapnr}P{parnr}S{stnr}N{pnr}"
+    # "#P{parnr}"
+    # "#P{parnr}S{stnr}"
+    # "#P{parnr}S{stnr}N{pnr}"
+    # "#S{stnr}"
+    # "#S{stnr}N{pnr}"
+    proptuples = [(RPUBL.kapitelnummer, "K"),
+                  (RPUBL.paragrafnummer, "P"),
+                  (RINFOEX.styckenummer, "S"),
+                  (RINFOEX.punktnummer, "N")]
+    while len(proptuples) > 1:
+        bindings = [RPUBL.forfattningssamling, RPUBL.arsutgava, RPUBL.lopnummer]
+        uritemplate = template + "#"
+        for p, fragletter in proptuples:
+            bindings.append(p)
+            with desc.rel(COIN.template):
+                uritemplate += fragletter + "{" + util.uri_leaf(p) + "}"
+                # print("adding uritemplate %s" % uritemplate)
+                desc.value(COIN.uriTemplate, uritemplate)
+                add_bindings(desc, bindings, abbrslug)
+                             
+        proptuples.pop(0)
+    
 
 def add_bindings(desc, bindings, slugFrom):
     for b in bindings:
