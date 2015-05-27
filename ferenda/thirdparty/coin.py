@@ -3,7 +3,7 @@ from __future__ import print_function, unicode_literals
 __metaclass__ = type
 import re
 from operator import attrgetter
-from rdflib import Graph, Literal, Namespace, URIRef, RDF, RDFS
+from rdflib import Graph, Literal, Namespace, URIRef, RDF, RDFS, BNode
 from rdflib.resource import Resource
 from six.moves.urllib_parse import urljoin
 from six import text_type as str
@@ -29,6 +29,7 @@ class URISpace:
 
     def __init__(self, resource):
         self.base = str(resource.value(COIN.base))
+        self.fragmentSeparator = str(resource.value(COIN.fragmentSeparator))
         self.templates = [Template(self, template_resource)
                           for template_resource in resource.objects(
                                   COIN.template)]
@@ -123,7 +124,6 @@ class Template:
             return "<Template>"
 
     def coin_uri(self, resource):
-        from pudb import set_trace; set_trace()
         # self.forType is bound to the space graph, resource is bound
         # to the content graph so we can't just compare graphs
         # if self.forType and not self.forType in resource.objects(RDF.type):
@@ -143,15 +143,14 @@ class Template:
     def build_uri(self, base, matches):
         if not base:
             return None
-        if not self.uriTemplate:
-            if self.fragmentTemplate:
-                print("Do something smart with #%s" % self.fragmentTemplate)
-                return None
-            else:
-                return None # TODO: one value
-        expanded = str(self.uriTemplate)
-        if "{+base}" in expanded:
-            pass
+        if self.uriTemplate:
+            expanded = str(self.uriTemplate)
+        elif self.fragmentTemplate:
+            if "#" not in base:
+                base += "#"
+            expanded = base + str(self.fragmentTemplate)
+        else:
+            return None
 
         expanded = expanded.replace("{+base}", base)
         for var, value in matches.items():
@@ -162,10 +161,19 @@ class Template:
     def get_base(self, resource):
         base = self.space.base
         def guarded_base(b):
-            if b:
+            if isinstance(b.identifier, URIRef):
                 s = str(b.identifier)
                 if s.startswith(base):
                     return s
+            elif isinstance(b.identifier, BNode):
+                from pudb import set_trace; set_trace()
+                # try to recursively mint a URI for this other subject
+                try:
+                    return self.space.coin_uri(b)
+                except ValueError:  # FIXME: mk coin_uri raise specific error
+                    return None
+            else:
+                return None
         if self.relToBase:
             for baserel in resource.objects(self.relToBase.identifier):
                 return guarded_base(baserel)
