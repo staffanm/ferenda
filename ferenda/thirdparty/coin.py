@@ -113,7 +113,7 @@ class Template:
         self.bindings = [Binding(self, binding)
                 for binding in resource.objects(COIN.binding)]
         # IMPROVE: if not template and variable bindings correspond: TemplateException
-
+        assert self.uriTemplate or self.fragmentTemplate, "No template for template"
 
     def __repr__(self):
         if self.uriTemplate:

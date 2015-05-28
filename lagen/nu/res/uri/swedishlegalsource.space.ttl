@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2015-05-28T07:21:51.729604
+# Automatically transformed from sources at 2015-05-28T16:56:17.195585
 
 @prefix : <http://rinfo.lagrummet.se/sys/uri/space#> .
 @prefix coin: <http://purl.org/court/def/2009/coin#> .
@@ -158,8 +158,6 @@ space: a coin:URISpace ;
         [ coin:binding [ coin:property rinfoex:meningnummer ] ;
             coin:fragmentTemplate "M{meningnummer}" ;
             coin:relFromBase rinfoex:mening ],
-        [ coin:binding [ coin:property rpubl:celexNummer ] ;
-            coin:uriTemplate "/ext/celex/{celexNummer}#{artikelnummer}" ],
         [ coin:binding [ coin:property rpubl:celexNummer ],
                 [ coin:property rinfoex:artikelnummer ] ;
             coin:uriTemplate "/ext/celex/{celexNummer}#{artikelnummer}" ],
@@ -169,9 +167,11 @@ space: a coin:URISpace ;
                     coin:variable "rtype" ],
                 [ coin:property rpubl:lopnummer ;
                     coin:variable "lopnummer" ],
+                [ coin:property rpubl:sidnummer ;
+                    coin:variable "sidnummer" ],
                 [ coin:property rpubl:arsutgava ;
                     coin:variable "arsutgava" ] ;
-            coin:urlTemplate "/{rtype}/{arsutgava}:{lopnummer}#s{sidnummer}" ],
+            coin:uriTemplate "/{rtype}/{arsutgava}:{lopnummer}#s{sidnummer}" ],
         [ coin:binding [ coin:property rinfoex:styckenummer ] ;
             coin:fragmentTemplate "S{styckenummer}" ;
             coin:relFromBase rinfoex:stycke ] .

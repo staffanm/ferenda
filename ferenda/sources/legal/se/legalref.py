@@ -695,10 +695,10 @@ class LegalRef:
         # object. It is this subnode that we'll return in the end
         for k in ("sentence", "item", "itemnumeric", "piece",
                   "element", "section", "chapter"):
-            p = self.attributemap[k]
-            leaf = util.uri_leaf(p)
-            rel = URIRef(str(p).replace("nummer", ""))
             if k in attributes:
+                p = self.attributemap[k]
+                leaf = util.uri_leaf(p)
+                rel = URIRef(str(p).replace("nummer", ""))
                 g.add((current, p, Literal(attributes[k])))
                 del attributes[k]
                 new = BNode()
@@ -711,7 +711,7 @@ class LegalRef:
             if k in self.attributemap:
                 if not isinstance(v, URIRef):
                     v = Literal(v)
-                    g.add((current, self.attributemap[k], v))
+                g.add((current, self.attributemap[k], v))
             else:
                 log.error("Can't map attribute %s to RDF predicate" % k)
 
@@ -855,8 +855,9 @@ class LegalRef:
 
         lawrefid_node = self.find_node(root, 'LawRefID')
         if lawrefid_node is None:
-            # Ok, no explicit LawRefID found, lets see if this is a named law that we have the ID for
-            # namedlaw_node = self.find_node(root, 'NamedLawExternalLawRef')
+            # Ok, no explicit LawRefID found, lets see if this is a
+            # named law that we have the ID for namedlaw_node =
+            # self.find_node(root, 'NamedLawExternalLawRef')
             namedlaw_node = self.find_node(root, 'NamedLaw')
             if namedlaw_node is None:
                 # As a last chance, this might be a reference back to a previously
@@ -907,7 +908,6 @@ class LegalRef:
     def format_SectionItemRefs(self, root):
         assert(root.nodes[0].nodes[0].tag == 'SectionRefID')
         self.currentsection = root.nodes[0].nodes[0].text.strip()
-        # res = self.formatter_dispatch(root.nodes[0]) # was formatter_dispatch(self.root)
         res = self.format_tokentree(root)
         self.currentsection = None
         return res
@@ -1053,13 +1053,8 @@ class LegalRef:
                 a['year'], a['no'] = val.split(":")
                 del a[key]
             elif key == 'celex':
-                if len(val) == 8:  # incorrectly formatted, uses YY instead of YYYY
-                    a[key]= val[0] + '19' + val[1:]
-
-        # split {'prop': '1996/97:85'} to {'type': 'Proposition,
-        #                                  'year': '1996/97',
-        #                                  'no':' 85'}
-
+                if len(val) == 8:  # badly formatted, uses YY instead of YYYY
+                    a[key] = val[0] + '19' + val[1:]
         res = self.attributes_to_resource(a)
         return self.minter.space.coin_uri(res)
 

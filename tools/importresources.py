@@ -245,20 +245,19 @@ space: coin:template [
         coin:binding [ coin:property rinfoex:meningnummer ]
      ], [
         coin:uriTemplate "/ext/celex/{celexNummer}#{artikelnummer}";
-        coin:binding [ coin:property rpubl:celexNummer ]
-     ], [
-        coin:uriTemplate "/ext/celex/{celexNummer}#{artikelnummer}";
         coin:binding [ coin:property rpubl:celexNummer ],
                      [ coin:property rinfoex:artikelnummer ]
      ], [
         # maybe do this as a general relFromBase rpubl:sida?
-        coin:urlTemplate "/{rtype}/{arsutgava}:{lopnummer}#s{sidnummer}";
+        coin:uriTemplate "/{rtype}/{arsutgava}:{lopnummer}#s{sidnummer}";
         coin:binding [ coin:property rpubl:sidnummer ],
                      [ coin:property rdf:type ;
                        coin:slugFrom space:abbrSlug ;
                        coin:variable "rtype" ],
                      [ coin:property rpubl:lopnummer ;
                        coin:variable "lopnummer" ],
+                     [ coin:property rpubl:sidnummer ;
+                       coin:variable "sidnummer" ],
                      [ coin:property rpubl:arsutgava ;
                        coin:variable "arsutgava" ]
     ] .
