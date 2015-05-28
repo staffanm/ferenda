@@ -1,4 +1,4 @@
-# Automatically concatenated from sources at 2015-05-27T19:19:05.251558
+# Automatically concatenated from sources at 2015-05-28T07:21:48.392202
 
 @prefix : <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .

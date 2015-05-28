@@ -201,10 +201,17 @@ def mapspace(base, dest):
             strtemplate = strtemplate.replace("/ext/eur-lex/", "/ext/celex/")
             strtemplate = strtemplate.replace("/rf/{serie}/{arsutgava}/s_{sidnummer}", "/rf/{serie}/{arsutgava}s{sidnummer}")
             o = rdflib.Literal(strtemplate)
+        elif p == COIN.fragmentTemplate and o[1] == "_":
+            # "p_{paragrafnummer}" => "P{paragrafnummer}"
+            strtemplate = str(o)
+            strtemplate = strtemplate[0].upper() + strtemplate[2:]
+            o = rdflib.Literal(strtemplate)
         elif (p == COIN.slugFrom and
               o == rdflib.URIRef("http://rinfo.lagrummet.se/sys/uri/space#abbrSlug")):
             o = rdflib.URIRef("https://lagen.nu/sys/uri/space#abbrSlug")
-        elif (p == COIN.spaceReplacement):
+        elif p == COIN.spaceReplacement:
+            o = rdflib.Literal("")
+        elif p == COIN.fragmentSeparator:
             o = rdflib.Literal("")
         if o == COIN.ToLowerCase:  # yeah we don't want this since our
                                    # CELEX uris contains uppercase
@@ -212,47 +219,72 @@ def mapspace(base, dest):
         if s:
             graph.add((s, p, o))
 
-        # the finegrained approach causes a combinatorial explosion of
-        # templates -- need to do this right
-        # 
-        # if str(o).startswith("/{fs}/"):
-        #      add_finegrained(desc, str(o), abbrslug)
+    extra = """
+@prefix : <http://rinfo.lagrummet.se/sys/uri/space#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix coin: <http://purl.org/court/def/2009/coin#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix rinfoex: <http://lagen.nu/terms#> .
+@prefix space: <https://lagen.nu/sys/uri/space#> .
 
-    # also one additional for eurlex documents with article fragments
-    with desc.rel(COIN.template):
-        desc.value(COIN.uriTemplate, "/ext/celex/{celexNummer}#{artikelnummer}")
-        with desc.rel(COIN.binding):
-            desc.rel(COIN.property, RPUBL.celexNummer)
-            desc.value(COIN.variable, "celexNummer")
-        with desc.rel(COIN.binding):
-            desc.rel(COIN.property, RINFOEX.artikelnummer)
-            desc.value(COIN.variable, "artikelnummer")
-    # and for general docs with page numbers
-    with desc.rel(COIN.template):
-        desc.value(COIN.uriTemplate,
-                   "/{rtype}/{arsutgava}:{lopnummer}#s{sidnummer}")
-        add_bindings(desc, (RDF.type, RPUBL.arsutgava, RPUBL.lopnummer,
-                            RPUBL.sidnummer), abbrslug)
+space: coin:template [
+        coin:relFromBase rinfoex:stycke;
+        coin:fragmentTemplate "S{styckenummer}";
+        coin:binding [ coin:property rinfoex:styckenummer ]
+     ], [
+        coin:relFromBase rinfoex:moment;
+        coin:fragmentTemplate "O{momentnummer}";
+        coin:binding [ coin:property rinfoex:momentnummer ]
+     ], [
+        coin:relFromBase rinfoex:punkt;
+        coin:fragmentTemplate "N{punktnummer}";
+        coin:binding [ coin:property rinfoex:punktnummer ]
+     ], [
+        coin:relFromBase rinfoex:mening;
+        coin:fragmentTemplate "M{meningnummer}";
+        coin:binding [ coin:property rinfoex:meningnummer ]
+     ], [
+        coin:uriTemplate "/ext/celex/{celexNummer}#{artikelnummer}";
+        coin:binding [ coin:property rpubl:celexNummer ]
+     ], [
+        coin:uriTemplate "/ext/celex/{celexNummer}#{artikelnummer}";
+        coin:binding [ coin:property rpubl:celexNummer ],
+                     [ coin:property rinfoex:artikelnummer ]
+     ], [
+        # maybe do this as a general relFromBase rpubl:sida?
+        coin:urlTemplate "/{rtype}/{arsutgava}:{lopnummer}#s{sidnummer}";
+        coin:binding [ coin:property rpubl:sidnummer ],
+                     [ coin:property rdf:type ;
+                       coin:slugFrom space:abbrSlug ;
+                       coin:variable "rtype" ],
+                     [ coin:property rpubl:lopnummer ;
+                       coin:variable "lopnummer" ],
+                     [ coin:property rpubl:arsutgava ;
+                       coin:variable "arsutgava" ]
+    ] .
+
+"""
+    graph.parse(data=extra, format="turtle")
     writegraph(graph, dest)
     print("Mapped %s triples to URISpace definitions" % len(graph))
 
 
-def add_canonical_templates(graph):
-    desc = Describer(graph, URISPACE)
-    proptuples = [(RPUBL.kapitelnummer, "k_"),
-                  (RPUBL.paragrafnummer, "p_")]
-    while proptuples:
-        bindings = [RPUBL.forfattningssamling, RPUBL.arsutgava, RPUBL.lopnummer]
-        uritemplate = "/publ/{fs}/{arsutgava}:{lopnummer}#"
-        for p, fragletter in proptuples:
-            with desc.rel(COIN.template):
-                uritemplate += fragletter + "{" + util.uri_leaf(p) + "}-"
-                # print("adding uritemplate %s" % uritemplate)
-                desc.value(COIN.uriTemplate, uritemplate[:-1])
-                bindings.append(p)
-                add_bindings(desc, bindings,
-                             "http://rinfo.lagrummet.se/sys/uri/space#abbrSlug")
-        proptuples.pop(0)
+#def add_canonical_templates(graph):
+#    desc = Describer(graph, URISPACE)
+#    proptuples = [(RPUBL.kapitelnummer, "k_"),
+#                  (RPUBL.paragrafnummer, "p_")]
+#    while proptuples:
+#        bindings = [RPUBL.forfattningssamling, RPUBL.arsutgava, RPUBL.lopnummer]
+#        uritemplate = "/publ/{fs}/{arsutgava}:{lopnummer}#"
+#        for p, fragletter in proptuples:
+#            with desc.rel(COIN.template):
+#                uritemplate += fragletter + "{" + util.uri_leaf(p) + "}-"
+#                # print("adding uritemplate %s" % uritemplate)
+#                desc.value(COIN.uriTemplate, uritemplate[:-1])
+#                bindings.append(p)
+#                add_bindings(desc, bindings,
+#                             "http://rinfo.lagrummet.se/sys/uri/space#abbrSlug")
+#        proptuples.pop(0)
 
 def add_finegrained(desc, template, abbrslug):
     # now create ~10 bunch of fine-grained templates for each
@@ -308,8 +340,7 @@ def main():
     # NB: we might need to add a few templates dynamically to this one
     # (like mapspace does):
     concatgraph("../rdl/resources/base/sys/uri/space.n3",
-                "ferenda/sources/legal/se/res/uri/swedishlegalsource.space.ttl",
-                add_canonical_templates)
+                "ferenda/sources/legal/se/res/uri/swedishlegalsource.space.ttl")
     mapgraph("../rdl/resources/base/datasets",
              "lagen/nu/res/extra/swedishlegalsource.ttl",
              "lagen/nu/res/extra/swedishlegalsource.ttl")

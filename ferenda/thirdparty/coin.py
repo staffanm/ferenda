@@ -146,7 +146,9 @@ class Template:
         if self.uriTemplate:
             expanded = str(self.uriTemplate)
         elif self.fragmentTemplate:
-            if "#" not in base:
+            if "#" in base:
+                base += self.space.fragmentSeparator
+            else:
                 base += "#"
             expanded = base + str(self.fragmentTemplate)
         else:
@@ -166,7 +168,6 @@ class Template:
                 if s.startswith(base):
                     return s
             elif isinstance(b.identifier, BNode):
-                from pudb import set_trace; set_trace()
                 # try to recursively mint a URI for this other subject
                 try:
                     return self.space.coin_uri(b)
