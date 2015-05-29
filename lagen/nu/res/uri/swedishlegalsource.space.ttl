@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2015-05-28T16:56:17.195585
+# Automatically transformed from sources at 2015-05-29T07:51:58.513953
 
 @prefix : <http://rinfo.lagrummet.se/sys/uri/space#> .
 @prefix coin: <http://purl.org/court/def/2009/coin#> .
@@ -99,7 +99,7 @@ space: a coin:URISpace ;
                     coin:variable "lopnummer" ],
                 [ coin:property rpubl:sidnummer ;
                     coin:variable "sidnummer" ] ;
-            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}_s_{sidnummer}" ],
+            coin:uriTemplate "/{fs}/{arsutgava}:{lopnummer}_s._{sidnummer}" ],
         [ coin:binding [ coin:property dct:title,
                         rdfs:label ;
                     coin:variable "repr" ] ;
@@ -128,7 +128,7 @@ space: a coin:URISpace ;
                     coin:variable "bihang" ],
                 [ coin:property rpubl:sidnummer ;
                     coin:variable "sidnummer" ] ;
-            coin:uriTemplate "/{fs}/{arsutgava}:bih_{bihang}_s_{sidnummer}" ],
+            coin:uriTemplate "/{fs}/{arsutgava}:bih_{bihang}_s._{sidnummer}" ],
         [ coin:binding [ coin:property rpubl:forfattningssamling ;
                     coin:slugFrom space:abbrSlug ;
                     coin:variable "fs" ],
@@ -158,6 +158,9 @@ space: a coin:URISpace ;
         [ coin:binding [ coin:property rinfoex:meningnummer ] ;
             coin:fragmentTemplate "M{meningnummer}" ;
             coin:relFromBase rinfoex:mening ],
+        [ coin:binding [ coin:property rinfoex:andringsforfattningnummer ] ;
+            coin:fragmentTemplate "L{andringsforfattningnummer}" ;
+            coin:relFromBase rinfoex:andringsforfattning ],
         [ coin:binding [ coin:property rpubl:celexNummer ],
                 [ coin:property rinfoex:artikelnummer ] ;
             coin:uriTemplate "/ext/celex/{celexNummer}#{artikelnummer}" ],

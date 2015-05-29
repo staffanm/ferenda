@@ -156,19 +156,32 @@ def mapslugs(base, customresources, dest):
     targetgraph = load_file(customresources)
     targetgraph.bind("rinfoex", str(RINFOEX))
     import_slugs(basegraph, targetgraph)
-    targetgraph.add((RINFOEX.Utskottsbetankande, MAPPEDSPACE.abbrSlug, rdflib.Literal("bet")))
-    targetgraph.add((RINFOEX.Riksdagsskrivelse, MAPPEDSPACE.abbrSlug, rdflib.Literal("rskr")))
+    targetgraph.add((RINFOEX.Utskottsbetankande,
+                     MAPPEDSPACE.abbrSlug,
+                     rdflib.Literal("bet")))
+    targetgraph.add((RINFOEX.Riksdagsskrivelse,
+                     MAPPEDSPACE.abbrSlug,
+                     rdflib.Literal("rskr")))
     writegraph(targetgraph, dest)
 
 
 def writegraph(graph, dest, operation="transformed"):
     util.ensure_dir(dest)
-    with open(dest, "w") as fp:
-        header = "# Automatically %s from sources at %s\n\n" % (
-            operation, datetime.now().isoformat())
-        fp.write(header)
-        fp.write(graph.serialize(format="turtle").decode("utf-8"))
-        print("Wrote %s triples to %s" % (len(graph), dest))
+    if os.path.exists(dest):
+        olddata = util.readfile(dest).split("\n\n", 1)[1]
+    else:
+        olddata = ""
+
+    newdata = graph.serialize(format="turtle").decode("utf-8")
+    if newdata != olddata:
+        with open(dest, "w") as fp:
+            header = "# Automatically %s from sources at %s\n\n" % (
+                operation, datetime.now().isoformat())
+            fp.write(header)
+            fp.write(newdata)
+            print("Wrote %s triples to %s" % (len(graph), dest))
+    else:
+        print("%s is unchanged" % dest)
 
 
 def mapspace(base, dest):
@@ -200,6 +213,8 @@ def mapspace(base, dest):
             # a couple of special cases
             strtemplate = strtemplate.replace("/ext/eur-lex/", "/ext/celex/")
             strtemplate = strtemplate.replace("/rf/{serie}/{arsutgava}/s_{sidnummer}", "/rf/{serie}/{arsutgava}s{sidnummer}")
+            strtemplate = strtemplate.replace("_s_{sidnummer}",
+                                              "_s._{sidnummer}")
             o = rdflib.Literal(strtemplate)
         elif p == COIN.fragmentTemplate and o[1] == "_":
             # "p_{paragrafnummer}" => "P{paragrafnummer}"
@@ -243,6 +258,10 @@ space: coin:template [
         coin:relFromBase rinfoex:mening;
         coin:fragmentTemplate "M{meningnummer}";
         coin:binding [ coin:property rinfoex:meningnummer ]
+     ], [
+        coin:relFromBase rinfoex:andringsforfattning;
+        coin:fragmentTemplate "L{andringsforfattningnummer}";
+        coin:binding [ coin:property rinfoex:andringsforfattningnummer ]
      ], [
         coin:uriTemplate "/ext/celex/{celexNummer}#{artikelnummer}";
         coin:binding [ coin:property rpubl:celexNummer ],

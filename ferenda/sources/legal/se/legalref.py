@@ -232,7 +232,10 @@ class LegalRef:
             self.namedseries.update(self.get_relations(SKOS.altLabel,
                                                        self.metadata_graph))
 
-        if baseuri_attributes is None:
+        if baseuri_attributes:
+            self.baseuri_attributes = baseuri_attributes
+        else:
+#            self.baseuri_attributes = {}
             self.baseuri_attributes = {"law": "9999:999",
                                        "chapter": "9",
                                        "section": "9",
@@ -669,6 +672,7 @@ class LegalRef:
 
     attributemap = {"year": RPUBL.arsutgava,
                     "no": RPUBL.lopnummer,
+                    "lawref": RINFOEX.andringsforfattningnummer,
                     "chapter": RPUBL.kapitelnummer,
                     "section": RPUBL.paragrafnummer,
                     "element": RINFOEX.momentnummer,
@@ -694,7 +698,7 @@ class LegalRef:
         # fragments of a document, starting with the most fine-grained
         # object. It is this subnode that we'll return in the end
         for k in ("sentence", "item", "itemnumeric", "piece",
-                  "element", "section", "chapter"):
+                  "element", "section", "chapter", "lawref"):
             if k in attributes:
                 p = self.attributemap[k]
                 leaf = util.uri_leaf(p)
@@ -734,8 +738,8 @@ class LegalRef:
                          'åttonde': '8',
                          'nionde': '9'}
 
-        attributeorder = ['law', 'chapter', 'section',
-                          'element', 'piece', 'item', 'itemnumeric', 'sentence']
+        attributeorder = ['law', 'chapter', 'section', 'element',
+                          'piece', 'item', 'itemnumeric', 'sentence']
 
         # possibly complete attributes with data from
         # baseuri_attributes as needed
@@ -746,7 +750,9 @@ class LegalRef:
                     specificity = True  # don't complete further than this
                 elif (not specificity) and a in self.baseuri_attributes:
                     attributes[a] = self.baseuri_attributes[a]
-        # munge graph a little further to be able to map to RDF
+        # munge attributes a little further to be able to map to RDF
+        if 'item' in attributes and 'piece' not in attributes:
+            attributes['piece'] = '1'
         if "law" in attributes:
             attributes["year"], attributes["no"] = attributes["law"].split(":")
             del attributes["law"]
@@ -768,7 +774,7 @@ class LegalRef:
         abbrSlug = rg.value(predicate=RDF.type, object=RDF.Property)
         fsuri = rg.value(predicate=abbrSlug, object=Literal("sfs"))
         assert fsuri, "Couldn't find URI for forfattningssamling 'sfs'"
-        rest =  [(RPUBL.forfattningssamling, fsuri)]
+        rest = [(RPUBL.forfattningssamling, fsuri)]
         res = self.attributes_to_resource(attributes, rest)
         return self.minter.space.coin_uri(res)
 
@@ -948,6 +954,7 @@ class LegalRef:
                                         root.tag)]
 
     def format_SFSNr(self, root):
+        from pudb import set_trace; set_trace()
         if not self.baseuri_attributes:
             sfsid = self.find_node(root, 'LawRefID').data
             res = self.attributes_to_resource({'law': sfsid})
