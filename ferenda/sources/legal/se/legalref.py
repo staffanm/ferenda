@@ -232,14 +232,14 @@ class LegalRef:
             self.namedseries.update(self.get_relations(SKOS.altLabel,
                                                        self.metadata_graph))
 
-        if baseuri_attributes:
-            self.baseuri_attributes = baseuri_attributes
-        else:
+        if baseuri_attributes is None:
             self.baseuri_attributes = {"law": "9999:999",
                                        "chapter": "9",
                                        "section": "9",
                                        "piece": "9",
                                        "items": "9"}
+        else:
+            self.baseuri_attributes = baseuri_attributes
 
         # Det är svårt att få EBNF-grammatiken att känna igen
         # godtyckliga ord som slutar på ett givet suffix (exv
