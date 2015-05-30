@@ -235,14 +235,11 @@ class LegalRef:
         if baseuri_attributes:
             self.baseuri_attributes = baseuri_attributes
         else:
-#            self.baseuri_attributes = {}
             self.baseuri_attributes = {"law": "9999:999",
                                        "chapter": "9",
                                        "section": "9",
                                        "piece": "9",
                                        "items": "9"}
-        else:
-            self.baseuri_attributes = baseuri_attributes
 
         # Det är svårt att få EBNF-grammatiken att känna igen
         # godtyckliga ord som slutar på ett givet suffix (exv
@@ -275,6 +272,7 @@ class LegalRef:
         result = []
 
         root = NodeTree(taglist, fixedindata)
+        from pudb import set_trace; set_trace()
         for part in root.nodes:
             if part.tag != 'plain' and self.verbose:
                 sys.stdout.write(self.prettyprint(part))
@@ -855,6 +853,7 @@ class LegalRef:
     # automagically. Although now it seems to be branching out and be
     # all things to all people.
     def format_ExternalRefs(self, root):
+        from pudb import set_trace; set_trace()
         assert(root.tag == 'ExternalRefs')
         # print "DEBUG: start of format_ExternalRefs; self.currentlaw is %s" %
         # self.currentlaw
@@ -954,7 +953,6 @@ class LegalRef:
                                         root.tag)]
 
     def format_SFSNr(self, root):
-        from pudb import set_trace; set_trace()
         if not self.baseuri_attributes:
             sfsid = self.find_node(root, 'LawRefID').data
             res = self.attributes_to_resource({'law': sfsid})
