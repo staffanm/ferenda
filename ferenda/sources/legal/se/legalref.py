@@ -232,14 +232,19 @@ class LegalRef:
             self.namedseries.update(self.get_relations(SKOS.altLabel,
                                                        self.metadata_graph))
 
-        if baseuri_attributes:
-            self.baseuri_attributes = baseuri_attributes
-        else:
+        if baseuri_attributes is None:
             self.baseuri_attributes = {"law": "9999:999",
                                        "chapter": "9",
                                        "section": "9",
                                        "piece": "9",
                                        "items": "9"}
+        else:
+            self.baseuri_attributes = baseuri_attributes
+
+        if self.baseuri_attributes == {}:
+            self.nobaseuri = True
+        else:
+            self.nobaseuri = False
 
         # Det är svårt att få EBNF-grammatiken att känna igen
         # godtyckliga ord som slutar på ett givet suffix (exv
@@ -272,7 +277,6 @@ class LegalRef:
         result = []
 
         root = NodeTree(taglist, fixedindata)
-        from pudb import set_trace; set_trace()
         for part in root.nodes:
             if part.tag != 'plain' and self.verbose:
                 sys.stdout.write(self.prettyprint(part))
@@ -692,7 +696,16 @@ class LegalRef:
         b = BNode()
         current = b
 
-        # first, try to create any needed sub-nodes representing
+        # firstly first, clean some degenerate attribute values
+        for k in attributes:
+            if not isinstance(attributes[k], URIRef):
+                v = attributes[k]
+                v = v.replace("\xa0", "") # Non-breakable space
+                v = v.replace("\n", "")
+                v = v.replace("\r", "")
+                attributes[k] = v
+
+        # then, try to create any needed sub-nodes representing
         # fragments of a document, starting with the most fine-grained
         # object. It is this subnode that we'll return in the end
         for k in ("sentence", "item", "itemnumeric", "piece",
@@ -853,7 +866,6 @@ class LegalRef:
     # automagically. Although now it seems to be branching out and be
     # all things to all people.
     def format_ExternalRefs(self, root):
-        from pudb import set_trace; set_trace()
         assert(root.tag == 'ExternalRefs')
         # print "DEBUG: start of format_ExternalRefs; self.currentlaw is %s" %
         # self.currentlaw
@@ -953,12 +965,9 @@ class LegalRef:
                                         root.tag)]
 
     def format_SFSNr(self, root):
-        if not self.baseuri_attributes:
+        if self.nobaseuri:
             sfsid = self.find_node(root, 'LawRefID').data
-            res = self.attributes_to_resource({'law': sfsid})
-            baseuri = self.minter.space.coin_uri(res)
-            self.baseuri_attributes = {'baseuri': baseuri}
-
+            self.baseuri_attributes = {'law': sfsid}
         return self.format_tokentree(root)
 
     def format_NamedExternalLawRef(self, root):
@@ -986,23 +995,15 @@ class LegalRef:
             res = [self.format_generic_link(root)]
 
         # print "format_NamedExternalLawRef: self.baseuri is %r" % self.baseuri
-        if 'law' not in self.baseuri_attributes and self.currentlaw is not None:
-            # print "format_NamedExternalLawRef: setting baseuri_attributes"
-            # use this as the new baseuri_attributes
-            m = self.re_urisegments.match(self.currentlaw)
-            if m:
-                self.baseuri_attributes = {'baseuri': m.group(1),
-                                           'law': m.group(2),
-                                           'chapter': m.group(6),
-                                           'section': m.group(8),
-                                           'piece': m.group(10),
-                                           'item': m.group(12)}
-            else:
-                res = self.attributes_to_resource({'law': self.currentlaw})
-                self.baseuri_attributes = {
-                    'baseuri': self.minter.space.coin_uri(res)
-                }
-
+        if self.nobaseuri and self.currentlaw is not None:
+            self.baseuri_attributes = {'law': self.currentlaw,
+                                       'chapter': self.currentchapter,
+                                       'section': self.currentsection,
+                                       'piece': self.currentpiece}
+            # remove keys whose value are None or otherwise falsy
+            for k in list(self.baseuri_attributes.keys()):
+                if not self.baseuri_attributes[k]:
+                    del self.baseuri_attributes[k]
         if resetcurrentlaw:
             if self.currentlaw is not None:
                 self.lastlaw = self.currentlaw
