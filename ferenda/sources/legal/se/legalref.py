@@ -3,6 +3,7 @@ from __future__ import unicode_literals, print_function
 
 import logging
 import os
+import sys
 import re
 
 # thirdparty
@@ -104,10 +105,10 @@ class LegalRef:
         self.namedlaws = {}
         self.namedseries = {}
         self.lawlist = []
-        
         self.load_ebnf(fname("res/ebnf/base.ebnf"))
-
         self.args = args
+        self.failfast = False
+        
         if self.LAGRUM in args:
             productions = self.load_ebnf(fname("res/ebnf/lagrum.ebnf"))
             for p in productions:
@@ -282,10 +283,16 @@ class LegalRef:
                 sys.stdout.write(self.prettyprint(part))
             if part.tag in self.roots:
                 self.clear_state()
-                # self.verbose = False
-                result.extend(self.formatter_dispatch(part))
+                try:
+                    r = self.formatter_dispatch(part)
+                except Exception as e:
+                    if self.failfast:
+                        raise e
+                    else:
+                        r = part.text
+                result.extend(r)
             else:
-                assert part.tag == 'plain', "Tag is %s" % part.tag
+                assert part.tag == 'plain', "%s not in self.roots" % part.tag
                 result.append(part.text)
 
             # clear state

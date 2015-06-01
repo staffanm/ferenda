@@ -8,16 +8,13 @@ rättsdatabaser.
 # system libraries (+ six)
 from collections import defaultdict
 from datetime import datetime, date
-from tempfile import mktemp
-from time import time, sleep
-import cgi
+from time import time
 import codecs
 import difflib
 import logging
 import os
 import re
 import sys
-import shutil
 
 from six.moves import html_parser
 from six.moves.urllib_parse import quote, unquote
@@ -25,8 +22,8 @@ from six import text_type as str
 from ferenda.compat import OrderedDict
 
 # 3rdparty libs
-from rdflib import Namespace, URIRef, Literal, RDF
-from rdflib.namespace import DCTERMS, XSD
+from rdflib import URIRef, Literal, RDF
+from rdflib.namespace import DCTERMS
 from lxml import etree
 from lxml.builder import ElementMaker
 import bs4
@@ -182,10 +179,9 @@ class Kapitel(CompoundElement, OrdinalElement):
 class UpphavdParagraf(UnicodeElement, OrdinalElement):
     pass
 
+
 # en paragraf har inget "eget" värde, bara ett nummer och ett eller
 # flera stycken
-
-
 class Paragraf(CompoundElement, OrdinalElement):
     fragment_label = "P"
     tagname = "div"
@@ -196,9 +192,8 @@ class Paragraf(CompoundElement, OrdinalElement):
         self.uri = kwargs.get("uri", None)
         super(Paragraf, self).__init__(*args, **kwargs)
 
+
 # kan innehålla nästlade numrerade listor
-
-
 class Listelement(CompoundElement, OrdinalElement):
     fragment_label = "N"
     tagname = "li"
@@ -236,7 +231,6 @@ class Bilaga(CompoundElement):
 
 
 class Register(CompoundElement):
-
     """Innehåller lite metadata om en grundförfattning och dess
     efterföljande ändringsförfattningar"""
     tagname = "div"
@@ -291,8 +285,6 @@ class InteExisterandeSFS(Exception):
     pass  # same as IdNotFound?
 
 
-
-
 class SFSDocumentStore(DocumentStore):
 
     def basefile_to_pathfrag(self, basefile):
@@ -317,7 +309,8 @@ class SFSDocumentStore(DocumentStore):
 
 class SFS(Trips):
 
-    """Handles consolidated (codified) versions of statutes from SFS (Svensk förvattningssamling)
+    """Handles consolidated (codified) versions of statutes from SFS
+    (Svensk förvattningssamling).
 
     A note about logging:
 
@@ -418,6 +411,7 @@ class SFS(Trips):
             self._lagrum_parser = SwedishCitationParser(LegalRef(LegalRef.LAGRUM,
                                                                  LegalRef.EULAGSTIFTNING),
                                                         self.minter,
+                                                        self.commondata,
                                                         allow_relative=True)
         return self._lagrum_parser
 
@@ -425,7 +419,8 @@ class SFS(Trips):
     def forarbete_parser(self):
         if not hasattr(self, '_forarbete_parser'):
             self._forarbete_parser = SwedishCitationParser(LegalRef(LegalRef.FORARBETEN),
-                                                           self.config.url)
+                                                           self.minter,
+                                                           self.commondata)
         return self._forarbete_parser
 
     @classmethod
@@ -2897,17 +2892,9 @@ class SFS(Trips):
             fp.write(treestring)
         return self.store.annotation_path(basefile)
 
-    def _unlocalize_uri(self, uri):
-        # may need to munge https://lagen.nu/2010:1770#K1P2S1 back to
-        # http://rinfo.lagrummet.se/publ/sfs/2010:1770#K1P2S1 since
-        # that's what legalref expects. This is (or should be) the
-        # inverse of SwedishLegalSource.localize_uri()
-        prefix = self.config.url + self.config.urlpath
-        return uri.replace(prefix, "http://rinfo.lagrummet.se/publ/sfs/")
-
     def display_title(self, uri, form="absolute"):
         # "https://lagen.nu/2010:1770#K1P2S1" => "Lag (2010:1770) om blahonga, 1 kap. 2 § 1 st."
-        parts = legaluri.parse(self._unlocalize_uri(uri))
+        parts = legaluri.parse(uri)
         res = ""
         for (field, label) in (('chapter', 'kap.'),
                                ('section', '\xa7'),
