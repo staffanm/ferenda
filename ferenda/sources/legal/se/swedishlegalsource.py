@@ -739,7 +739,6 @@ class SwedishCitationParser(CitationParser):
         string = string.replace("\r\n", " ").replace("\n", " ")
         # transform self._currenturl => attributes
         attributes = {}
-        from pudb import set_trace; set_trace()
         return self._legalrefparser.parse(string,
                                           minter=self._minter,
                                           metadata_graph=self._commondata,

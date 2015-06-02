@@ -75,7 +75,7 @@ class Forfattning(CompoundElement, TemporalElement):
     tagname = "body"
     classname = "konsolideradforfattning"
 
-# Rubrike är en av de få byggstenarna som faktiskt inte kan innehålla
+# Rubrik är en av de få byggstenarna som faktiskt inte kan innehålla
 # något annat (det förekommer "aldrig" en hänvisning i en
 # rubriktext). Den ärver alltså från UnicodeElement, inte
 # CompoundElement.
@@ -85,7 +85,7 @@ class Rubrik(UnicodeElement, TemporalElement):
 
     """En rubrik av något slag - kan vara en huvud- eller underrubrik
     i löptexten, en kapitelrubrik, eller något annat"""
-    fragment_label = "R"
+    ordinalpredicate = "rinfoex:rubriknummer"
 
     def _get_tagname(self):
         if hasattr(self, 'type') and self.type == "underrubrik":
@@ -104,6 +104,7 @@ class Stycke(CompoundElement):
     fragment_label = "S"
     tagname = "p"
     typeof = "rinfoex:Stycke"  # not defined by the rpubl vocab
+    ordinalpredicate = "rinfoex:styckenummer"
 
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
@@ -127,10 +128,6 @@ class Bokstavslista (CompoundElement):
     classname = "bokstavslista"
 
 
-# class Preformatted(UnicodeElement):
-#     pass
-
-
 class Tabell(CompoundElement):
     tagname = "table"
 
@@ -146,6 +143,7 @@ class Tabellcell(CompoundElement):
 class Avdelning(CompoundElement, OrdinalElement):
     tagname = "div"
     fragment_label = "A"
+    ordinalpredicate = "rinfoex:avdelningsnummer"
 
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
@@ -154,7 +152,6 @@ class Avdelning(CompoundElement, OrdinalElement):
 
 
 class UpphavtKapitel(UnicodeElement, OrdinalElement):
-
     """Ett UpphavtKapitel är annorlunda från ett upphävt Kapitel på så
     sätt att inget av den egentliga lagtexten finns kvar, bara en
     platshållare"""
@@ -164,12 +161,11 @@ class Kapitel(CompoundElement, OrdinalElement):
     fragment_label = "K"
     tagname = "div"
     typeof = "rpubl:Kapitel"  # FIXME: This is qname string, not
-    # rdflib.URIRef (which would be better),
-    # since as_xhtml doesn't have access to
-    # a graph with namespace bindings, which
-    # is required to turn a URIRef to a
-    # qname
-
+    # rdflib.URIRef (which would be better), since as_xhtml doesn't
+    # have access to a graph with namespace bindings, which is
+    # required to turn a URIRef to a qname
+    ordinalpredicate = "rpubl:kapitelnummer"
+    
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
         self.uri = kwargs.get("uri", None)
@@ -186,6 +182,7 @@ class Paragraf(CompoundElement, OrdinalElement):
     fragment_label = "P"
     tagname = "div"
     typeof = "rpubl:Paragraf"  # FIXME: see above
+    ordinalpredicate = "rpubl:paragrafnummer"
 
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
@@ -197,6 +194,7 @@ class Paragraf(CompoundElement, OrdinalElement):
 class Listelement(CompoundElement, OrdinalElement):
     fragment_label = "N"
     tagname = "li"
+    ordinalpredicate = "rinfoex:punktnummer"
 
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
@@ -214,6 +212,7 @@ class Overgangsbestammelser(CompoundElement):
 class Overgangsbestammelse(CompoundElement, OrdinalElement):
     tagname = "div"
     fragment_label = "L"
+    ordinalpredicate = "rinfoex:overgangsbestammelse"  # really sfsid...
 
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
@@ -223,6 +222,7 @@ class Overgangsbestammelse(CompoundElement, OrdinalElement):
 
 class Bilaga(CompoundElement):
     fragment_label = "B"
+    ordinalpredicate = "rinfoex:bilaganummer"
 
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
@@ -1219,179 +1219,182 @@ class SFS(Trips):
         capitalized = term[0].upper() + term[1:]
         return 'https://lagen.nu/concept/%s' % capitalized.replace(' ', '_')
 
-    # Post-processar dokumentträdet rekursivt och gör två saker:
-    #
-    # Hittar adresserbara enheter (delresurser som ska ha unika URI:s,
-    # dvs kapitel, paragrafer, stycken, punkter) och konstruerar id's
-    # för dem, exv K1P2S3N4 för 1 kap. 2 \xa7 3 st. 4 p
-    #
-    # Hittar begreppsdefinitioner i löptexten
-    def _construct_ids(self, element, prefix, baseuri, skip_fragments=[],
-                       find_definitions=False):
+
+    def visit_node(self, node, clbl, state):
+        """Visit each part of the document recursively (depth-first) and call
+        a user-supplied function for each part.
+
+        :param node: The document part
+        :param clbl: A function that is called with node and state as
+                     argument. It should return True if sub-nodes
+                     should be visited, False otherwise.
+        :param state: A mutable or immutable object (helpful!)
+
+        """
+        # node could be a CompoundElement, a plain str, or something else
+        newstate = clbl(node, state)
+        if newstate is not None and isinstance(node, CompoundElement):
+            for subnode in node:
+                self.visit_node(subnode, clbl, newstate)
+        
+
+    def construct_id(self, node, state):
+        if hasattr(node, 'ordinalpredicate'): # could be a qname?
+            if hasattr(node, 'ordinal') and node.ordinal:
+                ordinal = node.ordinal
+            elif hasattr(node. sfsnr):
+                ordinal = node.sfsnr
+            else:
+                # find out which # this is
+                ordinal = 0
+                for othernode in node.parent:
+                    if type(node) == type(othernode):
+                        ordinal += 1
+                    if node == othernode:
+                        break
+            state[node.ordinalpredicate] = ordinal
+            res = self.attributes_to_resource(state)
+            try:
+                uri = self.minter.space.coin_uri(res)
+                node.uri = uri
+            except Exception:
+                pass
+
+
+    def find_definitions(self, element, find_definitions):
+        if not isinstance(element, CompoundElement):
+            return False
         find_definitions_recursive = find_definitions
-        counters = defaultdict(int)
-        if isinstance(element, CompoundElement):
-            # Hitta begreppsdefinitioner
-            if isinstance(element, Paragraf):
-                # kolla om första stycket innehåller en text som
-                # antyder att definitioner följer
-                # self.log.debug("Testing %r against some regexes" % element[0][0])
-                if self.re_definitions(element[0][0]):
-                    find_definitions = "normal"
-                if (self.re_brottsdef(element[0][0]) or
-                        self.re_brottsdef_alt(element[0][0])):
-                    find_definitions = "brottsrubricering"
-                if self.re_parantesdef(element[0][0]):
-                    find_definitions = "parantes"
-                if self.re_loptextdef(element[0][0]):
-                    find_definitions = "loptext"
+        # Hitta begreppsdefinitioner
+        if isinstance(element, Paragraf):
+            # kolla om första stycket innehåller en text som
+            # antyder att definitioner följer
+            # self.log.debug("Testing %r against some regexes" % element[0][0])
+            if self.re_definitions(element[0][0]):
+                find_definitions = "normal"
+            if (self.re_brottsdef(element[0][0]) or
+                    self.re_brottsdef_alt(element[0][0])):
+                find_definitions = "brottsrubricering"
+            if self.re_parantesdef(element[0][0]):
+                find_definitions = "parantes"
+            if self.re_loptextdef(element[0][0]):
+                find_definitions = "loptext"
 
-                for p in element:
-                    if isinstance(p, Stycke):
-                        # do an extra check in case "I denna paragraf
-                        # avses med" occurs in the 2nd or later
-                        # paragrapgh of a section
-                        if self.re_definitions(p[0]):
-                            find_definitions = "normal"
-                find_definitions_recursive = find_definitions
-
-            # Hitta lagrumshänvisningar + definitioner
-            if (isinstance(element, Stycke)
-                or isinstance(element, Listelement)
-                    or isinstance(element, Tabellcell)):
-                nodes = []
-                term = None
-
-                # self.log.debug("handling text %s, find_definitions %s" % (element[0],find_definitions))
-                if find_definitions:
-                    elementtext = element[0]
-                    termdelimiter = ":"
-
-                    if isinstance(element, Tabellcell):
-                        if elementtext != "Beteckning":
-                            term = elementtext
-                            self.log.debug(
-                                '"%s" är nog en definition (1)' % term)
-                    elif isinstance(element, Stycke):
-
-                        # Case 1: "antisladdsystem: ett tekniskt stödsystem"
-                        # Sometimes, : is not the delimiter between
-                        # the term and the definition, but even in
-                        # those cases, : might figure in the
-                        # definition itself, usually as part of the
-                        # SFS number. Do some hairy heuristics to find
-                        # out what delimiter to use
-                        if find_definitions == "normal":
-                            if not self.re_definitions(elementtext):
-                                if " - " in elementtext:
-                                    if (":" in elementtext and
-                                            (elementtext.index(":") < elementtext.index(" - "))):
-                                        termdelimiter = ":"
-                                    else:
-                                        termdelimiter = " - "
-                                m = self.re_SearchSfsId(elementtext)
-
-                                if termdelimiter == ":" and m and m.start() < elementtext.index(
-                                        ":"):
-                                    termdelimiter = " "
-
-                                if termdelimiter in elementtext:
-                                    term = elementtext.split(termdelimiter)[0]
-                                    self.log.debug('"%s" är nog en definition (2.1)' % term)
-
-                        # case 2: "Den som berövar annan livet, döms
-                        # för mord till fängelse"
-                        m = self.re_brottsdef(elementtext)
-                        if m:
-                            term = m.group(2)
-                            self.log.debug(
-                                '"%s" är nog en definition (2.2)' % term)
-
-                        # case 3: "För miljöbrott döms till böter"
-                        m = self.re_brottsdef_alt(elementtext)
-                        if m:
-                            term = m.group(1)
-                            self.log.debug(
-                                '"%s" är nog en definition (2.3)' % term)
-
-                        # case 4: "Inteckning får på ansökan av
-                        # fastighetsägaren dödas (dödning)."
-                        m = self.re_parantesdef(elementtext)
-                        if m:
-                            term = m.group(1)
-                            # print("%s: %s" %  (self.id, elementtext))
-                            self.log.debug(
-                                '"%s" är nog en definition (2.4)' % term)
-
-                        # case 5: "Med detaljhandel avses i denna lag
-                        # försäljning av läkemedel"
-                        m = self.re_loptextdef(elementtext)
-                        if m:
-                            term = m.group(1)
-                            self.log.debug(
-                                '"%s" är nog en definition (2.5)' % term)
-
-                    elif isinstance(element, Listelement):
-                        # remove
-                        for rx in (self.re_Bullet,
-                                   self.re_DottedNumber,
-                                   self.re_Bokstavslista):
-                            elementtext = rx.sub('', elementtext)
-                        term = elementtext.split(termdelimiter)[0]
-                        self.log.debug('"%s" är nog en definition (3)' % term)
-
-                    # Longest legitimate term found "Valutaväxling,
-                    # betalningsöverföring och annan finansiell
-                    # verksamhet"
-                    if term and len(term) < 68:
-                        term = util.normalize_space(term)
-                        termnode = LinkSubject(term, uri=self._term_to_subject(
-                            term), predicate="dcterms:subject")
-                        find_definitions_recursive = False
-                    else:
-                        term = None
-
-                if term:
-                    idx = None
-                    for p in element:
-                        if isinstance(p, str) and term in p:
-                            (head, tail) = p.split(term, 1)
-                            nodes = (head, termnode, tail)
-                            idx = element.index(p)
-                    if not idx is None:
-                        element[idx:idx + 1] = nodes
-
-            # Konstruera IDs
             for p in element:
-                counters[type(p)] += 1
+                if isinstance(p, Stycke):
+                    # do an extra check in case "I denna paragraf
+                    # avses med" occurs in the 2nd or later
+                    # paragrapgh of a section
+                    if self.re_definitions(p[0]):
+                        find_definitions = "normal"
+            find_definitions_recursive = find_definitions
 
-                if hasattr(p, 'fragment_label'):
-                    elementtype = p.fragment_label
-                    if hasattr(p, 'ordinal') and p.ordinal:
-                        elementordinal = p.ordinal.replace(" ", "")
-                    elif hasattr(p, 'sfsnr'):
-                        elementordinal = p.sfsnr
-                    else:
-                        elementordinal = counters[type(p)]
-                    fragment = "%s%s%s" % (prefix, elementtype, elementordinal)
-                    p.id = fragment
-                    p.uri = baseuri + "#" + fragment
-                else:
-                    fragment = prefix
+        # Hitta lagrumshänvisningar + definitioner
+        if isinstance(element, (Stycke, Listelement, Tabellcell)):
+            nodes = []
+            term = None
 
-                if ((hasattr(p, 'fragment_label') and
-                     p.fragment_label in skip_fragments)):
-                    self._construct_ids(p, prefix, baseuri, skip_fragments,
-                                        find_definitions_recursive)
-                else:
-                    self._construct_ids(p, fragment, baseuri, skip_fragments,
-                                        find_definitions_recursive)
+            # self.log.debug("handling text %s, find_definitions %s" % (element[0],find_definitions))
+            if find_definitions:
+                elementtext = element[0]
+                termdelimiter = ":"
 
-                # Efter att första tabellcellen i en rad hanterats,
-                # undvik att leta definitioner i tabellceller 2,3,4...
-                if isinstance(element, Tabellrad):
-                    # print "släcker definitionsletarflaggan"
+                if isinstance(element, Tabellcell):
+                    if elementtext != "Beteckning":
+                        term = elementtext
+                        self.log.debug(
+                            '"%s" är nog en definition (1)' % term)
+                elif isinstance(element, Stycke):
+
+                    # Case 1: "antisladdsystem: ett tekniskt stödsystem"
+                    # Sometimes, : is not the delimiter between
+                    # the term and the definition, but even in
+                    # those cases, : might figure in the
+                    # definition itself, usually as part of the
+                    # SFS number. Do some hairy heuristics to find
+                    # out what delimiter to use
+                    if find_definitions == "normal":
+                        if not self.re_definitions(elementtext):
+                            if " - " in elementtext:
+                                if (":" in elementtext and
+                                        (elementtext.index(":") < elementtext.index(" - "))):
+                                    termdelimiter = ":"
+                                else:
+                                    termdelimiter = " - "
+                            m = self.re_SearchSfsId(elementtext)
+
+                            if termdelimiter == ":" and m and m.start() < elementtext.index(
+                                    ":"):
+                                termdelimiter = " "
+
+                            if termdelimiter in elementtext:
+                                term = elementtext.split(termdelimiter)[0]
+                                self.log.debug('"%s" är nog en definition (2.1)' % term)
+
+                    # case 2: "Den som berövar annan livet, döms
+                    # för mord till fängelse"
+                    m = self.re_brottsdef(elementtext)
+                    if m:
+                        term = m.group(2)
+                        self.log.debug(
+                            '"%s" är nog en definition (2.2)' % term)
+
+                    # case 3: "För miljöbrott döms till böter"
+                    m = self.re_brottsdef_alt(elementtext)
+                    if m:
+                        term = m.group(1)
+                        self.log.debug(
+                            '"%s" är nog en definition (2.3)' % term)
+
+                    # case 4: "Inteckning får på ansökan av
+                    # fastighetsägaren dödas (dödning)."
+                    m = self.re_parantesdef(elementtext)
+                    if m:
+                        term = m.group(1)
+                        # print("%s: %s" %  (self.id, elementtext))
+                        self.log.debug(
+                            '"%s" är nog en definition (2.4)' % term)
+
+                    # case 5: "Med detaljhandel avses i denna lag
+                    # försäljning av läkemedel"
+                    m = self.re_loptextdef(elementtext)
+                    if m:
+                        term = m.group(1)
+                        self.log.debug(
+                            '"%s" är nog en definition (2.5)' % term)
+
+                elif isinstance(element, Listelement):
+                    # remove
+                    for rx in (self.re_Bullet,
+                               self.re_DottedNumber,
+                               self.re_Bokstavslista):
+                        elementtext = rx.sub('', elementtext)
+                    term = elementtext.split(termdelimiter)[0]
+                    self.log.debug('"%s" är nog en definition (3)' % term)
+
+                # Longest legitimate term found "Valutaväxling,
+                # betalningsöverföring och annan finansiell
+                # verksamhet"
+                if term and len(term) < 68:
+                    term = util.normalize_space(term)
+                    termnode = LinkSubject(term, uri=self._term_to_subject(
+                        term), predicate="dcterms:subject")
                     find_definitions_recursive = False
+                else:
+                    term = None
+
+            if term:
+                idx = None
+                for p in element:
+                    if isinstance(p, str) and term in p:
+                        (head, tail) = p.split(term, 1)
+                        nodes = (head, termnode, tail)
+                        idx = element.index(p)
+                if not idx is None:
+                    element[idx:idx + 1] = nodes
+        
+    def find_definitions(self, node, state):
+        pass
 
     def _count_elements(self, element):
         counters = defaultdict(int)
@@ -1405,6 +1408,12 @@ class SFS(Trips):
                     for k in subcounters:
                         counters[k] += subcounters[k]
         return counters
+
+
+    def null_visitor(self, node, state):
+        print("Visiting %s, state is %s" % (type(node), state))
+        return state + [node.__class__.__name__]
+    
 
     def parse_sfst(self, text, doc):
         # self.reader = TextReader(string=lawtext,linesep=TextReader.UNIX)
@@ -1420,10 +1429,13 @@ class SFS(Trips):
         else:
             skipfragments = ['A']
 
-        self._construct_ids(doc.body, '',
-                            self.canonical_uri(doc.basefile),
-                            skipfragments)
-        self.lagrum_parser.parse_recursive(doc.body)
+
+        state = {}
+        self.visit_node(doc.body, self.null_visitor, [])
+        self.visit_node(doc.body, self.construct_id, state)
+        self.visit_node(doc.body, self.find_definitions, state)
+        self.visit_node(doc.body, self.find_references, state)
+        # self.lagrum_parser.parse_recursive(doc.body)
 
     #----------------------------------------------------------------
     #
@@ -2776,32 +2788,8 @@ class SFS(Trips):
         # by root/chapter/section/paragraph URI:s. We do this using
         # raw XML, not RDFlib, to avoid normalizing the graph -- we
         # need repetition in order to make the XSLT processing simple.
-        #
-        # The RDF dump looks something like:
-        #
-        # <rdf:RDF>
-        # <rdf:Description about="http://rinfo.lagrummet.se/publ/sfs/1998:204#P1">
-        #     <rpubl:isLagrumFor>
-        #       <rdf:Description about="http://rinfo.lagrummet.se/publ/dom/rh/2004:51">
-        #           <dcterms:identifier>RH 2004:51</dcterms:identifier>
-        #           <dcterms:description>Hemsida på Internet. Fråga om...</dcterms:description>
-        #       </rdf:Description>
-        #     </rpubl:isLagrumFor>
-        #     <dcterms:description>Personuppgiftslagens syfte är att skydda...</dcterms:description>
-        #     <rpubl:isChangedBy>
-        #        <rdf:Description about="http://rinfo.lagrummet.se/publ/sfs/2003:104">
-        #           <dcterms:identifier>SFS 2003:104</dcterms:identifier>
-        #           <rpubl:proposition>
-        #             <rdf:Description about="http://rinfo.lagrummet.se/publ/prop/2002/03:123">
-        #               <dcterms:title>Översyn av personuppgiftslagen</dcterms:title>
-        #               <dcterms:identifier>Prop. 2002/03:123</dcterms:identifier>
-        #             </rdf:Description>
-        #           </rpubl:proposition>
-        #        </rdf:Description>
-        #     </rpubl:isChangedBy>
-        #   </rdf:Description>
-        # </rdf:RDF>
-
+        # FIXME: Preferred way would be to serialize the RDF graph as GRIT
+        
         start = time()
         # compatibility hack to enable lxml to process qnames for namespaces
 
@@ -2991,9 +2979,6 @@ class SFS(Trips):
                       dimension_label="utgiven")
                 ]
 
-    def tabs(self):
-        return [("Författningar", self.dataset_uri())]
-
     def toc_item(self, binding, row):
         """Returns a formatted version of row, using Element objects"""
         title = self._forfattningskey(row['titel'])
@@ -3004,11 +2989,3 @@ class SFS(Trips):
                 res.append(row['titel'][:idx])
         res.append(Link(title, uri=row['uri']))
         return res
-
-    templ = [
-        "downloaded/(?P<type>\w+)/(?P<byear>\d+)/(?P<bnum>[\d_s\.bih]+)\.html",
-        # these next are only interesting for sfst, not sfsr
-        "downloaded/sfst/(?P<byear>\d+)/(?P<bnum>[\d_s\.bih]+)-(?P<vyear>\d+)-(?P<vnum>[\d_s\.bih]+)\.html",
-        "downloaded/sfst/(?P<byear>\d+)/(?P<bnum>[\d_s\.bih]+)-(?P<vyear>first)-(?P<vnum>version)\.html",
-        "downloaded/sfst/(?P<byear>\d+)/(?P<bnum>[\d_s\.bih]+)-(?P<vyear>\d+)-(?P<vnum>[\d_s\.bih]+)-checksum-(?P<vcheck>[\w\d]+)\.html"
-    ]
