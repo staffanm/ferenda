@@ -19,17 +19,19 @@ from lagen.nu import LNMediaWiki as MediaWiki
 
 from ferenda.sources.tech import RFC, W3Standards, PEP
 from ferenda.sources.legal.eu import EurlexCaselaw, EurlexTreaties
-from ferenda.sources.legal.se import ARN, Direktiv, Ds, DV, JK, JO, Kommitte, MyndFskr, Propositioner, Regeringen, Riksdagen, SFS, SOU, SwedishLegalSource
+from ferenda.sources.legal.se import ARN, Direktiv, Ds, DV, JK, JO, Kommitte, MyndFskr, Propositioner, Regeringen, Riksdagen, SOU, SwedishLegalSource
 # subrepos, normally used through a container CompositeRepository
 from ferenda.sources.legal.se.propositioner import PropRegeringen
 from ferenda.sources.legal.se.direktiv import DirTrips, DirRegeringen
 
+from lagen.nu import SFS
+
 for cls in (Keyword, Skeleton, MediaWiki, RFC, W3Standards, PEP,
             EurlexCaselaw, EurlexTreaties, ARN, Direktiv, Ds, DV, JK,
             JO, Kommitte, MyndFskr, Propositioner, Regeringen,
-            Riksdagen, SFS, SOU, SwedishLegalSource, PropRegeringen,
-            DirTrips, DirRegeringen):
-# for cls in (ARN, MediaWiki):
+            Riksdagen, SOU, SwedishLegalSource, PropRegeringen,
+            DirTrips, DirRegeringen,
+            SFS):
     # Create a new class, based on RepoTester, on the fly.
     d = {'repoclass': cls,
          'docroot': os.path.dirname(__file__)+"/files/repo/" + cls.alias}

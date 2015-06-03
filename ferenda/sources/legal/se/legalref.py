@@ -719,7 +719,6 @@ class LegalRef:
                   "element", "section", "chapter", "lawref"):
             if k in attributes:
                 p = self.attributemap[k]
-                leaf = util.uri_leaf(p)
                 rel = URIRef(str(p).replace("nummer", ""))
                 g.add((current, p, Literal(attributes[k])))
                 del attributes[k]
@@ -741,7 +740,6 @@ class LegalRef:
         for (p, o) in rest:
             g.add((current, p, o))
         return g.resource(b)
-
     
     def sfs_format_uri(self, attributes):
         if 'law' not in attributes and not self.allow_relative:

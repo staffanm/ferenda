@@ -82,12 +82,8 @@ class Forfattning(CompoundElement, TemporalElement):
 
 
 class Rubrik(UnicodeElement, TemporalElement):
-
     """En rubrik av något slag - kan vara en huvud- eller underrubrik
     i löptexten, en kapitelrubrik, eller något annat"""
-    # NB: this should maybe only be part of lagen.nu.SFS, not
-    # ferenda.sources.legal.se.SFS
-    ordinalpredicate = "rinfoex:rubriknummer"
 
     def _get_tagname(self):
         if hasattr(self, 'type') and self.type == "underrubrik":
@@ -106,7 +102,6 @@ class Stycke(CompoundElement):
     fragment_label = "S"
     tagname = "p"
     typeof = "rinfoex:Stycke"  # not defined by the rpubl vocab
-    ordinalpredicate = "rinfoex:styckenummer"
 
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
@@ -145,7 +140,6 @@ class Tabellcell(CompoundElement):
 class Avdelning(CompoundElement, OrdinalElement):
     tagname = "div"
     fragment_label = "A"
-    ordinalpredicate = "rinfoex:avdelningsnummer"
 
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
@@ -166,7 +160,6 @@ class Kapitel(CompoundElement, OrdinalElement):
     # rdflib.URIRef (which would be better), since as_xhtml doesn't
     # have access to a graph with namespace bindings, which is
     # required to turn a URIRef to a qname
-    ordinalpredicate = "rpubl:kapitelnummer"
     
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
@@ -184,7 +177,6 @@ class Paragraf(CompoundElement, OrdinalElement):
     fragment_label = "P"
     tagname = "div"
     typeof = "rpubl:Paragraf"  # FIXME: see above
-    ordinalpredicate = "rpubl:paragrafnummer"
 
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
@@ -196,7 +188,6 @@ class Paragraf(CompoundElement, OrdinalElement):
 class Listelement(CompoundElement, OrdinalElement):
     fragment_label = "N"
     tagname = "li"
-    ordinalpredicate = "rinfoex:punktnummer"
 
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
@@ -214,7 +205,6 @@ class Overgangsbestammelser(CompoundElement):
 class Overgangsbestammelse(CompoundElement, OrdinalElement):
     tagname = "div"
     fragment_label = "L"
-    ordinalpredicate = "rinfoex:overgangsbestammelse"  # really sfsid...
 
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
@@ -224,7 +214,6 @@ class Overgangsbestammelse(CompoundElement, OrdinalElement):
 
 class Bilaga(CompoundElement):
     fragment_label = "B"
-    ordinalpredicate = "rinfoex:bilaganummer"
 
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get("id", None)
@@ -1234,7 +1223,9 @@ class SFS(Trips):
 
         """
         # node could be a CompoundElement, a plain str, or something else
+        print("visitng %s: %r" % (node.__class__.__name__, [x for x in state.keys() if x != "parent"]))
         newstate = clbl(node, state)
+        print("visited %s: %r" % (node.__class__.__name__, [x for x in newstate.keys() if x != "parent"]))
         if newstate is not None and isinstance(node, CompoundElement):
             for subnode in node:
                 self.visit_node(subnode, clbl, newstate)
@@ -1249,7 +1240,7 @@ class SFS(Trips):
         g = Graph()
         b = BNode()
         current = b
-
+        attributes = dict(attributes)
         # create needed sub-nodes
         for k in ("rinfoex:meningnummer", "rinfoex:punktnummer",
                   "rinfoex:styckenummer", "rpubl:paragrafnummer",
@@ -1263,22 +1254,40 @@ class SFS(Trips):
                 g.add((new, rel, current))
                 current = new
 
-        # FIXME: should handle <ar>:<lopnr>_s_<n>, ...bih_<n> etc
-        arsutgava, lopnummer = self.id.split(":", 1)
-        g.add((current, RPUBL.arsutgava, Literal(arsutgava)))
-        g.add((current, RPUBL.lopnummer, Literal(lopnummer)))
-        g.add((current, RPUBL.forfattningssamling, self.lookup_resource("SFS", SKOS.altLabel)))
+        for k, v in attributes.items():
+            if not isinstance(v, URIRef):
+                v = Literal(v)
+            g.add((current, uri(k), v))
         return g.resource(b)
         
 
+    # this struct is intended to be overridable
+    ordinalpredicates = {
+        Kapitel: "rpubl:kapitelnummer",
+        Paragraf: "rpubl:paragrafnummer",
+#        Rubrik: "rinfoex:rubriknummer",
+#        Stycke: "rinfoex:styckenummer",
+#        Listelement: "rinfoex:punktnummer",
+#        Overgangsbestammelse: "rinfoex:overgangsbestammelse",
+#        Bilaga: "rinfoex:bilaganummer"
+#        Avdelning: "rinfoex:avdelningsnummer",
+    }
+    
     def construct_id(self, node, state):
-        from pudb import set_trace; set_trace()
+        print("constructing %s: %r" % (node.__class__.__name__, [x for x in state.keys() if x != "parent"]))
         # copy our state (shouldn't use nested dicts)
         state = dict(state)
-        if hasattr(node, 'ordinalpredicate'): # could be a qname?
+        if isinstance(node, Forfattning):
+            arsutgava, lopnummer = self.id.split(":", 1)
+            state["rpubl:arsutgava"] = arsutgava
+            state["rpubl:lopnummer"] = lopnummer
+            state["rpubl:forfattningssamling"] = URIRef(self.lookup_resource("SFS", SKOS.altLabel))
+                   
+        if self.ordinalpredicates.get(node.__class__): # could be a qname?
             if hasattr(node, 'ordinal') and node.ordinal:
                 ordinal = node.ordinal
             elif hasattr(node, 'sfsnr'):
+                # from pudb import set_trace; set_trace()
                 ordinal = node.sfsnr
             else:
                 # find out which # this is
@@ -1288,7 +1297,7 @@ class SFS(Trips):
                         ordinal += 1
                     if node == othernode:
                         break
-            state[node.ordinalpredicate] = ordinal
+            state[self.ordinalpredicates.get(node.__class__)] = ordinal
             del state['parent']
             res = self.attributes_to_resource(state)
             try:
@@ -1297,6 +1306,7 @@ class SFS(Trips):
             except Exception:
                 pass
         state['parent'] = node
+        print("constructed %s: %r" % (node.__class__.__name__, [x for x in state.keys() if x != "parent"]))
         return state
 
 
@@ -1469,9 +1479,8 @@ class SFS(Trips):
             skipfragments = ['A']
 
 
-        state = {}
-        self.visit_node(doc.body, self.null_visitor, [])
-        self.visit_node(doc.body, self.construct_id, state)
+        # self.visit_node(doc.body, self.null_visitor, [])
+        self.visit_node(doc.body, self.construct_id, {})
         from ferenda.elements import serialize
         print(serialize(doc.body))
         raise ThisWouldBeAGoodPlaceToCrash

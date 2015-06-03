@@ -9,29 +9,42 @@ from datetime import datetime
 from ferenda import decorators, util
 from ferenda import TextReader, DocumentEntry
 from ferenda.sources.legal.se import SFS as OrigSFS
-
+from ferenda.sources.legal.se.sfs import Kapitel, Paragraf, Rubrik, Stycke, Listelement, Overgangsbestammelse, Listelement, Overgangsbestammelse, Bilaga
 
 class SFS(OrigSFS):
+    alias = "lsfs"
     # consider moving facets() and tabs() from OrigSFS to this
 
+    ordinalpredicates = {
+        Kapitel: "rpubl:kapitelnummer",
+        Paragraf: "rpubl:paragrafnummer",
+        Rubrik: "rinfoex:rubriknummer",
+        Stycke: "rinfoex:styckenummer",
+        Listelement: "rinfoex:punktnummer",
+        Overgangsbestammelse: "rinfoex:overgangsbestammelse",
+        Bilaga: "rinfoex:bilaganummer"
+        # Avdelning: "rinfoex:avdelningsnummer",
+    }
 
     def _makeimages(self):
         # FIXME: make sure a suitable font exists
-        font = "Helvetica" 
+        font = "Helvetica"
+
         def makeimage(basename, label):
             filename = "res/img/sfs/%s.png" % basename
             if not os.path.exists(filename):
                 util.ensure_dir(filename)
-                self.log.info("Creating img %s with label %s" % (filename,label))
-                cmd = 'convert -background transparent -fill Grey -font Helvetica -pointsize 10 -size 44x14 -gravity East label:"%s " %s' % (label,filename)
+                self.log.info("Creating img %s with label %s" %
+                              (filename, label))
+                cmd = 'convert -background transparent -fill Grey -font %s -pointsize 10 -size 44x14 -gravity East label:"%s " %s' % (font, label, filename)
                 util.runcmd(cmd)
             return filename
         ret = []
-        for i in range(1,150):
-            for j in ('','a','b'):
-                ret.append(makeimage("K%d%s"%(i,j),"%d%s kap."%(i,j)))
-        for i in range(1,100):
-            ret.append(makeimage("S%d"%i,"%d st."%i))
+        for i in range(1, 150):
+            for j in ('', 'a', 'b'):
+                ret.append(makeimage("K%d%s" % (i, j), "%d%s kap." % (i, j)))
+        for i in range(1, 100):
+            ret.append(makeimage("S%d" % i, "%d st." % i))
         return ret
 
     @decorators.action
