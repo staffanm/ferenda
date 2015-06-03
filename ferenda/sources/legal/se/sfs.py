@@ -22,8 +22,8 @@ from six import text_type as str
 from ferenda.compat import OrderedDict
 
 # 3rdparty libs
-from rdflib import URIRef, Literal, RDF
-from rdflib.namespace import DCTERMS
+from rdflib import URIRef, Literal, RDF, Graph, BNode
+from rdflib.namespace import DCTERMS, SKOS
 from lxml import etree
 from lxml.builder import ElementMaker
 import bs4
@@ -85,6 +85,8 @@ class Rubrik(UnicodeElement, TemporalElement):
 
     """En rubrik av något slag - kan vara en huvud- eller underrubrik
     i löptexten, en kapitelrubrik, eller något annat"""
+    # NB: this should maybe only be part of lagen.nu.SFS, not
+    # ferenda.sources.legal.se.SFS
     ordinalpredicate = "rinfoex:rubriknummer"
 
     def _get_tagname(self):
@@ -1237,28 +1239,65 @@ class SFS(Trips):
             for subnode in node:
                 self.visit_node(subnode, clbl, newstate)
         
+    def attributes_to_resource(self, attributes):
+        # this is roughly the same code as
+        # LegalRef.attributes_to_resource but with different keys
+        def uri(qname):
+            (prefix, leaf) = qname.split(":", 1)
+            return self.ns[prefix][leaf]
+        
+        g = Graph()
+        b = BNode()
+        current = b
+
+        # create needed sub-nodes
+        for k in ("rinfoex:meningnummer", "rinfoex:punktnummer",
+                  "rinfoex:styckenummer", "rpubl:paragrafnummer",
+                  "rpubl:kapitelnummer"):
+            if k in attributes:
+                p = uri(k)
+                rel = URIRef(str(p).replace("nummer", ""))
+                g.add((current, p, Literal(attributes[k])))
+                del attributes[k]
+                new = BNode()
+                g.add((new, rel, current))
+                current = new
+
+        # FIXME: should handle <ar>:<lopnr>_s_<n>, ...bih_<n> etc
+        arsutgava, lopnummer = self.id.split(":", 1)
+        g.add((current, RPUBL.arsutgava, Literal(arsutgava)))
+        g.add((current, RPUBL.lopnummer, Literal(lopnummer)))
+        g.add((current, RPUBL.forfattningssamling, self.lookup_resource("SFS", SKOS.altLabel)))
+        return g.resource(b)
+        
 
     def construct_id(self, node, state):
+        from pudb import set_trace; set_trace()
+        # copy our state (shouldn't use nested dicts)
+        state = dict(state)
         if hasattr(node, 'ordinalpredicate'): # could be a qname?
             if hasattr(node, 'ordinal') and node.ordinal:
                 ordinal = node.ordinal
-            elif hasattr(node. sfsnr):
+            elif hasattr(node, 'sfsnr'):
                 ordinal = node.sfsnr
             else:
                 # find out which # this is
                 ordinal = 0
-                for othernode in node.parent:
+                for othernode in state['parent']:
                     if type(node) == type(othernode):
                         ordinal += 1
                     if node == othernode:
                         break
             state[node.ordinalpredicate] = ordinal
+            del state['parent']
             res = self.attributes_to_resource(state)
             try:
                 uri = self.minter.space.coin_uri(res)
                 node.uri = uri
             except Exception:
                 pass
+        state['parent'] = node
+        return state
 
 
     def find_definitions(self, element, find_definitions):
@@ -1393,7 +1432,7 @@ class SFS(Trips):
                 if not idx is None:
                     element[idx:idx + 1] = nodes
         
-    def find_definitions(self, node, state):
+    def find_references(self, node, state):
         pass
 
     def _count_elements(self, element):
@@ -1411,7 +1450,7 @@ class SFS(Trips):
 
 
     def null_visitor(self, node, state):
-        print("Visiting %s, state is %s" % (type(node), state))
+        # print("Visiting %s, state is %s" % (type(node), state))
         return state + [node.__class__.__name__]
     
 
@@ -1433,6 +1472,9 @@ class SFS(Trips):
         state = {}
         self.visit_node(doc.body, self.null_visitor, [])
         self.visit_node(doc.body, self.construct_id, state)
+        from ferenda.elements import serialize
+        print(serialize(doc.body))
+        raise ThisWouldBeAGoodPlaceToCrash
         self.visit_node(doc.body, self.find_definitions, state)
         self.visit_node(doc.body, self.find_references, state)
         # self.lagrum_parser.parse_recursive(doc.body)
