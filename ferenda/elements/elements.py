@@ -153,7 +153,7 @@ that includes this element."""
         attrs = {}
         for stdattr in ('class', 'id', 'dir', 'lang', 'src',
                         'href', 'name', 'alt', 'role'):
-            if hasattr(self, stdattr):
+            if hasattr(self, stdattr) and getattr(self, stdattr):
                 attrs[stdattr] = getattr(self, stdattr)
         return E(self.tagname, attrs)
 
@@ -271,7 +271,7 @@ class CompoundElement(AbstractElement, list):
         for stdattr in ('class', 'id', 'dir', 'lang', 'src',
                         'href', 'name', 'alt', 'role', 'typeof',
                         'datatype', 'property', 'rel', 'about'):
-            if hasattr(self, stdattr):
+            if hasattr(self, stdattr) and getattr(self, stdattr):
                 attrs[stdattr] = getattr(self, stdattr)
 
         # create extra attributes depending on circumstances

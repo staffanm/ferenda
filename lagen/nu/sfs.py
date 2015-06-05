@@ -12,7 +12,7 @@ from ferenda.sources.legal.se import SFS as OrigSFS
 from ferenda.sources.legal.se.sfs import Kapitel, Paragraf, Rubrik, Stycke, Listelement, Overgangsbestammelse, Listelement, Overgangsbestammelse, Bilaga
 
 class SFS(OrigSFS):
-    alias = "lsfs"
+
     # consider moving facets() and tabs() from OrigSFS to this
 
     ordinalpredicates = {

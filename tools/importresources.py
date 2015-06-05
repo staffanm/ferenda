@@ -263,6 +263,10 @@ space: coin:template [
         coin:fragmentTemplate "L{andringsforfattningnummer}";
         coin:binding [ coin:property rinfoex:andringsforfattningnummer ]
      ], [
+        coin:relFromBase rinfoex:rubrik;
+        coin:fragmentTemplate "R{rubriknummer}";
+        coin:binding [ coin:property rinfoex:rubriknummer ]
+     ], [
         coin:uriTemplate "/ext/celex/{celexNummer}#{artikelnummer}";
         coin:binding [ coin:property rpubl:celexNummer ],
                      [ coin:property rinfoex:artikelnummer ]

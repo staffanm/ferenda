@@ -1326,6 +1326,8 @@ with the *config* object as single parameter.
         :returns: The XHTML document
         :rtype: str
         """
+        from ferenda.elements import serialize
+        print(serialize(doc.body))
         xhtmldoc = self.render_xhtml_tree(doc)
         # Doctypes for XHTML+RDFa documents seem to be optional in RDFa 1.1
         # doctype = ('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML+RDFa 1.0//EN" '

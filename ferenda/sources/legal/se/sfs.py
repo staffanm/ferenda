@@ -423,16 +423,14 @@ class SFS(Trips):
         return opts
 
     def canonical_uri(self, basefile, konsolidering=False):
-        prefix = self.config.url + self.config.urlpath
-        basefile = basefile.replace(" ", "_")
+        from pudb import set_trace; set_trace()
+        attributes = self._construct_base_attributes(basefile)
         if konsolidering:
-            if konsolidering == True:
-                return "%s%s/konsolidering" % (prefix, basefile)
-            else:
+            if konsolidering is not True:
                 konsolidering = konsolidering.replace(" ", "_")
-                return "%s%s/konsolidering/%s" % (prefix, basefile, konsolidering)
-        else:
-            return "%s%s" % (prefix, basefile)
+            attributes["dcterms:issued"] = konsolidering
+        resource = self.attributes_to_resource(attributes)
+        return self.minter.space.coin_uri(resource)
 
     def basefile_from_uri(self, uri):
         prefix = self.config.url + self.config.urlpath
@@ -1211,7 +1209,7 @@ class SFS(Trips):
         return 'https://lagen.nu/concept/%s' % capitalized.replace(' ', '_')
 
 
-    def visit_node(self, node, clbl, state):
+    def visit_node(self, node, clbl, state, debug=False):
         """Visit each part of the document recursively (depth-first) and call
         a user-supplied function for each part.
 
@@ -1223,12 +1221,18 @@ class SFS(Trips):
 
         """
         # node could be a CompoundElement, a plain str, or something else
-        print("visitng %s: %r" % (node.__class__.__name__, [x for x in state.keys() if x != "parent"]))
+        if debug:
+            print("About to visit %s with %s" %
+                  (node.__class__.__name__, clbl.__name__))
         newstate = clbl(node, state)
-        print("visited %s: %r" % (node.__class__.__name__, [x for x in newstate.keys() if x != "parent"]))
+        if debug:
+            print("After visiting %s: %s" % (node.__class__.__name__, newstate))
         if newstate is not None and isinstance(node, CompoundElement):
             for subnode in node:
-                self.visit_node(subnode, clbl, newstate)
+                if debug:
+                    print("about to visit subnode %s with %s" %
+                          (subnode.__class__.__name__, newstate))
+                self.visit_node(subnode, clbl, newstate, debug)
         
     def attributes_to_resource(self, attributes):
         # this is roughly the same code as
@@ -1244,16 +1248,26 @@ class SFS(Trips):
         # create needed sub-nodes
         for k in ("rinfoex:meningnummer", "rinfoex:punktnummer",
                   "rinfoex:styckenummer", "rpubl:paragrafnummer",
-                  "rpubl:kapitelnummer"):
+                  "rinfoex:rubriknummer", "rpubl:kapitelnummer"):
             if k in attributes:
                 p = uri(k)
-                rel = URIRef(str(p).replace("nummer", ""))
                 g.add((current, p, Literal(attributes[k])))
                 del attributes[k]
                 new = BNode()
+                if p.endswith("nummer"):
+                    rel = URIRef(str(p).replace("nummer", ""))
                 g.add((new, rel, current))
                 current = new
 
+        # create relToBase things
+        if "dcterms:issued" in attributes:
+            rel = RPUBL.konsoliderar
+            new = BNode()  # the document
+            g.add((current, DCTERMS.issued, Literal(attributes["dcterms:issued"])))
+            del attributes["dcterms:issued"]
+            g.add((current, rel, new))
+            current = new
+                
         for k, v in attributes.items():
             if not isinstance(v, URIRef):
                 v = Literal(v)
@@ -1272,22 +1286,32 @@ class SFS(Trips):
 #        Bilaga: "rinfoex:bilaganummer"
 #        Avdelning: "rinfoex:avdelningsnummer",
     }
-    
+
+    def _construct_base_attributes(self, sfsid):
+        """Construct the basic attributes, in dict form, for a given SFS, eg
+
+       '1998:204' => {'rinfo:arsutgava': '1984',
+                      'rinfo:lopnummer': '204',
+                      'rinfo:forfattningssamling':
+                       URIRef("http://rinfo.lagrummet.se/serie/fs/sfs")}
+        """
+        parts = sfsid.split(":", 1)
+        return {"rpubl:arsutgava": parts[0],
+                "rpubl:lopnummer": parts[1],
+                "rpubl:forfattningssamling":
+                URIRef(self.lookup_resource("SFS", SKOS.altLabel))}
+
+        
     def construct_id(self, node, state):
-        print("constructing %s: %r" % (node.__class__.__name__, [x for x in state.keys() if x != "parent"]))
         # copy our state (shouldn't use nested dicts)
         state = dict(state)
         if isinstance(node, Forfattning):
-            arsutgava, lopnummer = self.id.split(":", 1)
-            state["rpubl:arsutgava"] = arsutgava
-            state["rpubl:lopnummer"] = lopnummer
-            state["rpubl:forfattningssamling"] = URIRef(self.lookup_resource("SFS", SKOS.altLabel))
+            attributes = self._construct_base_attributes(self.id)
                    
         if self.ordinalpredicates.get(node.__class__): # could be a qname?
             if hasattr(node, 'ordinal') and node.ordinal:
                 ordinal = node.ordinal
             elif hasattr(node, 'sfsnr'):
-                # from pudb import set_trace; set_trace()
                 ordinal = node.sfsnr
             else:
                 # find out which # this is
@@ -1303,16 +1327,17 @@ class SFS(Trips):
             try:
                 uri = self.minter.space.coin_uri(res)
                 node.uri = uri
+                if "#" in uri:
+                    node.id = uri.split("#", 1)[1]
             except Exception:
                 pass
         state['parent'] = node
-        print("constructed %s: %r" % (node.__class__.__name__, [x for x in state.keys() if x != "parent"]))
         return state
 
 
     def find_definitions(self, element, find_definitions):
         if not isinstance(element, CompoundElement):
-            return False
+            return None
         find_definitions_recursive = find_definitions
         # Hitta begreppsdefinitioner
         if isinstance(element, Paragraf):
@@ -1441,6 +1466,8 @@ class SFS(Trips):
                         idx = element.index(p)
                 if not idx is None:
                     element[idx:idx + 1] = nodes
+
+        return find_definitions_recursive
         
     def find_references(self, node, state):
         pass
@@ -1458,12 +1485,6 @@ class SFS(Trips):
                         counters[k] += subcounters[k]
         return counters
 
-
-    def null_visitor(self, node, state):
-        # print("Visiting %s, state is %s" % (type(node), state))
-        return state + [node.__class__.__name__]
-    
-
     def parse_sfst(self, text, doc):
         # self.reader = TextReader(string=lawtext,linesep=TextReader.UNIX)
         self.reader = TextReader(string=text, linesep=TextReader.DOS)
@@ -1479,14 +1500,11 @@ class SFS(Trips):
             skipfragments = ['A']
 
 
-        # self.visit_node(doc.body, self.null_visitor, [])
         self.visit_node(doc.body, self.construct_id, {})
-        from ferenda.elements import serialize
-        print(serialize(doc.body))
-        raise ThisWouldBeAGoodPlaceToCrash
-        self.visit_node(doc.body, self.find_definitions, state)
-        self.visit_node(doc.body, self.find_references, state)
-        # self.lagrum_parser.parse_recursive(doc.body)
+        self.visit_node(doc.body, self.find_definitions, True, debug=False)
+        self.lagrum_parser.parse_recursive(doc.body)
+        # FIXME: Maybe we should use visit_node for this as well
+        # self.visit_node(doc.body, self.find_references, state)
 
     #----------------------------------------------------------------
     #
