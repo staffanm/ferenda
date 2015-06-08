@@ -8,25 +8,25 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://localhost:8000/res/sfs/2013:363#P1S1N1> dcterms:isPartOf <http://localhost:8000/res/sfs/2013:363#P1S1> ;
-    dcterms:references <http://rinfo.lagrummet.se/ext/celex/31991R2092>,
-        <http://rinfo.lagrummet.se/ext/celex/32007R0834> .
+<https://lagen.nu/sfs/2013:363#P1S1N1> dcterms:isPartOf <https://lagen.nu/sfs/2013:363#P1S1> ;
+    dcterms:references <https://lagen.nu/ext/celex/31991R2092>,
+        <https://lagen.nu/ext/celex/32007R0834> .
 
-<http://localhost:8000/res/sfs/2013:363#P1S1N2> dcterms:isPartOf <http://localhost:8000/res/sfs/2013:363#P1S1> ;
-    dcterms:references <http://rinfo.lagrummet.se/ext/celex/32007R0834> .
+<https://lagen.nu/sfs/2013:363#P1S1N2> dcterms:isPartOf <https://lagen.nu/sfs/2013:363#P1S1> ;
+    dcterms:references <https://lagen.nu/ext/celex/32007R0834> .
 
-<http://localhost:8000/res/sfs/2013:363/konsolidering> owl:sameAs <http://localhost:8000/res/sfs/2013:363/konsolidering/2013:363> .
+<https://lagen.nu/sfs/2013:363/konsolidering> owl:sameAs <https://lagen.nu/sfs/2013:363/konsolidering/2013:363> .
 
-<http://localhost:8000/res/bet/2012/13:MJU14> dcterms:identifier "bet. 2012/13:MJU14" .
+<https://lagen.nu/bet/2012/13:MJU14> dcterms:identifier "bet. 2012/13:MJU14" .
 
-<http://localhost:8000/res/prop/2012/13:55> dcterms:identifier "Prop. 2012/13:55" .
+<https://lagen.nu/prop/2012/13:55> dcterms:identifier "Prop. 2012/13:55" .
 
-<http://localhost:8000/res/rskr/2012/13:210> dcterms:identifier "rskr. 2012/13:210" .
+<https://lagen.nu/rskr/2012/13:210> dcterms:identifier "rskr. 2012/13:210" .
 
-<http://localhost:8000/res/sfs/2013:363#P1> a rpubl:Paragraf ;
-    dcterms:isPartOf <http://localhost:8000/res/sfs/2013:363> .
+<https://lagen.nu/sfs/2013:363#P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/sfs/2013:363> .
 
-<http://localhost:8000/res/sfs/2013:363/konsolidering/2013:363> a rpubl:KonsolideradGrundforfattning ;
+<https://lagen.nu/sfs/2013:363/konsolidering/2013:363> a rpubl:KonsolideradGrundforfattning ;
     rinfoex:senastHamtad "2013-06-11T18:58:58.242181"^^xsd:dateTime ;
     rinfoex:senastKontrollerad "2013-06-11T18:59:58.242181"^^xsd:dateTime ;
     dcterms:creator <https://lagen.nu/org/2012/landsbygdsdepartementet> ;
@@ -34,35 +34,35 @@
     dcterms:issued "2013-05-23"^^xsd:date ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
     dcterms:title "Lag (2013:363) om kontroll av ekologisk produktion"@sv ;
-    rpubl:konsoliderar <http://localhost:8000/res/sfs/2013:363> ;
-    rpubl:konsolideringsunderlag <http://localhost:8000/res/sfs/2013:363> ;
+    rpubl:konsoliderar <https://lagen.nu/sfs/2013:363> ;
+    rpubl:konsolideringsunderlag <https://lagen.nu/sfs/2013:363> ;
     rpubl:utfardandedatum "2013-05-23"^^xsd:date ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2013:363/konsolidering/2013-05-23> ;
-    prov:wasGeneratedBy "ferenda.sources.legal.se.sfs.SFS" .
+    prov:wasGeneratedBy "lagen.nu.sfs.SFS" .
 
-<http://rinfo.lagrummet.se/ext/eur-lex/32004R0882> rpubl:celexNummer "32004R0882" .
+<https://lagen.nu/ext/celex/32004R0882> rpubl:celexNummer "32004R0882" .
 
-<http://rinfo.lagrummet.se/ext/eur-lex/32007R0834> rpubl:celexNummer "32007R0834" .
+<https://lagen.nu/ext/celex/32007R0834> rpubl:celexNummer "32007R0834" .
 
-<http://rinfo.lagrummet.se/ext/eur-lex/32008R0889> rpubl:celexNummer "32008R0889" .
+<https://lagen.nu/ext/celex/32008R0889> rpubl:celexNummer "32008R0889" .
 
-<http://localhost:8000/res/sfs/2013:363#P1S1> a rinfoex:Stycke ;
-    dcterms:isPartOf <http://localhost:8000/res/sfs/2013:363#P1> .
+<https://lagen.nu/sfs/2013:363#P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/sfs/2013:363#P1> .
 
-<http://localhost:8000/res/sfs/2013:363> a rpubl:Lag ;
+<https://lagen.nu/sfs/2013:363> a rpubl:Lag ;
     dcterms:identifier "SFS 2013:363" ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
     dcterms:title "Lag (2013:363) om kontroll av ekologisk produktion"@sv ;
     rpubl:arsutgava "2013" ;
     rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
     rpubl:departement <https://lagen.nu/org/2012/landsbygdsdepartementet> ;
-    rpubl:forarbete <http://localhost:8000/res/bet/2012/13:MJU14>,
-        <http://localhost:8000/res/prop/2012/13:55>,
-        <http://localhost:8000/res/rskr/2012/13:210> ;
+    rpubl:forarbete <https://lagen.nu/bet/2012/13:MJU14>,
+        <https://lagen.nu/prop/2012/13:55>,
+        <https://lagen.nu/rskr/2012/13:210> ;
     rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/sfs> ;
-    rpubl:genomforDirektiv <http://rinfo.lagrummet.se/ext/eur-lex/32004R0882>,
-        <http://rinfo.lagrummet.se/ext/eur-lex/32007R0834>,
-        <http://rinfo.lagrummet.se/ext/eur-lex/32008R0889> ;
+    rpubl:genomforDirektiv <https://lagen.nu/ext/celex/32004R0882>,
+        <https://lagen.nu/ext/celex/32007R0834>,
+        <https://lagen.nu/ext/celex/32008R0889> ;
     rpubl:ikrafttradandedatum "2014-01-01"^^xsd:date ;
     rpubl:lopnummer "363" ;
     rpubl:utfardandedatum "2013-05-23"^^xsd:date ;

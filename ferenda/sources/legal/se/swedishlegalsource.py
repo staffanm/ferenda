@@ -734,11 +734,28 @@ class SwedishCitationParser(CitationParser):
         from ferenda.sources.legal.se.sfs import UpphavtKapitel, UpphavdParagraf
         if isinstance(string, (UpphavtKapitel, UpphavdParagraf)):
             return [string]
-
         # basic normalization without stripping
         string = string.replace("\r\n", " ").replace("\n", " ")
-        # transform self._currenturl => attributes
-        attributes = {}
+
+        # transform self._currenturl => attributes.
+        # FIXME: we should maintain a self._current_baseuri_attributes
+        # instead of this fragile, URI-interpreting, hack.
+        if self._currenturl:
+            re_urisegments = re.compile(r'([\w]+://[^/]+/[^\d]*)(\d+:(bih\.[_ ]|N|)?\d+([_ ]s\.\d+|))#?(K([a-z0-9]+)|)(P([a-z0-9]+)|)(S(\d+)|)(N(\d+)|)')
+            m = re_urisegments.match(self._currenturl)
+            if m:
+                attributes = {'law':m.group(2),
+                              'chapter':m.group(6),
+                              'section':m.group(8),
+                              'piece':m.group(10),
+                              'item':m.group(12)}
+            else:
+                attributes = {}
+        else:
+            attributes = {}
+        for k in list(attributes):
+            if attributes[k] is None:
+                del attributes[k]
         return self._legalrefparser.parse(string,
                                           minter=self._minter,
                                           metadata_graph=self._commondata,

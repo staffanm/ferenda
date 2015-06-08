@@ -423,14 +423,20 @@ class SFS(Trips):
         return opts
 
     def canonical_uri(self, basefile, konsolidering=False):
-        from pudb import set_trace; set_trace()
         attributes = self._construct_base_attributes(basefile)
         if konsolidering:
             if konsolidering is not True:
+                # eg konsolidering = "2013-05-30"
                 konsolidering = konsolidering.replace(" ", "_")
             attributes["dcterms:issued"] = konsolidering
         resource = self.attributes_to_resource(attributes)
-        return self.minter.space.coin_uri(resource)
+        res = self.minter.space.coin_uri(resource)
+        # create eg "https://lagen.nu/sfs/2013:460/konsolidering" if
+        # konsolidering = True instead of a issued date.
+        # FIXME: This should be done in CoIN entirely
+        if konsolidering is True:
+            res = res.rsplit("/",1)[0]
+        return res
 
     def basefile_from_uri(self, uri):
         prefix = self.config.url + self.config.urlpath
@@ -1133,7 +1139,10 @@ class SFS(Trips):
                                            str(node))
                 elif key == 'CELEX-nr':
                     for celex in re.findall('3\d{2,4}[LR]\d{4}', val):
-                        celexuri = "http://rinfo.lagrummet.se/ext/eur-lex/%s" % celex
+                        b = BNode()
+                        g = Graph()
+                        g.add((b, RPUBL.celexNummer, Literal(celex)))
+                        celexuri = self.minter.space.coin_uri(g.resource(b))
                         with desc.rel(self.ns['rpubl'].genomforDirektiv,
                                       celexuri):
                             desc.value(self.ns['rpubl'].celexNummer, celex)
@@ -1307,7 +1316,7 @@ class SFS(Trips):
         state = dict(state)
         if isinstance(node, Forfattning):
             attributes = self._construct_base_attributes(self.id)
-                   
+            state.update(attributes)
         if self.ordinalpredicates.get(node.__class__): # could be a qname?
             if hasattr(node, 'ordinal') and node.ordinal:
                 ordinal = node.ordinal
@@ -1502,8 +1511,8 @@ class SFS(Trips):
 
         self.visit_node(doc.body, self.construct_id, {})
         self.visit_node(doc.body, self.find_definitions, True, debug=False)
-        self.lagrum_parser.parse_recursive(doc.body)
         # FIXME: Maybe we should use visit_node for this as well
+        self.lagrum_parser.parse_recursive(doc.body)
         # self.visit_node(doc.body, self.find_references, state)
 
     #----------------------------------------------------------------
