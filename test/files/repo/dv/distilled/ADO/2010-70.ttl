@@ -7,22 +7,22 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://localhost:8000/res/dv/ad/2010:70> a rpubl:Rattsfallsreferat ;
+<https://lagen.nu/rf/ad/2010:70> a rpubl:Rattsfallsreferat ;
     dcterms:identifier "AD 2010 nr 70" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
     rpubl:arsutgava "2010" ;
     rpubl:lopnummer "70" ;
-    rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/ad> ;
-    rpubl:referatAvDomstolsavgorande <http://localhost:8000/res/dv/ad/B-117-2009/2010-10-13> ;
+    rpubl:rattsfallspublikation <https://lagen.nu/dataset/ad> ;
+    rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/ad/B-117-2009/2010-10-13> ;
     rpubl:referatrubrik "Målet gällde skadestånd. Domen innebar att tingsrättens domslut fastställdes."@sv ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/ad/2010:70> ;
-    prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rf/ad/2010:70> ;
+    prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
-<http://localhost:8000/res/dv/ad/B-117-2009/2010-10-13> a rpubl:VagledandeDomstolsavgorande ;
+<https://lagen.nu/dom/ad/B-117-2009/2010-10-13> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/arbetsdomstolen> ;
     dcterms:title "Målet gällde skadestånd. Domen innebar att tingsrättens domslut fastställdes."@sv ;
     rpubl:avgorandedatum "2010-10-13"^^xsd:date ;
     rpubl:domsnummer "2010-70" ;
     rpubl:malnummer "B-117-2009" ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/ad/B-117-2009/2010-10-13> .
+    owl:sameAs <http://rinfo.lagrummet.se/publ/dom/ad/b-117-2009/2010-10-13> .
 

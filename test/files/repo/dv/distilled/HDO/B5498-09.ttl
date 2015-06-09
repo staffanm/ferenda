@@ -7,7 +7,7 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://localhost:8000/res/dv/nja/2010s168> a rpubl:Rattsfallsreferat ;
+<https://lagen.nu/rf/nja/2010s168> a rpubl:Rattsfallsreferat ;
     dcterms:bibliographicCitation "NJA 2010:19" ;
     dcterms:creator "Göta hovrätt"@sv,
         "Hovrätten över Skåne och Blekinge"@sv,
@@ -18,26 +18,25 @@
         "I"@sv,
         "II"@sv ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
-    dcterms:references <http://localhost:8000/res/dv/nja/2000s622>,
-        <http://localhost:8000/res/dv/nja/2004s840>,
-        <http://localhost:8000/res/dv/nja/2005s856>,
-        <http://localhost:8000/res/dv/nja/2006s467>,
-        <http://localhost:8000/res/dv/nja/2008s946>,
-        <http://localhost:8000/res/dv/ra/2000:65>,
-        <http://localhost:8000/res/dv/ra/2009:94>,
-        <http://localhost:8000/res/sfs/1971:69#P4>,
-        <http://localhost:8000/res/sfs/1971:69#P5> ;
+    dcterms:references <https://lagen.nu/rf/nja/2000s622>,
+        <https://lagen.nu/rf/nja/2004s840>,
+        <https://lagen.nu/rf/nja/2005s856>,
+        <https://lagen.nu/rf/nja/2006s467>,
+        <https://lagen.nu/rf/nja/2008s946>,
+        <https://lagen.nu/rf/ra/2000:65>,
+        <https://lagen.nu/rf/ra/2009:94>,
+        <https://lagen.nu/sfs/1971:69#P4>,
+        <https://lagen.nu/sfs/1971:69#P5> ;
     rpubl:arsutgava "2010" ;
     rpubl:lopnummer "19" ;
-    rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/nja> ;
-    rpubl:referatAvDomstolsavgorande <http://localhost:8000/res/dv/hd/B5498-09/2010-03-31> ;
+    rpubl:rattsfallspublikation <https://lagen.nu/dataset/nja> ;
+    rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/hd/B5498-09/2010-03-31> ;
     rpubl:referatrubrik "Fråga om det svenska systemet med dubbla sanktioner (skattetillägg och brottspåföljd) och två förfaranden för oriktiga uppgifter i skatteförfarandet är förenligt med det i artikel 4 i det sjunde tilläggsprotokollet till Europakonventionen upptagna förbudet mot dubbla förfaranden (ne bis in idem). (I=B 5498-09 och II= 2509-09)"@sv ;
     rpubl:sidnummer "168" ;
-    owl:sameAs <http://localhost:8000/res/dv/nja/2010:19>,
-        <http://rinfo.lagrummet.se/publ/rattsfall/nja/2010s168> ;
-    prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rf/nja/2010/s_168> ;
+    prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
-<http://localhost:8000/res/dv/hd/B5498-09/2010-03-31> a rpubl:VagledandeDomstolsavgorande ;
+<https://lagen.nu/dom/hd/B5498-09/2010-03-31> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
     dcterms:subject <http://localhost:8000/concept/Dubbla_förfaranden>,
         <http://localhost:8000/concept/Ne_bis_in_idem>,
@@ -47,13 +46,13 @@
     dcterms:title "Fråga om det svenska systemet med dubbla sanktioner (skattetillägg och brottspåföljd) och två förfaranden för oriktiga uppgifter i skatteförfarandet är förenligt med det i artikel 4 i det sjunde tilläggsprotokollet till Europakonventionen upptagna förbudet mot dubbla förfaranden (ne bis in idem). (I=B 5498-09 och II= 2509-09)"@sv ;
     rpubl:avdelning "1" ;
     rpubl:avgorandedatum "2010-03-31"^^xsd:date ;
-    rpubl:lagrum <http://localhost:8000/res/sfs/1994:1219> ;
+    rpubl:lagrum <https://lagen.nu/sfs/1994:1219> ;
     rpubl:malnummer "B5498-09" ;
-    rpubl:rattsfall <http://localhost:8000/res/dv/nja/2000s622>,
-        <http://localhost:8000/res/dv/nja/2004s840>,
-        <http://localhost:8000/res/dv/nja/2005s856>,
-        <http://localhost:8000/res/dv/nja/2006s467>,
-        <http://localhost:8000/res/dv/nja/2008s946>,
-        <http://localhost:8000/res/dv/ra/2000:65> ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/hd/B5498-09/2010-03-31> .
+    rpubl:rattsfall <https://lagen.nu/rf/nja/2000s622>,
+        <https://lagen.nu/rf/nja/2004s840>,
+        <https://lagen.nu/rf/nja/2005s856>,
+        <https://lagen.nu/rf/nja/2006s467>,
+        <https://lagen.nu/rf/nja/2008s946>,
+        <https://lagen.nu/rf/ra/2000:65> ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/b5498-09/2010-03-31> .
 

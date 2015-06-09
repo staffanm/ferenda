@@ -100,6 +100,11 @@ class FerendaTestCase(object):
             if len(in_second) > 0:
                 msg = "%s unexpected triples were found\n" % len(in_second) + msg
             msg = "%r != %r\n" % (want, got) + msg
+#            print("=======WANT=======")
+#            print(want.serialize(format="n3"))
+#            print("=======GOT========")
+#            print(got.serialize(format="n3"))
+#            sys.exit(0)
             return self.fail(msg)
 
     def assertAlmostEqualDatetime(self, datetime1, datetime2, delta=1):

@@ -7,21 +7,21 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://localhost:8000/res/dv/ra/2010/not/1> a rpubl:Rattsfallsnotis ;
+<https://lagen.nu/rf/ra/2010/not/1> a rpubl:Rattsfallsnotis ;
     dcterms:identifier "RÅ 2010 not 1" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
-    dcterms:references <http://localhost:8000/res/prop/1985/86:1>,
-        <http://localhost:8000/res/sfs/1987:10#K5P27>,
-        <http://localhost:8000/res/sfs/2007:845>,
-        <http://localhost:8000/res/sfs/2007:845#P4> ;
+    dcterms:references <https://lagen.nu/prop/1985/86:1>,
+        <https://lagen.nu/sfs/1987:10#K5P27>,
+        <https://lagen.nu/sfs/2007:845>,
+        <https://lagen.nu/sfs/2007:845#P4> ;
     rpubl:arsutgava "2010" ;
     rpubl:lopnummer "1" ;
     rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/rå> ;
-    rpubl:referatAvDomstolsavgorande <http://localhost:8000/res/dv/regr/5267-09/2010-01-04> ;
+    rpubl:referatAvDomstolsavgorande <https://lagen.nu/rf/regr/5267-09/2010-01-04> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/ra/2010/not/1> ;
     prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
 
-<http://localhost:8000/res/dv/regr/5267-09/2010-01-04> a rpubl:VagledandeDomstolsavgorande ;
+<https://lagen.nu/rf/regr/5267-09/2010-01-04> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringsratten> ;
     dcterms:subject <http://localhost:8000/concept/Avslag_)>,
         <http://localhost:8000/concept/Beslut_att_anta_detaljplan>,
@@ -30,10 +30,10 @@
         <http://localhost:8000/concept/Plan-_och_bygglagen>,
         <http://localhost:8000/concept/Rättsprövning_enligt_lagen_(2006:304)_om_rättsprövning_av_vissa_regeringsbeslut> ;
     rpubl:avgorandedatum "2010-01-04"^^xsd:date ;
-    rpubl:lagrum <http://localhost:8000/res/sfs/1987:10#K5P29>,
-        <http://localhost:8000/res/sfs/2006:304>,
-        <http://localhost:8000/res/sfs/2006:304#P1>,
-        <http://localhost:8000/res/sfs/2007:845#P4> ;
+    rpubl:lagrum <https://lagen.nu/sfs/1987:10#K5P29>,
+        <https://lagen.nu/sfs/2006:304>,
+        <https://lagen.nu/sfs/2006:304#P1>,
+        <https://lagen.nu/sfs/2007:845#P4> ;
     rpubl:malnummer "5267-09" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/regr/5267-09/2010-01-04> .
 

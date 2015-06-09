@@ -7,7 +7,7 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://localhost:8000/res/dv/hfd/2013:29> a rpubl:Rattsfallsreferat ;
+<https://lagen.nu/rf/hfd/2013:29> a rpubl:Rattsfallsreferat ;
     dcterms:creator "Försäkringskassan"@sv,
         "Förvaltningsrätten i Göteborg"@sv,
         "Högsta förvaltningsdomstolen"@sv,
@@ -17,19 +17,19 @@
     rpubl:arsutgava "2013" ;
     rpubl:lopnummer "29" ;
     rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/hfd> ;
-    rpubl:referatAvDomstolsavgorande <http://localhost:8000/res/dv/hfd/33-12/2013-05-27> ;
+    rpubl:referatAvDomstolsavgorande <https://lagen.nu/rf/hfd/33-12/2013-05-27> ;
     rpubl:referatrubrik "Minskning av en retroaktivt beviljad sjukersättning med sjukpenning som tidigare betalats ut för en del av den retroaktiva perioden skulle göras för den retroaktiva perioden i dess helhet."@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/hfd/2013:29> ;
     prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
 
-<http://localhost:8000/res/dv/hfd/33-12/2013-05-27> a rpubl:VagledandeDomstolsavgorande ;
+<https://lagen.nu/rf/hfd/33-12/2013-05-27> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2011/hogsta-forvaltningsdomstolen> ;
     dcterms:relation "Prop. 1992/93:30 s. 34 och 39" ;
     dcterms:subject <http://localhost:8000/concept/Allmän_försäkring> ;
     dcterms:title "Minskning av en retroaktivt beviljad sjukersättning med sjukpenning som tidigare betalats ut för en del av den retroaktiva perioden skulle göras för den retroaktiva perioden i dess helhet."@sv ;
     rpubl:avgorandedatum "2013-05-27"^^xsd:date ;
-    rpubl:lagrum <http://localhost:8000/res/sfs/1962:381>,
-        <http://localhost:8000/res/sfs/1962:381#K17P1S1> ;
+    rpubl:lagrum <https://lagen.nu/sfs/1962:381>,
+        <https://lagen.nu/sfs/1962:381#K17P1S1> ;
     rpubl:malnummer "33-12" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/hfd/33-12/2013-05-27> .
 

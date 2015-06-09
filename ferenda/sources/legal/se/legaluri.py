@@ -75,7 +75,7 @@ patterns = {LegalRef.RATTSFALL:
 #  "sidnr": "43"}
 #
 # The output is a URI string like 'http://rinfo.lagrummet.se/publ/rattsfall/nja/2004s43'
-def construct(dictionary):
+def construct(dictionary, minter=None):
     # Step 1: massage the data to a rdflib graph
     graph = Graph()
     bnode = BNode()
@@ -104,7 +104,7 @@ def construct(dictionary):
                 val = Literal(dictionary[key])
             graph.add((bnode, predicate[key], val))
     # return construct_from_graph(graph)
-    return coinstruct_from_graph(graph, bnode)
+    return coinstruct_from_graph(graph, bnode, minter)
 
 
 def _rpubl_uri_transform(s):

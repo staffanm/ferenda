@@ -293,7 +293,7 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
                 LegalRef.RATTSFALL,
                 LegalRef.LAGRUM,
                 LegalRef.FORARBETEN)
-        citparser = SwedishCitationParser(self.ref_parser, self.config.url)
+        citparser = SwedishCitationParser(self.ref_parser, self.minter, self.commondata)
         citparser.parse_recursive(doc.body)
 
     def create_external_resources(self, doc):

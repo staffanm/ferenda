@@ -1,16 +1,72 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, print_function
 
-from rdflib import RDF
-from rdflib.namespace import DCTERMS
+from rdflib import RDF, URIRef
+from rdflib.namespace import DCTERMS, OWL
 
-from ferenda import Facet
-from ferenda import fulltextindex
+from ferenda import Facet, Describer
+from ferenda import fulltextindex, util
+from ferenda.sources.legal.se import legaluri
 from ferenda.sources.legal.se import DV as OrigDV
 from ferenda.sources.legal.se import RPUBL
+from ferenda.sources.legal.se.legalref import LegalRef
+from . import SameAs
 
-class DV(OrigDV):
-    
+
+class DV(OrigDV, SameAs):
+
+    @property
+    def commondata(self):
+        # for parsing, our .commondata needs to access named laws
+        # defined in extra/sfs.ttl. Make sure these are loaded even
+        # though we don't inherit from SFS.
+        if not hasattr(self, '_commondata'):
+            self._commondata = super(DV, self).commondata
+            path = "extra/sfs.ttl"
+            if self.resourceloader.exists(path):
+                with self.resourceloader.open(path) as fp:         
+                    self._commondata.parse(data=fp.read(), format="turtle")
+        return self._commondata
+        
+    def add_keyword_to_metadata(self, domdesc, keyword):
+
+        def sokord_uri(value):
+            # FIXME: This should coined by self.minter
+            baseuri = self.config.url + "concept/"
+            return baseuri + util.ucfirst(value).replace(' ', '_')
+
+        domdesc.rel(DCTERMS.subject, sokord_uri(keyword))
+
+    # override polish_metadata to add some extra owl:sameAs attributes
+    def polish_metadata(self, head, doc):
+
+        # where do we get refdesc, domdesc?
+        coin_uri = self.sameas_minter.space.coin_uri
+        refuri, domuri = super(DV, self).polish_metadata(head, doc)
+        refuri_sameas = coin_uri(doc.meta.resource(refuri))
+        domuri_sameas = coin_uri(doc.meta.resource(domuri))
+        doc.meta.add((URIRef(refuri), OWL.sameAs, URIRef(refuri_sameas)))
+        doc.meta.add((URIRef(domuri), OWL.sameAs, URIRef(domuri_sameas)))
+        return refuri, domuri
+
+#         if '_nja_ordinal' in head:
+#             # <sidnummer-based> owl:sameAs <lopnummer based>
+#             altattribs = {'type': LegalRef.RATTSFALL,
+#                           'rattsfallspublikation': 'nja',
+#                           'arsutgava': refdesc.getvalue(RPUBL.arsutgava),
+#                           'lopnummer': refdesc.getvalue(RPUBL.lopnummer)}
+#             refdesc.rel(OWL.sameAs, legaluri.construct(altattribs))
+#         else:
+#             # Canonical URIs are based on lopnummer. add a sameas ref
+#             # back to the sidnummer based URI
+#             altattribs = {'type': LegalRef.RATTSFALL,
+#                           'rattsfallspublikation': 'nja',
+#                           'arsutgava': refdesc.getvalue(RPUBL.arsutgava),
+#                           'lopnummer': refdesc.getvalue(RPUBL.sidnummer)}
+#             refdesc.rel(OWL.sameAs, legaluri.construct(altattribs))
+
+
+
     def facets(self):
         # NOTE: it's important that RPUBL.rattsfallspublikation is the
         # first facet (toc_pagesets depend on it)
@@ -31,7 +87,7 @@ class DV(OrigDV):
                       indexingtype=fulltextindex.Resource(),
                       use_for_toc=True,
                       use_for_feed=True,
-                      selector=myselector, # =>  ("ad", "2001"), ("nja", "1981")
+                      selector=myselector,  # => ("ad","2001"), ("nja","1981")
                       key=Facet.resourcelabel,
                       identificator=Facet.defaultselector,
                       dimension_type='ref'),

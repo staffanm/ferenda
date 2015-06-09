@@ -195,6 +195,8 @@ class SwedishLegalSource(DocumentRepository):
             spacefile = filename("uri/swedishlegalsource.space.ttl")
             slugsfile = filename("uri/swedishlegalsource.slugs.ttl")
             self.log.debug("Loading URISpace from %s" % spacefile)
+            # print("Loading URISpace from %s" % spacefile)
+            # print("Loading Slugs from %s" % slugsfile)
             cfg = Graph().parse(spacefile,
                                 format="turtle").parse(slugsfile,
                                                        format="turtle")
@@ -203,6 +205,7 @@ class SwedishLegalSource(DocumentRepository):
             # finding a single coin:URISpace object
             spaceuri = cfg.value(predicate=RDF.type, object=COIN.URISpace)
             self._minter = URIMinter(cfg, spaceuri)
+            # print("Minter is %s" % id(self._minter))
         return self._minter
 
     @classmethod

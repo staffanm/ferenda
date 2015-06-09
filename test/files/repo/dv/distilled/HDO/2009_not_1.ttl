@@ -7,18 +7,18 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://localhost:8000/res/dv/nja/2009/not/1> a rpubl:Rattsfallsnotis ;
+<https://lagen.nu/rf/nja/2009/not/1> a rpubl:Rattsfallsnotis ;
     dcterms:identifier "NJA 2009 not 1" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
-    dcterms:references <http://localhost:8000/res/dv/nja/1999s715> ;
+    dcterms:references <https://lagen.nu/rf/nja/1999s715> ;
     rpubl:arsutgava "2009" ;
     rpubl:lopnummer "1" ;
     rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/nja> ;
-    rpubl:referatAvDomstolsavgorande <http://localhost:8000/res/dv/hd/Ö1242-08/2009-01-27> ;
+    rpubl:referatAvDomstolsavgorande <https://lagen.nu/rf/hd/Ö1242-08/2009-01-27> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/nja/2009/not/1> ;
     prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
 
-<http://localhost:8000/res/dv/hd/Ö1242-08/2009-01-27> a rpubl:VagledandeDomstolsavgorande ;
+<https://lagen.nu/rf/hd/Ö1242-08/2009-01-27> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
     rpubl:avgorandedatum "2009-01-27"^^xsd:date ;
     rpubl:malnummer "Ö1242-08" ;

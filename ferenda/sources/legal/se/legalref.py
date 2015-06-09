@@ -14,6 +14,7 @@ except ImportError:
     from ._simpleparseFallback import Parser, tag
 import six
 from six import text_type as str
+from six import unichr as chr
 from rdflib import Graph, Namespace, Literal, BNode, RDFS, RDF, URIRef
 from rdflib.namespace import DCTERMS, SKOS
 COIN = Namespace("http://purl.org/court/def/2009/coin#")

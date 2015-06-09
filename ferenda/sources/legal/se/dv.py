@@ -710,7 +710,7 @@ class DV(SwedishLegalSource):
         else:
             rawhead, rawbody = self.parse_antiword_docbook(patchedtext, doc.basefile)
         sanitized_head = self.sanitize_metadata(rawhead, doc.basefile)
-        doc.uri = self.polish_metadata(sanitized_head, doc)
+        doc.uri, domuri = self.polish_metadata(sanitized_head, doc)
         if patchdesc:
             doc.meta.add((URIRef(doc.uri),
                           self.ns['rinfoex'].patchdescription,
@@ -1137,49 +1137,25 @@ class DV(SwedishLegalSource):
 
     # create nice RDF from the sanitized metadata
     def polish_metadata(self, head, doc):
-
-        # FIXME: This setup (parser instance and makeurl function) could
-        # probably be shared between many repos
         parser = SwedishCitationParser(LegalRef(LegalRef.RATTSFALL),
-                                       self.config.url,
-                                       '',
-                                       localizeuri=self.config.localizeuri)
+                                       self.minter,
+                                       self.commondata)
 
         lparser = SwedishCitationParser(LegalRef(LegalRef.LAGRUM),
-                                        self.config.url,
-                                        '', 
-                                        localizeuri=self.config.localizeuri)
+                                        self.minter,
+                                        self.commondata)
 
         def ref_to_uri(ref):
             nodes = parser.parse_string(ref)
-            assert isinstance(nodes[0], Link), "Couldn't make URI from ref %s" % ref
+            assert isinstance(nodes[0], Link), "Can't make URI from '%s'" % ref
             return nodes[0].uri
-
 
         def split_nja(value):
             return [x[:-1] for x in value.split("(")]
 
-        def sokord_uri(value):
-            # only used when self.config.localizeuri is set
-            baseuri = self.config.url + "concept/"
-            return baseuri + util.ucfirst(value).replace(' ', '_')
-
         # 1. mint uris and create the two Describers we'll use
-        if self.config.localizeuri or '_nja_ordinal' not in head:
-            refuri = ref_to_uri(head["Referat"])
-        else:
-            # Canonical URIs for NJA are not based on the
-            # dct:identifier (NJA 1997 s. 522) but on the alternative
-            # (NJA 1997:91). ref_to_uri doesn't handle these
-            rf = URIRef(self.lookup_resource("NJA", SKOS.altLabel))
-            m = re.search(r'(\d{4}):(\d+)', head["_nja_ordinal"])
-            refuri = makeurl({'type': LegalRef.RATTSFALL,
-                              'rattsfallspublikation': rf,
-                              'arsutgava': m.group(1),
-                              'lopnummer': m.group(2)})
-
-
-
+        # if self.config.localizeuri or '_nja_ordinal' not in head:
+        refuri = ref_to_uri(head["Referat"])
         refdesc = Describer(doc.meta, refuri)
         slug = self.lookup_label(self.lookup_resource(head["Domstol"]),
                                  predicate=URISPACE.abbrSlug)
@@ -1264,37 +1240,10 @@ class DV(SwedishLegalSource):
                     domdesc.value(DCTERMS.relation, util.normalize_space(i))
             elif label == "Sökord":
                 for s in value:
-                    if self.config.localizeuri:
-                        domdesc.rel(DCTERMS.subject, sokord_uri(s))
-                    else:
-                        # Canonical uris don't define a URI space for
-                        # keywords/concepts. Instead refer to bnodes
-                        # with rdfs:label set (cf. rdl/documentation/exempel/
-                        # documents/publ/Domslut/HD/2009/T_170-08.rdf)
-                        with domdesc.rel(DCTERMS.subject):
-                            domdesc.value(RDFS.label, s, lang=self.lang)
-
+                    self.add_keyword_to_metadata(domdesc, s)
 
         # 3. mint some owl:sameAs URIs -- but only if not using canonical URIs
-        if self.config.localizeuri:
-            refdesc.rel(OWL.sameAs, self.sameas_uri(refuri))
-            # FIXME: could be multiple domuris
-            domdesc.rel(OWL.sameAs, self.sameas_uri(domuri))
-            if '_nja_ordinal' in head:
-                # <sidnummer-based> owl:sameAs <lopnummer based>
-                altattribs = {'type': LegalRef.RATTSFALL,
-                              'rattsfallspublikation': 'nja',
-                              'arsutgava': refdesc.getvalue(RPUBL.arsutgava),
-                              'lopnummer': refdesc.getvalue(RPUBL.lopnummer)}
-                refdesc.rel(OWL.sameAs, makeurl(altattribs))
-            else:
-                # Canonical URIs are based on lopnummer. add a sameas ref
-                # back to the sidnummer based URI
-                altattribs = {'type': LegalRef.RATTSFALL,
-                              'rattsfallspublikation': 'nja',
-                              'arsutgava': refdesc.getvalue(RPUBL.arsutgava),
-                              'lopnummer': refdesc.getvalue(RPUBL.sidnummer)}
-                refdesc.rel(OWL.sameAs, makeurl(altattribs))
+        # (moved to lagen.nu.DV)
 
         # 4. Add some same-for-everyone properties
         refdesc.rel(DCTERMS.publisher, self.lookup_resource('Domstolsverket'))
@@ -1305,17 +1254,31 @@ class DV(SwedishLegalSource):
         domdesc.rdftype(RPUBL.VagledandeDomstolsavgorande)
         refdesc.rel(RPUBL.referatAvDomstolsavgorande, domuri)
         refdesc.value(PROV.wasGeneratedBy, self.qualified_class_name())
+
 # FIXME: implement this
-#        # 5. Create a meaningful identifier for the verdict itself (ie. "Göta hovrätts dom den 42 september 2340 i mål B 1234-42")
-#        domdesc.value(DCTERMS.identifier, dom_to_identifier(head["Domstol"],
-#                                                                   head["_localid"],
-#                                                                   head["Avgörandedatum"])
+#
+#        # 5. Create a meaningful dcterms:identifier for the verdict itself
+#        # (ie. "Göta hovrätts dom den 42 september 2340 i mål B
+#        # 1234-42")
+#        domdesc.value(DCTERMS.identifier,
+#                      dom_to_identifier(head["Domstol"],
+#                                        head["_localid"],
+#                                        head["Avgörandedatum"])
 #
 
         # 6. assert that we have everything we need
 
         # 7. done!
-        return refuri
+        return refuri, domuri
+
+    def add_keyword_to_metadata(self, domdesc, keyword):
+        # Canonical uris don't define a URI space for
+        # keywords/concepts. Instead refer to bnodes
+        # with rdfs:label set (cf. rdl/documentation/exempel/
+        # documents/publ/Domslut/HD/2009/T_170-08.rdf)
+        with domdesc.rel(DCTERMS.subject):
+            domdesc.value(RDFS.label, keyword, lang=self.lang)
+        
 
     def format_body(self, paras, basefile):
         b = Body()
@@ -1337,9 +1300,8 @@ class DV(SwedishLegalSource):
             parser = SwedishCitationParser(LegalRef(LegalRef.RATTSFALL,
                                                     LegalRef.LAGRUM,
                                                     LegalRef.FORARBETEN),
-                                           self.config.url,
-                                           '',
-                                           localizeuri=self.config.localizeuri)
+                                           self.minter,
+                                           self.commondata)
             b = parser.parse_recursive(b)
 
         # convert the unstructured list of Paragraphs to a
