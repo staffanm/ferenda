@@ -19,15 +19,14 @@
         <https://lagen.nu/sfs/2000:1281> ;
     rpubl:arsutgava "2007" ;
     rpubl:lopnummer "32" ;
-    rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/nja> ;
-    rpubl:referatAvDomstolsavgorande <https://lagen.nu/rf/hd/B86-05/2007-04-04> ;
+    rpubl:rattsfallspublikation <https://lagen.nu/dataset/nja> ;
+    rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/hd/B86-05/2007-04-04> ;
     rpubl:referatrubrik "Bestämmelsen i 8 § smugglingslagen om \"tull, skatt eller annan avgift\" har befunnits tillämplig i fråga om en i EG-förordningen nr (EEG) 1470/2001 föreskriven antidumpningstull. Det har ansetts förenligt med regeringsformens bestämmelser om normgivning och med legalitetsprincipen att straffbestämmelsen såvitt gäller tullplikten fått sitt innehåll utfyllt av föreskrifter i en EG-förordning. Undandragande av pålagor som avses i den nämnda förordningen har bedömts rikta sig mot \"det allmänna\". Även fråga om EG-förordningen utgör en in casu-lagstiftning."@sv ;
     rpubl:sidnummer "227" ;
-    owl:sameAs <https://lagen.nu/rf/nja/2007:32>,
-        <http://rinfo.lagrummet.se/publ/rattsfall/nja/2007s227> ;
-    prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rf/nja/2007/s_227> ;
+    prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
-<https://lagen.nu/rf/hd/B86-05/2007-04-04> a rpubl:VagledandeDomstolsavgorande ;
+<https://lagen.nu/dom/hd/B86-05/2007-04-04> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
     dcterms:subject <http://localhost:8000/concept/Antidumpningstull>,
         <http://localhost:8000/concept/Det_allmänna>,
@@ -50,5 +49,5 @@
         <https://lagen.nu/sfs/1976:633>,
         <https://lagen.nu/sfs/1976:633#P1S3> ;
     rpubl:malnummer "B86-05" ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/hd/B86-05/2007-04-04> .
+    owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/b86-05/2007-04-04> .
 

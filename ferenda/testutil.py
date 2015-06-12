@@ -364,6 +364,10 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
 
     def setUp(self):
         self.datadir = tempfile.mkdtemp()
+        # FIXME: Setting up a class can be pretty expensive (if it
+        # loads a lot of RDF and/or minter objects) so it'd be nice if
+        # we could reuse them. Maybe to this in setupClass /
+        # teardownClass?
         self.repo = self.repoclass(datadir=self.datadir,
                                    storelocation=self.datadir + "/ferenda.sqlite",
                                    indexlocation=self.datadir + "/whoosh",)

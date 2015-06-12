@@ -21,14 +21,14 @@
         <https://lagen.nu/sfs/1972:207#K3P2> ;
     rpubl:arsutgava "2007" ;
     rpubl:lopnummer "19" ;
-    rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/nja> ;
-    rpubl:referatAvDomstolsavgorande <https://lagen.nu/rf/hd/T4459-05/2007-03-22> ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/nja/2007/not/19> ;
-    prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
+    rpubl:rattsfallspublikation <https://lagen.nu/dataset/nja> ;
+    rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/hd/T4459-05/2007-03-22> ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rf/nja/2007/not/19> ;
+    prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
-<https://lagen.nu/rf/hd/T4459-05/2007-03-22> a rpubl:VagledandeDomstolsavgorande ;
+<https://lagen.nu/dom/hd/T4459-05/2007-03-22> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
     rpubl:avgorandedatum "2007-03-22"^^xsd:date ;
     rpubl:malnummer "T4459-05" ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/hd/T4459-05/2007-03-22> .
+    owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/t4459-05/2007-03-22> .
 

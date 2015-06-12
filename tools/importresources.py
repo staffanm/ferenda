@@ -228,6 +228,10 @@ def mapspace(base, dest):
             o = rdflib.Literal("")
         elif p == COIN.fragmentSeparator:
             o = rdflib.Literal("")
+        # We don't need to add this explicit priority if we have
+        # coin.py sort templates by type specificity
+        # elif p == COIN.forType and o == RPUBL.Rattsfallsnotis:
+        #     graph.add((s, COIN.priority, rdflib.Literal(2)))
         if o == COIN.ToLowerCase:  # yeah we don't want this since our
                                    # CELEX uris contains uppercase
             s = p = o = None

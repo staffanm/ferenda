@@ -1,15 +1,20 @@
 # -*- coding: iso-8859-1 -*-
 # ------------ rattsfall.ebnf ----------------
 
-rattsfallref      ::= RattsfallRefID/NJARattsfallRefID
+rattsfallref      ::= RattsfallRefID/NJARattsfallRefID/NotisfallRefID/NJANotisfallRefID
 RattsfallRefID    ::= DomstolRefID, Whitespace, ArRefID, Separator, LopnrRefID
 NJARattsfallRefID ::= NJARefID, Whitespace, ArRefID, NJASeparator, SidnrRefID
-DomstolRefID      ::= 'RÅ'/'AD'/'RH'/'RK'/'MÖD'/'MIG'/'MD'/'HFD'
+NotisfallRefID    ::= DomstolRefID, Whitespace, ArRefID, Notsep, NotnrRefID
+NJANotisfallRefID ::= NJARefID, Whitespace, ArRefID, Notsep, NotnrRefID
+DomstolRefID      ::= 'RÅ'/'AD'/'RH'/'RK'/'MÖD'/'MMD'/'MIG'/'MD'/'HFD'
 NJARefID          ::= 'NJA'
 ArRefID           ::= LangtAr
-Separator         ::= ((Whitespace/Hyphen), 'ref'/'nr'/'not', Period?, Whitespace?)/(Whitespace?,(Colon/Hyphen),Whitespace?)
-NJASeparator      ::= Whitespace,'s'/'not',Period?, Whitespace?
+Separator         ::= ((Whitespace/Hyphen), 'ref'/'nr', Period?, Whitespace?)/(Whitespace?,(Colon/Hyphen),Whitespace?)
+NJASeparator      ::= Whitespace, 's', Period?, Whitespace?
+Notsep            ::= Whitespace, 'not', Period?, Whitespace?
 LopnrRefID        ::= number
+NotnrRefID        ::= number
+
 
 # ------------ end of rattsfall.ebnf ----------------
 

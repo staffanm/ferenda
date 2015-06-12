@@ -24,15 +24,14 @@
         <https://lagen.nu/sfs/1996:1619#P27S2> ;
     rpubl:arsutgava "2007" ;
     rpubl:lopnummer "42" ;
-    rpubl:rattsfallspublikation <http://localhost:8000/coll/dv/nja> ;
-    rpubl:referatAvDomstolsavgorande <https://lagen.nu/rf/hd/Ö4503-04/2007-05-16> ;
+    rpubl:rattsfallspublikation <https://lagen.nu/dataset/nja> ;
+    rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/hd/Ö4503-04/2007-05-16> ;
     rpubl:referatrubrik "Bestämmelsen i 27 § andra stycket rättshjälpslagen (1996:1619) om ersättning till rättshjälpsbiträde för arbete som utförts före ansökan om rättshjälp har, till skillnad från motsvarande bestämmelse i 1972 års rättshjälpslag, inte ansetts ge stöd för att begränsa ersättningsrätten till att avse arbete som utförts inom den närmaste månaden före ansökan."@sv ;
     rpubl:sidnummer "323" ;
-    owl:sameAs <https://lagen.nu/rf/nja/2007:42>,
-        <http://rinfo.lagrummet.se/publ/rattsfall/nja/2007s323> ;
-    prov:wasGeneratedBy "ferenda.sources.legal.se.dv.DV" .
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rf/nja/2007/s_323> ;
+    prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
-<https://lagen.nu/rf/hd/Ö4503-04/2007-05-16> a rpubl:VagledandeDomstolsavgorande ;
+<https://lagen.nu/dom/hd/Ö4503-04/2007-05-16> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
     dcterms:subject <http://localhost:8000/concept/Biträdesersättning>,
         <http://localhost:8000/concept/Ersättning>,
@@ -42,5 +41,5 @@
     rpubl:avgorandedatum "2007-05-16"^^xsd:date ;
     rpubl:lagrum <https://lagen.nu/sfs/1990:998#P27S2> ;
     rpubl:malnummer "Ö4503-04" ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/rattsfall/hd/Ö4503-04/2007-05-16> .
+    owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/oe4503-04/2007-05-16> .
 

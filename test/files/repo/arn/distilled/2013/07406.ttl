@@ -13,5 +13,5 @@
     dcterms:title "Fråga om köparen fullgjort sin skyldighet att kontrollera riktigheten av utfärdade biljetter samt om resebyrås ansvar för de felaktiga biljetterna."@sv ;
     rpubl:arendenummer "2013-07406" ;
     rpubl:avgorandedatum "2013-11-19" ;
-    prov:wasGeneratedBy "ferenda.sources.legal.se.arn.ARN" .
+    prov:wasGeneratedBy "lagen.nu.arn.ARN" .
 

@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2015-05-29T07:43:24.048651
+# Automatically transformed from sources at 2015-06-12T07:24:02.023192
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -289,9 +289,9 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 
 <https://lagen.nu/org/2011/hogsta-forvaltningsdomstolen> space:abbrSlug "hfd" .
 
-<https://lagen.nu/org/2011/mark-och-miljooverdomstolen> space:abbrSlug "mmd" .
-
 <https://lagen.nu/org/2014/justitiekanslern> space:abbrSlug "jk" .
+
+<https://lagen.nu/org/2014/mark-_och_miljooverdomstolen> space:abbrSlug "mmd" .
 
 <https://lagen.nu/org/2014/statens_ansvarsnamnd> space:abbrSlug "san" .
 

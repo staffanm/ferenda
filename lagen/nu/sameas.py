@@ -8,6 +8,7 @@ class SameAs(object):
     @property
     def sameas_minter(self):
         if not hasattr(self, '_sameas_minter'):
+            # print("%s (%s) loading sameas_minter" % (self.alias, id(self)))
             # make a resourceloader that only loads resource from
             # superclasses, not this actual class. This'll make it
             # look in ferenda/sources/legal/se/res, not lagen/nu/res.

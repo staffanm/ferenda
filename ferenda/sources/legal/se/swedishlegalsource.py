@@ -191,6 +191,7 @@ class SwedishLegalSource(DocumentRepository):
     @property
     def minter(self):
         if not hasattr(self, '_minter'):
+            # print("%s (%s) loading minter" % (self.alias, id(self)))
             filename = self.resourceloader.filename
             spacefile = filename("uri/swedishlegalsource.space.ttl")
             slugsfile = filename("uri/swedishlegalsource.slugs.ttl")

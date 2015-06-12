@@ -366,12 +366,13 @@ class DocumentRepository(object):
         taken from ``extra/[repoalias].ttl``.
         """
         if not hasattr(self, '_commondata'):
+            # print("%s (%s) loading commondata" % (self.alias, id(self)))
             self._commondata = Graph()
             for cls in inspect.getmro(self.__class__):
                 if hasattr(cls, "alias"):
                     commonpath = "extra/%s.ttl" % cls.alias
                     if self.resourceloader.exists(commonpath):
-                        with self.resourceloader.open(commonpath) as fp:                 
+                        with self.resourceloader.open(commonpath) as fp:
                             self._commondata.parse(data=fp.read(), format="turtle")                 
         return self._commondata
 

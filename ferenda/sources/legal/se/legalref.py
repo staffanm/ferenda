@@ -192,7 +192,7 @@ class LegalRef:
             d[six.text_type(subj)] = six.text_type(obj)
         return d
 
-    def parse(self, 
+    def parse(self,
               indata,
               minter,
               metadata_graph=None,
@@ -695,6 +695,7 @@ class LegalRef:
                     "sidnr": RPUBL.sidnummer,
                     "type": RDF.type,
                     "lopnr": RPUBL.lopnummer,
+                    "notnr": RPUBL.lopnummer,
                     "rattsfallspublikation": RPUBL.rattsfallspublikation,
                     "ar": RPUBL.arsutgava,
                     }
@@ -1125,9 +1126,14 @@ class LegalRef:
     def rattsfall_format_uri(self, attributes):
         if 'nja' in attributes:
             attributes['domstol'] = attributes['nja']
+        if 'notnr' in attributes:
+            attributes['type'] = RPUBL.Rattsfallsnotis
+        else:
+            attributes['type'] = RPUBL.Rattsfallsreferat
         attributes['rattsfallspublikation'] = URIRef(
             self.namedseries[attributes['domstol']])
-        for crap in ('nja', 'njarattsfall', 'rattsfall', 'domstol'):
+        for crap in ('nja', 'njarattsfall', 'njanotisfall',
+                     'rattsfall', 'domstol'):
             if crap in attributes:
                 del attributes[crap]
         res = self.attributes_to_resource(attributes)
