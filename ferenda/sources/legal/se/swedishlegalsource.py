@@ -345,14 +345,6 @@ class SwedishLegalSource(DocumentRepository):
         if self.rdf_type == self.ns['rpubl'].Utredningsbetankande:
             d.rel(self.ns['rpubl'].utrSerie, self.dataset_uri())
 
-        if self.config.localizeuri:
-            # construct a new anonymized graph to pass to construct_from_graph
-            g = Graph()
-            bnode = BNode()
-            for (s, p, o) in d.graph:
-                if s == d._current():
-                    g.add((bnode, p, o))
-            d.rel(OWL.sameAs, legaluri.construct_from_graph(g))
 
     def tabs(self, primary=False):
         if self.config.tabs:

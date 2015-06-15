@@ -50,6 +50,13 @@ class CompositeRepository(DocumentRepository):
                 config = self.config
             else:
                 config = None
+
+            # FIXME: this instance will be using a default
+            # ResourceLoader, eg if a subrepo is at foo/bar.py, only
+            # foo/bar/res will we in that resourceloaders path. This
+            # causes problems, primarily if our CompositeRepository is
+            # subclassed to somewhere else, eg subclass/bar.py -- we
+            # might want to use resources at subclass/res instead.
             inst = instanceclass(config)
             # if we don't have a config object yet, the created
             # instance is just temporary -- don't save it

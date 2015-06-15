@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals, print_function
+
 from rdflib import Graph, Namespace, RDF, URIRef
 
 from ferenda import ResourceLoader

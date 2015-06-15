@@ -7,3 +7,4 @@ from .arn import ARN
 from .myndfskr import CompositeMyndFskr as MyndFskr
 from .forarbeten import Forarbeten
 from .myndprax import MyndPrax
+from .direktiv import Direktiv

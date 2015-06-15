@@ -362,20 +362,40 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
     # this should be the only setting of maxDiff we need
     maxDiff = None
 
-    def setUp(self):
-        self.datadir = tempfile.mkdtemp()
+    setupclass = False
+    @classmethod
+    def setUpClass(cls):
+        cls.datadir = tempfile.mkdtemp()
         # FIXME: Setting up a class can be pretty expensive (if it
         # loads a lot of RDF and/or minter objects) so it'd be nice if
         # we could reuse them. Maybe to this in setupClass /
         # teardownClass?
-        self.repo = self.repoclass(datadir=self.datadir,
-                                   storelocation=self.datadir + "/ferenda.sqlite",
-                                   indexlocation=self.datadir + "/whoosh",)
+        cls.repo = cls.repoclass(datadir=cls.datadir,
+                                   storelocation=cls.datadir + "/ferenda.sqlite",
+                                   indexlocation=cls.datadir + "/whoosh",)
+        cls.setupclass = True
+    
+    def setUp(self):
+        if not hasattr(self, 'repo'):
+            self.datadir = tempfile.mkdtemp()
+            # FIXME: Setting up a class can be pretty expensive (if it
+            # loads a lot of RDF and/or minter objects) so it'd be nice if
+            # we could reuse them. Maybe to this in setupClass /
+            # teardownClass?
+            self.repo = self.repoclass(datadir=self.datadir,
+                                       storelocation=self.datadir + "/ferenda.sqlite",
+                                       indexlocation=self.datadir + "/whoosh",)
+    @classmethod
+    def tearDownClass(cls):
+        if cls.setupclass:
+            shutil.rmtree(cls.datadir)
 
     def tearDown(self):
-        # print("Not removing %s" % self.datadir)
-        shutil.rmtree(self.datadir)
+        if not self.setupclass:
+            # print("Not removing %s" % self.datadir)
+            shutil.rmtree(self.datadir)
 
+    
     def filename_to_basefile(self, filename):
         """Converts a test filename to a basefile. Default implementation
         attempts to find out basefile from the repoclass being tested

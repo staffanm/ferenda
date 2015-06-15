@@ -1047,15 +1047,17 @@ with the *config* object as single parameter.
         RDF/XML file.
 
         You will need to provide your own parsing logic, but often
-        it's easier to just override parse_from_soup (assuming your
-        indata is in a HTML format parseable by BeautifulSoup) and let
-        the base class read and write the files.
+        it's easier to just override
+        parse_{metadata,document}_from_soup (assuming your indata is
+        in a HTML format parseable by BeautifulSoup) and let the base
+        class read and write the files.
 
         If your data is not in a HTML format, or BeautifulSoup is not
         an appropriate parser to use, override this method.
 
         :param doc: The document object to fill in.
         :type  doc: ferenda.Document
+
         """
         soup = self.soup_from_basefile(doc.basefile, self.source_encoding)
         self.parse_metadata_from_soup(soup, doc)

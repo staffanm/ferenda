@@ -223,6 +223,8 @@ class Regeringen(SwedishLegalSource):
         return docurl
 
     def canonical_uri(self, basefile, document_type=None):
+        # basefile eg 2014:158 => [] a rpubl:For ; rpubl:arsutgava "2014"; rpubl:lopnummer "158";
+        from pudb import set_trace; set_trace()
         if not document_type:
             document_type = self.document_type
         seg = {self.KOMMITTEDIREKTIV: "dir",
@@ -309,9 +311,6 @@ class Regeringen(SwedishLegalSource):
         d = Describer(doc.meta, doc.uri)
         d.rdftype(self.rdf_type)
         d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-        sameas = self.sameas_uri(doc.uri)
-        if sameas:
-            d.rel(self.ns['owl'].sameAs, sameas)
 
         content = soup.find(id="content")
         title = content.find("h1").string
@@ -425,6 +424,7 @@ class Regeringen(SwedishLegalSource):
                 #    d.value(RDFS.label, link.get_text(strip=True))
 
         self.infer_triples(d, doc.basefile)
+        return doc.uri
 
     def parse_document_from_soup(self, soup, doc):
 
