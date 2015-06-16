@@ -218,6 +218,7 @@ class SwedishLegalSource(DocumentRepository):
         return opts
 
     def _swedish_ordinal(self, s):
+        """'första' => '1'"""
         sl = s.lower()
         if sl in self.swedish_ordinal_dict:
             return self.swedish_ordinal_dict[sl]
