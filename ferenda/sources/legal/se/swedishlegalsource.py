@@ -7,8 +7,7 @@ from datetime import datetime, date
 import re
 
 from layeredconfig import LayeredConfig, Defaults
-from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
-from rdflib.namespace import OWL
+from rdflib import URIRef, RDF, Namespace, Literal, Graph
 from six import text_type as str
 
 from ferenda import (DocumentRepository, DocumentStore, FSMParser,
@@ -20,6 +19,7 @@ from ferenda.elements import (Paragraph, Section, Body,
                               OrdinalElement, CompoundElement,
                               SectionalElement)
 from ferenda.pdfreader import Page
+from ferenda.decorators import action, managedparsing
 from ferenda.thirdparty.coin import URIMinter
 from . import RPUBL, legaluri
 
@@ -217,12 +217,6 @@ class SwedishLegalSource(DocumentRepository):
         opts['tabs'] = True
         return opts
 
-    def _swedish_ordinal(self, s):
-        """'första' => '1'"""
-        sl = s.lower()
-        if sl in self.swedish_ordinal_dict:
-            return self.swedish_ordinal_dict[sl]
-        return None
 
     def lookup_label(self, resource, predicate=FOAF.name):
         val = self.commondata.value(subject=URIRef(resource),
@@ -232,57 +226,142 @@ class SwedishLegalSource(DocumentRepository):
         else:
             return str(val)
 
-    def parse_iso_date(self, datestr):
-        # only handles YYYY-MM-DD now. Look into dateutil or isodate
-        # for more complete support of all ISO 8601 variants
-        datestr = datestr.replace(" ", "")  # Data cleaning occasionally
-        # needed. Maybe this isn't
-        # the right place?
-        return datetime.strptime(datestr, "%Y-%m-%d").date()
 
-    def parse_swedish_date(self, datestr):
-        """Parses a number of common forms of expressing swedish dates with
-        varying precision.
+    def attributes_to_resource(self, attributes):
+        # generalized impl handling all special cases 
+        pass
 
-        >>> parse_swedish_date("3 februari 2010")
-        datetime.date(2010, 2, 3)
-        >>> parse_swedish_date("vid utgången av december 1999")
-        datetime.date(1999, 12, 31)
-        >>> parse_swedish_date("november 1999")
-        ferenda.util.gYearMonth(1999, 11)
-        >>> parse_swedish_date("1998")
-        ferenda.util.gYear(1999)
+    def canonical_uri(self, basefile):
+        # possibly break out the attrib-generating code to a separate
+        # func since that's the one that'll be overridden. In
+        # particular, rpubl:forfattningssamling or similar needs to be
+        # added by many repos
+        year, ordinal = basefile.split(":")
+        attrib = {'rpubl:arsutgava': year,
+                  'rpubl:lopnummer': ordinal,
+                  'rdf:type': self.rdf_type}
+        resource = attributes_to_resource(attrib)
+        return self.minter.space.coin_uri(resource) 
 
-        """
-        day = month = year = None
-        # assume strings on the form "3 februari 2010"
-        # strings on the form "vid utg\xe5ngen av december 1999"
-        if datestr.startswith("vid utg\xe5ngen av"):
-            import calendar
-            (x, y, z, month, year) = datestr.split()
-            month = self.swedish_months[month]
-            year = int(year)
-            day = calendar.monthrange(year, month)[1]
-        else:
-            # assume strings on the form "3 februari 2010", "8 dec. 1997"
-            components = datestr.split()
-            year = int(components[-1])
-            if len(components) >= 2:
-                if components[-2].endswith("."):
-                    components[-2] = components[-2][:-1]
-                if components[-2] not in self.swedish_months:
-                    raise ValueError(datestr)
-                month = self.swedish_months[components[-2]]
-            if len(components) >= 3:
-                day = int(components[-3])
+    def sanitize_basefile(self, basefile):
+        # will primarily be used by download to normalize eg "2014:04"
+        # to "2014:4" and similar Regeringen.download_get_basefiles
+        # line 188- should call this method (and
+        # .download_get_basefiles in general probably)
+        return basefile
 
-        # return the best we can
-        if day:
-            return date(year, month, day)
-        if month:
-            return util.gYearMonth(year, month)
-        else:
-            return util.gYear(year)
+
+    # General call hierarchy:
+    # parse
+    #     parse_metadata
+    #         extract_head
+    #         extract_metadata
+    #         sanitize_metadata
+    #             sanitize_identifier
+    #         polish_metadata
+    #             attributes_to_resource
+    #         infer_metadata
+    #     parse_body
+    #         extract_body
+    #         sanitize_body
+    #         get_parser
+    #         tokenize_body
+    #         visit_body
+    #             visit_node
+    #     parse_entry_update
+    @action
+    @managedparsing
+    def parse(self, doc):
+        resource = parse_metadata(self, doc.basefile)
+        doc.meta = resource.graph
+        doc.uri = resource.identifier
+        if resource.value(DCTERMS.title):
+            doc.lang = resource.value(DCTERMS.title).language
+        doc.body = parse_body(self, doc.basefile)
+        self.parse_entry_update(doc)
+        return True
+
+    def parse_metadata(self, basefile):
+        # FIXME: Do we need to set
+        #   1) doc.lang (probably not) and
+        #   2) doc.uri (very possible)?
+        # If so, how do we do that best? Have parse_metadata return a
+        # rdflib.Resource and determine:
+        #   1) resource.value(DCTERMS.title).lang
+        #   2) resource.identifier
+
+        rawhead = self.extract_head(basefile)
+        attribs = self.extract_metadata(rawhead, basefile)
+        # produces flat dict -- note that
+        # DV.parse_{not,ooxml,antiword_docbook} already does this
+
+        sane_attribs = self.sanitize_metadata(attribs)
+        # cleans up flat dict -- note similar
+        # Regeringen.post_process_proposition that requires access to
+        # parsed body
+
+        resource = self.polish_metadata(sane_attribs)
+        # converts dict to rdfgraph -- is this too similar to
+        # attributes_to_resource? This modifies the given graph (which
+        # has namespace prefix mappings set up)
+
+        self.infer_metadata(self, resource, basefile)
+        # maybe hang sameAs off here? Is it more reasonable to infer
+        # new keys to the attribs dict, before conversion to RDF
+        # graph?
+
+        return graph
+
+    def extract_head(self, basefile):
+        soup = self.soup_from_basefile(basefile, self.source_encoding)
+        return soup.head
+
+    def extract_metadata(self, rawhead, basefile):
+        soup = rawhead
+        return {'dcterms:title': soup.find("title").string,
+                'dcterms:identifier': basefile,
+                'rdf:type': self.rdf_type}
+
+    def sanitize_metadata(self, attribs):
+        if 'dcterms:identifier' in attribs:
+            attribs['dcterms:identifier'] = self.sanitize_identifier(
+                attribs['dcterms:identifier'])
+
+    def sanitize_identifier(self, identifier):
+        # docrepos with unclean data might override this
+        return identifier
+
+    def polish_metadata(self, attribs):
+        resource = self.attributes_to_resource(attribs)
+        uri = self.minter.space.coin_uri(resource)
+                        
+    
+    def parse_body(self, rawbody, doc):
+        sanitized = self.sanitize_body(rawbody)
+        parser = self.get_parser()
+        tokenstream = self.tokenize(sanitized)
+        # for PDFs, pdfreader.textboxes(gluefunc) is a tokenizer
+        self.body = parser(tokenstream)
+        for func in self.visitor_functions:
+            # could be functions for assigning URIs to particular
+            # nodes, for parsing text sections of individual nodes
+            # etc.
+            self.visit_node(self.body, func)
+        
+    visitor_functions = []
+             
+    def sanitize_body(self, rawbody):
+        return rawbody
+
+    def get_parser(self):
+        return lambda x: x
+
+    def tokenize(self, sanitized_body):
+        return sanitized_body
+
+    # see SFS.visit_node
+    def visit_node(self, ...):
+        pass 
 
     def infer_triples(self, d, basefile=None):
         """Try to infer any missing metadata from what we already have.
@@ -290,8 +369,9 @@ class SwedishLegalSource(DocumentRepository):
         :param d: A configured Describer instance
         :param basefile: The basefile for the doc we want to infer from 
         """
-        # Lagen.nu specific subclasses (ie classes that mints lagen.nu-owned URIs) 
-        # should inherit this and create suitable owl:sameAs semantics
+        # Lagen.nu specific subclasses (ie classes that mints
+        # lagen.nu-owned URIs) should inherit this and create suitable
+        # owl:sameAs semantics
         try:
             identifier = d.getvalue(self.ns['dcterms'].identifier)
             # if the identifier is incomplete, eg "2010/11:68" instead
@@ -352,6 +432,69 @@ class SwedishLegalSource(DocumentRepository):
             return super(SwedishLegalSource, self).tabs(primary)
         else:
             return []
+
+
+    ################################################################
+    # General small utility functions
+    # (these could be module functions or staticmethods instead)
+    def _swedish_ordinal(self, s):
+        """'första' => '1'"""
+        sl = s.lower()
+        if sl in self.swedish_ordinal_dict:
+            return self.swedish_ordinal_dict[sl]
+        return None
+
+    def parse_iso_date(self, datestr):
+        # only handles YYYY-MM-DD now. Look into dateutil or isodate
+        # for more complete support of all ISO 8601 variants
+        datestr = datestr.replace(" ", "")  # Data cleaning occasionally
+        # needed. Maybe this isn't
+        # the right place?
+        return datetime.strptime(datestr, "%Y-%m-%d").date()
+
+    def parse_swedish_date(self, datestr):
+        """Parses a number of common forms of expressing swedish dates with
+        varying precision.
+
+        >>> parse_swedish_date("3 februari 2010")
+        datetime.date(2010, 2, 3)
+        >>> parse_swedish_date("vid utgången av december 1999")
+        datetime.date(1999, 12, 31)
+        >>> parse_swedish_date("november 1999")
+        ferenda.util.gYearMonth(1999, 11)
+        >>> parse_swedish_date("1998")
+        ferenda.util.gYear(1999)
+
+        """
+        day = month = year = None
+        # assume strings on the form "3 februari 2010"
+        # strings on the form "vid utg\xe5ngen av december 1999"
+        if datestr.startswith("vid utg\xe5ngen av"):
+            import calendar
+            (x, y, z, month, year) = datestr.split()
+            month = self.swedish_months[month]
+            year = int(year)
+            day = calendar.monthrange(year, month)[1]
+        else:
+            # assume strings on the form "3 februari 2010", "8 dec. 1997"
+            components = datestr.split()
+            year = int(components[-1])
+            if len(components) >= 2:
+                if components[-2].endswith("."):
+                    components[-2] = components[-2][:-1]
+                if components[-2] not in self.swedish_months:
+                    raise ValueError(datestr)
+                month = self.swedish_months[components[-2]]
+            if len(components) >= 3:
+                day = int(components[-3])
+
+        # return the best we can
+        if day:
+            return date(year, month, day)
+        if month:
+            return util.gYearMonth(year, month)
+        else:
+            return util.gYear(year)
 
 
 # can't really have a toc_item thats general for all kinds of swedish legal documents?

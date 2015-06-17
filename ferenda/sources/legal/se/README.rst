@@ -18,14 +18,16 @@ attributes_to_resource(), at which times missing triples that can be inferred
 are added etc. 
 
 Sample code::
+
  #  general methods, used outside of a pure parse()-context
- def attributes_to_resource(self, attributes): # generalized impl handling all special cases
+ def attributes_to_resource(self, attributes):
+      # generalized impl handling all special cases 
       pass
  
  def canonical_uri(self, basefile):
-     # possibly break out the attrib-generating code to a separate func since 
-     # that's the one that'll be overridden. In particular, rpubl:forfattningssamling
-     # or similar needs to be added.
+     # possibly break out the attrib-generating code to a separate
+     # func since that's the one that'll be overridden. In particular,
+     # rpubl:forfattningssamling or similar needs to be added.
      year, ordinal = basefile.split(":")
      attrib = {'rpubl:arsutgava': year,
                'rpubl:lopnummer': ordinal,
@@ -34,9 +36,10 @@ Sample code::
      return self.minter.space.coin_uri(resource) 
 
  def sanitize_basefile(self, basefile):
-     # will primarily be used by download to normalize eg "2014:04" to "2014:4" and similar
-     # Regeringen.download_get_basefiles line 188- should call this method (and 
-     # .download_get_basefiles in general probably)
+     # will primarily be used by download to normalize eg "2014:04" to
+     # "2014:4" and similar Regeringen.download_get_basefiles line
+     # 188- should call this method (and .download_get_basefiles in
+     # general probably)
      pass
 
  parse(self, doc) # -- returns True if ok
@@ -55,7 +58,8 @@ Sample code::
      # extract_body will need the same thing. 
      
      rawbody = self.extract_body(self, body.basefile)
-     # rawbody could be a list of lines, a PDFReader object, a BeautifulSoup object...
+     # rawbody could be a list of lines, a PDFReader object, a
+     # BeautifulSoup object...
  
      parse_metadata(self, rawhead, doc) # doc.meta will be populated
          attribs = extract_metadata(rawhead)  # produces flat dict -- note DV.parse_{not,ooxml,antiword_docbook} already does this
@@ -78,21 +82,21 @@ Sample code::
 Composite repositories and inheritance
 --------------------------------------
 
-When a simple repository is inherited, things like self.resourceloader and 
-self.minter automatically picks up the correct resources/minting rules etc
-since 'self' in the superclass methods' now refer to a subclass instance.
-But a composite repository instantiates a number of separate repos that by 
-themselves are not subclassed, and so they use the default resourceloader/
-minter etc.
+When a simple repository is inherited, things like self.resourceloader
+and self.minter automatically picks up the correct resources/minting
+rules etc since 'self' in the superclass methods' now refer to a
+subclass instance.  But a composite repository instantiates a number
+of separate repos that by themselves are not subclassed, and so they
+use the default resourceloader/ minter etc.
 
-We'd like to avoid subclassing each subrepo (like DirAsp, DirTrips, 
-DirRegeringen...), but we need the subclasses to 1) use the correct resourceloader 
-path and 2) somehow call lagen.nu.SameAs.sameas_uri.
+We'd like to avoid subclassing each subrepo (like DirAsp, DirTrips,
+DirRegeringen...), but we need the subclasses to 1) use the correct
+resourceloader path and 2) somehow call lagen.nu.SameAs.sameas_uri.
 
-CompositeRepository.get_instance already makes sure subrepo instances get a 
-correct self.config object. It could maybe graft on a proper resourceloader
-just after __init__? And dynamically create a new type with both lagen.nu.SameAs
-and the original type. Something like::
+CompositeRepository.get_instance already makes sure subrepo instances
+get a correct self.config object. It could maybe graft on a proper
+resourceloader just after __init__? And dynamically create a new type
+with both lagen.nu.SameAs and the original type. Something like::
 
  def get_instance(self, instanceclass):
      ...
