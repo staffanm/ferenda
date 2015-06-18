@@ -9,10 +9,12 @@ reason or another, couldn't be directly fetched by setup.py from pypi.
   fixes. BSD License.
 
 * patch by Anatoly Techtonik
-  (https://code.google.com/p/python-patch/). Included since the
-  package isn't on pypi or is python3 compatible. Code using patches
-  for python3 compatiblity by Johannes Berg, taken from
-  https://raw.github.com/mcgrof/backports/master/lib/patch.py. MIT License.
+  (https://code.google.com/p/python-patch/). Included since inclusion
+  is the recommended way of using the lib, and the package isn't
+  python3 compatible. Code using patches for python3 compatiblity by
+  Johannes Berg, taken from
+  https://raw.github.com/mcgrof/backports/master/lib/patch.py. MIT
+  License.
 
 * httpheader by Deron Meranda
   (http://deron.meranda.us/python/httpheader/). Included since the

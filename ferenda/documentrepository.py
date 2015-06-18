@@ -4,7 +4,7 @@ from __future__ import unicode_literals, print_function
 from collections import defaultdict
 from datetime import datetime
 from ferenda.compat import OrderedDict
-from io import BytesIO
+from io import BytesIO, StringIO
 from itertools import chain
 from operator import itemgetter
 from tempfile import mkstemp
@@ -1066,6 +1066,7 @@ with the *config* object as single parameter.
         return True  # Signals that everything is OK
 
     def parse_entry_update(self, doc):
+        """Update the DocumentEntry json file for this document."""
         entry = DocumentEntry(self.store.documententry_path(doc.basefile))
         entry.basefile = doc.basefile  # do we even need this?
         entry.id = doc.uri
@@ -1073,6 +1074,8 @@ with the *config* object as single parameter.
         entry.save()
 
     def parse_entry_title(self, doc):
+        """Construct a useful title for the document, like it's dcterms:title,
+        to be stored in it's DocumentEntry json file."""
         title = doc.meta.value(URIRef(doc.uri), self.ns['dcterms'].title)
         if title:
             return str(title)

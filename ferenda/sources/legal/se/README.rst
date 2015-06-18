@@ -9,75 +9,41 @@ DocumentRepository.parse. All URI-generating functions (primarily
 canonical_uri, but also all parts that generate URIs to other docs)
 should use self.minter.
 
+Where DocumentRepository.parse calls soup_from_basefile,
+parse_metadata_from_soup and parse_document_from_soup in that order,
+SwedishLegalSource.parse uses a slightly different call hierarcy::
 
-Metadata about a document is generally captured/extracted as simple key/value 
-pairs stored in a dict. The keys are either derived from EBNF parsing rules 
-("sfs", "chapter" etc) or are string-based CURIEs with well-known prefixes 
-("rpubl:arsutgava"). These attribute dicts are refined to a full RDF graph by 
-attributes_to_resource(), at which times missing triples that can be inferred 
-are added etc. 
+ parse(doc) -> bool
+     parse_open(basefile) -> file
+         parse_convert_to_intermediate(basefile) -> file
+         patch_if_needed(file) -> file
+     parse_metadata(basefile) -> rdflib.Resource
+         extract_head(basefile) -> object
+         extract_metadata(object, basefile) -> dict
+         sanitize_metadata(dict) -> dict
+             sanitize_identifier(str) -> str
+         polish_metadata(dict) -> rdflib.Resource
+             attributes_to_resource(dict) -> rdflib.Resource
+         infer_metadata(rdflib.Resource) -> rdflib.Resource
+     parse_body(basefile) -> elements.Body
+         extract_body(basefile) -> object
+         sanitize_body(object) -> object
+         get_parser() -> callable
+         tokenize_body(object) -> iterable
+	 callable(iterable) -> elements.Body
+         visit_body()
+             visit_node(node, callable, state) -> state
+	         callable(node, state) -> state
+     parse_entry_update(doc)
 
-Sample code::
+FIXME: Where do we generally put patch_if_needed?
 
- #  general methods, used outside of a pure parse()-context
- def attributes_to_resource(self, attributes):
-      # generalized impl handling all special cases 
-      pass
- 
- def canonical_uri(self, basefile):
-     # possibly break out the attrib-generating code to a separate
-     # func since that's the one that'll be overridden. In particular,
-     # rpubl:forfattningssamling or similar needs to be added.
-     year, ordinal = basefile.split(":")
-     attrib = {'rpubl:arsutgava': year,
-               'rpubl:lopnummer': ordinal,
-               'rdf:type': self.rdf_type}
-     resource = attributes_to_resource(attrib)
-     return self.minter.space.coin_uri(resource) 
-
- def sanitize_basefile(self, basefile):
-     # will primarily be used by download to normalize eg "2014:04" to
-     # "2014:4" and similar Regeringen.download_get_basefiles line
-     # 188- should call this method (and .download_get_basefiles in
-     # general probably)
-     pass
-
- parse(self, doc) # -- returns True if ok
-     # shouldn't basefile have been sanitized long before?
-     doc.basefile = sanitize_basefile(doc.basefile)
-
-     # previously, initial content loading/extraction was done in various different ways:
-     # DV.py: rawhead, rawbody = parse_{not,ooxml,antiword_docbook}
-     # SFS.py:  extract_sfst, jfr parse_sfsr
-     # DocumentRepository: soup_from_basefile
-     # PDFDocumentRepository: pdfreader_from_basefile
-
-     rawhead = self.extract_head(self, body.basefile)
-     # rawhead could be list of lines, a dict, a BeautifulSoup object...
-     # extract_head could also cache it's return value in self._extracted if 
-     # extract_body will need the same thing. 
-     
-     rawbody = self.extract_body(self, body.basefile)
-     # rawbody could be a list of lines, a PDFReader object, a
-     # BeautifulSoup object...
- 
-     parse_metadata(self, rawhead, doc) # doc.meta will be populated
-         attribs = extract_metadata(rawhead)  # produces flat dict -- note DV.parse_{not,ooxml,antiword_docbook} already does this
-         attribs = sanitize_metadata(attribs) # cleans up flat dict -- note similar Regeringen.post_process_proposition that requires access to parsed body
-             attribs['dcterms:identifier'] = sanitize_identifier(attribs['dcterms:identifier'])
-         graph = polish_metadata(attribs)   # converts dict to rdfgraph -- is this too similar to attributes_to_resource? Do we need to use/access doc.meta (which contains namespace prefix mappings)?
-             canonical_uri() # -- should use self.minter if possible
-         infer_metadata(self, graph, basefile) # -- maybe hang sameAs off here? Is it more reasonable to infer new keys to the attribs dict, before conversion to RDF graph?
-
-     parse_body(self, rawbody) # SFS.py: parse_sfst
-         sanitized = self.sanitize_body(rawbody)
-         parser = self.get_parser()
-         tokenstream = self.tokenize(sanitized)  # for PDFs, pdfreader.textboxes(gluefunc) is a tokenizer
-         self.body = parser(tokenstream)  
-         for func in self.visitor_functions:
-             # could be functions for assigning URIs to particular nodes, for parsing text sections of individual nodes etc. 
-             self.visit_node(self.body, func)
-
+Metadata about a document is generally captured/extracted as simple
+key/value pairs stored in a dict. The keys are either derived from
+EBNF parsing rules ("sfs", "chapter" etc) or are string-based CURIEs
+with well-known prefixes ("rpubl:arsutgava"). These attribute dicts
+are refined to a full RDF graph by attributes_to_resource(), at which
+times missing triples that can be inferred are added etc.
 
 Composite repositories and inheritance
 --------------------------------------

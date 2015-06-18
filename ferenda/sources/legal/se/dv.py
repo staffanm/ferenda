@@ -680,16 +680,15 @@ class DV(SwedishLegalSource):
               'Avgörandedatum': RPUBL.avgorandedatum,
               }
 
-    @managedparsing
-    def parse(self, doc):
-        docfile = self.store.downloaded_path(doc.basefile)
-        intermediatefile = self.store.intermediate_path(doc.basefile)
+    def extract_head(self, basefile):
+        docfile = self.store.downloaded_path(basefile)
+        intermediatefile = self.store.intermediate_path(basefile)
         r = WordReader()
         intermediatefile, filetype = r.read(docfile, intermediatefile)
         if filetype == "docx":
             self._simplify_ooxml(intermediatefile)
         with codecs.open(intermediatefile, encoding="utf-8") as fp:
-            patchedtext, patchdesc = self.patch_if_needed(doc.basefile,
+            patchedtext, patchdesc = self.patch_if_needed(basefile,
                                                           fp.read())
         # The second step is to mangle the crappy XML produced by
         # antiword (docbook) or Word 2007 (OOXML) into a nice pair of
@@ -709,15 +708,46 @@ class DV(SwedishLegalSource):
             rawhead, rawbody = self.parse_ooxml(patchedtext, doc.basefile)
         else:
             rawhead, rawbody = self.parse_antiword_docbook(patchedtext, doc.basefile)
-        sanitized_head = self.sanitize_metadata(rawhead, doc.basefile)
-        doc.uri, domuri = self.polish_metadata(sanitized_head, doc)
-        if patchdesc:
-            doc.meta.add((URIRef(doc.uri),
-                          self.ns['rinfoex'].patchdescription,
-                          Literal(patchdesc)))
-        doc.body = self.format_body(rawbody, doc.basefile)
-        self.parse_entry_update(doc)
-        return True
+       
+
+#    @managedparsing
+#    def parse(self, doc):
+#        docfile = self.store.downloaded_path(doc.basefile)
+#        intermediatefile = self.store.intermediate_path(doc.basefile)
+#        r = WordReader()
+#        intermediatefile, filetype = r.read(docfile, intermediatefile)
+#        if filetype == "docx":
+#            self._simplify_ooxml(intermediatefile)
+#        with codecs.open(intermediatefile, encoding="utf-8") as fp:
+#            patchedtext, patchdesc = self.patch_if_needed(doc.basefile,
+#                                                          fp.read())
+#        # The second step is to mangle the crappy XML produced by
+#        # antiword (docbook) or Word 2007 (OOXML) into a nice pair of
+#        # structures. rawhead is a simple dict that we'll later transform
+#        # into a rdflib Graph. rawbody is a list of plaintext strings, each
+#        # representing a paragraph.
+#        #
+#        # long-term FIXME: WordReader should expose a unified
+#        # interface for handling both kinds of word files so that we
+#        # wouldn't need both parse_ooxml() and
+#        # parse_antiword_docbook(). This might require some other tool
+#        # than antiword for old .doc files, as this throws away a LOT
+#        # of info.
+#        if "not" in doc.basefile:
+#            rawhead, rawbody = self.parse_not(patchedtext, doc.basefile, filetype)
+#        elif filetype == "docx":
+#            rawhead, rawbody = self.parse_ooxml(patchedtext, doc.basefile)
+#        else:
+#            rawhead, rawbody = self.parse_antiword_docbook(patchedtext, doc.basefile)
+#        sanitized_head = self.sanitize_metadata(rawhead, doc.basefile)
+#        doc.uri, domuri = self.polish_metadata(sanitized_head, doc)
+#        if patchdesc:
+#            doc.meta.add((URIRef(doc.uri),
+#                          self.ns['rinfoex'].patchdescription,
+#                          Literal(patchdesc)))
+#        doc.body = self.format_body(rawbody, doc.basefile)
+#        self.parse_entry_update(doc)
+#        return True
 
     def parse_entry_title(self, doc):
         # FIXME: The primary use for entry.title is to generate

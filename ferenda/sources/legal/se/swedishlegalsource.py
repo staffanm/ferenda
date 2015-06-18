@@ -251,37 +251,136 @@ class SwedishLegalSource(DocumentRepository):
         return basefile
 
 
-    # General call hierarchy:
-    # parse
-    #     parse_metadata
-    #         extract_head
-    #         extract_metadata
-    #         sanitize_metadata
-    #             sanitize_identifier
-    #         polish_metadata
-    #             attributes_to_resource
-    #         infer_metadata
-    #     parse_body
-    #         extract_body
-    #         sanitize_body
-    #         get_parser
-    #         tokenize_body
-    #         visit_body
-    #             visit_node
-    #     parse_entry_update
     @action
     @managedparsing
     def parse(self, doc):
-        resource = parse_metadata(self, doc.basefile)
+        fp = parse_open(doc.basefile)
+        resource = parse_metadata(self, fp)
         doc.meta = resource.graph
         doc.uri = resource.identifier
         if resource.value(DCTERMS.title):
             doc.lang = resource.value(DCTERMS.title).language
-        doc.body = parse_body(self, doc.basefile)
+        doc.body = parse_body(self, fp)
         self.parse_entry_update(doc)
         return True
 
-    def parse_metadata(self, basefile):
+    def parse_open(self, basefile):
+        """Open the main downloaded file for the given basefile, caching to an
+        intermediate representation if applicable, and patching that
+        if needed.
+
+        """
+        # FIXME: write the code
+        # 1. check if intermediate_path exists
+        if not os.path.exists(self.store.intermediate_path(basefile)):
+            # 2. if not, call code
+            #    parse_convert_to_intermediate(basefile) to convert
+            #    downloaded_path -> intermediate_path (eg.
+            #    WordReader.read, SFS.extract_sfst)
+            fp = self.convert_to_intermediate(basefile)
+        else:
+            # 3. recieve intermediate_path as open file (binary?)
+            fp = open(self.store.intermediate_path(basefile), "rb")
+        # 4. call patch_if_needed, recieve as open file (binary?)
+        return self.patch_if_needed_fp(fp, basefile)
+
+        def patch_if_needed_fp(self, fp, basefile):
+        """Given *basefile* and the an open file of the downloaded or
+        intermediate document, find if there exists a patch file under
+        ``self.config.patchdir``, and if so, applies it. Returns
+        patchedfp if so, fp otherwise. patchedfp will have a
+        patchdescription attribute.
+        """
+
+        # 1. do we have a patch?
+        patchstore = self.documentstore_class(self.config.patchdir + os.sep + self.alias)
+        patchpath = patchstore.path(basefile, "patches", ".patch")
+        descpath = patchstore.path(basefile, "patches", ".desc")
+        if not os.path.exists(patchpath):
+            return fp
+
+        
+        # 2. make sure error msgs from the patch modules are available
+        # if we fail.
+        from io import StringIO
+        if PY2:
+            pbuf = BytesIO()
+        else:
+            pbuf = StringIO()
+        plog = logging.getLogger('ferenda.thirdparty.patch')
+        plog.setLevel(logging.WARNING)
+        for h in plog.handlers:
+            plog.removeHandler(h)
+        plog.addHandler(logging.StreamHandler(pbuf))
+
+        # 2. read and parse it
+
+        # patches use the same encoding as source, but must be
+        # read as a byte string for patch.PatchSet() to work -- at
+        # least on py2
+        encoding = self.source_encoding
+        with open(patchpath, 'rb') as fp:
+            if not PY2:
+                fp = codecs.getreader(encoding)(fp)
+            ps = patch.PatchSet()
+            success = ps.parse(fp)
+        if not success:
+            errmsg = pbuf.getvalue()
+            if not isinstance(errmsg, str):
+                errmsg = errmsg.decode(encoding)
+            raise errors.PatchError(
+                "Patch %s couldn't be parsed: %s" % (patchpath, errmsg))
+        pbuf.truncate(0)  # call was success, so flush any warnings so far
+        assert len(ps.items) == 1
+        # 3. Create a temporary file with the file to be patched
+        # open tmpfile
+        fileno, tmpfile = mkstemp()
+        fp = os.fdopen(fileno, "wb")
+        # dump text to tmpfile
+        fp.write(text.encode(encoding))
+        fp.close()
+        ps.items[0].source = tmpfile
+        # 5. now do the patching
+
+        # FIXME: we need to make sure
+        # a naked open() call on py3 opens files with a
+        # predictable encoding. (ie handle the case when the user
+        # has set LANG=sv_SE.ISO8859-1)
+        success = ps.apply()
+        if not success:
+            errmsg = pbuf.getvalue()
+            if not isinstance(errmsg, str):
+                errmsg = errmsg.decode(encoding)
+            print(errmsg)
+            raise errors.PatchError("Patch %s failed: %s" % (patchpath, errmsg))
+        else:
+            # 6. Finally get a patch description
+            if ps.items[0].hunks[0].desc:
+                desc = ps.items[0].hunks[0].desc
+                if isinstance(desc, bytes):  # on py2
+                    desc = desc.decode(encoding)
+            elif os.path.exists(descpath):
+                desc = util.readfile(descpath)
+            else:
+                desc = "(No patch description available)"
+            if not PY2:
+                # on py3, the patch module will unfortunately use
+                # unicode strings internally and then create a
+                # utf8 file (by opening it w/o encoding in write_hunks)
+                # (depending on the val of LC_CTYPE/LANG)
+                # seems the exact encoding is platform dependent
+                import locale
+                encoding = locale.getpreferredencoding(False)
+            res = util.readfile(tmpfile, encoding=encoding)
+            os.unlink(tmpfile)
+            return res, desc
+
+    def convert_to_intermediate(self, basefile):
+        # default implementation does not do any conversation, simply
+        # opens downloaded_path
+        return open(self.store.downloaded_path(basefile))
+
+    def parse_metadata(self, fp):
         # FIXME: Do we need to set
         #   1) doc.lang (probably not) and
         #   2) doc.uri (very possible)?
