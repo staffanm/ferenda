@@ -5,10 +5,12 @@ from __future__ import unicode_literals
 
 from datetime import datetime, date
 import re
+import os
 
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph
 from six import text_type as str
+import bs4
 
 from ferenda import (DocumentRepository, DocumentStore, FSMParser,
                      CitationParser)
@@ -254,20 +256,24 @@ class SwedishLegalSource(DocumentRepository):
     @action
     @managedparsing
     def parse(self, doc):
-        fp = parse_open(doc.basefile)
-        resource = parse_metadata(self, fp)
+        fp = self.parse_open(doc.basefile)
+        resource = self.parse_metadata(fp, doc.basefile)
         doc.meta = resource.graph
         doc.uri = resource.identifier
         if resource.value(DCTERMS.title):
             doc.lang = resource.value(DCTERMS.title).language
-        doc.body = parse_body(self, fp)
+        doc.body = self.parse_body(self, fp)
         self.parse_entry_update(doc)
         return True
 
     def parse_open(self, basefile):
-        """Open the main downloaded file for the given basefile, caching to an
-        intermediate representation if applicable, and patching that
-        if needed.
+        """Open the main downloaded file for the given basefile, caching the
+        contents to an intermediate representation if applicable (or
+        reading from that cache if that's ok), and patching the file
+        transparently if needed.
+
+        :param basefile: The basefile to open
+        :return: an open file object from which the document can be read
 
         """
         # FIXME: write the code
@@ -277,110 +283,41 @@ class SwedishLegalSource(DocumentRepository):
             #    parse_convert_to_intermediate(basefile) to convert
             #    downloaded_path -> intermediate_path (eg.
             #    WordReader.read, SFS.extract_sfst)
-            fp = self.convert_to_intermediate(basefile)
+            fp = self.downloaded_to_intermediate(basefile)
         else:
             # 3. recieve intermediate_path as open file (binary?)
+            # FIXME: DV.py needs this fp to have a .filetype attribute
+            # -- where do we store it and how do we retrieve it?
             fp = open(self.store.intermediate_path(basefile), "rb")
         # 4. call patch_if_needed, recieve as open file (binary?)
-        return self.patch_if_needed_fp(fp, basefile)
+        return self.patch_if_needed(fp, basefile)
 
-        def patch_if_needed_fp(self, fp, basefile):
-        """Given *basefile* and the an open file of the downloaded or
-        intermediate document, find if there exists a patch file under
-        ``self.config.patchdir``, and if so, applies it. Returns
-        patchedfp if so, fp otherwise. patchedfp will have a
-        patchdescription attribute.
-        """
-
+    def patch_if_needed(self, fp, basefile):
+        """Override of DocumentRepository.patch_if_needed with different, streamier API."""
         # 1. do we have a patch?
         patchstore = self.documentstore_class(self.config.patchdir + os.sep + self.alias)
         patchpath = patchstore.path(basefile, "patches", ".patch")
         descpath = patchstore.path(basefile, "patches", ".desc")
         if not os.path.exists(patchpath):
             return fp
+        from patchit import PatchSet
+        with open(patchpath, 'r') as pfp:
+            # this might raise a PatchSyntaxError
+            ps = PatchSet.from_stream(pfp)
+        assert len(ps.patches) == 1
+        stream = ps.patches[0].merge(fp)
+        return stream
 
-        
-        # 2. make sure error msgs from the patch modules are available
-        # if we fail.
-        from io import StringIO
-        if PY2:
-            pbuf = BytesIO()
-        else:
-            pbuf = StringIO()
-        plog = logging.getLogger('ferenda.thirdparty.patch')
-        plog.setLevel(logging.WARNING)
-        for h in plog.handlers:
-            plog.removeHandler(h)
-        plog.addHandler(logging.StreamHandler(pbuf))
-
-        # 2. read and parse it
-
-        # patches use the same encoding as source, but must be
-        # read as a byte string for patch.PatchSet() to work -- at
-        # least on py2
-        encoding = self.source_encoding
-        with open(patchpath, 'rb') as fp:
-            if not PY2:
-                fp = codecs.getreader(encoding)(fp)
-            ps = patch.PatchSet()
-            success = ps.parse(fp)
-        if not success:
-            errmsg = pbuf.getvalue()
-            if not isinstance(errmsg, str):
-                errmsg = errmsg.decode(encoding)
-            raise errors.PatchError(
-                "Patch %s couldn't be parsed: %s" % (patchpath, errmsg))
-        pbuf.truncate(0)  # call was success, so flush any warnings so far
-        assert len(ps.items) == 1
-        # 3. Create a temporary file with the file to be patched
-        # open tmpfile
-        fileno, tmpfile = mkstemp()
-        fp = os.fdopen(fileno, "wb")
-        # dump text to tmpfile
-        fp.write(text.encode(encoding))
-        fp.close()
-        ps.items[0].source = tmpfile
-        # 5. now do the patching
-
-        # FIXME: we need to make sure
-        # a naked open() call on py3 opens files with a
-        # predictable encoding. (ie handle the case when the user
-        # has set LANG=sv_SE.ISO8859-1)
-        success = ps.apply()
-        if not success:
-            errmsg = pbuf.getvalue()
-            if not isinstance(errmsg, str):
-                errmsg = errmsg.decode(encoding)
-            print(errmsg)
-            raise errors.PatchError("Patch %s failed: %s" % (patchpath, errmsg))
-        else:
-            # 6. Finally get a patch description
-            if ps.items[0].hunks[0].desc:
-                desc = ps.items[0].hunks[0].desc
-                if isinstance(desc, bytes):  # on py2
-                    desc = desc.decode(encoding)
-            elif os.path.exists(descpath):
-                desc = util.readfile(descpath)
-            else:
-                desc = "(No patch description available)"
-            if not PY2:
-                # on py3, the patch module will unfortunately use
-                # unicode strings internally and then create a
-                # utf8 file (by opening it w/o encoding in write_hunks)
-                # (depending on the val of LC_CTYPE/LANG)
-                # seems the exact encoding is platform dependent
-                import locale
-                encoding = locale.getpreferredencoding(False)
-            res = util.readfile(tmpfile, encoding=encoding)
-            os.unlink(tmpfile)
-            return res, desc
-
-    def convert_to_intermediate(self, basefile):
+    def downloaded_to_intermediate(self, basefile):
         # default implementation does not do any conversation, simply
-        # opens downloaded_path
+        # opens downloaded_path. Any source that actually uses
+        # intermediate files should override this.
         return open(self.store.downloaded_path(basefile))
 
-    def parse_metadata(self, fp):
+    def parse_metadata(self, fp, basefile):
+        """Given a open file containing raw document content (or intermediate
+        content), return a rdflib.Resource object containing all metadata
+        about the object."""
         # FIXME: Do we need to set
         #   1) doc.lang (probably not) and
         #   2) doc.uri (very possible)?
@@ -389,7 +326,7 @@ class SwedishLegalSource(DocumentRepository):
         #   1) resource.value(DCTERMS.title).lang
         #   2) resource.identifier
 
-        rawhead = self.extract_head(basefile)
+        rawhead = self.extract_head(fp, basefile)
         attribs = self.extract_metadata(rawhead, basefile)
         # produces flat dict -- note that
         # DV.parse_{not,ooxml,antiword_docbook} already does this
@@ -411,30 +348,45 @@ class SwedishLegalSource(DocumentRepository):
 
         return graph
 
-    def extract_head(self, basefile):
-        soup = self.soup_from_basefile(basefile, self.source_encoding)
+    def extract_head(self, fp, basefile):
+        """Given a open file containing raw document content (or intermediate
+        content), return the parts of that document that contains
+        document metadata, in some raw form that extract_metadata can
+        digest."""
+
+        parser = 'lxml'
+        soup = bs4.BeautifulSoup(fp.read(), parser)
         return soup.head
 
     def extract_metadata(self, rawhead, basefile):
+        """Given the document metadata returned by extract_head, extract all
+        metadata about the document as such in a flat dict where keys are
+        CURIEs and values are strings."""
         soup = rawhead
         return {'dcterms:title': soup.find("title").string,
                 'dcterms:identifier': basefile,
                 'rdf:type': self.rdf_type}
 
     def sanitize_metadata(self, attribs):
+        """Given a dict with unprocessed metadata, run various sanitizing checks on the content and return a sane version."""
         if 'dcterms:identifier' in attribs:
             attribs['dcterms:identifier'] = self.sanitize_identifier(
                 attribs['dcterms:identifier'])
 
     def sanitize_identifier(self, identifier):
+        """Given the unprocessed dcterms:identifier for a document, return a sane version of the same."""
         # docrepos with unclean data might override this
         return identifier
 
     def polish_metadata(self, attribs):
+        """Given a sanitized flat dict of metadatafor a document, return a rdflib.Resource version of the same.""" 
+
         resource = self.attributes_to_resource(attribs)
         uri = self.minter.space.coin_uri(resource)
+
+    def infer_metadata(self, resource, basefile):
+        """Given a rdflib.Resource object, add additional triples that can be inferred from existing metadata."""
                         
-    
     def parse_body(self, rawbody, doc):
         sanitized = self.sanitize_body(rawbody)
         parser = self.get_parser()
@@ -459,8 +411,31 @@ class SwedishLegalSource(DocumentRepository):
         return sanitized_body
 
     # see SFS.visit_node
-    def visit_node(self, ...):
-        pass 
+    def visit_node(self, node, clbl, state, debug=False):
+
+        """Visit each part of the document recursively (depth-first) and call
+        a user-supplied function for each part.
+
+        :param node: The document part
+        :param clbl: A function that is called with node and state as
+                     argument. It should return True if sub-nodes
+                     should be visited, False otherwise.
+        :param state: A mutable or immutable object (helpful!)
+
+        """
+        if debug:
+            print("About to visit %s with %s" %
+                  (node.__class__.__name__, clbl.__name__))
+        newstate = clbl(node, state)
+        if debug:
+            print("After visiting %s: %s" % (node.__class__.__name__, newstate))
+        if newstate is not None and isinstance(node, CompoundElement):
+            for subnode in node:
+                if debug:
+                    print("about to visit subnode %s with %s" %
+                          (subnode.__class__.__name__, newstate))
+                self.visit_node(subnode, clbl, newstate, debug)
+
 
     def infer_triples(self, d, basefile=None):
         """Try to infer any missing metadata from what we already have.

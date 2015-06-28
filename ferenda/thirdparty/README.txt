@@ -14,7 +14,12 @@ reason or another, couldn't be directly fetched by setup.py from pypi.
   python3 compatible. Code using patches for python3 compatiblity by
   Johannes Berg, taken from
   https://raw.github.com/mcgrof/backports/master/lib/patch.py. MIT
-  License.
+  License. (NOTE: This module will be removed once patchit has been
+  determined to be usable)
+
+* patchit by Arthur Skowronek
+  (https://github.com/eisensheng/patchit). Included since the released
+  version on pypi isn't python3 compatible. MIT License.
 
 * httpheader by Deron Meranda
   (http://deron.meranda.us/python/httpheader/). Included since the

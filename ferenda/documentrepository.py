@@ -1195,83 +1195,30 @@ with the *config* object as single parameter.
         patchstore = self.documentstore_class(self.config.patchdir + os.sep + self.alias)
         patchpath = patchstore.path(basefile, "patches", ".patch")
         descpath = patchstore.path(basefile, "patches", ".desc")
-        if os.path.exists(patchpath):
-            # 4. make sure error msgs from the patch modules are
-            # available if we fail.
-            from io import StringIO
-            if PY2:
-                pbuf = BytesIO()
-            else:
-                pbuf = StringIO()
-            plog = logging.getLogger('ferenda.thirdparty.patch')
-            plog.setLevel(logging.WARNING)
-            for h in plog.handlers:
-                plog.removeHandler(h)
-            plog.addHandler(logging.StreamHandler(pbuf))
 
-            # 2. read and parse it
+        if not os.path.exists(patchpath):
+            return text, None
+        from patchit import PatchSet, PatchSyntaxError, PatchConflictError
+        with codecs.open(patchpath, 'r', encoding=self.source_encoding) as pfp:
+            # this might raise a PatchSyntaxError
+            try:
+                ps = PatchSet.from_stream(pfp)
+            except PatchSyntaxError as e:
+                raise errors.PatchError(e)
+            
+        assert len(ps.patches) == 1
 
-            # patches use the same encoding as source, but must be
-            # read as a byte string for patch.PatchSet() to work -- at
-            # least on py2
-            encoding = self.source_encoding
-            with open(patchpath, 'rb') as fp:
-                if not PY2:
-                    fp = codecs.getreader(encoding)(fp)
-                ps = patch.PatchSet()
-                success = ps.parse(fp)
-            if not success:
-                errmsg = pbuf.getvalue()
-                if not isinstance(errmsg, str):
-                    errmsg = errmsg.decode(encoding)
-                raise errors.PatchError(
-                    "Patch %s couldn't be parsed: %s" % (patchpath, errmsg))
-            pbuf.truncate(0)  # call was success, so flush any warnings so far
-            assert len(ps.items) == 1
-            # 3. Create a temporary file with the file to be patched
-            # open tmpfile
-            fileno, tmpfile = mkstemp()
-            fp = os.fdopen(fileno, "wb")
-            # dump text to tmpfile
-            fp.write(text.encode(encoding))
-            fp.close()
-            ps.items[0].source = tmpfile
-            # 5. now do the patching
-
-            # FIXME: we need to make sure
-            # a naked open() call on py3 opens files with a
-            # predictable encoding. (ie handle the case when the user
-            # has set LANG=sv_SE.ISO8859-1)
-            success = ps.apply()
-            if not success:
-                errmsg = pbuf.getvalue()
-                if not isinstance(errmsg, str):
-                    errmsg = errmsg.decode(encoding)
-                print(errmsg)
-                raise errors.PatchError("Patch %s failed: %s" % (patchpath, errmsg))
-            else:
-                # 6. Finally get a patch description
-                if ps.items[0].hunks[0].desc:
-                    desc = ps.items[0].hunks[0].desc
-                    if isinstance(desc, bytes):  # on py2
-                        desc = desc.decode(encoding)
-                elif os.path.exists(descpath):
-                    desc = util.readfile(descpath)
-                else:
-                    desc = "(No patch description available)"
-                if not PY2:
-                    # on py3, the patch module will unfortunately use
-                    # unicode strings internally and then create a
-                    # utf8 file (by opening it w/o encoding in write_hunks)
-                    # (depending on the val of LC_CTYPE/LANG)
-                    # seems the exact encoding is platform dependent
-                    import locale
-                    encoding = locale.getpreferredencoding(False)
-                res = util.readfile(tmpfile, encoding=encoding)
-                os.unlink(tmpfile)
-                return res, desc
+        if ps.patches[0].hunks[0].comment:
+            desc = ps.patches[0].hunks[0].comment
+        elif os.path.exists(descpath):
+            desc = util.readfile(descpath)
         else:
-            return (text, None)
+            desc = "(No patch description available)"
+        try:
+            stream = ps.patches[0].merge(text.split("\n"))
+            return "\n".join(stream), desc
+        except PatchConflictError as e:
+            raise errors.PatchError(e)
 
     def make_document(self, basefile=None):
         """

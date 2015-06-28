@@ -1,6 +1,20 @@
 Misc notes about these docrepos
 ===============================
 
+All docrepos in this package should inherit from
+SwedishLegalSource. Any custom DocumentStore should inherit from
+SwedishLegalStore. These classes have a bunch of extra functionality
+compared to DocumentRepository, which help with writing consistent
+document repos containing swedish law related documents. Some of that
+functionality might migrate to DocumentRepository in due time if it's
+found to be generic enough.
+
+* self.minter helps with creating URIs from RDF properties
+* self.patch_if_needed works with file handles, not text blobs
+* The parse step has a more fine-grained structure with more points to
+  override
+  
+
 General structure of the parse step
 -----------------------------------
 
@@ -15,7 +29,7 @@ SwedishLegalSource.parse uses a slightly different call hierarcy::
 
  parse(doc) -> bool
      parse_open(basefile) -> file
-         parse_convert_to_intermediate(basefile) -> file
+         downloaded_to_intermediate(basefile) -> file
          patch_if_needed(file) -> file
      parse_metadata(basefile) -> rdflib.Resource
          extract_head(basefile) -> object
@@ -35,8 +49,6 @@ SwedishLegalSource.parse uses a slightly different call hierarcy::
              visit_node(node, callable, state) -> state
 	         callable(node, state) -> state
      parse_entry_update(doc)
-
-FIXME: Where do we generally put patch_if_needed?
 
 Metadata about a document is generally captured/extracted as simple
 key/value pairs stored in a dict. The keys are either derived from

@@ -1212,7 +1212,7 @@ class Generate(RepoTester):
         typeof="bibo:DocumentPart"
         class="preamblesection"
         property="dcterms:title"
-        content="Abstract">
+o        content="Abstract">
       <p>Lorem ipsum dolor sit amet</p>
       <p><a href="http://localhost:8000/res/test/something-else">external</a></p>
       <p><a href="http://localhost:8000/dataset/test">dataset</a></p>
@@ -1691,6 +1691,10 @@ class Patch(RepoTester):
         self.repo.config.patchdir = self.datadir
         self.patchstore = self.repo.documentstore_class(self.repo.config.patchdir + os.sep + self.repo.alias)
 
+    def tearDown(self):
+        self.setupclass = False
+        super(Patch, self).tearDown()
+
     def test_successful_patch(self):
         # Note that this patch's "fromfile" and "tofile" fields
         # doesn't match any actual file (and that there really isn't
@@ -1838,6 +1842,7 @@ It can span several lines."""
         result, desc = self.repo.patch_if_needed("123/a", self.sourcedoc)
         self.assertEqual("Editöriål edit", desc)
         self.assertEqual(self.targetdoc2, result)
+        self.repo.source_encoding = "utf-8"
         
 
 

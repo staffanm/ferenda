@@ -224,7 +224,6 @@ class Regeringen(SwedishLegalSource):
 
     def canonical_uri(self, basefile, document_type=None):
         # basefile eg 2014:158 => [] a rpubl:For ; rpubl:arsutgava "2014"; rpubl:lopnummer "158";
-        from pudb import set_trace; set_trace()
         if not document_type:
             document_type = self.document_type
         seg = {self.KOMMITTEDIREKTIV: "dir",

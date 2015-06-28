@@ -387,11 +387,11 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
                                        indexlocation=self.datadir + "/whoosh",)
     @classmethod
     def tearDownClass(cls):
-        if cls.setupclass:
+        if cls.setupclass and os.path.exists(cls.datadir):
             shutil.rmtree(cls.datadir)
 
     def tearDown(self):
-        if not self.setupclass:
+        if not self.setupclass and os.path.exists(self.datadir):
             # print("Not removing %s" % self.datadir)
             shutil.rmtree(self.datadir)
 

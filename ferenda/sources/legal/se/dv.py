@@ -20,8 +20,8 @@ from collections import defaultdict
 from copy import deepcopy
 
 # 3rdparty libs
-from rdflib import Namespace, URIRef, Graph, RDF, RDFS, Literal, BNode
-from rdflib.namespace import DCTERMS, OWL, SKOS
+from rdflib import Namespace, URIRef, Graph, RDF, RDFS, BNode
+from rdflib.namespace import DCTERMS, SKOS
 import requests
 import lxml.html
 from lxml import etree
@@ -29,62 +29,16 @@ from bs4 import BeautifulSoup, NavigableString
 
 # my libs
 from ferenda import (Document, DocumentStore, Describer, WordReader, FSMParser)
-from ferenda.decorators import managedparsing, newstate
+from ferenda.decorators import newstate
 from ferenda import util, errors
 from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda.elements import (Body, Paragraph, CompoundElement, OrdinalElement,
                               Heading, Link)
 
 from ferenda.elements.html import Strong, Em
-from . import legaluri, SwedishLegalSource, SwedishCitationParser, RPUBL, URISPACE
+from . import SwedishLegalSource, SwedishCitationParser, RPUBL, URISPACE
 
 PROV = Namespace(util.ns['prov'])
-
-# Objektmodellen för rättsfall:
-#
-# meta:
-#  <http://localhost:8000/res/dv/nja/2009/s_695> a rpubl:Rattsfallsreferat;
-#     owl:sameAs <http://localhost:8000/res/dv/nja/2009:68>,
-#                <http://rinfo.lagrummet.se/publ/rf/nja/2009:68>;
-# This should be owl:sameAs <http://rinfo.lagrummet.se/serie/rf/nja>
-#     rpubl:rattsfallspublikation <http:///localhost:8000/coll/dv/nja>;
-#     rpubl:arsutgava "2009";
-#     rpubl:lopnummer "68";
-#     rpubl:sidnummer "695";
-#     rpubl:referatAvDomstolsavgorande <http://localhost:8000/res/dv/hd/t170-08/2009-11-04>;
-#     rpubl:referatrubrik "Överföring av mönsterregistrering..."@sv;
-#     dcterms:identifier "NJA 1987 s 187";
-#     dcterms:bibliographicCitation "NJA 1987:68"
-# This shld b owl:sameAs <http://rinfo.lagrummet.se/org/domstolsverket>
-#     dcterms:publisher <http://localhost:8000/org/domstolsverket>;
-#     dcterms:issued "2009-11-05"^^xsd:date.
-#
-#
-#  <http://localhost:8000/res/dv/hd/t170-08/2009-11-04> a VagledandeDomstolsavgorande;
-#     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/t_170-08/2009-11-04>;
-#     rpubl:avgorandedatum "2009-11-04"^^xsd:date;
-#     rpubl:domstolsavdelning "2";
-#     rpubl:malnummer "T 170-08";
-# rpubl:lagrum <http://localhost:8000/res/sfs/1970:485#P1>;
-# rpubl:lagrum <http://localhost:8000/res/sfs/1970:485#P1a>;
-# rpubl:lagrum <http://localhost:8000/res/sfs/1970:485#P2>;
-# rpubl:lagrum <http://localhost:8000/res/sfs/1970:485#P5>;
-# rpubl:lagrum <http://localhost:8000/res/sfs/1970:485#P31>;
-# rpubl:lagrum <http://localhost:8000/res/sfs/1970:485#P32>;
-#     dcterms:title "Överföring av mönsterregistrering..."@sv;
-# shld be owl:sameAs <http://rinfo.lagrummet.se/org/hoegsta_domstolen>
-#     dcterms:publisher <http://localhost:8000/org/hoegsta_domstolen>;
-#     dcterms:issued "2009-11-05"^^xsd:date;
-#     dcterms:subject <http://localhost:8000/concept/Mönsterrätt>;
-#     dcterms:subject <http://localhost:8000/concept/Dubbelöverlåtelse>;
-#     dcterms:subject <http://localhost:8000/concept/Formgivarrätt>;
-#     dcterms:subject <http://localhost:8000/concept/Godtrosförvärv>;
-#     dcterms:subject <http://localhost:8000/concept/Formgivning>;
-# litteratur? dcterms:references t bnodes...
-#
-# uri: http://localhost:8000/res/dv/nja/2009/s_695 # hard to construct from "HDO/T170-08", requires a rdf lookup like .value(pred=RDF.type, object=RPUBL.Rattsfallsreferat)
-# lang: sv
-# body: [Paragraph(), Paragraph(), Paragraph(), ...]
 
 
 class DVStore(DocumentStore):
@@ -680,16 +634,7 @@ class DV(SwedishLegalSource):
               'Avgörandedatum': RPUBL.avgorandedatum,
               }
 
-    def extract_head(self, basefile):
-        docfile = self.store.downloaded_path(basefile)
-        intermediatefile = self.store.intermediate_path(basefile)
-        r = WordReader()
-        intermediatefile, filetype = r.read(docfile, intermediatefile)
-        if filetype == "docx":
-            self._simplify_ooxml(intermediatefile)
-        with codecs.open(intermediatefile, encoding="utf-8") as fp:
-            patchedtext, patchdesc = self.patch_if_needed(basefile,
-                                                          fp.read())
+    def extract_head(self, fp, basefile):
         # The second step is to mangle the crappy XML produced by
         # antiword (docbook) or Word 2007 (OOXML) into a nice pair of
         # structures. rawhead is a simple dict that we'll later transform
@@ -702,6 +647,12 @@ class DV(SwedishLegalSource):
         # parse_antiword_docbook(). This might require some other tool
         # than antiword for old .doc files, as this throws away a LOT
         # of info.
+        filetype = fp.filetype
+        patchedtext = fp.read()
+        
+        # FIXME: Where do we get filetype? We had it in
+        # downloaded_to_intermediate at one time, how do we get it
+        # again?
         if "not" in doc.basefile:
             rawhead, rawbody = self.parse_not(patchedtext, doc.basefile, filetype)
         elif filetype == "docx":
@@ -748,6 +699,18 @@ class DV(SwedishLegalSource):
 #        doc.body = self.format_body(rawbody, doc.basefile)
 #        self.parse_entry_update(doc)
 #        return True
+
+
+    def downloaded_to_intermediate(self, basefile):
+        docfile = self.store.downloaded_path(doc.basefile)
+        intermediatefile = self.store.intermediate_path(doc.basefile)
+        if not os.path.exists(intermediatefile):
+            intermediatefile, filetype = WordReader().read(docfile, intermediatefile)
+            if filetype == "docx":
+                self._simplify_ooxml(intermediatefile)
+        fp = open(self.store.intermediate_path(basefile))
+        fp.filetype = filetype
+        return fp
 
     def parse_entry_title(self, doc):
         # FIXME: The primary use for entry.title is to generate

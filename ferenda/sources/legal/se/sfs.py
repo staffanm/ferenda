@@ -1218,31 +1218,6 @@ class SFS(Trips):
         return 'https://lagen.nu/concept/%s' % capitalized.replace(' ', '_')
 
 
-    def visit_node(self, node, clbl, state, debug=False):
-        """Visit each part of the document recursively (depth-first) and call
-        a user-supplied function for each part.
-
-        :param node: The document part
-        :param clbl: A function that is called with node and state as
-                     argument. It should return True if sub-nodes
-                     should be visited, False otherwise.
-        :param state: A mutable or immutable object (helpful!)
-
-        """
-        # node could be a CompoundElement, a plain str, or something else
-        if debug:
-            print("About to visit %s with %s" %
-                  (node.__class__.__name__, clbl.__name__))
-        newstate = clbl(node, state)
-        if debug:
-            print("After visiting %s: %s" % (node.__class__.__name__, newstate))
-        if newstate is not None and isinstance(node, CompoundElement):
-            for subnode in node:
-                if debug:
-                    print("about to visit subnode %s with %s" %
-                          (subnode.__class__.__name__, newstate))
-                self.visit_node(subnode, clbl, newstate, debug)
-        
     def attributes_to_resource(self, attributes):
         # this is roughly the same code as
         # LegalRef.attributes_to_resource but with different keys
