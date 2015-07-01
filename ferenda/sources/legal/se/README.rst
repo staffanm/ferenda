@@ -32,17 +32,17 @@ SwedishLegalSource.parse uses a slightly different call hierarcy::
          downloaded_to_intermediate(basefile) -> file
          patch_if_needed(file) -> file
      parse_metadata(basefile) -> rdflib.Resource
-         extract_head(basefile) -> object
+         extract_head(file, basefile) -> object
          extract_metadata(object, basefile) -> dict
-         sanitize_metadata(dict) -> dict
+         sanitize_metadata(dict, basefile) -> dict
              sanitize_identifier(str) -> str
          polish_metadata(dict) -> rdflib.Resource
              attributes_to_resource(dict) -> rdflib.Resource
          infer_metadata(rdflib.Resource) -> rdflib.Resource
-     parse_body(basefile) -> elements.Body
-         extract_body(basefile) -> object
+     parse_body(file, basefile) -> elements.Body
+         extract_body(file, basefile) -> object
          sanitize_body(object) -> object
-         get_parser() -> callable
+         get_parser(basefile) -> callable
          tokenize_body(object) -> iterable
 	 callable(iterable) -> elements.Body
          visit_body()

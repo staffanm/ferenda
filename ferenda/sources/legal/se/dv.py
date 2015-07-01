@@ -635,71 +635,37 @@ class DV(SwedishLegalSource):
               }
 
     def extract_head(self, fp, basefile):
-        # The second step is to mangle the crappy XML produced by
-        # antiword (docbook) or Word 2007 (OOXML) into a nice pair of
-        # structures. rawhead is a simple dict that we'll later transform
-        # into a rdflib Graph. rawbody is a list of plaintext strings, each
-        # representing a paragraph.
-        #
-        # long-term FIXME: WordReader should expose a unified
-        # interface for handling both kinds of word files so that we
-        # wouldn't need both parse_ooxml() and
-        # parse_antiword_docbook(). This might require some other tool
-        # than antiword for old .doc files, as this throws away a LOT
-        # of info.
-        filetype = fp.filetype
-        patchedtext = fp.read()
-        
-        # FIXME: Where do we get filetype? We had it in
-        # downloaded_to_intermediate at one time, how do we get it
-        # again?
-        if "not" in doc.basefile:
-            rawhead, rawbody = self.parse_not(patchedtext, doc.basefile, filetype)
-        elif filetype == "docx":
-            rawhead, rawbody = self.parse_ooxml(patchedtext, doc.basefile)
+        # Determine if the intermediate files come from .doc or OOXML
+        # (.docx) sources by sniffing the first bytes
+        start = fp.read(6)
+        if start in ("<w:doc", "<body "):
+            filetype = "docx"
+        elif start in ("<book>", "<body>"):
+            filetype = "doc"
         else:
-            rawhead, rawbody = self.parse_antiword_docbook(patchedtext, doc.basefile)
-       
+            raise ValueError("Can't guess filetype from %r" % start)
+        fp.seek(0)
 
-#    @managedparsing
-#    def parse(self, doc):
-#        docfile = self.store.downloaded_path(doc.basefile)
-#        intermediatefile = self.store.intermediate_path(doc.basefile)
-#        r = WordReader()
-#        intermediatefile, filetype = r.read(docfile, intermediatefile)
-#        if filetype == "docx":
-#            self._simplify_ooxml(intermediatefile)
-#        with codecs.open(intermediatefile, encoding="utf-8") as fp:
-#            patchedtext, patchdesc = self.patch_if_needed(doc.basefile,
-#                                                          fp.read())
-#        # The second step is to mangle the crappy XML produced by
-#        # antiword (docbook) or Word 2007 (OOXML) into a nice pair of
-#        # structures. rawhead is a simple dict that we'll later transform
-#        # into a rdflib Graph. rawbody is a list of plaintext strings, each
-#        # representing a paragraph.
-#        #
-#        # long-term FIXME: WordReader should expose a unified
-#        # interface for handling both kinds of word files so that we
-#        # wouldn't need both parse_ooxml() and
-#        # parse_antiword_docbook(). This might require some other tool
-#        # than antiword for old .doc files, as this throws away a LOT
-#        # of info.
-#        if "not" in doc.basefile:
-#            rawhead, rawbody = self.parse_not(patchedtext, doc.basefile, filetype)
-#        elif filetype == "docx":
-#            rawhead, rawbody = self.parse_ooxml(patchedtext, doc.basefile)
-#        else:
-#            rawhead, rawbody = self.parse_antiword_docbook(patchedtext, doc.basefile)
-#        sanitized_head = self.sanitize_metadata(rawhead, doc.basefile)
-#        doc.uri, domuri = self.polish_metadata(sanitized_head, doc)
-#        if patchdesc:
-#            doc.meta.add((URIRef(doc.uri),
-#                          self.ns['rinfoex'].patchdescription,
-#                          Literal(patchdesc)))
-#        doc.body = self.format_body(rawbody, doc.basefile)
-#        self.parse_entry_update(doc)
-#        return True
+        patchedtext = fp.read()
+        # rawhead is a simple dict that we'll later transform into a
+        # rdflib Graph. rawbody is a list of plaintext strings, each
+        # representing a paragraph.
+        if "not" in basefile:
+            rawhead, rawbody = self.parse_not(patchedtext, basefile, filetype)
+        elif filetype == "docx":
+            rawhead, rawbody = self.parse_ooxml(patchedtext, basefile)
+        else:
+            rawhead, rawbody = self.parse_antiword_docbook(patchedtext, basefile)
 
+        # stash the body away for later reference
+        self._rawbody = rawbody
+        return rawhead
+
+                     
+    def extract_metadata(self, rawhead, basefile):
+        # we have already done all the extracting in extract_head
+        return rawhead
+        
 
     def downloaded_to_intermediate(self, basefile):
         docfile = self.store.downloaded_path(doc.basefile)
@@ -1129,7 +1095,7 @@ class DV(SwedishLegalSource):
         return head
 
     # create nice RDF from the sanitized metadata
-    def polish_metadata(self, head, doc):
+    def polish_metadata(self, head):
         parser = SwedishCitationParser(LegalRef(LegalRef.RATTSFALL),
                                        self.minter,
                                        self.commondata)
@@ -1148,8 +1114,9 @@ class DV(SwedishLegalSource):
 
         # 1. mint uris and create the two Describers we'll use
         # if self.config.localizeuri or '_nja_ordinal' not in head:
+        graph = self.make_graph()
         refuri = ref_to_uri(head["Referat"])
-        refdesc = Describer(doc.meta, refuri)
+        refdesc = Describer(graph, refuri)
         slug = self.lookup_label(self.lookup_resource(head["Domstol"]),
                                  predicate=URISPACE.abbrSlug)
         for malnummer in head['_localid']:
@@ -1165,7 +1132,7 @@ class DV(SwedishLegalSource):
             dtmp.rel(DCTERMS.publisher, self.lookup_resource(head["Domstol"]))
             resource = dtmp.graph.resource(bnodetmp)
             domuri = self.minter.space.coin_uri(resource)
-            domdesc = Describer(doc.meta, domuri)
+            domdesc = Describer(graph, domuri)
 
         # 2. convert all strings in head to proper RDF
         #
@@ -1247,22 +1214,8 @@ class DV(SwedishLegalSource):
         domdesc.rdftype(RPUBL.VagledandeDomstolsavgorande)
         refdesc.rel(RPUBL.referatAvDomstolsavgorande, domuri)
         refdesc.value(PROV.wasGeneratedBy, self.qualified_class_name())
+        return refdesc.graph.resource(refuri)
 
-# FIXME: implement this
-#
-#        # 5. Create a meaningful dcterms:identifier for the verdict itself
-#        # (ie. "Göta hovrätts dom den 42 september 2340 i mål B
-#        # 1234-42")
-#        domdesc.value(DCTERMS.identifier,
-#                      dom_to_identifier(head["Domstol"],
-#                                        head["_localid"],
-#                                        head["Avgörandedatum"])
-#
-
-        # 6. assert that we have everything we need
-
-        # 7. done!
-        return refuri, domuri
 
     def add_keyword_to_metadata(self, domdesc, keyword):
         # Canonical uris don't define a URI space for
@@ -1309,8 +1262,8 @@ class DV(SwedishLegalSource):
     def structure_body(self, paras, basefile):
         return self.get_parser(basefile).parse(paras)
 
-    @staticmethod
-    def get_parser(basefile):
+    # @staticmethod
+    def get_parser(self, basefile):
         re_courtname = re.compile(
             "^(Högsta domstolen|Hovrätten (över|för) [A-ZÅÄÖa-zåäö ]+|([A-ZÅÄÖ][a-zåäö]+ )(tingsrätt|hovrätt))(|, mark- och miljödomstolen|, Mark- och miljööverdomstolen)$")
 
@@ -1995,7 +1948,8 @@ class DV(SwedishLegalSource):
         p.initial_state = "body"
         p.initial_constructor = make_body
         p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
-        return p
+        # return p
+        return p.parse
 
     def _simplify_ooxml(self, filename, pretty_print=True):
         # simplify the horrendous mess that is OOXML through simplify-ooxml.xsl

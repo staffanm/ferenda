@@ -262,7 +262,7 @@ class SwedishLegalSource(DocumentRepository):
         doc.uri = resource.identifier
         if resource.value(DCTERMS.title):
             doc.lang = resource.value(DCTERMS.title).language
-        doc.body = self.parse_body(self, fp)
+        doc.body = self.parse_body(fp, doc.basefile)
         self.parse_entry_update(doc)
         return True
 
@@ -331,7 +331,7 @@ class SwedishLegalSource(DocumentRepository):
         # produces flat dict -- note that
         # DV.parse_{not,ooxml,antiword_docbook} already does this
 
-        sane_attribs = self.sanitize_metadata(attribs)
+        sane_attribs = self.sanitize_metadata(attribs, basefile)
         # cleans up flat dict -- note similar
         # Regeringen.post_process_proposition that requires access to
         # parsed body
@@ -341,12 +341,12 @@ class SwedishLegalSource(DocumentRepository):
         # attributes_to_resource? This modifies the given graph (which
         # has namespace prefix mappings set up)
 
-        self.infer_metadata(self, resource, basefile)
+        self.infer_metadata(resource, basefile)
         # maybe hang sameAs off here? Is it more reasonable to infer
         # new keys to the attribs dict, before conversion to RDF
         # graph?
 
-        return graph
+        return resource
 
     def extract_head(self, fp, basefile):
         """Given a open file containing raw document content (or intermediate
@@ -361,13 +361,13 @@ class SwedishLegalSource(DocumentRepository):
     def extract_metadata(self, rawhead, basefile):
         """Given the document metadata returned by extract_head, extract all
         metadata about the document as such in a flat dict where keys are
-        CURIEs and values are strings."""
+        CURIEs and values are strings (or possibly a list of strings)."""
         soup = rawhead
         return {'dcterms:title': soup.find("title").string,
                 'dcterms:identifier': basefile,
                 'rdf:type': self.rdf_type}
 
-    def sanitize_metadata(self, attribs):
+    def sanitize_metadata(self, attribs, basefile):
         """Given a dict with unprocessed metadata, run various sanitizing checks on the content and return a sane version."""
         if 'dcterms:identifier' in attribs:
             attribs['dcterms:identifier'] = self.sanitize_identifier(
@@ -387,9 +387,9 @@ class SwedishLegalSource(DocumentRepository):
     def infer_metadata(self, resource, basefile):
         """Given a rdflib.Resource object, add additional triples that can be inferred from existing metadata."""
                         
-    def parse_body(self, rawbody, doc):
+    def parse_body(self, rawbody, basefile):
         sanitized = self.sanitize_body(rawbody)
-        parser = self.get_parser()
+        parser = self.get_parser(basefile)
         tokenstream = self.tokenize(sanitized)
         # for PDFs, pdfreader.textboxes(gluefunc) is a tokenizer
         self.body = parser(tokenstream)

@@ -38,16 +38,18 @@ class DV(OrigDV, SameAs):
         domdesc.rel(DCTERMS.subject, sokord_uri(keyword))
 
     # override polish_metadata to add some extra owl:sameAs attributes
-    def polish_metadata(self, head, doc):
+    def polish_metadata(self, head):
 
         # where do we get refdesc, domdesc?
         coin_uri = self.sameas_minter.space.coin_uri
-        refuri, domuri = super(DV, self).polish_metadata(head, doc)
-        refuri_sameas = coin_uri(doc.meta.resource(refuri))
-        domuri_sameas = coin_uri(doc.meta.resource(domuri))
-        doc.meta.add((URIRef(refuri), OWL.sameAs, URIRef(refuri_sameas)))
-        doc.meta.add((URIRef(domuri), OWL.sameAs, URIRef(domuri_sameas)))
-        return refuri, domuri
+        resource = super(DV, self).polish_metadata(head)
+        refuri = resource.identifier
+        domuri = resource.value(RPUBL.referatAvDomstolsavgorande).identifier
+        refuri_sameas = coin_uri(resource)
+        domuri_sameas = coin_uri(resource.value(RPUBL.referatAvDomstolsavgorande))
+        resource.graph.add((URIRef(refuri), OWL.sameAs, URIRef(refuri_sameas)))
+        resource.graph.add((URIRef(domuri), OWL.sameAs, URIRef(domuri_sameas)))
+        return resource
 
 #         if '_nja_ordinal' in head:
 #             # <sidnummer-based> owl:sameAs <lopnummer based>
