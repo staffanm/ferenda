@@ -31,31 +31,34 @@ SwedishLegalSource.parse uses a slightly different call hierarcy::
      parse_open(basefile) -> file
          downloaded_to_intermediate(basefile) -> file
          patch_if_needed(file) -> file
-     parse_metadata(basefile) -> rdflib.Resource
+     parse_metadata(file, basefile) -> rdflib.Resource
          extract_head(file, basefile) -> object
          extract_metadata(object, basefile) -> dict
          sanitize_metadata(dict, basefile) -> dict
              sanitize_identifier(str) -> str
          polish_metadata(dict) -> rdflib.Resource
              attributes_to_resource(dict) -> rdflib.Resource
-         infer_metadata(rdflib.Resource) -> rdflib.Resource
+         infer_metadata(rdflib.Resource, basefile) -> rdflib.Resource
      parse_body(file, basefile) -> elements.Body
          extract_body(file, basefile) -> object
          sanitize_body(object) -> object
          get_parser(basefile) -> callable
          tokenize_body(object) -> iterable
 	 callable(iterable) -> elements.Body
-         visit_body()
-             visit_node(node, callable, state) -> state
-	         callable(node, state) -> state
+         visitor_functions() -> callables
+         visit_node(elements.Body, callable, state) -> state
+	     callable(elements.CompoundElement, state) -> state
      parse_entry_update(doc)
 
-Metadata about a document is generally captured/extracted as simple
+Metadata about a document is generally first captured/extracted as simple
 key/value pairs stored in a dict. The keys are either derived from
 EBNF parsing rules ("sfs", "chapter" etc) or are string-based CURIEs
 with well-known prefixes ("rpubl:arsutgava"). These attribute dicts
-are refined to a full RDF graph by attributes_to_resource(), at which
-times missing triples that can be inferred are added etc.
+are refined to a full RDF graph by attributes_to_resource(), at which time 
+plain-text identifiers are switched to URI resources as applicable, etc. 
+Afterwards, infer_metadata uses this graph (and basefile) to infer additional 
+missing triplets. (A derived class in the lagen.nu package migth override 
+infer_metadata to add owl:sameAs statements.
 
 Composite repositories and inheritance
 --------------------------------------
@@ -107,8 +110,8 @@ DocumentRepository::
    1177:    def patch_if_needed(self, basefile, text): # not called by baseclass
    1311:    def create_external_resources(self, doc):
 
-SwedishLegalSource::
-    # lacks top-level parse, parse_metadata_from_soup, etc
+SwedishLegalSource (# lacks top-level parse, parse_metadata_from_soup, etc)::
+    
     132:class SwedishLegalSource(DocumentRepository):
     192:    def minter(self):
     220:    def _swedish_ordinal(self, s):
@@ -118,6 +121,7 @@ SwedishLegalSource::
     286:    def infer_triples(self, d, basefile=None):
 
 ARN::
+
      75:class ARN(SwedishLegalSource, PDFDocumentRepository):
     237:    def parse(self, doc):  # metadata added here
     238:        def nextcell(key):
@@ -126,11 +130,13 @@ ARN::
     299:    def create_external_resources(self, doc):
 
 Direktiv::
+
     263:class DirAsp(SwedishLegalSource, PDFDocumentRepository):
     287:    def download_get_basefiles(self, depts):  # download_santitize_basefile
     315:    def parse_from_pdfreader(self, pdfreader, doc):
 
 DV::
+
     200:class DV(SwedishLegalSource):
     273:    def canonical_uri(self, basefile):
     298:    def make_document(self, basefile=None): # don't call canonical_uri
@@ -152,11 +158,13 @@ DV::
    2030:    def _merge_ooxml(self, soup):
 
 JK::
+
      26:class JK(SwedishLegalSource):
      83:    def parse_metadata_from_soup(self, soup, doc):
     109:    def parse_document_from_soup(self, soup, doc):
 
 JO::
+
      49:class JO(SwedishLegalSource, PDFDocumentRepository):
     131:    def parse(self, doc):
     135:        def gluecondition(textbox, nextbox, prevbox):
@@ -165,6 +173,7 @@ JO::
     300:    def create_external_resources(self, doc):
 
 MyndFskr::
+
      33:class MyndFskr(SwedishLegalSource):
      69:    def forfattningssamlingar(self):
      72:    def download_sanitize_basefile(self, basefile):
@@ -204,6 +213,7 @@ MyndFskr::
    1226:    def parse_metadata_from_textreader(self, reader, doc):
 
 Propositioner::
+
      44:class PropTrips(Trips):
      58:    def get_default_options(cls):
      65:    def download(self, basefile=None):
@@ -220,6 +230,7 @@ Propositioner::
     412:    def tabs(self, primary=False):
 
 Regeringen::
+
      65:class Regeringen(SwedishLegalSource):
     225:    def canonical_uri(self, basefile, document_type=None):
     238:    def basefile_from_uri(self, uri):
@@ -239,6 +250,7 @@ Regeringen::
     334:    def sanitize_identifier(self, identifier):
 
 Riksdagen::
+
      24:class Riksdagen(SwedishLegalSource):
      61:    def download(self, basefile=None):
      69:    def download_get_basefiles(self, start_url):
@@ -250,6 +262,7 @@ Riksdagen::
     390:class PropRiksdagen(Riksdagen):
 
 Trips::
+
      25:class Trips(SwedishLegalSource):
     131:    def remote_url(self, basefile):
     136:    def canonical_uri(self, basefile):
@@ -294,5 +307,3 @@ Trips::
    1497:    def parse_sfst(self, text, doc):
    1521:    def make_header(self, desc):
    1590:    def makeForfattning(self):
-
-
