@@ -31,15 +31,15 @@
     dcterms:publisher <https://lagen.nu/org/2008/migrationsoverdomstolen> ;
     dcterms:relation "Prop. 2004/05:170 s. 153, 224 ff.",
         "Rådets direktiv 2005/85/EG av den" ;
-    dcterms:subject <http://localhost:8000/concept/Lagakraftvunnet_avlägsnandebeslut>,
-        <http://localhost:8000/concept/Ny_omständighet>,
-        <http://localhost:8000/concept/Ny_prövning>,
-        <http://localhost:8000/concept/Nytt_land>,
-        <http://localhost:8000/concept/Processram>,
-        <http://localhost:8000/concept/Resning>,
-        <http://localhost:8000/concept/Uppehållstillstånd_efter_ny_prövning>,
-        <http://localhost:8000/concept/Verkställighetshinder>,
-        <http://localhost:8000/concept/Verkställighetsstadiet> ;
+    dcterms:subject <https://lagen.nu/concept/Lagakraftvunnet_avlägsnandebeslut>,
+        <https://lagen.nu/concept/Ny_omständighet>,
+        <https://lagen.nu/concept/Ny_prövning>,
+        <https://lagen.nu/concept/Nytt_land>,
+        <https://lagen.nu/concept/Processram>,
+        <https://lagen.nu/concept/Resning>,
+        <https://lagen.nu/concept/Uppehållstillstånd_efter_ny_prövning>,
+        <https://lagen.nu/concept/Verkställighetshinder>,
+        <https://lagen.nu/concept/Verkställighetsstadiet> ;
     dcterms:title "En ny prövning enligt 12 kap. 19 § utlänningslagen kan beviljas om det har framkommit uppgifter om att utlänningen är medborgare i annat land än vad den tidigare prövningen har omfattat. En sådan prövning av frågan om uppehållstillstånd kan omfatta skyddsskäl som hänför sig till annat land än det som omfattas av det lagakraftvunna utvisningsbeslutet."@sv ;
     rpubl:avdelning "1" ;
     rpubl:avgorandedatum "2013-03-19"^^xsd:date ;

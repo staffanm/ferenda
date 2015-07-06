@@ -38,11 +38,11 @@
 
 <https://lagen.nu/dom/hd/B5498-09/2010-03-31> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
-    dcterms:subject <http://localhost:8000/concept/Dubbla_förfaranden>,
-        <http://localhost:8000/concept/Ne_bis_in_idem>,
-        <http://localhost:8000/concept/Res_judicata>,
-        <http://localhost:8000/concept/Skattebrott>,
-        <http://localhost:8000/concept/Skattetillägg> ;
+    dcterms:subject <https://lagen.nu/concept/Dubbla_förfaranden>,
+        <https://lagen.nu/concept/Ne_bis_in_idem>,
+        <https://lagen.nu/concept/Res_judicata>,
+        <https://lagen.nu/concept/Skattebrott>,
+        <https://lagen.nu/concept/Skattetillägg> ;
     dcterms:title "Fråga om det svenska systemet med dubbla sanktioner (skattetillägg och brottspåföljd) och två förfaranden för oriktiga uppgifter i skatteförfarandet är förenligt med det i artikel 4 i det sjunde tilläggsprotokollet till Europakonventionen upptagna förbudet mot dubbla förfaranden (ne bis in idem). (I=B 5498-09 och II= 2509-09)"@sv ;
     rpubl:avdelning "1" ;
     rpubl:avgorandedatum "2010-03-31"^^xsd:date ;

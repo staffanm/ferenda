@@ -15,7 +15,7 @@ import bs4
 from ferenda import (DocumentRepository, DocumentStore, FSMParser,
                      CitationParser)
 from ferenda import util
-from ferenda.sources.legal.se.legalref import Link
+from ferenda.sources.legal.se.legalref import Link, LegalRef
 from ferenda.elements.html import A, H1, H2, H3
 from ferenda.elements import (Paragraph, Section, Body,
                               OrdinalElement, CompoundElement,
@@ -259,7 +259,7 @@ class SwedishLegalSource(DocumentRepository):
         fp = self.parse_open(doc.basefile)
         resource = self.parse_metadata(fp, doc.basefile)
         doc.meta = resource.graph
-        doc.uri = resource.identifier
+        doc.uri = str(resource.identifier)
         if resource.value(DCTERMS.title):
             doc.lang = resource.value(DCTERMS.title).language
         doc.body = self.parse_body(fp, doc.basefile)
@@ -368,39 +368,73 @@ class SwedishLegalSource(DocumentRepository):
                 'rdf:type': self.rdf_type}
 
     def sanitize_metadata(self, attribs, basefile):
-        """Given a dict with unprocessed metadata, run various sanitizing checks on the content and return a sane version."""
+        """Given a dict with unprocessed metadata, run various sanitizing
+        checks on the content and return a sane version.
+
+        """
         if 'dcterms:identifier' in attribs:
             attribs['dcterms:identifier'] = self.sanitize_identifier(
                 attribs['dcterms:identifier'])
 
     def sanitize_identifier(self, identifier):
-        """Given the unprocessed dcterms:identifier for a document, return a sane version of the same."""
+        """Given the unprocessed dcterms:identifier for a document, return a
+        sane version of the same.
+
+        """
         # docrepos with unclean data might override this
         return identifier
 
     def polish_metadata(self, attribs):
-        """Given a sanitized flat dict of metadatafor a document, return a rdflib.Resource version of the same.""" 
+        """Given a sanitized flat dict of metadatafor a document, return a
+        rdflib.Resource version of the same.
+
+        """ 
 
         resource = self.attributes_to_resource(attribs)
-        uri = self.minter.space.coin_uri(resource)
+        # uri = self.minter.space.coin_uri(resource)
+        return resource
 
     def infer_metadata(self, resource, basefile):
-        """Given a rdflib.Resource object, add additional triples that can be inferred from existing metadata."""
-                        
-    def parse_body(self, rawbody, basefile):
+        """Given a rdflib.Resource object, add additional triples that can be
+        inferred from existing metadata.
+
+        """
+
+    parse_types = LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN
+
+    def visitor_functions(self):
+        return []
+
+    def parse_body(self, fp, basefile):
+        rawbody = self.extract_body(fp)
         sanitized = self.sanitize_body(rawbody)
         parser = self.get_parser(basefile)
         tokenstream = self.tokenize(sanitized)
         # for PDFs, pdfreader.textboxes(gluefunc) is a tokenizer
-        self.body = parser(tokenstream)
-        for func in self.visitor_functions:
+        body = parser(tokenstream)
+        for func in self.visitor_functions():
             # could be functions for assigning URIs to particular
-            # nodes, for parsing text sections of individual nodes
-            # etc.
-            self.visit_node(self.body, func)
+            # nodes, extracting keywords from text etc. Note: finding
+            # references in text with LegalRef is done afterwards
+            self.visit_node(body, func)
+        if self.parse_types:
+            # now find references using LegalRef
+            parser = SwedishCitationParser(LegalRef(*self.parse_types),
+                                           self.minter,
+                                           self.commondata)
+            body = parser.parse_recursive(body)
+        return body
         
-    visitor_functions = []
              
+    def extract_body(self, fp):
+        # FIXME: This re-parses the same data as extract_head
+        # does. This will be common. Maybe fix a superclass level
+        # caching system? (ie read from self._rawbody, which
+        # extract_head has previously set).
+        parser = 'lxml'
+        soup = bs4.BeautifulSoup(fp.read(), parser)
+        return soup.body
+
     def sanitize_body(self, rawbody):
         return rawbody
 
@@ -408,6 +442,8 @@ class SwedishLegalSource(DocumentRepository):
         return lambda x: x
 
     def tokenize(self, sanitized_body):
+        # this method might recieve a arbitrary object (the superclass
+        # impl returns a BeautifulSoup node) but must return an iterable
         return sanitized_body
 
     # see SFS.visit_node

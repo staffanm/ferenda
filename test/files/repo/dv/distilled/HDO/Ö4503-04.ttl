@@ -33,9 +33,9 @@
 
 <https://lagen.nu/dom/hd/Ö4503-04/2007-05-16> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
-    dcterms:subject <http://localhost:8000/concept/Biträdesersättning>,
-        <http://localhost:8000/concept/Ersättning>,
-        <http://localhost:8000/concept/Rättshjälp> ;
+    dcterms:subject <https://lagen.nu/concept/Biträdesersättning>,
+        <https://lagen.nu/concept/Ersättning>,
+        <https://lagen.nu/concept/Rättshjälp> ;
     dcterms:title "Bestämmelsen i 27 § andra stycket rättshjälpslagen (1996:1619) om ersättning till rättshjälpsbiträde för arbete som utförts före ansökan om rättshjälp har, till skillnad från motsvarande bestämmelse i 1972 års rättshjälpslag, inte ansetts ge stöd för att begränsa ersättningsrätten till att avse arbete som utförts inom den närmaste månaden före ansökan."@sv ;
     rpubl:avdelning "1" ;
     rpubl:avgorandedatum "2007-05-16"^^xsd:date ;

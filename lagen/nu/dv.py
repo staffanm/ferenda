@@ -32,7 +32,7 @@ class DV(OrigDV, SameAs):
 
         def sokord_uri(value):
             # FIXME: This should coined by self.minter
-            baseuri = self.config.url + "concept/"
+            baseuri = "https://lagen.nu/concept/"
             return baseuri + util.ucfirst(value).replace(' ', '_')
 
         domdesc.rel(DCTERMS.subject, sokord_uri(keyword))

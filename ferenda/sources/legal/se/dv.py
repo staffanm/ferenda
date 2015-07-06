@@ -640,7 +640,7 @@ class DV(SwedishLegalSource):
         start = fp.read(6)
         if start in ("<w:doc", "<body "):
             filetype = "docx"
-        elif start in ("<book>", "<body>"):
+        elif start in ("<book ", "<book>", "<body>"):
             filetype = "doc"
         else:
             raise ValueError("Can't guess filetype from %r" % start)
@@ -688,15 +688,18 @@ class DV(SwedishLegalSource):
         if title:
             return str(title)
 
-    # smth like this
-    def sanitize_body(self, rawbody):
-        for section in rawbody:
-            # are all sections strings? or what can they be?
-            if section.endswith(".II"):
-                yield one
-                yield two
-            else:
-                yield section
+    def extract_body(self, fp):
+        return self._rawbody
+
+#     # smth like this
+#     def sanitize_body(self, rawbody):
+#         for section in rawbody:
+#             # are all sections strings? or what can they be?
+#             if section.endswith(".II"):
+#                 yield one
+#                 yield two
+#             else:
+#                 yield section
 
     def parse_not(self, text, basefile, filetype):
         basefile_regex = re.compile("(?P<type>\w+)/(?P<year>\d+)_not_(?P<ordinal>\d+)")
@@ -837,6 +840,7 @@ class DV(SwedishLegalSource):
             if line:
                 body.append(line)
         return head, body
+
 
     def parse_ooxml(self, text, basefile):
         soup = BeautifulSoup(text)

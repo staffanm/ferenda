@@ -1285,14 +1285,13 @@ class SFS(Trips):
                 "rpubl:forfattningssamling":
                 URIRef(self.lookup_resource("SFS", SKOS.altLabel))}
 
-        
     def construct_id(self, node, state):
         # copy our state (shouldn't use nested dicts)
         state = dict(state)
         if isinstance(node, Forfattning):
             attributes = self._construct_base_attributes(self.id)
             state.update(attributes)
-        if self.ordinalpredicates.get(node.__class__): # could be a qname?
+        if self.ordinalpredicates.get(node.__class__):  # could be a qname?
             if hasattr(node, 'ordinal') and node.ordinal:
                 ordinal = node.ordinal
             elif hasattr(node, 'sfsnr'):
@@ -1317,7 +1316,6 @@ class SFS(Trips):
                 pass
         state['parent'] = node
         return state
-
 
     def find_definitions(self, element, find_definitions):
         if not isinstance(element, CompoundElement):
