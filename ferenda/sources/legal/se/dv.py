@@ -692,7 +692,12 @@ class DV(SwedishLegalSource):
         return self._rawbody
 
 #     # smth like this
-#     def sanitize_body(self, rawbody):
+    def sanitize_body(self, rawbody):
+        for x in rawbody:
+            if isinstance(x, str):
+                x = [x]
+            yield(Paragraph(x))
+            
 #         for section in rawbody:
 #             # are all sections strings? or what can they be?
 #             if section.endswith(".II"):
@@ -1220,7 +1225,6 @@ class DV(SwedishLegalSource):
         refdesc.value(PROV.wasGeneratedBy, self.qualified_class_name())
         return refdesc.graph.resource(refuri)
 
-
     def add_keyword_to_metadata(self, domdesc, keyword):
         # Canonical uris don't define a URI space for
         # keywords/concepts. Instead refer to bnodes
@@ -1228,43 +1232,7 @@ class DV(SwedishLegalSource):
         # documents/publ/Domslut/HD/2009/T_170-08.rdf)
         with domdesc.rel(DCTERMS.subject):
             domdesc.value(RDFS.label, keyword, lang=self.lang)
-        
 
-    def format_body(self, paras, basefile):
-        b = Body()
-        # paras is typically a list of strings, but can be a list of
-        # lists, where the innermost list consists of strings
-        # interspersed with Element objects.
-        for x in paras:
-            if isinstance(x, str):
-                x = [x]
-            b.append(Paragraph(x))
-
-        # find and link references -- this increases processing time
-        # 5-10x, so do it only if requested. For some types (NJA
-        # notiser) we could consider finding references anyway, as
-        # these documents do not have headnotes with fixed fields for
-        # references to statutory law and caselaw -- if we don't parse
-        # body, we don't have nothing.
-        if self.config.parsebodyrefs:
-            parser = SwedishCitationParser(LegalRef(LegalRef.RATTSFALL,
-                                                    LegalRef.LAGRUM,
-                                                    LegalRef.FORARBETEN),
-                                           self.minter,
-                                           self.commondata)
-            b = parser.parse_recursive(b)
-
-        # convert the unstructured list of Paragraphs to a
-        # hierarchical tree of instances, domslut, domskäl, etc
-        try:
-            b = self.structure_body(deepcopy(b), basefile)
-        except errors.FSMStateError as e:
-            self.log.warning("%s: structure_body failed: %s" % (basefile, e))
-            self.log.debug("%s: using unstructured body" % basefile)
-        return b
-
-    def structure_body(self, paras, basefile):
-        return self.get_parser(basefile).parse(paras)
 
     # @staticmethod
     def get_parser(self, basefile):
