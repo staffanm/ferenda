@@ -3,7 +3,7 @@
 # defined in swedishlegalsource.ttl
 from __future__ import unicode_literals
 
-from datetime import datetime
+from datetime import date, datetime
 import os
 import sys
 
@@ -19,7 +19,7 @@ from ferenda.thirdparty.coin import COIN
 if sys.version_info < (3,):
     raise RuntimeError("Only works on py3")
 
-TRANS = str.maketrans("åäö ", "aao_")
+TRANS = str.maketrans("åäö ", "aao-")
     
 URIMAP = {}
 URISPACE = rdflib.Namespace("http://rinfo.lagrummet.se/sys/uri/space#")
@@ -33,7 +33,8 @@ def import_org(sourcegraph, targetgraph):
         targeturi = targetgraph.value(predicate=FOAF.name, object=name)
         if not targeturi: # We didn't have this previously. Need to
                           # make up a URI
-            uri = "https://lagen.nu/org/2014/%s" % str(name).lower().translate(TRANS)
+            uri = "https://lagen.nu/org/%s/%s" % (date.today().year,
+                                                  str(name).lower().translate(TRANS))
             print("  Adding new resource %s" %uri)
             targeturi = rdflib.URIRef(uri)
             
