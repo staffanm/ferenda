@@ -1217,48 +1217,6 @@ class SFS(Trips):
         capitalized = term[0].upper() + term[1:]
         return 'https://lagen.nu/concept/%s' % capitalized.replace(' ', '_')
 
-
-    def attributes_to_resource(self, attributes):
-        # this is roughly the same code as
-        # LegalRef.attributes_to_resource but with different keys
-        def uri(qname):
-            (prefix, leaf) = qname.split(":", 1)
-            return self.ns[prefix][leaf]
-        
-        g = Graph()
-        b = BNode()
-        current = b
-        attributes = dict(attributes)
-        # create needed sub-nodes
-        for k in ("rinfoex:meningnummer", "rinfoex:punktnummer",
-                  "rinfoex:styckenummer", "rpubl:paragrafnummer",
-                  "rinfoex:rubriknummer", "rpubl:kapitelnummer"):
-            if k in attributes:
-                p = uri(k)
-                g.add((current, p, Literal(attributes[k])))
-                del attributes[k]
-                new = BNode()
-                if p.endswith("nummer"):
-                    rel = URIRef(str(p).replace("nummer", ""))
-                g.add((new, rel, current))
-                current = new
-
-        # create relToBase things
-        if "dcterms:issued" in attributes:
-            rel = RPUBL.konsoliderar
-            new = BNode()  # the document
-            g.add((current, DCTERMS.issued, Literal(attributes["dcterms:issued"])))
-            del attributes["dcterms:issued"]
-            g.add((current, rel, new))
-            current = new
-                
-        for k, v in attributes.items():
-            if not isinstance(v, URIRef):
-                v = Literal(v)
-            g.add((current, uri(k), v))
-        return g.resource(b)
-        
-
     # this struct is intended to be overridable
     ordinalpredicates = {
         Kapitel: "rpubl:kapitelnummer",

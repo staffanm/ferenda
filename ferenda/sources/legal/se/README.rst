@@ -43,7 +43,7 @@ SwedishLegalSource.parse uses a slightly different call hierarcy::
          extract_body(file, basefile) -> object
          sanitize_body(object) -> object
          get_parser(basefile) -> callable
-         tokenize_body(object) -> iterable
+         tokenize(object) -> iterable
 	 callable(iterable) -> elements.Body
          visitor_functions() -> callables
          visit_node(elements.Body, callable, state) -> state

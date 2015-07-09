@@ -87,6 +87,18 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
     documentstore_class = ARNStore
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
 
+
+    def canonical_uri(self, basefile):
+        # this is a trimmed-down version of extract_metadata, that
+        # only extracts the rpubl:diarienummer (which really is a
+        # rpubl:arendenummer, but for purposes of minting the uri...)
+        attrib = {'rpubl:diarienummer': basefile,
+                  'rdf:type': self.rdf_type,
+                  'dcterms:publisher': self.lookup_resource('Allmänna reklamationsnämnden')}
+        resource = self.attributes_to_resource(attrib)
+        return self.minter.space.coin_uri(resource) 
+        
+
     @recordlastdownload
     def download(self, basefile=None):
         self.session = requests.Session()
@@ -233,40 +245,79 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
                 fp.write(str(fragment).encode("utf-8"))
         return ret
 
-    @managedparsing
-    def parse(self, doc):
+    def downloaded_to_intermediate(self, basefile):
+        # Create a PDFReader object which we throw away -- at this
+        # stage we're only interested in creating the intermediate
+        # file. It's the responsibility of this method to return a
+        # filepath to a intermediate file.
+        #
+        # FIXME: The fact that creating a PDFReader both creates this
+        # intermediate XML file, and also parses that XML file into
+        # Pages and TextElement objects, suggests that maybe the
+        # functionality should be split up.
+        filename = self.store.downloaded_path(basefile)
+        intermediate = self.store.intermediate_path(basefile)
+        workdir = os.path.dirname(intermediate)
+        filetype = os.path.splitext(filename)[1]
+        convert_to_pdf = filetype != ".pdf"
+        if self.config.compress == "bz2":
+            keep_xml = "bz2"
+        else:
+            keep_xml = True
+        PDFReader(filename=filename,
+                  workdir=workdir,
+                  images=self.config.pdfimages,
+                  convert_to_pdf=convert_to_pdf,
+                  keep_xml=keep_xml)
+        return open(intermediate)
+
+    def extract_head(self, fp, basefile):
+        self._basefile = basefile
+        # the fp is for the PDF file, but most of the metadata is in
+        # stored HTML fragment attachment. So we open that separately.
+        fragment = self.store.downloaded_path(basefile, attachment="fragment.html")
+        return BeautifulSoup(util.readfile(fragment, encoding="utf-8"))
+
+    def extract_metadata(self, soup, basefile):
         def nextcell(key):
             cell = soup.find(text=key)
             if cell:
                 return cell.find_parent("td").find_next_sibling("td").get_text().strip()
             else:
                 raise KeyError("Could not find cell key %s" % key)
-        downloaded = self.store.downloaded_path(doc.basefile)
-        fragment = self.store.downloaded_path(doc.basefile, attachment="fragment.html")
-        soup = BeautifulSoup(util.readfile(fragment, encoding="utf-8"))
-        desc = Describer(doc.meta, doc.uri)
-        desc.rdftype(self.rdf_type)
-        desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-        desc.value(self.ns['dcterms'].identifier, "ARN %s" % doc.basefile)
-        desc.value(self.ns['rpubl'].arendenummer, nextcell("Änr"))
-        desc.value(self.ns['rpubl'].avgorandedatum, nextcell("Avgörande"))
-        desc.value(self.ns['dcterms'].subject, nextcell("Avdelning"), lang="sv")
-        title = util.normalize_space(soup.table.find_all("tr")[3].get_text())
-        title = re.sub("Avgörande \d+-\d+-\d+; \d+-\d+\.?", "", title)
-        desc.value(self.ns['dcterms'].title, title.strip(), lang="sv")
-        # dcterms:issued is required, but we only have rpubl.avgorandedatum
-        desc.value(self.ns['dcterms'].issued,
-                   desc.getvalue(self.ns['rpubl'].avgorandedatum))
-        filetype = os.path.splitext(downloaded)[1]
-        # for uniformity, we try to treat everything as PDF by
-        # converting, even .doc/.docx documents are converted to PDF
-        # elif filetype in (".doc", ".docx"):
-        # self.parse_from_word(doc, downloaded)
-        self.parse_from_pdf(doc, downloaded, filetype=filetype)
-        self.parse_entry_update(doc)
-        return True
+#        desc = Describer(doc.meta, doc.uri)
+#        desc.rdftype(self.rdf_type)
+#        desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
+#        desc.value(self.ns['dcterms'].identifier, "ARN %s" % doc.basefile)
+#        desc.value(self.ns['rpubl'].arendenummer, nextcell("Änr"))
+#        desc.value(self.ns['rpubl'].avgorandedatum, nextcell("Avgörande"))
+#        desc.value(self.ns['dcterms'].subject, nextcell("Avdelning"), lang="sv")
+#        title = util.normalize_space(soup.table.find_all("tr")[3].get_text())
+#        title = re.sub("Avgörande \d+-\d+-\d+; \d+-\d+\.?", "", title)
+#        desc.value(self.ns['dcterms'].title, title.strip(), lang="sv")
+#        # dcterms:issued is required, but we only have rpubl.avgorandedatum
+#        desc.value(self.ns['dcterms'].issued,
+#                   desc.getvalue(self.ns['rpubl'].avgorandedatum))
+#
+        return {'dcterms:identifier': "ARN %s" % basefile,
+                'dcterms:publisher': self.lookup_resource('Allmänna reklamationsnämnden'),
+                'rpubl:arendenummer': nextcell("Änr"),
+                'rpubl:diarienummer': nextcell("Änr"),
+                'rpubl:avgorandedatum': nextcell("Avgörande"),
+                'dcterms:subject': Literal(nextcell("Avdelning"), lang="sv"),
+                'dcterms:title': soup.table.find_all("tr")[3].get_text(),
+                'dcterms:issued': nextcell("Avgörande")
+                }
 
-    def parse_from_pdf(self, doc, filename, filetype=".pdf"):
+    def sanitize_metadata(self, attribs, basefile):
+        attribs['dcterms:title'] = Literal(
+            re.sub("Avgörande \d+-\d+-\d+; \d+-\d+\.?",
+                   "", util.normalize_space(attribs['dcterms:title'])),
+            lang="sv")
+        return attribs
+
+
+    def tokenize(self, sanitized_data):
         def gluecondition(textbox, nextbox, prevbox):
             linespacing = 7
             res = (textbox.font.family == nextbox.font.family and
@@ -274,27 +325,19 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
                    textbox.top + textbox.height + linespacing >= nextbox.top and
                    nextbox.top > prevbox.top)
             return res
-        convert_to_pdf = filetype != ".pdf"
-        workdir = os.path.dirname(self.store.intermediate_path(doc.basefile))
-        if self.config.compress == "bz2":
-            keep_xml = "bz2"
-        else:
-            keep_xml = True
-        reader = PDFReader(filename=filename,
-                           workdir=workdir,
-                           images=self.config.pdfimages,
-                           convert_to_pdf=convert_to_pdf,
-                           keep_xml=keep_xml)
-        textboxes = reader.textboxes(gluecondition)
-        doc.body = Body(textboxes)
 
-        if not hasattr(self, 'ref_parser'):
-            self.ref_parser = LegalRef(
-                LegalRef.RATTSFALL,
-                LegalRef.LAGRUM,
-                LegalRef.FORARBETEN)
-        citparser = SwedishCitationParser(self.ref_parser, self.minter, self.commondata)
-        citparser.parse_recursive(doc.body)
+        # sanitized_data is a bs4.element.Tag object since we haven't
+        # overridden extract_body and is of no use to us. We just want
+        # the filename to pass to PDFReader.
+        # This SHOULD just re-open the intermediate file that was
+        # created by downloaded_to_intermediate. Hopefully we won't
+        # need to specify the images/convert_to_pdf/keep_xml arguments
+        # again.
+        filename = self.store.downloaded_path(self._basefile)
+        intermediate = self.store.intermediate_path(self._basefile)
+        workdir = os.path.dirname(intermediate)
+        reader = PDFReader(filename=filename, workdir=workdir)
+        return reader.textboxes(gluecondition)
 
     def create_external_resources(self, doc):
         pass

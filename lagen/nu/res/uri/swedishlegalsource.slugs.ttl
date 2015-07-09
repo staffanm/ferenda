@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2015-06-12T07:24:02.023192
+# Automatically transformed from sources at 2015-07-08T22:16:03.563272
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -257,29 +257,19 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 
 <https://lagen.nu/org/2008/hogsta-domstolen> space:abbrSlug "hd" .
 
-<https://lagen.nu/org/2008/hovratten-for-nedre-norrland> space:abbrSlug "hnn" .
-
 <https://lagen.nu/org/2008/hovratten-for-ovre-norrland> space:abbrSlug "hon" .
-
-<https://lagen.nu/org/2008/hovratten-for-vastra-sverige> space:abbrSlug "hvs" .
 
 <https://lagen.nu/org/2008/hovratten-over-skane-och-blekinge> space:abbrSlug "hsb" .
 
 <https://lagen.nu/org/2008/kammarratten-i-goteborg> space:abbrSlug "kgg" .
 
-<https://lagen.nu/org/2008/kammarratten-i-jonkoping> space:abbrSlug "kjo" .
-
 <https://lagen.nu/org/2008/kammarratten-i-stockholm> space:abbrSlug "kst" .
-
-<https://lagen.nu/org/2008/kammarratten-i-sundsvall> space:abbrSlug "ksu" .
 
 <https://lagen.nu/org/2008/marknadsdomstolen> space:abbrSlug "md" .
 
 <https://lagen.nu/org/2008/migrationsoverdomstolen> space:abbrSlug "mig" .
 
 <https://lagen.nu/org/2008/miljooverdomstolen> space:abbrSlug "mod" .
-
-<https://lagen.nu/org/2008/patentbesvarsratten> space:abbrSlug "pbr" .
 
 <https://lagen.nu/org/2008/rattshjalpsnamnden> space:abbrSlug "rhn" .
 
@@ -289,9 +279,21 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 
 <https://lagen.nu/org/2011/hogsta-forvaltningsdomstolen> space:abbrSlug "hfd" .
 
+<https://lagen.nu/org/2014/allmanna_reklamationsnamnden> space:abbrSlug "arn" .
+
+<https://lagen.nu/org/2014/hovratten_for_nedre_norrland> space:abbrSlug "hnn" .
+
+<https://lagen.nu/org/2014/hovratten_for_vastra_sverige> space:abbrSlug "hvs" .
+
 <https://lagen.nu/org/2014/justitiekanslern> space:abbrSlug "jk" .
 
+<https://lagen.nu/org/2014/kammarratten_i_jonkoping> space:abbrSlug "kjo" .
+
+<https://lagen.nu/org/2014/kammarratten_i_sundsvall> space:abbrSlug "ksu" .
+
 <https://lagen.nu/org/2014/mark-_och_miljooverdomstolen> space:abbrSlug "mmd" .
+
+<https://lagen.nu/org/2014/patentbesvarsratten> space:abbrSlug "pbr" .
 
 <https://lagen.nu/org/2014/statens_ansvarsnamnd> space:abbrSlug "san" .
 

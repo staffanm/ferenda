@@ -6,7 +6,7 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://localhost:8000/res/arn/2013-07406> a rpubl:VagledandeMyndighetsavgorande ;
+<https://lagen.nu/avg/arn/2013-07406> a rpubl:VagledandeMyndighetsavgorande ;
     dcterms:identifier "ARN 2013-07406" ;
     dcterms:issued "2013-11-19" ;
     dcterms:subject "Resor"@sv ;

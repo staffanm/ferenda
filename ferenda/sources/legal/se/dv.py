@@ -688,7 +688,7 @@ class DV(SwedishLegalSource):
         if title:
             return str(title)
 
-    def extract_body(self, fp):
+    def extract_body(self, fp, basefile):
         return self._rawbody
 
 #     # smth like this

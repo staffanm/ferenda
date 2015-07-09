@@ -8,7 +8,7 @@ import re
 import os
 
 from layeredconfig import LayeredConfig, Defaults
-from rdflib import URIRef, RDF, Namespace, Literal, Graph
+from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
 from six import text_type as str
 import bs4
 
@@ -224,14 +224,61 @@ class SwedishLegalSource(DocumentRepository):
         val = self.commondata.value(subject=URIRef(resource),
                                     predicate=predicate)
         if not val:
+            from pudb import set_trace; set_trace()
             raise KeyError(resource)
         else:
             return str(val)
 
 
     def attributes_to_resource(self, attributes):
-        # generalized impl handling all special cases 
-        pass
+        # FIXME: this is roughly the same code as
+        # LegalRef.attributes_to_resource but with different keys. 
+        def uri(qname):
+            (prefix, leaf) = qname.split(":", 1)
+            return self.ns[prefix][leaf]
+
+        g = self.make_graph()
+        b = BNode()
+        current = b
+        attributes = dict(attributes)
+        # create needed sub-nodes
+        for k in ("rinfoex:meningnummer", "rinfoex:punktnummer",
+                  "rinfoex:styckenummer", "rpubl:paragrafnummer",
+                  "rinfoex:rubriknummer", "rpubl:kapitelnummer"):
+            if k in attributes:
+                p = uri(k)
+                g.add((current, p, Literal(attributes[k])))
+                del attributes[k]
+                new = BNode()
+                if p.endswith("nummer"):
+                    rel = URIRef(str(p).replace("nummer", ""))
+                g.add((new, rel, current))
+                current = new
+
+        # specifically for rpubl:KonsolideradGrundforfattning, create
+        # relToBase things
+        if (self.rdf_type.endswith("KonsolideradGrundforfattning") and
+            "dcterms:issued" in attributes):
+            rel = RPUBL.konsoliderar
+            new = BNode()  # the document
+            g.add((current, DCTERMS.issued, Literal(attributes["dcterms:issued"])))
+            del attributes["dcterms:issued"]
+            g.add((current, rel, new))
+            current = new
+
+        
+        for k, v in attributes.items():
+            if not isinstance(v, URIRef):
+                v = Literal(v)
+            g.add((current, uri(k), v))
+
+        # finally add triples that we can infer from class properties
+        # (is this a job for infer_metadata? But we need it,
+        # particularly the rdf:type data, beforehand)
+        g.add((current, RDF.type, self.rdf_type))
+        g.add((current, PROV.wasGeneratedBy, Literal(self.qualified_class_name())))
+        return g.resource(b)
+        
 
     def canonical_uri(self, basefile):
         # possibly break out the attrib-generating code to a separate
@@ -276,7 +323,6 @@ class SwedishLegalSource(DocumentRepository):
         :return: an open file object from which the document can be read
 
         """
-        # FIXME: write the code
         # 1. check if intermediate_path exists
         if not os.path.exists(self.store.intermediate_path(basefile)):
             # 2. if not, call code
@@ -385,14 +431,21 @@ class SwedishLegalSource(DocumentRepository):
         return identifier
 
     def polish_metadata(self, attribs):
-        """Given a sanitized flat dict of metadatafor a document, return a
+        """Given a sanitized flat dict of metadata for a document, return a
         rdflib.Resource version of the same.
 
         """ 
 
         resource = self.attributes_to_resource(attribs)
-        # uri = self.minter.space.coin_uri(resource)
-        return resource
+        uri = URIRef(self.minter.space.coin_uri(resource))
+        # now that we know the document URI (didn't we already know
+        # it?), we should somehow replace resource.identifier (a
+        # BNODE) with uri (a URIRef) in the whole graph.
+        for (p, o) in list(resource.graph.predicate_objects(resource.identifier)):
+            resource.graph.remove((resource.identifier, p, o))
+            resource.graph.add((uri, p, o))
+                
+        return resource.graph.resource(uri)
 
     def infer_metadata(self, resource, basefile):
         """Given a rdflib.Resource object, add additional triples that can be
@@ -406,7 +459,7 @@ class SwedishLegalSource(DocumentRepository):
         return []
 
     def parse_body(self, fp, basefile):
-        rawbody = self.extract_body(fp)
+        rawbody = self.extract_body(fp, basefile)
         sanitized = self.sanitize_body(rawbody)
         parser = self.get_parser(basefile)
         tokenstream = self.tokenize(sanitized)
@@ -426,7 +479,7 @@ class SwedishLegalSource(DocumentRepository):
         return body
         
              
-    def extract_body(self, fp):
+    def extract_body(self, fp, basefile):
         # FIXME: This re-parses the same data as extract_head
         # does. This will be common. Maybe fix a superclass level
         # caching system? (ie read from self._rawbody, which
@@ -438,9 +491,13 @@ class SwedishLegalSource(DocumentRepository):
     def sanitize_body(self, rawbody):
         return rawbody
 
-    def get_parser(self):
-        return lambda x: x
-
+    def get_parser(self, basefile):
+        # should return a function that gets any iterable (the output
+        # from tokenize) and returns a ferenda.elements.Body object
+        def default_parser(iterable):
+            return Body(list(iterable))
+        return default_parser
+    
     def tokenize(self, sanitized_body):
         # this method might recieve a arbitrary object (the superclass
         # impl returns a BeautifulSoup node) but must return an iterable
