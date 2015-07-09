@@ -306,6 +306,20 @@ class Regeringen(SwedishLegalSource):
 
         return updated or pdfupdated
 
+    def extract_head(self, fp, basefile):
+        parser = 'lxml'
+        soup = bs4.BeautifulSoup(fp.read(), parser)
+        return soup.find(id="content")
+
+    def extract_metadata(self, rawhead, basefile):
+        content = rawhead
+        title = content.find("h1").string
+        identifier = content.find("p", "lead").text
+        # ... FIXME: keep converting the old parse_metadata_from_soup
+        # code to this style
+        return {'dcterms:title': title,
+                'dcterms:identifier': identifier}
+    
     def parse_metadata_from_soup(self, soup, doc):
         d = Describer(doc.meta, doc.uri)
         d.rdftype(self.rdf_type)

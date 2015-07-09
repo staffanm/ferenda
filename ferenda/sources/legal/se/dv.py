@@ -1126,8 +1126,6 @@ class DV(SwedishLegalSource):
         graph = self.make_graph()
         refuri = ref_to_uri(head["Referat"])
         refdesc = Describer(graph, refuri)
-        slug = self.lookup_label(self.lookup_resource(head["Domstol"]),
-                                 predicate=URISPACE.abbrSlug)
         for malnummer in head['_localid']:
             bnodetmp = BNode()
             gtmp = Graph()

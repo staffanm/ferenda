@@ -224,7 +224,6 @@ class SwedishLegalSource(DocumentRepository):
         val = self.commondata.value(subject=URIRef(resource),
                                     predicate=predicate)
         if not val:
-            from pudb import set_trace; set_trace()
             raise KeyError(resource)
         else:
             return str(val)
