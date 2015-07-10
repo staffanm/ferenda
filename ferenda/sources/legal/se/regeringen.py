@@ -308,13 +308,48 @@ class Regeringen(SwedishLegalSource):
 
     def extract_head(self, fp, basefile):
         parser = 'lxml'
-        soup = bs4.BeautifulSoup(fp.read(), parser)
+        soup = BeautifulSoup(fp.read(), parser)
         return soup.find(id="content")
 
     def extract_metadata(self, rawhead, basefile):
         content = rawhead
         title = content.find("h1").string
         identifier = content.find("p", "lead").text
+
+        definitions = content.find("dl", "definitions")
+        if definitions:
+            for dt in definitions.find_all("dt"):
+                key = dt.get_text(strip=True)
+                value = dt.find_next_sibling("dd").get_text(strip=True)
+                if key == "Utgiven:":
+                    try:
+                        dateval = self.parse_swedish_date(value)
+                        if isinstance(dateval, date):
+                            d.value(self.ns['dcterms'].issued, dateval)
+                        else:
+                            datatype = {util.gYearMonth: XSD.gYearMonth,
+                                        util.gYear: XSD.gYear}[type(dateval)]
+                            d.value(
+                                self.ns['dcterms'].issued,
+                                str(dateval),
+                                datatype=datatype)
+                    except ValueError as e:
+                        self.log.warning(
+                            "Could not parse %s as swedish date" % value)
+                elif key == "Avsändare:":
+                    try:
+                        res = self.lookup_resource(value)
+                        if value.endswith("departementet"):
+                            d.rel(self.ns['rpubl'].departement,
+                                  res)
+                        else:
+                            d.rel(self.ns['dcterms'].publisher,
+                                  res)
+                    except KeyError:
+                        self.log.warning(
+                            "%s: Could not find resource for Avsändare: '%s'" %
+                            (doc.basefile, value))
+
         # ... FIXME: keep converting the old parse_metadata_from_soup
         # code to this style
         return {'dcterms:title': title,
