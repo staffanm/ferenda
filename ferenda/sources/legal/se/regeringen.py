@@ -222,17 +222,17 @@ class Regeringen(SwedishLegalSource):
                 "Could not find document with basefile %s" % basefile)
         return docurl
 
-    def canonical_uri(self, basefile, document_type=None):
-        # basefile eg 2014:158 => [] a rpubl:For ; rpubl:arsutgava "2014"; rpubl:lopnummer "158";
-        if not document_type:
-            document_type = self.document_type
-        seg = {self.KOMMITTEDIREKTIV: "dir",
-               self.DS: "utr/ds",
-               self.PROPOSITION: "prop",
-               self.SKRIVELSE: "skr",
-               self.SOU: "utr/sou",
-               self.SO: "so"}
-        return self.config.url + "res/%s/%s" % (seg[document_type], basefile)
+#    def canonical_uri(self, basefile, document_type=None):
+#        # basefile eg 2014:158 => [] a rpubl:For ; rpubl:arsutgava "2014"; rpubl:lopnummer "158";
+#        if not document_type:
+#            document_type = self.document_type
+#        seg = {self.KOMMITTEDIREKTIV: "dir",
+#               self.DS: "utr/ds",
+#               self.PROPOSITION: "prop",
+#               self.SKRIVELSE: "skr",
+#               self.SOU: "utr/sou",
+#               self.SO: "so"}
+#        return self.config.url + "res/%s/%s" % (seg[document_type], basefile)
 
     def basefile_from_uri(self, uri):
         # make sure this function is the reverse of the canonical_uri
@@ -313,167 +313,91 @@ class Regeringen(SwedishLegalSource):
 
     def extract_metadata(self, rawhead, basefile):
         content = rawhead
-        title = content.find("h1").string
-        identifier = content.find("p", "lead").text
+        title = list(content.find("h1").children)[0].string
+        identifier = content.find("span", "h1-vignette").text
+        # the <time> element has a datetime attrib with
+        # machine-readable timestamp, but this has unwarranted high
+        # precision. We'd like to capture just a xsd:YearMonth if
+        # "Publicerad: April 1994", not a datetime(1994, 4, 1, 0, 0,
+        # 0). So we just grab text and use parse_swedish_date later
+        # on.
+        utgiven = content.find("span", "published").time.text
+        ansvarig = content.find("p", "media--publikations__sender").a.text
+        sammanfattning = content.find("div", "has-wordExplanation").get_text()
 
-        definitions = content.find("dl", "definitions")
-        if definitions:
-            for dt in definitions.find_all("dt"):
-                key = dt.get_text(strip=True)
-                value = dt.find_next_sibling("dd").get_text(strip=True)
-                if key == "Utgiven:":
-                    try:
-                        dateval = self.parse_swedish_date(value)
-                        if isinstance(dateval, date):
-                            d.value(self.ns['dcterms'].issued, dateval)
-                        else:
-                            datatype = {util.gYearMonth: XSD.gYearMonth,
-                                        util.gYear: XSD.gYear}[type(dateval)]
-                            d.value(
-                                self.ns['dcterms'].issued,
-                                str(dateval),
-                                datatype=datatype)
-                    except ValueError as e:
-                        self.log.warning(
-                            "Could not parse %s as swedish date" % value)
-                elif key == "Avsändare:":
-                    try:
-                        res = self.lookup_resource(value)
-                        if value.endswith("departementet"):
-                            d.rel(self.ns['rpubl'].departement,
-                                  res)
-                        else:
-                            d.rel(self.ns['dcterms'].publisher,
-                                  res)
-                    except KeyError:
-                        self.log.warning(
-                            "%s: Could not find resource for Avsändare: '%s'" %
-                            (doc.basefile, value))
+        # look for related items:
+        linkfrags = {self.KOMMITTEDIREKTIV: [],
+                     self.DS: ["/komittedirektiv/"],
+                     self.PROPOSITION: ["/kommittedirektiv/",
+                                        "/departementsserien/",
+                                        "/statens-offentliga-utredningar"],
+                    self.SOU: ["/kommittedirektiv/"]
+        }[self.document_type]
 
-        # ... FIXME: keep converting the old parse_metadata_from_soup
-        # code to this style
+        utgarFran = []
+        island = content.find("div", "island")
+        for linkfrag in linkfrags:
+            regex = re.compile(".*"+linkfrag)
+            for link in island.find_all("a", regex):
+                # from a relative link on the form
+                # "/rattsdokument/kommittedirektiv/2012/01/dir.-20123/",
+                # extract
+                # {'rdf:type': RPUBL.Kommittedirektiv,
+                #  'rpubl:arsutgava': 2012,
+                #  'rpubl:lopnummer} -> attributes_to_resource -> coin_uri
+                (doctype, year, ordinal) = re.search("/(\w+)\.-(\d{4})(\d+)/$",
+                                                 link["href"]).matches()
+                attribs = {"rpubl:arsutgava": year,
+                           "rpubl:lopnummer": ordinal}
+                if doctype == "dir":
+                    attribs["rdf:type"] = RPUBL.Kommittedirektiv
+                else:
+                    attribs["rdf:type"] = RPUBL.Utredningsbetankande
+                    # lookup on skos:altLabel, but with "Ds" and "SOU"
+                    # as keys (not "ds" and "sou")
+                    altlabel = doctype.upper() if doctype == "sou" else doctype.capitalize()
+                    attribs["utrSerie"] = self.lookup_resource(altlabel, SKOS.altLabel)
+                uri = self.minter.space.coin_uri(self.attributes_to_resource(attributes))
+                utgarFran.append(uri)
         return {'dcterms:title': title,
-                'dcterms:identifier': identifier}
+                'dcterms:identifier': identifier,
+                'dcterms:issued': utgiven,
+                'dcterms:publisher': ansvarig,
+                'dcterms:abstract': sammanfattning,
+                'rpubl:utgarFran': utgarFran
+        }
+
+    def sanitize_metadata(self, a, basefile):
+        # trim space
+        for k in ("dcterms:title", "dcterms:abstract"):
+            a[k] = util.normalize_space(a[k])
+        # trim identifier
+        a["dcterms:identifier"] = a["dcterms:identifier"].replace("ID-nummer: ", "")
+        a["dcterms:publisher"] = self.lookup_resource(a["dcterms:publisher"])
+        # remove empty utgarFran list
+        if a["rpubl:utgarFran"]:
+            a["rpubl:utgarFran"] = [URIRef(x) for x in a["rpubl:utgarFran"]]
+        else:
+            del a["rpubl:utgarFran"]
+        a["rdf:type"] = self.rdf_type
+        # split basefile into rpubl:arsutgava + rpubl:lopnummer
+        a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":")
+
+        # FIXME: possibly derive utrSerie from self.document_type?
+        return a
+
+    def extract_body(self, fp, basefile):
+        from pudb import set_trace; set_trace()
+        return super(self, Regeringen).extract_body(fp, basefile)
+
+    def sanitize_body(self, rawbody):
+        from pudb import set_trace; set_trace()
+        return super(self, Regeringen).sanitize_body(rawbody)
+
+    # something get_parser(), something tokenize()
     
-    def parse_metadata_from_soup(self, soup, doc):
-        d = Describer(doc.meta, doc.uri)
-        d.rdftype(self.rdf_type)
-        d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-
-        content = soup.find(id="content")
-        title = content.find("h1").string
-        d.value(self.ns['dcterms'].title, title, lang=doc.lang)
-        identifier = self.sanitize_identifier(
-            content.find("p", "lead").text)  # might need fixing up
-
-        d.value(self.ns['dcterms'].identifier, identifier)
-
-        definitions = content.find("dl", "definitions")
-        if definitions:
-            for dt in definitions.find_all("dt"):
-                key = dt.get_text(strip=True)
-                value = dt.find_next_sibling("dd").get_text(strip=True)
-                if key == "Utgiven:":
-                    try:
-                        dateval = self.parse_swedish_date(value)
-                        if isinstance(dateval, date):
-                            d.value(self.ns['dcterms'].issued, dateval)
-                        else:
-                            datatype = {util.gYearMonth: XSD.gYearMonth,
-                                        util.gYear: XSD.gYear}[type(dateval)]
-                            d.value(
-                                self.ns['dcterms'].issued,
-                                str(dateval),
-                                datatype=datatype)
-                    except ValueError as e:
-                        self.log.warning(
-                            "Could not parse %s as swedish date" % value)
-                elif key == "Avsändare:":
-                    try:
-                        res = self.lookup_resource(value)
-                        if value.endswith("departementet"):
-                            d.rel(self.ns['rpubl'].departement,
-                                  res)
-                        else:
-                            d.rel(self.ns['dcterms'].publisher,
-                                  res)
-                    except KeyError:
-                        self.log.warning(
-                            "%s: Could not find resource for Avsändare: '%s'" %
-                            (doc.basefile, value))
-
-        if content.find("h2", text="Sammanfattning"):
-            sums = content.find("h2", text="Sammanfattning").find_next_siblings("p")
-            # "\n\n" doesn't seem to survive being stuffed in a rdfa
-            # content attribute. Replace with simple space.
-            summary = " ".join([x.get_text(strip=True) for x in sums])
-            d.value(self.ns['dcterms'].abstract,
-                    summary, lang=doc.lang)
-
-        # find related documents
-        re_basefile = re.compile(r'\d{4}(|/\d{2,4}):\d+')
-        # legStep1=Kommittedirektiv, 2=Utredning, 3=lagrådsremiss,
-        # 4=proposition. Assume that relationships between documents
-        # are reciprocal (ie if the page for a Kommittedirektiv
-        # references a Proposition, the page for that Proposition
-        # references the Kommittedirektiv.
-        elements = {self.KOMMITTEDIREKTIV: [],
-                    self.DS: ["legStep1"],
-                    self.PROPOSITION: ["legStep1", "legStep2"],
-                    self.SOU: ["legStep1"]}[self.document_type]
-
-        for elementid in elements:
-            box = content.find(id=elementid)
-            for listitem in box.find_all("li"):
-                if not listitem.find("span", "info"):
-                    continue
-                infospans = [x.text.strip(
-                ) for x in listitem.find_all("span", "info")]
-
-                rel_basefile = None
-                identifier = None
-
-                for infospan in infospans:
-                    if re_basefile.search(infospan):
-                        # scrub identifier ("Dir. 2008:50" -> "2008:50" etc)
-                        rel_basefile = re_basefile.search(infospan).group()
-                        identifier = infospan
-
-                if not rel_basefile:
-                    self.log.warning(
-                        "%s: Couldn't find rel_basefile (elementid #%s) among %r" % (doc.basefile, elementid, infospans))
-                    continue
-                if elementid == "legStep1":
-                    subjUri = self.canonical_uri(
-                        rel_basefile, self.KOMMITTEDIREKTIV)
-                elif elementid == "legStep2":
-                    if identifier.startswith("SOU"):
-                        subjUri = self.canonical_uri(rel_basefile, self.SOU)
-                    elif identifier.startswith(("Ds", "DS")):
-                        subjUri = self.canonical_uri(rel_basefile, self.DS)
-                    else:
-                        self.log.warning(
-                            "Cannot find out what type of document the linked %s is (#%s)" % (identifier, elementid))
-                        self.log.warning("Infospans was %r" % infospans)
-                        continue
-                elif elementid == "legStep3":
-                    subjUri = self.canonical_uri(
-                        rel_basefile, self.PROPOSITION)
-                d.rel(self.ns['rpubl'].utgarFran, subjUri)
-
-        # find related pages
-        related = content.find("h2", text="Relaterat")
-        if related:
-            for link in related.findParent("div").find_all("a"):
-                r = urljoin(
-                    "http://www.regeringen.se/", link["href"])
-                d.rel(RDFS.seeAlso, URIRef(r))
-                # with d.rel(RDFS.seeAlso, URIRef(r)):
-                #    d.value(RDFS.label, link.get_text(strip=True))
-
-        self.infer_triples(d, doc.basefile)
-        return doc.uri
-
+    
+    
     def parse_document_from_soup(self, soup, doc):
 
         # reset global state

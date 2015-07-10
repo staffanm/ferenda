@@ -288,7 +288,7 @@ class SwedishLegalSource(DocumentRepository):
         attrib = {'rpubl:arsutgava': year,
                   'rpubl:lopnummer': ordinal,
                   'rdf:type': self.rdf_type}
-        resource = attributes_to_resource(attrib)
+        resource = self.attributes_to_resource(attrib)
         return self.minter.space.coin_uri(resource) 
 
     def sanitize_basefile(self, basefile):
@@ -420,6 +420,7 @@ class SwedishLegalSource(DocumentRepository):
         if 'dcterms:identifier' in attribs:
             attribs['dcterms:identifier'] = self.sanitize_identifier(
                 attribs['dcterms:identifier'])
+        return attribs
 
     def sanitize_identifier(self, identifier):
         """Given the unprocessed dcterms:identifier for a document, return a
