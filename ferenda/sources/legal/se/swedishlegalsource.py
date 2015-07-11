@@ -458,10 +458,11 @@ class SwedishLegalSource(DocumentRepository):
     def visitor_functions(self):
         return []
 
+
     def parse_body(self, fp, basefile):
         rawbody = self.extract_body(fp, basefile)
         sanitized = self.sanitize_body(rawbody)
-        parser = self.get_parser(basefile)
+        parser = self.get_parser(basefile, sanitized)
         tokenstream = self.tokenize(sanitized)
         # for PDFs, pdfreader.textboxes(gluefunc) is a tokenizer
         body = parser(tokenstream)

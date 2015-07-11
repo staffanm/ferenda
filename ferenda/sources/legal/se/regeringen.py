@@ -309,7 +309,8 @@ class Regeringen(SwedishLegalSource):
     def extract_head(self, fp, basefile):
         parser = 'lxml'
         soup = BeautifulSoup(fp.read(), parser)
-        return soup.find(id="content")
+        self._rawbody = soup.body
+        return self._rawbody.find(id="content")
 
     def extract_metadata(self, rawhead, basefile):
         content = rawhead
@@ -373,6 +374,8 @@ class Regeringen(SwedishLegalSource):
             a[k] = util.normalize_space(a[k])
         # trim identifier
         a["dcterms:identifier"] = a["dcterms:identifier"].replace("ID-nummer: ", "")
+        # save for later
+        self._identifier = a["dcterms:identifier"]
         a["dcterms:publisher"] = self.lookup_resource(a["dcterms:publisher"])
         # remove empty utgarFran list
         if a["rpubl:utgarFran"]:
@@ -386,37 +389,48 @@ class Regeringen(SwedishLegalSource):
         # FIXME: possibly derive utrSerie from self.document_type?
         return a
 
-    def extract_body(self, fp, basefile):
-        from pudb import set_trace; set_trace()
-        return super(self, Regeringen).extract_body(fp, basefile)
-
     def sanitize_body(self, rawbody):
-        from pudb import set_trace; set_trace()
-        return super(self, Regeringen).sanitize_body(rawbody)
+        return super(Regeringen, self).sanitize_body(rawbody)
 
-    # something get_parser(), something tokenize()
-    
-    
-    
-    def parse_document_from_soup(self, soup, doc):
+    def get_parser(self, basefile, sanitized_body):
+        if self.document_type == self.PROPOSITION:
+            preset = 'proposition'
+        elif self.document_type == self.SOU:
+            preset = 'sou'
+        elif self.document_type == self.DS:
+            preset = 'ds'
+        elif self.document_type == self.KOMMITTEDIREKTIV:
+            preset = 'dir'
+        else:
+            preset = 'default'
+        return offtryck_parser(metrics=sanitized_body.metrics, preset=preset).parse
 
+    def tokenize(self, pdfreader):
+        return pdfreader.textboxes(offtryck_gluefunc)
+    
+    def extract_body(self, fp, basefile):
         # reset global state
         PreambleSection.counter = 0
         UnorderedSection.counter = 0
-
-        pdffiles = self.find_pdf_links(soup, doc.basefile)
+        pdffiles = self.find_pdf_links(self._rawbody, basefile)
         if not pdffiles:
             self.log.error(
-                "%s: No PDF documents found, can't parse anything" % doc.basefile)
+                "%s: No PDF documents found, can't parse anything" % basefile)
             return None
-        identifier = doc.meta.value(URIRef(doc.uri), self.ns['dcterms'].identifier)
-        if identifier:
-            identifier = str(identifier)
-        doc.body = self.parse_pdfs(doc.basefile, pdffiles, identifier)
-        if self.document_type == self.PROPOSITION:
-            self.post_process_proposition(doc)
-        return doc
+        
+        # read a list of pdf files and return a contatenated PDFReader
+        # object (where do we put metrics? On the PDFReader itself?
+        return self.read_pdfs(basefile, pdffiles, self._identifier)
 
+    def visitor_functions(self):
+        if self.document_type == self.PROPOSITION:
+            # FIXME: translate post_process_proposition to visitor
+            # functions and return them
+            return []
+        else:
+            return []
+    
+    # FIXME: Translate this to  visitor functions
     def post_process_proposition(self, doc):
         # do some post processing. First loop through leading
         # textboxes and try to find dcterms:identifier, dcterms:title and
@@ -518,15 +532,11 @@ class Regeringen(SwedishLegalSource):
 
     def find_pdf_links(self, soup, basefile):
         pdffiles = []
-        docsection = soup.find('div', 'doc')
+        docsection = soup.find('ul', 'list--Block--icons')
+        pdflink = re.compile("/contentassets/")
         if docsection:
-            for li in docsection.find_all("li", "pdf"):
-                link = li.find('a')
-                m = re.match(r'/download/(\w+\.pdf).*', link['href'], re.IGNORECASE)
-                if not m:
-                    continue
-                pdfbasefile = m.group(1)
-                pdffiles.append((pdfbasefile, link.string))
+            for link in docsection.find_all("a", href=pdflink):
+                pdffiles.append((link["href"] + ".pdf", link.string))
         selected = self.select_pdfs(pdffiles)
         self.log.debug(
             "selected %s out of %d pdf files" %
@@ -585,6 +595,48 @@ class Regeringen(SwedishLegalSource):
                                    keep_xml=keep_xml)
         return pdf
 
+    # returns a list of (PDFReader, metrics) tuples, one for each PDF
+    # file.
+    def read_pdfs(self, basefile, pdffiles, identifier=None):
+        metrics_path = self.store.intermediate_path(basefile,
+                                                    attachment="metrics.json")
+        pdfdebug_path = self.store.intermediate_path(basefile,
+                                                     attachment="debug.pdf")
+        if os.environ.get("FERENDA_PLOTANALYSIS"):
+            plot_path = self.store.intermediate_path(basefile,
+                                                    attachment="plot.png")
+        else:
+            plot_path = None
+
+        reader = None
+        for pdffile in pdffiles:
+            basepath = pdffile.split("/")[-1]
+            pdf_path = self.store.downloaded_path(basefile, attachment=basepath)
+            intermediate_path = self.store.intermediate_path(basefile, attachment=pdffile)
+            intermediate_dir = os.path.dirname(intermediate_path)
+            if not reader:
+                reader = self.parse_pdf(pdf_path, intermediate_dir)
+            else:
+                # FIXME: PDF Reader object must be able to be combined
+                # (implement __iadd__)
+                reader += self.parse_pdf(pdf_path, intermediate_dir)
+            
+        # Grab correct analyzer class
+        if self.document_type == self.KOMMITTEDIREKTIV:
+            from ferenda.sources.legal.se.direktiv import DirAnalyzer
+            analyzer = DirAnalyzer(reader)
+        elif self.document_type == self.SOU:
+            from ferenda.sources.legal.se.sou import SOUAnalyzer
+            analyzer = SOUAnalyzer(reader)
+        else:
+            analyzer = PDFAnalyzer(reader)
+
+        metrics = analyzer.metrics(metrics_path, plot_path, force=self.config.force)
+        if os.environ.get("FERENDA_DEBUGANALYSIS"):
+            analyzer.drawboxes(pdfdebug_path, offtryck_gluefunc, metrics=metrics)
+        reader.metrics = metrics
+        return reader
+            
     def parse_pdfs(self, basefile, pdffiles, identifier=None):
         body = None
         gluefunc = offtryck_gluefunc
