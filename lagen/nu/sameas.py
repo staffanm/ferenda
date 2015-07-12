@@ -2,6 +2,7 @@
 from __future__ import unicode_literals, print_function
 
 from rdflib import Graph, Namespace, RDF, URIRef
+from rdflib.namespace import OWL
 
 from ferenda import ResourceLoader
 from ferenda.thirdparty.coin import URIMinter
@@ -45,3 +46,9 @@ class SameAs(object):
             self._sameas_minter = URIMinter(cfg, spaceuri)
             # print("sameas: Created minter at %s" % id(self._sameas_minter))
         return self._sameas_minter
+
+    def infer_metadata(self, resource, basefile):
+        # resource = super(SameAs, self).infer_metadata(resource, basefile)
+        sameas_uri = self.sameas_minter.space.coin_uri(resource)
+        resource.add(OWL.sameAs, URIRef(sameas_uri))
+        return resource

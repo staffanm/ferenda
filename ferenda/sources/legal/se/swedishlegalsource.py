@@ -41,7 +41,6 @@ from ferenda.elements.elements import E
 
 
 class Sidbrytning(OrdinalElement):
-
     def as_xhtml(self, uri, parent_uri=None):
         return E("span", {'id': 'sid%s' % self.ordinal,
                           'class': 'sidbrytning'})
@@ -267,7 +266,7 @@ class SwedishLegalSource(DocumentRepository):
 
         
         for k, v in attributes.items():
-            if not isinstance(v, URIRef):
+            if not isinstance(v, (URIRef, Literal)):
                 v = Literal(v)
             g.add((current, uri(k), v))
 
@@ -436,6 +435,24 @@ class SwedishLegalSource(DocumentRepository):
 
         """ 
 
+        # even though our attributes are sanitized, plain-str objects
+        # might need some tuning.
+        for k in attribs:
+            # since isinstance(rdflib.Literal, str) == True, we need a
+            # more specific check to see if we need to "upgrade"
+            if not type(k) == str:
+                continue
+            if k in ("dcterms:title", "dcterms:abstract"):
+                attribs[k] = Literal(attribs[k], lang=self.lang)
+            elif k == "dcterms:issued":
+                if re.match("\d{4}-\d{2}-\d{2}", attribs[k]):
+                    # iso8859-1 date (no time portion)
+                    attribs[k] = Literal(datetime.strptime(attribs[k],
+                                                           "%Y-%m-%d"))
+                else:
+                    # assume something that parse_swedish_date handles
+                    attribs[k] = Literal(self.parse_swedish_date(attribs[k]))
+
         resource = self.attributes_to_resource(attribs)
         uri = URIRef(self.minter.space.coin_uri(resource))
         # now that we know the document URI (didn't we already know
@@ -452,6 +469,12 @@ class SwedishLegalSource(DocumentRepository):
         inferred from existing metadata.
 
         """
+        # this is the root superclass for this method, but we still
+        # need to call super to give lagen.nu.SameAs.infer_metadata a
+        # chance to rune
+        resource = super(SwedishLegalSource, self).infer_metadata(resource, basefile)
+        return resource
+
 
     parse_types = LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN
 

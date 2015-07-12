@@ -45,8 +45,8 @@
     rpubl:arsutgava "2013/14" ;
     rpubl:departement <https://lagen.nu/org/2008/justitiedepartementet> ;
     rpubl:lopnummer "51" ;
-    rpubl:utgarFran <http://localhost:8000/res/dir/2010:35>,
-        <http://localhost:8000/res/dir/2012:3>,
+    rpubl:utgarFran <https://lagen.nu/dir/2010:35>,
+        <https://lagen.nu/dir/2012:3>,
         <http://localhost:8000/res/utr/sou/2012:95> ;
     rdfs:seeAlso <http://www.regeringen.se/sb/d/17984/a/228868> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/prop/2013/14:51> ;

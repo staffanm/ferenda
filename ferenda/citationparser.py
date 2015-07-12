@@ -110,6 +110,9 @@ class CitationParser(object):
 
         res = []
         if not isinstance(part, str):
+            if not (hasattr(part, '__iter__') or
+                    hasattr(part, '__getitem__')):
+                return part
             for subpart in part:
                 if isinstance(subpart, str):
                     res.extend(self.parse_recursive(subpart, predicate))

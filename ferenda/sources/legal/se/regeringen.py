@@ -324,7 +324,7 @@ class Regeringen(SwedishLegalSource):
         # on.
         utgiven = content.find("span", "published").time.text
         ansvarig = content.find("p", "media--publikations__sender").a.text
-        sammanfattning = content.find("div", "has-wordExplanation").get_text()
+        sammanfattning = " ".join(content.find("div", "has-wordExplanation").strings)
 
         # look for related items:
         linkfrags = {self.KOMMITTEDIREKTIV: [],
@@ -363,9 +363,9 @@ class Regeringen(SwedishLegalSource):
         return {'dcterms:title': title,
                 'dcterms:identifier': identifier,
                 'dcterms:issued': utgiven,
-                'dcterms:publisher': ansvarig,
                 'dcterms:abstract': sammanfattning,
-                'rpubl:utgarFran': utgarFran
+                'rpubl:utgarFran': utgarFran,
+                'rpubl:departement': ansvarig
         }
 
     def sanitize_metadata(self, a, basefile):
@@ -376,7 +376,7 @@ class Regeringen(SwedishLegalSource):
         a["dcterms:identifier"] = a["dcterms:identifier"].replace("ID-nummer: ", "")
         # save for later
         self._identifier = a["dcterms:identifier"]
-        a["dcterms:publisher"] = self.lookup_resource(a["dcterms:publisher"])
+        a["rpubl:departement"] = self.lookup_resource(a["rpubl:departement"])
         # remove empty utgarFran list
         if a["rpubl:utgarFran"]:
             a["rpubl:utgarFran"] = [URIRef(x) for x in a["rpubl:utgarFran"]]
@@ -403,10 +403,13 @@ class Regeringen(SwedishLegalSource):
             preset = 'dir'
         else:
             preset = 'default'
-        return offtryck_parser(metrics=sanitized_body.metrics, preset=preset).parse
+        parser = offtryck_parser(metrics=sanitized_body.metrics, preset=preset)
+        parser.debug = os.environ.get('FERENDA_FSMDEBUG', False)
+        parser.current_identifier = self._identifier
+        return parser.parse
 
     def tokenize(self, pdfreader):
-        return pdfreader.textboxes(offtryck_gluefunc)
+        return pdfreader.textboxes(offtryck_gluefunc, pageobjects=True)
     
     def extract_body(self, fp, basefile):
         # reset global state
@@ -421,6 +424,8 @@ class Regeringen(SwedishLegalSource):
         # read a list of pdf files and return a contatenated PDFReader
         # object (where do we put metrics? On the PDFReader itself?
         return self.read_pdfs(basefile, pdffiles, self._identifier)
+
+    parse_types = []
 
     def visitor_functions(self):
         if self.document_type == self.PROPOSITION:
@@ -692,9 +697,14 @@ class Regeringen(SwedishLegalSource):
     def create_external_resources(self, doc):
         """Optionally create external files that go together with the
         parsed file (stylesheets, images, etc). """
+        
         if len(doc.body) == 0:
             self.log.warning(
                 "%s: No external resources to create", doc.basefile)
+            return
+        if not isinstance(doc.body, PDFReader):
+            # The body is processed enough that we won't need to
+            # create a CSS file w/ fontspecs etc
             return
         # Step 1: Create CSS
         # 1.1 find css name
@@ -705,7 +715,6 @@ class Regeringen(SwedishLegalSource):
         # for pdf in doc.body:
         pdf = doc.body
         # this is needed to get fontspecs and other things
-        assert isinstance(pdf, PDFReader)
         for spec in list(pdf.fontspec.values()):
             fp.write(".fontspec%s {font: %spx %s; color: %s;}\n" %
                      (spec['id'], spec['size'], spec['family'], spec['color']))
