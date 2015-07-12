@@ -1233,7 +1233,7 @@ class DV(SwedishLegalSource):
 
 
     # @staticmethod
-    def get_parser(self, basefile):
+    def get_parser(self, basefile, sanitized):
         re_courtname = re.compile(
             "^(Högsta domstolen|Hovrätten (över|för) [A-ZÅÄÖa-zåäö ]+|([A-ZÅÄÖ][a-zåäö]+ )(tingsrätt|hovrätt))(|, mark- och miljödomstolen|, Mark- och miljööverdomstolen)$")
 

@@ -1,4 +1,5 @@
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -8,10 +9,11 @@
 
 <https://lagen.nu/avg/arn/2013-07406> a rpubl:VagledandeMyndighetsavgorande ;
     dcterms:identifier "ARN 2013-07406" ;
-    dcterms:issued "2013-11-19" ;
+    dcterms:issued "2013-11-19"^^xsd:date ;
     dcterms:subject "Resor"@sv ;
     dcterms:title "Fråga om köparen fullgjort sin skyldighet att kontrollera riktigheten av utfärdade biljetter samt om resebyrås ansvar för de felaktiga biljetterna."@sv ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/avg/arn/2013-07406>;
     rpubl:arendenummer "2013-07406" ;
-    rpubl:avgorandedatum "2013-11-19" ;
+    rpubl:avgorandedatum "2013-11-19"^^xsd:date ;
     prov:wasGeneratedBy "lagen.nu.arn.ARN" .
 

@@ -444,11 +444,11 @@ class SwedishLegalSource(DocumentRepository):
                 continue
             if k in ("dcterms:title", "dcterms:abstract"):
                 attribs[k] = Literal(attribs[k], lang=self.lang)
-            elif k == "dcterms:issued":
+            elif k in ("dcterms:issued", "rpubl:avgorandedatum"):
                 if re.match("\d{4}-\d{2}-\d{2}", attribs[k]):
                     # iso8859-1 date (no time portion)
-                    attribs[k] = Literal(datetime.strptime(attribs[k],
-                                                           "%Y-%m-%d"))
+                    dt= datetime.strptime(attribs[k], "%Y-%m-%d")
+                    attribs[k] = Literal(date(dt.year, dt.month, dt.day))
                 else:
                     # assume something that parse_swedish_date handles
                     attribs[k] = Literal(self.parse_swedish_date(attribs[k]))
@@ -471,8 +471,10 @@ class SwedishLegalSource(DocumentRepository):
         """
         # this is the root superclass for this method, but we still
         # need to call super to give lagen.nu.SameAs.infer_metadata a
-        # chance to rune
-        resource = super(SwedishLegalSource, self).infer_metadata(resource, basefile)
+        # chance to run
+        if hasattr(super(SwedishLegalSource, self),
+                   'infer_metadata'):
+            resource = super(SwedishLegalSource, self).infer_metadata(resource, basefile)
         return resource
 
 
@@ -515,7 +517,7 @@ class SwedishLegalSource(DocumentRepository):
     def sanitize_body(self, rawbody):
         return rawbody
 
-    def get_parser(self, basefile):
+    def get_parser(self, basefile, sanitized):
         # should return a function that gets any iterable (the output
         # from tokenize) and returns a ferenda.elements.Body object
         def default_parser(iterable):
