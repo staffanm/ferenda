@@ -218,7 +218,6 @@ class SwedishLegalSource(DocumentRepository):
         opts['tabs'] = True
         return opts
 
-
     def lookup_label(self, resource, predicate=FOAF.name):
         val = self.commondata.value(subject=URIRef(resource),
                                     predicate=predicate)
@@ -227,10 +226,9 @@ class SwedishLegalSource(DocumentRepository):
         else:
             return str(val)
 
-
     def attributes_to_resource(self, attributes):
         # FIXME: this is roughly the same code as
-        # LegalRef.attributes_to_resource but with different keys. 
+        # LegalRef.attributes_to_resource but with different keys.
         def uri(qname):
             (prefix, leaf) = qname.split(":", 1)
             return self.ns[prefix][leaf]
@@ -265,18 +263,24 @@ class SwedishLegalSource(DocumentRepository):
             current = new
 
         
-        for k, v in attributes.items():
-            if not isinstance(v, (URIRef, Literal)):
-                v = Literal(v)
-            g.add((current, uri(k), v))
+        for k, values in attributes.items():
+            if not isinstance(values, list):
+                values = [values]
+            for v in values:
+                if not isinstance(v, (URIRef, Literal)):
+                    v = Literal(v)
+                g.add((current, uri(k), v))
 
         # finally add triples that we can infer from class properties
         # (is this a job for infer_metadata? But we need it,
         # particularly the rdf:type data, beforehand)
+
+        # this is only valid when generating the resource for the
+        # document itself, but attributes_to_resource must be able to
+        # generate other resources
         g.add((current, RDF.type, self.rdf_type))
         g.add((current, PROV.wasGeneratedBy, Literal(self.qualified_class_name())))
         return g.resource(b)
-        
 
     def canonical_uri(self, basefile):
         # possibly break out the attrib-generating code to a separate

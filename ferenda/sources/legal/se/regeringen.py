@@ -12,25 +12,22 @@ from datetime import datetime, timedelta, date
 from time import sleep
 from six import text_type as str
 from six.moves.urllib_parse import urljoin, urlencode
-from collections import Counter
 
 import requests
 import lxml.html
 from bs4 import BeautifulSoup
 from rdflib import URIRef
-from rdflib import RDFS, XSD
+from rdflib.namespace import SKOS
 
-from ferenda import PDFDocumentRepository
-from ferenda import DocumentEntry
-from ferenda import FSMParser
 from ferenda import Describer
+from ferenda import DocumentEntry
 from ferenda import PDFAnalyzer
 from ferenda import util
-from ferenda.compat import OrderedDict
-from ferenda.elements import Body, Paragraph, Section, CompoundElement, SectionalElement, Link
-from ferenda.pdfreader import PDFReader, Page, Textbox
-from ferenda.decorators import recordlastdownload, downloadmax
-from . import SwedishLegalSource
+from ferenda.decorators import recordlastdownload, downloadmax, action, managedparsing
+from ferenda.elements import Section, Link
+from ferenda.pdfreader import PDFReader, Textbox
+
+from . import SwedishLegalSource, RPUBL
 from .swedishlegalsource import offtryck_parser, offtryck_gluefunc, PreambleSection, UnorderedSection
 
 
@@ -324,13 +321,16 @@ class Regeringen(SwedishLegalSource):
         # on.
         utgiven = content.find("span", "published").time.text
         ansvarig = content.find("p", "media--publikations__sender").a.text
-        sammanfattning = " ".join(content.find("div", "has-wordExplanation").strings)
+        s = content.find("div", "has-wordExplanation")
+        for a in s.find_all("a"):  # links in summary are extra tacked-on bogus
+            a.decompose()
+        sammanfattning = " ".join(s.strings)
 
         # look for related items:
         linkfrags = {self.KOMMITTEDIREKTIV: [],
                      self.DS: ["/komittedirektiv/"],
                      self.PROPOSITION: ["/kommittedirektiv/",
-                                        "/departementsserien/",
+                                        "/departementsserien-och-promemorior/",
                                         "/statens-offentliga-utredningar"],
                     self.SOU: ["/kommittedirektiv/"]
         }[self.document_type]
@@ -339,17 +339,18 @@ class Regeringen(SwedishLegalSource):
         island = content.find("div", "island")
         for linkfrag in linkfrags:
             regex = re.compile(".*"+linkfrag)
-            for link in island.find_all("a", regex):
+            for link in island.find_all("a", href=regex):
                 # from a relative link on the form
                 # "/rattsdokument/kommittedirektiv/2012/01/dir.-20123/",
                 # extract
                 # {'rdf:type': RPUBL.Kommittedirektiv,
                 #  'rpubl:arsutgava': 2012,
                 #  'rpubl:lopnummer} -> attributes_to_resource -> coin_uri
-                (doctype, year, ordinal) = re.search("/(\w+)\.-(\d{4})(\d+)/$",
-                                                 link["href"]).matches()
+                (doctype, year, ordinal) = re.search("/(\w+)\.?-(\d{4})(\d+)/$",
+                                                 link["href"]).groups()
                 attribs = {"rpubl:arsutgava": year,
                            "rpubl:lopnummer": ordinal}
+                from pudb import set_trace; set_trace()
                 if doctype == "dir":
                     attribs["rdf:type"] = RPUBL.Kommittedirektiv
                 else:
@@ -357,8 +358,8 @@ class Regeringen(SwedishLegalSource):
                     # lookup on skos:altLabel, but with "Ds" and "SOU"
                     # as keys (not "ds" and "sou")
                     altlabel = doctype.upper() if doctype == "sou" else doctype.capitalize()
-                    attribs["utrSerie"] = self.lookup_resource(altlabel, SKOS.altLabel)
-                uri = self.minter.space.coin_uri(self.attributes_to_resource(attributes))
+                    attribs["rpubl:utrSerie"] = self.lookup_resource(altlabel, SKOS.altLabel)
+                uri = self.minter.space.coin_uri(self.attributes_to_resource(attribs))
                 utgarFran.append(uri)
         return {'dcterms:title': title,
                 'dcterms:identifier': identifier,
@@ -388,6 +389,13 @@ class Regeringen(SwedishLegalSource):
 
         # FIXME: possibly derive utrSerie from self.document_type?
         return a
+
+    # FIXME: This is hackish -- need to rethink which parts of the
+    # parse steps needs access to which data
+    def polish_metadata(self, sane_attribs):
+        resource = super(Regeringen, self).polish_metadata(sane_attribs)
+        self._resource = resource
+        return resource
 
     def sanitize_body(self, rawbody):
         return super(Regeringen, self).sanitize_body(rawbody)
@@ -427,18 +435,17 @@ class Regeringen(SwedishLegalSource):
 
     parse_types = []
 
-    # This could theoretically be written as visitor functions, but since the code
-    # requires access to doc.meta and just iterates over top-level elements of 
-    # doc.body (no recursing) it's easier to just override parse and do our 
-    # postprocessing at the end.
-    @action
-    @managedparsing
-    def parse(self, doc):
+    # This could theoretically be written as visitor functions, but
+    # since the code requires access to doc.meta and just iterates
+    # over top-level elements of doc.body (no recursing) it's easier
+    # to just override parse_body and do our postprocessing at the
+    # end.
+    def parse_body(self, fp, basefile):
 
         def _check_differing(describer, predicate, newval):
             if describer.getvalue(predicate) != newval:
                 self.log.warning("%s: HTML page: %s is %r, document: it's %r" %
-                                 (doc.basefile,
+                                 (basefile,
                                   d.graph.qname(predicate),
                                   describer.getvalue(predicate),
                                   newval))
@@ -448,14 +455,15 @@ class Regeringen(SwedishLegalSource):
                                 d.graph.value(d._current(), predicate)))
                 d.value(predicate, newval)
 
-        res = super(Regeringen, self).parse(doc)
+        body = super(Regeringen, self).parse_body(fp, basefile)
+
         # loop through leading  textboxes and try to find dcterms:identifier,
-        # dcterms:title and dcterms:issued (these should already be present 
+        # dcterms:title and dcterms:issued (these should already be present
         # in doc.meta, but the values in the actual document should take
         # precendence
-        d = Describer(doc.meta, doc.uri)
+        d = Describer(self._resource.graph, self._resource.identifier)
         title_found = identifier_found = issued_found = False
-        for idx, element in enumerate(doc.body):
+        for idx, element in enumerate(body):
             if not isinstance(element, Textbox):
                 continue
             str_element = str(element).strip()
@@ -494,7 +502,7 @@ class Regeringen(SwedishLegalSource):
 
             if title_found and identifier_found and issued_found:
                 break
-        return res
+        return body
 
 
     # FIXME: Hook this up as a visitor function
@@ -618,7 +626,7 @@ class Regeringen(SwedishLegalSource):
         for pdffile in pdffiles:
             basepath = pdffile.split("/")[-1]
             pdf_path = self.store.downloaded_path(basefile, attachment=basepath)
-            intermediate_path = self.store.intermediate_path(basefile, attachment=pdffile)
+            intermediate_path = self.store.intermediate_path(basefile, attachment=basepath)
             intermediate_dir = os.path.dirname(intermediate_path)
             if not reader:
                 reader = self.parse_pdf(pdf_path, intermediate_dir)

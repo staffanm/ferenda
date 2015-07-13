@@ -8,36 +8,36 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://localhost:8000/res/prop/2013/14:51#PS1> a bibo:DocumentPart ;
-    dcterms:isPartOf <http://localhost:8000/res/prop/2013/14:51> ;
+<https://lagen.nu/prop/2013/14:51#PS1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:51> ;
     dcterms:title "Propositionens huvudsakliga innehåll"@sv .
 
-<http://localhost:8000/res/prop/2013/14:51#S1> a bibo:DocumentPart ;
-    dcterms:isPartOf <http://localhost:8000/res/prop/2013/14:51> ;
+<https://lagen.nu/prop/2013/14:51#S1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:51> ;
     dcterms:title "Förslag till riksdagsbeslut"@sv ;
     bibo:chapter "1"@sv .
 
-<http://localhost:8000/res/prop/2013/14:51#S4.1> a bibo:DocumentPart ;
-    dcterms:isPartOf <http://localhost:8000/res/prop/2013/14:51#S4> ;
+<https://lagen.nu/prop/2013/14:51#S4.1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:51#S4> ;
     dcterms:title "Begreppet rikets säkerhet"@sv ;
     bibo:chapter "4.1"@sv .
 
-<http://localhost:8000/res/prop/2013/14:51#S4.2.1> a bibo:DocumentPart ;
-    dcterms:isPartOf <http://localhost:8000/res/prop/2013/14:51#S4.2> ;
+<https://lagen.nu/prop/2013/14:51#S4.2.1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:51#S4.2> ;
     dcterms:title "Spioneri"@sv ;
     bibo:chapter "4.2.1"@sv .
 
-<http://localhost:8000/res/prop/2013/14:51#S4.2> a bibo:DocumentPart ;
-    dcterms:isPartOf <http://localhost:8000/res/prop/2013/14:51#S4> ;
+<https://lagen.nu/prop/2013/14:51#S4.2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:51#S4> ;
     dcterms:title "Aktuella straffbestämmelser i 19 kap. brottsbalken"@sv ;
     bibo:chapter "4.2"@sv .
 
-<http://localhost:8000/res/prop/2013/14:51#S4> a bibo:DocumentPart ;
-    dcterms:isPartOf <http://localhost:8000/res/prop/2013/14:51> ;
+<https://lagen.nu/prop/2013/14:51#S4> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:51> ;
     dcterms:title "Gällande rätt"@sv ;
     bibo:chapter "4"@sv .
 
-<http://localhost:8000/res/prop/2013/14:51> a rpubl:Proposition ;
+<https://lagen.nu/prop/2013/14:51> a rpubl:Proposition ;
     dcterms:abstract "Propositionen innehåller förslag till skärpningar i den reglering som bland annat rör skydd mot främmande makts underrättelseverksamhet. Det föreslås att ett nytt brott införs i brottsbalken, olovlig underrättelseverksamhet mot Sverige. Brottet tar sikte på otillåten underrättelseverksamhet vars syfte är att komma över uppgifter om förhållanden som det kan skada Sveriges säkerhet att en främmande makt känner till. För straffansvar ska krävas att verksamheten bedrivs hemligen eller med användande av svikliga medel och att gärningsmannens syfte är att gå en främmande makt tillhanda. Straffet föreslås vara fängelse i högst två år eller, om brottet är grovt, fängelse i lägst sex månader och högst fyra år. Det ska finnas samma möjligheter att använda hemliga tvångsmedel för att förebygga, förhindra och utreda det nya brottet som gäller för andra former av olovlig underrättelseverksamhet. Dessutom föreslås att straffbestämmelsen om så kallat flyktingspionage utvidgas till att omfatta verksamhet som bedrivs med användande av otillbörliga medel samt att straffskalan skärps genom att straffminimum höjs från böter till fängelse. Straffskalan för brottet vårdslöshet med hemlig uppgift föreslås också ändras genom att straffmaximum höjs från fängelse i högst sex månader till fängelse i högst ett år. Slutligen innefattar propositionen förslag om vissa språkliga och lagtekniska ändringar i brottsbalken. I aktuella delar föreslås ändringarna få genomslag även i tryckfrihetsförordningens brottskatalog. Ändringarna i brottsbalken och de lagar som reglerar hemliga tvångsmedel föreslås träda i kraft den 1 juli 2014 och ändringarna i tryckfrihetsförordningen den 1 januari 2015."@sv ;
     dcterms:identifier "Prop. 2013/14:51" ;
     dcterms:issued "2013-11-21"^^xsd:date ;
@@ -47,8 +47,7 @@
     rpubl:lopnummer "51" ;
     rpubl:utgarFran <https://lagen.nu/dir/2010:35>,
         <https://lagen.nu/dir/2012:3>,
-        <http://localhost:8000/res/utr/sou/2012:95> ;
-    rdfs:seeAlso <http://www.regeringen.se/sb/d/17984/a/228868> ;
+        <https://lagen.nu/utr/sou/2012:95> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/prop/2013/14:51> ;
-    prov:wasGeneratedBy "ferenda.sources.legal.se.propositioner.PropRegeringen" .
+    prov:wasGeneratedBy "lagen.nu.propositioner.PropRegeringen" .
 

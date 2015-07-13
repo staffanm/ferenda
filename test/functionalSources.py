@@ -20,12 +20,11 @@ from lagen.nu import LNMediaWiki as MediaWiki
 from ferenda.sources.tech import RFC, W3Standards, PEP
 from ferenda.sources.legal.eu import EurlexCaselaw, EurlexTreaties
 from ferenda.sources.legal.se import Direktiv, Ds, JK, JO, Kommitte, MyndFskr, Propositioner, Regeringen, Riksdagen, SOU, SwedishLegalSource
-# subrepos, normally used through a container CompositeRepository
-from ferenda.sources.legal.se.propositioner import PropRegeringen
-# from ferenda.sources.legal.se.direktiv import DirTrips, DirRegeringen
 
 from lagen.nu import ARN, DV, SFS
+# subrepos, normally used through a container CompositeRepository
 from lagen.nu.direktiv import DirRegeringen, DirTrips
+from lagen.nu.propositioner import PropRegeringen
 
 for cls in (Keyword, Skeleton, MediaWiki, RFC, W3Standards, PEP,
             EurlexCaselaw, EurlexTreaties, ARN, Direktiv, Ds, DV, JK,
