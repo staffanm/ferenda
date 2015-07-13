@@ -427,21 +427,13 @@ class Regeringen(SwedishLegalSource):
 
     parse_types = []
 
-    def visitor_functions(self):
-        if self.document_type == self.PROPOSITION:
-            # FIXME: translate post_process_proposition to visitor
-            # functions and return them
-            return []
-        else:
-            return []
-    
-    # FIXME: Translate this to  visitor functions
-    def post_process_proposition(self, doc):
-        # do some post processing. First loop through leading
-        # textboxes and try to find dcterms:identifier, dcterms:title and
-        # dcterms:issued (these should already be present in doc.meta,
-        # but the values in the actual document should take
-        # precendence
+    # This could theoretically be written as visitor functions, but since the code
+    # requires access to doc.meta and just iterates over top-level elements of 
+    # doc.body (no recursing) it's easier to just override parse and do our 
+    # postprocessing at the end.
+    @action
+    @managedparsing
+    def parse(self, doc):
 
         def _check_differing(describer, predicate, newval):
             if describer.getvalue(predicate) != newval:
@@ -456,6 +448,11 @@ class Regeringen(SwedishLegalSource):
                                 d.graph.value(d._current(), predicate)))
                 d.value(predicate, newval)
 
+        res = super(Regeringen, self).parse(doc)
+        # loop through leading  textboxes and try to find dcterms:identifier,
+        # dcterms:title and dcterms:issued (these should already be present 
+        # in doc.meta, but the values in the actual document should take
+        # precendence
         d = Describer(doc.meta, doc.uri)
         title_found = identifier_found = issued_found = False
         for idx, element in enumerate(doc.body):
@@ -497,11 +494,15 @@ class Regeringen(SwedishLegalSource):
 
             if title_found and identifier_found and issued_found:
                 break
+        return res
 
-        # then maybe look for the section named Författningskommentar
+
+    # FIXME: Hook this up as a visitor function
+    def visit_find_commentary(self, node, state):
+        # Look for a section named Författningskommentar
         # (or similar), identify each section and which proposed new
         # regulation it refers to)
-        for i, element in enumerate(doc.body):
+        for i, element in enumerate(node):
             if isinstance(element, Section) and (element.title == "Författningskommentar"):
                 for j, subsection in enumerate(element):
                     if hasattr(subsection, 'title'):
