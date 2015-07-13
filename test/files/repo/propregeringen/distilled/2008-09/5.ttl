@@ -1,0 +1,27 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://lagen.nu/prop/2008/09:5#PS1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2008/09:5> ;
+    dcterms:title "Propositionens huvudsakliga innehåll"@sv .
+
+<https://lagen.nu/prop/2008/09:5> a rpubl:Proposition ;
+    dcterms:abstract "Propositionen innehåller förslag om ett bättre genomförande av EG:s byggplatsdirektiv 92/57/EEG, bl.a. mot bakgrund av ett av Europeiska kommissionen initierat, alltjämt pågående överträdelseärende. Förslagen innebär i huvudsak följande. Den som låter utföra byggnads- eller anläggningsarbete (byggherren) ska beakta arbetsmiljösynpunkter under varje skede av planeringen och projekteringen samt utse en lämplig byggarbetsmiljösamordnare dels för planering och projektering, dels för utförande av arbetet. Byggarbetsmiljösamordnarnas uppgifter anges i princip i lagen i enlighet med byggplatsdirektivets systematik, och av lagen framgår också att både samordnarna och byggherren har ett ansvar för att uppgifterna blir utförda. Skyldigheter rörande förhandsanmälan, arbetsmiljöplan och annan dokumentation ska dock alltjämt meddelas genom myndighetsföreskrifter och en lagbestämmelse som redan finns med bemyndigande justeras i enlighet härmed. Byggherrens arbetsmiljöansvar kan dock gå över till en självständig uppdragstagare, i princip en total- eller generalentreprenör, men endast om denne verkligen tar över uppgifter som motsvarar ansvaret. Arbetsmiljöverket kan, om det finns särskilda skäl, flytta ansvaret mellan uppdragstagaren och byggherren. Om byggnads- eller anläggningsarbete utgör gemensamt arbetsställe med annan verksamhet sker en uppdelning av arbetsmiljöansvaret mellan byggarbetsmiljösamordnaren och den som är ansvarig för samordningen av arbetsmiljöfrågorna i den övriga verksamheten. Dessa ansvariga ska samråda och gemensamt verka för att åstadkomma tillfredsställande skyddsförhållanden. De som bedriver verksamhet eller arbetar på ett gemensamt arbetsställe för byggnads- eller anläggningsarbete ska följa anvisningarna från en byggarbetsmiljösamordnare. Förslagen innebär nya regler i framför allt 3 kap. arbetsmiljölagen som strukturerats om i aktuella delar. Det leder till att det också föreslås några ändringar i andra lagar som hänvisar till de reglerna i arbetsmiljölagen. Reglerna föreslås träda i kraft den 1 januari 2009"@sv ;
+    dcterms:identifier "Prop. 2008/09:5" ;
+    dcterms:issued "2008-09-04"^^xsd:date ;
+    dcterms:title "Bättre genomförande av EG:s byggplatsdirektiv"@sv ;
+    rpubl:arsutgava "2008/09" ;
+    rpubl:departement <https://lagen.nu/org/2008/arbetsmarknadsdepartementet> ;
+    rpubl:lopnummer "5" ;
+    rpubl:utgarFran <https://lagen.nu/utr/ds/2008:24>,
+        <https://lagen.nu/utr/sou/2007:43> ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/prop/2008/09:5> ;
+    prov:wasGeneratedBy "lagen.nu.propositioner.PropRegeringen" .
+

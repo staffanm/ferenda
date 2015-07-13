@@ -1,0 +1,26 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://lagen.nu/prop/2012/13:182#PS1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2012/13:182> ;
+    dcterms:title "Propositionens huvudsakliga innehåll"@sv .
+
+<https://lagen.nu/prop/2012/13:182> a rpubl:Proposition ;
+    dcterms:abstract "I propositionen föreslås ändringar i delgivningslagen (2010:1932) som tillsammans med en ny förordningsreglering kommer att skapa en modern och mer effektiv ordning för internationell delgivning. De ärenden om delgivning som i dag hanteras inom Regeringskansliet (Justitiedepartementet) såsom centralmyndighet och mottagande organ för delgivningssamarbetet föreslås flyttas över till Länsstyrelsen i Stockholms län. Vidare föreslås en tydligare reglering kring delgivning i utlandet och vilka förutsättningar som ska gälla vid bistånd med delgivning i Sverige, bl.a. när avvikelse från delgivningslagens regler får ske och vilka översättningskrav som ska gälla för de handlingar som ska delges. Slutligen föreslås ändringar i offentlighets- och sekretesslagen (2009:400) i syfte att tydliggöra att sekretess även gäller vid bistånd med delgivning. Lagändringarna föreslås träda i kraft den 1 januari 2014."@sv ;
+    dcterms:identifier "Prop. 2012/13:182" ;
+    dcterms:issued "2013-06-27"^^xsd:date ;
+    dcterms:title "Internationell delgivning"@sv ;
+    rpubl:arsutgava "2012/13" ;
+    rpubl:departement <https://lagen.nu/org/2008/justitiedepartementet> ;
+    rpubl:lopnummer "182" ;
+    rpubl:utgarFran <https://lagen.nu/utr/ds/2011:46> ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/prop/2012/13:182> ;
+    prov:wasGeneratedBy "lagen.nu.propositioner.PropRegeringen" .
+

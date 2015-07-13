@@ -437,7 +437,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
     def download_test(self, specfile, basefile=None):
         """This test is run for each json file found in docroot/source."""
         # this function can run in normal test mode or in
-        # SET_TESTFILES mode. In the latter, all the normal download
+        # FERENDA_SET_TESTFILE mode. In the latter, all the normal download
         # code, including net access, is run. Calls to requests.get
         # are intercepted and notes are made of which URLs are
         # requested, and if this results in files on disk. The end
@@ -854,6 +854,7 @@ def parametrize_repotester(cls, include_failures=True):
         # Test 1: is rdf distilled correctly?
         rdf_file = "%s/distilled/%s.ttl" % (docroot, pathfrag)
         testname = ("test_distill_" + basetest)
+        # wrapper = None
         wrapper = unittest.expectedFailure if not os.path.exists(rdf_file) else None
         if wrapper is None or include_failures:
             parametrize(
