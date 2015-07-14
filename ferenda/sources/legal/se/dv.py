@@ -674,7 +674,7 @@ class DV(SwedishLegalSource):
             intermediatefile, filetype = WordReader().read(docfile, intermediatefile)
             if filetype == "docx":
                 self._simplify_ooxml(intermediatefile)
-        fp = open(self.store.intermediate_path(basefile))
+        fp = open(intermediatefile)
         fp.filetype = filetype
         return fp
 

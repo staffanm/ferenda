@@ -133,8 +133,8 @@ class Trips(SwedishLegalSource):
                                              'app': self.app,
                                              'base': self.base}
 
-    def canonical_uri(self, basefile):
-        seg = {'dir': 'dir',
-               'prop': 'prop',
-               'sfst': 'sfs'}
-        return self.config.url + "res/%s/%s" % (seg[self.app], basefile)
+    def sanitize_metadata(self, a, basefile):
+        a = super(Trips, self).sanitize_metadata(a, basefile)
+        a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":")
+        return a
+

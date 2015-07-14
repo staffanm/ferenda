@@ -451,7 +451,9 @@ class SwedishLegalSource(DocumentRepository):
             if k in ("dcterms:title", "dcterms:abstract"):
                 attribs[k] = Literal(attribs[k], lang=self.lang)
             elif k in ("dcterms:issued", "rpubl:avgorandedatum"):
-                if re.match("\d{4}-\d{2}-\d{2}", attribs[k]):
+                if isinstance(attribs[k], date):
+                    pass
+                elif re.match("\d{4}-\d{2}-\d{2}", attribs[k]):
                     # iso8859-1 date (no time portion)
                     dt= datetime.strptime(attribs[k], "%Y-%m-%d")
                     attribs[k] = Literal(date(dt.year, dt.month, dt.day))
@@ -461,9 +463,10 @@ class SwedishLegalSource(DocumentRepository):
 
         resource = self.attributes_to_resource(attribs)
         uri = URIRef(self.minter.space.coin_uri(resource))
-        # now that we know the document URI (didn't we already know
-        # it?), we should somehow replace resource.identifier (a
-        # BNODE) with uri (a URIRef) in the whole graph.
+        # now that we know the document URI (didn't we already know it
+        # from canonical_uri?), we should somehow replace
+        # resource.identifier (a BNODE) with uri (a URIRef) in the
+        # whole graph.
         for (p, o) in list(resource.graph.predicate_objects(resource.identifier)):
             resource.graph.remove((resource.identifier, p, o))
             resource.graph.add((uri, p, o))

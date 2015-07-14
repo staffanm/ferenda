@@ -15,7 +15,8 @@ from rdflib import Literal
 import requests
 from six import text_type as str
 
-from . import SwedishLegalSource, SwedishLegalStore, Trips, Regeringen, RPUBL
+from . import SwedishLegalSource, SwedishLegalStore, SwedishCitationParser, Trips, Regeringen, RPUBL
+from .legalref import LegalRef
 from ferenda import Describer
 from ferenda import PDFDocumentRepository
 from ferenda import CompositeRepository, CompositeStore
@@ -23,9 +24,7 @@ from ferenda import TextReader
 from ferenda import util
 from ferenda import PDFAnalyzer
 from ferenda.decorators import managedparsing, downloadmax, recordlastdownload
-from ferenda.elements import Paragraph
-from ferenda.elements import Heading
-from ferenda.elements import ListItem
+from ferenda.elements import Body, Heading, ListItem, Paragraph
 from ferenda.errors import DocumentRemovedError
 
 
@@ -86,27 +85,36 @@ class DirTrips(Trips):
                     datetime.strftime(datetime.now(), "%Y-%m-%d"))
             super(DirTrips, self).download()
 
-    @managedparsing
-    def parse(self, doc):
+
+    def downloaded_to_intermediate(self, basefile):
+        downloaded_path = self.store.downloaded_path(basefile)
         # FIXME: need some way of telling intermediate_path that
         # suffix should be .txt (preferably w/o overriding
         # DocumentStore)
-        intermediate_path = self.store.path(doc.basefile, 'intermediate', '.txt')
-        downloaded_path = self.store.downloaded_path(doc.basefile)
+        intermediate_path = self.store.path(basefile, 'intermediate', '.txt')
         if not util.outfile_is_newer([downloaded_path], intermediate_path):
             html = codecs.open(downloaded_path, encoding="iso-8859-1").read()
             util.writefile(intermediate_path, util.extract_text(
                 html, '<pre>', '</pre>'), encoding="utf-8")
-        reader = TextReader(intermediate_path, encoding="utf-8")
-        header_chunk = reader.readparagraph()
-        self.make_meta(header_chunk, doc.meta, doc.uri, doc.basefile)
-        self.make_body(reader, doc.body)
+        return codecs.open(intermediate_path, encoding="utf-8")
+        
 
-        # Iterate through body tree and find things to link to (See
-        # EurlexTreaties.process_body for inspiration)
-        self.process_body(doc.body, '', doc.uri)
-        return doc
+    def extract_head(self, file, basefile):
+        reader = TextReader(string=file.read(), encoding="utf-8")
+        file.close()
+        self._reader = reader
+        return reader.readparagraph()
 
+    
+#        header_chunk = reader.readparagraph()
+#        self.make_meta(header_chunk, doc.meta, doc.uri, doc.basefile)
+#        self.make_body(reader, doc.body)
+#
+#        # Iterate through body tree and find things to link to (See
+#        # EurlexTreaties.process_body for inspiration)
+#        self.process_body(doc.body, '', doc.uri)
+#        return doc
+#
     def header_lines(self, header_chunk):
         n = util.normalize_space
         # This is a ridiculously complicated way of extracting
@@ -139,24 +147,13 @@ class DirTrips(Trips):
                     cv = ""
         yield(n(ck), n(cv))
 
-    def make_meta(self, chunk, meta, uri, basefile):
-        d = Describer(meta, uri)
-        dcterms = self.ns['dcterms']
-        prov = self.ns['prov']
-        owl = self.ns['owl']
-        rpubl = RPUBL
-
-        d.rdftype(self.rdf_type)
-        d.value(prov.wasGeneratedBy, self.qualified_class_name())
-
-        # predicates maps key strings to corresponsing RDFLib terms,
-        # e.g. "Rubrik" -> dcterms:title
-        predicates = {'Dir nr': dcterms.identifier,
-                      'Departement': rpubl.departement,
+    def extract_metadata(self, rawheader, basefile):  # -> dict
+        predicates = {'Dir nr': "dcterms:identifier",
+                      'Departement': "rpubl:departement",
                       'Beslut vid regeringssammanträde':
-                      rpubl.beslutsdatum,
-                      'Rubrik': dcterms.title,
-                      'Senast ändrad': dcterms.changed
+                      "rpubl:beslutsdatum",
+                      'Rubrik': "dcterms:title",
+                      'Senast ändrad': "dcterms:changed"
                       }
         # munger contains a set of tuples where the first item is a
         # method for converting a plain text into the appropriate
@@ -167,29 +164,28 @@ class DirTrips(Trips):
         # The second item is the Describer method that
         # should be used to add the value to the graph, i.e. .value
         # for Literals and .rel for URIRefs
-        munger = {'Dir nr': (self.sanitize_identifier, d.value),  # the RDFLib constructor
-                  'Departement': (functools.partial(self.lookup_resource, warn=False), d.rel),
-                  'Beslut vid regeringssammanträde': (self.parse_iso_date, d.value),
-                  'Rubrik': (self.sanitize_rubrik, d.value),
-                  'Senast ändrad': (self.parse_iso_date, d.value)
+        d = {}
+        munger = {'Dir nr': self.sanitize_identifier,
+                  'Departement': functools.partial(self.lookup_resource, warn=False),
+                  'Beslut vid regeringssammanträde': self.parse_iso_date,
+                  'Rubrik': self.sanitize_rubrik,
+                  'Senast ändrad': self.parse_iso_date
                   }
-        for (key, val) in self.header_lines(chunk):
+        for (key, val) in self.header_lines(rawheader):
             try:
                 pred = predicates[key]
-                (transformer, setter) = munger[key]
-                setter(pred, transformer(val))
+                transformer = munger[key]
+                d[pred] = transformer(val)
             except (KeyError, ValueError):
                 self.log.error(
                     "Couldn't munge value '%s' into a proper object for predicate '%s'" % (val, key))
-
-        d.rel(dcterms.publisher, self.lookup_resource("Regeringskansliet"))
-        d.rel(owl.sameAs, self.sameas_uri(uri))
-        self.infer_triples(d, basefile)
+        d["dcterms:publisher"] = self.lookup_resource("Regeringskansliet")
         # finally, we need a dcterms:issued, and the best we can come up
         # with is the "Beslut vid regeringssammanträde" date
         # (rpubl:beslutsdatum), so we copy it.
-        d.value(dcterms.issued, d.getvalue(rpubl.beslutsdatum))
-
+        d["dcterms:issued"] = d["rpubl:beslutsdatum"]
+        return d
+        
     def sanitize_rubrik(self, rubrik):
         if rubrik == "Utgår":
             raise DocumentRemovedError()
@@ -205,8 +201,11 @@ class DirTrips(Trips):
             identifier = "Dir. " + identifier
         return Literal(identifier)
 
-    def make_body(self, reader, body):
+    def parse_body(self, fp, basefile):
         current_type = None
+        fp.close()
+        reader = self._reader
+        body = Body()
         for p in reader.getiterator(reader.readparagraph):
             new_type = self.guess_type(p, current_type)
             # if not new_type == None:
@@ -224,6 +223,15 @@ class DirTrips(Trips):
                     new_type = Paragraph
                 body.append(new_type([p]))
                 current_type = new_type
+
+        # LegalRef needs to be a little smarter and not parse refs
+        # like "dir. 2004:55" and "(N2004:13)" as SFS references
+        # before we enable it.
+#         parser = SwedishCitationParser(LegalRef(*self.parse_types),
+#                                        self.minter,
+#                                        self.commondata)
+#        body = parser.parse_recursive(body)
+        return body
 
     def guess_type(self, p, current_type):
         if not p:  # empty string
