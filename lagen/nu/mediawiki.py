@@ -9,11 +9,14 @@ import os
 
 # 3rdparty
 from lxml import etree
+from rdflib import Graph, Namespace, RDF
+
 
 # mine
 from ferenda import DocumentStore
 from ferenda.sources.legal.se import SwedishLegalSource, SwedishCitationParser, SFS
 from ferenda.sources.general import wiki
+from ferenda.thirdparty.coin import URIMinter
 from . import LNKeyword
 
 class LNMediaWikiStore(wiki.MediaWikiStore):
@@ -50,6 +53,29 @@ class LNMediaWiki(wiki.MediaWiki):
         else:
             self.sfsrepo = SFS()
 
+    # Taken from ferenda.sources.legal.se.SwedishLegalSource which
+    # this repo does not derive from
+    @property
+    def minter(self):
+        if not hasattr(self, '_minter'):
+            # print("%s (%s) loading minter" % (self.alias, id(self)))
+            filename = self.resourceloader.filename
+            spacefile = filename("uri/swedishlegalsource.space.ttl")
+            slugsfile = filename("uri/swedishlegalsource.slugs.ttl")
+            self.log.debug("Loading URISpace from %s" % spacefile)
+            # print("Loading URISpace from %s" % spacefile)
+            # print("Loading Slugs from %s" % slugsfile)
+            cfg = Graph().parse(spacefile,
+                                format="turtle").parse(slugsfile,
+                                                       format="turtle")
+            COIN = Namespace("http://purl.org/court/def/2009/coin#")
+            # select correct URI for the URISpace definition by
+            # finding a single coin:URISpace object
+            spaceuri = cfg.value(predicate=RDF.type, object=COIN.URISpace)
+            self._minter = URIMinter(cfg, spaceuri)
+            # print("Minter is %s" % id(self._minter))
+        return self._minter
+
     def get_wikisettings(self):
         settings = LNSettings(lang=self.lang)
         # NOTE: The settings object (the make_url method) only needs
@@ -84,7 +110,8 @@ class LNMediaWiki(wiki.MediaWiki):
             allow_relative = False
         body = super(LNMediaWiki, self).postprocess(doc, xhtmltree,
                                                      toplevel_property=toplevel_property)
-        citparser = SwedishCitationParser(self.p, self.config.url,
+        citparser = SwedishCitationParser(self.p, self.minter,
+                                          self.commondata,
                                           allow_relative=allow_relative)
         citparser.parse_recursive(body, predicate=None)
         return body

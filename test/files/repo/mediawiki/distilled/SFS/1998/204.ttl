@@ -36,7 +36,7 @@
     """^^rdf:XMLLiteral ;
     dcterms:subject <https://lagen.nu/concept/Lagar_inom_IT-rätt> ;
     dcterms:title "SFS/1998:204"@sv ;
-    prov:wasGeneratedBy "ferenda.sources.legal.se.lnwiki.LNMediaWiki" .
+    prov:wasGeneratedBy "lagen.nu.mediawiki.LNMediaWiki" .
 
 <http://localhost:8000/res/sfs/1998:204#P1> dcterms:description """
       <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">

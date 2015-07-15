@@ -214,7 +214,7 @@ class LegalRef:
                 self.namedlaws.update(self.get_relations(RDFS.label,
                                                          self.metadata_graph))
 
-        if self.KORTLAGRUM in self.args and not self.lawlist:
+        if self.KORTLAGRUM in self.args and not self.lawlist and "LawAbbreviation ::= " not in self.decl:
             d = self.get_relations(DCTERMS.alternate, self.metadata_graph)
             self.namedlaws.update(d)
             self.lawlist = list(d.keys())

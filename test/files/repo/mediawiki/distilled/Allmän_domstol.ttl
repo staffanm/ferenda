@@ -16,5 +16,5 @@
   """^^rdf:XMLLiteral ;
     dcterms:subject <https://lagen.nu/concept/Processrätt> ;
     dcterms:title "Allmän domstol"@sv ;
-    prov:wasGeneratedBy "ferenda.sources.legal.se.lnwiki.LNMediaWiki" .
+    prov:wasGeneratedBy "lagen.nu.mediawiki.LNMediaWiki" .
 

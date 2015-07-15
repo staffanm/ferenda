@@ -18,5 +18,5 @@
   """^^rdf:XMLLiteral ;
     dcterms:subject <https://lagen.nu/concept/Tryckfrihetsrätt> ;
     dcterms:title "Anskaffarfrihet"@sv ;
-    prov:wasGeneratedBy "ferenda.sources.legal.se.lnwiki.LNMediaWiki" .
+    prov:wasGeneratedBy "lagen.nu.mediawiki.LNMediaWiki" .
 
