@@ -873,8 +873,11 @@ class SFS(Trips):
             plaintext = self.extract_sfst(sfst_file)
             plaintextfile = self.store.intermediate_path(doc.basefile)
             util.writefile(plaintextfile, plaintext, encoding="iso-8859-1")
-            (plaintext, patchdesc) = self.patch_if_needed(doc.basefile,
-                                                          plaintext)
+            with codecs.open(plaintextfile, encoding="iso-8859-1") as fp:
+                # FIXME: Where do we get patchdesc from this new API?
+                # (plaintext, patchdesc) = self.patch_if_needed(fp, doc.basefile)
+                plaintext = self.patch_if_needed(fp, doc.basefile).read()
+                patchdesc = None
             if patchdesc:
                 desc.value(self.ns['rinfoex'].patchdescription,
                            patchdesc)
