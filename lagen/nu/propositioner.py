@@ -8,3 +8,5 @@ from . import SameAs
 class PropRegeringen(OrigPropRegeringen, SameAs):
     pass
 
+class Propositioner(OrigPropositioner):
+    extrabases = (SameAs,)

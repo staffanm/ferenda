@@ -387,6 +387,9 @@ class Regeringen(SwedishLegalSource):
         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":")
 
         # FIXME: possibly derive utrSerie from self.document_type?
+        if self.rdf_type == RPUBL.Utredningsbetankande:
+            altlabel = "SOU" if self.document_type == Regeringen.SOU else "Ds"
+            a["rpubl:utrSerie"] = self.lookup_resource(altlabel, SKOS.altLabel)
         return a
 
     # FIXME: This is hackish -- need to rethink which parts of the

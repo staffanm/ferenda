@@ -3,8 +3,9 @@ from __future__ import unicode_literals
 
 import re
 
-from ferenda import PDFAnalyzer
+from rdflib.namespace import SKOS
 
+from ferenda import PDFAnalyzer
 from . import Regeringen, RPUBL
 
 
@@ -44,3 +45,12 @@ class SOU(Regeringen):
     rdf_type = RPUBL.Utredningsbetankande
     document_type = Regeringen.SOU
     sparql_annotations = None  # don't even bother creating an annotation file
+
+    def canonical_uri(self, basefile):
+        year, ordinal = basefile.split(":")
+        attrib = {'rpubl:arsutgava': year,
+                  'rpubl:lopnummer': ordinal,
+                  'rpubl:utrSerie': self.lookup_resource("SOU", SKOS.altLabel),
+                  'rdf:type': self.rdf_type}
+        resource = self.attributes_to_resource(attrib)
+        return self.minter.space.coin_uri(resource) 

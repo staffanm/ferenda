@@ -8,50 +8,49 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://localhost:8000/res/utr/sou/2013:75#PS1> a bibo:DocumentPart ;
-    dcterms:isPartOf <http://localhost:8000/res/utr/sou/2013:75> ;
+<https://lagen.nu/utr/sou/2013:75#PS1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/utr/sou/2013:75> ;
     dcterms:title "Till statsrådet Anna-Karin Hatt"@sv .
 
-<http://localhost:8000/res/utr/sou/2013:75#PS2> a bibo:DocumentPart ;
-    dcterms:isPartOf <http://localhost:8000/res/utr/sou/2013:75> ;
+<https://lagen.nu/utr/sou/2013:75#PS2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/utr/sou/2013:75> ;
     dcterms:title "Innehåll"@sv .
 
-<http://localhost:8000/res/utr/sou/2013:75#PS3> a bibo:DocumentPart ;
-    dcterms:isPartOf <http://localhost:8000/res/utr/sou/2013:75> ;
+<https://lagen.nu/utr/sou/2013:75#PS3> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/utr/sou/2013:75> ;
     dcterms:title "Sammanfattning"@sv .
 
-<http://localhost:8000/res/utr/sou/2013:75#S1> a bibo:DocumentPart ;
-    dcterms:isPartOf <http://localhost:8000/res/utr/sou/2013:75> ;
+<https://lagen.nu/utr/sou/2013:75#S1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/utr/sou/2013:75> ;
     dcterms:title "Uppdraget"@sv ;
     bibo:chapter "1"@sv .
 
-<http://localhost:8000/res/utr/sou/2013:75#S2.1.1> a bibo:DocumentPart ;
-    dcterms:isPartOf <http://localhost:8000/res/utr/sou/2013:75#S2.1> ;
+<https://lagen.nu/utr/sou/2013:75#S2.1.1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/utr/sou/2013:75#S2.1> ;
     dcterms:title "E-förvaltning – en definition"@sv ;
     bibo:chapter "2.1.1"@sv .
 
-<http://localhost:8000/res/utr/sou/2013:75#S2> a bibo:DocumentPart ;
-    dcterms:isPartOf <http://localhost:8000/res/utr/sou/2013:75> ;
+<https://lagen.nu/utr/sou/2013:75#S2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/utr/sou/2013:75> ;
     dcterms:title "Bakgrund och nuläge"@sv ;
     bibo:chapter "2"@sv .
 
-<http://localhost:8000/res/utr/sou/2013:75#S2.1> a bibo:DocumentPart ;
-    dcterms:isPartOf <http://localhost:8000/res/utr/sou/2013:75#S2> ;
+<https://lagen.nu/utr/sou/2013:75#S2.1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/utr/sou/2013:75#S2> ;
     dcterms:title "Regeringens målbild för e-förvaltningen"@sv ;
     bibo:chapter "2.1"@sv .
 
-<http://localhost:8000/res/utr/sou/2013:75> a rpubl:Utredningsbetankande ;
-    dcterms:abstract "E-delegationen har under fyra års tid arbetat för att stärka utvecklingen av e-förvaltning. Detta betänkande ger förslag på hur framtidens e-förvaltning kan organiseras och föras vidare i ett längre perspektiv."@sv ;
+<https://lagen.nu/utr/sou/2013:75> a rpubl:Utredningsbetankande ;
+    dcterms:abstract "E-delegationen har under fyra års tid arbetat för att stärka utvecklingen av e-förvaltning. Detta betänkande ger förslag på hur framtidens e-förvaltning kan organiseras och föras vidare i ett längre perspektiv. Regeringens mål för e-förvaltningen är att det ska vara så enkelt som möjligt för så många som möjligt att utöva sina rättigheter och fullgöra sina skyldigheter samt ta del av förvaltningens service. Inriktningen är en förvaltning där tjänster byggs upp utifrån ett livshändelseperspektiv med medborgaren i fokus. E-delegationen konstaterar att en kritisk framgångsfaktor för att åstadkomma denna inriktning är en ökad förvaltningsövergripande digital samverkan mellan statlig och kommunal sektor. E-delegationen bedömer att den svenska förvaltningsmodellen med relativt självständiga myndigheter och kommunalt självstyre är så fast etablerad att inte ens e-förvaltningen kan frigöra sig från den. Erfarenheter visar att det istället är viktigt att hitta former för en funktion som bygger på samarbete, medinflytande och koordinering snarare än styrning. Därför föreslår E-delegationen att samordningen av de gemensamma e-förvaltningsfrågorna förs in i en medlemsorganisation liknande en kollegiemodell, till exempel på det sätt Arbetsgivarverket idag är uppbyggt. För att stärka samverkan med den statliga och kommunala sektorn bör den nya organisationen upprätta ett särskilt samarbetsorgan med kommunal sektor. E-delegationen föreslår att en utredare utses för att a) utforma regler och andra beslut som krävs, b) föreslå former för samordningen inom hela offentlig sektor, c) lämna förslag på de uppgifter som ska tillföras funktionen. Vidare föreslås, för att undvika avbrott, att E-delegationens mandat fortsätter till dess en ny organisation kan överta den verksamhet som beslutas."@sv ;
     dcterms:identifier "SOU 2013:75" ;
     dcterms:issued "2013-10-17"^^xsd:date ;
     dcterms:title "Organisering av framtidens e-förvaltning"@sv ;
     rpubl:arsutgava "2013" ;
     rpubl:departement <https://lagen.nu/org/2008/naringsdepartementet> ;
     rpubl:lopnummer "75" ;
-    rpubl:utgarFran <http://localhost:8000/res/dir/2009:19>,
-        <http://localhost:8000/res/dir/2010:32>,
-        <http://localhost:8000/res/dir/2013:40> ;
-    rpubl:utrSerie <http://localhost:8000/dataset/sou> ;
+    rpubl:utgarFran <https://lagen.nu/dir/2013:40>,
+        <https://lagen.nu/dir/2014:131> ;
+    rpubl:utrSerie <https://lagen.nu/dataset/sou> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/utr/sou/2013:75> ;
-    prov:wasGeneratedBy "ferenda.sources.legal.se.sou.SOU" .
+    prov:wasGeneratedBy "lagen.nu.sou.SOU" .
 

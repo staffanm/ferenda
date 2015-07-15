@@ -8,3 +8,6 @@ from .myndfskr import CompositeMyndFskr as MyndFskr
 from .forarbeten import Forarbeten
 from .myndprax import MyndPrax
 from .direktiv import Direktiv
+from .sou import SOU
+from .ds import Ds
+from .propositioner import Propositioner
