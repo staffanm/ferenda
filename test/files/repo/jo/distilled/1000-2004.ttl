@@ -6,11 +6,11 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://localhost:8000/res/jo/1000/2004> a rpubl:VagledandeMyndighetsavgorande ;
-    dcterms:identifier "JO dnr 1000/2004" ;
+<https://lagen.nu/avg/jo/1000-2004> a rpubl:VagledandeMyndighetsavgorande ;
+    dcterms:identifier "JO dnr 1000-2004" ;
     dcterms:issued "2004-11-17"^^xsd:date ;
     dcterms:title "Ett ärende om en socialförsäkringsnämndsledamots agerande efter ett sammanträde"@sv ;
     rpubl:avgorandedatum "2004-11-17"^^xsd:date ;
     rpubl:diarienummer "1000-2004" ;
-    prov:wasGeneratedBy "ferenda.sources.legal.se.jo.JO" .
+    prov:wasGeneratedBy "lagen.nu.jo.JO" .
 

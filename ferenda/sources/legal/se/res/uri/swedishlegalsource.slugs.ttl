@@ -1,4 +1,4 @@
-# Automatically concatenated from sources at 2015-07-08T07:40:19.729333
+# Automatically concatenated from sources at 2015-07-16T17:01:41.255559
 
 @prefix : <http://rinfo.lagrummet.se/sys/uri/space#> .
 @prefix coin: <http://purl.org/court/def/2009/coin#> .
@@ -61,6 +61,8 @@ rpubl:Skrivelse :abbrSlug "skr" .
 <http://rinfo.lagrummet.se/org/raettshjaelpsnaemnden> :abbrSlug "rhn" .
 
 <http://rinfo.lagrummet.se/org/regeringsraetten> :abbrSlug "regr" .
+
+<http://rinfo.lagrummet.se/org/riksdagens_ombudsmaen> :abbrSlug "jo" .
 
 <http://rinfo.lagrummet.se/org/statens_ansvarsnaemnd> :abbrSlug "san" .
 

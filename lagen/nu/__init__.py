@@ -11,3 +11,4 @@ from .direktiv import Direktiv
 from .sou import SOU
 from .ds import Ds
 from .propositioner import Propositioner
+from .jo import JO

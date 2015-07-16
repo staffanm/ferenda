@@ -11,6 +11,7 @@ import lxml.html
 import requests
 from six import text_type as str
 from rdflib import Literal
+from rdflib.namespace import SKOS
 from bs4 import BeautifulSoup
 
 # My own stuff
@@ -36,15 +37,16 @@ class Meta(CompoundElement):
 
 
 class JOStore(DocumentStore):
+    pass
 
-    def basefile_to_pathfrag(self, basefile):
-        # 2371-2014 -> 2014/2371
-        return "/".join(basefile.split("-")[::-1])
-
-    def pathfrag_to_basefile(self, pathfrag):
-        # 2014/2371 -> 2371-2014
-        return "-".join(pathfrag.split("/")[::-1])
-
+#    def basefile_to_pathfrag(self, basefile):
+#        # 2371-2014 -> 2014/2371
+#        return "/".join(basefile.split("-")[::-1])
+#
+#    def pathfrag_to_basefile(self, pathfrag):
+#        # 2014/2371 -> 2371-2014
+#        return "-".join(pathfrag.split("/")[::-1])
+#
 
 class JO(SwedishLegalSource, PDFDocumentRepository):
 
@@ -60,10 +62,21 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
     headnote_url_template = "http://www.jo.se/sv/JO-beslut/Soka-JO-beslut/?query=%(basefile)s&pn=1"
 
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
-
     storage_policy = "dir"
     documentstore_class = JOStore
     downloaded_suffix = ".pdf"  # might need to change
+
+    def canonical_uri(self, basefile):
+        # possibly break out the attrib-generating code to a separate
+        # func since that's the one that'll be overridden. In
+        # particular, rpubl:forfattningssamling or similar needs to be
+        # added by many repos
+        attrib = {'rpubl:diarienummer': basefile,
+                  'dcterms:publisher': self.lookup_resource("JO", SKOS.altLabel),
+                  'rdf:type': self.rdf_type}
+        resource = self.attributes_to_resource(attrib)
+        return self.minter.space.coin_uri(resource) 
+
 
     @decorators.action
     @decorators.recordlastdownload

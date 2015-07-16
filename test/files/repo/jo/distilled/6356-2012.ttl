@@ -7,21 +7,21 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<http://localhost:8000/res/jo/6356/2012> a rpubl:VagledandeMyndighetsavgorande ;
-    dcterms:identifier "JO dnr 6356/2012" ;
+<https://lagen.nu/avg/jo/6356-2012> a rpubl:VagledandeMyndighetsavgorande ;
+    dcterms:identifier "JO dnr 6356-2012" ;
     dcterms:issued "2014-03-28"^^xsd:date ;
     dcterms:title "Kritik mot ordföranden i Utbildningsstyrelsen i Värmdö kommun för att han ensam beslutat om ett förbud för åhörare att göra inspelningar med ljud och bild under ett styrelsesammanträde som var öppet för allmänheten"@sv ;
     rpubl:avgorandedatum "2014-03-28"^^xsd:date ;
     rpubl:diarienummer "6356-2012",
         "6488-2012" ;
-    prov:wasGeneratedBy "ferenda.sources.legal.se.jo.JO" .
+    prov:wasGeneratedBy "lagen.nu.jo.JO" .
 
-<http://localhost:8000/res/jo/6356/2012#US1> a bibo:DocumentPart ;
+<https://lagen.nu/avg/jo/6356-2012#US1> a bibo:DocumentPart ;
     dcterms:title "Bakgrund och anmälningar till JO"@sv .
 
-<http://localhost:8000/res/jo/6356/2012#US2> a bibo:DocumentPart ;
+<https://lagen.nu/avg/jo/6356-2012#US2> a bibo:DocumentPart ;
     dcterms:title "Utredning"@sv .
 
-<http://localhost:8000/res/jo/6356/2012#US3> a bibo:DocumentPart ;
+<https://lagen.nu/avg/jo/6356-2012#US3> a bibo:DocumentPart ;
     dcterms:title "Bedömning"@sv .
 

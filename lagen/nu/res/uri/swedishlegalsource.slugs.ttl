@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2015-07-09T23:09:10.304518
+# Automatically transformed from sources at 2015-07-16T17:01:43.589724
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -294,6 +294,8 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 <https://lagen.nu/org/2014/allmanna_reklamationsnamnden> space:abbrSlug "arn" .
 
 <https://lagen.nu/org/2014/justitiekanslern> space:abbrSlug "jk" .
+
+<https://lagen.nu/org/2014/riksdagens_ombudsman> space:abbrSlug "jo" .
 
 <https://lagen.nu/org/2014/statens_ansvarsnamnd> space:abbrSlug "san" .
 
