@@ -459,6 +459,11 @@ class Regeringen(SwedishLegalSource):
 
         body = super(Regeringen, self).parse_body(fp, basefile)
 
+        # the following postprocessing code is so far only written for
+        # Propositioner
+        if self.rdf_type != RPUBL.Proposition:
+            return body
+
         # loop through leading  textboxes and try to find dcterms:identifier,
         # dcterms:title and dcterms:issued (these should already be present
         # in doc.meta, but the values in the actual document should take

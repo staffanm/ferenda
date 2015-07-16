@@ -14,10 +14,11 @@ from rdflib import Graph, Namespace, RDF
 
 # mine
 from ferenda import DocumentStore
-from ferenda.sources.legal.se import SwedishLegalSource, SwedishCitationParser, SFS
+from ferenda.sources.legal.se import SwedishLegalSource, SwedishCitationParser
+from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda.sources.general import wiki
 from ferenda.thirdparty.coin import URIMinter
-from . import LNKeyword
+from . import LNKeyword 
 
 class LNMediaWikiStore(wiki.MediaWikiStore):
 
@@ -41,13 +42,30 @@ class LNMediaWiki(wiki.MediaWiki):
     from ferenda.sources.legal.se.legalref import LegalRef
     keyword_class = LNKeyword
 
-    p = LegalRef(LegalRef.LAGRUM, LegalRef.KORTLAGRUM,
-                 LegalRef.FORARBETEN, LegalRef.RATTSFALL)
+
+
+    @property
+    def parser(self):
+        if not hasattr(self, '_parser'):
+            p = LegalRef(LegalRef.LAGRUM, LegalRef.KORTLAGRUM,
+                         LegalRef.FORARBETEN, LegalRef.RATTSFALL)
+            # self.commondata need to include extra/sfs.ttl
+            # somehow. This is probably not the best way.
+            self.commondata  # make sure it's loaded
+            with self.resourceloader.open("extra/sfs.ttl") as fp:
+                self._commondata.parse(data=fp.read(), format="turtle")
+            self._parser = SwedishCitationParser(p,
+                                                 self.minter,
+                                                 self.commondata,
+                                                 allow_relative=True)
+        return self._parser
+
     lang = "sv"
     # alias = "lnwiki"
     
     def __init__(self, config=None, **kwargs):
         super(LNMediaWiki, self).__init__(config, **kwargs)
+        from . import SFS
         if self.config._parent and hasattr(self.config._parent, "sfs"):
             self.sfsrepo = SFS(self.config._parent.sfs)
         else:
@@ -110,10 +128,7 @@ class LNMediaWiki(wiki.MediaWiki):
             allow_relative = False
         body = super(LNMediaWiki, self).postprocess(doc, xhtmltree,
                                                      toplevel_property=toplevel_property)
-        citparser = SwedishCitationParser(self.p, self.minter,
-                                          self.commondata,
-                                          allow_relative=allow_relative)
-        citparser.parse_recursive(body, predicate=None)
+        self.parser.parse_recursive(body, predicate=None)
         return body
 
     def postprocess_commentary(self, doc, xhtmltree):
@@ -127,6 +142,7 @@ class LNMediaWiki(wiki.MediaWiki):
         currdiv.set("property", "dcterms:description")
         currdiv.set("datatype", "rdf:XMLLiteral")
         containerdiv = etree.SubElement(currdiv, "div")
+
         for child in body.getchildren():
             if child.tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
                 # remove that <span> element that Semantics._h_el adds for us
@@ -138,7 +154,8 @@ class LNMediaWiki(wiki.MediaWiki):
                         txt = child.text.decode("utf-8")
                     else:
                         txt = child.text
-                    nodes = self.p.parse(txt, curruri)
+                    self.parser._currenturl = curruri
+                    nodes = self.parser.parse_string(txt, None)
                     curruri = nodes[0].uri
                 # body.remove(child)
                 newbody.append(child) 
