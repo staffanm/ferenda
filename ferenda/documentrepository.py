@@ -4,7 +4,7 @@ from __future__ import unicode_literals, print_function
 from collections import defaultdict
 from datetime import datetime
 from ferenda.compat import OrderedDict
-from io import BytesIO, StringIO
+from io import BytesIO
 from itertools import chain
 from operator import itemgetter
 from tempfile import mkstemp
@@ -52,7 +52,7 @@ from ferenda import (Describer, TripleStore, FulltextIndex, Document,
 from ferenda.elements import (Body, Link,
                               UnorderedList, ListItem, Paragraph)
 from ferenda.elements.html import elements_from_soup
-from ferenda.thirdparty import patch, httpheader
+from ferenda.thirdparty import httpheader
 # establish two central RDF Namespaces at the top level
 DCTERMS = Namespace(util.ns['dcterms'])
 PROV = Namespace(util.ns['prov'])
@@ -60,7 +60,8 @@ PROV = Namespace(util.ns['prov'])
 
 class DocumentRepository(object):
 
-    """Base class for downloading, parsing and generating HTML versions of a repository of documents.
+    """Base class for downloading, parsing and generating HTML versions of
+    a repository of documents.
 
     Start building your application by subclassing this class, and
     then override methods in order to customize the downloading,

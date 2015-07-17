@@ -60,23 +60,32 @@ class FontmappingPDFReader(PDFReader):
 
 
 class Regeringen(SwedishLegalSource):
-    DS = 1
-    KOMMITTEDIREKTIV = 2
-    LAGRADSREMISS = 3
-    PRESSMEDDELANDE = 4
-    PROMEMORIA = 5
-    PROPOSITION = 6
-    MINISTERRADSMOTE = 7
-    SKRIVELSE = 8
-    SOU = 9
-    SO = 10
-    WEBBUTSANDNING = 11
-    OVRIGA = 12
-
+#    DS = 1
+#    KOMMITTEDIREKTIV = 2
+#    LAGRADSREMISS = 3
+#    PRESSMEDDELANDE = 4
+#    PROMEMORIA = 5
+#    PROPOSITION = 6
+#    MINISTERRADSMOTE = 7
+#    SKRIVELSE = 8
+#    SOU = 9
+#    SO = 10
+#    WEBBUTSANDNING = 11
+#    OVRIGA = 12
+    RAPPORT = 1341
+    DS = 1325
+    FORORDNINGSMOTIV = 1326
+    KOMMITTEDIREKTIV = 1327
+    LAGRADSREMISS = 2085
+    PROPOSITION = 1329
+    SKRIVELSE = 1330
+    SOU = 1331
+    SO = 1332
+    
     document_type = None  # subclasses must override
-    start_url = "http://www.regeringen.se/sb/d/107/a/136"
+    start_url = "http://www.regeringen.se/Filter/GetFilteredItems"
+    start_url = "http://www.regeringen.se/Filter/RssFeed"
     downloaded_suffix = ".html"  # override PDFDocumentRepository
-    source_encoding = "latin-1"
     storage_policy = "dir"
     alias = "regeringen"
     xslt_template = "res/xsl/forarbete.xsl"
@@ -85,127 +94,65 @@ class Regeringen(SwedishLegalSource):
 
     @recordlastdownload
     def download(self, basefile=None):
-        if basefile:
-            return self.download_single(basefile)
-
-        self.session = requests.session()
-        resp = self.session.get(self.start_url)
-        searchpage = lxml.html.fromstring(resp.content)
-        searchpage.make_links_absolute(self.start_url)
-        # try to find the form we want -- might just as well use
-        # .forms[1]
-        for form in searchpage.forms:
-            if form.get('id') == "advancedSearch":
-                break
-        today = datetime.today()
-
+        params = {'filterType': 'Taxonomy',
+                  'filterByType': 'FilterablePageBase',
+                  'preFilteredCategories': '1324',
+                  'rootPageReference': '0',
+                  'pageSize': '1000', # FIXME: max value supported --
+                                      # but we need more -- use
+                                      # fromDate or maybe page?
+                  'filteredContentCategories': self.document_type
+                  }
+        # params = {'filterType': 'Taxonomy',
+        #           'filterByType': 'FilterablePageBase',
+        #           'preFilteredCategories': '1324'
+        #           'rootPageReference': '0',
+        #           'page': '1',
+        #           'pageSize': '10',
+        #           'displayLimited': 'true',
+        #           'sortAlphabetically': 'False',
+        #           'filteredContentCategories': self.document_type
+        # }
         if 'lastdownload' in self.config and not self.config.refresh:
-            last = self.config.lastdownload - timedelta(days=1)
-            self.log.debug("Only downloading documents published on or after %s"
-                           % last)
-            form.fields['dateRange'] = '4'  # specify date interval
-            form.fields['dateRangeFromDay'] = str(last.day)
-            form.fields['dateRangeFromMonth'] = str(last.month)
-            # the dateRange{From,To}Year is a select list where the
-            # year 2000 is value 1, 2001 is 2 and so on (ie a offset
-            # of 1999). Therefore we subtract the offset from our
-            # initial starting year to arrive at the proper value
-            form.fields['dateRangeFromYear'] = str(last.year - 1999)
-        form.fields['docTypes'] = [str(self.document_type)]
-        params = urlencode(form.form_values())
-
-        searchurl = form.action + "?" + params
+            params['fromDate'] = self.config.lastdownload.strftime("%Y-%m-%d")
+        params = urlencode(params)
+        searchurl = self.start_url + "?" + params
         self.log.info("Searching using %s" % searchurl)
-        # this'll take us to an intermediate page (showing results
-        # from both HTML pages and the "document database") -- we
-        # select the link that only gives us documents
-        resp = self.session.get(searchurl)
-        intermediatepage = lxml.html.fromstring(resp.content)
-        intermediatepage.make_links_absolute(searchurl)
-        realstarturl = searchurl
-        for elem, attrib, value, foo in intermediatepage.iterlinks():
-            if elem.get('class') == 'more' and 'publikationer' in elem.text:
-                realstarturl = elem.get('href')
-        for basefile, url in self.download_get_basefiles(realstarturl):
+        for basefile, url in self.download_get_basefiles(searchurl):
             self.download_single(basefile, url)
+
+    def attribs_from_url(self, url):
+        # this assumes that arsutgava is "2004", not "2004/05"
+        m = re.search("/(\w+)\.?-(\d{4})(\d+)/$", url)
+        if m:
+            (doctype, year, ordinal) = m.groups()
+            if doctype == "prop":
+                offset = 4 if ordinal.startswith("1999") else 2
+                year = year + "/" + ordinal[:offset]
+                ordinal = ordinal[offset:]
+            return {'rdf:type': doctype,
+                    'rpubl:arsutgava': year,
+                    'rpubl:lopnummer': ordinal}
+        else:
+            # in the future, download page and look at that
+            raise ValueError("Can't find doc attribs from %s" % url)
 
     @downloadmax
     def download_get_basefiles(self, url):
         done = False
-        pagecount = 1
-        while not done:
-            self.log.info('Result page #%s (%s)' % (pagecount, url))
+        resp = self.session.get(url)
+        tree = lxml.etree.fromstring(resp.text)
+        for item in tree.findall(".//item"):
+            url = item.find("link").text
+            attribs = self.attribs_from_url(url)
+            basefile = "%s:%s" % (attribs['rpubl:arsutgava'], attribs['rpubl:lopnummer'])
+            yield basefile, url
 
-            # sometimes the search service returns a blank page when
-            # it shouldn't.
-            tries = 5
-            while tries:
-                resp = self.session.get(url)
-                # FIXME: this uses BeautifulSoup while the main download()
-                # uses lxml.html -- this is inconsistent.
-                mainsoup = BeautifulSoup(resp.text)
-                # check if there is any text (there should always be)
-                if mainsoup.find(id="body").get_text().strip():
-                    tries = 0  # ok we have good mainsoup now
-                else:
-                    self.log.warning(
-                        'Result page #%s was blank, waiting and retrying' %
-                        pagecount)
-                    tries -= 1
-                    if tries:
-                        sleep(5 - tries)
-
-            for link in mainsoup.find_all(href=re.compile("/sb/d/108/a/")):
-                desc = link.find_next_sibling("span", "info").get_text(strip=True)
-                tmpurl = urljoin(url, link['href'])
-
-                # use a strict regex first, then a more forgiving
-                m = self.re_basefile_strict.search(desc)
-                if not m:
-                    m = self.re_basefile_lax.search(desc)
-                    if not m:
-                        self.log.warning(
-                            "Can't find Document ID from %s, forced to download doc page" % desc)
-                        resp = requests.get(tmpurl)
-                        subsoup = BeautifulSoup(resp.text)
-
-                        for a in subsoup.find("div", "doc").find_all("li", "pdf"):
-                            text = a.get_text(strip=True)
-                            m = self.re_basefile_lax.search(text)
-                            if m:
-                                break
-                        else:
-                            self.log.error("Cannot possibly find docid for %s" % tmpurl)
-                            continue
-                    else:
-                        self.log.warning(
-                            "%s (%s) not using preferred form: '%s'" % (m.group(1), tmpurl, m.group(0)))
-                basefile = m.group(1)
-
-                # Extra checking -- sometimes ids like 2003/2004:45
-                # are used (should be 2003/04:45)
-                if (":" in basefile and "/" in basefile):
-                    (y1, y2, o) = re.split("[:/]", basefile)
-                    # 1999/2000:45 is a special case
-                    if len(y2) == 4 and y1 != "1999":
-                        self.log.warning(
-                            "%s (%s) using incorrect year format, should be '%s/%s:%s'" %
-                            (basefile, tmpurl, y1, y2[2:], o))
-                        basefile = "%s/%s:%s" % (y1, y2[2:], o)
-
-                yield basefile, urljoin(url, link['href'])
-
-            pagecount += 1
-            next = mainsoup.find("a", text="Nästa sida")
-            # next = mainsoup.find("a", text=str(pagecount))
-            if next:
-                url = urljoin(url, next['href'])
-            else:
-                done = True
-
+    # FIXME: Don't know if this can be rewritten for new regeringen.se
     def remote_url(self, basefile):
         # do a search to find the proper url for the document
-        templ = "http://www.regeringen.se/sb/d/107/a/136?query=%(basefile)s&docTypes=%(doctype)s&type=advanced&action=search"
+        templ = ("http://www.regeringen.se/sb/d/107/a/136?query=%(basefile)s" 
+                 "docTypes=%(doctype)s&type=advanced&action=search")
         searchurl = templ % {'doctype': self.document_type,
                              'basefile': basefile}
         soup = BeautifulSoup(requests.get(searchurl).text)
@@ -264,17 +211,9 @@ class Regeringen(SwedishLegalSource):
             pdffiles = self.find_pdf_links(soup, basefile)
             if pdffiles:
                 for pdffile in pdffiles:
-                    # note; the pdfurl goes to a redirect script; however that
-                    # part of the URL tree (/download/*) is off-limits for
-                    # robots. But we can figure out the actual URL anyway!
-                    if len(docid) > 4:
-                        path = "c6/%02d/%s/%s" % (
-                            int(docid[:-4]), docid[-4:-2], docid[-2:])
-                    else:
-                        path = "c4/%02d/%s" % (int(docid[:-2]), docid[-2:])
-                    pdfurl = "http://www.regeringen.se/content/1/%s/%s" % (
-                        path, pdffile)
-                    pdffilename = self.store.downloaded_path(basefile, attachment=pdffile)
+                    pdfurl = urljoin(url, pdffile)
+                    basepath = pdffile.split("/")[-1] + ".pdf"
+                    pdffilename = self.store.downloaded_path(basefile, attachment=basepath)
                     if self.download_if_needed(pdfurl, basefile, filename=pdffilename):
                         pdfupdated = True
                         self.log.debug(
@@ -346,6 +285,7 @@ class Regeringen(SwedishLegalSource):
                 # {'rdf:type': RPUBL.Kommittedirektiv,
                 #  'rpubl:arsutgava': 2012,
                 #  'rpubl:lopnummer} -> attributes_to_resource -> coin_uri
+                attribs = self.attribs_from_url(link["href"])
                 (doctype, year, ordinal) = re.search("/(\w+)\.?-(\d{4})(\d+)/$",
                                                  link["href"]).groups()
                 attribs = {"rpubl:arsutgava": year,
@@ -425,7 +365,7 @@ class Regeringen(SwedishLegalSource):
         # reset global state
         PreambleSection.counter = 0
         UnorderedSection.counter = 0
-        pdffiles = self.find_pdf_links(self._rawbody, basefile)
+        pdffiles = [x + ".pdf" for x in self.find_pdf_links(self._rawbody, basefile)]
         if not pdffiles:
             self.log.error(
                 "%s: No PDF documents found, can't parse anything" % basefile)
@@ -557,7 +497,7 @@ class Regeringen(SwedishLegalSource):
         pdflink = re.compile("/contentassets/")
         if docsection:
             for link in docsection.find_all("a", href=pdflink):
-                pdffiles.append((link["href"] + ".pdf", link.string))
+                pdffiles.append((link["href"], link.string))
         selected = self.select_pdfs(pdffiles)
         self.log.debug(
             "selected %s out of %d pdf files" %
