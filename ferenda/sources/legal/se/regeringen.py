@@ -98,9 +98,10 @@ class Regeringen(SwedishLegalSource):
                   'filterByType': 'FilterablePageBase',
                   'preFilteredCategories': '1324',
                   'rootPageReference': '0',
-                  'pageSize': '1000', # FIXME: max value supported --
-                                      # but we need more -- use
-                                      # fromDate or maybe page?
+                  # 'pageSize': '1000',
+                  # NOTE: 1000 is the max allowed page size, but since
+                  # we can handle paging, we go with whatever the
+                  # default is
                   'filteredContentCategories': self.document_type
                   }
         # params = {'filterType': 'Taxonomy',
@@ -115,11 +116,11 @@ class Regeringen(SwedishLegalSource):
         # }
         if 'lastdownload' in self.config and not self.config.refresh:
             params['fromDate'] = self.config.lastdownload.strftime("%Y-%m-%d")
-        params = urlencode(params)
-        searchurl = self.start_url + "?" + params
-        self.log.info("Searching using %s" % searchurl)
-        for basefile, url in self.download_get_basefiles(searchurl):
-            self.download_single(basefile, url)
+        for basefile, url in self.download_get_basefiles(params):
+            try:
+                self.download_single(basefile, url)
+            except Exception as e:
+                self.log.critical("%s: %s" % (basefile, e))
 
     def attribs_from_url(self, url):
         # this assumes that arsutgava is "2004", not "2004/05"
@@ -138,15 +139,26 @@ class Regeringen(SwedishLegalSource):
             raise ValueError("Can't find doc attribs from %s" % url)
 
     @downloadmax
-    def download_get_basefiles(self, url):
+    def download_get_basefiles(self, params):
         done = False
-        resp = self.session.get(url)
-        tree = lxml.etree.fromstring(resp.text)
-        for item in tree.findall(".//item"):
-            url = item.find("link").text
-            attribs = self.attribs_from_url(url)
-            basefile = "%s:%s" % (attribs['rpubl:arsutgava'], attribs['rpubl:lopnummer'])
-            yield basefile, url
+        while not done:
+            qsparams = urlencode(params)
+            searchurl = self.start_url + "?" + qsparams
+            self.log.info("Loading page #%s" % params.get('page', 1))
+            resp = self.session.get(searchurl)
+            tree = lxml.etree.fromstring(resp.text)
+            done = True
+            for item in tree.findall(".//item"):
+                done = False
+                url = item.find("link").text
+                try:
+                    attribs = self.attribs_from_url(url)
+                    
+                    basefile = "%s:%s" % (attribs['rpubl:arsutgava'], attribs['rpubl:lopnummer'])
+                    yield basefile, url
+                except ValueError as e:
+                    self.log.error(e)
+            params['page'] = params.get('page', 1) + 1
 
     # FIXME: Don't know if this can be rewritten for new regeringen.se
     def remote_url(self, basefile):
