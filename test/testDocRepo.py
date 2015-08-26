@@ -53,7 +53,12 @@ class Repo(RepoTester):
     # TODO: Many parts of this class could be divided into subclasses
     # (like Generate, Toc, News, Storage and Archive already has)
 
-    # class Repo(RepoTester)
+    def tearDown(self):
+        # make sure self.repo is always newly initialized, not reused
+        super(Repo, self).tearDown()
+        if hasattr(Repo, 'repo'):
+            delattr(Repo, 'repo')
+
     def test_init(self):
         # make sure self.ns is properly initialized
         class StandardNS(DocumentRepository):
@@ -1099,6 +1104,12 @@ class Generate(RepoTester):
         shutil.copy2("%s/files/base/rsrc/resources.xml"%os.path.dirname(__file__),
                      resources)
 
+    def tearDown(self):
+        # make sure self.repo is always newly initialized, not reused
+        super(Generate, self).tearDown()
+        if hasattr(Generate, 'repo'):
+            delattr(Generate, 'repo')
+
     def test_graph_to_annotation_file(self):
         testgraph = rdflib.Graph()
         testgraph.parse(
@@ -1212,7 +1223,7 @@ class Generate(RepoTester):
         typeof="bibo:DocumentPart"
         class="preamblesection"
         property="dcterms:title"
-o        content="Abstract">
+        content="Abstract">
       <p>Lorem ipsum dolor sit amet</p>
       <p><a href="http://localhost:8000/res/test/something-else">external</a></p>
       <p><a href="http://localhost:8000/dataset/test">dataset</a></p>
@@ -1518,6 +1529,12 @@ class Storage(RepoTester):
 
 class Archive(RepoTester):
     url_location = None
+
+    def tearDown(self):
+        # make sure self.repo is always newly initialized, not reused
+        super(Archive, self).tearDown()
+        if hasattr(Archive, 'repo'):
+            delattr(Archive, 'repo')
     
     def test_archive(self):
         # create an existing thing

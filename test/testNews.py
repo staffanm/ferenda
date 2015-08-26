@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, print_function
 
-import sys, os
+import sys
+import os
 from datetime import datetime, timedelta
 from operator import attrgetter, itemgetter
 
@@ -34,13 +35,14 @@ from ferenda import Facet, Feedset, Feed, DocumentEntry, Describer
 # from given facets and indata. Test data is 4 entries that match data
 # from testToc.
 
+
 class News(RepoTester):
 
     def setUp(self):
         super(News, self).setUp()
         self.faceted_data = []
         # create a bunch of DocumentEntry objects and save them
-        basetime = datetime(2013,1,1,12,0)
+        basetime = datetime(2013, 1, 1, 12, 0)
         for basefile in range(25):
             v = {'id':self.repo.canonical_uri(basefile),
                  'title':"Doc #%s" % basefile}
@@ -90,6 +92,13 @@ class News(RepoTester):
     <h1>%(title)s</h1>
   </body>
 </html>""" % v)
+
+    def tearDown(self):
+        # make sure self.repo is always newly initialized, not reused
+        super(News, self).tearDown()
+        if hasattr(News, 'repo'):
+            delattr(News, 'repo')
+
     def test_news(self):
         # should test the main method, not the helpers. That'll
         # require mocking most methods.
@@ -274,7 +283,6 @@ class News(RepoTester):
                            self.repo.canonical_uri(str(basefile)),
                            inline=True)
             de.save()
-
         unsorted_entries = self.repo.news_facet_entries()
         entries = sorted(list(unsorted_entries),
                          key=itemgetter('updated'), reverse=True)
@@ -285,6 +293,7 @@ class News(RepoTester):
         tree = etree.parse('%s/base/feed/main.atom' % self.datadir)
         NS = "{http://www.w3.org/2005/Atom}"
         content = tree.find(".//"+NS+"content")
+        self.assertIsNotNone(content)
         self.assertIsNone(content.get("src"))
         self.assertIsNone(content.get("hash"))
         self.assertEqual(content.get("type"), "xhtml")

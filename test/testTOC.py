@@ -80,6 +80,12 @@ class TOC(RepoTester):
         shutil.copy2("%s/files/base/rsrc/resources.xml"%os.path.dirname(__file__),
                      resources)
 
+    def tearDown(self):
+        # make sure self.repo is always newly initialized, not reused
+        super(TOC, self).tearDown()
+        if hasattr(TOC, 'repo'):
+            delattr(TOC, 'repo')
+
     def test_toc(self):
         # tests the main TOC method, not the helper methods (they are
         # tested separately)

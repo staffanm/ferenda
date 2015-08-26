@@ -60,12 +60,12 @@ PROV = Namespace(util.ns['prov'])
 
 class DocumentRepository(object):
 
-    """Base class for downloading, parsing and generating HTML versions of
-    a repository of documents.
+    """Base class for handling a repository of documents.
 
-    Start building your application by subclassing this class, and
-    then override methods in order to customize the downloading,
-    parsing and generation behaviour.
+    Handles downloading, parsing and generation of HTML version of
+    documents. Start building your application by subclassing this
+    class, and then override methods in order to customize the
+    downloading, parsing and generation behaviour.
 
     :param \*\*kwargs: Any named argument overrides any
                    similarly-named configuration file parameter.
@@ -894,6 +894,7 @@ with the *config* object as single parameter.
             self.log.debug("%s: 304 Not modified" % url)
             return False  # ie not updated
         elif response.status_code > 400:
+            self.log.error("Failed to retrieve %s" % url)
             response.raise_for_status()
 
         with open(tmpfile, "wb") as fp:

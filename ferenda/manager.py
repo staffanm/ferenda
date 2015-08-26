@@ -1329,7 +1329,7 @@ def _list_enabled_classes():
 
     >>> enable("ferenda.DocumentRepository") == 'base'
     True
-    >>> _list_enabled_classes() == {'base': 'Base class for downloading, parsing and generating HTML versions of a repository of documents.'}
+    >>> _list_enabled_classes() == {'base': 'Base class for handling a repository of documents.'}
     True
     >>> os.unlink("ferenda.ini")
 

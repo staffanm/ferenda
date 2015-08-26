@@ -89,7 +89,7 @@ class Regeringen(SwedishLegalSource):
     storage_policy = "dir"
     alias = "regeringen"
     xslt_template = "res/xsl/forarbete.xsl"
-
+    download_accept_404 = True
     session = None
 
     @recordlastdownload
@@ -119,12 +119,16 @@ class Regeringen(SwedishLegalSource):
         for basefile, url in self.download_get_basefiles(params):
             try:
                 self.download_single(basefile, url)
-            except Exception as e:
-                self.log.critical("%s: %s" % (basefile, e))
+            except requests.exceptions.HTTPError as e:
+                if self.download_accept_404 and e.response.status_code == 404:
+                    self.log.error("%s: %s %s" % (basefile, url, e))
+                    ret = False
+                else:
+                    raise e
 
     def attribs_from_url(self, url):
         # this assumes that arsutgava is "2004", not "2004/05"
-        m = re.search("/(\w+)\.?-(\d{4})(\d+)/$", url)
+        m = re.search("/(\w+)\.?-?(\d{4})(\d+)-?/$", url)
         if m:
             (doctype, year, ordinal) = m.groups()
             if doctype == "prop":

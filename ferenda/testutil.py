@@ -2,13 +2,10 @@
 """:py:mod:`unittest`-based classes and accompanying functions to
 create some types of ferenda-specific tests easier."""
 from __future__ import unicode_literals
-from datetime import datetime
 from difflib import unified_diff
 from io import BytesIO
 import codecs
-import collections
 import filecmp
-import hashlib
 import inspect
 import json
 import os
@@ -20,7 +17,6 @@ import time
 import unicodedata
 
 from ferenda.compat import unittest
-from ferenda.compat import Mock, patch
 
 import six
 from six import text_type as str
@@ -62,9 +58,14 @@ class FerendaTestCase(object):
     def assertEqualGraphs(self, want, got, exact=True):
         """Assert that two RDF graphs are identical (isomorphic).
 
-        :param want: The graph as expected, as an :py:class:`~rdflib.graph.Graph` object or the filename of a serialized graph
-        :param got: The actual graph, as an :py:class:`~rdflib.graph.Graph` object or the filename of a serialized graph
-        :param exact: Whether to require that the graphs are exactly alike (True) or only if all triples in want exists in got (False)
+        :param want: The graph as expected, as an
+                     :py:class:`~rdflib.graph.Graph` object or the filename
+                     of a serialized graph
+        :param got: The actual graph, as an :py:class:`~rdflib.graph.Graph`
+                    object or the filename of a serialized graph
+        :param exact: Whether to require that the graphs are exactly alike
+                      (True) or only if all triples in want exists in got
+                      (False)
         :type  exact: bool
         """
 
@@ -366,10 +367,11 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
     @classmethod
     def setUpClass(cls):
         cls.datadir = tempfile.mkdtemp()
-        # FIXME: Setting up a class can be pretty expensive (if it
-        # loads a lot of RDF and/or minter objects) so it'd be nice if
-        # we could reuse them. Maybe to this in setupClass /
-        # teardownClass?
+        # Setting up a class can be pretty expensive (if it loads a
+        # lot of RDF and/or minter objects) so we create it in
+        # setUpClass instead. If your test needs a fresh repo for each
+        # case, make sure your tearDown deletes self.repo, so that
+        # next setUp will recreate it.
         cls.repo = cls.repoclass(datadir=cls.datadir,
                                    storelocation=cls.datadir + "/ferenda.sqlite",
                                    indexlocation=cls.datadir + "/whoosh",)
@@ -378,10 +380,6 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
     def setUp(self):
         if not hasattr(self, 'repo'):
             self.datadir = tempfile.mkdtemp()
-            # FIXME: Setting up a class can be pretty expensive (if it
-            # loads a lot of RDF and/or minter objects) so it'd be nice if
-            # we could reuse them. Maybe to this in setupClass /
-            # teardownClass?
             self.repo = self.repoclass(datadir=self.datadir,
                                        storelocation=self.datadir + "/ferenda.sqlite",
                                        indexlocation=self.datadir + "/whoosh",)
