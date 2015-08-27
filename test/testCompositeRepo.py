@@ -11,6 +11,7 @@ from ferenda.testutil import RepoTester
 #SUT
 from ferenda import CompositeRepository
 
+
 class SubrepoA(DocumentRepository):
     storage_policy = "file"
     alias= "a"
@@ -134,3 +135,20 @@ class TestComposite(RepoTester):
 #        self.repo.config = LayeredConfig(Defaults({'datadir': self.datadir}))
 #        got = self.repo.custom()
 #        self.assertEqual("Hello world!", got)
+
+
+class Mixin(object):
+    def custom(self):
+        return "Hello world from mixin"
+
+class CompositeExtrabase(CompositeExample):
+    extrabases = (Mixin,)
+
+
+class TestExtrabase(RepoTester):
+
+    repoclass = CompositeExtrabase
+
+    def test_config(self):
+        got = self.repo.custom()
+        self.assertEqual("Hello world from mixin", got)

@@ -5,8 +5,6 @@ import os
 import time
 from collections import defaultdict
 
-from layeredconfig import LayeredConfig
-
 from ferenda import DocumentRepository, DocumentStore
 from ferenda import util, errors
 
@@ -43,6 +41,7 @@ class CompositeStore(DocumentStore):
 class CompositeRepository(DocumentRepository):
     subrepos = ()  # list of classes
     documentstore_class = CompositeStore
+    extrabases = ()
 
     def get_instance(self, instanceclass):
         if instanceclass not in self._instances:
@@ -72,23 +71,22 @@ class CompositeRepository(DocumentRepository):
         # config object was provided or not
         super(CompositeRepository, self).__init__(config, **kwargs)
 
+        newsubrepos = []
         for c in self.subrepos:  # populate self._instances
+            if self.extrabases:
+                bases = self.extrabases + c.__bases__
+                c = type(c.__name__, bases, {})
+                newsubrepos.append(c)
             self.get_instance(c)
-
+        if newsubrepos:
+            self.subrepos = newsubrepos
         cls = self.documentstore_class
+
         self.store = cls(self.config.datadir + os.sep + self.alias,
                          downloaded_suffix=self.downloaded_suffix,
                          storage_policy=self.storage_policy,
                          docrepo_instances=self._instances)
 
-        for c in self.subrepos:  # populate self._instances
-            self.get_instance(c)
-
-        cls = self.documentstore_class
-        self.store = cls(self.config.datadir + os.sep + self.alias,
-                         downloaded_suffix=self.downloaded_suffix,
-                         storage_policy=self.storage_policy,
-                         docrepo_instances=self._instances)
 
     @classmethod
     def get_default_options(cls):
