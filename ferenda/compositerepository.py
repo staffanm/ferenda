@@ -11,6 +11,8 @@ from ferenda import util, errors
 
 class CompositeStore(DocumentStore):
 
+    """Custom store for CompositeRepository objects."""
+    
     def __init__(self, datadir, downloaded_suffix=".html",
                  storage_policy="file",
                  docrepo_instances=None):
@@ -39,9 +41,22 @@ class CompositeStore(DocumentStore):
 
 
 class CompositeRepository(DocumentRepository):
+
+    """Acts as a proxy for a list of sub-repositories.
+
+    Calls the download() method for each of the included
+    subrepos. Parse calls each subrepos parse() method in order until
+    one succeeds, unless config.failfast is True. In that case any
+    errors from the first subrepo is re-raised.
+
+    """
+
     subrepos = ()  # list of classes
+
+    """List of respository classes to use."""
     documentstore_class = CompositeStore
     extrabases = ()
+    """List of mixin classes to add to each subrepo class."""
 
     def get_instance(self, instanceclass):
         if instanceclass not in self._instances:

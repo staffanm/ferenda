@@ -70,6 +70,7 @@ Classes
    api/wordreader
    api/wsgiapp
    api/resources
+   api/compositerepository
    
 Modules
 -------
