@@ -825,7 +825,7 @@ def _run_class(enabled, argv, config):
                         argv)
                 else:
                     # - run the jobs, one by one, in the current process
-                    for basefile in inst.store.list_basefiles_for(config.action):
+                    for basefile in iterable:
                         res.append(
                             _run_class_with_basefile(
                                 clbl,

@@ -2,11 +2,14 @@
 from __future__ import unicode_literals
 
 import re
+import os
+from datetime import datetime
 
 from rdflib.namespace import SKOS
+from bs4 import BeautifulSoup
 
-from ferenda import PDFAnalyzer
-from . import Regeringen, RPUBL
+from ferenda import PDFAnalyzer, CompositeRepository, DocumentEntry
+from . import Regeringen, SwedishLegalSource, RPUBL
 
 
 # are there other sources? www.sou.gov.se directs here,
@@ -38,8 +41,8 @@ class SOUAnalyzer(PDFAnalyzer):
             super(SOUAnalyzer, self).count_horizontal_textbox(pagenumber, textbox, counters)
 
 
-class SOU(Regeringen):
-    alias = "sou"
+class SOURegeringen(Regeringen):
+    alias = "souregeringen"
     re_basefile_strict = re.compile(r'SOU (\d{4}:\d+)')
     re_basefile_lax = re.compile(r'(?:SOU|) ?(\d{4}:\d+)', re.IGNORECASE)
     rdf_type = RPUBL.Utredningsbetankande
@@ -54,3 +57,53 @@ class SOU(Regeringen):
                   'rdf:type': self.rdf_type}
         resource = self.attributes_to_resource(attrib)
         return self.minter.space.coin_uri(resource) 
+
+
+class SOUKB(SwedishLegalSource):
+    alias = "soukb"
+    storage_policy = "dir"
+    downloaded_suffix = ".pdf"
+    basefile_regex = "(?P<basefile>\d{4}:\d+)"
+    start_url = "http://regina.kb.se/sou/"
+
+    def download_single(self, basefile, url):
+        resp = self.session.get(url)
+        soup = BeautifulSoup(resp.text)
+        pdfurl = soup.find("a", href=re.compile(".*\.pdf$"))
+        thumburl = soup.find("img", "tumnagel")
+        librisid = url.rsplit("-")[0]
+        rdfurl = "http://data.libris.kb.se/open/bib/%s.rdf" % librisid
+        filename = self.store.downloaded_path(basefile)
+        created = not os.path.exists(filename)
+        if self.download_if_needed(pdfurl, basefile):
+            if created:
+                self.log.info("%s: downloaded from %s" % (basefile, pdfurl))
+            else:
+                self.log.info(
+                    "%s: downloaded new version from %s" % (basefile, pdfurl))
+            updated = True
+            self.download_if_needed(rdfurl, basefile,
+                                    filename=self.store.downloaded_path(
+                                        basefile, attachment="metadata.rdf"))
+            self.download_if_needed(thumburl, basefile,
+                                    filename=self.store.downloaded_path(
+                                        basefile, attachment="thumb.jpg"))
+        else:
+            self.log.debug("%s: exists and is unchanged" % basefile)
+
+        entry = DocumentEntry(self.store.documententry_path(basefile))
+        now = datetime.now()
+        entry.orig_url = url  # or pdfurl?
+        if created:
+            entry.orig_created = now
+        if updated:
+            entry.orig_updated = now
+        entry.orig_checked = now
+        entry.save()
+        return updated
+
+
+class SOU(CompositeRepository):
+    alias = "sou"
+    subrepos = (SOURegeringen, SOUKB)
+    

@@ -89,8 +89,9 @@ class CompositeRepository(DocumentRepository):
         newsubrepos = []
         for c in self.subrepos:  # populate self._instances
             if self.extrabases:
-                bases = self.extrabases + c.__bases__
-                c = type(c.__name__, bases, {})
+                bases = [x for x in self.extrabases if x not in c.__bases__]
+                bases.extend(c.__bases__)
+                c = type(c.__name__, tuple(bases), dict(c.__dict__))
                 newsubrepos.append(c)
             self.get_instance(c)
         if newsubrepos:
