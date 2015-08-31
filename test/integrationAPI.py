@@ -198,27 +198,26 @@ class AdvancedAPI(object):
             # the ElasticSearch mapping undeleted -- make sure
             # tearDown runs in this case
             super(AdvancedAPI, self).setUp()
-            self.env['PATH_INFO'] = '/myapi/' 
+            self.env['PATH_INFO'] = '/myapi/'
         except Exception as e:
             self.tearDown()
             raise e
 
-
     def tearDown(self):
         FulltextIndex.connect(self.indextype, self.indexlocation,
                               [DocumentRepository()]).destroy()
-        TripleStore.connect(self.storetype, self.storelocation, self.storerepository).clear()
+        TripleStore.connect(self.storetype, self.storelocation,
+                            self.storerepository).clear()
 
     def put_files_in_place(self):
         self.repos = []
         for repoclass in DocRepo1, DocRepo2, DocRepo3:
             repo = repoclass(datadir=self.datadir,
-                             storetype = self.storetype,
-                             storelocation = self.storelocation,
-                             storerepository = self.storerepository,
-                             indextype = self.indextype,
-                             indexlocation = self.indexlocation
-            )
+                             storetype=self.storetype,
+                             storelocation=self.storelocation,
+                             storerepository=self.storerepository,
+                             indextype=self.indextype,
+                             indexlocation=self.indexlocation)
             self.repos.append(repo)
 
         for repo in self.repos:

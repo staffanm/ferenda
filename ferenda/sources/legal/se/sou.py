@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import re
 import os
 from datetime import datetime
+from six.moves.urllib_parse import urljoin
 
 from rdflib.namespace import SKOS
 from bs4 import BeautifulSoup
@@ -69,9 +70,10 @@ class SOUKB(SwedishLegalSource):
     def download_single(self, basefile, url):
         resp = self.session.get(url)
         soup = BeautifulSoup(resp.text)
-        pdfurl = soup.find("a", href=re.compile(".*\.pdf$"))
-        thumburl = soup.find("img", "tumnagel")
-        librisid = url.rsplit("-")[0]
+        pdfurl = soup.find("a", href=re.compile(".*\.pdf$")).get("href")
+        
+        thumburl = urljoin(url, soup.find("img", "tumnagel").get("src"))
+        librisid = url.rsplit("-")[1]
         rdfurl = "http://data.libris.kb.se/open/bib/%s.rdf" % librisid
         filename = self.store.downloaded_path(basefile)
         created = not os.path.exists(filename)

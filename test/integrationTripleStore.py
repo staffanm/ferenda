@@ -215,7 +215,7 @@ d:i8301
         )
 
         uri = "http://localhost:8000/res/rfc/7066"
-        sq = util.readfile("ferenda/res/sparql/rfc-annotations.rq") % {'uri': uri}
+        sq = util.readfile("ferenda/sources/tech/res/sparql/rfc-annotations.rq") % {'uri': uri}
         got = self.store.construct(sq)
         want = Graph()
         want.parse(data=util.readfile("test/files/datasets/annotations-rfc.nt"),
