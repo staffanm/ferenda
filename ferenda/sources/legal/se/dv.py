@@ -219,8 +219,8 @@ class DV(SwedishLegalSource):
     @classmethod
     def get_default_options(cls):
         opts = super(DV, cls).get_default_options()
-        opts['ftpuser'] = None
-        opts['ftppassword'] = None
+        opts['ftpuser'] = ''  # None  # Doesn't work great since Defaults is a typesource...
+        opts['ftppassword'] = ''  # None
         opts['parsebodyrefs'] = True
         return opts
 

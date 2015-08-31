@@ -2,7 +2,7 @@
 from __future__ import unicode_literals, print_function
 
 """Hanterar (konsoliderade) författningar i SFS från Regeringskansliet
-rättsdatabaser.
+rättsdatabaser. 
 """
 
 # system libraries (+ six)
@@ -365,18 +365,17 @@ class SFS(Trips):
         self.current_section = '0'
         self.current_headline_level = 0  # 0 = unknown, 1 = normal, 2 = sub
 
-        # the new DNS-based URLs used to be dog slow for some reasons
-        # sometimes -- a quick hack to change them back to the old
-        # IP-based ones. The hack hade to be sidabled since the
-        # IP-based URLs stopped working. Fortunaltely the DNS-based
-        # ones has been sped up.
-
-#        for p in ('document_url_template',
-#                  'document_sfsr_url_template',
-#                  'document_sfsr_change_url_template'):
-#            setattr(self, p,
-#                    getattr(self, p).replace('rkrattsbaser.gov.se',
-#                                           '62.95.69.15'))
+        # the new DNS-based URLs can be dog slow for some reasons
+        # sometimes -- seems that they resolve to ipv6 addresses, and
+        # that connect() on my system is super slow. Quick hack to
+        # change them to IP-based ones (luckily, no Host: header is
+        # needed).
+        for p in ('document_url_template',
+                  'document_sfsr_url_template',
+                  'document_sfsr_change_url_template'):
+            setattr(self, p,
+                    getattr(self, p).replace('rkrattsbaser.gov.se',
+                                             '193.188.157.98'))
         from ferenda.manager import loglevels
         self.trace = {}
         for logname in ('paragraf', 'tabell', 'numlist', 'rubrik'):
