@@ -66,6 +66,7 @@ class SOUKB(SwedishLegalSource):
     downloaded_suffix = ".pdf"
     basefile_regex = "(?P<basefile>\d{4}:\d+)"
     start_url = "http://regina.kb.se/sou/"
+    download_reverseorder = True
 
     def download_single(self, basefile, url):
         resp = self.session.get(url)
@@ -108,4 +109,3 @@ class SOUKB(SwedishLegalSource):
 class SOU(CompositeRepository):
     alias = "sou"
     subrepos = (SOURegeringen, SOUKB)
-    

@@ -19,7 +19,7 @@ from . import SameAs
 
 
 class RegeringenLegacy(Regeringen):
-    def download():
+    def download(self, basefile=None):
         return False
 
     # override just some of the methods to parse the HTML index page

@@ -1235,6 +1235,7 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command, wrapctrlc=False):
             ), traceback.extract_tb(tb)
         else:
             raise
+    # FIXME: should we add BDBQuit here for practiality?
 
 
 def _instantiate_class(cls, config=None, argv=[]):

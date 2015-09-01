@@ -232,6 +232,8 @@ class DocumentRepository(object):
     download_accept_404 = False
     """TBW"""
 
+    download_reverseorder = False
+    """TBW"""
     #
     # parse() specific class properties
     rdf_type = Namespace(util.ns['foaf']).Document
@@ -741,6 +743,8 @@ with the *config* object as single parameter.
 
         """
         yielded = set()
+        if self.download_reverseorder:
+            source = reversed(list(source))
         for (element, attribute, link, pos) in source:
             basefile = None
 
@@ -752,7 +756,8 @@ with the *config* object as single parameter.
                     re.search(self.basefile_regex, element.text)):
                 m = re.search(self.basefile_regex, element.text)
                 basefile = m.group("basefile")
-            elif self.document_url_regex and re.match(self.document_url_regex, link):
+            elif self.document_url_regex and re.match(self.document_url_regex,
+                                                      link):
                 m = re.match(self.document_url_regex, link)
                 if m:
                     basefile = m.group("basefile")
