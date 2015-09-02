@@ -15,7 +15,8 @@ class TestDVParserBase(unittest.TestCase):
     maxDiff = None
     method = "none"
     def t(self, want, testdata, basefile="HDO/T1-14"):
-        p = DV.get_parser(basefile)
+        repo = DV()
+        p = repo.get_parser(basefile, testdata).im_self
         p.reader = fsmparser.Peekable([testdata])
         p._state_stack = ["notbody"] # to avoid the special fallback rule in is_instans
         for f in p.recognizers:
