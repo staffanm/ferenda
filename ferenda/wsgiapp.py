@@ -372,7 +372,7 @@ class WSGIApp(object):
 
                 pass
             if observation is not None:
-                k = (facet.dimension_type, observation)
+                k = (dimension_type, observation)
                 if (row['uri'], observation) not in observed:
                     observed[(row['uri'], observation)] = True
                     observations[k] += 1

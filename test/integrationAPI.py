@@ -24,8 +24,11 @@ class BasicAPI(object):
         self.env['PATH_INFO'] = '/myapi/' 
         
     def tearDown(self):
+        self.setupclass = False # make sure super.tearDown deletes all files
+        super(BasicAPI, self).tearDown()
         FulltextIndex.connect(self.indextype, self.indexlocation,
                               [DocumentRepository()]).destroy()
+        # maybe destroy all entries as well?
         
     # is called by WSGI.setUp
     def put_files_in_place(self):
@@ -204,6 +207,8 @@ class AdvancedAPI(object):
             raise e
 
     def tearDown(self):
+        self.setupclass = False # make sure super.tearDown deletes all files
+        super(AdvancedAPI, self).tearDown()
         FulltextIndex.connect(self.indextype, self.indexlocation,
                               [DocumentRepository()]).destroy()
         TripleStore.connect(self.storetype, self.storelocation,
