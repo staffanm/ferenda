@@ -4,9 +4,6 @@ from __future__ import unicode_literals
 of that document. Alternatively, given a URI for a document, parse the
 different properties for the document"""
 
-# As features pile up, this module is starting to look more and more
-# like a imperative version of rdl/resources/base/sys/uri/space.n3
-
 # system libs
 import re
 
@@ -36,7 +33,8 @@ predicate = {"type": RDF.type,
              "section": RINFOEX.paragrafnummer,
              "piece": RINFOEX.styckenummer,
              "item": RINFOEX.punktnummer,
-             "myndighet": DCTERMS.creator, # ??
+             # "myndighet": DCTERMS.creator, # ??
+             "myndighet": DCTERMS.publisher,
              "domstol": DCTERMS.publisher,
              "rattsfallspublikation": RPUBL.rattsfallspublikation,  # probably?
              "dnr": RPUBL.diarienummer,
@@ -95,6 +93,14 @@ def construct(dictionary, minter=None):
             # for now.
             graph.add((bnode, RPUBL.forfattningssamling,
                        URIRef("http://rinfo.lagrummet.se/serie/fs/sfs")))
+        elif key in ("myndighet", "publikation", "rattsfallspublikation"):
+            # need to lookup slugs eg "jk" to it's correct URI eg
+            # <http://rinfo.lagrummet.se/org/justitiekanslern> (so
+            # that we can turn it back to slugs again...
+            g = Graph().parse("ferenda/sources/legal/se/res/uri/swedishlegalsource.slugs.ttl", format="turtle")
+            SPACE = Namespace("http://rinfo.lagrummet.se/sys/uri/space#")
+            uri = g.value(None, SPACE.abbrSlug, Literal(dictionary[key]))
+            graph.add((bnode, predicate[key], uri))
         else:
             if isinstance(dictionary[key], Identifier):
                 val = dictionary[key]
@@ -123,8 +129,8 @@ def coinstruct_from_graph(graph, subject, minter=None):
         configgraph = Graph()
         # FIXME: The configgraph should only be loaded once, but be
         # configurable ie load the correct COIN n3 config
-        configgraph.parse("ferenda/sources/legal/se/res/uri/swedishlegalsource.space.ttl", format="n3")
-        configgraph.parse("ferenda/sources/legal/se/res/uri/swedishlegalsource.slugs.ttl", format="n3")
+        configgraph.parse("ferenda/sources/legal/se/res/uri/swedishlegalsource.space.ttl", format="turtle")
+        configgraph.parse("ferenda/sources/legal/se/res/uri/swedishlegalsource.slugs.ttl", format="turtle")
         minter = URIMinter(configgraph,
                            URIRef("http://rinfo.lagrummet.se/sys/uri/space#"))
     result = minter.space.coin_uri(graph.resource(subject))

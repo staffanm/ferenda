@@ -1,1 +1,1 @@
-{'arsutgava': '2004', 'publikation': 'nja', 'sidnummer': '43', 'type': 7}
+{'arsutgava': '2004', 'rattsfallspublikation': 'nja', 'sidnummer': '43', 'type': 7}
