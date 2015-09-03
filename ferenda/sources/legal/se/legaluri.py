@@ -29,11 +29,8 @@ predicate = {"type": RDF.type,
              "sidnummer": RPUBL.sidnummer,
              "lopnummer": RPUBL.lopnummer,
              "law": RPUBL.platsangivelse,  # FIXME: This pred is only proposed
-             "chapter": RINFOEX.kapitelnummer,
-             "section": RINFOEX.paragrafnummer,
              "piece": RINFOEX.styckenummer,
              "item": RINFOEX.punktnummer,
-             # "myndighet": DCTERMS.creator, # ??
              "myndighet": DCTERMS.publisher,
              "domstol": DCTERMS.publisher,
              "rattsfallspublikation": RPUBL.rattsfallspublikation,  # probably?
@@ -89,8 +86,8 @@ def construct(dictionary, minter=None):
             # <http://rinfo.lagrummet.se/serie/fs/sfs> or
             # <https://lagen.nu/dataset/sfs> (or really anything). The
             # truth is in slugs.n3 (which should be loaded in a
-            # URIMinter object, but we don't have that. Let's hardcode
-            # for now.
+            # URIMinter object, but we don't have that). Let's
+            # hardcode for now.
             graph.add((bnode, RPUBL.forfattningssamling,
                        URIRef("http://rinfo.lagrummet.se/serie/fs/sfs")))
         elif key in ("myndighet", "publikation", "rattsfallspublikation"):
@@ -109,7 +106,6 @@ def construct(dictionary, minter=None):
             else:
                 val = Literal(dictionary[key])
             graph.add((bnode, predicate[key], val))
-    # return construct_from_graph(graph)
     return coinstruct_from_graph(graph, bnode, minter)
 
 
