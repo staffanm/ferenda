@@ -160,6 +160,13 @@ class Template:
         for var, value in matches.items():
             slug = self.space.transform_value(value)
             expanded = expanded.replace("{%s}" % var, slug)
+        # if base is eg "http://localhost/res/" and expanded is a
+        # /-prefixed relative uri like "/sfs/9999:998", urljoin
+        # results in "http://localhost/sfs/9999:998/", not
+        # "http://localhost/res/" like you'd expect. So we work
+        # around.
+        if expanded[0] == "/":
+            expanded = expanded[1:]
         return urljoin(base, expanded)
 
     def get_base(self, resource):

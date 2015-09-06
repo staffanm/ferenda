@@ -9,34 +9,40 @@ from six import text_type as str
 from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 
 import codecs
-from ferenda.sources.legal.se import SFS
+# from ferenda.sources.legal.se import SFS
+from lagen.nu import SFS  # uses a more complete URISpace definition
 from ferenda.elements import serialize, LinkSubject
 from ferenda import TextReader
 
 
 class Parse(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        # Creating a new SFS object, particularly loading resources
+        # and URI space is so expensive, so we set it up once here
+        cls.p = SFS()
+        cls.p.id = '9999:998'
+        # for compatibility with old test files:
+        cls.p.minter.space.base = "http://localhost:8000/res/" 
+
+    
     def parametric_test(self, filename):
         self.maxDiff = None
-        p = SFS()
-        p.id = '(test)'
-        p.reader = TextReader(filename=filename, encoding='iso-8859-1',
+        self.p.reader = TextReader(filename=filename, encoding='iso-8859-1',
                               linesep=TextReader.DOS)
-        p.reader.autostrip = True
+        self.p.reader.autostrip = True
         # p.lagrum_parser = FakeParser()
-        b = p.makeForfattning()
-        elements = p._count_elements(b)
+        b = self.p.makeForfattning()
+        elements = self.p._count_elements(b)
         if 'K' in elements and elements['K'] > 1 and elements['P1'] < 2:
             skipfragments = ['A', 'K']
         else:
             skipfragments = ['A']
 
         # NB: _construct_ids won't look for references
-        p._construct_ids(b, '', 'http://rinfo.lagrummet.se/publ/sfs/9999:998',
-                         skipfragments)
-        # NB: parse_recursive filters out references that end in
-        # 9999:999, that's why we use :998 above...
-        p.lagrum_parser.parse_recursive(b)
+        self.p.visit_node(b, self.p.construct_id, {})
+        self.p.lagrum_parser.parse_recursive(b)
 
         self._remove_uri_for_testcases(b)
         resultfilename = filename.replace(".txt", ".xml")

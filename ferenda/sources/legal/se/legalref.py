@@ -719,7 +719,6 @@ class LegalRef:
         g = Graph()
         b = BNode()
         current = b
-
         # firstly first, clean some degenerate attribute values
         for k in attributes:
             if not isinstance(attributes[k], URIRef):

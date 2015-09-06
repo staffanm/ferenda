@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 import os,sys
 from ferenda.compat import unittest
 
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 
 import shutil
 from ferenda import TextReader, util

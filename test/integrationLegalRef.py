@@ -3,6 +3,7 @@ from __future__ import unicode_literals,print_function
 
 import sys, os
 from ferenda.compat import unittest
+from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
 import codecs
