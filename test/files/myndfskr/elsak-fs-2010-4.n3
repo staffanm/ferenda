@@ -8,10 +8,10 @@
     dcterms:title "Föreskrifter om ändring i Elsäkerhetsverkets föreskrifter (ELSÄK-FS 2007:2) om behörighet för elinstallatörer"@sv;
     rpubl:andrar <http://rinfo.lagrummet.se/publ/elsaek-fs/2007:2>;
     rpubl:arsutgava "2010";
-    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/1990:806#P15>,
-        <http://rinfo.lagrummet.se/publ/sfs/1990:806#P4>,
-        <http://rinfo.lagrummet.se/publ/sfs/1990:806#P8>,
-        <http://rinfo.lagrummet.se/publ/sfs/1990:806#P9>;
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/1990:806#p_15>,
+        <http://rinfo.lagrummet.se/publ/sfs/1990:806#p_4>,
+        <http://rinfo.lagrummet.se/publ/sfs/1990:806#p_8>,
+        <http://rinfo.lagrummet.se/publ/sfs/1990:806#p_9>;
     rpubl:beslutadAv <http://rinfo.lagrummet.se/org/elsaekerhetsverket>;
     rpubl:beslutsdatum "2010-06-18"^^xsd:date;
     rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/elsaek-fs>;

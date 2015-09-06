@@ -12,7 +12,7 @@
     rpubl:beslutadAv <http://rinfo.lagrummet.se/org/finansinspektionen>;
     rpubl:beslutsdatum "2011-03-17"^^xsd:date;
     rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/fffs>;
-    rpubl:genomforDirektiv <http://rinfo.lagrummet.se/ext/eur-lex/32002L0087>;
+    rpubl:genomforDirektiv <http://rinfo.lagrummet.se/ext/eur-lex/32002l0087>;
     rpubl:ikrafttradandedatum "2011-05-01"^^xsd:date;
     rpubl:lopnummer "26";
     rpubl:upphaver <http://rinfo.lagrummet.se/publ/fffs/2006:6>;

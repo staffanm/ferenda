@@ -6,7 +6,7 @@
     dcterms:identifier "FFFS 1991:16";
     dcterms:publisher <http://rinfo.lagrummet.se/org/finansinspektionen>;
     rpubl:arsutgava "1991";
-    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/1987:617#K7P6>;
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/1987:617#k_7-p_6>;
     rpubl:beslutadAv <http://rinfo.lagrummet.se/org/finansinspektionen>;
     rpubl:beslutsdatum "1991-12-17"^^xsd:date;
     rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/fffs>;

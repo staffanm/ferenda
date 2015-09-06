@@ -8,9 +8,9 @@
     dcterms:publisher <http://rinfo.lagrummet.se/org/finansinspektionen>;
     dcterms:title "Finansinspektionens föreskrifter och allmänna råd om information som gäller försäkring och tjänstepension;"@sv;
     rpubl:arsutgava "2011";
-    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2011:257#K7P2>,
-        <http://rinfo.lagrummet.se/publ/sfs/2011:257#K7P5>,
-        <http://rinfo.lagrummet.se/publ/sfs/2011:257#K7P6>;
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2011:257#k_7-p_2>,
+        <http://rinfo.lagrummet.se/publ/sfs/2011:257#k_7-p_5>,
+        <http://rinfo.lagrummet.se/publ/sfs/2011:257#k_7-p_6>;
     rpubl:beslutadAv <http://rinfo.lagrummet.se/org/finansinspektionen>;
     rpubl:beslutsdatum "2011-06-13"^^xsd:date;
     rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/fffs>;

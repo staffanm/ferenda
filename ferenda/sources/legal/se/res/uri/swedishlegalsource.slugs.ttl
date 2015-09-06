@@ -1,4 +1,4 @@
-# Automatically concatenated from sources at 2015-07-16T17:01:41.255559
+# Automatically concatenated from sources at 2015-09-04T16:41:59.158502
 
 @prefix : <http://rinfo.lagrummet.se/sys/uri/space#> .
 @prefix coin: <http://purl.org/court/def/2009/coin#> .
@@ -129,6 +129,8 @@ rpubl:Skrivelse :abbrSlug "skr" .
 <http://rinfo.lagrummet.se/serie/fs/agvfs> :abbrSlug "agvfs" .
 
 <http://rinfo.lagrummet.se/serie/fs/amsfs> :abbrSlug "amsfs" .
+
+<http://rinfo.lagrummet.se/serie/fs/bffs> :abbrSlug "bffs" .
 
 <http://rinfo.lagrummet.se/serie/fs/bfs> :abbrSlug "bfs" .
 

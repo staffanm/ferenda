@@ -8,11 +8,11 @@
     dcterms:publisher <http://rinfo.lagrummet.se/org/finansinspektionen>;
     dcterms:title "Föreskrifter om upphävande av vissa föreskrifter och allmänna råd inom Finansinspektionens område;"@sv;
     rpubl:arsutgava "2007";
-    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/1992:308#P19a>,
-        <http://rinfo.lagrummet.se/publ/sfs/1995:1600#P4>,
-        <http://rinfo.lagrummet.se/publ/sfs/1995:1600#P5>,
-        <http://rinfo.lagrummet.se/publ/sfs/1995:1600#P7>,
-        <http://rinfo.lagrummet.se/publ/sfs/1995:1600#P8>;
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/1992:308#p_19_a>,
+        <http://rinfo.lagrummet.se/publ/sfs/1995:1600#p_4>,
+        <http://rinfo.lagrummet.se/publ/sfs/1995:1600#p_5>,
+        <http://rinfo.lagrummet.se/publ/sfs/1995:1600#p_7>,
+        <http://rinfo.lagrummet.se/publ/sfs/1995:1600#p_8>;
     rpubl:beslutadAv <http://rinfo.lagrummet.se/org/finansinspektionen>;
     rpubl:beslutsdatum "2007-06-21"^^xsd:date;
     rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/fffs>;

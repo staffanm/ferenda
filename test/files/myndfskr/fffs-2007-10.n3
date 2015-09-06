@@ -9,11 +9,11 @@
     dcterms:title "Föreskrifter om ändring i Finansinspektionens föreskrifter och allmänna råd (FFFS 2007:1) om kapitaltäckning och stora exponeringar;"@sv;
     rpubl:andrar <http://rinfo.lagrummet.se/publ/fffs/2007:1>;
     rpubl:arsutgava "2007";
-    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2006:1533#P32>;
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2006:1533#p_32>;
     rpubl:beslutadAv <http://rinfo.lagrummet.se/org/finansinspektionen>;
     rpubl:beslutsdatum "2007-06-04"^^xsd:date;
     rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/fffs>;
-    rpubl:genomforDirektiv <http://rinfo.lagrummet.se/ext/eur-lex/32007L0018>;
+    rpubl:genomforDirektiv <http://rinfo.lagrummet.se/ext/eur-lex/32007l0018>;
     rpubl:ikrafttradandedatum "2007-10-01"^^xsd:date;
     rpubl:lopnummer "10";
     rpubl:utkomFranTryck "2007-06-11"^^xsd:date .

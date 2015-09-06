@@ -9,7 +9,7 @@
     dcterms:title "Föreskrifter om ändring i Finansinspektionens föreskrifter och allmänna råd (FFFS 2010:9) om förhandsgranskning av interna modeller för att beräkna solvenskapitalkrav;"@sv;
     rpubl:andrar <http://rinfo.lagrummet.se/publ/fffs/2010:9>;
     rpubl:arsutgava "2011";
-    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2011:257#K7P2S1N36>;
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2011:257#k_7-p_2>;
     rpubl:beslutadAv <http://rinfo.lagrummet.se/org/finansinspektionen>;
     rpubl:beslutsdatum "2011-06-13"^^xsd:date;
     rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/fffs>;

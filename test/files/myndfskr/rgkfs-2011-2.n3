@@ -19,7 +19,7 @@
     dcterms:publisher <http://rinfo.lagrummet.se/org/riksgaeldskontoret> ;
     dcterms:title "Riksgäldskontorets föreskrifter om instituts skyldighet att lämna uppgifter om insättare och deras insättningar;"@sv ;
     rpubl:arsutgava "2011" ;
-    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2011:834#P3> ;
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2011:834#p_3> ;
     rpubl:beslutadAv <http://rinfo.lagrummet.se/org/riksgaeldskontoret> ;
     rpubl:beslutsdatum "2011-12-14"^^xsd:date ;
     rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/rgkfs> ;

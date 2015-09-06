@@ -8,9 +8,9 @@
     dcterms:publisher <http://rinfo.lagrummet.se/org/finansinspektionen>;
     dcterms:title "Finansinspektionens föreskrifter om rapportering av likviditetsrisker för kreditinstitut och värdepappersbolag;"@sv;
     rpubl:arsutgava "2011";
-    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2004:329#K5P2S1N9>,
-        <http://rinfo.lagrummet.se/publ/sfs/2006:1533#P32S1N40>,
-        <http://rinfo.lagrummet.se/publ/sfs/2007:572#K6P1S1N60>;
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2004:329#k_5-p_2>,
+        <http://rinfo.lagrummet.se/publ/sfs/2006:1533#p_32>,
+        <http://rinfo.lagrummet.se/publ/sfs/2007:572#k_6-p_1>;
     rpubl:beslutadAv <http://rinfo.lagrummet.se/org/finansinspektionen>;
     rpubl:beslutsdatum "2011-05-19"^^xsd:date;
     rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/fffs>;

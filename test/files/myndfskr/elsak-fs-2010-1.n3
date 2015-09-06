@@ -8,7 +8,7 @@
     dcterms:title "Elsäkerhetsverkets föreskrifter om ändring i föreskrifter (ELSÄK-FS 2008:1) och allmänna råd om hur elektriska anläggningar ska vara utförda;"@sv;
     rpubl:andrar <http://rinfo.lagrummet.se/publ/elsaek-fs/2008:1>;
     rpubl:arsutgava "2010";
-    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2009:22#P16>;
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2009:22#p_16>;
     rpubl:beslutadAv <http://rinfo.lagrummet.se/org/elsaekerhetsverket>;
     rpubl:beslutsdatum "2010-04-16"^^xsd:date;
     rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/elsaek-fs>;

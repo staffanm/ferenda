@@ -20,8 +20,8 @@
     dcterms:title "Föreskrifter om ändring i Statens jordbruksverks föreskrifter (2013:38) om växtskadegörare som omfattas av Europeiska kommissionens genomförandebeslut;"@sv ;
     rpubl:andrar <http://rinfo.lagrummet.se/publ/sjvfs/2013:38> ;
     rpubl:arsutgava "2014" ;
-    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2006:817#P10>,
-        <http://rinfo.lagrummet.se/publ/sfs/2006:817#P27> ;
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/2006:817#p_10>,
+        <http://rinfo.lagrummet.se/publ/sfs/2006:817#p_27> ;
     rpubl:beslutadAv <http://rinfo.lagrummet.se/org/statens_jordbruksverk> ;
     rpubl:beslutsdatum "2014-05-05"^^xsd:date ;
     rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/sjvfs> ;

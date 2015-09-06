@@ -28,6 +28,7 @@ from . import RPUBL, legaluri
 DCTERMS = Namespace(util.ns['dcterms'])
 PROV = Namespace(util.ns['prov'])
 FOAF = Namespace(util.ns['foaf'])
+SKOS = Namespace(util.ns['skos'])
 
 
 class Stycke(Paragraph):
@@ -253,7 +254,8 @@ class SwedishLegalSource(DocumentRepository):
 
         # specifically for rpubl:KonsolideradGrundforfattning, create
         # relToBase things
-        if (self.rdf_type.endswith("KonsolideradGrundforfattning") and
+        if (not isinstance(self.rdf_type, (tuple, list)) and
+            self.rdf_type.endswith("KonsolideradGrundforfattning") and
             "dcterms:issued" in attributes):
             rel = RPUBL.konsoliderar
             new = BNode()  # the document
@@ -268,7 +270,10 @@ class SwedishLegalSource(DocumentRepository):
                 values = [values]
             for v in values:
                 if not isinstance(v, (URIRef, Literal)):
-                    v = Literal(v)
+                    if k in ("rpubl:forfattningssamling"):
+                        v = URIRef(self.lookup_resource(v, SKOS.altLabel))
+                    else:
+                        v = Literal(v)
                 g.add((current, uri(k), v))
 
 
@@ -280,7 +285,8 @@ class SwedishLegalSource(DocumentRepository):
             # this is only valid when generating the resource for the
             # document itself, but attributes_to_resource must be able to
             # generate other resources
-            g.add((current, RDF.type, self.rdf_type))
+            if not g.value(current, RDF.type):
+                g.add((current, RDF.type, self.rdf_type))
             g.add((current, PROV.wasGeneratedBy, Literal(self.qualified_class_name())))
         return g.resource(b)
 

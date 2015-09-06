@@ -206,6 +206,21 @@ class LegalRef:
             return indata  # this actually triggered a bug...
         self.predicate = predicate
         self.minter = minter
+
+        # Depending on the URI Space definition graph, we might not
+        # have URI templates for the most fine-grained objects (the
+        # canonical URI Space does not support anything more specific
+        # than a section). attributes_to_resource will make use of
+        # this list.
+        if len([x for x in minter.space.templates if x.fragmentTemplate]) <= 3:
+            self._supported_sub_objects = ("section", "chapter", "lawref")
+        else:
+            self._supported_sub_objects = ("sentence", "item",
+                                           "itemnumeric", "piece",
+                                           "element", "section",
+                                           "chapter", "lawref")
+
+        
         self.metadata_graph = metadata_graph if metadata_graph else Graph()
         self.allow_relative = allow_relative
 
@@ -717,8 +732,9 @@ class LegalRef:
         # then, try to create any needed sub-nodes representing
         # fragments of a document, starting with the most fine-grained
         # object. It is this subnode that we'll return in the end
-        for k in ("sentence", "item", "itemnumeric", "piece",
-                  "element", "section", "chapter", "lawref"):
+
+
+        for k in self._supported_sub_objects:
             if k in attributes:
                 p = self.attributemap[k]
                 rel = URIRef(str(p).replace("nummer", ""))

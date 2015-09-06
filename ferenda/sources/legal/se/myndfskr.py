@@ -338,28 +338,13 @@ class MyndFskr(SwedishLegalSource):
         proper RDF graph.
 
         """
-        # FIXME: by setting urlpath to '', instead of default
-        # 'res/myndfs', we get localized uris like
-        # https://lagen.nu/sosfs/2013:20 and
-        # https://lagen.nu/1969:624#P6 (for references) instead of
-        # https://lagen.nu/res/myndfs/sosfs/2013:20 and
-        # https://lagen.nu/res/myndfs/1969:624#P6 (for references,
-        # CLEARLY wrong).
-        #
-        # A proper solution that handles both this repo and the SFS
-        # repo would require full access to sfs.config, which we don't
-        # have at the parse step, and probably multiple
-        # SwedishCitationParser instances. Instead we optimize for the
-        # common case of either lagen.nu URIs or canonical URIs.
+        def makeurl(attributes):
+            resource = self.attributes_to_resource(attributes)
+            return self.minter.space.coin_uri(resource)
+
         parser = SwedishCitationParser(LegalRef(LegalRef.LAGRUM),
-                                       self.config.url,
-                                       # '',  # shld be self.config.urlpath, but
-                                       localizeuri=self.config.localizeuri)
-        if self.config.localizeuri:
-            def makeurl(data):
-                return parser.localize_uri(legaluri.construct(data))
-        else:
-            makeurl = legaluri.construct
+                                       self.minter,
+                                       self.commondata)
 
         # FIXME: this code should go into canonical_uri, if we can
         # find a way to give it access to props['dcterms:identifier']
@@ -372,10 +357,10 @@ class MyndFskr(SwedishLegalSource):
             props['dcterms:identifier'] = "%s %s:%s" % (pub, year, ordinal)
             self.log.warning("%s: Couldn't find dcterms:identifier, inferred %s from basefile" %
                              (doc.basefile, props['dcterms:identifier']))
-        uri = makeurl({'type': LegalRef.FORESKRIFTER,
-                       'publikation': pub,
-                       'arsutgava': year,
-                       'lopnummer': ordinal})
+        uri = makeurl({'rdf:type': RPUBL.Myndighetsforeskrift,
+                       'rpubl:forfattningssamling': pub,
+                       'rpubl:arsutgava': year,
+                       'rpubl:lopnummer': ordinal})
 
         if doc.uri is not None and uri != doc.uri:
             self.log.warning(
@@ -422,10 +407,10 @@ class MyndFskr(SwedishLegalSource):
                     # the same as this change act
                     (year, ordinal) = re.split('[ :]', orig)
                     pub = props['dcterms:identifier'].split(" ")[0]
-                origuri = makeurl({'type': LegalRef.FORESKRIFTER,
-                                   'publikation': pub,
-                                   'arsutgava': year,
-                                   'lopnummer': ordinal})
+                origuri = makeurl({'rdf:type': RPUBL.Myndighetsforeskrift,
+                                   'rpubl:forfattningssamling': pub,
+                                   'rpubl:arsutgava': year,
+                                   'rpubl:lopnummer': ordinal})
                 desc.rel(RPUBL.andrar,
                          URIRef(origuri))
 
@@ -453,8 +438,8 @@ class MyndFskr(SwedishLegalSource):
                                self.parse_swedish_date(props[key].lower()))
 
         if 'rpubl:genomforDirektiv' in props:
-            diruri = makeurl({'type': LegalRef.EULAGSTIFTNING,
-                              'celex':
+            diruri = makeurl({'rdf:type': RINFOEX.EUDirektiv, # FIXME: standardize this type
+                              'rpubl:celexNummer':
                               props['rpubl:genomforDirektiv']})
             desc.rel(RPUBL.genomforDirektiv, diruri)
 
@@ -482,10 +467,10 @@ class MyndFskr(SwedishLegalSource):
             for upph in re.findall('([A-ZÅÄÖ-]+FS \d{4}:\d+)',
                                    util.normalize_space(props['rpubl:upphaver'])):
                 (pub, year, ordinal) = re.split('[ :]', upph)
-                upphuri = legaluri.construct({'type': LegalRef.FORESKRIFTER,
-                                              'publikation': pub,
-                                              'arsutgava': year,
-                                              'lopnummer': ordinal})
+                upphuri = makeurl({'rdf:type': RPUBL.Myndighetsforeskrift,
+                                   'rpubl:forfattningssamling': pub,
+                                   'rpubl:arsutgava': year,
+                                   'rpubl:lopnummer': ordinal})
                 desc.rel(RPUBL.upphaver, upphuri)
 
         if ('dcterms:title' in props and

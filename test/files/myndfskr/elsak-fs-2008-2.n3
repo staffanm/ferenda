@@ -7,9 +7,9 @@
     dcterms:publisher <http://rinfo.lagrummet.se/org/elsaekerhetsverket>;
     dcterms:title "Elsäkerhetsverkets föreskrifter och allmänna råd om varselmärkning vid elektriska starkströmsanläggningar;"@sv;
     rpubl:arsutgava "2008";
-    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/1957:601#K1P2>,
-        <http://rinfo.lagrummet.se/publ/sfs/1957:601#K5P1>,
-        <http://rinfo.lagrummet.se/publ/sfs/1957:601#K5P2>;
+    rpubl:bemyndigande <http://rinfo.lagrummet.se/publ/sfs/1957:601#k_1-p_2>,
+        <http://rinfo.lagrummet.se/publ/sfs/1957:601#k_5-p_1>,
+        <http://rinfo.lagrummet.se/publ/sfs/1957:601#k_5-p_2>;
     rpubl:beslutadAv <http://rinfo.lagrummet.se/org/elsaekerhetsverket>;
     rpubl:beslutsdatum "2008-01-31"^^xsd:date;
     rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/elsaek-fs>;
