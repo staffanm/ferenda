@@ -60,9 +60,12 @@ class SubrepoB(DocumentRepository):
     def custom(self):
         return self.config.customproperty
 
+class SubrepoASubclass(SubrepoA): pass
+
+class SubrepoBSubclass(SubrepoB): pass
 
 class CompositeExample(CompositeRepository):
-    subrepos = SubrepoB, SubrepoA
+    subrepos = SubrepoBSubclass, SubrepoASubclass
     storage_policy = "dir"
 
     def custom(self):
