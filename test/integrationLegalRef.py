@@ -54,12 +54,16 @@ class TestLegalRef(unittest.TestCase):
         test_paras = re.split('\r?\n---\r?\n',testdata)
         got_paras = []
 
+        # we need to set up logging in some way as legalref.parse will
+        # use logging facilities. For tests though, we should only log
+        # at CRITICAL level.
         import logging
         r = logging.getLogger()
-        h = logging.StreamHandler()
-        h.setFormatter(logging.Formatter("%(name)s %(levelname)s %(message)s"))
-        r.addHandler(h)
-        r.setLevel(logging.DEBUG)
+        if not r.handlers:
+            h = logging.StreamHandler()
+            h.setFormatter(logging.Formatter("%(name)s %(levelname)s %(message)s"))
+            r.addHandler(h)
+            r.setLevel(logging.CRITICAL)
         for para in test_paras:
             if para.startswith("RESET:"):
                 parser.currentlynamedlaws.clear()

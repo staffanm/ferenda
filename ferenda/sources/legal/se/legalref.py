@@ -32,7 +32,6 @@ from . import RPUBL, RINFOEX
 SP_CHARSET = 'iso-8859-1'
 log = logging.getLogger('lr')
 
-
 # Lite om hur det hela funkar: Att hitta referenser i löptext är en
 # tvåstegsprocess.
 #
