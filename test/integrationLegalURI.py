@@ -25,14 +25,14 @@ class Construct(unittest.TestCase):
         uri = construct(d)
         self.assertEqual(uri,testanswer)
 
-class Parse(unittest.TestCase):
-    def parametric_test(self,filename):
-        with open(filename) as fp:
-            uri = fp.read().strip()
-        with open(filename.replace(".txt",".py")) as fp:
-            parts_repr = " ".join(fp.read().split())
-        parts = eval(parts_repr,{"__builtins__":None},globals())
-        self.assertEqual(parse(uri),parts)
+#class Parse(unittest.TestCase):
+#    def parametric_test(self,filename):
+#        with open(filename) as fp:
+#            uri = fp.read().strip()
+#        with open(filename.replace(".txt",".py")) as fp:
+#            parts_repr = " ".join(fp.read().split())
+#        parts = eval(parts_repr,{"__builtins__":None},globals())
+#        self.assertEqual(parse(uri),parts)
 
 
 class Coinstruct(unittest.TestCase):
@@ -50,9 +50,6 @@ class Coinstruct(unittest.TestCase):
         coined_uri = coinstruct_from_graph(resourcegraph, subjects.pop())
         self.assertEqual(uri, coined_uri)
 
-# class CoinstructCanonical(Coinstruct):
-#     def parametric_test(self, filename):
-#         pass
 
 def tests_from_atom(cls, atomfile, base):
     atom = lxml.etree.parse(atomfile).getroot()
@@ -65,6 +62,6 @@ def tests_from_atom(cls, atomfile, base):
         parametrize(cls, cls.coin_test, name, (uri, resource_graph))
 
 file_parametrize(Construct,"test/files/legaluri",".py")
-file_parametrize(Parse,"test/files/legaluri",".txt")
+# file_parametrize(Parse,"test/files/legaluri",".txt")
 tests_from_atom(Coinstruct, Coinstruct.atomfile,
                 "http://rinfo.lagrummet.se/publ/")
