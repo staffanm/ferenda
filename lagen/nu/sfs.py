@@ -9,7 +9,7 @@ from datetime import datetime
 from ferenda import decorators, util
 from ferenda import TextReader, DocumentEntry
 from ferenda.sources.legal.se import SFS as OrigSFS
-from ferenda.sources.legal.se.sfs import Kapitel, Paragraf, Rubrik, Stycke, Listelement, Overgangsbestammelse, Listelement, Overgangsbestammelse, Bilaga
+from ferenda.sources.legal.se.sfs import Kapitel, Paragraf, Rubrik, Stycke, Listelement, Overgangsbestammelse, Bilaga, Avdelning
 
 class SFS(OrigSFS):
 

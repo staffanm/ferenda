@@ -42,6 +42,7 @@ class Parse(unittest.TestCase):
 
         # NB: _construct_ids won't look for references
         self.p.visit_node(b, self.p.construct_id, {})
+        self.p.visit_node(b, self.p.find_definitions, True, debug=False)
         self.p.lagrum_parser.parse_recursive(b)
 
         self._remove_uri_for_testcases(b)

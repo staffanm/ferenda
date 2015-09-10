@@ -730,9 +730,9 @@ class LegalRef:
         # then, try to create any needed sub-nodes representing
         # fragments of a document, starting with the most fine-grained
         # object. It is this subnode that we'll return in the end
+        attributes_to_convert = self._supported_sub_objects
 
-
-        for k in self._supported_sub_objects:
+        for k in attributes_to_convert:
             if k in attributes:
                 p = self.attributemap[k]
                 rel = URIRef(str(p).replace("nummer", ""))
@@ -783,6 +783,10 @@ class LegalRef:
                 elif (not specificity) and a in self.baseuri_attributes:
                     attributes[a] = self.baseuri_attributes[a]
         # munge attributes a little further to be able to map to RDF
+        if 'lawref' in attributes:
+            # remove all other attribs except two
+            attributes = {'law': attributes['law'],
+                          'lawref': attributes['lawref']}
         if 'item' in attributes and 'piece' not in attributes:
             attributes['piece'] = '1'
         if "law" in attributes:
