@@ -5,7 +5,7 @@
   <Stycke id="S2">
     <str>HAR KOMMIT ÖVERENS OM FÖLJANDE.</str>
   </Stycke>
-  <Avdelning id="A1" ordinal="1" rubrik="AVDELNING I" underrubrik="KONVENTIONENS TILLÄMPNINGSOMRÅDE">
+  <Avdelning ordinal="1" rubrik="AVDELNING I" underrubrik="KONVENTIONENS TILLÄMPNINGSOMRÅDE">
     <Rubrik id="R1">Artikel 1</Rubrik>
     <Stycke id="S1">
       <str>Konventionens tillämpningsområde</str>

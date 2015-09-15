@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2015-06-12T07:24:02.240121
+# Automatically transformed from sources at 2015-09-14T17:19:32.401668
 
 @prefix : <http://rinfo.lagrummet.se/sys/uri/space#> .
 @prefix coin: <http://purl.org/court/def/2009/coin#> .
@@ -155,6 +155,12 @@ space: a coin:URISpace ;
         [ coin:binding [ coin:property rinfoex:punktnummer ] ;
             coin:fragmentTemplate "N{punktnummer}" ;
             coin:relFromBase rinfoex:punkt ],
+        [ coin:binding [ coin:property rinfoex:subpunktnummer ] ;
+            coin:fragmentTemplate "N{subpunktnummer}" ;
+            coin:relFromBase rinfoex:subpunkt ],
+        [ coin:binding [ coin:property rinfoex:subsubpunktnummer ] ;
+            coin:fragmentTemplate "N{subsubpunktnummer}" ;
+            coin:relFromBase rinfoex:subsubpunkt ],
         [ coin:binding [ coin:property rinfoex:meningnummer ] ;
             coin:fragmentTemplate "M{meningnummer}" ;
             coin:relFromBase rinfoex:mening ],

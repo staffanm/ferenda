@@ -260,6 +260,14 @@ space: coin:template [
         coin:fragmentTemplate "N{punktnummer}";
         coin:binding [ coin:property rinfoex:punktnummer ]
      ], [
+        coin:relFromBase rinfoex:subpunkt;
+        coin:fragmentTemplate "N{subpunktnummer}";
+        coin:binding [ coin:property rinfoex:subpunktnummer ]
+     ], [
+        coin:relFromBase rinfoex:subsubpunkt;
+        coin:fragmentTemplate "N{subsubpunktnummer}";
+        coin:binding [ coin:property rinfoex:subsubpunktnummer ]
+     ], [
         coin:relFromBase rinfoex:mening;
         coin:fragmentTemplate "M{meningnummer}";
         coin:binding [ coin:property rinfoex:meningnummer ]

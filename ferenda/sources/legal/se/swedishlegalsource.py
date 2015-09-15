@@ -238,8 +238,12 @@ class SwedishLegalSource(DocumentRepository):
         b = BNode()
         current = b
         attributes = dict(attributes)
-        # create needed sub-nodes
-        for k in ("rinfoex:meningnummer", "rinfoex:punktnummer",
+        # create needed sub-nodes. FIXME: this includes multiple
+        # rinfoex values -- these should be in a derivec lagen.nu
+        # class. Maybe using similar approach as
+        # SFS.ordinalpredicates?
+        for k in ("rinfoex:meningnummer", "rinfoex:subsubpunktnummer",
+                  "rinfoex:subpunktnummer", "rinfoex:punktnummer",
                   "rinfoex:styckenummer", "rpubl:paragrafnummer",
                   "rinfoex:rubriknummer", "rpubl:kapitelnummer"):
             if k in attributes:

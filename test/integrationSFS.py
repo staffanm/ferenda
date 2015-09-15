@@ -35,16 +35,18 @@ class Parse(unittest.TestCase):
         # p.lagrum_parser = FakeParser()
         b = self.p.makeForfattning()
         elements = self.p._count_elements(b)
-        if 'K' in elements and elements['K'] > 1 and elements['P1'] < 2:
-            skipfragments = ['A', 'K']
-        else:
-            skipfragments = ['A']
+
+        # FIXME: How was this used? Where should we plug
+        # skipfragments?
+        # if 'K' in elements and elements['K'] > 1 and elements['P1'] < 2:
+        #     skipfragments = ['A', 'K']
+        # else:
+        #     skipfragments = ['A']
 
         # NB: _construct_ids won't look for references
         self.p.visit_node(b, self.p.construct_id, {})
-        self.p.visit_node(b, self.p.find_definitions, True, debug=False)
+        self.p.visit_node(b, self.p.find_definitions, False, debug=False)
         self.p.lagrum_parser.parse_recursive(b)
-
         self._remove_uri_for_testcases(b)
         resultfilename = filename.replace(".txt", ".xml")
         if os.path.exists(resultfilename):
@@ -53,6 +55,9 @@ class Parse(unittest.TestCase):
             self.assertEqual(result, serialize(b).strip())
         else:
             self.assertEqual("", serialize(b).strip())
+        # reset the state of the repo...
+        self.p.current_section = '0'
+        self.current_headline_level = 0
 
     def _remove_uri_for_testcases(self, part):
         if hasattr(part,'uri'):

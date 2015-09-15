@@ -1264,7 +1264,19 @@ class SFS(Trips):
                         ordinal += 1
                     if node == othernode:
                         break
-            state[self.ordinalpredicates.get(node.__class__)] = ordinal
+
+            # in the case of Listelement / rinfoex:punktnummer, these
+            # can be nested. In order to avoid overwriting a toplevel
+            # Listelement with the ordinal from a sub-Listelement, we
+            # make up some extra RDF predicates that our URISpace
+            # definition knows how to handle. NB: That def doesn't support
+            # a nesting of arbitrary depth, but this should not be a
+            # problem in practice.
+            ordinalpredicate = self.ordinalpredicates.get(node.__class__)
+            if ordinalpredicate == "rinfoex:punktnummer":
+                while ordinalpredicate in state:
+                    ordinalpredicate = "rinfoex:sub" + ordinalpredicate.split(":")[1]
+            state[ordinalpredicate] = ordinal
             del state['parent']
             res = self.attributes_to_resource(state)
             try:
