@@ -1318,16 +1318,25 @@ class SFS(Trips):
             find_definitions_recursive = find_definitions
 
         # Hitta lagrumshänvisningar + definitioner
-        if isinstance(element, (Stycke, Listelement, Tabellcell)):
+        if isinstance(element, (Stycke, Listelement, Tabellrad)):
             nodes = []
             term = None
 
             # self.log.debug("handling text %s, find_definitions %s" % (element[0],find_definitions))
             if find_definitions:
-                elementtext = element[0]
+                # For Tabellrad, this is a Tabellcell, not a string,
+                # but we fix that later
+                elementtext = element[0] 
                 termdelimiter = ":"
 
-                if isinstance(element, Tabellcell):
+                if isinstance(element, Tabellrad):
+                    # only the first cell can be a definition, and
+                    # only if it's not the text "Beteckning". So for
+                    # the reminder of this func, we switch context to
+                    # not the element itself but rather the first
+                    # cell.
+                    element = elementtext 
+                    elementtext = element[0]
                     if elementtext != "Beteckning":
                         term = elementtext
                         self.log.debug(
