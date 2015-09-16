@@ -21,7 +21,7 @@ class SFS(OrigSFS):
         Rubrik: "rinfoex:rubriknummer",
         Stycke: "rinfoex:styckenummer",
         Listelement: "rinfoex:punktnummer",
-        Overgangsbestammelse: "rinfoex:overgangsbestammelse",
+        Overgangsbestammelse: "rinfoex:andringsforfattningnummer",
         Bilaga: "rinfoex:bilaganummer"
         # Avdelning: "rinfoex:avdelningsnummer",
     }
