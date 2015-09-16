@@ -125,7 +125,7 @@
       </NumreradLista>
     </Stycke><Stycke id="P2S3">
       <str>Med tullskuld och gemenskapsvara förstås detsamma som i </str>
-      <LinkSubject predicate="dcterms:references" uri="http://rinfo.lagrummet.se/ext/celex/31992R2913">rådets förordning (EEG) nr 2913/92 av den 12 oktober 1992</LinkSubject>
+      <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/ext/celex/31992R2913">rådets förordning (EEG) nr 2913/92 av den 12 oktober 1992</LinkSubject>
       <str> om inrättandet av en tullkodex för gemenskapen.</str>
     </Stycke><Stycke id="P2S4">
       <str>Särskilda bestämmelser om vem som i vissa fall är skattskyldig finns i </str>
