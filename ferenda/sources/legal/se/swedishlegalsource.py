@@ -245,7 +245,8 @@ class SwedishLegalSource(DocumentRepository):
         for k in ("rinfoex:meningnummer", "rinfoex:subsubpunktnummer",
                   "rinfoex:subpunktnummer", "rinfoex:punktnummer",
                   "rinfoex:styckenummer", "rpubl:paragrafnummer",
-                  "rinfoex:rubriknummer", "rpubl:kapitelnummer"):
+                  "rinfoex:rubriknummer", "rpubl:kapitelnummer",
+                  "rinfoex:bilaganummer"):
             if k in attributes:
                 p = uri(k)
                 g.add((current, p, Literal(attributes[k])))

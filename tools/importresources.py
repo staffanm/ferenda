@@ -239,6 +239,21 @@ def mapspace(base, dest):
         if s:
             graph.add((s, p, o))
 
+    # locate and remove the bilaga fragmentTemplate
+    # 1 find root bnode
+    root = graph.value(predicate=COIN.fragmentTemplate,
+                       object=rdflib.Literal("bilaga_{repr}"))
+    # 2 find binding bnode
+    binding = graph.value(subject=root, predicate=COIN.binding)
+    # remove it all
+    for (p, o) in graph.predicate_objects(binding):
+        graph.remove((binding, p, o))
+    for (p, o) in graph.predicate_objects(root):
+        graph.remove((root, p, o))
+    space = graph.value(predicate=COIN.template, object=root)
+    graph.remove((space, COIN.template, root))
+    
+    # add extra stuff
     extra = """
 @prefix : <http://rinfo.lagrummet.se/sys/uri/space#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -279,6 +294,10 @@ space: coin:template [
         coin:relFromBase rinfoex:rubrik;
         coin:fragmentTemplate "R{rubriknummer}";
         coin:binding [ coin:property rinfoex:rubriknummer ]
+     ], [
+        coin:relFromBase rinfoex:bilaga;
+        coin:fragmentTemplate "B{bilaganummer}";
+        coin:binding [ coin:property rinfoex:bilaganummer ]
      ], [
         coin:uriTemplate "/ext/celex/{celexNummer}#{artikelnummer}";
         coin:binding [ coin:property rpubl:celexNummer ],
