@@ -22,8 +22,8 @@ class SFS(OrigSFS):
         Stycke: "rinfoex:styckenummer",
         Listelement: "rinfoex:punktnummer",
         Overgangsbestammelse: "rinfoex:andringsforfattningnummer",
-        Bilaga: "rinfoex:bilaganummer"
-        # Avdelning: "rinfoex:avdelningsnummer",
+        Bilaga: "rinfoex:bilaganummer",
+        Avdelning: "rinfoex:avdelningnummer"
     }
 
     def _makeimages(self):

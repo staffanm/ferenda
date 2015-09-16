@@ -1228,7 +1228,7 @@ class SFS(Trips):
 #        Listelement: "rinfoex:punktnummer",
 #        Overgangsbestammelse: "rinfoex:overgangsbestammelse",
 #        Bilaga: "rinfoex:bilaganummer"
-#        Avdelning: "rinfoex:avdelningsnummer",
+#        Avdelning: "rinfoex:avdelningnummer",
     }
 
     def _construct_base_attributes(self, sfsid):
@@ -1278,6 +1278,11 @@ class SFS(Trips):
                     ordinalpredicate = "rinfoex:sub" + ordinalpredicate.split(":")[1]
             state[ordinalpredicate] = ordinal
             del state['parent']
+            for skip, ifpresent in self.skipfragments:
+                if skip in state and ifpresent in state:
+                    del state[skip]
+                    
+
             res = self.attributes_to_resource(state)
             try:
                 uri = self.minter.space.coin_uri(res)
@@ -1458,10 +1463,12 @@ class SFS(Trips):
 
         elements = self._count_elements(doc.body)
         if 'K' in elements and elements['P1'] < 2:
-            skipfragments = ['A', 'K']
+            self.skipfragments = [
+                ('rinfoex:avdelningnummer', 'rpubl:kapitelnummer'),
+                ('rpubl:kapitelnummer', 'rpubl:paragrafnummer')]
         else:
-            skipfragments = ['A']
-
+            self.skipfragments = [('rinfoex:avdelningnummer',
+                                   'rpubl:kapitelnummer')]
 
         self.visit_node(doc.body, self.construct_id, {})
         self.visit_node(doc.body, self.find_definitions, True, debug=False)

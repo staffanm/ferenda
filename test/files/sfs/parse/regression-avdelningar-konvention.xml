@@ -5,12 +5,12 @@
   <Stycke id="S2">
     <str>HAR KOMMIT ÖVERENS OM FÖLJANDE.</str>
   </Stycke>
-  <Avdelning ordinal="1" rubrik="AVDELNING I" underrubrik="KONVENTIONENS TILLÄMPNINGSOMRÅDE">
-    <Rubrik id="R1">Artikel 1</Rubrik>
-    <Stycke id="S1">
+  <Avdelning id="A1" ordinal="1" rubrik="AVDELNING I" underrubrik="KONVENTIONENS TILLÄMPNINGSOMRÅDE">
+    <Rubrik id="A1R1">Artikel 1</Rubrik>
+    <Stycke id="A1S1">
       <str>Konventionens tillämpningsområde</str>
       <NumreradLista>
-        <Listelement id="S1N1" ordinal="1">
+        <Listelement id="A1S1N1" ordinal="1">
           <str>1. Bestämmelserna i denna konvention skall tillämpas på avtalsförpliktelser i de fall då ett val skall göras mellan lagarna i olika länder.</str>
         </Listelement>
       </NumreradLista>

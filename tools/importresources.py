@@ -295,6 +295,10 @@ space: coin:template [
         coin:fragmentTemplate "R{rubriknummer}";
         coin:binding [ coin:property rinfoex:rubriknummer ]
      ], [
+        coin:relFromBase rinfoex:avdelning;
+        coin:fragmentTemplate "A{avdelningnummer}";
+        coin:binding [ coin:property rinfoex:avdelningnummer ]
+     ], [
         coin:relFromBase rinfoex:bilaga;
         coin:fragmentTemplate "B{bilaganummer}";
         coin:binding [ coin:property rinfoex:bilaganummer ]

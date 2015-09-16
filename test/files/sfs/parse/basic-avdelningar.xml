@@ -1,5 +1,5 @@
 <Forfattning>
-  <Avdelning ordinal="1" rubrik="FÖRSTA AVDELNINGEN" underrubrik="ÖVERGRIPANDE BESTÄMMELSER">
+  <Avdelning id="A1" ordinal="1" rubrik="FÖRSTA AVDELNINGEN" underrubrik="ÖVERGRIPANDE BESTÄMMELSER">
     <Kapitel id="K1" ordinal="1" rubrik="1 Kap. Första kapitlet">
       <Paragraf id="K1P1" ordinal="1">
         <Stycke id="K1P1S1">
@@ -8,7 +8,7 @@
       </Paragraf>
     </Kapitel>
   </Avdelning>
-  <Avdelning ordinal="2" rubrik="ANDRA AVDELNINGEN" underrubrik="NÅGOT ANNAT">
+  <Avdelning id="A2" ordinal="2" rubrik="ANDRA AVDELNINGEN" underrubrik="NÅGOT ANNAT">
     <Kapitel id="K2" ordinal="2" rubrik="2 Kap. Andra kapitlet">
       <Paragraf id="K2P1" ordinal="1">
         <Stycke id="K2P1S1">

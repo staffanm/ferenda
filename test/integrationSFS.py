@@ -38,10 +38,13 @@ class Parse(unittest.TestCase):
 
         # FIXME: How was this used? Where should we plug
         # skipfragments?
-        # if 'K' in elements and elements['K'] > 1 and elements['P1'] < 2:
-        #     skipfragments = ['A', 'K']
-        # else:
-        #     skipfragments = ['A']
+        if 'K' in elements and elements['K'] > 1 and elements['P1'] < 2:
+            self.p.skipfragments = [
+                ('rinfoex:avdelningnummer', 'rpubl:kapitelnummer'),
+                ('rpubl:kapitelnummer', 'rpubl:paragrafnummer')]
+        else:
+            self.p.skipfragments = [('rinfoex:avdelningnummer',
+                                     'rpubl:kapitelnummer')]
 
         # NB: _construct_ids won't look for references
         self.p.visit_node(b, self.p.construct_id, {})
@@ -57,7 +60,7 @@ class Parse(unittest.TestCase):
             self.assertEqual("", serialize(b).strip())
         # reset the state of the repo...
         self.p.current_section = '0'
-        self.current_headline_level = 0
+        self.p.current_headline_level = 0
 
     def _remove_uri_for_testcases(self, part):
         if hasattr(part,'uri'):
