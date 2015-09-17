@@ -1,9 +1,13 @@
 HFD 2013 not. 3
-RÃ… 1999 not 421
+RÅ 1999 not 421
 MIG 2011 not 4
 
 <list>
   <Link uri="https://lagen.nu/rf/hfd/2013/not/3">HFD 2013 not. 3</Link>
-  <Link uri="https://lagen.nu/rf/ra/1999/not/421">RÃ… 1999 not 421</Link>
+  <str>
+</str>
+  <Link uri="https://lagen.nu/rf/ra/1999/not/421">RÅ 1999 not 421</Link>
+  <str>
+</str>
   <Link uri="https://lagen.nu/rf/mig/2011/not/4">MIG 2011 not 4</Link>
 </list>

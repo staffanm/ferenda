@@ -206,6 +206,8 @@ class LegalRef:
         self.predicate = predicate
         self.minter = minter
 
+        # from pudb import set_trace; set_trace()
+        
         # Depending on the URI Space definition graph, we might not
         # have URI templates for the most fine-grained objects (the
         # canonical URI Space does not support anything more specific
