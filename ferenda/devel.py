@@ -6,6 +6,8 @@ from difflib import unified_diff
 from tempfile import mkstemp
 import inspect
 import codecs
+from itertools import islice
+import shutil
 
 from rdflib import Graph, URIRef, RDF
 import six
@@ -159,7 +161,7 @@ class Devel(object):
                 row['subobjects'] = len(list(g.subject_objects(RDF.type)))
                 writer.writerow(row)
 
-    def _repo_from_alias(self, alias):
+    def _repo_from_alias(self, alias, datadir=None):
         #  (FIXME: This uses several undocumented APIs)
         mainconfig = self.config._parent
         assert mainconfig is not None, "Devel must be initialized with a full set of configuration"
@@ -172,11 +174,16 @@ class Devel(object):
         for key, val in repocls.get_default_options().items():
             if key not in repo.config:
                 LayeredConfig.set(repo.config, key, val, "defaults")
+        if datadir is None:
+            datadir = repo.config.datadir + os.sep + repo.alias
+            
         repo.store = repo.documentstore_class(
-            repo.config.datadir + os.sep + repo.alias,
+            datadir,
             downloaded_suffix=repo.downloaded_suffix,
             storage_policy=repo.storage_policy)
         return repo
+
+
 
     @decorators.action
     def mkpatch(self, alias, basefile, description):
@@ -438,6 +445,35 @@ class Devel(object):
         start_response = Mock()
         for chunk in app(environ, start_response):
             sys.stdout.write(chunk)
+
+    @decorators.action
+    def samplerepo(self, alias, sourcedir):
+        if 'samplesize' in self.config:
+            samplesize = int(self.config.samplesize)
+        else:
+            samplesize = 10
+
+        destrepo = self._repo_from_alias(alias)
+        sourcerepo = self._repo_from_alias(alias, sourcedir)
+        for basefile in islice(sourcerepo.store.list_basefiles_for("parse"),
+                            0, samplesize):
+            print("  %s: copying %s" % (alias, basefile))
+            src = sourcerepo.store.downloaded_path(basefile)
+            dst = destrepo.store.downloaded_path(basefile)
+            copy = shutil.copy2
+            if sourcerepo.store.storage_policy == "dir":
+                src = os.path.dirname(src)
+                dst = os.path.dirname(dst)
+                copy = shutil.copytree
+            util.ensure_dir(dst)
+            copy(src, dst)
+
+    def samplerepos(self, sourcedir):
+        for alias in self.config._parent._subsections:
+            if alias == self.alias:
+                continue
+            print("Copying from %s" % alias)
+            self.samplerepo(alias, sourcedir+os.sep+alias)
 
     # FIXME: These are dummy implementations of methods and class
     # variables that manager.py expects all docrepos to have. We don't
