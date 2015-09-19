@@ -30,7 +30,7 @@ from . import RPUBL, RINFOEX
 PROV = Namespace(util.ns['prov'])
 
 
-class MyndFskr(SwedishLegalSource):
+class MyndFskrBase(SwedishLegalSource):
 
     """A abstract base class for fetching and parsing regulations from
     various swedish government agencies. These documents often have a
@@ -544,7 +544,7 @@ class MyndFskr(SwedishLegalSource):
         return [(self.__class__.__name__, self.dataset_uri())]
 
 
-class AFS(MyndFskr):
+class AFS(MyndFskrBase):
     alias = "afs"
     start_url = "http://www.av.se/lagochratt/afs/nummerordning.aspx"
     basefile_regex = None
@@ -601,7 +601,7 @@ class AFS(MyndFskr):
         return super(AFS, self).download_sanitize_basefile(basefile.replace("_", ":"))
 
 
-class BOLFS(MyndFskr):
+class BOLFS(MyndFskrBase):
     # FIXME: The id is not linked, and the link does not *reliably*
     # contain the id: given link, one should get
     # link.parent.parent.parent.div.h3.text for the basefile. Most of
@@ -610,14 +610,14 @@ class BOLFS(MyndFskr):
     start_url = "http://www.bolagsverket.se/om/oss/verksamhet/styr/forfattningssamling"
 
 
-class DIFS(MyndFskr):
+class DIFS(MyndFskrBase):
     alias = "difs"
     start_url = "http://www.datainspektionen.se/lagar-och-regler/datainspektionens-foreskrifter/"
 
     # def sanitize_text(self, text, basefile):
 
 
-class DVFS(MyndFskr):
+class DVFS(MyndFskrBase):
     alias = "dvfs"
     start_url = "http://www.domstol.se/Ladda-ner--bestall/Verksamhetsstyrning/DVFS/DVFS1/"
     downloaded_suffix = ".html"
@@ -693,7 +693,7 @@ class DVFS(MyndFskr):
         return t
 
 
-class EIFS(MyndFskr):
+class EIFS(MyndFskrBase):
     alias = "eifs"
     start_url = "http://www.ei.se/sv/Publikationer/Foreskrifter/"
     basefile_regex = None
@@ -705,7 +705,7 @@ class EIFS(MyndFskr):
         return super(EIFS, self).download_sanitize_basefile(basefile)
 
 
-class ELSAKFS(MyndFskr):
+class ELSAKFS(MyndFskrBase):
     alias = "elsakfs"  # real name is ELSÄK-FS, but avoid swedchars, uppercase and dashes
     uri_slug = "elsaek-fs"  # for use in
     start_url = "http://www.elsakerhetsverket.se/om-oss/lag-och-ratt/gallande-regler/Elsakerhetsverkets-foreskrifter-listade-i-nummerordning/"
@@ -724,13 +724,13 @@ class ELSAKFS(MyndFskr):
     # when we expected documents
 
 
-class Ehalso(MyndFskr):
+class Ehalso(MyndFskrBase):
     alias = "ehalso"
     # Ehälsomyndigheten publicerar i TLVFS
     start_url = "http://www.ehalsomyndigheten.se/Om-oss-/Foreskrifter/"
 
 
-class FFFS(MyndFskr):
+class FFFS(MyndFskrBase):
     alias = "fffs"
     start_url = "http://www.fi.se/Regler/FIs-forfattningar/Forteckning-FFFS/"
     document_url = "http://www.fi.se/Regler/FIs-forfattningar/Samtliga-forfattningar/%s/"
@@ -811,7 +811,7 @@ class FFFS(MyndFskr):
             self.log.warning("%s: No idea!" % basefile)
 
 
-class FFS(MyndFskr):
+class FFS(MyndFskrBase):
     alias = "ffs"
     start_url = "http://www.forsvarsmakten.se/sv/om-myndigheten/dokument/lagrum"
     # FIXME: document_url_regex should match
@@ -821,70 +821,70 @@ class FFS(MyndFskr):
     #   http://www.forsvarsmakten.se/siteassets/4-om-myndigheten/dokumentfiler/lagrum/gallande-fib/fib2001-4.pdf
 
 
-class FMI(MyndFskr):
+class FMI(MyndFskrBase):
     alias = "fmi"
     # Fastighetsmäklarinspektionen publicerar i KAMFS
     start_url = "http://www.fmi.se/gallande-foreskrifter"
 
 
-class FoHMFS(MyndFskr):
+class FoHMFS(MyndFskrBase):
     alias = "fohmfs"
     start_url = "http://www.folkhalsomyndigheten.se/publicerat-material/foreskrifter-och-allmanna-rad/"
 
 
-class KFMFS(MyndFskr):
+class KFMFS(MyndFskrBase):
     alias = "kfmfs"
     start_url = "http://www.kronofogden.se/Foreskrifter.html"
 
 
-class KOVFS(MyndFskr):
+class KOVFS(MyndFskrBase):
     alias = "kovfs"
     start_url = "http://publikationer.konsumentverket.se/sv/publikationer/lagarregler/forfattningssamling-kovfs/"
 
 
-class KVFS(MyndFskr):
+class KVFS(MyndFskrBase):
     alias = "kvfs"
     start_url = "http://www.kriminalvarden.se/om-kriminalvarden/publikationer/regelverk"
     # (finns även konsoliderade på http://www.kriminalvarden.se/om-kriminalvarden/styrning-och-regelverk/lagar-forordningar-och-foreskrifter)
 
 
-class LMFS(MyndFskr):
+class LMFS(MyndFskrBase):
     alias = "lmfs"
     start_url = "http://www.lantmateriet.se/Om-Lantmateriet/Rattsinformation/Foreskrifter/"
 
 
-class LIFS(MyndFskr):
+class LIFS(MyndFskrBase):
     alias = "lifs"
     start_url = "http://www.lotteriinspektionen.se/sv/Lagar-och-villkor/Foreskrifter/"
 
 
-class LVFS(MyndFskr):
+class LVFS(MyndFskrBase):
     alias = "lvfs"
     start_url = "http://www.lakemedelsverket.se/overgripande/Lagar--regler/Lakemedelsverkets-foreskrifter---LVFS/"
 
 
-class MIGRFS(MyndFskr):
+class MIGRFS(MyndFskrBase):
     alias = "migrfs"
     start_url = "http://www.migrationsverket.se/info/1082.html"
 
 
-class MRTVFS(MyndFskr):
+class MRTVFS(MyndFskrBase):
     alias = "mrtvfs"
     start_url = "http://www.radioochtv.se/Publikationer-Blanketter/Foreskrifter/"
 
 
-class MSBFS(MyndFskr):
+class MSBFS(MyndFskrBase):
     alias = "msbfs"
     start_url = "https://www.msb.se/sv/Om-MSB/Lag-och-ratt/ (efter POST)"
 
 
-class MYHFS(MyndFskr):
+class MYHFS(MyndFskrBase):
     #  (id vs länk)
     alias = "myhfs"
     start_url = "https://www.myh.se/Lagar-regler-och-tillsyn/Foreskrifter/"
 
 
-class NFS(MyndFskr):
+class NFS(MyndFskrBase):
     alias = "nfs"
     start_url = "http://www.naturvardsverket.se/nfs"
     basefile_regex = "^(?P<basefile>S?NFS \d+:\d+)$"
@@ -947,23 +947,23 @@ class NFS(MyndFskr):
                 self.download_single(subbasefile, suburl)
 
 
-class RNFS(MyndFskr):
+class RNFS(MyndFskrBase):
     alias = "rnfs"
     start_url = "http://www.revisorsnamnden.se/rn/om_rn/regler/kronologi.html"
 
 
-class RAFS(MyndFskr):
+class RAFS(MyndFskrBase):
     #  (efter POST)
     alias = "rafs"
     start_url = "http://riksarkivet.se/rafs"
 
 
-class RGKFS(MyndFskr):
+class RGKFS(MyndFskrBase):
     alias = "rgkfs"
     start_url = "https://www.riksgalden.se/sv/omriksgalden/Pressrum/publicerat/Foreskrifter/"
 
 
-class SJVFS(MyndFskr):
+class SJVFS(MyndFskrBase):
     alias = "sjvfs"
     start_url = "http://www.jordbruksverket.se/forfattningar/forfattningssamling.4.5aec661121e2613852800012537.html"
     download_iterlinks = False
@@ -1005,7 +1005,7 @@ class SJVFS(MyndFskr):
                     yield(basefile, suburl)
 
 
-class SKVFS(MyndFskr):
+class SKVFS(MyndFskrBase):
     alias = "skvfs"
     source_encoding = "utf-8"
     storage_policy = "dir"
@@ -1096,7 +1096,7 @@ class SKVFS(MyndFskr):
             raise ParseError("%s: Didn't find a suitable header" % basefile)
 
 
-class SOSFS(MyndFskr):
+class SOSFS(MyndFskrBase):
     alias = "sosfs"
     start_url = "http://www.socialstyrelsen.se/sosfs"
     storage_policy = "dir"  # must be able to handle attachments
@@ -1221,7 +1221,7 @@ class SOSFS(MyndFskr):
         return super(SOSFS, self).parse_metadata_from_textreader(reader, doc)
 
 
-class STAFS(MyndFskr):
+class STAFS(MyndFskrBase):
     alias = "stafs"
     start_url = ("http://www.swedac.se/sv/Det-handlar-om-fortroende/"
                  "Lagar-och-regler/Gallande-foreskrifter-i-nummerordning/")
@@ -1287,12 +1287,12 @@ class STAFS(MyndFskr):
                 (basefile, mainurl, e))
 
 
-class STFS(MyndFskr):
+class STFS(MyndFskrBase):
     # (id vs länk)
     alias = "stfs"
     start_url = "http://www.sametinget.se/1014?cat_id=52"
 
 
-class SvKFS(MyndFskr):
+class SvKFS(MyndFskrBase):
     alias = "svkfs"
     start_url = "http://www.svk.se/Tekniska-krav/Foreskrifter/"

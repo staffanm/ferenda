@@ -7,7 +7,6 @@ from rdflib import RDF, URIRef
 from rdflib.namespace import DCTERMS, SKOS
 from ferenda.sources.legal.se import RPUBL
 
-# from ferenda.sources.legal.se import MyndFskr as OrigMyndFskr
 from ferenda.sources.legal.se import myndfskr
 from ferenda import CompositeRepository, CompositeStore, Facet, TocPageset, TocPage
 from ferenda import util
@@ -16,15 +15,13 @@ from ferenda.sources.legal.se import SwedishLegalSource, SwedishLegalStore, Swed
 
 from six import text_type as str
 
-# class MyndFskr(OrigMyndFskr):
-#     pass
 
 # inherit list_basefiles_for from CompositeStore, basefile_to_pathfrag
 # from SwedishLegalStore)
-class CompositeMyndFskrStore(CompositeStore, SwedishLegalStore):
+class MyndFskrStore(CompositeStore, SwedishLegalStore):
     pass
 
-class CompositeMyndFskr(CompositeRepository, SwedishLegalSource):
+class MyndFskr(CompositeRepository, SwedishLegalSource):
     alias = "myndfs"
     subrepos = [
         myndfskr.AFS,
@@ -65,7 +62,7 @@ class CompositeMyndFskr(CompositeRepository, SwedishLegalSource):
                   ('rpubl', 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#'),
                   ('rinfoex', 'http://lagen.nu/terms#')]
     sparql_annotations = None  # until we can speed things up
-    documentstore_class = CompositeMyndFskrStore
+    documentstore_class = MyndFskrStore
     
     def facets(self):
         # maybe if each entry in the list could be a tuple or a single

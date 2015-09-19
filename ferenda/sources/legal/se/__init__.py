@@ -14,7 +14,7 @@ from .dv import DV
 from .jk import JK
 from .jo import JO
 from .kommitte import Kommitte
-from .myndfskr import MyndFskr
+from .myndfskr import MyndFskrBase
 from .propositioner import Propositioner
 from .sfs import SFS
 from .sou import SOU
