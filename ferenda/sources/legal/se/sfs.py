@@ -365,17 +365,6 @@ class SFS(Trips):
         self.current_section = '0'
         self.current_headline_level = 0  # 0 = unknown, 1 = normal, 2 = sub
 
-        # the new DNS-based URLs can be dog slow for some reasons
-        # sometimes -- seems that they resolve to ipv6 addresses, and
-        # that connect() on my system is super slow. Quick hack to
-        # change them to IP-based ones (luckily, no Host: header is
-        # needed).
-        for p in ('document_url_template',
-                  'document_sfsr_url_template',
-                  'document_sfsr_change_url_template'):
-            setattr(self, p,
-                    getattr(self, p).replace('rkrattsbaser.gov.se',
-                                             '193.188.157.98'))
         from ferenda.manager import loglevels
         self.trace = {}
         for logname in ('paragraf', 'tabell', 'numlist', 'rubrik'):

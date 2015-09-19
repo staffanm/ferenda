@@ -148,8 +148,8 @@ class Trips(SwedishLegalSource):
         existing_soup = BeautifulSoup(
             util.readfile(
                 existing,
-                encoding=self.source_encoding))
-        new_soup = BeautifulSoup(util.readfile(new, encoding=self.source_encoding))
+                encoding=self.source_encoding), "lxml")
+        new_soup = BeautifulSoup(util.readfile(new, encoding=self.source_encoding), "lxml")
         return existing_soup.pre != new_soup.pre
 
     def remote_url(self, basefile):
