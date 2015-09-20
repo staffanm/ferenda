@@ -143,8 +143,8 @@ class SOURegeringenLegacy(RegeringenLegacy, SameAs, SOURegeringen):
     alias = "souregeringen.legacy"
 
 
-class DsLegacy(RegeringenLegacy, SameAs, Ds):
-    alias = "ds.legacy"
+class DsRegeringenLegacy(RegeringenLegacy, SameAs, Ds):
+    alias = "dsregeringen.legacy"
 
 
 class PropRegeringenLegacy(RegeringenLegacy, SameAs, PropRegeringen):

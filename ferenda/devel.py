@@ -8,6 +8,7 @@ import inspect
 import codecs
 from itertools import islice
 import shutil
+import random
 
 from rdflib import Graph, URIRef, RDF
 import six
@@ -455,25 +456,57 @@ class Devel(object):
 
         destrepo = self._repo_from_alias(alias)
         sourcerepo = self._repo_from_alias(alias, sourcedir)
-        for basefile in islice(sourcerepo.store.list_basefiles_for("parse"),
-                            0, samplesize):
+        randomsample = True
+        if randomsample:
+            basefiles = list(sourcerepo.store.list_basefiles_for("parse"))
+            samplesize = min([len(basefiles), samplesize])
+            basefiles = random.sample(list(sourcerepo.store.list_basefiles_for("parse")), samplesize)
+        else:
+            basefiles = islice(sourcerepo.store.list_basefiles_for("parse"),
+                               0, samplesize)
+        
+        for basefile in basefiles:
             print("  %s: copying %s" % (alias, basefile))
             src = sourcerepo.store.downloaded_path(basefile)
             dst = destrepo.store.downloaded_path(basefile)
+            isrc = sourcerepo.store.intermediate_path(basefile)
+            idst = destrepo.store.intermediate_path(basefile)
             copy = shutil.copy2
             if sourcerepo.store.storage_policy == "dir":
                 src = os.path.dirname(src)
                 dst = os.path.dirname(dst)
+                isrc = os.path.dirname(isrc)
+                idst = os.path.dirname(idst)
+                if os.path.exists(dst):
+                    shutil.rmtree(dst)
+                if os.path.exists(idst):
+                    shutil.rmtree(idst)
                 copy = shutil.copytree
             util.ensure_dir(dst)
             copy(src, dst)
+            if os.path.exists(isrc):
+                util.ensure_dir(idst)
+                copy(isrc, idst)
+
+            if os.path.exists(sourcerepo.store.documententry_path(basefile)):
+                util.ensure_dir(destrepo.store.documententry_path(basefile))
+                shutil.copy2(sourcerepo.store.documententry_path(basefile),
+                             destrepo.store.documententry_path(basefile))
 
     def samplerepos(self, sourcedir):
         for alias in self.config._parent._subsections:
             if alias == self.alias:
                 continue
-            print("Copying from %s" % alias)
-            self.samplerepo(alias, sourcedir+os.sep+alias)
+            aliascfg = self.config._parent._subsections[alias]
+            if 'samplesource' in aliascfg:
+                if not aliascfg.samplesource:
+                    continue
+                aliasdir = sourcedir+os.sep+aliascfg.samplesource
+            else:
+                aliasdir = sourcedir+os.sep+alias
+                    
+            print("%s: Copying docs from %s" % (alias, aliasdir))
+            self.samplerepo(alias, aliasdir)
 
     # FIXME: These are dummy implementations of methods and class
     # variables that manager.py expects all docrepos to have. We don't

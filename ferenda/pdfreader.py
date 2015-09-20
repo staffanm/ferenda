@@ -236,6 +236,15 @@ class PDFReader(CompoundElement):
         self.log.debug("running " + cmd)
         (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
 
+        # Step 4: Later versions of tesseract adds a automatic .hocr
+        # suffix, while earlier versions add a automatic .html. Other
+        # parts of the code expects the .html suffix, so we check to
+        # see if we have new-tesseract behaviour and compensate.
+        if os.path.exists("%(workdir)s/%(root)s%(suffix)s.hocr" % locals()):
+            util.robust_rename("%(workdir)s/%(root)s%(suffix)s.hocr" % locals(),
+                               "%(workdir)s/%(root)s%(suffix)s.html" % locals())
+                               
+        
         # Step 5: Cleanup (the main .tif file can stay)
         os.unlink(tmppdffile)
         for f in glob("%(workdir)s/%(root)s-tmp*.tif" % locals()):

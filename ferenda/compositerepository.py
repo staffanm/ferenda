@@ -191,14 +191,14 @@ class CompositeRepository(DocumentRepository):
                            'elapsed': time.time() - start})
             return ret
         else:
-            # FIXME: maybe subrepos should only contain those repos
-            # that actually had a chance of parsing (basefile in
+            # subrepos should only contain those repos that actually
+            # had a chance of parsing (basefile in
             # self.store.basefiles[c])
-            subrepos = ", ".join([self.get_instance(x).qualified_class_name()
-                                  for x in self.subrepos if basefile in self.store.basefiles[x]])
+            subrepos_lbl = ", ".join([self.get_instance(x).qualified_class_name()
+                                      for x in self.subrepos if basefile in self.store.basefiles[x]])
             raise errors.ParseError(
                 "No instance of %s was able to parse %s" %
-                (subrepos, basefile))
+                (subrepos_lbl, basefile))
 
     def copy_parsed(self, basefile, instance):
         # If the distilled and parsed links are recent, assume that
