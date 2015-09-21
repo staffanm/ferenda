@@ -299,7 +299,10 @@ class PDFReader(CompoundElement):
     dims = "bbox (?P<left>\d+) (?P<top>\d+) (?P<right>\d+) (?P<bottom>\d+)"
     re_dimensions = re.compile(dims).search
 
-    def _parse_hocr(self, fp):
+    def _parse_hocr(self, fp, dummy):
+        if dummy:
+            import warnings
+            warnings.warn("filenames passed to _parse_xml are now ignored", DeprecationWarning)
         def dimensions(s):
             m = self.re_dimensions(s)
             return m.groupdict()
@@ -375,7 +378,10 @@ class PDFReader(CompoundElement):
         self.log.debug("PDFReader initialized: %d pages" %
                        (len(self)))
 
-    def _parse_xml(self, xmlfp):
+    def _parse_xml(self, xmlfp, dummy=None):
+        if dummy:
+            import warnings
+            warnings.warn("filenames passed to _parse_xml are now ignored", DeprecationWarning)
         def txt(element_text):
             return re.sub(r"[\s\xa0\xc2]+", " ", str(element_text))
 

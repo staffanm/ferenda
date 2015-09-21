@@ -58,7 +58,6 @@ class PDFDocumentRepository(DocumentRepository):
 
     def create_external_resources(self, doc):
         cssfile = self.store.parsed_path(doc.basefile, attachment="index.css")
-        from pudb import set_trace; set_trace()
         with open(cssfile, "w") as fp:
             # Create CSS header with fontspecs
             for pdf in doc.body:
