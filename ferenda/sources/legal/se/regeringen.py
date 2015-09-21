@@ -327,7 +327,8 @@ class Regeringen(SwedishLegalSource):
     def sanitize_metadata(self, a, basefile):
         # trim space
         for k in ("dcterms:title", "dcterms:abstract"):
-            a[k] = util.normalize_space(a[k])
+            if k in a:
+                a[k] = util.normalize_space(a[k])
         # trim identifier
         a["dcterms:identifier"] = a["dcterms:identifier"].replace("ID-nummer: ", "")
         # save for later

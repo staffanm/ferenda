@@ -43,12 +43,13 @@ class RegeringenLegacy(Regeringen):
                 elif key == "Avsändare:":
                     ansvarig = value 
 
+        sammanfattning = None
         if content.find("h2", text="Sammanfattning"):
             sums = content.find("h2", text="Sammanfattning").find_next_siblings("p")
             # "\n\n" doesn't seem to survive being stuffed in a rdfa
             # content attribute. Replace with simple space.
             sammanfattning = " ".join([x.get_text(strip=True) for x in sums])
-
+        
         # find related documents
         re_basefile = re.compile(r'\d{4}(|/\d{2,4}):\d+')
         # legStep1=Kommittedirektiv, 2=Utredning, 3=lagrådsremiss,
@@ -110,15 +111,20 @@ class RegeringenLegacy(Regeringen):
                 r = urljoin("http://www.regeringen.se/", link["href"])
                 seealso.append(URIRef(r))
 
-        return {'dcterms:title': title,
-                'dcterms:identifier': identifier,
-                'dcterms:issued': utgiven,
-                'dcterms:abstract': sammanfattning,
-                'rpubl:utgarFran': utgarFran,
-                'rpubl:departement': ansvarig,
-                "rdfs:seeAlso": seealso
-        }
 
+        ret = {'dcterms:title': title,
+               'dcterms:identifier': identifier,
+               'dcterms:issued': utgiven,
+               'rpubl:utgarFran': utgarFran,
+               'rpubl:departement': ansvarig,
+               "rdfs:seeAlso": seealso
+        }
+        if sammanfattning:
+            ret['dcterms:abstract'] = sammanfattning
+
+        return ret
+    
+    
     def find_pdf_links(self, soup, basefile):
         pdffiles = []
         docsection = soup.find('div', 'doc')

@@ -379,13 +379,14 @@ class PDFReader(CompoundElement):
                        (len(self)))
 
     def _parse_xml(self, xmlfp, dummy=None):
+        filename = xmlfp.name
         if dummy:
             import warnings
             warnings.warn("filenames passed to _parse_xml are now ignored", DeprecationWarning)
         def txt(element_text):
             return re.sub(r"[\s\xa0\xc2]+", " ", str(element_text))
 
-        self.log.debug("Loading %s" % xmlfp.name)
+        self.log.debug("Loading %s" % filename)
 
         try:
             tree = etree.parse(xmlfp)
@@ -398,6 +399,7 @@ class PDFReader(CompoundElement):
             from io import BytesIO
             soup = BeautifulSoup(xmlfp, "xml")
             xmlfp = BytesIO(str(soup).encode("utf-8"))
+            xmlfp.name = filename
             tree = etree.parse(xmlfp)
             self.log.debug("BeautifulSoup workaround successful")
 
@@ -411,7 +413,7 @@ class PDFReader(CompoundElement):
                         height=int(pageelement.attrib['height']),
                         background=None)
             background = "%s%03d.png" % (
-                os.path.splitext(xmlfp.name)[0], page.number)
+                os.path.splitext(filename)[0], page.number)
 
             # Reasons this file might not exist: it was blank and
             # therefore removed, or We're running under RepoTester

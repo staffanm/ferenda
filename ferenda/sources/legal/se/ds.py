@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import re
 
+from rdflib.namespace import SKOS
 
 from . import Regeringen, RPUBL
 
@@ -16,3 +17,12 @@ class Ds(Regeringen):
     rdf_type = RPUBL.Utredningsbetankande
     document_type = Regeringen.DS
     sparql_annotations = None  # don't even bother creating an annotation file
+
+    def canonical_uri(self, basefile):
+        year, ordinal = basefile.split(":")
+        attrib = {'rpubl:arsutgava': year,
+                  'rpubl:lopnummer': ordinal,
+                  'rpubl:utrSerie': self.lookup_resource("Ds", SKOS.altLabel),
+                  'rdf:type': self.rdf_type}
+        resource = self.attributes_to_resource(attrib)
+        return self.minter.space.coin_uri(resource) 

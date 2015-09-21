@@ -12,4 +12,5 @@ class DsRegeringen(OrigDs, SameAs):
 
 
 class Ds(CompositeRepository):
+    alias = "ds"
     subrepos = DsRegeringen, DsRegeringenLegacy
