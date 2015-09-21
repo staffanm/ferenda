@@ -58,10 +58,11 @@ class PDFDocumentRepository(DocumentRepository):
 
     def create_external_resources(self, doc):
         cssfile = self.store.parsed_path(doc.basefile, attachment="index.css")
+        from pudb import set_trace; set_trace()
         with open(cssfile, "w") as fp:
             # Create CSS header with fontspecs
             for pdf in doc.body:
-                assert isinstance(pdf, PDFReader)
+                assert isinstance(pdf, PDFReader), "doc.body is %s, not PDFReader -- still need to access fontspecs etc" % type(pdf)
                 for spec in list(pdf.fontspec.values()):
                     fp.write(".fontspec%s {font: %spx %s; color: %s;}\n" %
                              (spec['id'], spec['size'], spec['family'], spec['color']))

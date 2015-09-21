@@ -1218,13 +1218,14 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command, wrapctrlc=False):
             # when everyting's ok
         else:
             errmsg = str(e)
-            getlog().error("%s of %s failed: %s" %
+            getlog().error("%s of %s fAiled: %s" %
                            (command, basefile, errmsg))
             exc_type, exc_value, tb = sys.exc_info()
             return exc_type, exc_value, traceback.extract_tb(tb)
     except Exception as e:
         errmsg = str(e)
-        getlog().error("%s of %s failed: %s" %
+        from pudb import set_trace; set_trace()
+        getlog().error("%s of %s Failed: %s" %
                        (command, basefile, errmsg))
         exc_type, exc_value, tb = sys.exc_info()
         return exc_type, exc_value, traceback.extract_tb(tb)

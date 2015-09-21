@@ -718,7 +718,7 @@ class SwedishLegalSource(DocumentRepository):
 #                'label': row['dcterms_identifier'] + ": " + row['dcterms_title']}
 
 
-def offtryck_parser(basefile="0", metrics=None, preset=None):
+def offtryck_parser(basefile="0", metrics=None, preset=None, identifier=None):
     # First: merge the metrics we're provided with with a set of
     # defaults (for fallback), and wrap them in a LayeredConfig
     # structure
@@ -732,6 +732,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None):
                       'even_leftmargin': 278,
                       'even_parindent': 293,
                       'even_rightmargin': 725,
+                      'bottommargin': 800,
+                      'topmargin': 100,
                       'h1': {'family': 'TimesNewRomanPS-BoldMT',  # should also be weight: bold?
                              'size': 20},
                       'h2': {'family': 'TimesNewRomanPS-BoldMT',
@@ -749,7 +751,6 @@ def offtryck_parser(basefile="0", metrics=None, preset=None):
     state = LayeredConfig(Defaults({'pageno': 0,
                                     'appendixno': None,
                                     'preset': preset}))
-
     def is_pagebreak(parser):
         return isinstance(parser.reader.peek(), Page)
 
@@ -1034,6 +1035,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None):
 
     p.initial_state = "body"
     p.initial_constructor = make_body
+    p.current_identifier = identifier
     return p
 
 

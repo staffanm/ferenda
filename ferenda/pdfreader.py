@@ -57,6 +57,7 @@ class PDFReader(CompoundElement):
     ################################################################
     # properties and methods relating to the initialization of the
     # PDFReader object
+
     def __init__(self,
                  pages=None,
                  filename=None,
@@ -293,12 +294,12 @@ class PDFReader(CompoundElement):
                 raise errors.ExternalCommandError(stderr)
         finally:
             os.unlink(tmppdffile)
-            assert not os.path.exists(tmppdffile)
+            assert not os.path.exists(tmppdffile), "tmppdffile still there:" + tmppdffile
 
     dims = "bbox (?P<left>\d+) (?P<top>\d+) (?P<right>\d+) (?P<bottom>\d+)"
     re_dimensions = re.compile(dims).search
 
-    def _parse_hocr(self, fp, filename):
+    def _parse_hocr(self, fp):
         def dimensions(s):
             m = self.re_dimensions(s)
             return m.groupdict()
@@ -374,11 +375,11 @@ class PDFReader(CompoundElement):
         self.log.debug("PDFReader initialized: %d pages" %
                        (len(self)))
 
-    def _parse_xml(self, xmlfp, xmlfilename):
+    def _parse_xml(self, xmlfp):
         def txt(element_text):
             return re.sub(r"[\s\xa0\xc2]+", " ", str(element_text))
 
-        self.log.debug("Loading %s" % xmlfilename)
+        self.log.debug("Loading %s" % xmlfp.name)
 
         try:
             tree = etree.parse(xmlfp)
@@ -404,7 +405,7 @@ class PDFReader(CompoundElement):
                         height=int(pageelement.attrib['height']),
                         background=None)
             background = "%s%03d.png" % (
-                os.path.splitext(xmlfilename)[0], page.number)
+                os.path.splitext(xmlfp.name)[0], page.number)
 
             # Reasons this file might not exist: it was blank and
             # therefore removed, or We're running under RepoTester
@@ -567,10 +568,105 @@ class PDFReader(CompoundElement):
                 textbox.bottom + (prevbox.height * linespacing) - prevbox.height >= nextbox.top):
             return True
 
+class StreamingPDFReader(PDFReader):
+    def __init__(self, *args, **kwargs):
+        """Experimental API for PDFReader that separates conversion (Word
+        etc->)PDF->intermediate format from parsing of the
+        intermediate XML/hOCR data. """
+        self.log = logging.getLogger('pdfreader')
+        self.fontspec = kwargs.get('fontspec') or {}
+        return None
+
+    def parse(self, filename, workdir, images=True,
+              convert_to_pdf=False,
+              keep_xml=True,
+              ocr_lang=None,
+              fontspec=None):
+        self.read(self.convert(filename, workdir, images, convert_to_pdf,
+                               keep_xml, ocr_lang))
+
+    def intermediate_filename(self, filename, ocr_lang, keep_xml):
+        basename = os.path.basename(filename)
+        stem = os.path.splitext(basename)[0]
+        if ocr_lang:
+            suffix = ".hocr.html"
+        else:
+            suffix = ".xml"
+        convertedfile = os.sep.join([self.workdir, stem + suffix])
+        if keep_xml == "bz2":
+            real_convertedfile = convertedfile + ".bz2"
+        else:
+            real_convertedfile = convertedfile
+        return real_convertedfile
+
+    def convert(self, filename, workdir=None, images=True,
+                convert_to_pdf=False, keep_xml=True, ocr_lang=None):
+        self.workdir = workdir
+        if self.workdir is None:
+            self.workdir = tempfile.mkdtemp()
+
+        if convert_to_pdf:
+            newfilename = workdir + os.sep + \
+                os.path.splitext(os.path.basename(filename))[0] + ".pdf"
+            if not os.path.exists(newfilename):
+                util.ensure_dir(newfilename)
+                cmdline = "soffice --headless -convert-to pdf -outdir '%s' %s" % (
+                    workdir, filename)
+                self.log.debug("%s: Converting to PDF: %s" % (filename, cmdline))
+                (ret, stdout, stderr) = util.runcmd(
+                    cmdline, require_success=True)
+                filename = newfilename
+
+        assert os.path.exists(filename), "PDF %s not found" % filename
+        convertedfile = self.intermediate_filename(filename, ocr_lang, keep_xml)
+        if ocr_lang:
+            converter = self._tesseract
+            converter_extra = {'lang': ocr_lang}
+        else:
+            converter = self._pdftohtml
+            converter_extra = {'images': images}
+
+        tmpfilename = os.sep.join([workdir, os.path.basename(filename)])
+        # copying the filename to the workdir is only needed if we use
+        # PDFReader._pdftohtml
+
+        if not util.outfile_is_newer([filename], convertedfile):
+            util.copy_if_different(filename, tmpfilename)
+            # this is the expensive operation
+            res = converter(tmpfilename, workdir, **converter_extra)
+            if keep_xml == "bz2":
+                with open(convertedfile, mode="rb") as rfp:
+                    # BZ2File supports the with statement in py27+,
+                    # but we support py2.6
+                    wfp = BZ2File(convertedfile, "wb")
+                    wfp.write(rfp.read())
+                    wfp.close()
+                os.unlink(convertedfile)
+            else:  # keep_xml = True
+                pass
+
+        if keep_xml == "bz2":
+            # FIXME: explicitly state that encoding is utf-8 (in a
+            # py26 compatible manner
+            fp = BZ2File(convertedfile)
+        else:
+            fp = codecs.open(convertedfile, encoding="utf-8")
+        return fp
+
+    def read(self, fp, type="xml"):
+        if type == "ocr":
+            parser = self._parse_hocr
+        else:
+            parser = self._parse_xml
+        ret = parser(fp)
+        fp.close()
+        return ret
+
 
 class Page(CompoundElement, OrdinalElement):
 
-    """Represents a Page in a PDF file. Has *width* and *height* properties."""
+    """Represents a Page in a PDF file. Has *width* and *height*
+     properties."""
 
     tagname = "div"
     classname = "pdfpage"
