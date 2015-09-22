@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 import re
+import sys
 import os
 from datetime import datetime
 import codecs
@@ -316,18 +317,9 @@ class PropTrips(Trips):
             # .wpd or .doc file to .pdf first
             if (wordfile
                     and not os.path.exists(pdffile)):
-                intermediate_pdf = self.store.path(
-                    doc.basefile, "intermediate", ".pdf")
-                if not os.path.exists(intermediate_pdf):
-                    cmdline = "%s --headless -convert-to pdf -outdir '%s' %s" % (self.config.get('soffice', 'soffice'),
-                                                                                 os.path.dirname(
-                                                                                     intermediate_pdf),
-                                                                                 wordfile)
-                    self.log.debug(
-                        "%s: Converting to PDF: %s" % (doc.basefile, cmdline))
-                    (ret, stdout, stderr) = util.runcmd(
-                        cmdline, require_success=True)
-                pdffile = intermediate_pdf
+                convert_to_pdf = True
+            else:
+                convert_to_pdf = False
 
             if os.path.exists(pdffile):
                 self.log.debug("%s: Using %s" % (doc.basefile, pdffile))
@@ -336,6 +328,7 @@ class PropTrips(Trips):
                 keep_xml = "bz2" if self.config.compress == "bz2" else True
                 pdfreader = PDFReader(filename=pdffile,
                                       workdir=intermediate_dir,
+                                      convert_to_pdf=convert_to_pdf,
                                       keep_xml=keep_xml)
                 self.parse_from_pdfreader(pdfreader, doc)
             else:
@@ -360,13 +353,14 @@ class PropTrips(Trips):
             self.infer_triples(d, doc.basefile)
             return True
         except Exception as e:
+            traceback = sys.exc_info()[2]
             err = errors.ParseError(str(e))
             if isinstance(e, IOError):
                 err.dummyfile = self.store.parsed_path(doc.basefile)
-            raise err
+            raise errors.ParseError, err, traceback
 
     def parse_from_pdfreader(self, pdfreader, doc):
-        parser = offtryck_parser(preset='proposition')
+        parser = offtryck_parser(preset='proposition', identifier="Prop. " + doc.basefile)
         doc.body = parser.parse(pdfreader.textboxes(offtryck_gluefunc))
 
     def parse_from_textreader(self, textreader, doc):

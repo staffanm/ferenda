@@ -643,13 +643,13 @@ class StreamingPDFReader(PDFReader):
             # this is the expensive operation
             res = converter(tmpfilename, workdir, **converter_extra)
             if keep_xml == "bz2":
-                with open(convertedfile, mode="rb") as rfp:
+                with open(convertedfile.replace(".bz2", ""), mode="rb") as rfp:
                     # BZ2File supports the with statement in py27+,
                     # but we support py2.6
                     wfp = BZ2File(convertedfile, "wb")
                     wfp.write(rfp.read())
                     wfp.close()
-                os.unlink(convertedfile)
+                os.unlink(convertedfile.replace(".bz2", ""))
             else:  # keep_xml = True
                 pass
 

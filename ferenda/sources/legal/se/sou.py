@@ -6,20 +6,16 @@ import os
 from datetime import datetime
 from six.moves.urllib_parse import urljoin
 
-from rdflib.namespace import SKOS
+import rdflib
+from rdflib.namespace import SKOS, DCTERMS, RDF
+BIBO = rdflib.Namespace("http://purl.org/ontology/bibo/")
 from bs4 import BeautifulSoup
 
-from ferenda import PDFAnalyzer, CompositeRepository, DocumentEntry
+from ferenda import PDFAnalyzer, CompositeRepository, DocumentEntry, PDFDocumentRepository
+from ferenda.pdfreader import StreamingPDFReader
 from . import Regeringen, SwedishLegalSource, RPUBL
+from .swedishlegalsource import offtryck_gluefunc, offtryck_parser
 
-
-# are there other sources? www.sou.gov.se directs here,
-# anyway. Possibly
-# https://www.riksdagen.se/Webbnav/index.aspx?nid=3282, but it's
-# unsure whether they have any more information, or they just import
-# from regeringen.se (the data quality suggests some sort of auto
-# import). Some initial comparisons cannot find data that riksdagen.se
-# has that regeringen.se doesn't
 
 class SOUAnalyzer(PDFAnalyzer):
     # SOU running headers can contain quite a bit of text, 2 %
@@ -60,7 +56,7 @@ class SOURegeringen(Regeringen):
         return self.minter.space.coin_uri(resource) 
 
 
-class SOUKB(SwedishLegalSource):
+class SOUKB(SwedishLegalSource, PDFDocumentRepository):
     alias = "soukb"
     storage_policy = "dir"
     downloaded_suffix = ".pdf"
@@ -105,7 +101,60 @@ class SOUKB(SwedishLegalSource):
         entry.save()
         return updated
 
+    def canonical_uri(self, basefile):
+        year, ordinal = basefile.split(":")
+        attrib = {'rpubl:arsutgava': year,
+                  'rpubl:lopnummer': ordinal,
+                  'rpubl:utrSerie': self.lookup_resource("SOU", SKOS.altLabel),
+                  'rdf:type': self.rdf_type}
+        resource = self.attributes_to_resource(attrib)
+        return self.minter.space.coin_uri(resource) 
+
+    def downloaded_to_intermediate(self, basefile):
+        intermediate_path = self.store.intermediate_path(basefile)
+        intermediate_dir = os.path.dirname(intermediate_path)
+        keep_xml = "bz2" if self.config.compress == "bz2" else True
+        reader = StreamingPDFReader()
+        return reader.convert(filename=self.store.downloaded_path(basefile),
+                              workdir=intermediate_dir,
+                              images=self.config.pdfimages,
+                              keep_xml=keep_xml)
+
+    def parse_metadata(self, file, basefile):
+        year, no = basefile.split(":")
+        sourcegraph = rdflib.Graph().parse(self.store.downloaded_path(
+            basefile, attachment="metadata.rdf"))
+        rooturi = sourcegraph.value(predicate=RDF.type, object=BIBO.Book)
+        title = sourcegraph.value(subject=rooturi, predicate=DCTERMS.title)
+        metadata = {"rpubl:arsutgava": year,
+                    "rpubl:lopnummer": no,
+                    "dcterms:title": sourcegraph,
+                    "rpubl:utrSerie": self.lookup_resource("SOU",
+                                                           SKOS.altLabel)}
+        
+        resource = self.polish_metadata(metadata)
+        self.infer_metadata(resource, basefile)
+        return resource
+
+    def extract_body(self, fp, basefile):
+        reader = StreamingPDFReader()
+        reader.read(fp)
+        return reader
+        
+    def get_parser(self, basefile, sanitized):
+        p = offtryck_parser(basefile, preset="dir")
+        p.current_identifier = "SOU %s" % basefile
+        return p.parse
+
+    def tokenize(self, pdfreader):
+        # FIXME: We should probably build a better tokenizer
+        return pdfreader.textboxes(offtryck_gluefunc)
+
+    def create_external_resources(self, doc):
+        pass
 
 class SOU(CompositeRepository):
     alias = "sou"
     subrepos = (SOURegeringen, SOUKB)
+
+
