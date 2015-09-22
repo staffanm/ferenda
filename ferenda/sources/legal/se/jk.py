@@ -8,6 +8,7 @@ from six.moves.urllib_parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
+from rdflib.namespace import SKOS
 
 from . import SwedishLegalSource, RPUBL, SwedishCitationParser
 from .swedishlegalsource import Stycke
@@ -80,58 +81,54 @@ class JK(SwedishLegalSource):
         return (existing_soup.find("div", id="mainContent") !=
                 new_soup.find("div", id="mainContent"))
 
-    def parse_metadata_from_soup(self, soup, doc):
-        # this maybe goes in self.canonical_uri, but cannot be generalized
-        doc.uri = self.makeurl({'type': LegalRef.MYNDIGHETSBESLUT,
-                                'myndighet': 'jk',
-                                'dnr': doc.basefile})
-        desc = Describer(doc.meta, doc.uri)
-        # 1. static same-for-all metadata
-        desc.rdftype(self.rdf_type)
-        desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-        desc.rel(self.ns['dcterms'].publisher, self.lookup_resource("Justitiekanslern"))
-        # 2. document-level metadata
-        desc.value(self.ns['dcterms'].title,
-                   soup.find("h1", "besluttitle").get_text(), lang="sv")
-        datestr = soup.find("span", class_="label",
-                            text="Beslutsdatum").find_next_sibling("span").get_text()
-        desc.value(self.ns['rpubl'].beslutsdatum,
-                   datetime.strptime(datestr, '%Y-%m-%d').date())
-        desc.value(self.ns['rpubl'].diarienummer,
-                   soup.find("span", class_="label",
-                             text="Diarienummer").find_next_sibling("span").get_text())
-        if self.config.localizeuri:
-            desc.rel(self.ns['owl'].sameAs,
-                     legaluri.construct({'type': LegalRef.MYNDIGHETSBESLUT,
-                                         'myndighet': 'jk',
-                                         'dnr': doc.basefile}))
 
-    def parse_document_from_soup(self, soup, doc):
+    def canonical_uri(self, basefile):
+        # possibly break out the attrib-generating code to a separate
+        # func since that's the one that'll be overridden. In
+        # particular, rpubl:forfattningssamling or similar needs to be
+        # added by many repos
+        attrib = {'rpubl:diarienummer': basefile,
+                  'dcterms:publisher': self.lookup_resource("JK", SKOS.altLabel),
+                  'rdf:type': self.rdf_type}
+        resource = self.attributes_to_resource(attrib)
+        return self.minter.space.coin_uri(resource) 
 
-        # 3: Process the actual text of the document
+    def extract_head(self, fp, basefile):
+        return BeautifulSoup(fp.read(), "lxml")
 
+    def extract_metadata(self, soup, basefile):
+        title = soup.find("h1", "besluttitle").get_text()
+        beslutsdatum = soup.find("span", class_="label",
+                                 text="Beslutsdatum").find_next_sibling("span").get_text()
+        diarienummer = soup.find("span", class_="label",
+                                 text="Diarienummer").find_next_sibling("span").get_text()
+        return {"dcterms:title": title,
+                "dcterms:publisher": self.lookup_resource("JK", SKOS.altLabel),
+                "rpubl:beslutsdatum": beslutsdatum,
+                "rpubl:diarienummer": diarienummer,
+                "dcterms:identifier": "JK %s" % diarienummer
+        }
+    
+    def extract_body(self, fp, basefile):
+        # NB: extract_head already did this (so the fp will have been
+        # read to the end -- need to seek(0)
+        fp.seek(0)
+        soup = BeautifulSoup(fp.read(), "lxml")
         main = soup.find("div", id="mainContent")
-        # remove crap
-        main.find("div", id="breadcrumbcontainer").decompose()
-        main.find("h1",  class_="besluttitle").decompose()
-        main.find("div", class_="beslutmetadatacontainer").decompose()
-        # structurize
-        parser = self.make_parser()
+        # remove crap -- FIXME: after the first .decompose(), further
+        # calls to find() seem to fail with beautifulsoup4 4.4.0?
+        # 
+        # main.find("div", id="breadcrumbcontainer").decompose()
+        # main.find("h1", "besluttitle").decompose()
+        # main.find("div", "beslutmetadatacontainer").decompose()
+        return main
+
+    def tokenize(self, main):
         # list all tags (x.name) that aren't empty (x.get_text().strip())
-        body = parser.parse(main.find_all(lambda x: x.name and x.get_text().strip()))
+        return main.find_all(lambda x: x.name and x.get_text().strip())
 
-        # linkify
-        self.ref_parser = LegalRef(LegalRef.LAGRUM,
-                                   LegalRef.KORTLAGRUM,
-                                   LegalRef.RATTSFALL,
-                                   LegalRef.FORARBETEN)
 
-        # FIXME: citparser should respect self.config.localizeuri
-        citparser = SwedishCitationParser(self.ref_parser, self.config.url)
-        doc.body = citparser.parse_recursive(body)
-
-    @staticmethod
-    def make_parser():
+    def get_parser(self, basefile, sanitized_body):
         def is_section(parser):
             return parser.reader.peek().name == "h1"
 
@@ -187,4 +184,4 @@ class JK(SwedishLegalSource):
         p.initial_state = "body"
         p.initial_constructor = make_body
         p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
-        return p
+        return p.parse

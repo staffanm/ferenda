@@ -78,6 +78,7 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
         return self.minter.space.coin_uri(resource) 
 
 
+
     @decorators.action
     @decorators.recordlastdownload
     def download(self, basefile=None):
