@@ -213,7 +213,11 @@ class FSMParser():
                 self._state_stack[-1] = newstate
 
             if constructor:
-                element = self.make_child(constructor, newstate)
+                try:
+                    element = self.make_child(constructor, newstate)
+                except StopIteration:
+                    self._debug("Couldn't make child -- seems we're done!")
+                    element = None
                 if element is not None:
                     parent.append(element)
             else:

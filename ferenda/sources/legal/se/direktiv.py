@@ -322,8 +322,8 @@ class DirAsp(SwedishLegalSource, PDFDocumentRepository):
     def downloaded_to_intermediate(self, basefile):
         intermediate_path = self.store.intermediate_path(basefile)
         intermediate_dir = os.path.dirname(intermediate_path)
-        # keep_xml = "bz2" if self.config.compress == "bz2" else True
-        keep_xml = "bz2"
+        keep_xml = "bz2" if self.config.compress == "bz2" else True
+        # keep_xml = "bz2"
         reader = StreamingPDFReader()
         return reader.convert(filename=self.store.downloaded_path(basefile),
                               workdir=intermediate_dir,

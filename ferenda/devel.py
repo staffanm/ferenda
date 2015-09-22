@@ -468,6 +468,11 @@ class Devel(object):
         for basefile in basefiles:
             print("  %s: copying %s" % (alias, basefile))
             src = sourcerepo.store.downloaded_path(basefile)
+            # NOTE: For SFS (and only SFS), there exists separate
+            # register files under
+            # data/sfs/register/1998/204.html. Maybe we should use
+            # storage_policy="dir" and handle those things as
+            # attachments?
             dst = destrepo.store.downloaded_path(basefile)
             isrc = sourcerepo.store.intermediate_path(basefile)
             idst = destrepo.store.intermediate_path(basefile)
