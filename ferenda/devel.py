@@ -468,11 +468,6 @@ class Devel(object):
         for basefile in basefiles:
             print("  %s: copying %s" % (alias, basefile))
             src = sourcerepo.store.downloaded_path(basefile)
-            # NOTE: For SFS (and only SFS), there exists separate
-            # register files under
-            # data/sfs/register/1998/204.html. Maybe we should use
-            # storage_policy="dir" and handle those things as
-            # attachments?
             dst = destrepo.store.downloaded_path(basefile)
             isrc = sourcerepo.store.intermediate_path(basefile)
             idst = destrepo.store.intermediate_path(basefile)
@@ -493,6 +488,15 @@ class Devel(object):
                 util.ensure_dir(idst)
                 copy(isrc, idst)
 
+            # NOTE: For SFS (and only SFS), there exists separate
+            # register files under
+            # data/sfs/register/1998/204.html. Maybe we should use
+            # storage_policy="dir" and handle those things as
+            # attachments?
+            if os.path.exists(sourcerepo.path(basefile, "register", ".html")):
+                shutil.copy2(sourcerepo.path(basefile, "register", ".html"),
+                             destrepo.path(basefile, "register", ".html"))
+            # also copy the docentry json file
             if os.path.exists(sourcerepo.store.documententry_path(basefile)):
                 util.ensure_dir(destrepo.store.documententry_path(basefile))
                 shutil.copy2(sourcerepo.store.documententry_path(basefile),
