@@ -114,7 +114,7 @@ class Coverpage(CompoundElement):
 
 class SwedishLegalStore(DocumentStore):
 
-    """Customized DocumentStore."""
+    """Customized DocumentStore that better handles some pecularities in swedish legal document naming."""
 
     def basefile_to_pathfrag(self, basefile):
         # "2012/13:152" => "2012-13/152"
@@ -129,6 +129,54 @@ class SwedishLegalStore(DocumentStore):
     def intermediate_path(self, basefile, attachment=None):
         return self.path(basefile, "intermediate", ".xml",
                          attachment=attachment)
+
+
+class NonsemanticDocumentStore(DocumentStore):
+    """Handles storage of documents in non-semantic formats (either PDF or word processing docs that are converted to PDF). A single repo may have heterogenous usage of file formats, and this store will store each document with an appropriate file suffix."""
+
+    downloaded_suffix = ".pdf"  #  this is teh default
+    doctypes = OrderedDict((".wpd", b'\xffWPC'),
+                           (".doc", b'\xd0\xcf\x11\xe0'),
+                           (".docx", b'PK\x03\x04'),
+                           (".rtf", b'{\\rt'),
+                           (".pdf", b'%PDF'))
+
+    def downloaded_path(self, basefile, version=None, attachment=None, suffix=None):
+        if not suffix:
+            for s in self.doctypes:
+                if os.path.exists(self.path(basefile, "downloaded", s)):
+                    suffix = s
+                    break
+            else:
+                suffix = self.downloaded_suffix
+        return self.path(basefile, "downloaded", suffix, version, attachment)
+
+    def list_basefiles_for(self, action, basedir=None):
+        if not basedir:
+            basedir = self.datadir
+        if action == "parse":
+            d = os.path.sep.join((basedir, "downloaded"))
+            if not os.path.exists(d):
+                return
+            iterators = (util.list_dirs(d, x) for x in self.doctypes)
+            for x in sorted(itertools.chain(*iterators):
+                suffix = "/index" + os.path.splitext(x)[1]
+                pathfrag = x[len(d) + 1:-len(suffix)]
+                yield self.pathfrag_to_basefile(pathfrag)
+        else:
+            for x in super(NonsemanticDocumentStore, self).list_basefiles_for(action, basedir):
+                yield x
+
+    def guess_type(self, fp, basefile):
+        start = fp.tell()
+        sig = fp.read(4)
+        fp.seek(start)
+        for s in self.doctypes:
+            if sig == self.doctypes[s]:
+                return s
+        else:
+            self.log.error("%s: document file stream has magic number %r -- don't know what that is" % (basefile, sig))
+            # FIXME: Raise something instead?
 
 
 class SwedishLegalSource(DocumentRepository):
@@ -296,16 +344,16 @@ class SwedishLegalSource(DocumentRepository):
         return g.resource(b)
 
     def canonical_uri(self, basefile):
-        # possibly break out the attrib-generating code to a separate
-        # func since that's the one that'll be overridden. In
-        # particular, rpubl:forfattningssamling or similar needs to be
-        # added by many repos
+        attrib = self.metadata_from_basefile(basefile)
+        resource = self.attributes_to_resource(attrib)
+        return self.minter.space.coin_uri(resource) 
+
+    def metadata_from_basefile(self, basefile)    
         year, ordinal = basefile.split(":")
         attrib = {'rpubl:arsutgava': year,
                   'rpubl:lopnummer': ordinal,
                   'rdf:type': self.rdf_type}
-        resource = self.attributes_to_resource(attrib)
-        return self.minter.space.coin_uri(resource) 
+
 
     def sanitize_basefile(self, basefile):
         # will primarily be used by download to normalize eg "2014:04"
@@ -710,11 +758,40 @@ class SwedishLegalSource(DocumentRepository):
             return util.gYear(year)
 
 
-# can't really have a toc_item thats general for all kinds of swedish legal documents?
-#
-#    def toc_item(self, binding, row):
-#        return {'uri': row['uri'],
-#                'label': row['dcterms_identifier'] + ": " + row['dcterms_title']}
+class NonsemanticLegalSource(SwedishLegalSource):
+    """this is basically like PDFDocumentRepository, but handles other word processing formats along with PDF files (everything is converted to/handled as PDF internally) """
+
+
+    def downloaded_to_intermediate(self, basefile):
+        # force just the conversion part of the PDF handling
+        downloaded_path = self.store.downloaded_path(basefile)
+        intermediate_path = self.store.intermediate_path(basefile) 
+        intermediate_dir = os.path.dirname(intermediate_path) 
+        ocr_lang = None
+        reader = StreamingPDFReader()
+        return reader.convert(filename=self.store.downloaded_path(basefile), 
+                              workdir=intermediate_dir, 
+                              images=self.config.pdfimages, 
+                              convert_to_pdf=not downloadpath.endswith(".pdf")
+                              keep_xml="bz2" if self.config.compress == "bz2" else True,
+                              ocr_lang=ocr_lang)
+
+    def parse_metadata(self, file, basefile):
+        resource = self.polish_metadata(self.metadata_from_basefile(basefile))
+        self.infer_metadata(resource, basefile)
+        return resource
+    
+    def extract_body(self, fp, basefile):
+        return StreamingPDFReader().read(fp)
+
+    def infer_identifier(self, basefile):
+        return basefile
+
+    def get_parser(self, basefile)
+	return offtryck_parser(basefile, preset=self.alias, identifier=self.infer_identifier(basefile)).parse
+
+    def tokenize(self, pdfreader):
+        return pdfreader.textboxes(offtryck_gluefunc)
 
 
 def offtryck_parser(basefile="0", metrics=None, preset=None, identifier=None):
@@ -1117,3 +1194,4 @@ class SwedishCitationParser(CitationParser):
                                           baseuri_attributes=attributes,
                                           predicate=predicate,
                                           allow_relative=self._allow_relative)
+
