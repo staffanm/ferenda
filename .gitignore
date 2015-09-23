@@ -1,5 +1,6 @@
 *~
 metrics.json
+devtools.py
 *.pyc
 *.log
 .DS_Store
@@ -14,6 +15,7 @@ metrics.json
 /htmlcov/
 /netstandards
 /lagen.nu
+/test/files/repo/sfs/intermediate
 /tng.lagen.nu
 /wip
 __pycache__/
