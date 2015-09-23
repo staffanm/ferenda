@@ -8,7 +8,8 @@ if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 from ferenda import DocumentRepository, Document
 from ferenda.errors import DocumentRemovedError, ParseError
 # SUT
-from ferenda.decorators import timed, parseifneeded, render, handleerror, makedocument, recordlastdownload, downloadmax
+from ferenda.decorators import (timed, parseifneeded, render, handleerror,
+                                makedocument, recordlastdownload, downloadmax)
 
 class Decorators(unittest.TestCase):
 
@@ -34,11 +35,12 @@ class Decorators(unittest.TestCase):
 
     def test_parseifneeded(self):
         @parseifneeded
-        def testfunc(repo,doc):
+        def testfunc(repo, basefile):
             repo.called = True
 
-        mockdoc = Mock()
-        mockdoc.basefile="1234"
+        # mockdoc = Mock()
+        # mockdoc.basefile="1234"
+        mockbasefile = "1234"
         mockrepo = Mock()
         mockrepo.parseneeded = DocumentRepository().parseneeded
         mockrepo.called = False
@@ -46,21 +48,21 @@ class Decorators(unittest.TestCase):
         # test 1: Outfile is newer - the parseifneeded decorator
         # should make sure the actual testfunc code is never reached
         with patch('ferenda.util.outfile_is_newer', return_value=True):
-            testfunc(mockrepo,mockdoc)
+            testfunc(mockrepo, mockbasefile)
 
         self.assertFalse(mockrepo.called)
         mockrepo.called = False
 
         # test 2: Outfile is older
         with patch('ferenda.util.outfile_is_newer', return_value=False):
-            testfunc(mockrepo,mockdoc)
+            testfunc(mockrepo, mockbasefile)
         self.assertTrue(mockrepo.called)
         mockrepo.called = False
 
         # test 3: Outfile is newer, but the global force option was set
         mockrepo.config.force = True
         with patch('ferenda.util.outfile_is_newer', return_value=True):
-            testfunc(mockrepo,mockdoc)
+            testfunc(mockrepo, mockbasefile)
         self.assertTrue(mockrepo.called)
         mockrepo.config.force = None
         mockrepo.called = False
@@ -68,7 +70,7 @@ class Decorators(unittest.TestCase):
         # test 4: Outfile is newer, but the module parseforce option was set
         mockrepo.config.parseforce = True
         with patch('ferenda.util.outfile_is_newer', return_value=True):
-            testfunc(mockrepo,mockdoc)
+            testfunc(mockrepo, mockbasefile)
         self.assertTrue(mockrepo.called)
         mockrepo.called = False
 

@@ -154,7 +154,7 @@ class DsRegeringenLegacy(RegeringenLegacy, SameAs, Ds):
 
 
 class PropRegeringenLegacy(RegeringenLegacy, SameAs, PropRegeringen):
-    alias = "prop.legacy"
+    alias = "propregeringen.legacy"
 
 
 

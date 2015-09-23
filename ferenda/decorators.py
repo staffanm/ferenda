@@ -75,18 +75,18 @@ def parseifneeded(f):
     user has specified in the config file or on the command line that
     it should be re-generated."""
     @functools.wraps(f)
-    def wrapper(self, doc):
+    def wrapper(self, basefile):
         # note: We hardcode the use of .parseneeded() and the
         # 'parseforce' config option, which means that this decorator
         # can only be used sensibly with the .parse() function.
         force = (self.config.force is True or
                  self.config.parseforce is True)
-        if not force and not self.parseneeded(doc.basefile):
-            self.log.debug("%s: Skipped", doc.basefile)
+        if not force and not self.parseneeded(basefile):
+            self.log.debug("%s: Skipped", basefile)
             return True  # Signals that everything is OK
         else:
-            self.log.debug("%s: Starting", doc.basefile)
-            return f(self, doc)
+            self.log.debug("%s: Starting", basefile)
+            return f(self, basefile)
     return wrapper
 
 
@@ -252,9 +252,12 @@ def makedocument(f):
 
 def managedparsing(f):
     """Use all standard decorators for parse() in the correct order
-    (:py:func:`~ferenda.decorators.makedocument`, :py:func:`~ferenda.decorators.parseifneeded`, :py:func:`~ferenda.decorators.timed`, :py:func:`~ferenda.decorators.render`)"""
-    return makedocument(
-        parseifneeded(
+    (:py:func:`~ferenda.decorators.parseifneeded`, 
+    :py:func:`~ferenda.decorators.makedocument`, 
+    :py:func:`~ferenda.decorators.timed`, 
+    :py:func:`~ferenda.decorators.render`)"""
+    return parseifneeded(
+        makedocument(
             # handleerror( # is this really a good idea?
             timed(
                 render(f))))

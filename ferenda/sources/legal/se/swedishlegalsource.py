@@ -197,9 +197,8 @@ class SwedishLegalSource(DocumentRepository):
             filename = self.resourceloader.filename
             spacefile = filename("uri/swedishlegalsource.space.ttl")
             slugsfile = filename("uri/swedishlegalsource.slugs.ttl")
+            from pudb import set_trace; set_trace()
             self.log.debug("Loading URISpace from %s" % spacefile)
-            # print("Loading URISpace from %s" % spacefile)
-            # print("Loading Slugs from %s" % slugsfile)
             cfg = Graph().parse(spacefile,
                                 format="turtle").parse(slugsfile,
                                                        format="turtle")
