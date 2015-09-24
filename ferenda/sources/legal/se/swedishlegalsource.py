@@ -11,11 +11,12 @@ from bz2 import BZ2File
 
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
+from rdflib.namespace import DCTERMS
 from six import text_type as str
 import bs4
 
 from ferenda import (DocumentRepository, DocumentStore, FSMParser,
-                     CitationParser)
+                     CitationParser, Describer)
 from ferenda import util
 from ferenda.compat import OrderedDict
 from ferenda.sources.legal.se.legalref import Link, LegalRef
@@ -136,59 +137,6 @@ class SwedishLegalStore(DocumentStore):
                          attachment=attachment)
 
 
-class NonsemanticDocumentStore(SwedishLegalStore):
-    """Handles storage of documents in non-semantic formats (either PDF or
-    word processing docs that are converted to PDF). A single repo may
-    have heterogenous usage of file formats, and this store will store
-    each document with an appropriate file suffix.
-
-    """
-
-    downloaded_suffix = ".pdf"  #  this is teh default
-    doctypes = OrderedDict([(".wpd", b'\xffWPC'),
-                            (".doc", b'\xd0\xcf\x11\xe0'),
-                            (".docx", b'PK\x03\x04'),
-                            (".rtf", b'{\\rt'),
-                            (".pdf", b'%PDF')])
-
-
-    def downloaded_path(self, basefile, version=None, attachment=None, suffix=None):
-        if not suffix:
-            for s in self.doctypes:
-                if os.path.exists(self.path(basefile, "downloaded", s)):
-                    suffix = s
-                    break
-            else:
-                suffix = NonsemanticDocumentStore.downloaded_suffix
-        return self.path(basefile, "downloaded", suffix, version, attachment)
-
-    def list_basefiles_for(self, action, basedir=None):
-        if not basedir:
-            basedir = self.datadir
-        if action == "parse":
-            d = os.path.sep.join((basedir, "downloaded"))
-            if not os.path.exists(d):
-                return
-            iterators = (util.list_dirs(d, x) for x in self.doctypes)
-            for x in sorted(itertools.chain(*iterators)):
-                suffix = "/index" + os.path.splitext(x)[1]
-                pathfrag = x[len(d) + 1:-len(suffix)]
-                yield self.pathfrag_to_basefile(pathfrag)
-        else:
-            for x in super(NonsemanticDocumentStore,
-                           self).list_basefiles_for(action, basedir):
-                yield x
-
-    def guess_type(self, fp, basefile):
-        start = fp.tell()
-        sig = fp.read(4)
-        fp.seek(start)
-        for s in self.doctypes:
-            if sig == self.doctypes[s]:
-                return s
-        else:
-            self.log.error("%s: document file stream has magic number %r -- don't know what that is" % (basefile, sig))
-            # FIXME: Raise something instead?
 
 
 class SwedishLegalSource(DocumentRepository):
@@ -203,6 +151,8 @@ class SwedishLegalSource(DocumentRepository):
     lang = "sv"
 
     rdf_type = RPUBL.Rattsinformationsdokument  # subclasses override this
+
+    parse_types = LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN
 
     # This is according to the RPUBL vocabulary: All
     # rpubl:Rattsinformationsdokument should have dcterms:title,
@@ -471,9 +421,6 @@ class SwedishLegalSource(DocumentRepository):
         # has namespace prefix mappings set up)
 
         self.infer_metadata(resource, basefile)
-        # maybe hang sameAs off here? Is it more reasonable to infer
-        # new keys to the attribs dict, before conversion to RDF
-        # graph?
 
         return resource
 
@@ -552,21 +499,6 @@ class SwedishLegalSource(DocumentRepository):
                 
         return resource.graph.resource(uri)
 
-    def infer_metadata(self, resource, basefile):
-        """Given a rdflib.Resource object, add additional triples that can be
-        inferred from existing metadata.
-
-        """
-        # this is the root superclass for this method, but we still
-        # need to call super to give lagen.nu.SameAs.infer_metadata a
-        # chance to run
-        if hasattr(super(SwedishLegalSource, self),
-                   'infer_metadata'):
-            resource = super(SwedishLegalSource, self).infer_metadata(resource, basefile)
-        return resource
-
-
-    parse_types = LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN
 
     def visitor_functions(self):
         return []
@@ -644,7 +576,7 @@ class SwedishLegalSource(DocumentRepository):
                 self.visit_node(subnode, clbl, newstate, debug)
 
 
-    def infer_triples(self, d, basefile=None):
+    def infer_metadata(self, resource, basefile=None):
         """Try to infer any missing metadata from what we already have.
 
         :param d: A configured Describer instance
@@ -653,60 +585,44 @@ class SwedishLegalSource(DocumentRepository):
         # Lagen.nu specific subclasses (ie classes that mints
         # lagen.nu-owned URIs) should inherit this and create suitable
         # owl:sameAs semantics
-        try:
-            identifier = d.getvalue(self.ns['dcterms'].identifier)
-            # if the identifier is incomplete, eg "2010/11:68" instead
-            # of "Prop. 2010/11:68", the following triggers a
-            # ValueError, which is handled the same as if no
-            # identifier is available at all. Ideally,
-            # sanitize_identifier should prevent all preventable
-            # occurrences of this.
-            (doctype, arsutgava, lopnummer) = re.split("[ :]", identifier)
-        except (KeyError, ValueError) as e:
-            if isinstance(e, ValueError):
-                # The existing identifier was incomplete. We should remove it.
-                # FIXME: depends on internal details of the
-                # rdflib.extras implementation in order to get the
-                # current URI
-                d.graph.remove(
-                    (d._current(),
-                     self.ns['dcterms'].identifier,
-                        Literal(identifier)))
-            # Create one from basefile. First guess prefix
-            if self.rdf_type == self.ns['rpubl'].Kommittedirektiv:
-                prefix = "Dir. "
-            elif self.rdf_type == self.ns['rpubl'].Utredningsbetankande:
-                # FIXME: rpubl:utrSerie might have a site-specific URI
-                # which is not aligned with official Rinfo URIs (eg
-                # https://lagen.nu/dataset/ds). Also, rpubl:utrSerie
-                # is only set further down below in this very method.
-                if d.getvalue(
-                        self.ns['rpubl'].utrSerie) == "http://rinfo.lagrummet.se/serie/utr/ds":
-                    prefix = "Ds "
-                else:
-                    prefix = "SOU "
-            elif self.rdf_type == self.ns['rpubl'].Proposition:
-                prefix = "Prop. "
-            elif self.rdf_type == self.ns['rpubl'].Forordningsmotiv:
-                prefix = "Fm "
+        d = Describer(resource.graph, resource.identifier)
+        if not resource.value(DCTERMS.identifier):
+            identifier = self.infer_identifier(basefile)
+            # self.log.warning(
+            #     "%s: No dcterms:identifier, assuming %s" % (basefile,
+            #                                                 identifier))
+            d.value(DCTERMS.identifier, identifier)
+
+        if self.rdf_type == RPUBL.Utredningsbetankande:
+            d.rel(RPUBL.utrSerie, self.dataset_uri())
+
+
+    def infer_identifier(self, basefile):
+        # FIXME: This logic should really be split up and put into
+        # different subclasses override of infer_identifier
+        
+        # Create one from basefile. First guess prefix
+        if self.rdf_type == RPUBL.Kommittedirektiv:
+            prefix = "Dir. "
+        elif self.rdf_type == RPUBL.Utredningsbetankande:
+            # FIXME: rpubl:utrSerie might have a site-specific URI
+            # which is not aligned with official Rinfo URIs (eg
+            # https://lagen.nu/dataset/ds). Also, rpubl:utrSerie
+            # is only set further down below in this very method.
+            if d.getvalue(
+                    RPUBL.utrSerie) == "http://rinfo.lagrummet.se/serie/utr/ds":
+                prefix = "Ds "
             else:
-                raise ValueError(
-                    "Cannot create dcterms:identifier for rdf_type %r" %
-                    self.rdf_type)
-            identifier = "%s%s" % (prefix, basefile)
-
-            self.log.warning(
-                "%s: No dcterms:identifier, assuming %s" % (basefile, identifier))
-            d.value(self.ns['dcterms'].identifier, identifier)
-
-        # self.log.debug("Identifier %s" % identifier)
-        (doctype, arsutgava, lopnummer) = re.split("[ :]", identifier)
-        d.value(self.ns['rpubl'].arsutgava, arsutgava)
-        d.value(self.ns['rpubl'].lopnummer, lopnummer)
-
-        if self.rdf_type == self.ns['rpubl'].Utredningsbetankande:
-            d.rel(self.ns['rpubl'].utrSerie, self.dataset_uri())
-
+                prefix = "SOU "
+        elif self.rdf_type == RPUBL.Proposition:
+            prefix = "Prop. "
+        elif self.rdf_type == RPUBL.Forordningsmotiv:
+            prefix = "Fm "
+        else:
+            raise ValueError(
+                "Cannot create dcterms:identifier for rdf_type %r" %
+                self.rdf_type)
+        return "%s%s" % (prefix, basefile)
 
     def tabs(self, primary=False):
         if self.config.tabs:
@@ -777,44 +693,6 @@ class SwedishLegalSource(DocumentRepository):
         else:
             return util.gYear(year)
 
-class NonsemanticLegalSource(SwedishLegalSource):
-    """This is basically like PDFDocumentRepository, but handles other
-    word processing formats along with PDF files (everything is
-    converted to/handled as PDF internally) """
-
-    def downloaded_to_intermediate(self, basefile):
-        # force just the conversion part of the PDF handling
-        downloaded_path = self.store.downloaded_path(basefile)
-        intermediate_path = self.store.intermediate_path(basefile) 
-        intermediate_dir = os.path.dirname(intermediate_path) 
-        ocr_lang = None
-        reader = StreamingPDFReader()
-        return reader.convert(filename=self.store.downloaded_path(basefile), 
-                              workdir=intermediate_dir, 
-                              images=self.config.pdfimages, 
-                              convert_to_pdf=not downloaded_path.endswith(".pdf"),
-                              keep_xml="bz2" if self.config.compress == "bz2" else True,
-                              ocr_lang=ocr_lang)
-
-    def parse_metadata(self, file, basefile):
-        # at this point, we only have the PDF file itself, which is
-        # hard to extract metadata from. We just return anything we
-        # can infer from basefile 
-        resource = self.polish_metadata(self.metadata_from_basefile(basefile))
-        self.infer_metadata(resource, basefile)
-        return resource
-    
-    def extract_body(self, fp, basefile):
-        return StreamingPDFReader().read(fp)
-
-    def infer_identifier(self, basefile):
-        return basefile
-
-    def get_parser(self, basefile, sanitized):
-	return offtryck_parser(basefile, preset=self.alias, identifier=self.infer_identifier(basefile)).parse
-
-    def tokenize(self, pdfreader):
-        return pdfreader.textboxes(offtryck_gluefunc)
 
 
 def offtryck_parser(basefile="0", metrics=None, preset=None, identifier=None):

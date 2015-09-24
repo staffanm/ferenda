@@ -18,13 +18,12 @@ from rdflib import URIRef, Literal
 
 # My own stuff
 from ferenda import util
+from ferenda.elements import Body
 from ferenda.decorators import downloadmax, recordlastdownload
-from .swedishlegalsource import (NonsemanticLegalSource,
-                                 NonsemanticDocumentStore,
-                                 RPUBL)
+from . import FixedLayoutSource, FixedLayoutStore, RPUBL
 
 
-class ARNStore(NonsemanticDocumentStore):
+class ARNStore(FixedLayoutStore):
 
     """Customized DocumentStore that handles multiple download suffixes
     and transforms YYYY-NNN basefiles to YYYY/NNN pathfrags"""
@@ -36,7 +35,7 @@ class ARNStore(NonsemanticDocumentStore):
         return pathfrag.replace("/", "-", 1)
 
 
-class ARN(NonsemanticLegalSource):
+class ARN(FixedLayoutSource):
 
     """Hanterar referat från Allmänna Reklamationsnämnden, www.arn.se.
 
@@ -51,7 +50,6 @@ class ARN(NonsemanticLegalSource):
                  "processName=SearchRefCasesProcess")
     documentstore_class = ARNStore
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
-    downloaded_suffix = ".pdf"
     storage_policy = "dir"
 
     def metadata_from_basefile(self, basefile):
@@ -206,12 +204,25 @@ class ARN(NonsemanticLegalSource):
                 fp.write(str(fragment).encode("utf-8"))
         return ret
 
+    def parse_metadata(self, fp, basefile):
+        # this is exactly identical to the grandparent class, since we
+        # in this case can extract metadata from a attached HTML
+        # fragment, in addition to what we can infer from the
+        # basefile. But it is kind of fragile to reproduce the same
+        # code here. Maybe do something smart with
+        # super(FixedLayoutSource, self)?
+        rawhead = self.extract_head(fp, basefile)
+        attribs = self.extract_metadata(rawhead, basefile)
+        sane_attribs = self.sanitize_metadata(attribs, basefile)
+        resource = self.polish_metadata(sane_attribs)
+        self.infer_metadata(resource, basefile)
+        return resource
+
     def extract_head(self, fp, basefile):
-        self._basefile = basefile
-        # the fp is for the PDF file, but most of the metadata is in
+        # the fp contains the PDF file, but most of the metadata is in
         # stored HTML fragment attachment. So we open that separately.
         fragment = self.store.downloaded_path(basefile, attachment="fragment.html")
-        return BeautifulSoup(util.readfile(fragment, encoding="utf-8"))
+        return BeautifulSoup(util.readfile(fragment, encoding="utf-8"), "lxml")
 
     def extract_metadata(self, soup, basefile):
         def nextcell(key):
@@ -220,20 +231,6 @@ class ARN(NonsemanticLegalSource):
                 return cell.find_parent("td").find_next_sibling("td").get_text().strip()
             else:
                 raise KeyError("Could not find cell key %s" % key)
-#        desc = Describer(doc.meta, doc.uri)
-#        desc.rdftype(self.rdf_type)
-#        desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-#        desc.value(self.ns['dcterms'].identifier, "ARN %s" % doc.basefile)
-#        desc.value(self.ns['rpubl'].arendenummer, nextcell("Änr"))
-#        desc.value(self.ns['rpubl'].avgorandedatum, nextcell("Avgörande"))
-#        desc.value(self.ns['dcterms'].subject, nextcell("Avdelning"), lang="sv")
-#        title = util.normalize_space(soup.table.find_all("tr")[3].get_text())
-#        title = re.sub("Avgörande \d+-\d+-\d+; \d+-\d+\.?", "", title)
-#        desc.value(self.ns['dcterms'].title, title.strip(), lang="sv")
-#        # dcterms:issued is required, but we only have rpubl.avgorandedatum
-#        desc.value(self.ns['dcterms'].issued,
-#                   desc.getvalue(self.ns['rpubl'].avgorandedatum))
-#
         return {'dcterms:identifier': "ARN %s" % basefile,
                 'dcterms:publisher': self.lookup_resource('Allmänna reklamationsnämnden'),
                 'rpubl:arendenummer': nextcell("Änr"),
@@ -251,6 +248,8 @@ class ARN(NonsemanticLegalSource):
             lang="sv")
         return attribs
 
+    def get_parser(self, basefile, sanitized):
+        return lambda stream: Body(list(stream))
 
     def tokenize(self, reader):
         def gluecondition(textbox, nextbox, prevbox):

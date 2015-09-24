@@ -135,7 +135,7 @@ class Skeleton(DocumentRepository):
         return True
 
     # FIXME: Move this to SwedishLegalSource -- also unify
-    # triples_from_uri with SwedishLegalSource.infer_triples(basefile)
+    # triples_from_uri with SwedishLegalSource.infer_metadata(basefile)
     RATTSFALL = 1
     KONSOLIDERAD = 2
     FORESKRIFT = 3

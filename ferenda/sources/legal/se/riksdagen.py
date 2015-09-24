@@ -222,7 +222,7 @@ class Riksdagen(SwedishLegalSource):
         d.value(self.ns['dcterms'].issued,
                 util.strptime(xsoup.dokument.publicerad.text,
                               "%Y-%m-%d %H:%M:%S").date())
-        self.infer_triples(d, doc.basefile)
+        self.infer_triples(doc.meta.resource(doc.uri), doc.basefile)
         identifier = doc.meta.value(URIRef(doc.uri),
                                     self.ns['dcterms'].identifier)
         if identifier:

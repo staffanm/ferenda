@@ -312,7 +312,7 @@ class MyndFskrBase(SwedishLegalSource):
 
         self.sanitize_metadata(props, doc)
         self.polish_metadata(props, doc)
-        self.infer_triples(Describer(doc.meta, doc.uri), doc)
+        self.infer_metadata(doc.meta.resource(doc.uri), doc.basefile)
         return doc
 
     def sanitize_metadata(self, props, doc):

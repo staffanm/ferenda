@@ -4,6 +4,7 @@ RPUBL = Namespace('http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#')
 URISPACE = Namespace('http://rinfo.lagrummet.se/sys/uri/space#')
 RINFOEX = Namespace("http://lagen.nu/terms#")
 from .swedishlegalsource import SwedishLegalSource, SwedishLegalStore, SwedishCitationParser
+from .fixedlayoutsource import FixedLayoutStore, FixedLayoutSource
 from .regeringen import Regeringen
 from .riksdagen import Riksdagen
 from .trips import Trips, NoMoreLinks

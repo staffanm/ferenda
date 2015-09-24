@@ -15,7 +15,7 @@ from rdflib import Literal
 import requests
 from six import text_type as str
 
-from . import SwedishLegalSource, SwedishLegalStore, SwedishCitationParser, Trips, Regeringen, RPUBL
+from . import SwedishLegalSource, SwedishLegalStore, SwedishCitationParser, FixedLayoutSource, Trips, Regeringen, RPUBL
 from .legalref import LegalRef
 from .swedishlegalsource import offtryck_parser, offtryck_gluefunc
 from ferenda import Describer
@@ -270,7 +270,7 @@ class DirTrips(Trips):
         return self.config.url + "res/dir/" + basefile
 
 
-class DirAsp(SwedishLegalSource, PDFDocumentRepository):
+class DirAsp(FixedLayoutSource):
 
     """Downloads Direktiv in PDF format from http://rkrattsdb.gov.se/kompdf/"""
     alias = "dirasp"
@@ -278,6 +278,7 @@ class DirAsp(SwedishLegalSource, PDFDocumentRepository):
     document_url = "http://62.95.69.24/KOMdoc/%(yy)02d/%(yy)02d%(num)04d.PDF"
     source_encoding = "iso-8859-1"
     rdf_type = RPUBL.Kommittedirektiv
+    storage_policy = "dir"
 
     def download(self, basefile=None):
         resp = requests.get(self.start_url)
@@ -319,44 +320,8 @@ class DirAsp(SwedishLegalSource, PDFDocumentRepository):
         num = int(basefile[5:])
         return self.document_url % {'yy': yy, 'num': num}
 
-    def downloaded_to_intermediate(self, basefile):
-        intermediate_path = self.store.intermediate_path(basefile)
-        intermediate_dir = os.path.dirname(intermediate_path)
-        keep_xml = "bz2" if self.config.compress == "bz2" else True
-        # keep_xml = "bz2"
-        reader = StreamingPDFReader()
-        return reader.convert(filename=self.store.downloaded_path(basefile),
-                              workdir=intermediate_dir,
-                              images=self.config.pdfimages,
-                              keep_xml=keep_xml)
-
-    def parse_metadata(self, file, basefile):
-        # the only metadata we have at this point is what we can
-        # derive from the PDF file and what we can infer from the
-        # basefile + the class itself.
-        #
-        # just create a suitable but empty resource
-        year, no = basefile.split(":")
-        resource = self.polish_metadata({"rpubl:arsutgava": year,
-                                         "rpubl:lopnummer": no})
-        self.infer_metadata(resource, basefile)
-        return resource
-
-    def extract_body(self, fp, basefile):
-        reader = StreamingPDFReader()
-        reader.read(fp)
-        return reader
-        
-    def get_parser(self, basefile, sanitized):
-        p = offtryck_parser(basefile, preset="dir")
-        p.current_identifier = "Dir. %s" % basefile
-        return p.parse
-
-    def tokenize(self, pdfreader):
-        return pdfreader.textboxes(offtryck_gluefunc)
-
-    def create_external_resources(self, doc):
-        pass
+    def infer_identifier(self, basefile):
+        return "Dir %s" % basefile
 
 
 class DirRegeringen(Regeringen):

@@ -350,7 +350,7 @@ class PropTrips(Trips):
                 # dcterms:format to correct mime type
 
             d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-            self.infer_triples(d, doc.basefile)
+            self.infer_metadata(doc.meta.resource(doc.identifier), doc.basefile)
             return True
         except Exception as e:
             traceback = sys.exc_info()[2]
