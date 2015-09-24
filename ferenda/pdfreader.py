@@ -583,7 +583,6 @@ class StreamingPDFReader(PDFReader):
         intermediate XML/hOCR data. """
         self.log = logging.getLogger('pdfreader')
         self.fontspec = kwargs.get('fontspec') or {}
-        return None
 
     def parse(self, filename, workdir, images=True,
               convert_to_pdf=False,
@@ -668,7 +667,8 @@ class StreamingPDFReader(PDFReader):
             parser = self._parse_xml
         ret = parser(fp)
         fp.close()
-        return ret
+        # return ret
+        return self
 
 
 class Page(CompoundElement, OrdinalElement):

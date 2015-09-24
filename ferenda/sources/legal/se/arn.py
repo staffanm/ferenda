@@ -17,15 +17,14 @@ import requests.exceptions
 from rdflib import URIRef, Literal
 
 # My own stuff
-from ferenda import PDFDocumentRepository, DocumentStore, PDFReader, WordReader, Describer
 from ferenda import util
-from ferenda.decorators import downloadmax, recordlastdownload, managedparsing
-from ferenda.elements import Body, UnicodeElement, CompoundElement, serialize
-from . import SwedishLegalSource, SwedishCitationParser, RPUBL
-from ferenda.sources.legal.se.legalref import LegalRef
+from ferenda.decorators import downloadmax, recordlastdownload
+from .swedishlegalsource import (NonsemanticLegalSource,
+                                 NonsemanticDocumentStore,
+                                 RPUBL)
 
 
-class ARNStore(DocumentStore):
+class ARNStore(NonsemanticDocumentStore):
 
     """Customized DocumentStore that handles multiple download suffixes
     and transforms YYYY-NNN basefiles to YYYY/NNN pathfrags"""
@@ -36,43 +35,8 @@ class ARNStore(DocumentStore):
     def pathfrag_to_basefile(self, pathfrag):
         return pathfrag.replace("/", "-", 1)
 
-    def downloaded_path(self, basefile, version=None, attachment=None, suffix=None):
-        if not suffix:
-            if os.path.exists(self.path(basefile, "downloaded", ".wpd")):
-                suffix = ".wpd"
-            elif os.path.exists(self.path(basefile, "downloaded", ".doc")):
-                suffix = ".doc"
-            elif os.path.exists(self.path(basefile, "downloaded", ".docx")):
-                suffix = ".docx"
-            elif os.path.exists(self.path(basefile, "downloaded", ".rtf")):
-                suffix = ".rtf"
-            elif os.path.exists(self.path(basefile, "downloaded", ".pdf")):
-                suffix = ".pdf"
-            else:
-                suffix = self.downloaded_suffix
-        return self.path(basefile, "downloaded", suffix, version, attachment)
 
-    def list_basefiles_for(self, action, basedir=None):
-        if not basedir:
-            basedir = self.datadir
-        if action == "parse":
-            d = os.path.sep.join((basedir, "downloaded"))
-            if not os.path.exists(d):
-                return
-            for x in sorted(itertools.chain(util.list_dirs(d, ".wpd"),
-                                            util.list_dirs(d, ".rtf"),
-                                            util.list_dirs(d, ".doc"),
-                                            util.list_dirs(d, ".docx"),
-                                            util.list_dirs(d, ".pdf"))):
-                suffix = "/index" + os.path.splitext(x)[1]
-                pathfrag = x[len(d) + 1:-len(suffix)]
-                yield self.pathfrag_to_basefile(pathfrag)
-        else:
-            for x in super(ARNStore, self).list_basefiles_for(action, basedir):
-                yield x
-
-
-class ARN(SwedishLegalSource, PDFDocumentRepository):
+class ARN(NonsemanticLegalSource):
 
     """Hanterar referat från Allmänna Reklamationsnämnden, www.arn.se.
 
@@ -83,21 +47,18 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
 
     alias = "arn"
     xslt_template = "res/xsl/arn.xsl"
-    start_url = "http://adokweb.arn.se/digiforms/sessionInitializer?processName=SearchRefCasesProcess"
+    start_url = ("http://adokweb.arn.se/digiforms/sessionInitializer?"
+                 "processName=SearchRefCasesProcess")
     documentstore_class = ARNStore
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
+    downloaded_suffix = ".pdf"
+    storage_policy = "dir"
 
-
-    def canonical_uri(self, basefile):
-        # this is a trimmed-down version of extract_metadata, that
-        # only extracts the rpubl:diarienummer (which really is a
-        # rpubl:arendenummer, but for purposes of minting the uri...)
-        attrib = {'rpubl:diarienummer': basefile,
-                  'rdf:type': self.rdf_type,
-                  'dcterms:publisher': self.lookup_resource('Allmänna reklamationsnämnden')}
-        resource = self.attributes_to_resource(attrib)
-        return self.minter.space.coin_uri(resource) 
-        
+    def metadata_from_basefile(self, basefile):
+        return {'rpubl:diarienummer': basefile,
+                'rdf:type': self.rdf_type,
+                'dcterms:publisher': self.lookup_resource(
+                    'Allmänna reklamationsnämnden')}
 
     @recordlastdownload
     def download(self, basefile=None):
@@ -245,32 +206,6 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
                 fp.write(str(fragment).encode("utf-8"))
         return ret
 
-    def downloaded_to_intermediate(self, basefile):
-        # Create a PDFReader object which we throw away -- at this
-        # stage we're only interested in creating the intermediate
-        # file. It's the responsibility of this method to return a
-        # filepath to a intermediate file.
-        #
-        # FIXME: The fact that creating a PDFReader both creates this
-        # intermediate XML file, and also parses that XML file into
-        # Pages and TextElement objects, suggests that maybe the
-        # functionality should be split up.
-        filename = self.store.downloaded_path(basefile)
-        intermediate = self.store.intermediate_path(basefile)
-        workdir = os.path.dirname(intermediate)
-        filetype = os.path.splitext(filename)[1]
-        convert_to_pdf = filetype != ".pdf"
-        if self.config.compress == "bz2":
-            keep_xml = "bz2"
-        else:
-            keep_xml = True
-        PDFReader(filename=filename,
-                  workdir=workdir,
-                  images=self.config.pdfimages,
-                  convert_to_pdf=convert_to_pdf,
-                  keep_xml=keep_xml)
-        return open(intermediate)
-
     def extract_head(self, fp, basefile):
         self._basefile = basefile
         # the fp is for the PDF file, but most of the metadata is in
@@ -317,7 +252,7 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
         return attribs
 
 
-    def tokenize(self, sanitized_data):
+    def tokenize(self, reader):
         def gluecondition(textbox, nextbox, prevbox):
             linespacing = 7
             res = (textbox.font.family == nextbox.font.family and
@@ -325,18 +260,6 @@ class ARN(SwedishLegalSource, PDFDocumentRepository):
                    textbox.top + textbox.height + linespacing >= nextbox.top and
                    nextbox.top > prevbox.top)
             return res
-
-        # sanitized_data is a bs4.element.Tag object since we haven't
-        # overridden extract_body and is of no use to us. We just want
-        # the filename to pass to PDFReader.
-        # This SHOULD just re-open the intermediate file that was
-        # created by downloaded_to_intermediate. Hopefully we won't
-        # need to specify the images/convert_to_pdf/keep_xml arguments
-        # again.
-        filename = self.store.downloaded_path(self._basefile)
-        intermediate = self.store.intermediate_path(self._basefile)
-        workdir = os.path.dirname(intermediate)
-        reader = PDFReader(filename=filename, workdir=workdir)
         return reader.textboxes(gluecondition)
 
     def create_external_resources(self, doc):

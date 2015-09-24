@@ -27,6 +27,9 @@ Where DocumentRepository.parse calls soup_from_basefile,
 parse_metadata_from_soup and parse_document_from_soup in that order,
 SwedishLegalSource.parse uses a slightly different call hierarcy::
 
+ canonical_uri(basefile) -> str
+     metadata_from_basefile(basefile) -> dict
+     attributes_to_resource(dict) ->rdflib.Resource
  parse(doc) -> bool
      parse_open(basefile) -> file
          downloaded_to_intermediate(basefile) -> file
@@ -34,6 +37,7 @@ SwedishLegalSource.parse uses a slightly different call hierarcy::
      parse_metadata(file, basefile) -> rdflib.Resource
          extract_head(file, basefile) -> object
          extract_metadata(object, basefile) -> dict
+	     [metadata_from_basefile(basefile) -> dict]
          sanitize_metadata(dict, basefile) -> dict
              sanitize_identifier(str) -> str
          polish_metadata(dict) -> rdflib.Resource

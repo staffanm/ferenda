@@ -6,6 +6,8 @@ from __future__ import unicode_literals
 from datetime import datetime, date
 import re
 import os
+import itertools
+from bz2 import BZ2File
 
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
@@ -15,12 +17,14 @@ import bs4
 from ferenda import (DocumentRepository, DocumentStore, FSMParser,
                      CitationParser)
 from ferenda import util
+from ferenda.compat import OrderedDict
 from ferenda.sources.legal.se.legalref import Link, LegalRef
 from ferenda.elements.html import A, H1, H2, H3
 from ferenda.elements import (Paragraph, Section, Body,
                               OrdinalElement, CompoundElement,
                               SectionalElement)
 from ferenda.pdfreader import Page
+from ferenda.pdfreader import StreamingPDFReader
 from ferenda.decorators import action, managedparsing
 from ferenda.thirdparty.coin import URIMinter
 from . import RPUBL, legaluri
@@ -114,7 +118,8 @@ class Coverpage(CompoundElement):
 
 class SwedishLegalStore(DocumentStore):
 
-    """Customized DocumentStore that better handles some pecularities in swedish legal document naming."""
+    """Customized DocumentStore that better handles some pecularities in
+    swedish legal document naming."""
 
     def basefile_to_pathfrag(self, basefile):
         # "2012/13:152" => "2012-13/152"
@@ -131,15 +136,21 @@ class SwedishLegalStore(DocumentStore):
                          attachment=attachment)
 
 
-class NonsemanticDocumentStore(DocumentStore):
-    """Handles storage of documents in non-semantic formats (either PDF or word processing docs that are converted to PDF). A single repo may have heterogenous usage of file formats, and this store will store each document with an appropriate file suffix."""
+class NonsemanticDocumentStore(SwedishLegalStore):
+    """Handles storage of documents in non-semantic formats (either PDF or
+    word processing docs that are converted to PDF). A single repo may
+    have heterogenous usage of file formats, and this store will store
+    each document with an appropriate file suffix.
+
+    """
 
     downloaded_suffix = ".pdf"  #  this is teh default
-    doctypes = OrderedDict((".wpd", b'\xffWPC'),
-                           (".doc", b'\xd0\xcf\x11\xe0'),
-                           (".docx", b'PK\x03\x04'),
-                           (".rtf", b'{\\rt'),
-                           (".pdf", b'%PDF'))
+    doctypes = OrderedDict([(".wpd", b'\xffWPC'),
+                            (".doc", b'\xd0\xcf\x11\xe0'),
+                            (".docx", b'PK\x03\x04'),
+                            (".rtf", b'{\\rt'),
+                            (".pdf", b'%PDF')])
+
 
     def downloaded_path(self, basefile, version=None, attachment=None, suffix=None):
         if not suffix:
@@ -148,7 +159,7 @@ class NonsemanticDocumentStore(DocumentStore):
                     suffix = s
                     break
             else:
-                suffix = self.downloaded_suffix
+                suffix = NonsemanticDocumentStore.downloaded_suffix
         return self.path(basefile, "downloaded", suffix, version, attachment)
 
     def list_basefiles_for(self, action, basedir=None):
@@ -159,12 +170,13 @@ class NonsemanticDocumentStore(DocumentStore):
             if not os.path.exists(d):
                 return
             iterators = (util.list_dirs(d, x) for x in self.doctypes)
-            for x in sorted(itertools.chain(*iterators):
+            for x in sorted(itertools.chain(*iterators)):
                 suffix = "/index" + os.path.splitext(x)[1]
                 pathfrag = x[len(d) + 1:-len(suffix)]
                 yield self.pathfrag_to_basefile(pathfrag)
         else:
-            for x in super(NonsemanticDocumentStore, self).list_basefiles_for(action, basedir):
+            for x in super(NonsemanticDocumentStore,
+                           self).list_basefiles_for(action, basedir):
                 yield x
 
     def guess_type(self, fp, basefile):
@@ -245,7 +257,6 @@ class SwedishLegalSource(DocumentRepository):
             filename = self.resourceloader.filename
             spacefile = filename("uri/swedishlegalsource.space.ttl")
             slugsfile = filename("uri/swedishlegalsource.slugs.ttl")
-            from pudb import set_trace; set_trace()
             self.log.debug("Loading URISpace from %s" % spacefile)
             cfg = Graph().parse(spacefile,
                                 format="turtle").parse(slugsfile,
@@ -346,14 +357,13 @@ class SwedishLegalSource(DocumentRepository):
     def canonical_uri(self, basefile):
         attrib = self.metadata_from_basefile(basefile)
         resource = self.attributes_to_resource(attrib)
-        return self.minter.space.coin_uri(resource) 
+        return self.minter.space.coin_uri(resource)
 
-    def metadata_from_basefile(self, basefile)    
+    def metadata_from_basefile(self, basefile):
         year, ordinal = basefile.split(":")
-        attrib = {'rpubl:arsutgava': year,
-                  'rpubl:lopnummer': ordinal,
-                  'rdf:type': self.rdf_type}
-
+        return {'rpubl:arsutgava': year,
+                'rpubl:lopnummer': ordinal,
+                'rdf:type': self.rdf_type}
 
     def sanitize_basefile(self, basefile):
         # will primarily be used by download to normalize eg "2014:04"
@@ -361,7 +371,6 @@ class SwedishLegalSource(DocumentRepository):
         # line 188- should call this method (and
         # .download_get_basefiles in general probably)
         return basefile
-
 
     @action
     @managedparsing
@@ -387,7 +396,17 @@ class SwedishLegalSource(DocumentRepository):
 
         """
         # 1. check if intermediate_path exists
-        if not os.path.exists(self.store.intermediate_path(basefile)):
+        intermediate_path = self.store.intermediate_path(basefile)
+        # FIXME: This name mangling should be done by
+        # NonsemanticLegalSource somehow. However, the API for
+        # StreamingPDFReader should first be adapted so that
+        # intermediate_file is specified (maybe alongside of workdir).
+        if self.config.compress == "bz2":
+            intermediate_path += ".bz2"
+            opener = BZ2File
+        else:
+            opener = open
+        if not os.path.exists(intermediate_path):
             # 2. if not, call code
             #    parse_convert_to_intermediate(basefile) to convert
             #    downloaded_path -> intermediate_path (eg.
@@ -397,7 +416,8 @@ class SwedishLegalSource(DocumentRepository):
             # 3. recieve intermediate_path as open file (binary?)
             # FIXME: DV.py needs this fp to have a .filetype attribute
             # -- where do we store it and how do we retrieve it?
-            fp = open(self.store.intermediate_path(basefile), "rb")
+            
+            fp = opener(intermediate_path, "rb")
         # 4. call patch_if_needed, recieve as open file (binary?)
         return self.patch_if_needed(fp, basefile)
 
@@ -757,10 +777,10 @@ class SwedishLegalSource(DocumentRepository):
         else:
             return util.gYear(year)
 
-
 class NonsemanticLegalSource(SwedishLegalSource):
-    """this is basically like PDFDocumentRepository, but handles other word processing formats along with PDF files (everything is converted to/handled as PDF internally) """
-
+    """This is basically like PDFDocumentRepository, but handles other
+    word processing formats along with PDF files (everything is
+    converted to/handled as PDF internally) """
 
     def downloaded_to_intermediate(self, basefile):
         # force just the conversion part of the PDF handling
@@ -772,11 +792,14 @@ class NonsemanticLegalSource(SwedishLegalSource):
         return reader.convert(filename=self.store.downloaded_path(basefile), 
                               workdir=intermediate_dir, 
                               images=self.config.pdfimages, 
-                              convert_to_pdf=not downloadpath.endswith(".pdf")
+                              convert_to_pdf=not downloaded_path.endswith(".pdf"),
                               keep_xml="bz2" if self.config.compress == "bz2" else True,
                               ocr_lang=ocr_lang)
 
     def parse_metadata(self, file, basefile):
+        # at this point, we only have the PDF file itself, which is
+        # hard to extract metadata from. We just return anything we
+        # can infer from basefile 
         resource = self.polish_metadata(self.metadata_from_basefile(basefile))
         self.infer_metadata(resource, basefile)
         return resource
@@ -787,7 +810,7 @@ class NonsemanticLegalSource(SwedishLegalSource):
     def infer_identifier(self, basefile):
         return basefile
 
-    def get_parser(self, basefile)
+    def get_parser(self, basefile, sanitized):
 	return offtryck_parser(basefile, preset=self.alias, identifier=self.infer_identifier(basefile)).parse
 
     def tokenize(self, pdfreader):
