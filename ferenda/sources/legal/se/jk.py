@@ -82,16 +82,10 @@ class JK(SwedishLegalSource):
                 new_soup.find("div", id="mainContent"))
 
 
-    def canonical_uri(self, basefile):
-        # possibly break out the attrib-generating code to a separate
-        # func since that's the one that'll be overridden. In
-        # particular, rpubl:forfattningssamling or similar needs to be
-        # added by many repos
-        attrib = {'rpubl:diarienummer': basefile,
-                  'dcterms:publisher': self.lookup_resource("JK", SKOS.altLabel),
-                  'rdf:type': self.rdf_type}
-        resource = self.attributes_to_resource(attrib)
-        return self.minter.space.coin_uri(resource) 
+    def metadata_from_basefile(self, basefile):
+        return {'rpubl:diarienummer': basefile,
+                'dcterms:publisher': self.lookup_resource("JK", SKOS.altLabel),
+                'rdf:type': self.rdf_type}
 
     def extract_head(self, fp, basefile):
         return BeautifulSoup(fp.read(), "lxml")
