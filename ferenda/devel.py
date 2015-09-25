@@ -468,6 +468,7 @@ class Devel(object):
         for basefile in basefiles:
             print("  %s: copying %s" % (alias, basefile))
             src = sourcerepo.store.downloaded_path(basefile)
+            # NB: This won't work nice for eg DV.py
             dst = destrepo.store.downloaded_path(basefile)
             isrc = sourcerepo.store.intermediate_path(basefile)
             idst = destrepo.store.intermediate_path(basefile)

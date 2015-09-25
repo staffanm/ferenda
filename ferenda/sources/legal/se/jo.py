@@ -15,12 +15,12 @@ from rdflib.namespace import SKOS
 from bs4 import BeautifulSoup
 
 # My own stuff
+from ferenda import FSMParser
 from ferenda import decorators
-from ferenda import PDFDocumentRepository, FSMParser, Describer, DocumentStore
-from . import SwedishLegalSource, RPUBL
+from ferenda.elements import CompoundElement, Body, Paragraph
+from . import RPUBL
+from .fixedlayoutsource import FixedLayoutSource
 from .swedishlegalsource import UnorderedSection
-from ferenda.elements import CompoundElement, Body, Paragraph, Heading
-from ferenda.elements.html import Span
 
 
 class Abstract(CompoundElement):
@@ -48,8 +48,7 @@ class JO(FixedLayoutSource):
 
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
     storage_policy = "dir"
-    documentstore_class = JOStore
-    downloaded_suffix = ".pdf"  # might need to change
+    downloaded_suffix = ".pdf" 
 
     def metadata_from_basefile(self, basefile):
         return {'rpubl:diarienummer': basefile,
@@ -130,7 +129,7 @@ class JO(FixedLayoutSource):
         else:
             return self.metadata_from_basefile(basefile)
         
-    def tokenize(self, reader)
+    def tokenize(self, reader):
         def gluecondition(textbox, nextbox, prevbox):
             linespacing = nextbox.height / 1.5  # allow for large linespacing
             return (textbox.font.size == nextbox.font.size and

@@ -332,8 +332,14 @@ class SwedishLegalSource(DocumentRepository):
         if resource.value(DCTERMS.title):
             doc.lang = resource.value(DCTERMS.title).language
         doc.body = self.parse_body(fp, doc.basefile)
+        self.postprocess_doc(doc)
         self.parse_entry_update(doc)
         return True
+
+    def postprocess_doc(self, doc):
+        """Do any last-minute postprocessing (mainly used to add extra
+        metadata from doc.body to doc.head)"""
+        pass
 
     def parse_open(self, basefile):
         """Open the main downloaded file for the given basefile, caching the

@@ -11,7 +11,8 @@ from datetime import datetime, timedelta
 from six.moves.urllib_parse import urljoin
 
 from bs4 import BeautifulSoup
-from rdflib import Literal
+from rdflib import Literal, URIRef
+from rdflib.namespace import DCTERMS, XSD
 import requests
 from six import text_type as str
 
@@ -292,7 +293,6 @@ class DirAsp(FixedLayoutSource):
             if ((not self.config.refresh) and
                     (not os.path.exists(self.store.downloaded_path(basefile)))):
                 self.download_single(basefile, url)
-
     @downloadmax
     def download_get_basefiles(self, depts):
         for dept in depts:
@@ -323,6 +323,23 @@ class DirAsp(FixedLayoutSource):
     def infer_identifier(self, basefile):
         return "Dir %s" % basefile
 
+    def postprocess_doc(self, doc):
+        next_is_title = False
+        for para in doc.body:
+            strpara = str(para).strip()
+            if strpara == "Kommittédirektiv":
+                next_is_title = True
+            elif next_is_title:
+                doc.meta.add((URIRef(doc.uri), DCTERMS.title, Literal(strpara)))
+                next_is_title = False
+            elif strpara.startswith("Beslut vid regeringssammanträde den "):
+                datestr = strpara[36:]  # length of above prefix
+                if datestr.endswith("."):
+                    datestr = datestr[:-1]
+                doc.meta.add((URIRef(doc.uri), DCTERMS.issued,
+                              Literal(self.parse_swedish_date(datestr),
+                                      datatype=XSD.date)))
+                break
 
 class DirRegeringen(Regeringen):
 

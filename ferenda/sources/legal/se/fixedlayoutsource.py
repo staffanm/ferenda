@@ -88,13 +88,14 @@ class FixedLayoutSource(SwedishLegalSource):
                               keep_xml=keep_xml,
                               ocr_lang=ocr_lang)
 
-    def parse_metadata(self, file, basefile):
-        # at this point, we only have the PDF file itself, which is
-        # hard to extract metadata from. We just return anything we
-        # can infer from basefile
-        resource = self.polish_metadata(self.metadata_from_basefile(basefile))
-        self.infer_metadata(resource, basefile)
-        return resource
+    def extract_head(self, fp, basefile):
+        # at this point, fp points to the PDF file itself, which is
+        # hard to extract metadata from. We just let extract_metadata
+        # return anything we can infer from basefile
+        pass
+
+    def extract_metadata(self, rawhead, basefile):
+        return self.metadata_from_basefile(basefile)
     
     def extract_body(self, fp, basefile):
         return StreamingPDFReader().read(fp)

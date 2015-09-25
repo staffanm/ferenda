@@ -266,8 +266,15 @@ class Regeringen(SwedishLegalSource):
 
     def extract_metadata(self, rawhead, basefile):
         content = rawhead
-        title = list(content.find("h1").children)[0].string
-        identifier = content.find("span", "h1-vignette").text
+        title = list(content.find("h1").children)[0].string.strip()
+        # in some cases, the <h1> is not a real title but rather an
+        # identifier. Do a simple sanity check for this
+        # the longest possible id, "Prop. 1999/2000:123", is 19 chars
+        if len(title) < 20 and title.endswith(basefile):
+            identifier = title
+            title = ""  # FIXME: hunt for title amongst the PDF file links
+        else:
+            identifier = content.find("span", "h1-vignette").text
         # the <time> element has a datetime attrib with
         # machine-readable timestamp, but this has unwarranted high
         # precision. We'd like to capture just a xsd:YearMonth if

@@ -204,20 +204,6 @@ class ARN(FixedLayoutSource):
                 fp.write(str(fragment).encode("utf-8"))
         return ret
 
-    def parse_metadata(self, fp, basefile):
-        # this is exactly identical to the grandparent class, since we
-        # in this case can extract metadata from a attached HTML
-        # fragment, in addition to what we can infer from the
-        # basefile. But it is kind of fragile to reproduce the same
-        # code here. Maybe do something smart with
-        # super(FixedLayoutSource, self)?
-        rawhead = self.extract_head(fp, basefile)
-        attribs = self.extract_metadata(rawhead, basefile)
-        sane_attribs = self.sanitize_metadata(attribs, basefile)
-        resource = self.polish_metadata(sane_attribs)
-        self.infer_metadata(resource, basefile)
-        return resource
-
     def extract_head(self, fp, basefile):
         # the fp contains the PDF file, but most of the metadata is in
         # stored HTML fragment attachment. So we open that separately.
