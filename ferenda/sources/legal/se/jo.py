@@ -32,23 +32,8 @@ class Blockquote(CompoundElement):
     tagname = "blockquote"
 
 
-class Meta(CompoundElement):
-    pass
 
-
-class JOStore(DocumentStore):
-    pass
-
-#    def basefile_to_pathfrag(self, basefile):
-#        # 2371-2014 -> 2014/2371
-#        return "/".join(basefile.split("-")[::-1])
-#
-#    def pathfrag_to_basefile(self, pathfrag):
-#        # 2014/2371 -> 2371-2014
-#        return "-".join(pathfrag.split("/")[::-1])
-#
-
-class JO(SwedishLegalSource, PDFDocumentRepository):
+class JO(FixedLayoutSource):
 
     """Hanterar beslut från Riksdagens Ombudsmän, www.jo.se
 
@@ -66,18 +51,10 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
     documentstore_class = JOStore
     downloaded_suffix = ".pdf"  # might need to change
 
-    def canonical_uri(self, basefile):
-        # possibly break out the attrib-generating code to a separate
-        # func since that's the one that'll be overridden. In
-        # particular, rpubl:forfattningssamling or similar needs to be
-        # added by many repos
-        attrib = {'rpubl:diarienummer': basefile,
-                  'dcterms:publisher': self.lookup_resource("JO", SKOS.altLabel),
-                  'rdf:type': self.rdf_type}
-        resource = self.attributes_to_resource(attrib)
-        return self.minter.space.coin_uri(resource) 
-
-
+    def metadata_from_basefile(self, basefile):
+        return {'rpubl:diarienummer': basefile,
+                'dcterms:publisher': self.lookup_resource("JO", SKOS.altLabel),
+                'rdf:type': self.rdf_type}
 
     @decorators.action
     @decorators.recordlastdownload
@@ -141,54 +118,26 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
                               (basefile, headnote_url))
         return ret
 
-    @decorators.managedparsing
-    def parse(self, doc):
-        # reset global state
-        UnorderedSection.counter = 0
 
+    def extract_head(self, fp, basefile):
+        if "headnote.html" in list(self.store.list_attachments(basefile, "downloaded")):
+            return BeautifulSoup(self.store.downloaded_path(basefile, attachment="headnote.html"))
+        # else: return None
+        
+    def extract_metadata(self, rawhead, basefile):
+        if rawhead:
+            print("FIXME: we should do something with this BeautifulSoup data")
+        else:
+            return self.metadata_from_basefile(basefile)
+        
+    def tokenize(self, reader)
         def gluecondition(textbox, nextbox, prevbox):
             linespacing = nextbox.height / 1.5  # allow for large linespacing
             return (textbox.font.size == nextbox.font.size and
                     textbox.top + textbox.height + linespacing >= nextbox.top)
+        return reader.textboxes(gluecondition)
 
-        reader = self.pdfreader_from_basefile(doc.basefile)
-        iterator = reader.textboxes(gluecondition)
-        desc = Describer(doc.meta, doc.uri)
-        doc.body = self.removemeta(self.structure(doc, iterator),
-                                   Describer(doc.meta, doc.uri))
-
-        # add basic metadata
-        desc.rdftype(self.rdf_type)
-        desc.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-        desc.value(self.ns['dcterms'].identifier, "JO dnr %s" % doc.basefile)
-        # dcterms:issued is required, but we only have rpubl.avgorandedatum
-        desc.value(self.ns['dcterms'].issued,
-                   desc.getvalue(self.ns['rpubl'].avgorandedatum))
-
-        # if the headnote is present, do more (incl replacing title?)
-        if "headnote.html" in list(self.store.list_attachments(doc.basefile, "downloaded")):
-            self.parse_headnote(desc)
-
-        self.parse_entry_update(doc)
-        return True
-
-    def parse_headnote(self, desc):
-        pass
-
-    def removemeta(self, tree, desc):
-        tmp = []
-        for node in tree:
-            if isinstance(node, Meta):
-                for el in node:  # should contain a list of RDF Literal objects
-                    desc.value(node.predicate, el)
-            elif isinstance(node, list):
-                tmp.append(self.removemeta(node, desc))
-            else:
-                tmp.append(node)
-        tree[:] = tmp[:]
-        return tree
-
-    def structure(self, doc, chunks):
+    def get_parser(self, basefile, sanitized):
         def is_heading(parser):
             return parser.reader.peek().font.size == 17
 
@@ -308,8 +257,4 @@ class JO(SwedishLegalSource, PDFDocumentRepository):
                            ("blockquote", is_datum): (make_datum, None),
                            ("blockquote", is_dnr): (make_dnr, None),
                            })
-        p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
-        return p.parse(chunks)
-
-    def create_external_resources(self, doc):
-        pass
+        return p.parse
