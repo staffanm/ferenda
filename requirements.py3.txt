@@ -22,3 +22,5 @@ psutil
 layeredconfig
 grako
 responses
+scandir # not needed for py3.5 +
+

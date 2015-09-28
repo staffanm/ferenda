@@ -460,7 +460,7 @@ class Devel(object):
         if randomsample:
             basefiles = list(sourcerepo.store.list_basefiles_for("parse"))
             samplesize = min([len(basefiles), samplesize])
-            basefiles = random.sample(list(sourcerepo.store.list_basefiles_for("parse")), samplesize)
+            basefiles = random.sample(basefiles, samplesize)
         else:
             basefiles = islice(sourcerepo.store.list_basefiles_for("parse"),
                                0, samplesize)
@@ -468,7 +468,8 @@ class Devel(object):
         for basefile in basefiles:
             print("  %s: copying %s" % (alias, basefile))
             src = sourcerepo.store.downloaded_path(basefile)
-            # NB: This won't work nice for eg DV.py
+            # FIXME: For DV.py (and possibly other multi-sufffix
+            # repos) this will yield an incorrect suffix (eg ".zip")
             dst = destrepo.store.downloaded_path(basefile)
             isrc = sourcerepo.store.intermediate_path(basefile)
             idst = destrepo.store.intermediate_path(basefile)
@@ -494,9 +495,12 @@ class Devel(object):
             # data/sfs/register/1998/204.html. Maybe we should use
             # storage_policy="dir" and handle those things as
             # attachments?
-            if os.path.exists(sourcerepo.path(basefile, "register", ".html")):
-                shutil.copy2(sourcerepo.path(basefile, "register", ".html"),
-                             destrepo.path(basefile, "register", ".html"))
+            
+            if os.path.exists(sourcerepo.store.path(basefile, "register", ".html")):
+                dst = destrepo.store.path(basefile, "register", ".html")
+                util.ensure_dir(dst)
+                shutil.copy2(sourcerepo.store.path(basefile, "register", ".html"),
+                             dst)
             # also copy the docentry json file
             if os.path.exists(sourcerepo.store.documententry_path(basefile)):
                 util.ensure_dir(destrepo.store.documententry_path(basefile))

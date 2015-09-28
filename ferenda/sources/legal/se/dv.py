@@ -17,7 +17,6 @@ from six.moves.urllib_parse import urljoin
 from six import BytesIO
 import tempfile
 from collections import defaultdict
-from copy import deepcopy
 
 # 3rdparty libs
 from rdflib import Namespace, URIRef, Graph, RDF, RDFS, BNode
@@ -36,7 +35,7 @@ from ferenda.elements import (Body, Paragraph, CompoundElement, OrdinalElement,
                               Heading, Link)
 
 from ferenda.elements.html import Strong, Em
-from . import SwedishLegalSource, SwedishCitationParser, RPUBL, URISPACE
+from . import SwedishLegalSource, SwedishCitationParser, RPUBL
 
 PROV = Namespace(util.ns['prov'])
 

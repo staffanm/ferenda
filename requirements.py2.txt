@@ -25,3 +25,4 @@ psutil
 layeredconfig
 # grako -- doesn't support 2.6 at all
 responses
+scandir

@@ -259,7 +259,7 @@ def normalize_space(string):
 # util.File
 
 
-def list_dirs(d, suffix=None, reverse=False):
+def list_dirs_slow(d, suffix=None, reverse=False):
     """A generator that works much like :py:func:`os.listdir`, only recursively (and only returns files, not directories).
 
     :param d: The directory to start in
@@ -273,7 +273,6 @@ def list_dirs(d, suffix=None, reverse=False):
 
     """
     # inspired by http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/161542
-
     directories = [d]
     while directories:
         d = directories.pop()
@@ -289,6 +288,30 @@ def list_dirs(d, suffix=None, reverse=False):
                 else:
                     yield f
 
+
+def list_dirs(d, suffix=None, reverse=False):
+    """A generator that works much like :py:func:`os.listdir`, only recursively (and only returns files, not directories).
+
+    :param d: The directory to start in
+    :type d: str
+    :param suffix: Only return files with the given suffix
+    :type suffix: str
+    :param reverse: Returns result sorted in reverse alphabetic order
+    :param type:
+    :returns: the full path (starting from d) of each matching file
+    :rtype: generator
+
+    """
+    try:
+        from scandir import walk
+    except ImportError:
+        from os import walk
+    for (dirpath, dirnames, filenames) in walk(d, topdown=True):
+        dirnames.sort(reverse=reverse, key=split_numalpha)
+        for filename in sorted(filenames, key=split_numalpha):
+            fullpath = dirpath + os.sep + filename
+            if (not suffix) or fullpath.endswith(suffix):
+                yield fullpath
 # util.File
 
 
