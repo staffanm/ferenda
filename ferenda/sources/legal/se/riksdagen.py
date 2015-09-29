@@ -50,7 +50,7 @@ class Riksdagen(SwedishLegalSource):
     UTSKOTTSDOKUMENT = "utskottsdokument"
     YTTRANDE = "yttr"
 
-    # add typ=prop or whatever
+
     downloaded_suffix = ".xml"
     storage_policy = "dir"
 
@@ -199,84 +199,54 @@ class Riksdagen(SwedishLegalSource):
             self.log.debug(
                 "%s and all associated files unchanged" % xmlfile)
 
-    @managedparsing
-    def parse(self, doc):
-        filename = self.store.downloaded_path(doc.basefile)
-        if not os.path.exists(filename):
-            raise errors.NoDownloadedFileError("File '%s' not found" % filename)
-        htmlfile = self.store.path(doc.basefile, 'downloaded', '.html')
-        pdffile = self.store.path(doc.basefile, 'downloaded', '.pdf')
 
-        intermediate_path = self.store.intermediate_path(doc.basefile,
-                                                         attachment=os.path.basename(pdffile))
-        intermediate_dir = os.path.dirname(intermediate_path)
+    def extract_head(self, fp, basefile)    
+        return BeautifulSoup(fp.read(), "xml")
 
-        doc.uri = self.canonical_uri(doc.basefile)
-        self.log.debug("Set URI to %s (from %s)" % (doc.uri, doc.basefile))
-        d = Describer(doc.meta, doc.uri)
-        d.rdftype(self.rdf_type)
-        d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-        xsoup = BeautifulSoup(open(self.store.downloaded_path(
-            doc.basefile)).read(), "xml")
-        d.value(self.ns['dcterms'].title, xsoup.dokument.titel.text, lang="sv")
-        d.value(self.ns['dcterms'].issued,
-                util.strptime(xsoup.dokument.publicerad.text,
-                              "%Y-%m-%d %H:%M:%S").date())
-        self.infer_metadata(doc.meta.resource(doc.uri), doc.basefile)
-        identifier = doc.meta.value(URIRef(doc.uri),
-                                    self.ns['dcterms'].identifier)
-        if identifier:
-            identifier = str(identifier)
+    def extract_metadata(self, soup, basefile):
+        attribs = self.metadata_from_basefile(basefile)
+        attribs["dcterms:title"] = soup.dokument.titel.text
+	attribs["dcterms:issued" = util.strptime(ssoup.dokument.publicerad.text,
+                              "%Y-%m-%d %H:%M:%S").date()
+        return attribs
 
+    def extract_body(self, fp, basefile):
+        pdffile = self.store.downloaded_path(basefile, attachment="index.pdf")
         if os.path.exists(pdffile):
-            hocr_path = self.store.path(doc.basefile, 'intermediate',
-                                        '.hocr.html.bz2')
-            metrics_path = self.store.path(doc.basefile, 'intermediate',
-                                           '.metrics.json')
-            plot_path = self.store.path(doc.basefile, 'intermediate',
-                                        '.plot.png')
-            pdfdebug_path = self.store.path(doc.basefile, 'intermediate',
-                                            '.debug.pdf')
-            # slight optimization: if we've already performed OCR,
-            # then the PDF won't contain regular text -- don't bother
-            # trying to parse it as a regular PDF.
-            if util.outfile_is_newer([pdffile], hocr_path):
-                pdf = PDFReader(filename=pdffile,
-                                workdir=intermediate_dir,
-                                ocr_lang="swe", keep_xml="bz2")
-            else:
-                pdf = PDFReader(filename=pdffile,
-                                workdir=intermediate_dir,
-                                images=False, keep_xml="bz2")
-                if pdf.is_empty():
-                    self.log.debug("%s: %s contains no text, performing OCR" %
-                                   (doc.basefile, pdffile))
-                    pdf = PDFReader(filename=pdffile, workdir=intermediate_dir,
-                                    ocr_lang="swe", keep_xml="bz2")
-
-            # FIXME: add code to get a customized PDFAnalyzer class here
-            # if self.document_type = self.PROPOSITION:
-            analyzer = PDFAnalyzer(pdf)
-            # metrics = analyzer.metrics(metrics_path, plot_path, force=self.config.force)
-            metrics = analyzer.metrics(metrics_path, plot_path)
-            if os.environ.get("FERENDA_DEBUGANALYSIS"):
-                self.log.debug("Creating debug version of PDF")
-                analyzer.drawboxes(pdfdebug_path, offtryck_gluefunc, metrics=metrics)
-            self.log.debug("Parsing with metrics %s" % metrics)
-
-            parser = offtryck_parser(metrics=metrics)
-            parser.debug = os.environ.get('FERENDA_FSMDEBUG', False)
-            parser.current_identifier = identifier
-            doc.body = parser.parse(pdf.textboxes(offtryck_gluefunc))
+            # fp will point to the small XML metadata file, while we want the best 
+            # possible real (fixed-layout) document available (probably a PDF). 
+            # FIXME: implement a optional attachment parameter to parse_open (which 
+            # must pass this to downloaded_to_intermediate and all _path methods).
+            # ALSO: downloaded_to_intermediate must know if and when to pass a 
+            # ocr_lang parameter to StreamingPDFReader.convert
+            fp = self.parse_open(basefile, attachment="index.pdf")
+            return StreamingPDFReader().read(fp)
+            # this will have returned a fully-loaded PDFReader document
         else:
             self.log.debug("Loading soup from %s" % htmlfile)
             soup = BeautifulSoup(
                 codecs.open(
                     htmlfile, encoding='iso-8859-1', errors='replace').read(),
             )
-            self.parse_from_soup(soup, doc)
-        return True
+            return soup
 
+# FIXME: Work in the below support for FERENDA_DEBUGANALYSIS and FERENDA_FSMDEBUG in fixedlayoutsource.get_parser
+#     def get_parser(self, basefile, sanitized)
+#        # FIXME: add code to get a customized PDFAnalyzer class here
+#        # if self.document_type = self.PROPOSITION:
+#        analyzer = PDFAnalyzer(pdf)
+#        # metrics = analyzer.metrics(metrics_path, plot_path, force=self.config.force)
+#        metrics = analyzer.metrics(metrics_path, plot_path)
+#        if os.environ.get("FERENDA_DEBUGANALYSIS"):
+#            self.log.debug("Creating debug version of PDF")
+#            analyzer.drawboxes(pdfdebug_path, offtryck_gluefunc, metrics=metrics)
+#        self.log.debug("Parsing with metrics %s" % metrics)
+#        parser = offtryck_parser(basefile, metrics=metrics, identifier=identifier)
+#        parser.debug = os.environ.get('FERENDA_FSMDEBUG', False)
+#        return parse
+
+    # FIXME: This code does not get called. it shoud be wrapped in a 
+    # function that get_parser returns if there's a need.
     def parse_from_soup(self, soup, doc):
         for block in soup.findAll(['div', 'p', 'span']):
             t = util.normalize_space(''.join(block.findAll(text=True)))
@@ -284,7 +254,3 @@ class Riksdagen(SwedishLegalSource):
             if t:
                 doc.body.append(Paragraph([t]))
 
-    def canonical_uri(self, basefile):
-        seg = {self.ns['rpubl'].Proposition: "prop",
-               self.ns['rpubl'].Skrivelse: "skr"}
-        return self.config.url + "res/%s/%s" % (seg[self.rdf_type], basefile)
