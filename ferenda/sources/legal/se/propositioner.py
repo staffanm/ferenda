@@ -15,19 +15,21 @@ from six import text_type as str
 from ferenda import util, errors
 from ferenda.elements import UnicodeElement, CompoundElement, \
     Heading, Preformatted, Paragraph, Section, Link, ListItem, \
-    serialize
+    Body, serialize
 from ferenda import CompositeRepository, CompositeStore
 from ferenda import PDFDocumentRepository
 from ferenda import Describer
 from ferenda import TextReader
 from ferenda import PDFReader
 from ferenda import DocumentEntry
+from ferenda.compat import OrderedDict
 from ferenda.decorators import managedparsing
 from . import Trips, NoMoreLinks
 from . import Regeringen
 from . import Riksdagen
 from . import RPUBL
 from . import SwedishLegalSource, SwedishLegalStore
+from .fixedlayoutsource import FixedLayoutStore, FixedLayoutSource
 from .swedishlegalsource import offtryck_parser, offtryck_gluefunc
 
 
@@ -41,8 +43,23 @@ class PropRegeringen(Regeringen):
     # sparql_annotations = "res/sparql/prop-annotations.rq"
     sparql_annotations = None  # don't even bother creating an annotation file
 
+class PropTripsStore(FixedLayoutStore):
+    # 1999/94 and 1994/95 has only plaintext (wrapped in .html)
+    # 1995/96 to 2006/07 has plaintext + doc
+    # 2007/08 onwards has plaintext, doc and pdf
+    downloaded_suffix = ".html"
+    doctypes = OrderedDict([(".pdf", b'%PDF'),
+                            (".doc", b'\xd0\xcf\x11\xe0'),
+                            (".docx", b'PK\x03\x04'),
+                            (".html", b'<!DO')])
 
-class PropTrips(Trips):
+    def intermediate_path(self, basefile):
+        if self.downloaded_path(basefile).endswith(".html"):
+            return self.path(basefile, "intermediate", ".txt")
+        else:
+            return super(PropTripsStore, self).intermediate_path(basefile)
+
+class PropTrips(Trips, FixedLayoutSource):
     alias = "proptrips"
     base = "THWALLAPROP"
     app = "prop"
@@ -54,7 +71,8 @@ class PropTrips(Trips):
     rdf_type = RPUBL.Proposition
 
     storage_policy = "dir"
-
+    documentstore_class = PropTripsStore
+    
     @classmethod
     def get_default_options(cls):
         opts = super(PropTrips, cls).get_default_options()
@@ -278,107 +296,82 @@ class PropTrips(Trips):
             sanitized = basefile
         return sanitized
 
-    # For parsing:
-    # 1999/94 and 1994/95 has only plaintext
-    # 1995/96 to 2006/07 has plaintext + doc
-    # 2007/08 onwards has plaintext, doc and pdf
-    @managedparsing
-    def parse(self, doc):
-        try:
+    def downloaded_to_intermediate(self, basefile):
+        intermediate_path = self.store.intermediate_path(basefile)
+        if intermediate_path.endswith(".txt"):
+            # extract txt from file, return fp to it
+            downloaded_path = self.store.downloaded_path(basefile)
+            html = codecs.open(
+                downloaded_path, encoding="iso-8859-1").read()
+            util.writefile(intermediate_path, util.extract_text(
+                html, '<pre>', '</pre>'), encoding="utf-8")
+            return open(intermediate_path)
+        else:
+             return super(PropTrips, self).downloaded_to_intermediate(basefile)
 
-            # prefer PDF or Word files over the plaintext-containing HTML files
-            # FIXME: PDF or Word files are now stored as attachments
-            htmlfile = self.store.downloaded_path(doc.basefile)
+    def extract_head(self, fp, basefile):
+        # regardless of whether fp points to a pdf->xml file, a
+        # word->docbook file, or a plaintext-wrapped-in-html file,
+        # we'll use the latter to extract identifier and title since
+        # it's quick and easy.
+        downloaded_path = self.store.downloaded_path(
+            basefile, attachment="index.html")
+        html = codecs.open(downloaded_path, encoding="iso-8859-1").read()
+        return util.extract_text(html, '<pre>', '</pre>')[:400]
 
-            pdffile = self.store.path(doc.basefile, 'downloaded', '.pdf')
+    def extract_metadata(self, chunk, basefile):
+        attribs = self.metadata_from_basefile(basefile)
+        for p in re.split("\n\n+", chunk):
+            if p.startswith("Titel: "):
+                attribs["dcterms:title"] = p.split(": ", 1)[1]
+            elif p.startswith("Dokument: "):
+                attribs["dcterms:identifier"] = p.split(": ", 1)[1]
+        return attribs
 
-            wordfiles = (self.store.path(doc.basefile, 'downloaded', '.doc'),
-                         self.store.path(doc.basefile, 'downloaded', '.docx'),
-                         self.store.path(doc.basefile, 'downloaded', '.wpd'),
-                         self.store.path(doc.basefile, 'downloaded', '.rtf'))
+    def sanitize_metadata(self, attribs, basefile):
+        attribs = super(PropTrips, self).sanitize_metadata(attribs, basefile)
+        if ('dcterms:title' in attribs and
+            'dcterms:identifier' in attribs and
+            attribs['dcterms:title'].endswith(attribs['dcterms:title'])):
+            x = attribs['dcterms:title'][:-len(attribs['dcterms:identifier'])]
+            attribs['dcterms:title'] = util.normalize_space(x)
+        return attribs
+    
+    def extract_body(self, fp, basefile):
+        if fp.name.endswith(".txt"):
+            # fp is opened in bytestream mode
+            return TextReader(string=fp.read().decode("utf-8"))
+        else:
+            return super(PropTrips, self).extract_body(fp, basefile)
 
-            # check if ANY of these exist
-            if not filter(None, [os.path.exists(f)
-                                 for f in wordfiles + (htmlfile, pdffile)]):
-                raise errors.NoDownloadedFileError(
-                    "File '%s' (or any .pdf/.doc/.docx/.wpd/.rdf variant) not found" %
-                    htmlfile)
-
-            wordfile = None
-            for f in wordfiles:
-                if os.path.exists(f):
-                    wordfile = f
-
-            doc.uri = self.canonical_uri(doc.basefile)
-            d = Describer(doc.meta, doc.uri)
-            d.rdftype(self.rdf_type)
-
-            # if we lack a .pdf file, use Open/LibreOffice to convert any
-            # .wpd or .doc file to .pdf first
-            if (wordfile
-                    and not os.path.exists(pdffile)):
-                convert_to_pdf = True
-            else:
-                convert_to_pdf = False
-
-            if os.path.exists(pdffile):
-                self.log.debug("%s: Using %s" % (doc.basefile, pdffile))
-                intermediate_dir = os.path.dirname(
-                    self.store.path(doc.basefile, 'intermediate', '.foo'))
-                keep_xml = "bz2" if self.config.compress == "bz2" else True
-                pdfreader = PDFReader(filename=pdffile,
-                                      workdir=intermediate_dir,
-                                      convert_to_pdf=convert_to_pdf,
-                                      keep_xml=keep_xml)
-                self.parse_from_pdfreader(pdfreader, doc)
-            else:
-                downloaded_path = self.store.downloaded_path(doc.basefile)
-                intermediate_path = self.store.path(
-                    doc.basefile, 'intermediate', '.txt')
-                self.log.debug("%s: Using %s (%s)" % (doc.basefile,
-                                                      downloaded_path, intermediate_path))
-                if not os.path.exists(intermediate_path):
-                    html = codecs.open(
-                        downloaded_path, encoding="iso-8859-1").read()
-                    util.writefile(intermediate_path, util.extract_text(
-                        html, '<pre>', '</pre>'), encoding="utf-8")
-                textreader = TextReader(intermediate_path, encoding="utf-8")
-                self.parse_from_textreader(textreader, doc)
-                # How to represent that one XHTML doc was created from
-                # plaintext, and another from PDF? create a bnode
-                # representing the source prov:wasDerivedFrom and set its
-                # dcterms:format to correct mime type
-
-            d.value(self.ns['prov'].wasGeneratedBy, self.qualified_class_name())
-            self.infer_metadata(doc.meta.resource(doc.identifier), doc.basefile)
-            return True
-        except Exception as e:
-            traceback = sys.exc_info()[2]
-            err = errors.ParseError(str(e))
-            if isinstance(e, IOError):
-                err.dummyfile = self.store.parsed_path(doc.basefile)
-            raise errors.ParseError, err, traceback
-
-    def parse_from_pdfreader(self, pdfreader, doc):
-        parser = offtryck_parser(preset='proposition', identifier="Prop. " + doc.basefile)
-        doc.body = parser.parse(pdfreader.textboxes(offtryck_gluefunc))
-
-    def parse_from_textreader(self, textreader, doc):
-        describer = Describer(doc.meta, doc.uri)
-        for p in textreader.getiterator(textreader.readparagraph):
-            # print "Handing %r (%s)" % (p[:40], len(doc.body))
+    @staticmethod
+    def textparser(chunks):
+        b = Body()
+        for p in chunks:
             if not p.strip():
                 continue
-            elif not doc.body and 'Obs! Dokumenten i denna databas kan vara ofullständiga.' in p:
+            elif not b and 'Obs! Dokumenten i denna databas kan vara ofullständiga.' in p:
                 continue
-            elif not doc.body and p.strip().startswith("Dokument:"):
+            elif not b and p.strip().startswith("Dokument:"):
                 # We already know this
                 continue
-            elif not doc.body and p.strip().startswith("Titel:"):
-                describer.value(
-                    self.ns['dcterms'].title, util.normalize_space(p[7:]))
+            elif not b and p.strip().startswith("Titel:"):
+                continue
             else:
-                doc.body.append(Preformatted([p]))
+                b.append(Preformatted([p]))
+        return b
+
+    def get_parser(self, basefile, sanitized):
+        if self.store.intermediate_path(basefile).endswith(".txt"):
+            return self.textparser
+        else:
+            return super(PropTrips, self).get_parser(basefile, sanitized)
+
+    def tokenize(self, reader):
+        if isinstance(reader, TextReader):
+            return reader.getiterator(reader.readparagraph)
+        else:
+            return super(PropTrips, self).tokenize(reader)
 
 
 class PropRiksdagen(Riksdagen):

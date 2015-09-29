@@ -829,7 +829,7 @@ all text in a Textbox has the same font and size.
                       fontspec=self._fontspec)
 
         # add all TextElement objects, concatenating adjacent TE:s if
-        # their tags match
+        # their tags match. 
         c = Textelement(tag=self[0].tag)
         for e in itertools.chain(self, other):
             if e.tag != c.tag:
@@ -928,4 +928,12 @@ class Textelement(UnicodeElement):
     tagname = property(_get_tagname)
 
     def __add__(self, other):
-        return Textelement(str(self) + str(other), tag=self.tag)
+        # It seems like some versions of pdf2html automatically add a
+        # space at the end of lines to that they can be concatenated,
+        # but some (later) versions omit this, requiring us to add a
+        # extra space to avoid mashing words together.
+        if len(self) and not (self.endswith(" ") or self.endswith("-")):
+            extraspace = " "
+        else:
+            extraspace = ""
+        return Textelement(str(self) + extraspace + str(other), tag=self.tag)

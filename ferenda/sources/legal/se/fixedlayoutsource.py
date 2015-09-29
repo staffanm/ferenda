@@ -39,6 +39,7 @@ class FixedLayoutStore(SwedishLegalStore):
         if not basedir:
             basedir = self.datadir
         if action == "parse":
+            yielded = set()
             d = os.path.sep.join((basedir, "downloaded"))
             if not os.path.exists(d):
                 return
@@ -46,7 +47,10 @@ class FixedLayoutStore(SwedishLegalStore):
             for x in sorted(itertools.chain(*iterators)):
                 suffix = "/index" + os.path.splitext(x)[1]
                 pathfrag = x[len(d) + 1:-len(suffix)]
-                yield self.pathfrag_to_basefile(pathfrag)
+                basefile = self.pathfrag_to_basefile(pathfrag)
+                if basefile not in yielded:
+                    yielded.add(basefile)
+                    yield basefile
         else:
             for x in super(FixedLayoutStore,
                            self).list_basefiles_for(action, basedir):
@@ -71,6 +75,7 @@ class FixedLayoutSource(SwedishLegalSource):
     converted to/handled as PDF internally) """
 
     downloaded_suffix = ".pdf"
+    documentstore_class = FixedLayoutStore
     
     def downloaded_to_intermediate(self, basefile):
         # force just the conversion part of the PDF handling
@@ -78,7 +83,7 @@ class FixedLayoutSource(SwedishLegalSource):
         intermediate_path = self.store.intermediate_path(basefile)
         intermediate_dir = os.path.dirname(intermediate_path)
         ocr_lang = None
-        convert_to_pdf = not downloaded_path.endswith(".pdf"),
+        convert_to_pdf = not downloaded_path.endswith(".pdf")
         keep_xml = "bz2" if self.config.compress == "bz2" else True
         reader = StreamingPDFReader()
         return reader.convert(filename=self.store.downloaded_path(basefile),

@@ -467,7 +467,10 @@ class Regeringen(SwedishLegalSource):
 
             # dcterms:issued
             if not issued_found and str_element.startswith("Stockholm den"):
-                pubdate = self.parse_swedish_date(str_element[13:])
+                datestr = str_element[13:]
+                if datestr.endswith("."):
+                    datestr = datestr[:-1]
+                pubdate = self.parse_swedish_date(datestr)
                 _check_differing(d, self.ns['dcterms'].issued, pubdate)
                 issued_found = True
 

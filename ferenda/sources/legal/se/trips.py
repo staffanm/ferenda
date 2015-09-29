@@ -157,8 +157,10 @@ class Trips(SwedishLegalSource):
                                              'app': self.app,
                                              'base': self.base}
 
-    def sanitize_metadata(self, a, basefile):
-        a = super(Trips, self).sanitize_metadata(a, basefile)
-        a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":")
-        return a
+# this should be done by metadata_from_basefile now
+#
+#    def sanitize_metadata(self, a, basefile):
+#        a = super(Trips, self).sanitize_metadata(a, basefile)
+#         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":")
+#        return a
 
