@@ -86,7 +86,7 @@ class FixedLayoutSource(SwedishLegalSource):
         convert_to_pdf = not downloaded_path.endswith(".pdf")
         keep_xml = "bz2" if self.config.compress == "bz2" else True
         reader = StreamingPDFReader()
-        return reader.convert(filename=self.store.downloaded_path(basefile),
+        return reader.convert(filename=downloaded_path,
                               workdir=intermediate_dir,
                               images=self.config.pdfimages,
                               convert_to_pdf=convert_to_pdf,

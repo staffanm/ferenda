@@ -132,8 +132,8 @@ class SwedishLegalStore(DocumentStore):
         # "2012/152"    => "2012:152"
         return pathfrag.replace("/", ":").replace("-", "/")
 
-    def intermediate_path(self, basefile, attachment=None):
-        return self.path(basefile, "intermediate", ".xml",
+    def intermediate_path(self, basefile, version=None, attachment=None):
+        return self.path(basefile, "intermediate", ".xml", version=version,
                          attachment=attachment)
 
 
@@ -341,7 +341,7 @@ class SwedishLegalSource(DocumentRepository):
         metadata from doc.body to doc.head)"""
         pass
 
-    def parse_open(self, basefile):
+    def parse_open(self, basefile, attachment=None):
         """Open the main downloaded file for the given basefile, caching the
         contents to an intermediate representation if applicable (or
         reading from that cache if that's ok), and patching the file

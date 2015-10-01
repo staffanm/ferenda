@@ -3,7 +3,11 @@
 from __future__ import unicode_literals
 
 
-class ParseError(Exception):
+class FerendaException(Exception):
+    """Base class for anything that can go wrong in ferenda."""
+
+
+class ParseError(FerendaException):
 
     """Raised when :py:meth:`~ferenda.DocumentRepository.parse` fails in
     any way.
@@ -18,7 +22,7 @@ class FSMStateError(ParseError):
     """
 
 
-class DocumentRemovedError(Exception):
+class DocumentRemovedError(FerendaException):
 
     """Raised whenever a particular document has been found to be removed
     -- this can happen either during
@@ -64,42 +68,42 @@ class AttachmentPolicyError(ValueError):
     """
 
 
-class ArchivingError(Exception):
+class ArchivingError(FerendaException):
 
     """Raised whenever an attempt to archive a document version using :py:meth:`~ferenda.DocumentStore.archive` fails (for example, because the archive version
 already exists)."""
 
 
-class ValidationError(Exception):
+class ValidationError(FerendaException):
 
     """Raised whenever a created document doesn't validate using the
     appropriate schema."""
 
 
-class TransformError(Exception):
+class TransformError(FerendaException):
 
     """Raised whenever a XSLT transformation fails for any reason."""
 
 
-class ExternalCommandError(Exception):
+class ExternalCommandError(FerendaException):
 
     """Raised whenever any invocation of an external commmand fails for
     any reason."""
 
 
-class ExternalCommandNotFound(Exception):
+class ExternalCommandNotFound(FerendaException):
 
     """Raised whenever any invocation of an external commmand fails """
 
 
-class ConfigurationError(Exception):
+class ConfigurationError(FerendaException):
 
     """Raised when a configuration file cannot be found in it's expected
 location or when it cannot be used due to corruption, file permissions
 or other reasons"""
 
 
-class TriplestoreError(Exception):
+class TriplestoreError(FerendaException):
 
     """Raised whenever communications with the triple store fails, for whatever reason."""
 
@@ -113,17 +117,17 @@ class SparqlError(TriplestoreError):
     """
 
 
-class IndexingError(Exception):
+class IndexingError(FerendaException):
 
     """Raised whenever an attempt to put text into the fulltext index fails."""
 
 
-class SearchingError(Exception):
+class SearchingError(FerendaException):
 
     """Raised whenever an attempt to do a full-text search fails."""
 
 
-class SchemaConflictError(Exception):
+class SchemaConflictError(FerendaException):
 
     """Raised whenever a fulltext index is opened with repo arguments that
        result in a different schema than what's currently in
@@ -133,7 +137,7 @@ class SchemaConflictError(Exception):
     """
 
 
-class SchemaMappingError(Exception):
+class SchemaMappingError(FerendaException):
 
     """Raised whenever a given field in a schema cannot be mapped to or
        from the underlying native field object in an actual
@@ -142,7 +146,7 @@ class SchemaMappingError(Exception):
     """
 
 
-class MaxDownloadsReached(Exception):
+class MaxDownloadsReached(FerendaException):
 
     """Raised whenever a recursive download operation has reached a
     globally set maximum number of requests.
@@ -150,7 +154,16 @@ class MaxDownloadsReached(Exception):
     """
     pass
 
-class ResourceNotFound(Exception):
+
+class ResourceNotFound(FerendaException):
     """Raised when :py:class:`~ferenda.ResourceLoader` method is called
     with the name of a non-existing resource. """
     pass
+
+class PDFFileIsEmpty(FerendaException):
+    """Raised when
+    :py:class:`~ferenda.pdfreader.StreamingPDFReader.convert` tries to
+    parse the textual content of a PDF, but finds that it has no text
+    information (maybe because it only contains scanned images).
+
+    """

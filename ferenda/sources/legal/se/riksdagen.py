@@ -15,13 +15,32 @@ from rdflib import URIRef
 from . import SwedishLegalSource
 from .swedishlegalsource import offtryck_parser, offtryck_gluefunc, PreambleSection, UnorderedSection
 from ferenda import util, errors
+from ferenda.compat import OrderedDict
 from ferenda.decorators import managedparsing, downloadmax
 from ferenda.describer import Describer
-from ferenda.elements import Paragraph
+from ferenda.elements import Body, Paragraph, Preformatted
 from ferenda import PDFReader, PDFAnalyzer
+from ferenda.pdfreader import StreamingPDFReader
+from .fixedlayoutsource import FixedLayoutSource, FixedLayoutStore
 
+class RiksdagenStore(FixedLayoutStore):
+    downloaded_suffix = ".xml"
+    doctypes = OrderedDict([(".xml", b''),
+                            (".pdf", b''),
+                            (".html", b'')])
 
-class Riksdagen(SwedishLegalSource):
+    def intermediate_path(self, basefile, version=None, attachment=None):
+        candidate = None
+        for suffix in (".hocr.html.bz2", ".hocr.html", ".xml", ".xml.bz2"):
+            candidate = self.path(basefile, "intermediate", suffix)
+            if os.path.exists(candidate):
+                break
+        if not candidate:
+            return self.path(basefile, "intermediate", ".xml")
+        else:
+            return candidate.replace(".bz2", "")
+
+class Riksdagen(FixedLayoutSource):
     BILAGA = "bilaga"
     DS = "ds"
     DIREKTIV = "dir"
@@ -53,7 +72,7 @@ class Riksdagen(SwedishLegalSource):
 
     downloaded_suffix = ".xml"
     storage_policy = "dir"
-
+    documentstore_class = RiksdagenStore
     document_type = None
     start_url = None
     start_url_template = "http://data.riksdagen.se/dokumentlista/?sz=100&sort=d&utformat=xml&typ=%(doctype)s"
@@ -199,36 +218,85 @@ class Riksdagen(SwedishLegalSource):
             self.log.debug(
                 "%s and all associated files unchanged" % xmlfile)
 
+    def downloaded_to_intermediate(self, basefile):
+        downloaded_path = self.store.downloaded_path(basefile,
+                                                     attachment="index.pdf")
+        if not os.path.exists(downloaded_path):
+            # attempt to parse HTML instead
+            return open(self.store.downloaded_path(basefile,
+                                                   attachment="index.html"))
+        
+        intermediate_path = self.store.intermediate_path(basefile)
+        intermediate_dir = os.path.dirname(intermediate_path)
+        convert_to_pdf = not downloaded_path.endswith(".pdf")
+        keep_xml = "bz2" if self.config.compress == "bz2" else True
+        reader = StreamingPDFReader()
+        try:
+            return reader.convert(filename=downloaded_path,
+                                  workdir=intermediate_dir,
+                                  images=self.config.pdfimages,
+                                  convert_to_pdf=convert_to_pdf,
+                                  keep_xml=keep_xml)
+        except errors.PDFFileIsEmpty:
+            self.log.debug("%s: PDF had no textcontent, trying OCR" % basefile)
+            return reader.convert(filename=downloaded_path,
+                                  workdir=intermediate_dir,
+                                  images=self.config.pdfimages,
+                                  convert_to_pdf=convert_to_pdf,
+                                  keep_xml=keep_xml,
+                                  ocr_lang="swe")
 
-    def extract_head(self, fp, basefile)    
-        return BeautifulSoup(fp.read(), "xml")
+    def extract_head(self, fp, basefile):
+        # fp will point to the pdf2html output -- we need to open the
+        # XML file instead
+        with self.store.open_downloaded(basefile) as fp:
+            return BeautifulSoup(fp.read(), "xml")
 
     def extract_metadata(self, soup, basefile):
         attribs = self.metadata_from_basefile(basefile)
         attribs["dcterms:title"] = soup.dokument.titel.text
-	attribs["dcterms:issued" = util.strptime(ssoup.dokument.publicerad.text,
-                              "%Y-%m-%d %H:%M:%S").date()
+        attribs["dcterms:issued"] = util.strptime(soup.dokument.publicerad.text,
+                                                  "%Y-%m-%d %H:%M:%S").date()
         return attribs
 
     def extract_body(self, fp, basefile):
         pdffile = self.store.downloaded_path(basefile, attachment="index.pdf")
         if os.path.exists(pdffile):
-            # fp will point to the small XML metadata file, while we want the best 
-            # possible real (fixed-layout) document available (probably a PDF). 
-            # FIXME: implement a optional attachment parameter to parse_open (which 
-            # must pass this to downloaded_to_intermediate and all _path methods).
-            # ALSO: downloaded_to_intermediate must know if and when to pass a 
-            # ocr_lang parameter to StreamingPDFReader.convert
-            fp = self.parse_open(basefile, attachment="index.pdf")
-            return StreamingPDFReader().read(fp)
+            fp = self.parse_open(basefile)
+            parser = "ocr" if ".hocr." in fp.name else "xml"
+            return StreamingPDFReader().read(fp, parser=parser)
             # this will have returned a fully-loaded PDFReader document
         else:
-            self.log.debug("Loading soup from %s" % htmlfile)
-            soup = BeautifulSoup(
-                codecs.open(
-                    htmlfile, encoding='iso-8859-1', errors='replace').read(),
-            )
-            return soup
+            # fp points to a HTML file, which we can use directly.
+            # fp will be a raw bitstream of a latin-1 file.
+            self.log.debug("%s: Loading soup from %s" % (basefile, fp.name))
+            return BeautifulSoup(fp.read(), "lxml")
+
+    @staticmethod
+    def htmlparser(chunks):
+        b = Body()
+        for block in chunks:
+            tagtype = Preformatted if block.name == "pre" else Paragraph
+            t = util.normalize_space(''.join(block.findAll(text=True)))
+            block.extract()  # to avoid seeing it again
+            if t:
+                b.append(tagtype([t]))
+        return b
+
+    def get_parser(self, basefile, sanitized):
+        if isinstance(sanitized, BeautifulSoup):
+            return self.htmlparser
+        else:
+            return super(Riksdagen, self).get_parser(basefile, sanitized)
+
+    def tokenize(self, reader):
+        if isinstance(reader, BeautifulSoup):
+            if reader.find("div"):
+                return reader.find_all(['div', 'p', 'span'])
+            else:
+                return reader.find_all("pre")
+        else:
+            return super(Riksdagen, self).tokenize(reader)
 
 # FIXME: Work in the below support for FERENDA_DEBUGANALYSIS and FERENDA_FSMDEBUG in fixedlayoutsource.get_parser
 #     def get_parser(self, basefile, sanitized)
@@ -244,13 +312,4 @@ class Riksdagen(SwedishLegalSource):
 #        parser = offtryck_parser(basefile, metrics=metrics, identifier=identifier)
 #        parser.debug = os.environ.get('FERENDA_FSMDEBUG', False)
 #        return parse
-
-    # FIXME: This code does not get called. it shoud be wrapped in a 
-    # function that get_parser returns if there's a need.
-    def parse_from_soup(self, soup, doc):
-        for block in soup.findAll(['div', 'p', 'span']):
-            t = util.normalize_space(''.join(block.findAll(text=True)))
-            block.extract()  # to avoid seeing it again
-            if t:
-                doc.body.append(Paragraph([t]))
 

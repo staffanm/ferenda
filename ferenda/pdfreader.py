@@ -259,7 +259,7 @@ class PDFReader(CompoundElement):
                 # background pictures, then use -xml to get easy-to-parse
                 # text with bounding boxes.
                 cmd = "pdftohtml -nodrm -c %s" % tmppdffile
-                self.log.debug("Converting: %s" % cmd)
+                self.log.debug("Converting with images: %s" % cmd)
                 (returncode, stdout, stderr) = util.runcmd(cmd,
                                                            require_success=True)
                 # we won't need the html files, or the blank PNG files
@@ -299,7 +299,7 @@ class PDFReader(CompoundElement):
     dims = "bbox (?P<left>\d+) (?P<top>\d+) (?P<right>\d+) (?P<bottom>\d+)"
     re_dimensions = re.compile(dims).search
 
-    def _parse_hocr(self, fp, dummy):
+    def _parse_hocr(self, fp, dummy=None):
         if dummy:
             import warnings
             warnings.warn("filenames passed to _parse_xml are now ignored", DeprecationWarning)
@@ -640,7 +640,14 @@ class StreamingPDFReader(PDFReader):
         if not util.outfile_is_newer([filename], convertedfile):
             util.copy_if_different(filename, tmpfilename)
             # this is the expensive operation
-            res = converter(tmpfilename, workdir, **converter_extra)
+            converter(tmpfilename, workdir, **converter_extra)
+
+            # check if result is empty (has no content in any text node)
+            tree = etree.parse(open(convertedfile.replace(".bz2", "")))
+            if not etree.tostring(tree, method="text", encoding="utf-8").strip():
+                os.unlink(convertedfile.replace(".bz2", ""))
+                raise errors.PDFFileIsEmpty(filename)
+            
             if keep_xml == "bz2":
                 with open(convertedfile.replace(".bz2", ""), mode="rb") as rfp:
                     # BZ2File supports the with statement in py27+,
@@ -660,8 +667,8 @@ class StreamingPDFReader(PDFReader):
             fp = codecs.open(convertedfile, encoding="utf-8")
         return fp
 
-    def read(self, fp, type="xml"):
-        if type == "ocr":
+    def read(self, fp, parser="xml"):
+        if parser == "ocr":
             parser = self._parse_hocr
         else:
             parser = self._parse_xml
