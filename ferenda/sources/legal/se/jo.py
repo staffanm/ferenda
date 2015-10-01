@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 # My own stuff
 from ferenda import FSMParser
 from ferenda import decorators
-from ferenda.elements import CompoundElement, Body, Paragraph
+from ferenda.elements import CompoundElement, Body, Paragraph, Heading
 from . import RPUBL
 from .fixedlayoutsource import FixedLayoutSource
 from .swedishlegalsource import UnorderedSection
@@ -32,7 +32,9 @@ class Blockquote(CompoundElement):
     tagname = "blockquote"
 
 
-
+class Meta(CompoundElement):
+    pass
+    
 class JO(FixedLayoutSource):
 
     """Hanterar beslut från Riksdagens Ombudsmän, www.jo.se
@@ -117,18 +119,22 @@ class JO(FixedLayoutSource):
                               (basefile, headnote_url))
         return ret
 
-
     def extract_head(self, fp, basefile):
-        if "headnote.html" in list(self.store.list_attachments(basefile, "downloaded")):
-            return BeautifulSoup(self.store.downloaded_path(basefile, attachment="headnote.html"))
+        if "headnote.html" in list(self.store.list_attachments(basefile,
+                                                               "downloaded")):
+            with self.store.open_downloaded(basefile,
+                                            attachment="headnote.html") as fp:
+                return BeautifulSoup(fp, "lxml")
         # else: return None
+
+    def infer_identifier(self, basefile):
+        return "JO %s" % basefile.replace("/", "-")
         
     def extract_metadata(self, rawhead, basefile):
         if rawhead:
             print("FIXME: we should do something with this BeautifulSoup data")
-        else:
-            return self.metadata_from_basefile(basefile)
-        
+        return self.metadata_from_basefile(basefile)
+
     def tokenize(self, reader):
         def gluecondition(textbox, nextbox, prevbox):
             linespacing = nextbox.height / 1.5  # allow for large linespacing
@@ -186,7 +192,7 @@ class JO(FixedLayoutSource):
 
         def make_heading(parser):
             # h = Heading(str(parser.reader.next()).strip())
-            h = Meta([Literal(str(parser.reader.next()).strip(), lang="sv")],
+            h = Meta([str(parser.reader.next()).strip()],
                      predicate=self.ns['dcterms'].title)
             return h
 
@@ -210,12 +216,11 @@ class JO(FixedLayoutSource):
             return p
 
         def make_datum(parser):
-            d = [Literal(str(parser.reader.next()).strip(),
-                         datatype=self.ns['xsd'].date)]
+            d = [str(parser.reader.next())]
             return Meta(d, predicate=self.ns['rpubl'].avgorandedatum)
 
         def make_dnr(parser):
-            ds = [Literal(x) for x in str(parser.reader.next()).strip().split(" ")]
+            ds = [x for x in str(parser.reader.next()).strip().split(" ")]
             return Meta(ds, predicate=self.ns['rpubl'].diarienummer)
 
         def skip_nonessential(parser):
