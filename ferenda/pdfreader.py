@@ -608,6 +608,7 @@ class StreamingPDFReader(PDFReader):
 
     def convert(self, filename, workdir=None, images=True,
                 convert_to_pdf=False, keep_xml=True, ocr_lang=None):
+        self.filename=filename
         self.workdir = workdir
         if self.workdir is None:
             self.workdir = tempfile.mkdtemp()
@@ -668,14 +669,14 @@ class StreamingPDFReader(PDFReader):
         return fp
 
     def read(self, fp, parser="xml"):
+        self.filename=fp.name
         if parser == "ocr":
             parser = self._parse_hocr
         else:
             parser = self._parse_xml
-        ret = parser(fp)
+        parser(fp)  # does not return anything useful
         fp.close()
-        # return ret
-        return self
+        return self  # for chainability
 
 
 class Page(CompoundElement, OrdinalElement):

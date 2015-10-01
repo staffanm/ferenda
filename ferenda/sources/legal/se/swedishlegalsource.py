@@ -701,7 +701,7 @@ class SwedishLegalSource(DocumentRepository):
 
 
 
-def offtryck_parser(basefile="0", metrics=None, preset=None, identifier=None):
+def offtryck_parser(basefile="0", metrics=None, preset=None, identifier=None, debug=False):
     # First: merge the metrics we're provided with with a set of
     # defaults (for fallback), and wrap them in a LayeredConfig
     # structure
@@ -1019,6 +1019,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None, identifier=None):
     p.initial_state = "body"
     p.initial_constructor = make_body
     p.current_identifier = identifier
+    p.debug = bool(debug)
     return p
 
 
