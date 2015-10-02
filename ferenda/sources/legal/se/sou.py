@@ -63,6 +63,7 @@ class SOUKB(SwedishLegalSource, PDFDocumentRepository):
     basefile_regex = "(?P<basefile>\d{4}:\d+)"
     start_url = "http://regina.kb.se/sou/"
     download_reverseorder = True
+    rdf_type = RPUBL.Utredningsbetankande
 
     def download_single(self, basefile, url):
         resp = self.session.get(url)

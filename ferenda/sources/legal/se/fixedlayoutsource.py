@@ -104,35 +104,3 @@ class FixedLayoutSource(SwedishLegalSource):
     
     def extract_body(self, fp, basefile):
         return StreamingPDFReader().read(fp)
-
-    # this is for certain subclasses to override with eg
-    # ferenda.sources.legal.sou.SOUAnalyzer
-    def get_pdf_analyzer(self, pdf):
-        return PDFAnalyzer(pdf)
-    
-    def get_parser(self, basefile, sanitized):
-        analyzer = PDFAnalyzer(sanitized)
-        metrics_path = self.store.path(basefile, 'intermediate',
-                                       '.metrics.json')
-        
-        if os.environ.get("FERENDA_DEBUGANALYSIS"):
-            plot_path = self.store.path(basefile, 'intermediate',
-                                        '.plot.png')
-        else:
-            plot_path = None
-        self.log.debug("%s: Calculating PDF metrics" % basefile)
-        metrics = analyzer.metrics(metrics_path, plot_path)
-        if os.environ.get("FERENDA_DEBUGANALYSIS"):
-            pdfdebug_path = self.store.path(basefile, 'intermediate',
-                                            '.debug.pdf')
-
-            self.log.debug("Creating debug version of PDF")
-            analyzer.drawboxes(pdfdebug_path, offtryck_gluefunc,
-                               metrics=metrics)
-        parser = offtryck_parser(basefile, metrics=metrics,
-                                 identifier=self.infer_identifier(basefile),
-                                 debug=os.environ.get('FERENDA_FSMDEBUG', 0))
-        return parser.parse
-    
-    def tokenize(self, pdfreader):
-        return pdfreader.textboxes(offtryck_gluefunc)

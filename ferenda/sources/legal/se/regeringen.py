@@ -366,25 +366,7 @@ class Regeringen(SwedishLegalSource):
     def sanitize_body(self, rawbody):
         return super(Regeringen, self).sanitize_body(rawbody)
 
-    def get_parser(self, basefile, sanitized_body):
-        if self.document_type == self.PROPOSITION:
-            preset = 'proposition'
-        elif self.document_type == self.SOU:
-            preset = 'sou'
-        elif self.document_type == self.DS:
-            preset = 'ds'
-        elif self.document_type == self.KOMMITTEDIREKTIV:
-            preset = 'dir'
-        else:
-            preset = 'default'
-        parser = offtryck_parser(metrics=sanitized_body.metrics, preset=preset)
-        parser.debug = os.environ.get('FERENDA_FSMDEBUG', False)
-        parser.current_identifier = self._identifier
-        return parser.parse
 
-    def tokenize(self, pdfreader):
-        return pdfreader.textboxes(offtryck_gluefunc, pageobjects=True)
-    
     def extract_body(self, fp, basefile):
         # reset global state
         PreambleSection.counter = 0
@@ -393,7 +375,7 @@ class Regeringen(SwedishLegalSource):
         if not pdffiles:
             self.log.error(
                 "%s: No PDF documents found, can't parse anything" % basefile)
-            return None
+            return ["[Dokumenttext saknas]"]
         
         # read a list of pdf files and return a contatenated PDFReader
         # object (where do we put metrics? On the PDFReader itself?

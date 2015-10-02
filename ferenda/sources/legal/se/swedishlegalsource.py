@@ -25,7 +25,7 @@ from ferenda.elements import (Paragraph, Section, Body,
                               OrdinalElement, CompoundElement,
                               SectionalElement)
 from ferenda.pdfreader import Page
-from ferenda.pdfreader import StreamingPDFReader
+from ferenda.pdfreader import PDFReader, StreamingPDFReader
 from ferenda.decorators import action, managedparsing
 from ferenda.thirdparty.coin import URIMinter
 from . import RPUBL, legaluri
@@ -543,17 +543,51 @@ class SwedishLegalSource(DocumentRepository):
     def sanitize_body(self, rawbody):
         return rawbody
 
+    def get_pdf_analyzer(self, pdf):
+        return PDFAnalyzer(pdf)
+
     def get_parser(self, basefile, sanitized):
         # should return a function that gets any iterable (the output
-        # from tokenize) and returns a ferenda.elements.Body object
-        def default_parser(iterable):
-            return Body(list(iterable))
-        return default_parser
+        # from tokenize) and returns a ferenda.elements.Body object.
+        #
+        if isinstance(sanitized, PDFReader):
+            # If our sanitized body is a PDFReader, it's most likely
+            # something that can be handled by the offtryck_parser.
+            analyzer = self.get_pdf_analyzer(sanitized)
+            metrics_path = self.store.path(basefile, 'intermediate',
+                                           '.metrics.json')
+
+            if os.environ.get("FERENDA_DEBUGANALYSIS"):
+                plot_path = self.store.path(basefile, 'intermediate',
+                                            '.plot.png')
+            else:
+                plot_path = None
+            self.log.debug("%s: Calculating PDF metrics" % basefile)
+            metrics = analyzer.metrics(metrics_path, plot_path)
+            if os.environ.get("FERENDA_DEBUGANALYSIS"):
+                pdfdebug_path = self.store.path(basefile, 'intermediate',
+                                                '.debug.pdf')
+
+                self.log.debug("Creating debug version of PDF")
+                analyzer.drawboxes(pdfdebug_path, offtryck_gluefunc,
+                                   metrics=metrics)
+            parser = offtryck_parser(basefile, metrics=metrics,
+                                     identifier=self.infer_identifier(basefile),
+                                     debug=os.environ.get('FERENDA_FSMDEBUG', 0))
+            return parser.parse
+        else:
+            def default_parser(iterable):
+                return Body(list(iterable))
+            return default_parser
     
-    def tokenize(self, sanitized_body):
+    def tokenize(self, body):
         # this method might recieve a arbitrary object (the superclass
         # impl returns a BeautifulSoup node) but must return an iterable
-        return sanitized_body
+        if isinstance(body, PDFReader):
+            return body.textboxes(offtryck_gluefunc, pageobjects=True)
+        else:
+            # just assume that this is iterable
+            return body
 
     # see SFS.visit_node
     def visit_node(self, node, clbl, state, debug=False):
@@ -602,24 +636,20 @@ class SwedishLegalSource(DocumentRepository):
         if self.rdf_type == RPUBL.Utredningsbetankande:
             d.rel(RPUBL.utrSerie, self.dataset_uri())
 
-
     def infer_identifier(self, basefile):
         # FIXME: This logic should really be split up and put into
-        # different subclasses override of infer_identifier
+        # different subclasses override of infer_identifier. Also note
+        # that many docrepos get dcterms:identifier from the document
+        # itself.
         
         # Create one from basefile. First guess prefix
         if self.rdf_type == RPUBL.Kommittedirektiv:
             prefix = "Dir. "
         elif self.rdf_type == RPUBL.Utredningsbetankande:
-            # FIXME: rpubl:utrSerie might have a site-specific URI
-            # which is not aligned with official Rinfo URIs (eg
-            # https://lagen.nu/dataset/ds). Also, rpubl:utrSerie
-            # is only set further down below in this very method.
-            if d.getvalue(
-                    RPUBL.utrSerie) == "http://rinfo.lagrummet.se/serie/utr/ds":
-                prefix = "Ds "
-            else:
+            if self.alias.startswith("sou"):  # FIXME: only ever used by soukb
                 prefix = "SOU "
+            else:
+                prefix = "Ds "
         elif self.rdf_type == RPUBL.Proposition:
             prefix = "Prop. "
         elif self.rdf_type == RPUBL.Forordningsmotiv:
