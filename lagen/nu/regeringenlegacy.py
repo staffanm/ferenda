@@ -32,7 +32,6 @@ class RegeringenLegacy(Regeringen):
     def extract_metadata(self, rawhead, basefile):
         content = rawhead
         title = content.find("h1").string
-        from pudb import set_trace; set_trace()
         identifier = content.find("p", "lead").text
         definitions = content.find("dl", "definitions")
         if definitions:
@@ -81,7 +80,6 @@ class RegeringenLegacy(Regeringen):
                         rel_identifier = infospan
 
                 if not rel_basefile:
-                    from pudb import set_trace; set_trace()
                     self.log.warning(
                         "%s: Couldn't find rel_basefile (elementid #%s) among %r" % (basefile, elementid, infospans))
                     continue
