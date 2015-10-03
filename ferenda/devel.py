@@ -464,13 +464,14 @@ class Devel(object):
         else:
             basefiles = islice(sourcerepo.store.list_basefiles_for("parse"),
                                0, samplesize)
-        
         for basefile in basefiles:
             print("  %s: copying %s" % (alias, basefile))
             src = sourcerepo.store.downloaded_path(basefile)
-            # FIXME: For DV.py (and possibly other multi-sufffix
-            # repos) this will yield an incorrect suffix (eg ".zip")
             dst = destrepo.store.downloaded_path(basefile)
+            if os.path.splitext(src)[1] != os.path.splitext(dst)[1]:
+                # FIX for DV.py (and possibly other multi-suffix
+                # repos) this will yield an incorrect suffix (eg ".zip")
+                dst = os.path.splitext(dst)[0] + os.path.splitext(src)[1]
             isrc = sourcerepo.store.intermediate_path(basefile)
             idst = destrepo.store.intermediate_path(basefile)
             copy = shutil.copy2

@@ -11,14 +11,13 @@ from bz2 import BZ2File
 
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
-from rdflib.namespace import DCTERMS
+from rdflib.namespace import DCTERMS, SKOS, FOAF
 from six import text_type as str
 import bs4
 
 from ferenda import (DocumentRepository, DocumentStore, FSMParser,
                      CitationParser, Describer)
 from ferenda import util
-from ferenda.compat import OrderedDict
 from ferenda.sources.legal.se.legalref import Link, LegalRef
 from ferenda.elements.html import A, H1, H2, H3
 from ferenda.elements import (Paragraph, Section, Body,
@@ -26,14 +25,12 @@ from ferenda.elements import (Paragraph, Section, Body,
                               SectionalElement)
 from ferenda.pdfreader import Page
 from ferenda.pdfreader import PDFReader, StreamingPDFReader
+from ferenda.pdfanalyze import PDFAnalyzer
 from ferenda.decorators import action, managedparsing
 from ferenda.thirdparty.coin import URIMinter
-from . import RPUBL, legaluri
-
-DCTERMS = Namespace(util.ns['dcterms'])
+from ferenda.elements.elements import E
+from . import RPUBL
 PROV = Namespace(util.ns['prov'])
-FOAF = Namespace(util.ns['foaf'])
-SKOS = Namespace(util.ns['skos'])
 
 
 class Stycke(Paragraph):
@@ -42,8 +39,6 @@ class Stycke(Paragraph):
 
 class Sektion(Section):
     pass
-
-from ferenda.elements.elements import E
 
 
 class Sidbrytning(OrdinalElement):
@@ -135,8 +130,6 @@ class SwedishLegalStore(DocumentStore):
     def intermediate_path(self, basefile, version=None, attachment=None):
         return self.path(basefile, "intermediate", ".xml", version=version,
                          attachment=attachment)
-
-
 
 
 class SwedishLegalSource(DocumentRepository):
@@ -290,7 +283,6 @@ class SwedishLegalSource(DocumentRepository):
                         v = Literal(v)
                 g.add((current, uri(k), v))
 
-
         if for_self:
             # finally add triples that we can infer from class properties
             # (is this a job for infer_metadata? But we need it,
@@ -301,7 +293,8 @@ class SwedishLegalSource(DocumentRepository):
             # generate other resources
             if not g.value(current, RDF.type):
                 g.add((current, RDF.type, self.rdf_type))
-            g.add((current, PROV.wasGeneratedBy, Literal(self.qualified_class_name())))
+            g.add((current, PROV.wasGeneratedBy, Literal(
+                self.qualified_class_name())))
         return g.resource(b)
 
     def canonical_uri(self, basefile):
@@ -378,9 +371,12 @@ class SwedishLegalSource(DocumentRepository):
         return self.patch_if_needed(fp, basefile)
 
     def patch_if_needed(self, fp, basefile):
-        """Override of DocumentRepository.patch_if_needed with different, streamier API."""
+        """Override of DocumentRepository.patch_if_needed with different,
+        streamier API."""
+        
         # 1. do we have a patch?
-        patchstore = self.documentstore_class(self.config.patchdir + os.sep + self.alias)
+        patchstore = self.documentstore_class(self.config.patchdir +
+                                              os.sep + self.alias)
         patchpath = patchstore.path(basefile, "patches", ".patch")
         descpath = patchstore.path(basefile, "patches", ".desc")
         if not os.path.exists(patchpath):
@@ -487,7 +483,7 @@ class SwedishLegalSource(DocumentRepository):
                     pass
                 elif re.match("\d{4}-\d{2}-\d{2}", attribs[k]):
                     # iso8859-1 date (no time portion)
-                    dt= datetime.strptime(attribs[k], "%Y-%m-%d")
+                    dt = datetime.strptime(attribs[k], "%Y-%m-%d")
                     attribs[k] = Literal(date(dt.year, dt.month, dt.day))
                 else:
                     # assume something that parse_swedish_date handles
@@ -499,16 +495,14 @@ class SwedishLegalSource(DocumentRepository):
         # from canonical_uri?), we should somehow replace
         # resource.identifier (a BNODE) with uri (a URIRef) in the
         # whole graph.
-        for (p, o) in list(resource.graph.predicate_objects(resource.identifier)):
+        for (p, o) in list(resource.graph.predicate_objects(
+                resource.identifier)):
             resource.graph.remove((resource.identifier, p, o))
             resource.graph.add((uri, p, o))
-                
         return resource.graph.resource(uri)
-
 
     def visitor_functions(self):
         return []
-
 
     def parse_body(self, fp, basefile):
         rawbody = self.extract_body(fp, basefile)
@@ -529,8 +523,7 @@ class SwedishLegalSource(DocumentRepository):
                                            self.commondata)
             body = parser.parse_recursive(body)
         return body
-        
-             
+
     def extract_body(self, fp, basefile):
         # FIXME: This re-parses the same data as extract_head
         # does. This will be common. Maybe fix a superclass level
@@ -615,7 +608,6 @@ class SwedishLegalSource(DocumentRepository):
                           (subnode.__class__.__name__, newstate))
                 self.visit_node(subnode, clbl, newstate, debug)
 
-
     def infer_metadata(self, resource, basefile=None):
         """Try to infer any missing metadata from what we already have.
 
@@ -665,7 +657,6 @@ class SwedishLegalSource(DocumentRepository):
             return super(SwedishLegalSource, self).tabs(primary)
         else:
             return []
-
 
     ################################################################
     # General small utility functions
@@ -730,8 +721,8 @@ class SwedishLegalSource(DocumentRepository):
             return util.gYear(year)
 
 
-
-def offtryck_parser(basefile="0", metrics=None, preset=None, identifier=None, debug=False):
+def offtryck_parser(basefile="0", metrics=None, preset=None,
+                    identifier=None, debug=False):
     # First: merge the metrics we're provided with with a set of
     # defaults (for fallback), and wrap them in a LayeredConfig
     # structure

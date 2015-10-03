@@ -634,17 +634,7 @@ class DV(SwedishLegalSource):
               }
 
     def extract_head(self, fp, basefile):
-        # Determine if the intermediate files come from .doc or OOXML
-        # (.docx) sources by sniffing the first bytes
-        start = fp.read(6)
-        if start in ("<w:doc", "<body "):
-            filetype = "docx"
-        elif start in ("<book ", "<book>", "<body>"):
-            filetype = "doc"
-        else:
-            raise ValueError("Can't guess filetype from %r" % start)
-        fp.seek(0)
-
+        filetype = self.filetype
         patchedtext = fp.read()
         # rawhead is a simple dict that we'll later transform into a
         # rdflib Graph. rawbody is a list of plaintext strings, each
@@ -667,14 +657,25 @@ class DV(SwedishLegalSource):
         
 
     def downloaded_to_intermediate(self, basefile):
-        docfile = self.store.downloaded_path(doc.basefile)
-        intermediatefile = self.store.intermediate_path(doc.basefile)
+        docfile = self.store.downloaded_path(basefile)
+        intermediatefile = self.store.intermediate_path(basefile)
         if not os.path.exists(intermediatefile):
             intermediatefile, filetype = WordReader().read(docfile, intermediatefile)
             if filetype == "docx":
                 self._simplify_ooxml(intermediatefile)
         fp = open(intermediatefile)
-        fp.filetype = filetype
+
+        # Determine if the intermediate files come from .doc or OOXML
+        # (.docx) sources by sniffing the first bytes
+        start = fp.read(6)
+        if start in ("<w:doc", "<body "):
+            filetype = "docx"
+        elif start in ("<book ", "<book>", "<body>"):
+            filetype = "doc"
+        else:
+            raise ValueError("Can't guess filetype from %r" % start)
+        fp.seek(0)
+        self.filetype = filetype
         return fp
 
     def parse_entry_title(self, doc):
@@ -718,7 +719,7 @@ class DV(SwedishLegalSource):
         coll = m['type']
         head["Referat"] = referat_templ[coll] % m
 
-        soup = BeautifulSoup(text)
+        soup = BeautifulSoup(text, "lxml")
         if filetype == "docx":
             ptag = "w:p"
             soup = self._merge_ooxml(soup)
@@ -847,7 +848,7 @@ class DV(SwedishLegalSource):
 
 
     def parse_ooxml(self, text, basefile):
-        soup = BeautifulSoup(text)
+        soup = BeautifulSoup(text, "lxml")
         soup = self._merge_ooxml(soup)
 
         head = {}
@@ -916,7 +917,7 @@ class DV(SwedishLegalSource):
         return head, body
 
     def parse_antiword_docbook(self, text, basefile):
-        soup = BeautifulSoup(text)
+        soup = BeautifulSoup(text, "lxml")
         head = {}
         header_elements = soup.find("para")
         header_text = ''

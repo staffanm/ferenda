@@ -32,6 +32,7 @@ class RegeringenLegacy(Regeringen):
     def extract_metadata(self, rawhead, basefile):
         content = rawhead
         title = content.find("h1").string
+        from pudb import set_trace; set_trace()
         identifier = content.find("p", "lead").text
         definitions = content.find("dl", "definitions")
         if definitions:
@@ -71,17 +72,18 @@ class RegeringenLegacy(Regeringen):
                 ) for x in listitem.find_all("span", "info")]
 
                 rel_basefile = None
-                identifier = None
+                rel_identifier = None
 
                 for infospan in infospans:
                     if re_basefile.search(infospan):
-                        # scrub identifier ("Dir. 2008:50" -> "2008:50" etc)
+                        # scrub rel_identifier ("Dir. 2008:50" -> "2008:50" etc)
                         rel_basefile = re_basefile.search(infospan).group()
-                        identifier = infospan
+                        rel_identifier = infospan
 
                 if not rel_basefile:
+                    from pudb import set_trace; set_trace()
                     self.log.warning(
-                        "%s: Couldn't find rel_basefile (elementid #%s) among %r" % (doc.basefile, elementid, infospans))
+                        "%s: Couldn't find rel_basefile (elementid #%s) among %r" % (basefile, elementid, infospans))
                     continue
 
                 attribs = {"rpubl:arsutgava": basefile.split(":")[0],
@@ -90,13 +92,13 @@ class RegeringenLegacy(Regeringen):
                     attribs["rdf:type"] = RPUBL.Kommittedirektiv
                 elif elementid == "legStep2":
                     attribs["rdf:type"] = RPUBL.Utredningsbetankande
-                    if identifier.startswith("SOU"):
+                    if rel_identifier.startswith("SOU"):
                         altlabel = "SOU"
-                    elif identifier.startswith(("Ds", "DS")):
+                    elif rel_identifier.startswith(("Ds", "DS")):
                         altlabel = "Ds"
                     else:
                         self.log.warning(
-                            "Cannot find out what type of document the linked %s is (#%s)" % (identifier, elementid))
+                            "Cannot find out what type of document the linked %s is (#%s)" % (rel_identifier, elementid))
                     attribs["rpubl:utrSerie"] = self.lookup_resource(altlabel, SKOS.altLabel)
                 elif elementid == "legStep3":
                     attribs["rdf:type"] = RPUBL.Proposition
