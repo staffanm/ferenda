@@ -167,7 +167,7 @@ class DirTrips(Trips):
         # The second item is the Describer method that
         # should be used to add the value to the graph, i.e. .value
         # for Literals and .rel for URIRefs
-        d = {}
+        d = self.metadata_from_basefile(basefile)
         munger = {'Dir nr': self.sanitize_identifier,
                   'Departement': functools.partial(self.lookup_resource, warn=False),
                   'Beslut vid regeringssammanträde': self.parse_iso_date,

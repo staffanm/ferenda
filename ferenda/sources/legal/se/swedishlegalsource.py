@@ -416,7 +416,7 @@ class SwedishLegalSource(DocumentRepository):
         # cleans up flat dict -- note similar
         # Regeringen.post_process_proposition that requires access to
         # parsed body
-
+        
         resource = self.polish_metadata(sane_attribs)
         # converts dict to rdfgraph -- is this too similar to
         # attributes_to_resource? This modifies the given graph (which
