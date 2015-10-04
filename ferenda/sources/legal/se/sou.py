@@ -82,12 +82,17 @@ class SOUKB(SwedishLegalSource, PDFDocumentRepository):
                 self.log.info(
                     "%s: downloaded new version from %s" % (basefile, pdfurl))
             updated = True
-            self.download_if_needed(rdfurl, basefile,
-                                    filename=self.store.downloaded_path(
-                                        basefile, attachment="metadata.rdf"))
-            self.download_if_needed(thumburl, basefile,
-                                    filename=self.store.downloaded_path(
-                                        basefile, attachment="thumb.jpg"))
+            try:
+                self.download_if_needed(rdfurl, basefile,
+                                        filename=self.store.downloaded_path(
+                        basefile, attachment="metadata.rdf"))
+                self.download_if_needed(thumburl, basefile,
+                                        filename=self.store.downloaded_path(
+                        basefile, attachment="thumb.jpg"))
+            except requests.exceptions.HTTPError as e:
+                self.log.error("Failed to load attachment: %s" % e)
+                raise
+                
         else:
             self.log.debug("%s: exists and is unchanged" % basefile)
 
