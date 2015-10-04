@@ -277,11 +277,13 @@ class PDFReader(CompoundElement):
                         else:
                             self.log.debug("Keeping non-blank image %s" % f)
 
-            # Without -fontfullname, all fonts are just reported as
-            # having family="Times"...
             imgflag = "-i" if not images else ""
 
-            cmd = "pdftohtml -nodrm -xml -fontfullname %s %s" % (imgflag, tmppdffile)
+            # Without -fontfullname, all fonts are just reported as
+            # having family="Times"...
+            # Without -hidden, some scanned-and-OCR:ed files turn up
+            # empty
+            cmd = "pdftohtml -nodrm -xml -fontfullname -hidden %s %s" % (imgflag, tmppdffile)
             self.log.debug("Converting: %s" % cmd)
             (returncode, stdout, stderr) = util.runcmd(cmd,
                                                        require_success=True)
