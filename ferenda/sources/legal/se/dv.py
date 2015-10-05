@@ -17,6 +17,7 @@ from six.moves.urllib_parse import urljoin
 from six import BytesIO
 import tempfile
 from collections import defaultdict
+from bz2 import BZ2File
 
 # 3rdparty libs
 from rdflib import Namespace, URIRef, Graph, RDF, RDFS, BNode
@@ -633,6 +634,54 @@ class DV(SwedishLegalSource):
               'Avgörandedatum': RPUBL.avgorandedatum,
               }
 
+    def parse_open(self, basefile, attachment=None):
+        intermediate_path = self.store.intermediate_path(basefile)
+        if self.config.compress == "bz2":
+            intermediate_path += ".bz2"
+            opener = BZ2File
+        else:
+            opener = open
+        if not os.path.exists(intermediate_path):
+            fp = self.downloaded_to_intermediate(basefile)
+        else:
+            fp = opener(intermediate_path, "rb")
+            # Determine if the previously-created intermediate files
+            # came from .doc or OOXML (.docx) sources by sniffing the
+            # first bytes.
+            start = fp.read(6)
+            if start in ("<w:doc", "<body "):
+                filetype = "docx"
+            elif start in ("<book ", "<book>", "<body>"):
+                filetype = "doc"
+            else:
+                raise ValueError("Can't guess filetype from %r" % start)
+            fp.seek(0)
+            self.filetype = filetype
+        return self.patch_if_needed(fp, basefile)
+
+
+    def downloaded_to_intermediate(self, basefile):
+        docfile = self.store.downloaded_path(basefile)
+        intermediatefile = self.store.intermediate_path(basefile)
+        intermediatefile, filetype = WordReader().read(docfile,
+                                                       intermediatefile)
+        if filetype == "docx":
+            self._simplify_ooxml(intermediatefile)
+        if self.config.compress == "bz2":
+            with open(intermediatefile, mode="rb") as rfp:
+                # BZ2File supports the with statement in py27+,
+                # but we support py2.6
+                wfp = BZ2File(intermediatefile+".bz2", "wb")
+                wfp.write(rfp.read())
+                wfp.close()
+            os.unlink(intermediatefile)
+            fp = BZ2File(intermediatefile + ".bz2")
+        else:
+            fp = open(intermediatefile)
+        self.filetype = filetype
+        return fp
+
+
     def extract_head(self, fp, basefile):
         filetype = self.filetype
         patchedtext = fp.read()
@@ -654,30 +703,9 @@ class DV(SwedishLegalSource):
     def extract_metadata(self, rawhead, basefile):
         # we have already done all the extracting in extract_head
         return rawhead
-        
 
-    def downloaded_to_intermediate(self, basefile):
-        docfile = self.store.downloaded_path(basefile)
-        intermediatefile = self.store.intermediate_path(basefile)
-        if not os.path.exists(intermediatefile):
-            intermediatefile, filetype = WordReader().read(docfile, intermediatefile)
-            if filetype == "docx":
-                self._simplify_ooxml(intermediatefile)
-        fp = open(intermediatefile)
 
-        # Determine if the intermediate files come from .doc or OOXML
-        # (.docx) sources by sniffing the first bytes
-        start = fp.read(6)
-        if start in ("<w:doc", "<body "):
-            filetype = "docx"
-        elif start in ("<book ", "<book>", "<body>"):
-            filetype = "doc"
-        else:
-            raise ValueError("Can't guess filetype from %r" % start)
-        fp.seek(0)
-        self.filetype = filetype
-        return fp
-
+    
     def parse_entry_title(self, doc):
         # FIXME: The primary use for entry.title is to generate
         # feeds. Should we construct a feed-friendly title here

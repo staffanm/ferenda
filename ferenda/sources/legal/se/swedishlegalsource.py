@@ -433,7 +433,7 @@ class SwedishLegalSource(DocumentRepository):
         # 1. check if intermediate_path exists
         intermediate_path = self.store.intermediate_path(basefile)
         # FIXME: This name mangling should be done by
-        # NonsemanticLegalSource somehow. However, the API for
+        # FixedLayoutSource somehow. However, the API for
         # StreamingPDFReader should first be adapted so that
         # intermediate_file is specified (maybe alongside of workdir).
         if self.config.compress == "bz2":
