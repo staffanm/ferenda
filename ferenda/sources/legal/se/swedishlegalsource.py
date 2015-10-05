@@ -626,6 +626,19 @@ class SwedishLegalSource(DocumentRepository):
         return body
 
     def extract_body(self, fp, basefile):
+        """Given a open file containing raw document content (or intermediate
+        content), return some sort of object representing the same content that 
+        :py:method:`tokenize` can work with.
+        
+        The default implementation assumes that the open file contains HTML/XML,
+        creates a BeautifulSoup instance from it, and returns the body of that instance.
+        
+        Docrepos using different file formats, or having documents that are split up
+        in multiple files, should override this to load those in some suitable way. 
+        This will often be similar to the processing that extract_head does (but not always,
+        eg. if the metadata is located in a HTML file but the main document content is in a 
+        PDF file).
+        """
         # FIXME: This re-parses the same data as extract_head
         # does. This will be common. Maybe fix a superclass level
         # caching system? (ie read from self._rawbody, which
@@ -635,15 +648,28 @@ class SwedishLegalSource(DocumentRepository):
         return soup.body
 
     def sanitize_body(self, rawbody):
+        """Given an object representing the document content, return the same or a similar 
+        object, with some basic sanitation performed. 
+        
+        The default implementation returns its input unchanged.
+        """
         return rawbody
 
     def get_pdf_analyzer(self, pdf):
         return PDFAnalyzer(pdf)
 
     def get_parser(self, basefile, sanitized):
-        # should return a function that gets any iterable (the output
-        # from tokenize) and returns a ferenda.elements.Body object.
-        #
+        """should return a function that gets any iterable (the output
+        from tokenize) and returns a ferenda.elements.Body object.
+        
+        The default implementation calls :py:func:`offtryck_parser` to
+        create a function/closure which is returned IF the sanitized 
+        body data is a PDFReader object. Otherwise, returns a function that
+        justs packs every item in a recieved iterable into a Body object.
+        
+        If your docrepo requires a FSMParser-created parser, you should 
+        instantiate and return it here.
+        """
         if isinstance(sanitized, PDFReader):
             # If our sanitized body is a PDFReader, it's most likely
             # something that can be handled by the offtryck_parser.
@@ -675,6 +701,13 @@ class SwedishLegalSource(DocumentRepository):
             return default_parser
     
     def tokenize(self, body):
+        """Given a document format-specific object (like a PDFReader or a BeautifulSoup object),
+        return a list or other iterable of suitable "chunks" for your parser function. 
+        
+        For PDF Readers, you might want to use :py:meth:`~ferenda.PDFReader.textboxes`
+        with a suitable glue function to create the iterable.
+        
+        """
         # this method might recieve a arbitrary object (the superclass
         # impl returns a BeautifulSoup node) but must return an iterable
         if isinstance(body, PDFReader):
@@ -685,7 +718,6 @@ class SwedishLegalSource(DocumentRepository):
 
     # see SFS.visit_node
     def visit_node(self, node, clbl, state, debug=False):
-
         """Visit each part of the document recursively (depth-first) and call
         a user-supplied function for each part.
 
@@ -730,6 +762,13 @@ class SwedishLegalSource(DocumentRepository):
             d.rel(RPUBL.utrSerie, self.dataset_uri())
 
     def infer_identifier(self, basefile):
+        """
+        Given a basefile of a document, returns a string that is a usable dcterms:identifier for that document.
+        
+        This is similar to metadata_from_basefile, but should return a single string that 
+        can be used as a human-readable label or identifier for the document.
+        
+        """
         # FIXME: This logic should really be split up and put into
         # different subclasses override of infer_identifier. Also note
         # that many docrepos get dcterms:identifier from the document
