@@ -229,6 +229,29 @@ class SwedishLegalSource(DocumentRepository):
             return str(val)
 
     def attributes_to_resource(self, attributes, for_self=True):
+        """Given a dict of metadata attributes for a document or 
+        fragment, create a RDF resource for that same thing. The RDF 
+        graph may contain multiple nodes if the thing is a document 
+        fragment, in which case the root document and possibly other 
+        containing fragments will be present as nodes.
+        
+        if the values of the dict are rdflib.Term-derived objects, they
+        will be put into the RDF graph as-is. If they're 
+        
+        The resource being returned (as well as all other nodes in the RDF
+        graph will be a BNode, i.e. this method does not coin URIs
+        
+        :param attributes: document/fragment metadata where keys are CURIE strings 
+                           and values are either plain strings or rdflib.Term objects
+        :type attributes: dict
+        :param for_self: Indicates that this is metadata for the document 
+                         we're processing, not some other linked document. 
+                         This results in the addition of some extra triples 
+                         to the resource (rdf:type and prov:wasGeneratedBy).
+        :type for_self: bool
+        :returns: The metadata in RDF form
+        :rtype: rdflib.Resource
+        """
         # FIXME: this is roughly the same code as
         # LegalRef.attributes_to_resource but with different keys.
         def uri(qname):
@@ -303,12 +326,44 @@ class SwedishLegalSource(DocumentRepository):
         return self.minter.space.coin_uri(resource)
 
     def metadata_from_basefile(self, basefile):
+        """Create a metadata dict with whatever we can infer from
+        a document basefile. The dict can be passed to 
+        py:method:`attributes_to_resource`.
+        
+        This method is intended to be overridden by every docrepo that has
+        a clear transformation rule for metadata <-> basefile.
+        
+        :param basefile: The doc we want to create metadata for
+        :type basefile: str
+        :returns: inferred metadata.
+        :rtype: dict
+        """
+        
         year, ordinal = basefile.split(":")
         return {'rpubl:arsutgava': year,
                 'rpubl:lopnummer': ordinal,
                 'rdf:type': self.rdf_type}
 
     def sanitize_basefile(self, basefile):
+        """Given a basefile (typically during the download stage), 
+        make sure it's consistent with whatever rules the repo has 
+        for basefile naming, and sanitize it if it's not proper but
+        still possible to guess what it should be. 
+        
+        Sanitazion rules may include things like converting 
+        two-digit-years to four digits, removing or adding leading zeroes,
+        case folding etc.
+        
+        Intended  to be overridden by every docrepo that has
+        rules for basefiles. The default implementation returns the basefile 
+        unchanged.
+        
+        :param basefile: The basefile to sanitize
+        :type basefile: str
+        :return: the sanitized basefile
+        :rtype: str
+        
+        """
         # will primarily be used by download to normalize eg "2014:04"
         # to "2014:4" and similar Regeringen.download_get_basefiles
         # line 188- should call this method (and
@@ -318,6 +373,42 @@ class SwedishLegalSource(DocumentRepository):
     @action
     @managedparsing
     def parse(self, doc):
+        """Parse downloaded documents into structured XML and RDF.
+        
+        This overrides :py:method:`ferenda.DocumentRepository.parse` and replaces it with
+        a fine-grained structure of methods, which are intended to be overridden by subclasses
+        as needed. The principal call chain looks like this::
+        
+        parse(doc) -> bool
+        parse_open(basefile) -> file
+            downloaded_to_intermediate(basefile) -> file
+            patch_if_needed(file) -> file
+        parse_metadata(file, basefile) -> rdflib.Resource
+            extract_head(file, basefile) -> object
+            extract_metadata(object, basefile) -> dict
+                [metadata_from_basefile(basefile) -> dict]
+            sanitize_metadata(dict, basefile) -> dict
+                sanitize_identifier(str) -> str
+            polish_metadata(dict) -> rdflib.Resource
+                attributes_to_resource(dict) -> rdflib.Resource
+            infer_metadata(rdflib.Resource, basefile) -> rdflib.Resource
+                infer_identifier(basefile) -> str
+        parse_body(file, basefile) -> elements.Body
+            extract_body(file, basefile) -> object
+            sanitize_body(object) -> object
+            get_parser(basefile) -> callable
+            tokenize(object) -> iterable
+            callable(iterable) -> elements.Body
+            visitor_functions() -> callables
+            visit_node(elements.Body, callable, state) -> state
+                callable(elements.CompoundElement, state) -> state
+        postprocess_doc(doc)
+        parse_entry_update(doc)
+
+        :param doc: The document object to fill in.
+        :type  doc: ferenda.Document
+        """
+        
         fp = self.parse_open(doc.basefile)
         resource = self.parse_metadata(fp, doc.basefile)
         doc.meta = resource.graph
@@ -328,11 +419,6 @@ class SwedishLegalSource(DocumentRepository):
         self.postprocess_doc(doc)
         self.parse_entry_update(doc)
         return True
-
-    def postprocess_doc(self, doc):
-        """Do any last-minute postprocessing (mainly used to add extra
-        metadata from doc.body to doc.head)"""
-        pass
 
     def parse_open(self, basefile, attachment=None):
         """Open the main downloaded file for the given basefile, caching the
@@ -390,9 +476,15 @@ class SwedishLegalSource(DocumentRepository):
         return stream
 
     def downloaded_to_intermediate(self, basefile):
-        # default implementation does not do any conversation, simply
-        # opens downloaded_path. Any source that actually uses
-        # intermediate files should override this.
+        """Given a basefile, convert the corresponding downloaded file 
+        into some suitable intermediate format and returns an open file
+        to that intermediate format (if any).
+        
+        The default implementation does not do any conversation, simply
+        opens downloaded_path. Any source that actually uses
+        intermediate files should override this.
+        
+        """
         return open(self.store.downloaded_path(basefile))
 
     def parse_metadata(self, fp, basefile):
@@ -502,9 +594,18 @@ class SwedishLegalSource(DocumentRepository):
         return resource.graph.resource(uri)
 
     def visitor_functions(self):
+        """Returns a list of callables that can operate on a single 
+        document node and a (function-dependent) state object. These
+        functions are automatically run on each document node, and can
+        be used eg. to find references, tidy up things, and so on.
+        """
         return []
 
     def parse_body(self, fp, basefile):
+        """Given a open file containing raw document content (or intermediate
+        content), return a ferenda.elements.Body object containing a structured
+        version of the document text.
+        """
         rawbody = self.extract_body(fp, basefile)
         sanitized = self.sanitize_body(rawbody)
         parser = self.get_parser(basefile, sanitized)
@@ -651,6 +752,12 @@ class SwedishLegalSource(DocumentRepository):
                 "Cannot create dcterms:identifier for rdf_type %r" %
                 self.rdf_type)
         return "%s%s" % (prefix, basefile)
+
+
+    def postprocess_doc(self, doc):
+        """Do any last-minute postprocessing (mainly used to add extra
+        metadata from doc.body to doc.head)"""
+        pass
 
     def tabs(self, primary=False):
         if self.config.tabs:
