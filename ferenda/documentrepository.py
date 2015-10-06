@@ -475,6 +475,7 @@ class DocumentRepository(object):
             'url': 'http://localhost:8000/',
             'fulltextindex': True,
             'useragent': 'ferenda-bot',
+            'relate': True,
             'republishsource': False,
             'tabs': True,
             'class': cls.__module__ + "." + cls.__name__,
@@ -1540,6 +1541,9 @@ with the *config* object as single parameter.
                                         config.storerepository)
             store.clear(context)
 
+        if config.relate is False:
+            log.info("%s: Not relating" % cls.alias)
+            return False
         # FIXME: if config.fulltextindex, we should attempt to connect
         # to the index (at least if config.indextype != "WHOOSH") to
         # see if the server is up.
@@ -1628,6 +1632,10 @@ with the *config* object as single parameter.
            and put the text of the document into a fulltext index.
 
         """
+        if self.config.relate is False:
+            self.log.warning("%s: repo %s config has relate=False" %
+                             (basefile, self.alias))
+            return False
         entry = DocumentEntry(self.store.documententry_path(basefile))
         if self.config.force:
             reltriples = True
@@ -1754,14 +1762,16 @@ parsed document path to that documents dependency file."""
                     # multiple, linked, resources. Don't attempt to
                     # find basefiles for these resources, even if they
                     # occur as objects in the graphs as well.
+                    if p == RDF.type:
+                        continue
                     if o in subjects:
                         continue
                     # for each URIRef in graph
                     if isinstance(o, URIRef):
                         # in order to minimize calls to
                         # basefile_from_uri(), it'd be nice if the
-                        # order of repos was dynamically altered according to MRU (most
-                        # recently used)
+                        # order of repos was dynamically altered
+                        # according to MRU (most recently used)
                         for repo in repos:
                             # find out if any docrepo can handle it
                             dep_basefile = repo.basefile_from_uri(str(o))

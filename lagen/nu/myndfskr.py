@@ -152,11 +152,3 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
 
     def tabs(self):
         return [("Myndighetsföreskrifter", self.dataset_uri())]
-
-    def basefile_from_uri(self, uri):
-        # if our parse has been done without setting self.config.localizeuri = True%
-        if uri.startswith("http://rinfo.lagrummet.se/"):
-            f = SwedishCitationParser(None, self.config.url,
-                                  self.config.urlpath).localize_uri
-            uri = f(uri)
-        return super(CompositeMyndFskr, self).basefile_from_uri(uri)
