@@ -249,12 +249,15 @@ def runcmd(cmdline, require_success=False, cwd=None,
 
 
 def normalize_space(string):
-    """Normalize all whitespace in string so that only a single space between words is ever used, and that the string neither starts with nor ends with whitespace.
+    """Normalize all whitespace in string so that only a single space
+between words is ever used, and that the string neither starts with
+nor ends with whitespace.
 
     >>> normalize_space(" This is  a long \\n string\\n") == 'This is a long string'
     True
+
     """
-    return ' '.join(string.split())
+    return ' '.join(string.replace("\xa0", " ").split())
 
 # util.File
 

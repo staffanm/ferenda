@@ -7,17 +7,18 @@ from ferenda import util
 from ferenda import Facet, TocPageset, TocPage
 from ferenda.elements import Link
 from ferenda.sources.legal.se import SwedishLegalSource, RPUBL
+from ferenda.sources.legal.se import Propositioner, SOU, Ds, Direktiv
+from .facadesource import FacadeSource
 
 
-class Forarbeten(SwedishLegalSource):
+class Forarbeten(FacadeSource):
     """This is a sort of a wrapper repo to provide useful tabs/tocs for set
     of related docrepos ("preparatory works")"""
 
     alias = "forarbeten"
-
-    def tabs(self):
-        return [("Förarbeten", self.dataset_uri())]
-
+    tablabel = "Förarbeten"
+    subrepos = Propositioner, SOU, Ds, Direktiv
+    
     def facet_query(self, context):
         # Override the standard query in order to ignore the default
         # context (provided by .dataset_uri()) since we're going to

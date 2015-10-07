@@ -37,14 +37,10 @@ from ferenda import TextReader, Describer, Facet
 from ferenda import decorators
 from ferenda.sources.legal.se import legaluri
 from ferenda import util
-from ferenda.elements import CompoundElement
-from ferenda.elements import OrdinalElement
-from ferenda.elements import TemporalElement
-from ferenda.elements import UnicodeElement
-from ferenda.elements import Link
-from ferenda.errors import FerendaError, DocumentRemovedError, ParseError
+from ferenda.errors import FerendaException, DocumentRemovedError, ParseError
 from .legalref import LegalRef, LinkSubject
 from . import Trips, SwedishCitationParser, RPUBL
+from .elements import *
 
 E = ElementMaker(namespace="http://www.w3.org/1999/xhtml")
 
@@ -61,11 +57,11 @@ class IdNotFound(DocumentRemovedError):
     pass
 
 
-class InteUppdateradSFS(FerendaError):
+class InteUppdateradSFS(FerendaException):
     pass
 
 
-class InteExisterandeSFS(FerendaError):
+class InteExisterandeSFS(FerendaException):
     pass  # same as IdNotFound?
 
 
@@ -543,6 +539,7 @@ class SFS(Trips):
         parts = basefile.split(":", 1)
         return {"rpubl:arsutgava": parts[0],
                 "rpubl:lopnummer": parts[1],
+                "rdf:type:": self.rdf_type,
                 "rpubl:forfattningssamling":
                 URIRef(self.lookup_resource("SFS", SKOS.altLabel))}
 
@@ -562,7 +559,7 @@ class SFS(Trips):
         except IOError:
             self.log.warning("%s: Fulltext is missing" % basefile) 
             # FIXME: This code needs to be rewritten
-            baseuri = self.canonical_uri(doc.basefile)
+            baseuri = self.canonical_uri(basefile)
             if baseuri in registry:
                 title = registry[baseuri].value(URIRef(baseuri),
                                                 self.ns['dcterms'].title)
@@ -570,7 +567,7 @@ class SFS(Trips):
             desc.rel(self.ns['dcterms'].publisher,
                      self.lookup_resource("Regeringskansliet"))
 
-            desc.value(self.ns['dcterms'].identifier, "SFS " + doc.basefile)
+            desc.value(self.ns['dcterms'].identifier, "SFS " + basefile)
 
             doc.body = Forfattning([Stycke(['Lagtext saknas'],
                                            id='S1')])
@@ -583,8 +580,8 @@ class SFS(Trips):
                 t.cuepast('<i>Författningen är upphävd/skall upphävas: ')
                 datestr = t.readto('</i></b>')
                 if datetime.strptime(datestr, '%Y-%m-%d') < datetime.today():
-                    self.log.debug('%s: Expired' % doc.basefile)
-                    raise UpphavdForfattning("%s is an expired SFS" % doc.basefile)
+                    self.log.debug('%s: Expired' % basefile)
+                    raise UpphavdForfattning("%s is an expired SFS" % basefile)
             except IOError:
                 pass
 	    finally:
@@ -604,55 +601,71 @@ class SFS(Trips):
         return codecs.open(self.store.intermediate_path(basefile), encoding="iso-8859-1") 
 
 
-    def patch_if_needed(self, fp):
-        fp = super(SFS, self).patch_if_needed(fp)
+    def patch_if_needed(self, fp, basefile):
+        fp = super(SFS, self).patch_if_needed(fp, basefile)
         # find out if patching occurred and record the patch description 
         # (maybe this should only be done in the lagen.nu.SFS subclass? 
         # the canonical SFS repo should maybe not have patches?)
-        if patchdesc:
+        if None and patchdesc:
             desc.value(self.ns['rinfoex'].patchdescription,
                        patchdesc)
-
+        return fp
 
     def extract_head(self, fp, basefile):
         """Parsear ut det SFSR-registret som innehåller alla ändringar
         i lagtexten från HTML-filer"""
-        filename = self.store.register_path(doc.basefile)
-        with codecs.open(filename, encoding="iso-8859-1") as fp:
-            soup = bs4.BeautifulSoup(fp.read(), "lxml")
 
+        # NB: We should really call self.store.register_path, but that
+        # custom func isn't mocked by ferenda.testutil.RepoTester,
+        # and downloaded_path is. So we call that one and munge it.
+        filename = self.store.downloaded_path(basefile).replace(
+            "/downloaded/", "/register/")
+        with codecs.open(filename, encoding="iso-8859-1") as rfp:
+            soup = bs4.BeautifulSoup(rfp.read(), "lxml")
         # do we really have a registry?
         notfound = soup.find(text="Sökningen gav ingen träff!")
         if notfound:
             raise IdNotFound(str(notfound))
+        reader = TextReader(string=fp.read(2048).decode("iso-8859-1"),
+                            linesep=TextReader.DOS)
+        subreader = reader.getreader(
+            reader.readchunk, reader.linesep * 4)
+        return soup, subreader.getiterator(subreader.readparagraph)
 
-        return soup
+    def extract_metadata(self, datatuple, basefile):
+        soup, reader = datatuple
+        d = self.metadata_from_basefile(basefile)
+        d.update(self.extract_metadata_register(soup, basefile))
+        d.update(self.extract_metadata_header(reader))
+        return d
 
-
-    def extract_metadata(self, soup, basefile):
-        d = OrderedDict()
+    def extract_metadata_register(self, soup, basefile):
+        d = {}
         rubrik = util.normalize_space(soup.body('table')[2].text)
         changes = soup.body('table')[3:-2]
         for table in changes:
             sfsnr = table.find(text="SFS-nummer:").find_parent(
                 "td").find_next_sibling("td").text.strip()
-
             docuri = self.canonical_uri(sfsnr)
-             
-            d[docuri] = {}
-	    g = make_graph()  # used for qname lookup only
             rowdict = {}
+            parts = sfsnr.split(":")
+            d[docuri] = {"rpubl:arsutgava": parts[0],
+                         "rpubl:lopnummer": parts[1],
+                         "rpubl:forfattningssamling":
+                         URIRef(self.lookup_resource("SFS", SKOS.altLabel))}
+            g = self.make_graph()  # used for qname lookup only
             for row in table('tr'):
                 key = row.td.text.strip()
                 if key.endswith(":"):
                     key = key[:-1]  # trim ending ":"
                 elif key == '':
                     continue
-                val = util.normalize_space(row('td')[1].text.replace('\xa0', ' '))
+                # FIXME: the \xa0 (&nbsp;) to space conversion should
+                # maye be part of normalize_space?
+                val = util.normalize_space(row('td')[1].text)
                 if val == "":
                     continue
                 rowdict[key] = val
-
             # first change does not contain a "Rubrik" key. Fake it.
             if 'Rubrik' not in rowdict and rubrik:
                 rowdict['Rubrik'] = rubrik
@@ -667,7 +680,9 @@ class SFS(Trips):
 
                 elif key == 'Ansvarig myndighet':
                     d[docuri]["rpubl:departement"] = val
-                    # FIXME: Sanitize this in sanitize_metadata->sanitize_department, lookup resource in polish_metadata
+                    # FIXME: Sanitize this in
+                    # sanitize_metadata->sanitize_department, lookup
+                    # resource in polish_metadata
                 elif key == 'Rubrik':
                     # Change acts to Balkar never contain the SFS no
                     # of the Balk.
@@ -733,7 +748,7 @@ class SFS(Trips):
                     for node in self.forarbete_parser.parse_string(val, "rpubl:forarbete"):
                         if hasattr(node, 'uri'):
                             d[docuri]["rpubl:forarbete"] = node.uri
-                            d[node.uri]["dcterms:identifier"] = str(node)
+                            d[node.uri]= {"dcterms:identifier": str(node)}
                 elif key == 'CELEX-nr':
                     for celex in re.findall('3\d{2,4}[LR]\d{4}', val):
                         b = BNode()
@@ -741,7 +756,7 @@ class SFS(Trips):
                         g.add((b, RPUBL.celexNummer, Literal(celex)))
                         celexuri = self.minter.space.coin_uri(g.resource(b))
                         d[docuri]["rpubl:genomforDirektiv"] = celexuri
-                        d[celexuri]["rpubl:celexNummer"] = celex
+                        d[celexuri] = {"rpubl:celexNummer": celex}
                 elif key == 'Tidsbegränsad':
                     d["rinfoex:tidsbegransad"] = val[:10]
                     expdate = datetime.strptime(val[:10], '%Y-%m-%d')
@@ -762,9 +777,74 @@ class SFS(Trips):
             if utfardandedatum:
                 d["rpubl:utfardandedatum"] = utfardandedatum
         return d
-	# NOTE: This nested dict with attributes will probably require a rewrite of polish_metadata/attribute_to_resource
 
-    # FIXME: Hook this up to sanitize_metadata
+    def extract_metadata_header(self, reader):
+        re_sfs = re.compile(r'(\d{4}:\d+)\s*$').search
+        d = {}
+        for line in reader:
+            if ":" in line:
+                (key, val) = [util.normalize_space(x)
+                              for x in line.split(":", 1)]
+            # Simple string literals
+            if key == 'Rubrik':
+                d["dcterms:title"] = val
+            elif key == 'Övrigt':
+                d["rdfs:comment"] = val
+            elif key == 'SFS nr':
+                identifier = "SFS " + val
+                # delay actual writing to graph, since we may need to
+                # amend this
+
+            # date literals
+            elif key == 'Utfärdad':
+                d["rpubl:utfardandedatum"] = val[:10]
+            elif key == 'Tidsbegränsad':
+                # FIXME: Should be done by lagen.nu.SFS
+                d["rinfoex:tidsbegransad"] = val[:10]
+            elif key == 'Upphävd':
+                d = datetime.strptime(val[:10], '%Y-%m-%d')
+                d["rpubl:upphavandedatum"] = val[:10]
+                if not self.config.keepexpired and d < datetime.today():
+                    raise UpphavdForfattning("%s is an expired SFS" % self.id)
+
+            # urirefs
+            elif key == 'Departement/ myndighet':
+                # this is only needed because of SFS 1942:724, which
+                # has "Försvarsdepartementet, Socialdepartementet"...
+                if "departementet, " in val:
+                    val = val.split(", ")[0]
+                d["dcterms:creator"] = val
+            elif (key == 'Ändring införd' and re_sfs(val)):
+                uppdaterad = re_sfs(val).group(1)
+                # not sure we need to add this, since parse_metadata
+                # catches the same
+                d["rpubl:konsolideringsunderlag"] = self.canonical_uri(uppdaterad)
+                if identifier and identifier != "SFS " + uppdaterad:
+                    identifier += " i lydelse enligt SFS " + uppdaterad
+
+            elif (key == 'Omtryck' and re_sfs(val)):
+                d["rinfoex:omtryck"] = self.canonical_uri(re_sfs(val).group(1))
+            elif (key == 'Författningen har upphävts genom' and
+                  re_sfs(val)):
+                s = re_sfs(val).group(1)
+                d["rinfoex:upphavdAv"] = self.canonical_uri(s)
+            else:
+                self.log.warning(
+                    '%s: Obekant nyckel [\'%s\']' % (self.id, key))
+
+        d["dcterms:identifier"] = identifier
+        if "dcterms:title" not in d:
+            self.log.warning("%s: Rubrik saknas" % self.id)
+        return d
+
+
+    def sanitize_metadata(self, attribs, basefile):
+        attribs = super(SFS, self).sanitize_metadata(attribs, basefile)
+        if 'dcterms:creator' in attribs:
+            attribs['dcterms:creator'] = self.sanitize_departement(
+                attribs['dcterms:creator'])
+        return attribs
+
     def sanitize_departement(self, val):
         # to avoid "Assuming that" warnings, autoremove sub-org ids,
         # ie "Finansdepartementet S3" -> "Finansdepartementet"
@@ -778,25 +858,31 @@ class SFS(Trips):
             val = cleaned
         return cleaned
 
-
     def polish_metadata(self, attributes):
         registry = {}
-        for k in attributes:
+        for k in list(attributes.keys()):
             if isinstance(attributes[k], dict):
                 registry[k] = attributes[k]
                 del attributes[k]
-
+        from pudb import set_trace; set_trace()
         resource = super(SFS, self).polish_metadata(attributes)
-
         for uri in registry:
-            r = super(SFS, self).polish_metadata(registry[uri])
-            resource.graph.add((resource.identifier, RPUBL.konsolideringsunderlag, r.identifier))
-            resource.graph += r.graph
+            if len(registry[uri]) > 1:
+                r = super(SFS, self).polish_metadata(registry[uri])
+                resource.add(RPUBL.konsolideringsunderlag, r.identifier)
+                # NB: we directly access the underlying graph object
+                # (._graph) since resource.graph is a read-only lambda
+                # function
+                resource._graph += r.graph
+            else:
+                r = self.attributes_to_resource(registry[uri], for_self=False)
+                for p, o in r.predicate_objects():
+                    resource.graph.add((URIRef(uri), p.identifier, o))
 
         # Finally: the dcterms:issued property for this
         # rpubl:KonsolideradGrundforfattning isn't readily
         # available. The true value is only found by parsing PDF files
-        # in another docrepo. There are three general ways of finding
+        # in another docrepo. There are two ways of finding
         # it out.
         issued = None
         # 1. if registry contains a single value (ie a
@@ -807,31 +893,25 @@ class SFS(Trips):
         else:
             # 2. if the last post in registry contains a
             # rpubl:utfardandedatum, assume that this version of the
-            # rpubl:KonsolideradGrundforfattning has the same dcterms:issued date
-	    # (Note that r is automatically set to the last post due to the above loop)
+            # rpubl:KonsolideradGrundforfattning has the same
+            # dcterms:issued date (Note that r is automatically set to
+            # the last post due to the above loop)
             utfardad = r.value(RPUBL.utfardandedatum)
             if utfardad:
                 issued = utfardad.toPython()
-            else:
-                # 3. general fallback: Use the corresponding orig_updated
-                # on the DocumentEntry. This is not correct (as it
-                # represents the date we fetched the document, not the
-                # date the document was made available), but it's as close
-                # as we can get.
-                issued = de.orig_updated.date()
-        resource.graph.add((resource.identifier, DCTERMS.issued, issued)
+        if issued:
+            resource.graph.add((resource.identifier, DCTERMS.issued, issued))
         return resource
 
-
     def infer_metadata(self, resource, basefile):
-        # FIXME: should only be part of lagen.nu.SFS, and even then we 
-        # can probably have the SameAs mixin class generate it for us. 
+        # FIXME: should only be part of lagen.nu.SFS, and even then we
+        # can probably have the SameAs mixin class generate it for us.
         rinfo_sameas = "http://rinfo.lagrummet.se/publ/sfs/%s/konsolidering/%d-%02d-%02d" % (
-            doc.basefile.replace(" ", "_"), issued.year, issued.month, issued.day)
+            basefile.replace(" ", "_"), issued.year, issued.month, issued.day)
         desc.rel(self.ns['owl'].sameAs, rinfo_sameas)
 
         # FIXME: make this part of head metadata
-        desc.rel(self.ns['rpubl'].konsoliderar, self.canonical_uri(doc.basefile))
+        desc.rel(self.ns['rpubl'].konsoliderar, self.canonical_uri(basefile))
         de = DocumentEntry(self.store.documententry_path(basefile))
 
 
@@ -839,13 +919,13 @@ class SFS(Trips):
         desc.value(self.ns['rinfoex'].senastHamtad, de.orig_updated)
         desc.value(self.ns['rinfoex'].senastKontrollerad, de.orig_checked)
         # find any established abbreviation
-        grf_uri = self.canonical_uri(doc.basefile)
+        grf_uri = self.canonical_uri(basefile)
         v = self.commondata.value(URIRef(grf_uri), self.ns['dcterms'].alternate, any=True)
         if v:
             desc.value(self.ns['dcterms'].alternate, v)
 
 
-    def postprocess_doc(self, doc)
+    def postprocess_doc(self, doc):
         uppdaterad_tom = self._find_uppdaterad_tom(doc.basefile, reader=t)
         # now we can set doc.uri for reals
         doc.uri = self.canonical_uri(doc.basefile, uppdaterad_tom)
@@ -878,8 +958,9 @@ class SFS(Trips):
 
     def _forfattningstyp(self, forfattningsrubrik):
         if (forfattningsrubrik.startswith('Lag ') or
-            (forfattningsrubrik.endswith('lag') and not forfattningsrubrik.startswith('Förordning')) or
-                forfattningsrubrik.endswith('balk')):
+            (forfattningsrubrik.endswith('lag') and
+             not forfattningsrubrik.startswith('Förordning')) or
+            forfattningsrubrik.endswith('balk')):
             return self.ns['rpubl'].Lag
         else:
             return self.ns['rpubl'].Forordning
@@ -909,9 +990,8 @@ class SFS(Trips):
                 }
         return fake.get(sfsnr, None)
 
-
-    def extract_body(self, fp, basefile)
-        return TextReader(fp, linesep=TextReader.DOS, autostrip=True)
+    def extract_body(self, fp, basefile):
+        return TextReader(fp.read(), linesep=TextReader.DOS, autostrip=True)
 
     # FIXME: should get hold of a real LNKeyword repo object and call
     # it's canonical_uri()

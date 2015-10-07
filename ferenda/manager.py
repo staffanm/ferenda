@@ -375,6 +375,7 @@ def run(argv, subcall=False):
                 return runbuildqueue(**args)
 
             elif config.action == 'makeresources':
+                from pudb import set_trace; set_trace()
                 repoclasses = _classes_from_classname(enabled, classname)
                 args = _setup_makeresources_args(config)
                 repos = []

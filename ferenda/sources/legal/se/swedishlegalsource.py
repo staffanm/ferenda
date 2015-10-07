@@ -128,7 +128,7 @@ class SwedishLegalStore(DocumentStore):
         return pathfrag.replace("/", ":").replace("-", "/")
 
     def intermediate_path(self, basefile, version=None, attachment=None):
-        return self.path(basefile, "intermediate", ".xml", version=version,
+        return self.path(basefile, "intermediate", ".txt", version=version,
                          attachment=attachment)
 
 
@@ -375,9 +375,10 @@ class SwedishLegalSource(DocumentRepository):
     def parse(self, doc):
         """Parse downloaded documents into structured XML and RDF.
         
-        This overrides :py:method:`ferenda.DocumentRepository.parse` and replaces it with
-        a fine-grained structure of methods, which are intended to be overridden by subclasses
-        as needed. The principal call chain looks like this::
+        This overrides :py:method:`ferenda.DocumentRepository.parse`
+        and replaces it with a fine-grained structure of methods,
+        which are intended to be overridden by subclasses as
+        needed. The principal call chain looks like this::
         
         parse(doc) -> bool
         parse_open(basefile) -> file
@@ -407,8 +408,8 @@ class SwedishLegalSource(DocumentRepository):
 
         :param doc: The document object to fill in.
         :type  doc: ferenda.Document
+
         """
-        
         fp = self.parse_open(doc.basefile)
         resource = self.parse_metadata(fp, doc.basefile)
         doc.meta = resource.graph
@@ -570,7 +571,7 @@ class SwedishLegalSource(DocumentRepository):
                 continue
             if k in ("dcterms:title", "dcterms:abstract"):
                 attribs[k] = Literal(attribs[k], lang=self.lang)
-            elif k in ("dcterms:issued", "rpubl:avgorandedatum"):
+            elif k in ("dcterms:issued", "rpubl:avgorandedatum", "rpubl:utfardandedatum"):
                 if isinstance(attribs[k], date):
                     pass
                 elif re.match("\d{4}-\d{2}-\d{2}", attribs[k]):
@@ -580,7 +581,8 @@ class SwedishLegalSource(DocumentRepository):
                 else:
                     # assume something that parse_swedish_date handles
                     attribs[k] = Literal(self.parse_swedish_date(attribs[k]))
-
+            elif k in ("dcterms:creator", "dcterms:publisher", "rpubl:beslutadAv"):
+                attribs[k] = self.lookup_resource(attribs[k])
         resource = self.attributes_to_resource(attribs)
         uri = URIRef(self.minter.space.coin_uri(resource))
         # now that we know the document URI (didn't we already know it
@@ -798,9 +800,9 @@ class SwedishLegalSource(DocumentRepository):
         metadata from doc.body to doc.head)"""
         pass
 
-    def tabs(self, primary=False):
+    def tabs(self):
         if self.config.tabs:
-            return super(SwedishLegalSource, self).tabs(primary)
+            return super(SwedishLegalSource, self).tabs()
         else:
             return []
 

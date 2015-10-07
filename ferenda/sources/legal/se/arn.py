@@ -249,3 +249,9 @@ class ARN(FixedLayoutSource):
 
     def create_external_resources(self, doc):
         pass
+
+    def tabs(self):
+        if self.config.tabs:
+            return [("ARN"), self.dataset_uri()]
+        else:
+            return []

@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, print_function
 
-# ferenda.sources.legal.se.elements
+from ferenda.elements import CompoundElement
+from ferenda.elements import OrdinalElement
+from ferenda.elements import TemporalElement
+from ferenda.elements import UnicodeElement
+from ferenda.elements import Link
 
 class Forfattning(CompoundElement, TemporalElement):
     """Grundklass för en konsoliderad författningstext."""

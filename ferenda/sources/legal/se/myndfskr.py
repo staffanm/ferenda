@@ -540,7 +540,7 @@ class MyndFskrBase(SwedishLegalSource):
             label = "URI: " + row['uri']
         return [Link(label, uri=row['uri'])]
 
-    def tabs(self, primary=False):
+    def tabs(self):
         return [(self.__class__.__name__, self.dataset_uri())]
 
 

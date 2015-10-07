@@ -179,3 +179,9 @@ class JK(SwedishLegalSource):
         p.initial_constructor = make_body
         p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
         return p.parse
+
+    def tabs(self):
+        if self.config.tabs:
+            return [("JK"), self.dataset_uri()]
+        else:
+            return []

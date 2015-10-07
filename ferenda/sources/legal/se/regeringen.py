@@ -720,7 +720,7 @@ class Regeringen(SwedishLegalSource):
             "Not generating TOC (let ferenda.sources.legal.se.Forarbeten do that instead")
         return
 
-    def tabs(self, primary=False):
+    def tabs(self):
         if self.config.tabs:
             label = {self.DS: "Ds:ar",
                      self.KOMMITTEDIREKTIV: "Kommittédirektiv",

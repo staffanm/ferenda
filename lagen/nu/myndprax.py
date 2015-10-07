@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from ferenda.sources.legal.se import SwedishLegalSource, RPUBL
+# from ferenda.sources.legal.se import SwedishLegalSource, RPUBL
+from .facadesource import FacadeSource
+from . import ARN, JO, JK
 
-class MyndPrax(SwedishLegalSource):
+
+class MyndPrax(FacadeSource):
     """Wrapper repo like Forarbeten, but for ARN/JO/JK"""
     alias = "myndprax"
-    def tabs(self, primary=False):
-        return [("Myndighetspraxis", self.dataset_uri())]
+    subrepos = ARN, JO, JK
+
+    tablabel = "Myndighetspraxis"
+    

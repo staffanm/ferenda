@@ -12,7 +12,7 @@ from ferenda import util, errors
 class CompositeStore(DocumentStore):
 
     """Custom store for CompositeRepository objects."""
-    
+
     def __init__(self, datadir, downloaded_suffix=".html",
                  storage_policy="file",
                  docrepo_instances=None):
@@ -36,7 +36,8 @@ class CompositeStore(DocumentStore):
                         documents.add(basefile)
                         yield basefile
         else:
-            for basefile in super(CompositeStore, self).list_basefiles_for(action):
+            for basefile in super(CompositeStore,
+                                  self).list_basefiles_for(action):
                 yield basefile
 
 

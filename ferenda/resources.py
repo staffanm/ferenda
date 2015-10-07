@@ -169,6 +169,7 @@ class Resources(object):
         elements = []
         for repo in self.repos:
             for item in getattr(repo, methodname)():
+                from pudb import set_trace; set_trace()
                 (label, url) = item
                 alias = repo.alias
                 self.log.debug(

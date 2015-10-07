@@ -262,3 +262,9 @@ class JO(FixedLayoutSource):
                            ("blockquote", is_dnr): (make_dnr, None),
                            })
         return p.parse
+
+    def tabs(self):
+        if self.config.tabs:
+            return [("JO"), self.dataset_uri()]
+        else:
+            return []
