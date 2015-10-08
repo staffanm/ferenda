@@ -168,15 +168,25 @@ class Resources(object):
         E = ElementMaker()
         elements = []
         for repo in self.repos:
-            for item in getattr(repo, methodname)():
-                from pudb import set_trace; set_trace()
+            items = getattr(repo, methodname)()
+            elements.extend(self._links_listitems(items)
+        return elements
+        
+    def _links_listitems(self, listitems)
+        elements = []
+        for item in listitems:
+            if len(item) == 2:
                 (label, url) = item
-                alias = repo.alias
-                self.log.debug(
-                    "Adding %(methodname)s %(label)s (%(url)s) from docrepo %(alias)s" % locals())
-                elements.append(E.li(
-                    E.a({'href': url},
-                        label)))
+                sublist = None
+            else:
+                (label, url, sublist) = item
+            alias = repo.alias
+            self.log.debug(
+                "Adding %(methodname)s %(label)s (%(url)s) from docrepo %(alias)s" % locals())
+            li = E.li(E.a({'href': url}, label))
+            if sublist:
+                li.append(E.ul(*self._links_listitems(sublist))
+            elements.append(li)
         return elements
 
     def _make_files(self, option, filedir, combinefile=None, combinefunc=None):
