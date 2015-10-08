@@ -187,3 +187,163 @@ class Registerpost(CompoundElement):
         # FIXME: Render this better (particularly the rpubl:andring
         # property -- should be parsed and linked)
         return super(Registerpost, self).as_xhtml()
+
+class OrderedParagraph(Paragraph, OrdinalElement):
+
+    def as_xhtml(self, baseuri, parent_uri=None):
+        element = super(OrderedParagraph, self).as_xhtml(baseuri, parent_uri)
+        # FIXME: id needs to be unique in document by prepending a
+        # instans identifier
+        # element.set('id', self.ordinal)
+        return element
+
+
+class DomElement(CompoundElement):
+    tagname = "div"
+    prop = None
+
+    def _get_classname(self):
+        return self.__class__.__name__.lower()
+    classname = property(_get_classname)
+
+    def as_xhtml(self, baseuri, parent_uri=None):
+        element = super(DomElement, self).as_xhtml(baseuri, parent_uri)
+        if self.prop:
+            # ie if self.prop = ('ordinal', 'dcterms:identifier'), then
+            # dcterms:identifier = self.ordinal
+            if (hasattr(self, self.prop[0]) and
+                    getattr(self, self.prop[0]) and
+                    isinstance(getattr(self, self.prop[0]), str)):
+                element.set('content', getattr(self, self.prop[0]))
+                element.set('property', self.prop[1])
+        return element
+
+
+class Delmal(DomElement):
+    prop = ('ordinal', 'dcterms:identifier')
+
+
+class Instans(DomElement):
+    prop = ('court', 'dcterms:creator')
+
+
+class Dom(DomElement):
+    prop = ('malnr', 'dcterms:identifier')
+
+
+class Domskal(DomElement):
+    pass
+
+
+class Domslut(DomElement):
+    pass  # dcterms:author <- names of judges
+
+
+class Betankande(DomElement):
+    pass  # dcterms:author <- referent
+
+
+class Skiljaktig(DomElement):
+    pass  # dcterms:author <- name
+
+
+class Tillagg(DomElement):
+    pass  # dcterms:author <- name
+
+
+class Endmeta(DomElement):
+    pass
+
+class Sektion(CompoundElement):
+    tagname = "div"
+
+class Abstract(CompoundElement):
+    tagname = "div"
+    classname = "beslutikorthet"
+
+
+class Blockquote(CompoundElement):
+    tagname = "blockquote"
+
+
+class Meta(CompoundElement):
+    pass
+
+class Stycke(Paragraph):
+    pass
+
+
+class Sektion(Section):
+    pass
+
+
+class Sidbrytning(OrdinalElement):
+    def as_xhtml(self, uri, parent_uri=None):
+        return E("span", {'id': 'sid%s' % self.ordinal,
+                          'class': 'sidbrytning'})
+
+
+class PreambleSection(CompoundElement):
+    tagname = "div"
+    classname = "preamblesection"
+    counter = 0
+    uri = None
+
+    def as_xhtml(self, uri, parent_uri=None):
+        if not self.uri:
+            self.__class__.counter += 1
+            self.uri = uri + "#PS%s" % self.__class__.counter
+        element = super(PreambleSection, self).as_xhtml(uri, parent_uri)
+        element.set('property', 'dcterms:title')
+        element.set('content', self.title)
+        element.set('typeof', 'bibo:DocumentPart')
+        return element
+
+
+class UnorderedSection(CompoundElement):
+    # FIXME: It'd be nice with some way of ordering nested unordered
+    # sections, like:
+    #  US1
+    #  US2
+    #    US2.1
+    #    US2.2
+    #  US3
+    #
+    # right now they'll appear as:
+    #  US1
+    #  US2
+    #    US3
+    #    US4
+    #  US5
+    tagname = "div"
+    classname = "unorderedsection"
+    counter = 0
+    uri = None
+
+    def as_xhtml(self, uri, parent_uri=None):
+        if not self.uri:
+            self.__class__.counter += 1
+            # note that this becomes a document-global running counter
+            self.uri = uri + "#US%s" % self.__class__.counter
+        element = super(UnorderedSection, self).as_xhtml(uri, parent_uri)
+        element.set('property', 'dcterms:title')
+        element.set('content', self.title)
+        element.set('typeof', 'bibo:DocumentPart')
+        return element
+
+
+class Appendix(SectionalElement):
+    tagname = "div"
+    classname = "appendix"
+
+    def as_xhtml(self, uri, parent_uri=None):
+        if not self.uri:
+            self.uri = uri + "#B%s" % self.ordinal
+
+        return super(Appendix, self).as_xhtml(uri, parent_uri)
+
+
+class Coverpage(CompoundElement):
+    tagname = "div"
+    classname = "coverpage"
+
