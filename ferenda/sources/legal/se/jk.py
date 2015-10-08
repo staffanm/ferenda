@@ -18,11 +18,7 @@ from ferenda import Describer, FSMParser
 from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda.sources.legal.se import legaluri
 from ferenda.elements import Body, CompoundElement
-
-
-class Sektion(CompoundElement):
-    tagname = "div"
-
+from .elements import *
 
 class JK(SwedishLegalSource):
     alias = "jk"
