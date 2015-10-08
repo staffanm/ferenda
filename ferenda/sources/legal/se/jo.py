@@ -21,7 +21,7 @@ from ferenda.elements import CompoundElement, Body, Paragraph, Heading
 from . import RPUBL
 from .fixedlayoutsource import FixedLayoutSource
 from .swedishlegalsource import UnorderedSection
-from .element import *
+from .elements import *
 
     
 class JO(FixedLayoutSource):

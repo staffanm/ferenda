@@ -25,7 +25,6 @@ from ferenda.compat import OrderedDict
 from rdflib import URIRef, Literal, RDF, Graph, BNode
 from rdflib.namespace import DCTERMS, SKOS
 from lxml import etree
-from lxml.builder import ElementMaker
 import bs4
 import requests
 import requests.exceptions
@@ -42,7 +41,6 @@ from .legalref import LegalRef, LinkSubject
 from . import Trips, SwedishCitationParser, RPUBL
 from .elements import *
 
-E = ElementMaker(namespace="http://www.w3.org/1999/xhtml")
 
 class IckeSFS(ParseError):
     """Slängs när en författning som inte är en egentlig
@@ -626,7 +624,10 @@ class SFS(Trips):
         notfound = soup.find(text="Sökningen gav ingen träff!")
         if notfound:
             raise IdNotFound(str(notfound))
-        reader = TextReader(string=fp.read(2048).decode("iso-8859-1"),
+        textheader = fp.read(2048)
+        idx = textheader.index(b"\r\n"* 4)
+        fp.seek(idx + 8)
+        reader = TextReader(string=textheader.decode("iso-8859-1"),
                             linesep=TextReader.DOS)
         subreader = reader.getreader(
             reader.readchunk, reader.linesep * 4)
@@ -688,14 +689,14 @@ class SFS(Trips):
                     # of the Balk.
                     if not basefile in val and not val.endswith("balken"):
                         self.log.warning(
-                            "%s: Base SFS %s not found in title %r" % (self.id, self.id, val))
+                            "%s: Base SFS %s not found in title %r" % (basefile, basefile, val))
                     d[docuri]["dcterms:title"] = val
                     d[docuri]["rdf:type"] = self._forfattningstyp(val)
                 elif key == 'Observera':
                     if not self.config.keepexpired:
                         if 'Författningen är upphävd/skall upphävas: ' in val:
                             if datetime.strptime(val[41:51], '%Y-%m-%d') < datetime.today():
-                                raise UpphavdForfattning("%s is an expired SFS" % self.id)
+                                raise UpphavdForfattning("%s is an expired SFS" % basefile)
                     d[docuri]["rdfs:comment"] = val
                 elif key == 'Ikraft':
                     d[docuri]["rpubl:ikrafttradandedatum"] = val[:10]
@@ -734,7 +735,7 @@ class SFS(Trips):
                         else:
                             self.log.warning(
                                 "%s: Okänd omfattningstyp %r" %
-                                (self.id, changecat))
+                                (basefile, changecat))
                             pred = None
                         old_currenturl = self.lagrum_parser._currenturl
                         self.lagrum_parser._currenturl = docuri
@@ -805,7 +806,7 @@ class SFS(Trips):
                 d = datetime.strptime(val[:10], '%Y-%m-%d')
                 d["rpubl:upphavandedatum"] = val[:10]
                 if not self.config.keepexpired and d < datetime.today():
-                    raise UpphavdForfattning("%s is an expired SFS" % self.id)
+                    raise UpphavdForfattning("%s is an expired SFS" % basefile)
 
             # urirefs
             elif key == 'Departement/ myndighet':
@@ -830,11 +831,11 @@ class SFS(Trips):
                 d["rinfoex:upphavdAv"] = self.canonical_uri(s)
             else:
                 self.log.warning(
-                    '%s: Obekant nyckel [\'%s\']' % (self.id, key))
+                    '%s: Obekant nyckel [\'%s\']' % (basefile, key))
 
         d["dcterms:identifier"] = identifier
         if "dcterms:title" not in d:
-            self.log.warning("%s: Rubrik saknas" % self.id)
+            self.log.warning("%s: Rubrik saknas" % basefile)
         return d
 
 
@@ -864,7 +865,6 @@ class SFS(Trips):
             if isinstance(attributes[k], dict):
                 registry[k] = attributes[k]
                 del attributes[k]
-        from pudb import set_trace; set_trace()
         resource = super(SFS, self).polish_metadata(attributes)
         for uri in registry:
             if len(registry[uri]) > 1:
@@ -904,11 +904,13 @@ class SFS(Trips):
         return resource
 
     def infer_metadata(self, resource, basefile):
+        desc = Describer(resource.graph, resource.identifier)
         # FIXME: should only be part of lagen.nu.SFS, and even then we
         # can probably have the SameAs mixin class generate it for us.
-        rinfo_sameas = "http://rinfo.lagrummet.se/publ/sfs/%s/konsolidering/%d-%02d-%02d" % (
-            basefile.replace(" ", "_"), issued.year, issued.month, issued.day)
-        desc.rel(self.ns['owl'].sameAs, rinfo_sameas)
+        if False:
+            rinfo_sameas = "http://rinfo.lagrummet.se/publ/sfs/%s/konsolidering/%d-%02d-%02d" % (
+                basefile.replace(" ", "_"), issued.year, issued.month, issued.day)
+            desc.rel(self.ns['owl'].sameAs, rinfo_sameas)
 
         # FIXME: make this part of head metadata
         desc.rel(self.ns['rpubl'].konsoliderar, self.canonical_uri(basefile))
@@ -926,8 +928,12 @@ class SFS(Trips):
 
 
     def postprocess_doc(self, doc):
+        # FIXME: we should have been able to get this data earlier
+        t = TextReader(self.store.intermediate_path(doc.basefile),
+                       encoding="iso-8859-1")
         uppdaterad_tom = self._find_uppdaterad_tom(doc.basefile, reader=t)
-        # now we can set doc.uri for reals
+        # now we can set doc.uri for reals. FIXME: This should've been
+        # done WAY earlier.
         doc.uri = self.canonical_uri(doc.basefile, uppdaterad_tom)
         # finally, combine data from the registry with any possible
         # overgangsbestammelser, and append them at the end of the
@@ -946,13 +952,17 @@ class SFS(Trips):
             reg = Register(rubrik='Ändringar och övergångsbestämmelser')
         else:
             reg = Register(rubrik='Ändringar')
-        for uri, graph in registry.items():
-            identifier = graph.value(URIRef(uri), self.ns['dcterms'].identifier)
-            identifier = identifier.replace("SFS ", "L")
-            rp = Registerpost(uri=uri, meta=graph, id=identifier)
-            reg.append(rp)
-            if uri in obs:
-                rp.append(obs[uri])
+
+        # FIXME: should iterate over
+        # doc.meta.resource(doc.identifier).values(RPUBL.konsolideringsunderlag)
+        # instead
+#        for uri, graph in registry.items():
+#            identifier = graph.value(URIRef(uri), self.ns['dcterms'].identifier)
+#            identifier = identifier.replace("SFS ", "L")
+#            rp = Registerpost(uri=uri, meta=graph, id=identifier)
+#            reg.append(rp)
+#            if uri in obs:
+#                rp.append(obs[uri])
         doc.body.append(reg)
 
 
@@ -991,7 +1001,10 @@ class SFS(Trips):
         return fake.get(sfsnr, None)
 
     def extract_body(self, fp, basefile):
-        return TextReader(fp.read(), linesep=TextReader.DOS, autostrip=True)
+        reader = TextReader(string=fp.read().decode("iso-8859-1"),
+                            linesep=TextReader.DOS)
+        reader.autostrip = True
+        return reader
 
     # FIXME: should get hold of a real LNKeyword repo object and call
     # it's canonical_uri()
@@ -1009,7 +1022,7 @@ class SFS(Trips):
         # copy our state (shouldn't use nested dicts)
         state = dict(state)
         if isinstance(node, Forfattning):
-            attributes = self.metadata_from_basefile(self.id)
+            attributes = self.metadata_from_basefile(state['basefile'])
             state.update(attributes)
         if self.ordinalpredicates.get(node.__class__):  # could be a qname?
             if hasattr(node, 'ordinal') and node.ordinal:
@@ -1041,8 +1054,6 @@ class SFS(Trips):
             for skip, ifpresent in self.skipfragments:
                 if skip in state and ifpresent in state:
                     del state[skip]
-                    
-
             res = self.attributes_to_resource(state)
             try:
                 uri = self.minter.space.coin_uri(res)
@@ -1054,6 +1065,15 @@ class SFS(Trips):
         state['parent'] = node
         return state
 
+    re_definitions = re.compile(
+        r'^I (lagen|förordningen|balken|denna lag|denna förordning|denna balk|denna paragraf|detta kapitel) (avses med|betyder|används följande)').match
+    re_brottsdef = re.compile(
+        r'\b(döms|dömes)(?: han)?(?:,[\w\xa7 ]+,)? för ([\w ]{3,50}) till (böter|fängelse)', re.UNICODE).search
+    re_brottsdef_alt = re.compile(
+        r'[Ff]ör ([\w ]{3,50}) (döms|dömas) till (böter|fängelse)', re.UNICODE).search
+    re_parantesdef = re.compile(r'\(([\w ]{3,50})\)\.', re.UNICODE).search
+    re_loptextdef = re.compile(
+        r'^Med ([\w ]{3,50}) (?:avses|förstås) i denna (förordning|lag|balk)', re.UNICODE).search
     def find_definitions(self, element, find_definitions):
         if not isinstance(element, CompoundElement):
             return None
@@ -1153,7 +1173,7 @@ class SFS(Trips):
                     m = self.re_parantesdef(elementtext)
                     if m:
                         term = m.group(1)
-                        # print("%s: %s" %  (self.id, elementtext))
+                        # print("%s: %s" %  (basefile, elementtext))
                         self.log.debug(
                             '"%s" är nog en definition (2.4)' % term)
 
@@ -1214,7 +1234,7 @@ class SFS(Trips):
                         counters[k] += subcounters[k]
         return counters
  
-    def set_skipfragments(self, node):
+    def set_skipfragments(self, node, dummystate):
         elements = self._count_elements(node)
         if 'K' in elements and elements['P1'] < 2:
             self.skipfragments = [
@@ -1225,13 +1245,15 @@ class SFS(Trips):
                                    'rpubl:kapitelnummer')]
         return False  # run only on root element
 
-    def get_parser(self, basefile):
+    def get_parser(self, basefile, sanitized):
         # this should work something like offtryck_parser
-        from .sfs_parser import sfs_parser
-        return sfs_parser()
+        from .sfs_parser import make_parser
+        return make_parser(sanitized, self.log, self.trace)
 
-    def visitor_functions(self):
-        return self.set_skipfragments, self.construct_id, self.find_definitions
+    def visitor_functions(self, basefile):
+        return ((self.set_skipfragments, None),
+                (self.construct_id, {'basefile': basefile}),
+                (self.find_definitions, True))
 
 
     _document_name_cache = {}

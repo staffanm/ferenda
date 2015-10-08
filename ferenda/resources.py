@@ -169,10 +169,10 @@ class Resources(object):
         elements = []
         for repo in self.repos:
             items = getattr(repo, methodname)()
-            elements.extend(self._links_listitems(items)
+            elements.extend(self._links_listitems(items))
         return elements
         
-    def _links_listitems(self, listitems)
+    def _links_listitems(self, listitems):
         elements = []
         for item in listitems:
             if len(item) == 2:
@@ -185,7 +185,7 @@ class Resources(object):
                 "Adding %(methodname)s %(label)s (%(url)s) from docrepo %(alias)s" % locals())
             li = E.li(E.a({'href': url}, label))
             if sublist:
-                li.append(E.ul(*self._links_listitems(sublist))
+                li.append(E.ul(*self._links_listitems(sublist)))
             elements.append(li)
         return elements
 

@@ -49,7 +49,7 @@ class SwedishLegalStore(DocumentStore):
         return pathfrag.replace("/", ":").replace("-", "/")
 
     def intermediate_path(self, basefile, version=None, attachment=None):
-        return self.path(basefile, "intermediate", ".txt", version=version,
+        return self.path(basefile, "intermediate", ".xml", version=version,
                          attachment=attachment)
 
 
@@ -215,8 +215,9 @@ class SwedishLegalSource(DocumentRepository):
             g.add((current, rel, new))
             current = new
 
-        
         for k, values in attributes.items():
+            if ":" not in k:
+                continue
             if not isinstance(values, list):
                 values = [values]
             for v in values:
@@ -517,10 +518,12 @@ class SwedishLegalSource(DocumentRepository):
         return resource.graph.resource(uri)
 
     def visitor_functions(self):
-        """Returns a list of callables that can operate on a single 
-        document node and a (function-dependent) state object. These
-        functions are automatically run on each document node, and can
-        be used eg. to find references, tidy up things, and so on.
+        """Returns a list of (callables, initialstate) tuples that can operate
+        on a single document node and a (function-dependent) state
+        object. These functions are automatically run on each document
+        node, and can be used eg. to find references, tidy up things,
+        and so on.
+
         """
         return []
 
@@ -535,11 +538,11 @@ class SwedishLegalSource(DocumentRepository):
         tokenstream = self.tokenize(sanitized)
         # for PDFs, pdfreader.textboxes(gluefunc) is a tokenizer
         body = parser(tokenstream)
-        for func in self.visitor_functions():
+        for func, initialstate in self.visitor_functions(basefile):
             # could be functions for assigning URIs to particular
             # nodes, extracting keywords from text etc. Note: finding
             # references in text with LegalRef is done afterwards
-            self.visit_node(body, func)
+            self.visit_node(body, func, initialstate)
         if self.parse_types:
             # now find references using LegalRef
             parser = SwedishCitationParser(LegalRef(*self.parse_types),

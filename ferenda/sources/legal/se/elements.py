@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, print_function
 
-from ferenda.elements import CompoundElement
-from ferenda.elements import OrdinalElement
-from ferenda.elements import TemporalElement
-from ferenda.elements import UnicodeElement
-from ferenda.elements import Link
+from lxml.builder import ElementMaker
+
+from ferenda.elements import (CompoundElement, OrdinalElement,
+                              TemporalElement, UnicodeElement, Link,
+                              Paragraph, Section, SectionalElement)
+
+E = ElementMaker(namespace="http://www.w3.org/1999/xhtml")
 
 class Forfattning(CompoundElement, TemporalElement):
     """Grundklass för en konsoliderad författningstext."""
