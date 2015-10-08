@@ -37,6 +37,8 @@ from ferenda.elements import (Body, Paragraph, CompoundElement, OrdinalElement,
 
 from ferenda.elements.html import Strong, Em
 from . import SwedishLegalSource, SwedishCitationParser, RPUBL
+from .elements import *
+
 
 PROV = Namespace(util.ns['prov'])
 
@@ -82,73 +84,6 @@ class DVStore(DocumentStore):
         else:
             for x in super(DVStore, self).list_basefiles_for(action, basedir):
                 yield x
-
-
-class OrderedParagraph(Paragraph, OrdinalElement):
-
-    def as_xhtml(self, baseuri, parent_uri=None):
-        element = super(OrderedParagraph, self).as_xhtml(baseuri, parent_uri)
-        # FIXME: id needs to be unique in document by prepending a
-        # instans identifier
-        # element.set('id', self.ordinal)
-        return element
-
-
-class DomElement(CompoundElement):
-    tagname = "div"
-    prop = None
-
-    def _get_classname(self):
-        return self.__class__.__name__.lower()
-    classname = property(_get_classname)
-
-    def as_xhtml(self, baseuri, parent_uri=None):
-        element = super(DomElement, self).as_xhtml(baseuri, parent_uri)
-        if self.prop:
-            # ie if self.prop = ('ordinal', 'dcterms:identifier'), then
-            # dcterms:identifier = self.ordinal
-            if (hasattr(self, self.prop[0]) and
-                    getattr(self, self.prop[0]) and
-                    isinstance(getattr(self, self.prop[0]), str)):
-                element.set('content', getattr(self, self.prop[0]))
-                element.set('property', self.prop[1])
-        return element
-
-
-class Delmal(DomElement):
-    prop = ('ordinal', 'dcterms:identifier')
-
-
-class Instans(DomElement):
-    prop = ('court', 'dcterms:creator')
-
-
-class Dom(DomElement):
-    prop = ('malnr', 'dcterms:identifier')
-
-
-class Domskal(DomElement):
-    pass
-
-
-class Domslut(DomElement):
-    pass  # dcterms:author <- names of judges
-
-
-class Betankande(DomElement):
-    pass  # dcterms:author <- referent
-
-
-class Skiljaktig(DomElement):
-    pass  # dcterms:author <- name
-
-
-class Tillagg(DomElement):
-    pass  # dcterms:author <- name
-
-
-class Endmeta(DomElement):
-    pass
 
 
 class DV(SwedishLegalSource):
