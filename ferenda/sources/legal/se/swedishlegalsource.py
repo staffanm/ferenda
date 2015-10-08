@@ -30,87 +30,8 @@ from ferenda.decorators import action, managedparsing
 from ferenda.thirdparty.coin import URIMinter
 from ferenda.elements.elements import E
 from . import RPUBL
+from .elements import *
 PROV = Namespace(util.ns['prov'])
-
-
-class Stycke(Paragraph):
-    pass
-
-
-class Sektion(Section):
-    pass
-
-
-class Sidbrytning(OrdinalElement):
-    def as_xhtml(self, uri, parent_uri=None):
-        return E("span", {'id': 'sid%s' % self.ordinal,
-                          'class': 'sidbrytning'})
-
-
-class PreambleSection(CompoundElement):
-    tagname = "div"
-    classname = "preamblesection"
-    counter = 0
-    uri = None
-
-    def as_xhtml(self, uri, parent_uri=None):
-        if not self.uri:
-            self.__class__.counter += 1
-            self.uri = uri + "#PS%s" % self.__class__.counter
-        element = super(PreambleSection, self).as_xhtml(uri, parent_uri)
-        element.set('property', 'dcterms:title')
-        element.set('content', self.title)
-        element.set('typeof', 'bibo:DocumentPart')
-        return element
-
-
-class UnorderedSection(CompoundElement):
-    # FIXME: It'd be nice with some way of ordering nested unordered
-    # sections, like:
-    #  US1
-    #  US2
-    #    US2.1
-    #    US2.2
-    #  US3
-    #
-    # right now they'll appear as:
-    #  US1
-    #  US2
-    #    US3
-    #    US4
-    #  US5
-    tagname = "div"
-    classname = "unorderedsection"
-    counter = 0
-    uri = None
-
-    def as_xhtml(self, uri, parent_uri=None):
-        if not self.uri:
-            self.__class__.counter += 1
-            # note that this becomes a document-global running counter
-            self.uri = uri + "#US%s" % self.__class__.counter
-        element = super(UnorderedSection, self).as_xhtml(uri, parent_uri)
-        element.set('property', 'dcterms:title')
-        element.set('content', self.title)
-        element.set('typeof', 'bibo:DocumentPart')
-        return element
-
-
-class Appendix(SectionalElement):
-    tagname = "div"
-    classname = "appendix"
-
-    def as_xhtml(self, uri, parent_uri=None):
-        if not self.uri:
-            self.uri = uri + "#B%s" % self.ordinal
-
-        return super(Appendix, self).as_xhtml(uri, parent_uri)
-
-
-class Coverpage(CompoundElement):
-    tagname = "div"
-    classname = "coverpage"
-
 
 class SwedishLegalStore(DocumentStore):
 
