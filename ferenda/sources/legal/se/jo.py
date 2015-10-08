@@ -21,19 +21,8 @@ from ferenda.elements import CompoundElement, Body, Paragraph, Heading
 from . import RPUBL
 from .fixedlayoutsource import FixedLayoutSource
 from .swedishlegalsource import UnorderedSection
+from .element import *
 
-
-class Abstract(CompoundElement):
-    tagname = "div"
-    classname = "beslutikorthet"
-
-
-class Blockquote(CompoundElement):
-    tagname = "blockquote"
-
-
-class Meta(CompoundElement):
-    pass
     
 class JO(FixedLayoutSource):
 
