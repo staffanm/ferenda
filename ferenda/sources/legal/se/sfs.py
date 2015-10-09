@@ -81,7 +81,7 @@ class SFSDocumentStore(DocumentStore):
     def metadata_path(self, basefile):
         return self.path(basefile, "metadata", ".html")
 
-    def intermediate_path(self, basefile):
+    def intermediate_path(self, basefile, version=None, attachment="None"):
         return self.path(basefile, "intermediate", ".txt")
 
 
@@ -500,20 +500,28 @@ class SFS(Trips):
         import hashlib
         c = hashlib.md5()
         try:
-            fp = self.downloaded_to_intermediate(basefile)
-            # for some insane reason, hashlib:s update method can't seem
-            # to handle ordinary unicode strings
-            c.update(plaintext.encode('iso-8859-1'))
+            c.update(util.readfile(filename, encoding='iso-8859-1'))
         except:
             self.log.warning("Could not extract plaintext from %s" % filename)
         return c.hexdigest()
 
+    def make_document(self, basefile):
+        doc = super(SFS, self).make_document(basefile)
+        # We need to get the uppdaterad_tom field to create a proper
+        # URI.  First create a throwaway reader and make sure we have
+        # the intermediate file at ready
+        fp = self.downloaded_to_intermediate(basefile)
+        t = TextReader(string=fp.read(2048))
+        fp.close()
+        uppdaterad_tom = self._find_uppdaterad_tom(basefile, reader=t)
+        doc.uri = self.canonical_uri(basefile, uppdaterad_tom)
+        return doc
 
     def canonical_uri(self, basefile, konsolidering=False):
         attributes = self.metadata_from_basefile(basefile)
         if konsolidering:
             if konsolidering is not True:
-                # eg konsolidering = "2013-05-30"
+                # eg konsolidering = "2013-05-30" or "2013:460"
                 konsolidering = konsolidering.replace(" ", "_")
             attributes["dcterms:issued"] = konsolidering
         resource = self.attributes_to_resource(attributes)
@@ -522,9 +530,8 @@ class SFS(Trips):
         # konsolidering = True instead of a issued date.
         # FIXME: This should be done in CoIN entirely
         if konsolidering is True:
-            res = res.rsplit("/",1)[0]
+            res = res.rsplit("/", 1)[0]
         return res
-
 
     def metadata_from_basefile(self, basefile):
         """Construct the basic attributes, in dict form, for a given SFS, eg
@@ -541,7 +548,6 @@ class SFS(Trips):
                 "rpubl:forfattningssamling":
                 URIRef(self.lookup_resource("SFS", SKOS.altLabel))}
 
-
     def downloaded_to_intermediate(self, basefile):
         # Check to see if this might not be a proper SFS at all
         # (from time to time, other agencies publish their stuff
@@ -550,7 +556,6 @@ class SFS(Trips):
         # these out.
         if basefile.startswith('N'):
             raise IckeSFS("%s is not a regular SFS" % basefile)
-
         filename = self.store.downloaded_path(basefile)
         try:
             t = TextReader(filename, encoding="iso-8859-1")
@@ -564,12 +569,9 @@ class SFS(Trips):
                 desc.value(self.ns['dcterms'].title, title)
             desc.rel(self.ns['dcterms'].publisher,
                      self.lookup_resource("Regeringskansliet"))
-
             desc.value(self.ns['dcterms'].identifier, "SFS " + basefile)
-
             doc.body = Forfattning([Stycke(['Lagtext saknas'],
                                            id='S1')])
-
         # Check to see if the Författning has been revoked (using
         # plain fast string searching, no fancy HTML parsing and
         # traversing)
@@ -584,25 +586,25 @@ class SFS(Trips):
                 pass
 	    finally:
                 t.seek(0)
-
         t.cuepast('<pre>')
         # remove &auml; et al
         hp = html_parser.HTMLParser()
         txt = hp.unescape(t.readto('</pre>'))
-        if not '\r\n' in txt:
+        if '\r\n' not in txt:
             txt = txt.replace('\n', '\r\n')
         re_tags = re.compile("</?\w{1,3}>")
         txt = re_tags.sub('', txt)
         # add ending CRLF aids with producing better diffs
         txt += "\r\n"
-        util.write_file(self.store.intermediate_path(basefile), txt, encoding="iso-8859-1")
-        return codecs.open(self.store.intermediate_path(basefile), encoding="iso-8859-1") 
-
+        util.writefile(self.store.intermediate_path(basefile), txt,
+                       encoding="iso-8859-1")
+        return codecs.open(self.store.intermediate_path(basefile),
+                           encoding="iso-8859-1")
 
     def patch_if_needed(self, fp, basefile):
         fp = super(SFS, self).patch_if_needed(fp, basefile)
-        # find out if patching occurred and record the patch description 
-        # (maybe this should only be done in the lagen.nu.SFS subclass? 
+        # find out if patching occurred and record the patch description
+        # (maybe this should only be done in the lagen.nu.SFS subclass?
         # the canonical SFS repo should maybe not have patches?)
         if None and patchdesc:
             desc.value(self.ns['rinfoex'].patchdescription,
@@ -625,7 +627,7 @@ class SFS(Trips):
         if notfound:
             raise IdNotFound(str(notfound))
         textheader = fp.read(2048)
-        idx = textheader.index(b"\r\n"* 4)
+        idx = textheader.index(b"\r\n" * 4)
         fp.seek(idx + 8)
         reader = TextReader(string=textheader.decode("iso-8859-1"),
                             linesep=TextReader.DOS)
@@ -687,20 +689,23 @@ class SFS(Trips):
                 elif key == 'Rubrik':
                     # Change acts to Balkar never contain the SFS no
                     # of the Balk.
-                    if not basefile in val and not val.endswith("balken"):
+                    if basefile not in val and not val.endswith("balken"):
                         self.log.warning(
-                            "%s: Base SFS %s not found in title %r" % (basefile, basefile, val))
+                            "%s: Base SFS %s not in title %r" % (basefile,
+                                                                 basefile,
+                                                                 val))
                     d[docuri]["dcterms:title"] = val
                     d[docuri]["rdf:type"] = self._forfattningstyp(val)
                 elif key == 'Observera':
                     if not self.config.keepexpired:
                         if 'Författningen är upphävd/skall upphävas: ' in val:
-                            if datetime.strptime(val[41:51], '%Y-%m-%d') < datetime.today():
-                                raise UpphavdForfattning("%s is an expired SFS" % basefile)
+                            dateval = datetime.strptime(val[41:51], '%Y-%m-%d')
+                            if dateval < datetime.today():
+                                raise UpphavdForfattning("%s is an expired SFS"
+                                                         % basefile)
                     d[docuri]["rdfs:comment"] = val
                 elif key == 'Ikraft':
                     d[docuri]["rpubl:ikrafttradandedatum"] = val[:10]
-                    # FIXME: conversion to datetime object should be done in polish_metadata
                 elif key == 'Omfattning':
                     # First, create rdf statements for every
                     # single modified section we can find

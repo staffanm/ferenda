@@ -333,6 +333,8 @@ class SwedishLegalSource(DocumentRepository):
 
         """
         fp = self.parse_open(doc.basefile)
+        from devtools import *
+        from pudb import set_trace; set_trace()
         resource = self.parse_metadata(fp, doc.basefile)
         doc.meta = resource.graph
         doc.uri = str(resource.identifier)
