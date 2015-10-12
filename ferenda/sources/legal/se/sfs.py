@@ -524,6 +524,7 @@ class SFS(Trips):
                 # eg konsolidering = "2013-05-30" or "2013:460"
                 konsolidering = konsolidering.replace(" ", "_")
             attributes["dcterms:issued"] = konsolidering
+        from pudb import set_trace; set_trace()
         resource = self.attributes_to_resource(attributes)
         res = self.minter.space.coin_uri(resource)
         # create eg "https://lagen.nu/sfs/2013:460/konsolidering" if
@@ -544,7 +545,7 @@ class SFS(Trips):
         parts = basefile.split(":", 1)
         return {"rpubl:arsutgava": parts[0],
                 "rpubl:lopnummer": parts[1],
-                "rdf:type:": self.rdf_type,
+                "rdf:type": self.rdf_type,
                 "rpubl:forfattningssamling":
                 URIRef(self.lookup_resource("SFS", SKOS.altLabel))}
 
@@ -639,7 +640,7 @@ class SFS(Trips):
         soup, reader = datatuple
         d = self.metadata_from_basefile(basefile)
         d.update(self.extract_metadata_register(soup, basefile))
-        d.update(self.extract_metadata_header(reader))
+        d.update(self.extract_metadata_header(reader, basefile))
         return d
 
     def extract_metadata_register(self, soup, basefile):
@@ -744,17 +745,19 @@ class SFS(Trips):
                             pred = None
                         old_currenturl = self.lagrum_parser._currenturl
                         self.lagrum_parser._currenturl = docuri
-                        for node in self.lagrum_parser.parse_string(changecat, pred):
+                        for node in self.lagrum_parser.parse_string(changecat,
+                                                                    pred):
                             if hasattr(node, 'predicate'):
                                 d[docuri][g.qname(node.predicate)] = node.uri
                         self.lagrum_parser._currenturl = old_currenturl
                     # Secondly, preserve the entire text
                     d[docuri]["rpubl:andrar"] = val
                 elif key == 'Förarbeten':
-                    for node in self.forarbete_parser.parse_string(val, "rpubl:forarbete"):
+                    for node in self.forarbete_parser.parse_string(val,
+                                                                   "rpubl:forarbete"):
                         if hasattr(node, 'uri'):
                             d[docuri]["rpubl:forarbete"] = node.uri
-                            d[node.uri]= {"dcterms:identifier": str(node)}
+                            d[node.uri] = {"dcterms:identifier": str(node)}
                 elif key == 'CELEX-nr':
                     for celex in re.findall('3\d{2,4}[LR]\d{4}', val):
                         b = BNode()
@@ -769,11 +772,10 @@ class SFS(Trips):
                     if expdate < datetime.today():
                         if not self.config.keepexpired:
                             raise UpphavdForfattning(
-                                "%s is an expired (time-limited) SFS" % filename)
+                                "%s is expired (time-limited) SFS" % filename)
                 else:
                     self.log.warning(
                         '%s: Obekant nyckel [\'%s\']' % basefile, key)
-
             # finally, add some properties not directly found in the
             # registry, but which are always present for SFSes, or deducible
             d["dcterms:publisher"] = "Regeringskansliet"
@@ -784,7 +786,7 @@ class SFS(Trips):
                 d["rpubl:utfardandedatum"] = utfardandedatum
         return d
 
-    def extract_metadata_header(self, reader):
+    def extract_metadata_header(self, reader, basefile):
         re_sfs = re.compile(r'(\d{4}:\d+)\s*$').search
         d = {}
         for line in reader:
@@ -827,6 +829,7 @@ class SFS(Trips):
                 d["rpubl:konsolideringsunderlag"] = self.canonical_uri(uppdaterad)
                 if identifier and identifier != "SFS " + uppdaterad:
                     identifier += " i lydelse enligt SFS " + uppdaterad
+                d["dcterms:issued"] = uppdaterad
 
             elif (key == 'Omtryck' and re_sfs(val)):
                 d["rinfoex:omtryck"] = self.canonical_uri(re_sfs(val).group(1))
@@ -839,10 +842,15 @@ class SFS(Trips):
                     '%s: Obekant nyckel [\'%s\']' % (basefile, key))
 
         d["dcterms:identifier"] = identifier
+
+        # FIXME: This is a misuse of the dcterms:issued prop in order
+        # to mint the correct URI
+        if "dcterms:issued" not in d:
+            d["dcterms:issued"] = basefile
+
         if "dcterms:title" not in d:
             self.log.warning("%s: Rubrik saknas" % basefile)
         return d
-
 
     def sanitize_metadata(self, attribs, basefile):
         attribs = super(SFS, self).sanitize_metadata(attribs, basefile)
@@ -921,25 +929,17 @@ class SFS(Trips):
         desc.rel(self.ns['rpubl'].konsoliderar, self.canonical_uri(basefile))
         de = DocumentEntry(self.store.documententry_path(basefile))
 
-
         # FIXME: These should be added by lagen.nu.SFS 
         desc.value(self.ns['rinfoex'].senastHamtad, de.orig_updated)
         desc.value(self.ns['rinfoex'].senastKontrollerad, de.orig_checked)
         # find any established abbreviation
         grf_uri = self.canonical_uri(basefile)
-        v = self.commondata.value(URIRef(grf_uri), self.ns['dcterms'].alternate, any=True)
+        v = self.commondata.value(URIRef(grf_uri),
+                                  self.ns['dcterms'].alternate, any=True)
         if v:
             desc.value(self.ns['dcterms'].alternate, v)
 
-
     def postprocess_doc(self, doc):
-        # FIXME: we should have been able to get this data earlier
-        t = TextReader(self.store.intermediate_path(doc.basefile),
-                       encoding="iso-8859-1")
-        uppdaterad_tom = self._find_uppdaterad_tom(doc.basefile, reader=t)
-        # now we can set doc.uri for reals. FIXME: This should've been
-        # done WAY earlier.
-        doc.uri = self.canonical_uri(doc.basefile, uppdaterad_tom)
         # finally, combine data from the registry with any possible
         # overgangsbestammelser, and append them at the end of the
         # document.

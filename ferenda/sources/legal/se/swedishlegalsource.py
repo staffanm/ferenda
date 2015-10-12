@@ -150,28 +150,31 @@ class SwedishLegalSource(DocumentRepository):
             return str(val)
 
     def attributes_to_resource(self, attributes, for_self=True):
-        """Given a dict of metadata attributes for a document or 
-        fragment, create a RDF resource for that same thing. The RDF 
-        graph may contain multiple nodes if the thing is a document 
-        fragment, in which case the root document and possibly other 
+        """Given a dict of metadata attributes for a document or
+        fragment, create a RDF resource for that same thing. The RDF
+        graph may contain multiple nodes if the thing is a document
+        fragment, in which case the root document and possibly other
         containing fragments will be present as nodes.
         
-        if the values of the dict are rdflib.Term-derived objects, they
-        will be put into the RDF graph as-is. If they're 
+        if the values of the dict are rdflib.Identifier-derived objects,
+        they will be put into the RDF graph as-is. If they're string
+        literals, they're converted to rdflib.Literal
         
         The resource being returned (as well as all other nodes in the RDF
         graph will be a BNode, i.e. this method does not coin URIs
         
-        :param attributes: document/fragment metadata where keys are CURIE strings 
-                           and values are either plain strings or rdflib.Term objects
+        :param attributes: document/fragment metadata where keys are
+                           CURIE strings and values are either plain
+                           strings or rdflib.term.Identifier objects
         :type attributes: dict
-        :param for_self: Indicates that this is metadata for the document 
-                         we're processing, not some other linked document. 
+        :param for_self: Indicates that this is metadata for the document
+                         we're processing, not some other linked document.
                          This results in the addition of some extra triples 
                          to the resource (rdf:type and prov:wasGeneratedBy).
         :type for_self: bool
         :returns: The metadata in RDF form
         :rtype: rdflib.Resource
+
         """
         # FIXME: this is roughly the same code as
         # LegalRef.attributes_to_resource but with different keys.
@@ -210,10 +213,12 @@ class SwedishLegalSource(DocumentRepository):
             "dcterms:issued" in attributes):
             rel = RPUBL.konsoliderar
             new = BNode()  # the document
-            g.add((current, DCTERMS.issued, Literal(attributes["dcterms:issued"])))
+            g.add((current, DCTERMS.issued,
+                   Literal(attributes["dcterms:issued"])))
             del attributes["dcterms:issued"]
             g.add((current, rel, new))
             current = new
+            from pudb import set_trace; set_trace()
 
         for k, values in attributes.items():
             if ":" not in k:
@@ -222,10 +227,7 @@ class SwedishLegalSource(DocumentRepository):
                 values = [values]
             for v in values:
                 if not isinstance(v, (URIRef, Literal)):
-                    if k in ("rpubl:forfattningssamling"):
-                        v = URIRef(self.lookup_resource(v, SKOS.altLabel))
-                    else:
-                        v = Literal(v)
+                    v = Literal(v)
                 g.add((current, uri(k), v))
 
         if for_self:
@@ -237,7 +239,9 @@ class SwedishLegalSource(DocumentRepository):
             # document itself, but attributes_to_resource must be able to
             # generate other resources
             if not g.value(current, RDF.type):
+                raise ValueError("You should already have set the rdf:type when calling attributes_to_resource, you lazy slacker")
                 g.add((current, RDF.type, self.rdf_type))
+            # FIXME: this should probably be done in infer_metadata
             g.add((current, PROV.wasGeneratedBy, Literal(
                 self.qualified_class_name())))
         return g.resource(b)
@@ -416,31 +420,11 @@ class SwedishLegalSource(DocumentRepository):
         """Given a open file containing raw document content (or intermediate
         content), return a rdflib.Resource object containing all metadata
         about the object."""
-        # FIXME: Do we need to set
-        #   1) doc.lang (probably not) and
-        #   2) doc.uri (very possible)?
-        # If so, how do we do that best? Have parse_metadata return a
-        # rdflib.Resource and determine:
-        #   1) resource.value(DCTERMS.title).lang
-        #   2) resource.identifier
-
         rawhead = self.extract_head(fp, basefile)
         attribs = self.extract_metadata(rawhead, basefile)
-        # produces flat dict -- note that
-        # DV.parse_{not,ooxml,antiword_docbook} already does this
-
         sane_attribs = self.sanitize_metadata(attribs, basefile)
-        # cleans up flat dict -- note similar
-        # Regeringen.post_process_proposition that requires access to
-        # parsed body
-        
         resource = self.polish_metadata(sane_attribs)
-        # converts dict to rdfgraph -- is this too similar to
-        # attributes_to_resource? This modifies the given graph (which
-        # has namespace prefix mappings set up)
-
         self.infer_metadata(resource, basefile)
-
         return resource
 
     def extract_head(self, fp, basefile):
@@ -448,9 +432,7 @@ class SwedishLegalSource(DocumentRepository):
         content), return the parts of that document that contains
         document metadata, in some raw form that extract_metadata can
         digest."""
-
-        parser = 'lxml'
-        soup = bs4.BeautifulSoup(fp.read(), parser)
+        soup = bs4.BeautifulSoup(fp.read(), "lxml")
         return soup.head
 
     def extract_metadata(self, rawhead, basefile):
@@ -495,7 +477,8 @@ class SwedishLegalSource(DocumentRepository):
                 continue
             if k in ("dcterms:title", "dcterms:abstract"):
                 attribs[k] = Literal(attribs[k], lang=self.lang)
-            elif k in ("dcterms:issued", "rpubl:avgorandedatum", "rpubl:utfardandedatum"):
+            elif k in ("dcterms:issued", "rpubl:avgorandedatum",
+                       "rpubl:utfardandedatum"):
                 if isinstance(attribs[k], date):
                     pass
                 elif re.match("\d{4}-\d{2}-\d{2}", attribs[k]):
@@ -503,10 +486,17 @@ class SwedishLegalSource(DocumentRepository):
                     dt = datetime.strptime(attribs[k], "%Y-%m-%d")
                     attribs[k] = Literal(date(dt.year, dt.month, dt.day))
                 else:
-                    # assume something that parse_swedish_date handles
-                    attribs[k] = Literal(self.parse_swedish_date(attribs[k]))
-            elif k in ("dcterms:creator", "dcterms:publisher", "rpubl:beslutadAv"):
+                    try:
+                        # assume something that parse_swedish_date handles
+                        dt = self.parse_swedish_date(attribs[k])
+                        attribs[k] = Literal(dt)
+                    except ValueError: # parse_swedish_date failed, pass as-is
+                        attribs[k] = Literal(attribs[k])
+            elif k in ("dcterms:creator", "dcterms:publisher",
+                       "rpubl:beslutadAv"):
                 attribs[k] = self.lookup_resource(attribs[k])
+            elif k in ("rpubl:forfattningssamling"):
+                attribs[k] = self.lookup_resource(attribs[k], SKOS.altLabel)
         resource = self.attributes_to_resource(attribs)
         uri = URIRef(self.minter.space.coin_uri(resource))
         # now that we know the document URI (didn't we already know it
