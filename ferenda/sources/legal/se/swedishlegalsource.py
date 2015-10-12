@@ -471,7 +471,7 @@ class SwedishLegalSource(DocumentRepository):
         # docrepos with unclean data might override this
         return identifier
 
-    def polish_metadata(self, attribs):
+    def polish_metadata(self, attribs, infer_nodes=True):
         """Given a sanitized flat dict of metadata for a document, return a
         rdflib.Resource version of the same.
 
@@ -506,7 +506,7 @@ class SwedishLegalSource(DocumentRepository):
                 attribs[k] = self.lookup_resource(attribs[k])
             elif k in ("rpubl:forfattningssamling"):
                 attribs[k] = self.lookup_resource(attribs[k], SKOS.altLabel)
-        resource = self.attributes_to_resource(attribs)
+        resource = self.attributes_to_resource(attribs, infer_nodes=infer_nodes)
         uri = URIRef(self.minter.space.coin_uri(resource))
         # now that we know the document URI (didn't we already know it
         # from canonical_uri?), we should somehow replace
