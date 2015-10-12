@@ -878,7 +878,7 @@ class SFS(Trips):
             if isinstance(attributes[k], dict):
                 registry[k] = attributes[k]
                 del attributes[k]
-        resource = super(SFS, self).polish_metadata(attributes)
+        resource = super(SFS, self).polish_metadata(attributes, infer_nodes=False)
         for uri in registry:
             if len(registry[uri]) > 1:
                 r = super(SFS, self).polish_metadata(registry[uri])
