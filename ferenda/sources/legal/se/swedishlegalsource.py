@@ -149,7 +149,7 @@ class SwedishLegalSource(DocumentRepository):
         else:
             return str(val)
 
-    def attributes_to_resource(self, attributes, for_self=True):
+    def attributes_to_resource(self, attributes, for_self=True, infer_nodes=True):
         """Given a dict of metadata attributes for a document or
         fragment, create a RDF resource for that same thing. The RDF
         graph may contain multiple nodes if the thing is a document
@@ -172,6 +172,12 @@ class SwedishLegalSource(DocumentRepository):
                          This results in the addition of some extra triples 
                          to the resource (rdf:type and prov:wasGeneratedBy).
         :type for_self: bool
+        :param infer_nodes: For certain attributes (pinpoint reference 
+                            fragments and consolidated legal acts), create 
+                            multiple nodes and infer relationships between them.
+                            This is needed for some of our URI minting rules as 
+                            expressed by COIN.
+        :type infer_nodes: bool
         :returns: The metadata in RDF form
         :rtype: rdflib.Resource
 
@@ -189,26 +195,28 @@ class SwedishLegalSource(DocumentRepository):
         # create needed sub-nodes. FIXME: this includes multiple
         # rinfoex values -- these should be in a derivec lagen.nu
         # class. Maybe using similar approach as
-        # SFS.ordinalpredicates?
-        for k in ("rinfoex:meningnummer", "rinfoex:subsubpunktnummer",
-                  "rinfoex:subpunktnummer", "rinfoex:punktnummer",
-                  "rinfoex:styckenummer", "rpubl:paragrafnummer",
-                  "rinfoex:rubriknummer", "rpubl:kapitelnummer",
-                  "rinfoex:avdelningnummer",
-                  "rinfoex:bilaganummer", "rinfoex:andringsforfattningnummer"):
-            if k in attributes:
-                p = uri(k)
-                g.add((current, p, Literal(attributes[k])))
-                del attributes[k]
-                new = BNode()
-                if p.endswith("nummer"):
-                    rel = URIRef(str(p).replace("nummer", ""))
-                g.add((new, rel, current))
-                current = new
+        # SFS.ordinalpredicates?'
+        if infer_nodes:
+            for k in ("rinfoex:meningnummer", "rinfoex:subsubpunktnummer",
+                      "rinfoex:subpunktnummer", "rinfoex:punktnummer",
+                      "rinfoex:styckenummer", "rpubl:paragrafnummer",
+                      "rinfoex:rubriknummer", "rpubl:kapitelnummer",
+                      "rinfoex:avdelningnummer",
+                      "rinfoex:bilaganummer", "rinfoex:andringsforfattningnummer"):
+                if k in attributes:
+                    p = uri(k)
+                    g.add((current, p, Literal(attributes[k])))
+                    del attributes[k]
+                    new = BNode()
+                    if p.endswith("nummer"):
+                        rel = URIRef(str(p).replace("nummer", ""))
+                    g.add((new, rel, current))
+                    current = new
 
         # specifically for rpubl:KonsolideradGrundforfattning, create
         # relToBase things
-        if (not isinstance(self.rdf_type, (tuple, list)) and
+        if (infer_nodes and
+            not isinstance(self.rdf_type, (tuple, list)) and
             self.rdf_type.endswith("KonsolideradGrundforfattning") and
             "dcterms:issued" in attributes):
             rel = RPUBL.konsoliderar
@@ -227,10 +235,11 @@ class SwedishLegalSource(DocumentRepository):
                 values = [values]
             for v in values:
                 if not isinstance(v, (URIRef, Literal)):
+                    self.log.warning("attributes_to_resources recieved naked str %s for %k, should be Literal or URIRef" % (v, k))
                     v = Literal(v)
                 g.add((current, uri(k), v))
 
-        if for_self:
+        if for_self:  # this flag is sort of limited infer_nodes
             # finally add triples that we can infer from class properties
             # (is this a job for infer_metadata? But we need it,
             # particularly the rdf:type data, beforehand)
