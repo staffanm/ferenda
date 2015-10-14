@@ -48,7 +48,12 @@ class SameAs(object):
         return self._sameas_minter
 
     def infer_metadata(self, resource, basefile):
-        # resource = super(SameAs, self).infer_metadata(resource, basefile)
-        sameas_uri = self.sameas_minter.space.coin_uri(resource)
-        resource.add(OWL.sameAs, URIRef(sameas_uri))
+        sup = super(SameAs, self)
+        if hasattr(sup, 'infer_metadata'):
+            resource = super(SameAs, self).infer_metadata(resource, basefile)
+        try:
+            sameas_uri = self.sameas_minter.space.coin_uri(resource)
+            resource.add(OWL.sameAs, URIRef(sameas_uri))
+        except ValueError as e:
+            self.log.error("Couldn't mint owl:sameAs: %s" % e)
         return resource

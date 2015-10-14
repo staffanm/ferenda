@@ -32,8 +32,6 @@
     dcterms:isPartOf <https://lagen.nu/sfs/2013:460> .
 
 <https://lagen.nu/sfs/2013:460/konsolidering/2013:460> a rpubl:KonsolideradGrundforfattning ;
-    rinfoex:senastHamtad "None" ;
-    rinfoex:senastKontrollerad "None" ;
     dcterms:creator <https://lagen.nu/org/2008/justitiedepartementet> ;
     dcterms:identifier "SFS 2013:460" ;
     dcterms:issued "2013-05-30"^^xsd:date ;
@@ -47,7 +45,7 @@
 
 <https://lagen.nu/ext/celex/31995L0046> rpubl:celexNummer "31995L0046" .
 
-<https://lagen.nu/sfs/2013:460> a rpubl:Forordning ;
+<https://lagen.nu/sfs/2013:460> a rpubl:Lag ;
     dcterms:identifier "SFS 2013:460" ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
     dcterms:title "Kameraövervakningslag (2013:460)"@sv ;

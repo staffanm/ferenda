@@ -510,6 +510,7 @@ class SFS(Trips):
         # We need to get the uppdaterad_tom field to create a proper
         # URI.  First create a throwaway reader and make sure we have
         # the intermediate file at ready
+        # FIXME: this is broken
         fp = self.downloaded_to_intermediate(basefile)
         t = TextReader(string=fp.read(2048))
         fp.close()
@@ -519,12 +520,20 @@ class SFS(Trips):
 
     def canonical_uri(self, basefile, konsolidering=False):
         attributes = self.metadata_from_basefile(basefile)
+        parts = basefile.split(":", 1)
+        # add some extra attributes that will enable
+        # attributes_to_resource to create a graph that is partly
+        # wrong, but will yield the correct URI.
+        attributes.update({"rpubl:arsutgava": parts[0],
+                           "rpubl:lopnummer": parts[1],
+                           "rpubl:forfattningssamling":
+                           URIRef(self.lookup_resource("SFS",
+                                                       SKOS.altLabel))})
         if konsolidering:
             if konsolidering is not True:
                 # eg konsolidering = "2013-05-30" or "2013:460"
                 konsolidering = konsolidering.replace(" ", "_")
             attributes["dcterms:issued"] = konsolidering
-        from pudb import set_trace; set_trace()
         resource = self.attributes_to_resource(attributes)
         res = self.minter.space.coin_uri(resource)
         # create eg "https://lagen.nu/sfs/2013:460/konsolidering" if
@@ -542,13 +551,11 @@ class SFS(Trips):
                       'rinfo:forfattningssamling':
                        URIRef("http://rinfo.lagrummet.se/serie/fs/sfs")}
         """
-        parts = basefile.split(":", 1)
-        return {"rpubl:arsutgava": parts[0],
-                "rpubl:lopnummer": parts[1],
-                "rdf:type": self.rdf_type,
-                "rpubl:forfattningssamling":
-                URIRef(self.lookup_resource("SFS", SKOS.altLabel))}
-
+        # maybe
+        attribs = super(SFS, self).metadata_from_basefile(basefile)
+        attribs["dcterms:publisher"] = "Regeringskansliet"
+        return attribs
+    
     def downloaded_to_intermediate(self, basefile):
         # Check to see if this might not be a proper SFS at all
         # (from time to time, other agencies publish their stuff
@@ -655,8 +662,8 @@ class SFS(Trips):
             parts = sfsnr.split(":")
             d[docuri] = {"rpubl:arsutgava": parts[0],
                          "rpubl:lopnummer": parts[1],
-                         "rpubl:forfattningssamling":
-                         URIRef(self.lookup_resource("SFS", SKOS.altLabel))}
+                         "rpubl:forfattningssamling": "SFS"}
+                         # URIRef(self.lookup_resource("SFS", SKOS.altLabel))}
             g = self.make_graph()  # used for qname lookup only
             for row in table('tr'):
                 key = row.td.text.strip()
@@ -776,11 +783,6 @@ class SFS(Trips):
                 else:
                     self.log.warning(
                         '%s: Obekant nyckel [\'%s\']' % basefile, key)
-            # finally, add some properties not directly found in the
-            # registry, but which are always present for SFSes, or deducible
-            d["dcterms:publisher"] = "Regeringskansliet"
-            d["rpubl:beslutadAv"] = "Regeringskansliet"
-            d["rpubl:forfattningssamling"] = "SFS"
             utfardandedatum = self._find_utfardandedatum(sfsnr)
             if utfardandedatum:
                 d["rpubl:utfardandedatum"] = utfardandedatum
@@ -844,7 +846,7 @@ class SFS(Trips):
         d["dcterms:identifier"] = identifier
 
         # FIXME: This is a misuse of the dcterms:issued prop in order
-        # to mint the correct URI
+        # to mint the correct URI. We need to remove this somehow afterwards.
         if "dcterms:issued" not in d:
             d["dcterms:issued"] = basefile
 
@@ -873,25 +875,33 @@ class SFS(Trips):
         return cleaned
 
     def polish_metadata(self, attributes):
-        registry = {}
-        for k in list(attributes.keys()):
+        # attributes will be a nested dict with some values being
+        # dicts themselves. Convert the subdicts to rdflib.Resource
+        # objects.
+        baseuri = None
+        post_count = 0
+        for k in sorted(list(attributes.keys()), key=util.split_numalpha,
+                        reverse=True):
             if isinstance(attributes[k], dict):
-                registry[k] = attributes[k]
-                del attributes[k]
-        resource = super(SFS, self).polish_metadata(attributes, infer_nodes=False)
-        for uri in registry:
-            if len(registry[uri]) > 1:
-                r = super(SFS, self).polish_metadata(registry[uri])
-                resource.add(RPUBL.konsolideringsunderlag, r.identifier)
-                # NB: we directly access the underlying graph object
-                # (._graph) since resource.graph is a read-only lambda
-                # function
-                resource._graph += r.graph
-            else:
-                r = self.attributes_to_resource(registry[uri], for_self=False)
-                for p, o in r.predicate_objects():
-                    resource.graph.add((URIRef(uri), p.identifier, o))
-
+                if len(attributes[k]) > 1:
+                    # get a rdflib.Resource with a coined URI
+                    r = super(SFS, self).polish_metadata(attributes[k])
+                    baseuri = k
+                    del attributes[k]
+                    attributes[URIRef(k)] = r
+                    if "rpubl:konsolideringsunderlag" not in attributes:
+                        attributes["rpubl:konsolideringsunderlag"] = []
+                    attributes["rpubl:konsolideringsunderlag"].append(r.identifier)
+                    post_count += 1
+                else:
+                    # get a anonymous (BNode) rdflib.Resource
+                    r = self.attributes_to_resource(attributes[k])
+                    del attributes[k]
+                    attributes[URIRef(k)] = r
+        assert baseuri
+        attributes["rpubl:konsoliderar"] = URIRef(baseuri)
+        resource = super(SFS, self).polish_metadata(attributes,
+                                                    infer_nodes=False)
         # Finally: the dcterms:issued property for this
         # rpubl:KonsolideradGrundforfattning isn't readily
         # available. The true value is only found by parsing PDF files
@@ -901,7 +911,7 @@ class SFS(Trips):
         # 1. if registry contains a single value (ie a
         # Grundforfattning that hasn't been amended yet), we can
         # assume that dcterms:issued == rpubl:utfardandedatum
-        if len(registry) == 1 and resource.value(RPUBL.utfardandedatum):
+        if post_count == 1 and resource.value(RPUBL.utfardandedatum):
             issued = resource.value(RPUBL.utfardandedatum)
         else:
             # 2. if the last post in registry contains a
@@ -916,28 +926,6 @@ class SFS(Trips):
             resource.graph.add((resource.identifier, DCTERMS.issued, issued))
         return resource
 
-    def infer_metadata(self, resource, basefile):
-        desc = Describer(resource.graph, resource.identifier)
-        # FIXME: should only be part of lagen.nu.SFS, and even then we
-        # can probably have the SameAs mixin class generate it for us.
-        if False:
-            rinfo_sameas = "http://rinfo.lagrummet.se/publ/sfs/%s/konsolidering/%d-%02d-%02d" % (
-                basefile.replace(" ", "_"), issued.year, issued.month, issued.day)
-            desc.rel(self.ns['owl'].sameAs, rinfo_sameas)
-
-        # FIXME: make this part of head metadata
-        desc.rel(self.ns['rpubl'].konsoliderar, self.canonical_uri(basefile))
-        de = DocumentEntry(self.store.documententry_path(basefile))
-
-        # FIXME: These should be added by lagen.nu.SFS 
-        desc.value(self.ns['rinfoex'].senastHamtad, de.orig_updated)
-        desc.value(self.ns['rinfoex'].senastKontrollerad, de.orig_checked)
-        # find any established abbreviation
-        grf_uri = self.canonical_uri(basefile)
-        v = self.commondata.value(URIRef(grf_uri),
-                                  self.ns['dcterms'].alternate, any=True)
-        if v:
-            desc.value(self.ns['dcterms'].alternate, v)
 
     def postprocess_doc(self, doc):
         # finally, combine data from the registry with any possible
@@ -958,6 +946,13 @@ class SFS(Trips):
         else:
             reg = Register(rubrik='Ändringar')
 
+        # remove the bogus dcterms:issued thing that we only added to
+        # aid URI generation
+        for o in doc.meta.objects(URIRef(doc.uri), DCTERMS.issued):
+            if not o.datatype:
+                doc.meta.remove((URIRef(doc.uri), DCTERMS.issued, o))
+
+
         # FIXME: should iterate over
         # doc.meta.resource(doc.identifier).values(RPUBL.konsolideringsunderlag)
         # instead
@@ -970,8 +965,8 @@ class SFS(Trips):
 #                rp.append(obs[uri])
         doc.body.append(reg)
 
-
     def _forfattningstyp(self, forfattningsrubrik):
+        forfattningsrubrik = re.sub(" *\(\d{4}:\d+\)", "", forfattningsrubrik)
         if (forfattningsrubrik.startswith('Lag ') or
             (forfattningsrubrik.endswith('lag') and
              not forfattningsrubrik.startswith('Förordning')) or

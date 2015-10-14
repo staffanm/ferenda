@@ -321,7 +321,7 @@ class Regeringen(SwedishLegalSource):
                     # as keys (not "ds" and "sou")
                     altlabel = doctype.upper() if doctype == "sou" else doctype.capitalize()
                     attribs["rpubl:utrSerie"] = self.lookup_resource(altlabel, SKOS.altLabel)
-                uri = self.minter.space.coin_uri(self.attributes_to_resource(attribs, for_self=False))
+                uri = self.minter.space.coin_uri(self.attributes_to_resource(attribs))
                 utgarFran.append(uri)
         return {'dcterms:title': title,
                 'dcterms:identifier': identifier,

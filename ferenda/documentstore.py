@@ -480,7 +480,8 @@ class DocumentStore(object):
         :returns: The full filesystem path
         :rtype:   str
         """
-        return self.path(basefile, 'entries', '.json', version, storage_policy="file")
+        return self.path(basefile, 'entries', '.json', version,
+                         storage_policy="file")
 
     def intermediate_path(self, basefile, version=None, attachment=None):
         """Get the full path for the main intermediate file for the given
@@ -497,7 +498,8 @@ class DocumentStore(object):
         """
         return self.path(basefile, 'intermediate', '.xml', version, attachment)
 
-    def open_intermediate(self, basefile, mode="r", version=None, attachment=None):
+    def open_intermediate(self, basefile, mode="r", version=None,
+                          attachment=None):
         """Opens files for reading and writing,
         c.f. :meth:`~ferenda.DocumentStore.open`. The parameters are
         the same as for

@@ -6,15 +6,21 @@ import re
 import shutil
 from datetime import datetime
 
+from rdflib.namespace import DCTERMS, OWL
+from ferenda.sources.legal.se import RINFOEX
+
 from ferenda import decorators, util
-from ferenda import TextReader, DocumentEntry
+from ferenda import TextReader, DocumentEntry, Describer
 from ferenda.sources.legal.se import SFS as OrigSFS
-from ferenda.sources.legal.se.sfs import Kapitel, Paragraf, Rubrik, Stycke, Listelement, Overgangsbestammelse, Bilaga, Avdelning
+from ferenda.sources.legal.se.elements import (Kapitel, Paragraf, Rubrik,
+                                               Stycke, Listelement,
+                                               Overgangsbestammelse, Bilaga,
+                                               Avdelning)
+from . import SameAs
 
-class SFS(OrigSFS):
 
+class SFS(OrigSFS, SameAs):
     # consider moving facets() and tabs() from OrigSFS to this
-
     ordinalpredicates = {
         Kapitel: "rpubl:kapitelnummer",
         Paragraf: "rpubl:paragrafnummer",
@@ -46,6 +52,27 @@ class SFS(OrigSFS):
         for i in range(1, 100):
             ret.append(makeimage("S%d" % i, "%d st." % i))
         return ret
+
+    def infer_metadata(self, resource, basefile):
+        super(SFS, self).infer_metadata(resource, basefile)
+        desc = Describer(resource.graph, resource.identifier)
+        # FIXME: should only be part of lagen.nu.SFS, and even then we
+        # can probably have the SameAs mixin class generate it for us.
+        if False:
+            rinfo_sameas = "http://rinfo.lagrummet.se/publ/sfs/%s/konsolidering/%d-%02d-%02d" % (
+                basefile.replace(" ", "_"), issued.year, issued.month, issued.day)
+            desc.rel(OWL.sameAs, rinfo_sameas)
+
+        de = DocumentEntry(self.store.documententry_path(basefile))
+        if de.orig_updated:
+            desc.value(RINFOEX.senastHamtad, de.orig_updated)
+        if de.orig_checked:
+            desc.value(RINFOEX.senastKontrollerad, de.orig_checked)
+        v = self.commondata.value(resource.identifier,
+                                  DCTERMS.alternate, any=True)
+        if v:
+            desc.value(DCTERMS.alternate, v)
+
 
     @decorators.action
     def importarchive(self, archivedir):

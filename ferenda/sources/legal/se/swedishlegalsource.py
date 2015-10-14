@@ -11,6 +11,7 @@ from bz2 import BZ2File
 
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
+from rdflib.resource import Resource
 from rdflib.namespace import DCTERMS, SKOS, FOAF
 from six import text_type as str
 import bs4
@@ -149,7 +150,7 @@ class SwedishLegalSource(DocumentRepository):
         else:
             return str(val)
 
-    def attributes_to_resource(self, attributes, for_self=True, infer_nodes=True):
+    def attributes_to_resource(self, attributes, infer_nodes=True):
         """Given a dict of metadata attributes for a document or
         fragment, create a RDF resource for that same thing. The RDF
         graph may contain multiple nodes if the thing is a document
@@ -167,16 +168,12 @@ class SwedishLegalSource(DocumentRepository):
                            CURIE strings and values are either plain
                            strings or rdflib.term.Identifier objects
         :type attributes: dict
-        :param for_self: Indicates that this is metadata for the document
-                         we're processing, not some other linked document.
-                         This results in the addition of some extra triples 
-                         to the resource (rdf:type and prov:wasGeneratedBy).
-        :type for_self: bool
-        :param infer_nodes: For certain attributes (pinpoint reference 
-                            fragments and consolidated legal acts), create 
-                            multiple nodes and infer relationships between them.
-                            This is needed for some of our URI minting rules as 
-                            expressed by COIN.
+        :param infer_nodes: For certain attributes (pinpoint reference
+                            fragments and consolidated legal acts),
+                            create multiple nodes and infer
+                            relationships between them.  This is
+                            needed for some of our URI minting rules
+                            as expressed by COIN.
         :type infer_nodes: bool
         :returns: The metadata in RDF form
         :rtype: rdflib.Resource
@@ -226,7 +223,6 @@ class SwedishLegalSource(DocumentRepository):
             del attributes["dcterms:issued"]
             g.add((current, rel, new))
             current = new
-            from pudb import set_trace; set_trace()
 
         for k, values in attributes.items():
             if ":" not in k:
@@ -234,25 +230,21 @@ class SwedishLegalSource(DocumentRepository):
             if not isinstance(values, list):
                 values = [values]
             for v in values:
-                if not isinstance(v, (URIRef, Literal)):
-                    self.log.warning("attributes_to_resources recieved naked str %s for %k, should be Literal or URIRef" % (v, k))
-                    v = Literal(v)
-                g.add((current, uri(k), v))
+                if isinstance(v, Resource):
+                    assert isinstance(k, URIRef)
+                    if isinstance(v.identifier, BNode):
+                        for p, o in v.graph.predicate_objects():
+                            g.add((k, p, o))
+                    else:
+                        g += v.graph
+                else:
+                    if not isinstance(v, (URIRef, Literal)):
+                        self.log.warning("attributes_to_resources recieved "
+                                         "naked str %s for %s, should be "
+                                         "Literal or URIRef" % (v, k))
+                        v = Literal(v)
+                    g.add((current, uri(k), v))
 
-        if for_self:  # this flag is sort of limited infer_nodes
-            # finally add triples that we can infer from class properties
-            # (is this a job for infer_metadata? But we need it,
-            # particularly the rdf:type data, beforehand)
-
-            # this is only valid when generating the resource for the
-            # document itself, but attributes_to_resource must be able to
-            # generate other resources
-            if not g.value(current, RDF.type):
-                raise ValueError("You should already have set the rdf:type when calling attributes_to_resource, you lazy slacker")
-                g.add((current, RDF.type, self.rdf_type))
-            # FIXME: this should probably be done in infer_metadata
-            g.add((current, PROV.wasGeneratedBy, Literal(
-                self.qualified_class_name())))
         return g.resource(b)
 
     def canonical_uri(self, basefile):
@@ -261,23 +253,24 @@ class SwedishLegalSource(DocumentRepository):
         return self.minter.space.coin_uri(resource)
 
     def metadata_from_basefile(self, basefile):
-        """Create a metadata dict with whatever we can infer from
-        a document basefile. The dict can be passed to 
+        """Create a metadata dict with whatever we can infer from a document
+        basefile. The dict can be passed to
         py:method:`attributes_to_resource`.
-        
+
         This method is intended to be overridden by every docrepo that has
         a clear transformation rule for metadata <-> basefile.
-        
+
         :param basefile: The doc we want to create metadata for
         :type basefile: str
         :returns: inferred metadata.
         :rtype: dict
+
         """
-        
-        year, ordinal = basefile.split(":")
-        return {'rpubl:arsutgava': year,
-                'rpubl:lopnummer': ordinal,
-                'rdf:type': self.rdf_type}
+
+        attribs = {'prov:wasGeneratedBy': self.qualified_class_name()}
+        if isinstance(self.rdf_type, URIRef):
+            attribs['rdf:type'] = self.rdf_type
+        return attribs
 
     def sanitize_basefile(self, basefile):
         """Given a basefile (typically during the download stage), 
@@ -346,8 +339,6 @@ class SwedishLegalSource(DocumentRepository):
 
         """
         fp = self.parse_open(doc.basefile)
-        from devtools import *
-        from pudb import set_trace; set_trace()
         resource = self.parse_metadata(fp, doc.basefile)
         doc.meta = resource.graph
         doc.uri = str(resource.identifier)
@@ -448,10 +439,10 @@ class SwedishLegalSource(DocumentRepository):
         """Given the document metadata returned by extract_head, extract all
         metadata about the document as such in a flat dict where keys are
         CURIEs and values are strings (or possibly a list of strings)."""
-        soup = rawhead
-        return {'dcterms:title': soup.find("title").string,
-                'dcterms:identifier': basefile,
-                'rdf:type': self.rdf_type}
+        attribs = self.metadata_from_basefile(basefile)
+        if (isinstance(rawhead, bs4.BeautifulSoup) and
+            'dcterms:title' not in attribs):
+            attribs["dcterms:title"] = soup.find("title").string,
 
     def sanitize_metadata(self, attribs, basefile):
         """Given a dict with unprocessed metadata, run various sanitizing
@@ -473,7 +464,7 @@ class SwedishLegalSource(DocumentRepository):
 
     def polish_metadata(self, attribs, infer_nodes=True):
         """Given a sanitized flat dict of metadata for a document, return a
-        rdflib.Resource version of the same.
+        rdflib.Resource version of the same. 
 
         """ 
 
@@ -677,6 +668,7 @@ class SwedishLegalSource(DocumentRepository):
         # Lagen.nu specific subclasses (ie classes that mints
         # lagen.nu-owned URIs) should inherit this and create suitable
         # owl:sameAs semantics
+        super(SwedishLegalSource, self).infer_metadata(resource, basefile)
         d = Describer(resource.graph, resource.identifier)
         if not resource.value(DCTERMS.identifier):
             identifier = self.infer_identifier(basefile)
