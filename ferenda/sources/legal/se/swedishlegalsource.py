@@ -328,7 +328,7 @@ class SwedishLegalSource(DocumentRepository):
             get_parser(basefile) -> callable
             tokenize(object) -> iterable
             callable(iterable) -> elements.Body
-            visitor_functions() -> callables
+            visitor_functions(basefile) -> callables
             visit_node(elements.Body, callable, state) -> state
                 callable(elements.CompoundElement, state) -> state
         postprocess_doc(doc)
@@ -525,7 +525,7 @@ class SwedishLegalSource(DocumentRepository):
             resource.graph.add((uri, p, o))
         return resource.graph.resource(uri)
 
-    def visitor_functions(self):
+    def visitor_functions(self, basefile):
         """Returns a list of (callables, initialstate) tuples that can operate
         on a single document node and a (function-dependent) state
         object. These functions are automatically run on each document
