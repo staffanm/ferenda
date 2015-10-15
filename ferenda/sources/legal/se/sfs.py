@@ -540,14 +540,10 @@ class SFS(Trips):
         return res
 
     def metadata_from_basefile(self, basefile):
-        """Construct the basic attributes, in dict form, for a given SFS, eg
+        """Construct the basic attributes, in dict form, for a given
+        consolidated SFS.
 
-       '1998:204' => {'rinfo:arsutgava': '1984',
-                      'rinfo:lopnummer': '204',
-                      'rinfo:forfattningssamling':
-                       URIRef("http://rinfo.lagrummet.se/serie/fs/sfs")}
         """
-        # maybe
         attribs = super(SFS, self).metadata_from_basefile(basefile)
         attribs["dcterms:publisher"] = "Regeringskansliet"
         return attribs

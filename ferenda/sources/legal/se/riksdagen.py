@@ -246,6 +246,12 @@ class Riksdagen(FixedLayoutSource):
                                   keep_xml=keep_xml,
                                   ocr_lang="swe")
 
+    def metadata_from_basefile(self, basefile):
+        a = super(Riksdagen, self).metadata_from_basefile(basefile)
+        a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
+        return a
+    
+
     def extract_head(self, fp, basefile):
         # fp will point to the pdf2html output -- we need to open the
         # XML file instead
