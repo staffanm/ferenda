@@ -6,8 +6,9 @@ import re
 import shutil
 from datetime import datetime
 
+from rdflib import URIRef
 from rdflib.namespace import DCTERMS, OWL
-from ferenda.sources.legal.se import RINFOEX
+from ferenda.sources.legal.se import RPUBL, RINFOEX
 
 from ferenda import decorators, util
 from ferenda import TextReader, DocumentEntry, Describer
@@ -54,15 +55,14 @@ class SFS(OrigSFS, SameAs):
         return ret
 
     def infer_metadata(self, resource, basefile):
-        super(SFS, self).infer_metadata(resource, basefile)
+        sameas_uri = self.sameas_minter.space.coin_uri(resource)
+        resource.add(OWL.sameAs, URIRef(sameas_uri))
+        # then find each rpubl:konsolideringsunderlag, and create
+        # owl:sameas for them as well
+        for subresource in resource.objects(RPUBL.konsolideringsunderlag):
+            uri = self.sameas_minter.space.coin_uri(subresource)
+            subresource.add(OWL.sameAs, URIRef(uri))
         desc = Describer(resource.graph, resource.identifier)
-        # FIXME: should only be part of lagen.nu.SFS, and even then we
-        # can probably have the SameAs mixin class generate it for us.
-        if False:
-            rinfo_sameas = "http://rinfo.lagrummet.se/publ/sfs/%s/konsolidering/%d-%02d-%02d" % (
-                basefile.replace(" ", "_"), issued.year, issued.month, issued.day)
-            desc.rel(OWL.sameAs, rinfo_sameas)
-
         de = DocumentEntry(self.store.documententry_path(basefile))
         if de.orig_updated:
             desc.value(RINFOEX.senastHamtad, de.orig_updated)
@@ -164,3 +164,5 @@ class SFS(OrigSFS, SameAs):
 
         self.log.info("Extracted %s current versions and %s archived versions" % (current, archived))
     
+
+            

@@ -55,7 +55,7 @@
     rpubl:forarbete <https://lagen.nu/bet/2012/13:JuU22>,
         <https://lagen.nu/prop/2012/13:115>,
         <https://lagen.nu/rskr/2012/13:252> ;
-    rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/sfs> ;
+    rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
     rpubl:genomforDirektiv <https://lagen.nu/ext/celex/31995L0046> ;
     rpubl:ikrafttradandedatum "2013-07-01"^^xsd:date ;
     rpubl:lopnummer "460" ;

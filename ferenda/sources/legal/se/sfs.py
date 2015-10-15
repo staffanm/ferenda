@@ -1,10 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, print_function
 
-"""Hanterar (konsoliderade) författningar i SFS från Regeringskansliet
-rättsdatabaser. 
-"""
-
 # system libraries (+ six)
 from collections import defaultdict
 from datetime import datetime, date
@@ -660,9 +656,13 @@ class SFS(Trips):
             docuri = self.canonical_uri(sfsnr)
             rowdict = {}
             parts = sfsnr.split(":")
-            d[docuri] = {"rpubl:arsutgava": parts[0],
-                         "rpubl:lopnummer": parts[1],
-                         "rpubl:forfattningssamling": "SFS"}
+            d[docuri] = {
+                "dcterms:publisher": "Regeringskansliet",
+                "rpubl:arsutgava": parts[0],
+                "rpubl:beslutadAv": "Regeringskansliet",
+                "rpubl:forfattningssamling": "SFS",
+                "rpubl:lopnummer": parts[1]
+            }
                          # URIRef(self.lookup_resource("SFS", SKOS.altLabel))}
             g = self.make_graph()  # used for qname lookup only
             for row in table('tr'):
@@ -763,7 +763,9 @@ class SFS(Trips):
                     for node in self.forarbete_parser.parse_string(val,
                                                                    "rpubl:forarbete"):
                         if hasattr(node, 'uri'):
-                            d[docuri]["rpubl:forarbete"] = node.uri
+                            if "rpubl:forarbete" not in d[docuri]:
+                                d[docuri]["rpubl:forarbete"] = []
+                            d[docuri]["rpubl:forarbete"].append(node.uri)
                             d[node.uri] = {"dcterms:identifier": str(node)}
                 elif key == 'CELEX-nr':
                     for celex in re.findall('3\d{2,4}[LR]\d{4}', val):
@@ -856,9 +858,9 @@ class SFS(Trips):
 
     def sanitize_metadata(self, attribs, basefile):
         attribs = super(SFS, self).sanitize_metadata(attribs, basefile)
-        if 'dcterms:creator' in attribs:
-            attribs['dcterms:creator'] = self.sanitize_departement(
-                attribs['dcterms:creator'])
+        for k in "dcterms:creator", "rpubl:departement":
+            if k in attribs:
+                attribs[k] = self.sanitize_departement(attribs[k])
         return attribs
 
     def sanitize_departement(self, val):
@@ -1019,11 +1021,14 @@ class SFS(Trips):
     }
 
     def construct_id(self, node, state):
-        # copy our state (shouldn't use nested dicts)
+        # copy our state (no need for copy.deepcopy as state shouldn't
+        # use nested dicts)
         state = dict(state)
         if isinstance(node, Forfattning):
             attributes = self.metadata_from_basefile(state['basefile'])
             state.update(attributes)
+            state["rpubl:arsutgava"], state["rpubl:lopnummer"] = state["basefile"].split(":", 1)
+            state["rpubl:forfattningssamling"] = self.lookup_resource("SFS", SKOS.altLabel)
         if self.ordinalpredicates.get(node.__class__):  # could be a qname?
             if hasattr(node, 'ordinal') and node.ordinal:
                 ordinal = node.ordinal
@@ -1042,13 +1047,14 @@ class SFS(Trips):
             # can be nested. In order to avoid overwriting a toplevel
             # Listelement with the ordinal from a sub-Listelement, we
             # make up some extra RDF predicates that our URISpace
-            # definition knows how to handle. NB: That def doesn't support
-            # a nesting of arbitrary depth, but this should not be a
-            # problem in practice.
+            # definition knows how to handle. NB: That def doesn't
+            # support a nesting of arbitrary depth, but this should
+            # not be a problem in practice.
             ordinalpredicate = self.ordinalpredicates.get(node.__class__)
             if ordinalpredicate == "rinfoex:punktnummer":
                 while ordinalpredicate in state:
-                    ordinalpredicate = "rinfoex:sub" + ordinalpredicate.split(":")[1]
+                    ordinalpredicate = ("rinfoex:sub" +
+                                        ordinalpredicate.split(":")[1])
             state[ordinalpredicate] = ordinal
             del state['parent']
             for skip, ifpresent in self.skipfragments:
@@ -1061,6 +1067,7 @@ class SFS(Trips):
                 if "#" in uri:
                     node.id = uri.split("#", 1)[1]
             except Exception:
+                self.log.warning("Couldn't mint URI for %s" % type(node))
                 pass
         state['parent'] = node
         return state

@@ -469,34 +469,50 @@ class SwedishLegalSource(DocumentRepository):
         """ 
 
         # even though our attributes are sanitized, plain-str objects
-        # might need some tuning.
+        # might need conversion (language-tagged literals, typed
+        # literals, lookups from a label to a URIRef...)
         for k in attribs:
-            # since isinstance(rdflib.Literal, str) == True, we need a
-            # more specific check to see if we need to "upgrade"
-            if not type(k) == str:
+            islist = isinstance(attribs[k], (list, tuple))
+            if islist:
+                values = attribs[k]
+            else:
+                values = [attribs[k]]
+            if not type(values[0]) == str:
                 continue
-            if k in ("dcterms:title", "dcterms:abstract"):
-                attribs[k] = Literal(attribs[k], lang=self.lang)
-            elif k in ("dcterms:issued", "rpubl:avgorandedatum",
-                       "rpubl:utfardandedatum"):
-                if isinstance(attribs[k], date):
-                    pass
-                elif re.match("\d{4}-\d{2}-\d{2}", attribs[k]):
-                    # iso8859-1 date (no time portion)
-                    dt = datetime.strptime(attribs[k], "%Y-%m-%d")
-                    attribs[k] = Literal(date(dt.year, dt.month, dt.day))
+            result = []
+            for value in values:
+                if k in ("dcterms:title", "dcterms:abstract"):
+                    result.append(Literal(value, lang=self.lang))
+                elif k in ("dcterms:issued", "rpubl:avgorandedatum",
+                           "rpubl:utfardandedatum", "rpubl:ikrafttradandedatum"):
+                    if re.match("\d{4}-\d{2}-\d{2}", value):
+                        # iso8859-1 date (no time portion)
+                        dt = datetime.strptime(value, "%Y-%m-%d")
+                        result.append(Literal(date(dt.year, dt.month, dt.day)))
+                    else:
+                        try:
+                            # assume something that parse_swedish_date handles
+                            dt = self.parse_swedish_date(value)
+                            result.append(Literal(dt))
+                        except ValueError:
+                            # parse_swedish_date failed, pass as-is
+                            result.append(Literal(value))
+                elif k in ("rpubl:forarbete", "rpubl:genomforDirektiv"):
+                    result.append(URIRef(value))
+                elif k in ("dcterms:creator", "dcterms:publisher",
+                           "rpubl:beslutadAv", "rpubl:departement"):
+                    result.append(self.lookup_resource(value))
+                elif k in ("rpubl:forfattningssamling"):
+                    result.append(self.lookup_resource(value, SKOS.altLabel))
                 else:
-                    try:
-                        # assume something that parse_swedish_date handles
-                        dt = self.parse_swedish_date(attribs[k])
-                        attribs[k] = Literal(dt)
-                    except ValueError: # parse_swedish_date failed, pass as-is
-                        attribs[k] = Literal(attribs[k])
-            elif k in ("dcterms:creator", "dcterms:publisher",
-                       "rpubl:beslutadAv"):
-                attribs[k] = self.lookup_resource(attribs[k])
-            elif k in ("rpubl:forfattningssamling"):
-                attribs[k] = self.lookup_resource(attribs[k], SKOS.altLabel)
+                    # the default: just create a plain string literal
+                    result.append(Literal(value))
+            if islist:
+                attribs[k] = result
+            else:
+                assert len(result) == 1, "attribs[%s] returned %s results" % (k, len(result))
+                attribs[k] = result[0]
+            
         resource = self.attributes_to_resource(attribs, infer_nodes=infer_nodes)
         uri = URIRef(self.minter.space.coin_uri(resource))
         # now that we know the document URI (didn't we already know it

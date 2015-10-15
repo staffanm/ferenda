@@ -52,6 +52,8 @@ class SameAs(object):
         if hasattr(sup, 'infer_metadata'):
             resource = super(SameAs, self).infer_metadata(resource, basefile)
         try:
+            # since the resource is <main> rpubl:konsoliderar <sfs>,
+            # and <sfs> is a URIRef not a BNode, this will fail
             sameas_uri = self.sameas_minter.space.coin_uri(resource)
             resource.add(OWL.sameAs, URIRef(sameas_uri))
         except ValueError as e:

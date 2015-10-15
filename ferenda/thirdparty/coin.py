@@ -172,11 +172,10 @@ class Template:
     def get_base(self, resource):
         base = self.space.base
         def guarded_base(b):
-            if isinstance(b.identifier, URIRef):
-                s = str(b.identifier)
-                if s.startswith(base):
-                    return s
-            elif isinstance(b.identifier, BNode):
+            s = str(b.identifier)
+            if isinstance(b.identifier, URIRef) and s.startswith(base):
+                return s
+            elif isinstance(b.identifier, (BNode, URIRef)):
                 # try to recursively mint a URI for this other subject
                 try:
                     return self.space.coin_uri(b)
