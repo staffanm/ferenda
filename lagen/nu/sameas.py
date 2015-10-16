@@ -50,7 +50,7 @@ class SameAs(object):
     def infer_metadata(self, resource, basefile):
         sup = super(SameAs, self)
         if hasattr(sup, 'infer_metadata'):
-            resource = super(SameAs, self).infer_metadata(resource, basefile)
+            sup.infer_metadata(resource, basefile)
         try:
             # since the resource is <main> rpubl:konsoliderar <sfs>,
             # and <sfs> is a URIRef not a BNode, this will fail

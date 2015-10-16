@@ -258,6 +258,11 @@ class Regeringen(SwedishLegalSource):
 
         return updated or pdfupdated
 
+    def metadata_from_basefile(self, basefile):
+        a = super(Regeringen, self).metadata_from_basefile(basefile)
+        a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
+        return a
+
     def extract_head(self, fp, basefile):
         parser = 'lxml'
         soup = BeautifulSoup(fp.read(), parser)
@@ -323,13 +328,15 @@ class Regeringen(SwedishLegalSource):
                     attribs["rpubl:utrSerie"] = self.lookup_resource(altlabel, SKOS.altLabel)
                 uri = self.minter.space.coin_uri(self.attributes_to_resource(attribs))
                 utgarFran.append(uri)
-        return {'dcterms:title': title,
-                'dcterms:identifier': identifier,
-                'dcterms:issued': utgiven,
-                'dcterms:abstract': sammanfattning,
-                'rpubl:utgarFran': utgarFran,
-                'rpubl:departement': ansvarig
-        }
+        a = self.metadata_from_basefile(basefile)
+        a.update({'dcterms:title': title,
+                  'dcterms:identifier': identifier,
+                  'dcterms:issued': utgiven,
+                  'dcterms:abstract': sammanfattning,
+                  'rpubl:utgarFran': utgarFran,
+                  'rpubl:departement': ansvarig
+        })
+        return a
 
     def sanitize_metadata(self, a, basefile):
         # trim space
@@ -346,9 +353,6 @@ class Regeringen(SwedishLegalSource):
             a["rpubl:utgarFran"] = [URIRef(x) for x in a["rpubl:utgarFran"]]
         else:
             del a["rpubl:utgarFran"]
-        a["rdf:type"] = self.rdf_type
-        # split basefile into rpubl:arsutgava + rpubl:lopnummer
-        a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":")
 
         # FIXME: possibly derive utrSerie from self.document_type?
         if self.rdf_type == RPUBL.Utredningsbetankande:

@@ -30,6 +30,7 @@ import subprocess
 import sys
 import tempfile
 import traceback
+import warnings
 
 from six import text_type as str
 from six.moves import configparser
@@ -79,7 +80,6 @@ def makeresources(repos,
     :returns: All created/copied css, js and resources.xml files
     :rtype: dict of lists
     """
-    import warnings
     warnings.warn("manager.makeresources is deprecated; "
                   "use ferenda.Resources().make() instead")
     return Resources(repos, resourcedir,
@@ -222,7 +222,6 @@ def make_wsgi_app(inifile=None, **kwargs):
     :rtype: callable
 
     """
-    import warnings
     warnings.warn("manager.make_wsgi_app is deprecated; "
                   "use ferenda.WSGIApp() instead")
     if inifile:

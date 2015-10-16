@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 import os
@@ -8,6 +9,7 @@ import codecs
 import tempfile
 from glob import glob
 from bz2 import BZ2File
+import warnings
 
 from lxml import etree
 from lxml.builder import ElementMaker
@@ -303,7 +305,6 @@ class PDFReader(CompoundElement):
 
     def _parse_hocr(self, fp, dummy=None):
         if dummy:
-            import warnings
             warnings.warn("filenames passed to _parse_xml are now ignored", DeprecationWarning)
         def dimensions(s):
             m = self.re_dimensions(s)
@@ -383,7 +384,6 @@ class PDFReader(CompoundElement):
     def _parse_xml(self, xmlfp, dummy=None):
         filename = xmlfp.name
         if dummy:
-            import warnings
             warnings.warn("filenames passed to _parse_xml are now ignored", DeprecationWarning)
         def txt(element_text):
             return re.sub(r"[\s\xa0\xc2]+", " ", str(element_text))

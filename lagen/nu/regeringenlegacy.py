@@ -111,18 +111,18 @@ class RegeringenLegacy(Regeringen):
                 r = urljoin("http://www.regeringen.se/", link["href"])
                 seealso.append(URIRef(r))
 
-
-        ret = {'dcterms:title': title,
-               'dcterms:identifier': identifier,
-               'dcterms:issued': utgiven,
-               'rpubl:utgarFran': utgarFran,
-               'rpubl:departement': ansvarig,
-               "rdfs:seeAlso": seealso
-        }
+        a = self.metadata_from_basefile(basefile)
+        a.update({'dcterms:title': title,
+                  'dcterms:identifier': identifier,
+                  'dcterms:issued': utgiven,
+                  'rpubl:utgarFran': utgarFran,
+                  'rpubl:departement': ansvarig
+        })
+        if seealso:
+            a["rdfs:seeAlso"] = seealso
         if sammanfattning:
-            ret['dcterms:abstract'] = sammanfattning
-
-        return ret
+            a['dcterms:abstract'] = sammanfattning
+        return a
     
     
     def find_pdf_links(self, soup, basefile):

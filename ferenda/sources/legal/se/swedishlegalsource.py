@@ -7,6 +7,7 @@ from datetime import datetime, date
 import re
 import os
 import itertools
+import warnings
 from bz2 import BZ2File
 
 from layeredconfig import LayeredConfig, Defaults
@@ -239,9 +240,9 @@ class SwedishLegalSource(DocumentRepository):
                         g += v.graph
                 else:
                     if not isinstance(v, (URIRef, Literal)):
-                        self.log.warning("attributes_to_resources recieved "
-                                         "naked str %s for %s, should be "
-                                         "Literal or URIRef" % (v, k))
+                        # self.log.warning("attributes_to_resources recieved "
+                        #                  "naked str %s for %s, should be "
+                        #                  "Literal or URIRef" % (v, k))
                         v = Literal(v)
                     g.add((current, uri(k), v))
 
@@ -684,7 +685,9 @@ class SwedishLegalSource(DocumentRepository):
         # Lagen.nu specific subclasses (ie classes that mints
         # lagen.nu-owned URIs) should inherit this and create suitable
         # owl:sameAs semantics
-        super(SwedishLegalSource, self).infer_metadata(resource, basefile)
+        sup = super(SwedishLegalSource, self)
+        if hasattr(sup, 'infer_metadata'):
+            sup.infer_metadata(resource, basefile)
         d = Describer(resource.graph, resource.identifier)
         if not resource.value(DCTERMS.identifier):
             identifier = self.infer_identifier(basefile)

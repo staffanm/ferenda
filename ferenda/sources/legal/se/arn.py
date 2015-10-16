@@ -53,10 +53,11 @@ class ARN(FixedLayoutSource):
     storage_policy = "dir"
 
     def metadata_from_basefile(self, basefile):
-        return {'rpubl:diarienummer': basefile,
-                'rdf:type': self.rdf_type,
-                'dcterms:publisher': self.lookup_resource(
-                    'Allmänna reklamationsnämnden')}
+        attribs = super(ARN, self).metadata_from_basefile(basefile)
+        attribs["rpubl:diarienummer"] = basefile
+        attribs["dcterms:publisher"] = self.lookup_resource(
+                    'Allmänna reklamationsnämnden')
+        return attribs
 
     @recordlastdownload
     def download(self, basefile=None):
@@ -210,22 +211,25 @@ class ARN(FixedLayoutSource):
         fragment = self.store.downloaded_path(basefile, attachment="fragment.html")
         return BeautifulSoup(util.readfile(fragment, encoding="utf-8"), "lxml")
 
+
     def extract_metadata(self, soup, basefile):
+        d = self.metadata_from_basefile(basefile)
         def nextcell(key):
             cell = soup.find(text=key)
             if cell:
                 return cell.find_parent("td").find_next_sibling("td").get_text().strip()
             else:
                 raise KeyError("Could not find cell key %s" % key)
-        return {'dcterms:identifier': "ARN %s" % basefile,
-                'dcterms:publisher': self.lookup_resource('Allmänna reklamationsnämnden'),
-                'rpubl:arendenummer': nextcell("Änr"),
-                'rpubl:diarienummer': nextcell("Änr"),
-                'rpubl:avgorandedatum': nextcell("Avgörande"),
-                'dcterms:subject': Literal(nextcell("Avdelning"), lang="sv"),
-                'dcterms:title': soup.table.find_all("tr")[3].get_text(),
-                'dcterms:issued': nextcell("Avgörande")
-                }
+        d.update({'dcterms:identifier': "ARN %s" % basefile,
+                  'rpubl:arendenummer': nextcell("Änr"),
+                  'rpubl:diarienummer': nextcell("Änr"),
+                  'rpubl:avgorandedatum': nextcell("Avgörande"),
+                  'dcterms:subject': Literal(nextcell("Avdelning"), lang="sv"),
+                  'dcterms:title': soup.table.find_all("tr")[3].get_text(),
+                  'dcterms:issued': nextcell("Avgörande")
+        })
+        assert d["rpubl:diarienummer"] == basefile, "Doc metadata differs from basefile"
+        return d
 
     def sanitize_metadata(self, attribs, basefile):
         attribs['dcterms:title'] = Literal(

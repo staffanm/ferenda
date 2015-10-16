@@ -16,17 +16,13 @@ from rdflib.namespace import DCTERMS, XSD
 import requests
 from six import text_type as str
 
-from . import SwedishLegalSource, SwedishLegalStore, SwedishCitationParser, FixedLayoutSource, Trips, Regeringen, RPUBL
-from .legalref import LegalRef
-from .swedishlegalsource import offtryck_parser, offtryck_gluefunc
-from ferenda import Describer
-from ferenda import PDFDocumentRepository, PDFReader
-from ferenda.pdfreader import StreamingPDFReader  # experimental
+from . import (SwedishLegalSource, SwedishLegalStore, FixedLayoutSource,
+               Trips, Regeringen, RPUBL)
 from ferenda import CompositeRepository, CompositeStore
 from ferenda import TextReader
 from ferenda import util
 from ferenda import PDFAnalyzer
-from ferenda.decorators import managedparsing, downloadmax, recordlastdownload
+from ferenda.decorators import downloadmax, recordlastdownload
 from ferenda.elements import Body, Heading, ListItem, Paragraph
 from ferenda.errors import DocumentRemovedError
 
@@ -44,7 +40,8 @@ class DirAnalyzer(PDFAnalyzer):
 
         # title style: the 2nd largest style on the frontpage
         if frontmatter_styles:
-            ts = sorted(frontmatter_styles.keys(), key=self.fontsize_key, reverse=True)[1]
+            ts = sorted(frontmatter_styles.keys(), key=self.fontsize_key,
+                        reverse=True)[1]
             styledefs['title'] = self.fontdict(ts)
 
         # h1 - h2: the two styles just larger than ds (normally set in the
@@ -319,6 +316,11 @@ class DirAsp(FixedLayoutSource):
         yy = int(basefile[2:4])
         num = int(basefile[5:])
         return self.document_url % {'yy': yy, 'num': num}
+
+    def metadata_from_basefile(self, basefile):
+        a = super(DirAsp, self).metadata_from_basefile(basefile)
+        a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
+        return a
 
     def infer_identifier(self, basefile):
         return "Dir %s" % basefile

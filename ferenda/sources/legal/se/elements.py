@@ -256,7 +256,7 @@ class Tillagg(DomElement):
 class Endmeta(DomElement):
     pass
 
-class Sektion(CompoundElement):
+class AnonSektion(CompoundElement):
     tagname = "div"
 
 class Abstract(CompoundElement):

@@ -42,9 +42,11 @@ class JO(FixedLayoutSource):
     downloaded_suffix = ".pdf" 
 
     def metadata_from_basefile(self, basefile):
-        return {'rpubl:diarienummer': basefile,
-                'dcterms:publisher': self.lookup_resource("JO", SKOS.altLabel),
-                'rdf:type': self.rdf_type}
+        attribs = super(JO, self).metadata_from_basefile(basefile)
+        attribs["rpubl:diarienummer"] = basefile
+        attribs["dcterms:publisher"] = self.lookup_resource(
+                    'JO', SKOS.altLabel)
+        return attribs
 
     @decorators.action
     @decorators.recordlastdownload

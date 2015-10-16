@@ -594,7 +594,6 @@ class DV(SwedishLegalSource):
             self.filetype = filetype
         return self.patch_if_needed(fp, basefile)
 
-
     def downloaded_to_intermediate(self, basefile):
         docfile = self.store.downloaded_path(basefile)
         intermediatefile = self.store.intermediate_path(basefile)
@@ -616,31 +615,26 @@ class DV(SwedishLegalSource):
         self.filetype = filetype
         return fp
 
-
     def extract_head(self, fp, basefile):
         filetype = self.filetype
-        patchedtext = fp.read()
+        patched = fp.read()
         # rawhead is a simple dict that we'll later transform into a
         # rdflib Graph. rawbody is a list of plaintext strings, each
         # representing a paragraph.
         if "not" in basefile:
-            rawhead, rawbody = self.parse_not(patchedtext, basefile, filetype)
+            rawhead, rawbody = self.parse_not(patched, basefile, filetype)
         elif filetype == "docx":
-            rawhead, rawbody = self.parse_ooxml(patchedtext, basefile)
+            rawhead, rawbody = self.parse_ooxml(patched, basefile)
         else:
-            rawhead, rawbody = self.parse_antiword_docbook(patchedtext, basefile)
-
+            rawhead, rawbody = self.parse_antiword_docbook(patched, basefile)
         # stash the body away for later reference
         self._rawbody = rawbody
         return rawhead
 
-                     
     def extract_metadata(self, rawhead, basefile):
         # we have already done all the extracting in extract_head
         return rawhead
 
-
-    
     def parse_entry_title(self, doc):
         # FIXME: The primary use for entry.title is to generate
         # feeds. Should we construct a feed-friendly title here

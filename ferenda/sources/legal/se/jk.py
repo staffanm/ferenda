@@ -79,9 +79,11 @@ class JK(SwedishLegalSource):
 
 
     def metadata_from_basefile(self, basefile):
-        return {'rpubl:diarienummer': basefile,
-                'dcterms:publisher': self.lookup_resource("JK", SKOS.altLabel),
-                'rdf:type': self.rdf_type}
+        attribs = super(JK, self).metadata_from_basefile(basefile)
+        attribs["rpubl:diarienummer"] = basefile
+        attribs["dcterms:publisher"] = self.lookup_resource(
+                    'JK', SKOS.altLabel)
+        return attribs
 
     def extract_head(self, fp, basefile):
         return BeautifulSoup(fp.read(), "lxml")
@@ -92,12 +94,13 @@ class JK(SwedishLegalSource):
                                  text="Beslutsdatum").find_next_sibling("span").get_text()
         diarienummer = soup.find("span", class_="label",
                                  text="Diarienummer").find_next_sibling("span").get_text()
-        return {"dcterms:title": title,
-                "dcterms:publisher": self.lookup_resource("JK", SKOS.altLabel),
-                "rpubl:beslutsdatum": beslutsdatum,
-                "rpubl:diarienummer": diarienummer,
-                "dcterms:identifier": "JK %s" % diarienummer
-        }
+        a = self.metadata_from_basefile(basefile)
+        a.update({"dcterms:title": title,
+                  "dcterms:publisher": self.lookup_resource("JK", SKOS.altLabel),
+                  "rpubl:beslutsdatum": beslutsdatum,
+                  "rpubl:diarienummer": diarienummer,
+                  "dcterms:identifier": "JK %s" % diarienummer})
+        return a
     
     def extract_body(self, fp, basefile):
         # NB: extract_head already did this (so the fp will have been
@@ -137,17 +140,17 @@ class JK(SwedishLegalSource):
 
         @newstate('section')
         def make_section(parser):
-            s = Sektion(title=parser.reader.next().get_text())
+            s = AnonSektion(title=parser.reader.next().get_text())
             return parser.make_children(s)
 
         @newstate('subsection')
         def make_subsection(parser):
-            s = Sektion(title=parser.reader.next().get_text())
+            s = AnonSektion(title=parser.reader.next().get_text())
             return parser.make_children(s)
 
         @newstate('subsubsection')
         def make_subsubsection(parser):
-            s = Sektion(title=parser.reader.next().get_text())
+            s = AnonSektion(title=parser.reader.next().get_text())
             return parser.make_children(s)
 
         def make_paragraph(parser):
