@@ -78,7 +78,7 @@ class DirTrips(Trips):
         if basefile:
             return super(DirTrips, self).download(basefile)
         else:
-            if self.config.lastdownload and not self.config.refresh:
+            if 'lastdownload' in self.config and self.config.lastdownload and not self.config.refresh:
                 startdate = self.config.lastdownload - timedelta(days=30)
                 self.start_url += "&UDAT=%s+till+%s" % (
                     datetime.strftime(startdate, "%Y-%m-%d"),
@@ -272,8 +272,13 @@ class DirAsp(FixedLayoutSource):
 
     """Downloads Direktiv in PDF format from http://rkrattsdb.gov.se/kompdf/"""
     alias = "dirasp"
-    start_url = "http://rkrattsdb.gov.se/kompdf/search.asp"
-    document_url = "http://62.95.69.24/KOMdoc/%(yy)02d/%(yy)02d%(num)04d.PDF"
+    # FIXME: these url should start with http://rkrattsdb.gov.se/, but
+    # on at least some systems we have some IPv4/IPv6 problems with
+    # that URI similar to what required the config.ipbasedurls option
+    # in trips.py -- maybe we need something similar here (or fix our
+    # systems at a lower level...)
+    start_url = "http://193.188.157.100/kompdf/search.asp"
+    document_url = "http://193.188.157.100/KOMdoc/%(yy)02d/%(yy)02d%(num)04d.PDF"
     source_encoding = "iso-8859-1"
     rdf_type = RPUBL.Kommittedirektiv
     storage_policy = "dir"

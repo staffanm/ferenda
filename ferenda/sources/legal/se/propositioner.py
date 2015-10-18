@@ -98,6 +98,7 @@ class PropTrips(Trips, FixedLayoutSource):
                         self).download()  # download_get_basefiles_page sets lastbase as it goes along
             else:
                 r = super(PropTrips, self).download()
+            self.config.lastbase = self._prev_base(self.config.lastbase)
             LayeredConfig.write(self.config)      # assume we have data to write
             return r
 
@@ -105,6 +106,18 @@ class PropTrips(Trips, FixedLayoutSource):
         # 1992/93:23 -> "PROPARKIV9293"
         # 1999/2000:23 -> "PROPARKIV9900"
         (y1, y2, idx) = re.split("[:/]", basefile)
+        return "PROPARKIV%02d%02d" % (int(y1) % 100, int(y2) % 100)
+
+    def _next_base(self, base):
+        # "PROPARKIV9293" -> "PROPARKIV9394"
+        # "PROPARKIV9899" -> "PROPARKIV9900"
+        y1, y2 = int(base[-4:-2]) + 1, int(base[-2:]) + 1
+        return "PROPARKIV%02d%02d" % (int(y1) % 100, int(y2) % 100)
+
+    def _prev_base(self, base):
+        # "PROPARKIV9394" -> "PROPARKIV9293"
+        # "PROPARKIV9900" -> "PROPARKIV9899"
+        y1, y2 = int(base[-4:-2]) - 1, int(base[-2:]) - 1
         return "PROPARKIV%02d%02d" % (int(y1) % 100, int(y2) % 100)
 
     def download_get_basefiles_page(self, pagetree):
@@ -161,6 +174,11 @@ class PropTrips(Trips, FixedLayoutSource):
         for element, attribute, link, pos in pagetree.iterlinks():
             if element.text and element.text.strip() == "Fler poster":
                 nextpage = link
+
+        if nextpage is None:
+            b = self._next_base(self.config.lastbase)
+            self.log.info("Advancing lastbase from %s to %s" % (self.config.lastbase, b))
+            self.config.lastbase = b
         raise NoMoreLinks(nextpage)
 
     document_url_template = ("http://rkrattsbaser.gov.se/cgi-bin/thw?"
