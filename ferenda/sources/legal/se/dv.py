@@ -1783,7 +1783,15 @@ class DV(SwedishLegalSource):
                 # Ugly hack: mangle the statestack so that *next time*
                 # we encounter a is_domskal, we pop the statestack,
                 # but for now we push to it.
-                statestack[statestack.index('betankande')] = "__done__"
+
+                # FIXME: This made TestDV.test_parse_HDO_O2668_07 fail
+                # since is_dom wasn't amongst the possible recognizers
+                # when "HD (...) fattade slutligt beslut i enlighet
+                # [...]" was up. I don't know if this logic is needed
+                # anymore, but removing it does not cause test
+                # failures.
+                
+                # statestack[statestack.index('betankande')] = "__done__"
                 return make_domskal, "domskal"
             else:
                 # here's where we pop the stack

@@ -182,6 +182,7 @@ class PDFAnalyzer(object):
         if plotpath:
             self.plot(plotpath, margincounters, stylecounters, allmetrics)
         if metricspath:
+            util.ensure_dir(metricspath)
             with open(metricspath, "w") as fp:
                 json.dump(allmetrics, fp, indent=4)
         return allmetrics

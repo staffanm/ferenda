@@ -2,6 +2,7 @@
 from __future__ import unicode_literals, print_function
 
 from lxml.builder import ElementMaker
+from six import text_type as str
 
 from ferenda.elements import (CompoundElement, OrdinalElement,
                               TemporalElement, UnicodeElement, Link,
