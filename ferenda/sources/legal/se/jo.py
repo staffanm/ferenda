@@ -10,8 +10,8 @@ from datetime import datetime, timedelta
 import lxml.html
 import requests
 from six import text_type as str
-from rdflib import Literal
-from rdflib.namespace import SKOS
+from rdflib import Literal, URIRef
+from rdflib.namespace import SKOS, XSD, DCTERMS
 from bs4 import BeautifulSoup
 
 # My own stuff
@@ -19,11 +19,28 @@ from ferenda import FSMParser
 from ferenda import decorators
 from ferenda.elements import CompoundElement, Body, Paragraph, Heading
 from . import RPUBL
-from .fixedlayoutsource import FixedLayoutSource
+from .fixedlayoutsource import FixedLayoutSource, FixedLayoutStore
 from .swedishlegalsource import UnorderedSection
 from .elements import *
 
-    
+
+
+class JOStore(FixedLayoutStore):
+    def basefile_to_pathfrag(self, basefile):
+        # store data using years as top-level dir, even though the
+        # diarienummer are constructed the other way round.
+        #
+        # "1000-2004" => "2004/1000"
+        # "6356-2012" => "2012/6356"
+        no, year = basefile.split("-")
+        return "%s/%s" % (year, no)
+
+    def pathfrag_to_basefile(self, pathfrag):
+        # "2004/1000" => "1000-2004"
+        # "2012/6356" => "6356-2012"
+        year, no = pathfrag.split(os.sep)
+        return "%s-%s" % (no, year)
+
 class JO(FixedLayoutSource):
 
     """Hanterar beslut från Riksdagens Ombudsmän, www.jo.se
@@ -38,8 +55,11 @@ class JO(FixedLayoutSource):
     headnote_url_template = "http://www.jo.se/sv/JO-beslut/Soka-JO-beslut/?query=%(basefile)s&pn=1"
 
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
+    parse_types = []
     storage_policy = "dir"
-    downloaded_suffix = ".pdf" 
+    downloaded_suffix = ".pdf"
+    documentstore_class = JOStore
+
 
     def metadata_from_basefile(self, basefile):
         attribs = super(JO, self).metadata_from_basefile(basefile)
@@ -119,12 +139,30 @@ class JO(FixedLayoutSource):
         # else: return None
 
     def infer_identifier(self, basefile):
-        return "JO %s" % basefile.replace("/", "-")
+        return "JO dnr %s" % basefile.replace("/", "-")
         
     def extract_metadata(self, rawhead, basefile):
         if rawhead:
             print("FIXME: we should do something with this BeautifulSoup data")
-        return self.metadata_from_basefile(basefile)
+        d = self.metadata_from_basefile(basefile)
+        return d
+
+    def postprocess_doc(self, doc):
+        def helper(node, meta):
+            for subnode in list(node):
+                if isinstance(subnode, Meta):
+                    kwargs = {'lang': getattr(subnode, 'lang', None),
+                              'datatype': getattr(subnode, 'datatype', None)}
+                    for s in subnode:
+                        l = Literal(s, **kwargs)
+                        meta.add((URIRef(doc.uri), subnode.predicate, l))
+                    node.remove(subnode)
+                elif isinstance(subnode, list):
+                    helper(subnode, meta)
+        helper(doc.body, doc.meta)
+        d = doc.meta.value(URIRef(doc.uri), RPUBL.avgorandedatum)
+        if d:
+            doc.meta.add((URIRef(doc.uri), DCTERMS.issued, d))
 
     def tokenize(self, reader):
         def gluecondition(textbox, nextbox, prevbox):
@@ -184,7 +222,8 @@ class JO(FixedLayoutSource):
         def make_heading(parser):
             # h = Heading(str(parser.reader.next()).strip())
             h = Meta([str(parser.reader.next()).strip()],
-                     predicate=self.ns['dcterms'].title)
+                     predicate=DCTERMS.title,
+                     lang="sv")
             return h
 
         @decorators.newstate("abstract")
@@ -208,11 +247,12 @@ class JO(FixedLayoutSource):
 
         def make_datum(parser):
             d = [str(parser.reader.next())]
-            return Meta(d, predicate=self.ns['rpubl'].avgorandedatum)
+            return Meta(d, predicate=RPUBL.avgorandedatum,
+                        datatype=XSD.date)
 
         def make_dnr(parser):
             ds = [x for x in str(parser.reader.next()).strip().split(" ")]
-            return Meta(ds, predicate=self.ns['rpubl'].diarienummer)
+            return Meta(ds, predicate=RPUBL.diarienummer)
 
         def skip_nonessential(parser):
             parser.reader.next()  # return nothing

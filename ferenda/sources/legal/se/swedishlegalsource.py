@@ -700,12 +700,13 @@ class SwedishLegalSource(DocumentRepository):
             d.rel(RPUBL.utrSerie, self.dataset_uri())
 
     def infer_identifier(self, basefile):
-        """
-        Given a basefile of a document, returns a string that is a usable dcterms:identifier for that document.
+        """Given a basefile of a document, returns a string that is a usable
+        dcterms:identifier for that document.
         
-        This is similar to metadata_from_basefile, but should return a single string that 
-        can be used as a human-readable label or identifier for the document.
-        
+        This is similar to metadata_from_basefile, but should return a
+        single string that can be used as a human-readable label or
+        identifier for the document.
+
         """
         # FIXME: This logic should really be split up and put into
         # different subclasses override of infer_identifier. Also note
