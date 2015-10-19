@@ -3,23 +3,21 @@ from __future__ import unicode_literals
 
 import sys
 import os
-import datetime
 
 import six
 
-from ferenda.compat import unittest
-from ferenda.compat import Mock, patch
-
 from ferenda.testutil import RepoTester, parametrize_repotester
 from ferenda.sources.general import Keyword, Skeleton  # MediaWiki
+
 # test cases right now expects to see literals language-typed as @sv,
 # therefore we use the derived Lagen.nu-specific subclass.
-
 from lagen.nu import LNMediaWiki as MediaWiki
 
 from ferenda.sources.tech import RFC, W3Standards, PEP
 from ferenda.sources.legal.eu import EurlexCaselaw, EurlexTreaties
-from ferenda.sources.legal.se import Direktiv, JK, Kommitte, MyndFskrBase, Propositioner, Regeringen, Riksdagen, SwedishLegalSource
+from ferenda.sources.legal.se import (Direktiv, JK, Kommitte, MyndFskrBase,
+                                      Propositioner, Regeringen, Riksdagen,
+                                      SwedishLegalSource)
 
 from lagen.nu import ARN, DV, SFS, SOU, Ds, JO
 # subrepos, normally used through a container CompositeRepository

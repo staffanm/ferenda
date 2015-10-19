@@ -339,6 +339,8 @@ class SwedishLegalSource(DocumentRepository):
         :type  doc: ferenda.Document
 
         """
+        # reset global state
+        UnorderedSection.counter = 0
         fp = self.parse_open(doc.basefile)
         resource = self.parse_metadata(fp, doc.basefile)
         doc.meta = resource.graph

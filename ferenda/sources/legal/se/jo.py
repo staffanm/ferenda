@@ -24,7 +24,6 @@ from .swedishlegalsource import UnorderedSection
 from .elements import *
 
 
-
 class JOStore(FixedLayoutStore):
     def basefile_to_pathfrag(self, basefile):
         # store data using years as top-level dir, even though the
