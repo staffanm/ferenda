@@ -783,7 +783,7 @@ class SFS(Trips):
                         '%s: Obekant nyckel [\'%s\']' % basefile, key)
             utfardandedatum = self._find_utfardandedatum(sfsnr)
             if utfardandedatum:
-                d["rpubl:utfardandedatum"] = utfardandedatum
+                d[docuri]["rpubl:utfardandedatum"] = utfardandedatum
         return d
 
     def extract_metadata_header(self, reader, basefile):
@@ -826,7 +826,7 @@ class SFS(Trips):
                 uppdaterad = re_sfs(val).group(1)
                 # not sure we need to add this, since parse_metadata
                 # catches the same
-                d["rpubl:konsolideringsunderlag"] = self.canonical_uri(uppdaterad)
+                d["rpubl:konsolideringsunderlag"] = [URIRef(self.canonical_uri(uppdaterad))]
                 if identifier and identifier != "SFS " + uppdaterad:
                     identifier += " i lydelse enligt SFS " + uppdaterad
                 d["dcterms:issued"] = uppdaterad
@@ -950,18 +950,28 @@ class SFS(Trips):
             if not o.datatype:
                 doc.meta.remove((URIRef(doc.uri), DCTERMS.issued, o))
 
-
-        # FIXME: should iterate over
-        # doc.meta.resource(doc.identifier).values(RPUBL.konsolideringsunderlag)
-        # instead
-#        for uri, graph in registry.items():
-#            identifier = graph.value(URIRef(uri), self.ns['dcterms'].identifier)
-#            identifier = identifier.replace("SFS ", "L")
-#            rp = Registerpost(uri=uri, meta=graph, id=identifier)
-#            reg.append(rp)
-#            if uri in obs:
-#                rp.append(obs[uri])
+        for res in doc.meta.resource(doc.uri).objects(RPUBL.konsolideringsunderlag):
+            identifier = res.value(DCTERMS.identifier).replace("SFS ", "L")
+            graph = self.make_graph()
+            for s, p, o in res:
+                if not isinstance(o, Literal):
+                    o = o.identifier
+                triple = (s.identifier, p.identifier, o)
+                graph.add(triple)
+                doc.meta.remove(triple)
+                if p.identifier == RPUBL.forarbete:
+                    triple = (o, DCTERMS.identifier, doc.meta.value(o, DCTERMS.identifier))
+                    graph.add(triple)
+                    doc.meta.remove(triple)
+            rp = Registerpost(uri=res.identifier, meta=graph, id=identifier)
+            reg.append(rp)
+            if res.identifier in obs:
+                rp.append(obs[uri])
         doc.body.append(reg)
+
+        # finally, set doc.uri to a better value
+        # from pudb import set_trace; set_trace()
+        doc.uri = str(doc.meta.value(URIRef(doc.uri), RPUBL.konsoliderar))
 
     def _forfattningstyp(self, forfattningsrubrik):
         forfattningsrubrik = re.sub(" *\(\d{4}:\d+\)", "", forfattningsrubrik)

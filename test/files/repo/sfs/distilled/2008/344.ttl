@@ -62,7 +62,7 @@
     rpubl:forarbete <https://lagen.nu/bet/2009/10:SfU8>,
         <https://lagen.nu/prop/2009/10:31>,
         <https://lagen.nu/rskr/2009/10:133> ;
-    rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/sfs> ;
+    rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
     rpubl:ikrafttradandedatum "2010-01-01"^^xsd:date ;
     rpubl:lopnummer "1550" ;
     rpubl:utfardandedatum "2009-12-17"^^xsd:date ;
@@ -78,7 +78,7 @@
     rpubl:forarbete <https://lagen.nu/bet/2012/13:SoU20>,
         <https://lagen.nu/prop/2012/13:109>,
         <https://lagen.nu/rskr/2012/13:230> ;
-    rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/sfs> ;
+    rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
     rpubl:ikrafttradandedatum "2013-07-01"^^xsd:date ;
     rpubl:lopnummer "411" ;
     rpubl:utfardandedatum "2013-05-30"^^xsd:date ;
@@ -94,7 +94,7 @@
     rpubl:forarbete <https://lagen.nu/bet/2007/08:SfU8>,
         <https://lagen.nu/prop/2007/08:105>,
         <https://lagen.nu/rskr/2007/08:199> ;
-    rpubl:forfattningssamling <http://rinfo.lagrummet.se/serie/fs/sfs> ;
+    rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
     rpubl:ikrafttradandedatum "2008-07-01"^^xsd:date ;
     rpubl:lopnummer "344" ;
     rpubl:utfardandedatum "2008-05-22"^^xsd:date ;
