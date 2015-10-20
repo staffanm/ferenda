@@ -628,9 +628,20 @@ class SwedishLegalSource(DocumentRepository):
                 self.log.debug("Creating debug version of PDF")
                 analyzer.drawboxes(pdfdebug_path, offtryck_gluefunc,
                                    metrics=metrics)
-            parser = offtryck_parser(basefile, metrics=metrics,
+            if self.document_type == self.PROPOSITION:
+                preset = 'proposition'
+            elif self.document_type == self.SOU:
+                preset = 'sou'
+            elif self.document_type == self.DS:
+                preset = 'ds'
+            elif self.document_type == self.KOMMITTEDIREKTIV:
+                preset = 'dir'
+            else:
+                preset = 'default'
+            parser = offtryck_parser(basefile, metrics=metrics, preset=preset,
                                      identifier=self.infer_identifier(basefile),
-                                     debug=os.environ.get('FERENDA_FSMDEBUG', 0))
+                                     debug=os.environ.get('FERENDA_FSMDEBUG', 0)            )
+            parser.debug = os.environ.get('FERENDA_FSMDEBUG', False)
             return parser.parse
         else:
             def default_parser(iterable):

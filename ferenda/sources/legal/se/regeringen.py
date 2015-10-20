@@ -98,24 +98,12 @@ class Regeringen(SwedishLegalSource):
                   'filterByType': 'FilterablePageBase',
                   'preFilteredCategories': '1324',
                   'rootPageReference': '0',
-                  # 'pageSize': '1000',
-                  # NOTE: 1000 is the max allowed page size, but since
-                  # we can handle paging, we go with whatever the
-                  # default is
                   'filteredContentCategories': self.document_type
                   }
-        # params = {'filterType': 'Taxonomy',
-        #           'filterByType': 'FilterablePageBase',
-        #           'preFilteredCategories': '1324'
-        #           'rootPageReference': '0',
-        #           'page': '1',
-        #           'pageSize': '10',
-        #           'displayLimited': 'true',
-        #           'sortAlphabetically': 'False',
-        #           'filteredContentCategories': self.document_type
-        # }
         if 'lastdownload' in self.config and not self.config.refresh:
             params['fromDate'] = self.config.lastdownload.strftime("%Y-%m-%d")
+            self.log.debug("Loading documents starting from %s" %
+                           params.get('fromDate', "the beginning"))
         for basefile, url in self.download_get_basefiles(params):
             try:
                 self.download_single(basefile, url)
@@ -148,7 +136,7 @@ class Regeringen(SwedishLegalSource):
         while not done:
             qsparams = urlencode(params)
             searchurl = self.start_url + "?" + qsparams
-            self.log.info("Loading page #%s" % params.get('page', 1))
+            self.log.debug("Loading page #%s" % params.get('page', 1))
             resp = self.session.get(searchurl)
             tree = lxml.etree.fromstring(resp.text)
             done = True
@@ -387,18 +375,16 @@ class Regeringen(SwedishLegalSource):
 
     parse_types = []
 
-    # This could theoretically be written as visitor functions, but
-    # since the code requires access to doc.meta and just iterates
-    # over top-level elements of doc.body (no recursing) it's easier
-    # to just override parse_body and do our postprocessing at the
-    # end.
-    def parse_body(self, fp, basefile):
-
+    def postprocess_doc(self, doc):
+        # loop through leading  textboxes and try to find dcterms:identifier,
+        # dcterms:title and dcterms:issued (these should already be present
+        # in doc.meta, but the values in the actual document should take
+        # precendence
         def _check_differing(describer, predicate, newval):
             if describer.getvalue(predicate) != newval:
                 self.log.warning("%s: HTML page: %s is %r, document: it's %r" %
-                                 (basefile,
-                                  d.graph.qname(predicate),
+                                 (doc.basefile,
+                                  doc.meta.qname(predicate),
                                   describer.getvalue(predicate),
                                   newval))
                 # remove old val
@@ -407,20 +393,21 @@ class Regeringen(SwedishLegalSource):
                                 d.graph.value(d._current(), predicate)))
                 d.value(predicate, newval)
 
-        body = super(Regeringen, self).parse_body(fp, basefile)
-
+        def helper(node, meta):
+            for subnode in list(node):
+                if isinstance(subnode, Textbox):
+                    pass
+                elif isinstance(subnode, list):
+                    helper(subnode, meta)
+        helper(doc.body, doc.meta)
         # the following postprocessing code is so far only written for
         # Propositioner
         if self.rdf_type != RPUBL.Proposition:
-            return body
+            return doc.body
 
-        # loop through leading  textboxes and try to find dcterms:identifier,
-        # dcterms:title and dcterms:issued (these should already be present
-        # in doc.meta, but the values in the actual document should take
-        # precendence
         d = Describer(self._resource.graph, self._resource.identifier)
         title_found = identifier_found = issued_found = False
-        for idx, element in enumerate(body):
+        for idx, element in enumerate(doc.body):
             if not isinstance(element, Textbox):
                 continue
             str_element = str(element).strip()
@@ -462,8 +449,6 @@ class Regeringen(SwedishLegalSource):
 
             if title_found and identifier_found and issued_found:
                 break
-        return body
-
 
     # FIXME: Hook this up as a visitor function
     def visit_find_commentary(self, node, state):
@@ -570,7 +555,6 @@ class Regeringen(SwedishLegalSource):
         return pdf
 
     # returns a list of (PDFReader, metrics) tuples, one for each PDF
-    # file.
     def read_pdfs(self, basefile, pdffiles, identifier=None):
         metrics_path = self.store.intermediate_path(basefile,
                                                     attachment="metrics.json")
@@ -578,23 +562,23 @@ class Regeringen(SwedishLegalSource):
                                                      attachment="debug.pdf")
         if os.environ.get("FERENDA_PLOTANALYSIS"):
             plot_path = self.store.intermediate_path(basefile,
-                                                    attachment="plot.png")
+                                                     attachment="plot.png")
         else:
             plot_path = None
-
         reader = None
         for pdffile in pdffiles:
             basepath = pdffile.split("/")[-1]
-            pdf_path = self.store.downloaded_path(basefile, attachment=basepath)
-            intermediate_path = self.store.intermediate_path(basefile, attachment=basepath)
-            intermediate_dir = os.path.dirname(intermediate_path)
+            pdf_path = self.store.downloaded_path(basefile,
+                                                  attachment=basepath)
+            intermed_path = self.store.intermediate_path(basefile,
+                                                         attachment=basepath)
+            intermediate_dir = os.path.dirname(intermed_path)
             if not reader:
                 reader = self.parse_pdf(pdf_path, intermediate_dir)
             else:
                 # FIXME: PDF Reader object must be able to be combined
                 # (implement __iadd__)
                 reader += self.parse_pdf(pdf_path, intermediate_dir)
-            
         # Grab correct analyzer class
         if self.document_type == self.KOMMITTEDIREKTIV:
             from ferenda.sources.legal.se.direktiv import DirAnalyzer
@@ -605,68 +589,17 @@ class Regeringen(SwedishLegalSource):
         else:
             analyzer = PDFAnalyzer(reader)
 
-        metrics = analyzer.metrics(metrics_path, plot_path, force=self.config.force)
+        metrics = analyzer.metrics(metrics_path, plot_path,
+                                   force=self.config.force)
         if os.environ.get("FERENDA_DEBUGANALYSIS"):
-            analyzer.drawboxes(pdfdebug_path, offtryck_gluefunc, metrics=metrics)
+            analyzer.drawboxes(pdfdebug_path, offtryck_gluefunc,
+                               metrics=metrics)
         reader.metrics = metrics
         return reader
-            
-    def parse_pdfs(self, basefile, pdffiles, identifier=None):
-        body = None
-        gluefunc = offtryck_gluefunc
-        for pdffile in pdffiles:
-            pdf_path = self.store.downloaded_path(basefile, attachment=pdffile)
-            intermediate_path = self.store.intermediate_path(basefile, attachment=pdffile)
-            intermediate_dir = os.path.dirname(intermediate_path)
-            # case 1: intermediate path does not exist and that's ok
-            # case 2: intermediate path exists alongside downloaded_path
-            pdf = self.parse_pdf(pdf_path, intermediate_dir)
-
-            metrics_path = self.store.intermediate_path(basefile,
-                                                        attachment=os.path.splitext(os.path.basename(pdf_path))[0] + ".metrics.json")
-            if os.environ.get("FERENDA_PLOTANALYSIS"):
-                plot_path = metrics_path.replace(".metrics.json", ".plot.png")
-            else:
-                plot_path = None
-            pdfdebug_path = metrics_path.replace(".metrics.json", ".debug.pdf")
-            # 1. Grab correct analyzer class
-            if self.document_type == self.KOMMITTEDIREKTIV:
-                from ferenda.sources.legal.se.direktiv import DirAnalyzer
-                analyzer = DirAnalyzer(pdf)
-            elif self.document_type == self.SOU:
-                from ferenda.sources.legal.se.sou import SOUAnalyzer
-                analyzer = SOUAnalyzer(pdf)
-            else:
-                analyzer = PDFAnalyzer(pdf)
-
-            metrics = analyzer.metrics(metrics_path, plot_path, force=self.config.force)
-            if os.environ.get("FERENDA_DEBUGANALYSIS"):
-                analyzer.drawboxes(pdfdebug_path, offtryck_gluefunc, metrics=metrics)
-            # metrics = json.loads(util.readfile(metrics_path))
-
-            if self.document_type == self.PROPOSITION:
-                preset = 'proposition'
-            elif self.document_type == self.SOU:
-                preset = 'sou'
-            elif self.document_type == self.DS:
-                preset = 'ds'
-            elif self.document_type == self.KOMMITTEDIREKTIV:
-                preset = 'dir'
-            else:
-                preset = 'default'
-            parser = offtryck_parser(metrics=metrics, preset=preset)
-            parser.debug = os.environ.get('FERENDA_FSMDEBUG', False)
-            parser.current_identifier = identifier
-            tbs = list(pdf.textboxes(gluefunc, pageobjects=True))
-            body = parser.parse(tbs)
-            pdf[:] = body[:]
-            pdf.tagname = "body"
-        return pdf
 
     def create_external_resources(self, doc):
         """Optionally create external files that go together with the
         parsed file (stylesheets, images, etc). """
-        
         if len(doc.body) == 0:
             self.log.warning(
                 "%s: No external resources to create", doc.basefile)
