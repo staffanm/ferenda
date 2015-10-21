@@ -67,11 +67,11 @@ def make_parser(reader, log, trace):
             log.debug(
                 'Författning med ikraftträdandedatum %s' % ikrafttrader)
 
-            b = Forfattning(ikrafttrader=ikrafttrader)
+            b = Forfattning(ikrafttrader=ikrafttrader, uri=None)
             reader.readline()
         else:
             log.debug('Författning utan ikraftträdandedatum')
-            b = Forfattning()
+            b = Forfattning(uri=None)
 
         while not reader.eof():
             state_handler = guess_state()

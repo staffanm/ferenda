@@ -500,7 +500,8 @@ class SwedishLegalSource(DocumentRepository):
                         except ValueError:
                             # parse_swedish_date failed, pass as-is
                             result.append(Literal(value))
-                elif k in ("rpubl:forarbete", "rpubl:genomforDirektiv"):
+                elif k in ("rpubl:forarbete", "rpubl:genomforDirektiv",
+                           "rpubl:ersatter", "rpubl:upphaver", "rpubl:inforsI"):
                     result.append(URIRef(value))
                 elif k in ("dcterms:creator", "dcterms:publisher",
                            "rpubl:beslutadAv", "rpubl:departement"):

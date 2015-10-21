@@ -949,7 +949,6 @@ class SFS(Trips):
         for o in doc.meta.objects(URIRef(doc.uri), DCTERMS.issued):
             if not o.datatype:
                 doc.meta.remove((URIRef(doc.uri), DCTERMS.issued, o))
-
         for res in doc.meta.resource(doc.uri).objects(RPUBL.konsolideringsunderlag):
             identifier = res.value(DCTERMS.identifier).replace("SFS ", "L")
             graph = self.make_graph()
@@ -969,9 +968,8 @@ class SFS(Trips):
                 rp.append(obs[uri])
         doc.body.append(reg)
 
-        # finally, set doc.uri to a better value
-        # from pudb import set_trace; set_trace()
-        doc.uri = str(doc.meta.value(URIRef(doc.uri), RPUBL.konsoliderar))
+        # finally, set the uri of the main body object to a better value
+        doc.body.uri = str(doc.meta.value(URIRef(doc.uri), RPUBL.konsoliderar))
 
     def _forfattningstyp(self, forfattningsrubrik):
         forfattningsrubrik = re.sub(" *\(\d{4}:\d+\)", "", forfattningsrubrik)
@@ -1069,11 +1067,13 @@ class SFS(Trips):
             res = self.attributes_to_resource(state)
             try:
                 uri = self.minter.space.coin_uri(res)
+            except Exception:
+                self.log.warning("Couldn't mint URI for %s" % type(node))
+                uri = None
+            if uri:
                 node.uri = uri
                 if "#" in uri:
                     node.id = uri.split("#", 1)[1]
-            except Exception:
-                self.log.warning("Couldn't mint URI for %s" % type(node))
                 pass
         state['parent'] = node
         return state

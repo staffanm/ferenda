@@ -272,8 +272,10 @@ class Blockquote(CompoundElement):
 class Meta(CompoundElement):
     pass
 
-class Stycke(Paragraph):
-    pass
+
+
+#class Stycke(Paragraph):
+#    pass
 
 
 class Sektion(Section):

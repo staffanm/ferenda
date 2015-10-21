@@ -154,7 +154,9 @@ class JK(SwedishLegalSource):
             return parser.make_children(s)
 
         def make_paragraph(parser):
-            # FIXME: this strips out formatting tags
+            # FIXME: this strips out formatting tags NB: Now this is a
+            # SFS stycke that has fragment_label, id/uri and other
+            # crap. Let's see if it still works!
             return Stycke([parser.reader.next().get_text()])
 
         p = FSMParser()
