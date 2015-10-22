@@ -55,8 +55,18 @@ class SFS(OrigSFS, SameAs):
         return ret
 
     def infer_metadata(self, resource, basefile):
+        # remove the bogus dcterms:issued thing that we only added to
+        # aid URI generation. NB: This is removed in the superclass'
+        # postprocess_doc as well, because for this lagen.nu-derived
+        # class it needs to be done at this point, but for use of the
+        # superclass directly, it needs to be done at some point.
+        for o in resource.objects(DCTERMS.issued):
+            if not o.datatype:
+                resource.remove(DCTERMS.issued, o)
         sameas_uri = self.sameas_minter.space.coin_uri(resource)
         resource.add(OWL.sameAs, URIRef(sameas_uri))
+        resource.graph.add((URIRef(self.canonical_uri(basefile, True)),
+                            OWL.sameAs, resource.identifier))
         # then find each rpubl:konsolideringsunderlag, and create
         # owl:sameas for them as well
         for subresource in resource.objects(RPUBL.konsolideringsunderlag):

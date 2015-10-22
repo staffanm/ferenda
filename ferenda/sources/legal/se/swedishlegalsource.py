@@ -69,6 +69,7 @@ class SwedishLegalSource(DocumentRepository):
     rdf_type = RPUBL.Rattsinformationsdokument  # subclasses override this
 
     parse_types = LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN
+    parse_allow_relative = False
 
     # This is according to the RPUBL vocabulary: All
     # rpubl:Rattsinformationsdokument should have dcterms:title,
@@ -559,23 +560,27 @@ class SwedishLegalSource(DocumentRepository):
             # now find references using LegalRef
             parser = SwedishCitationParser(LegalRef(*self.parse_types),
                                            self.minter,
-                                           self.commondata)
+                                           self.commondata,
+                                           allow_relative=self.parse_allow_relative)
             body = parser.parse_recursive(body)
         return body
 
     def extract_body(self, fp, basefile):
         """Given a open file containing raw document content (or intermediate
-        content), return some sort of object representing the same content that 
-        :py:method:`tokenize` can work with.
+        content), return some sort of object representing the same
+        content that :py:method:`tokenize` can work with.
         
-        The default implementation assumes that the open file contains HTML/XML,
-        creates a BeautifulSoup instance from it, and returns the body of that instance.
+        The default implementation assumes that the open file contains
+        HTML/XML, creates a BeautifulSoup instance from it, and
+        returns the body of that instance.
         
-        Docrepos using different file formats, or having documents that are split up
-        in multiple files, should override this to load those in some suitable way. 
-        This will often be similar to the processing that extract_head does (but not always,
-        eg. if the metadata is located in a HTML file but the main document content is in a 
-        PDF file).
+        Docrepos using different file formats, or having documents
+        that are split up in multiple files, should override this to
+        load those in some suitable way.  This will often be similar
+        to the processing that extract_head does (but not always,
+        eg. if the metadata is located in a HTML file but the main
+        document content is in a PDF file).
+
         """
         # FIXME: This re-parses the same data as extract_head
         # does. This will be common. Maybe fix a superclass level

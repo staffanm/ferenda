@@ -17,9 +17,8 @@ re_SectionId = re.compile(
    r'^(\d+ ?\w?) \xa7[ \.]')  # used for both match+sub
 re_SectionIdOld = re.compile(
     r'^\xa7 (\d+ ?\w?).')     # as used in eg 1810:0926
-re_DottedNumber = re.compile(r'^(\d+ ?\w?)\. ')
-re_Bullet = re.compile(r'^(\-\-?|\x96) ')
 re_NumberRightPara = re.compile(r'^(\d+)\) ').match
+re_DottedNumber = re.compile(r'^(\d+ ?\w?)\. ')
 re_Bokstavslista = re.compile(r'^(\w)\) ')
 re_ElementId = re.compile(
     r'^(\d+) mom\.')        # used for both match+sub
@@ -124,6 +123,7 @@ def make_parser(reader, log, trace):
         return c
 
     def makeKapitel():
+        global state
         kapitelnummer = idOfKapitel()
 
         para = reader.readparagraph()
@@ -136,8 +136,8 @@ def make_parser(reader, log, trace):
         if ikrafttrader:
             kwargs['ikrafttrader'] = ikrafttrader
         k = Kapitel(**kwargs)
-        current_headline_level = 0
-        current_section = '0'
+        state['current_headline_level'] = 0
+        state['current_section'] = '0'
 
         log.debug("    Nytt kapitel: '%s...'" % line[:30])
 
@@ -616,6 +616,7 @@ def make_parser(reader, log, trace):
             return None
 
     def isRubrik(p=None):
+        global state
         if p is None:
             p = reader.peekparagraph()
             indirect = False
@@ -695,7 +696,7 @@ def make_parser(reader, log, trace):
         # headline and all subsequent headlines should be regardes as
         # sub-headlines
         if (not indirect) and isRubrik(nextp):
-            current_headline_level = 1
+            state['current_headline_level'] = 1
 
         # ok, all tests passed, this might be a headline!
         trace['rubrik'].debug(

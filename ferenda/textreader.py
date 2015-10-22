@@ -50,8 +50,8 @@ class TextReader(object):
         else:
             self.linesep = os.linesep
 
-        # can be changed through getiterator, if we want to iterate over anything
-        # else but lines
+        # can be changed through getiterator, if we want to iterate
+        # over anything else but lines
         self.iterfunc = self.readline
         self.iterargs = []
         self.iterkwargs = {}

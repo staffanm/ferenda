@@ -101,6 +101,8 @@ class SFS(Trips):
 
     alias = "sfs"
     rdf_type = RPUBL.KonsolideradGrundforfattning
+    parse_types = LegalRef.LAGRUM, LegalRef.EULAGSTIFTNING
+    parse_allow_relative = True
     app = "sfst"  # dir, prop, sfst
     base = "SFSR"  # DIR, THWALLPROP, SFSR
     basefile_regex = "(?P<basefile>\d{4}:[\d s\.]+)$"
@@ -545,6 +547,8 @@ class SFS(Trips):
 
         """
         attribs = super(SFS, self).metadata_from_basefile(basefile)
+        del attribs["rpubl:arsutgava"]
+        del attribs["rpubl:lopnummer"]
         attribs["dcterms:publisher"] = "Regeringskansliet"
         return attribs
     
@@ -558,9 +562,10 @@ class SFS(Trips):
             raise IckeSFS("%s is not a regular SFS" % basefile)
         filename = self.store.downloaded_path(basefile)
         try:
+            # t = TextReader(filename, encoding="iso-8859-1")
             t = TextReader(filename, encoding="iso-8859-1")
         except IOError:
-            self.log.warning("%s: Fulltext is missing" % basefile) 
+            self.log.warning("%s: Fulltext is missing" % basefile)
             # FIXME: This code needs to be rewritten
             baseuri = self.canonical_uri(basefile)
             if baseuri in registry:
@@ -677,7 +682,6 @@ class SFS(Trips):
             if 'Rubrik' not in rowdict and rubrik:
                 rowdict['Rubrik'] = rubrik
                 rubrik = None
-
             for key, val in rowdict.items():
                 if key == 'SFS-nummer':
                     (arsutgava, lopnummer) = val.split(":")
@@ -769,7 +773,9 @@ class SFS(Trips):
                         g = Graph()
                         g.add((b, RPUBL.celexNummer, Literal(celex)))
                         celexuri = self.minter.space.coin_uri(g.resource(b))
-                        d[docuri]["rpubl:genomforDirektiv"] = celexuri
+                        if "rpubl:genomforDirektiv" not in d[docuri]:
+                            d[docuri]["rpubl:genomforDirektiv"] = []
+                        d[docuri]["rpubl:genomforDirektiv"].append(celexuri)
                         d[celexuri] = {"rpubl:celexNummer": celex}
                 elif key == 'Tidsbegränsad':
                     d["rinfoex:tidsbegransad"] = val[:10]
@@ -876,14 +882,14 @@ class SFS(Trips):
         # attributes will be a nested dict with some values being
         # dicts themselves. Convert the subdicts to rdflib.Resource
         # objects.
-        baseuri = None
         post_count = 0
-        for k in sorted(list(attributes.keys()), key=util.split_numalpha,
-                        reverse=True):
+        for k in sorted(list(attributes.keys()), key=util.split_numalpha):
             if isinstance(attributes[k], dict):
                 if len(attributes[k]) > 1:
                     # get a rdflib.Resource with a coined URI
                     r = super(SFS, self).polish_metadata(attributes[k])
+                    if "rpubl:konsoliderar" not in attributes:
+                        attributes["rpubl:konsoliderar"] = URIRef(k)
                     baseuri = k
                     del attributes[k]
                     attributes[URIRef(k)] = r
@@ -891,13 +897,11 @@ class SFS(Trips):
                         attributes["rpubl:konsolideringsunderlag"] = []
                     attributes["rpubl:konsolideringsunderlag"].append(r.identifier)
                     post_count += 1
-                else:
-                    # get a anonymous (BNode) rdflib.Resource
-                    r = self.attributes_to_resource(attributes[k])
+                else: 
+                   # get a anonymous (BNode) rdflib.Resource
+                    ar = self.attributes_to_resource(attributes[k])
                     del attributes[k]
-                    attributes[URIRef(k)] = r
-        assert baseuri
-        attributes["rpubl:konsoliderar"] = URIRef(baseuri)
+                    attributes[URIRef(k)] = ar
         resource = super(SFS, self).polish_metadata(attributes,
                                                     infer_nodes=False)
         # Finally: the dcterms:issued property for this
@@ -919,7 +923,7 @@ class SFS(Trips):
             # the last post due to the above loop)
             utfardad = r.value(RPUBL.utfardandedatum)
             if utfardad:
-                issued = utfardad.toPython()
+                issued = utfardad
         if issued:
             resource.graph.add((resource.identifier, DCTERMS.issued, issued))
         return resource
@@ -949,7 +953,9 @@ class SFS(Trips):
         for o in doc.meta.objects(URIRef(doc.uri), DCTERMS.issued):
             if not o.datatype:
                 doc.meta.remove((URIRef(doc.uri), DCTERMS.issued, o))
-        for res in doc.meta.resource(doc.uri).objects(RPUBL.konsolideringsunderlag):
+
+            # from pudb import set_trace; set_trace()
+        for res in sorted(doc.meta.resource(doc.uri).objects(RPUBL.konsolideringsunderlag)):
             identifier = res.value(DCTERMS.identifier).replace("SFS ", "L")
             graph = self.make_graph()
             for s, p, o in res:
@@ -958,8 +964,13 @@ class SFS(Trips):
                 triple = (s.identifier, p.identifier, o)
                 graph.add(triple)
                 doc.meta.remove(triple)
-                if p.identifier == RPUBL.forarbete:
-                    triple = (o, DCTERMS.identifier, doc.meta.value(o, DCTERMS.identifier))
+                if p.identifier in (RPUBL.forarbete, RPUBL.genomforDirektiv):
+                    if p.identifier == RPUBL.forarbete:
+                        triple = (o, DCTERMS.identifier,
+                                  doc.meta.value(o, DCTERMS.identifier))
+                    elif p.identifier == RPUBL.genomforDirektiv:
+                        triple = (o, RPUBL.celexNummer,
+                                  doc.meta.value(o, RPUBL.celexNummer))
                     graph.add(triple)
                     doc.meta.remove(triple)
             rp = Registerpost(uri=res.identifier, meta=graph, id=identifier)
@@ -981,22 +992,6 @@ class SFS(Trips):
         else:
             return self.ns['rpubl'].Forordning
 
-    def _dict_to_graph(self, d, graph, uri):
-        mapping = {'SFS nr': self.ns['rpubl'].fsNummer,
-                   'Rubrik': self.ns['dcterms'].title,
-                   'Senast hämtad': self.ns['rinfoex'].senastHamtad,
-                   'Utfärdad': self.ns['rpubl'].utfardandedatum,
-                   'Utgivare': self.ns['dcterms'].publisher,
-                   'Departement/ myndighet': self.ns['dcterms'].creator
-                   }
-        desc = Describer(graph, uri)
-        for (k, v) in d.items():
-            if k in mapping:
-                if hasattr(v, 'uri'):
-                    desc.rel(mapping[k], v.uri)
-                else:
-                    desc.value(mapping[k], v)
-
     def _find_utfardandedatum(self, sfsnr):
         # FIXME: Code to instantiate a SFSTryck object and muck about goes here
         fake = {'2013:363': date(2013, 5, 23),
@@ -1007,7 +1002,9 @@ class SFS(Trips):
         return fake.get(sfsnr, None)
 
     def extract_body(self, fp, basefile):
-        reader = TextReader(string=fp.read().decode("iso-8859-1"),
+        bodystring = fp.read().decode("iso-8859-1")
+        # replace bogus emdash contained in some text files
+        reader = TextReader(string=bodystring.replace("\u2013", "-"),
                             linesep=TextReader.DOS)
         reader.autostrip = True
         return reader
@@ -1078,6 +1075,10 @@ class SFS(Trips):
         state['parent'] = node
         return state
 
+    re_Bullet = re.compile(r'^(\-\-?|\x96) ')
+    # NB: these are redefinitions of regex objects in sfs_parser.py
+    re_DottedNumber = re.compile(r'^(\d+ ?\w?)\. ')
+    re_Bokstavslista = re.compile(r'^(\w)\) ')
     re_definitions = re.compile(
         r'^I (lagen|förordningen|balken|denna lag|denna förordning|denna balk|denna paragraf|detta kapitel) (avses med|betyder|används följande)').match
     re_brottsdef = re.compile(

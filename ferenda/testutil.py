@@ -324,6 +324,14 @@ class RepoTesterStore(object):
             p = os.path.dirname(p) + os.sep + attachment
         return p
 
+    def documententry_path(self, basefile, version=None):
+        p = os.path.splitext(
+            self.downloaded_file.replace(
+                "downloaded",
+                "entries"))[0] + ".json"
+        return p
+        
+
     # To handle any other DocumentStore method, just return whatever
     # our origstore would.
     def __getattr__(self, name):
