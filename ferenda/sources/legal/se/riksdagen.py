@@ -227,6 +227,11 @@ class Riksdagen(FixedLayoutSource):
                                                    attachment="index.html"))
         
         intermediate_path = self.store.intermediate_path(basefile)
+        # if a compressed bz2 file is > 5 MB, it's just too damn big
+        if os.path.getsize(intermediate_path) > 5*1024*1025:
+            raise ParseError("%s: %s is just too damn big (%s bytes)" % 
+                             (basefile, intermediate_path, 
+                              os.path.getsize(intermediate_path)))
         intermediate_dir = os.path.dirname(intermediate_path)
         convert_to_pdf = not downloaded_path.endswith(".pdf")
         keep_xml = "bz2" if self.config.compress == "bz2" else True

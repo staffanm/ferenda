@@ -150,7 +150,10 @@ class Trips(SwedishLegalSource):
                 existing,
                 encoding=self.source_encoding), "lxml")
         new_soup = BeautifulSoup(util.readfile(new, encoding=self.source_encoding), "lxml")
-        return existing_soup.pre != new_soup.pre
+        try:
+            return existing_soup.pre != new_soup.pre
+        except RuntimeError: # can happen with at least v4.4.1 of beautifulsoup
+            return True
 
     def remote_url(self, basefile):
         return self.document_url_template % {'basefile': quote(basefile),
