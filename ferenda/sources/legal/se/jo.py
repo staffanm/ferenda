@@ -295,6 +295,6 @@ class JO(FixedLayoutSource):
 
     def tabs(self):
         if self.config.tabs:
-            return [("JO"), self.dataset_uri()]
+            return [("JO", self.dataset_uri())]
         else:
             return []

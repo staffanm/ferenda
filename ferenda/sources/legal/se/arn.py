@@ -256,6 +256,6 @@ class ARN(FixedLayoutSource):
 
     def tabs(self):
         if self.config.tabs:
-            return [("ARN"), self.dataset_uri()]
+            return [("ARN", self.dataset_uri())]
         else:
             return []

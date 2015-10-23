@@ -2,6 +2,7 @@
 from __future__ import unicode_literals, print_function
 
 from ferenda.sources.legal.se import SOU as OrigSOU  # a compositerepo
+from ferenda.sources.legal.se import SwedishLegalSource
 from ferenda.sources.legal.se.sou import SOURegeringen as OrigSOURegeringen
 from ferenda.sources.legal.se.sou import SOUKB as OrigSOUKB
 from .regeringenlegacy import SOURegeringenLegacy
@@ -18,7 +19,7 @@ class SOURegeringen(OrigSOURegeringen, SameAs): pass
 
 class SOUKB(OrigSOUKB, SameAs): pass
 
-class SOU(OrigSOU):
+class SOU(OrigSOU, SwedishLegalSource):
     subrepos = SOURegeringen, SOURegeringenLegacy, SOUKB
     # Since we had to subclass SOURegeringen and SOUKB in order to
     # correctly initialize their ResourceLoader, we have no real need

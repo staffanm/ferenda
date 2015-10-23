@@ -15,4 +15,4 @@ class FacadeSource(CompositeRepository):
 
     def tabs(self):
         subtabs = [self.get_instance(c).tabs() for c in self.subrepos]
-        return (self.tablabel, None, subtabs)
+        return [(self.tablabel, None, subtabs)]

@@ -83,7 +83,6 @@ class SFS(OrigSFS, SameAs):
         if v:
             desc.value(DCTERMS.alternate, v)
 
-
     @decorators.action
     def importarchive(self, archivedir):
         """Imports downloaded data from an archive from legacy lagen.nu data.
@@ -92,15 +91,6 @@ class SFS(OrigSFS, SameAs):
         versions of each text.
 
         """
-#        import tarfile
-#        if not tarfile.is_tarfile(archivefile):
-#            self.log.error("%s is not a readable tarfile" % archivefile)
-#            return
-#        t = tarfile.open(archivefile)
-#        for ti in t.getmembers():
-#            if not ti.isfile():
-#                continue
-#            f = ti.name
         current = archived = 0
         for f in util.list_dirs(archivedir, ".html"):
             if not f.startswith("downloaded/sfs"):  # sfst or sfsr
@@ -149,30 +139,25 @@ class SFS(OrigSFS, SameAs):
                     # de.set_content()
                     # de.set_link()
                     de.save(self.store.documententry_path(basefile))
-                    
                 # this yields more reasonable basefiles, but they are not
                 # backwards compatible -- skip them for now
                 # basefile = basefile.replace("_", "").replace(".", "")
-
                 if "type" in m.groupdict() and m.group("type") == "sfsr":
                     dest = self.store.register_path(basefile)
                     current -= 1  # to offset the previous increment
                 else:
                     dest = self.store.downloaded_path(basefile, version)
-
                 self.log.debug("%s: extracting %s to %s" % (basefile, f, dest))
-
-                #with openmethod(basefile, mode="wb", version=version) as fp:
-                #    fp.write(t.extractfile(f).read())
                 util.ensure_dir(dest)
                 shutil.copy2(f, dest)
                 break
-                    
             else:
                 self.log.warning("Couldn't process %s" % f)
+        self.log.info("Extracted %s current versions and %s archived versions"
+                      % (current, archived))
 
-
-        self.log.info("Extracted %s current versions and %s archived versions" % (current, archived))
-    
-
-            
+    def tabs(self):
+        if self.config.tabs:
+            return [("SFS", self.dataset_uri())]
+        else:
+            return []

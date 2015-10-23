@@ -183,6 +183,6 @@ class JK(SwedishLegalSource):
 
     def tabs(self):
         if self.config.tabs:
-            return [("JK"), self.dataset_uri()]
+            return [("JK", self.dataset_uri())]
         else:
             return []

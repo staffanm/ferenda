@@ -168,24 +168,33 @@ class Resources(object):
         E = ElementMaker()
         elements = []
         for repo in self.repos:
+            alias = repo.alias
             items = getattr(repo, methodname)()
+            self.log.debug("Adding %(methodname)s from docrepo %(alias)s" %
+                           locals())
             elements.extend(self._links_listitems(items))
         return elements
-        
+
     def _links_listitems(self, listitems):
+        E = ElementMaker()
         elements = []
         for item in listitems:
             if len(item) == 2:
                 (label, url) = item
-                sublist = None
+                sublists = None
             else:
-                (label, url, sublist) = item
-            alias = repo.alias
+                (label, url, sublists) = item
             self.log.debug(
-                "Adding %(methodname)s %(label)s (%(url)s) from docrepo %(alias)s" % locals())
-            li = E.li(E.a({'href': url}, label))
-            if sublist:
-                li.append(E.ul(*self._links_listitems(sublist)))
+                " - %(label)s (%(url)s)" % locals())
+            if url:
+                li = E.li(E.a({'href': url}, label))
+            else:
+                li = E.li(label)
+            if sublists:
+                subelements = []
+                for sublist in sublists:
+                    subelements.extend(self._links_listitems(sublist))
+                li.append(E.ul(*subelements))
             elements.append(li)
         return elements
 
@@ -195,8 +204,9 @@ class Resources(object):
         processed = set()
         # eg. self.config.cssfiles
         if getattr(self.config, option):  # it's possible to set eg
-                                         # cssfiles=None when creating
-                                         # the Resources object
+                                          # cssfiles=None when
+                                          # creating the Resources
+                                          # object
             for f in getattr(self.config, option):
                 urls.append(self._process_file(f, buf, filedir, "ferenda.ini"))
                 processed.add(f)
@@ -258,7 +268,9 @@ class Resources(object):
             fp.close()
             return None
         else:
-            self.log.debug("writing %s out to %s" % (filename, destdir))
+            # FIXME: don't copy (at least not log) if the outfile
+            # already exists.
+            # self.log.debug("writing %s out to %s" % (filename, destdir))
             outfile = destdir + os.sep + os.path.basename(filename)
             util.ensure_dir(outfile)
             with open(outfile, "wb") as fp2:
@@ -441,6 +453,8 @@ class Resources(object):
         g = Graph()
         g.add((root, RDF.type, FOAF.Document))
         for repo in self.repos:
+            # FIXME: Adding 25 repos with maybe 3-6 large ontologies
+            # each is horribly inefficient.
             for prefix, uri in repo.ontologies.store.namespaces():
                 if prefix:
                     g.bind(prefix, uri)
