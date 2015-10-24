@@ -3,6 +3,7 @@ from __future__ import unicode_literals, print_function
 
 import os
 import json
+import inspect
 
 import six
 from six import text_type as str
@@ -452,23 +453,28 @@ class Resources(object):
         root = URIRef(graphuri)
         g = Graph()
         g.add((root, RDF.type, FOAF.Document))
+        bigg = Graph()
+        paths = set()
         for repo in self.repos:
-            # FIXME: Adding 25 repos with maybe 3-6 large ontologies
-            # each is horribly inefficient.
-            for prefix, uri in repo.ontologies.store.namespaces():
-                if prefix:
-                    g.bind(prefix, uri)
-            # foaf: must always be bound
-            g.bind("foaf", "http://xmlns.com/foaf/0.1/")
-            for (s, p, o) in repo.ontologies:
-                if isinstance(s, BNode):
+            for p, ns in repo.ns.items():
+                if p in ("rdf", "rdfs", "owl"):
                     continue
-                if p in (RDF.type, RDFS.label, RDFS.comment):
-                    g.add((root, FOAF.topic, s))  # unless we've already added it?
-                    if isinstance(o, Literal):  # remove language typing info
-                        o = Literal(str(o))
-                    g.add((s, p, o))  # control duplicates somehow
-                    # print(g.serialize(format="json-ld", context=context, indent=4).decode())
+                g.bind(p, ns)
+                resourcename = "vocab/%s.ttl" % p
+                if repo.resourceloader.exists(resourcename):
+                    ontopath = repo.resourceloader.filename(resourcename)
+                    if ontopath not in paths:
+                        self.log.debug("Loading vocabulary %s" % ontopath)
+                        bigg.parse(ontopath, format="turtle")
+                        paths.add(ontopath)
+
+        g.bind("foaf", "http://xmlns.com/foaf/0.1/")
+        for (s, p, o) in bigg:
+            if p in (RDF.type, RDFS.label, RDFS.comment):
+                g.add((root, FOAF.topic, s))  # unless we've already added it?
+                if isinstance(o, Literal):  # remove language typing info
+                    o = Literal(str(o))
+                g.add((s, p, o))  # control duplicates somehow
         return g
 
     def _get_common_graph(self, graphuri):
@@ -479,21 +485,28 @@ class Resources(object):
         g.bind("skos", SKOS)
         g.bind("foaf", FOAF)
         g.add((root, RDF.type, FOAF.Document))
+        paths = set()
+        bigg = Graph()
         for repo in self.repos:
-            for (s, p, o) in repo.commondata:  # should work like
-                                            # repo.ontologies, but read
-                                            # one file per repo
-                                            # ("res/extra/rfc.ttl",
-                                            #  "res/extra/propregeringen.ttl" in
-                                            # a controlled way)
-                if p in (FOAF.name, SKOS.prefLabel, SKOS.altLabel, BIBO.identifier):
-                    g.add((root, FOAF.topic, s))
-                    # strip any typing/langtagging (because of reasons)
-                    if isinstance(o, Literal):
-                        o = Literal(str(o))
-                    g.add((s, p, o))
-                    # try to find a type
-                    g.add((s, RDF.type, repo.commondata.value(s, RDF.type)))
+            for cls in inspect.getmro(repo.__class__):
+                if hasattr(cls, "alias"):
+                    resourcename = "extra/%s.ttl" % cls.alias
+                    if repo.resourceloader.exists(resourcename):
+                        commonpath = repo.resourceloader.filename(resourcename)
+                        if commonpath not in paths:
+                            self.log.debug("loading data %s" % commonpath)
+                            bigg.parse(commonpath, format="turtle")
+                            paths.add(commonpath)
+        for (s, p, o) in bigg:
+            if p in (FOAF.name, SKOS.prefLabel,
+                     SKOS.altLabel, BIBO.identifier):
+                g.add((root, FOAF.topic, s))
+                # strip any typing/langtagging (because of reasons)
+                if isinstance(o, Literal):
+                    o = Literal(str(o))
+                g.add((s, p, o))
+                # try to find a type
+                g.add((s, RDF.type, bigg.value(s, RDF.type)))
         return g
 
     def _filepath_to_urlpath(self, path, keep_segments=2):
