@@ -632,9 +632,11 @@ class SFS(Trips):
         if notfound:
             raise IdNotFound(str(notfound))
         textheader = fp.read(2048)
+        assert isinstance(textheader, str), ("Textheader should be unicode str"
+                                             ", is %s" % type(textheader))
         idx = textheader.index(b"\r\n" * 4)
         fp.seek(idx + 8)
-        reader = TextReader(string=textheader.decode("iso-8859-1"),
+        reader = TextReader(string=textheader,
                             linesep=TextReader.DOS)
         subreader = reader.getreader(
             reader.readchunk, reader.linesep * 4)
@@ -783,7 +785,7 @@ class SFS(Trips):
                     if expdate < datetime.today():
                         if not self.config.keepexpired:
                             raise UpphavdForfattning(
-                                "%s is expired (time-limited) SFS" % filename)
+                                "%s is expired (time-limited) SFS" % basefile)
                 else:
                     self.log.warning(
                         '%s: Obekant nyckel [\'%s\']' % basefile, key)
@@ -860,6 +862,7 @@ class SFS(Trips):
 
     def sanitize_metadata(self, attribs, basefile):
         attribs = super(SFS, self).sanitize_metadata(attribs, basefile)
+        # FIXME: Needs to be recursive
         for k in "dcterms:creator", "rpubl:departement":
             if k in attribs:
                 attribs[k] = self.sanitize_departement(attribs[k])
@@ -926,6 +929,11 @@ class SFS(Trips):
                 issued = utfardad
         if issued:
             resource.graph.add((resource.identifier, DCTERMS.issued, issued))
+        else:
+            # create a totally incorrect value, otherwise
+            # lagen.nu.SFS.infer_Triples wont be able to generate a
+            # owl:sameAs uri
+            resource.graph.add((resource.identifier, DCTERMS.issued, Literal(datetime.today())))
         return resource
 
 
@@ -1002,7 +1010,9 @@ class SFS(Trips):
         return fake.get(sfsnr, None)
 
     def extract_body(self, fp, basefile):
-        bodystring = fp.read().decode("iso-8859-1")
+        bodystring = fp.read()
+        assert isinstance(bodystring, str), ("Bodystring should be unicode str"
+                                             ", is %s" % type(textheader))
         # replace bogus emdash contained in some text files
         reader = TextReader(string=bodystring.replace("\u2013", "-"),
                             linesep=TextReader.DOS)

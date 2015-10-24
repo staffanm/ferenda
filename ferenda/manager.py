@@ -839,13 +839,12 @@ def _run_class(enabled, argv, config):
             # NOTE: This is a shorter version of the error handling
             # that _run_class_with_basefile does. All errors except
             # DocumentRemoved we want to propagate.
-            try:
-                res = clbl(*config.arguments, **kwargs)
-            except errors.DocumentRemovedError as e:
-                # blindly assume that the exception has a dummyfile
-                # attribute
-                util.writefile(e.dummyfile, "")
-                raise e
+#            try:
+            res = clbl(*config.arguments, **kwargs)
+#            except errors.DocumentRemovedError as e:
+#                if hasattr(e, 'dummyfile'):
+#                    util.writefile(e.dummyfile, "")
+#                raise e
     return res
 
 # The functions runbuildclient, _queuejobs, _make_client_manager,
@@ -1217,7 +1216,7 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command, wrapctrlc=False):
             # when everyting's ok
         else:
             errmsg = str(e)
-            getlog().error("%s of %s fAiled: %s" %
+            getlog().error("%s of %s failed: %s" %
                            (command, basefile, errmsg))
             exc_type, exc_value, tb = sys.exc_info()
             return exc_type, exc_value, traceback.extract_tb(tb)
