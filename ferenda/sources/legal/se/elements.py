@@ -274,8 +274,8 @@ class Meta(CompoundElement):
 
 
 
-#class Stycke(Paragraph):
-#    pass
+class AnonStycke(Paragraph):
+    pass
 
 
 class Sektion(Section):

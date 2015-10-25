@@ -10,8 +10,8 @@ import requests
 from bs4 import BeautifulSoup
 from rdflib.namespace import SKOS
 
-from . import SwedishLegalSource, RPUBL, SwedishCitationParser
-from .swedishlegalsource import Stycke
+from . import SwedishLegalSource, SwedishLegalStore, RPUBL, SwedishCitationParser
+from .swedishlegalsource import AnonStycke
 from ferenda.decorators import downloadmax, recordlastdownload, newstate
 from ferenda import util
 from ferenda import Describer, FSMParser
@@ -20,13 +20,34 @@ from ferenda.sources.legal.se import legaluri
 from ferenda.elements import Body, CompoundElement
 from .elements import *
 
+class JKStore(SwedishLegalStore):
+    def basefile_to_pathfrag(self, basefile):
+        # store data using years as top-level dir by extracting the
+        # year from the middle of the diarienummer:
+        # "3541-97-21" => "1997/3541-97-21"
+        # "3497-06-40" => "2006/3497-06-40"
+        no, year, dtype = basefile.split("-")
+        if int(year) > 50:  # arbitrary cutoff
+            year = "19" + year
+        else:
+            year = "20" + year
+        return "%s/%s" % (year, basefile)
+
+    def pathfrag_to_basefile(self, pathfrag):
+        # "1997/3541-97-21" => "3541-97-21"
+        # "2006/3497-06-40" => "3497-06-40"
+        year, basefile = pathfrag.split(os.sep)
+        return basefile
+
+
 class JK(SwedishLegalSource):
     alias = "jk"
 
     start_url = "http://www.jk.se/Beslut.aspx?query=&type=all&dateFrom=%(date)s&dateTo=2100-01-01&dnr="
     document_url_regex = "http://www.jk.se/Beslut/(?P<kategori>[\w\-]+)/(?P<basefile>\d+\-\d+\-\d+).aspx"
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
-
+    documentstore_class = JKStore
+    
     @recordlastdownload
     def download(self, basefile=None):
         self.session = requests.session()
@@ -53,7 +74,7 @@ class JK(SwedishLegalSource):
         self.log.debug("Starting at %s" % start_url)
         while not done:
             self.log.debug("Getting page #%s" % pagecount)
-            soup = BeautifulSoup(requests.get(url).text)
+            soup = BeautifulSoup(requests.get(url).text, "lxml")
             for link in soup.find_all("a", href=document_url_regex):
                 basefile = document_url_regex.search(link["href"]).group("basefile")
                 yield basefile, urljoin(url, link["href"])
@@ -72,8 +93,8 @@ class JK(SwedishLegalSource):
         existing_soup = BeautifulSoup(
             util.readfile(
                 existing,
-                encoding=self.source_encoding))
-        new_soup = BeautifulSoup(util.readfile(new, encoding=self.source_encoding))
+                encoding=self.source_encoding), "lxml")
+        new_soup = BeautifulSoup(util.readfile(new, encoding=self.source_encoding), "lxml")
         return (existing_soup.find("div", id="mainContent") !=
                 new_soup.find("div", id="mainContent"))
 
@@ -157,7 +178,7 @@ class JK(SwedishLegalSource):
             # FIXME: this strips out formatting tags NB: Now this is a
             # SFS stycke that has fragment_label, id/uri and other
             # crap. Let's see if it still works!
-            return Stycke([parser.reader.next().get_text()])
+            return AnonStycke([parser.reader.next().get_text()])
 
         p = FSMParser()
         p.set_recognizers(is_section,
