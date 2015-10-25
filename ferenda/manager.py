@@ -420,8 +420,17 @@ def run(argv, subcall=False):
                 if classname == "all":
                     ret = []
                     for alias, classname in enabled.items():
-                        #argv_copy = list(argv)
-                        #argv_copy[0] = alias
+                        # in order to optimize / cut down on
+                        # meaningless logs, check if the class has
+                        # relate=False set and skip the relate step in
+                        # that case
+                        # (DocumentRepository.relate_all_setup does
+                        # the same check)
+                        if (argv[1] == "relate" and
+                            'relate' in getattr(config, alias) and
+                            getattr(config, alias).relate is False):
+                            log.debug("%s relate: skipping (relate=False)" % alias)
+                            continue
                         config.alias = alias
                         try:
                             ret.append(_run_class(enabled, argv, config))
