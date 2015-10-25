@@ -117,7 +117,7 @@ class JO(FixedLayoutSource):
                 # don't save the entire 100+ KB HTML mess when we only
                 # want a litle 6 KB piece. Disk space is cheap but not
                 # infinite
-                soup = BeautifulSoup(resp.text).find("div", "MidContent")
+                soup = BeautifulSoup(resp.text, "lxml").find("div", "MidContent")
                 soup.find("ol", "breadcrumb").decompose()
                 soup.find("div", id="SearchSettings").decompose()
                 with self.store.open_downloaded(basefile, mode="wb", attachment="headnote.html") as fp:
