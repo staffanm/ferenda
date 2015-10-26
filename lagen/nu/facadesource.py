@@ -13,6 +13,10 @@ class FacadeSource(CompositeRepository):
     def facets(self):
         pass
 
+    @classmethod
+    def parse_all_setup(cls, config):
+        return False
+    
     def tabs(self):
         subtabs = [self.get_instance(c).tabs() for c in self.subrepos]
         return [(self.tablabel, None, subtabs)]

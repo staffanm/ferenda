@@ -839,7 +839,8 @@ def _run_class(enabled, argv, config):
                                 clbl,
                                 basefile,
                                 kwargs,
-                                config.action))
+                                config.action,
+                                config.alias))
                 cls.teardown(config.action, inst.config)
         else:
             # The only thing that kwargs may contain is a
@@ -989,6 +990,7 @@ def _build_worker(jobqueue, resultqueue, clientname):
         kwargs = {}
         res = _run_class_with_basefile(clbl, job['basefile'],
                                        kwargs, job['command'],
+                                       job['alias'],
                                        wrapctrlc=True)
         log.debug("Client: [pid %s] %s finished: %s" % (os.getpid(), job['basefile'], res))
         logtext = logstream.getvalue()
@@ -1063,6 +1065,7 @@ def __queue_jobs_nomanager(jobqueue, iterable, inst, classname, command):
         job = {'basefile': basefile,
                'classname': classname,
                'command': command,
+               'alias': 'IDK!',  # FIXME: get hold of the alias for our class
                'config': client_config}
         # log.debug("Server: putting %r into jobqueue" %  job['basefile'])
         jobqueue.put(job)
@@ -1090,6 +1093,7 @@ def _queue_jobs(manager, iterable, inst, classname, command):
         job = {'basefile': basefile,
                'classname': classname,
                'command': command,
+               'alias': 'IDK...',  # FIXME: get hold of class alias
                'config': client_config}
         # print("putting %r into jobqueue" %  job)
         jobqueue.put(job)
@@ -1214,7 +1218,8 @@ def _process_resultqueue(resultqueue, basefiles):
     return [res[x] for x in basefiles]
 
 
-def _run_class_with_basefile(clbl, basefile, kwargs, command, wrapctrlc=False):
+def _run_class_with_basefile(clbl, basefile, kwargs, command,
+                             alias="(unknown)", wrapctrlc=False):
     try:
         return clbl(basefile, **kwargs)
     except errors.DocumentRemovedError as e:
@@ -1225,14 +1230,14 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command, wrapctrlc=False):
             # when everyting's ok
         else:
             errmsg = str(e)
-            getlog().error("%s of %s failed: %s" %
-                           (command, basefile, errmsg))
+            getlog().error("%s %s %s failed! %s" %
+                           (alias, command, basefile, errmsg))
             exc_type, exc_value, tb = sys.exc_info()
             return exc_type, exc_value, traceback.extract_tb(tb)
     except Exception as e:
         errmsg = str(e)
-        getlog().error("%s of %s Failed: %s" %
-                       (command, basefile, errmsg))
+        getlog().error("%s %s %s failed: %s" %
+                       (alias, command, basefile, errmsg))
         exc_type, exc_value, tb = sys.exc_info()
         return exc_type, exc_value, traceback.extract_tb(tb)
     except KeyboardInterrupt as e:   # KeyboardInterrupt is not an Exception
