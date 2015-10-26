@@ -4,24 +4,18 @@ from __future__ import unicode_literals
 # A abstract base class for fetching documents from data.riksdagen.se
 
 import os
-import json
-import codecs
 
 import requests
 import requests.exceptions
 from bs4 import BeautifulSoup
-from rdflib import URIRef
 
-from . import SwedishLegalSource
-from .swedishlegalsource import offtryck_parser, offtryck_gluefunc, PreambleSection, UnorderedSection
 from ferenda import util, errors
 from ferenda.compat import OrderedDict
-from ferenda.decorators import managedparsing, downloadmax
-from ferenda.describer import Describer
+from ferenda.decorators import downloadmax
 from ferenda.elements import Body, Paragraph, Preformatted
-from ferenda import PDFReader, PDFAnalyzer
 from ferenda.pdfreader import StreamingPDFReader
 from .fixedlayoutsource import FixedLayoutSource, FixedLayoutStore
+
 
 class RiksdagenStore(FixedLayoutStore):
     downloaded_suffix = ".xml"

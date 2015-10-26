@@ -18,6 +18,11 @@ class Forarbeten(FacadeSource):
     alias = "forarbeten"
     tablabel = "Förarbeten"
     subrepos = Propositioner, SOU, Ds, Direktiv
+
+    namespaces = ['rdf', 'rdfs', 'xsd', 'dcterms', 'skos', 'foaf',
+                  'xhv', 'xsi', 'owl', 'prov', 'bibo',
+                  ('rpubl', 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#'),
+                  ('rinfoex', 'http://lagen.nu/terms#')]
     
     def facet_query(self, context):
         # Override the standard query in order to ignore the default
@@ -43,6 +48,7 @@ WHERE {
                   'sou': 'SOU',
                   'ds': 'Ds',
                   'prop': 'Propositioner'}
+
         # rdf:type rpubl:Kommittedirektiv => "Kommittédirektiv"
         # rdf:type rpubl:Utredningsbetankande, rpubl:utrSerie .*sou => "SOU"
         # rdf:type rpubl:Utredningsbetankande, rpubl:utrSerie .*ds => "Ds"
@@ -50,14 +56,18 @@ WHERE {
         def select(row, binding, extra):
             return labels[ident(row, binding, extra)]
 
-
         # This is a selector that can CLEARLY not run on arbirtrary rows
         def ident(row, binding, extra):
             rdftype = row[binding]
             if rdftype == str(self.ns['rpubl'].Utredningsbetankande):
                 if row['rpubl_utrSerie']:
-                    # return "sou" or "ds", hopefully
-                    return util.uri_leaf(row['rpubl_utrSerie'])
+                    leaf = util.uri_leaf(row['rpubl_utrSerie'])
+                    if leaf.startswith("ds"):
+                        return "ds"
+                    elif leaf.startswith("sou"):
+                        return "sou"
+                    else:
+                        assert leaf in ("sou", "ds"), "leaf was %s, unsure whether this is a SOU or a Ds." % leaf
                 else:
                     self.log.error("Row for %s is rpubl:Utredning but lacks rpubl:utrSerie" % row['uri'])
             elif rdftype == str(self.ns['rpubl'].Kommittedirektiv):

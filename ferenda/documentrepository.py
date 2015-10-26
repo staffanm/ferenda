@@ -2395,9 +2395,6 @@ WHERE {
         document properties will be sufficient.
 
         """
-        # Simple caching logic -- won't hold for all cases
-        if self.config.refresh is False:
-            return
         tocindex = self.store.resourcepath("toc/index.html")
         faceted_data = self.store.resourcepath("toc/faceted_data.json")
         if (not self.config.force) and util.outfile_is_newer([faceted_data], tocindex):
