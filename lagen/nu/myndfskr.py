@@ -8,11 +8,11 @@ from rdflib.namespace import DCTERMS, SKOS
 from ferenda.sources.legal.se import RPUBL
 
 from ferenda.sources.legal.se import myndfskr
-from ferenda import CompositeRepository, CompositeStore, Facet, TocPageset, TocPage
+from ferenda import (CompositeRepository, CompositeStore, Facet, TocPageset,
+                     TocPage)
 from ferenda import util
 from ferenda.elements import Link
-from ferenda.sources.legal.se import SwedishLegalSource, SwedishLegalStore, SwedishCitationParser
-
+from ferenda.sources.legal.se import (SwedishLegalSource, SwedishLegalStore)
 from six import text_type as str
 
 

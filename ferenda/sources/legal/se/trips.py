@@ -68,7 +68,7 @@ class Trips(SwedishLegalSource):
             addrs = socket.getaddrinfo("rkrattsbaser.gov.se", 80)
             # grab the first IPv4 number
             ip = [addr[4][0] for addr in addrs if addr[0] == socket.AF_INET][0]
-            print("Changing rkrattsbaser.gov.se to %s in all URLs" % ip)
+            self.log.warning("Changing rkrattsbaser.gov.se to %s in all URLs" % ip)
             for p in ('start_url',
                       'document_url_template',
                       'document_sfsr_url_template',
@@ -98,7 +98,7 @@ class Trips(SwedishLegalSource):
             url = self.start_url % param
             pagecount = 1
             while not done:
-                self.log.info("Starting at %s" % url)
+                self.log.debug("Starting at %s" % url)
                 resp = requests.get(url)
                 tree = lxml.html.document_fromstring(resp.text)
                 tree.make_links_absolute(url, resolve_base_href=True)
@@ -109,7 +109,7 @@ class Trips(SwedishLegalSource):
                     if e.nextpage:
                         pagecount += 1
                         url = e.nextpage
-                        self.log.info("Getting page #%s of results" % pagecount)
+                        self.log.debug("Getting page #%s of results" % pagecount)
                     else:
                         done = True
 

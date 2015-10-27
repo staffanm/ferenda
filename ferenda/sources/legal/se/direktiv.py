@@ -305,7 +305,7 @@ class DirAsp(FixedLayoutSource):
                                   'ACTION': '  SÖK  '.encode('latin-1')})
             soup = BeautifulSoup(resp.text)
             hits = list(soup.find_all(True, text=re.compile(r'(\d{4}:\d+)')))
-            self.log.info("Searching for dept %s, %d results" % (dept, len(hits)))
+            self.log.debug("Searching for dept %s, %d results" % (dept, len(hits)))
             for hit in hits:
                 link = hit.find_parent("a")
                 # convert 2006:02 to 2006:2 for consistency
