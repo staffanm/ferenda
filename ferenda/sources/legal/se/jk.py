@@ -119,6 +119,7 @@ class JK(SwedishLegalSource):
         a.update({"dcterms:title": title,
                   "dcterms:publisher": self.lookup_resource("JK", SKOS.altLabel),
                   "rpubl:beslutsdatum": beslutsdatum,
+                  "dcterms:issued": beslutsdatum,
                   "rpubl:diarienummer": diarienummer,
                   "dcterms:identifier": "JK %s" % diarienummer})
         return a

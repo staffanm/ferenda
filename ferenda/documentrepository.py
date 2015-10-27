@@ -1775,8 +1775,8 @@ parsed document path to that documents dependency file."""
                             # find out if any docrepo can handle it
                             dep_basefile = repo.basefile_from_uri(str(o))
                             if dep_basefile and (
-                                    (repo != self) or (dep_basefile != basefile)):
-                                # self.log.debug("basefile %s adds dependency to %s" % (basefile, dep_basefile))
+                                    (repo != self) or
+                                    (dep_basefile != basefile)):
                                 # if so, add to that repo's dependencyfile
                                 res = repo.add_dependency(dep_basefile,
                                                           self.store.parsed_path(basefile))
@@ -1806,7 +1806,6 @@ parsed document path to that documents dependency file."""
                             self.store.dependencies_path(basefile),
                             basefile,
                             self.alias))
-
         return not present  # return True if we added something, False otherwise
 
     def relate_fulltext(self, basefile, repos=None):
@@ -2064,11 +2063,9 @@ WHERE {
         :type  context: str
         :returns: The results of the query, as python objects
         :rtype: set of dicts"""
-
         store = TripleStore.connect(self.config.storetype,
                                     self.config.storelocation,
                                     self.config.storerepository)
-
         res = store.select(query, "python")
         store.close()
         return res

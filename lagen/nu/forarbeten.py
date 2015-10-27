@@ -56,7 +56,7 @@ WHERE {
         def select(row, binding, extra):
             return labels[ident(row, binding, extra)]
 
-        # This is a selector that can CLEARLY not run on arbirtrary rows
+        # This is a selector that can CLEARLY not run on arbitrary rows
         def ident(row, binding, extra):
             rdftype = row[binding]
             if rdftype == str(self.ns['rpubl'].Utredningsbetankande):
@@ -81,10 +81,6 @@ WHERE {
                       selector=select,
                       identificator=ident),
                 Facet(RPUBL.arsutgava)]
-
-                      
-        res = super(Forarbeten, self).facets()
-        return res
 
     def toc_pagesets(self, data, facets):
         # FIXME: Main structure of this (create a two-level hierarchy

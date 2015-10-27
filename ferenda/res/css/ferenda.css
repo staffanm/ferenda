@@ -145,7 +145,7 @@ header nav ul li a {
 	border: none;
 	padding: 0;
     }
-    .header-container nav ul li a {
+    .header-container nav ul > li > a {
 	width: inherit;
 	padding: 5px;
 	margin: 0 5px 0 0;
@@ -155,7 +155,9 @@ header nav ul li a {
     .header-container nav ul li:last-child a {
 	margin-right: 10px;
     }
-
+    .header-container nav ul > li > ul {
+	display: none;
+    }
     a.navbutton, a.searchbutton {
 	display: none;
     }
