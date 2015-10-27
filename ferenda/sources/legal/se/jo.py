@@ -31,6 +31,8 @@ class JOStore(FixedLayoutStore):
         #
         # "1000-2004" => "2004/1000"
         # "6356-2012" => "2012/6356"
+        if "-" not in basefile:
+            return super(JOStore, self).basefile_to_pathfrag(basefile)
         no, year = basefile.split("-")
         return "%s/%s" % (year, no)
 

@@ -26,6 +26,8 @@ class JKStore(SwedishLegalStore):
         # year from the middle of the diarienummer:
         # "3541-97-21" => "1997/3541-97-21"
         # "3497-06-40" => "2006/3497-06-40"
+        if "-" not in basefile:
+            return super(JKStore, self).basefile_to_pathfrag(basefile)
         no, year, dtype = basefile.split("-")
         if int(year) > 50:  # arbitrary cutoff
             year = "19" + year
