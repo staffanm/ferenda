@@ -43,8 +43,7 @@ class FixedLayoutStore(SwedishLegalStore):
             d = os.path.sep.join((basedir, "downloaded"))
             if not os.path.exists(d):
                 return
-            iterators = (util.list_dirs(d, x) for x in self.doctypes)
-            for x in sorted(itertools.chain(*iterators)):
+            for x in util.list_dirs(d, self.doctypes.keys()):
                 suffix = "/index" + os.path.splitext(x)[1]
                 pathfrag = x[len(d) + 1:-len(suffix)]
                 basefile = self.pathfrag_to_basefile(pathfrag)

@@ -298,7 +298,7 @@ def list_dirs(d, suffix=None, reverse=False):
     :param d: The directory to start in
     :type d: str
     :param suffix: Only return files with the given suffix
-    :type suffix: str
+    :type suffix: str or list
     :param reverse: Returns result sorted in reverse alphabetic order
     :param type:
     :returns: the full path (starting from d) of each matching file
@@ -309,12 +309,17 @@ def list_dirs(d, suffix=None, reverse=False):
         from scandir import walk
     except ImportError:
         from os import walk
+    if isinstance(suffix, str):
+        suffix = [suffix]
+    elif suffix is None:
+        suffix = []
     for (dirpath, dirnames, filenames) in walk(d, topdown=True):
         dirnames.sort(reverse=reverse, key=split_numalpha)
         for filename in sorted(filenames, key=split_numalpha):
             fullpath = dirpath + os.sep + filename
-            if (not suffix) or fullpath.endswith(suffix):
-                yield fullpath
+            for s in suffix:
+                if fullpath.endswith(s):
+                    yield fullpath
 # util.File
 
 
