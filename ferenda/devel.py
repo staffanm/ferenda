@@ -16,7 +16,7 @@ from six import text_type as str
 from layeredconfig import LayeredConfig
 
 from ferenda.compat import OrderedDict, Mock
-from ferenda import TextReader, TripleStore, FulltextIndex, WSGIApp
+from ferenda import TextReader, TripleStore, FulltextIndex, WSGIApp, CompositeRepository
 from ferenda.elements import serialize
 from ferenda import decorators, util
 
@@ -162,11 +162,12 @@ class Devel(object):
                 row['subobjects'] = len(list(g.subject_objects(RDF.type)))
                 writer.writerow(row)
 
-    def _repo_from_alias(self, alias, datadir=None):
+    def _repo_from_alias(self, alias, datadir=None, repoconfig=None):
         #  (FIXME: This uses several undocumented APIs)
-        mainconfig = self.config._parent
-        assert mainconfig is not None, "Devel must be initialized with a full set of configuration"
-        repoconfig = getattr(mainconfig, alias)
+        if repoconfig is None:
+            mainconfig = self.config._parent
+            assert mainconfig is not None, "Devel must be initialized with a full set of configuration"
+            repoconfig = getattr(mainconfig, alias)
         from ferenda import manager
         repocls = manager._load_class(getattr(repoconfig, 'class'))
         repo = repocls()
@@ -448,14 +449,15 @@ class Devel(object):
             sys.stdout.write(chunk)
 
     @decorators.action
-    def samplerepo(self, alias, sourcedir):
+    def samplerepo(self, alias, sourcedir, sourcerepo=None, destrepo=None):
         if 'samplesize' in self.config:
             samplesize = int(self.config.samplesize)
         else:
             samplesize = 10
-
-        destrepo = self._repo_from_alias(alias)
-        sourcerepo = self._repo_from_alias(alias, sourcedir)
+        if sourcerepo is None:
+            sourcerepo = self._repo_from_alias(alias, sourcedir)
+        if destrepo is None:
+            destrepo = self._repo_from_alias(alias)
         randomsample = True
         if randomsample:
             basefiles = list(sourcerepo.store.list_basefiles_for("parse"))
@@ -509,19 +511,40 @@ class Devel(object):
                              destrepo.store.documententry_path(basefile))
 
     def samplerepos(self, sourcedir):
+        classes = set()
         for alias in self.config._parent._subsections:
-            if alias == self.alias:
+            if alias == self.alias:  # ie "devel"
                 continue
-            aliascfg = self.config._parent._subsections[alias]
-            if 'samplesource' in aliascfg:
-                if not aliascfg.samplesource:
-                    continue
-                aliasdir = sourcedir+os.sep+aliascfg.samplesource
+            destrepo = self._repo_from_alias(alias)
+            if destrepo.__class__ in classes:
+                print("...skipping class %r" % destrepo.__class__)
+                continue
+            if isinstance(destrepo, CompositeRepository):
+                sourcerepo = self._repo_from_alias(alias)
+                for cls in destrepo.subrepos:
+                    subdestrepo = destrepo.get_instance(cls)
+                    if isinstance(subdestrepo, CompositeRepository):
+                        print("...giving up on nested compositerepository")
+                        continue
+                    if subdestrepo.__class__ in classes:
+                        print("...skipping class %r" % subdestrepo.__class__)
+                        continue
+                    classes.add(subdestrepo.__class__)
+                    subsourcerepo = sourcerepo.get_instance(cls)
+                    assert id(subdestrepo) != id(subsourcerepo)
+                    subsourcerepo.store.datadir = (sourcedir + os.sep +
+                                                   subsourcerepo.alias)
+                    alias = subsourcerepo.alias
+                    aliasdir = subsourcerepo.store.datadir
+                    print("%s/%s: Copying docs from  %s" %
+                          (sourcerepo.alias, alias, aliasdir))
+                    self.samplerepo(alias, aliasdir, subsourcerepo, subdestrepo)
             else:
+                classes.add(destrepo.__class__)
                 aliasdir = sourcedir+os.sep+alias
-                    
-            print("%s: Copying docs from %s" % (alias, aliasdir))
-            self.samplerepo(alias, aliasdir)
+                print("%s: Copying docs from %s" % (alias, aliasdir))
+                self.samplerepo(alias, aliasdir)
+
 
     # FIXME: These are dummy implementations of methods and class
     # variables that manager.py expects all docrepos to have. We don't
