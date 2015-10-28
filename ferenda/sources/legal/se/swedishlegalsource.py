@@ -471,7 +471,6 @@ class SwedishLegalSource(DocumentRepository):
         rdflib.Resource version of the same. 
 
         """ 
-
         # even though our attributes are sanitized, plain-str objects
         # might need conversion (language-tagged literals, typed
         # literals, lookups from a label to a URIRef...)

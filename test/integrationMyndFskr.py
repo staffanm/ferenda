@@ -13,7 +13,7 @@ from ferenda.testutil import RepoTester, file_parametrize
 from ferenda.sources.legal.se import myndfskr
 
 class Parse(RepoTester):
-    repoclass = myndfskr.MyndFskr  # in some cases we might need to get a
+    repoclass = myndfskr.MyndFskrBase  # in some cases we might need to get a
     # specific one like SOSFS, see below
 
     def parametric_test(self,filename):
@@ -31,7 +31,7 @@ class Parse(RepoTester):
         basefile = os.path.splitext(os.path.basename(filename))[0].replace("-", "/", 1).replace("-", ":")
         repoclass = {'afs': myndfskr.AFS,
                      'sosfs': myndfskr.SOSFS,
-                     'dvfs': myndfskr.DVFS}.get(repo, myndfskr.MyndFskr)
+                     'dvfs': myndfskr.DVFS}.get(repo, myndfskr.MyndFskrBase)
         if repoclass != self.repoclass:
             self.repo = repoclass(datadir=self.datadir,
                                   storelocation=self.datadir + "/ferenda.sqlite",

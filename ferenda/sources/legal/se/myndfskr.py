@@ -29,7 +29,11 @@ from rdflib.namespace import DCTERMS, SKOS
 from . import RPUBL, RINFOEX
 PROV = Namespace(util.ns['prov'])
 
-
+# NOTE: Since the main parse logic operates on the output of
+# pdftotext, not pdftohtml, there is no real gain in subclassing
+# FixedLayoutSource even though the goals of that repo is very similar
+# to most MyndFskrBase derived repos. Also, there are repos that do
+# not contain PDF files (DVFS).
 class MyndFskrBase(SwedishLegalSource):
 
     """A abstract base class for fetching and parsing regulations from
@@ -72,7 +76,7 @@ class MyndFskrBase(SwedishLegalSource):
     def forfattningssamlingar(self):
         return [self.alias]
 
-    def download_sanitize_basefile(self, basefile):
+    def sanitize_basefile(self, basefile):
         segments = re.split('[/:_-]', basefile.lower())
         # force "01" to "1" (and check integerity (not integrity))
         segments[-1] = str(int(segments[-1]))
@@ -92,7 +96,7 @@ class MyndFskrBase(SwedishLegalSource):
         # DocumentRepository.download_get_basefiles which handles
         # "next page" navigation and also ensures that the default
         # basefilepattern is "myndfs/2015:1", not just "2015:1"
-        # (through download_sanitize_basefile)
+        # (through sanitize_basefile)
         yielded = set()
         while source:
             nextform = nexturl = None
@@ -114,7 +118,7 @@ class MyndFskrBase(SwedishLegalSource):
                         basefile = m.group("basefile")
 
                 if basefile:
-                    basefile = self.download_sanitize_basefile(basefile)
+                    basefile = self.sanitize_basefile(basefile)
                     if self.download_rewrite_url:
                         if callable(self.download_rewrite_url):
                             link = self.download_rewrite_url(basefile, link)
@@ -363,10 +367,12 @@ class MyndFskrBase(SwedishLegalSource):
             props['dcterms:identifier'] = "%s %s:%s" % (pub, year, ordinal)
             self.log.warning("%s: Couldn't find dcterms:identifier, inferred %s from basefile" %
                              (doc.basefile, props['dcterms:identifier']))
-        uri = makeurl({'rdf:type': RPUBL.Myndighetsforeskrift,
-                       'rpubl:forfattningssamling': pub,
-                       'rpubl:arsutgava': year,
-                       'rpubl:lopnummer': ordinal})
+        attrs = {'rdf:type': RPUBL.Myndighetsforeskrift,
+                 'rpubl:forfattningssamling':
+                 self.lookup_resource(pub, SKOS.altLabel),
+                 'rpubl:arsutgava': year,
+                 'rpubl:lopnummer': ordinal}
+        uri = makeurl(attrs)
 
         if doc.uri is not None and uri != doc.uri:
             self.log.warning(
@@ -414,7 +420,8 @@ class MyndFskrBase(SwedishLegalSource):
                     (year, ordinal) = re.split('[ :]', orig)
                     pub = props['dcterms:identifier'].split(" ")[0]
                 origuri = makeurl({'rdf:type': RPUBL.Myndighetsforeskrift,
-                                   'rpubl:forfattningssamling': pub,
+                                   'rpubl:forfattningssamling':
+                                   self.lookup_resource(pub, SKOS.altLabel),
                                    'rpubl:arsutgava': year,
                                    'rpubl:lopnummer': ordinal})
                 desc.rel(RPUBL.andrar,
@@ -474,7 +481,8 @@ class MyndFskrBase(SwedishLegalSource):
                                    util.normalize_space(props['rpubl:upphaver'])):
                 (pub, year, ordinal) = re.split('[ :]', upph)
                 upphuri = makeurl({'rdf:type': RPUBL.Myndighetsforeskrift,
-                                   'rpubl:forfattningssamling': pub,
+                                   'rpubl:forfattningssamling':
+                                   self.lookup_resource(pub, SKOS.altLabel),
                                    'rpubl:arsutgava': year,
                                    'rpubl:lopnummer': ordinal})
                 desc.rel(RPUBL.upphaver, upphuri)
@@ -603,8 +611,8 @@ class AFS(MyndFskrBase):
                 newtext += newline + "\n"
         return newtext
 
-    def download_sanitize_basefile(self, basefile):
-        return super(AFS, self).download_sanitize_basefile(basefile.replace("_", ":"))
+    def sanitize_basefile(self, basefile):
+        return super(AFS, self).sanitize_basefile(basefile.replace("_", ":"))
 
 
 class BOLFS(MyndFskrBase):
@@ -705,10 +713,10 @@ class EIFS(MyndFskrBase):
     basefile_regex = None
     document_url_regex = re.compile('.*(?P<basefile>EIFS_\d{4}_\d+).pdf$')
 
-    def download_sanitize_basefile(self, basefile):
+    def sanitize_basefile(self, basefile):
         basefile = basefile.replace("_", "/", 1)
         basefile = basefile.replace("_", ":", 1)
-        return super(EIFS, self).download_sanitize_basefile(basefile)
+        return super(EIFS, self).sanitize_basefile(basefile)
 
 
 class ELSAKFS(MyndFskrBase):
@@ -908,9 +916,9 @@ class NFS(MyndFskrBase):
     nextpage_regex = "Nästa"
     storage_policy = "dir"
 
-    def download_sanitize_basefile(self, basefile):
+    def sanitize_basefile(self, basefile):
         basefile = basefile.replace(" ", "/")
-        return super(NFS, self).download_sanitize_basefile(basefile)
+        return super(NFS, self).sanitize_basefile(basefile)
 
     def forfattningssamlingar(self):
         return ["nfs", "snfs"]
@@ -1061,7 +1069,7 @@ class SKVFS(MyndFskrBase):
                             '\w+FS \d+:\d+', docelement.text):
                         continue
                     linktext = re.match("\w+FS \d+:\d+", docelement.text).group(0)
-                    basefile = self.download_sanitize_basefile(linktext.replace(" ", "/"))
+                    basefile = self.sanitize_basefile(linktext.replace(" ", "/"))
                     if "bilaga" in element.text:
                         self.log.warning(
                             "%s: Skipping attachment in %s" %
@@ -1123,7 +1131,7 @@ class SOSFS(MyndFskrBase):
         if linktext:
             m = re.search("SOSFS\s+(\d+:\d+)", linktext)
             if m:
-                return self.download_sanitize_basefile(m.group(1))
+                return self.sanitize_basefile(m.group(1))
 
     @decorators.downloadmax
     def download_get_basefiles(self, source):
@@ -1188,7 +1196,7 @@ class SOSFS(MyndFskrBase):
                         "Senaste version av SOSFS (?P<basefile>\d+:\d+)")
                     konslinkel = soup.find("a", text=konsbasefileregex)
                     if konslinkel:
-                        konsbasefile = self.download_sanitize_basefile(
+                        konsbasefile = self.sanitize_basefile(
                             konsbasefileregex.search(
                                 konslinkel.text).group("basefile"))
                         konsfile = self.store.downloaded_path(
@@ -1264,7 +1272,7 @@ class STAFS(MyndFskrBase):
                     m = self.re_identifier.search(linkel.text)
                     assert m
                     if url.endswith(".pdf"):
-                        newbasefile = self.download_sanitize_basefile(m.group(1))
+                        newbasefile = self.sanitize_basefile(m.group(1))
                         if basefile != newbasefile:
                             # incorrectly labeled file -- no way of
                             # knowing which label is correct
@@ -1284,7 +1292,7 @@ class STAFS(MyndFskrBase):
                             assert m
                             suburl = urljoin(url, sublink.get("href"))
                             if suburl.endswith(".pdf"):
-                                subbasefile = self.download_sanitize_basefile(m.group(1))
+                                subbasefile = self.sanitize_basefile(m.group(1))
                                 self.log.debug("%s:    Downloading change %s from %s" %
                                                (basefile, subbasefile, suburl))
                                 self.download_if_needed(suburl, subbasefile)

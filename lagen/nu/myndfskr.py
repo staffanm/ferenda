@@ -15,7 +15,7 @@ from ferenda import util
 from ferenda.elements import Link
 from ferenda.sources.legal.se import (SwedishLegalSource, SwedishLegalStore)
 from six import text_type as str
-
+from . import SameAs
 
 # inherit list_basefiles_for from CompositeStore, basefile_to_pathfrag
 # from SwedishLegalStore)
@@ -24,6 +24,10 @@ class MyndFskrStore(CompositeStore, SwedishLegalStore):
 
 class MyndFskr(CompositeRepository, SwedishLegalSource):
     alias = "myndfs"
+    # FIXME: just specifying an extra base is not enough, we need to make the
+    # resourceloader initialize from the correct dir (lagen/nu/res
+    # instead of ferenda/sources/legal/se/res).
+    extrabases = SameAs,
     subrepos = [
         myndfskr.AFS,
         myndfskr.BOLFS,
@@ -68,7 +72,9 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
 
     # This custom implementation of download is able to select a
     # particular subrepo and call its download method. That way we
-    # don't have to enable the subrepo specifically.
+    # don't have to enable the subrepo specifically, eg:
+    #
+    # ./ferenda-build.py myndfs download bolfs:
     def download(self, basefile=None):
         if basefile:
             # expect a basefile on the form "subrepoalias:basefile" or
@@ -85,7 +91,9 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
             return super(MyndFskr, self).download()
 
     # This custom implementation of parse is able to select a
-    # particular subrepo and parse using that
+    # particular subrepo and parse using that, eg::
+    #
+    # ./ferenda-build.py myndfs parse bolfs:bolfs/2012:1
     def parse(self, basefile):
         subrepoalias, subbasefile = basefile.split(":", 1)
         if re.match("[a-zåäö\-]+fs$", subrepoalias, re.IGNORECASE):
