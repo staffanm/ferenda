@@ -7,7 +7,7 @@ from collections import defaultdict
 
 from ferenda import DocumentRepository, DocumentStore
 from ferenda import util, errors
-
+from ferenda.compat import OrderedDict
 
 class CompositeStore(DocumentStore):
 
@@ -20,7 +20,7 @@ class CompositeStore(DocumentStore):
         self.downloaded_suffix = downloaded_suffix
         self.storage_policy = storage_policy
         if not docrepo_instances:
-            docrepo_instances = {}
+            docrepo_instances = OrderedDict()
         self.docrepo_instances = docrepo_instances
         self.basefiles = defaultdict(set)
 
@@ -82,7 +82,7 @@ class CompositeRepository(DocumentRepository):
             return self._instances[instanceclass]
 
     def __init__(self, config=None, **kwargs):
-        self._instances = {}
+        self._instances = OrderedDict()
         # after this, self.config WILL be set (regardless of whether a
         # config object was provided or not
         super(CompositeRepository, self).__init__(config, **kwargs)

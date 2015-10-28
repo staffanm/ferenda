@@ -2,6 +2,7 @@
 from __future__ import unicode_literals, print_function
 
 from operator import attrgetter
+import re
 
 from rdflib import RDF, URIRef
 from rdflib.namespace import DCTERMS, SKOS
@@ -64,6 +65,10 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
     sparql_annotations = None  # until we can speed things up
     documentstore_class = MyndFskrStore
 
+
+    # This custom implementation of download is able to select a
+    # particular subrepo and call its download method. That way we
+    # don't have to enable the subrepo specifically.
     def download(self, basefile=None):
         if basefile:
             # expect a basefile on the form "subrepoalias:basefile" or
@@ -78,6 +83,19 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
                 self.log.error("Couldn't find any subrepo with alias %s" % subrepoalias)
         else:
             return super(MyndFskr, self).download()
+
+    # This custom implementation of parse is able to select a
+    # particular subrepo and parse using that
+    def parse(self, basefile):
+        subrepoalias, subbasefile = basefile.split(":", 1)
+        if re.match("[a-zåäö\-]+fs$", subrepoalias, re.IGNORECASE):
+            for cls in self.subrepos:
+                if cls.alias == subrepoalias:
+                    inst = self.get_instance(cls)
+                    inst.parse(subbasefile)
+                    break
+        else:
+             return super(MyndFskr, self).parse(basefile)   
     
     def facets(self):
         # maybe if each entry in the list could be a tuple or a single
