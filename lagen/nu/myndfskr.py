@@ -63,6 +63,21 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
                   ('rinfoex', 'http://lagen.nu/terms#')]
     sparql_annotations = None  # until we can speed things up
     documentstore_class = MyndFskrStore
+
+    def download(self, basefile=None):
+        if basefile:
+            # expect a basefile on the form "subrepoalias:basefile" or
+            # just "subrepoalias:"
+            subrepoalias, basefile = basefile.split(":")
+            for cls in self.subrepos:
+                if cls.alias == subrepoalias:
+                    inst = self.get_instance(cls)
+                    inst.download(basefile)
+                    break
+            else:
+                self.log.error("Couldn't find any subrepo with alias %s" % subrepoalias)
+        else:
+            return super(MyndFskr, self).download()
     
     def facets(self):
         # maybe if each entry in the list could be a tuple or a single

@@ -60,9 +60,12 @@ class MyndFskrBase(SwedishLegalSource):
 
     nextpage_regex = None
     nextpage_url_regex = None
-    download_rewrite_url = False  # iff True, use remote_url to rewrite
-    # download links instead of accepting
-    # found links as-is
+    download_rewrite_url = False
+    # iff True, use remote_url to rewrite download links instead of
+    # accepting found links as-is. If it's a callable, call that with
+    # basefile, URL and expect a rewritten URL.
+
+    
     download_formid = None  # if the paging uses forms, POSTs and other
     # forms of insanity
 
@@ -113,7 +116,10 @@ class MyndFskrBase(SwedishLegalSource):
                 if basefile:
                     basefile = self.download_sanitize_basefile(basefile)
                     if self.download_rewrite_url:
-                        link = self.remote_url(basefile)
+                        if callable(self.download_rewrite_url):
+                            link = self.download_rewrite_url(basefile, link)
+                        else:
+                            link = self.remote_url(basefile)
                     if basefile not in yielded:
                         yield (basefile, link)
                         yielded.add(basefile)
@@ -674,7 +680,7 @@ class DVFS(MyndFskrBase):
 
     def textreader_from_basefile(self, basefile):
         infile = self.store.downloaded_path(basefile)
-        soup = BeautifulSoup(util.readfile(infile))
+        soup = BeautifulSoup(util.readfile(infile), "lxml")
         main = soup.find("div", id="readme")
         if main:
             main.find("div", "rs_skip").decompose()
@@ -738,7 +744,7 @@ class FFFS(MyndFskrBase):
 
     def download(self, basefile=None):
         self.session = requests.session()
-        soup = BeautifulSoup(self.session.get(self.start_url).text)
+        soup = BeautifulSoup(self.session.get(self.start_url).text, "lxml")
         main = soup.find(id="fffs-searchresults")
         docs = []
         for numberlabel in main.find_all(text=re.compile('\s*Nummer\s*')):
@@ -771,7 +777,7 @@ class FFFS(MyndFskrBase):
         pdffile = self.store.downloaded_path(basefile)
         self.log.debug("%s: download_single..." % basefile)
         snippetfile = self.store.downloaded_path(basefile, attachment="snippet.html")
-        soup = BeautifulSoup(open(snippetfile))
+        soup = BeautifulSoup(open(snippetfile), "lxml")
         href = soup.find(
             text=re.compile("\s*Rubrik\s*")).find_parent("div", "FFFSListArea").a.get("href")
         url = urljoin("http://www.fi.se/Regler/FIs-forfattningar/Forteckning-FFFS/", href)
@@ -785,7 +791,7 @@ class FFFS(MyndFskrBase):
             descriptionfile = self.store.downloaded_path(
                 basefile,
                 attachment="description.html")
-            soup = BeautifulSoup(open(descriptionfile))
+            soup = BeautifulSoup(open(descriptionfile), "lxml")
             for link in soup.find("div", "maincontent").find_all("a"):
                 suburl = urljoin(url, link['href']).replace(" ", "%20")
                 if link.text.strip().startswith('Grundförfattning'):
@@ -829,7 +835,14 @@ class FMI(MyndFskrBase):
 
 class FoHMFS(MyndFskrBase):
     alias = "fohmfs"
-    start_url = "http://www.folkhalsomyndigheten.se/publicerat-material/foreskrifter-och-allmanna-rad/"
+    start_url = ("http://www.folkhalsomyndigheten.se/publicerat-material/"
+                 "foreskrifter-och-allmanna-rad/")
+
+    def download_rewrite_url(self, basefile, link):
+        soup = BeautifulSoup(self.session.get(link).text, "lxml")
+        linkel = soup.find("a", href=re.compile(".pdf"))
+        link = urljoin(link, linkel.get("href"))
+        return link
 
 
 class KFMFS(MyndFskrBase):
@@ -839,13 +852,17 @@ class KFMFS(MyndFskrBase):
 
 class KOVFS(MyndFskrBase):
     alias = "kovfs"
-    start_url = "http://publikationer.konsumentverket.se/sv/publikationer/lagarregler/forfattningssamling-kovfs/"
+    start_url = ("http://publikationer.konsumentverket.se/sv/publikationer/"
+                 "lagarregler/forfattningssamling-kovfs/")
 
 
 class KVFS(MyndFskrBase):
     alias = "kvfs"
-    start_url = "http://www.kriminalvarden.se/om-kriminalvarden/publikationer/regelverk"
-    # (finns även konsoliderade på http://www.kriminalvarden.se/om-kriminalvarden/styrning-och-regelverk/lagar-forordningar-och-foreskrifter)
+    start_url = ("http://www.kriminalvarden.se/om-kriminalvarden/"
+                 "publikationer/regelverk")
+    # (finns även konsoliderade på http://www.kriminalvarden.se/
+    #  om-kriminalvarden/styrning-och-regelverk/lagar-forordningar-och-
+    #  foreskrifter)
 
 
 class LMFS(MyndFskrBase):
@@ -1261,7 +1278,7 @@ class STAFS(MyndFskrBase):
                     else:
                         # not pdf - link to yet another pg
                         self.log.debug("%s:    Fetching landing page %s" % (basefile, url))
-                        subsoup = BeautifulSoup(self.session.get(url).text)
+                        subsoup = BeautifulSoup(self.session.get(url).text, "lxml")
                         for sublink in soup.find_all("a", text=self.re_identifier):
                             m = self.re_identifier.search(sublink.text)
                             assert m
