@@ -34,43 +34,59 @@ from ferenda.sources.legal.se import legaluri
 from ferenda import util
 from ferenda.errors import FerendaException, DocumentRemovedError, ParseError
 from .legalref import LegalRef, LinkSubject
-from . import Trips, SwedishCitationParser, RPUBL
+from . import Trips, SwedishCitationParser, RPUBL, SwedishLegalStore
 from .elements import *
 
 
 class IckeSFS(ParseError):
-    """Raised when an act that has been published in SFS, but is not a proper SFS (eg N1992:31),
-    is encountered."""
-    # NB: This is only raised in download_to_intermediate. Should perhaps be raised in 
-    # download_single to avoid storing these at all? There only seems to be SFSR entries for 
-    # these, no fulltext can be found in SFST.
+    """Raised when an act that has been published in SFS, but is not a
+    proper SFS (eg N1992:31), is encountered.
+
+    """
+    # NB: This is only raised in download_to_intermediate. Should
+    # perhaps be raised in download_single to avoid storing these at
+    # all? There only seems to be SFSR entries for these, no fulltext
+    # can be found in SFST.
 
 
 class UpphavdForfattning(DocumentRemovedError):
-    """Raised when an act that is parsed is determined to be expired. The setting 
-    config.keepexpired controls whether these exceptions are thrown."""
-    # FIXME: Those checks occur in several places: extract_metadata_header, extract_metadata_register
-    # and download_to_intermediate, with varying amounts of completeness and error handling
+    """Raised when an act that is parsed is determined to be expired. The
+    setting config.keepexpired controls whether these exceptions are
+    thrown.
+
+    """
+    # FIXME: Those checks occur in several places:
+    # extract_metadata_header, extract_metadata_register and
+    # download_to_intermediate, with varying amounts of completeness
+    # and error handling
 
 
 class InteUppdateradSFS(FerendaException):
-    """Raised whenever SFSR indicates that a base SFS has been updated, but SFST doesn't reflect this."""
+    """Raised whenever SFSR indicates that a base SFS has been updated,
+    but SFST doesn't reflect this.
+
+    """
     pass
 
 
 class InteExisterandeSFS(DocumentRemovedError):
-    """Raised when a HTML page that should contain the text of an statute instead contains an error 
-    message saying that no such document exists. This happens because the search results occasionally
-    contain such links. A common case seem to be a search result appearing to be a base SFS, but the
-    SFS number really refers to a change SFS of some other base SFS."""
-    # FIXME: This is raised in extract_head and download_base_sfs (only called when doing updating
-    # download, not full refresh). It should probably be raised in download_single as well (and 
+    """Raised when a HTML page that should contain the text of an statute
+    instead contains an error message saying that no such document
+    exists. This happens because the search results occasionally
+    contain such links. A common case seem to be a search result
+    appearing to be a base SFS, but the SFS number really refers to a
+    change SFS of some other base SFS.
+
+    """
+    # FIXME: This is raised in extract_head and download_base_sfs
+    # (only called when doing updating download, not full refresh). It
+    # should probably be raised in download_single as well (and
     # possibly not in extract_head)
     
-class SFSDocumentStore(SwedishLegalSource):
+class SFSDocumentStore(SwedishLegalStore):
 
-    # FIXME: we might just add the quote call to SwedishLegalSource.basefile_to_pathfrag and
-    # remove this override
+    # FIXME: we might just add the quote call to
+    # SwedishLegalSource.basefile_to_pathfrag and remove this override
     def basefile_to_pathfrag(self, basefile):
         return quote(super(SFSDocumentStore, self).basefile_to_pathfrag(basefile))
 
@@ -650,8 +666,12 @@ class SFS(Trips):
         if notfound:
             raise InteExisterandeSFS(str(notfound))
         textheader = fp.read(2048)
-        assert isinstance(textheader, str), ("Textheader should be unicode str"
-                                             ", is %s" % type(textheader))
+        if not isinstance(textheader, str):
+            # Depending on whether the fp is opened through standard
+            # open() or bz2.BZ2File() in self.parse_open(), it might
+            # return bytes or unicode strings. This seem to be a
+            # problem in BZ2File (or how we use it). Just roll with it.
+            textheader = textheader.decode("iso-8859-1")
         idx = textheader.index(b"\r\n" * 4)
         fp.seek(idx + 8)
         reader = TextReader(string=textheader,
@@ -1029,9 +1049,13 @@ class SFS(Trips):
 
     def extract_body(self, fp, basefile):
         bodystring = fp.read()
-        assert isinstance(bodystring, str), ("Bodystring should be unicode str"
-                                             ", is %s" % type(textheader))
-        # replace bogus emdash contained in some text files
+        # see comment in extract_head for why we must handle both
+        # bytes- and str-files
+        if not isinstance(bodystring, str):
+            bodystring = bodystring.decode("iso-8859-1")
+        # replace bogus emdash contained in some text files before
+        # loading into TextReader (our need to do this before creating
+        # the TextReader is why we can't do it in sanitize_body
         reader = TextReader(string=bodystring.replace("\u2013", "-"),
                             linesep=TextReader.DOS)
         reader.autostrip = True
