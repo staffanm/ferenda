@@ -39,34 +39,48 @@ from .elements import *
 
 
 class IckeSFS(ParseError):
-    """Slängs när en författning som inte är en egentlig
-    SFS-författning parsas"""
+    """Raised when an act that has been published in SFS, but is not a proper SFS (eg N1992:31),
+    is encountered."""
+    # NB: This is only raised in download_to_intermediate. Should perhaps be raised in 
+    # download_single to avoid storing these at all? There only seems to be SFSR entries for 
+    # these, no fulltext can be found in SFST.
 
 
 class UpphavdForfattning(DocumentRemovedError):
-    pass
-
-
-class IdNotFound(DocumentRemovedError):
-    pass
+    """Raised when an act that is parsed is determined to be expired. The setting 
+    config.keepexpired controls whether these exceptions are thrown."""
+    # FIXME: Those checks occur in several places: extract_metadata_header, extract_metadata_register
+    # and download_to_intermediate, with varying amounts of completeness and error handling
 
 
 class InteUppdateradSFS(FerendaException):
+    """Raised whenever SFSR indicates that a base SFS has been updated, but SFST doesn't reflect this."""
     pass
 
 
-class InteExisterandeSFS(FerendaException):
-    pass  # same as IdNotFound?
+class InteExisterandeSFS(DocumentRemovedError):
+    """Raised when a HTML page that should contain the text of an statute instead contains an error 
+    message saying that no such document exists. This happens because the search results occasionally
+    contain such links. A common case seem to be a search result appearing to be a base SFS, but the
+    SFS number really refers to a change SFS of some other base SFS."""
+    # FIXME: This is raised in extract_head and download_base_sfs (only called when doing updating
+    # download, not full refresh). It should probably be raised in download_single as well (and 
+    # possibly not in extract_head)
+    
+class SFSDocumentStore(SwedishLegalSource):
 
-
-class SFSDocumentStore(DocumentStore):
-
+    # FIXME: we might just add the quote call to SwedishLegalSource.basefile_to_pathfrag and
+    # remove this override
     def basefile_to_pathfrag(self, basefile):
-        return quote(basefile.replace(":", "/"))
+        return quote(super(SFSDocumentStore, self).basefile_to_pathfrag(basefile))
 
+    # FIXME: ditto
     def pathfrag_to_basefile(self, pathfrag):
-        return unquote(pathfrag.replace("\\", "/").replace("/", ":"))
+        return unquote(super(SFSDocumentStore, self).pathfrag_to_basefile(pathfrag))
 
+    # some extra methods for SFSR pages and semi-hidden metadata pages. 
+    # FIXME: These should probably be handled as attachments instead of custom methods, even if that 
+    # means we need to set storage_policy = "dir"
     def register_path(self, basefile):
         return self.path(basefile, "register", ".html")
 
@@ -77,7 +91,8 @@ class SFSDocumentStore(DocumentStore):
     def metadata_path(self, basefile):
         return self.path(basefile, "metadata", ".html")
 
-    def intermediate_path(self, basefile, version=None, attachment="None"):
+    # Override to ensure that intermediate files use .txt suffix (not .xml)
+    def intermediate_path(self, basefile, version=None, attachment=None):
         return self.path(basefile, "intermediate", ".txt")
 
 
@@ -122,7 +137,10 @@ class SFS(Trips):
          'start': '2009',
          'end': str(datetime.today().year)}
     ]
-
+    # download_params is split into a list of two since the UI has a bug in that it only 
+    # returns the first 10 000 hits (or so). When doing a full refresh, the 10 000:th document 
+    # occurs somewhere around 2009 
+ 
     document_url_template = (
         "http://rkrattsbaser.gov.se/cgi-bin/thw?${OOHTML}=sfst_dok&"
         "${HTML}=sfst_lst&${SNHTML}=sfst_err&${BASE}=SFST&"
@@ -630,7 +648,7 @@ class SFS(Trips):
         # do we really have a registry?
         notfound = soup.find(text="Sökningen gav ingen träff!")
         if notfound:
-            raise IdNotFound(str(notfound))
+            raise InteExisterandeSFS(str(notfound))
         textheader = fp.read(2048)
         assert isinstance(textheader, str), ("Textheader should be unicode str"
                                              ", is %s" % type(textheader))
@@ -1668,4 +1686,5 @@ class SFS(Trips):
                 res.append(row['titel'][:idx])
         res.append(Link(title, uri=row['uri']))
         return res
+
 
