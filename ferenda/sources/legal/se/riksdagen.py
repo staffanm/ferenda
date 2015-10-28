@@ -221,8 +221,9 @@ class Riksdagen(FixedLayoutSource):
                                                    attachment="index.html"))
         
         intermediate_path = self.store.intermediate_path(basefile)
+        intermediate_path += ".bz2" if self.config.compress == "bz2" else ""
         # if a compressed bz2 file is > 5 MB, it's just too damn big
-        if os.path.getsize(intermediate_path) > 5*1024*1025:
+        if os.path.exists(intermediate_path) and os.path.getsize(intermediate_path) > 5*1024*1024:
             raise ParseError("%s: %s is just too damn big (%s bytes)" % 
                              (basefile, intermediate_path, 
                               os.path.getsize(intermediate_path)))
@@ -231,19 +232,26 @@ class Riksdagen(FixedLayoutSource):
         keep_xml = "bz2" if self.config.compress == "bz2" else True
         reader = StreamingPDFReader()
         try:
-            return reader.convert(filename=downloaded_path,
-                                  workdir=intermediate_dir,
-                                  images=self.config.pdfimages,
-                                  convert_to_pdf=convert_to_pdf,
-                                  keep_xml=keep_xml)
+            res = reader.convert(filename=downloaded_path,
+                                 workdir=intermediate_dir,
+                                 images=self.config.pdfimages,
+                                 convert_to_pdf=convert_to_pdf,
+                                 keep_xml=keep_xml)
         except errors.PDFFileIsEmpty:
             self.log.debug("%s: PDF had no textcontent, trying OCR" % basefile)
-            return reader.convert(filename=downloaded_path,
-                                  workdir=intermediate_dir,
-                                  images=self.config.pdfimages,
-                                  convert_to_pdf=convert_to_pdf,
-                                  keep_xml=keep_xml,
-                                  ocr_lang="swe")
+            res = reader.convert(filename=downloaded_path,
+                                 workdir=intermediate_dir,
+                                 images=self.config.pdfimages,
+                                 convert_to_pdf=convert_to_pdf,
+                                 keep_xml=keep_xml,
+                                 ocr_lang="swe")
+        intermediate_path = self.store.intermediate_path(basefile)
+        intermediate_path += ".bz2" if self.config.compress == "bz2" else ""
+        if os.path.getsize(intermediate_path) > 5*1024*1024:
+            raise ParseError("%s: %s (after conversion) is just too damn big (%s bytes)" % 
+                             (basefile, intermediate_path, 
+                              os.path.getsize(intermediate_path)))
+        return res
 
     def metadata_from_basefile(self, basefile):
         a = super(Riksdagen, self).metadata_from_basefile(basefile)
