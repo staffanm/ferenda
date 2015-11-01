@@ -69,6 +69,9 @@ class PropTrips(Trips, FixedLayoutSource):
 
     downloaded_suffix = ".html"
     rdf_type = RPUBL.Proposition
+    KOMMITTEDIREKTIV = SOU = DS = None
+    PROPOSITION = "prop"
+    document_type = PROPOSITION
 
     storage_policy = "dir"
     documentstore_class = PropTripsStore

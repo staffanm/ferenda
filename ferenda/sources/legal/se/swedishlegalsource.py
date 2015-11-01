@@ -700,9 +700,8 @@ class SwedishLegalSource(DocumentRepository):
         :param d: A configured Describer instance
         :param basefile: The basefile for the doc we want to infer from 
         """
-        # Lagen.nu specific subclasses (ie classes that mints
-        # lagen.nu-owned URIs) should inherit this and create suitable
-        # owl:sameAs semantics
+        # Right now, this only tries to infer a dcterms:identifier if
+        # not already present
         sup = super(SwedishLegalSource, self)
         if hasattr(sup, 'infer_metadata'):
             sup.infer_metadata(resource, basefile)
@@ -713,9 +712,6 @@ class SwedishLegalSource(DocumentRepository):
             #     "%s: No dcterms:identifier, assuming %s" % (basefile,
             #                                                 identifier))
             d.value(DCTERMS.identifier, identifier)
-
-        if self.rdf_type == RPUBL.Utredningsbetankande:
-            d.rel(RPUBL.utrSerie, self.dataset_uri())
 
     def infer_identifier(self, basefile):
         """Given a basefile of a document, returns a string that is a usable

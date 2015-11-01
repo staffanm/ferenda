@@ -3,7 +3,7 @@ from __future__ import unicode_literals, print_function
 
 from ferenda import CompositeRepository
 from ferenda.sources.legal.se import Ds as OrigDs
-from ferenda.sources.legal.se import SwedishLegalSource
+from ferenda.sources.legal.se import SwedishLegalSource, RPUBL
 from .regeringenlegacy import DsRegeringenLegacy
 from . import SameAs
 
@@ -16,5 +16,6 @@ class DsRegeringen(OrigDs, SameAs):
 # We inherit from SwedishLegalSource to get at the custom tabs()
 # implementation (that respects config.tabs)
 class Ds(CompositeRepository, SwedishLegalSource):
+    rdf_type = RPUBL.Utredningsbetankande
     alias = "ds"
     subrepos = DsRegeringen, DsRegeringenLegacy

@@ -161,6 +161,7 @@ class SOUKB(SwedishLegalSource, PDFDocumentRepository):
 
 class SOU(CompositeRepository):
     alias = "sou"
+    rdf_type = RPUBL.Utredningsbetankande
     subrepos = (SOURegeringen, SOUKB)
 
 

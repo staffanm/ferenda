@@ -15,13 +15,16 @@ class ResourceLoader(object):
     # pkg_resources.resource_stream et al
     @staticmethod
     def make_loadpath(instance, suffix="res"):
-        """Given an object instance, returns a list of path locations corresponding 
-        to the physical location of the implementation of that instance, with
-        a specified suffix. 
-        
-        ie. if provided an ``Foo`` instance, whose class is defined in project/subclass/foo.py, 
-        and ``Foo`` derives from ``Bar``, whose class is defined in project/bar.py, the returned
-        make_loadpath will return ``['project/subclass/res', 'project/res']`` 
+        """Given an object instance, returns a list of path locations
+        corresponding to the physical location of the implementation
+        of that instance, with a specified suffix.
+
+        ie. if provided an ``Foo`` instance, whose class is defined in
+        project/subclass/foo.py, and ``Foo`` derives from ``Bar``,
+        whose class is defined in project/bar.py, the returned
+        make_loadpath will return ``['project/subclass/res',
+        'project/res']``
+
         """
         res = []
         for cls in inspect.getmro(instance.__class__):
@@ -29,22 +32,27 @@ class ResourceLoader(object):
                 continue
             path = os.path.relpath(inspect.getfile(cls))
             candidate = os.path.dirname(path) + os.sep + suffix
+            # uniquify loadpath
             if candidate not in res and os.path.exists(candidate):
                res.append(candidate)
-
-        # uniquify loadpath
         return res
 
     def __init__(self, *loadpath, **kwargs):
         """
-        :param loadpath: A list of directories to search for by the instance methods (in priority order). 
-        :param kwargs: Any other named parameters to initialize the object with. The 
-                       only named parameter defined is ``use_pkg_resources`` (default: 
-                       True) for specifying whether to use the 
-                       `<https://pythonhosted.org/setuptools/pkg_resources.html#resourcemanager-api> ResourceManager API`_
-                       in addition to regular file operations. If set, the ResourceManager
-                       API is queried only after all directories in loadpath are searched.
-                       
+        Encapsulates resource access through a flexible load-path system.
+
+        :param loadpath: A list of directories to search for by the
+                         instance methods (in priority order) .
+        :param kwargs: Any other named parameters to initialize the
+                       object with. The only named parameter defined
+                       is ``use_pkg_resources`` (default: True) for
+                       specifying whether to use the
+                       `<https://pythonhosted.org/setuptools/pkg_resources.html#resourcemanager-api>
+                       ResourceManager API`_ in addition to regular
+                       file operations. If set, the ResourceManager
+                       API is queried only after all directories in
+                       loadpath are searched.
+
         """
         self.loadpath = loadpath
         self.use_pkg_resources = kwargs.get("use_pkg_resources", True)

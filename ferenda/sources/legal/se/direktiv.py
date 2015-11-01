@@ -282,7 +282,11 @@ class DirAsp(FixedLayoutSource):
     source_encoding = "iso-8859-1"
     rdf_type = RPUBL.Kommittedirektiv
     storage_policy = "dir"
-
+    # these defs are to play nice with SwedishLegalSource.get_parser
+    KOMMITTEDIREKTIV = "dir"
+    PROPOSITION = SOU = DS = None
+    document_type = KOMMITTEDIREKTIV
+    
     def download(self, basefile=None):
         resp = requests.get(self.start_url)
         soup = BeautifulSoup(resp.text)

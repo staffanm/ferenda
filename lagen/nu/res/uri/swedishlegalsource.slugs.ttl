@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2015-09-04T16:42:01.780035
+# Automatically transformed from sources at 2015-10-30T12:40:11.111564
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -102,6 +102,8 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 <https://lagen.nu/dataset/ds> space:abbrSlug "ds" .
 
 <https://lagen.nu/dataset/dvfs> space:abbrSlug "dvfs" .
+
+<https://lagen.nu/dataset/eifs> space:abbrSlug "eifs" .
 
 <https://lagen.nu/dataset/elsak-fs> space:abbrSlug "elsaek-fs" .
 

@@ -234,6 +234,9 @@ class DocumentRepository(object):
 
     download_reverseorder = False
     """TBW"""
+
+    loadpath = None
+    """TBW"""
     #
     # parse() specific class properties
     rdf_type = Namespace(util.ns['foaf']).Document
@@ -325,8 +328,15 @@ class DocumentRepository(object):
         self.session = requests.session()
 
         loadpath = ResourceLoader.make_loadpath(self)
+        # if the class specifieds additional path(s), these have
+        # priority over the inheritance-graph derived loadpath:
+        if self.loadpath:
+            loadpath = self.loadpath + loadpath
+        # if the used has specified an additional loadpath, it has
+        # priority over anything else.
         if 'loadpath' in self.config:
             loadpath = self.config.loadpath + loadpath
+            
         self.resourceloader = ResourceLoader(*loadpath)
 
     @property

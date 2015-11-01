@@ -153,24 +153,20 @@ class MyndFskrBase(SwedishLegalSource):
 
     def download_post_form(self, form, url):
         raise NotImplementedError
-
-    def canonical_uri(self, basefile):
-        # The canonical URI for these documents cannot always be
-        # computed from the basefile. Find the primary subject of the
-        # distilled RDF graph instead.
-        if not os.path.exists(self.store.distilled_path(basefile)):
-            return None
-
-        g = Graph()
-        g.parse(self.store.distilled_path(basefile))
-        subjects = list(g.subject_objects(RDF.type))
-
-        if subjects:
-            return str(subjects[0][0])
+    
+    def metadata_from_basefile(self, basefile):
+        # munge basefile or classname to find the skos:altLabel of the
+        # forfattningssamling we're dealing with
+        if "/" in basefile:
+            fs, realbasefile = basefile.split("/")
+            fs = fs.upper()
         else:
-            self.log.warning(
-                "No canonical uri in %s" % (self.distilled_path(basefile)))
-            return None
+            fs = self.__class__.__name__
+            realbasefile = basefile
+        a = super(MyndFskrBase, self).metadata_from_basefile(basefile)
+        a["rpubl:arsutgava"], a["rpubl:lopnummer"] = realbasefile.split(":", 1)
+        a["rpubl:forfattningssamling"] = self.lookup_resource(fs, SKOS.altLabel)
+        return a
 
     def basefile_from_uri(self, uri):
         # this should map https://lagen.nu/sjvfs/2014:9 to basefile sjvfs/2014:9
@@ -198,6 +194,9 @@ class MyndFskrBase(SwedishLegalSource):
         outfile = self.store.path(basefile, 'intermediate', '.txt')
         if not util.outfile_is_newer([infile], outfile):
             util.copy_if_different(infile, tmpfile)
+            with open(tmpfile, "rb") as fp:
+                if fp.read(4) != b'%PDF':
+                    raise errors.ParseError("%s is not a PDF file" % tmpfile)
             # this command will create a file named as the val of outfile
             util.runcmd("pdftotext %s" % tmpfile, require_success=True)
             # check to see if the outfile actually contains any text. It
@@ -236,7 +235,7 @@ class MyndFskrBase(SwedishLegalSource):
                 'rpubl:omtryckAv': ['^(Omtryck)$'],
                 'rpubl:genomforDirektiv': ['Celex (3\d{2,4}\w\d{4})'],
                 'rpubl:beslutsdatum':
-                ['(?:har beslutats|beslutade|beslutat|Beslutad) den (\d+ \w+ \d{4})',
+                ['(?:har beslutats|[Bb]eslutade|beslutat|Beslutad) den (\d+ \w+ \d{4})',
                  'Beslutade av (?:[A-ZÅÄÖ][\w ]+) den (\d+ \w+ \d{4}).'],
                 'rpubl:beslutadAv':
                 ['\n\s*([A-ZÅÄÖ][\w ]+?)\d? (?:meddelar|lämnar|föreskriver|beslutar)',
@@ -447,8 +446,13 @@ class MyndFskrBase(SwedishLegalSource):
                     desc.value(RPUBL.ikrafttradandedatum,
                                self.parse_swedish_date(props['rpubl:utkomFranTryck']))
                 else:
-                    desc.value(pred,
-                               self.parse_swedish_date(props[key].lower()))
+                    try:
+                        date = self.parse_swedish_date(props[key].lower())
+                        desc.value(pred,
+                                   self.parse_swedish_date(props[key].lower()))
+                    except ValueError as e:
+                        self.log.error("%s: Couldn't parse %s as a date" % (doc.basefile, props[key].lower()))
+                        
 
         if 'rpubl:genomforDirektiv' in props:
             diruri = makeurl({'rdf:type': RINFOEX.EUDirektiv, # FIXME: standardize this type
@@ -702,7 +706,7 @@ class DVFS(MyndFskrBase):
             raise e
 
     def fwdtests(self):
-        t = super(DVFS, self).fwdtests()
+        t = super(self.__class__, self).fwdtests()
         t["dcterms:identifier"] = ['(DVFS\s\s?\d{4}:\d+)']
         return t
 
@@ -1229,7 +1233,7 @@ class SOSFS(MyndFskrBase):
             return False
 
     def fwdtests(self):
-        t = super(SOSFS, self).fwdtests()
+        t = super(self.__class__, self).fwdtests()
         t["dcterms:identifier"] = ['^([A-ZÅÄÖ-]+FS\s\s?\d{4}:\d+)']
         return t
 
@@ -1238,12 +1242,14 @@ class SOSFS(MyndFskrBase):
         page = 1
         try:
             while "Ansvarig utgivare" not in reader.peekchunk('\f'):
-                self.log.debug("%s: Skipping cover page %s" % (doc.basefile, page))
+                self.log.debug("%s: Skipping cover page %s" %
+                               (doc.basefile, page))
                 reader.readpage()
                 page += 1
         except IOError:   # read past end of file
-            raise errors.ParseError("%s: Could not find a proper first page" % doc.basefile)
-        return super(SOSFS, self).parse_metadata_from_textreader(reader, doc)
+            raise errors.ParseError("%s: Could not find a proper first page" %
+                                    doc.basefile)
+        return super(self.__class__, self).parse_metadata_from_textreader(reader, doc)
 
 
 class STAFS(MyndFskrBase):

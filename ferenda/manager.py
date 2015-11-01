@@ -422,14 +422,14 @@ def run(argv, subcall=False):
                     for alias, classname in enabled.items():
                         # in order to optimize / cut down on
                         # meaningless logs, check if the class has
-                        # relate=False set and skip the relate step in
+                        # relate=False set and skip the relate/toc step in
                         # that case
                         # (DocumentRepository.relate_all_setup does
                         # the same check)
-                        if (argv[1] == "relate" and
+                        if (argv[1] in ("relate", "toc") and
                             'relate' in getattr(config, alias) and
                             getattr(config, alias).relate is False):
-                            log.debug("%s relate: skipping (relate=False)" % alias)
+                            log.debug("%s %s: skipping (relate=False)" % (alias, argv[1]))
                             continue
                         config.alias = alias
                         try:

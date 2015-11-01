@@ -6,22 +6,21 @@ from rdflib.namespace import OWL
 
 from ferenda import ResourceLoader
 from ferenda.thirdparty.coin import URIMinter
-
+from ferenda.sources.legal.se import RPUBL
 
 class SameAs(object):
     @property
     def sameas_minter(self):
         if not hasattr(self, '_sameas_minter'):
-            # print("%s (%s) loading sameas_minter" % (self.alias, id(self)))
             # make a resourceloader that only loads resource from
             # superclasses, not this actual class. This'll make it
             # look in ferenda/sources/legal/se/res, not lagen/nu/res.
             loadpath = ResourceLoader.make_loadpath(self)
-            rl = ResourceLoader(*loadpath[1:])
+            if "lagen/nu/" in loadpath[0]:
+                loadpath = loadpath[1:]
+            rl = ResourceLoader(*loadpath)
             spacefile = rl.filename("uri/swedishlegalsource.space.ttl")
-            slugsfile = self.resourceloader.filename("uri/swedishlegalsource.slugs.ttl")
             # print("sameas: Loading URISpace from %s" % spacefile)
-            # print("sameas: Loading Slugs from %s" % slugsfile)
             self.log.debug("Loading URISpace from %s" % spacefile)
             cfg = Graph().parse(spacefile, format="turtle")
             # slugs contains space:abbrSlug, but space contains
@@ -38,6 +37,8 @@ class SameAs(object):
                     cfg.remove((s, p, o))
                     cfg.add((dst, p, o))
                     
+            slugsfile = self.resourceloader.filename("uri/swedishlegalsource.slugs.ttl")
+            # self.log.debug("sameas: Loading slugs from %s" % slugsfile)
             cfg.parse(slugsfile, format="turtle")
             COIN = Namespace("http://purl.org/court/def/2009/coin#")
             # select correct URI for the URISpace definition by
@@ -52,8 +53,6 @@ class SameAs(object):
         if hasattr(sup, 'infer_metadata'):
             sup.infer_metadata(resource, basefile)
         try:
-            # since the resource is <main> rpubl:konsoliderar <sfs>,
-            # and <sfs> is a URIRef not a BNode, this will fail
             sameas_uri = self.sameas_minter.space.coin_uri(resource)
             resource.add(OWL.sameAs, URIRef(sameas_uri))
         except ValueError as e:

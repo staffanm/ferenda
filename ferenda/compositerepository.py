@@ -94,6 +94,8 @@ class CompositeRepository(DocumentRepository):
                 bases.extend(c.__bases__)
                 c = type(c.__name__, tuple(bases), dict(c.__dict__))
                 newsubrepos.append(c)
+            if self.loadpath:
+                c.loadpath = self.loadpath
             self.get_instance(c)
         if newsubrepos:
             self.subrepos = newsubrepos

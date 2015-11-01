@@ -3,6 +3,7 @@ from __future__ import unicode_literals, print_function
 
 from operator import attrgetter
 import re
+import os
 
 from rdflib import RDF, URIRef
 from rdflib.namespace import DCTERMS, SKOS
@@ -17,17 +18,17 @@ from ferenda.sources.legal.se import (SwedishLegalSource, SwedishLegalStore)
 from six import text_type as str
 from . import SameAs
 
+
 # inherit list_basefiles_for from CompositeStore, basefile_to_pathfrag
 # from SwedishLegalStore)
 class MyndFskrStore(CompositeStore, SwedishLegalStore):
     pass
 
+
 class MyndFskr(CompositeRepository, SwedishLegalSource):
     alias = "myndfs"
-    # FIXME: just specifying an extra base is not enough, we need to make the
-    # resourceloader initialize from the correct dir (lagen/nu/res
-    # instead of ferenda/sources/legal/se/res).
     extrabases = SameAs,
+    loadpath = [os.path.dirname(__file__) + os.sep + "res"]
     subrepos = [
         myndfskr.AFS,
         myndfskr.BOLFS,

@@ -4,8 +4,10 @@ from __future__ import unicode_literals, print_function
 from rdflib import RDF, URIRef
 from rdflib.namespace import DCTERMS, OWL
 
-from ferenda import Facet, Describer
+from ferenda import Facet, Describer, TocPageset, TocPage
 from ferenda import fulltextindex, util
+from ferenda.elements import Link
+from ferenda.elements.html import Strong
 from ferenda.sources.legal.se import legaluri
 from ferenda.sources.legal.se import DV as OrigDV
 from ferenda.sources.legal.se import RPUBL

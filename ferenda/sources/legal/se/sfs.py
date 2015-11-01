@@ -537,17 +537,18 @@ class SFS(Trips):
             self.log.warning("Could not extract plaintext from %s" % filename)
         return c.hexdigest()
 
-    def make_document(self, basefile):
+    def make_document(self, basefile=None):
         doc = super(SFS, self).make_document(basefile)
-        # We need to get the uppdaterad_tom field to create a proper
-        # URI.  First create a throwaway reader and make sure we have
-        # the intermediate file at ready
-        # FIXME: this is broken
-        fp = self.downloaded_to_intermediate(basefile)
-        t = TextReader(string=fp.read(2048))
-        fp.close()
-        uppdaterad_tom = self._find_uppdaterad_tom(basefile, reader=t)
-        doc.uri = self.canonical_uri(basefile, uppdaterad_tom)
+        if basefile:   # toc_generate_page calls this w/o basefile
+            # We need to get the uppdaterad_tom field to create a proper
+            # URI.  First create a throwaway reader and make sure we have
+            # the intermediate file at ready
+            # FIXME: this is broken
+            fp = self.downloaded_to_intermediate(basefile)
+            t = TextReader(string=fp.read(2048))
+            fp.close()
+            uppdaterad_tom = self._find_uppdaterad_tom(basefile, reader=t)
+            doc.uri = self.canonical_uri(basefile, uppdaterad_tom)
         return doc
 
     def canonical_uri(self, basefile, konsolidering=False):
@@ -621,9 +622,8 @@ class SFS(Trips):
                 if datetime.strptime(datestr, '%Y-%m-%d') < datetime.today():
                     self.log.debug('%s: Expired' % basefile)
                     raise UpphavdForfattning("%s is an expired SFS" % basefile)
+                t.seek(0)
             except IOError:
-                pass
-	    finally:
                 t.seek(0)
         t.cuepast('<pre>')
         # remove &auml; et al
