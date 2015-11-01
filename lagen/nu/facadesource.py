@@ -16,6 +16,10 @@ class FacadeSource(CompositeRepository):
     @classmethod
     def parse_all_setup(cls, config):
         return False
+
+    @classmethod
+    def relate_all_setup(cls, config):
+        return False
     
     def facet_query(self, context):
         # Override the standard query in order to ignore the default

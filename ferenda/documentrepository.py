@@ -2402,6 +2402,9 @@ WHERE {
         document properties will be sufficient.
 
         """
+        if not self.config.tabs:
+            self.log.info("%s: Not relating (config has tabs=False)" % self.alias)
+            return
         tocindex = self.store.resourcepath("toc/index.html")
         faceted_data = self.store.resourcepath("toc/faceted_data.json")
         if (not self.config.force) and util.outfile_is_newer([faceted_data], tocindex):
@@ -3273,14 +3276,17 @@ WHERE {
         [('base', 'http://localhost:8000/dataset/base')]
 
         """
-        uri = self.dataset_uri()
-        if self.rdf_type == Namespace(util.ns['foaf']).Document:
-            return [(self.alias, uri)]
-        else:
-            if isinstance(self.rdf_type, (tuple, list)):
-                return [(util.uri_leaf(str(x)), uri) for x in self.rdf_type]
+        if self.config.tabs:
+            uri = self.dataset_uri()
+            if self.rdf_type == Namespace(util.ns['foaf']).Document:
+                return [(self.alias, uri)]
             else:
-                return [(util.uri_leaf(str(self.rdf_type)), uri)]
+                if isinstance(self.rdf_type, (tuple, list)):
+                    return [(util.uri_leaf(str(x)), uri) for x in self.rdf_type]
+                else:
+                    return [(util.uri_leaf(str(self.rdf_type)), uri)]
+        else:
+            return []
 
     def footer(self):
         """Get a list of resources provided by this repo for publication in the site footer.

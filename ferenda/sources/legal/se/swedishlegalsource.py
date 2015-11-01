@@ -751,11 +751,6 @@ class SwedishLegalSource(DocumentRepository):
         metadata from doc.body to doc.head)"""
         pass
 
-    def tabs(self):
-        if self.config.tabs:
-            return super(SwedishLegalSource, self).tabs()
-        else:
-            return []
 
     ################################################################
     # General small utility functions
