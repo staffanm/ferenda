@@ -61,6 +61,7 @@ class JO(FixedLayoutSource):
     downloaded_suffix = ".pdf"
     documentstore_class = JOStore
 
+    urispace_segment = "avg/jo"
 
     def metadata_from_basefile(self, basefile):
         attribs = super(JO, self).metadata_from_basefile(basefile)

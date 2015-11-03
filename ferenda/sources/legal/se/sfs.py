@@ -226,14 +226,6 @@ class SFS(Trips):
         opts['next_sfsnr'] = str
         return opts
 
-    def basefile_from_uri(self, uri):
-        prefix = self.config.url + self.config.urlpath
-        # tell the difference btw "1998:204/konsolidering/2010:323"
-        # and "dom/nja/2008s42"
-        if uri.startswith(prefix) and uri[len(prefix)].isdigit():
-            rest = uri[len(prefix):].replace("_", " ")
-            return rest.split("/")[0]
-
     def download(self, basefile=None):
         if 'skipdownload' in self.config:
             return
@@ -568,13 +560,24 @@ class SFS(Trips):
                 konsolidering = konsolidering.replace(" ", "_")
             attributes["dcterms:issued"] = konsolidering
         resource = self.attributes_to_resource(attributes)
-        res = self.minter.space.coin_uri(resource)
+        uri = self.minter.space.coin_uri(resource)
         # create eg "https://lagen.nu/sfs/2013:460/konsolidering" if
         # konsolidering = True instead of a issued date.
         # FIXME: This should be done in CoIN entirely
         if konsolidering is True:
-            res = res.rsplit("/", 1)[0]
-        return res
+            uri = uri.rsplit("/", 1)[0]
+        # FIXME: temporary code we use while we get basefile_from_uri to work
+        computed_basefile = self.basefile_from_uri(uri)
+        assert basefile == computed_basefile, "%s -> %s -> %s" % (basefile, uri, computed_basefile)
+        # end temporary code
+        return uri
+
+    def basefile_from_uri(self, uri):
+        basefile = super(SFS, self).basefile_from_uri(uri)
+        # remove any possible "/konsolidering/2015:123" trailing info
+        if basefile:
+            return basefile.split("/")[0]
+    
 
     def metadata_from_basefile(self, basefile):
         """Construct the basic attributes, in dict form, for a given
@@ -1000,7 +1003,6 @@ class SFS(Trips):
             if not o.datatype:
                 doc.meta.remove((URIRef(doc.uri), DCTERMS.issued, o))
 
-            # from pudb import set_trace; set_trace()
         for res in sorted(doc.meta.resource(doc.uri).objects(RPUBL.konsolideringsunderlag)):
             identifier = res.value(DCTERMS.identifier).replace("SFS ", "L")
             graph = self.make_graph()

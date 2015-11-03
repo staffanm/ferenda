@@ -1,17 +1,19 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from datetime import datetime
 from tempfile import mktemp
+from time import mktime
+import codecs
 import logging
 import os
 import textwrap
 import xml.etree.cElementTree as ET
 import zipfile
-from datetime import datetime
-from time import mktime
-import codecs
-from ferenda import errors, util
 
+from six import text_type as str
+
+from ferenda import errors, util
 
 class WordReader(object):
 

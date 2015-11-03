@@ -168,12 +168,15 @@ class MyndFskrBase(SwedishLegalSource):
         a["rpubl:forfattningssamling"] = self.lookup_resource(fs, SKOS.altLabel)
         return a
 
+    urispace_segment = ""
+    
     def basefile_from_uri(self, uri):
+        basefile = super(MyndFskrBase, self).basefile_from_uri(uri)
         # this should map https://lagen.nu/sjvfs/2014:9 to basefile sjvfs/2014:9
         # but also https://lagen.nu/dfs/2007:8 -> dfs/2007:8
         for fs in self.forfattningssamlingar():
-            if uri.startswith(self.config.url + "/" + fs + "/"):
-                basefile = uri[len(self.config.url):]
+            # FIXME: use self.coin_base (self.urispace_base) instead.
+            if basefile.startswith(fs):
                 return basefile
 
     @decorators.action

@@ -286,6 +286,7 @@ class DirAsp(FixedLayoutSource):
     KOMMITTEDIREKTIV = "dir"
     PROPOSITION = SOU = DS = None
     document_type = KOMMITTEDIREKTIV
+    urispace_segment = "dir"
     
     def download(self, basefile=None):
         resp = requests.get(self.start_url)

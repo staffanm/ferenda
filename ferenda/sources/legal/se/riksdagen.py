@@ -71,6 +71,13 @@ class Riksdagen(FixedLayoutSource):
     start_url = None
     start_url_template = "http://data.riksdagen.se/dokumentlista/?sz=100&sort=d&utformat=xml&typ=%(doctype)s"
 
+    @property
+    def urispace_segment(self):
+        return {self.PROPOSITION: "prop",
+                self.DS: "utr/ds",
+                self.SOU: "utr/sou",
+                self.DIREKTIV: "dir"}.get(self.document_type)
+
     def download(self, basefile=None):
         if basefile:
             return self.download_single(basefile)

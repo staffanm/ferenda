@@ -136,15 +136,26 @@ class SwedishLegalSource(DocumentRepository):
             # print("Minter is %s" % id(self._minter))
         return self._minter
 
+    @property
+    def urispace_base(self):
+        return self.minter.space.base
+
+    @property
+    def urispace_segment(self):
+        return self.alias
+        
     @classmethod
     def get_default_options(cls):
         opts = super(SwedishLegalSource, cls).get_default_options()
         opts['pdfimages'] = False
-        opts['urlpath'] = "res/%s/" % cls.alias
-        opts['tabs'] = True
+        opts['parserefs'] = True
         return opts
 
     def lookup_label(self, resource, predicate=FOAF.name):
+        """The inverse of
+        :py:meth:`~ferenda.DocumentRepository.lookup_resource `.
+
+        """
         val = self.commondata.value(subject=URIRef(resource),
                                     predicate=predicate)
         if not val:
@@ -246,13 +257,17 @@ class SwedishLegalSource(DocumentRepository):
                         #                  "Literal or URIRef" % (v, k))
                         v = Literal(v)
                     g.add((current, uri(k), v))
-
         return g.resource(b)
 
     def canonical_uri(self, basefile):
         attrib = self.metadata_from_basefile(basefile)
         resource = self.attributes_to_resource(attrib)
-        return self.minter.space.coin_uri(resource)
+        uri = self.minter.space.coin_uri(resource)
+        # FIXME: temporary code we use while we get basefile_from_uri to work
+        computed_basefile = self.basefile_from_uri(uri)
+        assert basefile == computed_basefile, "%s -> %s -> %s" % (basefile, uri, computed_basefile)
+        # end temporary code
+        return uri
 
     def metadata_from_basefile(self, basefile):
         """Create a metadata dict with whatever we can infer from a document
@@ -299,6 +314,20 @@ class SwedishLegalSource(DocumentRepository):
         # line 188- should call this method (and
         # .download_get_basefiles in general probably)
         return basefile
+
+    def basefile_from_uri(self, uri):
+        # does a very simple transform. subclasses with specic needs
+        # can override and sanitize after the fact.
+        #
+        # examples:
+        # "https://lagen.nu/prop/1999/2000:35" => "1999/2000:35"
+        # "https://lagen.nu/rf/hfd/2013/not/12" => "hfd/2013/not/12"
+        # "https://lagen.nu/sosfs/2015:10" => "2015:10"
+        # "https://lagen.nu/sfs/2013:1127/konsolidering/2014:117" => "2013:1127/konsolidering/2014:117"
+        base = self.urispace_base
+        if uri.startswith(base) and uri[len(base)+1:].startswith(self.urispace_segment):
+            offset = 2 if self.urispace_segment else 1
+            return uri[len(base) + len(self.urispace_segment) + offset:]
 
     @action
     @managedparsing
@@ -555,7 +584,7 @@ class SwedishLegalSource(DocumentRepository):
             # nodes, extracting keywords from text etc. Note: finding
             # references in text with LegalRef is done afterwards
             self.visit_node(body, func, initialstate)
-        if self.parse_types:
+        if self.config.parserefs and self.parse_types:
             # now find references using LegalRef
             parser = SwedishCitationParser(LegalRef(*self.parse_types),
                                            self.minter,

@@ -49,6 +49,7 @@ class JK(SwedishLegalSource):
     document_url_regex = "http://www.jk.se/Beslut/(?P<kategori>[\w\-]+)/(?P<basefile>\d+\-\d+\-\d+).aspx"
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
     documentstore_class = JKStore
+    urispace_segment = "avg/jk"
     
     @recordlastdownload
     def download(self, basefile=None):

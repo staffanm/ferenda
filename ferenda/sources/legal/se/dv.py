@@ -109,8 +109,8 @@ class DV(SwedishLegalSource):
     required_predicates = [RDF.type, DCTERMS.identifier, PROV.wasGeneratedBy]
 
     DCTERMS = Namespace(util.ns['dcterms'])
-    sparql_annotations = "res/sparql/dv-annotations.rq"
-    xslt_template = "res/xsl/dv.xsl"
+    sparql_annotations = "sparql/dv-annotations.rq"
+    xslt_template = "xsl/dv.xsl"
 
     @classmethod
     def relate_all_setup(cls, config):
@@ -193,40 +193,34 @@ class DV(SwedishLegalSource):
         doc.uri = None  # can't know this yet
         return doc
 
-    # override DocumentRepository.basefile_from_uri to account for the
-    # fact that there is no 1:1 correspondance between basefiles and
-    # uris
+    urispace_segment = "rf"
+    
+    # override to account for the fact that there is no 1:1
+    # correspondance between basefiles and uris
     def basefile_from_uri(self, uri):
-        prefix = self.config.url + self.config.urlpath
-        if uri.startswith(prefix):
-            path = uri[len(prefix):]
+        basefile = super(DV, self).basefile_from_uri(uri)
+        # the "basefile" at this point is just the remainder of the
+        # URI (eg "nja/1995s362"). Create a lookup table to find the
+        # real basefile (eg "HDO/Ö463-95_1")
+        if basefile:
             if not hasattr(self, "_basefilemap"):
                 self._basefilemap = {}
                 mapfile = self.store.path("uri", "generated", ".map")
                 with codecs.open(mapfile, encoding="utf-8") as fp:
                     for line in fp:
-                        uriseg, basefile = line.split("\t")
-                        self._basefilemap[uriseg] = basefile.strip()
+                        uriseg, bf = line.split("\t")
+                        self._basefilemap[uriseg] = bf.strip()
 
-            if path in self._basefilemap:
-                return self._basefilemap[path]
+            if basefile in self._basefilemap:
+                return self._basefilemap[basefile]
             else:
                 # this will happen for older cases for which we don't
-                # have any files. We could invent URI-redived
+                # have any files. We could invent URI-derived
                 # basefiles for these, and gain a sort of skeleton
                 # entry for those, which we could use to track
                 # eg. frequently referenced older cases.
                 self.log.warning("%s: Could not find corresponding basefile" % uri)
                 return None
-        else:
-            pass  # The URI didn't start with our expected prefix, it's not a Rattsfall URI
-
-    # FIXME: store.list_basefiles_for("parse") must be fixed to handle two
-    # different suffixes. Maybe store.downloaded_path() as well, so that
-    # it returns .docx if a .docx file indeed exists, and .doc otherwise.
-    # But this case (where documents can be in two (or more) formats depending
-    # on age isn't uncommon, maybe DocumentStore should support it natively
-    # (like with optional suffix parameter to download_path)?
 
     def download(self, basefile=None):
         if basefile is not None:
@@ -1188,6 +1182,20 @@ class DV(SwedishLegalSource):
         with domdesc.rel(DCTERMS.subject):
             domdesc.value(RDFS.label, keyword, lang=self.lang)
 
+    # FIXME: temporary code we use while we get basefile_from_uri to work
+    def postprocess_doc(self, doc):
+        # append to mapfile -- duplicates are OK at this point
+        mapfile = self.store.path("uri", "generated", ".map")
+        util.ensure_dir(mapfile)
+        idx = len(self.urispace_base) + len(self.urispace_segment) + 2
+        with codecs.open(mapfile, "a", encoding="utf-8") as fp:
+            fp.write("%s\t%s\n" % (doc.uri[idx:], doc.basefile))
+            if hasattr(self, "_basefilemap"):
+                delattr(self, "_basefilemap")
+
+        # FIXME: temporary code we use while we get basefile_from_uri to work
+        computed_basefile = self.basefile_from_uri(doc.uri)
+        assert doc.basefile == computed_basefile, "%s -> %s -> %s" % (doc.basefile, doc.uri, computed_basefile)
 
     # @staticmethod
     def get_parser(self, basefile, sanitized):
@@ -1914,7 +1922,7 @@ class DV(SwedishLegalSource):
         # elements in a BeautifulSoup tree. This step probably should
         # be performed through XSL and be put in _simplify_ooxml as
         # well.
-                # The soup now contains a simplified version of OOXML where
+        # The soup now contains a simplified version of OOXML where
         # lot's of nonessential tags has been stripped. However, the
         # central w:p tag often contains unneccessarily splitted
         # subtags (eg "<w:t>Avgörand</w:t>...<w:t>a</w:t>...

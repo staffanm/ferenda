@@ -152,42 +152,30 @@ class Regeringen(SwedishLegalSource):
                     self.log.error(e)
             params['page'] = params.get('page', 1) + 1
 
-    # FIXME: Don't know if this can be rewritten for new regeringen.se
-    def remote_url(self, basefile):
-        # do a search to find the proper url for the document
-        templ = ("http://www.regeringen.se/sb/d/107/a/136?query=%(basefile)s" 
-                 "docTypes=%(doctype)s&type=advanced&action=search")
-        searchurl = templ % {'doctype': self.document_type,
-                             'basefile': basefile}
-        soup = BeautifulSoup(requests.get(searchurl).text)
-        docurl = None
-        for link in soup.find_all(href=re.compile("/sb/d/108/a/")):
-            desc = link.find_next_sibling("span", {'class': 'info'}).text
-            if basefile in desc:
-                docurl = urljoin(searchurl, link['href'])
-        if not docurl:
-            self.log.error(
-                "Could not find document with basefile %s" % basefile)
-        return docurl
+#    # FIXME: Don't know if this can be rewritten for new regeringen.se
+#    def remote_url(self, basefile):
+#        # do a search to find the proper url for the document
+#        templ = ("http://www.regeringen.se/sb/d/107/a/136?query=%(basefile)s" 
+#                 "docTypes=%(doctype)s&type=advanced&action=search")
+#        searchurl = templ % {'doctype': self.document_type,
+#                             'basefile': basefile}
+#        soup = BeautifulSoup(requests.get(searchurl).text)
+#        docurl = None
+#        for link in soup.find_all(href=re.compile("/sb/d/108/a/")):
+#            desc = link.find_next_sibling("span", {'class': 'info'}).text
+#            if basefile in desc:
+#                docurl = urljoin(searchurl, link['href'])
+#        if not docurl:
+#            self.log.error(
+#                "Could not find document with basefile %s" % basefile)
+#        return docurl
 
-#    def canonical_uri(self, basefile, document_type=None):
-#        # basefile eg 2014:158 => [] a rpubl:For ; rpubl:arsutgava "2014"; rpubl:lopnummer "158";
-#        if not document_type:
-#            document_type = self.document_type
-#        seg = {self.KOMMITTEDIREKTIV: "dir",
-#               self.DS: "utr/ds",
-#               self.PROPOSITION: "prop",
-#               self.SKRIVELSE: "skr",
-#               self.SOU: "utr/sou",
-#               self.SO: "so"}
-#        return self.config.url + "res/%s/%s" % (seg[document_type], basefile)
-
-    def basefile_from_uri(self, uri):
-        # make sure this function is the reverse of the canonical_uri
-        # *in our subrepos* by special-handling the sou/ds cases
-        if "utr/ds" in uri or "utr/sou" in uri:
-            uri = uri.replace("/utr/", "/")
-        return super(Regeringen, self).basefile_from_uri(uri)
+    @property
+    def urispace_segment(self):
+        return {self.PROPOSITION: "prop",
+                self.DS: "utr/ds",
+                self.SOU: "utr/sou",
+                self.KOMMITTEDIREKTIV: "dir"}.get(self.document_type)
 
     def download_single(self, basefile, url=None):
         if not url:

@@ -51,6 +51,7 @@ class ARN(FixedLayoutSource):
     documentstore_class = ARNStore
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
     storage_policy = "dir"
+    urispace_segment = "avg/arn"
 
     def metadata_from_basefile(self, basefile):
         attribs = super(ARN, self).metadata_from_basefile(basefile)
