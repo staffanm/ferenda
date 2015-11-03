@@ -2219,6 +2219,8 @@ WHERE {
         only run if ``config.staticsite``is ``True``.
 
         """
+        # FIXME: This might be called with an abundance of repos (25
+        # right now) where only ~5 needed to do the transforming
 
         # This implementation always transforms URLs to local file
         # paths (or if they can't be mapped, leaves them alone)
@@ -2229,6 +2231,8 @@ WHERE {
             if uri == self.config.url:
                 path = self.config.datadir + os.sep + "index.html"
                 # path = basedir + os.sep + "index.html"
+            elif uri.startswith("#"):
+                return uri
             else:
                 for repo in repos:
                     basefile = repo.basefile_from_uri(uri)

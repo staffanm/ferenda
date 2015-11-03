@@ -791,7 +791,11 @@ def _run_class(enabled, argv, config):
 
         kwargs = {}
         if config.action in ('relate', 'generate', 'toc', 'news'):
-            # we need to provide the otherrepos parameter
+            # we need to provide the otherrepos parameter to get
+            # things like URI transformation to work. However we might
+            # not need all repos (ie. not repos where relate or even
+            # tabs is set to false)
+            
             otherrepos = []
             for othercls in _classes_from_classname(enabled, 'all'):
                 if othercls != inst.__class__:

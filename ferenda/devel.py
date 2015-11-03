@@ -406,6 +406,17 @@ class Devel(object):
                                             self.config.indexlocation))
 
     @decorators.action
+    def clearstore(self):
+        store = TripleStore.connect(self.config.storetype,
+                                    self.config.storelocation,
+                                    self.config.storerepository)
+        triplecount = store.triple_count()
+        store.clear()
+        print("%s triplestore at %s %s cleared (was %s triples, now %s)" %
+              (self.config.storetype, self.config.storelocation,
+               self.config.storerepository, triplecount, store.triple_count()))
+
+    @decorators.action
     def report(self, alias):
         repo = self._repo_from_alias(alias)
         status = repo.get_status()
