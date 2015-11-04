@@ -2,6 +2,7 @@
 from __future__ import unicode_literals, print_function
 
 from operator import attrgetter
+from collections import Counter
 import re
 import os
 
@@ -194,3 +195,8 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
 
     def tabs(self):
         return [("Myndighetsföreskrifter", self.dataset_uri())]
+
+    def frontpage_content_body(self):
+        c = Counter([row['rpubl_forfattningssamling'] for row in self.faceted_data()])
+        return ("%s författningar från %s författningssamlingar" % (
+            sum(c.values()), len(c)))

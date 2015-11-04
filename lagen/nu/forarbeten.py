@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import unicode_literals, print_function
+
+from collections import Counter
 
 from rdflib import RDF
 
@@ -11,7 +13,7 @@ from ferenda.sources.legal.se import Propositioner, SOU, Ds, Direktiv
 from .facadesource import FacadeSource
 
 
-class Forarbeten(FacadeSource):
+class Forarbeten(FacadeSource, SwedishLegalSource):
     """This is a sort of a wrapper repo to provide useful tabs/tocs for set
     of related docrepos ("preparatory works")"""
 
@@ -134,3 +136,15 @@ WHERE {
         """Returns a formatted version of row, using Element objects"""
         return [Link(row['dcterms_identifier']+": "+row['dcterms_title'],
                      uri=row['uri'])]
+
+    def frontpage_content_body(self):
+        # we could either count the number of items
+        # self.store.list_basefiles_for("_postgenerate") returns or
+        # count the number of unique docs in faceted_data. The latter
+        # is prob more correct.
+        c = Counter([row['rdf_type'] for row in self.faceted_data()])
+        return ("%s propositioner, %s utredningsbetänkanden och %s kommittédirektiv" % (
+            c['http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Proposition'],
+            c['http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Utredningsbetankande'],
+            c['http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Kommittedirektiv']))
+    

@@ -781,6 +781,25 @@ class SwedishLegalSource(DocumentRepository):
         pass
 
 
+    def frontpage_content(self, primary=False):
+        if not self.config.tabs:
+            self.log.info("%s: Not doing frontpage content (config has tabs=False)" % self.alias)
+            return
+        x = self.tabs()[0]
+        label = x[0]
+        uri = x[1]
+        body = self.frontpage_content_body()
+        return ("<h2><a href='%(uri)s'>%(label)s</a></h2>"
+                "<p>%(body)s</p>" % locals())
+
+    def frontpage_content_body(self):
+        # we could either count the number of items
+        # self.store.list_basefiles_for("_postgenerate") returns or
+        # count the number of unique docs in faceted_data. The latter
+        # is prob more correct.
+        return "%s dokument" % len(set([row['uri'] for row in self.faceted_data()]))
+
+
     ################################################################
     # General small utility functions
     # (these could be module functions or staticmethods instead)

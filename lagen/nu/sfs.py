@@ -161,3 +161,10 @@ class SFS(OrigSFS, SameAs):
             return [("SFS", self.dataset_uri())]
         else:
             return []
+
+    def frontpage_content_body(self):
+        # it'd be nice if we could specify "X lagar, Y förordningar
+        # och Z andra författningar" but the rdf:type of all documents
+        # are rpubl:KonsolideradGrundforfattning. Maybe if we tweak
+        # the facets we could do better
+        return "%s författningar" % len(set([row['uri'] for row in self.faceted_data()]))

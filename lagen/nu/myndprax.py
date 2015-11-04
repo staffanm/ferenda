@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
+from collections import Counter
 from six import text_type as str
 
 from rdflib import URIRef
@@ -107,3 +108,10 @@ WHERE {
         """Returns a formatted version of row, using Element objects"""
         return [Link(row['dcterms_identifier'] + ": " + row['dcterms_title'],
                      uri=row['uri'])]
+
+    def frontpage_content_body(self):
+        c = Counter([row['dcterms_publisher'] for row in self.faceted_data()])
+        return ("%s JO-beslut, %s JK-beslut och %s ARN-beslut" % (
+            c['https://lagen.nu/org/2014/riksdagens_ombudsman'],
+            c['https://lagen.nu/org/2014/justitiekanslern'],
+            c['https://lagen.nu/org/2014/allmanna_reklamationsnamnden']))

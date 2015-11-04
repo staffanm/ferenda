@@ -19,6 +19,7 @@ from multiprocessing.managers import SyncManager
 from time import sleep
 from wsgiref.simple_server import make_server
 import argparse
+import codecs
 import inspect
 import logging
 from logging import getLogger as getlog
@@ -135,7 +136,7 @@ def frontpage(repos,
       </body>
     </html>""" % vars
         xhtml_path = os.path.splitext(path)[0] + ".xhtml"
-        with open(xhtml_path, "w") as fp:
+        with codecs.open(xhtml_path, "w", encoding="utf-8") as fp:
             fp.write(xhtml)
         # FIXME: We don't need to actually store the xhtml file on
         # disk -- we could just keep it in memory as an lxml tree and

@@ -136,7 +136,7 @@ class SFS(Trips):
     parse_allow_relative = True
     app = "sfst"  # dir, prop, sfst
     base = "SFSR"  # DIR, THWALLPROP, SFSR
-    basefile_regex = "(?P<basefile>\d{4}:[\d s\.]+)$"
+    basefile_regex = "^(?P<basefile>\d{4}:[\d s\.]+)$"
     start_url = ("http://rkrattsbaser.gov.se/cgi-bin/thw?${HTML}=%(app)s_lst"
                  "&${OOHTML}=%(app)s_dok&${SNHTML}=%(app)s_err"
                  "&${MAXPAGE}=%(maxpage)d&${BASE}=%(base)s"
@@ -396,10 +396,20 @@ class SFS(Trips):
         # FIXME: a lot of code duplication compared to
         # DocumentRepository.download_single. Maybe particularly the
         # DocumentEntry juggling should go into download_if_needed()?
-        created = not os.path.exists(self.store.downloaded_path(basefile))
+        downloaded_path = self.store.downloaded_path(basefile)
+        created = not os.path.exists(downloaded_path)
         updated = False
         if self.download_if_needed(sfst_url, basefile):
             if created:
+                t = TextReader(downloaded_path, encoding=self.source_encoding)
+                try:
+                    t.cue("<p>Sökningen gav ingen träff!</p>")
+                    self.log.warning("%s: Is not really an base SFS, search results must have contained an invalid entry" % basefile)
+                    util.robust_remove(downloaded_path)
+                    return False
+                except IOError:
+                    pass
+                
                 self.log.info("%s: downloaded from %s" % (basefile, sfst_url))
             else:
                 self.log.info(

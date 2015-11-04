@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, print_function
 
+from collections import Counter
+
 from rdflib import RDF, URIRef
 from rdflib.namespace import DCTERMS, OWL
 
@@ -197,3 +199,11 @@ class DV(OrigDV, SameAs):
 
     def tabs(self):
         return [("Domar", self.dataset_uri())]
+
+    def frontpage_content_body(self):
+        c = Counter([row['rdf_type'] for row in self.faceted_data()])
+        c2 = Counter([row['rpubl_rattsfallspublikation'] for row in self.faceted_data()])
+        return ("%s rättsfallsreferat och %s notisfall från %s referatsserier" %
+                (c['http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Rattsfallsreferat'],
+                 c['http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#Rattsfallsnotis'],
+                 len(c2)))
