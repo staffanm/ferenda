@@ -120,7 +120,8 @@ class DirTrips(Trips):
         # This is a ridiculously complicated way of extracting
         # key-value headers when both keys and headers may be
         # continuated. The below, which relies on HTML tags enclosing
-        # the value, is much simpler.
+        # the value, is much simpler, but at this point we've stripped
+        # away those...
         #
         # header = re.compile("([^:]+):\s*<b>([^<]*)</b>")
         # for m in header.finditer(header_chunk):
@@ -141,7 +142,7 @@ class DirTrips(Trips):
                 if line.startswith("    "):
                     cv += line
                 else:
-                    if ck.strip() and cv.strip():
+                    if ck.strip(): # and cv.strip():
                         yield(n(ck), n(cv))
                     ck = line
                     cv = ""
@@ -173,6 +174,9 @@ class DirTrips(Trips):
                   }
         for (key, val) in self.header_lines(rawheader):
             try:
+                if val == "Utgår" and "Rubrik" in key:
+                    raise DocumentRemovedError("%s: Removed" % basefile,
+                                               dummyfile=self.store.parsed_path(basefile))
                 pred = predicates[key]
                 transformer = munger[key]
                 d[pred] = transformer(val)
@@ -189,7 +193,6 @@ class DirTrips(Trips):
     def sanitize_rubrik(self, rubrik):
         if rubrik == "Utgår":
             raise DocumentRemovedError()
-
         rubrik = re.sub("^/r2/ ", "", rubrik)
         return Literal(rubrik, lang="sv")
 
