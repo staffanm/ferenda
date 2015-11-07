@@ -75,6 +75,8 @@ class PropTrips(Trips, FixedLayoutSource):
 
     storage_policy = "dir"
     documentstore_class = PropTripsStore
+    urispace_segment = "prop"
+
     
     @classmethod
     def get_default_options(cls):
