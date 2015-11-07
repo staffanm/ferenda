@@ -61,8 +61,15 @@ class Trips(SwedishLegalSource):
     #                     'start': '2009',
     #                     'end': str(datetime.today().year)}]
 
-    def __init__(self, config=None, **kwargs):
-        super(Trips, self).__init__(config, **kwargs)
+
+
+    @classmethod
+    def get_default_options(cls):
+        opts = super(Trips, cls).get_default_options()
+        opts['ipbasedurls'] = False
+        return opts
+
+    def download(self, basefile=None):
         if self.config.ipbasedurls:
             import socket
             addrs = socket.getaddrinfo("rkrattsbaser.gov.se", 80)
@@ -77,15 +84,6 @@ class Trips(SwedishLegalSource):
                     setattr(self, p,
                             getattr(self, p).replace('rkrattsbaser.gov.se',
                                                      ip))
-
-
-    @classmethod
-    def get_default_options(cls):
-        opts = super(Trips, cls).get_default_options()
-        opts['ipbasedurls'] = False
-        return opts
-
-    def download(self, basefile=None):
         if basefile:
             return self.download_single(basefile)
         for basefile, url in self.download_get_basefiles(self.download_params):

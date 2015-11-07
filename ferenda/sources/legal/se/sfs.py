@@ -634,7 +634,8 @@ class SFS(Trips):
                 datestr = t.readto('</i></b>')
                 if datetime.strptime(datestr, '%Y-%m-%d') < datetime.today():
                     self.log.debug('%s: Expired' % basefile)
-                    raise UpphavdForfattning("%s is an expired SFS" % basefile)
+                    raise UpphavdForfattning("%s is an expired SFS" % basefile,
+                                             dummyfile=self.store.parsed_path(basefile))
                 t.seek(0)
             except IOError:
                 t.seek(0)
@@ -704,6 +705,7 @@ class SFS(Trips):
         d = {}
         rubrik = util.normalize_space(soup.body('table')[2].text)
         changes = soup.body('table')[3:-2]
+        g = self.make_graph()  # used for qname lookup only
         for table in changes:
             sfsnr = table.find(text="SFS-nummer:").find_parent(
                 "td").find_next_sibling("td").text.strip()
@@ -717,8 +719,6 @@ class SFS(Trips):
                 "rpubl:forfattningssamling": "SFS",
                 "rpubl:lopnummer": parts[1]
             }
-                         # URIRef(self.lookup_resource("SFS", SKOS.altLabel))}
-            g = self.make_graph()  # used for qname lookup only
             for row in table('tr'):
                 key = row.td.text.strip()
                 if key.endswith(":"):
@@ -763,7 +763,8 @@ class SFS(Trips):
                             dateval = datetime.strptime(val[41:51], '%Y-%m-%d')
                             if dateval < datetime.today():
                                 raise UpphavdForfattning("%s is an expired SFS"
-                                                         % basefile)
+                                                         % basefile,
+                                                         dummyfile=self.store.parsed_path(basefile))
                     d[docuri]["rdfs:comment"] = val
                 elif key == 'Ikraft':
                     d[docuri]["rpubl:ikrafttradandedatum"] = val[:10]
@@ -808,7 +809,8 @@ class SFS(Trips):
                         for node in self.lagrum_parser.parse_string(changecat,
                                                                     pred):
                             if hasattr(node, 'predicate'):
-                                d[docuri][g.qname(node.predicate)] = node.uri
+                                qname = g.qname(node.predicate)
+                                d[docuri][qname] = node.uri
                         self.lagrum_parser._currenturl = old_currenturl
                     # Secondly, preserve the entire text
                     d[docuri]["rpubl:andrar"] = val
@@ -823,9 +825,9 @@ class SFS(Trips):
                 elif key == 'CELEX-nr':
                     for celex in re.findall('3\d{2,4}[LR]\d{4}', val):
                         b = BNode()
-                        g = Graph()
-                        g.add((b, RPUBL.celexNummer, Literal(celex)))
-                        celexuri = self.minter.space.coin_uri(g.resource(b))
+                        cg = Graph()
+                        cg.add((b, RPUBL.celexNummer, Literal(celex)))
+                        celexuri = self.minter.space.coin_uri(cg.resource(b))
                         if "rpubl:genomforDirektiv" not in d[docuri]:
                             d[docuri]["rpubl:genomforDirektiv"] = []
                         d[docuri]["rpubl:genomforDirektiv"].append(celexuri)
@@ -836,7 +838,8 @@ class SFS(Trips):
                     if expdate < datetime.today():
                         if not self.config.keepexpired:
                             raise UpphavdForfattning(
-                                "%s is expired (time-limited) SFS" % basefile)
+                                "%s is expired (time-limited) SFS" % basefile,
+                                dummyfile=self.store.parsed_path(basefile))
                 else:
                     self.log.warning(
                         '%s: Obekant nyckel [\'%s\']' % basefile, key)
@@ -872,7 +875,8 @@ class SFS(Trips):
                 d = datetime.strptime(val[:10], '%Y-%m-%d')
                 d["rpubl:upphavandedatum"] = val[:10]
                 if not self.config.keepexpired and d < datetime.today():
-                    raise UpphavdForfattning("%s is an expired SFS" % basefile)
+                    raise UpphavdForfattning("%s is an expired SFS" % basefile,
+                                             dummyfile=self.store.parsed_path(basefile))
 
             # urirefs
             elif key == 'Departement/ myndighet':
@@ -1013,7 +1017,12 @@ class SFS(Trips):
             if not o.datatype:
                 doc.meta.remove((URIRef(doc.uri), DCTERMS.issued, o))
 
+        # move some data from the big document graph to a series of
+        # small graphs, one for each change act.
+        trash = set()
         for res in sorted(doc.meta.resource(doc.uri).objects(RPUBL.konsolideringsunderlag)):
+            if not res.value(RDF.type):
+                continue
             identifier = res.value(DCTERMS.identifier).replace("SFS ", "L")
             graph = self.make_graph()
             for s, p, o in res:
@@ -1030,11 +1039,13 @@ class SFS(Trips):
                         triple = (o, RPUBL.celexNummer,
                                   doc.meta.value(o, RPUBL.celexNummer))
                     graph.add(triple)
-                    doc.meta.remove(triple)
+                    trash.add(triple)
             rp = Registerpost(uri=res.identifier, meta=graph, id=identifier)
             reg.append(rp)
             if res.identifier in obs:
                 rp.append(obs[uri])
+        for triple in trash:
+            doc.meta.remove(triple)
         doc.body.append(reg)
 
         # finally, set the uri of the main body object to a better value
@@ -1141,6 +1152,7 @@ class SFS(Trips):
 
     re_Bullet = re.compile(r'^(\-\-?|\x96) ')
     # NB: these are redefinitions of regex objects in sfs_parser.py
+    re_SearchSfsId = re.compile(r'\((\d{4}:\d+)\)').search
     re_DottedNumber = re.compile(r'^(\d+ ?\w?)\. ')
     re_Bokstavslista = re.compile(r'^(\w)\) ')
     re_definitions = re.compile(

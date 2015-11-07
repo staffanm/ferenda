@@ -545,7 +545,7 @@ class SwedishLegalSource(DocumentRepository):
             else:
                 assert len(result) == 1, "attribs[%s] returned %s results" % (k, len(result))
                 attribs[k] = result[0]
-            
+
         resource = self.attributes_to_resource(attribs, infer_nodes=infer_nodes)
         uri = URIRef(self.minter.space.coin_uri(resource))
         # now that we know the document URI (didn't we already know it

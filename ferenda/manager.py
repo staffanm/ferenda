@@ -850,16 +850,15 @@ def _run_class(enabled, argv, config):
         else:
             # The only thing that kwargs may contain is a
             # 'otherrepos' parameter.
-
             # NOTE: This is a shorter version of the error handling
             # that _run_class_with_basefile does. All errors except
             # DocumentRemoved we want to propagate.
-#            try:
-            res = clbl(*config.arguments, **kwargs)
-#            except errors.DocumentRemovedError as e:
-#                if hasattr(e, 'dummyfile'):
-#                    util.writefile(e.dummyfile, "")
-#                raise e
+            try:
+                res = clbl(*config.arguments, **kwargs)
+            except errors.DocumentRemovedError as e:
+                if e.dummyfile:
+                    util.writefile(e.dummyfile, "")
+                raise e
     return res
 
 # The functions runbuildclient, _queuejobs, _make_client_manager,

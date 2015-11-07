@@ -7,7 +7,7 @@ import shutil
 from datetime import datetime
 
 from rdflib import URIRef
-from rdflib.namespace import DCTERMS, OWL
+from rdflib.namespace import DCTERMS, OWL, RDF
 from ferenda.sources.legal.se import RPUBL, RINFOEX
 
 from ferenda import decorators, util
@@ -70,8 +70,15 @@ class SFS(OrigSFS, SameAs):
         # then find each rpubl:konsolideringsunderlag, and create
         # owl:sameas for them as well
         for subresource in resource.objects(RPUBL.konsolideringsunderlag):
-            uri = self.sameas_minter.space.coin_uri(subresource)
-            subresource.add(OWL.sameAs, URIRef(uri))
+            # sometimes there'll be a rpubl:konsolideringsunderlag to
+            # a resource URI but no actual data about that
+            # resource. This seems to happen if SFST is updated but
+            # SFSR is not. In those cases we can't generate a
+            # owl:sameAs URI since we have no other data about the
+            # resource.
+            if subresource.value(RDF.type):
+                uri = self.sameas_minter.space.coin_uri(subresource)
+                subresource.add(OWL.sameAs, URIRef(uri))
         desc = Describer(resource.graph, resource.identifier)
         de = DocumentEntry(self.store.documententry_path(basefile))
         if de.orig_updated:
