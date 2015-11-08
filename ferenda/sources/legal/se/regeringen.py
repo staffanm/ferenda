@@ -116,7 +116,7 @@ class Regeringen(SwedishLegalSource):
 
     def attribs_from_url(self, url):
         # this assumes that arsutgava is "2004", not "2004/05"
-        m = re.search("/(\w+)\.?-?(\d{4})(\d+)-?/$", url)
+        m = re.search("/([a-z]+)\.?-?(\d{4})(\d+)-?/$", url)
         if m:
             (doctype, year, ordinal) = m.groups()
             if doctype == "prop":
@@ -293,7 +293,11 @@ class Regeringen(SwedishLegalSource):
                 # {'rdf:type': RPUBL.Kommittedirektiv,
                 #  'rpubl:arsutgava': 2012,
                 #  'rpubl:lopnummer} -> attributes_to_resource -> coin_uri
-                attribs = self.attribs_from_url(link["href"])
+                try:
+                    attribs = self.attribs_from_url(link["href"])
+                except ValueError:
+                    self.log.warning("%s: Can't find out properties for linked resource %s" % (basefile, link["href"]))
+                    continue
                 if attribs["rdf:type"] == "dir":
                     attribs["rdf:type"] = RPUBL.Kommittedirektiv
                 else:
