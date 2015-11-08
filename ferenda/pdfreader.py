@@ -645,10 +645,18 @@ class StreamingPDFReader(PDFReader):
             converter(tmpfilename, workdir, **converter_extra)
 
             # check if result is empty (has no content in any text node)
-            tree = etree.parse(open(convertedfile.replace(".bz2", "")))
-            if not etree.tostring(tree, method="text", encoding="utf-8").strip():
-                os.unlink(convertedfile.replace(".bz2", ""))
-                raise errors.PDFFileIsEmpty(filename)
+            try:
+                tree = etree.parse(open(convertedfile.replace(".bz2", "")))
+                if not etree.tostring(tree, method="text", encoding="utf-8").strip():
+                    os.unlink(convertedfile.replace(".bz2", ""))
+                    raise errors.PDFFileIsEmpty(filename)
+            except etree.XMLSyntaxError as e:
+                # this means pdftohtml created incorrect markup. This
+                # probably means that the doc is nonempty, which is
+                # all we care about at this point. At a later stage
+                # (in _parse_xml), a workaround will be applied to the
+                # document on the fly.
+                pass
             
             if keep_xml == "bz2":
                 with open(convertedfile.replace(".bz2", ""), mode="rb") as rfp:
