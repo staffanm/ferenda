@@ -100,7 +100,7 @@ class RegeringenLegacy(Regeringen):
                     attribs["rpubl:utrSerie"] = self.lookup_resource(altlabel, SKOS.altLabel)
                 elif elementid == "legStep3":
                     attribs["rdf:type"] = RPUBL.Proposition
-                uri = self.minter.space.coin_uri(self.attributes_to_resource(attribs, for_self=False))
+                uri = self.minter.space.coin_uri(self.attributes_to_resource(attribs))
                 utgarFran.append(uri)
 
         # find related pages
@@ -139,7 +139,7 @@ class RegeringenLegacy(Regeringen):
         selected = self.select_pdfs(pdffiles)
         
         self.log.debug("selected %s out of %d pdf files" % (", ".join(selected), len(pdffiles)))
-        return [p.replace(".pdf", "") for p in selected]
+        return [p.lower().replace(".pdf", "") for p in selected]
 
 class DirRegeringenLegacy(RegeringenLegacy, SameAs, DirRegeringen):
     alias = "dirregeringen.legacy"
