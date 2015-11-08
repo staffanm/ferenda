@@ -323,7 +323,12 @@ class Regeringen(SwedishLegalSource):
         a["dcterms:identifier"] = a["dcterms:identifier"].replace("ID-nummer: ", "")
         # save for later
         self._identifier = a["dcterms:identifier"]
-        a["rpubl:departement"] = self.lookup_resource(a["rpubl:departement"])
+        # it's rare, but in some cases a document can be published by
+        # two different departments (eg dir. 2011:80). Convert string
+        # to a list in these cases (SwedishLegalSource.polish_metadata
+        # will handle that)
+        if ", " in a["rpubl:departement"]:
+            a["rpubl:departement"] = a["rpubl:departement"].split(", ")
         # remove empty utgarFran list
         if a["rpubl:utgarFran"]:
             a["rpubl:utgarFran"] = [URIRef(x) for x in a["rpubl:utgarFran"]]
@@ -540,6 +545,17 @@ class Regeringen(SwedishLegalSource):
                                    workdir=intermediatedir,
                                    images=self.config.pdfimages,
                                    keep_xml=keep_xml)
+        if pdf.is_empty:
+            self.log.warning("PDF file %s had no textcontent, trying OCR" % pdffile)
+            # No use using the FontmappingPDFReader, since OCR:ed
+            # files lack the same fonts as that reader can handle.
+            pdf = PDFReader(filename=pdffile,
+                            workdir=intermediatedir,
+                            images=self.config.pdfimages,
+                            keep_xml=keep_xml,
+                            ocr_lang="swe")
+
+            
         return pdf
 
     # returns a list of (PDFReader, metrics) tuples, one for each PDF

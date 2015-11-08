@@ -276,6 +276,8 @@ class PDFAnalyzer(object):
             if charcount > maxcount:
                 header = i - 1
                 break
+        else:
+             header = maxcount
         charcount = 0
         maxcount = self.footer_significance_threshold * sum(vcounters['topmargin'].values())
         for i in range(max(vcounters['pageheight']) - 1, -1, -1):
@@ -283,6 +285,8 @@ class PDFAnalyzer(object):
             if charcount > maxcount:
                 footer = i + 1
                 break
+        else:
+             footer = maxcount   
         return {'topmargin': header,
                 'bottommargin': footer}
 

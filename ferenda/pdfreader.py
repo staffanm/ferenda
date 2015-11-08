@@ -204,17 +204,17 @@ class PDFReader(CompoundElement):
             topage = min((i + 1) * 10, number_of_pages)
             if frompage > topage:
                 continue
-            cmd = "pdfimages -p -f %(frompage)s -l %(topage)s %(tmppdffile)s %(workdir)s/%(root)s" % locals(
+            cmd = "pdfimages -png -p -f %(frompage)s -l %(topage)s %(tmppdffile)s %(workdir)s/%(root)s" % locals(
             )
             self.log.debug("- running " + cmd)
             (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
-            # step 2.1: Combine the recently extracted images and
-            # into a new tif (so that we add 10
-            # pages at a time to the tif, as imagemagick can
-            # create a number of pretty large files for each page,
-            # so converting 200 images will fill 10 G of your temp
-            # space -- which we'd like to avoid)
-            cmd = "convert %(workdir)s/%(root)s-*.pbm -compress Zip %(workdir)s/%(root)s-tmp%(idx)04d.tif" % locals(
+            # step 2.1: Combine the recently extracted images (which
+            # can be pbm or ppm files) and into a new tif (so that we
+            # add 10 pages at a time to the tif, as imagemagick can
+            # create a number of pretty large files for each page, so
+            # converting 200 images will fill 10 G of your temp space
+            # -- which we'd like to avoid)
+            cmd = "convert %(workdir)s/%(root)s-*.png -compress Zip %(workdir)s/%(root)s-tmp%(idx)04d.tif" % locals(
             )
             self.log.debug("- running " + cmd)
             (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
