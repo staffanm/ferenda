@@ -263,7 +263,11 @@ class Regeringen(SwedishLegalSource):
         # 0). So we just grab text and use parse_swedish_date later
         # on.
         utgiven = content.find("span", "published").time.text
-        ansvarig = content.find("p", "media--publikations__sender").a.text
+        try:
+            ansvarig = content.find("p", "media--publikations__sender").a.text
+        except AttributeError:
+            self.log.warning("%s: No ansvarig departement found" % basefile)
+            ansvarig = None
         s = content.find("div", "has-wordExplanation")
         for a in s.find_all("a"):  # links in summary are extra tacked-on bogus
             a.decompose()
@@ -290,18 +294,15 @@ class Regeringen(SwedishLegalSource):
                 #  'rpubl:arsutgava': 2012,
                 #  'rpubl:lopnummer} -> attributes_to_resource -> coin_uri
                 attribs = self.attribs_from_url(link["href"])
-                (doctype, year, ordinal) = re.search("/(\w+)\.?-(\d{4})(\d+)/$",
-                                                 link["href"]).groups()
-                attribs = {"rpubl:arsutgava": year,
-                           "rpubl:lopnummer": ordinal}
-                if doctype == "dir":
+                if attribs["rdf:type"] == "dir":
                     attribs["rdf:type"] = RPUBL.Kommittedirektiv
                 else:
-                    attribs["rdf:type"] = RPUBL.Utredningsbetankande
                     # lookup on skos:altLabel, but with "Ds" and "SOU"
                     # as keys (not "ds" and "sou")
-                    altlabel = doctype.upper() if doctype == "sou" else doctype.capitalize()
+                    altlabel = attribs["rdf:type"].upper() if attribs["rdf:type"] == "sou" else attribs["rdf:type"].capitalize()
                     attribs["rpubl:utrSerie"] = self.lookup_resource(altlabel, SKOS.altLabel)
+                    attribs["rdf:type"] = RPUBL.Utredningsbetankande
+
                 uri = self.minter.space.coin_uri(self.attributes_to_resource(attribs))
                 utgarFran.append(uri)
         a = self.metadata_from_basefile(basefile)
@@ -327,7 +328,7 @@ class Regeringen(SwedishLegalSource):
         # two different departments (eg dir. 2011:80). Convert string
         # to a list in these cases (SwedishLegalSource.polish_metadata
         # will handle that)
-        if ", " in a["rpubl:departement"]:
+        if a["rpubl:departement"] and ", " in a["rpubl:departement"]:
             a["rpubl:departement"] = a["rpubl:departement"].split(", ")
         # remove empty utgarFran list
         if a["rpubl:utgarFran"]:
@@ -545,7 +546,7 @@ class Regeringen(SwedishLegalSource):
                                    workdir=intermediatedir,
                                    images=self.config.pdfimages,
                                    keep_xml=keep_xml)
-        if pdf.is_empty:
+        if pdf.is_empty():
             self.log.warning("PDF file %s had no textcontent, trying OCR" % pdffile)
             # No use using the FontmappingPDFReader, since OCR:ed
             # files lack the same fonts as that reader can handle.
