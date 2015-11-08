@@ -45,6 +45,9 @@ class FixedLayoutStore(SwedishLegalStore):
                 return
             for x in util.list_dirs(d, self.doctypes.keys()):
                 suffix = "/index" + os.path.splitext(x)[1]
+                if not x.endswith(suffix):
+                    continue  # this means we've recieved some
+                              # attachment, not the main file
                 pathfrag = x[len(d) + 1:-len(suffix)]
                 basefile = self.pathfrag_to_basefile(pathfrag)
                 if basefile not in yielded:
