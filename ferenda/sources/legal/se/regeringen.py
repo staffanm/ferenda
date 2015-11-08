@@ -43,7 +43,7 @@ class FontmappingPDFReader(PDFReader):
     # postprocessing the result of parse_xml
 
     def _parse_xml(self, xmlfp, xmlfilename):
-        super(FontmappingPDFReader, self)._parse_xml(xmlfp, xmlfilename)
+        super(FontmappingPDFReader, self)._parse_xml(xmlfp)
         for key, val in self.fontspec.items():
             if 'family' in val:
                 # Times New Roman => TimesNewRomanPSMT

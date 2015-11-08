@@ -390,7 +390,7 @@ class PDFReader(CompoundElement):
         self.log.debug("Loading %s" % filename)
 
         try:
-            tree = etree.parse(xmlfp)
+            root = etree.parse(xmlfp).getroot()
         except etree.XMLSyntaxError as e:
             self.log.warning(
                 "pdftohtml created incorrect markup, trying to fix using BeautifulSoup: %s" %
@@ -398,14 +398,19 @@ class PDFReader(CompoundElement):
             xmlfp.seek(0)
             from bs4 import BeautifulSoup
             from io import BytesIO
-            soup = BeautifulSoup(xmlfp, "xml")
+            soup = BeautifulSoup(xmlfp, "lxml")
             xmlfp = BytesIO(str(soup).encode("utf-8"))
             xmlfp.name = filename
-            tree = etree.parse(xmlfp)
+            # now the root node hierarchy is
+            # <html><body><pdf2xml><page>..., not
+            # <pdf2xml><page>... So just skip the top two levels
+            root = etree.parse(xmlfp).getroot()[0][0]
             self.log.debug("BeautifulSoup workaround successful")
 
+        assert root.tag == "pdf2xml", "Unexpected root node from pdftohtml -xml: %s" % root.tag
+
         # for each page element
-        for pageelement in tree.getroot():
+        for pageelement in root:
             if pageelement.tag == "outline":
                 # FIXME: we want to do something with this information
                 continue
