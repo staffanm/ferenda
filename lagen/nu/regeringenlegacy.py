@@ -23,11 +23,6 @@ class RegeringenLegacy(Regeringen):
         return False
 
     # override just some of the methods to parse the HTML index page
-    def extract_head(self, fp, basefile):
-        parser = 'lxml'
-        soup = BeautifulSoup(fp.read(), parser)
-        self._rawbody = soup.body
-        return self._rawbody.find(id="content")
 
     def extract_metadata(self, rawhead, basefile):
         content = rawhead

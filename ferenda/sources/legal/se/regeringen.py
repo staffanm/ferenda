@@ -26,6 +26,7 @@ from ferenda import util
 from ferenda.decorators import recordlastdownload, downloadmax, action, managedparsing
 from ferenda.elements import Section, Link
 from ferenda.pdfreader import PDFReader, Textbox
+from ferenda.errors import DocumentRemovedError
 
 from . import SwedishLegalSource, RPUBL
 from .swedishlegalsource import offtryck_parser, offtryck_gluefunc, PreambleSection, UnorderedSection
@@ -239,7 +240,15 @@ class Regeringen(SwedishLegalSource):
         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
         return a
 
+    blacklist = set([(SOU, "2008:35")])
     def extract_head(self, fp, basefile):
+        # Some documents are just beyond usable and/or completely
+        # uninteresting from a legal information point of view. We
+        # keep a hardcoded black list to skip these. This is the
+        # earliest point at which we can check against that blacklist.
+        if (self.document_type, basefile) in self.blacklist:
+            raise DocumentRemovedError("%s is blacklisted" % basefile,
+                                       dummyfile=self.store.parsed_path(basefile))
         parser = 'lxml'
         soup = BeautifulSoup(fp.read(), parser)
         self._rawbody = soup.body
