@@ -36,8 +36,8 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         myndfskr.DIFS,
         myndfskr.DVFS,
         myndfskr.EIFS,
-        myndfskr.ELSAKFS,
-        myndfskr.Ehalso,
+        # myndfskr.ELSAKFS,  # disabled for the time being
+        # myndfskr.Ehalso,   #            -""-
         myndfskr.FFFS,
         myndfskr.FFS,
         myndfskr.FMI,

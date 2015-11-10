@@ -1238,7 +1238,7 @@ class SwedishCitationParser(CitationParser):
         if isinstance(string, (UpphavtKapitel, UpphavdParagraf)):
             return [string]
         # basic normalization without stripping
-        string = string.replace("\r\n", " ").replace("\n", " ")
+        string = string.replace("\r\n", " ").replace("\n", " ").replace("\x00","")
 
         # transform self._currenturl => attributes.
         # FIXME: we should maintain a self._current_baseuri_attributes

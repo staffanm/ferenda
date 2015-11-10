@@ -163,6 +163,8 @@ class MyndFskrBase(SwedishLegalSource):
         else:
             fs = self.__class__.__name__
             realbasefile = basefile
+        # optionally map fs identifier to match skos:altLabel
+        fs = {'ELSAKFS': 'ELSÄK-FS'}.get(fs, fs) 
         a = super(MyndFskrBase, self).metadata_from_basefile(basefile)
         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = realbasefile.split(":", 1)
         a["rpubl:forfattningssamling"] = self.lookup_resource(fs, SKOS.altLabel)
@@ -238,8 +240,10 @@ class MyndFskrBase(SwedishLegalSource):
                 'rpubl:omtryckAv': ['^(Omtryck)$'],
                 'rpubl:genomforDirektiv': ['Celex (3\d{2,4}\w\d{4})'],
                 'rpubl:beslutsdatum':
-                ['(?:har beslutats|[Bb]eslutade|beslutat|Beslutad) den (\d+ \w+ \d{4})',
-                 'Beslutade av (?:[A-ZÅÄÖ][\w ]+) den (\d+ \w+ \d{4}).'],
+                ['(?:har beslutats|[Bb]eslutade|beslutat|[Bb]eslutad) den (\d+ \w+( \d{4}|))',
+                 'Beslutade av (?:[A-ZÅÄÖ][\w ]+) den (\d+ \w+ \d{4}).',
+                 'utfärdad den (\d+ \w+ \d{4}) tillkännages härmed i andra hand.',
+                 '(?:utfärdad|meddelad)e? den (\d+ \w+ \d{4}).'],
                 'rpubl:beslutadAv':
                 ['\n\s*([A-ZÅÄÖ][\w ]+?)\d? (?:meddelar|lämnar|föreskriver|beslutar)',
                  '\s(?:meddelar|föreskriver) ([A-ZÅÄÖ][\w ]+?)\d?\s'],
@@ -272,6 +276,8 @@ class MyndFskrBase(SwedishLegalSource):
             pagecount += 1
             props = {}
             for (prop, tests) in list(self.fwdtests().items()):
+                if prop == "rpubl:beslutsdatum" and 'FERENDA_MYNDFSKR_DEBUG' in os.environ:
+                    from pudb import set_trace; set_trace()
                 if prop in props:
                     continue
                 for test in tests:
@@ -726,29 +732,39 @@ class EIFS(MyndFskrBase):
         return super(EIFS, self).sanitize_basefile(basefile)
 
 
-class ELSAKFS(MyndFskrBase):
-    alias = "elsakfs"  # real name is ELSÄK-FS, but avoid swedchars, uppercase and dashes
-    uri_slug = "elsaek-fs"  # for use in
-    start_url = "http://www.elsakerhetsverket.se/om-oss/lag-och-ratt/gallande-regler/Elsakerhetsverkets-foreskrifter-listade-i-nummerordning/"
-    download_rewrite_url = True
+# This repo source does not have a simple publishing strategy where a
+# frontpage holds predictable links to all base and change acts. We
+# disable it until we can devote resources to download it properly.
+# 
+# class ELSAKFS(MyndFskrBase):
+#     alias = "elsakfs"  # real name is ELSÄK-FS, but avoid swedchars, uppercase and dashes
+#     start_url = "http://www.elsakerhetsverket.se/om-oss/lag-och-ratt/gallande-regler/Elsakerhetsverkets-foreskrifter-listade-i-nummerordning/"
+#     download_rewrite_url = True
+# 
+# 
+#     # this repo has a mismatch between basefile prefix and the URI
+#     # space slug. This is easily fixed.
+#     def basefile_from_uri(self, uri):
+#         basefile = super(MyndFskrBase, self).basefile_from_uri(uri)
+#         if basefile.startswith("elsaek-fs"):
+#                 return basefile.replace("elsaek-fs", "elsakfs")
+# 
+# 
+#     def remote_url(self, basefile):
+#         if "/" in basefile:
+#             basefile = basefile.split("/")[1]
+#         return "http://www.elsakerhetsverket.se/globalassets/foreskrifter/elsak-fs-%s.pdf" % basefile.replace(
+#             ":", "-")
+# 
 
-    def remote_url(self, basefile):
-        if "/" in basefile:
-            basefile = basefile.split("/")[1]
-        return "http://www.elsakerhetsverket.se/globalassets/foreskrifter/elsak-fs-%s.pdf" % basefile.replace(
-            ":", "-")
-
-    # FIXME: The crappy webserver returns status code 200 when it
-    # really is a 404, eg
-    # "http://www.elsakerhetsverket.se/globalassets/foreskrifter/1998-1.pdf". We
-    # should handle this in download_single and not store error pages
-    # when we expected documents
-
-
-class Ehalso(MyndFskrBase):
-    alias = "ehalso"
-    # Ehälsomyndigheten publicerar i TLVFS
-    start_url = "http://www.ehalsomyndigheten.se/Om-oss-/Foreskrifter/"
+# This repo source has as of now a single act, which is published in a
+# different författningssamling (TLVFS). The generic downloader
+# misclassifies this. Skip for now.
+# 
+# class Ehalso(MyndFskrBase):
+#     alias = "ehalso"
+#     # Ehälsomyndigheten publicerar i TLVFS
+#     start_url = "http://www.ehalsomyndigheten.se/Om-oss-/Foreskrifter/"
 
 
 class FFFS(MyndFskrBase):
@@ -824,7 +840,7 @@ class FFFS(MyndFskrBase):
                 elif link['href'].endswith(".pdf"):
                     filename = link['href'].split("/")[-1]
                     if self.download_if_needed(
-                            suburl, basefile, self.store.downloaded_path(basefile, attachment=filename)):
+                            suburl, basefile, filename=self.store.downloaded_path(basefile, attachment=filename)):
                         self.log.info("%s: downloaded '%s' to %s" %
                                       (basefile, link.text, filename))
 
