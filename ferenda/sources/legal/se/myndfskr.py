@@ -77,13 +77,15 @@ class MyndFskrBase(SwedishLegalSource):
         return [self.alias]
 
     def sanitize_basefile(self, basefile):
-        segments = re.split('[/:_-]', basefile.lower())
+        segments = re.split('[ /:_-]', basefile.lower())
         # force "01" to "1" (and check integerity (not integrity))
         segments[-1] = str(int(segments[-1]))
         if len(segments) == 2:
             basefile = "%s:%s" % tuple(segments)
         elif len(segments) == 3:
             basefile = "%s/%s:%s" % tuple(segments)
+        else:
+            raise ValueError("Can't sanitize %s" % basefile)
         if not any((basefile.startswith(fs + "/") for fs
                     in self.forfattningssamlingar())):
             return self.forfattningssamlingar()[0] + "/" + basefile
@@ -119,6 +121,14 @@ class MyndFskrBase(SwedishLegalSource):
 
                 if basefile:
                     basefile = self.sanitize_basefile(basefile)
+                    # since download_rewrite_url is potentially
+                    # expensive (might do a HTTP request), we should
+                    # perhaps check if we really need to download
+                    # this. NB: this is duplicating logic from
+                    # DocumentRepository.download.
+                    if (os.path.exists(self.store.downloaded_path(basefile))
+                        and not self.config.refresh):
+                        continue
                     if self.download_rewrite_url:
                         if callable(self.download_rewrite_url):
                             link = self.download_rewrite_url(basefile, link)
@@ -151,8 +161,27 @@ class MyndFskrBase(SwedishLegalSource):
                                          resolve_base_href=True)
                 source = tree.iterlinks()
 
+    def download_single(self, basefile, url=None):
+        ret = super(MyndFskrBase, self).download_single(basefile, url)
+        if self.downloaded_suffix == ".pdf":
+            # assure that the downloaded resource really is a PDF
+            downloaded_file = self.store.downloaded_path(basefile)
+            with open(downloaded_file, "rb") as fp:
+                sig = fp.read(4)
+                if sig != b'%PDF':
+                    other_file = downloaded_file.replace(".pdf", ".bak")
+                    util.robust_rename(downloaded_file, other_file)
+                    raise errors.DownloadError("%s: Assumed PDF, but downloaded file has sig %r (saved at %s)" % (basefile, sig, other_file))
+        return ret
+
     def download_post_form(self, form, url):
         raise NotImplementedError
+
+    def _basefile_frag_to_altlabel(self, basefilefrag):
+        # optionally map fs identifier to match skos:altLabel.
+        return {'ELSAKFS': 'ELSÄK-FS',
+                'HSLFFS': 'HSLF-FS',
+                'FOHMFS': 'FoHMFS'}.get(basefilefrag, basefilefrag)
     
     def metadata_from_basefile(self, basefile):
         # munge basefile or classname to find the skos:altLabel of the
@@ -163,8 +192,7 @@ class MyndFskrBase(SwedishLegalSource):
         else:
             fs = self.__class__.__name__
             realbasefile = basefile
-        # optionally map fs identifier to match skos:altLabel
-        fs = {'ELSAKFS': 'ELSÄK-FS'}.get(fs, fs) 
+        fs = self._basefile_frag_to_altlabel(fs)
         a = super(MyndFskrBase, self).metadata_from_basefile(basefile)
         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = realbasefile.split(":", 1)
         a["rpubl:forfattningssamling"] = self.lookup_resource(fs, SKOS.altLabel)
@@ -173,20 +201,41 @@ class MyndFskrBase(SwedishLegalSource):
     urispace_segment = ""
     
     def basefile_from_uri(self, uri):
-        basefile = super(MyndFskrBase, self).basefile_from_uri(uri)
         # this should map https://lagen.nu/sjvfs/2014:9 to basefile sjvfs/2014:9
         # but also https://lagen.nu/dfs/2007:8 -> dfs/2007:8
+        basefile = super(MyndFskrBase, self).basefile_from_uri(uri)
+        # since basefiles are always wihout hyphens, but URIs for
+        # författningssamlingar like HSLF-FS will contain a hyphen, we
+        # remove it here.
+        basefile = basefile.replace("-", "")
         for fs in self.forfattningssamlingar():
             # FIXME: use self.coin_base (self.urispace_base) instead.
             if basefile.startswith(fs):
                 return basefile
 
+
+    blacklist = set(["fohmfs/2014:1",  # Föreskriftsförteckning, inte föreskrift
+                     "myhfs/2013:2",   # Annan förteckning "FK" utan beslut
+                     "myhfs/2013:5",   #   -""-
+                     "myhfs/2014:4",   #   -""-
+                     "myhfs/2012:1",   # Saknar bara beslutsdatum, förbiseende?
+                    ])
     @decorators.action
     @decorators.managedparsing
     def parse(self, doc):
         # This has a similar structure to DocumentRepository.parse but
         # works on PDF docs converted to plaintext, instead of HTML
-        # trees.
+        # trees. FIXME: We should convert the general structure to
+        # what SwedishLegalSource uses.
+
+        # Some documents are just beyond usable and/or completely
+        # uninteresting from a legal information point of view. We
+        # keep a hardcoded black list to skip these. 
+        if doc.basefile in self.blacklist:
+            raise errors.DocumentRemovedError("%s is blacklisted" % doc.basefile,
+                                       dummyfile=self.store.parsed_path(doc.basefile))
+
+
         reader = self.textreader_from_basefile(doc.basefile)
         self.parse_metadata_from_textreader(reader, doc)
         self.parse_document_from_textreader(reader, doc)
@@ -240,7 +289,7 @@ class MyndFskrBase(SwedishLegalSource):
                 'rpubl:omtryckAv': ['^(Omtryck)$'],
                 'rpubl:genomforDirektiv': ['Celex (3\d{2,4}\w\d{4})'],
                 'rpubl:beslutsdatum':
-                ['(?:har beslutats|[Bb]eslutade|beslutat|[Bb]eslutad) den (\d+ \w+( \d{4}|))',
+                ['(?:har beslutats|[Bb]eslutade|beslutat|[Bb]eslutad)(?: den|) (\d+ \w+( \d{4}|))',
                  'Beslutade av (?:[A-ZÅÄÖ][\w ]+) den (\d+ \w+ \d{4}).',
                  'utfärdad den (\d+ \w+ \d{4}) tillkännages härmed i andra hand.',
                  '(?:utfärdad|meddelad)e? den (\d+ \w+ \d{4}).'],
@@ -285,7 +334,8 @@ class MyndFskrBase(SwedishLegalSource):
                         test, page, re.MULTILINE | re.DOTALL | re.UNICODE)
                     if m:
                         props[prop] = util.normalize_space(m.group(1))
-            # Single required propery. If we find this, we're done
+            # Single required propery. If we find this, we're done (ie
+            # we've skipped past the toc/cover pages).
             if 'rpubl:beslutsdatum' in props:
                 break
             self.log.debug("%s: Couldn't find required props on page %s" %
@@ -335,7 +385,9 @@ class MyndFskrBase(SwedishLegalSource):
 
     def sanitize_metadata(self, props, doc):
         """Correct those irregularities in the extracted metadata that we can
-           find"""
+           find
+
+        """
 
         # common false positive
         if 'dcterms:title' in props:
@@ -372,6 +424,7 @@ class MyndFskrBase(SwedishLegalSource):
         else:
             # do a a simple inference from basefile and populate props
             (pub, year, ordinal) = re.split('[/:_]', doc.basefile.upper())
+            pub = self._basefile_frag_to_altlabel(pub)
             props['dcterms:identifier'] = "%s %s:%s" % (pub, year, ordinal)
             self.log.warning("%s: Couldn't find dcterms:identifier, inferred %s from basefile" %
                              (doc.basefile, props['dcterms:identifier']))
@@ -399,8 +452,31 @@ class MyndFskrBase(SwedishLegalSource):
         desc.value(RPUBL.lopnummer, ordinal)
         desc.value(DCTERMS.identifier, props['dcterms:identifier'])
         if 'rpubl:beslutadAv' in props:
-            desc.rel(RPUBL.beslutadAv,
-                     self.lookup_resource(props['rpubl:beslutadAv']))
+            try:
+                desc.rel(RPUBL.beslutadAv,
+                         self.lookup_resource(props['rpubl:beslutadAv']))
+            except KeyError as e:
+                if self.alias == "ffs":
+                    # These documents are often enacted by entities
+                    # like Chefen för Flygvapnet, Försvarets
+                    # sjukvårdsstyrelse, Generalläkaren, Krigsarkivet,
+                    # Överbefälhavaren. We have no resources for those
+                    # and probably won't have (are they even
+                    # enumerable?)
+                    self.log.warning("%s: Couldn't look up entity '%s'" %
+                                     (doc.basefile, props['rpubl:beslutadAv']))
+                else:
+                    # there are other examples of where a entity might
+                    # not be resolved, like lvfs/1999:25, where a bad
+                    # OCR has resulted in "Läkea\nmedelsverket"
+                    # (instead of the proper Läkemedelsverket). Keep a
+                    # blacklist for now, until we can determine the
+                    # size of this problem.
+                    if doc.basefile in ("lvfs/1995:25"):
+                        self.log.warning("%s: Unknown entity '%s'" %
+                                         (doc.basefile, props['rpubl:beslutadAv']))
+                    else:
+                        raise e
 
         if 'dcterms:issn' in props:
             desc.value(DCTERMS.issn, props['dcterms:issn'])
@@ -413,25 +489,21 @@ class MyndFskrBase(SwedishLegalSource):
             if re.search('^(Föreskrifter|[\w ]+s föreskrifter) om ändring i ',
                          props['dcterms:title'], re.UNICODE):
                 # There should be something like FOOFS 2013:42 (or
-                # possibly just 2013:42) in the title
-                m = re.search('([A-ZÅÄÖ-]+FS |)\d{4}:\d+',
+                # possibly just 2013:42) in the title. The regex is forgiving about spurious spaces, seee LVFS 1998:5
+                m = re.search('(?P<pub>[A-ZÅÄÖ-]+FS|) ?(?P<year>\d{4}) ?:(?P<ordinal>\d+)',
                               props['dcterms:title'])
                 if not m:
                     raise errors.ParseError("%s: Couldn't find reference to change act in title %r" %
                                             (doc.basefile, props['dcterms:title']))
-                orig = m.group(0)
-                if " " in orig:
-                    (publication, year, ordinal) = re.split('[ :]', orig)
-                else:
-                    # No FS given for the base act, assume that it's
-                    # the same as this change act
-                    (year, ordinal) = re.split('[ :]', orig)
-                    pub = props['dcterms:identifier'].split(" ")[0]
+                parts = m.groupdict()
+                if not parts['pub']:
+                    parts["pub"] = props['dcterms:identifier'].split(" ")[0]
+
                 origuri = makeurl({'rdf:type': RPUBL.Myndighetsforeskrift,
                                    'rpubl:forfattningssamling':
-                                   self.lookup_resource(pub, SKOS.altLabel),
-                                   'rpubl:arsutgava': year,
-                                   'rpubl:lopnummer': ordinal})
+                                   self.lookup_resource(parts["pub"], SKOS.altLabel),
+                                   'rpubl:arsutgava': parts["year"],
+                                   'rpubl:lopnummer': parts["ordinal"]})
                 desc.rel(RPUBL.andrar,
                          URIRef(origuri))
 
@@ -715,7 +787,7 @@ class DVFS(MyndFskrBase):
             raise e
 
     def fwdtests(self):
-        t = super(self.__class__, self).fwdtests()
+        t = super(DVFS, self).fwdtests()
         t["dcterms:identifier"] = ['(DVFS\s\s?\d{4}:\d+)']
         return t
 
@@ -858,16 +930,28 @@ class FFS(MyndFskrBase):
     #   http://www.forsvarsmakten.se/siteassets/4-om-myndigheten/dokumentfiler/lagrum/gallande-fib/fib2001-4.pdf
 
 
-class FMI(MyndFskrBase):
-    alias = "fmi"
-    # Fastighetsmäklarinspektionen publicerar i KAMFS
-    start_url = "http://www.fmi.se/gallande-foreskrifter"
+# This is similar to EHalso -- ie a separate agency publishing
+# ordinances in another agencys collection. We need better handling of
+# this.
+# 
+#class FMI(MyndFskrBase):
+#    alias = "fmi"
+#    # Fastighetsmäklarinspektionen publicerar i KAMFS
+#    start_url = "http://www.fmi.se/gallande-foreskrifter"
 
 
 class FoHMFS(MyndFskrBase):
     alias = "fohmfs"
     start_url = ("http://www.folkhalsomyndigheten.se/publicerat-material/"
                  "foreskrifter-och-allmanna-rad/")
+    basefile_regex = "^(?P<basefile>(FoHMFS|HSLF-FS) \d+:\d+)$"
+
+    def forfattningssamlingar(self):
+        return ["fohmfs", "hslffs"]
+
+    def sanitize_basefile(self, basefile):
+        basefile = basefile.replace("-", "")
+        return super(FoHMFS, self).sanitize_basefile(basefile)
 
     def download_rewrite_url(self, basefile, link):
         soup = BeautifulSoup(self.session.get(link).text, "lxml")
@@ -910,6 +994,11 @@ class LVFS(MyndFskrBase):
     alias = "lvfs"
     start_url = "http://www.lakemedelsverket.se/overgripande/Lagar--regler/Lakemedelsverkets-foreskrifter---LVFS/"
 
+    def fwdtests(self):
+        t = super(LVFS, self).fwdtests()
+        # extra lax regex needed for LVFS 1992:4
+        t["rpubl:beslutsdatum"].append("^den (\d+ \w+ \d{4})$")
+        return t
 
 class MIGRFS(MyndFskrBase):
     alias = "migrfs"
@@ -1252,7 +1341,7 @@ class SOSFS(MyndFskrBase):
             return False
 
     def fwdtests(self):
-        t = super(self.__class__, self).fwdtests()
+        t = super(SOSFS, self).fwdtests()
         t["dcterms:identifier"] = ['^([A-ZÅÄÖ-]+FS\s\s?\d{4}:\d+)']
         return t
 
@@ -1268,73 +1357,22 @@ class SOSFS(MyndFskrBase):
         except IOError:   # read past end of file
             raise errors.ParseError("%s: Could not find a proper first page" %
                                     doc.basefile)
-        return super(self.__class__, self).parse_metadata_from_textreader(reader, doc)
+        return super(SOSFS, self).parse_metadata_from_textreader(reader, doc)
 
 
-class STAFS(MyndFskrBase):
-    alias = "stafs"
-    start_url = ("http://www.swedac.se/sv/Det-handlar-om-fortroende/"
-                 "Lagar-och-regler/Gallande-foreskrifter-i-nummerordning/")
-    basefile_regex = "^STAFS (?P<basefile>\d{4}:\d+)$"
-    storage_policy = "dir"
-
-    re_identifier = re.compile('STAFS[ _]+(\d{4}[:/_-]\d+)')
-
-    def download_single(self, basefile, mainurl):
-        consolidated_link = None
-        try:
-            soup = BeautifulSoup(self.session.get(mainurl).text)
-            if not soup.find_all("a", text=self.re_identifier):
-                self.log.error(
-                    "%s: Couldn't find any document links at %s" %
-                    (basefile, mainurl))
-                return False
-            for linkel in soup.find_all("a", text=self.re_identifier):
-                url = urljoin(mainurl, linkel.get("href"))
-                if "konso" in linkel.text:
-                    consolidated_link = url
-                else:
-                    m = self.re_identifier.search(linkel.text)
-                    assert m
-                    if url.endswith(".pdf"):
-                        newbasefile = self.sanitize_basefile(m.group(1))
-                        if basefile != newbasefile:
-                            # incorrectly labeled file -- no way of
-                            # knowing which label is correct
-                            self.log.warning(
-                                "Expected %s but got %s, skipping this" %
-                                (basefile, newbasefile))
-                            continue
-                        # download directly - but call baseclass
-                        # method to ensure DocumentEntry updates
-                        super(STAFS, self).download_single(basefile, url)
-                    else:
-                        # not pdf - link to yet another pg
-                        self.log.debug("%s:    Fetching landing page %s" % (basefile, url))
-                        subsoup = BeautifulSoup(self.session.get(url).text, "lxml")
-                        for sublink in soup.find_all("a", text=self.re_identifier):
-                            m = self.re_identifier.search(sublink.text)
-                            assert m
-                            suburl = urljoin(url, sublink.get("href"))
-                            if suburl.endswith(".pdf"):
-                                subbasefile = self.sanitize_basefile(m.group(1))
-                                self.log.debug("%s:    Downloading change %s from %s" %
-                                               (basefile, subbasefile, suburl))
-                                self.download_if_needed(suburl, subbasefile)
-
-            if consolidated_link:
-                filename = self.store.downloaded_path(
-                    basefile,
-                    attachment="consolidated.pdf")
-                self.log.debug(
-                    "%s:    Downloading consolidated  to %s" %
-                    (basefile, filename))
-                self.download_if_needed(
-                    consolidated_link, basefile, filename=filename)
-        except requests.exceptions.ConnectionError as e:
-            self.log.error(
-                "%s: Failure fetching %s (or some sub-URL): %s" %
-                (basefile, mainurl, e))
+# The previous implementation of STAFS.download_single was just too
+# complicated and also incorrect. It has similar requirements like
+# FFFS, maybe we could abstract the downloading of base act HTML pages
+# that link to base and change acts in PDF and optionally consolidated
+# versions, other things.
+# 
+# class STAFS(MyndFskrBase):
+#     alias = "stafs"
+#     start_url = ("http://www.swedac.se/sv/Det-handlar-om-fortroende/"
+#                  "Lagar-och-regler/Gallande-foreskrifter-i-nummerordning/")
+#     basefile_regex = "^STAFS (?P<basefile>\d{4}:\d+)$"
+#     storage_policy = "dir"
+#     re_identifier = re.compile('STAFS[ _]+(\d{4}[:/_-]\d+)')
 
 
 class STFS(MyndFskrBase):

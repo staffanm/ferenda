@@ -1,4 +1,4 @@
-# Automatically concatenated from sources at 2015-10-30T12:40:08.555097
+# Automatically concatenated from sources at 2015-11-12T19:14:47.044166
 
 @prefix : <http://rinfo.lagrummet.se/sys/uri/space#> .
 @prefix coin: <http://purl.org/court/def/2009/coin#> .
@@ -162,6 +162,10 @@ rpubl:Skrivelse :abbrSlug "skr" .
 
 <http://rinfo.lagrummet.se/serie/fs/fkfs> :abbrSlug "fkfs" .
 
+<http://rinfo.lagrummet.se/serie/fs/fohmfs> :abbrSlug "fohmfs" .
+
+<http://rinfo.lagrummet.se/serie/fs/hslf-fs> :abbrSlug "hslf-fs" .
+
 <http://rinfo.lagrummet.se/serie/fs/hsvfs> :abbrSlug "hsvfs" .
 
 <http://rinfo.lagrummet.se/serie/fs/hvmfs> :abbrSlug "hvmfs" .
@@ -198,11 +202,15 @@ rpubl:Skrivelse :abbrSlug "skr" .
 
 <http://rinfo.lagrummet.se/serie/fs/livsfs> :abbrSlug "livsfs" .
 
+<http://rinfo.lagrummet.se/serie/fs/lmfs> :abbrSlug "lmfs" .
+
 <http://rinfo.lagrummet.se/serie/fs/lmvfs> :abbrSlug "lmvfs" .
 
 <http://rinfo.lagrummet.se/serie/fs/lvfs> :abbrSlug "lvfs" .
 
 <http://rinfo.lagrummet.se/serie/fs/migrfs> :abbrSlug "migrfs" .
+
+<http://rinfo.lagrummet.se/serie/fs/myhfs> :abbrSlug "myhfs" .
 
 <http://rinfo.lagrummet.se/serie/fs/nfs> :abbrSlug "nfs" .
 

@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2015-07-09T23:09:09.508384
+# Automatically transformed from sources at 2015-11-12T10:01:03.973277
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -345,11 +345,24 @@
     skos:altLabel "FÖD"@sv ;
     skos:prefLabel "Försäkringsöverdomstolen"@sv .
 
+<https://lagen.nu/dataset/fohmfs> a rpubl:Forfattningssamling ;
+    dcterms:publisher <https://lagen.nu/org/2015/folkhalsomyndigheten> ;
+    owl:sameAs <http://rinfo.lagrummet.se/serie/fs/fohmfs> ;
+    skos:altLabel "FoHMFS"@sv ;
+    skos:prefLabel "Folkhälsomyndighetens författningssamling"@sv .
+
 <https://lagen.nu/dataset/hfd> a rpubl:Rattsfallspublikation ;
     rdfs:seeAlso <http://rinfo.lagrummet.se/serie/rf/ra> ;
     owl:sameAs <http://rinfo.lagrummet.se/serie/rf/hfd> ;
     skos:altLabel "HFD"@sv ;
     skos:prefLabel "Högsta förvaltningsdomstolens årsbok"@sv .
+
+<https://lagen.nu/dataset/hslf-fs> a rpubl:Forfattningssamling ;
+    dcterms:publisher <https://lagen.nu/org/2014/socialstyrelsen> ;
+    owl:sameAs <http://rinfo.lagrummet.se/serie/fs/hslf-fs> ;
+    skos:altLabel "HSLF-FS"@sv ;
+    skos:comment "Utnyttjas av E-hälsomyndigheten, Folkhälsomyndigheten, Inspektionen för vård och omsorg, Läkemedelsverket, Rättsmedicinalverket, Socialstyrelsen och Tandvårds- och läkemedelsförmånsverket"@sv ;
+    skos:prefLabel "Gemensamma författningssamlingen avseende hälso- och sjukvård, socialtjänst, läkemedel, folkhälsa m.m."@sv .
 
 <https://lagen.nu/dataset/hsvfs> a rpubl:Forfattningssamling ;
     dcterms:publisher <https://lagen.nu/org/2014/hogskoleverket> ;
@@ -1331,6 +1344,10 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/verket_foer_innovationssystem> ;
     foaf:name "Verket för innovationssystem"@sv .
 
+<https://lagen.nu/org/2015/e-halsomyndigheten> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/e-haelsomyndigheten> ;
+    foaf:name "E-hälsomyndigheten"@sv .
+
 <https://lagen.nu/org/2008/domstolsverket> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/domstolsverket> ;
     foaf:homepage <http://www.domstol.se/> ;
@@ -1620,10 +1637,6 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/skogsstyrelsen> ;
     foaf:name "Skogsstyrelsen"@sv .
 
-<https://lagen.nu/org/2014/socialstyrelsen> a foaf:Organization ;
-    owl:sameAs <http://rinfo.lagrummet.se/org/socialstyrelsen> ;
-    foaf:name "Socialstyrelsen"@sv .
-
 <https://lagen.nu/org/2014/sprangamnesinspektionen> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/spraengaemnesinspektionen> ;
     foaf:name "Sprängämnesinspektionen"@sv .
@@ -1706,6 +1719,10 @@
     owl:sameAs <http://rinfo.lagrummet.se/org/vetenskapsraadet> ;
     foaf:name "Vetenskapsrådet"@sv .
 
+<https://lagen.nu/org/2015/folkhalsomyndigheten> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/folkhaelsomyndigheten> ;
+    foaf:name "Folkhälsomyndigheten"@sv .
+
 <https://lagen.nu/org/2008/forsakringskassan> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/foersaekringskassan> ;
     foaf:name "Försäkringskassan"@sv .
@@ -1721,6 +1738,10 @@
 <https://lagen.nu/org/2014/riksarkivet> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/riksarkivet> ;
     foaf:name "Riksarkivet"@sv .
+
+<https://lagen.nu/org/2014/socialstyrelsen> a foaf:Organization ;
+    owl:sameAs <http://rinfo.lagrummet.se/org/socialstyrelsen> ;
+    foaf:name "Socialstyrelsen"@sv .
 
 <https://lagen.nu/org/2008/regeringskansliet> a foaf:Organization ;
     owl:sameAs <http://rinfo.lagrummet.se/org/regeringskansliet> ;

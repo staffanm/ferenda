@@ -156,7 +156,6 @@ class DV(SwedishLegalSource):
         opts = super(DV, cls).get_default_options()
         opts['ftpuser'] = ''  # None  # Doesn't work great since Defaults is a typesource...
         opts['ftppassword'] = ''  # None
-        opts['parsebodyrefs'] = True
         return opts
 
     def canonical_uri(self, basefile):

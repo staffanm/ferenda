@@ -40,7 +40,7 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         # myndfskr.Ehalso,   #            -""-
         myndfskr.FFFS,
         myndfskr.FFS,
-        myndfskr.FMI,
+        # myndfskr.FMI,      #            -""-
         myndfskr.FoHMFS,
         myndfskr.KFMFS,
         myndfskr.KOVFS,
@@ -59,7 +59,7 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         myndfskr.SJVFS,
         myndfskr.SKVFS,
         myndfskr.SOSFS,
-        myndfskr.STAFS,
+        # myndfskr.STAFS,    #            -""-
         myndfskr.STFS,
         myndfskr.SvKFS,
     ]
@@ -70,7 +70,6 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
                   ('rinfoex', 'http://lagen.nu/terms#')]
     sparql_annotations = None  # until we can speed things up
     documentstore_class = MyndFskrStore
-
 
     # This custom implementation of download is able to select a
     # particular subrepo and call its download method. That way we

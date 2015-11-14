@@ -60,9 +60,14 @@ class SubrepoB(DocumentRepository):
     def custom(self):
         return self.config.customproperty
 
+
 class SubrepoASubclass(SubrepoA): pass
 
-class SubrepoBSubclass(SubrepoB): pass
+class SubrepoBSubclass(SubrepoB):
+    def qualified_class_name(self):
+        return "Q:" + super(SubrepoBSubclass,
+                            self).qualified_class_name()
+
 
 class CompositeExample(CompositeRepository):
     subrepos = SubrepoBSubclass, SubrepoASubclass
@@ -75,7 +80,15 @@ class CompositeExample(CompositeRepository):
             if ret:
                 return ret
         raise RuntimeError("No subrepo could perform custom method")
-    
+
+    def qualified_class_name(self):
+        for c in self.subrepos:
+            inst = self.get_instance(c)
+            ret = inst.qualified_class_name()
+            if ret:
+                return ret
+        raise RuntimeError("No subrepo could perform qualified_class_name")
+
 
 class TestComposite(RepoTester):
     repoclass = CompositeExample
@@ -155,3 +168,7 @@ class TestExtrabase(RepoTester):
     def test_config(self):
         got = self.repo.custom()
         self.assertEqual("Hello world from mixin", got)
+
+    def test_super(self):
+        got = self.repo.qualified_class_name()
+        self.assertEqual("Q:testCompositeRepo.SubrepoBSubclass", got)

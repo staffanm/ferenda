@@ -1,4 +1,4 @@
-# Automatically transformed from sources at 2015-10-30T12:40:11.111564
+# Automatically transformed from sources at 2015-11-12T19:14:49.568754
 
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
@@ -125,7 +125,11 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 
 <https://lagen.nu/dataset/fod> space:abbrSlug "fod" .
 
+<https://lagen.nu/dataset/fohmfs> space:abbrSlug "fohmfs" .
+
 <https://lagen.nu/dataset/hfd> space:abbrSlug "hfd" .
+
+<https://lagen.nu/dataset/hslf-fs> space:abbrSlug "hslf-fs" .
 
 <https://lagen.nu/dataset/hsvfs> space:abbrSlug "hsvfs" .
 
@@ -163,6 +167,8 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 
 <https://lagen.nu/dataset/livsfs> space:abbrSlug "livsfs" .
 
+<https://lagen.nu/dataset/lmfs> space:abbrSlug "lmfs" .
+
 <https://lagen.nu/dataset/lmvfs> space:abbrSlug "lmvfs" .
 
 <https://lagen.nu/dataset/lvfs> space:abbrSlug "lvfs" .
@@ -174,6 +180,8 @@ rpubl:Skrivelse space:abbrSlug "skr" .
 <https://lagen.nu/dataset/migrfs> space:abbrSlug "migrfs" .
 
 <https://lagen.nu/dataset/mod> space:abbrSlug "mod" .
+
+<https://lagen.nu/dataset/myhfs> space:abbrSlug "myhfs" .
 
 <https://lagen.nu/dataset/nar> space:abbrSlug "nar" .
 

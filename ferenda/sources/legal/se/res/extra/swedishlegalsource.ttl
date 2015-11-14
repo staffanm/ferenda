@@ -1,4 +1,4 @@
-# Automatically concatenated from sources at 2015-05-29T07:43:21.244701
+# Automatically concatenated from sources at 2015-11-12T10:01:02.194913
 
 @prefix : <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .
@@ -42,6 +42,9 @@
 
 <http://rinfo.lagrummet.se/org/civildepartementet> a foaf:Organization ;
     foaf:name "Civildepartementet"@sv .
+
+<http://rinfo.lagrummet.se/org/e-haelsomyndigheten> a foaf:Organization ;
+    foaf:name "E-hälsomyndigheten"@sv .
 
 <http://rinfo.lagrummet.se/org/fastighetsmaeklarnaemnden> a foaf:Organization ;
     foaf:name "Fastighetsmäklarnämnden"@sv .
@@ -607,6 +610,17 @@
     skos:comment "Utnyttjas också av Myndigheten för internationella adoptionsfrågor och Premiepensionsmyndigheten"@sv ;
     skos:prefLabel "Försäkringskassans författningssamling"@sv .
 
+<http://rinfo.lagrummet.se/serie/fs/fohmfs> a :Forfattningssamling ;
+    dct:publisher <http://rinfo.lagrummet.se/org/folkhaelsomyndigheten> ;
+    skos:altLabel "FoHMFS"@sv ;
+    skos:prefLabel "Folkhälsomyndighetens författningssamling"@sv .
+
+<http://rinfo.lagrummet.se/serie/fs/hslf-fs> a :Forfattningssamling ;
+    dct:publisher <http://rinfo.lagrummet.se/org/socialstyrelsen> ;
+    skos:altLabel "HSLF-FS"@sv ;
+    skos:comment "Utnyttjas av E-hälsomyndigheten, Folkhälsomyndigheten, Inspektionen för vård och omsorg, Läkemedelsverket, Rättsmedicinalverket, Socialstyrelsen och Tandvårds- och läkemedelsförmånsverket"@sv ;
+    skos:prefLabel "Gemensamma författningssamlingen avseende hälso- och sjukvård, socialtjänst, läkemedel, folkhälsa m.m."@sv .
+
 <http://rinfo.lagrummet.se/serie/fs/hsvfs> a :Forfattningssamling ;
     dct:publisher <http://rinfo.lagrummet.se/org/hoegskoleverket> ;
     rdfs:seeAlso <http://www.hsv.se/lagochratt/lagarochregler/foreskrifter.4.539a949110f3d5914ec800062619.html> ;
@@ -906,7 +920,7 @@
 
 <http://rinfo.lagrummet.se/serie/fs/sosfs> a :Forfattningssamling ;
     dct:publisher <http://rinfo.lagrummet.se/org/socialstyrelsen> ;
-    rdfs:comment "Utnyttjas också av Rättsmedicinalverket, Smittskyddsinstitutet och Myndigheten för handikappolitisk samordning."@sv ;
+    rdfs:comment "Har ersatts av HSLF-FS."@sv ;
     rdfs:seeAlso <http://www.sos.se/sosfs/search/search.asp> ;
     skos:altLabel "SOSFS"@sv ;
     skos:prefLabel "Socialstyrelsens författningssamling"@sv .
@@ -1124,6 +1138,9 @@
 <http://rinfo.lagrummet.se/org/fiskeriverket> a foaf:Organization ;
     foaf:name "Fiskeriverket"@sv .
 
+<http://rinfo.lagrummet.se/org/folkhaelsomyndigheten> a foaf:Organization ;
+    foaf:name "Folkhälsomyndigheten"@sv .
+
 <http://rinfo.lagrummet.se/org/havs-_och_vattenmyndigheten> a foaf:Organization ;
     foaf:name "Havs- och vattenmyndigheten"@sv .
 
@@ -1286,9 +1303,6 @@
 <http://rinfo.lagrummet.se/org/skogsstyrelsen> a foaf:Organization ;
     foaf:name "Skogsstyrelsen"@sv .
 
-<http://rinfo.lagrummet.se/org/socialstyrelsen> a foaf:Organization ;
-    foaf:name "Socialstyrelsen"@sv .
-
 <http://rinfo.lagrummet.se/org/spraengaemnesinspektionen> a foaf:Organization ;
     foaf:name "Sprängämnesinspektionen"@sv .
 
@@ -1379,6 +1393,9 @@
 
 <http://rinfo.lagrummet.se/org/riksarkivet> a foaf:Organization ;
     foaf:name "Riksarkivet"@sv .
+
+<http://rinfo.lagrummet.se/org/socialstyrelsen> a foaf:Organization ;
+    foaf:name "Socialstyrelsen"@sv .
 
 <http://rinfo.lagrummet.se/org/regeringskansliet> a foaf:Organization ;
     foaf:name "Regeringskansliet"@sv .

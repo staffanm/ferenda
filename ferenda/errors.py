@@ -7,6 +7,9 @@ class FerendaException(Exception):
     """Base class for anything that can go wrong in ferenda."""
 
 
+class DownloadError(FerendaException):
+    """Raised when a download fails in a non-recoverable way."""
+
 class ParseError(FerendaException):
 
     """Raised when :py:meth:`~ferenda.DocumentRepository.parse` fails in
