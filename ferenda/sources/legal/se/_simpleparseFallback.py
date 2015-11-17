@@ -9,6 +9,7 @@ import hashlib
 import logging
 import tempfile
 import shutil
+import pickle
 
 # 3rdparty libs
 from six import unichr as chr
@@ -86,6 +87,7 @@ class Parser(object):
             shutil.rmtree(external_simpleparse_state)
             # print("__del__: setting external_simpleparse_state to None")
             external_simpleparse_state = None
+
     def buildTagger(self, production=None, processor=None):
         pickled_tagger = "%s/%s-%s.pickle" % (external_simpleparse_state,
                                               self.declaration_md5,
@@ -115,6 +117,7 @@ def tag(text, tagtable, sliceleft, sliceright):
     pickled_tagged = "%s-%s.pickle" % (pickled_tagger, text_checksum)
 
     if not os.path.exists(pickled_tagged):
+        assert os.path.exists(pickled_tagger), "It seems that %s doesn't exist" % pickled_tagger
         # 2. Dump text as string
         full_text_path = "%s/%s.txt" % (os.path.dirname(pickled_tagger),
                                         text_checksum)

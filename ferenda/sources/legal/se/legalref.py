@@ -157,8 +157,10 @@ class LegalRef:
         # if KORTLAGRUM, delay the construction of teh parser until we
         # can construct the LawAbbreviation production (see parse())
         if self.KORTLAGRUM not in self.args:
-            self.tagger = Parser(self.decl.encode(
-                SP_CHARSET), "root").buildTagger("root")
+            # we store this parser object so that it's __del__ method
+            # isn't called prematurely when using _simpleparseFallback
+            self.spparser = Parser(self.decl.encode(SP_CHARSET), "root")
+            self.tagger = self.spparser.buildTagger("root")
         self.verbose = False
         self.depth = 0
 
@@ -241,9 +243,8 @@ class LegalRef:
             lawdecl = "LawAbbreviation ::= ('%s')\n" % "'/'".join(
                 self.lawlist)
             self.decl += lawdecl
-            self.tagger = Parser(self.decl.encode(
-                SP_CHARSET), "root").buildTagger("root")
-            
+            self.spparser = Parser(self.decl.encode(SP_CHARSET), "root")
+            self.tagger = self.spparser.buildTagger("root")
         if self.RATTSFALL in self.args and not self.namedseries:
             self.namedseries.update(self.get_relations(SKOS.altLabel,
                                                        self.metadata_graph))
@@ -984,14 +985,14 @@ class LegalRef:
         return self.formatter_dispatch(root.nodes[0])
 
     def format_ChangeRef(self, root):
-        id = self.find_node(root, 'LawRefID').data
+        id = self.find_node(root, 'LawRefID').text
         return [self.format_custom_link({'lawref': id},
                                         root.text,
                                         root.tag)]
 
     def format_SFSNr(self, root):
         if self.nobaseuri:
-            sfsid = self.find_node(root, 'LawRefID').data
+            sfsid = self.find_node(root, 'LawRefID').text
             self.baseuri_attributes = {'law': sfsid}
         return self.format_tokentree(root)
 

@@ -401,7 +401,7 @@ class WSGIApp(object):
 
         # Mangle res into the expected JSON structure (see qresults.json)
         mangled = []
-        for hit in res:
+        for hit in sorted(res, key=itemgetter("uri"), reverse=True):
             mangledhit = {}
             for k, v in hit.items():
                 if self.config.legacyapi:

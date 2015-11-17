@@ -14,9 +14,11 @@ from ferenda import fsmparser
 class TestDVParserBase(unittest.TestCase):
     maxDiff = None
     method = "none"
+
     def t(self, want, testdata, basefile="HDO/T1-14"):
         repo = DV()
-        p = repo.get_parser(basefile, testdata).im_self
+        parsefunc = repo.get_parser(basefile, testdata)
+        p = parsefunc.__self__
         p.reader = fsmparser.Peekable([testdata])
         p._state_stack = ["notbody"] # to avoid the special fallback rule in is_instans
         for f in p.recognizers:
