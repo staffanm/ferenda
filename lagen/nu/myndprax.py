@@ -62,15 +62,18 @@ WHERE {
         selector_values = {}
         for row in data:
             # should use a SKOS.altLabel?
-            pagesetid = facets[0].identificator(row, 'dcterms_publisher',
-                                                self.commondata)
-            label = facets[0].selector(row, 'dcterms_publisher',
-                                       self.commondata)
-            pagesetdict[pagesetid] = TocPageset(label=label,
-                                                predicate=pagesetid,  # ??
-                                                pages=[])
-            selected = facets[1].selector(row, 'dcterms_issued', None)
-            selector_values[(pagesetid, selected)] = True
+            try:
+                pagesetid = facets[0].identificator(row, 'dcterms_publisher',
+                                                    self.commondata)
+                label = facets[0].selector(row, 'dcterms_publisher',
+                                           self.commondata)
+                pagesetdict[pagesetid] = TocPageset(label=label,
+                                                    predicate=pagesetid,  # ??
+                                                    pages=[])
+                selected = facets[1].selector(row, 'dcterms_issued', None)
+                selector_values[(pagesetid, selected)] = True
+            except KeyError as e:
+                self.log.error("toc_pagesets: Couldn't process row %s: %s" % (row.get("uri"), e))
         for (pagesetid, value) in sorted(list(selector_values.keys())):
             pageset = pagesetdict[pagesetid]
             pageset.pages.append(
@@ -87,13 +90,16 @@ WHERE {
         res = {}
         documents = {}
         for row in data:
-            key = (facets[0].identificator(row, 'dcterms_publisher',
-                                           self.commondata),
-                   facets[1].selector(row, 'dcterms_issued',
-                                      self.commondata))
-            if key not in documents:
-                documents[key] = []
-            documents[key].append(row)
+            try:
+                key = (facets[0].identificator(row, 'dcterms_publisher',
+                                               self.commondata),
+                       facets[1].selector(row, 'dcterms_issued',
+                                          self.commondata))
+                if key not in documents:
+                    documents[key] = []
+                documents[key].append(row)
+            except KeyError as e:
+                self.log.error("toc_select_for_pages: Couldn't process row %s: %s" % (row.get("uri"), e))
         pagesetdict = {}
         for pageset in pagesets:
             pagesetdict[pageset.predicate] = pageset

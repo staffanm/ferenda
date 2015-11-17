@@ -281,6 +281,8 @@ class JO(FixedLayoutSource):
                            ("body", is_paragraph): (make_paragraph, None),
                            ("abstract", is_paragraph): (make_paragraph, None),
                            ("abstract", is_section): (False, None),
+                           ("abstract", is_dnr): (False, None),
+                           ("abstract", is_datum): (False, None),
                            ("section", is_paragraph): (make_paragraph, None),
                            ("section", is_nonessential): (skip_nonessential, None),
                            ("section", is_section): (False, None),
@@ -294,6 +296,7 @@ class JO(FixedLayoutSource):
                            ("blockquote", is_datum): (make_datum, None),
                            ("blockquote", is_dnr): (make_dnr, None),
                            })
+        p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
         return p.parse
 
     def tabs(self):

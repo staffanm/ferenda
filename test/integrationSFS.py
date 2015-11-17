@@ -29,11 +29,12 @@ class Parse(unittest.TestCase):
     
     def parametric_test(self, filename):
         self.maxDiff = None
-        self.p.reader = TextReader(filename=filename, encoding='iso-8859-1',
+        reader = TextReader(filename=filename, encoding='iso-8859-1',
                               linesep=TextReader.DOS)
-        self.p.reader.autostrip = True
+        reader.autostrip = True
         # p.lagrum_parser = FakeParser()
-        b = self.p.makeForfattning()
+        parser = self.p.get_parser("9999:998", reader)
+        b = parser(reader)
         elements = self.p._count_elements(b)
 
         # FIXME: How was this used? Where should we plug
@@ -47,7 +48,7 @@ class Parse(unittest.TestCase):
                                      'rpubl:kapitelnummer')]
 
         # NB: _construct_ids won't look for references
-        self.p.visit_node(b, self.p.construct_id, {})
+        self.p.visit_node(b, self.p.construct_id, {'basefile': '9999:998'})
         self.p.visit_node(b, self.p.find_definitions, False, debug=False)
         self.p.lagrum_parser.parse_recursive(b)
         self._remove_uri_for_testcases(b)
