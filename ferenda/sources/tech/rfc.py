@@ -556,8 +556,8 @@ class RFC(DocumentRepository):
             desc.rel(self.ns['dcterms'].publisher,
                      self.lookup_resource(publisher_label))
         except KeyError:
-            self.log.warn("Couldn't look up a proper resource URI for %s" %
-                          publisher_label)
+            self.log.warning("Couldn't look up a proper resource URI for %s" %
+                             publisher_label)
             desc.value(self.ns['dcterms'].publisher,
                        publisher_label)
 
@@ -583,8 +583,8 @@ class RFC(DocumentRepository):
                     desc.rel(self.ns['dcterms'].subject,
                              self.lookup_resource(value, predicate=self.ns['bibo'].identifier))
                 except KeyError:
-                    self.log.warn("Couldn't look up a proper resource URI for %s" %
-                                  value)
+                    self.log.warning("Couldn't look up a proper resource URI for %s" %
+                                     value)
                     desc.value(self.ns['dcterms'].subject, value)
             elif key == "ISSN":
                 desc.value(self.ns['dcterms'].issn, value)

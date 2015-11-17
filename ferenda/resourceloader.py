@@ -189,4 +189,5 @@ class ResourceLoader(object):
                         readfp = pkg_resources.resource_stream(self.modulename,
                                                                src)
                         fp.write(readfp.read())
+                        readfp.close()
                     extracted.add(dest)

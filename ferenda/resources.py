@@ -471,6 +471,8 @@ class Resources(object):
         g.bind("foaf", "http://xmlns.com/foaf/0.1/")
         for (s, p, o) in bigg:
             if p in (RDF.type, RDFS.label, RDFS.comment):
+                if isinstance(s, BNode): # occurs in the def of foaf:member
+                    continue 
                 g.add((root, FOAF.topic, s))  # unless we've already added it?
                 if isinstance(o, Literal):  # remove language typing info
                     o = Literal(str(o))

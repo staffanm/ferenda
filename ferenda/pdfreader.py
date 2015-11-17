@@ -381,7 +381,12 @@ class PDFReader(CompoundElement):
                        (len(self)))
 
     def _parse_xml(self, xmlfp, dummy=None):
-        filename = xmlfp.name
+        if hasattr(xmlfp, 'name'):
+            filename = xmlfp.name
+        elif hasattr(xmlfp, '_fp'):
+            filename = xmlfp._fp.name
+        else:
+            raise ValueError("Can't find name of open file %r" % xmlfp)
         if dummy:
             warnings.warn("filenames passed to _parse_xml are now ignored", DeprecationWarning)
         def txt(element_text):

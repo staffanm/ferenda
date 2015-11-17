@@ -176,7 +176,7 @@ class EurlexTreaties(DocumentRepository):
             else:
                 p.append(Paragraph([line]))
 
-        self.log.warn("make_preamble ran out of lines!")
+        self.log.warning("make_preamble ran out of lines!")
         return p
 
     def make_part(self, lines):
@@ -198,7 +198,7 @@ class EurlexTreaties(DocumentRepository):
                 p.append(self.make_article(lines))
             else:
                 p.append(Paragraph([line]))
-                self.log.warn(
+                self.log.warning(
                     "make_part appended naked Paragraph '%s...'" % line[:25])
         return p
 
@@ -221,7 +221,7 @@ class EurlexTreaties(DocumentRepository):
                 t.append(self.make_article(lines))
             else:
                 t.append(Paragraph([line]))
-                self.log.warn(
+                self.log.warning(
                     "make_title appended naked Paragraph '%s...'" % line[:25])
         return t
 
@@ -247,7 +247,7 @@ class EurlexTreaties(DocumentRepository):
                 c.append(self.make_article(lines))
             else:
                 c.append(Paragraph([line]))
-                self.log.warn("make_chapter appended naked Paragraph '%s...'" %
+                self.log.warning("make_chapter appended naked Paragraph '%s...'" %
                               line[:25])
         return c
 
@@ -271,7 +271,7 @@ class EurlexTreaties(DocumentRepository):
                 s.append(self.make_article(lines))
             else:
                 s.append(Paragraph([line]))
-                self.log.warn("make_section appended naked Paragraph '%s...'" %
+                self.log.warning("make_section appended naked Paragraph '%s...'" %
                               line[:25])
         return s
 

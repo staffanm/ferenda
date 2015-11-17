@@ -10,6 +10,8 @@ jsmin
 cssmin
 whoosh
 pyparsing
+scandir # not needed for py3.5 +
+# patchit -- waiting for 1.2 so that we can drop our vendorized version
 # sphinx
 mock # not needed for py3.3 +
 coverage
@@ -22,5 +24,3 @@ psutil
 layeredconfig
 grako
 responses
-scandir # not needed for py3.5 +
-

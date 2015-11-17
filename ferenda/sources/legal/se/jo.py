@@ -128,8 +128,8 @@ class JO(FixedLayoutSource):
                 self.log.debug("%s: downloaded headnote from %s" %
                                (basefile, headnote_url))
             else:
-                self.log.warn("Could not find unique headnote for %s at %s" %
-                              (basefile, headnote_url))
+                self.log.warning("Could not find unique headnote for %s at %s" %
+                                 (basefile, headnote_url))
         return ret
 
     def extract_head(self, fp, basefile):

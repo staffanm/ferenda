@@ -142,7 +142,7 @@ class Decorators(unittest.TestCase):
 
     def test_handleerror(self):
         @handleerror
-        def testfunc(repo,doc):
+        def testfunc(repo, doc):
             if doc.exception:
                 raise doc.exception
             else:

@@ -113,11 +113,11 @@ class News(RepoTester):
         # behaviour. But other tests verifieds behaviour of individual
         # methods.
         self.repo.news()
-        self.repo.news_facet_entries.assert_called()
-        self.repo.facets.assert_called()
-        self.repo.news_feedsets.assert_called()
-        self.repo.news_select_for_feeds.assert_called()
-        self.repo.news_generate_feeds.assert_called()
+        assert(self.repo.news_facet_entries.called)
+        assert(self.repo.facets.called)
+        assert(self.repo.news_feedsets.called)
+        assert(self.repo.news_select_for_feeds.called)
+        assert(self.repo.news_generate_feeds.called)
 
 
     def test_news_facet_entries(self):

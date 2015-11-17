@@ -22,7 +22,9 @@ install_requires = ['beautifulsoup4 >= 4.3.0',
                     'six >= 1.4.0',
                     'docutils >= 0.11',
                     'layeredconfig >= 0.2.1',
-                    'responses >= 0.3.0']
+                    'responses >= 0.3.0',
+                    # 'patchit >= 1.2',   # not released yet, using vendorized copy
+]
 
 if sys.version_info < (3,0,0):
     # not py3 compatible, but not essential either

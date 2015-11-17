@@ -5,7 +5,6 @@ from __future__ import unicode_literals
 import codecs
 import datetime
 import filecmp
-import hashlib
 import locale
 import os
 import posixpath
@@ -293,7 +292,8 @@ def list_dirs_slow(d, suffix=None, reverse=False):
 
 
 def list_dirs(d, suffix=None, reverse=False):
-    """A generator that works much like :py:func:`os.listdir`, only recursively (and only returns files, not directories).
+    """A generator that works much like :py:func:`os.listdir`, only
+    recursively (and only returns files, not directories).
 
     :param d: The directory to start in
     :type d: str
@@ -311,15 +311,16 @@ def list_dirs(d, suffix=None, reverse=False):
         from os import walk
     if isinstance(suffix, str):
         suffix = [suffix]
-    elif suffix is None:
-        suffix = []
     for (dirpath, dirnames, filenames) in walk(d, topdown=True):
         dirnames.sort(reverse=reverse, key=split_numalpha)
-        for filename in sorted(filenames, key=split_numalpha):
+        for filename in sorted(filenames, key=split_numalpha, reverse=reverse):
             fullpath = dirpath + os.sep + filename
-            for s in suffix:
-                if fullpath.endswith(s):
-                    yield fullpath
+            if suffix:
+                for s in suffix:
+                    if fullpath.endswith(s):
+                        yield fullpath
+            else:
+                yield fullpath
 # util.File
 
 

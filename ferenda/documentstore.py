@@ -66,7 +66,10 @@ class DocumentStore(object):
                 util.ensure_dir(filename)
 
             fp = open(filename, mode)
-            yield fp
+            try:
+                yield fp
+            finally:
+                fp.close()
 
     # TODO: Maybe this is a worthwhile extension to the API? Could ofc
     # easily be done everywhere where a non-document related path is

@@ -1185,8 +1185,8 @@ with the *config* object as single parameter.
             raise errors.ParseError("%s: parse_content_selector %r matches nothing" %
                                     (doc.basefile, self.parse_content_selector))
         if len(soups) > 1:
-            self.log.warn("%s: parse_content_selector %r matches more than one tag" %
-                          (doc.basefile, self.parse_content_selector))
+            self.log.warning("%s: parse_content_selector %r matches more than one tag" %
+                             (doc.basefile, self.parse_content_selector))
         soup = soups[0]
         for filter_selector in self.parse_filter_selectors:
             for tag in soup.select(filter_selector):
@@ -1216,7 +1216,7 @@ with the *config* object as single parameter.
 
         if not os.path.exists(patchpath):
             return text, None
-        from patchit import PatchSet, PatchSyntaxError, PatchConflictError
+        from .thirdparty.patchit import PatchSet, PatchSyntaxError, PatchConflictError
         with codecs.open(patchpath, 'r', encoding=self.source_encoding) as pfp:
             # this might raise a PatchSyntaxError
             try:
@@ -1550,7 +1550,7 @@ with the *config* object as single parameter.
                                         config.storerepository)
             store.clear(context)
 
-        if config.relate is False:
+        if 'relate' in config and config.relate is False:
             log.info("%s: Not relating" % cls.alias)
             return False
         # FIXME: if config.fulltextindex, we should attempt to connect
@@ -1623,7 +1623,8 @@ with the *config* object as single parameter.
                               values):
                 store.get_serialized_file(dumppath, format="nt", context=context)
                 # just to report the number of dumped triples -- may be unneccesary
-                values['triplecount'] = sum(1 for line in open(dumppath))
+                with open(dumppath) as fp:
+                    values['triplecount'] = sum(1 for line in fp)
         except requests.exceptions.HTTPError as e:
             # probably the dataset URI didn't exist because no triples
             # have been stored. Create a empty dumpfile.
@@ -1733,7 +1734,8 @@ with the *config* object as single parameter.
                            'dataset': self.dataset_uri(),
                            'rdffile': self.store.distilled_path(basefile),
                            'triplestore': self.config.storelocation}):
-            data = open(self.store.distilled_path(basefile), "rb").read()
+            with open(self.store.distilled_path(basefile), "rb") as fp:
+                data = fp.read()
             ts.add_serialized(data, format="xml", context=self.dataset_uri())
 
     def _get_fulltext_indexer(self, repos, batchoptimize=False):
@@ -1788,11 +1790,11 @@ parsed document path to that documents dependency file."""
                                     (repo != self) or
                                     (dep_basefile != basefile)):
                                 # if so, add to that repo's dependencyfile
-                                res = repo.add_dependency(dep_basefile,
-                                                          self.store.parsed_path(basefile))
+                                pp = self.store.parsed_path(basefile)
+                                # from pudb import set_trace; set_trace()
+                                res = repo.add_dependency(dep_basefile, pp)
                                 values['deps'] += 1
                                 break
-
         return values['deps']
 
     def add_dependency(self, basefile, dependencyfile):
@@ -1800,6 +1802,7 @@ parsed document path to that documents dependency file."""
         True if anything new was added, False otherwise
 
         """
+        
         present = False
         if os.path.exists(self.store.dependencies_path(basefile)):
             with self.store.open_dependencies(basefile) as fp:
@@ -2932,9 +2935,9 @@ WHERE {
                 continue
 
             if not os.path.exists(self.store.distilled_path(basefile)):
-                self.log.warn("%s: No distilled file at %s, skipping" %
-                              (basefile,
-                               self.store.distilled_path(basefile)))
+                self.log.warning("%s: No distilled file at %s, skipping" %
+                                 (basefile,
+                                  self.store.distilled_path(basefile)))
                 continue
 
             # make sure common (and needed) properties are in fact set

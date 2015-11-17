@@ -43,7 +43,7 @@ class DocumentRemovedError(FerendaException):
     prevents endless re-parsing of expired documents.
 
     """
-    def __init__(self, value, dummyfile=None):
+    def __init__(self, value="", dummyfile=None):
         super(DocumentRemovedError, self).__init__(value)
         self.dummyfile = dummyfile
 

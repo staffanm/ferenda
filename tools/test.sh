@@ -1,6 +1,8 @@
+
 #!/bin/sh
 if [ -n "$1" ]
 then
+    # optionally pass -We::UserWarning to make exceptions out of warnings
     PYTHONPATH=test python -m unittest -v "$1"
 else
     # When running the entire suite, exit at first failure (-f) in

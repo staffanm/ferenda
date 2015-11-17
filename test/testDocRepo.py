@@ -619,7 +619,7 @@ class Repo(RepoTester):
     </div>
   </body>
 </html>"""
-        soup = BeautifulSoup(testdoc)
+        soup = BeautifulSoup(testdoc, "lxml")
         d.parse_document_from_soup(soup,doc)
         #print("Defaults")
         #print(serialize(doc.body))

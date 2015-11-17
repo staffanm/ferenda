@@ -1227,7 +1227,7 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command,
     try:
         return clbl(basefile, **kwargs)
     except errors.DocumentRemovedError as e:
-        if hasattr(e, 'dummyfile'):
+        if hasattr(e, 'dummyfile') and e.dummyfile:
             if not os.path.exists(e.dummyfile):
                 util.writefile(e.dummyfile, "")
             return None  # is what DocumentRepository.parse returns
