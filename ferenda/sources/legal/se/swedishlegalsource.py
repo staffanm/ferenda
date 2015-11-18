@@ -78,13 +78,6 @@ class SwedishLegalSource(DocumentRepository):
     required_predicates = [RDF.type, DCTERMS.title, DCTERMS.issued,
                            DCTERMS.identifier, PROV.wasGeneratedBy]
 
-    swedish_ordinal_list = ('f\xf6rsta', 'andra', 'tredje', 'fj\xe4rde',
-                            'femte', 'sj\xe4tte', 'sjunde', '\xe5ttonde',
-                            'nionde', 'tionde', 'elfte', 'tolfte')
-
-    swedish_ordinal_dict = dict(list(zip(
-        swedish_ordinal_list, list(range(1, len(swedish_ordinal_list) + 1)))))
-
     swedish_months = {"januari": 1,
                       "jan": 1,
                       "februari": 2,
@@ -803,12 +796,6 @@ class SwedishLegalSource(DocumentRepository):
     ################################################################
     # General small utility functions
     # (these could be module functions or staticmethods instead)
-    def _swedish_ordinal(self, s):
-        """'första' => '1'"""
-        sl = s.lower()
-        if sl in self.swedish_ordinal_dict:
-            return self.swedish_ordinal_dict[sl]
-        return None
 
     def parse_iso_date(self, datestr):
         # only handles YYYY-MM-DD now. Look into dateutil or isodate

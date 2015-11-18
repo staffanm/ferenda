@@ -1338,7 +1338,7 @@ class SFS(Trips):
     def get_parser(self, basefile, sanitized):
         # this should work something like offtryck_parser
         from .sfs_parser import make_parser
-        return make_parser(sanitized, self.log, self.trace)
+        return make_parser(sanitized, basefile, self.log, self.trace)
 
     def visitor_functions(self, basefile):
         return ((self.set_skipfragments, None),

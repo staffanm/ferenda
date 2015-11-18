@@ -1577,7 +1577,7 @@ def _preflight_check(log, verbose=False):
         ('whoosh', '2.4.1', True),
         ('pyparsing', '1.5.7', True))
 
-    binaries = (('pdftotext', '-v'),
+    binaries = (('pdftotext', '-v'),  # FIXME: we also now require pdfimages, at least version 0.25 (which supports the -png flag)
                 ('pdftohtml', '-v'),
                 ('antiword', '-h'),
                 ('convert', '-version'),

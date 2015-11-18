@@ -209,17 +209,17 @@ class PDFReader(CompoundElement):
             self.log.debug("- running " + cmd)
             (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
             # step 2.1: Combine the recently extracted images (which
-            # can be pbm or ppm files) and into a new tif (so that we
-            # add 10 pages at a time to the tif, as imagemagick can
-            # create a number of pretty large files for each page, so
-            # converting 200 images will fill 10 G of your temp space
-            # -- which we'd like to avoid)
+            # are always png) into a new tif (so that we add 10 pages
+            # at a time to the tif, as imagemagick can create a number
+            # of pretty large files for each page, so converting 200
+            # images will fill 10 G of your temp space -- which we'd
+            # like to avoid)
             cmd = "convert %(workdir)s/%(root)s-*.png -compress Zip %(workdir)s/%(root)s-tmp%(idx)04d.tif" % locals(
             )
             self.log.debug("- running " + cmd)
             (returncode, stdout, stderr) = util.runcmd(cmd, require_success=True)
-            # step 2.2: Remove pbm files now that they're in the .tif
-            for f in glob("%(workdir)s/%(root)s-*.pbm" % locals()):
+            # step 2.2: Remove png files now that they're in the .tif
+            for f in glob("%(workdir)s/%(root)s-*.png" % locals()):
                 os.unlink(f)
 
         # Step 3: Combine all the 10-page tifs into a giant tif using tiffcp

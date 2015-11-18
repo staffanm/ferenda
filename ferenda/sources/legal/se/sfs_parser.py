@@ -46,9 +46,24 @@ re_roman_numeral_matcher = re.compile(
 state = {'current_section': '0',
          'current_headline_level': 0}  # 0 = unknown, 1 = normal, 2 = sub
 
-def make_parser(reader, log, trace):
+swedish_ordinal_list = ('f\xf6rsta', 'andra', 'tredje', 'fj\xe4rde',
+                        'femte', 'sj\xe4tte', 'sjunde', '\xe5ttonde',
+                        'nionde', 'tionde', 'elfte', 'tolfte')
+
+swedish_ordinal_dict = dict(list(zip(
+    swedish_ordinal_list, list(range(1, len(swedish_ordinal_list) + 1)))))
+
+def _swedish_ordinal(s):
+    """'första' => '1'"""
+    sl = s.lower()
+    if sl in swedish_ordinal_dict:
+        return swedish_ordinal_dict[sl]
+    return None
+
+def make_parser(reader, basefile, log, trace):
     state['current_section'] = '0'
     state['current_headline_level'] = 0
+    state['basefile'] = basefile
 
     def parse(the_reader):
         global reader
@@ -237,7 +252,7 @@ def make_parser(reader, log, trace):
             elif state_handler == makeOvergangsbestammelse:
                 log.debug("      Paragraf %s färdig" % paragrafnummer)
                 log.warning(
-                    "%s: Avskiljande rubrik saknas mellan författningstext och övergångsbestämmelser" % id)
+                    "%s: Avskiljande rubrik saknas mellan författningstext och övergångsbestämmelser" % state['basefile'])
                 return p
             else:
                 assert state_handler == makeStycke, "guess_state returned %s, not makeStycke" % state_handler.__name__
@@ -374,10 +389,10 @@ def make_parser(reader, log, trace):
             if res is not None:
                 if state_handler != makeOvergangsbestammelse:
                     # assume these are the initial Övergångsbestämmelser
-                    if hasattr('id'):
-                        sfsnr = id
+                    if 'basefile' in state:
+                        sfsnr = state['basefile']
                         log.warning(
-                            "%s: Övergångsbestämmelsen saknar SFS-nummer - antar %s" % (id, sfsnr))
+                            "%s: Övergångsbestämmelsen saknar SFS-nummer - antar %s" % (state['basefile'], sfsnr))
                     else:
                         sfsnr = '0000:000'
                         log.warning(
@@ -1123,7 +1138,7 @@ def make_parser(reader, log, trace):
             fuzz = difflib.get_close_matches(l, separators, 1, 0.9)
             if fuzz:
                 log.warning("%s: Antar att '%s' ska vara '%s'?" %
-                                 (id, l, fuzz[0]))
+                                 (state['basefile'], l, fuzz[0]))
             else:
                 return False
         try:
