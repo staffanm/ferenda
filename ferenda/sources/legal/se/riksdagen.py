@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 # A abstract base class for fetching documents from data.riksdagen.se
 
 import os
+from io import StringIO
 
 import requests
 import requests.exceptions
@@ -63,13 +64,64 @@ class Riksdagen(FixedLayoutSource):
     UTSKOTTSDOKUMENT = "utskottsdokument"
     YTTRANDE = "yttr"
 
-
     downloaded_suffix = ".xml"
     storage_policy = "dir"
     documentstore_class = RiksdagenStore
     document_type = None
     start_url = None
     start_url_template = "http://data.riksdagen.se/dokumentlista/?sz=100&sort=d&utformat=xml&typ=%(doctype)s"
+
+    # some ridiculusly large document (statsbudget) have little legal importance. Just process the metadata
+    metadataonly = set([(PROPOSITION, "1971:1"),
+                        (PROPOSITION, "1971:115"),
+                        (PROPOSITION, "1972:1"),
+                        (PROPOSITION, "1972:90"),
+                        (PROPOSITION, "1973:1"),
+                        (PROPOSITION, "1973:125"),
+                        (PROPOSITION, "1974:1"),
+                        (PROPOSITION, "1974:100"),
+                        (PROPOSITION, "1975:1"),
+                        (PROPOSITION, "1975:100"),
+                        (PROPOSITION, "1996/97:1"),
+                        (PROPOSITION, "1996/97:100"),
+                        (PROPOSITION, "1997/98:1"),
+                        (PROPOSITION, "1997/98:100"),
+                        (PROPOSITION, "1998/99:1"),
+                        (PROPOSITION, "1998/99:100"),
+                        (PROPOSITION, "1999/2000:1"),
+                        (PROPOSITION, "1999/2000:100"),
+                        (PROPOSITION, "2000/01:1"),
+                        (PROPOSITION, "2000/01:100"),
+                        (PROPOSITION, "2001/02:1"),
+                        (PROPOSITION, "2001/02:100"),
+                        (PROPOSITION, "2002/03:1"),
+                        (PROPOSITION, "2002/03:100"),
+                        (PROPOSITION, "2003/04:1"),
+                        (PROPOSITION, "2003/04:100"),
+                        (PROPOSITION, "2004/05:1"),
+                        (PROPOSITION, "2004/05:100"),
+                        (PROPOSITION, "2005/06:1"),
+                        (PROPOSITION, "2005/06:100"),
+                        (PROPOSITION, "2006/07:1"),
+                        (PROPOSITION, "2006/07:100"),
+                        (PROPOSITION, "2007/08:1"),
+                        (PROPOSITION, "2007/08:100"),
+                        (PROPOSITION, "2008/09:1"),
+                        (PROPOSITION, "2008/09:100"),
+                        (PROPOSITION, "2009/10:1"),
+                        (PROPOSITION, "2009/10:100"),
+                        (PROPOSITION, "2010/11:1"),
+                        (PROPOSITION, "2010/11:100"),
+                        (PROPOSITION, "2011/12:1"),
+                        (PROPOSITION, "2011/12:100"),
+                        (PROPOSITION, "2012/13:1"),
+                        (PROPOSITION, "2012/13:100"),
+                        (PROPOSITION, "2013/14:1"),
+                        (PROPOSITION, "2013/14:100"),
+                        (PROPOSITION, "2014/15:1"),
+                        (PROPOSITION, "2014/15:100"),
+                        (PROPOSITION, "2015/16:1"),
+                        ])
 
     @property
     def urispace_segment(self):
@@ -220,13 +272,18 @@ class Riksdagen(FixedLayoutSource):
                 "%s and all associated files unchanged" % xmlfile)
 
     def downloaded_to_intermediate(self, basefile):
+        # first check against our "blacklist-light":
+        if (self.document_type, basefile) in self.metadataonly:
+            self.log.warning("%s: Will only process metadata, creating placeholder for body text" % basefile)
+            # nb: tokenize() depends on the text being enclosed in <pre> tags
+            return StringIO("<pre>Dokumenttext saknas (se originaldokument)</pre>")
+
         downloaded_path = self.store.downloaded_path(basefile,
                                                      attachment="index.pdf")
         if not os.path.exists(downloaded_path):
             # attempt to parse HTML instead
             return open(self.store.downloaded_path(basefile,
                                                    attachment="index.html"))
-        
         intermediate_path = self.store.intermediate_path(basefile)
         intermediate_path += ".bz2" if self.config.compress == "bz2" else ""
         # if a compressed bz2 file is > 5 MB, it's just too damn big
@@ -281,7 +338,8 @@ class Riksdagen(FixedLayoutSource):
 
     def extract_body(self, fp, basefile):
         pdffile = self.store.downloaded_path(basefile, attachment="index.pdf")
-        if os.path.exists(pdffile):
+        if (os.path.exists(pdffile) and
+            not (self.document_type, basefile) in self.metadataonly):
             fp = self.parse_open(basefile)
             parser = "ocr" if ".hocr." in fp.name else "xml"
             return StreamingPDFReader().read(fp, parser=parser)
@@ -289,7 +347,10 @@ class Riksdagen(FixedLayoutSource):
         else:
             # fp points to a HTML file, which we can use directly.
             # fp will be a raw bitstream of a latin-1 file.
-            self.log.debug("%s: Loading soup from %s" % (basefile, fp.name))
+            if hasattr(fp, 'name'):
+                self.log.debug("%s: Loading soup from %s" % (basefile, fp.name))
+            else:  # fp contains some sort of placeholder text generated in download_to_intermediate
+                self.log.debug("%s: Loading placeholder soup" % (basefile))
             return BeautifulSoup(fp.read(), "lxml")
 
     @staticmethod
