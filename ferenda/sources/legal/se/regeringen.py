@@ -10,6 +10,7 @@ import json
 from operator import itemgetter
 from datetime import datetime, timedelta, date
 from time import sleep
+from io import StringIO
 from six import text_type as str
 from six.moves.urllib_parse import urljoin, urlencode
 
@@ -367,6 +368,11 @@ class Regeringen(SwedishLegalSource):
 
 
     def extract_body(self, fp, basefile):
+        if (self.document_type == self.PROPOSITION and 
+            basefile.split(":")[1] in ("1", "100")):
+            self.log.warning("%s: Will only process metadata, creating placeholder for body text" % basefile)
+            # means vår/höstbudget. Create minimal placeholder text
+            return ["Dokumentttext saknas (se originaldokument)"]
         # reset global state
         PreambleSection.counter = 0
         UnorderedSection.counter = 0

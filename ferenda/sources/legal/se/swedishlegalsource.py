@@ -404,9 +404,6 @@ class SwedishLegalSource(DocumentRepository):
             fp = self.downloaded_to_intermediate(basefile)
         else:
             # 3. recieve intermediate_path as open file (binary?)
-            # FIXME: DV.py needs this fp to have a .filetype attribute
-            # -- where do we store it and how do we retrieve it?
-            
             fp = opener(intermediate_path, "rb")
         # 4. call patch_if_needed, recieve as open file (binary?)
         return self.patch_if_needed(fp, basefile)
