@@ -24,6 +24,7 @@ import inspect
 import logging
 from logging import getLogger as getlog
 import multiprocessing
+import re
 import os
 import shutil
 import stat
@@ -45,6 +46,11 @@ import requests
 import requests.exceptions
 from layeredconfig import (LayeredConfig, Defaults, INIFile, Commandline,
                            Environment)
+try:  # optional module
+    from setproctitle import setproctitle, getproctitle
+except ImportError:  # pragma: no cover
+    def setproctitle(title): pass
+    def getproctitle(): return ""
 
 # my modules
 from ferenda import DocumentRepository  # needed for a doctest
@@ -55,6 +61,8 @@ from ferenda import WSGIApp
 from ferenda import Resources
 from ferenda import errors
 from ferenda import util
+
+
 
 def makeresources(repos,
                   resourcedir="data/rsrc",
@@ -992,10 +1000,13 @@ def _build_worker(jobqueue, resultqueue, clientname):
         clbl = getattr(inst, job['command'])
         # kwargs = job['kwargs']   # if we ever support that
         kwargs = {}
+        proctitle = re.sub("[now: [^]*]", "", getproctitle())
+        setproctitle(proctitle + "[now: %(alias)s %(command)s %(basefile)s" % job)
         res = _run_class_with_basefile(clbl, job['basefile'],
                                        kwargs, job['command'],
                                        job['alias'],
                                        wrapctrlc=True)
+        setproctitle(proctitle + "[now: done]")
         log.debug("Client: [pid %s] %s finished: %s" % (os.getpid(), job['basefile'], res))
         logtext = logstream.getvalue()
         logstream.truncate(0)

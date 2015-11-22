@@ -63,3 +63,4 @@ except ImportError:  # pragma: no cover
     except ImportError:  # pragma: no cover
         # this means Mock isn't installed -- which is OK for a non-dev install
         Mock = MagicMock = patch = call = None
+
