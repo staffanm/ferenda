@@ -1080,7 +1080,7 @@ def __queue_jobs_nomanager(jobqueue, iterable, inst, classname, command):
         job = {'basefile': basefile,
                'classname': classname,
                'command': command,
-               'alias': 'IDK!',  # FIXME: get hold of the alias for our class
+               'alias': inst.alias,
                'config': client_config}
         # log.debug("Server: putting %r into jobqueue" %  job['basefile'])
         jobqueue.put(job)
@@ -1108,7 +1108,7 @@ def _queue_jobs(manager, iterable, inst, classname, command):
         job = {'basefile': basefile,
                'classname': classname,
                'command': command,
-               'alias': 'IDK...',  # FIXME: get hold of class alias
+               'alias': inst.alias,
                'config': client_config}
         # print("putting %r into jobqueue" %  job)
         jobqueue.put(job)
@@ -1251,8 +1251,19 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command,
             return exc_type, exc_value, traceback.extract_tb(tb)
     except Exception as e:
         errmsg = str(e)
-        getlog().error("%s %s %s failed: %s" %
-                       (alias, command, basefile, errmsg))
+        # inspect the stack and log the location of the error (and if
+        # that's in stdlib or thirdparty, the ferenda-or-project code
+        # line that called into the source)
+        tblines = traceback.extract_tb(sys.exc_info()[2])
+        loc = "%s:%s" % tblines[-1][0:2]
+        if "ferenda" not in loc:
+            for tbline in reversed(tblines):
+                if "ferenda" in tbline[0]:
+                    shortsrc = tbline[0][tbline[0].rindex("ferenda"):]
+                    loc += " (from %s:%s)" % (shortsrc, tbline[1])
+                    break
+        getlog().error("%s %s %s failed: %s (%s)" %
+                       (alias, command, basefile, errmsg, loc))
         exc_type, exc_value, tb = sys.exc_info()
         return exc_type, exc_value, traceback.extract_tb(tb)
     except KeyboardInterrupt as e:   # KeyboardInterrupt is not an Exception
