@@ -24,7 +24,6 @@ import inspect
 import logging
 from logging import getLogger as getlog
 import multiprocessing
-import re
 import os
 import shutil
 import stat
@@ -46,11 +45,6 @@ import requests
 import requests.exceptions
 from layeredconfig import (LayeredConfig, Defaults, INIFile, Commandline,
                            Environment)
-try:  # optional module
-    from setproctitle import setproctitle, getproctitle
-except ImportError:  # pragma: no cover
-    def setproctitle(title): pass
-    def getproctitle(): return ""
 
 # my modules
 from ferenda import DocumentRepository  # needed for a doctest
@@ -61,8 +55,6 @@ from ferenda import WSGIApp
 from ferenda import Resources
 from ferenda import errors
 from ferenda import util
-
-
 
 def makeresources(repos,
                   resourcedir="data/rsrc",
@@ -1000,13 +992,10 @@ def _build_worker(jobqueue, resultqueue, clientname):
         clbl = getattr(inst, job['command'])
         # kwargs = job['kwargs']   # if we ever support that
         kwargs = {}
-        proctitle = re.sub("[now: [^]*]", "", getproctitle())
-        setproctitle(proctitle + "[now: %(alias)s %(command)s %(basefile)s" % job)
         res = _run_class_with_basefile(clbl, job['basefile'],
                                        kwargs, job['command'],
                                        job['alias'],
                                        wrapctrlc=True)
-        setproctitle(proctitle + "[now: done]")
         log.debug("Client: [pid %s] %s finished: %s" % (os.getpid(), job['basefile'], res))
         logtext = logstream.getvalue()
         logstream.truncate(0)
@@ -1255,7 +1244,12 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command,
         # that's in stdlib or thirdparty, the ferenda-or-project code
         # line that called into the source)
         tblines = traceback.extract_tb(sys.exc_info()[2])
-        loc = "%s:%s" % tblines[-1][0:2]
+        tbline = tblines[-1]
+        if "ferenda" in tbline[0]:
+            shortsrc = tbline[0][tbline[0].rindex("ferenda"):]
+        else:
+            shortsrc = tbline[0]
+        loc = "%s:%s" % (shortsrc, tbline[1])
         if "ferenda" not in loc:
             for tbline in reversed(tblines):
                 if "ferenda" in tbline[0]:
