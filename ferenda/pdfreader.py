@@ -654,9 +654,11 @@ class StreamingPDFReader(PDFReader):
             # this is the expensive operation
             converter(tmpfilename, workdir, **converter_extra)
 
-            # check if result is empty (has no content in any text node)
+            # check if result is empty (has no content in any text node, except outline nodes)
             try:
                 tree = etree.parse(open(convertedfile.replace(".bz2", "")))
+                for bad in tree.findall("outline"):
+                    bad.getparent().remove(bad)
                 if not etree.tostring(tree, method="text", encoding="utf-8").strip():
                     os.unlink(convertedfile.replace(".bz2", ""))
                     raise errors.PDFFileIsEmpty(filename)
