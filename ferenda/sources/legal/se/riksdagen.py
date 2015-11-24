@@ -69,7 +69,7 @@ class Riksdagen(FixedLayoutSource):
     documentstore_class = RiksdagenStore
     document_type = None
     start_url = None
-    start_url_template = "http://data.riksdagen.se/dokumentlista/?sz=100&sort=d&utformat=xml&typ=%(doctype)s"
+    start_url_template = "http://data.riksdagen.se/dokumentlista/?sort=datum&sortorder=asc&utformat=xml&doktyp=%(doctype)s"
 
     # some ridiculusly large document (statsbudget) have little legal importance. Just process the metadata
     metadataonly = set([(PROPOSITION, "1971:1"),
@@ -292,74 +292,78 @@ class Riksdagen(FixedLayoutSource):
             docname = attachment
         else:
             docname = "index"
-
         if not url:
             url = self.remote_url(basefile)
             if not url:  # remote_url failed
                 return False
-
         xmlfile = self.store.downloaded_path(basefile)
         if not (self.config.refresh or not os.path.exists(xmlfile)):
             self.log.debug("%s already exists" % (xmlfile))
             return False
-
         existed = os.path.exists(xmlfile)
         self.log.debug("  %s: Downloading to %s" % (basefile, xmlfile))
-
-        updated = self.download_if_needed(url, basefile)
-
-        if existed:
-            if updated:
-                self.log.info("%s: updated from %s" % (basefile, url))
+        try:
+            updated = self.download_if_needed(url, basefile)
+            if existed:
+                if updated:
+                    self.log.info("  %s: updated from %s" % (basefile, url))
+                else:
+                    self.log.debug("  %s: %s is unchanged, checking files" %
+                                   (basefile, xmlfile))
             else:
-                self.log.debug("%s: %s is unchanged, checking files" %
-                               (basefile, xmlfile))
-        else:
-            self.log.info("%s: downloaded from %s" % (basefile, url))
-        fileupdated = False
-        r = None
-        docsoup = BeautifulSoup(open(xmlfile), features="xml")
-        dokid = docsoup.find('dok_id').text
-        if docsoup.find('dokument_url_html'):
-            htmlurl = docsoup.find('dokument_url_html').text
-            htmlfile = self.store.downloaded_path(basefile, attachment=docname + ".html")
-            self.log.debug("   Downloading to %s" % htmlfile)
-            r = self.download_if_needed(htmlurl, basefile, filename=htmlfile)
-        elif docsoup.find('dokument_url_text'):
-            texturl = docsoup.find('dokument_url_text').text
-            textfile = self.store.downloaded_path(basefile, attachment=docname + ".txt")
-            self.log.debug("   Downloading to %s" % htmlfile)
-            r = self.download_if_needed(texturl, basefile, filename=textfile)
-        fileupdated = fileupdated or r
-
-        for b in docsoup.findAll('bilaga'):
-            # self.log.debug("Looking for %s, found %s", dokid, b.dok_id.text)
-            if b.dok_id.text != dokid:
-                continue
-            if b.filtyp is None:
-                # apparantly this can happen sometimes? Very intermitently, though.
-                self.log.warning(
-                    "Couldn't find filtyp for bilaga %s in %s" %
-                    (b.dok_id.text, xmlfile))
-                continue
-            filetype = "." + b.filtyp.text
-            filename = self.store.downloaded_path(basefile, attachment=docname + filetype)
-            self.log.debug("   Downloading to %s" % filename)
-            try:
-                r = self.download_if_needed(b.fil_url.text, basefile, filename=filename)
-            except requests.exceptions.HTTPError as e:
-                # occasionally we get a 404 even though we shouldn't. Report and hope it
-                # goes better next time.
-                self.log.error("   Failed: %s" % e)
-                continue
+                self.log.info("%s: downloaded from %s" % (basefile, url))
+            fileupdated = False
+            r = None
+            docsoup = BeautifulSoup(open(xmlfile), features="xml")
+            dokid = docsoup.find('dok_id').text
+            if docsoup.find('dokument_url_html'):
+                htmlurl = docsoup.find('dokument_url_html').text
+                htmlfile = self.store.downloaded_path(basefile, attachment=docname + ".html")
+                #self.log.debug("   Downloading to %s" % htmlfile)
+                r = self.download_if_needed(htmlurl, basefile, filename=htmlfile)
+                if r:
+                    self.log.debug("    Downloaded html ver to %s" % htmlfile)
+            elif docsoup.find('dokument_url_text'):
+                texturl = docsoup.find('dokument_url_text').text
+                textfile = self.store.downloaded_path(basefile, attachment=docname + ".txt")
+                #self.log.debug("   Downloading to %s" % htmlfile)
+                r = self.download_if_needed(texturl, basefile, filename=textfile)
+                if r:
+                    self.log.debug("    Downloaded text ver to %s" % textfile)
             fileupdated = fileupdated or r
-            break
+            for b in docsoup.findAll('bilaga'):
+                # self.log.debug("Looking for %s, found %s", dokid, b.dok_id.text)
+                if b.dok_id.text != dokid:
+                    continue
+                if b.filtyp is None:
+                    # apparantly this can happen sometimes? Very intermitently, though.
+                    self.log.warning(
+                        "Couldn't find filtyp for bilaga %s in %s" %
+                        (b.dok_id.text, xmlfile))
+                    continue
+                filetype = "." + b.filtyp.text
+                filename = self.store.downloaded_path(basefile, attachment=docname + filetype)
+                # self.log.debug("   Downloading to %s" % filename)
+                try:
+                    r = self.download_if_needed(b.fil_url.text, basefile, filename=filename)
+                    if r:
+                        self.log.debug("    Downloaded attachment as %s" % filename)
+                except requests.exceptions.HTTPError as e:
+                    # occasionally we get a 404 even though we shouldn't. Report and hope it
+                    # goes better next time.
+                    self.log.error("   Failed: %s" % e)
+                    continue
+                fileupdated = fileupdated or r
+                break
+        except requests.exceptions.HTTPError as e:
+            self.log.error("%s: Failed: %s" % (basefile, e))
+            return False
 
         if updated or fileupdated:
             return True  # Successful download of new or changed file
         else:
             self.log.debug(
-                "%s and all associated files unchanged" % xmlfile)
+                "  %s: %s and all associated files unchanged" % (basefile, xmlfile))
 
     def downloaded_to_intermediate(self, basefile):
         # first check against our "blacklist-light":
