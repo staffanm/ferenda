@@ -1,6 +1,6 @@
 # -*- coding: iso-8859-1  -*-
 # ------------ lagrum.ebnf ----------------
-
+#
 sfsrefs              ::= (ExternalRefs/MultipleGenericRefs/ChapterSectionRefs/IndividualChapterSectionRefs/SectionPieceItemRefs/SectionPieceRefs/SectionRefs/SectionPieceExternalRefs/ExternalChapterSectionRefs/PieceAndItemRefs/SectionItemRefs)
 # this list overlaps with GenericRef
 sfsref               ::= (ChangeRef/ExternalRef/ChapterSectionPieceItemRef/ChapterSectionPieceRef/ChapterSectionRef/SectionPieceItemRef/SectionElementRef/SectionPieceRef/SectionSentenceRef/SectionItemRef/ChapterRef/SectionRef/PieceItemRef/PieceRef/SFSNr/LawRef/NamedExternalLawRef)
@@ -64,11 +64,9 @@ SectionItemRefs     ::= SectionRef, Whitespace, ItemRef, WAndOrW, ItemRef, ?-' §
 PieceItemRefs       ::= PieceRef, Whitespace, ItemRefs
 ItemRefs            ::= (ItemRef, Comma, Whitespace)*, ItemRef, WAndOrW, ItemRef
 
-IntervalOrSingle     ::= (IntervalSection/SectionSentenceRef/SingleSectionRef) # the SectionSentenceRef does not really belong...
+IntervalOrSingle     ::= (IntervalSection/SectionSentenceRef/SingleSectionRef)
 SingleSectionRefID   ::= SectionRefID
 IntervalSection      ::= SingleSectionRef, Whitespace?,Hyphen, Hyphen?, Whitespace?, SingleSectionRef
-
-
 
 LastSectionRef       ::= SectionRefID, Whitespace, DoubleSectionMark
 SingleSectionRef      ::= SectionRefID

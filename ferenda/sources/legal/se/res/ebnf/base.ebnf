@@ -1,3 +1,4 @@
+# -*- coding: windows-1252 -*-
 # ------------ base.ebnf ----------------
 
 # Diverse produktioner som kan vara användbara lite varstans
@@ -9,7 +10,7 @@ AndOr		     ::= (And/Or/Also)
 WAndOrW		     ::= Whitespace, AndOr, Whitespace
 Comma		     ::= ','
 CommaSpace	     ::= Comma, Whitespace
-Hyphen               ::= [-–] # – = endash, used in 2005:104 at least
+Hyphen               ::= [–—-]
 SectionMark	     ::= '§'
 DoubleSectionMark    ::= SectionMark, SectionMark
 Colon                ::= ':'
@@ -33,30 +34,24 @@ SidnrRefID          ::= number
 
 # GRUNDLÄGGANDE BYGGSTENAR
 plain        ::= (Whitespace/word/number/punctuation)
-#  is really SUBSTITUTE CHARACTER (0x1a)
-Whitespace   ::= [  \t\n\r\f\v]+
+Whitespace   ::= [  \t\n\r\f\v]+
 WhitespaceOrPunctuation ::= (Whitespace/punctuation)+
 
 # Bokstäver som hittats i SFST-datat:
 # * œ and Œ are windows-1252-only oe-ligatures (upper- and lowercase)
 # * Š (S-with-caron) occurs in 1994:1720 (where they probably mean 'é') 
 # * ş occurs in 1982:790 (where they probably mean space)
-#word        ::= [a-zA-ZåäöÅÄÖéèêëÉÈËüûùúÙÜÛÚıæáàâÀÂØøÒÓÔôóòŒœÍíîïãçñÑßÇçŠşõÆÿğÃ¯]+
-#char	     ::= [a-zA-ZåäöÅÄÖéèêëÉÈËüûùúÙÜÛÚıæáàâÀÂØøÒÓÔôóòŒœÍíîïãçñÑßÇçŠşõÆÿğÃ¯]
 word         ::= [a-zA-ZŠŒšœŸÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏĞÑÒÓÔÕÖ×ØÙÚÛÜİŞßàáâãäåæçèéêëìíîïğñòóôõöøùúûüışÿ]+
 char         ::= [a-zA-ZŠŒšœŸÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏĞÑÒÓÔÕÖ×ØÙÚÛÜİŞßàáâãäåæçèéêëìíîïğñòóôõöøùúûüışÿ]
 number       ::= [0-9]+
 digit	     ::= [0-9]
 
-
 # Skiljetecken som hittats i SFST-datat:
-# *  (\177) is DEL, which is present in 1977:1194, 
 # * € is (windows 1252) euro
 # * „ is smart quoutes, subscripted
 # * ‡ is a double-dagger, 
 # * ‰ is per-mille sign. 
 # * ‹ is less-than-or-equal,
-# *  is unmapped, but present in 1993:1199. 
 # * ‘ and ’ are single-smartquotes. 
 # * “ and ” are "smart quotes", 
 # * • is typography-bullet, 
@@ -71,6 +66,11 @@ digit	     ::= [0-9]
 # * ¼, ½, ¾ are fractions (1/4, 1/2, 3/4 - should these be digits?)
 # * × is multiplication sign
 # * Â­ is soft hyphen
-punctuation    ::= [][!"#$%&'()*+,-./:;<=>?@\^_`{}~€‚ƒ„…†‡ˆ‰‹‘’“”•–—˜™›¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿÷Â­|]
+
+# ALSO NOTE: The unmapped 0x8f is present in 1993:1199. Should be
+# sanitized beforehand. 0x7f (DEL) is present in 1977:1194, but is
+# clearly wrong.
+
+punctuation    ::= [][!"#$%&'()*+,-./:;<=>?@\^_`{}~€‚ƒ„…†‡ˆ‰‹‘’“”•–—˜™›¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿÷Â­|]
 
 # ------------ end of base.ebnf ----------------

@@ -50,6 +50,7 @@ class Parse(unittest.TestCase):
         # NB: _construct_ids won't look for references
         self.p.visit_node(b, self.p.construct_id, {'basefile': '9999:998'})
         self.p.visit_node(b, self.p.find_definitions, False, debug=False)
+        from pudb import set_trace; set_trace()
         self.p.lagrum_parser.parse_recursive(b)
         self._remove_uri_for_testcases(b)
         resultfilename = filename.replace(".txt", ".xml")

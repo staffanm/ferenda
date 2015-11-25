@@ -7,11 +7,8 @@ import sys
 import re
 
 # thirdparty
-try:
-    from simpleparse.parser import Parser
-    from simpleparse.stt.TextTools.TextTools import tag
-except ImportError:
-    from ._simpleparseFallback import Parser, tag
+from simpleparse.parser import Parser
+from simpleparse.stt.TextTools.TextTools import tag
 import six
 from six import text_type as str
 from six import unichr as chr
@@ -26,10 +23,6 @@ from ferenda.elements import Link, LinkSubject
 from ferenda.thirdparty.coin import URIMinter
 from . import RPUBL, RINFOEX
 
-# The charset used for the bytestrings that is sent to/from
-# simpleparse (which does not handle unicode)
-# Choosing utf-8 makes § a two-byte character, which does not work well
-SP_CHARSET = 'iso-8859-1'
 log = logging.getLogger('lr')
 
 # Lite om hur det hela funkar: Att hitta referenser i löptext är en
@@ -154,12 +147,12 @@ class LegalRef:
 
         rootprod = "root ::= (%s/plain)+\n" % "/".join(self.roots)
         self.decl += rootprod
-        # if KORTLAGRUM, delay the construction of teh parser until we
+        # if KORTLAGRUM, delay the construction of the parser until we
         # can construct the LawAbbreviation production (see parse())
         if self.KORTLAGRUM not in self.args:
             # we store this parser object so that it's __del__ method
             # isn't called prematurely when using _simpleparseFallback
-            self.spparser = Parser(self.decl.encode(SP_CHARSET), "root")
+            self.spparser = Parser(self.decl, "root")
             self.tagger = self.spparser.buildTagger("root")
         self.verbose = False
         self.depth = 0
@@ -176,14 +169,27 @@ class LegalRef:
         """Laddar in produktionerna i den angivna filen i den
         EBNF-deklaration som används, samt returnerar alla
         *Ref och *RefId-produktioner"""
-        # base.ebnf contains 0x1A, ie the EOF character on windows,
-        # therefore we need to read it in binary mode
-
-        f = open(file, 'rb')
-        # assume our ebnf files use the same charset
-        content = f.read(os.stat(file).st_size).decode(SP_CHARSET)
+#        # base.ebnf contains 0x1A, ie the EOF character on windows,
+#        # therefore we need to read it in binary mode
+#        f = open(file, 'rb')
+#        # Our EBNF files is in latin-1 for now. Maybe soon the time is
+#        # right to convert them to UTF-8, if SimpleParse 2.2 handles
+#        # unicode throughout.
+#        content = f.read(os.stat(file).st_size).decode("iso-8859-1")
+#        self.decl += content
+#        f.close()
+#
+        import codecs
+        content = ""
+        # NB: This needs to be read using latin-1, even though
+        # base.ebnf uses chars from the superset windows-1252. Test
+        # integrationLegalRef.Lagrum.test_sfs_tricky_i18n otherwise.
+        with codecs.open(file, encoding="latin-1") as fp:
+            for line in fp.readlines():
+                if line.startswith("#") or not line.strip():
+                    continue
+                content += line
         self.decl += content
-        f.close()
         return [x.group(1) for x in re.finditer(r'(\w+(Ref|RefID))\s*::=',
                                                 content)]
 
@@ -243,7 +249,7 @@ class LegalRef:
             lawdecl = "LawAbbreviation ::= ('%s')\n" % "'/'".join(
                 self.lawlist)
             self.decl += lawdecl
-            self.spparser = Parser(self.decl.encode(SP_CHARSET), "root")
+            self.spparser = Parser(self.decl, "root")
             self.tagger = self.spparser.buildTagger("root")
         if self.RATTSFALL in self.args and not self.namedseries:
             self.namedseries.update(self.get_relations(SKOS.altLabel,
@@ -276,23 +282,15 @@ class LegalRef:
             fixedindata = self.re_escape_named.sub(r'|\1', fixedindata)
         # print "After: %r" % type(fixedindata)
 
-        # SimpleParse har inget stöd för unicodesträngar, så vi
-        # konverterar intdatat till en bytesträng. Tyvärr får jag inte
-        # det hela att funka med UTF8, så vi kör xml character
-        # references istället
-        fixedindata = fixedindata.encode(SP_CHARSET, 'xmlcharrefreplace')
+        if self.verbose:
+            print("calling tag with '%s'" % (fixedindata))
 
         # Parsea texten med TextTools.tag - inte det enklaste sättet
         # att göra det, men om man gör enligt
         # Simpleparse-dokumentationen byggs taggertabellen om för
         # varje anrop till parse()
-        if self.verbose:
-            print(("calling tag with '%s'" % (fixedindata.decode(SP_CHARSET))))
-        # print "tagger length: %d" % len(repr(self.tagger))
         taglist = tag(fixedindata, self.tagger, 0, len(fixedindata))
-
         result = []
-
         root = NodeTree(taglist, fixedindata)
         for part in root.nodes:
             if part.tag != 'plain' and self.verbose:
@@ -1191,7 +1189,7 @@ class NodeTree:
 
     def __getattr__(self, name):
         if name == "text":
-            return self.data.decode(SP_CHARSET)
+            return self.data
         elif name == "tag":
             return (self.isRoot and 'root' or self.root[0])
         elif name == "nodes":

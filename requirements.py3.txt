@@ -10,6 +10,7 @@ jsmin
 cssmin
 whoosh
 pyparsing
+SimpleParse  # 2.2 is now py3 compatible
 scandir # not needed for py3.5 +
 # patchit -- waiting for 1.2 so that we can drop our vendorized version
 # sphinx

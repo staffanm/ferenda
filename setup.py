@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-
 from setuptools import setup, find_packages
-import os, sys
+import os
+import sys
 
 if os.path.exists("README.rst"):
     with open("README.rst") as fp:
@@ -23,20 +23,10 @@ install_requires = ['beautifulsoup4 >= 4.3.0',
                     'docutils >= 0.11',
                     'layeredconfig >= 0.2.1',
                     'responses >= 0.3.0',
+                    'SimpleParse >= 2.2.0',
                     # 'patchit >= 1.2',   # not released yet, using vendorized copy
 ]
 
-if sys.version_info < (3,0,0):
-    # not py3 compatible, but not essential either
-    install_requires.append('SimpleParse >= 2.1.1')
-    # in reality, python 2 works fine with pyparsing 2.0.1, but since
-    # the rdflib and rdfextras packages insists on <= 1.5.7, we have
-    # to, too, or else the ferenda-setup command line tool (which ties
-    # into setuptools in ways I don't *really* understand) will raise
-    # a pkg_resources.VersionConflict
-    install_requires.append('pyparsing<=1.5.7')
-else:
-    install_requires.append('pyparsing')
     
 if sys.version_info < (2,7,0):
     install_requires.append('ordereddict >= 1.1')
@@ -97,6 +87,7 @@ setup(name='ferenda',
           'Programming Language :: Python :: 3.2',
           'Programming Language :: Python :: 3.3',
           'Programming Language :: Python :: 3.4',
+          'Programming Language :: Python :: 3.5',
           'Topic :: Software Development :: Libraries :: Python Modules',
           'Topic :: Internet :: WWW/HTTP :: WSGI :: Application',
           'Topic :: Text Processing',
