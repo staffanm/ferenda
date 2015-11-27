@@ -361,7 +361,7 @@ class Feedsets(RepoTester):
     def setUp(self):
         super(Feedsets, self).setUp()
         self.repo.news_facet_entries = Mock(return_value=self.results2)
-        self.repo._commondata = self.results2data
+        self.repo.commondata = self.results2data
 
     def test_feedsets(self):
         got = self.repo.news_feedsets(self.results2, self.facets)

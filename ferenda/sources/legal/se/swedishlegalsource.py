@@ -17,6 +17,7 @@ from rdflib.resource import Resource
 from rdflib.namespace import DCTERMS, SKOS, FOAF
 from six import text_type as str
 import bs4
+from cached_property import cached_property
 
 from ferenda import (DocumentRepository, DocumentStore, FSMParser,
                      CitationParser, Describer)
@@ -111,24 +112,21 @@ class SwedishLegalSource(DocumentRepository):
         if not isinstance(self, SwedishLegalSource):
             assert self.alias != "swedishlegalsource", "Subclasses must override self.alias!"
 
-    @property
+    @cached_property
     def minter(self):
-        if not hasattr(self, '_minter'):
-            # print("%s (%s) loading minter" % (self.alias, id(self)))
-            filename = self.resourceloader.filename
-            spacefile = filename("uri/swedishlegalsource.space.ttl")
-            slugsfile = filename("uri/swedishlegalsource.slugs.ttl")
-            self.log.debug("Loading URISpace from %s" % spacefile)
-            cfg = Graph().parse(spacefile,
-                                format="turtle").parse(slugsfile,
-                                                       format="turtle")
-            COIN = Namespace("http://purl.org/court/def/2009/coin#")
-            # select correct URI for the URISpace definition by
-            # finding a single coin:URISpace object
-            spaceuri = cfg.value(predicate=RDF.type, object=COIN.URISpace)
-            self._minter = URIMinter(cfg, spaceuri)
-            # print("Minter is %s" % id(self._minter))
-        return self._minter
+        # print("%s (%s) loading minter" % (self.alias, id(self)))
+        filename = self.resourceloader.filename
+        spacefile = filename("uri/swedishlegalsource.space.ttl")
+        slugsfile = filename("uri/swedishlegalsource.slugs.ttl")
+        self.log.debug("Loading URISpace from %s" % spacefile)
+        cfg = Graph().parse(spacefile,
+                            format="turtle").parse(slugsfile,
+                                                   format="turtle")
+        COIN = Namespace("http://purl.org/court/def/2009/coin#")
+        # select correct URI for the URISpace definition by
+        # finding a single coin:URISpace object
+        spaceuri = cfg.value(predicate=RDF.type, object=COIN.URISpace)
+        return URIMinter(cfg, spaceuri)
 
     @property
     def urispace_base(self):
@@ -319,6 +317,8 @@ class SwedishLegalSource(DocumentRepository):
         # "https://lagen.nu/sosfs/2015:10" => "2015:10"
         # "https://lagen.nu/sfs/2013:1127/konsolidering/2014:117" => "2013:1127/konsolidering/2014:117"
         base = self.urispace_base
+        # FIXME: when doing canonical uris we should add "publ/" to
+        # self.urispace_segment (or something similar)
         if uri.startswith(base) and uri[len(base)+1:].startswith(self.urispace_segment):
             offset = 2 if self.urispace_segment else 1
             return uri[len(base) + len(self.urispace_segment) + offset:]

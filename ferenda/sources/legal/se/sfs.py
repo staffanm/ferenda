@@ -25,6 +25,7 @@ import bs4
 import requests
 import requests.exceptions
 from layeredconfig import LayeredConfig
+from cached_property import cached_property
 
 # my own libraries
 from ferenda import DocumentEntry, DocumentStore, TripleStore
@@ -198,25 +199,19 @@ class SFS(Trips):
                 # shut up logger
                 self.trace[logname].propagate = False
 
-    # make sure our EBNF-based parsers (which are expensive to create)
-    # only gets created if they are demanded.
-    @property
+    @cached_property
     def lagrum_parser(self):
-        if not hasattr(self, '_lagrum_parser'):
-            self._lagrum_parser = SwedishCitationParser(LegalRef(LegalRef.LAGRUM,
-                                                                 LegalRef.EULAGSTIFTNING),
-                                                        self.minter,
-                                                        self.commondata,
-                                                        allow_relative=True)
-        return self._lagrum_parser
+        return SwedishCitationParser(LegalRef(LegalRef.LAGRUM,
+                                              LegalRef.EULAGSTIFTNING),
+                                     self.minter,
+                                     self.commondata,
+                                     allow_relative=True)
 
-    @property
+    @cached_property
     def forarbete_parser(self):
-        if not hasattr(self, '_forarbete_parser'):
-            self._forarbete_parser = SwedishCitationParser(LegalRef(LegalRef.FORARBETEN),
-                                                           self.minter,
-                                                           self.commondata)
-        return self._forarbete_parser
+        return SwedishCitationParser(LegalRef(LegalRef.FORARBETEN),
+                                     self.minter,
+                                     self.commondata)
 
     @classmethod
     def get_default_options(cls):

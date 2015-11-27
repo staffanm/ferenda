@@ -34,6 +34,7 @@ import bs4
 import lxml.html
 import requests
 import requests.exceptions
+from cached_property import cached_property
 
 from six import text_type as str
 from six import binary_type as bytes
@@ -339,7 +340,7 @@ class DocumentRepository(object):
             
         self.resourceloader = ResourceLoader(*loadpath)
 
-    @property
+    @cached_property
     def ontologies(self):
         """Provides a :py:class:`~rdflib.graph.Graph` loaded with the
         ontologies/vocabularies that this docrepo uses (as determined by the
@@ -357,20 +358,19 @@ class DocumentRepository(object):
         """
         # in most cases, the user of the Docrepo object won't want to
         # look at the defined ontologies. But in case one does!
-        if not hasattr(self, '_ontologies'):
-            self._ontologies = Graph()
-            for prefix, uri in self.ns.items():
-                # , "foaf", "skos", "dcterms", "bibo", "prov"):
-                if prefix in ("rdf", "rdfs", "owl"):
-                    continue
-                ontopath = "vocab/%s.ttl" % prefix
-                if self.resourceloader.exists(ontopath):
-                    with self.resourceloader.open(ontopath) as fp:
-                        self._ontologies.parse(data=fp.read(), format="turtle")                 
-                        self._ontologies.bind(prefix, uri)
-        return self._ontologies
+        o = Graph()
+        for prefix, uri in self.ns.items():
+            # , "foaf", "skos", "dcterms", "bibo", "prov"):
+            if prefix in ("rdf", "rdfs", "owl"):
+                continue
+            ontopath = "vocab/%s.ttl" % prefix
+            if self.resourceloader.exists(ontopath):
+                with self.resourceloader.open(ontopath) as fp:
+                    o.parse(data=fp.read(), format="turtle")                 
+                    o.bind(prefix, uri)
+        return o
 
-    @property
+    @cached_property
     def commondata(self):
         """Provides a :py:class:`~rdflib.graph.Graph` containing any extra data that is common to
         documents in this docrepo -- this can be information about
@@ -378,16 +378,14 @@ class DocumentRepository(object):
         series in which they're published, and so on. The data is
         taken from ``extra/[repoalias].ttl``.
         """
-        if not hasattr(self, '_commondata'):
-            # print("%s (%s) loading commondata" % (self.alias, id(self)))
-            self._commondata = Graph()
-            for cls in inspect.getmro(self.__class__):
-                if hasattr(cls, "alias"):
-                    commonpath = "extra/%s.ttl" % cls.alias
-                    if self.resourceloader.exists(commonpath):
-                        with self.resourceloader.open(commonpath) as fp:
-                            self._commondata.parse(data=fp.read(), format="turtle")                 
-        return self._commondata
+        cd = Graph()
+        for cls in inspect.getmro(self.__class__):
+            if hasattr(cls, "alias"):
+                commonpath = "extra/%s.ttl" % cls.alias
+                if self.resourceloader.exists(commonpath):
+                    with self.resourceloader.open(commonpath) as fp:
+                        cd.parse(data=fp.read(), format="turtle")                 
+        return cd
 
     @property
     def config(self):

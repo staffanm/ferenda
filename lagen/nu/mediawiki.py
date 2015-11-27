@@ -10,7 +10,7 @@ import os
 # 3rdparty
 from lxml import etree
 from rdflib import Graph, Namespace, RDF
-
+from cached_property import cached_property
 
 # mine
 from ferenda import DocumentStore
@@ -44,21 +44,18 @@ class LNMediaWiki(wiki.MediaWiki):
 
 
 
-    @property
+    @cached_property
     def parser(self):
-        if not hasattr(self, '_parser'):
-            p = LegalRef(LegalRef.LAGRUM, LegalRef.KORTLAGRUM,
-                         LegalRef.FORARBETEN, LegalRef.RATTSFALL)
-            # self.commondata need to include extra/sfs.ttl
-            # somehow. This is probably not the best way.
-            self.commondata  # make sure it's loaded
-            with self.resourceloader.open("extra/sfs.ttl") as fp:
-                self._commondata.parse(data=fp.read(), format="turtle")
-            self._parser = SwedishCitationParser(p,
-                                                 self.minter,
-                                                 self.commondata,
-                                                 allow_relative=True)
-        return self._parser
+        p = LegalRef(LegalRef.LAGRUM, LegalRef.KORTLAGRUM,
+                     LegalRef.FORARBETEN, LegalRef.RATTSFALL)
+        # self.commondata need to include extra/sfs.ttl
+        # somehow. This is probably not the best way.
+        with self.resourceloader.open("extra/sfs.ttl") as fp:
+            self.commondata.parse(data=fp.read(), format="turtle")
+        return SwedishCitationParser(p,
+                                     self.minter,
+                                     self.commondata,
+                                     allow_relative=True)
 
     lang = "sv"
     # alias = "lnwiki"
@@ -73,26 +70,23 @@ class LNMediaWiki(wiki.MediaWiki):
 
     # Taken from ferenda.sources.legal.se.SwedishLegalSource which
     # this repo does not derive from
-    @property
+    @cached_property
     def minter(self):
-        if not hasattr(self, '_minter'):
-            # print("%s (%s) loading minter" % (self.alias, id(self)))
-            filename = self.resourceloader.filename
-            spacefile = filename("uri/swedishlegalsource.space.ttl")
-            slugsfile = filename("uri/swedishlegalsource.slugs.ttl")
-            self.log.debug("Loading URISpace from %s" % spacefile)
-            # print("Loading URISpace from %s" % spacefile)
-            # print("Loading Slugs from %s" % slugsfile)
-            cfg = Graph().parse(spacefile,
-                                format="turtle").parse(slugsfile,
-                                                       format="turtle")
-            COIN = Namespace("http://purl.org/court/def/2009/coin#")
-            # select correct URI for the URISpace definition by
-            # finding a single coin:URISpace object
-            spaceuri = cfg.value(predicate=RDF.type, object=COIN.URISpace)
-            self._minter = URIMinter(cfg, spaceuri)
-            # print("Minter is %s" % id(self._minter))
-        return self._minter
+        # print("%s (%s) loading minter" % (self.alias, id(self)))
+        filename = self.resourceloader.filename
+        spacefile = filename("uri/swedishlegalsource.space.ttl")
+        slugsfile = filename("uri/swedishlegalsource.slugs.ttl")
+        self.log.debug("Loading URISpace from %s" % spacefile)
+        # print("Loading URISpace from %s" % spacefile)
+        # print("Loading Slugs from %s" % slugsfile)
+        cfg = Graph().parse(spacefile,
+                            format="turtle").parse(slugsfile,
+                                                   format="turtle")
+        COIN = Namespace("http://purl.org/court/def/2009/coin#")
+        # select correct URI for the URISpace definition by
+        # finding a single coin:URISpace object
+        spaceuri = cfg.value(predicate=RDF.type, object=COIN.URISpace)
+        return URIMinter(cfg, spaceuri)
 
     def get_wikisettings(self):
         settings = LNSettings(lang=self.lang)

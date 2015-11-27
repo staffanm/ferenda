@@ -5,6 +5,7 @@ from collections import Counter
 
 from rdflib import RDF, URIRef
 from rdflib.namespace import DCTERMS, OWL
+from cached_property import cached_property
 
 from ferenda import Facet, Describer, TocPageset, TocPage
 from ferenda import fulltextindex, util
@@ -19,26 +20,23 @@ from . import SameAs
 
 class DV(OrigDV, SameAs):
 
-    @property
+    @cached_property
     def commondata(self):
         # for parsing, our .commondata needs to access named laws
         # defined in extra/sfs.ttl. Make sure these are loaded even
         # though we don't inherit from SFS.
-        if not hasattr(self, '_commondata'):
-            self._commondata = super(DV, self).commondata
-            path = "extra/sfs.ttl"
-            if self.resourceloader.exists(path):
-                with self.resourceloader.open(path) as fp:         
-                    self._commondata.parse(data=fp.read(), format="turtle")
-        return self._commondata
+        cd = super(DV, self).commondata
+        path = "extra/sfs.ttl"
+        if self.resourceloader.exists(path):
+            with self.resourceloader.open(path) as fp:
+                cd.parse(data=fp.read(), format="turtle")
+        return cd
         
     def add_keyword_to_metadata(self, domdesc, keyword):
-
         def sokord_uri(value):
             # FIXME: This should coined by self.minter
             baseuri = "https://lagen.nu/concept/"
             return baseuri + util.ucfirst(value).replace(' ', '_')
-
         domdesc.rel(DCTERMS.subject, sokord_uri(keyword))
 
     # override polish_metadata to add some extra owl:sameAs attributes

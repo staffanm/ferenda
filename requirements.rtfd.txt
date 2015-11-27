@@ -2,6 +2,7 @@
 # install rdfextras due to utf-8 problems
 
 beautifulsoup4
+cached_property
 lxml
 rdflib
 rdflib-jsonld
