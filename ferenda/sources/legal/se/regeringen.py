@@ -27,7 +27,7 @@ from ferenda import util
 from ferenda.decorators import recordlastdownload, downloadmax, action, managedparsing
 from ferenda.elements import Section, Link
 from ferenda.pdfreader import PDFReader, Textbox
-from ferenda.errors import DocumentRemovedError
+from ferenda.errors import DocumentRemovedError, ParseError
 
 from . import SwedishLegalSource, RPUBL
 from .swedishlegalsource import offtryck_parser, offtryck_gluefunc, PreambleSection, UnorderedSection

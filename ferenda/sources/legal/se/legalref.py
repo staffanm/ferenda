@@ -315,12 +315,11 @@ class LegalRef:
             self.currentlaw = None
 
         if taglist[-1] != len(fixedindata):
-            log.error('Problem (%d:%d) with %r / %r' % (
-                taglist[-1] - 8, taglist[-1] + 8, fixedindata, indata))
-
+            # log.error('Problem (%d:%d) with %r / %r' % (
+            #     taglist[-1] - 8, taglist[-1] + 8, fixedindata, indata))
             raise RefParseError(
                 "parsed %s chars of %s (...%s...)" % (taglist[-1], len(indata),
-                                                      indata[(taglist[-1] - 2):taglist[-1] + 3]))
+                                                      indata[max(0, taglist[-1] - 4):taglist[-1] + 5]))
 
         # Normalisera resultatet, dvs konkatenera intilliggande
         # textnoder, och ta bort ev '|'-tecken som vi stoppat in
@@ -1194,7 +1193,7 @@ class NodeTree:
             return (self.isRoot and 'root' or self.root[0])
         elif name == "nodes":
             res = []
-            l = (self.isRoot and self.root[1] or self.root[3])
+            l = (self.isRoot and self.root[1] or (len(self.root) > 3 and self.root[3]))
             if l:
                 for p in l:
                     res.append(NodeTree(p, self.data[p[1] -

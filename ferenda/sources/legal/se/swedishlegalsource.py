@@ -7,6 +7,7 @@ from datetime import datetime, date
 import re
 import os
 import itertools
+import logging
 import warnings
 from bz2 import BZ2File
 
@@ -20,7 +21,7 @@ import bs4
 from ferenda import (DocumentRepository, DocumentStore, FSMParser,
                      CitationParser, Describer)
 from ferenda import util
-from ferenda.sources.legal.se.legalref import Link, LegalRef
+from ferenda.sources.legal.se.legalref import Link, LegalRef, RefParseError
 from ferenda.elements.html import A, H1, H2, H3
 from ferenda.elements import (Paragraph, Section, Body,
                               OrdinalElement, CompoundElement,
@@ -1202,6 +1203,7 @@ class SwedishCitationParser(CitationParser):
         self._commondata = commondata
         self._currenturl = None
         self._allow_relative = allow_relative
+        self.log = logging.getLogger("scp")
 
     def parse_recursive(self, part, predicate="dcterms:references"):
         if hasattr(part, 'about'):
@@ -1243,10 +1245,14 @@ class SwedishCitationParser(CitationParser):
         for k in list(attributes):
             if attributes[k] is None:
                 del attributes[k]
-        return self._legalrefparser.parse(string,
-                                          minter=self._minter,
-                                          metadata_graph=self._commondata,
-                                          baseuri_attributes=attributes,
-                                          predicate=predicate,
-                                          allow_relative=self._allow_relative)
+        try:
+            return self._legalrefparser.parse(string,
+                                              minter=self._minter,
+                                              metadata_graph=self._commondata,
+                                              baseuri_attributes=attributes,
+                                              predicate=predicate,
+                                              allow_relative=self._allow_relative)
+        except RefParseError as e:
+            self.log.error(e)
+            return [string]
 
