@@ -405,10 +405,10 @@ class Riksdagen(FixedLayoutSource):
                                  ocr_lang="swe")
         intermediate_path = self.store.intermediate_path(basefile)
         intermediate_path += ".bz2" if self.config.compress == "bz2" else ""
-        if os.path.getsize(intermediate_path) > 5*1024*1024:
-            raise ParseError("%s: %s (after conversion) is just too damn big (%s bytes)" % 
-                             (basefile, intermediate_path, 
-                              os.path.getsize(intermediate_path)))
+        if os.path.getsize(intermediate_path) > 20*1024*1024:
+            raise errors.ParseError("%s: %s (after conversion) is just too damn big (%s Mbytes)" % 
+                                    (basefile, intermediate_path, 
+                                     os.path.getsize(intermediate_path) / (1024*1024)))
         return res
 
     def metadata_from_basefile(self, basefile):
