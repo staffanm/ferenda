@@ -184,7 +184,10 @@ class LegalRef:
         # NB: This needs to be read using latin-1, even though
         # base.ebnf uses chars from the superset windows-1252. Test
         # integrationLegalRef.Lagrum.test_sfs_tricky_i18n otherwise.
-        with codecs.open(file, encoding="latin-1") as fp:
+        #
+        # but let's try it anyway
+        # with codecs.open(file, encoding="latin-1") as fp:
+        with codecs.open(file, encoding="windows-1252") as fp:
             for line in fp.readlines():
                 if line.startswith("#") or not line.strip():
                     continue

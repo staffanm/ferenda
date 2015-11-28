@@ -135,6 +135,7 @@ class SFS(Trips):
     rdf_type = RPUBL.KonsolideradGrundforfattning
     parse_types = LegalRef.LAGRUM, LegalRef.EULAGSTIFTNING
     parse_allow_relative = True
+    source_encoding = "windows-1252"
     app = "sfst"  # dir, prop, sfst
     base = "SFSR"  # DIR, THWALLPROP, SFSR
     basefile_regex = "^(?P<basefile>\d{4}:[\d s\.]+)$"
@@ -496,7 +497,7 @@ class SFS(Trips):
 
     def _find_uppdaterad_tom(self, sfsnr, filename=None, reader=None):
         if not reader:
-            reader = TextReader(filename, encoding='iso-8859-1')
+            reader = TextReader(filename, encoding=self.source_encoding)
         try:
             reader.cue("&Auml;ndring inf&ouml;rd:<b> t.o.m. SFS")
             l = reader.readline()
@@ -512,7 +513,7 @@ class SFS(Trips):
             return sfsnr  # the base SFS nr
 
     def _find_upphavts_genom(self, filename):
-        reader = TextReader(filename, encoding='iso-8859-1')
+        reader = TextReader(filename, encoding=self.source_encoding)
         try:
             reader.cue("upph&auml;vts genom:<b> SFS")
             l = reader.readline()
@@ -529,7 +530,7 @@ class SFS(Trips):
         import hashlib
         c = hashlib.md5()
         try:
-            c.update(util.readfile(filename, encoding='iso-8859-1'))
+            c.update(util.readfile(filename, encoding=self.source_encoding))
         except:
             self.log.warning("Could not extract plaintext from %s" % filename)
         return c.hexdigest()
@@ -605,8 +606,8 @@ class SFS(Trips):
             raise IckeSFS("%s is not a regular SFS" % basefile)
         filename = self.store.downloaded_path(basefile)
         try:
-            # t = TextReader(filename, encoding="iso-8859-1")
-            t = TextReader(filename, encoding="iso-8859-1")
+            # t = TextReader(filename, encoding=self.source_encoding)
+            t = TextReader(filename, encoding=self.source_encoding)
         except IOError:
             self.log.warning("%s: Fulltext is missing" % basefile)
             # FIXME: This code needs to be rewritten
@@ -645,9 +646,9 @@ class SFS(Trips):
         # add ending CRLF aids with producing better diffs
         txt += "\r\n"
         util.writefile(self.store.intermediate_path(basefile), txt,
-                       encoding="iso-8859-1")
+                       encoding=self.source_encoding)
         return codecs.open(self.store.intermediate_path(basefile),
-                           encoding="iso-8859-1")
+                           encoding=self.source_encoding)
 
     def patch_if_needed(self, fp, basefile):
         fp = super(SFS, self).patch_if_needed(fp, basefile)
@@ -668,7 +669,7 @@ class SFS(Trips):
         # and downloaded_path is. So we call that one and munge it.
         filename = self.store.downloaded_path(basefile).replace(
             "/downloaded/", "/register/")
-        with codecs.open(filename, encoding="iso-8859-1") as rfp:
+        with codecs.open(filename, encoding=self.source_encoding) as rfp:
             soup = bs4.BeautifulSoup(rfp.read(), "lxml")
         # do we really have a registry?
         notfound = soup.find(text="Sökningen gav ingen träff!")
@@ -680,8 +681,8 @@ class SFS(Trips):
             # open() or bz2.BZ2File() in self.parse_open(), it might
             # return bytes or unicode strings. This seem to be a
             # problem in BZ2File (or how we use it). Just roll with it.
-            textheader = textheader.decode("iso-8859-1")
-        idx = textheader.index(b"\r\n" * 4)
+            textheader = textheader.decode(self.source_encoding)
+        idx = textheader.index("\r\n" * 4)
         fp.seek(idx + 8)
         reader = TextReader(string=textheader,
                             linesep=TextReader.DOS)
@@ -1070,7 +1071,7 @@ class SFS(Trips):
         # see comment in extract_head for why we must handle both
         # bytes- and str-files
         if not isinstance(bodystring, str):
-            bodystring = bodystring.decode("iso-8859-1")
+            bodystring = bodystring.decode(self.source_encoding)
         # replace bogus emdash contained in some text files before
         # loading into TextReader (our need to do this before creating
         # the TextReader is why we can't do it in sanitize_body

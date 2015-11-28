@@ -40,7 +40,8 @@ class TestLegalRef(unittest.TestCase):
         cls.minter = URIMinter(cfg, spaceuri)
     
     def _test_parser(self, testfile, parser):
-        encoding = 'iso-8859-1'
+        # encoding = 'iso-8859-1'
+        encoding = 'windows-1252'
         with codecs.open(testfile,encoding=encoding) as fp:
             testdata = fp.read()
 
