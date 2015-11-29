@@ -7,11 +7,12 @@ from datetime import datetime
 from six.moves.urllib_parse import urljoin
 
 import rdflib
-from rdflib.namespace import SKOS, DCTERMS, RDF
+from rdflib.namespace import SKOS, DCTERMS, DC, RDF, XSD
 BIBO = rdflib.Namespace("http://purl.org/ontology/bibo/")
 from bs4 import BeautifulSoup
 
 from ferenda import PDFAnalyzer, CompositeRepository, DocumentEntry, PDFDocumentRepository
+from ferenda import util
 from ferenda.pdfreader import StreamingPDFReader
 from . import Regeringen, SwedishLegalSource, RPUBL
 from .swedishlegalsource import offtryck_gluefunc, offtryck_parser
@@ -64,6 +65,7 @@ class SOUKB(SwedishLegalSource, PDFDocumentRepository):
     start_url = "http://regina.kb.se/sou/"
     download_reverseorder = True
     rdf_type = RPUBL.Utredningsbetankande
+    urispace_segment = "utr/sou"
 
     def download_single(self, basefile, url):
         resp = self.session.get(url)
@@ -107,14 +109,13 @@ class SOUKB(SwedishLegalSource, PDFDocumentRepository):
         entry.save()
         return updated
 
-    def canonical_uri(self, basefile):
+    def metadata_from_basefile(self, basefile):
+        attrib = super(SOUKB, self).metadata_from_basefile(basefile) 
         year, ordinal = basefile.split(":")
-        attrib = {'rpubl:arsutgava': year,
-                  'rpubl:lopnummer': ordinal,
-                  'rpubl:utrSerie': self.lookup_resource("SOU", SKOS.altLabel),
-                  'rdf:type': self.rdf_type}
-        resource = self.attributes_to_resource(attrib)
-        return self.minter.space.coin_uri(resource) 
+        attrib["rpubl:arsutgava"] = year
+        attrib["rpubl:lopnummer"] = ordinal
+        attrib["rpubl:utrSerie"] = self.lookup_resource("SOU", SKOS.altLabel)
+        return attrib
 
     def downloaded_to_intermediate(self, basefile):
         intermediate_path = self.store.intermediate_path(basefile)
@@ -126,21 +127,22 @@ class SOUKB(SwedishLegalSource, PDFDocumentRepository):
                               images=self.config.pdfimages,
                               keep_xml=keep_xml)
 
-    def parse_metadata(self, file, basefile):
-        year, no = basefile.split(":")
+    def extract_head(self, fp, basefile):
+        return None  # "rawhead" is never used
+        
+    def extract_metadata(self, rawhead, basefile):
         sourcegraph = rdflib.Graph().parse(self.store.downloaded_path(
             basefile, attachment="metadata.rdf"))
         rooturi = sourcegraph.value(predicate=RDF.type, object=BIBO.Book)
-        title = sourcegraph.value(subject=rooturi, predicate=DCTERMS.title)
-        metadata = {"rpubl:arsutgava": year,
-                    "rpubl:lopnummer": no,
-                    "dcterms:title": sourcegraph,
-                    "rpubl:utrSerie": self.lookup_resource("SOU",
-                                                           SKOS.altLabel)}
-        
-        resource = self.polish_metadata(metadata)
-        self.infer_metadata(resource, basefile)
-        return resource
+        title = sourcegraph.value(subject=rooturi, predicate=DC.title)
+        issued = sourcegraph.value(subject=rooturi, predicate=DC.date)
+        if isinstance(issued, str):
+            assert len(issued) == 4, "expected issued date as single 4-digit year, got %s" % issued
+            issued = rdflib.Literal(util.gYear(int(issued)), datatype=XSD.gYear)
+        attribs = self.metadata_from_basefile(basefile)
+        attribs["dcterms:title"] = title
+        attribs["dcterms:issued"] = issued
+        return attribs
 
     def extract_body(self, fp, basefile):
         reader = StreamingPDFReader()
