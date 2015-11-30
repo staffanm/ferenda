@@ -577,9 +577,10 @@ class DV(SwedishLegalSource):
             # came from .doc or OOXML (.docx) sources by sniffing the
             # first bytes.
             start = fp.read(6)
-            if start in ("<w:doc", "<body "):
+            assert isinstance(start, bytes), "fp seems to have been opened in a text-like mode"
+            if start in (b"<w:doc", b"<body "):
                 filetype = "docx"
-            elif start in ("<book ", "<book>", "<body>"):
+            elif start in (b"<book ", b"<book>", b"<body>"):
                 filetype = "doc"
             else:
                 raise ValueError("Can't guess filetype from %r" % start)

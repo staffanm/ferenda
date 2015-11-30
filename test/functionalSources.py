@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import sys
 import os
 
 import six
@@ -20,15 +19,17 @@ from ferenda.sources.legal.se import (Direktiv, JK, Kommitte, MyndFskrBase,
                                       SwedishLegalSource)
 
 from lagen.nu import ARN, DV, SFS, SOU, Ds, JO
+
 # subrepos, normally used through a container CompositeRepository
 from lagen.nu.direktiv import DirRegeringen, DirTrips
 from lagen.nu.propositioner import PropRegeringen
+from lagen.nu.sou import SOURegeringen
 
 for cls in (Keyword, Skeleton, MediaWiki, RFC, W3Standards, PEP,
             EurlexCaselaw, EurlexTreaties, ARN, Direktiv, Ds, DV, JK,
             JO, Kommitte, MyndFskrBase, Propositioner, Regeringen,
-            Riksdagen, SOU, SwedishLegalSource, PropRegeringen,
-            DirTrips, DirRegeringen,
+            Riksdagen,SwedishLegalSource, PropRegeringen,
+            DirTrips, DirRegeringen, SOURegeringen,
             SFS):
     # Create a new class, based on RepoTester, on the fly.
     d = {'repoclass': cls,

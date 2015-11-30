@@ -119,9 +119,11 @@ class SwedishLegalSource(DocumentRepository):
         spacefile = filename("uri/swedishlegalsource.space.ttl")
         slugsfile = filename("uri/swedishlegalsource.slugs.ttl")
         self.log.debug("Loading URISpace from %s" % spacefile)
-        cfg = Graph().parse(spacefile,
-                            format="turtle").parse(slugsfile,
-                                                   format="turtle")
+        with open(spacefile) as space:
+            with open(slugsfile) as slugs:
+                cfg = Graph().parse(space,
+                                    format="turtle").parse(slugs,
+                                                           format="turtle")
         COIN = Namespace("http://purl.org/court/def/2009/coin#")
         # select correct URI for the URISpace definition by
         # finding a single coin:URISpace object
@@ -372,6 +374,8 @@ class SwedishLegalSource(DocumentRepository):
         if resource.value(DCTERMS.title):
             doc.lang = resource.value(DCTERMS.title).language
         doc.body = self.parse_body(fp, doc.basefile)
+        if not fp.closed:
+            fp.close()
         self.postprocess_doc(doc)
         self.parse_entry_update(doc)
         return True

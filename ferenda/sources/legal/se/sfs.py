@@ -606,7 +606,6 @@ class SFS(Trips):
             raise IckeSFS("%s is not a regular SFS" % basefile)
         filename = self.store.downloaded_path(basefile)
         try:
-            # t = TextReader(filename, encoding=self.source_encoding)
             t = TextReader(filename, encoding=self.source_encoding)
         except IOError:
             self.log.warning("%s: Fulltext is missing" % basefile)
@@ -637,8 +636,14 @@ class SFS(Trips):
                 t.seek(0)
         t.cuepast('<pre>')
         # remove &auml; et al
-        hp = html_parser.HTMLParser()
-        txt = hp.unescape(t.readto('</pre>'))
+        try:
+            # this is the preferred way from py34 onwards. FIXME: Move this to ferenda.compat
+            import html
+            txt = html.unescape(t.readto('</pre>'))
+        except ImportError:
+            # this is the old way.
+            hp = html_parser.HTMLParser()
+            txt = hp.unescape(t.readto('</pre>'))
         if '\r\n' not in txt:
             txt = txt.replace('\n', '\r\n')
         re_tags = re.compile("</?\w{1,3}>")
@@ -1072,11 +1077,7 @@ class SFS(Trips):
         # bytes- and str-files
         if not isinstance(bodystring, str):
             bodystring = bodystring.decode(self.source_encoding)
-        # replace bogus emdash contained in some text files before
-        # loading into TextReader (our need to do this before creating
-        # the TextReader is why we can't do it in sanitize_body
-        reader = TextReader(string=bodystring.replace("\u2013", "-"),
-                            linesep=TextReader.DOS)
+        reader = TextReader(string=bodystring, linesep=TextReader.DOS)
         reader.autostrip = True
         return reader
 

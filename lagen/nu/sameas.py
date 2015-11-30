@@ -23,7 +23,8 @@ class SameAs(object):
         spacefile = rl.filename("uri/swedishlegalsource.space.ttl")
         # print("sameas: Loading URISpace from %s" % spacefile)
         self.log.debug("Loading URISpace from %s" % spacefile)
-        cfg = Graph().parse(spacefile, format="turtle")
+        with open(spacefile) as space:
+            cfg = Graph().parse(space, format="turtle")
         # slugs contains space:abbrSlug, but space contains
         # urispace:abbrSlug... We do a little translation
         src = URIRef("http://rinfo.lagrummet.se/sys/uri/space#abbrSlug")
@@ -39,7 +40,8 @@ class SameAs(object):
                 cfg.add((dst, p, o))
         slugsfile = self.resourceloader.filename("uri/swedishlegalsource.slugs.ttl")
         # self.log.debug("sameas: Loading slugs from %s" % slugsfile)
-        cfg.parse(slugsfile, format="turtle")
+        with open(slugsfile) as slugs:
+            cfg.parse(slugs, format="turtle")
         COIN = Namespace("http://purl.org/court/def/2009/coin#")
         # select correct URI for the URISpace definition by
         # finding a single coin:URISpace object
