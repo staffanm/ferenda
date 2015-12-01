@@ -64,7 +64,7 @@ class ARN(FixedLayoutSource):
     def download(self, basefile=None):
         self.session = requests.Session()
         resp = self.session.get(self.start_url)
-        soup = BeautifulSoup(resp.text)
+        soup = BeautifulSoup(resp.text, "lxml")
         action = soup.find("form")["action"]
 
         if ('lastdownload' in self.config and

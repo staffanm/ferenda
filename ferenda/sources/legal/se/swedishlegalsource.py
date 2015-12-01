@@ -319,8 +319,9 @@ class SwedishLegalSource(DocumentRepository):
         # "https://lagen.nu/sosfs/2015:10" => "2015:10"
         # "https://lagen.nu/sfs/2013:1127/konsolidering/2014:117" => "2013:1127/konsolidering/2014:117"
         base = self.urispace_base
-        # FIXME: when doing canonical uris we should add "publ/" to
-        # self.urispace_segment (or something similar)
+        # FIXME: This is super hacky.
+        if base == "http://rinfo.lagrummet.se":
+            base += "/publ"
         if uri.startswith(base) and uri[len(base)+1:].startswith(self.urispace_segment):
             offset = 2 if self.urispace_segment else 1
             return uri[len(base) + len(self.urispace_segment) + offset:]

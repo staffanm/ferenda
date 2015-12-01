@@ -804,30 +804,31 @@ class EIFS(MyndFskrBase):
         return super(EIFS, self).sanitize_basefile(basefile)
 
 
-# This repo source does not have a simple publishing strategy where a
-# frontpage holds predictable links to all base and change acts. We
-# disable it until we can devote resources to download it properly.
-# 
-# class ELSAKFS(MyndFskrBase):
-#     alias = "elsakfs"  # real name is ELSÄK-FS, but avoid swedchars, uppercase and dashes
-#     start_url = "http://www.elsakerhetsverket.se/om-oss/lag-och-ratt/gallande-regler/Elsakerhetsverkets-foreskrifter-listade-i-nummerordning/"
-#     download_rewrite_url = True
-# 
-# 
-#     # this repo has a mismatch between basefile prefix and the URI
-#     # space slug. This is easily fixed.
-#     def basefile_from_uri(self, uri):
-#         basefile = super(MyndFskrBase, self).basefile_from_uri(uri)
-#         if basefile.startswith("elsaek-fs"):
-#                 return basefile.replace("elsaek-fs", "elsakfs")
-# 
-# 
-#     def remote_url(self, basefile):
-#         if "/" in basefile:
-#             basefile = basefile.split("/")[1]
-#         return "http://www.elsakerhetsverket.se/globalassets/foreskrifter/elsak-fs-%s.pdf" % basefile.replace(
-#             ":", "-")
-# 
+class ELSAKFS(MyndFskrBase):
+    alias = "elsakfs"  # real name is ELSÄK-FS, but avoid swedchars, uppercase and dashes
+    start_url = "http://www.elsakerhetsverket.se/om-oss/lag-och-ratt/gallande-regler/Elsakerhetsverkets-foreskrifter-listade-i-nummerordning/"
+    download_rewrite_url = True
+
+    def download(self, basefile=None):
+        # This repo source does not have a simple publishing strategy
+        # where a frontpage holds predictable links to all base and
+        # change acts. We disable downloading until we can devote
+        # resources to download it properly.
+        pass
+
+    # this repo has a mismatch between basefile prefix and the URI
+    # space slug. This is easily fixed.
+    def basefile_from_uri(self, uri):
+        basefile = super(MyndFskrBase, self).basefile_from_uri(uri)
+        if basefile.startswith("elsaek-fs"):
+                return basefile.replace("elsaek-fs", "elsakfs")
+ 
+    def remote_url(self, basefile):
+        if "/" in basefile:
+            basefile = basefile.split("/")[1]
+        return ("http://www.elsakerhetsverket.se/globalassets/foreskrifter/elsak-fs-%s.pdf" %
+                basefile.replace(":", "-"))
+ 
 
 # This repo source has as of now a single act, which is published in a
 # different författningssamling (TLVFS). The generic downloader

@@ -690,7 +690,13 @@ class StreamingPDFReader(PDFReader):
         return fp
 
     def read(self, fp, parser="xml"):
-        self.filename=fp.name
+        if hasattr(fp, 'name'):
+            filename = fp.name
+        elif hasattr(fp, '_fp'):
+            filename = fp._fp.name
+        else:
+            raise ValueError("Can't find name of open file %r" % fp)
+        self.filename = filename
         if parser == "ocr":
             parser = self._parse_hocr
         else:

@@ -477,6 +477,7 @@ class DocumentRepository(object):
             'generateforce': False,
             'fsmdebug': False,
             'refresh': False,
+            'download': True,
             'lastdownload': datetime,
             'downloadmax': int,
             'conditionalget': True,

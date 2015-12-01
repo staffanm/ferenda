@@ -37,8 +37,10 @@ class Analyze(unittest.TestCase):
 
     # reportlab doesn't work with py3.2, current release of pyPDF2
     # (1.24) has a py3 bug that crashes page merging (patch exists at
-    # https://github.com/mstamy2/PyPDF2/pull/172)
-    @unittest.skipIf(sys.version_info > (3, 0, 0), "pyPDF2 not working on py3")
+    # https://github.com/mstamy2/PyPDF2/pull/172) -- but lets skip 3.2
+    # and try the new pypdf2 1.25
+    
+    # @unittest.skipIf(sys.version_info > (3, 0, 0), "pyPDF2 not working on py3")
     def test_drawboxes(self):
         # just test that a pdf is created
         pdfpath = "test/files/pdfanalyze/lipsum.debug.pdf"

@@ -359,7 +359,19 @@ def run(argv, subcall=False):
             _print_usage()  # also lists enabled modules
         else:
             classname = config.alias
-
+            # in order to optimize / cut down on meaningless logs,
+            # check if the class has relate=False set and skip the
+            # relate/toc step in that case
+            # (DocumentRepository.relate_all_setup does the same
+            # check)
+            if (config.action in ("relate", "toc") and
+                'relate' in config and config.relate is False):
+                log.debug("%s %s: skipping (relate=False)" % (enabled_aliases[config.alias], config.action))
+                return False
+            elif (config.action == "download" and
+                  'download' in config and config.download is False):
+                log.debug("%s %s: skipping (download=False)" % (enabled_aliases[config.alias], config.action))
+                return False
             if config.action == 'enable':
                 try:
                     return enable(classname)
@@ -427,17 +439,6 @@ def run(argv, subcall=False):
                 if classname == "all":
                     ret = []
                     for alias, classname in enabled.items():
-                        # in order to optimize / cut down on
-                        # meaningless logs, check if the class has
-                        # relate=False set and skip the relate/toc step in
-                        # that case
-                        # (DocumentRepository.relate_all_setup does
-                        # the same check)
-                        if (argv[1] in ("relate", "toc") and
-                            'relate' in getattr(config, alias) and
-                            getattr(config, alias).relate is False):
-                            log.debug("%s %s: skipping (relate=False)" % (alias, argv[1]))
-                            continue
                         config.alias = alias
                         try:
                             ret.append(_run_class(enabled, argv, config))
@@ -615,6 +616,8 @@ def _load_config(filename=None, argv=None, defaults=None):
                     'downloadmax': int,  # used strictly for typing
                     'combineresources': False,
                     'staticsite': False,
+                    'relate': True,
+                    'download': True,
                     'tabs': True,
                     'sitename': 'MySite',
                     'sitedescription': 'Just another Ferenda site',
