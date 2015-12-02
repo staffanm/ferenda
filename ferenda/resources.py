@@ -465,7 +465,8 @@ class Resources(object):
                     ontopath = repo.resourceloader.filename(resourcename)
                     if ontopath not in paths:
                         self.log.debug("Loading vocabulary %s" % ontopath)
-                        bigg.parse(ontopath, format="turtle")
+                        with open(ontopath) as onto:
+                            bigg.parse(onto, format="turtle")
                         paths.add(ontopath)
 
         g.bind("foaf", "http://xmlns.com/foaf/0.1/")
@@ -497,7 +498,8 @@ class Resources(object):
                         commonpath = repo.resourceloader.filename(resourcename)
                         if commonpath not in paths:
                             self.log.debug("loading data %s" % commonpath)
-                            bigg.parse(commonpath, format="turtle")
+                            with open(commonpath) as common:
+                                bigg.parse(common, format="turtle")
                             paths.add(commonpath)
         for (s, p, o) in bigg:
             if p in (FOAF.name, SKOS.prefLabel,

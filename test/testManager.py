@@ -31,7 +31,7 @@ import requests.exceptions
 from layeredconfig import LayeredConfig, Defaults
 
 from ferenda import manager, decorators, util, errors
-from ferenda import DocumentRepository, DocumentStore, ResourceLoader
+from ferenda import DocumentRepository, DocumentStore, ResourceLoader, Resources
 
 class staticmockstore(DocumentStore):
     def list_basefiles_for(cls,action):
@@ -182,7 +182,7 @@ class=testManager.staticmockclass2
         test = staticmockclass()
         test2 = staticmockclass2()
         outfile = self.tempdir+'/index.html'
-        manager.makeresources([test,test2], self.tempdir+'/rsrc')
+        Resources([test,test2], self.tempdir+'/rsrc').make()
         res = manager.frontpage([test,test2],
                                 path=outfile)
         self.assertTrue(res)
@@ -203,7 +203,7 @@ class=testManager.staticmockclass2
         test = staticmockclass(datadir=self.tempdir)
         test2 = staticmockclass2(datadir=self.tempdir)
         outfile = self.tempdir+'/index.html'
-        manager.makeresources([test,test2], self.tempdir+'/rsrc')
+        Resources([test,test2], self.tempdir+'/rsrc').make()
         manager.frontpage([test,test2],
                           path=outfile,
                           staticsite=True)
@@ -219,7 +219,7 @@ class=testManager.staticmockclass2
         self.assertEqual(headernavlinks[1].get("href"), 'staticmock2/toc/index.html')
 
         css = t.findall("head/link[@rel='stylesheet']")
-        self.assertRegex(css[0].get('href'), '^rsrc/css')
+        self.assertRegex(css[-1].get('href'), '^rsrc/css')
         
 class Setup(RepoTester):
 
@@ -395,6 +395,7 @@ class RunBase(object):
         sys.path.append(self.tempdir)
 
     def tearDown(self):
+        manager.config_loaded = False
         manager.shutdown_logger()
         if 'TRAVIS' in os.environ:
             util.robust_remove("ferenda.ini")
@@ -751,8 +752,8 @@ class Run(RunBase, unittest.TestCase):
                                ])),
              ('frontpage', True)])
 
-        self.assertEqual(manager.run(argv),
-                         want)
+        self.assertEqual(want,
+                         manager.run(argv))
         
     def test_run_makeresources(self):
         # 1. setup test_run_enable
@@ -851,6 +852,7 @@ imgfiles = []
     def test_config_init(self):
         # make sure that the sub-config object created by run() is
         # identical to the config object used by the instance
+        manager.config_loaded = False
         self._enable_repos()
         argv = ['test', 'inspect', 'config']
         ourcfg = manager._load_config(argv=argv,

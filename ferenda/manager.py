@@ -229,8 +229,6 @@ def make_wsgi_app(inifile=None, **kwargs):
     :rtype: callable
 
     """
-    warnings.warn("manager.make_wsgi_app is deprecated; "
-                  "use ferenda.WSGIApp() instead")
     if inifile:
         assert os.path.exists(
             inifile), "INI file %s doesn't exist (relative to %s)" % (inifile, os.getcwd())
@@ -321,7 +319,7 @@ def shutdown_logger():
         l.removeHandler(existing_handler)
 
 
-def run(argv, subcall=False):
+def run(argv, config=None, subcall=False):
     """Runs a particular action for either a particular class or all
     enabled classes.
 
@@ -336,12 +334,19 @@ def run(argv, subcall=False):
                  prefixed with ``--``, e.g. ``--loglevel=INFO``, or
                  positional arguments to the specified action).
     """
-    config = _load_config(_find_config_file(), argv)
+    if not config:
+        config = _load_config(_find_config_file(), argv)
+        alias = getattr(config, 'alias', None)
+        action = getattr(config, 'action', None)
+    else:
+        alias = argv[0]
+        action = argv[1]
+        
+    log = setup_logger(level=config.loglevel, filename=None)
     # if logfile is set to True (the default), autogenerate logfile
     # name from current datetime. Otherwise assume logfile is set to
     # the desired file name of the log
-    log = setup_logger(level=config.loglevel, filename=None)
-    if config.logfile:
+    if config.logfile and subcall is False:
         if isinstance(config.logfile, bool):
             logfile = "%s/logs/%s.log" % (
                 config.datadir, datetime.now().strftime("%Y%m%d-%H%M%S"))
@@ -358,94 +363,89 @@ def run(argv, subcall=False):
         if len(argv) < 1:
             _print_usage()  # also lists enabled modules
         else:
-            classname = config.alias
+            classname = alias
             # in order to optimize / cut down on meaningless logs,
             # check if the class has relate=False set and skip the
             # relate/toc step in that case
             # (DocumentRepository.relate_all_setup does the same
             # check)
-            if (config.action in ("relate", "toc") and
+            if (action in ("relate", "toc") and
                 'relate' in config and config.relate is False):
-                log.debug("%s %s: skipping (relate=False)" % (enabled_aliases[config.alias], config.action))
+                log.debug("%s %s: skipping (relate=False)" % (enabled_aliases[alias], action))
                 return False
-            elif (config.action == "download" and
+            elif (action == "download" and
                   'download' in config and config.download is False):
-                log.debug("%s %s: skipping (download=False)" % (enabled_aliases[config.alias], config.action))
+                log.debug("%s %s: skipping (download=False)" % (enabled_aliases[alias], action))
                 return False
-            if config.action == 'enable':
+            if action == 'enable':
                 try:
                     return enable(classname)
                 except (ImportError, ValueError) as e:
                     log.error(str(e))
                     return None
-
-            elif config.action == 'runserver':
+            elif action == 'runserver':
                 args = _setup_runserver_args(config, _find_config_file())
                 # Note: the actual runserver method never returns
                 return runserver(**args)
-
-            elif config.action == 'buildclient':
+            elif action == 'buildclient':
                 args = _setup_buildclient_args(config)
                 return runbuildclient(**args)
 
-            elif config.action == 'buildqueue':
+            elif action == 'buildqueue':
                 args = _setup_buildqueue_args(config)
                 return runbuildqueue(**args)
 
-            elif config.action == 'makeresources':
+            elif action == 'makeresources':
                 repoclasses = _classes_from_classname(enabled, classname)
                 args = _setup_makeresources_args(config)
                 repos = []
                 for cls in repoclasses:
                     inst = _instantiate_class(cls, config, argv)
                     repos.append(inst)
-                return makeresources(repos, **args)
+                return Resources(repos, **args).make()
 
-            elif config.action == 'frontpage':
+            elif action == 'frontpage':
                 repoclasses = _classes_from_classname(enabled, classname)
                 args = _setup_frontpage_args(config, argv)
                 return frontpage(**args)
 
-            elif config.action == 'all':
+            elif action == 'all':
                 classnames = _setup_classnames(enabled, classname)
                 results = OrderedDict()
                 for action in ("download",
                                "parse", "relate", "makeresources",
                                "generate", "toc", "news", "frontpage"):
                     if action in ("makeresources", "frontpage"):
-                        # FIXME: This way of re-creating the argv so
-                        # that LayeredConfig can process it again in
-                        # the subcall to run is less than elegant. A
-                        # better way would perhaps be to pass the
-                        # existing config object to run as an optional
-                        # argument)
                         argscopy = argv[2:]  # skip alias and action
                         argscopy.insert(0, action)
                         argscopy.insert(0, "all")
-                        results[action] = run(argscopy, subcall=True)
+                        results[action] = run(argscopy, config, subcall=True)
                     else:
                         results[action] = OrderedDict()
                         for classname in classnames:
                             alias = enabled_aliases[classname]
                             argscopy = argv[2:]
-                            if (action in ("parse", "relate", "generate") and
-                                    "--all" not in argscopy):
-                                argscopy.append("--all")
+                            if action in ("parse", "relate", "generate"):
+                                config.all = True
+                            else:
+                                config.all = False
                             argscopy.insert(0, action)
                             argscopy.insert(0, classname)
-                            results[action][alias] = run(argscopy, subcall=True)
+                            results[action][alias] = run(argscopy, config, subcall=True)
                 return results
             else:
                 if classname == "all":
                     ret = []
                     for alias, classname in enabled.items():
-                        config.alias = alias
                         try:
-                            ret.append(_run_class(enabled, argv, config))
+                            argscopy = argv[2:]  # skip alias and action
+                            argscopy.insert(0, action)
+                            argscopy.insert(0, alias)
+                            ret.append(_run_class(enabled, argscopy, config))
                         except Exception as e:
                             log.error("%s %s failed: %s" %
-                                      (config.action, config.alias, e))
-                    config.alias = "all"
+                                      (action, alias, e))
+                    alias = "all"
                     return ret
                 else:
                     return _run_class(enabled, argv, config)
@@ -453,6 +453,8 @@ def run(argv, subcall=False):
         if not subcall:
             _shutdown_buildserver()
             shutdown_logger()
+            global config_loaded
+            config_loaded = False
 
 
 def enable(classname):
@@ -594,6 +596,7 @@ def setup(argv=None, force=False, verbose=False, unattended=False):
     shutdown_logger()
     return True
 
+config_loaded = False
 
 def _load_config(filename=None, argv=None, defaults=None):
     """Loads general configuration information from ``filename`` (which
@@ -607,6 +610,9 @@ def _load_config(filename=None, argv=None, defaults=None):
     # FIXME: Expand on this list of defaults? Note that it only
     # pertains to global configuration, not docrepo configuration
     # (those have the get_default_options() classmethod).
+    global config_loaded
+    assert config_loaded is False, "load_config called more than once!"
+    
     if not defaults:
         defaults = {'loglevel': 'DEBUG',
                     'logfile': True,
@@ -616,6 +622,7 @@ def _load_config(filename=None, argv=None, defaults=None):
                     'downloadmax': int,  # used strictly for typing
                     'combineresources': False,
                     'staticsite': False,
+                    'all': False,
                     'relate': True,
                     'download': True,
                     'tabs': True,
@@ -666,6 +673,7 @@ def _load_config(filename=None, argv=None, defaults=None):
 
     config = LayeredConfig(*sources,
                            cascade=True)
+    config_loaded = True
     return config
 
 
@@ -769,43 +777,42 @@ def _run_class(enabled, argv, config):
 
     """
     log = getlog()
-    with util.logtime(
-        log.info, "%(alias)s %(command)s finished in %(elapsed).3f sec",
-        {'alias': config.alias,
-         'command': config.action}):
+    alias = argv[0]
+    action = argv[1]
+    with util.logtime(log.info,
+                      "%(alias)s %(action)s finished in %(elapsed).3f sec",
+                      {'alias': alias, 'action': action}):
         _enabled_classes = dict(reversed(item) for item in enabled.items())
-
-        if config.alias not in enabled and config.alias not in _enabled_classes:
-            log.error("Class-or-alias %s not enabled" % config.alias)
+        if alias not in enabled and alias not in _enabled_classes:
+            log.error("Class-or-alias '%s' not enabled" % alias)
             return
-        if config.alias in argv:
-            argv.remove(config.alias)
+        if alias in argv:
+            argv.remove(alias)
         # ie a fully qualified classname was used
-        if config.alias in _enabled_classes:
-            classname = config.alias
+        if alias in _enabled_classes:
+            classname = alias
         else:
-            classname = enabled[config.alias]
+            classname = enabled[alias]
         cls = _load_class(classname)
         inst = _instantiate_class(cls, config, argv=argv)
         try:
-            clbl = getattr(inst, config.action)
+            clbl = getattr(inst, action)
             assert(callable(clbl))
         except:  # action was None or not a callable thing
-            if config.action:
+            if action:
                 log.error("%s is not a valid command for %s" %
-                          (config.action, classname))
+                          (action, classname))
             else:
                 log.error("No command given for %s" % classname)
             _print_class_usage(cls)
             return
 
         kwargs = {}
-        if config.action in ('relate', 'generate', 'toc', 'news'):
+        if action in ('relate', 'generate', 'toc', 'news'):
             # we need to provide the otherrepos parameter to get
             # things like URI transformation to work. However we might
             # not need all repos (ie. not repos where relate or even
             # tabs is set to false)
-            
             otherrepos = []
             for othercls in _classes_from_classname(enabled, 'all'):
                 if othercls != inst.__class__:
@@ -813,13 +820,13 @@ def _run_class(enabled, argv, config):
                     otherrepos.append(obj)
             kwargs['otherrepos'] = otherrepos
 
-        if 'all' in inst.config and inst.config.all == True:
-            iterable = inst.store.list_basefiles_for(config.action)
+        if 'all' in inst.config and inst.config.all is True:
+            iterable = inst.store.list_basefiles_for(action)
             res = []
             # semi-magic handling
-            ret = cls.setup(config.action, inst.config)
-            if ret == False:
-                log.info("%s %s: Nothing to do!" % (config.alias, config.action))
+            ret = cls.setup(action, inst.config)
+            if ret is False:
+                log.info("%s %s: Nothing to do!" % (alias, action))
             else:
                 # Now we have a list of jobs in the iterable. They can
                 # be processed in four different ways:
@@ -828,12 +835,12 @@ def _run_class(enabled, argv, config):
                     # - start an internal jobqueue to which buildclients
                     #   connect, and send jobs to it (and read results
                     #   from a similar resultqueue)
-                    res = _queuejobs(iterable, inst, classname, config.action)
+                    res = _queuejobs(iterable, inst, classname, action)
                 elif LayeredConfig.get(config, 'buildqueue'):
                     # - send jobs to an external jobqueue process to which
                     #   buildclients connect (and read results from a
                     #   similar resultqueue)
-                    res = _queuejobs_to_queue(iterable, inst, classname, config.action)
+                    res = _queuejobs_to_queue(iterable, inst, classname, action)
                 elif inst.config.processes > 1:
                     # - start a number of processess which read from a
                     #   shared jobqueue, and send jobs to that queue (and
@@ -842,7 +849,7 @@ def _run_class(enabled, argv, config):
                         iterable,
                         inst,
                         classname,
-                        config.action,
+                        action,
                         config,
                         argv)
                 else:
@@ -853,9 +860,9 @@ def _run_class(enabled, argv, config):
                                 clbl,
                                 basefile,
                                 kwargs,
-                                config.action,
-                                config.alias))
-                cls.teardown(config.action, inst.config)
+                                action,
+                                alias))
+                cls.teardown(action, inst.config)
         else:
             # The only thing that kwargs may contain is a
             # 'otherrepos' parameter.
