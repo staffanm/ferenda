@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 # this repo overrides ferenda.sources.legal.se.Regeringen to work
 # against old downloaded
 import re
+import codecs
 
 from bs4 import BeautifulSoup
 from rdflib import URIRef
@@ -19,9 +20,15 @@ from . import SameAs
 
 
 class RegeringenLegacy(Regeringen):
+
+    source_encoding = "iso-8859-1"
+
     def download(self, basefile=None):
         return False
 
+    def downloaded_to_intermediate(self, basefile):
+        return codecs.open(self.store.downloaded_path(basefile), encoding=self.source_encoding)
+    
     # override just some of the methods to parse the HTML index page
 
     def extract_metadata(self, rawhead, basefile):

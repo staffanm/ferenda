@@ -250,8 +250,7 @@ class Regeringen(SwedishLegalSource):
         if (self.document_type, basefile) in self.blacklist:
             raise DocumentRemovedError("%s is blacklisted" % basefile,
                                        dummyfile=self.store.parsed_path(basefile))
-        parser = 'lxml'
-        soup = BeautifulSoup(fp.read(), parser)
+        soup = BeautifulSoup(fp.read(), "lxml")
         self._rawbody = soup.body
         return self._rawbody.find(id="content")
 
