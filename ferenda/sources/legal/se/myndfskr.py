@@ -56,7 +56,6 @@ class MyndFskrBase(SwedishLegalSource):
                            RPUBL.forfattningssamling,
                            RPUBL.ikrafttradandedatum, RPUBL.lopnummer,
                            RPUBL.utkomFranTryck, PROV.wasGeneratedBy]
-    sparql_annotations = None  # until we can speed things up
 
     basefile_regex = re.compile('(?P<basefile>\d{4}[:/_-]\d{1,3})(?:|\.\w+)$')
     document_url_regex = re.compile('.*(?P<basefile>\d{4}[:/_-]\d{1,3}).pdf$')

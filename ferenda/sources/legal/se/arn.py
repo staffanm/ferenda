@@ -45,7 +45,7 @@ class ARN(FixedLayoutSource):
     """
 
     alias = "arn"
-    xslt_template = "res/xsl/arn.xsl"
+    # xslt_template = "res/xsl/arn.xsl"
     start_url = ("http://adokweb.arn.se/digiforms/sessionInitializer?"
                  "processName=SearchRefCasesProcess")
     documentstore_class = ARNStore

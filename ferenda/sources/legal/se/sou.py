@@ -45,7 +45,6 @@ class SOURegeringen(Regeringen):
     re_basefile_lax = re.compile(r'(?:SOU|) ?(\d{4}:\d+)', re.IGNORECASE)
     rdf_type = RPUBL.Utredningsbetankande
     document_type = Regeringen.SOU
-    sparql_annotations = None  # don't even bother creating an annotation file
 
     def canonical_uri(self, basefile):
         year, ordinal = basefile.split(":")

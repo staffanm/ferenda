@@ -72,7 +72,10 @@ class SwedishLegalSource(DocumentRepository):
 
     parse_types = LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN
     parse_allow_relative = False
-
+    sparql_annotations = None  # Don't create any annotation files
+                               # until we can get a query that runs
+                               # somewhat fast...
+    
     # This is according to the RPUBL vocabulary: All
     # rpubl:Rattsinformationsdokument should have dcterms:title,
     # dcterms:issued (must be a xsd:date), dcterms:publisher and

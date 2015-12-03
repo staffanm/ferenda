@@ -41,7 +41,6 @@ class PropRegeringen(Regeringen):
     rdf_type = RPUBL.Proposition
     document_type = Regeringen.PROPOSITION
     # sparql_annotations = "res/sparql/prop-annotations.rq"
-    sparql_annotations = None  # don't even bother creating an annotation file
 
 class PropTripsStore(FixedLayoutStore):
     # 1999/94 and 1994/95 has only plaintext (wrapped in .html)
@@ -417,7 +416,6 @@ class Propositioner(CompositeRepository, SwedishLegalSource):
     storage_policy = "dir"
     rdf_type = RPUBL.Proposition
     documentstore_class = PropositionerStore
-    sparql_annotations = None  # don't even bother creating an annotation file
 
     def tabs(self):
         if self.config.tabs:

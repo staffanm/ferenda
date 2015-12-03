@@ -366,7 +366,6 @@ class DirRegeringen(Regeringen):
     re_basefile_lax = re.compile(r'(?:[Dd]ir\.?|) ?(\d{4}:\d+)')
     rdf_type = RPUBL.Kommittedirektiv
     document_type = Regeringen.KOMMITTEDIREKTIV
-    sparql_annotations = None  # don't even bother creating an annotation file
 
     def sanitize_identifier(self, identifier):
         # "Dir.1994:111" -> "Dir. 1994:111"
@@ -394,4 +393,5 @@ class Direktiv(CompositeRepository, SwedishLegalSource):
     storage_policy = "dir"
     rdf_type = RPUBL.Kommittedirektiv
     documentstore_class = DirektivStore
-    sparql_annotations = None  # don't even bother creating an annotation file
+
+    
