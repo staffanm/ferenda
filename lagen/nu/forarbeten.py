@@ -134,7 +134,7 @@ WHERE {
 
     def toc_item(self, binding, row):
         """Returns a formatted version of row, using Element objects"""
-        return [Link(row['dcterms_identifier']+": "+row['dcterms_title'],
+        return [Link(row['dcterms_identifier']+": "+row.get('dcterms_title', '(titel saknas)'),
                      uri=row['uri'])]
 
     def frontpage_content_body(self):

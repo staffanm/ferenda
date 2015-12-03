@@ -29,6 +29,11 @@ class TocPageset(object):
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
 
+    def __lt__(self, other):
+        # the default sort order when sorting a list of pagesets is by
+        # the associated RDF predicate.
+        return self.predicate < other.predicate
+        
     def __repr__(self):
         dictrepr = "".join(
             (" %s=%s" %

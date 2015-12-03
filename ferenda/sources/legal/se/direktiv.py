@@ -394,4 +394,11 @@ class Direktiv(CompositeRepository, SwedishLegalSource):
     rdf_type = RPUBL.Kommittedirektiv
     documentstore_class = DirektivStore
 
-    
+    # news() needs to be able to compute URI from basefile, so we need
+    # to reimplement this logic. Maybe that's stupid as there should
+    # already be a distilled RDF file available in
+    # distilled/[BASEFILE].rdf...
+    def metadata_from_basefile(self, basefile):
+        a = super(Direktiv, self).metadata_from_basefile(basefile)
+        a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
+        return a

@@ -431,7 +431,11 @@ def run(argv, config=None, subcall=False):
                                 config.all = False
                             argscopy.insert(0, action)
                             argscopy.insert(0, classname)
-                            results[action][alias] = run(argscopy, config, subcall=True)
+                            try:
+                                results[action][alias] = run(argscopy, config, subcall=True)
+                            except Exception as e:
+                                log.error("%s %s failed: %s" %
+                                          (action, alias, e))
                 return results
             else:
                 if classname == "all":

@@ -678,7 +678,6 @@ class FusekiStore(RemoteStore):
             qparts = query.rsplit("}", 1)
             assert len(qparts) == 2, "Failed to patch the query %s" % query
             query = "%s } } %s" % (qparts[0], qparts[1])
-
         return super(FusekiStore, self).select(query, format)
 
     def initialize_repository(self):

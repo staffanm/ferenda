@@ -1348,7 +1348,7 @@ class SFS(Trips):
     def store_select(self, store, query_template, uri, context=None):
         params = {'uri': uri,
                   'context': context}
-        with self.resourceloader(query_template):
+        with self.resourceloader.open(query_template) as fp:
             sq = fp.read() % params
         # FIXME: Only FusekiStore.select supports (or needs) uniongraph
         if context:

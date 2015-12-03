@@ -2409,7 +2409,7 @@ WHERE {
 
         """
         if not self.config.tabs:
-            self.log.info("%s: Not relating (config has tabs=False)" % self.alias)
+            self.log.info("%s: Not creating TOC (config has tabs=False)" % self.alias)
             return
         tocindex = self.store.resourcepath("toc/index.html")
         faceted_data = self.store.resourcepath("toc/faceted_data.json")
