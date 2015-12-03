@@ -129,9 +129,22 @@ def robust_remove(filename):
         # try:
         os.unlink(filename)
 
+
+# util.File
+def name_from_fp(fp):
+    """Returns the name of the opened file held by fp, which can be either
+    a regular file or a BZ2File.
+
+    """
+    if hasattr(fp, 'name'):
+        return fp.name
+    elif hasattr(fp, '_fp'):
+        return fp._fp.name
+    else:
+        raise ValueError("Can't find name of open file %r" % fp)
+  
+  
 # util.string
-
-
 def relurl(url, starturl):
     """Works like :py:func:`os.path.relpath`, but for urls
 

@@ -381,12 +381,7 @@ class PDFReader(CompoundElement):
                        (len(self)))
 
     def _parse_xml(self, xmlfp, dummy=None):
-        if hasattr(xmlfp, 'name'):
-            filename = xmlfp.name
-        elif hasattr(xmlfp, '_fp'):
-            filename = xmlfp._fp.name
-        else:
-            raise ValueError("Can't find name of open file %r" % xmlfp)
+        filename = util.name_from_fp(xmlfp)
         if dummy:
             warnings.warn("filenames passed to _parse_xml are now ignored", DeprecationWarning)
         def txt(element_text):
@@ -690,12 +685,7 @@ class StreamingPDFReader(PDFReader):
         return fp
 
     def read(self, fp, parser="xml"):
-        if hasattr(fp, 'name'):
-            filename = fp.name
-        elif hasattr(fp, '_fp'):
-            filename = fp._fp.name
-        else:
-            raise ValueError("Can't find name of open file %r" % fp)
+        filename = util.name_from_fp(fp)
         self.filename = filename
         if parser == "ocr":
             parser = self._parse_hocr

@@ -328,7 +328,7 @@ class PropTrips(Trips, FixedLayoutSource):
                 downloaded_path, encoding="iso-8859-1").read()
             util.writefile(intermediate_path, util.extract_text(
                 html, '<pre>', '</pre>'), encoding="utf-8")
-            return open(intermediate_path)
+            return open(intermediate_path, "rb")
         else:
              return super(PropTrips, self).downloaded_to_intermediate(basefile)
 
@@ -361,7 +361,7 @@ class PropTrips(Trips, FixedLayoutSource):
         return attribs
     
     def extract_body(self, fp, basefile):
-        if fp.name.endswith(".txt"):
+        if util.name_from_fp(fp).endswith(".txt"):
             # fp is opened in bytestream mode
             return TextReader(string=fp.read().decode("utf-8"))
         else:

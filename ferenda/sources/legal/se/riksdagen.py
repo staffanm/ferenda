@@ -435,7 +435,7 @@ class Riksdagen(FixedLayoutSource):
         if (os.path.exists(pdffile) and
             not (self.document_type, basefile) in self.metadataonly):
             fp = self.parse_open(basefile)
-            parser = "ocr" if ".hocr." in fp.name else "xml"
+            parser = "ocr" if ".hocr." in util.name_from_fp(fp) else "xml"
             return StreamingPDFReader().read(fp, parser=parser)
             # this will have returned a fully-loaded PDFReader document
         else:
