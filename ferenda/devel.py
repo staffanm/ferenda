@@ -486,7 +486,11 @@ class Devel(object):
                 # repos) this will yield an incorrect suffix (eg ".zip")
                 dst = os.path.splitext(dst)[0] + os.path.splitext(src)[1]
             isrc = sourcerepo.store.intermediate_path(basefile)
+            if sourcerepo.config.compress == "bz2":
+                isrc += ".bz2"
             idst = destrepo.store.intermediate_path(basefile)
+            if destrepo.config.compress == "bz2":
+                idst += ".bz2"
             copy = shutil.copy2
             if sourcerepo.store.storage_policy == "dir":
                 src = os.path.dirname(src)
