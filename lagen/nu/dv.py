@@ -3,7 +3,7 @@ from __future__ import unicode_literals, print_function
 
 from collections import Counter
 
-from rdflib import RDF, URIRef
+from rdflib import RDF, URIRef, BNode, Graph
 from rdflib.namespace import DCTERMS, OWL
 from cached_property import cached_property
 
@@ -46,30 +46,37 @@ class DV(OrigDV, SameAs):
         coin_uri = self.sameas_minter.space.coin_uri
         resource = super(DV, self).polish_metadata(head)
         refuri = resource.identifier
-        domuri = resource.value(RPUBL.referatAvDomstolsavgorande).identifier
         refuri_sameas = coin_uri(resource)
-        domuri_sameas = coin_uri(resource.value(RPUBL.referatAvDomstolsavgorande))
         resource.graph.add((URIRef(refuri), OWL.sameAs, URIRef(refuri_sameas)))
-        resource.graph.add((URIRef(domuri), OWL.sameAs, URIRef(domuri_sameas)))
+        # NB: In theory, we have all the data we need to generate a
+        # canonical URI for the dom. In practice, this data does not
+        # meet requirements of our URISpace templates in certain cases
+        # (all MD verdicts use rpubl:domsnummer instead of
+        # rpubl:malnummer, which is what the template expects. The
+        # superclass' definition of polish_metadata gets around this
+        # by creating a minimal graph from the plain dict in head and
+        # feeds that to coin_uri. So we do the same here, instead of
+        # the very simple:
+        #
+        #    domuri_sameas = coin_uri(resource.value(RPUBL.referatAvDomstolsavgorande))
+        #
+        # (also, this version handles the uncommon but valid case
+        # where one referat concerns multiple dom:s)
+        domuri = resource.value(RPUBL.referatAvDomstolsavgorande).identifier 
+        for malnummer in head['_localid']:
+            bnodetmp = BNode()
+            gtmp = Graph()
+            gtmp.bind("rpubl", RPUBL)
+            gtmp.bind("dcterms", DCTERMS)
+            dtmp = Describer(gtmp, bnodetmp)
+            dtmp.rdftype(RPUBL.VagledandeDomstolsavgorande)
+            dtmp.value(RPUBL.malnummer, malnummer)
+            dtmp.value(RPUBL.avgorandedatum, head['Avgörandedatum'])
+            dtmp.rel(DCTERMS.publisher, self.lookup_resource(head["Domstol"]))
+            rtmp = dtmp.graph.resource(bnodetmp)
+            domuri_sameas = coin_uri(rtmp)
+            resource.graph.add((URIRef(domuri), OWL.sameAs, URIRef(domuri_sameas)))
         return resource
-
-#         if '_nja_ordinal' in head:
-#             # <sidnummer-based> owl:sameAs <lopnummer based>
-#             altattribs = {'type': LegalRef.RATTSFALL,
-#                           'rattsfallspublikation': 'nja',
-#                           'arsutgava': refdesc.getvalue(RPUBL.arsutgava),
-#                           'lopnummer': refdesc.getvalue(RPUBL.lopnummer)}
-#             refdesc.rel(OWL.sameAs, legaluri.construct(altattribs))
-#         else:
-#             # Canonical URIs are based on lopnummer. add a sameas ref
-#             # back to the sidnummer based URI
-#             altattribs = {'type': LegalRef.RATTSFALL,
-#                           'rattsfallspublikation': 'nja',
-#                           'arsutgava': refdesc.getvalue(RPUBL.arsutgava),
-#                           'lopnummer': refdesc.getvalue(RPUBL.sidnummer)}
-#             refdesc.rel(OWL.sameAs, legaluri.construct(altattribs))
-
-
 
     def facets(self):
         # NOTE: it's important that RPUBL.rattsfallspublikation is the
