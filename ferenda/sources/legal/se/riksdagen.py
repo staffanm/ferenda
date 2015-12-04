@@ -9,6 +9,7 @@ from io import StringIO
 import requests
 import requests.exceptions
 from bs4 import BeautifulSoup
+from lxml import etree
 
 from ferenda import util, errors
 from ferenda.compat import OrderedDict
@@ -374,10 +375,21 @@ class Riksdagen(FixedLayoutSource):
 
         downloaded_path = self.store.downloaded_path(basefile,
                                                      attachment="index.pdf")
-        if not os.path.exists(downloaded_path):
+        downloaded_path_html = self.store.downloaded_path(basefile,
+                                                          attachment="index.html")
+        if (not os.path.exists(downloaded_path) and
+            os.path.exists(downloaded_path_html)):
             # attempt to parse HTML instead
-            return open(self.store.downloaded_path(basefile,
-                                                   attachment="index.html"))
+            return open(downloaded_path_html)
+        else:
+            # just grab the HTML from the XML file itself...
+            tree = etree.parse(self.store.downloaded_path(basefile))
+            html = tree.getroot().find("dokument").find("html")
+            if html is not None:
+                return StringIO(html.text)
+            else:
+                return StringIO("<html><h1>Dokumenttext saknas</h1></html>")
+
         intermediate_path = self.store.intermediate_path(basefile)
         intermediate_path += ".bz2" if self.config.compress == "bz2" else ""
         # if a compressed bz2 file is > 5 MB, it's just too damn big
@@ -441,9 +453,10 @@ class Riksdagen(FixedLayoutSource):
         else:
             # fp points to a HTML file, which we can use directly.
             # fp will be a raw bitstream of a latin-1 file.
-            if hasattr(fp, 'name'):
-                self.log.debug("%s: Loading soup from %s" % (basefile, fp.name))
-            else:  # fp contains some sort of placeholder text generated in download_to_intermediate
+            try:
+                filename = util.name_from_fp(fp)
+                self.log.debug("%s: Loading soup from %s" % (basefile, filename))
+            except ValueError:
                 self.log.debug("%s: Loading placeholder soup" % (basefile))
             return BeautifulSoup(fp.read(), "lxml")
 
