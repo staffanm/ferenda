@@ -6,13 +6,14 @@ import os
 from datetime import datetime
 from six.moves.urllib_parse import urljoin
 
-import rdflib
+from rdflib import URIRef, Literal, Graph, Namespace
 from rdflib.namespace import SKOS, DCTERMS, DC, RDF, XSD
-BIBO = rdflib.Namespace("http://purl.org/ontology/bibo/")
+BIBO = Namespace("http://purl.org/ontology/bibo/")
 from bs4 import BeautifulSoup
+import lxml.html
 
 from ferenda import PDFAnalyzer, CompositeRepository, DocumentEntry, PDFDocumentRepository
-from ferenda import util
+from ferenda import util, decorators
 from ferenda.pdfreader import StreamingPDFReader
 from . import Regeringen, SwedishLegalSource, RPUBL
 from .swedishlegalsource import offtryck_gluefunc, offtryck_parser
@@ -66,9 +67,50 @@ class SOUKB(SwedishLegalSource, PDFDocumentRepository):
     rdf_type = RPUBL.Utredningsbetankande
     urispace_segment = "utr/sou"
 
+    def download(self, basefile=None):
+        if basefile:
+            resp = self.session.get(self.start_url)
+            tree = lxml.html.document_fromstring(resp.text)
+            tree.make_links_absolute(self.start_url, resolve_base_href=True)
+            source = tree.iterlinks()
+            # 1. look through download_get_basefiles for basefile
+            for (b, url) in self.download_get_basefiles(source):
+                if b == basefile:
+                    return self.download_single(basefile, url)
+            else:
+                self.log.error("%s: Couldn't find requested basefile" % basefile)
+                
+        else:
+             return super(SOUKB, self).download()
+         
+
+    @decorators.downloadmax
+    def download_get_basefiles(self, source):
+        # extended verision that also yields the link title on the
+        # assumption that this is valuable to download_single
+        yielded = set()
+        if self.download_reverseorder:
+            source = reversed(list(source))
+        for (element, attribute, link, pos) in source:
+            basefile = None
+
+            # Two step process: First examine link text to see if
+            # basefile_regex match. If not, examine link url to see
+            # if document_url_regex
+            if (self.basefile_regex and
+                element.text and
+                    re.search(self.basefile_regex, element.text)):
+                m = re.search(self.basefile_regex, element.text)
+                basefile = m.group("basefile")
+            if basefile and (basefile, link) not in yielded:
+                yielded.add((basefile, link))
+                yield (basefile, (link, element.tail.strip()))
+
     def download_single(self, basefile, url):
+        # url is really a 2-tuple
+        url, title = url
         resp = self.session.get(url)
-        soup = BeautifulSoup(resp.text)
+        soup = BeautifulSoup(resp.text, "lxml")
         pdfurl = soup.find("a", href=re.compile(".*\.pdf$")).get("href")
         
         thumburl = urljoin(url, soup.find("img", "tumnagel").get("src"))
@@ -76,7 +118,7 @@ class SOUKB(SwedishLegalSource, PDFDocumentRepository):
         rdfurl = "http://data.libris.kb.se/open/bib/%s.rdf" % librisid
         filename = self.store.downloaded_path(basefile)
         created = not os.path.exists(filename)
-        if self.download_if_needed(pdfurl, basefile):
+        if self.download_if_needed(pdfurl, basefile) or self.config.refresh:
             if created:
                 self.log.info("%s: downloaded from %s" % (basefile, pdfurl))
             else:
@@ -84,19 +126,35 @@ class SOUKB(SwedishLegalSource, PDFDocumentRepository):
                     "%s: downloaded new version from %s" % (basefile, pdfurl))
             updated = True
             try:
+                # it appears that certain URLs (like curl
+                # http://data.libris.kb.se/open/bib/8351225.rdf)
+                # sometimes return an empty response. We should check
+                # and warn for this (and infer a minimal RDF by
+                # hand from what we can, eg dc:title from the link
+                # text)
+                rdffilename = self.store.downloaded_path(basefile, attachment="metadata.rdf")
                 self.download_if_needed(rdfurl, basefile,
-                                        filename=self.store.downloaded_path(
-                        basefile, attachment="metadata.rdf"))
+                                        filename=rdffilename)
+                if os.path.getsize(rdffilename) == 0:
+                    self.log.warning("%s: %s returned 0 response, infer RDF" %
+                                     (basefile, rdfurl))
+                    base = URIRef("http://libris.kb.se/resource/bib/%s" %
+                                  librisid)
+                    fakegraph = Graph()
+                    fakegraph.bind("dc", str(DC))
+                    fakegraph.add((base, DC.title, Literal(title, lang="sv")))
+                    year = basefile.split(":")[0] # Libris uses str type
+                    fakegraph.add((base, DC.date, Literal(year)))
+                    with open(rdffilename, "wb") as fp:
+                        fakegraph.serialize(fp, format="pretty-xml")
                 self.download_if_needed(thumburl, basefile,
                                         filename=self.store.downloaded_path(
                         basefile, attachment="thumb.jpg"))
             except requests.exceptions.HTTPError as e:
                 self.log.error("Failed to load attachment: %s" % e)
                 raise
-                
         else:
             self.log.debug("%s: exists and is unchanged" % basefile)
-
         entry = DocumentEntry(self.store.documententry_path(basefile))
         now = datetime.now()
         entry.orig_url = url  # or pdfurl?
@@ -130,14 +188,14 @@ class SOUKB(SwedishLegalSource, PDFDocumentRepository):
         return None  # "rawhead" is never used
         
     def extract_metadata(self, rawhead, basefile):
-        sourcegraph = rdflib.Graph().parse(self.store.downloaded_path(
+        sourcegraph = Graph().parse(self.store.downloaded_path(
             basefile, attachment="metadata.rdf"))
         rooturi = sourcegraph.value(predicate=RDF.type, object=BIBO.Book)
         title = sourcegraph.value(subject=rooturi, predicate=DC.title)
         issued = sourcegraph.value(subject=rooturi, predicate=DC.date)
         if isinstance(issued, str):
             assert len(issued) == 4, "expected issued date as single 4-digit year, got %s" % issued
-            issued = rdflib.Literal(util.gYear(int(issued)), datatype=XSD.gYear)
+            issued = Literal(util.gYear(int(issued)), datatype=XSD.gYear)
         attribs = self.metadata_from_basefile(basefile)
         attribs["dcterms:title"] = title
         attribs["dcterms:issued"] = issued

@@ -580,10 +580,13 @@ class SFS(Trips):
 
     def basefile_from_uri(self, uri):
         basefile = super(SFS, self).basefile_from_uri(uri)
+        if not basefile:
+            return
         # remove any possible "/konsolidering/2015:123" trailing info
-        if basefile:
-            return basefile.split("/")[0]
-    
+        basefile = basefile.split("/")[0]
+        # "1874:26 s.11" -> <https://lagen.nu/sfs/1874:26s.11> -> "1874:26 s.11"
+        basefile = basefile.replace("s.", " s.")
+        return basefile
 
     def metadata_from_basefile(self, basefile):
         """Construct the basic attributes, in dict form, for a given
