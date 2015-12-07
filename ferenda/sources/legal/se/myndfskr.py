@@ -34,6 +34,9 @@ PROV = Namespace(util.ns['prov'])
 # FixedLayoutSource even though the goals of that repo is very similar
 # to most MyndFskrBase derived repos. Also, there are repos that do
 # not contain PDF files (DVFS).
+
+class RequiredTextMissing(errors.ParseError): pass
+
 class MyndFskrBase(SwedishLegalSource):
 
     """A abstract base class for fetching and parsing regulations from
@@ -236,12 +239,20 @@ class MyndFskrBase(SwedishLegalSource):
 
 
         reader = self.textreader_from_basefile(doc.basefile)
-        self.parse_metadata_from_textreader(reader, doc)
+        try:
+            self.parse_metadata_from_textreader(reader, doc)
+        except RequiredTextMissing:
+            if self.might_need_ocr:
+                self.log.warning("%s: reprocessing using OCR" % doc.basefile)
+                reader = self.textreader_from_basefile(doc.basefile, force_ocr=True)
+                self.parse_metadata_from_textreader(reader, doc)
+            else:
+                raise
         self.parse_document_from_textreader(reader, doc)
         self.parse_entry_update(doc)
         return True  # Signals that everything is OK
 
-    def textreader_from_basefile(self, basefile):
+    def textreader_from_basefile(self, basefile, force_ocr=False):
         infile = self.store.downloaded_path(basefile)
         tmpfile = self.store.path(basefile, 'intermediate', '.pdf')
         outfile = self.store.path(basefile, 'intermediate', '.txt')
@@ -255,10 +266,11 @@ class MyndFskrBase(SwedishLegalSource):
             # check to see if the outfile actually contains any text. It
             # might just be a series of scanned images.
             text = util.readfile(outfile)
-            if not text.strip():
+            if not text.strip() or force_ocr:
                 os.unlink(outfile)
                 # OK, it's scanned images. We extract these, put them in a
                 # tif file, and OCR them with tesseract.
+                self.log.debug("%s: No text in PDF, trying OCR" % basefile)
                 p = PDFReader()
                 p._tesseract(tmpfile, os.path.dirname(outfile), "swe", False)
                 tmptif = self.store.path(basefile, 'intermediate', '.tif')
@@ -268,8 +280,16 @@ class MyndFskrBase(SwedishLegalSource):
         # just watermarks or leftovers from the scanning toolchain,
         # and that the real text is in non-OCR:ed images.
         if len(text) / (text.count("\x0c") + 1) < 50:
-            self.log.warning("%s: Extracted text from PDF is suspiciously short (%s bytes per page, %s total)" %
-                             (basefile, len(text) / text.count("\x0c") + 1, len(text)))
+            self.log.warning("%s: Extracted text from PDF suspiciously short "
+                             "(%s bytes per page, %s total)" %
+                             (basefile,
+                              len(text) / text.count("\x0c") + 1,
+                              len(text)))
+            # parse_metadata_from_textreader will raise an error if it
+            # can't find what it needs, at which time we might
+            # consider OCR:ing
+            self.might_need_ocr = True 
+
         util.robust_remove(tmpfile)
         text = self.sanitize_text(text, basefile)
         return TextReader(string=text, encoding=self.source_encoding,
@@ -341,7 +361,8 @@ class MyndFskrBase(SwedishLegalSource):
                            (doc.basefile, pagecount))
 
         if 'rpubl:beslutsdatum' not in props:
-            raise errors.ParseError(
+            # raise errors.ParseError(
+            self.log.warning(
                 "%s: Couldn't find required properties on any page, giving up" %
                 doc.basefile)
 
@@ -492,19 +513,22 @@ class MyndFskrBase(SwedishLegalSource):
                 m = re.search('(?P<pub>[A-ZÅÄÖ-]+FS|) ?(?P<year>\d{4}) ?:(?P<ordinal>\d+)',
                               props['dcterms:title'])
                 if not m:
-                    raise errors.ParseError("%s: Couldn't find reference to change act in title %r" %
-                                            (doc.basefile, props['dcterms:title']))
-                parts = m.groupdict()
-                if not parts['pub']:
-                    parts["pub"] = props['dcterms:identifier'].split(" ")[0]
+                    # raise errors.ParseError(
+                    self.log.warning(
+                        "%s: Couldn't find reference to change act in title %r" %
+                        (doc.basefile, props['dcterms:title']))
+                else:
+                    parts = m.groupdict()
+                    if not parts['pub']:
+                        parts["pub"] = props['dcterms:identifier'].split(" ")[0]
 
-                origuri = makeurl({'rdf:type': RPUBL.Myndighetsforeskrift,
-                                   'rpubl:forfattningssamling':
-                                   self.lookup_resource(parts["pub"], SKOS.altLabel),
-                                   'rpubl:arsutgava': parts["year"],
-                                   'rpubl:lopnummer': parts["ordinal"]})
-                desc.rel(RPUBL.andrar,
-                         URIRef(origuri))
+                    origuri = makeurl({'rdf:type': RPUBL.Myndighetsforeskrift,
+                                       'rpubl:forfattningssamling':
+                                       self.lookup_resource(parts["pub"], SKOS.altLabel),
+                                       'rpubl:arsutgava': parts["year"],
+                                       'rpubl:lopnummer': parts["ordinal"]})
+                    desc.rel(RPUBL.andrar,
+                             URIRef(origuri))
 
             # FIXME: is this a sensible value for rpubl:upphaver
             if (re.search('^(Föreskrifter|[\w ]+s föreskrifter) om upphävande '
@@ -1355,8 +1379,10 @@ class SOSFS(MyndFskrBase):
                 reader.readpage()
                 page += 1
         except IOError:   # read past end of file
-            raise errors.ParseError("%s: Could not find a proper first page" %
-                                    doc.basefile)
+            util.robust_remove(self.store.path(doc.basefile,
+                                               'intermediate', '.txt'))
+            raise RequiredTextMissing("%s: Could not find proper first page" %
+                                      doc.basefile)
         return super(SOSFS, self).parse_metadata_from_textreader(reader, doc)
 
 

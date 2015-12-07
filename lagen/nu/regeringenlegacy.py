@@ -34,7 +34,13 @@ class RegeringenLegacy(Regeringen):
     def extract_metadata(self, rawhead, basefile):
         content = rawhead
         title = content.find("h1").string
-        identifier = content.find("p", "lead").text
+        identifier_node = content.find("p", "lead")
+        if identifier_node:
+            identifier = identifier_node.text
+        else:
+            identifier = ""  # infer_metadata calls infer_identifier
+                             # if this is falsy, which will be good
+                             # enough. No need to warn.
         definitions = content.find("dl", "definitions")
         if definitions:
             for dt in definitions.find_all("dt"):
