@@ -364,19 +364,18 @@ def run(argv, config=None, subcall=False):
             _print_usage()  # also lists enabled modules
         else:
             classname = alias
-            # in order to optimize / cut down on meaningless logs,
-            # check if the class has relate=False set and skip the
-            # relate/toc step in that case
-            # (DocumentRepository.relate_all_setup does the same
-            # check)
-            if (action in ("relate", "toc") and
-                'relate' in config and config.relate is False):
-                log.debug("%s %s: skipping (relate=False)" % (enabled_aliases[alias], action))
-                return False
-            elif (action == "download" and
-                  'download' in config and config.download is False):
-                log.debug("%s %s: skipping (download=False)" % (enabled_aliases[alias], action))
-                return False
+            alias = enabled_aliases.get(alias, alias)
+            # if the selected action exists as a config value and is
+            # False (typed or not), then don't do that action.
+            if alias != "all" and action != "all" and hasattr(config, alias):
+                aliasconfig = getattr(config, alias)
+                if (action in aliasconfig and
+                    getattr(aliasconfig, action) in (False, 'False')):
+                    log.debug("%(alias)s %(action)s: skipping "
+                              "(config.%(alias)s.%(action)s=False)" %
+                              {'alias': alias,
+                               'action': action})
+                    return False
             if action == 'enable':
                 try:
                     return enable(classname)
@@ -445,7 +444,9 @@ def run(argv, config=None, subcall=False):
                             argscopy = argv[2:]  # skip alias and action
                             argscopy.insert(0, action)
                             argscopy.insert(0, alias)
-                            ret.append(_run_class(enabled, argscopy, config))
+                            # why do we use _run_class() here and run() above?
+                            # ret.append(_run_class(enabled, argscopy, config))
+                            ret.append(run(argscopy, config, subcall=True))
                         except Exception as e:
                             log.error("%s %s failed: %s" %
                                       (action, alias, e))
