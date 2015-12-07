@@ -241,8 +241,10 @@ class Regeringen(SwedishLegalSource):
         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
         return a
 
-    blacklist = set([(SOU, "2008:35"),
-                     (DS, "2002:34")])   # 2-column report, uninteresting
+    blacklist = set([(SOU, "2008:35"),  # very atypical report
+                     (DS, "2002:34"),   # 2-column report, uninteresting
+                     (SOU, "2002:11"),  # -""-
+                    ])
 
     def extract_head(self, fp, basefile):
         # Some documents are just beyond usable and/or completely
