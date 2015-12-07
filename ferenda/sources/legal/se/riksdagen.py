@@ -377,14 +377,14 @@ class Riksdagen(FixedLayoutSource):
                                                      attachment="index.pdf")
         downloaded_path_html = self.store.downloaded_path(basefile,
                                                           attachment="index.html")
-        if (not os.path.exists(downloaded_path) and
-            os.path.exists(downloaded_path_html)):
-            # attempt to parse HTML instead
-            return open(downloaded_path_html)
-        else:
-            # just grab the HTML from the XML file itself...
-            tree = etree.parse(self.store.downloaded_path(basefile))
-            html = tree.getroot().find("dokument").find("html")
+        if not os.path.exists(downloaded_path):
+            if os.path.exists(downloaded_path_html):
+                # attempt to parse HTML instead
+                return open(downloaded_path_html)
+            else:
+                # just grab the HTML from the XML file itself...
+                tree = etree.parse(self.store.downloaded_path(basefile))
+                html = tree.getroot().find("dokument").find("html")
             if html is not None:
                 return StringIO(html.text)
             else:
@@ -444,6 +444,9 @@ class Riksdagen(FixedLayoutSource):
 
     def extract_body(self, fp, basefile):
         pdffile = self.store.downloaded_path(basefile, attachment="index.pdf")
+        # fp can now be a pointer to a hocr file, a pdf2xml file,
+        # a html file or a StringIO object containing html taken
+        # from index.xml
         if (os.path.exists(pdffile) and
             not (self.document_type, basefile) in self.metadataonly):
             fp = self.parse_open(basefile)
