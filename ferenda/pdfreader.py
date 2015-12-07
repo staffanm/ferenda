@@ -468,7 +468,7 @@ class PDFReader(CompoundElement):
                             if child.text:
                                 b.append(Textelement(txt(child.text), tag=child.tag))
                             b.append(Textelement(
-                                txt(" ".join([x.text for x in grandchildren])), tag="ib"))
+                                txt(" ".join([x.text or '' for x in grandchildren])), tag="ib"))
                             if child.tail:
                                 b.append(Textelement(txt(child.tail), tag=None))
                         else:

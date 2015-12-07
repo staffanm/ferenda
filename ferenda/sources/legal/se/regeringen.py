@@ -241,12 +241,19 @@ class Regeringen(SwedishLegalSource):
         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
         return a
 
-    blacklist = set([(SOU, "2008:35")])
+    blacklist = set([(SOU, "2008:35"),
+                     (DS, "2002:34")])   # 2-column report, uninteresting
+
     def extract_head(self, fp, basefile):
         # Some documents are just beyond usable and/or completely
         # uninteresting from a legal information point of view. We
         # keep a hardcoded black list to skip these. This is the
         # earliest point at which we can check against that blacklist.
+        # FIXME: we should have a no-semantic-parse fallback that does
+        # no analysis, just attempts to create a viewable
+        # page-oriented HTML representation of the PDF. Maybe that
+        # fallback should even be part of
+        # ferenda.PDFDocumentRepository
         if (self.document_type, basefile) in self.blacklist:
             raise DocumentRemovedError("%s is blacklisted" % basefile,
                                        dummyfile=self.store.parsed_path(basefile))
