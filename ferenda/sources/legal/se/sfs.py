@@ -1400,7 +1400,7 @@ class SFS(Trips):
         # rpubl:lagrum, either directly or through a chain of
         # dcterms:isPartOf statements
         rattsfall = self.time_store_select(store,
-                                           "res/sparql/sfs_rattsfallsref.rq",
+                                           "sparql/sfs_rattsfallsref.rq",
                                            basefile,
                                            None,  # query uses both dv and sfs datasets
                                            "legal cases")
@@ -1451,7 +1451,7 @@ class SFS(Trips):
         # 2. all law sections that has a dcterms:references that matches this
         # (using dcterms:isPartOf).
         inboundlinks = self.time_store_select(store,
-                                              "res/sparql/sfs_inboundlinks.rq",
+                                              "sparql/sfs_inboundlinks.rq",
                                               basefile,
                                               sfsdataset,
                                               "law references")
@@ -1493,7 +1493,7 @@ class SFS(Trips):
         # pprint (stuff)
         # 3. all wikientries that dcterms:description this
         wikidesc = self.time_store_select(store,
-                                          "res/sparql/sfs_wikientries.rq",
+                                          "sparql/sfs_wikientries.rq",
                                           basefile,
                                           None,  # need both mediawiki and sfs contexts
                                           "wiki comments")
@@ -1515,7 +1515,7 @@ class SFS(Trips):
         # NOTE: The SFS RDF data does not yet contain change entries, this query
         # always returns 0 rows
         changes = self.time_store_select(store,
-                                         "res/sparql/sfs_changes.rq",
+                                         "sparql/sfs_changes.rq",
                                          basefile,
                                          sfsdataset,
                                          "change annotations")
@@ -1648,7 +1648,7 @@ class SFS(Trips):
 
                 changes = self.store_select(
                     store,
-                    "res/sparql/sfs_title.rq",
+                    "sparql/sfs_title.rq",
                     uri,
                     self.dataset_uri())
                 if changes:
