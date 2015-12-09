@@ -394,6 +394,8 @@ class Direktiv(CompositeRepository, SwedishLegalSource):
     rdf_type = RPUBL.Kommittedirektiv
     documentstore_class = DirektivStore
 
+    # NB: The same logic as in
+    # ferenda.sources.legal.se.{Regeringen,Riksdagen}.metadata_from_basefile
     # news() needs to be able to compute URI from basefile, so we need
     # to reimplement this logic. Maybe that's stupid as there should
     # already be a distilled RDF file available in

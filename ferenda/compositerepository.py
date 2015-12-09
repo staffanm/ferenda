@@ -27,10 +27,10 @@ class CompositeStore(DocumentStore):
     def list_basefiles_for(self, action, basedir=None):
         if not basedir:
             basedir = self.datadir
-        if action == "parse":
+        if action in ("parse", "news"):
             documents = set()
             for cls, inst in self.docrepo_instances.items():
-                for basefile in inst.store.list_basefiles_for("parse"):
+                for basefile in inst.store.list_basefiles_for(action):
                     self.basefiles[cls].add(basefile)
                     if basefile not in documents:
                         documents.add(basefile)

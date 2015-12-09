@@ -16,12 +16,12 @@ class Ds(Regeringen):
     re_basefile_lax = re.compile(r'(?:Ds|) ?(\d{4}:\d+)', re.IGNORECASE)
     rdf_type = RPUBL.Utredningsbetankande
     document_type = Regeringen.DS
+    urispace_segment = "utr/ds"
 
-    def canonical_uri(self, basefile):
-        year, ordinal = basefile.split(":")
-        attrib = {'rpubl:arsutgava': year,
-                  'rpubl:lopnummer': ordinal,
-                  'rpubl:utrSerie': self.lookup_resource("Ds", SKOS.altLabel),
-                  'rdf:type': self.rdf_type}
-        resource = self.attributes_to_resource(attrib)
-        return self.minter.space.coin_uri(resource) 
+    # NB: The same logic as in
+    # ferenda.sources.legal.se.{Regeringen,Riksdagen}.metadata_from_basefile
+    def metadata_from_basefile(self, basefile):
+        a = super(Ds, self).metadata_from_basefile(basefile)
+        a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
+        a["rpubl:utrSerie"] = self.lookup_resource("Ds", SKOS.altLabel)
+        return a

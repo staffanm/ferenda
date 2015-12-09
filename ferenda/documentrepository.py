@@ -1790,7 +1790,6 @@ parsed document path to that documents dependency file."""
                                     (dep_basefile != basefile)):
                                 # if so, add to that repo's dependencyfile
                                 pp = self.store.parsed_path(basefile)
-                                # from pudb import set_trace; set_trace()
                                 res = repo.add_dependency(dep_basefile, pp)
                                 values['deps'] += 1
                                 break
@@ -2222,7 +2221,11 @@ WHERE {
 
         """
         # FIXME: This might be called with an abundance of repos (25
-        # right now) where only ~5 needed to do the transforming
+        # right now) where only ~5 needed to do the transforming. This
+        # is worsened if calling basefile_from_uri or
+        # dataset_params_from_uri is expensive (like for
+        # SwedishLegalSource-derived repos, which need to load a big
+        # RDF config into self.minter)
 
         # This implementation always transforms URLs to local file
         # paths (or if they can't be mapped, leaves them alone)
@@ -2747,7 +2750,6 @@ WHERE {
                             object_hook=datehook)
         else:
             data = self.faceted_data()
-
             # transform list of dicts into a dict with the uri field as
             # key and teh entire dict as value, for fast lookup in the next step
             datadict = dict([(x['uri'], x) for x in data])
@@ -2756,7 +2758,13 @@ WHERE {
             # decorate datadict with entries
             for entry in self.news_entries():
                 # let's just hope that there always is one?
-                assert entry.id in datadict
+                if entry.id not in datadict:
+                    self.log.warning("%s does not occur in faceted_data, "
+                                     "mismatch between data in docentry files "
+                                     "and data in triplestore" % entry.id)
+                    continue   # ie skip this, since we can't decorate
+                               # the row we skip it altogether
+
                 d = datadict[entry.id]
                 # or maybe we should just stash the DocumentEntry object in the
                 # correct row of the faceted data? like:
@@ -2938,9 +2946,9 @@ WHERE {
                                  (basefile,
                                   self.store.distilled_path(basefile)))
                 continue
-
             # make sure common (and needed) properties are in fact set
-            if not entry.id:
+            if not entry.id or ('forceid' in self.config and
+                                self.config.forceid):
                 entry.id = self.canonical_uri(basefile)
                 dirty = True
             if not entry.url:
@@ -3008,7 +3016,14 @@ WHERE {
                                      feed.title,
                                      feed.slug)
                 if generate_html:
-                    infile = self.store.atom_path(feed.slug)
+                    # NB: infile must be initialized using the same
+                    # method as is used to initialize feedfile in
+                    # news_write_atom/write_file. Right now
+                    # resourcepath is preferrable as it DOESN'T run
+                    # its argument through basefile_to_pathfrag (since
+                    # feed.slug isn't really a basefile)
+                    infile = self.store.resourcepath("feed/%s.atom" % feed.slug)
+                    # infile = self.store.atom_path(feed.slug)
                     outfile = self.store.resourcepath('feed/%s.html' % feed.slug)
                     if self.config.staticsite:
                         uritransform = self.get_url_transform_func(

@@ -417,6 +417,13 @@ class Propositioner(CompositeRepository, SwedishLegalSource):
     rdf_type = RPUBL.Proposition
     documentstore_class = PropositionerStore
 
+    # NB: The same logic as in
+    # ferenda.sources.legal.se.{Regeringen,Riksdagen}.metadata_from_basefile
+    def metadata_from_basefile(self, basefile):
+        a = super(Propositioner, self).metadata_from_basefile(basefile)
+        a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
+        return a
+
     def tabs(self):
         if self.config.tabs:
             return [('Propositioner', self.dataset_uri())]

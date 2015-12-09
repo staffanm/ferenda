@@ -21,6 +21,17 @@ class FacadeSource(CompositeRepository):
     def relate_all_setup(cls, config):
         return False
     
+    def news_entries(self):
+        """reach into subrepos docentries, as subrepos are responsible for
+        generating documents and marking them as published."""
+        # just munging list_basefiles_for won't do, we need basefile +
+        # responsible repo class -- or just a loaded DocumentEntry object
+
+        for cls in self.subrepos:
+            inst = self.get_instance(cls)
+            for entry in inst.news_entries():
+                yield entry
+
     def facet_query(self, context):
         # Override the standard query in order to ignore the default
         # context (provided by .dataset_uri()) since we're going to
@@ -33,7 +44,9 @@ class FacadeSource(CompositeRepository):
         #   (collecting subrepo facets means having subrepo instances
         #   -- but inheriting from CompositeRepository should make
         #   that easy)
-        # 
+        #
+        # NB: Right now this code is never callled, instead each docrepo
+        # that's based on this class override facet_query
         g = self.make_graph()
         predicates = set()
         bindings = set()

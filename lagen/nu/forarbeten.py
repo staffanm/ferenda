@@ -9,9 +9,9 @@ from ferenda import util
 from ferenda import Facet, TocPageset, TocPage
 from ferenda.elements import Link
 from ferenda.sources.legal.se import SwedishLegalSource, RPUBL
-from ferenda.sources.legal.se import Propositioner, SOU, Ds, Direktiv
+# from ferenda.sources.legal.se import Propositioner, SOU, Ds, Direktiv
+from lagen.nu import Propositioner, SOU, Ds, Direktiv
 from .facadesource import FacadeSource
-
 
 class Forarbeten(FacadeSource, SwedishLegalSource):
     """This is a sort of a wrapper repo to provide useful tabs/tocs for set
@@ -25,6 +25,13 @@ class Forarbeten(FacadeSource, SwedishLegalSource):
                   'xhv', 'xsi', 'owl', 'prov', 'bibo',
                   ('rpubl', 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#'),
                   ('rinfoex', 'http://lagen.nu/terms#')]
+
+    # NB: The same logic as in
+    # ferenda.sources.legal.se.{Regeringen,Riksdagen}.metadata_from_basefile
+    def metadata_from_basefile(self, basefile):
+        a = super(Forarbeten, self).metadata_from_basefile(basefile)
+        a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
+        return a
     
     def facet_query(self, context):
         # Override the standard query in order to ignore the default

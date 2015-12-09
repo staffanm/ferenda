@@ -2,12 +2,13 @@
 from __future__ import unicode_literals, print_function
 
 from collections import Counter
+from operator import attrgetter
 
 from rdflib import RDF, URIRef, BNode, Graph
 from rdflib.namespace import DCTERMS, OWL
 from cached_property import cached_property
 
-from ferenda import Facet, Describer, TocPageset, TocPage
+from ferenda import Facet, Describer, TocPageset, TocPage, Feed, Feedset
 from ferenda import fulltextindex, util
 from ferenda.elements import Link
 from ferenda.elements.html import Strong

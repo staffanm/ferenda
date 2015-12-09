@@ -70,6 +70,29 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
                   ('rinfoex', 'http://lagen.nu/terms#')]
     sparql_annotations = None  # until we can speed things up
     documentstore_class = MyndFskrStore
+    urispace_segment = ""
+
+    def metadata_from_basefile(self, basefile):
+        # FIXME: Copied from
+        # ferenda.sources.legal.MyndFskrBase.metadata_from_basefile
+        fs, realbasefile = basefile.split("/")
+        fs = fs.upper()
+        # fs = self._basefile_frag_to_altlabel(fs)
+        fs = myndfskr.MyndFskrBase._basefile_frag_to_altlabel(self, fs)
+        a = super(MyndFskr, self).metadata_from_basefile(basefile)
+        a["rpubl:arsutgava"], a["rpubl:lopnummer"] = realbasefile.split(":", 1)
+        a["rpubl:forfattningssamling"] = self.lookup_resource(fs, SKOS.altLabel)
+        return a
+
+    def basefile_from_uri(self, uri):
+        # FIXME: Adapted from
+        # ferenda.sources.legal.MyndFskrBase.metadata_from_basefile
+        basefile = super(MyndFskr, self).basefile_from_uri(uri)
+        if basefile and basefile.count("/") == 1:
+            basefile = basefile.replace("-", "")
+            fs, realbasefile = basefile.split("/")
+            if fs != "sfs" and fs.endswith("fs"):
+                return basefile
 
     # This custom implementation of download is able to select a
     # particular subrepo and call its download method. That way we

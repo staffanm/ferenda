@@ -262,6 +262,10 @@ class SwedishLegalSource(DocumentRepository):
         uri = self.minter.space.coin_uri(resource)
         # FIXME: temporary code we use while we get basefile_from_uri to work
         computed_basefile = self.basefile_from_uri(uri)
+        if basefile != computed_basefile:
+            from pudb import set_trace; set_trace()
+            computed_basefile = self.basefile_from_uri(uri)
+            
         assert basefile == computed_basefile, "%s -> %s -> %s" % (basefile, uri, computed_basefile)
         # end temporary code
         return uri
@@ -287,24 +291,24 @@ class SwedishLegalSource(DocumentRepository):
         return attribs
 
     def sanitize_basefile(self, basefile):
-        """Given a basefile (typically during the download stage), 
-        make sure it's consistent with whatever rules the repo has 
-        for basefile naming, and sanitize it if it's not proper but
-        still possible to guess what it should be. 
+        """Given a basefile (typically during the download stage), make sure
+        it's consistent with whatever rules the repo has for basefile
+        naming, and sanitize it if it's not proper but still possible
+        to guess what it should be.
         
-        Sanitazion rules may include things like converting 
-        two-digit-years to four digits, removing or adding leading zeroes,
-        case folding etc.
+        Sanitazion rules may include things like converting
+        two-digit-years to four digits, removing or adding leading
+        zeroes, case folding etc.
         
-        Intended  to be overridden by every docrepo that has
-        rules for basefiles. The default implementation returns the basefile 
+        Intended to be overridden by every docrepo that has rules for
+        basefiles. The default implementation returns the basefile
         unchanged.
         
         :param basefile: The basefile to sanitize
         :type basefile: str
         :return: the sanitized basefile
         :rtype: str
-        
+
         """
         # will primarily be used by download to normalize eg "2014:04"
         # to "2014:4" and similar Regeringen.download_get_basefiles

@@ -79,7 +79,6 @@ class SOUKB(SwedishLegalSource, PDFDocumentRepository):
                     return self.download_single(basefile, url)
             else:
                 self.log.error("%s: Couldn't find requested basefile" % basefile)
-                
         else:
              return super(SOUKB, self).download()
          
@@ -222,5 +221,13 @@ class SOU(CompositeRepository):
     alias = "sou"
     rdf_type = RPUBL.Utredningsbetankande
     subrepos = (SOURegeringen, SOUKB)
+    urispace_segment = "utr/sou"
 
+    # NB: The same logic as in
+    # ferenda.sources.legal.se.{Regeringen,Riksdagen}.metadata_from_basefile
+    def metadata_from_basefile(self, basefile):
+        a = super(SOU, self).metadata_from_basefile(basefile)
+        a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
+        a["rpubl:utrSerie"] = self.lookup_resource("SOU", SKOS.altLabel)
+        return a
 
