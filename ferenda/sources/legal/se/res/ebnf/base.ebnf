@@ -33,7 +33,8 @@ Element	            ::= 'mom.'
 SidnrRefID          ::= number
 
 # GRUNDLÄGGANDE BYGGSTENAR
-plain        ::= (Whitespace/word/number/punctuation)
+plain        ::= (Whitespace/word/number/punctuation/other)
+other ::= -(Whitespace/word/number/punctuation)
 Whitespace   ::= [  \t\n\r\f\v]+
 WhitespaceOrPunctuation ::= (Whitespace/punctuation)+
 
