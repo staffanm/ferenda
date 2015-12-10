@@ -392,7 +392,7 @@ class PDFReader(CompoundElement):
         try:
             root = etree.parse(xmlfp).getroot()
         except etree.XMLSyntaxError as e:
-            self.log.warning(
+            self.log.debug(
                 "pdftohtml created incorrect markup, trying to fix using BeautifulSoup: %s" %
                 e)
             xmlfp.seek(0)

@@ -88,6 +88,11 @@ class RegeringenLegacy(Regeringen):
                         rel_identifier = infospan
 
                 if not rel_basefile:
+                    # this often means that a non-standard document
+                    # type is used as preparatory work for this
+                    # document (eg department memos not published in
+                    # Ds, like "S2013/8074/PBB" -- seems to be common
+                    # in Socialdepartementet and Finansdepartementet)
                     self.log.warning(
                         "%s: Couldn't find rel_basefile (elementid #%s) among %r" % (basefile, elementid, infospans))
                     continue

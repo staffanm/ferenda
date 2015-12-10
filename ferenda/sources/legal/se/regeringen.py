@@ -411,11 +411,11 @@ class Regeringen(SwedishLegalSource):
         # precendence
         def _check_differing(describer, predicate, newval):
             if describer.getvalue(predicate) != newval:
-                self.log.warning("%s: HTML page: %s is %r, document: it's %r" %
-                                 (doc.basefile,
-                                  doc.meta.qname(predicate),
-                                  describer.getvalue(predicate),
-                                  newval))
+                self.log.debug("%s: HTML page: %s is %r, document: it's %r" %
+                               (doc.basefile,
+                                doc.meta.qname(predicate),
+                                describer.getvalue(predicate),
+                                newval))
                 # remove old val
                 d.graph.remove((d._current(),
                                 predicate,

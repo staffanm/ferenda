@@ -989,7 +989,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         if (chunk.font.size == metrics.h1.size and txt.startswith("Bilaga ")):
             return True
         elif (int(chunk.font.size) == metrics.default.size and
-              (chunk.left < metrics_leftmargin() or
+              (chunk.right < metrics_leftmargin() or
                chunk.left > metrics_rightmargin())):
             m = re.search("Bilaga (\d)", str(chunk))
             if m:

@@ -876,9 +876,9 @@ class SFS(Trips):
                 # FIXME: Should be done by lagen.nu.SFS
                 d["rinfoex:tidsbegransad"] = val[:10]
             elif key == 'Upphävd':
-                d = datetime.strptime(val[:10], '%Y-%m-%d')
+                dat = datetime.strptime(val[:10], '%Y-%m-%d')
                 d["rpubl:upphavandedatum"] = val[:10]
-                if not self.config.keepexpired and d < datetime.today():
+                if not self.config.keepexpired and dat < datetime.today():
                     raise UpphavdForfattning("%s is an expired SFS" % basefile,
                                              dummyfile=self.store.parsed_path(basefile))
 
@@ -921,9 +921,10 @@ class SFS(Trips):
 
     def sanitize_metadata(self, attribs, basefile):
         attribs = super(SFS, self).sanitize_metadata(attribs, basefile)
-        # FIXME: Needs to be recursive
-        for k in "dcterms:creator", "rpubl:departement":
-            if k in attribs:
+        for k in attribs:
+            if isinstance(attribs[k], dict):
+                attribs[k] = self.sanitize_metadata(attribs[k], basefile)
+            elif k in ("dcterms:creator", "rpubl:departement"):
                 attribs[k] = self.sanitize_departement(attribs[k])
         return attribs
 

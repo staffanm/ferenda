@@ -968,7 +968,7 @@ class DV(SwedishLegalSource):
             self.lookup_resource(head["Domstol"], cutoff=1)
         except KeyError:
             # lookup URI with fuzzy matching, then turn back to canonical label
-            head["Domstol"] = self.lookup_label(str(self.lookup_resource(head["Domstol"])))
+            head["Domstol"] = self.lookup_label(str(self.lookup_resource(head["Domstol"], warn=False)))
 
         # 3. Convert head['Målnummer'] to a list. Occasionally more than one
         # Malnummer is provided (c.f. AD 1994 nr 107, AD
