@@ -1151,7 +1151,7 @@ class LegalRef:
             attributes['type'] = RPUBL.Rattsfallsreferat
         attributes['rattsfallspublikation'] = URIRef(
             self.namedseries[attributes['domstol']])
-        for crap in ('nja', 'njarattsfall', 'njanotisfall',
+        for crap in ('nja', 'njarattsfall', 'njanotisfall', 'notisfall',
                      'rattsfall', 'domstol'):
             if crap in attributes:
                 del attributes[crap]

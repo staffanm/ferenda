@@ -273,7 +273,15 @@ class Regeringen(SwedishLegalSource):
             identifier = title
             title = ""  # FIXME: hunt for title amongst the PDF file links
         else:
-            identifier = content.find("span", "h1-vignette").text
+            identifier_node = content.find("span", "h1-vignette")
+            if identifier_node:
+                identifier = identifier_node.text
+            else:
+                identifier = ""  # infer_metadata calls
+                                 # infer_identifier if this is falsy,
+                                 # which will be good enough. No need
+                                 # to warn.
+                
         # the <time> element has a datetime attrib with
         # machine-readable timestamp, but this has unwarranted high
         # precision. We'd like to capture just a xsd:YearMonth if
