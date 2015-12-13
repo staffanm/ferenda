@@ -276,10 +276,10 @@ class MyndFskrBase(SwedishLegalSource):
                 tmptif = self.store.path(basefile, 'intermediate', '.tif')
                 util.robust_remove(tmptif)
         text = util.readfile(outfile)
-        # if there's less than 50 chars on each page, chances are it's
+        # if there's less than 100 chars on each page, chances are it's
         # just watermarks or leftovers from the scanning toolchain,
         # and that the real text is in non-OCR:ed images.
-        if len(text) / (text.count("\x0c") + 1) < 50:
+        if len(text) / (text.count("\x0c") + 1) < 100:
             self.log.warning("%s: Extracted text from PDF suspiciously short "
                              "(%s bytes per page, %s total)" %
                              (basefile,
@@ -289,7 +289,8 @@ class MyndFskrBase(SwedishLegalSource):
             # can't find what it needs, at which time we might
             # consider OCR:ing
             self.might_need_ocr = True 
-
+        else:
+            self.might_need_ocr = False
         util.robust_remove(tmpfile)
         text = self.sanitize_text(text, basefile)
         return TextReader(string=text, encoding=self.source_encoding,

@@ -29,6 +29,8 @@ predicate = {"type": RDF.type,
              "sidnummer": RPUBL.sidnummer,
              "lopnummer": RPUBL.lopnummer,
              "law": RPUBL.platsangivelse,  # FIXME: This pred is only proposed
+             "chapter": RPUBL.kapitelnummer,
+             "section": RPUBL.paragrafnummer,
              "piece": RINFOEX.styckenummer,
              "item": RINFOEX.punktnummer,
              "myndighet": DCTERMS.publisher,

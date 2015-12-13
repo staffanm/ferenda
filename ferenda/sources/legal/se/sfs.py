@@ -1627,8 +1627,16 @@ class SFS(Trips):
         return self.store.annotation_path(basefile)
 
     def display_title(self, uri, form="absolute"):
-        # "https://lagen.nu/2010:1770#K1P2S1" => "Lag (2010:1770) om blahonga, 1 kap. 2 § 1 st."
-        parts = legaluri.parse(uri)
+        # "https://lagen.nu/2010:1770#K1P2S1" =>
+        #   "Lag (2010:1770) om blahonga, 1 kap. 2 § 1 st."
+
+        # FIXME: legaluri.parse only works with canonical uris (but
+        # not even correct canonical uris, rather the canonical base
+        # URI, but with old lagen-nu-style fragments). This is a
+        # horrible workaround when using localized uris
+        canonical_uri = uri.replace("https://lagen.nu/sfs/",
+                                    "http://rinfo.lagrummet.se/publ/sfs/")
+        parts = legaluri.parse(canonical_uri)
         res = ""
         for (field, label) in (('chapter', 'kap.'),
                                ('section', '\xa7'),
