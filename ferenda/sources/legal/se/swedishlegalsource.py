@@ -647,7 +647,10 @@ class SwedishLegalSource(DocumentRepository):
         if isinstance(sanitized, PDFReader):
             # If our sanitized body is a PDFReader, it's most likely
             # something that can be handled by the offtryck_parser.
+
             analyzer = self.get_pdf_analyzer(sanitized)
+            if "hocr" in sanitized.filename:
+                analyzer.scanned_source = True
             metrics_path = self.store.path(basefile, 'intermediate',
                                            '.metrics.json')
 
@@ -657,7 +660,7 @@ class SwedishLegalSource(DocumentRepository):
             else:
                 plot_path = None
             self.log.debug("%s: Calculating PDF metrics" % basefile)
-            metrics = analyzer.metrics(metrics_path, plot_path)
+            metrics = analyzer.metrics(metrics_path, plot_path, force=self.config.force)
             if os.environ.get("FERENDA_DEBUGANALYSIS"):
                 pdfdebug_path = self.store.path(basefile, 'intermediate',
                                                 '.debug.pdf')
@@ -786,7 +789,7 @@ class SwedishLegalSource(DocumentRepository):
 
     def frontpage_content(self, primary=False):
         if not self.config.tabs:
-            self.log.info("%s: Not doing frontpage content (config has tabs=False)" % self.alias)
+            self.log.debug("%s: Not doing frontpage content (config has tabs=False)" % self.alias)
             return
         x = self.tabs()[0]
         label = x[0]

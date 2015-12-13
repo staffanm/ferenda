@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import unicode_literals, division
 """A bunch of helper functions for analyzing pdf files."""
 import os
 import logging
 import json
 from io import BytesIO, StringIO
 from itertools import chain
+from math import floor, ceil
 
 from six import text_type as str
 
@@ -84,6 +85,7 @@ class PDFAnalyzer(object):
         # is split into several files, or because the user wants to
         # analyze a bunch of docs in one go).
         self.pdf = pdf
+        self.scanned_source = False
 
     def documents(self):
         """Attempts to distinguish different logical document (eg parts with
@@ -292,29 +294,52 @@ class PDFAnalyzer(object):
 
     # subclasses can (should) add metrics like parindent and secondcolumn
     def analyze_horizontal_margins(self, vcounters):
-        # find the probable left margin = the place where most textboxes start
         vmargins = {}
         pagewidth = vcounters['pagewidth'].most_common(1)[0][0]
-        l = vcounters['leftmargin']
-        r = vcounters['rightmargin']
+        midpage = pagewidth / 2
+        # find the probable left margin = the place where most textboxes start
+        l = self.filterdict(vcounters['leftmargin'], lambda x: x < midpage)
+        r = self.filterdict(vcounters['rightmargin'], lambda x: x > midpage)
         if l:
-            vmargins['leftmargin'] = l.most_common(1)[0][0]
-            assert vmargins['leftmargin'] < pagewidth / \
-                2, "leftmargin shouldn't be on the right hand side of the page"
+            vmargins['leftmargin'] = self.findmargin(l, trunc_func=floor)
         if r:
-            vmargins['rightmargin'] = r.most_common(1)[0][0]
+            vmargins['rightmargin'] = self.findmargin(r, trunc_func=ceil)
         if self.twopage:
-            le = vcounters['leftmargin_even']
-            re = vcounters['rightmargin_even']
+            le = self.filterdict(vcounters['leftmargin_even'], lambda x: x < midpage)
+            re = self.filterdict(vcounters['rightmargin_even'], lambda x: x > midpage)
             if le:
-                vmargins['leftmargin_even'] = le.most_common(1)[0][0]
-                assert vmargins['leftmargin_even'] < pagewidth / \
-                    2, "leftmargin shouldn't be on the right hand side of the page"
+                vmargins['leftmargin_even'] = self.findmargin(le, trunc_func=floor)
             if re:
-                vmargins['rightmargin_even'] = re.most_common(1)[0][0]
+                vmargins['rightmargin_even'] = self.findmargin(re, trunc_func=ceil)
         vmargins['pagewidth'] = max(vcounters['pagewidth'])
         return vmargins
 
+    def filterdict(self, counter, filter_func=None):
+        if filter_func is None:
+            filter_func = lambda x: True
+        newcounter = Counter()
+        for x in counter:
+            if filter_func(x):
+                newcounter[x] = counter[x]
+        return newcounter
+
+    def findmargin(self, counter, trunc_func=round):
+        if not self.scanned_source:
+            return counter.most_common(1)[0][0]
+        else:
+            # Taking most_common() works badly for scanned sources
+            # which might have 14 left edges (le) starting at 101, 13
+            # at 103, 9 at 99 and so on, when the "real" leftmargin is
+            # at 100. A naive way is to "quantize" everything by eg
+            # dividing everything by 4 or 10 or something (ie lowering
+            # resolution), finding the most_common of that.
+            binsize = 10 # FIXME: make configurable or selfadjusting
+            lowres = Counter()
+            for val in counter:
+                lowresbin = trunc_func(val / binsize)
+                lowres[lowresbin * binsize] += counter[val]
+            return lowres.most_common(1)[0][0]
+    
     def fontsize_key(self, fonttuple):
         family, size = fonttuple
         if "Bold" in family:

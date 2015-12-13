@@ -109,7 +109,8 @@ class RegeringenLegacy(Regeringen):
                         altlabel = "Ds"
                     else:
                         self.log.warning(
-                            "Cannot find out what type of document the linked %s is (#%s)" % (rel_identifier, elementid))
+                            "%s: Cannot find out what type of document the linked %s is (#%s)" % (basefile, rel_identifier, elementid))
+                        continue
                     attribs["rpubl:utrSerie"] = self.lookup_resource(altlabel, SKOS.altLabel)
                 elif elementid == "legStep3":
                     attribs["rdf:type"] = RPUBL.Proposition
