@@ -122,7 +122,11 @@ class Regeringen(SwedishLegalSource):
         # (eg. "Prop. 2015/16:64") of each document. However, the URL
         # (eg. http://www.regeringen.se/rattsdokument/proposition/2015/12/prop.-20151664/
         # often contains the same information. But not always...
-        m = re.search("(proposition|departementsserien-och-promemorior|statens-offentliga-utredningar|kommittedirektiv)/\d+/\d+/([a-z]+)\.?-?(\d{4})(\d+)-?/$", url)
+        doctypemap = {"proposition": "prop",
+                      "departementsserien-och-promemorior": "ds",
+                      "statens-offentliga-utredningar": "sou",
+                      "kommittedirektiv": "dir"}
+        m = re.search("(proposition|departementsserien-och-promemorior|statens-offentliga-utredningar|kommittedirektiv)/\d+/\d+/([a-z]*)\.?-?(\d{4})(\d+)-?/$", url)
         if m and (1900 < int(m.group(3)) < 2100):
             (longdoctype, doctype, year, ordinal) = m.groups()
             # The above regex assumes that arsutgava is "2004", not
@@ -131,7 +135,7 @@ class Regeringen(SwedishLegalSource):
                 offset = 4 if ordinal.startswith("1999") else 2
                 year = year + "/" + ordinal[:offset]
                 ordinal = ordinal[offset:]
-            return {'rdf:type': longdoctype,
+            return {'rdf:type': doctypemap[longdoctype],
                     'rpubl:arsutgava': year,
                     'rpubl:lopnummer': ordinal}
         else:
