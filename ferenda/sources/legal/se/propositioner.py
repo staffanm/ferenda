@@ -401,10 +401,9 @@ class PropRiksdagen(Riksdagen):
     rdf_type = RPUBL.Proposition
     document_type = Riksdagen.PROPOSITION
 
+
 # inherit list_basefiles_for from CompositeStore, basefile_to_pathfrag
 # from SwedishLegalStore)
-
-
 class PropositionerStore(CompositeStore, SwedishLegalStore):
     pass
 

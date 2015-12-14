@@ -228,13 +228,13 @@ class DV(SwedishLegalSource):
     def download(self, basefile=None):
         if basefile is not None:
             raise ValueException("DV.download cannot process a basefile parameter")
-        # recurse =~ download everything, which we do if force is
+        # recurse =~ download everything, which we do if refresh is
         # specified OR if we've never downloaded before
         recurse = False
         # if self.config.lastdownload has not been set, it has only
         # the type value, so self.config.lastdownload will raise
         # AttributeError. Should it return None instead?
-        if self.config.force or 'lastdownload' not in self.config:
+        if self.config.refresh or 'lastdownload' not in self.config:
             recurse = True
 
         self.downloadcount = 0  # number of files extracted from zip files
@@ -272,7 +272,7 @@ class DV(SwedishLegalSource):
                     basefile = dirname + "/" + basefile
                 # localpath = self.store.downloaded_path(basefile)
                 localpath = self.store.path(basefile, 'downloaded/zips', '.zip')
-                if os.path.exists(localpath) and not self.config.force:
+                if os.path.exists(localpath) and not self.config.refresh:
                     pass  # we already got this
                 else:
                     util.ensure_dir(localpath)
@@ -301,7 +301,7 @@ class DV(SwedishLegalSource):
 
                 # localpath = self.store.downloaded_path(basefile)
                 localpath = self.store.path(basefile, 'downloaded/zips', '.zip')
-                if os.path.exists(localpath) and not self.config.force:
+                if os.path.exists(localpath) and not self.config.refresh:
                     pass  # we already got this
                 else:
                     absolute_url = urljoin(url, link)

@@ -117,20 +117,41 @@ class Regeringen(SwedishLegalSource):
                     raise e
 
     def attribs_from_url(self, url):
-        # this assumes that arsutgava is "2004", not "2004/05"
-        m = re.search("/([a-z]+)\.?-?(\d{4})(\d+)-?/$", url)
-        if m:
-            (doctype, year, ordinal) = m.groups()
-            if doctype == "prop":
+        # Neither search results nor RSS feeds from regeringen.se
+        # contain textual information about the identifier
+        # (eg. "Prop. 2015/16:64") of each document. However, the URL
+        # (eg. http://www.regeringen.se/rattsdokument/proposition/2015/12/prop.-20151664/
+        # often contains the same information. But not always...
+        m = re.search("(proposition|departementsserien-och-promemorior|statens-offentliga-utredningar|kommittedirektiv)/\d+/\d+/([a-z]+)\.?-?(\d{4})(\d+)-?/$", url)
+        if m and (1900 < int(m.group(3)) < 2100):
+            (longdoctype, doctype, year, ordinal) = m.groups()
+            # The above regex assumes that arsutgava is "2004", not
+            # "2004/05". For propositioner, do a little extra munging.
+            if longdoctype == "proposition":
                 offset = 4 if ordinal.startswith("1999") else 2
                 year = year + "/" + ordinal[:offset]
                 ordinal = ordinal[offset:]
-            return {'rdf:type': doctype,
+            return {'rdf:type': longdoctype,
                     'rpubl:arsutgava': year,
                     'rpubl:lopnummer': ordinal}
         else:
-            # in the future, download page and look at that
-            raise ValueError("Can't find doc attribs from %s" % url)
+            self.log.debug("Can't find out doc attribs from url %s itself, downloading it..." % url)
+            soup = BeautifulSoup(self.session.get(url).text, "lxml")
+            identifier_node = soup.find("span", "h1-vignette")
+            if identifier_node:
+                identifier = identifier_node.text
+                m = re.search("(prop|dir|sou|ds)\.? ?(\d{4})(|/\d{2,4}):(\d+)",
+                              identifier, flags=re.IGNORECASE)
+                if m:
+                    doctype, y1, y2, ordinal = m.groups()
+                    if y2:
+                        year = "%s%s" % (y1, y2)  # y2 will start with "/"
+                    else:
+                        year = y1
+                    return {'rdf:type': doctype,
+                            'rpubl:arsutgava': year,
+                            'rpubl:lopnummer': ordinal}
+        raise ValueError("Can't find doc attribs from either url %s or the page at that url" % url)
 
     @downloadmax
     def download_get_basefiles(self, params):
@@ -147,12 +168,41 @@ class Regeringen(SwedishLegalSource):
                 url = item.find("link").text
                 try:
                     attribs = self.attribs_from_url(url)
-                    
                     basefile = "%s:%s" % (attribs['rpubl:arsutgava'], attribs['rpubl:lopnummer'])
+                    basefile = self.sanitize_basefile(basefile)
                     yield basefile, url
                 except ValueError as e:
                     self.log.error(e)
             params['page'] = params.get('page', 1) + 1
+
+    # Correct some invalid identifiers spotted in the wild:
+    # 1999/20 -> 1999/2000
+    # 2000/2001 -> 2000/01
+    # 1999/98 -> 1999/2000
+    def sanitize_basefile(self, basefile):
+        if self.document_type == self.PROPOSITION:
+            (y1, y2, idx) = re.split("[:/]", basefile)
+            assert len(
+                y1) == 4, "Basefile %s is invalid beyond sanitization" % basefile
+            if y1 == "1999" and y2 != "2000":
+                sanitized = "1999/2000:" + idx
+                self.log.warning("Basefile given as %s, correcting to %s" %
+                                 (basefile, sanitized))
+            elif (y1 != "1999" and
+                  (len(y2) != 2 or  # eg "2000/001"
+                   int(y1[2:]) + 1 != int(y2))):  # eg "1999/98
+
+                sanitized = "%s/%02d:%s" % (y1, int(y1[2:]) + 1, idx)
+                self.log.warning("Basefile given as %s, correcting to %s" %
+                                 (basefile, sanitized))
+            else:
+                sanitized = basefile
+        else:  # KOMMITTEDIREKTIV, SOU, DS
+            y, idx = basefile.split(":")
+            assert len(y) == 4, "Basefile %s is invalid beyond sanitization" % basefile
+            assert 1900 < int(y) < 2100, "Basefile %s has improbable year %s" % (basefile, y)
+            sanitized = basefile
+        return sanitized
 
 #    # FIXME: Don't know if this can be rewritten for new regeringen.se
 #    def remote_url(self, basefile):
@@ -187,7 +237,7 @@ class Regeringen(SwedishLegalSource):
         filename = self.store.downloaded_path(basefile)  # just the html page
         updated = pdfupdated = False
         created = not os.path.exists
-        if (not os.path.exists(filename) or self.config.force):
+        if (not os.path.exists(filename) or self.config.refresh):
             existed = os.path.exists(filename)
             updated = self.download_if_needed(url, basefile, filename=filename)
             docid = url.split("/")[-1]
@@ -200,7 +250,7 @@ class Regeringen(SwedishLegalSource):
             else:
                 self.log.info("%s: downloaded from %s" % (basefile, url))
 
-            soup = BeautifulSoup(codecs.open(filename, encoding=self.source_encoding))
+            soup = BeautifulSoup(codecs.open(filename, encoding=self.source_encoding), "lxml")
             cnt = 0
             pdffiles = self.find_pdf_links(soup, basefile)
             if pdffiles:
@@ -222,7 +272,7 @@ class Regeringen(SwedishLegalSource):
             else:
                 self.log.debug("%s and all PDF files are unchanged" % filename)
         else:
-            self.log.debug("%s already exists" % (filename))
+            self.log.debug("%s: %s already exists" % (basefile, filename))
 
         entry = DocumentEntry(self.store.documententry_path(basefile))
         now = datetime.now()
