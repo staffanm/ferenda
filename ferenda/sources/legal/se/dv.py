@@ -595,9 +595,9 @@ class DV(SwedishLegalSource):
     def downloaded_to_intermediate(self, basefile):
         docfile = self.store.downloaded_path(basefile)
         if os.path.getsize(docfile) == 0:
-            raise ParseError("%s: Downloaded file %s is empty, %s should have "
-                             "been created by download() but is missing!" %
-                             (basefile, docfile, intermediatefile))
+            raise errors.ParseError("%s: Downloaded file %s is empty, %s should have "
+                                    "been created by download() but is missing!" %
+                                    (basefile, docfile, intermediatefile))
         intermediatefile = self.store.intermediate_path(basefile)
         intermediatefile, filetype = WordReader().read(docfile,
                                                        intermediatefile)
@@ -1202,6 +1202,18 @@ class DV(SwedishLegalSource):
                 delattr(self, "_basefilemap")
 
         # FIXME: temporary code we use while we get basefile_from_uri to work
+
+        # NB: This cannot be made to work 100% as there is not a 1:1
+        # mapping between basefiles and URIs since multiple basefiles
+        # might map to the same URI (those basefiles should be
+        # equivalent though). Examples:
+        # HDO/B883-81_1 -> https://lagen.nu/rf/nja/1982s350 -> HDO/B882-81_1
+        # HFD/1112-14 -> https://lagen.nu/rf/hfd/2014:35 -> HFD/1113-14
+        #
+        # We might be able to minimize errors by simply refusing to
+        # parse one of the two basefiles (assuming that they are
+        # equivalent) if self._basefilemap tells us that there is
+        # another (and that that one is parsed)
         computed_basefile = self.basefile_from_uri(doc.uri)
         assert doc.basefile == computed_basefile, "%s -> %s -> %s" % (doc.basefile, doc.uri, computed_basefile)
 

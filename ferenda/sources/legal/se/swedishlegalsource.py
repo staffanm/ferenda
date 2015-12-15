@@ -263,7 +263,6 @@ class SwedishLegalSource(DocumentRepository):
         # FIXME: temporary code we use while we get basefile_from_uri to work
         computed_basefile = self.basefile_from_uri(uri)
         if basefile != computed_basefile:
-            from pudb import set_trace; set_trace()
             computed_basefile = self.basefile_from_uri(uri)
             
         assert basefile == computed_basefile, "%s -> %s -> %s" % (basefile, uri, computed_basefile)
@@ -593,6 +592,7 @@ class SwedishLegalSource(DocumentRepository):
                                            self.minter,
                                            self.commondata,
                                            allow_relative=self.parse_allow_relative)
+
             body = parser.parse_recursive(body)
         return body
 
@@ -680,8 +680,7 @@ class SwedishLegalSource(DocumentRepository):
                 preset = 'default'
             parser = offtryck_parser(basefile, metrics=metrics, preset=preset,
                                      identifier=self.infer_identifier(basefile),
-                                     debug=os.environ.get('FERENDA_FSMDEBUG', 0)            )
-            parser.debug = os.environ.get('FERENDA_FSMDEBUG', False)
+                                     debug=os.environ.get('FERENDA_FSMDEBUG', 0))
             return parser.parse
         else:
             def default_parser(iterable):
@@ -895,12 +894,13 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     # another mutable variable, which is accessible from the nested
     # functions
     state = LayeredConfig(Defaults({'pageno': 0,
+                                    'page': None,
                                     'appendixno': None,
                                     'preset': preset}))
     def is_pagebreak(parser):
         return isinstance(parser.reader.peek(), Page)
 
-    # page numbers, headings.
+    # page numbers, headers
     def is_nonessential(parser):
         chunk = parser.reader.peek()
         strchunk = str(chunk).strip()
@@ -923,7 +923,11 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                 strchunk.startswith(parser.current_identifier)):
             # print("%s on p %s is deemed nonessential" % (str(chunk), state.pageno))
             return True
-
+        # the first page of a prop has it in the right margin, with larger font
+        if (state.pageno == 1 and chunk.left > metrics_rightmargin() and
+            strchunk == parser.current_identifier):
+            return True
+        
         # Direktiv first page has a similar identifier, but it starts
         # slightly before the right margin (hence +10), and is set in larger type.
         if (chunk.left + 10 < metrics_rightmargin() and
@@ -935,15 +939,41 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         return isinstance(
             parser.reader.peek(), Page) and state.preset == "sou" and state.pageno < 2
 
+    def is_prophuvudrubrik(parser):
+        if state.pageno != 1:
+            return False
+        chunk = parser.reader.peek()
+        if chunk.font.size >= metrics.h1.size:
+            strchunk = str(chunk).strip()
+            if re.match("Regeringens proposition \d{4}(|/\d{2,4}):\d+", strchunk):
+                return True
+
+    def is_proprubrik(parser):
+        if state.pageno != 1:
+            return False
+        chunk = parser.reader.peek()
+        if (chunk.top < state.page.height / 4 and
+            chunk.font.size > metrics.default.size):
+            strchunk = str(chunk).strip()
+            if not re.match("(Prop. \d{4}(|/\d{2,4}):\d+|Propositionens huvudsakliga innehåll)", strchunk):
+                return True
+
     def is_preamblesection(parser):
         chunk = parser.reader.peek()
         if isinstance(chunk, Page):
             return False
         txt = str(chunk).strip()
-        fontsize = int(chunk.font.size)
-        if not metrics.h2.size <= fontsize <= metrics.h1.size:
+        # Current pdfanalyzer yields a too small metrics.h2 size for
+        # propositioner (metrics.h2.size = 17, but should be 23, at
+        # least for prop. 2005/06:173. And since this is hardcoded to
+        # recognize a fixed set of headings we could just make sure
+        # the font is bigger than defalt
+        # 
+        # if not metrics.h2.size <= fontsize <= metrics.h1.size:
+        #     return False
+        if chunk.font.size <= metrics.default.size:
             return False
-
+        
         for validheading in ('Propositionens huvudsakliga innehåll',
                              'Innehållsförteckning',
                              'Till statsrådet',
@@ -1006,6 +1036,12 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     def make_body(parser):
         return p.make_children(Body())
     setattr(make_body, 'newstate', 'body')
+
+    def make_prophuvudrubrik(parser):
+        return PropHuvudrubrik(str(parser.reader.next()).strip())
+
+    def make_proprubrik(parser):
+        return PropRubrik(str(parser.reader.next()).strip())
 
     def make_paragraph(parser):
         # if "Regeringen beslutade den 8 april 2010 att" in str(parser.reader.peek()):
@@ -1077,37 +1113,44 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     def skip_pagebreak(parser):
         # increment pageno
         state.pageno += 1
-        parser.reader.next()
+        state.page = parser.reader.next()
         sb = Sidbrytning()
         sb.ordinal = state.pageno
         return sb
 
     re_sectionstart = re.compile("^(\d[\.\d]*) +(.*[^\.])$").match
 
-    def analyze_sectionstart(parser, textbox=None):
+    def analyze_sectionstart(parser, chunk=None):
         """returns (ordinal, headingtype, text) if it looks like a section
-        heading, (None, None, textbox) otherwise.
+        heading, (None, None, chunk) otherwise.
 
         """
-
-        if not textbox:
-            textbox = parser.reader.peek()
-        # the font size and family should be defined
+        if not chunk:
+            chunk = parser.reader.peek()
         found = False
-        for h in ('h1', 'h2', 'h3'):
-            h_metrics = getattr(metrics, h)
-            if h_metrics.size == textbox.font.size and h_metrics.family == textbox.font.family:
-                found = h
-        if not found:
-            return (None, None, textbox)
-        txt = str(textbox)
-        m = re_sectionstart(txt)
+
+        # FIXME: Current pdfanalyzer yields a too small size metrics
+        # for propositioner (c.f. the commment in
+        # is_preamblesection). Just make sure the font is bigger than
+        # default.
+        # 
+        # for h in ('h1', 'h2', 'h3'):
+        #     h_metrics = getattr(metrics, h)
+        #     if h_metrics.size == chunk.font.size and h_metrics.family == chunk.font.family:
+        #         found = h
+        # if not found:
+        #     return (None, None, chunk)
+        if chunk.font.size <= metrics.default.size:
+            return (None, None, chunk)
+        strchunk = str(chunk)
+        m = re_sectionstart(strchunk)
         if m:
             ordinal = m.group(1).rstrip(".")
             title = m.group(2)
-            return (ordinal, found, title.strip())
+            headingtype = "h" + str(ordinal.count(".") + 1)
+            return (ordinal, headingtype, title.strip())
         else:
-            return (None, found, textbox)
+            return (None, found, chunk)
 
     def metrics_leftmargin():
         if state.pageno % 2 == 0:  # even page
@@ -1126,6 +1169,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     recognizers = [is_pagebreak,
                    is_appendix,
                    is_nonessential,
+                   is_prophuvudrubrik,  # maybe only when preset="prop"?
+                   is_proprubrik,       # -""-
                    is_section,
                    is_subsection,
                    is_subsubsection,
@@ -1146,6 +1191,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                        (commonstates, is_paragraph): (make_paragraph, None),
                        ("body", is_coverpage): (make_coverpage, "coverpage"),
                        ("body", is_preamblesection): (make_preamblesection, "preamblesection"),
+                       ("body", is_prophuvudrubrik): (make_prophuvudrubrik, None),
+                       ("body", is_proprubrik): (make_proprubrik, None),
                        ("coverpage", is_coverpage): (False, None),
                        ("coverpage", is_preamblesection): (False, None),
                        ("coverpage", is_paragraph): (make_paragraph, None),
@@ -1240,7 +1287,6 @@ class SwedishCitationParser(CitationParser):
             return [string]
         # basic normalization without stripping
         string = string.replace("\r\n", " ").replace("\n", " ").replace("\x00","")
-
         # transform self._currenturl => attributes.
         # FIXME: we should maintain a self._current_baseuri_attributes
         # instead of this fragile, URI-interpreting, hack.

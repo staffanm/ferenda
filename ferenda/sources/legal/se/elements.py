@@ -281,12 +281,15 @@ class AnonStycke(Paragraph):
 class Sektion(Section):
     pass
 
+class Lagrumskommentar(Section):
+    pass
 
 class Sidbrytning(OrdinalElement):
     def as_xhtml(self, uri, parent_uri=None):
         return E("span", {'id': 'sid%s' % self.ordinal,
                           'class': 'sidbrytning'})
-
+    def as_plaintext(self):
+        return "\n\n"
 
 class PreambleSection(CompoundElement):
     tagname = "div"
@@ -351,4 +354,16 @@ class Appendix(SectionalElement):
 class Coverpage(CompoundElement):
     tagname = "div"
     classname = "coverpage"
+
+    
+class PropHuvudrubrik(UnicodeElement):
+    # this is always something like "Regeringens proposition 2005/06:173"
+    tagname = "h1"
+    classname = "prophuvudrubrik"
+    
+class PropRubrik(CompoundElement):
+    # This is the actual dcterms:title of the document
+    tagname = "h1"  # even though traditionally set in smaller font
+    classname = "proprubrik"
+    # FIXME: make it output a dcterms:title triple?
 

@@ -5,7 +5,7 @@ from copy import copy
 
 from six import text_type as str
 
-from ferenda.elements import LinkSubject
+from ferenda.elements import Link, LinkSubject
 
 
 class CitationParser(object):
@@ -132,7 +132,9 @@ class CitationParser(object):
             nodes = self.parse_string(part, predicate)
             for node in nodes:
                 if isinstance(node, str):
-                    if type(part) == str:
+                    if isinstance(node, Link):
+                        res.append(node)
+                    elif type(part) == str:
                         res.append(node)
                     else:
                         # handle str-derived types by instantiting

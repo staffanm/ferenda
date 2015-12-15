@@ -20,17 +20,16 @@ from bs4 import BeautifulSoup
 from rdflib import URIRef
 from rdflib.namespace import SKOS
 
-from ferenda import Describer
-from ferenda import DocumentEntry
-from ferenda import PDFAnalyzer
+from ferenda import Describer, DocumentEntry, PDFAnalyzer
 from ferenda import util
-from ferenda.decorators import recordlastdownload, downloadmax, action, managedparsing
-from ferenda.elements import Section, Link
+from ferenda.decorators import recordlastdownload, downloadmax
+from ferenda.elements import Section, Link, Body
 from ferenda.pdfreader import PDFReader, Textbox
-from ferenda.errors import DocumentRemovedError, ParseError
-
+from ferenda.errors import DocumentRemovedError
 from . import SwedishLegalSource, RPUBL
-from .swedishlegalsource import offtryck_parser, offtryck_gluefunc, PreambleSection, UnorderedSection
+from .legalref import LegalRef
+from .swedishlegalsource import offtryck_gluefunc
+from .elements import PreambleSection, UnorderedSection, Lagrumskommentar
 
 
 class FontmappingPDFReader(PDFReader):
@@ -62,18 +61,6 @@ class FontmappingPDFReader(PDFReader):
 
 
 class Regeringen(SwedishLegalSource):
-#    DS = 1
-#    KOMMITTEDIREKTIV = 2
-#    LAGRADSREMISS = 3
-#    PRESSMEDDELANDE = 4
-#    PROMEMORIA = 5
-#    PROPOSITION = 6
-#    MINISTERRADSMOTE = 7
-#    SKRIVELSE = 8
-#    SOU = 9
-#    SO = 10
-#    WEBBUTSANDNING = 11
-#    OVRIGA = 12
     RAPPORT = 1341
     DS = 1325
     FORORDNINGSMOTIV = 1326
@@ -456,7 +443,13 @@ class Regeringen(SwedishLegalSource):
         # object (where do we put metrics? On the PDFReader itself?
         return self.read_pdfs(basefile, pdffiles, self._identifier)
 
-    parse_types = []
+    parse_types = (LegalRef.RATTSFALL,
+                   LegalRef.LAGRUM,
+                   LegalRef.KORTLAGRUM,
+                   LegalRef.FORARBETEN,
+#                   LegalRef.EULAGSTIFTNING,
+#                   LegalRef.EURATTSFALL
+    )
 
     def postprocess_doc(self, doc):
         # loop through leading  textboxes and try to find dcterms:identifier,
@@ -533,29 +526,43 @@ class Regeringen(SwedishLegalSource):
             if title_found and identifier_found and issued_found:
                 break
 
-    # FIXME: Hook this up as a visitor function
-    def visit_find_commentary(self, node, state):
-        # Look for a section named Författningskommentar
-        # (or similar), identify each section and which proposed new
-        # regulation it refers to)
-        for i, element in enumerate(node):
-            if isinstance(element, Section) and (element.title == "Författningskommentar"):
-                for j, subsection in enumerate(element):
-                    if hasattr(subsection, 'title'):
-                        # well, find out the id (URI) from the title -- possibly using
-                        # legalref
-                        law = subsection.title
-                        for k, p in enumerate(subsection):
-                            # find out individual paragraphs, create uris for
-                            # them, and annotate the first textbox that might
-                            # contain commentary (ideally, identify set of
-                            # textboxes that comment on a particular
-                            # identifiable section and wrap them in a
-                            # CommentaryOn container)
-                            pass
-                            # print("%s,%s,%s: %s" % (i,j,k,repr(p)))
-        # then maybe look for inline references ("Övervägandena finns
-        # i avsnitt 5.1 och 6" using CitationParser)
+    # FIXME: Hook this up as a visitor function. Also needs to be
+    # callable form
+    def visitor_functions(self, basefile):
+        return [(self.find_commentary, basefile)]
+    
+    def find_commentary(self, node, state):
+        if not isinstance(node, Section) or (node.title != "Författningskommentar"):
+            if isinstance(node, Body):
+                return state
+            else:
+                return None  # visit_node won't call any subnode
+        lawcomments = []
+        for subsection in enumerate(node):
+            if hasattr(subsection, 'title'):
+                lawcomments.append((subsection.title, subsection))
+        if lawcomments == []:  # no subsecs, ie the prop changes a single law
+            lawcomments.append(("Personuppgiftslag (1998:204)", node))
+
+        from pudb import set_trace; set_trace()
+        for law, section in lawcomments:
+            paras = []
+            para = None
+            for subnode in section:
+                text = str(subnode).strip()
+                if len(text) < 20 and text.endswith("§"):
+                    ordinal = ordinal=text.split(" ")[0].strip() # FIXME: be better
+                    para = Lagrumskommentar(title=text,
+                                            ordinal=ordinal)
+                    paras.append(para)
+                else:
+                    if para is None:
+                        paras.append(subnode)
+                    else:
+                        para.append(subnode)
+            # this is kinda risky but wth...
+            section[:] = paras[:]
+                        
 
     def sanitize_identifier(self, identifier):
         pattern = {self.KOMMITTEDIREKTIV: "%s. %s:%s",
