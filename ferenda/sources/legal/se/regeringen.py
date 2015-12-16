@@ -529,31 +529,44 @@ class Regeringen(SwedishLegalSource):
     # FIXME: Hook this up as a visitor function. Also needs to be
     # callable form
     def visitor_functions(self, basefile):
-        return [(self.find_commentary, basefile)]
-    
+        sharedstate = {'basefile': basefile}
+        return [(self.find_primary_law, sharedstate),
+                (self.find_commentary, sharedstate)]
+
+    def find_primary_law(self, node, state):
+        if not isinstance(node, Section) or not node.title.startswith("Förslag till lag om ändring i"):
+            if isinstance(node, Body):
+                return state
+            else:
+                return None  # visit_node won't call any subnode
+        state['primarylaw'] = self._parse_uri_from_text(node.title)
+        self.log.info("%s: find_primary_law finds %s" % (
+            state['basefile'], state['primarylaw']))
+        return None
+
     def find_commentary(self, node, state):
         if not isinstance(node, Section) or (node.title != "Författningskommentar"):
             if isinstance(node, Body):
                 return state
             else:
                 return None  # visit_node won't call any subnode
-        lawcomments = []
-        for subsection in enumerate(node):
+        commentary = []
+        for subsection in node:
             if hasattr(subsection, 'title'):
-                lawcomments.append((subsection.title, subsection))
-        if lawcomments == []:  # no subsecs, ie the prop changes a single law
-            lawcomments.append(("Personuppgiftslag (1998:204)", node))
-
-        from pudb import set_trace; set_trace()
-        for law, section in lawcomments:
+                commentary.append((self._parse_uri_from_text(subsection.title),
+                                   subsection))
+        if commentary == []:  # no subsecs, ie the prop changes a single law
+            assert 'primarylaw' in state, "Författningskommentar does not specify name of law and find_primary_law didn't find it either"
+            commentary.append((state['primarylaw'], node))
+        for law, section in commentary:
             paras = []
             para = None
             for subnode in section:
                 text = str(subnode).strip()
                 if len(text) < 20 and text.endswith("§"):
-                    ordinal = ordinal=text.split(" ")[0].strip() # FIXME: be better
+                    comment_on = self._parse_uri_from_text(text, law)
                     para = Lagrumskommentar(title=text,
-                                            ordinal=ordinal)
+                                            comment_on=comment_on)
                     paras.append(para)
                 else:
                     if para is None:
@@ -563,7 +576,21 @@ class Regeringen(SwedishLegalSource):
             # this is kinda risky but wth...
             section[:] = paras[:]
                         
-
+    def _parse_uri_from_text(self, text, baseuri=None):
+        if baseuri:
+            prevuri = self.refparser._currenturl
+            self.refparser._currenturl = baseuri
+            prevallow = self.refparser._allow_relative
+            self.refparser._allow_relative = True
+        res = self.refparser.parse_string(text)
+        links = [n for n in res if isinstance(n, Link)]
+        assert len(links) == 1, "Found %s links in '%s'" % (
+            len(links), text)
+        if baseuri:
+            self.refparser._currenturl = prevuri
+            self.refparser._allow_relative = prevallow
+        return links[0].uri
+            
     def sanitize_identifier(self, identifier):
         pattern = {self.KOMMITTEDIREKTIV: "%s. %s:%s",
                    self.DS: "%s %s:%s",

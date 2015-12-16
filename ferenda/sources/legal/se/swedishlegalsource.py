@@ -133,6 +133,13 @@ class SwedishLegalSource(DocumentRepository):
         spaceuri = cfg.value(predicate=RDF.type, object=COIN.URISpace)
         return URIMinter(cfg, spaceuri)
 
+    @cached_property
+    def refparser(self):
+        return SwedishCitationParser(LegalRef(*self.parse_types),
+                                     self.minter,
+                                     self.commondata,
+                                     allow_relative=self.parse_allow_relative)
+    
     @property
     def urispace_base(self):
         return self.minter.space.base
@@ -587,13 +594,7 @@ class SwedishLegalSource(DocumentRepository):
             # references in text with LegalRef is done afterwards
             self.visit_node(body, func, initialstate)
         if self.config.parserefs and self.parse_types:
-            # now find references using LegalRef
-            parser = SwedishCitationParser(LegalRef(*self.parse_types),
-                                           self.minter,
-                                           self.commondata,
-                                           allow_relative=self.parse_allow_relative)
-
-            body = parser.parse_recursive(body)
+            body = self.refparser.parse_recursive(body)
         return body
 
     def extract_body(self, fp, basefile):

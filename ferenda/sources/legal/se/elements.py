@@ -281,8 +281,6 @@ class AnonStycke(Paragraph):
 class Sektion(Section):
     pass
 
-class Lagrumskommentar(Section):
-    pass
 
 class Sidbrytning(OrdinalElement):
     def as_xhtml(self, uri, parent_uri=None):
@@ -339,6 +337,14 @@ class UnorderedSection(CompoundElement):
         element.set('typeof', 'bibo:DocumentPart')
         return element
 
+
+class Lagrumskommentar(UnorderedSection):
+    def as_xhtml(self, uri, parent_uri=None):
+        element = super(Lagrumskommentar, self).as_xhtml(uri, parent_uri)
+        if hasattr(self, "comment_on"):
+            element.set("rel", "rinfoex:kommentarTill")
+            element.set("href", self.comment_on)
+        return element
 
 class Appendix(SectionalElement):
     tagname = "div"
