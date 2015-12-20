@@ -173,15 +173,13 @@ class PDFReader(CompoundElement):
             else:  # keep_xml = True
                 pass
 
+        # it's important that we open the file as a bytestream since
+        # we might do byte-level manipulation in _parse_xml.
         if keep_xml == "bz2":
-            # FIXME: explicitly state that encoding is utf-8 (in a
-            # py26 compatible manner
             fp = BZ2File(real_convertedfile)
         else:
-            fp = codecs.open(real_convertedfile, encoding="utf-8")
-
-        res = parser(fp, real_convertedfile)
-
+            fp = open(real_convertedfile, "rb")
+        res = parser(fp)
         fp.close()
         if keep_xml == False:
             os.unlink(convertedfile)
@@ -288,11 +286,16 @@ class PDFReader(CompoundElement):
             self.log.debug("Converting: %s" % cmd)
             (returncode, stdout, stderr) = util.runcmd(cmd,
                                                        require_success=True)
+
+            xmlfile = os.path.splitext(tmppdffile)[0] + ".xml"
+            cmd = "pdffonts %s > %s.fontinfo" % (tmppdffile, xmlfile)
+            self.log.debug("Getting font info: %s" % cmd)
+            (returncode, stdout, stderr) = util.runcmd(cmd,
+                                                       require_success=True)
             # if pdftohtml fails (if it's an old version that doesn't
             # support the fullfontname flag) it still uses returncode
             # 0! Only way to know if it failed is to inspect stderr
             # and look for if the xml file wasn't created.
-            xmlfile = os.path.splitext(tmppdffile)[0] + ".xml"
             if stderr and not os.path.exists(xmlfile):
                 raise errors.ExternalCommandError(stderr)
         finally:
@@ -382,13 +385,70 @@ class PDFReader(CompoundElement):
 
     def _parse_xml(self, xmlfp, dummy=None):
         filename = util.name_from_fp(xmlfp)
+        # first up, try to locate a fontinfo.txt file
+        fontinfo = {}
+        fields = []
+        fonttypemap = {"Type 1": "Type1",
+                       "Type 1C": "Type1C",
+                       "Type 1C (OT)": "Type1C(OT)",
+                       "Type 3": "Type3",
+                       "TrueType (OT)": "TrueType(OT)",
+                       "CID Type 0": "CIDType0",
+                       "CID Type 0C": "CIDType0C",
+                       "CID Type 0C (OT)": "CIDType0C(OT)",
+                       "CID TrueType": "CIDTrueType",
+                       "CID TrueType (OT)": "CIDTrueType(OT)"}
+                       
+        if os.path.exists(filename + ".fontinfo"):
+            with open(filename + ".fontinfo") as fp:
+                for line in fp:
+                    if not fields:
+                        fields = line.split()
+                    elif not line.startswith("-----"):
+                        # remove all spaces in the "type" column by
+                        # knowing possible values
+                        for k in fonttypemap:
+                            if k in line:
+                                line = line.replace(k, fonttypemap[k])
+                        # NOW we can finally split on whitespace
+                        cols = line.split()
+                        if cols[0] not in fontinfo:  # the output from
+                                                     # pdffonts might
+                                                     # include several
+                                                     # fonts with the
+                                                     # same family...
+                            fontinfo[cols[0]] = dict(zip(fields, cols))
         if dummy:
             warnings.warn("filenames passed to _parse_xml are now ignored", DeprecationWarning)
         def txt(element_text):
             return re.sub(r"[\s\xa0\xc2]+", " ", str(element_text))
 
         self.log.debug("Loading %s" % filename)
-
+        
+        if "Custom" in [f.get("encoding") for f in fontinfo.values()]:
+            # the xmlfp might contain 0x03 (ctrl-C) for text nodes
+            # using a custom encoding, where space is really
+            # meant. Also a lot of other chars from 0x04 -- 0x19. It's
+            # a bug in pdftohtml that such invalid chars are
+            # included. Unfortunately, lxml/libxml seem to strip these
+            # invalid chars when parsing, before Textbox.decode can
+            # access it. So we preprocess the bytestream (in-memory --
+            # a custom wrapped codec would be better but more
+            # complicated) to change these to xml numeric character
+            # references
+            from io import BytesIO
+            newfp = BytesIO()
+            for b in xmlfp.read():
+                if b < 0x20 and b not in (0x9, 0xa, 0xd):
+                    # note: We don't use real xml numeric character
+                    # references as "&#3;" is as invalid as a real
+                    # 0x03 byte in XML, instead we double-escape it.
+                    entity = "&amp;#%s;" % b
+                    newfp.write(entity.encode())
+                else:
+                    newfp.write(bytes([b]))
+            newfp.seek(0)
+            xmlfp = newfp
         try:
             root = etree.parse(xmlfp).getroot()
         except etree.XMLSyntaxError as e:
@@ -397,7 +457,6 @@ class PDFReader(CompoundElement):
                 e)
             xmlfp.seek(0)
             from bs4 import BeautifulSoup
-            from io import BytesIO
             soup = BeautifulSoup(xmlfp, "lxml")
             xmlfp = BytesIO(str(soup).encode("utf-8"))
             xmlfp.name = filename
@@ -436,10 +495,13 @@ class PDFReader(CompoundElement):
                     fspec = dict([(k, str(v)) for k, v in element.attrib.items()])
                     # then make it more usable
                     fspec['size'] = int(fspec['size'])
+                    if fontinfo.get(fspec['family']):
+                        # Commmon values: MacRoman, WinAnsi, Custom
+                        fspec['encoding'] = fontinfo[fspec['family']]['encoding']
                     if "+" in fspec['family']:
                         fspec['family'] = fspec['family'].split("+", 1)[1]
                     self.fontspec[fontid] = fspec
-
+                    
                 elif element.tag == 'text':
                     # eliminate "empty" textboxes
                     if element.text and txt(
@@ -483,7 +545,7 @@ class PDFReader(CompoundElement):
             self.append(page)
         self.log.debug("PDFReader initialized: %d pages, %d fontspecs" %
                        (len(self), len(self.fontspec)))
-
+        
     ################################################################
     # Properties and methods relating to the initialized PDFReader
     # object
@@ -676,12 +738,12 @@ class StreamingPDFReader(PDFReader):
             else:  # keep_xml = True
                 pass
 
+        # it's important that we open the file as a bytestream since
+        # we might do byte-level manipulation in _parse_xml.
         if keep_xml == "bz2":
-            # FIXME: explicitly state that encoding is utf-8 (in a
-            # py26 compatible manner
             fp = BZ2File(convertedfile)
         else:
-            fp = codecs.open(convertedfile, encoding="utf-8")
+            fp = open(convertedfile, "rb")
         return fp
 
     def read(self, fp, parser="xml"):
@@ -817,7 +879,33 @@ all text in a Textbox has the same font and size.
         super(Textbox, self).__init__(*args, **kwargs)
 
     def __str__(self):
-        return "".join(self)
+        s = "".join(self)
+        if self._fontspec[self.fontid].get("encoding") == "Custom":
+            return self.decode(s)
+        else:
+            return s
+
+
+    customencoding_map = {}
+    # it seems basic characters are coded in the same order as ascii,
+    # but with a 0x1d offset. 
+    for i in range(0x20, 0x7e):
+        customencoding_map[i - 0x1d] = i
+
+    # assume that the rest is coded using windows-1252 but with a 0x7a
+    # offset. We have no basis for this assumption.
+    for i in range(0x80, 0xff):
+        if i - 0x7a in customencoding_map:
+            # print("would have mapped %s to %s but %s was already in customencoding_map" %
+            #       (chr(i - 0x7a), chr(i), chr(customencoding_map[i - 0x7a])))
+            pass
+        else:
+            customencoding_map[i - 0x7a] = i
+            
+    def decode(self, s):
+        re_xmlcharref = re.compile("&#\d+;")
+        s = re_xmlcharref.sub(lambda m: chr(int(m.group(0)[2:-1])), s)
+        return s.translate(self.customencoding_map)
 
     def __repr__(self):
         # <Textbox 30x18+278+257 "5.1">

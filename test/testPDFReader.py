@@ -204,46 +204,18 @@ class Read(unittest.TestCase):
         self.assertEqual("EUROPEAN COMPUTER MANUFACTURERS ASSOCIATION",
                          util.normalize_space(str(reader[0][1])))
 
-    # should test that defaultglue works as expected and that it
-    # doesn't fuck up the raw textboxes
-    def test_textboxes(self):
+
+    def test_custom_encoding(self):
         try:
-            reader = PDFReader(filename="test/files/pdfreader/sample.pdf",
+            reader = PDFReader(filename="test/files/pdfreader/custom-encoding.pdf",
                                workdir=self.datadir)
         except errors.ExternalCommandError:
             self._copy_sample()
-            reader = PDFReader(filename="test/files/pdfreader/sample.pdf",
+            reader = PDFReader(filename="test/files/pdfreader/custom-encoding.pdf",
                                workdir=self.datadir)
-        # There should be nine raw (nonempty) textboxes
-        self.assertEqual(9, len(reader[0]))
-        self.assertEqual("This is a paragraph that spans three lines. These "
-                         "should be treated as three ", str(reader[0][2]))
-        # But only five logical paragraphs, according to the default
-        # glue function.
+        # textbox 5 and 6 uses a font with a custom encoding, make
+        # sure that this is properly decoded.
         tbs = list(reader.textboxes())
-        self.assertEqual(5, len(tbs))
-        self.assertEqual(63, tbs[2].height)  # lineheight is 21, three
-                                             # lines == 63
-        self.assertEqual(602, tbs[2].width)  # max width of the three
-                                             # lines is 602
-
-        # the <b> tag will be present even though the font used for
-        # this paragraph is Cambria-Bold
-        self.assertEqual("This is a paragraph that is set entirely in bold. "
-                         "Pdftohtml will create a <b> element for the text in "
-                         "this paragraph. ", str(tbs[3]))
-        self.assertEqual(1, len(tbs[3]))  # should only contain a
-                                          # single TextElement, not a
-                                          # leading empty TE
-        self.assertEqual('b', tbs[3][0].tag)
-
-        # the final paragraph should contain only two textelements
-        self.assertEqual('b', tbs[4][0].tag)
-        self.assertEqual(None, tbs[4][1].tag)
-        self.assertEqual(2, len(tbs[4]))
-        
-        
-        # make sure no actual textboxes were harmed in the process
-        self.assertEqual("This is a paragraph that spans three lines. These "
-                         "should be treated as three ", str(reader[0][2]))
-        self.assertEqual(9, len(reader[0]))
+        self.assertEqual("Göran Persson", str(tbs[5]))
+        self.assertEqual("Bosse Ringholm", str(tbs[6]))
+        self.assertEqual("(Finansdepartementet)", str(tbs[7]))
