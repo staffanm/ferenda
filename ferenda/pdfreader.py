@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
-import os
-import logging
-import re
-import itertools
-import codecs
-import tempfile
-from glob import glob
 from bz2 import BZ2File
+from glob import glob
+from io import BytesIO
+import itertools
+import logging
+import os
+import re
+import tempfile
 import warnings
 
 from lxml import etree
@@ -436,7 +436,6 @@ class PDFReader(CompoundElement):
             # a custom wrapped codec would be better but more
             # complicated) to change these to xml numeric character
             # references
-            from io import BytesIO
             newfp = BytesIO()
             for b in xmlfp.read():
                 if b < 0x20 and b not in (0x9, 0xa, 0xd):

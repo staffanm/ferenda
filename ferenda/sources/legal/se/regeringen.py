@@ -43,7 +43,7 @@ class FontmappingPDFReader(PDFReader):
     # This subclass maps one class of fontnames to another by
     # postprocessing the result of parse_xml
 
-    def _parse_xml(self, xmlfp, xmlfilename):
+    def _parse_xml(self, xmlfp):
         super(FontmappingPDFReader, self)._parse_xml(xmlfp)
         for key, val in self.fontspec.items():
             if 'family' in val:
@@ -566,7 +566,8 @@ class Regeringen(SwedishLegalSource):
                 if len(text) < 20 and text.endswith("§"):
                     comment_on = self._parse_uri_from_text(text, law)
                     para = Lagrumskommentar(title=text,
-                                            comment_on=comment_on)
+                                            comment_on=comment_on,
+                                            uri=None)  # the URI is dynamically constructed in Lagrumskommentar.as_xhtml
                     paras.append(para)
                 else:
                     if para is None:

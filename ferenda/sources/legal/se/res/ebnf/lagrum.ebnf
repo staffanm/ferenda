@@ -3,7 +3,11 @@
 #
 sfsrefs              ::= (ExternalRefs/MultipleGenericRefs/ChapterSectionRefs/IndividualChapterSectionRefs/SectionPieceItemRefs/SectionPieceRefs/SectionRefs/SectionPieceExternalRefs/ExternalChapterSectionRefs/PieceAndItemRefs/SectionItemRefs)
 # this list overlaps with GenericRef
-sfsref               ::= (ChangeRef/ExternalRef/ChapterSectionPieceItemRef/ChapterSectionPieceRef/ChapterSectionRef/SectionPieceItemRef/SectionElementRef/SectionPieceRef/SectionSentenceRef/SectionItemRef/ChapterRef/SectionRef/PieceItemRef/PieceRef/SFSNr/LawRef/NamedExternalLawRef)
+sfsref               ::= (ChangeRef/ExternalRef/ChapterSectionPieceItemRef/ChapterSectionPieceRef/ChapterSectionRef/SectionPieceItemRef/SectionElementRef/SectionPieceRef/SectionSentenceRef/SectionItemRef/ChapterRef/SectionRef/PieceItemRef/PieceRef/SFSNr/NamedExternalLawRef)
+
+# NB: LawRef used to be in the above list but that yielded false
+# positives in strings like "Tilläggsdirektiv till Utredningen om en
+# översyn av fondregelverket (Fi 2014:15)"
 
 # testing SectionItemRefAndSectionItemRefs, a ugly special case for string on the form
 # "6 § 1 eller 7 § 1 eller 2 förmånsrättslagen (1970:979)"

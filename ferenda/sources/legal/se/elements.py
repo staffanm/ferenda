@@ -338,12 +338,23 @@ class UnorderedSection(CompoundElement):
         return element
 
 
-class Lagrumskommentar(UnorderedSection):
+class Lagrumskommentar(CompoundElement):
+    tagname = "div"
+    classname = "lagrumskommentar"
+    
     def as_xhtml(self, uri, parent_uri=None):
+        if not self.uri:
+            # FIXME: this will normally create fragments with
+            # extra fragments, ie
+            # 'https://lagen.nu/prop/2013/14:34#2010:1846#P52' --
+            # is that even legal?
+            self.uri = uri + "#kommentar-" + self.comment_on.rsplit("/")[-1]
         element = super(Lagrumskommentar, self).as_xhtml(uri, parent_uri)
         if hasattr(self, "comment_on"):
             element.set("rel", "rinfoex:kommentarTill")
             element.set("href", self.comment_on)
+        if hasattr(self, "title"):
+            element.set("content", self.title)
         return element
 
 class Appendix(SectionalElement):

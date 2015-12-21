@@ -1170,8 +1170,6 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     recognizers = [is_pagebreak,
                    is_appendix,
                    is_nonessential,
-                   is_prophuvudrubrik,  # maybe only when preset="prop"?
-                   is_proprubrik,       # -""-
                    is_section,
                    is_subsection,
                    is_subsubsection,
@@ -1181,6 +1179,10 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                    is_paragraph]
     if preset == "sou":
         recognizers.insert(0, is_coverpage)
+    elif preset == "proposition":
+        recognizers.insert(0, is_proprubrik)
+        recognizers.insert(0, is_prophuvudrubrik)
+        
     p.set_recognizers(*recognizers)
 
     commonstates = ("body", "preamblesection", "section", "subsection",
