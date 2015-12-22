@@ -7,6 +7,8 @@ python:
   - "3.4"
   - "3.5"
 before_install:
+  - sudo add-apt-repository "deb http://archive.ubuntu.com/ubuntu $(lsb_release -sc) universe"
+  - sudo apt-get update
   - sudo apt-get install -qq python-simpleparse antiword poppler-utils tesseract-ocr tesseract-ocr-swe tesseract-ocr-osd tidy
 services:
   - elasticsearch

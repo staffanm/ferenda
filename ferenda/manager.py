@@ -616,7 +616,9 @@ def _load_config(filename=None, argv=None, defaults=None):
     # pertains to global configuration, not docrepo configuration
     # (those have the get_default_options() classmethod).
     global config_loaded
-    assert config_loaded is False, "load_config called more than once!"
+    if config_loaded is not False:
+        # assert config_loaded is False, "load_config called more than once!"
+        getlog().critical("load_config called more than once!")
     
     if not defaults:
         defaults = {'loglevel': 'DEBUG',
