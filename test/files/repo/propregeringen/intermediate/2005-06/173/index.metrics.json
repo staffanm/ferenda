@@ -1,0 +1,21 @@
+{
+    "rightmargin_even": 638,
+    "default": {
+        "size": 16,
+        "family": "TT1172o00"
+    },
+    "pagewidth": 892,
+    "leftmargin_even": 85,
+    "title": {
+        "size": 34,
+        "family": "TT1173o00"
+    },
+    "h1": {
+        "size": 19,
+        "family": "TT117Fo00"
+    },
+    "topmargin": 84,
+    "leftmargin": 85,
+    "bottommargin": 1188,
+    "rightmargin": 638
+}

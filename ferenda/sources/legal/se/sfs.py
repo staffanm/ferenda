@@ -640,7 +640,8 @@ class SFS(Trips):
         t.cuepast('<pre>')
         # remove &auml; et al
         try:
-            # this is the preferred way from py34 onwards. FIXME: Move this to ferenda.compat
+            # this is the preferred way from py34 onwards. FIXME: Move
+            # this to ferenda.compat
             import html
             txt = html.unescape(t.readto('</pre>'))
         except ImportError:

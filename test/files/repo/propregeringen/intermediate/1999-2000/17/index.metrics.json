@@ -1,0 +1,25 @@
+{
+    "rightmargin": 638,
+    "rightmargin_even": 638,
+    "title": {
+        "family": "Times-Roman",
+        "size": 34
+    },
+    "bottommargin": 1185,
+    "leftmargin_even": 85,
+    "leftmargin": 85,
+    "h2": {
+        "family": "Times-Roman",
+        "size": 19
+    },
+    "pagewidth": 892,
+    "default": {
+        "family": "Times-Roman",
+        "size": 16
+    },
+    "topmargin": 80,
+    "h1": {
+        "family": "Times-Roman",
+        "size": 23
+    }
+}
