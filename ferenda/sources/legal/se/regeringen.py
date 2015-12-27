@@ -585,8 +585,10 @@ class Regeringen(SwedishLegalSource):
             self.refparser._allow_relative = True
         res = self.refparser.parse_string(text)
         links = [n for n in res if isinstance(n, Link)]
-        assert len(links) == 1, "Found %s links in '%s'" % (
-            len(links), text)
+        if len(links) != 1:
+            self.log.warning("Found %s links in '%s', expected single link" %
+                             (len(links), text))
+            return None
         if baseuri:
             self.refparser._currenturl = prevuri
             self.refparser._allow_relative = prevallow
