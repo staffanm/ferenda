@@ -153,7 +153,7 @@ class PDFReader(CompoundElement):
             real_convertedfile = convertedfile + ".bz2"
         else:
             real_convertedfile = convertedfile
-
+        print("filename: %s (%s), convertedfile: %s (%s), real_convertedfile: %s (%s)" % (filename, os.path.exists(filename), convertedfile, os.path.exists(convertedfile), real_convertedfile, os.path.exists(real_convertedfile)))
         tmpfilename = os.sep.join([workdir, basename])
         # copying the filename to the workdir is only needed if we use
         # PDFReader._pdftohtml
@@ -172,7 +172,8 @@ class PDFReader(CompoundElement):
                 os.unlink(convertedfile)
             else:  # keep_xml = True
                 pass
-
+        else:
+            print("outfile_is_newer returned True: real_convertedfile: %s (%s)" % (real_convertedfile, os.path.exists(real_convertedfile)))
         # it's important that we open the file as a bytestream since
         # we might do byte-level manipulation in _parse_xml.
         if keep_xml == "bz2":
@@ -257,7 +258,7 @@ class PDFReader(CompoundElement):
                 # two pass coding: First use -c (complex) to extract
                 # background pictures, then use -xml to get easy-to-parse
                 # text with bounding boxes.
-                cmd = "pdftohtml -nodrm -c %s" % tmppdffile
+                cmd = "xpdftohtml -nodrm -c %s" % tmppdffile
                 self.log.debug("Converting with images: %s" % cmd)
                 (returncode, stdout, stderr) = util.runcmd(cmd,
                                                            require_success=True)
@@ -363,7 +364,8 @@ class PDFReader(CompoundElement):
                 for specid, spec in self.fontspec.items():
                     if fontspec == spec:
                         fontid = specid
-                # None was found, create a new
+
+                        # None was found, create a new
                 if not fontid:
                     fontid = str(len(self.fontspec))  # start at 0
                     self.fontspec[fontid] = fontspec

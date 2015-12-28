@@ -1,10 +1,10 @@
 language: python
 python:
-  - "2.6"
-  - "2.7"
+#  - "2.6"
+#  - "2.7"
 #  - "3.2"  # consider unsupporting this version
-  - "3.3"
-  - "3.4"
+#  - "3.3"
+#  - "3.4"
   - "3.5"
 before_install:
   - sudo add-apt-repository "deb http://archive.ubuntu.com/ubuntu $(lsb_release -sc) universe"
@@ -17,8 +17,9 @@ install:
   - if [[ ${TRAVIS_PYTHON_VERSION%%.*} == '3' ]]; then LANG=en_US.UTF-8 pip install -r requirements.py3.txt; fi
   - pip install coveralls
 script:
-  - if [[ $TRAVIS_PYTHON_VERSION == '2.6' ]]; then PYTHONWARNINGS=i coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unittest2 discover test; fi
-  - if [[ $TRAVIS_PYTHON_VERSION != '2.6' ]]; then PYTHONWARNINGS=i coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unittest discover test; fi
+   - if [[ $TRAVIS_PYTHON_VERSION == '2.6' ]]; then PYTHONWARNINGS=i coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unittest2 discover test; fi
+#  - if [[ $TRAVIS_PYTHON_VERSION != '2.6' ]]; then PYTHONWARNINGS=i coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unittest discover test; fi
+  - if [[ $TRAVIS_PYTHON_VERSION != '2.6' ]]; then PYTHONPATH=test PYTHONWARNINGS=i coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unittest -v testPDFReader; fi
 after_success:
   - coveralls
 
