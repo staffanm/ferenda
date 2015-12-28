@@ -13,6 +13,6 @@ install:
   - pip install coveralls
 script:
    - if [[ $TRAVIS_PYTHON_VERSION == '2.6' ]]; then PYTHONWARNINGS=i coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unittest2 discover test; fi
-   - if [[ $TRAVIS_PYTHON_VERSION != '2.6' ]]; then PYTHONPATH=test PYTHONWARNINGS=i coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unites testPDFReader; fi
+   - if [[ $TRAVIS_PYTHON_VERSION != '2.6' ]]; then PYTHONPATH=test PYTHONWARNINGS=i coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unittest testPDFReader; fi
 after_success:
   - coveralls
