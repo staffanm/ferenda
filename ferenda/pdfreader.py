@@ -162,6 +162,7 @@ class PDFReader(CompoundElement):
             util.copy_if_different(filename, tmpfilename)
             # this is the expensive operation
             res = converter(tmpfilename, workdir, **converter_extra)
+            print("contents of workdir %s after conversion: %r" % (workdir, os.listdir(workdir)))
             if keep_xml == "bz2":
                 with open(convertedfile, mode="rb") as rfp:
                     # BZ2File supports the with statement in py27+,
@@ -262,6 +263,8 @@ class PDFReader(CompoundElement):
                 self.log.debug("Converting with images: %s" % cmd)
                 (returncode, stdout, stderr) = util.runcmd(cmd,
                                                            require_success=True)
+                print("1: ran %s (%s), stdout %r, stderr %r" % (cmd, returncode, stdout, stderr))
+                print("contents of %s is now %r" % (workdir, os.listdir(workdir)))
                 # we won't need the html files, or the blank PNG files
                 for f in os.listdir(workdir):
                     if f.startswith(root) and f.endswith(".html"):
@@ -288,17 +291,22 @@ class PDFReader(CompoundElement):
             (returncode, stdout, stderr) = util.runcmd(cmd,
                                                        require_success=True)
 
+            print("2: ran %s (%s), stdout %r, stderr %r" % (cmd, returncode, stdout, stderr))
+            print("contents of %s is now %r" % (workdir, os.listdir(workdir)))
             xmlfile = os.path.splitext(tmppdffile)[0] + ".xml"
-            cmd = "pdffonts %s > %s.fontinfo" % (tmppdffile, xmlfile)
-            self.log.debug("Getting font info: %s" % cmd)
-            (returncode, stdout, stderr) = util.runcmd(cmd,
-                                                       require_success=True)
             # if pdftohtml fails (if it's an old version that doesn't
             # support the fullfontname flag) it still uses returncode
             # 0! Only way to know if it failed is to inspect stderr
             # and look for if the xml file wasn't created.
             if stderr and not os.path.exists(xmlfile):
                 raise errors.ExternalCommandError(stderr)
+
+            cmd = "pdffonts %s > %s.fontinfo" % (tmppdffile, xmlfile)
+            self.log.debug("Getting font info: %s" % cmd)
+            (returncode, stdout, stderr) = util.runcmd(cmd,
+                                                       require_success=True)
+            print("3: ran %s (%s), stdout %r, stderr %r" % (cmd, returncode, stdout, stderr))
+            print("contents of %s is now %r" % (workdir, os.listdir(workdir)))
         finally:
             os.unlink(tmppdffile)
             assert not os.path.exists(tmppdffile), "tmppdffile still there:" + tmppdffile
