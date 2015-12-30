@@ -175,6 +175,8 @@ class Regeringen(SwedishLegalSource):
             (y1, y2, idx) = re.split("[:/]", basefile)
             assert len(
                 y1) == 4, "Basefile %s is invalid beyond sanitization" % basefile
+            assert idx.isdigit(), "Basefile %s has a non-numeric ordinal" % basefile
+            idx = int(idx) # remove any leading zeroes
             if y1 == "1999" and y2 != "2000":
                 sanitized = "1999/2000:" + idx
                 self.log.warning("Basefile given as %s, correcting to %s" %
