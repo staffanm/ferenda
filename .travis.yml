@@ -16,7 +16,7 @@ install:
   - if [[ ${TRAVIS_PYTHON_VERSION%%.*} == '3' ]]; then LANG=en_US.UTF-8 pip install -r requirements.py3.txt; fi
   - pip install coveralls
 script:
-   - if [[ $TRAVIS_PYTHON_VERSION == '2.6' ]]; then PYTHONWARNINGS=i coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unittest2 -v discover test; fi
-   - if [[ $TRAVIS_PYTHON_VERSION != '2.6' ]]; then PYTHONWARNINGS=i coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unittest -v discover test; fi
+   - if [[ $TRAVIS_PYTHON_VERSION == '2.6' ]]; then PYTHONWARNINGS=i coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unittest2 discover -v test; fi
+   - if [[ $TRAVIS_PYTHON_VERSION != '2.6' ]]; then PYTHONWARNINGS=i coverage run --include "ferenda/*py" --omit "ferenda/thirdparty/*" -m unittest discover -v test; fi
 after_success:
   - coveralls
