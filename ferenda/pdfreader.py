@@ -400,9 +400,11 @@ class PDFReader(CompoundElement):
                        "CID Type 0C (OT)": "CIDType0C(OT)",
                        "CID TrueType": "CIDTrueType",
                        "CID TrueType (OT)": "CIDTrueType(OT)"}
-                       
-        if os.path.exists(filename + ".fontinfo"):
-            with open(filename + ".fontinfo") as fp:
+
+        fontinfofile = filename + ".fontinfo"
+        print("Looking for %s (%s)" % (fontinfofile, os.path.exists(fontinfofile)))
+        if os.path.exists(fontinfofile):
+            with open(fontinfofile) as fp:
                 for line in fp:
                     if not fields:
                         fields = line.split()

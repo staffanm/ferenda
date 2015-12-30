@@ -209,7 +209,8 @@ class Read(unittest.TestCase):
         try:
             reader = PDFReader(filename="test/files/pdfreader/custom-encoding.pdf",
                                workdir=self.datadir)
-        except errors.ExternalCommandError:
+        except errors.ExternalCommandError as e:
+            print("test_custom_encoding got ExternalCommandError %s, copying sample and retrying" % e)
             self._copy_sample()
             reader = PDFReader(filename="test/files/pdfreader/custom-encoding.pdf",
                                workdir=self.datadir)
