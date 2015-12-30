@@ -176,11 +176,11 @@ class PDFReader(CompoundElement):
         else:
             # print("outfile_is_newer returned True: real_convertedfile: %s (%s)" % (real_convertedfile, os.path.exists(real_convertedfile)))
             pass
-        # it's important that we open the file as a bytestream since
-        # we might do byte-level manipulation in _parse_xml.
         if not os.path.exists(real_convertedfile):
             print("%s don't exist -- parsing will fail!" % real_convertedfile)
             print("%s has the following files: %s" % (workdir, os.listdir(workdir)))
+        # it's important that we open the file as a bytestream since
+        # we might do byte-level manipulation in _parse_xml.
         if keep_xml == "bz2":
             fp = BZ2File(real_convertedfile)
         else:
@@ -453,7 +453,7 @@ class PDFReader(CompoundElement):
             # complicated) to change these to xml numeric character
             # references
             newfp = BytesIO()
-            for b in xmlfp.read():
+            for b in six.iterbytes(xmlfp.read()):
                 if b < 0x20 and b not in (0x9, 0xa, 0xd):
                     # note: We don't use real xml numeric character
                     # references as "&#3;" is as invalid as a real
@@ -461,7 +461,7 @@ class PDFReader(CompoundElement):
                     entity = "&amp;#%s;" % b
                     newfp.write(entity.encode())
                 else:
-                    newfp.write(bytes([b]))
+                    newfp.write(six.int2byte(b))
             newfp.seek(0)
             xmlfp = newfp
         try:
