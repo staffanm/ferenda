@@ -153,7 +153,7 @@ class PDFReader(CompoundElement):
             real_convertedfile = convertedfile + ".bz2"
         else:
             real_convertedfile = convertedfile
-        print("filename: %s (%s), convertedfile: %s (%s), real_convertedfile: %s (%s)" % (filename, os.path.exists(filename), convertedfile, os.path.exists(convertedfile), real_convertedfile, os.path.exists(real_convertedfile)))
+        # print("filename: %s (%s), convertedfile: %s (%s), real_convertedfile: %s (%s)" % (filename, os.path.exists(filename), convertedfile, os.path.exists(convertedfile), real_convertedfile, os.path.exists(real_convertedfile)))
         tmpfilename = os.sep.join([workdir, basename])
         # copying the filename to the workdir is only needed if we use
         # PDFReader._pdftohtml
@@ -162,7 +162,7 @@ class PDFReader(CompoundElement):
             util.copy_if_different(filename, tmpfilename)
             # this is the expensive operation
             res = converter(tmpfilename, workdir, **converter_extra)
-            print("contents of workdir %s after conversion: %r" % (workdir, os.listdir(workdir)))
+            # print("contents of workdir %s after conversion: %r" % (workdir, os.listdir(workdir)))
             if keep_xml == "bz2":
                 with open(convertedfile, mode="rb") as rfp:
                     # BZ2File supports the with statement in py27+,
@@ -174,9 +174,13 @@ class PDFReader(CompoundElement):
             else:  # keep_xml = True
                 pass
         else:
-            print("outfile_is_newer returned True: real_convertedfile: %s (%s)" % (real_convertedfile, os.path.exists(real_convertedfile)))
+            # print("outfile_is_newer returned True: real_convertedfile: %s (%s)" % (real_convertedfile, os.path.exists(real_convertedfile)))
+            pass
         # it's important that we open the file as a bytestream since
         # we might do byte-level manipulation in _parse_xml.
+        if not os.path.exists(real_convertedfile):
+            print("%s don't exist -- parsing will fail!" % real_convertedfile)
+            print("%s has the following files: %s" % (workdir, os.listdir(workdir)))
         if keep_xml == "bz2":
             fp = BZ2File(real_convertedfile)
         else:
@@ -263,8 +267,8 @@ class PDFReader(CompoundElement):
                 self.log.debug("Converting with images: %s" % cmd)
                 (returncode, stdout, stderr) = util.runcmd(cmd,
                                                            require_success=True)
-                print("1: ran %s (%s), stdout %r, stderr %r" % (cmd, returncode, stdout, stderr))
-                print("contents of %s is now %r" % (workdir, os.listdir(workdir)))
+                # print("1: ran %s (%s), stdout %r, stderr %r" % (cmd, returncode, stdout, stderr))
+                # print("contents of %s is now %r" % (workdir, os.listdir(workdir)))
                 # we won't need the html files, or the blank PNG files
                 for f in os.listdir(workdir):
                     if f.startswith(root) and f.endswith(".html"):
@@ -291,8 +295,8 @@ class PDFReader(CompoundElement):
             (returncode, stdout, stderr) = util.runcmd(cmd,
                                                        require_success=True)
 
-            print("2: ran %s (%s), stdout %r, stderr %r" % (cmd, returncode, stdout, stderr))
-            print("contents of %s is now %r" % (workdir, os.listdir(workdir)))
+            # print("2: ran %s (%s), stdout %r, stderr %r" % (cmd, returncode, stdout, stderr))
+            # print("contents of %s is now %r" % (workdir, os.listdir(workdir)))
             xmlfile = os.path.splitext(tmppdffile)[0] + ".xml"
             # if pdftohtml fails (if it's an old version that doesn't
             # support the fullfontname flag) it still uses returncode
@@ -305,8 +309,8 @@ class PDFReader(CompoundElement):
             self.log.debug("Getting font info: %s" % cmd)
             (returncode, stdout, stderr) = util.runcmd(cmd,
                                                        require_success=True)
-            print("3: ran %s (%s), stdout %r, stderr %r" % (cmd, returncode, stdout, stderr))
-            print("contents of %s is now %r" % (workdir, os.listdir(workdir)))
+            # print("3: ran %s (%s), stdout %r, stderr %r" % (cmd, returncode, stdout, stderr))
+            # print("contents of %s is now %r" % (workdir, os.listdir(workdir)))
         finally:
             os.unlink(tmppdffile)
             assert not os.path.exists(tmppdffile), "tmppdffile still there:" + tmppdffile
@@ -410,7 +414,7 @@ class PDFReader(CompoundElement):
                        "CID TrueType (OT)": "CIDTrueType(OT)"}
         
         fontinfofile = filename + ".fontinfo"
-        print("Looking for %s (%s)" % (fontinfofile, os.path.exists(fontinfofile)))
+        # print("Looking for %s (%s)" % (fontinfofile, os.path.exists(fontinfofile)))
         if os.path.exists(fontinfofile):
             with open(fontinfofile) as fp:
                 for line in fp:
