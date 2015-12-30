@@ -258,7 +258,7 @@ class PDFReader(CompoundElement):
                 # two pass coding: First use -c (complex) to extract
                 # background pictures, then use -xml to get easy-to-parse
                 # text with bounding boxes.
-                cmd = "xpdftohtml -nodrm -c %s" % tmppdffile
+                cmd = "pdftohtml -nodrm -c %s" % tmppdffile
                 self.log.debug("Converting with images: %s" % cmd)
                 (returncode, stdout, stderr) = util.runcmd(cmd,
                                                            require_success=True)
@@ -308,7 +308,7 @@ class PDFReader(CompoundElement):
 
     def _parse_hocr(self, fp, dummy=None):
         if dummy:
-            warnings.warn("filenames passed to _parse_xml are now ignored", DeprecationWarning)
+            warnings.warn("filenames passed to _parse_hocr are now ignored", DeprecationWarning)
         def dimensions(s):
             m = self.re_dimensions(s)
             return m.groupdict()
@@ -400,7 +400,7 @@ class PDFReader(CompoundElement):
                        "CID Type 0C (OT)": "CIDType0C(OT)",
                        "CID TrueType": "CIDTrueType",
                        "CID TrueType (OT)": "CIDTrueType(OT)"}
-
+        
         fontinfofile = filename + ".fontinfo"
         print("Looking for %s (%s)" % (fontinfofile, os.path.exists(fontinfofile)))
         if os.path.exists(fontinfofile):
