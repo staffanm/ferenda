@@ -944,6 +944,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         if state.pageno != 1:
             return False
         chunk = parser.reader.peek()
+        if isinstance(chunk, Page):
+            return False
         if chunk.font.size >= metrics.h1.size:
             strchunk = str(chunk).strip()
             if re.match("Regeringens proposition \d{4}(|/\d{2,4}):\d+", strchunk):
@@ -953,6 +955,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         if state.pageno != 1:
             return False
         chunk = parser.reader.peek()
+        if isinstance(chunk, Page):
+            return False
         if (chunk.top < state.page.height / 4 and
             chunk.font.size > metrics.default.size):
             strchunk = str(chunk).strip()

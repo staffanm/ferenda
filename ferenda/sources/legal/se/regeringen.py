@@ -541,7 +541,7 @@ class Regeringen(SwedishLegalSource):
                 return state
             else:
                 return None  # visit_node won't call any subnode
-        state['primarylaw'] = self._parse_uri_from_text(node.title)
+        state['primarylaw'] = self._parse_uri_from_text(node.title, state['basefile'])
         self.log.info("%s: find_primary_law finds %s" % (
             state['basefile'], state['primarylaw']))
         return None
@@ -555,18 +555,20 @@ class Regeringen(SwedishLegalSource):
         commentary = []
         for subsection in node:
             if hasattr(subsection, 'title'):
-                commentary.append((self._parse_uri_from_text(subsection.title),
+                commentary.append((self._parse_uri_from_text(subsection.title, state['basefile']),
                                    subsection))
         if commentary == []:  # no subsecs, ie the prop changes a single law
-            assert 'primarylaw' in state, "Författningskommentar does not specify name of law and find_primary_law didn't find it either"
-            commentary.append((state['primarylaw'], node))
+            if 'primarylaw' in state:
+                commentary.append((state['primarylaw'], node))
+            else:
+                self.log.warning("%s: Författningskommentar does not specify name of law and find_primary_law didn't find it either" % state['basefile'])
         for law, section in commentary:
             paras = []
             para = None
             for subnode in section:
                 text = str(subnode).strip()
                 if len(text) < 20 and text.endswith("§"):
-                    comment_on = self._parse_uri_from_text(text, law)
+                    comment_on = self._parse_uri_from_text(text, state['basefile'], law)
                     para = Lagrumskommentar(title=text,
                                             comment_on=comment_on,
                                             uri=None)  # the URI is dynamically constructed in Lagrumskommentar.as_xhtml
@@ -579,7 +581,7 @@ class Regeringen(SwedishLegalSource):
             # this is kinda risky but wth...
             section[:] = paras[:]
                         
-    def _parse_uri_from_text(self, text, baseuri=None):
+    def _parse_uri_from_text(self, text, basefile, baseuri=None):
         if baseuri:
             prevuri = self.refparser._currenturl
             self.refparser._currenturl = baseuri
@@ -588,7 +590,7 @@ class Regeringen(SwedishLegalSource):
         res = self.refparser.parse_string(text)
         links = [n for n in res if isinstance(n, Link)]
         if len(links) != 1:
-            self.log.warning("Found %s links in '%s', expected single link" %
+            self.log.warning("%s: Found %s links in '%s', expected single link" %
                              (len(links), text))
             return None
         if baseuri:
