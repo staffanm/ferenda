@@ -232,6 +232,10 @@ class SFS(Trips):
             ret = super(SFS, self).download(basefile)
             self._set_last_sfsnr()
         else:
+            # in this case, super().download is never called so we'll
+            # have to make sure this runs anyway:
+            if self.config.ipbasedurls:
+                self._make_ipbasedurls()
             ret = self.download_new()
         return ret
 

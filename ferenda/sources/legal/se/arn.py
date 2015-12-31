@@ -130,7 +130,7 @@ class ARN(FixedLayoutSource):
                     remaining_attempts -= 1
                     time.sleep(1)
 
-            soup = BeautifulSoup(resp.text)
+            soup = BeautifulSoup(resp.text, "lxml")
             for link in soup.find_all(
                     "input", "standardlink", onclick=re.compile("javascript:window.open")):
                 url = link['onclick'][

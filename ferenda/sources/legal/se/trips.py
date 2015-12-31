@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 # Base class for fetching data from an ancient database system used by
 # swedish gov IT...
+import os
 import re
 from six.moves.urllib_parse import quote
 
@@ -71,23 +72,32 @@ class Trips(SwedishLegalSource):
 
     def download(self, basefile=None):
         if self.config.ipbasedurls:
-            import socket
-            addrs = socket.getaddrinfo("rkrattsbaser.gov.se", 80)
-            # grab the first IPv4 number
-            ip = [addr[4][0] for addr in addrs if addr[0] == socket.AF_INET][0]
-            self.log.warning("Changing rkrattsbaser.gov.se to %s in all URLs" % ip)
-            for p in ('start_url',
-                      'document_url_template',
-                      'document_sfsr_url_template',
-                      'document_sfsr_change_url_template'):
-                if hasattr(self, p):
-                    setattr(self, p,
-                            getattr(self, p).replace('rkrattsbaser.gov.se',
-                                                     ip))
+            self._make_ipbasedurls()
         if basefile:
             return self.download_single(basefile)
+        refresh = self.config.refresh
+        updated = False
         for basefile, url in self.download_get_basefiles(self.download_params):
-            self.download_single(basefile, url)
+            if (refresh or
+                    (not os.path.exists(self.store.downloaded_path(basefile)))):
+                ret = self.download_single(basefile, url)
+                updated = updated or ret
+        return updated
+
+    def _make_ipbasedurls(self):
+        import socket
+        addrs = socket.getaddrinfo("rkrattsbaser.gov.se", 80)
+        # grab the first IPv4 number
+        ip = [addr[4][0] for addr in addrs if addr[0] == socket.AF_INET][0]
+        self.log.warning("Changing rkrattsbaser.gov.se to %s in all URLs" % ip)
+        for p in ('start_url',
+                  'document_url_template',
+                  'document_sfsr_url_template',
+                  'document_sfsr_change_url_template'):
+            if hasattr(self, p):
+                setattr(self, p,
+                        getattr(self, p).replace('rkrattsbaser.gov.se',
+                                                 ip))
 
     @downloadmax
     def download_get_basefiles(self, params):
