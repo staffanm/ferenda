@@ -53,7 +53,7 @@ class Keyword(DocumentRepository):
     alias = "keyword"
     downloaded_suffix = ".txt"
     documentstore_class = KeywordStore
-    xslt_template = "res/xsl/keyword.xsl"
+    xslt_template = "xsl/keyword.xsl"
     rdf_type = Namespace(util.ns['skos']).Concept
     namespaces = ['skos', 'prov', 'dcterms']
 
@@ -237,7 +237,7 @@ class Keyword(DocumentRepository):
         # dcterms:description for this term. FIXME: This isn't a real
         # RDF graph yet.
         wikidesc = self.time_store_select(store,
-                                          "res/sparql/keyword_subjects.rq",
+                                          "sparql/keyword_subjects.rq",
                                           basefile,
                                           None,
                                           "descriptions")

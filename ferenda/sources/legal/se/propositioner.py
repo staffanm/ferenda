@@ -40,7 +40,7 @@ class PropRegeringen(Regeringen):
         r'(?:Prop\.?|) ?(\d{4}/\d{2,4}:\d+)', re.IGNORECASE)
     rdf_type = RPUBL.Proposition
     document_type = Regeringen.PROPOSITION
-    # sparql_annotations = "res/sparql/prop-annotations.rq"
+    # sparql_annotations = "sparql/prop-annotations.rq"
 
 class PropTripsStore(FixedLayoutStore):
     # 1999/94 and 1994/95 has only plaintext (wrapped in .html)
@@ -411,7 +411,7 @@ class PropositionerStore(CompositeStore, SwedishLegalStore):
 class Propositioner(CompositeRepository, SwedishLegalSource):
     subrepos = PropRegeringen, PropTrips, PropRiksdagen
     alias = "prop"
-    xslt_template = "res/xsl/forarbete.xsl"
+    xslt_template = "xsl/forarbete.xsl"
     storage_policy = "dir"
     rdf_type = RPUBL.Proposition
     documentstore_class = PropositionerStore

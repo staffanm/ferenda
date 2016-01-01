@@ -57,7 +57,8 @@ class Transformer(object):
                'JINJA': JinjaTransform}[transformertype]
         if not resourceloader:
             resourceloader = ResourceLoader()
-        self.t = cls(template, templatedir, resourceloader)
+        self.resourceloader = resourceloader
+        self.t = cls(template, templatedir, self.resourceloader)
         self.documentroot = documentroot
         self.config = config
 

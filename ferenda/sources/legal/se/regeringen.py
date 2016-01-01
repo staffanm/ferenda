@@ -77,7 +77,7 @@ class Regeringen(SwedishLegalSource):
     downloaded_suffix = ".html"  # override PDFDocumentRepository
     storage_policy = "dir"
     alias = "regeringen"
-    xslt_template = "res/xsl/forarbete.xsl"
+    xslt_template = "xsl/forarbete.xsl"
     download_accept_404 = True
     session = None
 

@@ -41,12 +41,12 @@ class LNKeyword(keyword.Keyword):
                                     self.config.storelocation,
                                     self.config.storerepository)
         legaldefs = self.time_store_select(store,
-                                          "res/sparql/keyword_sfs.rq",
+                                          "sparql/keyword_sfs.rq",
                                           basefile,
                                           sfsdataset,
                                           "legaldefs")
         rattsfall = self.time_store_select(store,
-                                          "res/sparql/keyword_dv.rq",
+                                          "sparql/keyword_dv.rq",
                                           basefile,
                                           dvdataset,
                                           "legalcases")

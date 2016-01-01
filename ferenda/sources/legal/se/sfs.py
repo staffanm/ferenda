@@ -174,7 +174,7 @@ class SFS(Trips):
         "${HTML}=sfst_lst&${SNHTML}=sfsr_err&${BASE}=SFSR&"
         "${TRIPSHOW}=format=THW&%%C4BET=%(basefile)s")
 
-    xslt_template = "res/xsl/sfs.xsl"
+    xslt_template = "xsl/sfs.xsl"
 
     documentstore_class = SFSDocumentStore
 

@@ -389,7 +389,7 @@ class Direktiv(CompositeRepository, SwedishLegalSource):
     "A composite repository containing ``DirTrips``, ``DirAsp`` and ``DirRegeringen``."""
     subrepos = DirRegeringen, DirAsp, DirTrips
     alias = "dir"
-    xslt_template = "res/xsl/forarbete.xsl"
+    xslt_template = "xsl/forarbete.xsl"
     storage_policy = "dir"
     rdf_type = RPUBL.Kommittedirektiv
     documentstore_class = DirektivStore

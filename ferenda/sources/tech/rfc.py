@@ -72,8 +72,8 @@ class RFC(DocumentRepository):
                   'prov',  # for :wasGeneratedBy
                   ('rfc', 'http://example.org/ontology/rfc/')  # custom (fake) ontology
                   )
-    sparql_annotations = "res/sparql/rfc-annotations.rq"
-    xslt_template = "res/xsl/rfc.xsl"
+    sparql_annotations = "sparql/rfc-annotations.rq"
+    xslt_template = "xsl/rfc.xsl"
     rdf_type = [URIRef("http://example.org/ontology/rfc/RFC"),
                 URIRef("http://example.org/ontology/rfc/BCP"),
                 URIRef("http://example.org/ontology/rfc/STD"),
