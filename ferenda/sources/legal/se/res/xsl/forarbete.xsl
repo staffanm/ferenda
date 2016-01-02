@@ -64,7 +64,6 @@ It's a generic template for any kind of content
   <!-- everything that has an @about attribute, i.e. _is_ something
        (with a URI) gets a <section> with an <aside> for inbound links etc -->
   <xsl:template match="xhtml:div[@about]">
-    
     <div class="section-wrapper" about="{@about}"><!-- needed? -->
       <section id="{substring-after(@about,'#')}">
 	<xsl:variable name="sectionheading"><xsl:if test="xhtml:span/@content"><xsl:value-of select="xhtml:span/@content"/>. </xsl:if><xsl:value-of select="@content"/></xsl:variable>
@@ -77,7 +76,7 @@ It's a generic template for any kind of content
 	<xsl:if test="count(ancestor::*) = 4">
 	  <h4><xsl:value-of select="$sectionheading"/></h4>
 	</xsl:if>
-	<xsl:apply-templates select="*[not(@about)]"/>
+       <xsl:apply-templates select="*[not(@about)]"/>
       </section>
       <xsl:call-template name="aside-annotations">
 	<xsl:with-param name="uri" select="@about"/>
@@ -95,7 +94,6 @@ It's a generic template for any kind of content
 
   <!-- remove spans which only purpose is to contain RDFa data -->
   <xsl:template match="xhtml:span[@property and @content and not(text())]"/>
-  
 
   
   <xsl:template match="xhtml:div[@about]" mode="toc">
@@ -103,6 +101,7 @@ It's a generic template for any kind of content
     <ul><xsl:apply-templates mode="toc"/></ul>
     </xsl:if></li>
   </xsl:template>
+
 
   <xsl:template match="xhtml:span[@class='sidbrytning']">
     <xsl:element name="div">
@@ -112,10 +111,10 @@ It's a generic template for any kind of content
     </xsl:element>
   </xsl:template>
 
-  <xsl:template match="*[not(text())]">
-    <!-- remove these empty elements (often <i/> or <span/> tags) -->
-  </xsl:template>
 
+  <!-- remove these empty elements (often <i/> or <span/> tags) -->
+  <xsl:template match="xhtml:span|xhtml:i[not(text())]">
+  </xsl:template>
   <!-- default template: translate everything from whatever namespace
        it's in (usually the XHTML1.1 NS) into the default namespace
        NOTE: It removes any attributes not accounted for otherwise
