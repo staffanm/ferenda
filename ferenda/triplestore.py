@@ -462,7 +462,7 @@ class RemoteStore(TripleStore):
             else:
                 return results.content  # not .text -- should return raw bytestring response
         except requests.exceptions.HTTPError as e:
-            raise errors.SparqlError(e)
+            raise errors.SparqlError(e.response.text)
 
     def construct(self, query):
         url = self._endpoint_url()

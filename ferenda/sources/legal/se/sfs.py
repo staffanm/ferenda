@@ -1353,18 +1353,25 @@ class SFS(Trips):
 
 
     _document_name_cache = {}
-
+    _query_template_cache = {}
     def store_select(self, store, query_template, uri, context=None):
         params = {'uri': uri,
                   'context': context}
-        with self.resourceloader.open(query_template) as fp:
-            sq = fp.read() % params
-        # FIXME: Only FusekiStore.select supports (or needs) uniongraph
-        if context:
-            uniongraph = False
+
+        if query_template not in self._query_template_cache:
+            with self.resourceloader.open(query_template) as fp:
+                self._query_template_cache[query_template] = fp.read()
+        sq = self._query_template_cache[query_template] % params
+        # Only FusekiStore.select supports (or needs) uniongraph
+        if self.config.storetype == "FUSEKI":
+            if context:
+                kwargs = {'uniongraph': False}
+            else:
+                kwargs = {'uniongraph': True}
         else:
-            uniongraph = True
-        return store.select(sq, "python", uniongraph=uniongraph)
+            kwargs = {}
+        return store.select(sq, "python", **kwargs)
+
 
     # FIXME: Copied verbatim from keyword.py
     def time_store_select(self, store, query_template, basefile,
