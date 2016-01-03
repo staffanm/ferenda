@@ -245,10 +245,10 @@ class Main(unittest.TestCase, FerendaTestCase):
         self.assertEqual(mock_get.call_count, 3)
 
         with self.assertRaises(errors.TriplestoreError):
-            mock_get.side_effect = requests.exceptions.HTTPError("Server error")
+            mockresponse = Mock()
+            mockresponse.text = "This is the actual error text"
+            mock_get.side_effect = requests.exceptions.HTTPError("Server error", response=mockresponse)
             got = store.select("the-query", format="python")
-            
-
     
     @patch('requests.get', side_effect=canned((200, "construct-results.xml")))
     def test_sesame_construct(self, mock_get):
