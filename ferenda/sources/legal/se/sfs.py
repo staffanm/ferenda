@@ -1282,7 +1282,6 @@ class SFS(Trips):
                             '"%s" är nog en definition (2.5)' % term)
 
                 elif isinstance(element, Listelement):
-                    # remove
                     for rx in (self.re_Bullet,
                                self.re_DottedNumber,
                                self.re_Bokstavslista):
@@ -1349,7 +1348,7 @@ class SFS(Trips):
     def visitor_functions(self, basefile):
         return ((self.set_skipfragments, None),
                 (self.construct_id, {'basefile': basefile}),
-                (self.find_definitions, True))
+                (self.find_definitions, False))
 
 
     _document_name_cache = {}

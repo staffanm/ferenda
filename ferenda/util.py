@@ -198,21 +198,23 @@ def split_numalpha(s):
 
     >>> split_numalpha('10 a §') == ['', 10, ' a §']
     True
+    >>> split_numalpha("squared²") == ["squared²"]
+    True
     >>> sorted(['2 §', '10 §', '1 §'], key=split_numalpha) == ['1 §', '2 §', '10 §']
     True
-
     """
+
     res = []
     seg = ''
-    digit = s[0].isdigit()
+    digit = s[0].isdecimal()
     for c in s:
-        if (c.isdigit() and digit) or (not c.isdigit() and not digit):
+        if (c.isdecimal() and digit) or (not c.isdecimal() and not digit):
             seg += c
         else:
-            res.append(int(seg) if seg.isdigit() else seg)
+            res.append(int(seg) if seg.isdecimal() else seg)
             seg = c
             digit = not digit
-    res.append(int(seg) if seg.isdigit() else seg)
+    res.append(int(seg) if seg.isdecimal() else seg)
     if isinstance(res[0], int):
         res.insert(0, '')  # to make sure every list has type str,int,str,int....
     return res

@@ -22,6 +22,13 @@ class LNKeyword(keyword.Keyword):
         else:
             self.sfsrepo = SFS()
 
+    def sanitize_term(self, term):
+        # attempt to filter out some obvious false positives
+        if term.strip()[:-1] in (".", ","):
+            return None
+        else:
+            return term
+            
     def canonical_uri(self, basefile):
         # FIXME: make configurable like SFS.canonical_uri
         capitalized = basefile[0].upper() + basefile[1:]

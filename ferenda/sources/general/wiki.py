@@ -87,7 +87,7 @@ class MediaWiki(DocumentRepository):
     def get_default_options(cls):
         opts = super(MediaWiki, cls).get_default_options()
         # The API endpoint URLs change with MW language
-        opts['mediawikiexport'] = 'http://localhost/wiki/Special:Export/%s(basefile)'
+        opts['mediawikiexport'] = 'http://localhost/wiki/Special:Export/%s(basefile)s'
         opts['mediawikidump'] = 'http://localhost/wiki/allpages-dump.xml'
         opts['mediawikinamespaces'] = ['Category']
         # process pages in this namespace (as well as pages in the
@@ -114,7 +114,6 @@ class MediaWiki(DocumentRepository):
 
         MW_NS = "{%s}" % xml.getroot().nsmap[None]
         wikinamespaces = []
-        # FIXME: Find out the proper value of MW_NS
         for ns_el in xml.findall("//" + MW_NS + "namespace"):
             wikinamespaces.append(ns_el.text)
 

@@ -111,6 +111,9 @@ class Keyword(DocumentRepository):
                 label = row['label']
             else:
                 label = self.basefile_from_uri(row['subject'])
+                if label is None:
+                    self.log.warning("could not determine keyword from %s" % row['subject'])
+                    continue
             # sanity checking -- not everything can be a legit
             # keyword. Must be under 100 chars and not start with . or /
             if len(label) < 100 and not label[0] in (".", "/", ":"):
@@ -122,6 +125,7 @@ class Keyword(DocumentRepository):
             termset_func(terms)
 
         for term in terms:
+            term = self.sanitize_term(term)
             if not term:
                 continue
             oldterms = ""
@@ -136,6 +140,9 @@ class Keyword(DocumentRepository):
             else:
                 self.log.debug("%s: skipped" % term)
 
+    def sanitize_term(self, term):
+        return term
+                
     def download_termset_mediawiki(self, terms):
         # 2) Download the wiki.lagen.nu dump from
         # http://wiki.lagen.nu/pages-articles.xml -- term set "mediawiki"
@@ -194,14 +201,17 @@ class Keyword(DocumentRepository):
     def store_select(self, store, query_template, uri, context=None):
         params = {'uri': uri,
                   'context': context}
-        with self.resourceloader.open(query_template) as fp:
+        with self.resourceloader.open(query_template, "rb") as fp:
             sq = fp.read().decode('utf-8') % params
-        # FIXME: Only FusekiStore.select supports (or needs) uniongraph
-        if context:
-            uniongraph = False
+        # Only FusekiStore.select supports (or needs) uniongraph
+        if self.config.storetype == "FUSEKI":
+            if context:
+                kwargs = {'uniongraph': False}
+            else:
+                kwargs = {'uniongraph': True}
         else:
-            uniongraph = True
-        return store.select(sq, "python", uniongraph=uniongraph)
+            kwargs = {}
+        return store.select(sq, "python", **kwargs)
 
     def time_store_select(
             self, store, query_template, basefile, context=None, label="things"):

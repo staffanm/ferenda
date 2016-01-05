@@ -6,7 +6,7 @@ SELECT DISTINCT ?uri ?baseuri ?label
 WHERE {
     GRAPH <%(context)s> {
        { ?uri dcterms:subject <%(uri)s> ;
-              dcterms:isPartOf{0,4} ?baseuri .
+              dcterms:isPartOf* ?baseuri .
          ?baseuri dcterms:title ?label .
 	 }
     }
