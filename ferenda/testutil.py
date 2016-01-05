@@ -375,6 +375,8 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
     @classmethod
     def setUpClass(cls):
         cls.datadir = tempfile.mkdtemp()
+        if isinstance(cls.datadir, bytes):
+            cls.datadir = cls.datadir.decode()
         # Setting up a class can be pretty expensive (if it loads a
         # lot of RDF and/or minter objects) so we create it in
         # setUpClass instead. If your test needs a fresh repo for each
@@ -388,6 +390,8 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
     def setUp(self):
         if not hasattr(self, 'repo'):
             self.datadir = tempfile.mkdtemp()
+            if isinstance(self.datadir, bytes):
+                self.datadir = self.datadir.decode()
             self.repo = self.repoclass(datadir=self.datadir,
                                        storelocation=self.datadir + "/ferenda.sqlite",
                                        indexlocation=self.datadir + "/whoosh",)

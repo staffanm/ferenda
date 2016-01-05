@@ -35,6 +35,7 @@ import traceback
 import warnings
 
 from six import text_type as str
+from six import binary_type as bytes
 from six.moves import configparser
 from six.moves.urllib_parse import urlsplit
 from six.moves.queue import Queue
@@ -1642,6 +1643,8 @@ def _preflight_check(log, verbose=False):
         try:
             m = __import__(mod)
             version = getattr(m, '__version__', None)
+            if isinstance(version, bytes):
+                version = version.decode()
             if isinstance(version, tuple):
                 version = ".".join([str(x) for x in version])
             # print("version of %s is %s" % (mod, version))

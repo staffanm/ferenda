@@ -21,6 +21,8 @@ class Main(unittest.TestCase):
 
     def setUp(self):
         self.datadir = tempfile.mkdtemp()
+        if isinstance(self.datadir, bytes):
+            self.datadir = self.datadir.decode()
         self.dname = self.datadir + os.sep + "foo"
         self.fname = self.datadir + os.sep + "foo/bar.txt"
         self.fname2 = self.datadir + os.sep + "foo/baz.txt"
