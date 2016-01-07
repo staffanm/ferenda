@@ -509,10 +509,10 @@ class PDFAnalyzer(object):
     def plot(self, filename, margincounters, stylecounters, metrics):
         try:
             import matplotlib
+            matplotlib.use('Agg')
             import matplotlib.pyplot as plt
         except ImportError:
             raise ImportError("You need matplotlib installed")
-        matplotlib.use('Agg')
         # plt.style.use('ggplot')  # looks good but makes histograms unreadable
         matplotlib.rcParams.update({'font.size': 8})
         # width, height in inches

@@ -203,7 +203,7 @@ class XSLTTransform(TransformerEngine):
     # returns:      directory name of the place where all files ended up
     def _setup_templates(self, template, templatedir):
         workdir = mkdtemp()
-        self.resourceloader.extractdir(templatedir, workdir)
+        self.resourceloader.extractdir(templatedir, workdir, (".xsl", ".xslt"))
         if os.path.basename(template) not in os.listdir(workdir):
             shutil.copy2(template, workdir)
         return workdir

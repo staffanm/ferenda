@@ -540,14 +540,16 @@ metadata as well. When we query for metadata about a particular
 document, we want to know if there is any other document that updates
 or obsoletes this document. Using a CONSTRUCT query, we create
 ``rfc:isUpdatedBy`` and ``rfc:isObsoletedBy`` references to such
-documents.
+documents. These queries are stored alongside the rest of the project
+in separate ``.rq`` files.
 
 .. literalinclude:: examples/rfcs.py
    :start-after: # begin annotations
    :end-before: # end annotations
 
-The contents of ``rfc-annotations.rq``, placed in the current
-directory, should be:
+The contents of the resource ``rfc-annotations.rq``, which should be
+placed in a subdirectory named ``res`` in the current directory,
+should be:
 
 .. literalinclude:: examples/rfc-annotations.rq
 
@@ -617,8 +619,9 @@ you did for the SPARQL query, you can override the default.
    :start-after: # begin xslt
    :end-before: # end xslt
 
-The contents of ``rfc.xsl``, placed in the current
-directory, should be:
+The contents of the resource ``rfc.xsl``, which should be
+placed in a subdirectory named ``res`` in the current directory,
+should be:
 
 .. literalinclude:: examples/rfc.xsl
    :language: xml		    

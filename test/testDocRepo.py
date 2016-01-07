@@ -1204,7 +1204,6 @@ class Generate(RepoTester):
             self.repo.config.staticsite = True
         if xsl is not None:
             self.repo.xslt_template = xsl
-
         if sparql is not None:
             self.repo.sparql_annotations = sparql
 

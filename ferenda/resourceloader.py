@@ -147,9 +147,9 @@ class ResourceLoader(object):
             return os.path.relpath(abspath)
         raise ResourceNotFound(resourcename) # should contain a list of places we searched?
                 
-    def extractdir(self, resourcedir, target):
-        """Extract all file resources directly contained in the specified
-        resource directory.
+    def extractdir(self, resourcedir, target, suffixes=None):
+        """Extract all file resources contained in the specified
+        resource directory to the target directory.
         
         Searches all loadpaths and optionally the Resources API for
         any file contained within. This means the target dir may end
@@ -157,16 +157,26 @@ class ResourceLoader(object):
         from the system dirs/resources. This in turns makes it easy to
         just override a single file in a larger set of resource files.
 
+        Even if the resourcedir might contain resources in
+        subdirectories (eg "source/sub/dir/resource.xml"), the
+        extraction will be to the top-level target directory (eg
+        "target/resource.xml").
+
         """
+        if not suffixes:
+            suffixes = []
         extracted = set()
         for path in self.loadpath:
-            if resourcedir:
+            if resourcedir and resourcedir != ".":
                 path = path+os.sep+resourcedir
             if not os.path.exists(path):
                 continue
-            for f in os.listdir(path):
+            # for f in os.listdir(path):
+            for f in util.list_dirs(path, suffixes):
+                f = f[len(path)+1:]
+                basef = os.path.basename(f)
                 src = os.sep.join([path, f])
-                dest = os.sep.join([target, f])
+                dest = os.sep.join([target, basef])
                 if dest not in extracted and os.path.isfile(src):
                     util.ensure_dir(dest)
                     shutil.copy2(src, dest)

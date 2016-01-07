@@ -327,13 +327,16 @@ class DocumentRepository(object):
         # when testing. FIXME: A better alternative would be to use
         # the responses library to mock calls to requests.
         self.session = requests.session()
-
         loadpath = ResourceLoader.make_loadpath(self)
         # if the class specifieds additional path(s), these have
         # priority over the inheritance-graph derived loadpath:
         if self.loadpath:
             loadpath = self.loadpath + loadpath
-        # if the used has specified an additional loadpath, it has
+        # A "res/" in the the currrent directory has priority over
+        # class loadpaths:
+        if os.path.exists("res") and os.path.isdir("res"):
+            loadpath = ["res"] + loadpath
+        # if the user has specified an additional loadpath, it has
         # priority over anything else.
         if 'loadpath' in self.config:
             loadpath = self.config.loadpath + loadpath
@@ -2181,7 +2184,13 @@ WHERE {
                 conffile = os.path.abspath(
                     os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
 
-                transformer = Transformer('XSLT', self.xslt_template, "xsl",
+                if self.xslt_template.startswith("/"):
+                    templatedir = "."
+                elif "/" in self.xslt_template:
+                    templatedir = self.xslt_template.rsplit("/", 1)[0]
+                else:
+                    templatedir = "."
+                transformer = Transformer('XSLT', self.xslt_template, templatedir,
                                           resourceloader=self.resourceloader,
                                           config=conffile,
                                           documentroot=self.config.datadir)
@@ -2193,7 +2202,6 @@ WHERE {
                     urltransform = self.get_url_transform_func(
                         repos,
                         os.path.dirname(outfile))
-
                 transformer.transform_file(infile, outfile,
                                            params, urltransform)
 

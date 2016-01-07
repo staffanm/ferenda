@@ -250,9 +250,10 @@ class Examples(unittest.TestCase, FerendaTestCase):
     def test_rfc(self):
         workingdir = tempfile.mkdtemp()
         try:
+            os.mkdir(workingdir+"/res")
             shutil.copy("doc/examples/rfc-annotations.rq",
-                        workingdir+"/rfc-annotations.rq")
-            shutil.copy("doc/examples/rfc.xsl", workingdir+"/rfc.xsl")
+                        workingdir+"/res/rfc-annotations.rq")
+            shutil.copy("doc/examples/rfc.xsl", workingdir+"/res/rfc.xsl")
             self._test_pyfile("doc/examples/rfcs.py", workingdir)
         finally:
             shutil.rmtree(workingdir)
