@@ -134,72 +134,73 @@ class Examples(unittest.TestCase, FerendaTestCase):
             self.datadir = os.getcwd()
         cwd = self.datadir
         with open(shfile+".log", "w") as fp:
-            for lineno, line in enumerate(open(shfile)):
-                if line.startswith("#") or line.strip() == '':
-                    fp.write(line)
-                    continue
-                elif line.startswith("$ "):
-                    fp.write(line)
-                    line = line.strip()
-                    # check that output from previous command was what was expected
-                    if check_output:
-                        self.assertEqual(self.mask(expected),
-                                         self.mask(out.decode("utf-8")),
-                                         "Not expected output from %s at line %s" % (shfile, cmd_lineno))
-                    if self.verbose:
-                        print("ok")
-                    out = b""
-                    expected = ""
-                    cmd_lineno = lineno
-                    cmdline = line[2:].split("#")[0].strip()
-                    # special hack to account for that ferenda-setup not being
-                    # available for a non-installed ferenda source checkout
-                    if self.verbose:
-                        print("Running '%s'" % cmdline,
-                              end=" ... ")
-                        sys.stdout.flush()
-                    if cmdline.startswith("ferenda-setup"):
-                        cmdline = cmdline.replace("ferenda-setup",
-                                                  ferenda_setup)
-                    elif cmdline.endswith("--downloadmax=50"):
-                        # special ugly hack to make sure only three
-                        # docs are downloaded during testing
-                        cmdline = cmdline.replace("--downloadmax=50",
-                                                  "--downloadmax=3")
-                        print("no, '%s'" % cmdline, end=" ... ")
+            with open(shfile) as sfp:
+                for lineno, line in enumerate(sfp):
+                    if line.startswith("#") or line.strip() == '':
+                        fp.write(line)
+                        continue
+                    elif line.startswith("$ "):
+                        fp.write(line)
+                        line = line.strip()
+                        # check that output from previous command was what was expected
+                        if check_output:
+                            self.assertEqual(self.mask(expected),
+                                             self.mask(out.decode("utf-8")),
+                                             "Not expected output from %s at line %s" % (shfile, cmd_lineno))
+                        if self.verbose:
+                            print("ok")
+                        out = b""
+                        expected = ""
+                        cmd_lineno = lineno
+                        cmdline = line[2:].split("#")[0].strip()
+                        # special hack to account for that ferenda-setup not being
+                        # available for a non-installed ferenda source checkout
+                        if self.verbose:
+                            print("Running '%s'" % cmdline,
+                                  end=" ... ")
+                            sys.stdout.flush()
+                        if cmdline.startswith("ferenda-setup"):
+                            cmdline = cmdline.replace("ferenda-setup",
+                                                      ferenda_setup)
+                        elif cmdline.endswith("--downloadmax=50"):
+                            # special ugly hack to make sure only three
+                            # docs are downloaded during testing
+                            cmdline = cmdline.replace("--downloadmax=50",
+                                                      "--downloadmax=3")
+                            print("no, '%s'" % cmdline, end=" ... ")
 
-                    if cmdline.startswith("cd "):
-                        # emulate this shell functionality in our control
-                        # logic. note: no support for quoting and therefore
-                        # no support for pathnames with space
-                        path = cmdline.strip().split(" ", 1)[1]
-                        cwd = os.path.normpath(os.path.join(cwd, path))
+                        if cmdline.startswith("cd "):
+                            # emulate this shell functionality in our control
+                            # logic. note: no support for quoting and therefore
+                            # no support for pathnames with space
+                            path = cmdline.strip().split(" ", 1)[1]
+                            cwd = os.path.normpath(os.path.join(cwd, path))
+                        else:
+                            process = subprocess.Popen(cmdline,
+                                                       shell=True,
+                                                       cwd=cwd,
+                                                       stdout=subprocess.PIPE,
+                                                       stderr=subprocess.STDOUT,
+                                                       env=env)
+                            out, err = process.communicate()
+                            if out:
+                                fp.write(out.decode('utf-8'))
+                            else:
+                                out = b''
+                            if err:
+                                fp.write(err.decode('utf-8'))
+                            else:
+                                err = b''
+                            retcode = process.poll()
+                            self.assertEqual(0, retcode, "STDOUT:\n%s\nSTDERR:\n%s" % (out.decode('utf-8'),
+                                                                                       err.decode('utf-8')))
                     else:
-                        process = subprocess.Popen(cmdline,
-                                                   shell=True,
-                                                   cwd=cwd,
-                                                   stdout=subprocess.PIPE,
-                                                   stderr=subprocess.STDOUT,
-                                                   env=env)
-                        out, err = process.communicate()
-                        if out:
-                            fp.write(out.decode('utf-8'))
-                        else:
-                            out = b''
-                        if err:
-                            fp.write(err.decode('utf-8'))
-                        else:
-                            err = b''
-                        retcode = process.poll()
-                        self.assertEqual(0, retcode, "STDOUT:\n%s\nSTDERR:\n%s" % (out.decode('utf-8'),
-                                                                                   err.decode('utf-8')))
-                else:
-                    expected += line
-            # check that final output was what was expected
-            if check_output:
-                self.assertEqual(self.mask(expected),
-                                 self.mask(out.decode("utf-8")),
-                                 "Not expected output from %s at line %s" % (shfile, cmd_lineno))
+                        expected += line
+                # check that final output was what was expected
+                if check_output:
+                    self.assertEqual(self.mask(expected),
+                                     self.mask(out.decode("utf-8")),
+                                     "Not expected output from %s at line %s" % (shfile, cmd_lineno))
         if self.verbose:
             print("ok")
 

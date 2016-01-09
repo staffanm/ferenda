@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 import tempfile
+from ferenda import util
 
 # mock methods
 def download_from_api(): pass
@@ -77,10 +78,18 @@ class CompositePatents(CompositeRepository):
 
     
 CompositePatents.subrepos = XMLPatents, HTMLPatents, ScannedPatents
-datadir = tempfile.mkdtemp()
-d = CompositePatents(datadir=datadir)
+# NB: The below code, which executes at import time, creates a temp
+# dir and does everything there. However, this'll get run by
+# composite-repository.sh, which already runs with cwd set to a temp
+# dir, so this is unneccesary.
+
+# datadir = tempfile.mkdtemp()
+# d = CompositePatents(datadir=datadir)
+# print("Doing things in %s" % datadir)
+d = CompositePatents()
 # make sure the files and methods we need actually exists
-util.writefile(datadir+"/patxml/downloaded/5723765.html", "hello world")
+# util.writefile(datadir+"/patxml/downloaded/5723765.html", "hello world")
+util.writefile("data/patxml/downloaded/5723765.html", "hello world")
 setattr(XMLPatents, 'transform_patent_xml_to_xhtml', lambda x, y: True)
 d.parse("5723765")
 d.generate("5723765")

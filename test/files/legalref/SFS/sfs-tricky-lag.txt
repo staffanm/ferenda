@@ -10,9 +10,7 @@ upphovsrättslagen. 12 § körkortsförordningen. 23 § okändalagen.
 är en referens till en lag som inte finns: (</str>
   <Link uri="https://lagen.nu/sfs/1492:123">1492:123</Link>
   <str>). Det här är
-en referens till en lag utan paranteser: </str>
-  <Link uri="https://lagen.nu/sfs/1982:713">1982:713</Link>
-  <str>. </str>
+en referens till en lag utan paranteser: 1982:713. </str>
   <Link uri="https://lagen.nu/sfs/1960:729#P42">42 §
 upphovsrättslagen</Link>
   <str>. </str>

@@ -169,9 +169,7 @@ $ ./ferenda-build.py w3c generate --all
 
 # begin final-commands
 $ ./ferenda-build.py w3c toc
-22:17:17 w3c INFO Created data/w3c/toc/dcterms_issued/2013.html
 22:17:17 w3c INFO Created data/w3c/toc/dcterms_issued/2014.html
-22:17:17 w3c INFO Created data/w3c/toc/dcterms_title/e.html
 22:17:17 w3c INFO Created data/w3c/toc/dcterms_title/m.html
 22:17:17 w3c INFO Created data/w3c/toc/dcterms_title/r.html
 22:17:17 w3c INFO Created data/w3c/toc/dcterms_title/x.html
