@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 
 doc = Mock()
 filedir = os.path.dirname(__file__) 
-doc.body = elements_from_soup(BeautifulSoup(open(filedir+"/../doc/examples/citationparsing-before.xhtml").read()).body)
+doc.body = elements_from_soup(BeautifulSoup(open(filedir+"/../doc/examples/citationparsing-before.xhtml").read(), "lxml").body)
 
 # begin
 from pyparsing import Word, nums
@@ -62,7 +62,6 @@ citparser = CitationParser(ferenda.citationpatterns.url,
 citparser.set_formatter(URIFormatter(("url", ferenda.uriformats.url),
                                       ("IETFRef", rfc_uri_formatter),
                                       ("EndnoteRef", lambda d: "#endnote-%(EndnoteID)s" % d)))
-
 citparser.parse_recursive(doc.body)
 
 # end

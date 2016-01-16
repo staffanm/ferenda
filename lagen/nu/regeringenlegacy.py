@@ -1,14 +1,16 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
 # this repo overrides ferenda.sources.legal.se.Regeringen to work
 # against old downloaded
 import re
 import codecs
+from urllib.parse import urljoin
 
-from bs4 import BeautifulSoup
 from rdflib import URIRef
 from rdflib.namespace import SKOS
-from six.moves.urllib_parse import urljoin
 
 from ferenda.sources.legal.se import Regeringen, RPUBL
 from ferenda.sources.legal.se.direktiv import DirRegeringen

@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+from future import standard_library
+standard_library.install_aliases()
 
 import os
 import hashlib
 import json
-from datetime import datetime
 
 from ferenda import util
 
@@ -129,16 +132,29 @@ with.
         """
         if not path:
             path = self._path  # better be there
-        d = dict((k, v) for (k, v) in self.__dict__.items() if k[0] != "_")
+            
+        # The below concise way of creating a dict will yield a
+        # future.types.newdict.newdict, whose .keys() method yields a
+        # dictionary-keyiterator object, not a standard sortable
+        # list. This fails with json.dump(sort_keys=True).
+        #
+        #  d = dict((k, v) for (k, v) in self.__dict__.items() if k[0] != "_")
+        #
+        # So we create a standard py2 dict by using literals:
+        d = {}
+        for (k, v) in self.__dict__.items():
+            if k[0] != "_":
+                d[k] = v
         util.ensure_dir(path)
         with open(path, "w") as fp:
-            json.dump(d, fp, default=util.json_default_date, indent=2,
-                      separators=(', ', ': '), sort_keys=True)
+            s = json.dumps(d, default=util.json_default_date, indent=2,
+                           separators=(', ', ': '), sort_keys=True)
+            fp.write(s)
+
     # If inline=True, the contents of filename is included in the Atom
     # entry. Otherwise, it just references it.
     #
     # Note that you can only have one content element.
-
     def set_content(self, filename, url, mimetype=None, inline=False):
         """Sets the ``content`` property and calculates md5 hash for the file
 

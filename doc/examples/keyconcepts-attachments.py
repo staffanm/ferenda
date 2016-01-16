@@ -9,7 +9,7 @@ class TestDocrepo(DocumentRepository):
         mainurl = self.document_url_template % {'basefile': basefile}
         self.download_if_needed(basefile, mainurl)
         with self.store.open_downloaded(basefile) as fp:
-            soup = BeautifulSoup(fp.read())
+            soup = BeautifulSoup(fp.read(), "lxml")
         for img in soup.find_all("img"):
             imgurl = urljoin(mainurl, img["src"])
             resp = requests.get(imgurl)

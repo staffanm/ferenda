@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+import builtins
 from copy import copy
 
-from six import text_type as str
-
 from ferenda.elements import Link, LinkSubject
-
 
 class CitationParser(object):
 
@@ -134,7 +133,9 @@ class CitationParser(object):
                 if isinstance(node, str):
                     if isinstance(node, Link):
                         res.append(node)
-                    elif type(part) == str:
+                    # under py2, str is now really future.types.newstr.newstr
+                    elif type(part) == str or (hasattr(builtins, 'unicode') and  # means py2 + future
+                                               type(part) == builtins.unicode):
                         res.append(node)
                     else:
                         # handle str-derived types by instantiting

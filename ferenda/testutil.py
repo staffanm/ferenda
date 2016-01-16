@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 """:py:mod:`unittest`-based classes and accompanying functions to
 create some types of ferenda-specific tests easier."""
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
 from difflib import unified_diff
 from io import BytesIO
 import codecs
@@ -15,14 +18,9 @@ import sys
 import tempfile
 import time
 import unicodedata
+from urllib.parse import unquote
 
 from ferenda.compat import unittest
-
-import six
-from six import text_type as str
-from six import binary_type as bytes
-from six.moves import input
-from six.moves.urllib_parse import unquote
 
 import rdflib
 from rdflib.compare import graph_diff
@@ -607,10 +605,10 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             # process final file and save specfile
             add_downloaded_files(state['downloaded'], spec,
                                  state['previous_url'])
-
-            # FIXME: should mode be w or wb? w for py3 at least
             with open(specfile, "w") as fp:
-                json.dump(spec, fp, indent=4)
+                s = json.dumps(spec, fp, indent=4, 
+                           separators=(', ', ': '))
+                fp.write(s)
 
         # organize a temporary copy of files that we can compare our results to
         wantdir = "%s/%s-want" % (self.datadir, self.repoclass.alias)
@@ -707,12 +705,14 @@ class Py23DocChecker(doctest.OutputChecker):
     """Checker to use in conjuction with :py:class:`doctest.DocTestSuite`."""
 
     def check_output(self, want, got, optionflags):
+        #return doctest.OutputChecker.check_output(self, want, got, optionflags)
         if sys.version_info[0] < 3:
-            # if running on py2, attempt to prefix all the strings
-            # with a u (since all our apis use unicode strings)
-            want = re.sub("'(.*?)'", "u'\\1'", want)
-            # want = re.sub('"(.*?)"', 'u"\\1"', want) -- doctest strings always (?)
-            # only use singlequoted strings
+            if want != got:
+                # if running on py2, attempt to prefix all the strings
+                # with a u (since all our apis use unicode strings)
+                want = re.sub(b"'(.*?)'", b"u'\\1'", want)
+                # want = re.sub('"(.*?)"', 'u"\\1"', want) -- doctest strings always (?)
+                # only use singlequoted strings
         return doctest.OutputChecker.check_output(self, want, got, optionflags)
 
 
@@ -764,12 +764,12 @@ def parametrize(cls, template_method, name, params, wrapper=None):
     def test_method(self):
         template_method(self, *params)
 
-    # py2 compat: name is a unicode object, func.__name__ must be a str(?)
-    if six.PY3:
+    try:
         test_method.__name__ = name
-    else:
-        # note that we have redefined str to six.text_type
-        test_method.__name__ = bytes(name)
+    except TypeError:
+        # In py2, all method names (eg all identifiers) must be ascii only
+        # represented as bytestrings. 
+        test_method.__name__ = name.encode()
     # wrapper is a unittest decorator like skip or expectedFailure
     if wrapper:
         setattr(cls, name, wrapper(test_method))

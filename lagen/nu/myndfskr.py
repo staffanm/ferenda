@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 from operator import attrgetter
 from collections import Counter
@@ -16,7 +18,6 @@ from ferenda import (CompositeRepository, CompositeStore, Facet, TocPageset,
 from ferenda import util
 from ferenda.elements import Link
 from ferenda.sources.legal.se import (SwedishLegalSource, SwedishLegalStore)
-from six import text_type as str
 from . import SameAs
 
 

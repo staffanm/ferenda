@@ -8,7 +8,10 @@ aside from the standards (``download``, ``parse``, ``generate`` et
 al), you should also use :py:func:`~ferenda.decorators.action` so that
 manage.py will be able to call it.
 """
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
 from datetime import datetime
 import codecs
 import functools
@@ -16,7 +19,6 @@ import itertools
 import os
 import time
 
-import six
 from rdflib import Graph, URIRef
 from rdflib.compare import graph_diff
 from layeredconfig import LayeredConfig
@@ -111,7 +113,7 @@ def render(f):
             res.append(node.meta)
         try:
             for subnode in node:
-                if not isinstance(subnode, six.string_types):
+                if not isinstance(subnode, str):
                     res.extend(iterate_graphs(subnode))
         except TypeError:  # node was not iterable
             pass

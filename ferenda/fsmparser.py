@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
-import collections
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
+import builtins
+from collections import deque
 import inspect
 
-import six
-from six import text_type as str
-
 from ferenda.errors import FSMStateError
-
 
 class FSMParser():
 
@@ -40,7 +40,7 @@ class FSMParser():
             relative_depth = len(self._state_stack)
             # print("%s[%s(%r)] %s" % (". " * relative_depth, calling_frame, self._state_stack, msg))
             state = "/".join(self._state_stack)
-            print("%s/%s(): %s" % (state, calling_frame, msg))
+            builtins.print("%s/%s(): %s" % (state, calling_frame, msg))
 
     def set_recognizers(self, *args):
         """Set the list of functions (or other callables) used in
@@ -235,18 +235,18 @@ class FSMParser():
 
 # inspired by recipe 19.18 in the python cookbook. A implementation detail
 # helper for FSMParser.
-class Peekable(six.Iterator):
+class Peekable(object):
 
     def __init__(self, iterable):
         self._iterable = iter(iterable)
-        self._cache = collections.deque()
+        self._cache = deque()
 
     def __iter__(self):
         return self
 
     def _fillcache(self):
         while len(self._cache) < 1:
-            self._cache.append(six.advance_iterator(self._iterable))
+            self._cache.append(next(self._iterable))
 
     def __next__(self):
         self._fillcache()

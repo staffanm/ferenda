@@ -1,36 +1,29 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+from future import standard_library
+standard_library.install_aliases()
+
 import re
-import sys
 import os
 from datetime import datetime
+from collections import OrderedDict
 import codecs
 
 from bs4 import BeautifulSoup
 from lxml import etree
 import requests
 from layeredconfig import LayeredConfig
-from six import text_type as str
 
-from ferenda import util, errors
-from ferenda.elements import UnicodeElement, CompoundElement, \
-    Heading, Preformatted, Paragraph, Section, Link, ListItem, \
-    Body, serialize
+from ferenda import util
+from ferenda.elements import Preformatted, Body
 from ferenda import CompositeRepository, CompositeStore
-from ferenda import PDFDocumentRepository
-from ferenda import Describer
 from ferenda import TextReader
-from ferenda import PDFReader
 from ferenda import DocumentEntry
-from ferenda.compat import OrderedDict
-from ferenda.decorators import managedparsing
-from . import Trips, NoMoreLinks
-from . import Regeringen
-from . import Riksdagen
-from . import RPUBL
-from . import SwedishLegalSource, SwedishLegalStore
+from . import (Trips, NoMoreLinks, Regeringen, Riksdagen,
+               SwedishLegalSource, SwedishLegalStore, RPUBL)
 from .fixedlayoutsource import FixedLayoutStore, FixedLayoutSource
-from .swedishlegalsource import offtryck_parser, offtryck_gluefunc
 
 
 class PropRegeringen(Regeringen):
@@ -41,6 +34,7 @@ class PropRegeringen(Regeringen):
     rdf_type = RPUBL.Proposition
     document_type = Regeringen.PROPOSITION
     # sparql_annotations = "sparql/prop-annotations.rq"
+
 
 class PropTripsStore(FixedLayoutStore):
     # 1999/94 and 1994/95 has only plaintext (wrapped in .html)
@@ -57,6 +51,7 @@ class PropTripsStore(FixedLayoutStore):
             return self.path(basefile, "intermediate", ".txt")
         else:
             return super(PropTripsStore, self).intermediate_path(basefile)
+
 
 class PropTrips(Trips, FixedLayoutSource):
     alias = "proptrips"
@@ -76,7 +71,6 @@ class PropTrips(Trips, FixedLayoutSource):
     documentstore_class = PropTripsStore
     urispace_segment = "prop"
 
-    
     @classmethod
     def get_default_options(cls):
         opts = super(PropTrips, cls).get_default_options()

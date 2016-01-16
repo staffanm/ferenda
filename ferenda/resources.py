@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
-import os
-import json
+from io import BytesIO
 import inspect
+import json
+import logging
+import os
 
-import six
-from six import text_type as str
 from lxml import etree
 from lxml.builder import ElementMaker
 from rdflib import URIRef, Literal, BNode, Graph, Namespace, RDF, RDFS
@@ -16,6 +18,7 @@ from layeredconfig import LayeredConfig, Defaults
 
 from ferenda import DocumentRepository, ResourceLoader
 from ferenda import util, errors
+
 
 class Resources(object):
 
@@ -29,9 +32,14 @@ class Resources(object):
         defaults = DocumentRepository.get_default_options()
         defaults.update(kwargs)
         self.config = LayeredConfig(Defaults(defaults))
-        from ferenda.manager import setup_logger
-        self.log = setup_logger()
-
+        # the below call to setup_logger alters the logging level of
+        # the root logger, which can't be good practice. Also, we
+        # should probably not log to the root logger, but rather to
+        # ferenda.resources.
+        #
+        # from ferenda.manager import setup_logger
+        # self.log = setup_logger()
+        self.log = logging.getLogger("ferenda.resources")
         # FIXME: How should we set up a global loadpath from the
         # individual repos?
         loadpaths = [ResourceLoader.make_loadpath(repo) for repo in repos]
@@ -201,7 +209,7 @@ class Resources(object):
 
     def _make_files(self, option, filedir, combinefile=None, combinefunc=None):
         urls = []
-        buf = six.BytesIO()
+        buf = BytesIO()
         processed = set()
         # eg. self.config.cssfiles
         if getattr(self.config, option):  # it's possible to set eg
@@ -300,7 +308,9 @@ class Resources(object):
         util.ensure_dir(context)
         with open(context, "w") as fp:
             contextdict = self._get_json_context()
-            json.dump({"@context": contextdict}, fp, indent=4, sort_keys=True)
+            s = json.dumps({"@context": contextdict}, separators=(', ', ': '),
+                           indent=4, sort_keys=True)
+            fp.write(s)
         files.append(self._filepath_to_urlpath(context, 2))
 
         common = os.sep.join([self.resourcedir, "api", "common.json"])
@@ -318,7 +328,9 @@ class Resources(object):
             if self.config.legacyapi:
                 d = self._convert_legacy_jsonld(d, self.config.url + urlpath[1:])
             with open(filename, "w") as fp:
-                json.dump(d, fp, indent=4, sort_keys=True)
+                s = json.dumps(d, indent=4, separators=(', ', ': '), sort_keys=True)
+                fp.write(s)
+                
             files.append(self._filepath_to_urlpath(filename, 2))
 
         if self.config.legacyapi:

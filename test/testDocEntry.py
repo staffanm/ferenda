@@ -1,21 +1,20 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
-import sys, os
-from ferenda.compat import unittest
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 import tempfile
 import shutil
 import os
 from datetime import datetime
+from io import StringIO
 
-import six
-
+from ferenda.compat import unittest
 from ferenda import DocumentRepository, util
 
 # SUT
 from ferenda import DocumentEntry
+
 
 class DocEntry(unittest.TestCase):
     basic_json = """{
@@ -118,7 +117,7 @@ class DocEntry(unittest.TestCase):
     def test_save(self):
         path = self.repo.store.documententry_path("123/x")
         d = DocumentEntry()
-        d.title = six.StringIO("A file-like object, not a string")
+        d.title = StringIO("A file-like object, not a string")
         with self.assertRaises(TypeError):
             d.save(path=path)
 

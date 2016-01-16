@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 import sys
 import os
@@ -8,22 +10,19 @@ import re
 import shutil
 from tempfile import mkstemp
 
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
-import six
 from layeredconfig import LayeredConfig, Defaults
-from ferenda.compat import unittest, patch, call,  Mock, MagicMock
-builtins = "__builtin__" if six.PY2 else "builtins"
-
-
 from rdflib import Graph, URIRef, Namespace, Literal
 DCTERMS = Namespace("http://purl.org/dc/terms/")
+
+
+from ferenda.compat import unittest, patch, call,  Mock, MagicMock
 from ferenda import DocumentRepository, DocumentStore, util
 
 # SUT
 from ferenda import Devel
 
-    
+
 class Main(unittest.TestCase):
 
     def mask_time(self, s):
@@ -41,7 +40,7 @@ class Main(unittest.TestCase):
         fp.close()
         d = Devel()
         mock = MagicMock()
-        with patch(builtins+'.print', mock):
+        with patch('builtins.print', mock):
             d.dumprdf(tmpfile, format="nt")
         os.unlink(tmpfile)
         self.assertTrue(mock.called)
@@ -58,7 +57,7 @@ class Main(unittest.TestCase):
                           b'[fake store content]'})}
         printmock = MagicMock()
         with patch('ferenda.devel.TripleStore', **config):
-            with patch(builtins+'.print', printmock):
+            with patch('builtins.print', printmock):
                 d.dumpstore(format="trix")
         want = "[fake store content]"
         printmock.assert_has_calls([call(want)])
@@ -98,14 +97,14 @@ And another.
             # 3. patch print and call fsmparse
             d = Devel()
             printmock = MagicMock()
-            with patch(builtins+'.print', printmock):
+            with patch('builtins.print', printmock):
                 # 3.1 fsmparse dynamically imports the module and call the method
                 #     with every chunk from the text file
                 # 3.2 fsmparse asserts that the method returned a callable
                 # 3.3 fsmparse calls it with a iterable of text chunks from the
                 #     textfile
                 # 3.4 fsmparse recieves a Element structure and prints a
-                # serialized version 
+                # serialized version
                 d.fsmparse("testparser.Testobject.get_parser", "testparseinput.txt")
             self.assertTrue(printmock.called)
             # 4. check that the expected thing was printed
@@ -145,7 +144,7 @@ WHERE { ?s ?p ?o .
                   Mock(**{'construct.return_value': g})}
         printmock = MagicMock()
         with patch('ferenda.devel.TripleStore', **config):
-            with patch(builtins+'.print', printmock):
+            with patch('builtins.print', printmock):
                 d = Devel()
                 d.config = LayeredConfig(Defaults({'storetype': 'a',
                                                    'storelocation': 'b',
@@ -200,7 +199,7 @@ WHERE { <%(uri)s> ?p ?o . }
         config = {'connect.return_value': Mock(**{'select.return_value': result})}
         printmock = MagicMock()
         with patch('ferenda.devel.TripleStore', **config):
-            with patch(builtins+'.print', printmock):
+            with patch('builtins.print', printmock):
                 d = Devel()
                 d.config = LayeredConfig(Defaults({'storetype': 'a',
                                                    'storelocation': 'b',
@@ -244,7 +243,7 @@ WHERE { <%(uri)s> ?p ?o . }
         config = {'connect.return_value': Mock(**{'query.return_value': res})}
         printmock = MagicMock()
         with patch('ferenda.devel.FulltextIndex', **config):
-            with patch(builtins+'.print', printmock):
+            with patch('builtins.print', printmock):
                 d = Devel()
                 d.config = LayeredConfig(Defaults({'indextype': 'a',
                                                    'indexlocation': 'b'}))

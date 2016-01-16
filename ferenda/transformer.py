@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
 from tempfile import mkdtemp
 import os
 import shutil

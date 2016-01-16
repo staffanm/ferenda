@@ -1,11 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
-
-import sys, os
-from ferenda.compat import unittest
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 import doctest
 
@@ -15,6 +11,7 @@ from ferenda.testutil import RepoTester
 
 # SUT
 from ferenda import Facet
+
 
 class Faceting(RepoTester):
 

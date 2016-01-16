@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 from collections import Counter
 from operator import attrgetter
@@ -12,10 +14,8 @@ from ferenda import Facet, Describer, TocPageset, TocPage, Feed, Feedset
 from ferenda import fulltextindex, util
 from ferenda.elements import Link
 from ferenda.elements.html import Strong
-from ferenda.sources.legal.se import legaluri
 from ferenda.sources.legal.se import DV as OrigDV
 from ferenda.sources.legal.se import RPUBL
-from ferenda.sources.legal.se.legalref import LegalRef
 from . import SameAs
 
 

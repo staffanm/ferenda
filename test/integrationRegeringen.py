@@ -1,12 +1,16 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
-import sys, os
+import sys
+import os
+
 from ferenda.compat import unittest
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
 # SUT
 from ferenda.sources.legal.se import Regeringen
+
 
 class SelectPDFs(unittest.TestCase):
 

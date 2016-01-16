@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 # the main idea is to just make sure every line of code is run once,
 # not to instantiate all eight different
@@ -8,7 +10,10 @@ from __future__ import unicode_literals
 # is to mock all http requests/RDFLib calls (neither of which is
 # idempotent), that is sort of unavoidable.
 
-import json, re, os, sqlite3
+import json
+import re
+import os
+import sqlite3
 from tempfile import mkstemp, mkdtemp
 import shutil
 
@@ -23,8 +28,9 @@ from ferenda.testutil import FerendaTestCase
 # SUT
 from ferenda import TripleStore
 
-# we could have a switch in canned() that, if set, actually calls
-# the request.get or post methods and writes the result to the
+
+# FIXME: we could have a switch in canned() that, if set, actually
+# calls the request.get or post methods and writes the result to the
 # given files.
 def canned(*responses):
     returned = []

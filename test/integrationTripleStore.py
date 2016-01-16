@@ -1,30 +1,26 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
-import sys, os
-from ferenda.compat import unittest
-
-
+import sys
+import os
 import time
 import subprocess
-import os
 import tempfile
 import shutil
-import logging
 import json
 
-from six import text_type as str
 from rdflib import Graph
-from rdflib.util import guess_format
-from rdflib.compare import graph_diff, isomorphic
 from ferenda import util, errors
 
+from ferenda.compat import unittest
 from ferenda.triplestore import TripleStore, SleepycatStore, FusekiStore
 
 from ferenda.testutil import FerendaTestCase
 
+
 class TripleStoreTestCase(FerendaTestCase):
-    
     # Set this to True if you want module-level text fixtures to
     # automatically start and stop the triple store's process for you.
     manage_server = False
@@ -33,7 +29,7 @@ class TripleStoreTestCase(FerendaTestCase):
 
     def test_add_serialized(self):
         # test adding to default graph
-        self.assertEqual(0,self.store.triple_count())
+        self.assertEqual(0, self.store.triple_count())
         self.store.add_serialized(
             util.readfile("test/files/datasets/dataset.nt"),
             format="nt")

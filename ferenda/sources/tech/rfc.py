@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 import re
 import os
@@ -8,7 +10,6 @@ from itertools import islice
 import requests
 import requests.exceptions
 
-import six
 from rdflib import URIRef, Graph, XSD
 from pyparsing import Word, CaselessLiteral, Optional, nums
 
@@ -522,7 +523,7 @@ class RFC(DocumentRepository):
             if isinstance(subpart, Pagebreak):
                 shorttitle = subpart.shorttitle
             else:
-                if isinstance(subpart, six.text_type):
+                if isinstance(subpart, str):
                     pass
                 else:
                     short = self.cleanup_body(subpart)

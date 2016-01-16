@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-import sys, os
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
+import sys
+import os
 
 from ferenda.compat import unittest
-
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
-
 from ferenda.testutil import FerendaTestCase, testparser, file_parametrize
 from ferenda.sources.tech import RFC
+
 
 # FIXME: This test should be re-worked as a normal RepoTester test
 class Parse(unittest.TestCase, FerendaTestCase):

@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 import sys, os
 from ferenda.compat import unittest
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
 from datetime import datetime
 from tempfile import mkdtemp
@@ -14,7 +15,9 @@ import whoosh.fields
 from rdflib.namespace import RDF, DC, DCTERMS
 
 from ferenda import FulltextIndex, DocumentRepository, Facet
-from ferenda.fulltextindex import Identifier, Datetime, Text, Label, Keyword, Boolean, URI, Resource, Less, More, Between
+from ferenda.fulltextindex import (Identifier, Datetime, Text, Label,
+                                   Keyword, Boolean, URI, Resource,
+                                   Less, More, Between)
 
 #----------------------------------------------------------------
 #

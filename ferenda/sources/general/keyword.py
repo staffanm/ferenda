@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 # system libraries
 import re
 import os
 from collections import defaultdict
-from time import time
 
 # 3rdparty libs
 import requests
 from lxml import etree
-from lxml.builder import ElementMaker
 from rdflib import Literal, Namespace
 
 # my libs

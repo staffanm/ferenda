@@ -1,22 +1,24 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
-import sys, os
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-import pkg_resources
-pkg_resources.resource_listdir('ferenda','res')
-
+import sys
+import os
 from copy import deepcopy
+# import pkg_resources
+# pkg_resources.resource_listdir('ferenda','res')
 
-from pyparsing import Word,nums
+from pyparsing import Word, nums
 
 from ferenda.compat import unittest
-
 from ferenda.citationparser import CitationParser
 from ferenda.uriformatter import URIFormatter
-from ferenda.elements import Body, Heading, Paragraph, Footnote, LinkSubject, UnicodeElement, serialize
+from ferenda.elements import (Body, Heading, Paragraph, Footnote,
+                              LinkSubject, UnicodeElement, serialize)
 import ferenda.uriformats
 import ferenda.citationpatterns
+
 
 class Main(unittest.TestCase):
 

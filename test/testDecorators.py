@@ -1,15 +1,19 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
-import sys, os, datetime
+import sys
+import os
+import datetime
 from ferenda.compat import unittest, Mock, MagicMock, patch
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 
 from ferenda import DocumentRepository, Document
 from ferenda.errors import DocumentRemovedError, ParseError
 # SUT
 from ferenda.decorators import (timed, parseifneeded, render, handleerror,
                                 makedocument, recordlastdownload, downloadmax)
+
 
 class Decorators(unittest.TestCase):
 

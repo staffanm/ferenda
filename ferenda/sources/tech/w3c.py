@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 from datetime import datetime
 from operator import itemgetter
 import os
 import re
 import sys
-
-from six import text_type as str
 
 from rdflib import Literal, Graph, URIRef, RDF, Namespace
 

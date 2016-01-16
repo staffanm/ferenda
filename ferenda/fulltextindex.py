@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+from future import standard_library
+standard_library.install_aliases()
 
 import json
 import math
@@ -7,10 +11,9 @@ import re
 import shutil
 import itertools
 from datetime import date, datetime, MAXYEAR, MINYEAR
+from urllib.parse import quote
 
-import six
-from six.moves.urllib_parse import quote
-from six import text_type as str
+
 import requests
 import requests.exceptions
 from bs4 import BeautifulSoup
@@ -691,14 +694,6 @@ class ElasticSearchIndex(RemoteIndex):
 
     def _update_payload(self, uri, repo, basefile, text, **kwargs):
         safe = ''
-        if six.PY2:
-            # urllib.quote in python 2.6 cannot handle unicode values
-            # for the safe parameter (not even empty). urllib.quote in
-            # python 2.7 handles it, but may fail later on. FIXME: We
-            # should create a shim as ferenda.compat.quote and use
-            # that
-            safe = safe.encode('ascii')  # pragma: no cover
-
         # quote (in python 2) only handles characters from 0x0 - 0xFF,
         # and basefile might contain characters outside of that (eg
         # u'MO\u0308D/P11463-12', which is MÖD/P11463-12 on a system
@@ -807,7 +802,7 @@ class ElasticSearchIndex(RemoteIndex):
                 # elements. FIXME: should work for other fields than
                 # 'text'
                 hltext = " ... ".join([x.strip() for x in hit['highlight']['text']])
-                soup = BeautifulSoup("<p>%s</p>" % re.sub("\s+", " ", hltext))
+                soup = BeautifulSoup("<p>%s</p>" % re.sub("\s+", " ", hltext), "lxml")
                 h['text'] = html.elements_from_soup(soup.html.body.p)
             res.append(h)
         pager = {'pagenum': pagenum,

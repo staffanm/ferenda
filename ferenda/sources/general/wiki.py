@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 # system
-from tempfile import mktemp
-import random
 import re
 import os
-from six import text_type as str
-from six import binary_type as bytes
 
 # 3rdparty
 from lxml import etree

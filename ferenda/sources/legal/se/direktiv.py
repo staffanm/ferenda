@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 # A number of different classes each fetching the same data from
 # different sources (and with different data formats and data fidelity)
@@ -8,13 +10,11 @@ import re
 import functools
 import codecs
 from datetime import datetime, timedelta
-from six.moves.urllib_parse import urljoin
 
 from bs4 import BeautifulSoup
 from rdflib import Literal, URIRef
 from rdflib.namespace import DCTERMS, XSD
 import requests
-from six import text_type as str
 
 from . import (SwedishLegalSource, SwedishLegalStore, FixedLayoutSource,
                Trips, Regeringen, RPUBL)

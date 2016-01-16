@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 # From python stdlib
 import re
@@ -9,7 +11,6 @@ from datetime import datetime, timedelta
 # 3rd party modules
 import lxml.html
 import requests
-from six import text_type as str
 from rdflib import Literal, URIRef
 from rdflib.namespace import SKOS, XSD, DCTERMS
 from bs4 import BeautifulSoup
@@ -17,7 +18,7 @@ from bs4 import BeautifulSoup
 # My own stuff
 from ferenda import FSMParser
 from ferenda import decorators
-from ferenda.elements import CompoundElement, Body, Paragraph, Heading
+from ferenda.elements import Body, Paragraph
 from . import RPUBL
 from .fixedlayoutsource import FixedLayoutSource, FixedLayoutStore
 from .swedishlegalsource import UnorderedSection

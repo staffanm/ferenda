@@ -1,20 +1,18 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 import re
 import os
 from datetime import datetime
 import time
-import itertools
-
-from six import text_type as str
-from six import binary_type as bytes
 
 # 3rd party
 from bs4 import BeautifulSoup
 import requests
 import requests.exceptions
-from rdflib import URIRef, Literal
+from rdflib import Literal
 
 # My own stuff
 from ferenda import util

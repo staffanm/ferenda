@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
-import sys, os, tempfile, shutil
+from bs4 import BeautifulSoup
 from datetime import date
-from six import text_type as str
+from ferenda.compat import unittest
 from lxml import etree
 from lxml.builder import ElementMaker
-from bs4 import BeautifulSoup
 from rdflib import Graph, Namespace
-from ferenda.compat import unittest
+from six import text_type as str
+import os
 
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 from ferenda.citationpatterns import url as urlparser
 from ferenda.testutil import FerendaTestCase
 from ferenda import util
@@ -189,7 +189,7 @@ class Main(unittest.TestCase):
   <!-- Hello world -->
   <center>Hello world</center>
   <p>That's enough of this nonsense</p>
-</body>""")
+</body>""", "lxml")
         got = html.elements_from_soup(soup.html)
         self.assertEqual(html.HTML([html.Head([html.Title(["Example doc"])]),
                                     html.Body([html.P(["That's enough of this nonsense"])])]),
@@ -532,7 +532,7 @@ class HTML(unittest.TestCase):
 <hr/>
 <a href="/">home</a> - <a href="/about">about</a>
 </div>
-</body>""")
+</body>""", "lxml")
         body = html.elements_from_soup(soup.body)
         # print("Body: \n%s" % serialize(body))
         result = html.Body([html.H1(["Sample"]),

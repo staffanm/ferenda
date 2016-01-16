@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
 from rdflib.extras.describer import Describer as OrigDescriber
 from rdflib import URIRef
 from rdflib import Literal
 from rdflib import RDF
-from six import text_type as str
 
 
 class Describer(OrigDescriber):

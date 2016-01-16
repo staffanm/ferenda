@@ -1,20 +1,18 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
-import sys, os
-from ferenda.compat import unittest
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
+import os
 
 import codecs
 import re
-import tempfile
-
-import six
 
 from ferenda import elements
 from ferenda.testutil import file_parametrize
 from ferenda.compat import patch
 from ferenda.decorators import newstate
+from ferenda.compat import unittest
 # SUT
 from ferenda import FSMParser, TextReader
 from ferenda.fsmparser import Peekable
@@ -342,8 +340,7 @@ class Parse(unittest.TestCase):
             self.run_test_file("test/files/fsmparser/no-transition.tx")
 
     def test_debug(self):
-        builtins = "__builtin__" if six.PY2 else "builtins"
-        with patch(builtins+".print") as printmock:
+        with patch("builtins.print") as printmock:
             self.run_test_file("test/files/fsmparser/basic.txt", debug=True)
             self.assertTrue(printmock.called)
 

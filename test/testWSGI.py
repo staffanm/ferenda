@@ -1,25 +1,19 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-import os, sys
-from ferenda.compat import Mock, patch
-
-from ferenda import manager
-manager.setup_logger('CRITICAL')
-
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 from io import BytesIO
 import codecs
-import json
-import shutil
 import datetime
+import json
+import os
+import shutil
 
 from lxml import etree
-from rdflib import Graph, Namespace
-from rdflib.namespace import RDF, DCTERMS
-SCHEMA = Namespace("http://schema.org/")
+from rdflib import Graph
 
-from ferenda import DocumentRepository, Facet, FulltextIndex
+from ferenda.compat import Mock, patch
 from ferenda import manager, util, fulltextindex
 from ferenda.elements import html
 from ferenda.testutil import RepoTester
@@ -56,20 +50,18 @@ class WSGI(RepoTester): # base class w/o tests
                                          apiendpoint="/myapi/",
                                          searchendpoint="/mysearch/",
                                          url="http://localhost:8000/",
-                                         repos = repos,
-                                         storetype = self.storetype,
-                                         storelocation = self.storelocation,
-                                         storerepository = self.storerepository,
-                                         indextype = self.indextype,
-                                         indexlocation = self.indexlocation
-        )
+                                         repos=repos,
+                                         storetype=self.storetype,
+                                         storelocation=self.storelocation,
+                                         storerepository=self.storerepository,
+                                         indextype=self.indextype,
+                                         indexlocation=self.indexlocation)
         self.env = {'HTTP_ACCEPT': DEFAULT_HTTP_ACCEPT,
                     'PATH_INFO':   '/',
                     'SERVER_NAME': 'localhost',
                     'SERVER_PORT': '8000',
                     'QUERY_STRING': '',
                     'wsgi.url_scheme': 'http'}
-
 
     def ttl_to_rdf_xml(self, inpath, outpath, store=None):
         if not store:

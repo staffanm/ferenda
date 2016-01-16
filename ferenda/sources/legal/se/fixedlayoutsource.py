@@ -1,13 +1,15 @@
+# -*- coding: utf-8 -*-
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
+from collections import OrderedDict
 import os
-import itertools
 
 from . import SwedishLegalStore, SwedishLegalSource
-
 from ferenda import util
-from ferenda.compat import OrderedDict
 from ferenda.pdfreader import StreamingPDFReader
-from .swedishlegalsource import offtryck_parser, offtryck_gluefunc
-from ferenda import PDFAnalyzer
+
 
 class FixedLayoutStore(SwedishLegalStore):
     """Handles storage of fixed-layout documents (either PDF or

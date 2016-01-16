@@ -1,21 +1,18 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, print_function
 
-# system libraries (+ six)
-from collections import defaultdict
+# system libraries
+from collections import defaultdict, OrderedDict
 from datetime import datetime, date
 from time import time
 import codecs
-import difflib
 import logging
 import os
 import re
 import sys
 
-from six.moves import html_parser
-from six.moves.urllib_parse import quote, unquote
-from six import text_type as str
-from ferenda.compat import OrderedDict
+from html.parser import HTMLParser
+from urllib.parse import quote, unquote
 
 # 3rdparty libs
 from rdflib import URIRef, Literal, RDF, Graph, BNode
@@ -28,9 +25,8 @@ from layeredconfig import LayeredConfig
 from cached_property import cached_property
 
 # my own libraries
-from ferenda import DocumentEntry, DocumentStore, TripleStore
-from ferenda import TextReader, Describer, Facet
-from ferenda import decorators
+from ferenda import DocumentEntry, TripleStore
+from ferenda import TextReader, Facet
 from ferenda.sources.legal.se import legaluri
 from ferenda import util
 from ferenda.errors import FerendaException, DocumentRemovedError, ParseError
@@ -650,7 +646,7 @@ class SFS(Trips):
             txt = html.unescape(t.readto('</pre>'))
         except ImportError:
             # this is the old way.
-            hp = html_parser.HTMLParser()
+            hp = HTMLParser()
             txt = hp.unescape(t.readto('</pre>'))
         if '\r\n' not in txt:
             txt = txt.replace('\n', '\r\n')

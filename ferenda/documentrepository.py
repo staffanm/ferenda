@@ -1,15 +1,19 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
-from collections import defaultdict
+# stdlib
+from collections import defaultdict, OrderedDict
 from datetime import datetime
-from ferenda.compat import OrderedDict
 from io import BytesIO
 from itertools import chain
 from operator import itemgetter
 from tempfile import mkstemp
 from wsgiref.handlers import format_date_time as format_http_date
 from wsgiref.util import request_uri
+from urllib.parse import quote
+import builtins
 import calendar
 import codecs
 import difflib
@@ -35,12 +39,6 @@ import lxml.html
 import requests
 import requests.exceptions
 from cached_property import cached_property
-
-from six import text_type as str
-from six import binary_type as bytes
-from six import PY2
-from six.moves.urllib_parse import quote
-
 
 # mine
 import ferenda
@@ -605,9 +603,6 @@ with the *config* object as single parameter.
 
         uri = "%sdataset/%s" % (self.config.url, self.alias)
         if param and value:
-            if PY2:
-                # FIXME: see comment in documentstore.basefile_to_pathfrag
-                value = value.encode("utf-8")
             uri += "?%s=%s" % (param, quote(value))
         return uri
 
@@ -2791,7 +2786,9 @@ WHERE {
             util.ensure_dir(cachepath)
             with open(cachepath, "w") as fp:
                 self.log.debug("Saving faceted_entries to %s" % cachepath)
-                json.dump(ret, fp, indent=4, default=util.json_default_date)
+                s = json.dumps(ret, indent=4, separators=(', ', ': '),
+                               default=util.json_default_date)
+                fp.write(s)
         return ret
 
     def news_feedsets(self, data, facets):
@@ -3200,7 +3197,7 @@ WHERE {
 
     def status(self, basefile=None, samplesize=3):
         """Prints out some basic status information about this repository."""
-
+        print = builtins.print
         print("Status for document repository '%s' (%s)" %
               (self.alias, getattr(self.config, 'class')))
         s = self.get_status()

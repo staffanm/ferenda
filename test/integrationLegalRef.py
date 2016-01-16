@@ -1,24 +1,22 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals,print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
-import sys, os
-from ferenda.compat import unittest
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-
+import sys
+import os
 import codecs
 import re
 
 from rdflib import Namespace, Graph, RDF
 
+from ferenda.compat import unittest
 from ferenda import ResourceLoader
 from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda.elements import serialize
 from ferenda.testutil import file_parametrize
 from ferenda.thirdparty.coin import URIMinter
 
-@unittest.skipIf('SKIP_SIMPLEPARSE_TESTS' in os.environ,
-                 "Skipping SimpleParser dependent tests")    
 class TestLegalRef(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -80,43 +78,31 @@ class TestLegalRef(unittest.TestCase):
         self.maxDiff = None
         self.assertEqual(want, got)
 
-@unittest.skipIf('SKIP_SIMPLEPARSE_TESTS' in os.environ,
-                 "Skipping SimpleParser dependent tests")    
 class Lagrum(TestLegalRef):
     def parametric_test(self,datafile):
         p = LegalRef(LegalRef.LAGRUM)
         return self._test_parser(datafile, p)
 
-@unittest.skipIf('SKIP_SIMPLEPARSE_TESTS' in os.environ,
-                 "Skipping SimpleParser dependent tests")    
 class KortLagrum(TestLegalRef):
     def parametric_test(self,datafile):
         p = LegalRef(LegalRef.LAGRUM, LegalRef.KORTLAGRUM)
         return self._test_parser(datafile, p)
 
-@unittest.skipIf('SKIP_SIMPLEPARSE_TESTS' in os.environ,
-                 "Skipping SimpleParser dependent tests")    
 class Forarbeten(TestLegalRef):
     def parametric_test(self,datafile):
         p = LegalRef(LegalRef.FORARBETEN)
         return self._test_parser(datafile, p)
 
-@unittest.skipIf('SKIP_SIMPLEPARSE_TESTS' in os.environ,
-                 "Skipping SimpleParser dependent tests")    
 class Rattsfall(TestLegalRef):
     def parametric_test(self,datafile):
         p = LegalRef(LegalRef.RATTSFALL)
         return self._test_parser(datafile, p)
 
-@unittest.skipIf('SKIP_SIMPLEPARSE_TESTS' in os.environ,
-                 "Skipping SimpleParser dependent tests")    
 class EULaw(TestLegalRef):
     def parametric_test(self,datafile):
         p = LegalRef(LegalRef.EULAGSTIFTNING)
         return self._test_parser(datafile, p)
 
-@unittest.skipIf('SKIP_SIMPLEPARSE_TESTS' in os.environ,
-                 "Skipping SimpleParser dependent tests")    
 class EUCaselaw(TestLegalRef):
     def parametric_test(self,datafile):
         p = LegalRef(LegalRef.EGRATTSFALL)

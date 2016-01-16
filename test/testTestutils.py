@@ -1,21 +1,22 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 from datetime import datetime
 from copy import copy
 import collections
 import json
 import os
+import sys
 import shutil
 import tempfile
 
 from lxml import etree
 from rdflib import Graph
 from bs4 import BeautifulSoup
-from six import text_type as str
-import six
 
-from ferenda.compat import unittest, patch, Mock
+from ferenda.compat import unittest, Mock
 from ferenda import util
 from ferenda import DocumentRepository
 
@@ -197,8 +198,8 @@ children 1 do not match: bar"""
         # should fail - soup's not one of the argument types we handle
         with self.assertRaises(ValueError):
             self.tester.assertEqualXML(
-                BeautifulSoup("<foo arg1='x' arg2='y'/>"),
-                BeautifulSoup("<foo arg2='y' arg1='x'/>"))
+                BeautifulSoup("<foo arg1='x' arg2='y'/>", "lxml"),
+                BeautifulSoup("<foo arg2='y' arg1='x'/>", "lxml"))
 
     def test_tidy_html(self):
         w = "<html><body><h1>Hi</h1></body></html>"
@@ -307,7 +308,7 @@ class TestRepo(unittest.TestCase, testutil.FerendaTestCase):
     def _runtest(self):
         # create a new class and set its docroot (like functionalSources does)
         name = "TestMyRepo"
-        if six.PY2:
+        if sys.version_info[0] < 3:
             name = name.encode()
         the_new_class = type(name, (testutil.RepoTester,),
                              {'repoclass': MyRepo,
@@ -337,8 +338,9 @@ class TestRepo(unittest.TestCase, testutil.FerendaTestCase):
         # create a basic.json + 1-2 resources
         os.mkdir(self.datadir+"/source")
         with open(self.datadir+"/source/basic.json", "w") as fp:
-            json.dump(self.basicjson,
-                      fp)
+            s = json.dumps(self.basicjson, separators=(', ', ': '))
+            fp.write(s)
+            
         util.writefile(self.datadir+"/source/index.html",
                        "<p><a href='doc/a_.html'>ID: a</a></p>")
         util.writefile(self.datadir+"/source/a_.html",
@@ -367,8 +369,10 @@ class TestRepo(unittest.TestCase, testutil.FerendaTestCase):
         # create a empty.json
         os.mkdir(self.datadir+"/source")
         with open(self.datadir+"/source/empty.json", "w") as fp:
-            json.dump({'@settings': {'config': {'refresh': True}}},
-                      fp)
+            s = json.dumps({'@settings': {'config': {'refresh': True}}},
+                          separators=(', ', ': '))
+            fp.write(s)
+
 
         os.environ["FERENDA_SET_TESTFILE"] = "true"
         self._runtest()

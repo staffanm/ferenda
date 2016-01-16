@@ -1,15 +1,20 @@
+# -*- coding: utf-8 -*-
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
 import tempfile
 import shutil
 import os
 
 from ferenda.compat import unittest
-from ferenda.testutil import FerendaTestCase
 from ferenda.errors import ResourceNotFound
 from ferenda import DocumentEntry  # just used for test_loadpath
 from ferenda import util
 
 # SUT
 from ferenda import ResourceLoader
+
 
 # this class mainly exists so that we can try out make_loadpath
 class SubTestCase(unittest.TestCase):

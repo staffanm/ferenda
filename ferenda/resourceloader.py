@@ -1,9 +1,14 @@
+# -*- coding: utf-8 -*-
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
+from contextlib import contextmanager
 import inspect
-import os
 import logging
+import os
 import pkg_resources
 import shutil
-from contextlib import contextmanager
 
 from ferenda import util
 from ferenda.errors import ResourceNotFound
@@ -28,7 +33,11 @@ class ResourceLoader(object):
         """
         res = []
         for cls in inspect.getmro(instance.__class__):
-            if cls == object:
+            # Under py2, object is now
+            # future.types.newobject.newobject, which means a "if cls
+            # == object" won't work. So instead we make a stringly
+            # comparison.
+            if cls.__name__ == "object":
                 continue
             path = os.path.relpath(inspect.getfile(cls))
             candidate = os.path.dirname(path) + os.sep + suffix

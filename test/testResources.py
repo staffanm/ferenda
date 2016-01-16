@@ -1,17 +1,14 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 import os
-import sys
 import json
-import pkg_resources
 import tempfile
 import shutil
-sys.path.insert(0,os.getcwd())
-pkg_resources.resource_listdir('ferenda','res')
 from lxml import etree as ET
 
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 from ferenda import DocumentRepository
 from ferenda import util, errors
 from ferenda.testutil import RepoTester, FerendaTestCase

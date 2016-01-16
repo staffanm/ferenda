@@ -1,16 +1,17 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 import os
 import time
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 from ferenda import DocumentRepository, DocumentStore
 from ferenda import util, errors
-from ferenda.compat import OrderedDict
+
 
 class CompositeStore(DocumentStore):
-
     """Custom store for CompositeRepository objects."""
 
     def __init__(self, datadir, downloaded_suffix=".html",
@@ -42,7 +43,6 @@ class CompositeStore(DocumentStore):
 
 
 class CompositeRepository(DocumentRepository):
-
     """Acts as a proxy for a list of sub-repositories.
 
     Calls the download() method for each of the included

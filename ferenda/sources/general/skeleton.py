@@ -1,15 +1,12 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 import sys
 import re
-from six.moves.urllib_parse import urljoin
 
-from rdflib import Graph
-from rdflib import URIRef
-from rdflib import Literal
-from rdflib import RDF
-from rdflib import RDFS
+from rdflib import Graph, URIRef, Literal, RDF, RDFS
 from lxml import etree
 import requests
 

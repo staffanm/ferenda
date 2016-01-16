@@ -1,21 +1,22 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
-import sys, os, tempfile, shutil
-from lxml import etree
+import sys
+import os
+
 from ferenda.compat import unittest, patch, MagicMock
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-
-from bz2 import BZ2File
-from ferenda import errors, util
-from six import text_type as str
+from ferenda import util
 
 
 # SUT
 from ferenda import PDFReader
 from ferenda import PDFAnalyzer
 
-@unittest.skipIf (sys.version_info < (2, 7, 0), "PDFAnalyzer not currently supported under Py26")
+
+@unittest.skipIf (sys.version_info < (2, 7, 0),
+                  "PDFAnalyzer not currently supported under Py26")
 class Analyze(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None

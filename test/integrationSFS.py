@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
-import sys, os
+import sys
+import os
+
 from ferenda.compat import unittest
 
-from six import text_type as str
-
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 
 import codecs
 # from ferenda.sources.legal.se import SFS

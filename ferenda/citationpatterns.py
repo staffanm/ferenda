@@ -4,11 +4,12 @@
 examples.
 
 """
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
 from pyparsing import *
 
-#
-#
 # ferenda.citationpatterns.url
 #
 # Adapted from http://pyparsing.wikispaces.com/file/view/urlparse_.py/31853197/urlparse_.py

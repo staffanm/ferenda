@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """This module contains classes that are based on native types (lists,
 dicts, string, datetime), but adds support for general attributes. The
@@ -15,7 +14,12 @@ The module also contains the convenience functions
 hierarchies to and from strings.
 
 """
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+import builtins
+from future.utils import native
+
 from operator import itemgetter
 import ast
 import datetime
@@ -28,9 +32,6 @@ import sys
 
 from lxml.builder import ElementMaker
 from rdflib import Graph, Namespace, Literal, URIRef
-from six import binary_type as bytes
-from six import text_type as str
-import six
 import pyparsing
 
 from ferenda import util
@@ -181,6 +182,12 @@ properties (such as ordinal label, date of enactment, etc)."""
             return res
         else:
             return None
+
+    def __str__(self):
+        if sys.version_info[0] < 3:
+            return self
+        else:
+            return super(UnicodeElement, self).__str__()
 
 
 class CompoundElement(AbstractElement, list):
@@ -493,10 +500,10 @@ class Link(UnicodeElement):
     def __repr__(self):
         # convoluted way around a UnicodeEncode error on py2 when self contains
         # non-ascii characters
-        if six.PY2:
-            rep = repr(str(self))[2:-1]
-        else:
-            rep = self
+        # if six.PY2:
+        #     rep = repr(str(self))[2:-1]
+        # else:
+        rep = self
         return 'Link(\'%s\', uri=%s)' % (rep, self.uri)
 
     def as_xhtml(self, uri, parent_uri=None):
@@ -650,18 +657,15 @@ class ListItem(CompoundElement, OrdinalElement):
 def __serialize_json(node):
     # some native datatypes should be returned as-is, ie not wrapped
     # in a dict. Note that types derived from these gets handled
-    # differently
-    if type(node) in (str, int, bool):
+    # differently. 
+    if type(node) in (str, int, bool) or type(node).__name__ == "unicode":
         return node
-    # NOTE: this transforms bytes into str's (even though on py2 these will be labeled as "str")
-    # elif type(node) == bytes:
-    #     return node.decode()
     # lists and dicts gets returned as-is, but the values in those
     # containers are transformed if need be
     elif type(node) == list:
         return [__serialize_json(x) for x in node]
-    elif type(node) == dict:
-        return dict([(k, __serialize_json(v)) for k, v in node.items()])
+    elif type(node) == dict or type(node).__name__ == "dict":
+        return native(dict([(k, __serialize_json(v)) for k, v in node.items()]))
     else:
         if node.__class__.__module__ in ('builtins', '__builtin__'):
             # py2 workaround -- we want a str to be known as 'str' always, but py2
@@ -688,7 +692,6 @@ def __serialize_json(node):
             # convert derived list to plain list
             e['@content'] = __serialize_json(list(node))
         elif isinstance(node, dict):
-            # convert derived dict to plain dict
             e['@content'] = __serialize_json(dict(node))
         elif isinstance(node, bytes):
             # assume that all bytestrings are ascii only. When this
@@ -800,8 +803,11 @@ def __serialize_xml(node, serialize_hidden_attrs=False):
         return ET.XML(xml)
 
     # We use type() instead of isinstance() because we want to
-    # serialize str derived types using their correct class names
-    if type(node) == str:
+    # serialize str derived types using their correct class
+    # names. This is now more involved since under py2, str is now
+    # really future.types.newstr.newstr.
+    if type(node) == str or (hasattr(builtins, 'unicode') and  # means py2 + future
+                             type(node) == builtins.unicode):
         nodename = "str"
     elif type(node) == bytes:
         nodename = "bytes"
@@ -843,17 +849,13 @@ def __deserialize_xml(elem, caller_globals):
     # specialcasing first -- class objects for these native objects
     # can't be created by the"caller_globals[elem.tag]" call below
     if elem.tag == 'int':
-        i = 0
-        cls = i.__class__
+        cls = int
     elif elem.tag == 'str':
-        i = ''
-        cls = i.__class__
+        cls = str
     elif elem.tag == 'bytes':
-        i = b''
-        cls = i.__class__
+        cls = bytes
     elif elem.tag == 'dict':
-        i = {}
-        cls = i.__class__
+        cls = dict
     else:
         # print "creating cls for %s" % elem.tag
         cls = caller_globals[elem.tag]

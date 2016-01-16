@@ -1,18 +1,15 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
 # A abstract base class for fetching and parsing documents
 # (particularly preparatory works) from regeringen.se
-import sys
 import os
 import re
 import codecs
-import json
-from operator import itemgetter
-from datetime import datetime, timedelta, date
-from time import sleep
-from io import StringIO
-from six import text_type as str
-from six.moves.urllib_parse import urljoin, urlencode
+from datetime import datetime
+from urllib.parse import urljoin, urlencode
 
 import requests
 import lxml.html

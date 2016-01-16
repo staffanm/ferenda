@@ -1,17 +1,22 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-import sys, os
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
+import sys
+import os
 
 import lxml
 import rdflib
 
 from ferenda.compat import unittest
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-
-from ferenda.sources.legal.se.legaluri import construct, parse, coinstruct_from_graph
+from ferenda.sources.legal.se.legaluri import (construct, parse,
+                                               coinstruct_from_graph)
 from ferenda.testutil import file_parametrize, parametrize
 
+
 class Construct(unittest.TestCase):
+
     def parametric_test(self,filename):
         with open(filename) as fp:
             testdata = fp.read()
@@ -33,7 +38,6 @@ class Construct(unittest.TestCase):
 #            parts_repr = " ".join(fp.read().split())
 #        parts = eval(parts_repr,{"__builtins__":None},globals())
 #        self.assertEqual(parse(uri),parts)
-
 
 class Coinstruct(unittest.TestCase):
     atomfile = "test/files/legaluri/publ.atom"

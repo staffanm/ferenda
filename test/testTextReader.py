@@ -1,17 +1,23 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
-import os,sys
+import os
+import sys
+import codecs
+
 from ferenda.compat import unittest
 
-import codecs
+# SUT
 from ferenda.textreader import TextReader
 
 PREFIX = os.path.dirname(__file__)+"/files/textreader"
-    
+
+
 class Basic(unittest.TestCase):
     def setUp(self):
-        self.f = TextReader(PREFIX + "/LICENSE.txt",linesep=TextReader.UNIX)
+        self.f = TextReader(PREFIX + "/LICENSE.txt", linesep=TextReader.UNIX)
 
     def testReadline(self):
         self.assertEqual(self.f.readline(),

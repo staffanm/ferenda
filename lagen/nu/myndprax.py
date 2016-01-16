@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
 from collections import Counter
-from six import text_type as str
 
 from rdflib import URIRef
 from rdflib.namespace import DCTERMS, FOAF

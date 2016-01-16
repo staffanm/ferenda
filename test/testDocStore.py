@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
-import sys, os
-from ferenda.compat import unittest
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-
-import tempfile
+import os
 import shutil
+import tempfile
 import time
 
+from ferenda.compat import unittest
 
 #SUT
 from ferenda import DocumentStore

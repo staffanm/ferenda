@@ -10,22 +10,32 @@ tool, you don't need to directly call any of these methods --
 else, for you.
 
 """
-from __future__ import unicode_literals, print_function
-# system
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+from future import standard_library
+standard_library.install_aliases()
+from future.utils import bytes_to_native_str
+
+# stdlib
+from collections import OrderedDict
 from datetime import datetime
-from ferenda.compat import OrderedDict, MagicMock
 from io import StringIO
+from logging import getLogger as getlog
 from multiprocessing.managers import SyncManager
+from queue import Queue
 from time import sleep
+from urllib.parse import urlsplit
 from wsgiref.simple_server import make_server
 import argparse
+import builtins
 import codecs
+import configparser
 import inspect
+import importlib
 import logging
-from logging import getLogger as getlog
 import multiprocessing
 import os
-import re
 import shutil
 import stat
 import subprocess
@@ -34,13 +44,6 @@ import tempfile
 import traceback
 import warnings
 
-from six import text_type as str
-from six import binary_type as bytes
-from six.moves import configparser
-from six.moves.urllib_parse import urlsplit
-from six.moves.queue import Queue
-import six
-input = six.moves.input
 
 # 3rd party
 import requests
@@ -55,13 +58,9 @@ except ImportError:  # pragma: no cover
 
 # my modules
 from ferenda import DocumentRepository  # needed for a doctest
-from ferenda import Transformer
-from ferenda import TripleStore
-from ferenda import ResourceLoader
-from ferenda import WSGIApp
-from ferenda import Resources
-from ferenda import errors
-from ferenda import util
+from ferenda import Transformer, TripleStore, ResourceLoader, WSGIApp, Resources
+from ferenda import errors, util
+from ferenda.compat import MagicMock
 
 def makeresources(repos,
                   resourcedir="data/rsrc",
@@ -462,6 +461,9 @@ def run(argv, config=None, subcall=False):
             global config_loaded
             config_loaded = False
 
+def _nativestr(unicodestr, encoding="utf-8"):
+    return bytes_to_native_str(unicodestr.encode(encoding))
+
 
 def enable(classname):
     """Registers a class by creating a section for it in the
@@ -477,15 +479,25 @@ def enable(classname):
     :returns: The short-form alias for the class
     :rtype: str
     """
+
     cls = _load_class(classname)  # eg ferenda.DocumentRepository
     # throws error if unsuccessful
+
     cfg = configparser.ConfigParser()
     configfilename = _find_config_file(create=True)
     cfg.read([configfilename])
     alias = cls.alias
-    cfg.add_section(alias)
-    cfg.set(alias, "class", classname)
-    with open(configfilename, "w") as fp:
+    if sys.version_info[0] < 3:
+        # configparser on py2 has a different API wrt
+        # unicode/bytestrings...
+        cfg.add_section(alias.encode())
+        cfg.set(alias.encode(), b"class", classname.encode())
+        mode = "wb"
+    else:
+        cfg.add_section(alias)
+        cfg.set(alias, "class", classname)
+        mode = "w"
+    with open(configfilename, mode) as fp:
         cfg.write(fp)
     log = getlog()
     log.info("Enabled class %s (alias '%s')" % (classname, alias))
@@ -1167,7 +1179,7 @@ def _queue_jobs(manager, iterable, inst, classname, command):
 
 
 buildmanager = None
-if six.PY2:
+if sys.version_info[0] < 3:
     jobqueue_id = b'jobqueue'
     resultqueue_id = b'resultqueue'
 else:
@@ -1192,6 +1204,7 @@ def _make_server_manager(port, authkey, start=True):
         class JobQueueManager(SyncManager):
             pass
 
+        
         JobQueueManager.register(jobqueue_id, callable=lambda: job_q)
         JobQueueManager.register(resultqueue_id, callable=lambda: result_q)
 
@@ -1371,6 +1384,7 @@ def _enabled_classes(inifile=None):
 
 def _print_usage():
     """Prints out general usage information for the ``ferenda-build.py`` tool."""
+    print = builtins.print
     # general info, enabled classes
     executable = sys.argv[0]
     print("""Usage: %(executable)s [class-or-alias] [action] <arguments> <options>
@@ -1414,6 +1428,7 @@ def _print_class_usage(cls):
     :param cls: The class object to print usage information for
     :type  cls: class
     """
+    print = builtins.print
     print("Valid actions are:")
     actions = _list_class_usage(cls)
     for action, desc in actions.items():
@@ -1615,7 +1630,8 @@ def _preflight_check(log, verbose=False):
         ('rdflib', '4.0', True),
         ('html5lib', '0.99', True),
         ('requests', '1.2.0', True),
-        ('six', '1.4.0', True),
+        # ('six', '1.4.0', True),
+        ('future', '0.15.0', True),
         ('jsmin', '2.0.2', True),
         ('cssmin', '0.2.0', True),
         ('whoosh', '2.4.1', True),
@@ -1641,7 +1657,7 @@ def _preflight_check(log, verbose=False):
     # 2: Check modules -- TODO: Do we really need to do this?
     for (mod, ver, required) in modules:
         try:
-            m = __import__(mod)
+            m = importlib.import_module(mod)
             version = getattr(m, '__version__', None)
             if isinstance(version, bytes):
                 version = version.decode()

@@ -1,24 +1,22 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 # the main idea here is, just like testTriplestore, to just make sure
 # every line of code is run once, not to instantiate all different
 # implementations/configurations and run them all
 
-import json, re, os
-from tempfile import mkstemp, mkdtemp
-import shutil
+import json
 
 import requests.exceptions
 
-from ferenda import util, errors
+from ferenda import util
 from ferenda.compat import patch, Mock, unittest
-from ferenda.testutil import FerendaTestCase
 
 # SUT
 from ferenda import FulltextIndex, DocumentRepository
-from ferenda import fulltextindex 
-from integrationFulltextIndex import WhooshBasicIndex, WhooshBasicQuery
+from ferenda import fulltextindex
 from integrationFulltextIndex import BasicIndex, BasicQuery, ESBase
 
 CREATE_CANNED = False

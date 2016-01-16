@@ -1,14 +1,29 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+from future import standard_library
+standard_library.install_aliases()
+from future.utils import exec_
 
 import sys
 import os
 import subprocess
 import tempfile
 import shutil
+from urllib.parse import urljoin as urljoin_orig
 
-import six
-
+def urljoin(root, other):
+    # on py26, it seems that BeautifulSoup Tag objects sometimes can
+    # return a bytestr instead of unicode (eg img["src"] =>
+    # 'hello.jpg', not u'hello.jpg'. This means that it cannot be used
+    # as input to urljoin, which requires that both args have the same
+    # type. So we wrap it in order to have simple (albeit somewhat
+    # misleading) example code.
+    if isinstance(other, bytes):
+        other = other.decode("utf-8")
+    return urljoin_orig (root, other)
+    
 from ferenda import util
 from ferenda.compat import unittest, patch
 from ferenda.testutil import FerendaTestCase
@@ -26,14 +41,13 @@ import ferenda.citationpatterns
 import ferenda.uriformats
 from bs4 import BeautifulSoup
 import requests
-from six.moves.urllib_parse import urljoin
 XMLPatents = HTMLPatents = ScannedPatents = None
 
 class TestExamples(unittest.TestCase, FerendaTestCase):
     def _test_pyfile(self, pyfile, want=True, comparator=None):
         with open(pyfile, 'rb') as fp:
             pycode = compile(fp.read(), pyfile, 'exec')
-        result = six.exec_(pycode, globals(), locals())
+        result = exec_(pycode, globals(), locals())
         # the exec:ed code is expected to set return_value
         got = locals()['return_value']
         if not comparator:

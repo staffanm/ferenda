@@ -9,7 +9,7 @@ doc.body = elements_from_soup(BeautifulSoup("""<html>
 <body>
 URLs often appear like http://example.org/foo, in running text
 </body>
-</html>""").body)
+</html>""", "lxml").body)
 # begin
 from ferenda import CitationParser
 from ferenda import URIFormatter

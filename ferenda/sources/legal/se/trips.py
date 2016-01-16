@@ -1,17 +1,19 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 # Base class for fetching data from an ancient database system used by
 # swedish gov IT...
 import os
 import re
-from six.moves.urllib_parse import quote
+from urllib.parse import quote
 
 import requests
 import lxml.html
 from bs4 import BeautifulSoup
 
-from ferenda.decorators import downloadmax, recordlastdownload
+from ferenda.decorators import downloadmax
 from ferenda import util
 from . import SwedishLegalSource
 

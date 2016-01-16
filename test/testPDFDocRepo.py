@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 import sys
 import os
@@ -11,11 +13,10 @@ from ferenda import util, errors
 from ferenda import PDFDocumentRepository
 from ferenda.testutil import RepoTester
 
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 
 class Repo(RepoTester):
     repoclass = PDFDocumentRepository
+
     def test_parse(self):
         util.ensure_dir(self.repo.store.downloaded_path("sample"))
         shutil.copy2("test/files/pdfreader/sample.pdf",

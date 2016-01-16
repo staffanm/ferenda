@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 """General  library of small utility functions."""
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+from future.standard_library import install_aliases
+install_aliases()
 
 import codecs
 import datetime
@@ -16,12 +20,7 @@ import time
 from contextlib import contextmanager
 from email.utils import parsedate_tz
 from ast import literal_eval
-
-import six
-from six.moves.urllib_parse import urlsplit, urlunsplit
-from six import text_type as str
-from six import binary_type as bytes
-
+from urllib.parse import urlsplit, urlunsplit
 
 from . import errors
 
@@ -236,9 +235,8 @@ def runcmd(cmdline, require_success=False, cwd=None,
     :returns: The returncode, all stdout output, all stderr output
     :rtype: tuple
     """
-    if sys.platform == "win32" and six.PY2:
-        cmdline_encoding = "windows-1252"
-
+    # if sys.platform == "win32" and six.PY2:
+    #     cmdline_encoding = "windows-1252"
     if cmdline_encoding:
         cmdline = cmdline.encode(cmdline_encoding)
 
@@ -534,11 +532,11 @@ def extract_text(html, start, end, decode_entities=True, strip_tags=True):
     endidx = html.rindex(end)
     text = html[startidx + len(start):endidx]
     if decode_entities:
-        from six.moves import html_entities
+        from html.entities import name2codepoint
         entities = re.compile("&(\w+?);")
         text = entities.sub(
-            lambda m: six.unichr(
-                html_entities.name2codepoint[
+            lambda m: chr(
+                name2codepoint[
                     m.group(1)]),
             text)
     if strip_tags:
@@ -666,7 +664,7 @@ def c_locale(category=locale.LC_TIME):
     """
 
     oldlocale = locale.getlocale(category)
-    newlocale = 'C' if six.PY3 else b'C'
+    newlocale = b'C' if sys.version_info[0] < 3 else 'C'
     locale.setlocale(category, newlocale)
     try:
         yield

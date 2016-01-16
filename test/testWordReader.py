@@ -1,19 +1,23 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 # NOTE: This unittest requires that the antiword binary is available
 # and calls that, making this not a pure unittest (it also
 # reads word files from disk) but that is just the way it is.
 
-import sys, os, tempfile, shutil
+import os
+import tempfile
+import shutil
+
 from lxml import etree
 from ferenda.compat import unittest
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
 from ferenda.errors import ExternalCommandError
 
 # SUT
 from ferenda import WordReader
+
 
 class Read(unittest.TestCase):
     def setUp(self):

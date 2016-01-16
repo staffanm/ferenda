@@ -1,28 +1,21 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
-import sys
-import os
 from datetime import datetime, timedelta
 from operator import attrgetter, itemgetter
-
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
-
-import copy
 import json
-import shutil
+import os
 
-from six import text_type as str
 from lxml import etree
 import rdflib
 from rdflib import RDF
 from rdflib.namespace import DCTERMS
 
-from ferenda.compat import Mock, MagicMock, patch
+from ferenda.compat import Mock, MagicMock
 from ferenda import util
 from ferenda.testutil import RepoTester
-from ferenda.elements import Link
 
 # SUT
 from ferenda import Facet, Feedset, Feed, DocumentEntry, Describer

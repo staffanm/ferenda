@@ -1,41 +1,70 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+from future import standard_library
+standard_library.install_aliases()
 
-import json
+from collections import OrderedDict
+from subprocess import Popen, PIPE
+from time import sleep
+import configparser
+import functools
 import logging
 import os
-import pkg_resources
 import shutil
 import sys
 import tempfile
-from time import sleep
-from subprocess import Popen, PIPE
-# NOTE: by inserting cwd (which *should* be the top-level source code
-# dir, with 'ferenda' and 'test' as subdirs) into sys.path as early as
-# possible, we make it possible for pkg_resources to find resources in
-# the 'ferenda' package even when we change the cwd later on. We also
-# have to call a resource method to make it stick.
-sys.path.insert(0,os.getcwd())
-pkg_resources.resource_listdir('ferenda','res')
-
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
-from ferenda.compat import unittest, OrderedDict, Mock, MagicMock, patch, call
-from ferenda.testutil import RepoTester, FerendaTestCase
-
-import six
-from six.moves import configparser, reload_module
-builtins = "__builtin__" if six.PY2 else "builtins"
 
 from lxml import etree as ET
 import requests.exceptions
-from layeredconfig import LayeredConfig, Defaults
+from layeredconfig import LayeredConfig
 
+from ferenda.compat import unittest, Mock, patch
+from ferenda.testutil import RepoTester, FerendaTestCase
 from ferenda import manager, decorators, util, errors
-from ferenda import DocumentRepository, DocumentStore, ResourceLoader, Resources
+from ferenda import (DocumentRepository, DocumentStore,
+                     ResourceLoader, Resources)
+
+
+def quiet():
+    """Ensures that anything called by the test method won't output
+    anything, either by logging statements or calls to print()."""
+    # extra ceremony to work with unittest
+    def outer(f, *args, **kwargs):
+        @functools.wraps(f)
+        def test_wrapper(self):
+            l = logging.getLogger()
+            for h in l.handlers:
+                if isinstance(h, logging.StreamHandler):
+                    break
+                tmp = None
+            else:
+                fileno, tmp = tempfile.mkstemp()
+                l.addHandler(logging.FileHandler(tmp))
+                h = logging.StreamHandler()
+                h.setLevel(logging.CRITICAL)
+                h.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s",
+                                                 datefmt="%H:%M:%S"))
+                l.addHandler(h)
+            prevlevel = l.level
+            l.setLevel(logging.CRITICAL)
+            with patch('builtins.print') as printmock:
+                ret = f(self, *args, **kwargs)
+            # assert l.level == logging.CRITICAL, "Someone messed with the root logger level"
+            l.setLevel(prevlevel)
+            h.setLevel(prevlevel) # otherwise it'll be the default logging.WARNING i think
+            os.unlink(tmp)
+            return ret
+        return test_wrapper
+    return outer
+
 
 class staticmockstore(DocumentStore):
-    def list_basefiles_for(cls,action):
-        return ["arg1","myarg","arg2"]
+
+    def list_basefiles_for(cls, action):
+        return ["arg1", "myarg", "arg2"]
+
 
 class staticmockclass(DocumentRepository):
     """Example class for testing"""
@@ -59,13 +88,13 @@ class staticmockclass(DocumentRepository):
     def relate(self, basefile):
         return "%s relate %s" % (self.alias, basefile)
  
-    def generate(self, basefile): 
+    def generate(self, basefile):
         return "%s generate %s" % (self.alias, basefile)
 
-    def toc(self): 
+    def toc(self):
         return "%s toc ok" % (self.alias)
 
-    def news(self): 
+    def news(self):
         return "%s news ok" % (self.alias)
 
     def internalmethod(self, arg):
@@ -73,6 +102,7 @@ class staticmockclass(DocumentRepository):
 
     @classmethod
     def setup(cls, action, config): pass
+
     @classmethod
     def teardown(cls, action, config): pass
         
@@ -85,25 +115,27 @@ class staticmockclass(DocumentRepository):
                      'imgfiles': [cls.resourcebase + '/test.png'],
                      'jsfiles': [cls.resourcebase + '/test.js']})
         return opts
-                    
-    
-    
+
+
 class staticmockclass2(staticmockclass):
     """Another class for testing"""
-    alias="staticmock2"
+    alias = "staticmock2"
+
     def mymethod(self, arg):
         """Frobnicate the bizbaz (alternate implementation)"""
         if arg == "myarg":
             return "yeah!"
 
+
 class staticmockclass3(staticmockclass):
     """Yet another (overrides footer())"""
-    alias="staticmock3"
+    alias = "staticmock3"
+
     def footer(self):
         return (("About", "http://example.org/about"),
                 ("Legal", "http://example.org/legal"),
-                ("Contact", "http://example.org/contact")
-        )
+                ("Contact", "http://example.org/contact"))
+
 
 class API(unittest.TestCase, FerendaTestCase):
     """Test cases for API level methods of the manager modules (functions
@@ -282,7 +314,7 @@ class Setup(RepoTester):
             log.error.reset_mock()
 
         # test 2: modules are old / or missing
-        with patch(builtins + '.__import__') as importmock:
+        with patch('importlib.import_module') as importmock:
             setattr(importmock.return_value, '__version__', '0.0.1')
             self.assertFalse(manager._preflight_check(log, verbose=True))
             self.assertTrue(log.error.called)
@@ -608,6 +640,7 @@ class Run(RunBase, unittest.TestCase):
     def test_run_enable(self):
         self._enable_repos()
 
+    @quiet()
     def test_run_single(self):
         # test1: run standard (custom) method
         self._enable_repos()
@@ -620,7 +653,7 @@ class Run(RunBase, unittest.TestCase):
         with patch('ferenda.manager.setup_logger'):
             self.assertEqual(manager.run(argv), None)
 
-        with patch(builtins+'.print') as printmock:
+        with patch('builtins.print') as printmock:
             with patch('ferenda.manager.setup_logger'):
                 # test3: specify invalid method
                 argv = ["test", "invalid"]
@@ -634,7 +667,7 @@ class Run(RunBase, unittest.TestCase):
         self._enable_repos()
         argv = ["test", "errmethod", "--all"]
         with patch('ferenda.manager.setup_logger'):
-            with patch(builtins+'.print') as printmock:
+            with patch('builtins.print') as printmock:
                 res = manager.run(argv)
         self.assertEqual(res[0][0], Exception)
         self.assertEqual(res[1][0], errors.DocumentRemovedError)
@@ -880,9 +913,8 @@ imgfiles = []
         os.unlink("out.log")
 
     def test_print_usage(self):
-        builtins = "__builtin__" if six.PY2 else "builtins"
         self._enable_repos()
-        with patch(builtins+'.print') as printmock:
+        with patch('builtins.print') as printmock:
             manager.run([])
 
         executable = sys.argv[0]

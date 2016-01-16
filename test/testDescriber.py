@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 import datetime
 
-from ferenda.compat import unittest
-
 from rdflib import Graph, Namespace
+
+from ferenda.compat import unittest
 
 # SUT
 from ferenda import Describer
 DCTERMS = Namespace("http://purl.org/dc/terms/")
 FOAF = Namespace("http://xmlns.com/foaf/0.1/")
+
 
 class TestDescriber(unittest.TestCase):
     def setUp(self):

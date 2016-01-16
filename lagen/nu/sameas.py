@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 from rdflib import Graph, Namespace, RDF, URIRef
 from rdflib.namespace import OWL
 from cached_property import cached_property
 
-
 from ferenda import ResourceLoader
 from ferenda.thirdparty.coin import URIMinter
-from ferenda.sources.legal.se import RPUBL
+
 
 class SameAs(object):
     @cached_property

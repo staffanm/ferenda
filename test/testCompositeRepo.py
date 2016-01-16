@@ -1,14 +1,12 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
-import sys, os
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-
-from layeredconfig import LayeredConfig, Defaults
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 from ferenda import DocumentRepository, util, errors
 from ferenda.testutil import RepoTester
-#SUT
+
+# SUT
 from ferenda import CompositeRepository
 
 

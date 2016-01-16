@@ -1,30 +1,31 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+from future import standard_library
+standard_library.install_aliases()
 
+from collections import defaultdict, OrderedDict, Counter
 from datetime import date, datetime
+from io import BytesIO
 from operator import itemgetter
 from wsgiref.util import FileWrapper
+from urllib.parse import parse_qsl, urlencode
 import inspect
 import json
 import logging
 import mimetypes
 import os
+import pkg_resources
 import re
 import sys
-from collections import defaultdict
-from itertools import chain
 
-import six
-from six.moves.urllib_parse import parse_qsl, urlencode
-from six import text_type as str
-from six import binary_type as bytes
 from rdflib import URIRef, Namespace, Literal, Graph
 from lxml import etree
 from layeredconfig import LayeredConfig, Defaults, INIFile
-import pkg_resources
 
-from ferenda.compat import OrderedDict, Counter
-from ferenda import DocumentRepository, FulltextIndex, Transformer, Facet, ResourceLoader
+from ferenda import (DocumentRepository, FulltextIndex, Transformer,
+                     Facet, ResourceLoader)
 from ferenda import fulltextindex, util, elements
 from ferenda.elements import html
 
@@ -151,8 +152,7 @@ class WSGIApp(object):
             d = self.stats()
         else:
             d = self.query(environ)
-
-        data = json.dumps(dict(d), indent=4, default=util.json_default_date,
+        data = json.dumps(d, indent=4, default=util.json_default_date,
                           sort_keys=True).encode('utf-8')
         start_response(self._str("200 OK"), [
             (self._str("Content-Type"), self._str("application/json")),
@@ -209,7 +209,7 @@ class WSGIApp(object):
                 mimetype = "text/html"
                 status = "404 Not Found"
                 length = len(msg.encode('utf-8'))
-                fp = six.BytesIO(msg.encode('utf-8'))
+                fp = BytesIO(msg.encode('utf-8'))
                 iterdata = FileWrapper(fp)
         length = str(length)
         start_response(self._str(status), [

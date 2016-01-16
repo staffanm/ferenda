@@ -1,14 +1,18 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+#
 # This is a set of class methods, originally from
 # ferenda.sources.legal.eu.EurlexTreaties, which perform graph
 # analysis on documents from ferenda.sources.legal.eu.EurlexCaselaw.
-# The main idea is to let them live in
+# They're not working now, but the main plan is to let them live in
 # ferenda.sources.general.GraphAnalyze, generalize them, and make them
 # available for any docrepo who wants their stuff analyzed (by
 # inheriting from DocumentRepository and this class). For the time
 # being though, the code should not be included in tests and coverage
 # -- it's dead code, but with a hope of resuscitation.
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
 import os
 import subprocess
 from datetime import datetime

@@ -1,24 +1,24 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-import xml.etree.cElementTree as ET
-import os
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
 from io import BytesIO, StringIO
-import tempfile
-import logging
-import re
 from xml.sax import SAXParseException
+from urllib.parse import quote
+import logging
+import os
+import re
+import tempfile
+import xml.etree.cElementTree as ET
 
 from rdflib import URIRef
 from rdflib import Graph
-from rdflib import URIRef
 from rdflib import ConjunctiveGraph
 import requests
 import requests.exceptions
 import pyparsing
 
-import six
-from six import text_type as str
-from six.moves.urllib_parse import quote
 
 try:
     from ferenda.thirdparty import SQLite
@@ -440,8 +440,6 @@ class RemoteStore(TripleStore):
     def select(self, query, format="sparql"):
         url = self._endpoint_url()
         query = query.replace("\n", " ")
-        if six.PY2:
-            query = query.encode("utf-8")
         url += "?query=" + quote(query).replace("/", "%2F")
 
         headers = {}
@@ -503,7 +501,6 @@ class RemoteStore(TripleStore):
             for element in row:
                 # print element.tag # should be "binding"
                 key = element.attrib['name']
-                # note: str is really six.text_type, ie str on py3, unicode on py2
                 value = str(element[0].text)
                 d[key] = value
             res.append(d)

@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 import sys
 import os
@@ -7,9 +9,7 @@ import subprocess
 import tempfile
 import shutil
 import re
-
-import six
-from six.moves import reload_module
+from importlib import reload
 
 from ferenda import util
 from ferenda.compat import unittest
@@ -24,7 +24,6 @@ from ferenda.decorators import downloadmax
 from bs4 import BeautifulSoup
 from datetime import datetime, date
 from itertools import islice
-from six.moves.urllib_parse import urljoin
 import requests
 
 
@@ -44,8 +43,8 @@ class Examples(unittest.TestCase, FerendaTestCase):
         pycode = compile(pytext, pyfile, 'exec')
         os.chdir(workingdir)
         try:
-            reload_module(ferenda)  # so that ferenda.__file__ might return a abspath
-            result = six.exec_(pycode, globals(), locals())
+            reload(ferenda)  # so that ferenda.__file__ might return a abspath
+            result = exec(pycode, globals(), locals())
         finally:
             os.chdir(oldwd)
         # the exec:ed code is expected to set return_value

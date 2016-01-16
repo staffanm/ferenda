@@ -1,18 +1,23 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
-# NOTE: This unittest requires that the pdftohtml binary is available
-# and calls that, making this not a pure unittest.
+# NOTE: This unittest requires that the pdftohtml and related binaries
+# are available for calling, making this not a pure unittest. If they
+# are not, the tests fall back to using canned result files.
 
-import sys, os, tempfile, shutil
-from lxml import etree
-from ferenda.compat import unittest
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
 from bz2 import BZ2File
+import os
+import shutil
+import tempfile
+
+from ferenda.compat import unittest
 from ferenda import errors, util
-from six import text_type as str
+
 # SUT
 from ferenda import PDFReader
+
 
 class Read(unittest.TestCase):
     def setUp(self):

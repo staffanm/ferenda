@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 import os
 import codecs
 import copy
 
-import six
-
 
 class TextReader(object):
-
     """Fancy file-like-class for reading (not writing) text files by line,
     paragraph, page or any other user-defined unit of text, with
     support for peeking ahead and looking backwards. It can read
@@ -64,7 +63,7 @@ class TextReader(object):
             self.data = self.f.read()
             self.f.close()
         else:
-            assert(isinstance(string, six.text_type))
+            assert(isinstance(string, str))
             self.data = string
 
         self.currpos = 0

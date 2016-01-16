@@ -1,23 +1,24 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 """Hanterar domslut (detaljer och referat) från Domstolsverket. Data
 hämtas fran DV:s (ickepublika) FTP-server, eller fran lagen.nu."""
 
 # system libraries (incl six-based renames)
+from bz2 import BZ2File
+from collections import defaultdict
 from datetime import datetime
 from ftplib import FTP
+from io import BytesIO
 from time import mktime
+from urllib.parse import urljoin
 import codecs
 import itertools
 import os
 import re
-import zipfile
-from six import text_type as str
-from six.moves.urllib_parse import urljoin
-from six import BytesIO
 import tempfile
-from collections import defaultdict
-from bz2 import BZ2File
+import zipfile
 
 # 3rdparty libs
 from rdflib import Namespace, URIRef, Graph, RDF, RDFS, BNode

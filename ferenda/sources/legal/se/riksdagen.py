@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+from future import standard_library
+standard_library.install_aliases()
 
 # A abstract base class for fetching documents from data.riksdagen.se
 
 import os
 from io import StringIO
+from collections import OrderedDict
 
 import requests
 import requests.exceptions
@@ -12,7 +17,6 @@ from bs4 import BeautifulSoup
 from lxml import etree
 
 from ferenda import util, errors
-from ferenda.compat import OrderedDict
 from ferenda.decorators import downloadmax
 from ferenda.elements import Body, Paragraph, Preformatted
 from ferenda.pdfreader import StreamingPDFReader

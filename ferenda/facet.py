@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function)
+from builtins import *
 
-import logging
 from datetime import datetime
 
-from six import text_type as str
 from rdflib import URIRef, Namespace
 from rdflib.namespace import RDF, RDFS, DC, SKOS, FOAF, DCTERMS
 SCHEMA = Namespace("http://schema.org/")

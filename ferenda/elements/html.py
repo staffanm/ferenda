@@ -9,10 +9,11 @@ that elements of a particular kind only contain allowed
 sub-elements.
 
 """
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 import logging
-import six
 
 import bs4
 
@@ -61,8 +62,8 @@ def elements_from_soup(soup,
             pass
         elif isinstance(child, bs4.NavigableString):
             #print("%sChild string %r" % (depth*". ",child[:10]))
-            if six.text_type(child).strip() != "":  # ignore pure whitespace between tags
-                element.append(six.text_type(child))  # convert NavigableString to pure str
+            if str(child).strip() != "":  # ignore pure whitespace between tags
+                element.append(str(child))  # convert NavigableString to pure str
         else:
             #print("%sChild %s" % (depth*". ",soup.name))
             subelement = elements_from_soup(child, remove_tags, keep_attributes)

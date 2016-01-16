@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 import logging
 import os
@@ -9,16 +11,12 @@ import re
 # thirdparty
 from simpleparse.parser import Parser
 from simpleparse.stt.TextTools.TextTools import tag
-import six
-from six import text_type as str
-from six import unichr as chr
 from rdflib import Graph, Namespace, Literal, BNode, RDFS, RDF, URIRef
 from rdflib.namespace import DCTERMS, SKOS
 COIN = Namespace("http://purl.org/court/def/2009/coin#")
 
 # my own libraries
 from ferenda import ResourceLoader
-from ferenda import util
 from ferenda.elements import Link, LinkSubject
 from ferenda.thirdparty.coin import URIMinter
 from . import RPUBL, RINFOEX
@@ -199,7 +197,7 @@ class LegalRef:
     def get_relations(self, predicate, graph):
         d = {}
         for obj, subj in graph.subject_objects(predicate):
-            d[six.text_type(subj)] = six.text_type(obj)
+            d[str(subj)] = str(obj)
         return d
 
     def parse(self,

@@ -1,31 +1,32 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-import os,sys
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+import os
 import codecs
-from ferenda.compat import unittest
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-
-import six
 
 from ferenda import CitationParser
 from ferenda import util
-import ferenda.citationpatterns
+from ferenda.compat import unittest
 from ferenda.testutil import file_parametrize
+import ferenda.citationpatterns
+
 
 class ParametricBase(unittest.TestCase):
     parser = ferenda.citationpatterns.url
-    def parametric_test(self,filename):
-        with codecs.open(filename,encoding="utf-8") as fp:
+
+    def parametric_test(self, filename):
+        with codecs.open(filename, encoding="utf-8") as fp:
             testdata = fp.read()
         
         cp = CitationParser(self.parser)
         nodes = cp.parse_string(testdata)
         got = []
         for node in nodes:
-            if isinstance(node,six.text_type):
+            if isinstance(node, str):
                 got.append(node.strip())
             else:
-                (text,result) = node
+                (text, result) = node
                 got.append(util.parseresults_as_xml(result).strip())
         
         wantfile = os.path.splitext(filename)[0] + ".result"

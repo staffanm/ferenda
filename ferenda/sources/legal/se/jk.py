@@ -1,24 +1,25 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 import re
 import os
 from datetime import datetime, timedelta
-from six.moves.urllib_parse import urljoin
+from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
 from rdflib.namespace import SKOS
 
-from . import SwedishLegalSource, SwedishLegalStore, RPUBL, SwedishCitationParser
-from .swedishlegalsource import AnonStycke
-from ferenda.decorators import downloadmax, recordlastdownload, newstate
-from ferenda import util
-from ferenda import Describer, FSMParser
-from ferenda.sources.legal.se.legalref import LegalRef
-from ferenda.sources.legal.se import legaluri
-from ferenda.elements import Body, CompoundElement
+from . import SwedishLegalSource, SwedishLegalStore, RPUBL
 from .elements import *
+from .swedishlegalsource import AnonStycke
+from ferenda import FSMParser
+from ferenda import util
+from ferenda.decorators import downloadmax, recordlastdownload, newstate
+from ferenda.elements import Body
+
 
 class JKStore(SwedishLegalStore):
     def basefile_to_pathfrag(self, basefile):

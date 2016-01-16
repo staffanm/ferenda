@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 """This module constructs URIs for a document based on the properties
 of that document. Alternatively, given a URI for a document, parse the
 different properties for the document"""
@@ -17,7 +19,7 @@ from rdflib.namespace import DCTERMS
 # my own libraries
 from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda import util
-from ferenda.thirdparty.coin import URIMinter, COIN
+from ferenda.thirdparty.coin import URIMinter
 from . import RPUBL, RINFOEX
 
 # This dict maps keys used by the internal dictionaries that LegalRef

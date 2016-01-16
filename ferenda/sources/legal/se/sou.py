@@ -1,18 +1,22 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
 
 import re
 import os
 from datetime import datetime
-from six.moves.urllib_parse import urljoin
+from urllib.parse import urljoin
 
 from rdflib import URIRef, Literal, Graph, Namespace
-from rdflib.namespace import SKOS, DCTERMS, DC, RDF, XSD
+from rdflib.namespace import SKOS, DC, RDF, XSD
 BIBO = Namespace("http://purl.org/ontology/bibo/")
 from bs4 import BeautifulSoup
 import lxml.html
 
-from ferenda import PDFAnalyzer, CompositeRepository, DocumentEntry, PDFDocumentRepository
+from ferenda import (PDFAnalyzer, CompositeRepository, DocumentEntry,
+                     PDFDocumentRepository)
 from ferenda import util, decorators
 from ferenda.pdfreader import StreamingPDFReader
 from . import Regeringen, SwedishLegalSource, RPUBL

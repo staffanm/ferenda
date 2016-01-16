@@ -6,6 +6,6 @@ then
 else
     # When running the entire suite, exit at first failure (-f) in
     # order to not have to wait three minutes.
-    python -Wi -m unittest discover -v test
+    python -m unittest discover -v -f test
     python -V
 fi

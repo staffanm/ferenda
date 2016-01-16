@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-# Intermediate base class containing some small functionality useful
-# for handling data sources of swedish law.
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
+# Intermediate base class containing some functionality useful
+# for handling data sources of swedish law, including minting URIs etc..
 
 from datetime import datetime, date
 import re
 import os
-import itertools
 import logging
-import warnings
 from bz2 import BZ2File
 
 from layeredconfig import LayeredConfig, Defaults
@@ -24,21 +25,18 @@ from ferenda import (DocumentRepository, DocumentStore, FSMParser,
 from ferenda import util
 from ferenda.sources.legal.se.legalref import Link, LegalRef, RefParseError
 from ferenda.elements.html import A, H1, H2, H3
-from ferenda.elements import (Paragraph, Section, Body,
-                              OrdinalElement, CompoundElement,
-                              SectionalElement)
+from ferenda.elements import Section, Body, CompoundElement
 from ferenda.pdfreader import Page
-from ferenda.pdfreader import PDFReader, StreamingPDFReader
+from ferenda.pdfreader import PDFReader
 from ferenda.pdfanalyze import PDFAnalyzer
 from ferenda.decorators import action, managedparsing
 from ferenda.thirdparty.coin import URIMinter
-from ferenda.elements.elements import E
 from . import RPUBL
 from .elements import *
 PROV = Namespace(util.ns['prov'])
 
-class SwedishLegalStore(DocumentStore):
 
+class SwedishLegalStore(DocumentStore):
     """Customized DocumentStore that better handles some pecularities in
     swedish legal document naming."""
 

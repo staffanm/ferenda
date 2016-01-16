@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, division
 """A bunch of helper functions for analyzing pdf files."""
-import os
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
 import logging
 import json
-from io import BytesIO, StringIO
+from collections import Counter
+from io import BytesIO
 from itertools import chain
 from math import floor, ceil
 
-from six import text_type as str
-
 from .pdfreader import Page
 from ferenda import util
-from ferenda.compat import Counter
 
 
 class PDFAnalyzer(object):

@@ -1,32 +1,28 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
+from tempfile import mktemp
+from urllib.parse import urljoin, unquote
+from xml.sax.saxutils import escape as xml_escape
 import os
 import re
-import logging
-import codecs
-from tempfile import mktemp
-from operator import attrgetter
-from xml.sax.saxutils import escape as xml_escape
 
-from rdflib import Graph, URIRef, Literal, Namespace
+from rdflib import URIRef, Literal, Namespace
 from bs4 import BeautifulSoup
 import requests
-import six
-from six.moves.urllib_parse import urljoin, unquote
 import lxml.html
+from rdflib import RDF
+from rdflib.namespace import DCTERMS, SKOS
 
-from ferenda import TextReader, Describer, Facet, DocumentRepository, PDFReader
+from . import RPUBL, RINFOEX, SwedishLegalSource
+from .swedishlegalsource import SwedishCitationParser
+from ferenda import TextReader, Describer, Facet, PDFReader
 from ferenda import util, decorators, errors
 from ferenda.elements import Body, Page, Preformatted, Link
 from ferenda.sources.legal.se.legalref import LegalRef
-from ferenda.sources.legal.se import legaluri
-from . import SwedishLegalSource
-from .swedishlegalsource import SwedishCitationParser
 
-from rdflib import RDF
-from rdflib.namespace import DCTERMS, SKOS
-from . import RPUBL, RINFOEX
 PROV = Namespace(util.ns['prov'])
 
 # NOTE: Since the main parse logic operates on the output of
@@ -621,10 +617,7 @@ class MyndFskrBase(SwedishLegalSource):
 
         # FIXME: should go in sanitize_text
         import unicodedata
-        if six.PY3:
-            all_chars = (chr(i) for i in range(0x10000))
-        else:
-            all_chars = (unichr(i) for i in range(0x10000))
+        all_chars = (chr(i) for i in range(0x10000))
         control_chars = ''.join(
             c for c in all_chars if unicodedata.category(c) == 'Cc')
         # tab and newline are technically Control characters in
@@ -764,20 +757,11 @@ class DVFS(MyndFskrBase):
         etgt, earg = [m.group(1) for m in re.finditer("'([^']*)'", url)]
         fields = dict(form.fields)
 
-        # requests seem to prefer that keys and values to the
-        # files argument should be str (eg bytes) on py2 and
-        # str (eg unicode) on py3. But we use unicode_literals
-        # for this file, so we define a wrapper to convert
-        # unicode strs in the appropriate way
-        if six.PY2:
-            f = six.binary_type
-        else:
-            f = lambda x: x
-        fields[f('__EVENTTARGET')] = etgt
-        fields[f('__EVENTARGUMENT')] = earg
+        fields['__EVENTTARGET'] = etgt
+        fields['__EVENTARGUMENT'] = earg
         for k, v in fields.items():
             if v is None:
-                fields[k] = f('')
+                fields[k] = ''
         # using the files argument to requests.post forces the
         # multipart/form-data encoding
         req = requests.Request(

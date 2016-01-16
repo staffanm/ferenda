@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
 from bz2 import BZ2File
 from glob import glob
 from io import BytesIO
@@ -12,9 +15,6 @@ import warnings
 
 from lxml import etree
 from lxml.builder import ElementMaker
-from six import text_type as str
-# from six import binary_type as bytes
-import six
 from layeredconfig import LayeredConfig, Defaults
 
 from ferenda import util, errors
@@ -453,15 +453,18 @@ class PDFReader(CompoundElement):
             # complicated) to change these to xml numeric character
             # references
             newfp = BytesIO()
-            for b in six.iterbytes(xmlfp.read()):
+            bytebuffer = bytes(xmlfp.read())
+            for b in bytebuffer:
                 if b < 0x20 and b not in (0x9, 0xa, 0xd):
                     # note: We don't use real xml numeric character
-                    # references as "&#3;" is as invalid as a real
-                    # 0x03 byte in XML, instead we double-escape it.
+                    # references as "&#3;" as this is as invalid as a
+                    # real 0x03 byte in XML, instead we double-escape
+                    # it.
                     entity = "&amp;#%s;" % b
                     newfp.write(entity.encode())
                 else:
-                    newfp.write(six.int2byte(b))
+                    # newfp.write(six.int2byte(b))
+                    newfp.write(bytes((b,)))
             newfp.seek(0)
             xmlfp = newfp
         try:
@@ -929,9 +932,9 @@ all text in a Textbox has the same font and size.
         if len(s) > 40:
             s = s[:25] + "[...]" + s[-10:]
 
-        if six.PY2:
-            # s = repr(s)
-            s = s.encode('ascii', 'replace')
+        #if six.PY2:
+        #    # s = repr(s)
+        #    s = s.encode('ascii', 'replace')
         if self.font:
             fontinfo = "%s@%s " % (self.font.family,
                                    self.font.size)
@@ -969,7 +972,7 @@ all text in a Textbox has the same font and size.
                 c = c + e
         # it MIGHT be the case that we need to merge c with the last
         # Textelement added to res iff their tags match
-        if res and c.tag == res[-1].tag:
+        if len(res) and c.tag == res[-1].tag:
             res[-1] = res[-1] + c
         else:
             res.append(c)

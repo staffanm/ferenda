@@ -1,22 +1,26 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
-import sys
-import os
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
+
+import builtins
+from collections import OrderedDict
 from difflib import unified_diff
-from tempfile import mkstemp
-import inspect
-import codecs
 from itertools import islice
-import shutil
+from tempfile import mkstemp
+import codecs
+import inspect
+import os
 import random
+import shutil
+import sys
 
 from rdflib import Graph, URIRef, RDF
-import six
-from six import text_type as str
 from layeredconfig import LayeredConfig
 
-from ferenda.compat import OrderedDict, Mock
-from ferenda import TextReader, TripleStore, FulltextIndex, WSGIApp, CompositeRepository
+from ferenda.compat import Mock
+from ferenda import (TextReader, TripleStore, FulltextIndex, WSGIApp,
+                     CompositeRepository)
 from ferenda.elements import serialize
 from ferenda import decorators, util
 
@@ -66,6 +70,7 @@ class Devel(object):
 
 
         """
+        print = builtins.print
         g = Graph()
         g.parse(data=util.readfile(filename), format="rdfa")
         # At least the turtle serializer creates UTF-8 data. Fix this!
@@ -86,6 +91,7 @@ class Devel(object):
         """
         # print("Creating store of type %s, location %s, repository %s" %
         #       (self.config.storetype, self.config.storelocation, self.config.storerepository))
+        print = builtins.print
         store = TripleStore.connect(self.config.storetype,
                                     self.config.storelocation,
                                     self.config.storerepository)
@@ -128,14 +134,14 @@ class Devel(object):
                       'prov:wasGeneratedBy',
                       ]
         import csv
-        if six.PY2:
-            delimiter = b';'
-            out = sys.stdout
-        else:
-            import codecs
-            delimiter = ';'
-            out = codecs.getwriter("latin-1")(sys.stdout.detach())
-            out.errors = "replace"
+        # if six.PY2:
+        #     delimiter = b';'
+        #     out = sys.stdout
+        # else:
+        import codecs
+        delimiter = ';'
+        out = codecs.getwriter("latin-1")(sys.stdout.detach())
+        out.errors = "replace"
 
         writer = csv.DictWriter(out, predicates, delimiter=delimiter)
         repo = self._repo_from_alias(alias)
@@ -156,8 +162,8 @@ class Devel(object):
                             # values), while py3 CSV expects unicode
                             # (sensibly)
                             fld = str(o)
-                            if six.PY2:
-                                fld = fld.encode("latin-1", errors="replace")
+                            # if six.PY2:
+                            #     fld = fld.encode("latin-1", errors="replace")
                             row[qname] = fld
                 row['subobjects'] = len(list(g.subject_objects(RDF.type)))
                 writer.writerow(row)
@@ -251,8 +257,10 @@ class Devel(object):
         # Assume that intermediate files use the same encoding as
         # source files
         encoding = repo.source_encoding
-        outfile_lines = codecs.open(outfile, encoding=encoding).readlines()
-        stash_lines = codecs.open(stash, encoding=encoding).readlines()
+        with codecs.open(outfile, encoding=encoding) as fp:
+            outfile_lines = fp.readlines()
+        with codecs.open(stash, encoding=encoding) as fp:
+            stash_lines = fp.readlines()
         difflines = list(unified_diff(outfile_lines,
                                       stash_lines,
                                       outfile,
@@ -326,6 +334,7 @@ class Devel(object):
         :type source:        str
 
         """
+        print = builtins.print
         modulename, classname, methodname = functionname.rsplit(".", 2)
         __import__(modulename)
         m = sys.modules[modulename]
@@ -346,6 +355,7 @@ class Devel(object):
         :param querystring: The query
         :type querystring: str
         """
+        print = builtins.print
         index = FulltextIndex.connect(self.config.indextype,
                                       self.config.indexlocation)
         rows = index.query(querystring)
@@ -354,6 +364,7 @@ class Devel(object):
 
     @decorators.action
     def construct(self, template, uri, format="turtle"):
+        print = builtins.print
         sq = util.readfile(template) % {'uri': uri}
         ts = TripleStore.connect(self.config.storetype,
                                  self.config.storelocation,
@@ -377,7 +388,7 @@ class Devel(object):
         ts = TripleStore.connect(self.config.storetype,
                                  self.config.storelocation,
                                  self.config.storerepository)
-
+        print = builtins.print
         print("# Constructing the following from %s, repository %s, type %s" %
               (self.config.storelocation,
                self.config.storerepository,

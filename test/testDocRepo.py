@@ -1,39 +1,27 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
-import sys, os
-from ferenda.compat import unittest
-if os.getcwd() not in sys.path: sys.path.insert(0,os.getcwd())
-
-from ferenda.manager import setup_logger; setup_logger('CRITICAL')
-
-from datetime import datetime,date,timedelta
-from operator import itemgetter, attrgetter
+from datetime import datetime, date
+import calendar
 import codecs
 import collections
-import shutil
-import tempfile
-import time
-import calendar
-import json
 import copy
+import doctest
+import os
+import shutil
+import time
 import unicodedata
 
+from bs4 import BeautifulSoup
+from layeredconfig import LayeredConfig, Defaults, INIFile
 import lxml.etree as etree
-from lxml.etree import XSLT
-from lxml.builder import ElementMaker
 import rdflib
 import requests.exceptions
 
-import six
-from six import text_type as str
-from ferenda.compat import Mock, MagicMock, patch, call
-from bs4 import BeautifulSoup
-from layeredconfig import LayeredConfig, Defaults, INIFile
-import doctest
-
-from ferenda import DocumentEntry, TocPageset, TocPage, \
-    Describer, TripleStore, FulltextIndex, Facet
+from ferenda.compat import Mock, patch, call
+from ferenda import DocumentEntry, Describer, Facet
 from ferenda.fulltextindex import WhooshIndex
 from ferenda.errors import *
 
@@ -869,8 +857,7 @@ Status for document repository 'base' (ferenda.documentrepository.DocumentReposi
  parse: None.
  generated: None.
 """.strip()
-        builtins = "__builtin__" if six.PY2 else "builtins"
-        with patch(builtins+".print") as printmock:
+        with patch("builtins.print") as printmock:
             self.repo.status()
         got = "\n".join([x[1][0] for x in printmock.mock_calls])
         self.assertEqual(want,got)
@@ -892,8 +879,7 @@ Status for document repository 'base' (ferenda.documentrepository.DocumentReposi
  parse: 8, 7, 6... (5 more) Todo: 12, 11, 10... (1 more)
  generated: 4, 3, 2... (1 more) Todo: 8, 7, 6... (1 more)
 """.strip()
-        builtins = "__builtin__" if six.PY2 else "builtins"
-        with patch(builtins+".print") as printmock:
+        with patch("builtins.print") as printmock:
             self.repo.status()
         got = "\n".join([x[1][0] for x in printmock.mock_calls])
         self.assertEqual(want,got)

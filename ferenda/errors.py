@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
-"""These are the exceptions thrown by Ferenda. Any of the python built-in exceptions may be thrown as well, but exceptions in used third-party libraries should be wrapped in one of these."""
-from __future__ import unicode_literals
+"""These are the exceptions thrown by Ferenda. Any of the python
+built-in exceptions may be thrown as well, but exceptions in used
+third-party libraries should be wrapped in one of these."""
+
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from builtins import *
 
 
 class FerendaException(Exception):
@@ -10,15 +15,14 @@ class FerendaException(Exception):
 class DownloadError(FerendaException):
     """Raised when a download fails in a non-recoverable way."""
 
-class ParseError(FerendaException):
 
+class ParseError(FerendaException):
     """Raised when :py:meth:`~ferenda.DocumentRepository.parse` fails in
     any way.
     """
 
 
 class FSMStateError(ParseError):
-
     """Raised whenever the current state and the current symbol in a
        :py:class:`~ferenda.FSMParser` configuration does not have a
        defined transition.
@@ -26,7 +30,6 @@ class FSMStateError(ParseError):
 
 
 class DocumentRemovedError(FerendaException):
-
     """Raised whenever a particular document has been found to be removed
     -- this can happen either during
     :py:meth:`~ferenda.DocumentRepository.download` or
@@ -48,25 +51,21 @@ class DocumentRemovedError(FerendaException):
         self.dummyfile = dummyfile
 
 class PatchError(ParseError):
-
     """Raised if a patch cannot be applied by
 :py:meth:`~ferenda.DocumentRepository.patch_if_needed`."""
 
 
 class NoDownloadedFileError(ParseError):
-
     """Raised on an attempt to parse a basefile for which there doesn't
 exist a downloaded file."""
 
 
 class AttachmentNameError(ValueError):
-
     """Raised whenever an invalid attachment name is used with any method
     of :py:class:`~ferenda.DocumentStore`."""
 
 
 class AttachmentPolicyError(ValueError):
-
     """Raised on any attempt to store an attachment using
     :py:class:`~ferenda.DocumentStore` when ``storage_policy`` is not
     set to ``dir``.
@@ -74,47 +73,43 @@ class AttachmentPolicyError(ValueError):
 
 
 class ArchivingError(FerendaException):
+    """Raised whenever an attempt to archive a document version using
+    :py:meth:`~ferenda.DocumentStore.archive` fails (for example,
+    because the archive version already exists).
 
-    """Raised whenever an attempt to archive a document version using :py:meth:`~ferenda.DocumentStore.archive` fails (for example, because the archive version
-already exists)."""
+    """
 
 
 class ValidationError(FerendaException):
-
     """Raised whenever a created document doesn't validate using the
     appropriate schema."""
 
 
 class TransformError(FerendaException):
-
     """Raised whenever a XSLT transformation fails for any reason."""
 
 
 class ExternalCommandError(FerendaException):
-
     """Raised whenever any invocation of an external commmand fails for
     any reason."""
 
 
 class ExternalCommandNotFound(FerendaException):
-
     """Raised whenever any invocation of an external commmand fails """
 
 
 class ConfigurationError(FerendaException):
-
     """Raised when a configuration file cannot be found in it's expected
 location or when it cannot be used due to corruption, file permissions
 or other reasons"""
 
 
 class TriplestoreError(FerendaException):
-
-    """Raised whenever communications with the triple store fails, for whatever reason."""
+    """Raised whenever communications with the triple store fails, for
+    whatever reason."""
 
 
 class SparqlError(TriplestoreError):
-
     """Raised whenever a SPARQL query fails. The Exception should contain
        whatever error message that the Triple store returned, so the
        exact formatting may be dependent on which store is used.
@@ -123,17 +118,14 @@ class SparqlError(TriplestoreError):
 
 
 class IndexingError(FerendaException):
-
     """Raised whenever an attempt to put text into the fulltext index fails."""
 
 
 class SearchingError(FerendaException):
-
     """Raised whenever an attempt to do a full-text search fails."""
 
 
 class SchemaConflictError(FerendaException):
-
     """Raised whenever a fulltext index is opened with repo arguments that
        result in a different schema than what's currently in
        use. Workaround this by removing the fulltext index and
@@ -143,7 +135,6 @@ class SchemaConflictError(FerendaException):
 
 
 class SchemaMappingError(FerendaException):
-
     """Raised whenever a given field in a schema cannot be mapped to or
        from the underlying native field object in an actual
        fulltextindex store.
@@ -152,7 +143,6 @@ class SchemaMappingError(FerendaException):
 
 
 class MaxDownloadsReached(FerendaException):
-
     """Raised whenever a recursive download operation has reached a
     globally set maximum number of requests.
 
