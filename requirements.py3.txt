@@ -6,7 +6,7 @@ rdfextras
 rdflib-jsonld
 html5lib
 requests
-six
+future
 jsmin
 cssmin
 whoosh
