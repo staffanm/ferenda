@@ -122,11 +122,19 @@ def robust_rename(old, new):
 # util.File
 
 
-def robust_remove(filename):
-    """Removes a filename no matter what (unlike :py:func:`os.unlink`, does not raise an error if the file does not exist)."""
-    if os.path.exists(filename):
-        # try:
-        os.unlink(filename)
+def robust_remove(path):
+    """Removes the path no matter what (unlike :py:func:`os.unlink`, does
+    not raise an error if the file does not exist). If the path is a
+    directory, the entire directory is removed.
+
+    """
+    if os.path.exists(path):
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+        elif os.path.isfile(path):
+            os.unlink(path)
+        else:
+            raise IOError("%s is neither file nor path" % path)
 
 
 # util.File

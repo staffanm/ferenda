@@ -186,7 +186,8 @@ class PDFAnalyzer(object):
         if metricspath:
             util.ensure_dir(metricspath)
             with open(metricspath, "w") as fp:
-                json.dump(allmetrics, fp, indent=4)
+                s = json.dumps(allmetrics, indent=4, separators=(', ', ': '))
+                fp.write(s)
         return allmetrics
 
     def textboxes(self, startpage, pagecount):

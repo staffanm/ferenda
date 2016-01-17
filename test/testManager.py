@@ -411,17 +411,32 @@ class RunBase(object):
         self.addTypeEqualityFunc(OrderedDict, self.assertDictEqual)
         self.maxDiff = None
         self.modulename = "example"
-        # When testing locally , we want to avoid cluttering cwd, so
-        # we chdir to a temp dir, but when testing on travis-ci,
-        # changing the wd makes subsequent calls to
-        # pkg_resources.resource_listdir fail (at least for python <=
-        # 3.2). Don't know why not the same thing happens locally.
-        if 'TRAVIS' in os.environ:
-            self.tempdir = os.getcwd()
-        else:
-            self.tempdir = tempfile.mkdtemp()
-            self.orig_cwd = os.getcwd()
-            os.chdir(self.tempdir)
+        # When testing, we want to avoid cluttering cwd with temporary
+        # directories, so we chdir to a temp dir, but in some cases,
+        # particularly when testing on travis-ci, changing the wd
+        # makes subsequent calls to pkg_resources.resource_listdir
+        # fail (at least for python <= 3.2). It also happens sometimes
+        # when testing locally. pkg_resources is too dense for me to
+        # find out why, so we just detect if that is the case and
+        # adapt for those test methods that need a working
+        # pkg_resources.resource_listdir
+        self.tempdir = tempfile.mkdtemp()
+        self.orig_cwd = os.getcwd()
+        os.chdir(self.tempdir)
+        try:
+            import pkg_resources
+            pkg_resources.resource_listdir('ferenda', 'res')
+        except OSError:  # No such file or directory, thrown by
+                         # os.listdir() call in
+                         # pkg_resources/__init__.py
+            if self.id() in ('testManager.Run.test_run_single_allmethods',
+                             'testManager.Run.test_run_makeresources_defaultconfig',
+                             'testManager.Run.test_run_all_allmethods'):
+                print("%s: couldn't change to tempdir, running in %s instead" %
+                      (self, self.orig_cwd))
+                os.chdir(self.orig_cwd)
+                self.tempdir = os.getcwd()
+                self.orig_cwd = None
 
         self._setup_files(self.tempdir,  self.modulename)
         sys.path.append(self.tempdir)
@@ -429,12 +444,17 @@ class RunBase(object):
     def tearDown(self):
         manager.config_loaded = False
         manager.shutdown_logger()
-        if 'TRAVIS' in os.environ:
-            util.robust_remove("ferenda.ini")
-        else:
+        if self.orig_cwd:
             os.chdir(self.orig_cwd)
             shutil.rmtree(self.tempdir)
             sys.path.remove(self.tempdir)
+        else:
+            # all tests took place in the project directory, so we
+            # have to clean some crap out.
+            for crap in ("ferenda.ini", "example.py", "index.html",
+                         "index.xhtml", "other.css", "rsrc", "data",
+                         "dummyfile.txt", "test.css", "test.js", "test.png"):
+                util.robust_remove(crap)
 
     # functionality used by most test methods except test_noconfig
     def _enable_repos(self):
