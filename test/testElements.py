@@ -40,7 +40,7 @@ class Main(unittest.TestCase):
                              ordinal=2,
                              title="Native types")
                  ])
-        # roundtrip using the default XML format 
+        # roundtrip using the default XML format
         serialized = serialize(tree)
         self.assertIsInstance(serialized, str)
         newtree = deserialize(serialized, caller_globals=globals())
@@ -119,6 +119,20 @@ class Main(unittest.TestCase):
         self.assertEqual(Body([Section([Paragraph(["Hello"]),
                                         Paragraph(["World"])])]).as_plaintext(),
                          "Hello World")
+        
+
+    def test_empty_compound(self):
+        # empty elements should be false
+        x = CompoundElement()
+        self.assertFalse(bool(x))
+
+        # even elements with metadata should be false, if they do not have any actual items
+        x = CompoundElement(id="42", foo="bar")
+        self.assertFalse(bool(x))
+
+        # but an element with some data should be true
+        x = CompoundElement(["actual", "data"], id="42", foo="bar")
+        self.assertTrue(bool(x))
         
     def test_unicode(self):
         x = UnicodeElement("Hello world", id="42")

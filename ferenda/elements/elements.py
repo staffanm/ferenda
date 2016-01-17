@@ -204,6 +204,14 @@ class CompoundElement(AbstractElement, list):
     def __str__(self):
         return self.as_plaintext()
 
+    def __nonzero__(self):
+        # on py2, we've had problems with empty elements (x =
+        # CompoundElement()) being truthy. Avoid this by defining a
+        # proper bool criteria using the magic __nonzero__
+        # method. These problems don't show up on py3, so we don't
+        # bother to define __bool__
+        return len(self) != 0
+
     def _cleanstring(self, s):
         # valid chars according to the XML spec
         def _valid(i):
