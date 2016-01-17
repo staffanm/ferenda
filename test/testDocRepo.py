@@ -763,8 +763,9 @@ class Repo(RepoTester):
     <dcterms:updates rdf:resource="http://localhost:8000/res/base/res-a"/>
     <dcterms:references rdf:resource="http://localhost:8000/res/other/res-b"/>
     <rdf:seeAlso rdf:resource="http://localhost:8000/somewhere/else"/>
+    <dcterms:title>Sacré bleu!</dcterms:title>
   </bibo:Document>
-</rdf:RDF>"""    
+</rdf:RDF>"""
         
     def test_relate(self):
         # the helper methods are called separately. this test only
@@ -828,8 +829,8 @@ class Repo(RepoTester):
         self.assertEqual(util.readfile(otherrepo.store.dependencies_path("res-b")),
                          dependencyfile)
         #  4.3 no other deps files exists in datadir
-        self.assertEqual(2,
-                         len(list(util.list_dirs(self.datadir, '.txt'))))
+        self.assertEqual(2, 
+                        len(list(util.list_dirs(self.datadir, '.txt'))))
 
         # 5. Finally, create a basefile with a complicated name
         # (KFD-normalized latin-1 name,which yields characters outside

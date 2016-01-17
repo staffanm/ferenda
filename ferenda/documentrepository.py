@@ -1762,35 +1762,35 @@ parsed document path to that documents dependency file."""
         with util.logtime(self.log.debug,
                           "%(basefile)s: Registered %(deps)s dependencies (%(elapsed).3f sec)",
                           values):
-            with self.store.open_distilled(basefile) as fp:
-                g = Graph().parse(fp, format="xml")
-                subjects = set([s for s, p, o in g])
-                for (s, p, o) in g:
-                    # the graph for a single doc can describe
-                    # multiple, linked, resources. Don't attempt to
-                    # find basefiles for these resources, even if they
-                    # occur as objects in the graphs as well.
-                    if p == RDF.type:
-                        continue
-                    if o in subjects:
-                        continue
-                    # for each URIRef in graph
-                    if isinstance(o, URIRef):
-                        # in order to minimize calls to
-                        # basefile_from_uri(), it'd be nice if the
-                        # order of repos was dynamically altered
-                        # according to MRU (most recently used)
-                        for repo in repos:
-                            # find out if any docrepo can handle it
-                            dep_basefile = repo.basefile_from_uri(str(o))
-                            if dep_basefile and (
-                                    (repo != self) or
-                                    (dep_basefile != basefile)):
-                                # if so, add to that repo's dependencyfile
-                                pp = self.store.parsed_path(basefile)
-                                res = repo.add_dependency(dep_basefile, pp)
-                                values['deps'] += 1
-                                break
+            distilled = util.readfile(self.store.distilled_path(basefile), encoding="utf-8")
+            g = Graph().parse(data=distilled, format="xml")
+            subjects = set([s for s, p, o in g])
+            for (s, p, o) in g:
+                # the graph for a single doc can describe
+                # multiple, linked, resources. Don't attempt to
+                # find basefiles for these resources, even if they
+                # occur as objects in the graphs as well.
+                if p == RDF.type:
+                    continue
+                if o in subjects:
+                    continue
+                # for each URIRef in graph
+                if isinstance(o, URIRef):
+                    # in order to minimize calls to
+                    # basefile_from_uri(), it'd be nice if the
+                    # order of repos was dynamically altered
+                    # according to MRU (most recently used)
+                    for repo in repos:
+                        # find out if any docrepo can handle it
+                        dep_basefile = repo.basefile_from_uri(str(o))
+                        if dep_basefile and (
+                                (repo != self) or
+                                (dep_basefile != basefile)):
+                            # if so, add to that repo's dependencyfile
+                            pp = self.store.parsed_path(basefile)
+                            res = repo.add_dependency(dep_basefile, pp)
+                            values['deps'] += 1
+                            break
         return values['deps']
 
     def add_dependency(self, basefile, dependencyfile):
