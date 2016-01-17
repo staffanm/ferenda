@@ -3,10 +3,12 @@ from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 from builtins import *
 
-import doctest
+import os
 
+import doctest
 import rdflib
 
+from ferenda.compat import patch
 from ferenda.testutil import RepoTester
 
 # SUT
@@ -42,6 +44,23 @@ WHERE {
         self.assertEqual(facets[0].rdftype, rdflib.RDF.type)
         # and more ...
 
+    def test_faceted_data(self):
+        canned = [{"uri": "http://example.org/books/A_Tale_of_Two_Cities",
+                   "dcterms_title": "A Tale of Two Cities"},
+                  {"uri": "http://example.org/books/The_Lord_of_the_Rings",
+                   "dcterms_title": "The Lord of the Rings"},
+        ]
+        with patch('ferenda.DocumentRepository.facet_select', return_value=canned) as mock:
+            faceted_data = self.repo.faceted_data()
+        self.assertEqual(faceted_data, canned)
+        self.assertTrue(os.path.exists(self.datadir + "/base/toc/faceted_data.json"))
+        # on second run, faceted_data should be read from the cache
+        # (if outfile_is_newer is called, we're far enough down in
+        # that branch to know that the cache file is used if
+        # outfile_is_newer returns True)
+        with patch('ferenda.util.outfile_is_newer', return_value=True):
+            faceted_data = self.repo.faceted_data()
+        self.assertEqual(faceted_data, canned)
 
     def test_year(self):
         self.assertEqual('2014',
@@ -54,6 +73,8 @@ WHERE {
             Facet.year({'dcterms_issued': 'This is clearly an invalid date'})
         with self.assertRaises(Exception):
             Facet.year({'dcterms_issued': '2014-14-99'})
+
+
         
 
 

@@ -1967,7 +1967,8 @@ parsed document path to that documents dependency file."""
             util.ensure_dir(cachepath)
             with open(cachepath, "w") as fp:
                 self.log.debug("Saving faceted_data to %s" % cachepath)
-                json.dump(data, fp, indent=4)
+                s = json.dumps(data, indent=4, separators=(', ', ': '))
+                fp.write(s)
             if os.path.getsize(cachepath) == 0:
                 util.robust_remove(cachepath)
         return data
