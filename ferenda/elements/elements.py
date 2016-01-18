@@ -829,7 +829,7 @@ def __serialize_xml(node, serialize_hidden_attrs=False):
             if val is None:
                 continue
             if (isinstance(val, (str, bytes))):
-                e.set(key, val)
+                e.set(key, native(val))
             else:
                 e.set(key, repr(val))
 

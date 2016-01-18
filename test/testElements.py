@@ -9,7 +9,6 @@ from ferenda.compat import unittest
 from lxml import etree
 from lxml.builder import ElementMaker
 from rdflib import Graph, Namespace
-from six import text_type as str
 import os
 
 from ferenda.citationpatterns import url as urlparser
@@ -70,6 +69,13 @@ class Main(unittest.TestCase):
         tree[2][0] = util.parseresults_as_xml(tree[2][0])
         newtree[2][0] = util.parseresults_as_xml(newtree[2][0])
         self.assertEqual(tree, newtree)
+
+    def test_serialize_newstr(self):
+        # really a test for future.types.newstr.newstr, here aliased
+        # to str() -- this is only ever an issue on py2.
+        tree = Body([], a=str("x"), b="y")
+        serialized = serialize(tree, format="xml")
+        self.assertEqual('<Body a="x" b="y" />\n', serialized)
 
     def test_json_roundtrip(self):
         # a more realistic roundtrip example with some hairy parts
@@ -133,6 +139,7 @@ class Main(unittest.TestCase):
         # but an element with some data should be true
         x = CompoundElement(["actual", "data"], id="42", foo="bar")
         self.assertTrue(bool(x))
+
         
     def test_unicode(self):
         x = UnicodeElement("Hello world", id="42")
