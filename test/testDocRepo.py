@@ -763,7 +763,7 @@ class Repo(RepoTester):
     <dcterms:updates rdf:resource="http://localhost:8000/res/base/res-a"/>
     <dcterms:references rdf:resource="http://localhost:8000/res/other/res-b"/>
     <rdf:seeAlso rdf:resource="http://localhost:8000/somewhere/else"/>
-    <dcterms:title>Sacré bleu!</dcterms:title>
+    <dcterms:title>Sacr\xc3\xa9 bleu!</dcterms:title>
   </bibo:Document>
 </rdf:RDF>"""
         
