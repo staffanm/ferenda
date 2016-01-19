@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
+nativeint = int
 from builtins import *
 
 # stdlib
@@ -480,7 +481,7 @@ class DocumentRepository(object):
             'refresh': False,
             'download': True,
             'lastdownload': datetime,
-            'downloadmax': int,
+            'downloadmax': nativeint,
             'conditionalget': True,
             'url': 'http://localhost:8000/',
             'fulltextindex': True,
@@ -941,7 +942,10 @@ with the *config* object as single parameter.
                 os.utime(filename, (time.time(), mtime))
             if response.headers.get("etag"):
                 with open(filename + ".etag", "w") as fp:
-                    fp.write(response.headers["etag"])
+                    etag = response.headers["etag"]
+                    if isinstance(etag, bytes):
+                        etag = etag.decode()
+                    fp.write(etag)
         return updated
 
     def download_name_file(self, tmpfile, basefile, assumedfile):

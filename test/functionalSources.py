@@ -2,8 +2,9 @@
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 from builtins import *
-import os
 
+import os
+import sys
 
 from ferenda.testutil import RepoTester, parametrize_repotester
 from ferenda.sources.general import Keyword, Skeleton  # MediaWiki
@@ -35,8 +36,8 @@ for cls in (Keyword, Skeleton, MediaWiki, RFC, W3Standards, PEP,
     d = {'repoclass': cls,
          'docroot': os.path.dirname(__file__)+"/files/repo/" + cls.alias}
     name = 'Test'+cls.__name__
-    # if six.PY2:
-    #     name = name.encode()
+    if sys.version_info[0] < 3:
+        name = name.encode()
     testcls = type(name, (RepoTester,), d)
     globals()[name] = testcls
     parametrize_repotester(testcls)

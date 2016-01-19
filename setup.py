@@ -31,6 +31,7 @@ install_requires = ['beautifulsoup4 >= 4.3.0',
     
 if sys.version_info < (2,7,0):
     install_requires.append('ordereddict >= 1.1')
+    install_requires.append("importlib")
 
 if sys.version_info >= (2,7,0):
     # grako won't even install on py26

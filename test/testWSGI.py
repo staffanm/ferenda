@@ -110,7 +110,6 @@ class WSGI(RepoTester): # base class w/o tests
         # distilled/dump.nt
         with self.repo.store.open("dump", "distilled", ".nt", "wb") as fp:
             fp.write(g.serialize(format="nt"))
-        
 
     def call_wsgi(self, environ):
         start_response = Mock()
@@ -120,7 +119,6 @@ class WSGI(RepoTester): # base class w/o tests
         call_args = start_response.mock_calls[0][1]
         # call_kwargs = start_response.mock_calls[0][2]
         return call_args[0], call_args[1], buf.getvalue()
-
 
     def assertResponse(self,
                        wanted_status,
@@ -135,6 +133,7 @@ class WSGI(RepoTester): # base class w/o tests
             self.assertEqual(value, got_headers[key])
         if wanted_content:
             self.assertEqual(wanted_content, got_content)
+
 
 class Fileserving(WSGI):
     def test_index_html(self):

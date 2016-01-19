@@ -12,6 +12,7 @@ else, for you.
 """
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
+nativeint = int
 from builtins import *
 from future import standard_library
 standard_library.install_aliases()
@@ -639,7 +640,7 @@ def _load_config(filename=None, argv=None, defaults=None):
                     'processes': 1,
                     'datadir': 'data',
                     'force': False,
-                    'downloadmax': int,  # used strictly for typing
+                    'downloadmax': nativeint,
                     'combineresources': False,
                     'staticsite': False,
                     'all': False,

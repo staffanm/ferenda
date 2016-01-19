@@ -2,6 +2,7 @@
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 from builtins import *
+from future.utils import exec_, native
 
 import sys
 import os
@@ -9,7 +10,13 @@ import subprocess
 import tempfile
 import shutil
 import re
-from importlib import reload
+try:
+    from importlib import reload
+except ImportError:
+    # we must be using py2, whose importlib does not have a reload,
+    # only import_module. BUT py2 has reload built-in function!
+    pass
+    
 
 from ferenda import util
 from ferenda.compat import unittest
@@ -44,7 +51,7 @@ class Examples(unittest.TestCase, FerendaTestCase):
         os.chdir(workingdir)
         try:
             reload(ferenda)  # so that ferenda.__file__ might return a abspath
-            result = exec(pycode, globals(), locals())
+            result = exec_(pycode, globals(), locals())
         finally:
             os.chdir(oldwd)
         # the exec:ed code is expected to set return_value
@@ -121,7 +128,7 @@ class Examples(unittest.TestCase, FerendaTestCase):
         self.maxDiff = None
         # these are not normal shell scripts, but rather docutils-like
         # interminglings of commands (prefixed by "$ ") and output.
-        env = dict(os.environ) # create a copy which we'll modify (maybe?)
+        env = native(dict(os.environ)) # create a copy which we'll modify (maybe?)
         env.update(extraenv)
         expected = ""
         out = b""
@@ -152,12 +159,12 @@ class Examples(unittest.TestCase, FerendaTestCase):
                         expected = ""
                         cmd_lineno = lineno
                         cmdline = line[2:].split("#")[0].strip()
-                        # special hack to account for that ferenda-setup not being
-                        # available for a non-installed ferenda source checkout
                         if self.verbose:
                             print("Running '%s'" % cmdline,
                                   end=" ... ")
                             sys.stdout.flush()
+                        # special hack to account for that ferenda-setup not being
+                        # available for a non-installed ferenda source checkout
                         if cmdline.startswith("ferenda-setup"):
                             cmdline = cmdline.replace("ferenda-setup",
                                                       ferenda_setup)
@@ -218,6 +225,7 @@ class Examples(unittest.TestCase, FerendaTestCase):
         self.verbose = True
         workingdir = tempfile.mkdtemp()
         shutil.copy2("doc/examples/w3cstandards.py", workingdir)
+        # from pudb import set_trace; set_trace()
         self._test_shfile("doc/examples/firststeps.sh", workingdir,
                           {'FERENDA_DOWNLOADMAX': '3',
                            'PYTHONPATH': os.getcwd(),
