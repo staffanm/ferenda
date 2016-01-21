@@ -33,6 +33,7 @@ from datetime import datetime, date
 from itertools import islice
 import requests
 
+from testManager import quiet
 
 class Examples(unittest.TestCase, FerendaTestCase):
 
@@ -84,6 +85,14 @@ class Examples(unittest.TestCase, FerendaTestCase):
             re.compile(r" INFO Dumped (\d+) triples from context "),
             
              ]
+        filters = [
+            re.compile(r"^(.*WARNING Failed to fetch .* remaining attempts\)\n)", re.MULTILINE),
+        ]
+        for filter in filters:
+            m = filter.search(s)
+            while m:
+                s = m.string[:m.start(1)] + m.string[m.end(1):]
+                m = filter.search(s)
         for mask in masks:
             m = mask.search(s)
             while m:
@@ -119,6 +128,15 @@ class Examples(unittest.TestCase, FerendaTestCase):
  generated: None."""),
                 ("12:16:13 w3c INFO Dumped 34 triples from context http://localhost:8000/dataset/w3c to data/w3c/distilled/dump.nt",
                  "[MASKED] w3c INFO Dumped [MASKED] triples from context http://localhost:8000/dataset/w3c to data/w3c/distilled/dump.nt"),
+                ("""11:03:11 w3c INFO Downloading max 3 documents
+11:03:11 w3c WARNING Failed to fetch http://www.w3.org/TR/2015/REC-tabular-data-model-20151217/: err ('Connection aborted.', error(54, 'Connection reset by peer')) (5 remaining attempts)
+11:03:13 w3c INFO tabular-data-model: downloaded from http://www.w3.org/TR/2015/REC-tabular-data-moxdel-20151217/
+""",
+                 """[MASKED] w3c INFO Downloading max 3 documents
+[MASKED] w3c INFO [MASKED]: downloaded from [MASKED]
+"""),
+
+
 
         ):
             self.assertEqual(want, self.mask(logstr))
@@ -210,8 +228,8 @@ class Examples(unittest.TestCase, FerendaTestCase):
         if self.verbose:
             print("ok")
 
+    @quiet()
     def test_firststeps_api(self):
-        from ferenda.manager import setup_logger; setup_logger('CRITICAL')
         # FIXME: consider mocking print() here
         workingdir = tempfile.mkdtemp()
         os.environ['FERENDA_HOME'] = os.getcwd()

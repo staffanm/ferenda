@@ -2646,8 +2646,8 @@ WHERE {
                     sublist.append(ListItem([page.linktext]))
                 else:
                     href = self.dataset_uri(page.binding, page.value)
-                    sublist.append(ListItem([Link(str(page.linktext), href=href)]))
-            nav.append(ListItem([Paragraph(pageset.label), sublist]))
+                    sublist.append(ListItem([Link(str(page.linktext), uri=href)]))
+            nav.append(ListItem([Paragraph([pageset.label]), sublist]))
 
         d.value(self.ns['dcterms'].title, title)
 

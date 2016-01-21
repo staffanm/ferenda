@@ -195,7 +195,7 @@ $ ./ferenda-build.py w3c all
 22:17:25 root INFO w3cstandards.W3CStandards parse finished in 0.019 sec
 22:17:25 root INFO w3cstandards.W3CStandards relate: Nothing to do!
 22:17:25 root INFO w3cstandards.W3CStandards relate finished in 0.025 sec
-22:17:25 root INFO Wrote data/rsrc/resources.xml
+22:17:25 ferenda.resources INFO Wrote data/rsrc/resources.xml
 22:17:29 root INFO w3cstandards.W3CStandards generate finished in 0.006 sec
 22:17:32 root INFO w3cstandards.W3CStandards toc finished in 3.376 sec
 22:17:34 w3c INFO feed type/document: 4 entries

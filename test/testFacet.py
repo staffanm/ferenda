@@ -42,6 +42,9 @@ WHERE {
         # expected properties
         facets = self.repo.facets()
         self.assertEqual(facets[0].rdftype, rdflib.RDF.type)
+        self.assertEqual(facets[0].label, "Sorted by %(term)s")
+        self.assertIsInstance(facets[0].label, str)
+        
         # and more ...
 
     def test_faceted_data(self):

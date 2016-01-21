@@ -10,6 +10,7 @@ import os
 from ferenda.compat import unittest
 from ferenda.errors import ResourceNotFound
 from ferenda import DocumentEntry  # just used for test_loadpath
+from ferenda import DocumentRepository
 from ferenda import util
 
 # SUT
@@ -30,7 +31,7 @@ class Main(SubTestCase, DocumentEntry):
         self.resourceloader = ResourceLoader(*loadpath)
     
     def tearDown(self):
-        shutil.rmtree(self.tempdir)  
+        shutil.rmtree(self.tempdir)
     
     def test_loadpath(self):
         self.assertEqual(ResourceLoader.make_loadpath(self),
@@ -99,3 +100,39 @@ class Main(SubTestCase, DocumentEntry):
         self.assertEqual(set(os.listdir(dest)),
                          set(["primaryresource.txt", "secondaryresource.txt",
                               "robots.txt", "humans.txt"]))
+
+
+class RepoResourceLoader(unittest.TestCase):
+
+    expected = set(["atom.xsl", "base.xsl", "frontpage.xsl", "generic.xsl",
+                    "grit-grddl.xsl", "keyword.xsl", "paged.xsl",
+                    "rdfxml-grit.xsl", "search.xsl", "simplify-ooxml.xsl",
+                    "toc.xsl", "tune-width.xsl", "uri.xsl"])
+    
+    def setUp(self):
+        self.tempdir = tempfile.mkdtemp()
+        self.repo = DocumentRepository()
+
+    def tearDown(self):
+        shutil.rmtree(self.tempdir)  
+
+    def test_extractdir_repo(self):
+        dest = self.tempdir + os.sep + "dest"
+        os.mkdir(dest)
+        self.repo.resourceloader.extractdir("xsl", dest)
+        extracted = [x[len(dest)+1:] for x in util.list_dirs(dest)]
+        self.assertEqual(self.expected, set(extracted))
+
+    def test_extractdir_newwd(self):
+        dest = self.tempdir + os.sep + "dest"
+        os.mkdir(dest)
+        prevdir = os.getcwd()
+        os.chdir(self.tempdir)
+        if "FERENDA_HOME" not in os.environ:
+            os.environ["FERENDA_HOME"] = prevdir
+        try:
+            self.repo.resourceloader.extractdir("xsl", dest)
+            extracted = [x[len(dest)+1:] for x in util.list_dirs(dest)]
+            self.assertEqual(self.expected, set(extracted))
+        finally:
+            os.chdir(prevdir)

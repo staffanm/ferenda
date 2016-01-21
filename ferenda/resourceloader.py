@@ -69,6 +69,38 @@ class ResourceLoader(object):
         self.resourceprefix = "res"
         self.log = logging.getLogger(__name__)
 
+
+    def _check_module_path(self):
+        # If ferenda is imported, and the working directory of the
+        # process is then changed (with os.cwd()), this can cause
+        # problems with the pkg_resources API, since that module might
+        # use relative paths for the location of resources, and
+        # changing the working directory causes these relative paths
+        # to be invalid wrt the new working directory. This seem to be
+        # a problem with py2 only, since on py3 the absolute path for
+        # each loaded module is stored in sys.modules which
+        # pkg_resources uses.
+        # 
+        # This method tries to detect the problem and correct it if
+        # possible.
+        if self.use_pkg_resources:
+            module_path = pkg_resources.get_provider("ferenda").module_path
+            if not os.path.exists(module_path) and not os.path.isabs(module_path):
+                # There appears to be no simple way of determining the
+                # "true" path of where ferenda is installed. But if
+                # os.environ["FERENDA_HOME"] is defined we can rely on
+                # that. Then we directly muck with sys.modules to
+                # record the absolute path to the module. This might
+                # not be legal... NB: This should only happen in
+                # development mode, not with an installed ferenda
+                # package, and only on py2.
+                if "FERENDA_HOME" in os.environ:
+                    truepath = (os.environ["FERENDA_HOME"] + os.sep +
+                                module_path + os.sep + "__init__.py")
+                    sys.modules["ferenda"].__file__ = truepath
+                else:
+                    raise ResourceNotFound("pkg_resources internal variable module_path is a relative path (%s). No such path exists relative to %s" % (module_path, os.getcwd()))
+
     def exists(self, resourcename):
         """Returns True iff the named resource can be found anywhere in any
         place where this loader searches, False otherwise"""
@@ -149,12 +181,16 @@ class ResourceLoader(object):
             candidate = path + os.sep + resourcename
             if os.path.exists(candidate):
                 return candidate
-        if (self.use_pkg_resources and
-            pkg_resources.resource_exists(self.modulename,
-                                          self.resourceprefix + os.sep + resourcename)):
-            abspath = pkg_resources.resource_filename(self.modulename, self.resourceprefix + os.sep + resourcename)
-            return os.path.relpath(abspath)
-        raise ResourceNotFound(resourcename) # should contain a list of places we searched?
+        if self.use_pkg_resources:
+            self._check_module_path()
+            if pkg_resources.resource_exists(self.modulename,
+                                             self.resourceprefix + os.sep + resourcename):
+                abspath = pkg_resources.resource_filename(self.modulename, self.resourceprefix + os.sep + resourcename)
+                return os.path.relpath(abspath)
+            else:
+                raise ResourceNotFound(resourcename)
+        else:
+                raise ResourceNotFound(resourcename) # should contain a list of places we searched?
                 
     def extractdir(self, resourcedir, target, suffixes=None):
         """Extract all file resources contained in the specified
@@ -190,15 +226,17 @@ class ResourceLoader(object):
                     util.ensure_dir(dest)
                     shutil.copy2(src, dest)
                     extracted.add(dest)
+                    with open("/Users/staffan/wds/ferenda/debug.log", "a") as fp:
+                        fp.write("extractdir: copied %s to %s\n" % (src, dest))
+
         if self.use_pkg_resources:
+            self._check_module_path()
             path = self.resourceprefix
             if resourcedir:
                 path = path + os.sep + resourcedir
             for f in pkg_resources.resource_listdir(self.modulename, path):
                 src = path + os.sep + f
                 dest = target
-                if resourcedir:
-                    dest = target + os.sep + resourcedir
                 dest += os.sep + f
                 if (dest not in extracted and not
                     pkg_resources.resource_isdir(self.modulename,
@@ -210,3 +248,6 @@ class ResourceLoader(object):
                         fp.write(readfp.read())
                         readfp.close()
                     extracted.add(dest)
+                    with open("/Users/staffan/wds/ferenda/debug.log", "a") as fp:
+                        fp.write("extractdir: streamed %s.%s to %s\n" % (self.modulename, src, dest))
+        
