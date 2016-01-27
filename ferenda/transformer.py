@@ -208,18 +208,8 @@ class XSLTTransform(TransformerEngine):
     def _setup_templates(self, template, templatedir):
         workdir = mkdtemp()
         self.resourceloader.extractdir(templatedir, workdir, (".xsl", ".xslt"))
-        with open("/Users/staffan/wds/ferenda/debug.log", "a") as fp:
-            fp.write("Checking for %s in %s (has %s)\n" % (template, workdir, os.listdir(workdir)))
         if os.path.basename(template) not in os.listdir(workdir):
-            shutil.copy2(template, workdir)        
-#        extracted = [x[len(workdir)+1:] for x in util.list_dirs(workdir, (".xsl", ".xslt"))]
-#        with open("/Users/staffan/wds/ferenda/debug.log", "a") as fp:
-#            fp.write("Checking for %s in %s (has %s)\n" % (template, workdir, extracted))
-#        if template not in extracted:
-#            if os.path.exists(template):
-#                shutil.copy2(template, workdir)
-#            else:
-#                raise errors.TransformError("Cannot find template %s, neither in templatedir %s or directly (cwd is %s)" % (template, templatedir, os.getcwd()))
+            shutil.copy2(template, workdir)
         return workdir
 
     # getconfig may return different data depending on engine -- in

@@ -226,8 +226,6 @@ class ResourceLoader(object):
                     util.ensure_dir(dest)
                     shutil.copy2(src, dest)
                     extracted.add(dest)
-                    with open("/Users/staffan/wds/ferenda/debug.log", "a") as fp:
-                        fp.write("extractdir: copied %s to %s\n" % (src, dest))
 
         if self.use_pkg_resources:
             self._check_module_path()
@@ -248,6 +246,3 @@ class ResourceLoader(object):
                         fp.write(readfp.read())
                         readfp.close()
                     extracted.add(dest)
-                    with open("/Users/staffan/wds/ferenda/debug.log", "a") as fp:
-                        fp.write("extractdir: streamed %s.%s to %s\n" % (self.modulename, src, dest))
-        

@@ -587,8 +587,9 @@ class Regeringen(SwedishLegalSource):
         res = self.refparser.parse_string(text)
         links = [n for n in res if isinstance(n, Link)]
         if len(links) != 1:
-            self.log.warning("%s: Found %s links in '%s', expected single link" %
-                             (len(links), text))
+            self.log.warning("%s: _parse_uri_from_text found %s links in '%s',"
+                             "expected single link" %
+                             (basefile, len(links), text))
             return None
         if baseuri:
             self.refparser._currenturl = prevuri
