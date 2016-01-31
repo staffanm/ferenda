@@ -493,18 +493,9 @@ class Riksdagen(FixedLayoutSource):
         else:
             return super(Riksdagen, self).tokenize(reader)
 
-# FIXME: Work in the below support for FERENDA_DEBUGANALYSIS and FERENDA_FSMDEBUG in fixedlayoutsource.get_parser
-#     def get_parser(self, basefile, sanitized)
-#        # FIXME: add code to get a customized PDFAnalyzer class here
-#        # if self.document_type = self.PROPOSITION:
-#        analyzer = PDFAnalyzer(pdf)
-#        # metrics = analyzer.metrics(metrics_path, plot_path, force=self.config.force)
-#        metrics = analyzer.metrics(metrics_path, plot_path)
-#        if os.environ.get("FERENDA_DEBUGANALYSIS"):
-#            self.log.debug("Creating debug version of PDF")
-#            analyzer.drawboxes(pdfdebug_path, offtryck_gluefunc, metrics=metrics)
-#        self.log.debug("Parsing with metrics %s" % metrics)
-#        parser = offtryck_parser(basefile, metrics=metrics, identifier=identifier)
-#        parser.debug = os.environ.get('FERENDA_FSMDEBUG', False)
-#        return parse
-
+    def sourcefiles(self, basefile):
+        sourcefile = self.store.downloaded_path(basefile,
+                                                attachment="index.pdf")
+        if not os.path.exists(sourcefile):
+            sourcefile = self.store.downloaded_path(basefile)
+        return [(sourcefile, self.infer_identifier(basefile))]

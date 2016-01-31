@@ -192,7 +192,7 @@ def render(f):
         if in_first:  # original metadata not present in the XHTML filee
             self.log.warning("%s: %d triple(s) from the original metadata was "
                              "not found in the serialized XHTML file:\n%s",
-                             doc.basefile, len(in_first), in_first.serialize(format="n3"))
+                             doc.basefile, len(in_first), in_first.serialize(format="n3").decode("utf-8"))
 
         # Validate that entry.title and entry.id has been filled
         # (might be from doc.meta and doc.uri, might be other things

@@ -1337,11 +1337,12 @@ with the *config* object as single parameter.
             if not children:
                 children = []
                 # if revlink == True, we're serializing triples for
-                # the main subject. This also means we don't have to
-                # set @about below, and that we should create a
-                # <title> tag for any dcterms:title triple (ideally, for
-                # any property that is rdfs:subPropertyOf dcterms:title,
-                # but...
+                # the main subject. So other triples that references
+                # the main subject should have the @rev attribute
+                # set. This also means we don't have to set @about
+                # below, and that we should create a <title> tag for
+                # any dcterms:title triple (ideally, for any property
+                # that is rdfs:subPropertyOf dcterms:title, but...
                 revlink = True
             else:
                 revlink = False
@@ -1353,12 +1354,10 @@ with the *config* object as single parameter.
                     continue
 
                 if g.qname(pred) == "dcterms:title" and revlink:
-                    if obj.language:
-                        children.append(
-                            E.title({'property': 'dcterms:title', }, str(obj)))
-                    else:
-                        children.append(E.title({'property':
-                                                 'dcterms:title', XML_LANG: ""}, str(obj)))
+                    attrs = {'property': 'dcterms:title'}
+                    if obj.language != doc.lang:
+                        attrs[XML_LANG] = obj.language or ""
+                    children.append(E.title(attrs, str(obj)))
 
                 elif isinstance(obj, URIRef) and str(subj) == uri:
                     children.append(E.link({'rel': g.qname(pred),

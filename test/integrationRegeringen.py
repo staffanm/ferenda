@@ -17,8 +17,9 @@ class SelectPDFs(unittest.TestCase):
     def setUp(self):
         self.repo = Regeringen()
 
-    def _t(self, data, want):
-        got = self.repo.select_pdfs(data)
+    def _t(self, data, want, labels=False):
+        got = self.repo.select_pdfs(data, labels)
+        from pudb import set_trace; set_trace()
         self.assertEqual(want, got)
         
     def test_single(self):
@@ -67,5 +68,14 @@ class SelectPDFs(unittest.TestCase):
                  ("d838f8a5.pdf", "Lista över remissinstanser (pdf 42 kB)")],
                 ["57313bec.pdf"])
         
+    def test_single_label(self):
+        self._t([("74a82f1a.pdf", "Ut ur skuldfällan, SOU 2013:72 (pdf 3,9 MB)"),],
+                [("74a82f1a.pdf", "Ut ur skuldfällan, SOU 2013:72 (pdf 3,9 MB)")],
+                True)
 
-        
+    def test_delar_label(self):
+        self._t([("4ab56c4e.pdf", "En digital agenda, SOU 2014:13 (del 1 av 2) (pdf 2,3 MB)"),
+                 ("e265db7c.pdf", "En digital agenda, SOU 2014:13 (del 2 av 2) (pdf 1,4 MB)")],
+                [("4ab56c4e.pdf", "En digital agenda, SOU 2014:13 (del 1 av 2) (pdf 2,3 MB)"),
+                 ("e265db7c.pdf", "En digital agenda, SOU 2014:13 (del 2 av 2) (pdf 1,4 MB)")],
+                True)

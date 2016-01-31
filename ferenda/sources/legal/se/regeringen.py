@@ -533,6 +533,7 @@ class Regeringen(SwedishLegalSource):
                 (self.find_commentary, sharedstate)]
 
     def find_primary_law(self, node, state):
+        # from pudb import set_trace; set_trace()
         if not isinstance(node, Section) or not node.title.startswith("Förslag till lag om ändring i"):
             if isinstance(node, Body):
                 return state
@@ -611,20 +612,33 @@ class Regeringen(SwedishLegalSource):
             self.log.warning("Couldn't sanitize identifier %s" % identifier)
             return identifier
 
-    def find_pdf_links(self, soup, basefile):
+    # FIXME: this'll only be called when eg PropRegeringen is used
+    # directly. If the composite repo Propositioner is used, it won't
+    # know to call into this. (Maybe it should be the responsibility
+    # of parse() to add the extra provenance triples about source
+    # files that this method is used by).
+    def sourcefiles(self, basefile):
+        with self.store.open_downloaded(basefile) as fp:
+            soup = BeautifulSoup(fp.read(), "lxml")
+        # FIXME: We might want to trim the labels here, eg to shorten
+        # "En digital agenda, SOU 2014:13 (del 2 av 2) (pdf 1,4 MB)"
+        # to something more display friendly.
+        return self.find_pdf_links(soup, basefile, labels=True)
+
+    def find_pdf_links(self, soup, basefile, labels=False):
         pdffiles = []
         docsection = soup.find('ul', 'list--Block--icons')
         pdflink = re.compile("/contentassets/")
         if docsection:
             for link in docsection.find_all("a", href=pdflink):
                 pdffiles.append((link["href"], link.string))
-        selected = self.select_pdfs(pdffiles)
+        selected = self.select_pdfs(pdffiles, labels)
         self.log.debug(
             "selected %s out of %d pdf files" %
             (", ".join(selected), len(pdffiles)))
         return selected
 
-    def select_pdfs(self, pdffiles):
+    def select_pdfs(self, pdffiles, labels=False):
         """Given a list of (pdffile, linktext) tuples, return only those pdf
         files we need to parse (by filtering out duplicates etc).
         """
@@ -633,12 +647,12 @@ class Regeringen(SwedishLegalSource):
         # 1. Simplest case: One file obviously contains all of the text
         for pdffile, linktext in pdffiles:
             if "hela dokumentet" in linktext or "hela betänkandet" in linktext:
+                if labels:
+                    pdffile = pdffile, linktext
                 return [pdffile]  # we're immediately done
 
         # 2. Filter out obviously extraneous files
         for pdffile, linktext in pdffiles:
-            if "hela dokumentet" in linktext or "hela betänkandet" in linktext:
-                return [pdffile]  # we're immediately done
             if (linktext.startswith("Sammanfattning ") or
                     linktext.startswith("Remissammanställning") or
                     linktext.startswith("Sammanställning över remiss") or
@@ -658,10 +672,15 @@ class Regeringen(SwedishLegalSource):
                 # and if we remove the commonprefix, do we end up with nothing?
                 if linktext.replace(commonprefix, "") == "":
                     # then this is probably a complete file
+                    if labels:
+                        pdffile = pdffile, linktext
                     return [pdffile]
 
         # 4. Base case: We return it all
-        return [x[0] for x in cleanfiles]
+        if labels:
+            return cleanfiles
+        else:
+            return [x[0] for x in cleanfiles]
 
     def parse_pdf(self, pdffile, intermediatedir):
         # By default, don't create and manage PDF backgrounds files

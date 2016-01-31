@@ -15,7 +15,8 @@ from bz2 import BZ2File
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
 from rdflib.resource import Resource
-from rdflib.namespace import DCTERMS, SKOS, FOAF
+from rdflib.collection import Collection
+from rdflib.namespace import DCTERMS, SKOS, FOAF, RDFS
 from six import text_type as str
 import bs4
 from cached_property import cached_property
@@ -70,9 +71,7 @@ class SwedishLegalSource(DocumentRepository):
 
     parse_types = LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN
     parse_allow_relative = False
-    sparql_annotations = None  # Don't create any annotation files
-                               # until we can get a query that runs
-                               # somewhat fast...
+    sparql_annotations = "sparql/describe-base.rq"
     
     # This is according to the RPUBL vocabulary: All
     # rpubl:Rattsinformationsdokument should have dcterms:title,
@@ -733,8 +732,11 @@ class SwedishLegalSource(DocumentRepository):
         :param d: A configured Describer instance
         :param basefile: The basefile for the doc we want to infer from 
         """
-        # Right now, this only tries to infer a dcterms:identifier if
-        # not already present
+        # Right now, this tries to infer a dcterms:identifier if not
+        # already present, and adds prov:alternateOf (the original
+        # main URL from where the data was fetched) and
+        # prov:wasDerivedFrom (URIs representing the actual
+        # PDF/Word/etc file(s) that is the basis for the parsed data).
         sup = super(SwedishLegalSource, self)
         if hasattr(sup, 'infer_metadata'):
             sup.infer_metadata(resource, basefile)
@@ -746,6 +748,34 @@ class SwedishLegalSource(DocumentRepository):
             #                                                 identifier))
             d.value(DCTERMS.identifier, identifier)
 
+        if not resource.value(PROV.alternateOf):
+            with d.rel(PROV.alternateOf, self.remote_url(basefile)):
+                d.value(RDFS.label, Literal("Källa", lang="sv"))
+
+        if not resource.value(PROV.wasDerivedFrom):
+            sourcefiles = self.sourcefiles(basefile)
+            if len(sourcefiles) == 1:
+                sourcefile, label = sourcefiles[0]
+                sourcefileuri = URIRef("%s?attachment=%s" %
+                                       (resource.identifier,
+                                        sourcefile.rsplit(os.sep, 1)[1]))
+                with d.rel(PROV.wasDerivedFrom, sourcefileuri):
+                    d.value(RDFS.label, Literal(label, lang="sv"))
+            elif len(sourcefiles) > 1:
+                derivedfrom = BNode()
+                c = Collection(graph, derivedfrom)
+                for sourcefile, label in sourcefiles:
+                    sourcefileuri = URIRef("%s?attachment=%s" %
+                                           (resource.identifier,
+                                            sourcefile.rsplit(os.sep, 1)[1]))
+                    c.append(sourcefileuri)
+                    resource.graph.add((sourcefileuri, RDFS.label,
+                                        Literal(label, lang="sv")))
+                d.rel(PROV.wasDerivedFrom, derivedfrom)
+            else:
+                self.log.warning("%s: infer_metadata: No sourcefiles" %
+                                 basefile)
+            
     def infer_identifier(self, basefile):
         """Given a basefile of a document, returns a string that is a usable
         dcterms:identifier for that document.
@@ -778,12 +808,14 @@ class SwedishLegalSource(DocumentRepository):
                 self.rdf_type)
         return "%s%s" % (prefix, basefile)
 
-
     def postprocess_doc(self, doc):
         """Do any last-minute postprocessing (mainly used to add extra
         metadata from doc.body to doc.head)"""
         pass
 
+    def sourcefiles(self, basefile):
+        return [(self.store.downloaded_path(basefile),
+                 self.infer_identifier(basefile))]
 
     def frontpage_content(self, primary=False):
         if not self.config.tabs:

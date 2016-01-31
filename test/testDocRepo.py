@@ -20,7 +20,7 @@ import lxml.etree as etree
 import rdflib
 import requests.exceptions
 
-from ferenda.compat import Mock, patch, call
+from ferenda.compat import Mock, patch, call, unittest
 from ferenda import DocumentEntry, Describer, Facet
 from ferenda.fulltextindex import WhooshIndex
 from ferenda.errors import *
@@ -680,7 +680,7 @@ class Repo(RepoTester):
         dcterms:title "This doesn't make any sense" ;
         dcterms:issued "2013-10-17"^^xsd:date .
 
-<http://localhost:8000/res/base/other> a bibo:Document;
+<http://localhost:8000/res/base/other>
         dcterms:references <http://localhost:8000/res/base/basefile> .
 
         """)
@@ -704,13 +704,84 @@ class Repo(RepoTester):
     <meta content="Doc:1" property="dcterms:identifier" xml:lang="en"></meta>
     <meta content="2013-10-17" datatype="xsd:date" property="dcterms:issued"></meta>
     <link href="http://localhost:8000/res/base/other" rev="dcterms:references"></link>
-    <title property="dcterms:title" xml:lang="">Document title (untyped)</title>
-    <title property="dcterms:title">Document title</title>
+    <title property="dcterms:title">Document title (untyped)</title>
+    <title property="dcterms:title" xml:lang="en">Document title</title>
     <link href="http://purl.org/ontology/bibo/Document" rel="rdf:type"></link>
   </head>      
   <body about="http://localhost:8000/res/base/basefile"/>
 </html>"""
         self.assertEqualXML(want, util.readfile(outfile, "rb"))
+
+        parsedmeta = rdflib.Graph().parse(format='rdfa', data=util.readfile(outfile, "rb"))
+        self.assertEqualGraphs(headmeta, parsedmeta)
+        
+
+    @unittest.expectedFailure # Needs to add support for serializing RDF lists
+    def test_render_xhtml_head_list(self):
+        # this metadata includes a URIRef which in turn has a
+        # rdfs:label, which we'd like to appear in the content, and a
+        # RDF list of dcterms:authors, which must be included in the
+        # correct order, and with additional foaf:name information.
+        doc = self.repo.make_document('basefile')
+        headmeta = rdflib.Graph().parse(format='n3', data="""
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<http://localhost:8000/res/base/basefile> a bibo:Document;
+        dcterms:title "Document title"@en ;
+        dcterms:author ( <http://localhost:8000/people/fred>
+                         <http://localhost:8000/people/john>
+                         <http://localhost:8000/people/jack> );
+        prov:wasDerivedFrom <http://example.org/documents/basefile> .
+
+<http://localhost:8000/people/fred>
+        foaf:name "Fred Bloggs" .
+
+<http://localhost:8000/people/john>
+        foaf:name "John Doe" .
+
+<http://localhost:8000/people/jack>
+        foaf:name "Jack Schitt" .
+
+<http://example.org/documents/basefile>
+        rdfs:label "Source document"@en .
+
+        """)
+        doc.meta += headmeta
+        doc.lang = None
+        
+        outfile = self.datadir + "/test.xhtml"
+        self.repo.render_xhtml(doc, outfile)
+        want = """<html xmlns="http://www.w3.org/1999/xhtml"
+                        xmlns:bibo="http://purl.org/ontology/bibo/"
+                        xmlns:foaf="http://xmlns.com/foaf/0.1/"
+                        xmlns:prov="http://www.w3.org/ns/prov#"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        version="XHTML+RDFa 1.1"
+                        xsi:schemaLocation="http://www.w3.org/1999/xhtml http://www.w3.org/MarkUp/SCHEMA/xhtml-rdfa-2.xsd"        
+                        xmlns:dcterms="http://purl.org/dc/terms/">
+  <head about="http://localhost:8000/res/base/basefile">
+    <link href="http://localhost:8000/people/fred" rel="dcterms:author" inlist=""></link>
+    <link href="http://localhost:8000/people/john" rel="dcterms:author" inlist=""></link>
+    <link href="http://localhost:8000/people/jack" rel="dcterms:author" inlist=""></link>
+    <meta about="http://localhost:8000/people/fred" content="Fred Bloggs" property="foaf:name"></meta>
+    <meta about="http://localhost:8000/people/john" content="John Doe" property="foaf:name"></meta>
+    <meta about="http://localhost:8000/people/jack" content="Jack Schitt" property="foaf:name"></meta>
+    <title property="dcterms:title" xml:lang="en">Document title</title>
+    <link href="http://purl.org/ontology/bibo/Document" rel="rdf:type"></link>
+    <link href="http://example.org/documents/basefile" rel="prov:wasDerivedFrom"></link>
+    <meta about="http://example.org/documents/basefile" content="Source document" property="rdfs:label" xml:lang="en"></meta>
+  </head>
+  <body about="http://localhost:8000/res/base/basefile"/>
+</html>"""
+        self.assertEqualXML(want, util.readfile(outfile, "rb"))
+
+        parsedmeta = rdflib.Graph().parse(format='rdfa', data=util.readfile(outfile, "rb"))
+        self.assertEqualGraphs(headmeta, parsedmeta)
         
 
         
