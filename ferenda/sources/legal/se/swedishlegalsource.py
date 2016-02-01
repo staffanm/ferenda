@@ -813,6 +813,20 @@ class SwedishLegalSource(DocumentRepository):
         metadata from doc.body to doc.head)"""
         pass
 
+    def get_url_transform_func(self, repos, basedir):
+        f = super(SwedishLegalSource, self).get_url_transform_func(repos, basedir)
+        # since all Swedish legal source repos share the method of
+        # generating URIs (through the self.minter property), we can
+        # just share the initialized minter object.
+        minter = self.minter
+        for repo in repos:
+            # NB: this doesn't check for the existance of a previous
+            # minter object, since I can't find a way to do that with
+            # a property using the @cached_property
+            # decorator. Hopefully not an issue.
+            repo.minter = minter
+        return f
+
     def sourcefiles(self, basefile):
         return [(self.store.downloaded_path(basefile),
                  self.infer_identifier(basefile))]

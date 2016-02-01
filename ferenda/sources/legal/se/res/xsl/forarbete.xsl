@@ -8,7 +8,9 @@ It's a generic template for any kind of content
 		xmlns:xhtml="http://www.w3.org/1999/xhtml"
 		xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
 		xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+		xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
 		xmlns:dcterms="http://purl.org/dc/terms/"
+		xmlns:prov="http://www.w3.org/ns/prov#"
 		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		xml:space="preserve"
@@ -25,6 +27,12 @@ It's a generic template for any kind of content
   <xsl:template name="bodyclass">generic</xsl:template>
   <xsl:template name="pagetitle">
     <h1><xsl:value-of select="../xhtml:head/xhtml:title"/></h1>
+    <aside class="source">
+      <xsl:variable name="docuri" select="@about"/>
+      <xsl:variable name="derivedfrom" select="$annotations/resource[@uri=$docuri]/prov:wasDerivedFrom/@ref"/>
+      Stuff for <xsl:value-of select="$docuri"/>, <xsl:value-of select="$derivedfrom"/>:<br/>
+      <a href="{$derivedfrom}"><xsl:value-of select="$annotations/resource[@uri=$derivedfrom]/rdfs:label"/></a>
+    </aside>
   </xsl:template>
       
   <xsl:template match="xhtml:a">
@@ -43,6 +51,7 @@ It's a generic template for any kind of content
       </aside>
     </xsl:if>
   </xsl:template>
+
 
   <xsl:template match="xhtml:body/xhtml:div">
     <div class="section-wrapper toplevel">
