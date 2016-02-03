@@ -484,6 +484,28 @@ class Riksdagen(FixedLayoutSource):
         else:
             return super(Riksdagen, self).get_parser(basefile, sanitized)
 
+    def sanitize_body(self, rawbody):
+        # if this is a scanned source, examine the front page for some
+        # common OCR errors (the coat of arms logo is sometimes
+        # mistaken for text) and remove those
+        if ".hocr." in rawbody.filename:
+            pageheight = rawbody[0].height
+            pagewidth = rawbody[0].width
+            for textbox in rawbody[0]:
+                prevright = 0
+                for textelement in textbox:
+                    # if a suspiciously large (over 5% of the page
+                    # width) space occurs between "words" in a line,
+                    # then the new item is probably a OCR mistake, at
+                    # least if it's small.
+                    if (prevright and
+                        (textelement.left - prevright > pagewidth / 20) and
+                        len(textelement.strip()) < 4):
+                        textbox.remove(textelement)
+                        self.log.debug("sanitize: removing textelement '%s', probable OCR mistake" % textelement)
+                    prevright = textelement.left + textelement.width
+        return rawbody
+
     def tokenize(self, reader):
         if isinstance(reader, BeautifulSoup):
             if reader.find("div"):
@@ -499,3 +521,12 @@ class Riksdagen(FixedLayoutSource):
         if not os.path.exists(sourcefile):
             sourcefile = self.store.downloaded_path(basefile)
         return [(sourcefile, self.infer_identifier(basefile))]
+
+    def source_url(self, basefile):
+        # http://data.riksdagen.se/dokumentstatus/GF03167.xml =>
+        # http://www.riksdagen.se/sv/Dokument-Lagar/Forslag/Propositioner-och-skrivelser/_GF03167/
+
+        url = super(Riksdagen, self).source_url(basefile)
+        return url.replace("http://data.riksdagen.se/dokumentstatus/",
+                           "http://www.riksdagen.se/sv/Dokument-Lagar/Forslag/Propositioner-och-skrivelser/_"
+                           ).replace(".xml", "/?text=true")

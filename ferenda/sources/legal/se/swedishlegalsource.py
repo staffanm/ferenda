@@ -749,16 +749,19 @@ class SwedishLegalSource(DocumentRepository):
             d.value(DCTERMS.identifier, identifier)
 
         if not resource.value(PROV.alternateOf):
-            with d.rel(PROV.alternateOf, self.remote_url(basefile)):
+            # possibly mangle the value of remote_url() a little, eg for propriksdagen: http://data.riksdagen.se/dokumentstatus/GF03167.xml => http://www.riksdagen.se/sv/Dokument-Lagar/Forslag/Propositioner-och-skrivelser/_GF03167/
+            with d.rel(PROV.alternateOf, self.source_url(basefile)):
                 d.value(RDFS.label, Literal("Källa", lang="sv"))
 
         if not resource.value(PROV.wasDerivedFrom):
             sourcefiles = self.sourcefiles(basefile)
             if len(sourcefiles) == 1:
                 sourcefile, label = sourcefiles[0]
-                sourcefileuri = URIRef("%s?attachment=%s" %
+                # we overload the URI to add more metadata needed later.
+                sourcefileuri = URIRef("%s?attachment=%s&repo=%s&dir=%s" %
                                        (resource.identifier,
-                                        sourcefile.rsplit(os.sep, 1)[1]))
+                                        sourcefile.rsplit(os.sep, 1)[1],
+                                        self.alias, "downloaded"))
                 with d.rel(PROV.wasDerivedFrom, sourcefileuri):
                     d.value(RDFS.label, Literal(label, lang="sv"))
             elif len(sourcefiles) > 1:
@@ -830,6 +833,9 @@ class SwedishLegalSource(DocumentRepository):
     def sourcefiles(self, basefile):
         return [(self.store.downloaded_path(basefile),
                  self.infer_identifier(basefile))]
+
+    def source_url(self, basefile):
+        return self.remote_url(basefile)
 
     def frontpage_content(self, primary=False):
         if not self.config.tabs:
@@ -1027,13 +1033,18 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                              'Innehållsförteckning',
                              'Till statsrådet',
                              'Innehåll',
-                             'Sammanfattning'):
+                             'Sammanfattning',
+                             'Propositionens lagförslag', # is preamble in older props
+        ):
             if txt.startswith(validheading):
+                return True
+            if txt.endswith("departementet"): # older props 
                 return True
 
     def is_section(parser):
         (ordinal, headingtype, title) = analyze_sectionstart(parser)
         if ordinal:
+            analyze_sectionstart(parser)
             return headingtype == "h1" and ordinal.count(".") == 0
 
     def is_subsection(parser):
@@ -1046,7 +1057,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         # for this doctype should not be thought of as
         # unorderedsections, even though they're set in the same type
         # as normal sections.
-        if state.preset == 'proposition':
+        if state.preset == "proposition":
             return False
         chunk = parser.reader.peek()
         return (chunk.font.size == metrics.h1.size and
@@ -1055,6 +1066,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     def is_unorderedsubsection(parser):
         # Subsections in "Författningskommentar" sections are
         # not always numbered. As a backup, check font size and family as well
+        if state.preset == "proposition":
+            return False
         chunk = parser.reader.peek()
         return (chunk.font.size == metrics.h2.size and
                 chunk.font.family == metrics.h2.family)
@@ -1189,9 +1202,20 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         #         found = h
         # if not found:
         #     return (None, None, chunk)
-        if chunk.font.size <= metrics.default.size:
+
+        min_size = metrics.default.size
+        if chunk.font.size <= min_size:
             return (None, None, chunk)
-        strchunk = str(chunk)
+        strchunk = str(chunk).strip()
+        if (strchunk.endswith(",") or
+            strchunk.endswith("och") or
+            strchunk.endswith("eller") or
+            strchunk.endswith(".")):
+            # sections doesn't end like that
+            return (None, None, chunk)
+        if strchunk.startswith("l "): # probable OCR mistake
+            strchunk = "1" + strchunk[1:]
+
         m = re_sectionstart(strchunk)
         if m:
             ordinal = m.group(1).rstrip(".")
@@ -1285,13 +1309,22 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
 
 def offtryck_gluefunc(textbox, nextbox, prevbox):
-    linespacing = nextbox.font.size / 2
+    # linespacing = nextbox.font.size / 2
+    linespacing = nextbox.font.size / 1.2 # bboxes for scanned
+                                          # material seem very tight,
+                                          # so that lines appear to
+                                          # have greater linespacing
     parindent = nextbox.font.size
     # FIXME: if one textbox has family "TimesNewRomanPSMT@12" and
     # another "TimesNewRomanPS-BoldMT@12", they should be considered
     # the same family (and pdfreader/pdftohtml will wrap the latters'
     # text in a <b> element). Maybe achiveable through
     # FontmappingPDFReader?
+
+    # if we're using hOCR data, take advantage of the paragraph segmentation that tesseract does through the p.ocr_par mechanism
+    if hasattr(prevbox, 'parid') and hasattr(nextbox, 'parid') and prevbox.parid == nextbox.parid:
+        return True
+    
     if (textbox.font.size == nextbox.font.size and
         textbox.font.family == nextbox.font.family and
         textbox.top + textbox.height + linespacing > nextbox.top and

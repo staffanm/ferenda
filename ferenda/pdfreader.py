@@ -323,27 +323,38 @@ class PDFReader(CompoundElement):
             warnings.warn("filenames passed to _parse_hocr are now ignored", DeprecationWarning)
         def dimensions(s):
             m = self.re_dimensions(s)
-            return m.groupdict()
+            return dict([(k, round(int(v) / px_per_point)) for (k, v)
+                         in m.groupdict().items()])
+        
         tree = etree.parse(fp)
         for pageelement in tree.findall(
                 "//{http://www.w3.org/1999/xhtml}div[@class='ocr_page']"):
-            dim = dimensions(pageelement.get('title'))
-            page = Page(number=int(pageelement.get('id')[5:]),
-                        width=int(dim['right']) - int(dim['left']),
-                        height=int(dim['bottom']) - int(dim['top']),
-                        background=None)
             pageheight_in_mm = 242  # FIXME: get this from PDF
             pointsize = 0.352777778  # constant
             pageheight_in_points = pageheight_in_mm / pointsize
-            px_per_point = page.height / pageheight_in_points
+            bbox = self.re_dimensions(pageelement.get('title'))
+            px_per_point = (int(bbox.group("bottom")) - int(bbox.group("top"))) / pageheight_in_points
+            dim = dimensions(pageelement.get('title'))
+            page = Page(number=int(pageelement.get('id')[5:]),
+                        width=dim['right'] - dim['left'],
+                        height=dim['bottom'] - dim['top'],
+                        background=None)
 
             # we discard elements at the ocr_carea (content area?)
             # level, we're only concerned with paragraph-level
-            # elements
+            # elements, which we use ocr_line for (to be consistent
+            # with _parse_xml). However, if those element are wrapped
+            # in ocr_par elements, then tesseract has indictated
+            # paragraph-level segmentation which we make use of.
             for boxelement in pageelement.findall(
                     ".//{http://www.w3.org/1999/xhtml}span[@class='ocr_line']"):
                 boxdim = dimensions(boxelement.get('title'))
                 textelements = []
+                par = boxelement.find("..[@class='ocr_par']")
+                if par is not None:
+                    parid = par.get('id')
+                else:
+                    parid = None
                 for element in boxelement.findall(
                         ".//{http://www.w3.org/1999/xhtml}span[@class='ocrx_word']"):
                     dim = dimensions(element.get("title"))
@@ -359,17 +370,17 @@ class PDFReader(CompoundElement):
                         tag = None
                     text = Textelement(t,
                                        tag=tag,
-                                       top=int(dim['top']),
-                                       left=int(dim['left']),
-                                       width=int(dim['right']) - int(dim['left']),
-                                       height=int(dim['bottom']) - int(dim['top']),)
+                                       top=dim['top'],
+                                       left=dim['left'],
+                                       width=dim['right'] - dim['left'],
+                                       height=dim['bottom'] - dim['top'])
                     textelements.append(text)
 
                 # Now that we know all text elements that should be in
                 # the Textbox, we can guess the font size.
 
                 fontspec = {'family': "unknown",
-                            'size': int(round(text.height / px_per_point))}
+                            'size': text.height}
 
                 # find any previous definition of this fontspec
                 fontid = None
@@ -384,12 +395,15 @@ class PDFReader(CompoundElement):
 
                 # finally create the box and add all our elements
                 # (should not be more than one?) to it
-                box = Textbox(top=int(boxdim['top']),
-                              left=int(boxdim['left']),
-                              width=int(boxdim['right']) - int(boxdim['left']),
-                              height=int(boxdim['bottom']) - int(boxdim['top']),
-                              fontspec=self.fontspec,
-                              fontid=fontid)
+                kwargs = {'top': boxdim['top'],
+                          'left': boxdim['left'],
+                          'width': boxdim['right'] - boxdim['left'],
+                          'height': boxdim['bottom'] - boxdim['top'],
+                          'fontspec': self.fontspec,
+                          'fontid': fontid}
+                if parid:
+                    kwargs['parid'] = parid
+                box = Textbox(**kwargs)
                 for e in textelements:
                     box.append(e)
                 page.append(box)
@@ -1000,9 +1014,35 @@ all text in a Textbox has the same font and size.
         self.height = max(self.top + self.height,
                           other.top + other.height) - self.top
         return self
+#
+#    def append(self, thing):
+#        if len(self) == 0 or self[-1].tag != thing.tag:
+#            return super(Textbox, self).append(thing)
+#        else:
+#            # concatenate adjacent TE:s if their tags match.
+#            self[-1] = self[-1] + thing
+#            return
+#            
 
     def as_xhtml(self, uri, parent_uri=None):
-        element = super(Textbox, self).as_xhtml(uri, parent_uri)
+        children = []
+        first = True
+        prevpart = None
+        for subpart in self:
+            if not first and getattr(subpart, 'tag', None) == getattr(prevpart, 'tag', None):
+                prevpart = prevpart + subpart
+            elif prevpart:
+                if not isinstance(prevpart, str):
+                    prevpart = prevpart.as_xhtml(uri, parent_uri)
+                children.append(prevpart)
+                prevpart = subpart
+            else:
+                prevpart = subpart
+            first = False
+        if not isinstance(prevpart, str):
+            prevpart = prevpart.as_xhtml(uri, parent_uri)
+        children.append(prevpart)
+        element = E("p", {'class': 'textbox'}, *children)
         # FIXME: we should output these positioned style attributes
         # only when the resulting document is being serialized in a
         # positioned fashion. Possibly do some translation from PDF
@@ -1067,4 +1107,26 @@ class Textelement(UnicodeElement):
             extraspace = " "
         else:
             extraspace = ""
-        return Textelement(str(self) + extraspace + str(other), tag=self.tag)
+        if hasattr(self, 'top') and hasattr(other, 'top'):
+            dims = {'top': min(self.top, other.top),
+                    'left': min(self.left, other.left),
+                    'width': max(self.left + self.width,
+                                 other.left + other.width) - self.left,
+                    'height': max(self.top + self.height,
+                                  other.top + other.height) - self.top}
+        else:
+            if hasattr(self, 'top'):
+                dims = {'top': self.top,
+                        'left': self.left,
+                        'width': self.width,
+                        'height': self.height}
+            elif hasattr(other, 'top'):
+                dims = {'top': other.top,
+                        'left': other.left,
+                        'width': other.width,
+                        'height': other.height}
+            else:
+                dims = {}
+        new = Textelement(str(self) + extraspace + str(other), tag=self.tag, **dims)
+        return new
+

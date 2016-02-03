@@ -26,13 +26,17 @@ It's a generic template for any kind of content
   <xsl:template name="headmetadata"/>
   <xsl:template name="bodyclass">generic</xsl:template>
   <xsl:template name="pagetitle">
-    <h1><xsl:value-of select="../xhtml:head/xhtml:title"/></h1>
-    <aside class="source">
-      <xsl:variable name="docuri" select="@about"/>
-      <xsl:variable name="derivedfrom" select="$annotations/resource[@uri=$docuri]/prov:wasDerivedFrom/@ref"/>
-      Stuff for <xsl:value-of select="$docuri"/>, <xsl:value-of select="$derivedfrom"/>:<br/>
-      <a href="{$derivedfrom}"><xsl:value-of select="$annotations/resource[@uri=$derivedfrom]/rdfs:label"/></a>
-    </aside>
+    <div class="section-wrapper toplevel">
+      <section>
+	<h1><xsl:value-of select="../xhtml:head/xhtml:meta[@property='dcterms:identifier']/@content"/></h1>
+	<h2><xsl:value-of select="../xhtml:head/xhtml:title"/></h2>
+      </section>
+      <aside class="source">
+	<xsl:variable name="docuri" select="@about"/>
+	<xsl:variable name="derivedfrom" select="$annotations/resource[@uri=$docuri]/prov:wasDerivedFrom/@ref"/>
+	Originaldokument: <a href="{$derivedfrom}"><xsl:value-of select="$annotations/resource[@uri=$derivedfrom]/rdfs:label"/></a>, <a href="{$annotations/resource[@uri=$docuri]/prov:alternateOf/@ref}">Källa</a>
+      </aside>
+    </div>
   </xsl:template>
       
   <xsl:template match="xhtml:a">

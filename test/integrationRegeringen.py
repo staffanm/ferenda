@@ -19,7 +19,6 @@ class SelectPDFs(unittest.TestCase):
 
     def _t(self, data, want, labels=False):
         got = self.repo.select_pdfs(data, labels)
-        from pudb import set_trace; set_trace()
         self.assertEqual(want, got)
         
     def test_single(self):

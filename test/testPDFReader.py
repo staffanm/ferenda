@@ -170,12 +170,13 @@ class Read(unittest.TestCase):
         self.assertEqual(2, len(reader))
 
         # assert that first element in the first textbox in the first
-        # page corresponds to the first bbox
+        # page corresponds to the first bbox, scaled by the
+        # pixel/point scaling factor.
         self.assertEqual("Regeringens ", str(reader[0][0][0]))
-        self.assertEqual(159, reader[0][0][0].top)
-        self.assertEqual(129, reader[0][0][0].left)
-        self.assertEqual(72, reader[0][0][0].height)
-        self.assertEqual(400, reader[0][0][0].width)
+        self.assertEqual(38, reader[0][0][0].top)
+        self.assertEqual(31, reader[0][0][0].left)
+        self.assertEqual(18, reader[0][0][0].height)
+        self.assertEqual(96, reader[0][0][0].width)
 
         # assert that the <s>third</s>fifth textbox (which has mostly
         # normal text) is rendered correctly (note that we have a

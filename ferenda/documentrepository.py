@@ -13,7 +13,7 @@ from operator import itemgetter
 from tempfile import mkstemp
 from wsgiref.handlers import format_date_time as format_http_date
 from wsgiref.util import request_uri
-from urllib.parse import quote
+from urllib.parse import quote, parse_qsl
 import builtins
 import calendar
 import codecs
@@ -657,6 +657,12 @@ with the *config* object as single parameter.
                 return tuple(path.split("=", 1))
             else:
                 return ()
+
+    def basefile_params_from_basefile(self, basefile):
+        if "?" not in basefile:
+            return {}
+        else:
+            return dict(parse_qsl(basefile.split("?", 1)[1]))
 
     #
     #
@@ -2253,7 +2259,24 @@ WHERE {
                     if basefile or (dataset_params is not None):
                         break
                 if basefile:
-                    path = repo.store.generated_path(basefile)
+                    basefile_params = repo.basefile_params_from_basefile(basefile)
+                    if basefile_params.get('repo') and basefile_params['repo'] != repo.alias:
+                        basefile = basefile.split("?")[0]
+                        # This means that the main composite repo was
+                        # eg "prop", but the underlying subrepo was eg
+                        # "propriksdagen". Find the underlying subrepo.
+                        for repo in repos:
+                            if repo.alias == basefile_params['repo']:
+                                break
+                        else:
+                            raise ValueError("%s: Couldn't find proper subrepo %s" % basefile, basefile_params['repo'])
+                        funcs = {'downloaded': repo.store.downloaded_path,
+                                 'parsed': repo.store.parsed_path}
+                        pathfunc = funcs.get(basefile_params["dir"],
+                                             repo.store.generated_path)
+                    else:
+                        pathfunc = repo.store.generated_path
+                    path = pathfunc(basefile, attachment=basefile_params.get("attachment"))
                 elif dataset_params is not None:
                     # FIXME: This reimplements the logic that calculates
                     # basefile at the end of toc_pagesets
