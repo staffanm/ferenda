@@ -769,11 +769,13 @@ class SwedishLegalSource(DocumentRepository):
                     d.value(RDFS.label, Literal(label, lang="sv"))
             elif len(sourcefiles) > 1:
                 derivedfrom = BNode()
-                c = Collection(graph, derivedfrom)
+                c = Collection(resource.graph, derivedfrom)
                 for sourcefile, label in sourcefiles:
-                    sourcefileuri = URIRef("%s?attachment=%s" %
-                                           (resource.identifier,
-                                            sourcefile.rsplit(os.sep, 1)[1]))
+                    if os.sep in sourcefile:
+                        sourcefile = sourcefile.rsplit(os.sep, 1)[1]
+                    sourcefileuri = URIRef("%s?attachment=%s&repo=%s&dir=%s" %
+                                           (resource.identifier, sourcefile,
+                                            self.alias, "downloaded"))
                     c.append(sourcefileuri)
                     resource.graph.add((sourcefileuri, RDFS.label,
                                         Literal(label, lang="sv")))

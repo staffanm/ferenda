@@ -698,7 +698,7 @@ class Repo(RepoTester):
   <head about="http://localhost:8000/res/base/basefile">
     <link href="http://localhost:8000/people/fred" rel="dcterms:author"></link>
     <meta about="http://localhost:8000/people/fred" content="2013-10-17" datatype="xsd:date" property="dcterms:issued"></meta>
-    <meta about="http://localhost:8000/people/fred" content="This doesn't make any sense" property="dcterms:title" xml:lang=""></meta>
+    <meta about="http://localhost:8000/people/fred" content="This doesn't make any sense" property="dcterms:title"></meta>
     <link about="http://localhost:8000/people/fred" href="http://xmlns.com/foaf/0.1/Person" rel="rdf:type"></link>
     <meta about="http://localhost:8000/people/fred" content="Fred Bloggs" property="foaf:name" xml:lang="en"></meta>
     <meta content="Doc:1" property="dcterms:identifier" xml:lang="en"></meta>
@@ -716,7 +716,7 @@ class Repo(RepoTester):
         self.assertEqualGraphs(headmeta, parsedmeta)
         
 
-    @unittest.expectedFailure # Needs to add support for serializing RDF lists
+    # @unittest.expectedFailure # Needs to add support for serializing RDF lists
     def test_render_xhtml_head_list(self):
         # this metadata includes a URIRef which in turn has a
         # rdfs:label, which we'd like to appear in the content, and a
