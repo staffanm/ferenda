@@ -287,6 +287,9 @@ class RepoTesterStore(object):
     """This is an internal class used by RepoTester in order to control
     where source documents are read from.
 
+    It purposefully does not derive from DocumentStore, even though it
+    uses one in a compositing way.
+
     """
 
     def __init__(self, origstore, downloaded_file=None):
@@ -307,28 +310,45 @@ class RepoTesterStore(object):
                     basefile, action, version):
                 yield x
 
-    def downloaded_path(self, basefile, version=None, attachment=None):
-        if attachment:
-            return os.path.dirname(self.downloaded_file) + os.sep + attachment
+    def path(self, basefile, maindir, suffix, version=None,
+                attachment=None, storage_policy=None):
+        p = self.origstore.path(basefile, maindir, suffix, version, attachment)
+        if maindir == "downloaded":
+            if attachment:
+                return "%s%s%s" % (os.path.dirname(self.downloaded_file),
+                                   os.sep, attachment)
+            else:
+                return self.downloaded_file
+        elif maindir in ("intermediate", "entries"):
+            origdir = self.downloaded_file[:self.downloaded_file.index(os.sep+"downloaded"+os.sep)]
+            return p.replace(self.datadir, origdir)
         else:
-            return self.downloaded_file
+            return p
 
-    def intermediate_path(self, basefile, version=None, attachment=None):
-        p = os.path.splitext(
-            self.downloaded_file.replace(
-                "downloaded",
-                "intermediate"))[0] + ".xml"
-        if attachment:
-            p = os.path.dirname(p) + os.sep + attachment
-        return p
+    def downloaded_path(self, basefile, version=None, attachment=None):
+        return self.path(basefile, 'downloaded',
+                         self.downloaded_suffix, version, attachment)
+
+    def open_downloaded(self, basefile, mode="r", version=None, attachment=None):
+        filename = self.downloaded_path(basefile, version, attachment)
+        return self.origstore._open(filename, mode)
 
     def documententry_path(self, basefile, version=None):
-        p = os.path.splitext(
-            self.downloaded_file.replace(
-                "downloaded",
-                "entries"))[0] + ".json"
-        return p
-        
+        return self.path(basefile, 'entries', '.json', version,
+                            storage_policy="file")
+
+    def intermediate_path(self, basefile, version=None, attachment=None):
+        return self.path(basefile, 'intermediate', '.xml', version, attachment)
+
+    def open_intermediate(self, basefile, mode="r", version=None,
+                          attachment=None):
+        filename = self.intermediate_path(basefile, version, attachment)
+        return self.origstore._open(filename, mode)
+
+
+    def documententry_path(self, basefile, version=None):
+        return self.path(basefile, 'entries', '.json', version,
+                            storage_policy="file")
 
     # To handle any other DocumentStore method, just return whatever
     # our origstore would.

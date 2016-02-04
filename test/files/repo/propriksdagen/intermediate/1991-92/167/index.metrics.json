@@ -1,0 +1,29 @@
+{
+    "rightmargin": 330, 
+    "pagewidth": 447, 
+    "bottommargin": 626, 
+    "leftmargin_even": 30, 
+    "topmargin": 36, 
+    "title": {
+        "size": 18, 
+        "family": "unknown"
+    }, 
+    "rightmargin_even": 330, 
+    "default": {
+        "size": 7, 
+        "family": "unknown"
+    }, 
+    "leftmargin": 20, 
+    "h1": {
+        "size": 10, 
+        "family": "unknown"
+    }, 
+    "h3": {
+        "size": 8, 
+        "family": "unknown"
+    }, 
+    "h2": {
+        "size": 9, 
+        "family": "unknown"
+    }
+}

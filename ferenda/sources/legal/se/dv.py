@@ -1218,6 +1218,17 @@ class DV(SwedishLegalSource):
         computed_basefile = self.basefile_from_uri(doc.uri)
         assert doc.basefile == computed_basefile, "%s -> %s -> %s" % (doc.basefile, doc.uri, computed_basefile)
 
+
+    def infer_identifier(self, basefile):
+        p = self.store.distilled_path(basefile)
+        if not os.path.exists(p):
+            raise ValueError("No distilled file for basefile %s at %s" % (basefile, p))
+
+        with self.store.open_distilled(basefile) as fp:
+            g = Graph().parse(data=fp.read())
+        uri = self.canonical_uri(basefile)
+        return str(g.value(URIRef(uri), DCTERMS.identifier))
+        
     # @staticmethod
     def get_parser(self, basefile, sanitized):
         re_courtname = re.compile(

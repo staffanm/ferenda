@@ -436,7 +436,7 @@ class Riksdagen(FixedLayoutSource):
     def extract_head(self, fp, basefile):
         # fp will point to the pdf2html output -- we need to open the
         # XML file instead
-        with self.store.open_downloaded(basefile) as fp:
+        with open(self.store.downloaded_path(basefile)) as fp:
             return BeautifulSoup(fp.read(), "xml")
 
     def extract_metadata(self, soup, basefile):
@@ -485,6 +485,8 @@ class Riksdagen(FixedLayoutSource):
             return super(Riksdagen, self).get_parser(basefile, sanitized)
 
     def sanitize_body(self, rawbody):
+        if isinstance(rawbody, BeautifulSoup):
+            return rawbody
         # if this is a scanned source, examine the front page for some
         # common OCR errors (the coat of arms logo is sometimes
         # mistaken for text) and remove those

@@ -11,6 +11,7 @@ import re
 import os
 import logging
 from bz2 import BZ2File
+from urllib.parse import quote
 
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
@@ -757,10 +758,12 @@ class SwedishLegalSource(DocumentRepository):
             sourcefiles = self.sourcefiles(basefile)
             if len(sourcefiles) == 1:
                 sourcefile, label = sourcefiles[0]
+                if os.sep in sourcefile:
+                    sourcefile = sourcefile.rsplit(os.sep, 1)[1]
                 # we overload the URI to add more metadata needed later.
                 sourcefileuri = URIRef("%s?attachment=%s&repo=%s&dir=%s" %
                                        (resource.identifier,
-                                        sourcefile.rsplit(os.sep, 1)[1],
+                                        sourcefile,
                                         self.alias, "downloaded"))
                 with d.rel(PROV.wasDerivedFrom, sourcefileuri):
                     d.value(RDFS.label, Literal(label, lang="sv"))
@@ -806,9 +809,8 @@ class SwedishLegalSource(DocumentRepository):
         elif self.rdf_type == RPUBL.Forordningsmotiv:
             prefix = "Fm "
         else:
-            raise ValueError(
-                "Cannot create dcterms:identifier for rdf_type %r" %
-                self.rdf_type)
+            
+            raise ValueError("Cannot create dcterms:identifier for rdf_type %s" % repr(self.rdf_type))
         return "%s%s" % (prefix, basefile)
 
     def postprocess_doc(self, doc):
@@ -835,7 +837,7 @@ class SwedishLegalSource(DocumentRepository):
                  self.infer_identifier(basefile))]
 
     def source_url(self, basefile):
-        return self.remote_url(basefile)
+        return quote(self.remote_url(basefile), safe="/:?$=&%")
 
     def frontpage_content(self, primary=False):
         if not self.config.tabs:

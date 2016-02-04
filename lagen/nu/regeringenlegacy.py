@@ -141,7 +141,7 @@ class RegeringenLegacy(Regeringen):
         return a
     
     
-    def find_pdf_links(self, soup, basefile):
+    def find_pdf_links(self, soup, basefile, labels=False):
         pdffiles = []
         docsection = soup.find('div', 'doc')
         if docsection:
@@ -152,10 +152,10 @@ class RegeringenLegacy(Regeringen):
                     continue
                 pdfbasefile = m.group(1)
                 pdffiles.append((pdfbasefile, link.string))
-        selected = self.select_pdfs(pdffiles)
-        
-        self.log.debug("selected %s out of %d pdf files" % (", ".join(selected), len(pdffiles)))
-        return [p.lower().replace(".pdf", "") for p in selected]
+        selected = self.select_pdfs(pdffiles, labels)
+        if not labels:
+            self.log.debug("selected %s out of %d pdf files" % (", ".join(selected), len(pdffiles)))
+        return selected
 
 class DirRegeringenLegacy(RegeringenLegacy, SameAs, DirRegeringen):
     alias = "dirregeringen.legacy"

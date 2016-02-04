@@ -113,6 +113,9 @@ class JK(SwedishLegalSource):
     def extract_head(self, fp, basefile):
         return BeautifulSoup(fp.read(), "lxml")
 
+    def infer_identifier(self, basefile):
+        return "JK %s" % basefile
+
     def extract_metadata(self, soup, basefile):
         title = soup.find("h1", "besluttitle").get_text()
         beslutsdatum = soup.find("span", class_="label",
@@ -125,7 +128,7 @@ class JK(SwedishLegalSource):
                   "rpubl:beslutsdatum": beslutsdatum,
                   "dcterms:issued": beslutsdatum,
                   "rpubl:diarienummer": diarienummer,
-                  "dcterms:identifier": "JK %s" % diarienummer})
+                  "dcterms:identifier": self.infer_identifier(diarienummer)})
         return a
     
     def extract_body(self, fp, basefile):

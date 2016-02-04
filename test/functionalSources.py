@@ -23,13 +23,13 @@ from lagen.nu import ARN, DV, SFS, SOU, Ds, JO
 
 # subrepos, normally used through a container CompositeRepository
 from lagen.nu.direktiv import DirRegeringen, DirTrips
-from lagen.nu.propositioner import PropRegeringen
+from lagen.nu.propositioner import PropRegeringen, PropRiksdagen
 from lagen.nu.sou import SOURegeringen
 
 for cls in (Keyword, Skeleton, MediaWiki, RFC, W3Standards, PEP,
             EurlexCaselaw, EurlexTreaties, ARN, Direktiv, Ds, DV, JK,
             JO, Kommitte, MyndFskrBase, Propositioner, Regeringen,
-            Riksdagen,SwedishLegalSource, PropRegeringen,
+            Riksdagen, SwedishLegalSource, PropRegeringen, PropRiksdagen,
             DirTrips, DirRegeringen, SOURegeringen,
             SFS):
     # Create a new class, based on RepoTester, on the fly.

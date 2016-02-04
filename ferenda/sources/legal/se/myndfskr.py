@@ -13,7 +13,7 @@ from rdflib import URIRef, Literal, Namespace
 from bs4 import BeautifulSoup
 import requests
 import lxml.html
-from rdflib import RDF
+from rdflib import RDF, Graph
 from rdflib.namespace import DCTERMS, SKOS
 
 from . import RPUBL, RINFOEX, SwedishLegalSource
@@ -605,6 +605,18 @@ class MyndFskrBase(SwedishLegalSource):
         if rdftype == RPUBL.Myndighetsforeskrift:
             self.required_predicates.append(RPUBL.bemyndigande)
 
+
+    def infer_identifier(self, basefile):
+        p = self.store.distilled_path(basefile)
+        if not os.path.exists(p):
+            raise ValueError("No distilled file for basefile %s at %s" % (basefile, p))
+
+        with self.store.open_distilled(basefile) as fp:
+            g = Graph().parse(data=fp.read())
+        uri = self.canonical_uri(basefile)
+        return str(g.value(URIRef(uri), DCTERMS.identifier))
+        
+            
     def parse_document_from_textreader(self, reader, doc):
         # Create data for the body, removing various control characters
         # TODO: Use pdftohtml to create a nice viewable HTML

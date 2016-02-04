@@ -432,7 +432,7 @@ class Regeringen(SwedishLegalSource):
         # reset global state
         PreambleSection.counter = 0
         UnorderedSection.counter = 0
-        pdffiles = [x + ".pdf" for x in self.find_pdf_links(self._rawbody, basefile)]
+        pdffiles = [x + ("" if x.endswith(".pdf") else ".pdf") for x in self.find_pdf_links(self._rawbody, basefile)]
         if not pdffiles:
             self.log.error(
                 "%s: No PDF documents found, can't parse anything" % basefile)
@@ -612,13 +612,8 @@ class Regeringen(SwedishLegalSource):
             self.log.warning("Couldn't sanitize identifier %s" % identifier)
             return identifier
 
-    # FIXME: this'll only be called when eg PropRegeringen is used
-    # directly. If the composite repo Propositioner is used, it won't
-    # know to call into this. (Maybe it should be the responsibility
-    # of parse() to add the extra provenance triples about source
-    # files that this method is used by).
     def sourcefiles(self, basefile):
-        with self.store.open_downloaded(basefile) as fp:
+        with self.store.open_downloaded(basefile, "rb") as fp:
             soup = BeautifulSoup(fp.read(), "lxml")
         # FIXME: We might want to trim the labels here, eg to shorten
         # "En digital agenda, SOU 2014:13 (del 2 av 2) (pdf 1,4 MB)"
@@ -633,9 +628,10 @@ class Regeringen(SwedishLegalSource):
             for link in docsection.find_all("a", href=pdflink):
                 pdffiles.append((link["href"], link.string))
         selected = self.select_pdfs(pdffiles, labels)
-        self.log.debug(
-            "selected %s out of %d pdf files" %
-            (", ".join(selected), len(pdffiles)))
+        if not labels:
+            self.log.debug(
+                "selected %s out of %d pdf files" %
+                (", ".join(selected), len(pdffiles)))
         return selected
 
     def select_pdfs(self, pdffiles, labels=False):

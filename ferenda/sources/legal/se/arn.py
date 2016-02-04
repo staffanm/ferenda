@@ -219,7 +219,7 @@ class ARN(FixedLayoutSource):
                 return cell.find_parent("td").find_next_sibling("td").get_text().strip()
             else:
                 raise KeyError("Could not find cell key %s" % key)
-        d.update({'dcterms:identifier': "ARN %s" % basefile,
+        d.update({'dcterms:identifier': self.infer_identifier(basefile),
                   'rpubl:arendenummer': nextcell("Änr"),
                   'rpubl:diarienummer': nextcell("Änr"),
                   'rpubl:avgorandedatum': nextcell("Avgörande"),
@@ -236,6 +236,9 @@ class ARN(FixedLayoutSource):
                    "", util.normalize_space(attribs['dcterms:title'])),
             lang="sv")
         return attribs
+
+    def infer_identifier(self, basefile):
+        return "ARN %s" % basefile
 
     def get_parser(self, basefile, sanitized):
         return lambda stream: Body(list(stream))
