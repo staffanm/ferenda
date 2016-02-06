@@ -858,7 +858,6 @@ class SwedishLegalSource(DocumentRepository):
                  self.infer_identifier(basefile))]
 
     def source_url(self, basefile):
-        from pudb import set_trace; set_trace()
         return quote(self.remote_url(basefile), safe="/:?$=&%")
 
     def frontpage_content(self, primary=False):
