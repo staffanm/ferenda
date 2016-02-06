@@ -15,6 +15,7 @@ from urllib.parse import quote
 
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
+OLO = Namespace("http://purl.org/ontology/olo/core#")
 from rdflib.resource import Resource
 from rdflib.collection import Collection
 from rdflib.namespace import DCTERMS, SKOS, FOAF, RDFS
@@ -60,7 +61,7 @@ class SwedishLegalStore(DocumentStore):
 class SwedishLegalSource(DocumentRepository):
     documentstore_class = SwedishLegalStore
     namespaces = ['rdf', 'rdfs', 'xsd', 'dcterms', 'skos', 'foaf',
-                  'xhv', 'xsi', 'owl', 'prov', 'bibo',
+                  'xhv', 'xsi', 'owl', 'prov', 'bibo', 'olo',
                   ('rpubl', 'http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#'),
                   ('rinfoex', 'http://lagen.nu/terms#')]
 
@@ -750,9 +751,10 @@ class SwedishLegalSource(DocumentRepository):
             d.value(DCTERMS.identifier, identifier)
 
         if not resource.value(PROV.alternateOf):
-            # possibly mangle the value of remote_url() a little, eg for propriksdagen: http://data.riksdagen.se/dokumentstatus/GF03167.xml => http://www.riksdagen.se/sv/Dokument-Lagar/Forslag/Propositioner-och-skrivelser/_GF03167/
-            with d.rel(PROV.alternateOf, self.source_url(basefile)):
-                d.value(RDFS.label, Literal("Källa", lang="sv"))
+            source_url = self.source_url(basefile)
+            if source_url:
+                with d.rel(PROV.alternateOf, source_url):
+                    d.value(RDFS.label, Literal("Källa", lang="sv"))
 
         if not resource.value(PROV.wasDerivedFrom):
             sourcefiles = self.sourcefiles(basefile)
@@ -768,18 +770,35 @@ class SwedishLegalSource(DocumentRepository):
                 with d.rel(PROV.wasDerivedFrom, sourcefileuri):
                     d.value(RDFS.label, Literal(label, lang="sv"))
             elif len(sourcefiles) > 1:
-                derivedfrom = BNode()
-                c = Collection(resource.graph, derivedfrom)
-                for sourcefile, label in sourcefiles:
-                    if os.sep in sourcefile:
-                        sourcefile = sourcefile.rsplit(os.sep, 1)[1]
+                # The commented-out code shows how to create a ordered
+                # list using the native rdf:List concept (ie BNodes
+                # with rdf:first/rdf:next). Serialization into RDFa
+                # works, but this became unwieldy to query using
+                # SPARQL. Instead we create a index triple for each
+                # member in the list using the olo:index property (but
+                # we don't bother with the rest of the olo vocab).
+                #
+                # derivedfrom = BNode()
+                # c = Collection(resource.graph, derivedfrom)
+                # for sourcefile, label in sourcefiles:
+                #     if os.sep in sourcefile:
+                #         sourcefile = sourcefile.rsplit(os.sep, 1)[1]
+                #     sourcefileur = URIRef("%s?attachment=%s&repo=%s&dir=%s" %
+                #                            (resource.identifier, sourcefile,
+                #                             self.alias, "downloaded"))
+                #     c.append(sourcefileuri)
+                #     resource.graph.add((sourcefileuri, RDFS.label,
+                #                         Literal(label, lang="sv")))
+                # d.rel(PROV.wasDerivedFrom, derivedfrom)
+                for index, tupl in enumerate(sourcefiles):
+                    (sourcefile, label) = tupl
                     sourcefileuri = URIRef("%s?attachment=%s&repo=%s&dir=%s" %
-                                           (resource.identifier, sourcefile,
+                                           (resource.identifier,
+                                            sourcefile,
                                             self.alias, "downloaded"))
-                    c.append(sourcefileuri)
-                    resource.graph.add((sourcefileuri, RDFS.label,
-                                        Literal(label, lang="sv")))
-                d.rel(PROV.wasDerivedFrom, derivedfrom)
+                    with d.rel(PROV.wasDerivedFrom, sourcefileuri):
+                        d.value(RDFS.label, Literal(label, lang="sv"))
+                        d.value(OLO['index'], Literal(index))  # auto xsd^^int?
             else:
                 self.log.warning("%s: infer_metadata: No sourcefiles" %
                                  basefile)
@@ -839,6 +858,7 @@ class SwedishLegalSource(DocumentRepository):
                  self.infer_identifier(basefile))]
 
     def source_url(self, basefile):
+        from pudb import set_trace; set_trace()
         return quote(self.remote_url(basefile), safe="/:?$=&%")
 
     def frontpage_content(self, primary=False):

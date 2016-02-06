@@ -157,6 +157,11 @@ class RegeringenLegacy(Regeringen):
             self.log.debug("selected %s out of %d pdf files" % (", ".join(selected), len(pdffiles)))
         return selected
 
+    def source_url(self, basefile):
+        # as the old site is gone, there is no possible URL we can
+        # return here.
+        return None
+
 class DirRegeringenLegacy(RegeringenLegacy, SameAs, DirRegeringen):
     alias = "dirregeringen.legacy"
 

@@ -2,22 +2,28 @@ PREFIX dcterms: <http://purl.org/dc/terms/>
 PREFIX prov: <http://www.w3.org/ns/prov#>
 PREFIX rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX bibo: <http://purl.org/ontology/bibo/>
+PREFIX olo: <http://purl.org/ontology/olo/core#>
+
 
 CONSTRUCT {
   <%(uri)s> dcterms:isReferencedBy ?referer .
   ?referer ?p ?o .
   ?o rdfs:label ?olabel .
   <%(uri)s> ?rp ?ro .
+  ?ro ?rrp ?rro
 }
 WHERE
 {
   {
     <%(uri)s> ?rp ?ro .
   } UNION {
-    ?referer dcterms:references <%(uri)s> .
-    ?referer ?p ?o .
-    } UNION {
+    <%(uri)s> ?rp ?ro .
+    ?ro ?rrp ?rro .
+  } UNION {
+      ?referer dcterms:references <%(uri)s> .
+      ?referer ?p ?o .
       ?o rdfs:label ?olabel .
-}
+  }
 }
 

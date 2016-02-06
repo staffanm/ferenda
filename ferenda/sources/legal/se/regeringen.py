@@ -620,6 +620,12 @@ class Regeringen(SwedishLegalSource):
         # to something more display friendly.
         return self.find_pdf_links(soup, basefile, labels=True)
 
+    def source_url(self, basefile):
+        # this source does not have any predictable URLs, so we try to
+        # find if we made a note on the URL when we ran download()
+        entry = DocumentEntry(self.store.documententry_path(basefile))
+        return entry.orig_url
+
     def find_pdf_links(self, soup, basefile, labels=False):
         pdffiles = []
         docsection = soup.find('ul', 'list--Block--icons')
