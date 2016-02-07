@@ -242,11 +242,12 @@ class Regeringen(SwedishLegalSource):
 
             soup = BeautifulSoup(codecs.open(filename, encoding=self.source_encoding), "lxml")
             cnt = 0
-            pdffiles = self.find_pdf_links(soup, basefile)
+            from pudb import set_trace; set_trace()
+            pdffiles = [x + ("" if x.endswith(".pdf") else ".pdf") for x in self.find_pdf_links(soup, basefile)]
             if pdffiles:
                 for pdffile in pdffiles:
                     pdfurl = urljoin(url, pdffile)
-                    basepath = pdffile.split("/")[-1] + ".pdf"
+                    basepath = pdffile.split("/")[-1]
                     pdffilename = self.store.downloaded_path(basefile, attachment=basepath)
                     if self.download_if_needed(pdfurl, basefile, filename=pdffilename):
                         pdfupdated = True
@@ -533,7 +534,6 @@ class Regeringen(SwedishLegalSource):
                 (self.find_commentary, sharedstate)]
 
     def find_primary_law(self, node, state):
-        # from pudb import set_trace; set_trace()
         if not isinstance(node, Section) or not node.title.startswith("Förslag till lag om ändring i"):
             if isinstance(node, Body):
                 return state
@@ -612,7 +612,7 @@ class Regeringen(SwedishLegalSource):
             self.log.warning("Couldn't sanitize identifier %s" % identifier)
             return identifier
 
-    def sourcefiles(self, basefile):
+    def sourcefiles(self, basefile, resource=None):
         with self.store.open_downloaded(basefile, "rb") as fp:
             soup = BeautifulSoup(fp.read(), "lxml")
         # FIXME: We might want to trim the labels here, eg to shorten

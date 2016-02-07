@@ -517,7 +517,7 @@ class Riksdagen(FixedLayoutSource):
         else:
             return super(Riksdagen, self).tokenize(reader)
 
-    def sourcefiles(self, basefile):
+    def sourcefiles(self, basefile, resource=None):
         sourcefile = self.store.downloaded_path(basefile,
                                                 attachment="index.pdf")
         if not os.path.exists(sourcefile):

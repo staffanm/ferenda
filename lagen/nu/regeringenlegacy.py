@@ -7,7 +7,7 @@ from builtins import *
 # against old downloaded
 import re
 import codecs
-from urllib.parse import urljoin
+# from urllib.parse import urljoin
 
 from rdflib import URIRef
 from rdflib.namespace import SKOS
@@ -17,6 +17,7 @@ from ferenda.sources.legal.se.direktiv import DirRegeringen
 from ferenda.sources.legal.se.sou import SOURegeringen
 from ferenda.sources.legal.se.ds import Ds
 from ferenda.sources.legal.se.propositioner import PropRegeringen
+from ferenda.compat import urljoin
 
 from . import SameAs
 

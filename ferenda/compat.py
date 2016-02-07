@@ -75,3 +75,15 @@ except ImportError:  # pragma: no cover
         # this means Mock isn't installed -- which is OK for a non-dev install
         Mock = MagicMock = patch = call = None
 
+from urllib.parse import urljoin as urljoin_orig
+
+def urljoin(root, other):
+    # on py26, it seems that BeautifulSoup Tag objects sometimes can
+    # return a bytestr instead of unicode (eg img["src"] =>
+    # 'hello.jpg', not u'hello.jpg'. This means that it cannot be used
+    # as input to urljoin, which requires that both args have the same
+    # type. So we wrap it in order to have simple (albeit somewhat
+    # misleading) example code.
+    if isinstance(other, bytes):
+        other = other.decode("utf-8")
+    return urljoin_orig (root, other)

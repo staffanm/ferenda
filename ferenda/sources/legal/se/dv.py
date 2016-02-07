@@ -641,7 +641,7 @@ class DV(SwedishLegalSource):
     def parse_entry_title(self, doc):
         # FIXME: The primary use for entry.title is to generate
         # feeds. Should we construct a feed-friendly title here
-        # (rpubl:referatrubrik is often too wordy, dctemr:identifier +
+        # (rpubl:referatrubrik is often too wordy, dcterm:identifier +
         # dcterms:subject might be a better choice -- also notisfall
         # does not have any rpubl:referatrubrik)
         title = doc.meta.value(URIRef(doc.uri), RPUBL.referatrubrik)
