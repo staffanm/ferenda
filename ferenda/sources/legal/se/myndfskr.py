@@ -1065,7 +1065,7 @@ class NFS(MyndFskrBase):
 
         # NB: the basefile we got might be a later change act. first
         # order of business is to identify the base act basefile
-        soup = BeautifulSoup(self.session.get(url).text)
+        soup = BeautifulSoup(self.session.get(url).text, "lxml")
         basehead = soup.find("h3", text=re.compile("Grundföreskrift$"))
         if not basehead:
             realbasefile = basefile
@@ -1079,7 +1079,7 @@ class NFS(MyndFskrBase):
         descpath = self.store.downloaded_path(basefile,
                                               attachment="description.html")
         self.download_if_needed(url, basefile, filename=descpath)
-        soup = BeautifulSoup(util.readfile(descpath))
+        soup = BeautifulSoup(util.readfile(descpath), "lxml")
         seen_consolidated = False
         # find all pdf links, identify consolidated version if present
         # [1:] in order to skip header
@@ -1131,7 +1131,7 @@ class SJVFS(MyndFskrBase):
 
     @decorators.downloadmax
     def download_get_basefiles(self, source):
-        soup = BeautifulSoup(source)
+        soup = BeautifulSoup(source, "lxml")
         main = soup.find_all("li", "active")
         assert len(main) == 1
         extra = []
@@ -1149,7 +1149,7 @@ class SJVFS(MyndFskrBase):
                 continue
             url = urljoin(self.start_url, a['href'])
             self.log.debug("Fetching index page for %s" % (a.text))
-            subsoup = BeautifulSoup(self.session.get(url).text)
+            subsoup = BeautifulSoup(self.session.get(url).text, "lxml")
             submain = subsoup.find("div", "pagecontent")
             for a in submain.find_all("a", href=re.compile(".pdf$", re.I)):
                 if re.search('\d{4}:\d+', a.text):
@@ -1218,7 +1218,7 @@ class SKVFS(MyndFskrBase):
         # this also updates the docentry
         html_downloaded = super(SKVFS, self).download_single(basefile, url)
         # try to find link to a PDF in what was just downloaded
-        soup = BeautifulSoup(util.readfile(self.store.downloaded_path(basefile)))
+        soup = BeautifulSoup(util.readfile(self.store.downloaded_path(basefile)), "lxml")
         pdffilename = self.store.downloaded_path(basefile,
                                                  attachment="index.pdf")
         if (self.config.refresh or not(os.path.exists(pdffilename))):
@@ -1239,7 +1239,7 @@ class SKVFS(MyndFskrBase):
     # adapted from DVFS
     def textreader_from_basefile(self, basefile):
         infile = self.store.downloaded_path(basefile)
-        soup = BeautifulSoup(util.readfile(infile))
+        soup = BeautifulSoup(util.readfile(infile), "lxml")
         # the DOM tree for SKVFS HTML are a real mess -- let's hope
         # this captures the relevant content. Maybe we should look for
         # a "index.pdf" attachment and prefer that one?
@@ -1268,7 +1268,7 @@ class SOSFS(MyndFskrBase):
 
     @decorators.downloadmax
     def download_get_basefiles(self, source):
-        soup = BeautifulSoup(source)
+        soup = BeautifulSoup(source, "lxml")
         for td in soup.find_all("td", "col3"):
             txt = td.get_text().strip()
             basefile = self._basefile_from_text(txt)
@@ -1297,7 +1297,7 @@ class SOSFS(MyndFskrBase):
                 konsfile = self.store.downloaded_path(
                     basefile, attachment="konsolidering.html")
                 if (self.config.refresh or (not os.path.exists(konsfile))):
-                    soup = BeautifulSoup(self.session.get(link).text)
+                    soup = BeautifulSoup(self.session.get(link).text, "lxml")
                     self.log.debug("%s: Has had changes -- downloading base act and all changes" %
                                    basefile)
 
@@ -1324,7 +1324,7 @@ class SOSFS(MyndFskrBase):
                         "%s: Downloading updated consolidated version of base" %
                         basefile)
                     self.log.debug("%s:    first getting %s" % (basefile, link))
-                    soup = BeautifulSoup(self.session.get(link).text)
+                    soup = BeautifulSoup(self.session.get(link).text, "lxml")
                     konsbasefileregex = re.compile(
                         "Senaste version av SOSFS (?P<basefile>\d+:\d+)")
                     konslinkel = soup.find("a", text=konsbasefileregex)
@@ -1352,7 +1352,7 @@ class SOSFS(MyndFskrBase):
         # download_single in order to update documententry. This'll
         # mean that the orig_url is set to the PDF link, not this HTML
         # landing page.
-        soup = BeautifulSoup(self.session.get(url).text)
+        soup = BeautifulSoup(self.session.get(url).text, "lxml")
         link_el = soup.find("a", text=re.compile("^\s*Ladda ner\s*$"))
         if link_el:
             link = urljoin(url, link_el.get("href"))

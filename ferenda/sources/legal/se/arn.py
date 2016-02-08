@@ -171,7 +171,7 @@ class ARN(FixedLayoutSource):
                             remaining_attempts -= 1
                             time.sleep(1)
 
-                    soup = BeautifulSoup(resp.text)
+                    soup = BeautifulSoup(resp.text, "lxml")
                     action = soup.find("form")["action"]
 
     def download_name_file(self, tmpfile, basefile, assumedfile):

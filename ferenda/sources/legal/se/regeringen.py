@@ -242,13 +242,14 @@ class Regeringen(SwedishLegalSource):
 
             soup = BeautifulSoup(codecs.open(filename, encoding=self.source_encoding), "lxml")
             cnt = 0
-            from pudb import set_trace; set_trace()
-            pdffiles = [x + ("" if x.endswith(".pdf") else ".pdf") for x in self.find_pdf_links(soup, basefile)]
+            pdffiles = self.find_pdf_links(soup, basefile)
             if pdffiles:
                 for pdffile in pdffiles:
                     pdfurl = urljoin(url, pdffile)
                     basepath = pdffile.split("/")[-1]
                     pdffilename = self.store.downloaded_path(basefile, attachment=basepath)
+                    if not pdffilename.lower().endswith(".pdf"):
+                        pdffilename += ".pdf"
                     if self.download_if_needed(pdfurl, basefile, filename=pdffilename):
                         pdfupdated = True
                         self.log.debug(

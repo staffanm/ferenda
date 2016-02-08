@@ -783,3 +783,24 @@ def make_json_date_object_hook(*fields):
                         pass
         return d
     return myhook
+
+
+def location_exception(exc):
+    """inspect the stack and return he location of the error (and if
+    that's in stdlib or thirdparty, the ferenda-or-project code
+    line that called into the source)"""
+    errmsg = str(exc)
+    tblines = traceback.extract_tb(sys.exc_info()[2])
+    tbline = tblines[-1]
+    if "ferenda" in tbline[0]:
+        shortsrc = tbline[0][tbline[0].rindex("ferenda"):]
+    else:
+        shortsrc = tbline[0]
+    loc = "%s:%s" % (shortsrc, tbline[1])
+    if "ferenda" not in loc:
+        for tbline in reversed(tblines):
+            if "ferenda" in tbline[0]:
+                shortsrc = tbline[0][tbline[0].rindex("ferenda"):]
+                loc += " (from %s:%s)" % (shortsrc, tbline[1])
+                break
+    return loc

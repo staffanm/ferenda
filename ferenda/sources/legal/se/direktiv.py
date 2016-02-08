@@ -25,7 +25,7 @@ from ferenda import PDFAnalyzer
 from ferenda.decorators import downloadmax, recordlastdownload
 from ferenda.elements import Body, Heading, ListItem, Paragraph
 from ferenda.errors import DocumentRemovedError
-
+from ferenda.compat import urljoin
 
 # custom style analyzer
 class DirAnalyzer(PDFAnalyzer):
@@ -293,7 +293,7 @@ class DirAsp(FixedLayoutSource):
     
     def download(self, basefile=None):
         resp = requests.get(self.start_url)
-        soup = BeautifulSoup(resp.text)
+        soup = BeautifulSoup(resp.text, "lxml")
         depts = [opt['value'] for opt in soup.find_all("option", value=True)]
         for basefile, url in self.download_get_basefiles(depts):
             # since the server doesn't support conditional caching and
@@ -311,7 +311,7 @@ class DirAsp(FixedLayoutSource):
                                   'kom_nr': '',
                                   'title': '',
                                   'ACTION': '  SÖK  '.encode('latin-1')})
-            soup = BeautifulSoup(resp.text)
+            soup = BeautifulSoup(resp.text, "lxml")
             hits = list(soup.find_all(True, text=re.compile(r'(\d{4}:\d+)')))
             self.log.debug("Searching for dept %s, %d results" % (dept, len(hits)))
             for hit in hits:

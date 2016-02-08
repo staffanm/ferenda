@@ -154,6 +154,13 @@ class SwedishLegalSource(DocumentRepository):
         opts['parserefs'] = True
         return opts
 
+    def download_is_different(self, existing, new):
+        # almost all resources handled by all repos deriving from this
+        # are immutable, ie they should never change. If some repo
+        # needs to handle changed resources (like SFS) they'll have to
+        # override this and do a proper semantic difference check.
+        return False
+
     def lookup_label(self, resource, predicate=FOAF.name):
         """The inverse of
         :py:meth:`~ferenda.DocumentRepository.lookup_resource `.

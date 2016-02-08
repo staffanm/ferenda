@@ -434,8 +434,9 @@ def run(argv, config=None, subcall=False):
                             try:
                                 results[action][alias] = run(argscopy, config, subcall=True)
                             except Exception as e:
-                                log.error("%s %s failed: %s" %
-                                          (action, alias, e))
+                                loc = util.location_exception(e)
+                                log.error("%s %s failed: %s (%s)" %
+                                          (action, alias, e, loc))
                 return results
             else:
                 if classname == "all":
@@ -445,12 +446,11 @@ def run(argv, config=None, subcall=False):
                             argscopy = argv[2:]  # skip alias and action
                             argscopy.insert(0, action)
                             argscopy.insert(0, alias)
-                            # why do we use _run_class() here and run() above?
-                            # ret.append(_run_class(enabled, argscopy, config))
                             ret.append(run(argscopy, config, subcall=True))
                         except Exception as e:
-                            log.error("%s %s failed: %s" %
-                                      (action, alias, e))
+                            loc = util.location_exception(e)
+                            log.error("%s %s failed: %s (loc)" %
+                                      (action, alias, e, loc))
                     alias = "all"
                     return ret
                 else:
@@ -896,6 +896,11 @@ def _run_class(enabled, argv, config):
                 if e.dummyfile:
                     util.writefile(e.dummyfile, "")
                 raise e
+            except Exception as e:
+                loc = util.location_exception(e)
+                log.error("%s %s failed: %s (loc)" %
+                          (action, alias, e, loc))
+                raise e
     return res
 
 # The functions runbuildclient, _queuejobs, _make_client_manager,
@@ -1281,23 +1286,7 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command,
             exc_type, exc_value, tb = sys.exc_info()
             return exc_type, exc_value, traceback.extract_tb(tb)
     except Exception as e:
-        errmsg = str(e)
-        # inspect the stack and log the location of the error (and if
-        # that's in stdlib or thirdparty, the ferenda-or-project code
-        # line that called into the source)
-        tblines = traceback.extract_tb(sys.exc_info()[2])
-        tbline = tblines[-1]
-        if "ferenda" in tbline[0]:
-            shortsrc = tbline[0][tbline[0].rindex("ferenda"):]
-        else:
-            shortsrc = tbline[0]
-        loc = "%s:%s" % (shortsrc, tbline[1])
-        if "ferenda" not in loc:
-            for tbline in reversed(tblines):
-                if "ferenda" in tbline[0]:
-                    shortsrc = tbline[0][tbline[0].rindex("ferenda"):]
-                    loc += " (from %s:%s)" % (shortsrc, tbline[1])
-                    break
+        loc = util.location_exception(e)
         getlog().error("%s %s %s failed: %s (%s)" %
                        (alias, command, basefile, errmsg, loc))
         exc_type, exc_value, tb = sys.exc_info()

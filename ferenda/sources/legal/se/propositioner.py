@@ -122,7 +122,7 @@ class PropTrips(Trips, FixedLayoutSource):
 
         # feed the lxml tree into beautifulsoup by serializing it to a
         # string -- is there a better way?
-        soup = BeautifulSoup(etree.tostring(pagetree))
+        soup = BeautifulSoup(etree.tostring(pagetree), "lxml")
         for tr in soup.findAll("tr"):
             if ((not tr.find("a")) or
                     not re.match(self.basefile_regex, tr.find("a").text)):

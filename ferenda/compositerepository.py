@@ -130,7 +130,8 @@ class CompositeRepository(DocumentRepository):
             try:
                 ret = inst.download(basefile)
             except Exception as e:  # be resilient
-                self.log.error("download for c failed: %s" % e)
+                loc = util.location_exception(e)
+                self.log.error("download for %s failed: %s (%s)" % (c.alias, e, loc))
                 ret = False
             if basefile and ret:
                 # we got the doc we want, we're done!
