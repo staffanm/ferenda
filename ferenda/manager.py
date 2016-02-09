@@ -449,7 +449,7 @@ def run(argv, config=None, subcall=False):
                             ret.append(run(argscopy, config, subcall=True))
                         except Exception as e:
                             loc = util.location_exception(e)
-                            log.error("%s %s failed: %s (loc)" %
+                            log.error("%s %s failed: %s (%s)" %
                                       (action, alias, e, loc))
                     alias = "all"
                     return ret

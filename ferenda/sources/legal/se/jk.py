@@ -90,17 +90,20 @@ class JK(SwedishLegalSource):
             else:
                 done = True
 
-    def download_is_different(self, existing, new):
-        # HTML pages many contain ASP.Net crap (__VIEWSTATE and
-        # __EVENTVALIDATION) that differ from request to request. Only
-        # compare div#mainContent
-        existing_soup = BeautifulSoup(
-            util.readfile(
-                existing,
-                encoding=self.source_encoding), "lxml")
-        new_soup = BeautifulSoup(util.readfile(new, encoding=self.source_encoding), "lxml")
-        return (existing_soup.find("div", id="mainContent") !=
-                new_soup.find("div", id="mainContent"))
+
+# Removed for now -- JK decisions ought to be immutable?
+#                
+#    def download_is_different(self, existing, new):
+#        # HTML pages many contain ASP.Net crap (__VIEWSTATE and
+#        # __EVENTVALIDATION) that differ from request to request. Only
+#        # compare div#mainContent
+#        existing_soup = BeautifulSoup(
+#            util.readfile(
+#                existing,
+#                encoding=self.source_encoding), "lxml")
+#        new_soup = BeautifulSoup(util.readfile(new, encoding=self.source_encoding), "lxml")
+#        return (existing_soup.find("div", id="mainContent") !=
+#                new_soup.find("div", id="mainContent"))
 
 
     def metadata_from_basefile(self, basefile):
