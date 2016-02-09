@@ -471,11 +471,12 @@ class Devel(object):
             sys.stdout.write(chunk)
 
     @decorators.action
-    def samplerepo(self, alias, sourcedir, sourcerepo=None, destrepo=None):
-        if 'samplesize' in self.config:
-            samplesize = int(self.config.samplesize)
-        else:
-            samplesize = 10
+    def samplerepo(self, alias, sourcedir, sourcerepo=None, destrepo=None, samplesize=None):
+        if not samplesize:
+            if 'samplesize' in self.config:
+                samplesize = int(self.config.samplesize)
+            else:
+                samplesize = 10
         if sourcerepo is None:
             sourcerepo = self._repo_from_alias(alias, sourcedir)
         if destrepo is None:
@@ -514,10 +515,13 @@ class Devel(object):
                     shutil.rmtree(idst)
                 copy = shutil.copytree
             util.ensure_dir(dst)
-            copy(src, dst)
-            if os.path.exists(isrc):
-                util.ensure_dir(idst)
-                copy(isrc, idst)
+            try:
+                copy(src, dst)
+                if os.path.exists(isrc):
+                    util.ensure_dir(idst)
+                    copy(isrc, idst)
+            except FileNotFoundError as e:
+                print("WARNING: %s" % e)
 
             # NOTE: For SFS (and only SFS), there exists separate
             # register files under
@@ -537,6 +541,11 @@ class Devel(object):
                              destrepo.store.documententry_path(basefile))
 
     def samplerepos(self, sourcedir):
+        if 'samplesize' in self.config:
+            samplesize = int(self.config.samplesize)
+        else:
+            samplesize = 10
+        
         classes = set()
         for alias in self.config._parent._subsections:
             if alias == self.alias:  # ie "devel"
@@ -564,7 +573,10 @@ class Devel(object):
                     aliasdir = subsourcerepo.store.datadir
                     print("%s/%s: Copying docs from  %s" %
                           (sourcerepo.alias, alias, aliasdir))
-                    self.samplerepo(alias, aliasdir, subsourcerepo, subdestrepo)
+                    self.samplerepo(alias, aliasdir, subsourcerepo,
+                                    subdestrepo,
+                                    samplesize=round(samplesize/
+                                                     len(destrepo.subrepos)))
             else:
                 classes.add(destrepo.__class__)
                 aliasdir = sourcedir+os.sep+alias
