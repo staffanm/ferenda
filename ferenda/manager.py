@@ -898,7 +898,7 @@ def _run_class(enabled, argv, config):
                 raise e
             except Exception as e:
                 loc = util.location_exception(e)
-                log.error("%s %s failed: %s (loc)" %
+                log.error("%s %s failed: %s (%s)" %
                           (action, alias, e, loc))
                 raise e
     return res

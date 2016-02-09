@@ -790,6 +790,7 @@ def location_exception(exc):
     that's in stdlib or thirdparty, the ferenda-or-project code
     line that called into the source)"""
     errmsg = str(exc)
+    import traceback
     tblines = traceback.extract_tb(sys.exc_info()[2])
     tbline = tblines[-1]
     if "ferenda" in tbline[0]:

@@ -446,7 +446,7 @@ class DV(SwedishLegalSource):
             prev_path = self.store.intermediate_path(prev_basefile)
             avd_p = None
             if os.path.exists(prev_path):
-                soup = BeautifulSoup(util.readfile(prev_path))
+                soup = BeautifulSoup(util.readfile(prev_path), "lxml")
                 tmp = soup.find(["w:p", "para"])
                 if re_avdstart.match(tmp.get_text().strip()):
                     avd_p = tmp
@@ -476,12 +476,12 @@ class DV(SwedishLegalSource):
         intermediatefile, filetype = r.read(docfile, intermediatefile)
         if filetype == "docx":
             self._simplify_ooxml(intermediatefile, pretty_print=False)
-            soup = BeautifulSoup(util.readfile(intermediatefile))
+            soup = BeautifulSoup(util.readfile(intermediatefile), "lxml")
             soup = self._merge_ooxml(soup)
             p_tag = "w:p"
             xmlns = ' xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
         else:
-            soup = BeautifulSoup(util.readfile(intermediatefile))
+            soup = BeautifulSoup(util.readfile(intermediatefile), "lxml")
             p_tag = "para"
             xmlns = ''
         iterator = soup.find_all(p_tag)
