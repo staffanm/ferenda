@@ -1286,6 +1286,7 @@ def _run_class_with_basefile(clbl, basefile, kwargs, command,
             exc_type, exc_value, tb = sys.exc_info()
             return exc_type, exc_value, traceback.extract_tb(tb)
     except Exception as e:
+        errmsg = str(e)
         loc = util.location_exception(e)
         getlog().error("%s %s %s failed: %s (%s)" %
                        (alias, command, basefile, errmsg, loc))
