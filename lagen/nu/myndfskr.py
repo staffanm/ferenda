@@ -15,7 +15,7 @@ from ferenda.sources.legal.se import RPUBL
 from ferenda.sources.legal.se import myndfskr
 from ferenda import (CompositeRepository, CompositeStore, Facet, TocPageset,
                      TocPage)
-from ferenda import util
+from ferenda import util, fulltextindex
 from ferenda.elements import Link
 from ferenda.sources.legal.se import (SwedishLegalSource, SwedishLegalStore)
 from . import SameAs
@@ -148,6 +148,7 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
                       identificator=Facet.term,
                       use_for_toc=True),
                 Facet(RPUBL.arsutgava,
+                      indexingtype=fulltextindex.Label(),
                       use_for_toc=True),
                 Facet(RDF.type, use_for_toc=False),
                 Facet(DCTERMS.title, use_for_toc=False),

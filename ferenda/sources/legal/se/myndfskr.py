@@ -650,6 +650,7 @@ class MyndFskrBase(SwedishLegalSource):
                 Facet(DCTERMS.publisher),
                 Facet(DCTERMS.identifier),
                 Facet(RPUBL.arsutgava,
+                      indexingtype=fulltextindex.Label(),
                       use_for_toc=True)]
 
     def toc_item(self, binding, row):

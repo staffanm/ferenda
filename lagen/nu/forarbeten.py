@@ -7,7 +7,7 @@ from collections import Counter
 
 from rdflib import RDF
 
-from ferenda import util
+from ferenda import util, fulltextindex
 from ferenda import Facet, TocPageset, TocPage
 from ferenda.elements import Link
 from ferenda.sources.legal.se import SwedishLegalSource, RPUBL
@@ -90,7 +90,9 @@ WHERE {
         return [Facet(RDF.type,
                       selector=select,
                       identificator=ident),
-                Facet(RPUBL.arsutgava)]
+                Facet(RPUBL.arsutgava,
+                      indexingtype=fulltextindex.Label(),
+                      )]
 
     def toc_pagesets(self, data, facets):
         # FIXME: Main structure of this (create a two-level hierarchy
