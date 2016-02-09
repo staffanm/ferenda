@@ -774,13 +774,19 @@ class SwedishLegalSource(DocumentRepository):
             sourcefiles = self.sourcefiles(basefile, resource)
             if len(sourcefiles) == 1:
                 sourcefile, label = sourcefiles[0]
-                if os.sep in sourcefile:
-                    sourcefile = sourcefile.rsplit(os.sep, 1)[1]
-                # we overload the URI to add more metadata needed later.
-                sourcefileuri = URIRef("%s?attachment=%s&repo=%s&dir=%s" %
-                                       (resource.identifier,
-                                        sourcefile,
-                                        self.alias, "downloaded"))
+                if self.store.storage_policy == "dir":
+                    if os.sep in sourcefile:
+                        sourcefile = sourcefile.rsplit(os.sep, 1)[1]
+                    # we overload the URI to add more metadata needed later.
+                    sourcefileuri = URIRef("%s?attachment=%s&repo=%s&dir=%s" %
+                                           (resource.identifier,
+                                            sourcefile,
+                                            self.alias, "downloaded"))
+                else:
+                    sourcefileuri = URIRef("%s?repo=%s&dir=%s" %
+                                           (resource.identifier,
+                                            self.alias, "downloaded"))
+                    
                 with d.rel(PROV.wasDerivedFrom, sourcefileuri):
                     d.value(RDFS.label, Literal(label, lang="sv"))
             elif len(sourcefiles) > 1:
@@ -806,13 +812,15 @@ class SwedishLegalSource(DocumentRepository):
                 # d.rel(PROV.wasDerivedFrom, derivedfrom)
                 for index, tupl in enumerate(sourcefiles):
                     (sourcefile, label) = tupl
+                    if os.sep in sourcefile:
+                        sourcefile = sourcefile.rsplit(os.sep, 1)[1]
                     sourcefileuri = URIRef("%s?attachment=%s&repo=%s&dir=%s" %
                                            (resource.identifier,
                                             sourcefile,
                                             self.alias, "downloaded"))
                     with d.rel(PROV.wasDerivedFrom, sourcefileuri):
                         d.value(RDFS.label, Literal(label, lang="sv"))
-                        d.value(OLO['index'], Literal(index))  # auto xsd^^int?
+                        d.value(OLO['index'], Literal(index))
             else:
                 self.log.warning("%s: infer_metadata: No sourcefiles" %
                                  basefile)

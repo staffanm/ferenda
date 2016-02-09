@@ -434,7 +434,7 @@ class Regeringen(SwedishLegalSource):
         # reset global state
         PreambleSection.counter = 0
         UnorderedSection.counter = 0
-        pdffiles = [x + ("" if x.endswith(".pdf") else ".pdf") for x in self.find_pdf_links(self._rawbody, basefile)]
+        pdffiles = [x + ("" if x.lower().endswith(".pdf") else ".pdf") for x in self.find_pdf_links(self._rawbody, basefile)]
         if not pdffiles:
             self.log.error(
                 "%s: No PDF documents found, can't parse anything" % basefile)

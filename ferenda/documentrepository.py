@@ -2285,7 +2285,7 @@ WHERE {
                             if repo.alias == basefile_params['repo']:
                                 break
                         else:
-                            raise ValueError("%s: Couldn't find proper subrepo %s" % basefile, basefile_params['repo'])
+                            raise ValueError("%s: Couldn't find proper subrepo %s" % (basefile, basefile_params['repo']))
                         funcs = {'downloaded': repo.store.downloaded_path,
                                  'parsed': repo.store.parsed_path}
                         pathfunc = funcs.get(basefile_params["dir"],
