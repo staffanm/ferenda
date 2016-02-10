@@ -16,10 +16,10 @@ from bs4 import BeautifulSoup
 import lxml.html
 
 from ferenda import (PDFAnalyzer, CompositeRepository, DocumentEntry,
-                     PDFDocumentRepository)
+                     PDFDocumentRepository, CompositeStore)
 from ferenda import util, decorators
 from ferenda.pdfreader import StreamingPDFReader
-from . import Regeringen, SwedishLegalSource, RPUBL
+from . import Regeringen, SwedishLegalSource, SwedishLegalStore, RPUBL
 from .swedishlegalsource import offtryck_gluefunc, offtryck_parser
 
 
@@ -221,11 +221,18 @@ class SOUKB(SwedishLegalSource, PDFDocumentRepository):
     def create_external_resources(self, doc):
         pass
 
+# inherit list_basefiles_for from CompositeStore, basefile_to_pathfrag
+# from SwedishLegalStore)
+class SOUStore(CompositeStore, SwedishLegalStore):
+    pass
+
+    
 class SOU(CompositeRepository):
     alias = "sou"
     rdf_type = RPUBL.Utredningsbetankande
     subrepos = (SOURegeringen, SOUKB)
     urispace_segment = "utr/sou"
+    documentstore_class = SOUStore
 
     # NB: The same logic as in
     # ferenda.sources.legal.se.{Regeringen,Riksdagen}.metadata_from_basefile

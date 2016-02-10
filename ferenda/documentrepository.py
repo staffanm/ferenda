@@ -2252,9 +2252,7 @@ WHERE {
         # FIXME: This might be called with an abundance of repos (25
         # right now) where only ~5 needed to do the transforming. This
         # is worsened if calling basefile_from_uri or
-        # dataset_params_from_uri is expensive (like for
-        # SwedishLegalSource-derived repos, which need to load a big
-        # RDF config into self.minter)
+        # dataset_params_from_uri is expensive.
 
         # This implementation always transforms URLs to local file
         # paths (or if they can't be mapped, leaves them alone)
@@ -2268,12 +2266,14 @@ WHERE {
             elif uri.startswith("#"):
                 return uri
             else:
-                for repo in repos:
+                for (repoidx, repo) in enumerate(repos):
                     basefile = repo.basefile_from_uri(uri)
                     # 2-tuple, empty tuple, or none
                     dataset_params = repo.dataset_params_from_uri(uri)
                     if basefile or (dataset_params is not None):
                         break
+                # reorder repos in MRU order
+                repos.insert(0, repos.pop(repoidx))
                 if basefile:
                     basefile_params = repo.basefile_params_from_basefile(basefile)
                     if basefile_params.get('repo') and basefile_params['repo'] != repo.alias:

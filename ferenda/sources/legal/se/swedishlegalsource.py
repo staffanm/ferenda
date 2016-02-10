@@ -764,20 +764,12 @@ class SwedishLegalSource(DocumentRepository):
                     d.value(RDFS.label, Literal("Källa", lang="sv"))
 
         if not resource.value(PROV.wasDerivedFrom):
-            # For DV, self.sourcefiles blows up b/c it tries to access
-            # infer_identifier, which for DV tries to read the
-            # distilled RDF file, which we haven't written
-            # yet. Ironically, at this level we have the identifier as
-            # resource.value(DCTERMS.identifier) -- how to make
-            # infer_identifier aware of it? Maybe by passing resource
-            # around (as an optional arg)?
             sourcefiles = self.sourcefiles(basefile, resource)
             if len(sourcefiles) == 1:
                 sourcefile, label = sourcefiles[0]
                 if self.store.storage_policy == "dir":
                     if os.sep in sourcefile:
                         sourcefile = sourcefile.rsplit(os.sep, 1)[1]
-                    # we overload the URI to add more metadata needed later.
                     sourcefileuri = URIRef("%s?attachment=%s&repo=%s&dir=%s" %
                                            (resource.identifier,
                                             sourcefile,
