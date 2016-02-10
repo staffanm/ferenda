@@ -203,28 +203,24 @@ See also :doc:`restapi`.
   a Accept: application/rdf+xml GET on the same URI, it'll reply with
   all statements about that URI in RDF/XML
   
-.. 
-  Using ``develurl`` during development
-  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  
-  .. note::
-  
-     The functionality in this section is not yet implemented either.
-  
-  When deploying, you won't use http://localhost:8000/ in your
-  public-facing URLs. Instead, come up with an external base url such as
-  ``http://example.org/netstandards/``, and in ferenda.ini set::
-  
-    [__root__]
-    url=http://example.org/netstandards/   
-    develurl=http://localhost:8000/
-  
-  This will make all uris in parsed and generated documents on the form
-  http://example.org/netstandards/res/rfc/4711, but during devel still
-  support http://localhost:8000/res/rfc/4711.
-  
-  When you set url to a new value, you must re-run ``./ferenda-build.py
-  all generate --all --force``, ``./ferenda-build.py all toc --force``,
-  ``./ferenda-build.py all news --force`` and ``./ferenda-build.py all
-  frontpage --force`` for it to take effect.
+
+Using ``develurl`` during development
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When deploying, you won't use http://localhost:8000/ in your
+public-facing URLs. Instead, come up with an external base url such as
+``http://example.org/netstandards/``, and in ferenda.ini set::
+
+  [__root__]
+  url=http://example.org/netstandards/   
+  develurl=http://localhost:8000/
+
+This will make all uris in parsed and generated documents on the form
+http://example.org/netstandards/res/rfc/4711, but during devel still
+support http://localhost:8000/res/rfc/4711.
+
+When you set url to a new value, you must re-run ``./ferenda-build.py
+all generate --all --force``, ``./ferenda-build.py all toc --force``,
+``./ferenda-build.py all news --force`` and ``./ferenda-build.py all
+frontpage --force`` for it to take effect.
 

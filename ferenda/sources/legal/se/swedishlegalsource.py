@@ -11,7 +11,8 @@ import re
 import os
 import logging
 from bz2 import BZ2File
-from urllib.parse import quote
+from urllib.parse import quote, unquote
+from wsgiref.util import request_uri
 
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
@@ -896,6 +897,22 @@ class SwedishLegalSource(DocumentRepository):
         # is prob more correct.
         return "%s dokument" % len(set([row['uri'] for row in self.faceted_data()]))
 
+    def http_handle(self, environ):
+        path_info = environ['PATH_INFO'][1:]
+        if path_info.startswith(self.urispace_segment + "/"):
+            from pudb import set_trace; set_trace()
+            url = unquote(request_uri(environ))
+            if 'develurl' in self.config:
+                url = url.replace(self.config.develurl, self.config.url)
+            basefile = self.basefile_from_uri(url)
+            path = self.store.generated_path(basefile)
+            return (open(path, 'rb'),
+                    os.path.getsize(path),
+                    200,
+                    "text/html")
+        else:
+            return (None, None, None, None)
+        
 
     ################################################################
     # General small utility functions

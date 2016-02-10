@@ -2223,6 +2223,12 @@ WHERE {
                     urltransform = self.get_url_transform_func(
                         repos,
                         os.path.dirname(outfile))
+                elif 'develurl' in self.config:
+                    config_url = self.config.url
+                    config_develurl = self.config.develurl
+                    urltransform = lambda u: u if not u.startswith(config_url)\
+                                             else u.replace(config_url,
+                                                            config_develurl)
                 transformer.transform_file(infile, outfile,
                                            params, urltransform)
 
@@ -2710,13 +2716,20 @@ WHERE {
         depth = len(outfile[len(self.store.datadir) + 1:].split(os.sep))
         repos = [self] + otherrepos
         if self.config.staticsite:
-            uritransform = self.get_url_transform_func(repos, os.path.dirname(outfile))
+            urltransform = self.get_url_transform_func(repos,
+                                                       os.path.dirname(outfile))
+        elif 'develurl' in self.config:
+            config_url = self.config.url
+            config_develurl = self.config.develurl
+            urltransform = lambda u: u if not u.startswith(config_url)\
+                                     else u.replace(config_url,
+                                                    config_develurl)
         else:
-            uritransform = None
+            urltransform = None
         tree = transformer.transform(
             self.render_xhtml_tree(doc),
             depth,
-            uritransform=uritransform)
+            uritransform=urltransform)
 
         fixed = transformer.t.html5_doctype_workaround(etree.tostring(tree))
 
@@ -3052,7 +3065,20 @@ WHERE {
                                       documentroot=self.config.datadir,
                                       config=conffile)
             repos = [self]  # FIXME: we must make otherrespos (passed
-            #  to news()) available to this scope
+                            #  to news()) available to this scope
+
+            if self.config.staticsite:
+                urltransform = self.get_url_transform_func(
+                    repos,
+                    os.path.dirname(outfile))
+            elif 'develurl' in self.config:
+                config_url = self.config.url
+                config_develurl = self.config.develurl
+                urltransform = lambda u: u if not u.startswith(config_url) \
+                                         else u.replace(config_url,
+                                                        config_develurl)
+            else:
+                urltransform = None
 
         for feedset in feedsets:
             for feed in feedset.feeds:
@@ -3073,14 +3099,8 @@ WHERE {
                     infile = self.store.resourcepath("feed/%s.atom" % feed.slug)
                     # infile = self.store.atom_path(feed.slug)
                     outfile = self.store.resourcepath('feed/%s.html' % feed.slug)
-                    if self.config.staticsite:
-                        uritransform = self.get_url_transform_func(
-                            repos,
-                            os.path.dirname(outfile))
-                    else:
-                        uritransform = None
                     transformer.transform_file(infile, outfile,
-                                               uritransform=uritransform)
+                                               uritransform=urltransform)
 
     def news_write_atom(self, entries, title, slug, archivesize=100):
         """Given a list of Atom entry-like objects, including links to RDF

@@ -106,7 +106,8 @@ def frontpage(repos,
               path="data/index.html",
               stylesheet="xsl/frontpage.xsl",
               sitename="MySite",
-              staticsite=False):
+              staticsite=False,
+              develurl=None):
     """Create a suitable frontpage.
 
     :param repos: The repositories to list on the frontpage, as instantiated
@@ -166,10 +167,15 @@ def frontpage(repos,
                                   config=conffile,
                                   documentroot=docroot)
         if staticsite:
-            uritransform = repos[0].get_url_transform_func(repos, os.path.dirname(path))
+            urltransform = repos[0].get_url_transform_func(repos, os.path.dirname(path))
+        elif develurl:
+            config_url = repos[0].config.url
+            urltransform = lambda u: u if not u.startswith(config_url)\
+                           else u.replace(config_url,
+                                          develurl)
         else:
-            uritransform = None
-        transformer.transform_file(xhtml_path, path, uritransform=uritransform)
+            urltransform = None
+        transformer.transform_file(xhtml_path, path, uritransform=urltransform)
     return True
 
 
@@ -1570,9 +1576,14 @@ def _setup_frontpage_args(config, argv):
         # inst = _instantiate_class(cls, _find_config_file(), argv)
         inst = _instantiate_class(cls, config, argv)
         repos.append(inst)
+    if 'develurl' in config:
+        develurl = config.develurl
+    else:
+        develurl = None
     return {'sitename': config.sitename,
             'path': config.datadir + "/index.html",
             'staticsite': config.staticsite,
+            'develurl': develurl,
             'repos': repos}
 
 
