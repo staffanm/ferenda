@@ -88,8 +88,8 @@ class Regeringen(SwedishLegalSource):
                   }
         if 'lastdownload' in self.config and not self.config.refresh:
             params['fromDate'] = self.config.lastdownload.strftime("%Y-%m-%d")
-            self.log.debug("Loading documents starting from %s" %
-                           params.get('fromDate', "the beginning"))
+        self.log.debug("Loading documents starting from %s" %
+                       params.get('fromDate', "the beginning"))
         for basefile, url in self.download_get_basefiles(params):
             try:
                 self.download_single(basefile, url)

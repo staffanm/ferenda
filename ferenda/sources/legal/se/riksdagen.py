@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 from lxml import etree
 
 from ferenda import util, errors
-from ferenda.decorators import downloadmax
+from ferenda.decorators import downloadmax, recordlastdownload
 from ferenda.elements import Body, Paragraph, Preformatted
 from ferenda.pdfreader import StreamingPDFReader
 from .fixedlayoutsource import FixedLayoutSource, FixedLayoutStore
@@ -225,16 +225,20 @@ class Riksdagen(FixedLayoutSource):
                 self.SOU: "utr/sou",
                 self.DIREKTIV: "dir"}.get(self.document_type)
 
+    
+    @recordlastdownload
     def download(self, basefile=None):
         if basefile:
             return self.download_single(basefile)
         url = self.start_url_template % {'doctype': self.document_type}
+        if 'lastdownload' in self.config and not self.config.refresh:
+            url += "&from=" + self.config.lastdownload.strftime("%Y-%m-%d")
         for basefile, url in self.download_get_basefiles(url):
             self.download_single(basefile, url)
 
     @downloadmax
     def download_get_basefiles(self, start_url):
-        self.log.info("Starting at %s" % start_url)
+        self.log.debug("Starting at %s" % start_url)
         url = start_url
         done = False
         pagecount = 1
@@ -262,9 +266,9 @@ class Riksdagen(FixedLayoutSource):
             try:
                 url = soup.dokumentlista['nasta_sida']
                 pagecount += 1
-                self.log.info("Getting page #%d" % pagecount)
+                self.log.debug("Getting page #%d" % pagecount)
             except KeyError:
-                self.log.info("That was the last page")
+                self.log.debug("That was the last page")
                 done = True
 
     def remote_url(self, basefile):
