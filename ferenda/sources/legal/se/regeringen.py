@@ -90,15 +90,27 @@ class Regeringen(SwedishLegalSource):
             params['fromDate'] = self.config.lastdownload.strftime("%Y-%m-%d")
         self.log.debug("Loading documents starting from %s" %
                        params.get('fromDate', "the beginning"))
-        for basefile, url in self.download_get_basefiles(params):
-            try:
-                self.download_single(basefile, url)
-            except requests.exceptions.HTTPError as e:
-                if self.download_accept_404 and e.response.status_code == 404:
-                    self.log.error("%s: %s %s" % (basefile, url, e))
-                    ret = False
-                else:
-                    raise e
+        urlmap_path = self.store.path("urls", "downloaded", ".map", storage_policy="file")
+        self.urlmap = {}
+        if os.path.exists(urlmap_path):
+            with codecs.open(urlmap_path, encoding="utf-8") as fp:
+                for line in fp:
+                    url, identifier = line.split("\t")
+                    self.urlmap[url] = identifier
+        try: 
+            for basefile, url in self.download_get_basefiles(params):
+                try:
+                    self.download_single(basefile, url)
+                except requests.exceptions.HTTPError as e:
+                    if self.download_accept_404 and e.response.status_code == 404:
+                        self.log.error("%s: %s %s" % (basefile, url, e))
+                        ret = False
+                    else:
+                        raise e
+        finally:
+            with codecs.open(urlmap_path, "w", encoding="utf-8") as fp:
+                for url, identifier in self.urlmap.items():
+                    fp.write("%s\t%s\n" % (url, identifier))
 
     def attribs_from_url(self, url):
         # Neither search results nor RSS feeds from regeringen.se
@@ -106,39 +118,45 @@ class Regeringen(SwedishLegalSource):
         # (eg. "Prop. 2015/16:64") of each document. However, the URL
         # (eg. http://www.regeringen.se/rattsdokument/proposition/2015/12/prop.-20151664/
         # often contains the same information. But not always...
-        doctypemap = {"proposition": "prop",
-                      "departementsserien-och-promemorior": "ds",
-                      "statens-offentliga-utredningar": "sou",
-                      "kommittedirektiv": "dir"}
-        m = re.search("(proposition|departementsserien-och-promemorior|statens-offentliga-utredningar|kommittedirektiv)/\d+/\d+/([a-z]*)\.?-?(\d{4})(\d+)-?/$", url)
-        if m and (1900 < int(m.group(3)) < 2100):
-            (longdoctype, doctype, year, ordinal) = m.groups()
-            # The above regex assumes that arsutgava is "2004", not
-            # "2004/05". For propositioner, do a little extra munging.
-            if longdoctype == "proposition":
-                offset = 4 if ordinal.startswith("1999") else 2
-                year = year + "/" + ordinal[:offset]
-                ordinal = ordinal[offset:]
-            return {'rdf:type': doctypemap[longdoctype],
+        year = ordinal = None
+        m = self.re_urlbasefile_strict.search(url)
+        if m and (1900 < int(m.group(1)[:4]) < 2100):
+            (year, ordinal) = m.groups()
+        else:
+            m = self.re_urlbasefile_lax.search(url)
+            if m: 
+                (year, ordinal) = m.groups()
+                year = year.replace("_", "")
+        if year and ordinal:
+            return {'rdf:type': self.urispace_segment.split("/")[-1],
                     'rpubl:arsutgava': year,
                     'rpubl:lopnummer': ordinal}
+        elif url in self.urlmap:
+            identifier = [self.urlmap[url]]
+            doclabels = []
         else:
-            self.log.debug("Can't find out doc attribs from url %s itself, downloading it..." % url)
+            self.log.warning("Can't find out doc attribs from url %s itself, downloading it..." % url)
             soup = BeautifulSoup(self.session.get(url).text, "lxml")
+            identifier = []
             identifier_node = soup.find("span", "h1-vignette")
             if identifier_node:
-                identifier = identifier_node.text
-                m = re.search("(prop|dir|sou|ds)\.? ?(\d{4})(|/\d{2,4}):(\d+)",
-                              identifier, flags=re.IGNORECASE)
+                identifier = [identifier_node.text]
+                self.urlmap[url] = identifier_node.text
+            else:
+                self.urlmap[url] = None
+            doclabels = [x[1] for x in self.find_pdf_links(soup, None, labels=True)]
+        for candidate in identifier + doclabels:
+            m = self.re_basefile_strict.search(candidate)
+            if m: 
+                (year, ordinal) = m.group(1).split(":")
+            else:
+                m = self.re_basefile_lax.search(candidate)
                 if m:
-                    doctype, y1, y2, ordinal = m.groups()
-                    if y2:
-                        year = "%s%s" % (y1, y2)  # y2 will start with "/"
-                    else:
-                        year = y1
-                    return {'rdf:type': doctype,
-                            'rpubl:arsutgava': year,
-                            'rpubl:lopnummer': ordinal}
+                    (year, ordinal) = m.group(1).split(":")
+            if year and ordinal:
+                return {'rdf:type': self.urispace_segment.split("/")[-1],
+                        'rpubl:arsutgava': year,
+                        'rpubl:lopnummer': ordinal}
         raise ValueError("Can't find doc attribs from either url %s or the page at that url" % url)
 
     @downloadmax
@@ -158,6 +176,7 @@ class Regeringen(SwedishLegalSource):
                     attribs = self.attribs_from_url(url)
                     basefile = "%s:%s" % (attribs['rpubl:arsutgava'], attribs['rpubl:lopnummer'])
                     basefile = self.sanitize_basefile(basefile)
+                    self.log.debug("%s: <- %s" % (basefile, url))
                     yield basefile, url
                 except ValueError as e:
                     self.log.error(e)
@@ -167,6 +186,7 @@ class Regeringen(SwedishLegalSource):
     # 1999/20 -> 1999/2000
     # 2000/2001 -> 2000/01
     # 1999/98 -> 1999/2000
+    # 2007/20:08123 -> 2007/08:123
     def sanitize_basefile(self, basefile):
         if self.document_type == self.PROPOSITION:
             (y1, y2, idx) = re.split("[:/]", basefile)
@@ -175,13 +195,12 @@ class Regeringen(SwedishLegalSource):
             assert idx.isdigit(), "Basefile %s has a non-numeric ordinal" % basefile
             idx = int(idx) # remove any leading zeroes
             if y1 == "1999" and y2 != "2000":
-                sanitized = "1999/2000:" + idx
+                sanitized = "1999/2000:%s" % idx
                 self.log.warning("Basefile given as %s, correcting to %s" %
                                  (basefile, sanitized))
             elif (y1 != "1999" and
                   (len(y2) != 2 or  # eg "2000/001"
                    int(y1[2:]) + 1 != int(y2))):  # eg "1999/98
-
                 sanitized = "%s/%02d:%s" % (y1, int(y1[2:]) + 1, idx)
                 self.log.warning("Basefile given as %s, correcting to %s" %
                                  (basefile, sanitized))

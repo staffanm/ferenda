@@ -364,6 +364,8 @@ class DirRegeringen(Regeringen):
     jsfiles = ['pdfviewer.js']
     re_basefile_strict = re.compile(r'Dir\. (\d{4}:\d+)')
     re_basefile_lax = re.compile(r'(?:[Dd]ir\.?|) ?(\d{4}:\d+)')
+    re_urlbasefile_strict = re.compile("kommittedirektiv/\d+/\d+/[a-z]*\.?-?(\d{4})(\d+)-?/$")
+    re_urlbasefile_lax = re.compile("kommittedirektiv/\d+/\d+/.*?(\d{4})_?(\d+)")
     rdf_type = RPUBL.Kommittedirektiv
     document_type = Regeringen.KOMMITTEDIREKTIV
 

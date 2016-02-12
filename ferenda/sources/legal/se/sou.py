@@ -48,6 +48,8 @@ class SOURegeringen(Regeringen):
     alias = "souregeringen"
     re_basefile_strict = re.compile(r'SOU (\d{4}:\d+)')
     re_basefile_lax = re.compile(r'(?:SOU|) ?(\d{4}:\d+)', re.IGNORECASE)
+    re_urlbasefile_strict = re.compile("statens-offentliga-utredningar/\d+/\d+/[a-z]*\.?-?(\d{4})(\d+)-?/$")
+    re_urlbasefile_lax = re.compile("statens-offentliga-utredningar/\d+/\d+/.*?(\d{4})_?(\d+)")
     rdf_type = RPUBL.Utredningsbetankande
     document_type = Regeringen.SOU
 

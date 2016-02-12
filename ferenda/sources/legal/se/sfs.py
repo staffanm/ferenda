@@ -286,8 +286,8 @@ class SFS(Trips):
                 # if none are there, we're done
                 if not peek:
                     peek = True
-                    self.log.info(
-                        'Peeking for SFS %s:%s' %
+                    self.log.debug(
+                        'Peeking forward for %s:%s' %
                         (year, nr + 1))  # increments below
                 elif datetime.today().year > year:
                     peek = False
@@ -302,7 +302,7 @@ class SFS(Trips):
         LayeredConfig.write(self.config)
 
     def download_base_sfs(self, wanted_sfs_nr):
-        self.log.info('Looking for %s' % wanted_sfs_nr)
+        self.log.debug('Looking for %s' % wanted_sfs_nr)
         (year, nr) = [int(x) for x in wanted_sfs_nr.split(":", 1)]
         base_sfsnr_list = self._check_for_sfs(year, nr)
         if base_sfsnr_list:
@@ -328,8 +328,8 @@ class SFS(Trips):
                                        (uppdaterad_tom,
                                         self._find_upphavts_genom(filename)))
                     else:
-                        self.log.warning("    Text updated to %s, not %s" %
-                                         (uppdaterad_tom, wanted_sfs_nr))
+                        self.log.warning("    Text in %s updated to %s, not %s" %
+                                         (base_sfsnr, uppdaterad_tom, wanted_sfs_nr))
                         raise InteUppdateradSFS(wanted_sfs_nr)
         else:
             raise InteExisterandeSFS(wanted_sfs_nr)

@@ -31,10 +31,26 @@ class PropRegeringen(Regeringen):
     re_basefile_strict = re.compile(r'Prop. (\d{4}/\d{2,4}:\d+)')
     re_basefile_lax = re.compile(
         r'(?:Prop\.?|) ?(\d{4}/\d{2,4}:\d+)', re.IGNORECASE)
+    re_urlbasefile_strict = re.compile("proposition/\d+/\d+/[a-z]*\.?-?(\d{6})(\d+)-?/$")
+    re_urlbasefile_lax = re.compile("proposition/\d+/\d+/.*?(\d{4}_?\d{2})[_-]?(\d+)")
     rdf_type = RPUBL.Proposition
     document_type = Regeringen.PROPOSITION
     # sparql_annotations = "sparql/prop-annotations.rq"
 
+    def attribs_from_url(self, url):
+        attribs = super(PropRegeringen, self).attribs_from_url(url)
+        # correct the not uncommon "2007/20:08123" -> "2007/2008:123" issue
+        total = attribs["rpubl:arsutgava"] + attribs["rpubl:lopnummer"]
+        if total.isdigit() and int(total[:4]) - int(total[4:8]) == - 1:
+            # convert to "2007/2008:123" and let santize_basefile make
+            # canonical (and warn). This way we don't need to
+            # specialcase "1999/2000:123"
+            attribs["rpubl:arsutgava"] = total[:8]
+            attribs["rpubl:lopnummer"] = total[8:]
+        y = attribs["rpubl:arsutgava"]
+        if "/" not in y:
+            attribs['rpubl:arsutgava'] = "%s/%s" % (y[:4], y[4:])
+        return attribs
 
 class PropTripsStore(FixedLayoutStore):
     # 1999/94 and 1994/95 has only plaintext (wrapped in .html)

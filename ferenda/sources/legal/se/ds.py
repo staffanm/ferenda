@@ -16,6 +16,8 @@ class Ds(Regeringen):
     alias = "ds"
     re_basefile_strict = re.compile(r'Ds (\d{4}:\d+)')
     re_basefile_lax = re.compile(r'(?:Ds|) ?(\d{4}:\d+)', re.IGNORECASE)
+    re_urlbasefile_strict = re.compile("departementsserien-och-promemorior/\d+/\d+/[a-z]*\.?-?(\d{4})(\d+)-?/$")
+    re_urlbasefile_lax = re.compile("departementsserien-och-promemorior/\d+/\d+/.*?(\d{4})_?(\d+)")
     rdf_type = RPUBL.Utredningsbetankande
     document_type = Regeringen.DS
     urispace_segment = "utr/ds"
