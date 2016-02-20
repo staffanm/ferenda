@@ -60,17 +60,11 @@ class Continuation(object):
 
 
 class DirTrips(Trips):
-
     """Downloads Direktiv in plain text format from http://rkrattsbaser.gov.se/dir/"""
+
     alias = "dirtrips"
-    app = "dir"
-    base = "DIR"
-    # start_url is created (by Trips.download_get_basefiles) from this:
-    download_params = [{'maxpage': 101, 'app': app, 'base': base}]
-
-    # overrides Trips.document_url_template
-    document_url_template = "http://rkrattsbaser.gov.se/cgi-bin/thw?${APPL}=DIR&${BASE}=DIR&${HTML}=dir_dok&${TRIPSHOW}=format=THW&BET=%(basefile)s"
-
+    start_url = "http://rkrattsbaser.gov.se/dir/adv?sort=asc"
+    document_url_template = "http://rkrattsbaser.gov.se/dir?bet=%(basefile)s"
     rdf_type = RPUBL.Kommittedirektiv
 
     @recordlastdownload
@@ -93,7 +87,7 @@ class DirTrips(Trips):
         # DocumentStore)
         intermediate_path = self.store.path(basefile, 'intermediate', '.txt')
         if not util.outfile_is_newer([downloaded_path], intermediate_path):
-            html = codecs.open(downloaded_path, encoding="iso-8859-1").read()
+            html = codecs.open(downloaded_path, encoding="utf-8").read()
             util.writefile(intermediate_path, util.extract_text(
                 html, '<pre>', '</pre>'), encoding="utf-8")
         return codecs.open(intermediate_path, encoding="utf-8")

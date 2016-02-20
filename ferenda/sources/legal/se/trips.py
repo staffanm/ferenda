@@ -4,10 +4,11 @@ from __future__ import (absolute_import, division,
 from builtins import *
 
 # Base class for fetching data from an ancient database system used by
-# swedish gov IT...
+# swedish gov IT...  FIXME: Now that the ancient database system has
+# been retired (early 2016), so should probably this class.
 import os
 import re
-from urllib.parse import quote
+from urllib.parse import quote, urljoin
 
 import requests
 import lxml.html
@@ -28,43 +29,7 @@ class NoMoreLinks(Exception):
 class Trips(SwedishLegalSource):
     alias = None  # abstract class
     basefile_regex = "(?P<basefile>\d{4}:\d+)$"
-
-    app = None  # komm, dir, prop, sfst
-    base = None  # KOMM, DIR, THWALLPROP, SFSR
-
-    source_encoding = "iso-8859-1"
-
-    # NOTE: both SFS and direktiv.DirTrips override this -- hard to find a
-    # template that works for everyone
-    document_url_template = ("http://rkrattsbaser.gov.se/cgi-bin/thw?"
-                             "${HTML}=%(app)s_lst"
-                             "&${OOHTML}=%(app)s_doc&${BASE}=%(base)s"
-                             "&${TRIPSHOW}=format=THW&BET=%(basefile)s")
-    start_url = ("http://rkrattsbaser.gov.se/cgi-bin/thw?${HTML}=%(app)s_lst"
-                 "&${OOHTML}=%(app)s_doc&${SNHTML}=%(app)s_err"
-                 "&${MAXPAGE}=%(maxpage)d&${TRIPSHOW}=format=THW"
-                 "&${BASE}=%(base)s")
-
-    # for SFS
-    # start_url = ("http://rkrattsbaser.gov.se/cgi-bin/thw?${HTML}=%(app)s_lst"
-    #              "&${OOHTML}=%(app)s_dok&${SNHTML}=%(app)s_err"
-    #              "&${MAXPAGE}=%(maxpage)d&${BASE}=%(base)s"
-    #             "&${FORD}=FIND&%%C5R=FR%%C5N+%(start)s&%%C5R=TILL+%(end)s")
-
-    download_params = [{'maxpage': 101, 'app': app, 'base': base}]
-    # for SFS:
-    # download_params = [{'maxpage': 101,
-    #                     'app': app,
-    #                     'base': base,
-    #                     'start': '1600',
-    #                     'end': '2008'},
-    #                    {'maxpage': 101,
-    #                     'app': app,
-    #                     'base': base,
-    #                     'start': '2009',
-    #                     'end': str(datetime.today().year)}]
-
-
+    source_encoding = "utf-8"
 
     @classmethod
     def get_default_options(cls):
@@ -79,7 +44,8 @@ class Trips(SwedishLegalSource):
             return self.download_single(basefile)
         refresh = self.config.refresh
         updated = False
-        for basefile, url in self.download_get_basefiles(self.download_params):
+        from pudb import set_trace; set_trace()
+        for basefile, url in self.download_get_basefiles(None):
             if (refresh or
                     (not os.path.exists(self.store.downloaded_path(basefile)))):
                 ret = self.download_single(basefile, url)
@@ -102,56 +68,51 @@ class Trips(SwedishLegalSource):
                                                  ip))
 
     @downloadmax
-    def download_get_basefiles(self, params):
-        for param in params:
-            done = False
-            url = self.start_url % param
-            pagecount = 1
-            while not done:
-                self.log.debug("Starting at %s" % url)
-                resp = requests.get(url)
-                tree = lxml.html.document_fromstring(resp.text)
-                tree.make_links_absolute(url, resolve_base_href=True)
-                try:
-                    for basefile, url in self.download_get_basefiles_page(tree):
-                        yield basefile, url
-                except NoMoreLinks as e:
-                    if e.nextpage:
-                        pagecount += 1
-                        url = e.nextpage
-                        self.log.debug("Getting page #%s of results" % pagecount)
-                    else:
-                        done = True
+    def download_get_basefiles(self, nullparams):
+        done = False
+        url = self.start_url 
+        pagecount = 1
+        while not done:
+            self.log.debug("Starting at %s" % url)
+            resp = requests.get(url)
+            soup = BeautifulSoup(resp.text, "lxml")
+            try:
+                for basefile, url in self.download_get_basefiles_page(soup):
+                    yield basefile, url
+            except NoMoreLinks as e:
+                if e.nextpage:
+                    pagecount += 1
+                    url = e.nextpage
+                    self.log.debug("Getting page #%s of results" % pagecount)
+                else:
+                    done = True
 
-    def download_get_basefiles_page(self, pagetree):
+    def download_get_basefiles_page(self, soup):
         nextpage = None
-        for element, attribute, link, pos in pagetree.iterlinks():
-            if element.text is None:
-                continue
-            m = re.search(self.basefile_regex, element.text)
+        for hit in soup.findAll("div", "search-hit-info-num"):
+            basefile = hit.text.split(": ", 1)[1].strip()
+            m = re.search(self.basefile_regex, basefile)
             if m:
-                basefile = m.group("basefile")
-                docurl = link
+                basefile = m.group()
             else:
-                basefile = docurl = None
-
-            if basefile:
-                yield(basefile, docurl)
-            else:
-                # maybe this is the "next page" link?
-                m = re.match("Fler poster", element.text)
-                if m:
-                    nextpage = link
+                self.log.warning("Couldn't find a basefile in this label: %r" % basefile)
+                continue
+            docurl = self.document_url_template % locals()
+            yield(basefile, docurl)
+        nextpage = soup.find("div", "search-opt-next").a
+        if nextpage:
+            nextpage = urljoin(self.start_url,
+                               nextpage.get("href"))
         raise NoMoreLinks(nextpage)
-
-    def download_single(self, basefile, url=None):
-        # explicitly call superclass' download_single WITHOUT url
-        # parameter. The reason is so that we construct the url
-        # through self.remote_url, which provides permanent urls to
-        # the wanted documents, instead of the temporary/session id
-        # based urls that download_get_basefiles can provide
-        return super(Trips, self).download_single(basefile)
-
+#
+#    def download_single(self, basefile, url=None):
+#        # explicitly call superclass' download_single WITHOUT url
+#        # parameter. The reason is so that we construct the url
+#        # through self.remote_url, which provides permanent urls to
+#        # the wanted documents, instead of the temporary/session id
+#        # based urls that download_get_basefiles can provide
+#        return super(Trips, self).download_single(basefile)
+#
     def download_is_different(self, existing, new):
         # load both existing and new into a BeautifulSoup object, then
         # compare the first <pre> element
@@ -166,9 +127,7 @@ class Trips(SwedishLegalSource):
             return True
 
     def remote_url(self, basefile):
-        return self.document_url_template % {'basefile': quote(basefile),
-                                             'app': self.app,
-                                             'base': self.base}
+        return self.document_url_template % {'basefile': quote(basefile)}
 
     def metadata_from_basefile(self, basefile):
         a = super(Trips, self).metadata_from_basefile(basefile)

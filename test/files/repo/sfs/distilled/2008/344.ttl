@@ -1,0 +1,103 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rinfoex: <http://lagen.nu/terms#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://lagen.nu/sfs/2008:344#P1S1> a rinfoex:Stycke ;
+    dcterms:isPartOf <https://lagen.nu/sfs/2008:344#P1> ;
+    dcterms:references <https://lagen.nu/sfs/1982:763>,
+        <https://lagen.nu/sfs/1985:125> .
+
+<https://lagen.nu/sfs/2008:344/konsolidering> owl:sameAs <https://lagen.nu/sfs/2008:344/konsolidering/2013:647> .
+
+<https://lagen.nu/bet/2007/08:SfU8> dcterms:identifier "bet. 2007/08:SfU8" .
+
+<https://lagen.nu/bet/2009/10:SfU8> dcterms:identifier "bet. 2009/10:SfU8" .
+
+<https://lagen.nu/bet/2012/13:SoU20> dcterms:identifier "bet. 2012/13:SoU20" .
+
+<https://lagen.nu/prop/2007/08:105> dcterms:identifier "Prop. 2007/08:105" .
+
+<https://lagen.nu/prop/2009/10:31> dcterms:identifier "Prop. 2009/10:31" .
+
+<https://lagen.nu/prop/2012/13:109> dcterms:identifier "Prop. 2012/13:109" .
+
+<https://lagen.nu/rskr/2007/08:199> dcterms:identifier "rskr. 2007/08:199" .
+
+<https://lagen.nu/rskr/2009/10:133> dcterms:identifier "rskr. 2009/10:133" .
+
+<https://lagen.nu/rskr/2012/13:230> dcterms:identifier "rskr. 2012/13:230" .
+
+<https://lagen.nu/sfs/2008:344#P1> a rpubl:Paragraf ;
+    dcterms:isPartOf <https://lagen.nu/sfs/2008:344> .
+
+<https://lagen.nu/sfs/2008:344/konsolidering/2013:647> a rpubl:KonsolideradGrundforfattning ;
+    rinfoex:senastHamtad "2013-06-12T18:58:58.242181"^^xsd:dateTime ;
+    rinfoex:senastKontrollerad "2013-06-13T18:58:58.242181"^^xsd:dateTime ;
+    dcterms:creator <https://lagen.nu/org/2008/justitiedepartementet> ;
+    dcterms:identifier "SFS 2008:344 i lydelse enligt SFS 2013:647" ;
+    dcterms:issued "2013-05-30"^^xsd:date ;
+    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "Lag (2008:344) om hälso- och sjukvård åt asylsökande m.fl."@sv ;
+    rpubl:konsoliderar <https://lagen.nu/sfs/2008:344> ;
+    rpubl:konsolideringsunderlag <https://lagen.nu/sfs/2008:344>,
+        <https://lagen.nu/sfs/2009:1550>,
+        <https://lagen.nu/sfs/2013:411> ,
+        <https://lagen.nu/sfs/2013:647> ;
+    rpubl:utfardandedatum "2008-05-22"^^xsd:date ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2008:344/konsolidering/2013-05-30> ;
+    prov:wasGeneratedBy "lagen.nu.sfs.SFS" .
+
+<https://lagen.nu/sfs/2009:1550> a rpubl:Lag ;
+    dcterms:identifier "SFS 2009:1550" ;
+    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "Lag (2009:1550) om ändring i lagen (2008:344) om hälso- och sjukvård åt asylsökande m.fl."@sv ;
+    rpubl:andrar "ändr. 4 §" ;
+    rpubl:arsutgava "2009" ;
+    rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
+    rpubl:forarbete <https://lagen.nu/bet/2009/10:SfU8>,
+        <https://lagen.nu/prop/2009/10:31>,
+        <https://lagen.nu/rskr/2009/10:133> ;
+    rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
+    rpubl:ikrafttradandedatum "2010-01-01"^^xsd:date ;
+    rpubl:lopnummer "1550" ;
+    rpubl:utfardandedatum "2009-12-17"^^xsd:date ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2009:1550> .
+
+<https://lagen.nu/sfs/2013:411> a rpubl:Lag ;
+    dcterms:identifier "SFS 2013:411" ;
+    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "Lag (2013:411) om ändring i lagen (2008:388) om hälso- och sjukvård åt asylsökande m.fl."@sv ;
+    rpubl:andrar "ändr. 4 §; ny 1 a §" ;
+    rpubl:arsutgava "2013" ;
+    rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
+    rpubl:forarbete <https://lagen.nu/bet/2012/13:SoU20>,
+        <https://lagen.nu/prop/2012/13:109>,
+        <https://lagen.nu/rskr/2012/13:230> ;
+    rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
+    rpubl:ikrafttradandedatum "2013-07-01"^^xsd:date ;
+    rpubl:lopnummer "411" ;
+    rpubl:utfardandedatum "2013-05-30"^^xsd:date ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2013:411> .
+
+<https://lagen.nu/sfs/2008:344> a rpubl:Lag ;
+    dcterms:identifier "SFS 2008:344" ;
+    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "Lag (2008:344) om hälso- och sjukvård åt asylsökande m.fl."@sv ;
+    rpubl:arsutgava "2008" ;
+    rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
+    rpubl:departement <https://lagen.nu/org/2008/justitiedepartementet> ;
+    rpubl:forarbete <https://lagen.nu/bet/2007/08:SfU8>,
+        <https://lagen.nu/prop/2007/08:105>,
+        <https://lagen.nu/rskr/2007/08:199> ;
+    rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
+    rpubl:ikrafttradandedatum "2008-07-01"^^xsd:date ;
+    rpubl:lopnummer "344" ;
+    rpubl:utfardandedatum "2008-05-22"^^xsd:date ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2008:344> .
+

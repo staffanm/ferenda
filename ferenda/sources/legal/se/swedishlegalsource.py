@@ -399,6 +399,8 @@ class SwedishLegalSource(DocumentRepository):
             fp.close()
         self.postprocess_doc(doc)
         self.parse_entry_update(doc)
+        from pudb import set_trace; set_trace()
+        print(doc.meta.serialize(format="turtle").decode("utf-8"))
         return True
 
     def parse_open(self, basefile, attachment=None):
