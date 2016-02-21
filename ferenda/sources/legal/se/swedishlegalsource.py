@@ -399,8 +399,7 @@ class SwedishLegalSource(DocumentRepository):
             fp.close()
         self.postprocess_doc(doc)
         self.parse_entry_update(doc)
-        from pudb import set_trace; set_trace()
-        print(doc.meta.serialize(format="turtle").decode("utf-8"))
+        # print(doc.meta.serialize(format="turtle").decode("utf-8"))
         return True
 
     def parse_open(self, basefile, attachment=None):
@@ -902,7 +901,6 @@ class SwedishLegalSource(DocumentRepository):
     def http_handle(self, environ):
         path_info = environ['PATH_INFO'][1:]
         if path_info.startswith(self.urispace_segment + "/"):
-            from pudb import set_trace; set_trace()
             url = unquote(request_uri(environ))
             if 'develurl' in self.config:
                 url = url.replace(self.config.develurl, self.config.url)

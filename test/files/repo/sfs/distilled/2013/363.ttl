@@ -29,7 +29,7 @@
 <https://lagen.nu/sfs/2013:363/konsolidering/2013:363> a rpubl:KonsolideradGrundforfattning ;
     rinfoex:senastHamtad "2013-06-11T18:58:58.242181"^^xsd:dateTime ;
     rinfoex:senastKontrollerad "2013-06-11T18:59:58.242181"^^xsd:dateTime ;
-    dcterms:creator <https://lagen.nu/org/2012/landsbygdsdepartementet> ;
+    dcterms:creator <https://lagen.nu/org/2008/naringsdepartementet> ;
     dcterms:identifier "SFS 2013:363" ;
     dcterms:issued "2013-05-23"^^xsd:date ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
@@ -55,7 +55,7 @@
     dcterms:title "Lag (2013:363) om kontroll av ekologisk produktion"@sv ;
     rpubl:arsutgava "2013" ;
     rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
-    rpubl:departement <https://lagen.nu/org/2012/landsbygdsdepartementet> ;
+    rpubl:departement <https://lagen.nu/org/2008/naringsdepartementet> ;
     rpubl:forarbete <https://lagen.nu/bet/2012/13:MJU14>,
         <https://lagen.nu/prop/2012/13:55>,
         <https://lagen.nu/rskr/2012/13:210> ;

@@ -98,7 +98,14 @@ class FerendaTestCase(object):
                 msg = "%s expected triples were not found\n" % len(in_first) + msg
             if len(in_second) > 0:
                 msg = "%s unexpected triples were found\n" % len(in_second) + msg
-            msg = "%r != %r\n" % (want, got) + msg
+            ntdiff = True
+            if ntdiff:
+                msg = "%r != %r\n" % (want, got) + msg
+            else: 
+                import difflib
+                d = difflib.unified_diff(want.serialize(format="turtle").decode("utf-8").split("\n"),
+                                         got.serialize(format="turtle").decode("utf-8").split("\n"), n=10000)
+                msg = msg + "\n".join(d)
 #            print("=======WANT=======")
 #            print(want.serialize(format="n3"))
 #            print("=======GOT========")

@@ -44,7 +44,6 @@ class Trips(SwedishLegalSource):
             return self.download_single(basefile)
         refresh = self.config.refresh
         updated = False
-        from pudb import set_trace; set_trace()
         for basefile, url in self.download_get_basefiles(None):
             if (refresh or
                     (not os.path.exists(self.store.downloaded_path(basefile)))):

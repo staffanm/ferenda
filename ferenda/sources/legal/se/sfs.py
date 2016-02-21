@@ -618,7 +618,9 @@ class SFS(Trips):
             textheader = textheader.decode(self.source_encoding)
 
         idx = textheader.index("-"*64)
-        return soup, textheader[:idx]
+        header = textheader[:idx]
+        fp.seek(len(header.encode("utf-8")) + 66)
+        return soup, header
 
     def extract_metadata(self, datatuple, basefile):
         soup, reader = datatuple
@@ -765,9 +767,9 @@ class SFS(Trips):
                 else:
                     self.log.warning(
                         '%s: Obekant nyckel [\'%s\']' % (basefile, key))
-        utfardandedatum = self._find_utfardandedatum(changes[0]['SFS-nummer'])
-        if utfardandedatum:
-            d[docuri]["rpubl:utfardandedatum"] = utfardandedatum
+            utfardandedatum = self._find_utfardandedatum(rowdict['SFS-nummer'])
+            if utfardandedatum:
+                d[docuri]["rpubl:utfardandedatum"] = utfardandedatum
         return d
 
     def extract_metadata_header(self, headertext, basefile):
@@ -779,15 +781,10 @@ class SFS(Trips):
         d = {}
         identifier = "SFS " + lines[0].split('\xb7')[1].strip()
         d["dcterms:title"] = lines[1].strip()
-        for line in lines:
-            if line == "":
-                skip = False
+        for line in lines[2:]:
+            if ":" not in line:
                 continue
-            elif skip:
-                continue
-            else:
-                assert ":" in line, "%r not a key: value line" % line
-                key, val = [x.strip() for x in line.split(":", 1)]
+            key, val = [x.strip() for x in line.split(":", 1)]
             
             # Simple string literals
             if key == '\xd6vrigt':
@@ -806,8 +803,9 @@ class SFS(Trips):
                                              dummyfile=self.store.parsed_path(basefile))
 
             elif key == 'Departement':
-                # this is only needed because of SFS 1942:724, which
-                # has "F\xf6rsvarsdepartementet, Socialdepartementet"...
+                # the split is only needed because of SFS 1942:724,
+                # which has "F\xf6rsvarsdepartementet,
+                # Socialdepartementet"...
                 if "departementet, " in val:
                     val = val.split(", ")[0]
                 d["dcterms:creator"] = val
@@ -989,6 +987,7 @@ class SFS(Trips):
                 '2008:344': date(2008, 5, 22),
                 '2009:1550': date(2009, 12, 17),
                 '2013:411': date(2013, 5, 30),
+                '2013:647': date(2013, 7, 2),
                 }
         return fake.get(sfsnr, None)
 
@@ -998,7 +997,7 @@ class SFS(Trips):
         # bytes- and str-files
         if not isinstance(bodystring, str):
             bodystring = bodystring.decode(self.source_encoding)
-        reader = TextReader(string=bodystring, linesep=TextReader.DOS)
+        reader = TextReader(string=bodystring, linesep=TextReader.UNIX)
         reader.autostrip = True
         return reader
 
