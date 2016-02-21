@@ -533,7 +533,9 @@ class SwedishLegalSource(DocumentRepository):
                 if k in ("dcterms:title", "dcterms:abstract"):
                     result.append(Literal(value, lang=self.lang))
                 elif k in ("dcterms:issued", "rpubl:avgorandedatum",
-                           "rpubl:utfardandedatum", "rpubl:ikrafttradandedatum"):
+                           "rpubl:utfardandedatum",
+                           "rpubl:ikrafttradandedatum",
+                           "rpubl:beslutsdatum"):
                     if re.match("\d{4}-\d{2}-\d{2}", value):
                         # iso8859-1 date (no time portion)
                         dt = datetime.strptime(value, "%Y-%m-%d")

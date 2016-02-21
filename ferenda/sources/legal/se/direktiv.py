@@ -86,104 +86,52 @@ class DirTrips(Trips):
         # suffix should be .txt (preferably w/o overriding
         # DocumentStore)
         intermediate_path = self.store.path(basefile, 'intermediate', '.txt')
-        if not util.outfile_is_newer([downloaded_path], intermediate_path):
-            html = codecs.open(downloaded_path, encoding="utf-8").read()
-            util.writefile(intermediate_path, util.extract_text(
-                html, '<pre>', '</pre>'), encoding="utf-8")
-        return codecs.open(intermediate_path, encoding="utf-8")
+        soup = BeautifulSoup(util.readfile(self.store.downloaded_path(
+            basefile)), "lxml")
+        content = soup.find("div", "search-results-content")
+        body = content.find("div", "body-text")
+        body.string = "----------------------------------------------------------------\n\n" + body.string
+        txt = content.text
+        # the body of the text uses CRLF, but the header uses only
+        # LF. Convert to only LF.
+        txt = txt.replace("\r", "")
+        util.writefile(self.store.intermediate_path(basefile), txt,
+                       encoding=self.source_encoding)
+        return codecs.open(self.store.intermediate_path(basefile),
+                           encoding=self.source_encoding)
         
 
-    def extract_head(self, file, basefile):
-        reader = TextReader(string=file.read(), encoding="utf-8")
-        file.close()
-        self._reader = reader
-        return reader.readparagraph()
-
-    
-#        header_chunk = reader.readparagraph()
-#        self.make_meta(header_chunk, doc.meta, doc.uri, doc.basefile)
-#        self.make_body(reader, doc.body)
-#
-#        # Iterate through body tree and find things to link to (See
-#        # EurlexTreaties.process_body for inspiration)
-#        self.process_body(doc.body, '', doc.uri)
-#        return doc
-#
-    def header_lines(self, header_chunk):
-        n = util.normalize_space
-        # This is a ridiculously complicated way of extracting
-        # key-value headers when both keys and headers may be
-        # continuated. The below, which relies on HTML tags enclosing
-        # the value, is much simpler, but at this point we've stripped
-        # away those...
-        #
-        # header = re.compile("([^:]+):\s*<b>([^<]*)</b>")
-        # for m in header.finditer(header_chunk):
-        #    yield [util.normalize_space(x) for x in m.groups()]
-        ck = cv = ""
-        for line in header_chunk.split("\n"):
-            if ": " in line:
-                # yield buffer
-                if ck.strip() and cv.strip():
-                    yield(n(ck), n(cv))
-                    ck = ""
-                k, cv = line.split(":", 1)
-                if ck.strip():
-                    ck += k
-                else:
-                    ck = k
-            else:
-                if line.startswith("    "):
-                    cv += line
-                else:
-                    if ck.strip(): # and cv.strip():
-                        yield(n(ck), n(cv))
-                    ck = line
-                    cv = ""
-        yield(n(ck), n(cv))
+    def extract_head(self, fp, basefile):
+        textheader = fp.read(2048)
+        if not isinstance(textheader, str):
+            # Depending on whether the fp is opened through standard
+            # open() or bz2.BZ2File() in self.parse_open(), it might
+            # return bytes or unicode strings. This seem to be a
+            # problem in BZ2File (or how we use it). Just roll with it.
+            textheader = textheader.decode(self.source_encoding)
+        idx = textheader.index("-"*64)
+        header = textheader[:idx]
+        fp.seek(len(header.encode("utf-8")) + 66)
+        return header
 
     def extract_metadata(self, rawheader, basefile):  # -> dict
-        predicates = {'Dir nr': "dcterms:identifier",
-                      'Departement': "rpubl:departement",
-                      'Beslut vid regeringssammanträde':
-                      "rpubl:beslutsdatum",
-                      'Rubrik': "dcterms:title",
-                      'Senast ändrad': "dcterms:changed"
-                      }
-        # munger contains a set of tuples where the first item is a
-        # method for converting a plain text into the appropriate
-        # RDFLib value, e.g:
-        # - "Utredning av foo" => Literal("Utredning av foo",lang="sv")
-        # - "1987-02-19" => datetime(1987,2,19)
-        # - "Arbetsdepartementet" => URIRef("http://lagen.nu/terms/arbdep")
-        # The second item is the Describer method that
-        # should be used to add the value to the graph, i.e. .value
-        # for Literals and .rel for URIRefs
+        predicates = {'Departement': "rpubl:departement",
+                      'Beslut': "rpubl:beslutsdatum"}
+        headers = [x.strip() for x in rawheader.split("\n\n") if x.strip()]
+        title, identifier = headers[0].rsplit(", ", 1)
         d = self.metadata_from_basefile(basefile)
-        munger = {'Dir nr': self.sanitize_identifier,
-                  'Departement': functools.partial(self.lookup_resource, warn=False),
-                  'Beslut vid regeringssammanträde': self.parse_iso_date,
-                  'Rubrik': self.sanitize_rubrik,
-                  'Senast ändrad': self.parse_iso_date
-                  }
-        for (key, val) in self.header_lines(rawheader):
-            try:
-                if val == "Utgår" and "Rubrik" in key:
-                    raise DocumentRemovedError("%s: Removed" % basefile,
-                                               dummyfile=self.store.parsed_path(basefile))
-                pred = predicates[key]
-                transformer = munger[key]
-                d[pred] = transformer(val)
-            except (KeyError, ValueError):
-                self.log.error(
-                    "Couldn't munge value '%s' into a proper object for predicate '%s'" % (val, key))
+        d.update({'dcterms:identifier': identifier.strip(),
+                  'dcterms:title': title.strip()})
+        if d['dcterms:title'] == "Utgår":
+            raise DocumentRemovedError("%s: Removed" % basefile,
+                                       dummyfile=self.store.parsed_path(basefile))
+        for header in headers[1:]:
+            key, val = header.split(":")
+            d[predicates[key.strip()]] = val.strip()
         d["dcterms:publisher"] = self.lookup_resource("Regeringskansliet")
-        # finally, we need a dcterms:issued, and the best we can come up
-        # with is the "Beslut vid regeringssammanträde" date
-        # (rpubl:beslutsdatum), so we copy it.
-        d["dcterms:issued"] = d["rpubl:beslutsdatum"]
+        d["dcterms:issued"] = d["rpubl:beslutsdatum"]  # best we can do
         return d
-        
+    
     def sanitize_rubrik(self, rubrik):
         if rubrik == "Utgår":
             raise DocumentRemovedError()
@@ -200,8 +148,7 @@ class DirTrips(Trips):
 
     def parse_body(self, fp, basefile):
         current_type = None
-        fp.close()
-        reader = self._reader
+        reader = TextReader(string=fp.read(), linesep=TextReader.UNIX)
         body = Body()
         for p in reader.getiterator(reader.readparagraph):
             new_type = self.guess_type(p, current_type)
