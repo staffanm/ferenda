@@ -69,7 +69,7 @@ class Trips(SwedishLegalSource):
     @downloadmax
     def download_get_basefiles(self, nullparams):
         done = False
-        url = self.start_url 
+        url = self.start_url.format(c=self.config)
         pagecount = 1
         while not done:
             self.log.debug("Starting at %s" % url)
@@ -96,6 +96,7 @@ class Trips(SwedishLegalSource):
             else:
                 self.log.warning("Couldn't find a basefile in this label: %r" % basefile)
                 continue
+            year, ordinal = basefile.split(":")
             docurl = self.document_url_template % locals()
             yield(basefile, docurl)
         nextpage = soup.find("div", "search-opt-next").a

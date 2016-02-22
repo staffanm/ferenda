@@ -71,11 +71,11 @@ class PropTripsStore(FixedLayoutStore):
 
 class PropTrips(Trips, FixedLayoutSource):
     alias = "proptrips"
-    base = "THWALLAPROP"
-    app = "prop"
+    ar = ""
+    start_url = "http://rkrattsbaser.gov.se/prop/adv?dok=P&sort=asc&ar={c.lastyear}"
+    document_url_template = "http://rkrattsbaser.gov.se/prop?ar=%(year)s&dok=P&dokid=%(ordinal)s" 
 
     basefile_regex = "(?P<basefile>\d+/\d+:\d+)$"
-    download_params = [{'maxpage': 101, 'app': app, 'base': base}]
 
     downloaded_suffix = ".html"
     rdf_type = RPUBL.Proposition
@@ -90,143 +90,57 @@ class PropTrips(Trips, FixedLayoutSource):
     @classmethod
     def get_default_options(cls):
         opts = super(PropTrips, cls).get_default_options()
-        opts['lastbase'] = "THWALLAPROP"
+        opts['lastyear'] = ""
         return opts
 
     # don't use @recordlastdownload -- download_get_basefiles_page
     # should set self.config.lastbase instead
     def download(self, basefile=None):
+        self.config.lastyear = "1997/98"
         if basefile:
             return super(PropTrips, self).download(basefile)
         else:
-            if ('lastbase' in self.config and
-                    self.config.lastbase and
+            if ('lastyear' in self.config and
+                    self.config.lastyear and
                     not self.config.refresh):
                 now = datetime.now()
-                maxbase = "PROPARKIV%s%s" % (now.year % 100, (now.year + 1) % 100)
-                while self.config.lastbase != maxbase:
-                    # override "THWALLAPROP" with eg "PROPARKIV0809"
-                    self.download_params[0]['base'] = self.config.lastbase
+                maxyear = "%s/%s" % (now.year, (now.year + 1) % 100)
+                while self.config.lastyear != maxyear:
                     r = super(
                         PropTrips,
                         self).download()  # download_get_basefiles_page sets lastbase as it goes along
             else:
                 r = super(PropTrips, self).download()
-            self.config.lastbase = self._prev_base(self.config.lastbase)
-            LayeredConfig.write(self.config)      # assume we have data to write
+            self.config.lastyear = self._prev_year(self.config.lastyear)
+            LayeredConfig.write(self.config)     # assume we have data to write
             return r
 
-    def _basefile_to_base(self, basefile):
-        # 1992/93:23 -> "PROPARKIV9293"
-        # 1999/2000:23 -> "PROPARKIV9900"
-        (y1, y2, idx) = re.split("[:/]", basefile)
-        return "PROPARKIV%02d%02d" % (int(y1) % 100, int(y2) % 100)
-
-    def _next_base(self, base):
-        # "PROPARKIV9293" -> "PROPARKIV9394"
-        # "PROPARKIV9899" -> "PROPARKIV9900"
+    def _next_year(self, year):
+        # "1992/93" -> "1993/94"
+        # "1998/99" -> "1999/00"
         y1, y2 = int(base[-4:-2]) + 1, int(base[-2:]) + 1
-        return "PROPARKIV%02d%02d" % (int(y1) % 100, int(y2) % 100)
+        return "%04d/%02d" % (int(y1), int(y2) % 100)
 
-    def _prev_base(self, base):
-        # "PROPARKIV9394" -> "PROPARKIV9293"
-        # "PROPARKIV9900" -> "PROPARKIV9899"
-        y1, y2 = int(base[-4:-2]) - 1, int(base[-2:]) - 1
-        return "PROPARKIV%02d%02d" % (int(y1) % 100, int(y2) % 100)
-
-    def download_get_basefiles_page(self, pagetree):
-
-        # feed the lxml tree into beautifulsoup by serializing it to a
-        # string -- is there a better way?
-        soup = BeautifulSoup(etree.tostring(pagetree), "lxml")
-        for tr in soup.findAll("tr"):
-            if ((not tr.find("a")) or
-                    not re.match(self.basefile_regex, tr.find("a").text)):
-                # FIXME: Maybe re.search instead of .match to find
-                # "Prop. 2012/13:152"
-                continue
-            # First, look at desc (third td):
-            descnodes = [util.normalize_space(x) for x
-                         in tr.find_all("td")[2]
-                         if isinstance(x, str)]
-            bilaga = None
-            if len(descnodes) > 1:
-                if descnodes[1].startswith("Bilaga:"):
-                    bilaga = util.normalize_space(descnodes[0].split(",")[-1])
-            desc = "\n".join(descnodes)
-
-            # then, find basefile (second td)
-            tds = tr.find_all("td")
-            td = tds[1]
-            basefile = td.a.text
-            assert re.match(self.basefile_regex, basefile)
-
-            basefile = self.sanitize_basefile(basefile)
-
-            # assume entries are strictly sorted from ancient to
-            # recent. Therefore, as soon as we encounter a new time
-            # period (eg 1998/99) we can update self.config.lastbase
-            self.config.lastbase = self._basefile_to_base(basefile)
-
-            url = td.a['href']
-
-            # self.download_single(basefile, refresh=refresh, url=url)
-
-            # and, if present, extra files (in td 4+5)
-            extraurls = []
-            for td in tr.findAll("td")[3:]:
-                extraurls.append(td.a['href'])
-
-            # we slightly abuse the protocol between
-            # download_get_basefiles and this generator -- instead of
-            # yielding just two strings, we yield two tuples with some
-            # extra information that download_single will need.
-
-            yield (basefile, bilaga), (url, extraurls)
-
-        nextpage = None
-        for element, attribute, link, pos in pagetree.iterlinks():
-            if element.text and element.text.strip() == "Fler poster":
-                nextpage = link
-
-        if nextpage is None:
-            b = self._next_base(self.config.lastbase)
-            self.log.info("Advancing lastbase from %s to %s" % (self.config.lastbase, b))
-            self.config.lastbase = b
-        raise NoMoreLinks(nextpage)
-
-    document_url_template = ("http://rkrattsbaser.gov.se/cgi-bin/thw?"
-                             "${HTML}=prop_lst&${OOHTML}=prop_dok"
-                             "&${SNHTML}=prop_err&${HILITE}=1&${MAXPAGE}=26"
-                             "&${TRIPSHOW}=format=THW"
-                             "&${SAVEHTML}=/prop/prop_form2.html"
-                             "&${BASE}=%(base)s&${FREETEXT}=&${FREETEXT}="
-                             "&PRUB=&DOK=p&PNR=%(pnr)s&ORG=")
+    def _prev_year(self, year):
+        # "1993/94" -> "1992/93"
+        # "1999/00" -> "1998/99"
+        y1, y2 = int(year[-4:-2]) - 1, int(year[-2:]) - 1
+        return "%04d/%02d" % (int(y1), int(y2) % 100)
 
     def remote_url(self, basefile):
-        base = self._basefile_to_base(basefile)
-        pnr = basefile.split(":")[1]
-        return self.document_url_template % {'base': base,
-                                             'pnr': pnr}
-
+        year, ordinal = basefile.split(":")
+        return self.document_url_template % locals()
+    
     def download_single(self, basefile, url=None):
         if url is None:
             url = self.remote_url(basefile)
             if not url:  # remote_url failed
                 return
 
-        # unpack the tuples we may recieve instead of plain strings
-        mainattachment = None
-        if isinstance(basefile, tuple):
-            basefile, attachment = basefile
-            if attachment:
-                mainattachment = attachment + ".html"
-        if isinstance(url, tuple):
-            url, extraurls = url
         updated = created = False
         checked = True
-
-        filename = self.store.downloaded_path(basefile, attachment=mainattachment)
+        mainattachment = None
+        filename = self.store.downloaded_path(basefile)
         created = not os.path.exists(filename)
 
         # since the server doesn't support conditional caching and
@@ -238,7 +152,14 @@ class PropTrips(Trips, FixedLayoutSource):
             self.log.debug("%s: already exists" % basefile)
             return
 
+        downloaded_path = self.store.downloaded_path(basefile,
+                                                     attachment="index.html")
         if self.download_if_needed(url, basefile, filename=filename):
+            text = util.readfile(downloaded_path)
+            if "<div>Inga tr\xe4ffar</div>" in text:
+                self.log.warning("%s: Could not find this prop at %s, might be a bug" % (basefile, url))
+                util.robust_remove(downloaded_path)
+                return False
             if created:
                 self.log.info("%s: downloaded from %s" % (basefile, url))
             else:
@@ -247,9 +168,24 @@ class PropTrips(Trips, FixedLayoutSource):
             updated = True
         else:
             self.log.debug("%s: exists and is unchanged" % basefile)
+            text = util.readfile(downloaded_path)
+            
+        soup = BeautifulSoup(text, "lxml")
+        # here we can look for eg "Dokument: Prop. 1/19" in
+        # div.result-inner-box, which signals that the document really
+        # is attachment 19 to "Prop. 1997/98:1". FIXME: this means that we really need to keep track of post_id
+        extraurls = []
+        a = soup.find("a", string="Hämta Pdf")
+        if a:
+            extraurls.append(a.get("href"))
+        a = soup.find("a", string="Hämta Doc") 
+        if a:
+            extraurls.append(a.get("href"))
+        
 
+        # parse downloaded html/text page and find out extraurls
         for url in extraurls:
-            if url.endswith('msword.application'):
+            if url.endswith('get=doc'):
                 # NOTE: We cannot be sure that this is
                 # actually a Word (CDF) file. For older files
                 # it might be a WordPerfect file (.wpd) or a
@@ -273,7 +209,7 @@ class PropTrips(Trips, FixedLayoutSource):
                     self.log.error(
                         "%s: Attached file has signature %r -- don't know what type this is" % (basefile, sig))
                     continue
-            elif url.endswith('pdf.application'):
+            elif url.endswith('get=pdf'):
                 doctype = ".pdf"
             else:
                 self.log.warning("Unknown doc type %s" %
@@ -291,17 +227,16 @@ class PropTrips(Trips, FixedLayoutSource):
                 self.log.debug("%s: downloading attachment %s" % (basefile, filename))
                 self.download_if_needed(url, basefile, filename=filename)
 
-        if mainattachment is None:
-            entry = DocumentEntry(self.store.documententry_path(basefile))
-            now = datetime.now()
-            entry.orig_url = url
-            if created:
-                entry.orig_created = now
-            if updated:
-                entry.orig_updated = now
-            if checked:
-                entry.orig_checked = now
-            entry.save()
+        entry = DocumentEntry(self.store.documententry_path(basefile))
+        now = datetime.now()
+        entry.orig_url = url
+        if created:
+            entry.orig_created = now
+        if updated:
+            entry.orig_updated = now
+        if checked:
+            entry.orig_checked = now
+        entry.save()
 
         return updated
 
@@ -328,18 +263,6 @@ class PropTrips(Trips, FixedLayoutSource):
             sanitized = basefile
         return sanitized
 
-    def downloaded_to_intermediate(self, basefile):
-        intermediate_path = self.store.intermediate_path(basefile)
-        if intermediate_path.endswith(".txt"):
-            # extract txt from file, return fp to it
-            downloaded_path = self.store.downloaded_path(basefile)
-            html = codecs.open(
-                downloaded_path, encoding="iso-8859-1").read()
-            util.writefile(intermediate_path, util.extract_text(
-                html, '<pre>', '</pre>'), encoding="utf-8")
-            return open(intermediate_path, "rb")
-        else:
-             return super(PropTrips, self).downloaded_to_intermediate(basefile)
 
     def extract_head(self, fp, basefile):
         # regardless of whether fp points to a pdf->xml file, a
