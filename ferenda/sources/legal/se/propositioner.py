@@ -352,25 +352,34 @@ class PropTrips(Trips, FixedLayoutSource):
             sanitized = basefile
         return sanitized
 
+    # FixedLayoutSource.downloaded_to_intermediate will always convert
+    # things to pdf, even html files. But if we only have html
+    # (eg. plaintext, we should work with that)
+    def downloaded_to_intermediate(self, basefile):
+        downloaded_path = self.store.downloaded_path(basefile)
+        if downloaded_path.endswith(".html"):
+            return self._extract_plaintext(basefile)
+        else:
+            return super(PropTrips, self).downloaded_to_intermediate(basefile)
 
     def extract_head(self, fp, basefile):
-        # regardless of whether fp points to a pdf->xml file, a
-        # word->docbook file, or a plaintext-wrapped-in-html file,
-        # we'll use the latter to extract identifier and title since
-        # it's quick and easy.
-        downloaded_path = self.store.downloaded_path(
-            basefile, attachment="index.html")
-        html = codecs.open(downloaded_path, encoding="iso-8859-1").read()
-        return util.extract_text(html, '<pre>', '</pre>')[:400]
+        txtfp = self._extract_plaintext(basefile)
+        txt = txtfp.read(1000).decode(self.source_encoding)
+        return txt.split("-"*64)[0]
 
-    def extract_metadata(self, chunk, basefile):
-        attribs = self.metadata_from_basefile(basefile)
-        for p in re.split("\n\n+", chunk):
-            if p.startswith("Titel: "):
-                attribs["dcterms:title"] = p.split(": ", 1)[1]
+    def extract_metadata(self, rawheader, basefile):
+        d = self.metadata_from_basefile(basefile)
+        lines = [x.strip() for x in rawheader.split("\n\n") if x.strip()]
+        d["dcterms:identifier"] = "Prop. " + lines[0].split('\xb7')[1].strip()
+        d["dcterms:title"] = lines[1].strip()
+        for p in lines[2:]:
+            if p.startswith("Ansvarig myndighet: "):
+                d["rpubl:departement"] = p.split(": ", 1)[1]
             elif p.startswith("Dokument: "):
-                attribs["dcterms:identifier"] = p.split(": ", 1)[1]
-        return attribs
+                pass
+            else:
+                self.log.warning("%s: Unknown header %s" % p)
+        return d
 
     def sanitize_metadata(self, attribs, basefile):
         attribs = super(PropTrips, self).sanitize_metadata(attribs, basefile)

@@ -9,6 +9,7 @@ from builtins import *
 import os
 import re
 from urllib.parse import quote, urljoin
+import codecs
 
 import requests
 import lxml.html
@@ -133,3 +134,25 @@ class Trips(SwedishLegalSource):
         a = super(Trips, self).metadata_from_basefile(basefile)
         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
         return a
+
+    def _extract_plaintext(self, basefile, attachment=None):
+        intermediate_path = self.store.path(basefile, 'intermediate', '.txt')
+        soup = BeautifulSoup(util.readfile(self.store.downloaded_path(
+            basefile, attachment=attachment)), "lxml")
+        content = soup.find("div", "search-results-content")
+        body = content.find("div", "body-text")
+        body.string = "----------------------------------------------------------------\n\n" + body.string
+        txt = content.text
+        # the body of the text uses CRLF, but the header uses only
+        # LF. Convert to only LF.
+        txt = txt.replace("\r", "")
+        util.writefile(intermediate_path, txt,
+                       encoding=self.source_encoding)
+        # I'm not sure whether we should return a binary or text fp,
+        # but since this is used by the main parse() logic (which
+        # demands binary fp's)...
+        # return codecs.open(intermediate_path,
+        #                   encoding=self.source_encoding)
+        return open(intermediate_path, "rb")
+
+

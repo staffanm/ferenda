@@ -571,18 +571,7 @@ class SFS(Trips):
                     self.log.debug('%s: Expired' % basefile)
                     raise UpphavdForfattning("%s is an expired SFS" % basefile,
                                              dummyfile=self.store.parsed_path(basefile))
-        soup = BeautifulSoup(rawtext, "lxml")
-        content = soup.find("div", "search-results-content")
-        body = content.find("div", "body-text")
-        body.string = "----------------------------------------------------------------\n\n" + body.string
-        txt = content.text
-        # the body of the text uses CRLF, but the header uses only
-        # LF. Convert to only LF.
-        txt = txt.replace("\r", "")
-        util.writefile(self.store.intermediate_path(basefile), txt,
-                       encoding=self.source_encoding)
-        return codecs.open(self.store.intermediate_path(basefile),
-                           encoding=self.source_encoding)
+        return self._extract_plaintext(basefile)
 
     def patch_if_needed(self, fp, basefile):
         fp = super(SFS, self).patch_if_needed(fp, basefile)

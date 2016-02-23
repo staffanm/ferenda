@@ -81,25 +81,7 @@ class DirTrips(Trips):
 
 
     def downloaded_to_intermediate(self, basefile):
-        downloaded_path = self.store.downloaded_path(basefile)
-        # FIXME: need some way of telling intermediate_path that
-        # suffix should be .txt (preferably w/o overriding
-        # DocumentStore)
-        intermediate_path = self.store.path(basefile, 'intermediate', '.txt')
-        soup = BeautifulSoup(util.readfile(self.store.downloaded_path(
-            basefile)), "lxml")
-        content = soup.find("div", "search-results-content")
-        body = content.find("div", "body-text")
-        body.string = "----------------------------------------------------------------\n\n" + body.string
-        txt = content.text
-        # the body of the text uses CRLF, but the header uses only
-        # LF. Convert to only LF.
-        txt = txt.replace("\r", "")
-        util.writefile(self.store.intermediate_path(basefile), txt,
-                       encoding=self.source_encoding)
-        return codecs.open(self.store.intermediate_path(basefile),
-                           encoding=self.source_encoding)
-        
+        return self._extract_plaintext(basefile)
 
     def extract_head(self, fp, basefile):
         textheader = fp.read(2048)

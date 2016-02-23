@@ -1,0 +1,28 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://rkrattsbaser.gov.se/prop?ar=1994/95&dok=P&dokid=72> rdfs:label "Källa"@sv .
+
+<https://lagen.nu/prop/1994/95:72> a rpubl:Proposition ;
+    dcterms:identifier "Prop. 1994/95:72" ;
+    dcterms:references <https://lagen.nu/bet/1993/94:TU28>,
+        <https://lagen.nu/prop/1993/94:166>,
+        <https://lagen.nu/prop/1994/95:72>,
+        <https://lagen.nu/rskr/1993/94:309> ;
+    dcterms:title "Omprövning av beslutet om avreglering av"@sv ;
+    rpubl:arsutgava "1994/95" ;
+    rpubl:departement <https://lagen.nu/org/2008/kommunikationsdepartementet> ;
+    rpubl:lopnummer "72" ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/prop/1994/95:72> ;
+    prov:alternateOf <http://rkrattsbaser.gov.se/prop?ar=1994/95&dok=P&dokid=72> ;
+    prov:wasDerivedFrom <https://lagen.nu/prop/1994/95:72?attachment=index.html&repo=proptrips&dir=downloaded> ;
+    prov:wasGeneratedBy "lagen.nu.propositioner.PropTrips" .
+
+<https://lagen.nu/prop/1994/95:72?attachment=index.html&repo=proptrips&dir=downloaded> rdfs:label "Prop. 1994/95:72"@sv .
+
