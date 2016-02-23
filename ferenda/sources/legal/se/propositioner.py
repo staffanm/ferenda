@@ -10,6 +10,7 @@ import os
 from datetime import datetime
 from collections import OrderedDict
 import codecs
+from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 from lxml import etree
@@ -94,42 +95,127 @@ class PropTrips(Trips, FixedLayoutSource):
         return opts
 
     # don't use @recordlastdownload -- download_get_basefiles_page
-    # should set self.config.lastbase instead
+    # should set self.config.lastyear instead
     def download(self, basefile=None):
-        self.config.lastyear = "1997/98"
+        if self.config.ipbasedurls:
+            self._make_ipbasedurls()
         if basefile:
             return super(PropTrips, self).download(basefile)
-        else:
+
+        try:
+            urlmap_path = self.store.path("urls", "downloaded", ".map",
+                                          storage_policy="file")
+            self.urlmap = {}
+            if os.path.exists(urlmap_path):
+                with codecs.open(urlmap_path, encoding="utf-8") as fp:
+                    for line in fp:
+                        url, attachment = line.split("\t")
+                        self.urlmap[url] = attachment.strip()
+
+            now = datetime.now()
             if ('lastyear' in self.config and
                     self.config.lastyear and
                     not self.config.refresh):
-                now = datetime.now()
                 maxyear = "%s/%s" % (now.year, (now.year + 1) % 100)
                 while self.config.lastyear != maxyear:
-                    r = super(
-                        PropTrips,
-                        self).download()  # download_get_basefiles_page sets lastbase as it goes along
+                    r = self.inner_download() 
             else:
-                r = super(PropTrips, self).download()
-            self.config.lastyear = self._prev_year(self.config.lastyear)
+                self.config.lastyear = ''
+                r = self.inner_download()
+            self.config.lastyear = "%s/%s" % (now.year - 1,
+                                              (now.year % 100))
             LayeredConfig.write(self.config)     # assume we have data to write
             return r
+        finally:
+            with codecs.open(urlmap_path, "w", encoding="utf-8") as fp:
+                for url, attachment in self.urlmap.items():
+                    fp.write("%s\t%s\n" % (url, attachment))
+
+    def inner_download(self):
+        refresh = self.config.refresh
+        updated = False
+        for basefile, url in self.download_get_basefiles(None):
+            if url in self.urlmap:
+                attachment = self.urlmap[url]
+            else:
+                attachment = self.sniff_attachment(url)
+            if attachment:
+                self.urlmap[url] = attachment
+                attachment += ".html"
+            else:
+                self.urlmap[url] = ''
+                attachment = None  # instead of the empty string
+            if (refresh or
+                    (not os.path.exists(self.store.downloaded_path(basefile, attachment=attachment)))):
+                ret = self.download_single(basefile, url)
+                updated = updated or ret
+        return updated
+        
+
+
+    def sniff_attachment(self, url):
+        r = requests.get(url, stream=True)
+        head = r.raw.read(8000)
+        soup = BeautifulSoup(head, "lxml")
+        return self.find_attachment(soup)
+
+    def find_attachment(self, soup):
+        results = soup.find("div", "search-results-content")
+        dokid = results.find("span", string="Dokument:")
+        if not dokid:
+            return None
+        dokid = dokid.next_sibling.strip().split(" ")[-1]
+        if "/" in dokid:
+            dokid, attachment = dokid.split("/")
+        else:
+            attachment = None
+        return attachment
+        
 
     def _next_year(self, year):
         # "1992/93" -> "1993/94"
         # "1998/99" -> "1999/00"
-        y1, y2 = int(base[-4:-2]) + 1, int(base[-2:]) + 1
+        assert len(year) == 7, "invalid year specifier %s" % year
+        y1, y2 = int(year[:4]) + 1, int(year[-2:]) + 1
         return "%04d/%02d" % (int(y1), int(y2) % 100)
 
     def _prev_year(self, year):
         # "1993/94" -> "1992/93"
         # "1999/00" -> "1998/99"
-        y1, y2 = int(year[-4:-2]) - 1, int(year[-2:]) - 1
+        assert len(year) == 7, "invalid year specifier %s" % year
+        y1, y2 = int(year[:4]) - 1, int(year[-2:]) - 1
         return "%04d/%02d" % (int(y1), int(y2) % 100)
 
     def remote_url(self, basefile):
         year, ordinal = basefile.split(":")
         return self.document_url_template % locals()
+
+    def download_get_basefiles_page(self, soup):
+        nextpage = None
+        for hit in soup.findAll("div", "search-hit-info-num"):
+            basefile = hit.text.split(": ", 1)[1].strip()
+            m = re.search(self.basefile_regex, basefile)
+            if m:
+                basefile = m.group()
+            else:
+                self.log.warning("Couldn't find a basefile in this label: %r" % basefile)
+                continue
+            docurl = urljoin(self.start_url, hit.parent.a["href"])
+            yield(basefile, docurl)
+        nextpage = soup.find("div", "search-opt-next").a
+        if nextpage:
+            nextpage = urljoin(self.start_url,
+                               nextpage.get("href"))
+        else:
+            if self.config.lastyear:
+                b = self._next_year(self.config.lastyear)
+            else:
+                now = datetime.now()
+                b = "%s/%s" % (now.year - 1, (now.year) % 100)
+            self.log.info("Advancing year from %s to %s" % (self.config.lastyear, b))
+            self.config.lastyear = b
+
+        raise NoMoreLinks(nextpage)
     
     def download_single(self, basefile, url=None):
         if url is None:
@@ -140,21 +226,23 @@ class PropTrips(Trips, FixedLayoutSource):
         updated = created = False
         checked = True
         mainattachment = None
-        filename = self.store.downloaded_path(basefile)
-        created = not os.path.exists(filename)
 
-        # since the server doesn't support conditional caching and
-        # propositioner are basically never updated once published, we
-        # avoid even calling download_if_needed if we already have
-        # the doc.
-        if (os.path.exists(self.store.downloaded_path(basefile))
-                and not self.config.refresh):
-            self.log.debug("%s: already exists" % basefile)
-            return
-
+        if url in self.urlmap:
+            attachment = self.urlmap[url]
+        else:
+            attachment = self.sniff_attachment(url)
+        if attachment:
+            self.urlmap[url] = attachment
+            attachment += ".html"
+        else:
+            self.urlmap[url] = ''
+            attachment = "index.html"
+        
         downloaded_path = self.store.downloaded_path(basefile,
-                                                     attachment="index.html")
-        if self.download_if_needed(url, basefile, filename=filename):
+                                                     attachment=attachment)
+        
+        created = not os.path.exists(downloaded_path)
+        if self.download_if_needed(url, basefile, filename=downloaded_path):
             text = util.readfile(downloaded_path)
             if "<div>Inga tr\xe4ffar</div>" in text:
                 self.log.warning("%s: Could not find this prop at %s, might be a bug" % (basefile, url))
@@ -171,14 +259,15 @@ class PropTrips(Trips, FixedLayoutSource):
             text = util.readfile(downloaded_path)
             
         soup = BeautifulSoup(text, "lxml")
-        # here we can look for eg "Dokument: Prop. 1/19" in
-        # div.result-inner-box, which signals that the document really
-        # is attachment 19 to "Prop. 1997/98:1". FIXME: this means that we really need to keep track of post_id
+        del text
+        attachment = self.find_attachment(soup)
+
         extraurls = []
-        a = soup.find("a", string="Hämta Pdf")
+        results = soup.find("div", "search-results-content")
+        a = results.find("a", string="Hämta Pdf")
         if a:
             extraurls.append(a.get("href"))
-        a = soup.find("a", string="Hämta Doc") 
+        a = results.find("a", string="Hämta Doc") 
         if a:
             extraurls.append(a.get("href"))
         
@@ -213,7 +302,7 @@ class PropTrips(Trips, FixedLayoutSource):
                 doctype = ".pdf"
             else:
                 self.log.warning("Unknown doc type %s" %
-                                 td.a['href'].split("=")[-1])
+                                 url.split("get=")[-1])
                 doctype = None
             if doctype:
                 if attachment:
