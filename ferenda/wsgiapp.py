@@ -65,17 +65,48 @@ class WSGIApp(object):
     # Main entry point
 
     def __call__(self, environ, start_response):
+        from wsgiref.util import request_uri
+        import logging
+        import traceback
+        from pprint import pformat
+        log = logging.getLogger("wsgiapp")
         path = environ['PATH_INFO']
-        # url = request_uri(environ)
+        url = request_uri(environ)
+        self.log.info("Starting process for %s (path_info=%s, query_string=%s)" % (url, path, environ['QUERY_STRING']))
         # FIXME: routing infrastructure -- could be simplified?
-        if path.startswith(self.config.searchendpoint):
-            return self.search(environ, start_response)
-        elif (path.startswith(self.config.apiendpoint) or
-              (self.config.legacyapi and path.startswith("/-/publ"))):
-            return self.api(environ, start_response)
-        else:
-            return self.static(environ, start_response)
+        try:
+            if path.startswith(self.config.searchendpoint):
+                return self.search(environ, start_response)
+            elif (path.startswith(self.config.apiendpoint) or
+                  (self.config.legacyapi and path.startswith("/-/publ"))):
+                return self.api(environ, start_response)
+            else:
+                return self.static(environ, start_response)
+        except Exception:
+            exc_type, exc_value, tb = sys.exc_info()
+            exception_data = str(exc_type) + ": " + str(exc_value)
+            tbstr = "\n".join(traceback.format_exception(exc_type, exc_value, tb))
+            msg = """500 Internal Server Error
 
+%s
+
+----------------
+request_uri: %s
+QUERY_STRING: %s
+PATH_INFO: %s
+sys.path: %r
+os.getcwd(): %s
+----------------
+Environ: %s
+
+            """ % (tbstr, url, environ['QUERY_STRING'], environ['PATH_INFO'], sys.path, os.getcwd(), pformat(environ))
+            msg = msg.encode('ascii')
+            start_response("500 Internal Server Error", [
+                ("Content-Type", "text/plain"),
+                ("Content-Length", str(len(msg)))
+            ])
+            return iter([msg])
+            
     ################################################################
     # WSGI methods
 
@@ -175,13 +206,14 @@ class WSGIApp(object):
         # status, always 200, or mimetype, always text/html). None
         # means no.
         fp = None
-        for repo in self.repos:
-            (fp, length, status, mimetype) = repo.http_handle(environ)  # and args?
-            if fp:
-                status = {200: "200 OK",
-                          406: "406 Not Acceptable"}[status]
-                iterdata = FileWrapper(fp)
-                break
+        if not(environ['PATH_INFO'].startswith("/rsrc") and os.path.exists(fullpath)):
+            for repo in self.repos:
+                (fp, length, status, mimetype) = repo.http_handle(environ)  # and args?
+                if fp:
+                    status = {200: "200 OK",
+                              406: "406 Not Acceptable"}[status]
+                    iterdata = FileWrapper(fp)
+                    break
         # no repo handled the path
         if not fp:
             if self.config.legacyapi:  # rewrite the path to some resources. FIXME:
@@ -204,8 +236,14 @@ class WSGIApp(object):
                 fp = open(fullpath, "rb")
                 iterdata = FileWrapper(fp)
             else:
-                msg = "<h1>404</h1>The path %s not found at %s" % (environ['PATH_INFO'],
-                                                                   fullpath)
+                msg = """
+<h1>404</h1>
+
+The path %s not found at %s.
+
+Examined %s repos.""" % (environ['PATH_INFO'],
+                         fullpath,
+                         len(self.repos))
                 mimetype = "text/html"
                 status = "404 Not Found"
                 length = len(msg.encode('utf-8'))

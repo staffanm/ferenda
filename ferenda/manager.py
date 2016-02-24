@@ -169,10 +169,7 @@ def frontpage(repos,
         if staticsite:
             urltransform = repos[0].get_url_transform_func(repos, os.path.dirname(path))
         elif develurl:
-            config_url = repos[0].config.url
-            urltransform = lambda u: u if not u.startswith(config_url)\
-                           else u.replace(config_url,
-                                          develurl)
+            urltransform = repos[0].get_url_transform_func(develurl=develurl)
         else:
             urltransform = None
         transformer.transform_file(xhtml_path, path, uritransform=urltransform)

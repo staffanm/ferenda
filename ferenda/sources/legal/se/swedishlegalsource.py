@@ -330,18 +330,21 @@ class SwedishLegalSource(DocumentRepository):
         return basefile
 
     def basefile_from_uri(self, uri):
-        # does a very simple transform. subclasses with specic needs
-        # can override and sanitize after the fact.
+        # Does a very simple transform. Examples:
         #
-        # examples:
         # "https://lagen.nu/prop/1999/2000:35" => "1999/2000:35"
         # "https://lagen.nu/rf/hfd/2013/not/12" => "hfd/2013/not/12"
         # "https://lagen.nu/sosfs/2015:10" => "2015:10"
         # "https://lagen.nu/sfs/2013:1127/konsolidering/2014:117" => "2013:1127/konsolidering/2014:117"
+        # 
+        # Subclasses with more specific rules should override, call
+        # this through super(), and then sanitize basefile afterwards.
         base = self.urispace_base
         # FIXME: This is super hacky.
         if base == "http://rinfo.lagrummet.se":
             base += "/publ"
+        if 'develurl' in self.config:
+            uri = uri.replace(self.config.develurl, self.config.url)
         if uri.startswith(base) and uri[len(base)+1:].startswith(self.urispace_segment):
             offset = 2 if self.urispace_segment else 1
             return uri[len(base) + len(self.urispace_segment) + offset:]
@@ -858,8 +861,10 @@ class SwedishLegalSource(DocumentRepository):
         metadata from doc.body to doc.head)"""
         pass
 
-    def get_url_transform_func(self, repos, basedir):
-        f = super(SwedishLegalSource, self).get_url_transform_func(repos, basedir)
+    def get_url_transform_func(self, repos=None, basedir=None, develurl=None):
+        f = super(SwedishLegalSource, self).get_url_transform_func(repos, basedir, develurl)
+        if develurl:
+            return f
         # since all Swedish legal source repos share the method of
         # generating URIs (through the self.minter property), we can
         # just share the initialized minter object.
@@ -913,6 +918,8 @@ class SwedishLegalSource(DocumentRepository):
                     os.path.getsize(path),
                     200,
                     "text/html")
+        elif path_info.startswith("dataset/%s" % self.alias):
+            return super(SwedishLegalSource, self).http_handle(environ)
         else:
             return (None, None, None, None)
         

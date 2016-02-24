@@ -651,6 +651,11 @@ with the *config* object as single parameter.
         """
 
         wantedprefix = self.config.url + "dataset/" + self.alias
+        if 'develurl' in self.config:
+            self.log.info("dataset_params_from_uri: changing %s->%s in %s" % (self.config.url, self.config.develurl, uri))
+            wantedprefix = wantedprefix.replace(self.config.url, self.config.develurl)
+        else:
+            self.log.info("dataset_params_from_uri: develurl not defined")
         if uri == wantedprefix or ("?" in uri and
                                    uri.startswith(wantedprefix)):
             path = uri[len(wantedprefix) + 1:]
@@ -2224,11 +2229,7 @@ WHERE {
                         repos,
                         os.path.dirname(outfile))
                 elif 'develurl' in self.config:
-                    config_url = self.config.url
-                    config_develurl = self.config.develurl
-                    urltransform = lambda u: u if not u.startswith(config_url)\
-                                             else u.replace(config_url,
-                                                            config_develurl)
+                    urltransform = self.get_url_transform_func(develurl=self.config.develurl)
                 transformer.transform_file(infile, outfile,
                                            params, urltransform)
 
@@ -2245,7 +2246,7 @@ WHERE {
             docentry.updated = now
             docentry.save()
 
-    def get_url_transform_func(self, repos, basedir):
+    def get_url_transform_func(self, repos=None, basedir=None, develurl=None):
         """Returns a function that, when called with a URI, transforms that
         URI to another suitable reference. This can be used to eg. map
         between canonical URIs and local URIs. The function is run on
@@ -2315,7 +2316,18 @@ WHERE {
 
             else:
                 return uri
-        return transform
+
+        def simple_transform(url):
+            if url.startswith(self.config.url):
+                # convert eg. "https://lagen.nu/dom/md/2014:2?repo=dv&attachment=1.pdf" to just "/dom/md/2014:2?repo=dv&attachment=1.pdf"
+                return url[len(self.config.url)-1:]
+            else:
+                return url
+
+        if develurl:
+            return simple_transform
+        else:
+            return transform
 
     def prep_annotation_file(self, basefile):
         """Helper function used by
@@ -2719,11 +2731,7 @@ WHERE {
             urltransform = self.get_url_transform_func(repos,
                                                        os.path.dirname(outfile))
         elif 'develurl' in self.config:
-            config_url = self.config.url
-            config_develurl = self.config.develurl
-            urltransform = lambda u: u if not u.startswith(config_url)\
-                                     else u.replace(config_url,
-                                                    config_develurl)
+            urltransform = self.get_url_transform_func(develurl=self.config.develurl)
         else:
             urltransform = None
         tree = transformer.transform(
@@ -3072,11 +3080,7 @@ WHERE {
                     repos,
                     os.path.dirname(outfile))
             elif 'develurl' in self.config:
-                config_url = self.config.url
-                config_develurl = self.config.develurl
-                urltransform = lambda u: u if not u.startswith(config_url) \
-                                         else u.replace(config_url,
-                                                        config_develurl)
+                urltransform = self.get_url_transform_func(develurl=self.config.develurl)
             else:
                 urltransform = None
 
@@ -3402,13 +3406,16 @@ WHERE {
                 suffix = None
             if len(segments) == 3:
                 null, res, alias = segments
+                self.log.info("%s: got %s, %s" % (self.alias, res, alias))
             else:
                 null, res, alias, basefile = segments
+                self.log.info("%s: got %s, %s, basefile %s" % (self.alias, res, alias, basefile))
 
             if (alias == self.alias):
                 # we SHOULD be able to handle this -- maybe provide
                 # apologetic message about this if we can't?
                 uri = request_uri(environ)
+                self.log.info("%s: OK trying to handle this, uri=%s" % (self.alias, uri))
                 path = None
 
                 accept = environ.get('HTTP_ACCEPT', 'text/html')
@@ -3502,6 +3509,7 @@ WHERE {
 
                     if contenttype == "text/html":
                         params = self.dataset_params_from_uri(uri)
+                        self.log.info("dataset_params_from_uri(%s) returned %s" % (uri, params))
                         if params:
                             pseudobasefile = "/".join(params)
                         else:
