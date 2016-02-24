@@ -1058,10 +1058,7 @@ class NFS(MyndFskrBase):
         return ["nfs", "snfs"]
 
     def download_single(self, basefile, url):
-        if url.endswith(".pdf") and "/Nerladdningssida/?fileType=pdf" not in url:
-            # munge the URL for reasons unknown
-            url = url.replace("http://www.naturvardsverket.se/",
-                              "http://www.naturvardsverket.se/Nerladdningssida/?fileType=pdf&downloadUrl=/")
+        if url.endswith(".pdf"):
             return super(NFS, self).download_single(basefile, url)
 
         # NB: the basefile we got might be a later change act. first
@@ -1109,7 +1106,8 @@ class NFS(MyndFskrBase):
 class RNFS(MyndFskrBase):
     alias = "rnfs"
     start_url = "http://www.revisorsnamnden.se/rn/om_rn/regler/kronologi.html"
-
+    basefile_regex = re.compile('RNFS (?P<basefile>\d{4}[:/_-]\d{1,3})$')
+    document_url_regex = None
 
 class RAFS(MyndFskrBase):
     #  (efter POST)

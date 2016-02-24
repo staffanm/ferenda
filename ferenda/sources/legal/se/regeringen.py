@@ -95,6 +95,8 @@ class Regeringen(SwedishLegalSource):
         if os.path.exists(urlmap_path):
             with codecs.open(urlmap_path, encoding="utf-8") as fp:
                 for line in fp:
+                    if "\t" not in line:
+                        continue
                     url, identifier = line.split("\t")
                     self.urlmap[url] = identifier
         try: 

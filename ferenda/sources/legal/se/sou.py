@@ -91,14 +91,18 @@ class SOUKB(SwedishLegalSource, PDFDocumentRepository):
 
     @decorators.downloadmax
     def download_get_basefiles(self, source):
-        # extended verision that also yields the link title on the
-        # assumption that this is valuable to download_single
+        # modified copy of DocumentRepository.download_get_basefiles
+        # that also yields the link title, based on the assumption
+        # that this is valuable to download_single. 
         yielded = set()
         if self.download_reverseorder:
             source = reversed(list(source))
         for (element, attribute, link, pos) in source:
+            # Also makes sure the link is not external (SOU 1997:119
+            # links to external site regeringen.se for some reason...)
+            if "kb.se/" not in link:
+                continue
             basefile = None
-
             # Two step process: First examine link text to see if
             # basefile_regex match. If not, examine link url to see
             # if document_url_regex
@@ -116,8 +120,8 @@ class SOUKB(SwedishLegalSource, PDFDocumentRepository):
         url, title = url
         resp = self.session.get(url)
         soup = BeautifulSoup(resp.text, "lxml")
-        pdfurl = soup.find("a", href=re.compile(".*\.pdf$")).get("href")
-        
+        pdflink = soup.find("a", href=re.compile(".*\.pdf$"))
+        pdfurl = pdflink.get("href")
         thumburl = urljoin(url, soup.find("img", "tumnagel").get("src"))
         librisid = url.rsplit("-")[1]
         rdfurl = "http://data.libris.kb.se/open/bib/%s.rdf" % librisid

@@ -8,7 +8,9 @@ from ferenda import CompositeRepository
 
 class FacadeSource(CompositeRepository):
     tablabel = "FacadeSource"  # subclasses override this
-
+    def download(self, basefile=None):
+        return False
+    
     def facet_query(self, context):
         pass
 

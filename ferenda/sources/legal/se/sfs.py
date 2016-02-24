@@ -177,8 +177,6 @@ class SFS(Trips):
         return opts
 
     def download(self, basefile=None):
-        if 'skipdownload' in self.config:
-            return
         if basefile:
             ret = self.download_single(basefile)
         # following is copied from supers' download
@@ -334,7 +332,7 @@ class SFS(Trips):
         else:
             # If a single change act changed multiple base acts. This
             # is very rare and we don't handle this at all now.
-            raise IckeExisterandeSFS("%s should contain a single base act, "
+            raise InteExisterandeSFS("%s should contain a single base act, "
                                      "but doesn't" % url)
 
     def download_single(self, basefile, url=None):
