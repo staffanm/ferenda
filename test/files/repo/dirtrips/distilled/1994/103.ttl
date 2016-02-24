@@ -8,7 +8,6 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <https://lagen.nu/dir/1994:103> a rpubl:Kommittedirektiv ;
-    dcterms:changed "1994-09-28"^^xsd:date ;
     dcterms:identifier "Dir. 1994:103" ;
     dcterms:issued "1994-09-15"^^xsd:date ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;

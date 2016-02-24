@@ -128,9 +128,14 @@ class DirTrips(Trips):
             identifier = "Dir. " + identifier
         return Literal(identifier)
 
+
     def parse_body(self, fp, basefile):
         current_type = None
-        reader = TextReader(string=fp.read(), linesep=TextReader.UNIX)
+        rawtext = fp.read().decode(self.source_encoding)
+        # remove whitespace on otherwise empty lines
+        rawtext = re.sub("\n\t\n", "\n\n", rawtext)
+        reader = TextReader(string=rawtext,
+                            linesep=TextReader.UNIX)
         body = Body()
         for p in reader.getiterator(reader.readparagraph):
             new_type = self.guess_type(p, current_type)

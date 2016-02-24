@@ -1,0 +1,59 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://lagen.nu/prop/2012/13:144#PS1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2012/13:144> ;
+    dcterms:title "Propositionens huvudsakliga innehåll"@sv .
+
+<https://lagen.nu/prop/2012/13:144#S1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2012/13:144> ;
+    dcterms:title "Förslag till riksdagsbeslut"@sv ;
+    bibo:chapter "1"@sv .
+
+<https://lagen.nu/prop/2012/13:144#S2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2012/13:144> ;
+    dcterms:title "Ärendet och dess beredning"@sv ;
+    bibo:chapter "2"@sv .
+
+<https://lagen.nu/prop/2012/13:144#S3.1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2012/13:144#S3> ;
+    dcterms:title "EU:s bestämmelser om statligt stöd till sjöfartsnäringen"@sv ;
+    bibo:chapter "3.1"@sv .
+
+<https://lagen.nu/prop/2012/13:144#S3.2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2012/13:144#S3> ;
+    dcterms:title "Det svenska sjöfartsstödet"@sv ;
+    bibo:chapter "3.2"@sv .
+
+<https://lagen.nu/prop/2012/13:144#S3.3> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2012/13:144#S3> ;
+    dcterms:title "En ändrad inriktning"@sv ;
+    bibo:chapter "3.3"@sv .
+
+<http://rkrattsbaser.gov.se/prop?ar=2012/13&dok=P&dokid=144> rdfs:label "Källa"@sv .
+
+<https://lagen.nu/prop/2012/13:144?attachment=index.pdf&repo=proptrips&dir=downloaded> rdfs:label "Prop. 2012/13:144"@sv .
+
+<https://lagen.nu/prop/2012/13:144#S3> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2012/13:144> ;
+    dcterms:title "Sjöfartsstödets inriktning"@sv ;
+    bibo:chapter "3"@sv .
+
+<https://lagen.nu/prop/2012/13:144> a rpubl:Proposition ;
+    dcterms:identifier "Prop. 2012/13:144" ;
+    dcterms:title "Sjöfartsstödets inriktning"@sv ;
+    rpubl:arsutgava "2012/13" ;
+    rpubl:departement <https://lagen.nu/org/2008/naringsdepartementet> ;
+    rpubl:lopnummer "144" ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/prop/2012/13:144> ;
+    prov:alternateOf <http://rkrattsbaser.gov.se/prop?ar=2012/13&dok=P&dokid=144> ;
+    prov:wasDerivedFrom <https://lagen.nu/prop/2012/13:144?attachment=index.pdf&repo=proptrips&dir=downloaded> ;
+    prov:wasGeneratedBy "lagen.nu.propositioner.PropTrips" .
+

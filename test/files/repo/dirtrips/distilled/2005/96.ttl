@@ -8,7 +8,6 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <https://lagen.nu/dir/2005:96> a rpubl:Kommittedirektiv ;
-    dcterms:changed "2005-09-09"^^xsd:date ;
     dcterms:identifier "Dir. 2005:96" ;
     dcterms:issued "2005-09-01"^^xsd:date ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;

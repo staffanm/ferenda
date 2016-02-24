@@ -15,7 +15,7 @@
         <https://lagen.nu/prop/1993/94:166>,
         <https://lagen.nu/prop/1994/95:72>,
         <https://lagen.nu/rskr/1993/94:309> ;
-    dcterms:title "Omprövning av beslutet om avreglering av"@sv ;
+    dcterms:title "Omprövning av beslutet om avreglering av järnvägstrafiken"@sv ;
     rpubl:arsutgava "1994/95" ;
     rpubl:departement <https://lagen.nu/org/2008/kommunikationsdepartementet> ;
     rpubl:lopnummer "72" ;

@@ -137,6 +137,8 @@ class Trips(SwedishLegalSource):
 
     def _extract_plaintext(self, basefile, attachment=None):
         intermediate_path = self.store.path(basefile, 'intermediate', '.txt')
+        if not attachment and self.store.storage_policy == "dir":
+            attachment = "index.html"
         soup = BeautifulSoup(util.readfile(self.store.downloaded_path(
             basefile, attachment=attachment)), "lxml")
         content = soup.find("div", "search-results-content")

@@ -2,7 +2,8 @@
 if [ -n "$1" ]
 then
     # optionally pass -We::UserWarning to make exceptions out of warnings
-    PYTHONPATH=test python -m unittest -v "$1"
+    # -Wi::DeprecationWarning:lxml to ignore warnings in lxml module
+    PYTHONPATH=test python  -m unittest -v "$1"
 else
     # When running the entire suite, exit at first failure (-f) in
     # order to not have to wait three minutes.

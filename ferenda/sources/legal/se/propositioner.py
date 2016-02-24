@@ -363,8 +363,11 @@ class PropTrips(Trips, FixedLayoutSource):
             return super(PropTrips, self).downloaded_to_intermediate(basefile)
 
     def extract_head(self, fp, basefile):
+        # get metadata from plaintext html even if we have doc/pdf,
+        # since plaintext is easiest to extract basic metadata from
         txtfp = self._extract_plaintext(basefile)
         txt = txtfp.read(1000).decode(self.source_encoding)
+        txtfp.close()
         return txt.split("-"*64)[0]
 
     def extract_metadata(self, rawheader, basefile):
@@ -385,7 +388,7 @@ class PropTrips(Trips, FixedLayoutSource):
         attribs = super(PropTrips, self).sanitize_metadata(attribs, basefile)
         if ('dcterms:title' in attribs and
             'dcterms:identifier' in attribs and
-            attribs['dcterms:title'].endswith(attribs['dcterms:title'])):
+            attribs['dcterms:title'].endswith(attribs['dcterms:identifier'])):
             x = attribs['dcterms:title'][:-len(attribs['dcterms:identifier'])]
             attribs['dcterms:title'] = util.normalize_space(x)
         return attribs
@@ -403,19 +406,11 @@ class PropTrips(Trips, FixedLayoutSource):
         for p in chunks:
             if not p.strip():
                 continue
-            elif not b and 'Obs! Dokumenten i denna databas kan vara ofullständiga.' in p:
-                continue
-            elif not b and p.strip().startswith("Dokument:"):
-                # We already know this
-                continue
-            elif not b and p.strip().startswith("Titel:"):
-                continue
-            else:
-                b.append(Preformatted([p]))
+            b.append(Preformatted([p]))
         return b
 
     def get_parser(self, basefile, sanitized):
-        if self.store.intermediate_path(basefile).endswith(".txt"):
+        if isinstance(sanitized, TextReader):
             return self.textparser
         else:
             return super(PropTrips, self).get_parser(basefile, sanitized)

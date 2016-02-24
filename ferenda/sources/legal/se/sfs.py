@@ -490,7 +490,7 @@ class SFS(Trips):
             # the intermediate file at ready
             # FIXME: this is broken
             fp = self.downloaded_to_intermediate(basefile)
-            t = TextReader(string=fp.read(2048))
+            t = TextReader(string=fp.read(2048).decode(self.source_encoding))
             fp.close()
             uppdaterad_tom = self._find_uppdaterad_tom(basefile, reader=t)
             doc.uri = self.canonical_uri(basefile, uppdaterad_tom)
