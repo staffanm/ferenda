@@ -1,0 +1,10 @@
+
+# adapted from https://www.elastic.co/guide/en/elasticsearch/reference/current/modules-snapshots.html
+
+1. Configure ES default path.repo variable, either in elasticsearch.yml or (on ubuntu) in /etc/init.d/elasticsearch:
+
+DAEMON_OPTS="-d -p $PID_FILE --default.path.home=$ES_HOME --default.path.logs=$LOG_DIR --default.path.data=$DATA_DIR --default.path.conf=$CONF_DIR --default.path.repo=/tmp/elasticsearch/snapshot"
+
+2. Run curl -T tools/backupsettings.json http://localhost:9200/_snapshot/lagen_backup
+
+3. Confirm that snapshotting is running: curl http://localhost:9200/_snapshot/lagen_backup/_status?pretty=true

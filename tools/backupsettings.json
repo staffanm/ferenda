@@ -1,0 +1,9 @@
+{
+    "type": "fs",
+    "settings": {
+      "compress": "true",
+      "location": "/tmp/elasticsearch/snapshot/lagen"
+    }
+  }
+}
+
