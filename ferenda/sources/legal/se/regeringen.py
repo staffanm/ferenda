@@ -16,6 +16,7 @@ import lxml.html
 from bs4 import BeautifulSoup
 from rdflib import URIRef
 from rdflib.namespace import SKOS
+from cached_property import cached_property
 
 from ferenda import Describer, DocumentEntry, PDFAnalyzer
 from ferenda import util
@@ -78,6 +79,20 @@ class Regeringen(SwedishLegalSource):
     download_accept_404 = True
     session = None
 
+    @cached_property
+    def urlmap(self):
+        urlmap_path = self.store.path("urls", "downloaded", ".map", storage_policy="file")
+        urlmap = {}
+        if os.path.exists(urlmap_path):
+            with codecs.open(urlmap_path, encoding="utf-8") as fp:
+                for line in fp:
+                    if "\t" not in line:
+                        continue
+                    url, identifier = line.split("\t")
+                    urlmap[url] = identifier
+        return urlmap
+
+
     @recordlastdownload
     def download(self, basefile=None):
         params = {'filterType': 'Taxonomy',
@@ -90,15 +105,6 @@ class Regeringen(SwedishLegalSource):
             params['fromDate'] = self.config.lastdownload.strftime("%Y-%m-%d")
         self.log.debug("Loading documents starting from %s" %
                        params.get('fromDate', "the beginning"))
-        urlmap_path = self.store.path("urls", "downloaded", ".map", storage_policy="file")
-        self.urlmap = {}
-        if os.path.exists(urlmap_path):
-            with codecs.open(urlmap_path, encoding="utf-8") as fp:
-                for line in fp:
-                    if "\t" not in line:
-                        continue
-                    url, identifier = line.split("\t")
-                    self.urlmap[url] = identifier
         try: 
             for basefile, url in self.download_get_basefiles(params):
                 try:
@@ -110,10 +116,13 @@ class Regeringen(SwedishLegalSource):
                     else:
                         raise e
         finally:
+            urlmap_path = self.store.path("urls", "downloaded", ".map", storage_policy="file")
             with codecs.open(urlmap_path, "w", encoding="utf-8") as fp:
                 for url, identifier in self.urlmap.items():
                     fp.write("%s\t%s\n" % (url, identifier))
 
+
+                    
     def attribs_from_url(self, url):
         # Neither search results nor RSS feeds from regeringen.se
         # contain textual information about the identifier
