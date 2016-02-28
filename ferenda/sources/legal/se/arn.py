@@ -204,6 +204,11 @@ class ARN(FixedLayoutSource):
                 fp.write(str(fragment).encode("utf-8"))
         return ret
 
+    def remote_url(self, basefile):
+        # it's not possible to construct stable URLs to document
+        # resources. Thank you Digiforms.
+        return None
+    
     def extract_head(self, fp, basefile):
         # the fp contains the PDF file, but most of the metadata is in
         # stored HTML fragment attachment. So we open that separately.

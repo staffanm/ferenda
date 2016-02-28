@@ -94,12 +94,12 @@ class PDFAnalyzer(object):
         You should override this method if you want to provide your
         own document segmentation logic.
 
-        :returns: Tuples (startpage, pagecount) for the different identified
+        :returns: Tuples (startpage, pagecount, tag) for the different identified
                   documents
         :rtype: list
 
         """
-        return [(0, len(self.pdf))]
+        return [(0, len(self.pdf), 'main')]
 
     def metrics(self, metricspath=None, plotpath=None,
                 startpage=0, pagecount=None, force=False):

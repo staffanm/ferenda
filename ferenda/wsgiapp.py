@@ -436,7 +436,6 @@ Examined %s repos.""" % (environ['PATH_INFO'],
                                pagenum=pagenum,
                                pagelen=pagelen,
                                **param)
-
         # Mangle res into the expected JSON structure (see qresults.json)
         mangled = []
         for hit in sorted(res, key=itemgetter("uri"), reverse=True):
@@ -577,7 +576,7 @@ Examined %s repos.""" % (environ['PATH_INFO'],
         # just the first page
         if param.get("_stats") == "on":
             pagenum = 1
-            pagelen = 100000
+            pagelen = 10000 # this is the max that default ES 2.x will allow
             stats = True
         else:
             pagenum = int(param.get('_page', '0')) + 1

@@ -667,7 +667,7 @@ class ElasticSearchIndex(RemoteIndex):
                     (Text(boost=2),
                      {"type": "string", "boost": 2.0, "index": "not_analyzed", "norms": {"enabled": True}}),  # abstract
                     (Text(),
-                     {"type": "string", "analyzer": "my_analyzer"}),  # text
+                     {"type": "string", "analyzer": "my_analyzer", "store": True}),  # text
                     (Datetime(),
                      {"type": "date", "format": "dateOptionalTime"}),
                     (Boolean(),
@@ -676,7 +676,8 @@ class ElasticSearchIndex(RemoteIndex):
                      {"properties": {"iri": {"type": "string", "index": "not_analyzed"},
                                      "label": {"type": "string", "index": "not_analyzed"}}}),
                     (Keyword(),
-                     {"type": "string", "index_name": "keyword"}),
+                     # {"type": "string", "index_name": "keyword"}), index_name is ES 1.x only
+                     {"type": "string", "copy_to": ["keyword"]}),
                     (URI(),
                      {"type": "string", "index": "not_analyzed", "boost": 1.1, "norms": {"enabled": True}}),
                     )
@@ -776,7 +777,7 @@ class ElasticSearchIndex(RemoteIndex):
 
         payload = {'query': query}
         if q:
-            payload['highlight'] = {'fields': {'text': {}},
+            payload['highlight'] = {'fields': {'_all': {}},
                                     'pre_tags': ["<strong class='match'>"],
                                     'post_tags': ["</strong>"],
                                     'fragment_size': '40'}
@@ -799,9 +800,8 @@ class ElasticSearchIndex(RemoteIndex):
             h['repo'] = hit['_type']
             if 'highlight' in hit:
                 # wrap highlighted field in P, convert to
-                # elements. FIXME: should work for other fields than
-                # 'text'
-                hltext = " ... ".join([x.strip() for x in hit['highlight']['text']])
+                # elements. 
+                hltext = " ... ".join([x.strip() for x in hit['highlight']['_all']])
                 soup = BeautifulSoup("<p>%s</p>" % re.sub("\s+", " ", hltext), "lxml")
                 h['text'] = html.elements_from_soup(soup.html.body.p)
             res.append(h)
@@ -831,6 +831,11 @@ class ElasticSearchIndex(RemoteIndex):
         # flatten the existing types (pay no mind to duplicate fields):
         for typename, mapping in mappings.items():
             for fieldname, fieldobject in mapping["properties"].items():
+                if fieldname == 'keyword':
+                    # our copy_to: keyword definition for the Keyword
+                    # indexed type dynamically creates a new
+                    # field. Skip that.
+                    continue
                 try:
                     schema[fieldname] = self.from_native_field(fieldobject)
                 except errors.SchemaMappingError as e:
@@ -878,7 +883,8 @@ class ElasticSearchIndex(RemoteIndex):
                 es_fields[key] = self.to_native_field(fieldtype)
             # _source enabled so we can get the text back
             payload["mappings"][repo.alias] = {"_source": {"enabled": True},
-                                               "_all": {"analyzer": "my_analyzer"},
+                                               "_all": {"analyzer": "my_analyzer",
+                                                        "store": True},
                                                "properties": es_fields}
         return "", json.dumps(payload, indent=4)
 

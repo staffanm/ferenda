@@ -226,3 +226,18 @@ class Read(unittest.TestCase):
         self.assertEqual("Göran Persson", str(tbs[5]))
         self.assertEqual("Bosse Ringholm", str(tbs[6]))
         self.assertEqual("(Finansdepartementet)", str(tbs[7]))
+
+
+class AsXHTML(unittest.TestCase, FerendaTestCase):
+
+    def _test_asxhtml(self, want, body):
+        uri = "http://localhost:8000/res/base/basefile"
+        got = etree.tostring(body.as_xhtml(uri), pretty_print=True)
+        self.assertEqualXML(want, got)
+
+    def test_basic(self):
+        body = Textbox([Textelement(["test"])])
+        want = """
+<p>Test</p>
+"""
+        self._test_asxhtml(want, body)

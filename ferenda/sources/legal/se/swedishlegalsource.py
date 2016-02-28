@@ -859,6 +859,7 @@ class SwedishLegalSource(DocumentRepository):
     def postprocess_doc(self, doc):
         """Do any last-minute postprocessing (mainly used to add extra
         metadata from doc.body to doc.head)"""
+        from pudb import set_trace; set_trace()
         pass
 
     def get_url_transform_func(self, repos=None, basedir=None, develurl=None):
@@ -886,7 +887,10 @@ class SwedishLegalSource(DocumentRepository):
                  identifier)]
 
     def source_url(self, basefile):
-        return quote(self.remote_url(basefile), safe="/:?$=&%")
+        url = self.remote_url(basefile)
+        if url:
+            return quote(url, safe="/:?$=&%")
+        # else return None
 
     def frontpage_content(self, primary=False):
         if not self.config.tabs:

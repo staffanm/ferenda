@@ -20,12 +20,40 @@ from layeredconfig import LayeredConfig
 from ferenda import util
 from ferenda.elements import Preformatted, Body
 from ferenda import CompositeRepository, CompositeStore
-from ferenda import TextReader
+from ferenda import TextReader, PDFAnalyzer
 from ferenda import DocumentEntry
 from . import (Trips, NoMoreLinks, Regeringen, Riksdagen,
                SwedishLegalSource, SwedishLegalStore, RPUBL)
 from .fixedlayoutsource import FixedLayoutStore, FixedLayoutSource
 
+class PropAnalyzer(PDFAnalyzer):
+    def documents(self):
+        for page in self.pdf:
+            determine dominant font:
+            if EUAlbertina:
+                currentdoc = 'eudok'
+            else:
+                currentdoc = 'main'
+
+    def metrics(self, metricspath=None, plotpath=None, startpage=0,
+                pagecount=None, force=False):
+        docsegments = self.documents()
+        if len(docsegments) == 1:
+            return super(PropAnalyzer, self).metrics(metricspath,
+                                                     plotpath,
+                                                     startpage,
+                                                     pagecount, force)
+        else:
+            r = []
+            exclude = []
+            for startpage, pagecount, tag in docsegments:
+                r.append = super(PropAnalyzer,
+                                 self).metrics(startpage=startpage,
+                                               pagecount=pagecount)
+                if tag != 'main':
+                    exclude.extend(list(range(startpage, pagecount)))
+        r[0]['excludedpages'] = exclude
+        return r[0]
 
 class PropRegeringen(Regeringen):
     alias = "propregeringen"
