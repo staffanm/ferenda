@@ -230,7 +230,7 @@ class PropTrips(Trips, FixedLayoutSource):
                 self.log.warning("Couldn't find a basefile in this label: %r" % basefile)
                 continue
             docurl = urljoin(self.start_url, hit.parent.a["href"])
-            yield(basefile, docurl)
+            yield(self.sanitize_basefile(basefile), docurl)
         nextpage = soup.find("div", "search-opt-next").a
         if nextpage:
             nextpage = urljoin(self.start_url,

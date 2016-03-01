@@ -29,7 +29,6 @@ from .legalref import LegalRef
 from .swedishlegalsource import offtryck_gluefunc
 from .elements import PreambleSection, UnorderedSection, Lagrumskommentar
 
-
 class FontmappingPDFReader(PDFReader):
     # Fonts in Propositioner get handled wierdly by pdf2xml
     # -- sometimes they come out as "Times New
@@ -224,24 +223,6 @@ class Regeringen(SwedishLegalSource):
             sanitized = basefile
         return sanitized
 
-#    # FIXME: Don't know if this can be rewritten for new regeringen.se
-#    def remote_url(self, basefile):
-#        # do a search to find the proper url for the document
-#        templ = ("http://www.regeringen.se/sb/d/107/a/136?query=%(basefile)s" 
-#                 "docTypes=%(doctype)s&type=advanced&action=search")
-#        searchurl = templ % {'doctype': self.document_type,
-#                             'basefile': basefile}
-#        soup = BeautifulSoup(requests.get(searchurl).text)
-#        docurl = None
-#        for link in soup.find_all(href=re.compile("/sb/d/108/a/")):
-#            desc = link.find_next_sibling("span", {'class': 'info'}).text
-#            if basefile in desc:
-#                docurl = urljoin(searchurl, link['href'])
-#        if not docurl:
-#            self.log.error(
-#                "Could not find document with basefile %s" % basefile)
-#        return docurl
-
     @property
     def urispace_segment(self):
         return {self.PROPOSITION: "prop",
@@ -371,18 +352,22 @@ class Regeringen(SwedishLegalSource):
             a.decompose()
         sammanfattning = " ".join(s.strings)
 
-        # look for related items:
+        # look for related items. We need to import some subclasses of
+        # this class in order to do that, which we need to do inline.
+        from .direktiv import DirRegeringen
+        from .ds import Ds
+        from .sou import SOURegeringen
         linkfrags = {self.KOMMITTEDIREKTIV: [],
-                     self.DS: ["/komittedirektiv/"],
-                     self.PROPOSITION: ["/kommittedirektiv/",
-                                        "/departementsserien-och-promemorior/",
-                                        "/statens-offentliga-utredningar"],
-                    self.SOU: ["/kommittedirektiv/"]
+                     self.DS: [("/komittedirektiv/", DirRegeringen)],
+                     self.PROPOSITION: [("/kommittedirektiv/", DirRegeringen),
+                                        ("/departementsserien-och-promemorior/", Ds),
+                                        ("/statens-offentliga-utredningar", SOURegeringen)],
+                     self.SOU: [("/kommittedirektiv/", DirRegeringen)]
         }[self.document_type]
-
         utgarFran = []
         island = content.find("div", "island")
-        for linkfrag in linkfrags:
+        for linkfrag, cls in linkfrags:
+            inst = cls(datadir=self.config.datadir)
             regex = re.compile(".*"+linkfrag)
             for link in island.find_all("a", href=regex):
                 # from a relative link on the form
@@ -392,7 +377,7 @@ class Regeringen(SwedishLegalSource):
                 #  'rpubl:arsutgava': 2012,
                 #  'rpubl:lopnummer} -> attributes_to_resource -> coin_uri
                 try:
-                    attribs = self.attribs_from_url(link["href"])
+                    attribs = inst.attribs_from_url(urljoin(inst.start_url, link["href"]))
                 except ValueError:
                     self.log.warning("%s: Can't find out properties for linked resource %s" % (basefile, link["href"]))
                     continue
@@ -404,7 +389,6 @@ class Regeringen(SwedishLegalSource):
                     altlabel = attribs["rdf:type"].upper() if attribs["rdf:type"] == "sou" else attribs["rdf:type"].capitalize()
                     attribs["rpubl:utrSerie"] = self.lookup_resource(altlabel, SKOS.altLabel)
                     attribs["rdf:type"] = RPUBL.Utredningsbetankande
-
                 uri = self.minter.space.coin_uri(self.attributes_to_resource(attribs))
                 utgarFran.append(uri)
         a = self.metadata_from_basefile(basefile)
