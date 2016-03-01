@@ -859,7 +859,6 @@ class SwedishLegalSource(DocumentRepository):
     def postprocess_doc(self, doc):
         """Do any last-minute postprocessing (mainly used to add extra
         metadata from doc.body to doc.head)"""
-        from pudb import set_trace; set_trace()
         pass
 
     def get_url_transform_func(self, repos=None, basedir=None, develurl=None):

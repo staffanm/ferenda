@@ -29,11 +29,12 @@ from .fixedlayoutsource import FixedLayoutStore, FixedLayoutSource
 class PropAnalyzer(PDFAnalyzer):
     def documents(self):
         for page in self.pdf:
-            determine dominant font:
-            if EUAlbertina:
-                currentdoc = 'eudok'
-            else:
-                currentdoc = 'main'
+            pass 
+            # determine dominant font:
+            # if EUAlbertina:
+            #    currentdoc = 'eudok'
+            # else:
+            #     currentdoc = 'main'
 
     def metrics(self, metricspath=None, plotpath=None, startpage=0,
                 pagecount=None, force=False):

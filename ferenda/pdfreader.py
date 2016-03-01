@@ -1029,17 +1029,19 @@ all text in a Textbox has the same font and size.
         first = True
         prevpart = None
         for subpart in self:
-            if not first and getattr(subpart, 'tag', None) == getattr(prevpart, 'tag', None):
+            if not first and subpart.tag == prevpart.tag:
                 prevpart = prevpart + subpart
             elif prevpart:
-                if not isinstance(prevpart, str):
+                # make sure Textelements w/o a tag doesn't render with
+                # as_xhtml as this adds a meaningless <span>
+                if hasattr(prevpart, 'as_xhtml') and prevpart.tag:
                     prevpart = prevpart.as_xhtml(uri, parent_uri)
                 children.append(prevpart)
                 prevpart = subpart
             else:
                 prevpart = subpart
             first = False
-        if not isinstance(prevpart, str):
+        if hasattr(prevpart, 'as_xhtml') and prevpart.tag:
             prevpart = prevpart.as_xhtml(uri, parent_uri)
         children.append(prevpart)
         element = E("p", {'class': 'textbox'}, *children)
@@ -1082,7 +1084,7 @@ class Textelement(UnicodeElement):
     as a whole is bold (``'b'``) , italic(``'i'`` bold + italic
     (``'bi'``) or regular (``None``).
     """
-
+        
     def _get_tagname(self):
         if self.tag:
             return self.tag

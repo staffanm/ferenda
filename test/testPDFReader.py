@@ -12,12 +12,15 @@ import os
 import shutil
 import tempfile
 
+from lxml import etree
+
 from ferenda.compat import unittest
 from ferenda import errors, util
+from ferenda.testutil import FerendaTestCase
 
 # SUT
 from ferenda import PDFReader
-
+from ferenda.pdfreader import Textbox, Textelement
 
 class Read(unittest.TestCase):
     def setUp(self):
@@ -231,13 +234,47 @@ class Read(unittest.TestCase):
 class AsXHTML(unittest.TestCase, FerendaTestCase):
 
     def _test_asxhtml(self, want, body):
-        uri = "http://localhost:8000/res/base/basefile"
-        got = etree.tostring(body.as_xhtml(uri), pretty_print=True)
+        got = etree.tostring(body.as_xhtml(None), pretty_print=True)
         self.assertEqualXML(want, got)
 
     def test_basic(self):
-        body = Textbox([Textelement(["test"])])
+        body = Textbox([Textelement("test", tag=None)],
+                       top=0, left=0, width=100, height=100, fontid=0)
         want = """
-<p>Test</p>
+<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px, left: 0px, height: 100px, width: 100px">test</p>
 """
         self._test_asxhtml(want, body)
+
+    def test_elements_with_tags(self):
+        body = Textbox([Textelement("normal", tag=None),
+                        Textelement("bold", tag="b"),
+                        Textelement("italic", tag="i"),
+                        Textelement("both", tag="bi")
+        ], top=0, left=0, width=100, height=100, fontid=0)
+        want = """
+<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px, left: 0px, height: 100px, width: 100px">normal<b>bold</b><i>italic</i><b><i>both</i></b></p>
+"""
+        self._test_asxhtml(want, body)
+
+
+    def test_leading_tag(self):
+        body = Textbox([Textelement("bold", tag="b"),
+                        Textelement("normal", tag=None),
+        ], top=0, left=0, width=100, height=100, fontid=0)
+        want = """
+<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px, left: 0px, height: 100px, width: 100px"><b>bold</b>normal</p>
+"""
+        self._test_asxhtml(want, body)
+                        
+    def test_tag_merge(self):
+        body = Textbox([Textelement("identical ", tag=None),
+                        Textelement("tags ", tag=None),
+                        Textelement("should ", tag="b"),
+                        Textelement("merge", tag="b"),
+        ], top=0, left=0, width=100, height=100, fontid=0)
+        want = """
+<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px, left: 0px, height: 100px, width: 100px">identical tags <b>should merge</b></p>
+"""
+        self._test_asxhtml(want, body)
+                        
+    

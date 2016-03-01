@@ -147,7 +147,7 @@ class Fileserving(WSGI):
     def test_not_found(self):
         self.env['PATH_INFO'] = '/nonexistent'
         status, headers, content = self.call_wsgi(self.env)
-        msg = '<h1>404</h1>The path /nonexistent not found at %s/nonexistent' % self.datadir
+        msg = '<h1>404</h1>\n\nThe path /nonexistent not found at %s/nonexistent.\n\nExamined 1 repos.' % self.datadir
         self.assertResponse("404 Not Found",
                             {'Content-Type': 'text/html'},
                             msg.encode(),

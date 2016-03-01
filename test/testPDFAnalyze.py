@@ -25,7 +25,7 @@ class Analyze(unittest.TestCase):
         self.analyzer = PDFAnalyzer(self.pdf)
 
     def test_documents(self):
-        self.assertEquals([(0,3)], self.analyzer.documents())
+        self.assertEquals([(0,3, 'main')], self.analyzer.documents())
 
     def test_vcounters(self):
         vcounters = self.analyzer.count_vertical_margins(0, 3)

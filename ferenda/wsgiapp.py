@@ -236,8 +236,7 @@ Environ: %s
                 fp = open(fullpath, "rb")
                 iterdata = FileWrapper(fp)
             else:
-                msg = """
-<h1>404</h1>
+                msg = """<h1>404</h1>
 
 The path %s not found at %s.
 
