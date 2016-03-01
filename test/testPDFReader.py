@@ -17,6 +17,7 @@ from lxml import etree
 from ferenda.compat import unittest
 from ferenda import errors, util
 from ferenda.testutil import FerendaTestCase
+from ferenda.elements import LinkSubject
 
 # SUT
 from ferenda import PDFReader
@@ -277,4 +278,20 @@ class AsXHTML(unittest.TestCase, FerendaTestCase):
 """
         self._test_asxhtml(want, body)
                         
-    
+    def test_other_elements(self):
+        body = Textbox([Textelement("plaintext ", tag=None),
+                        LinkSubject("link", uri="http://example.org/",
+                                    predicate="dcterms:references"),
+                        " raw string"
+        ], top=0, left=0, width=100, height=100, fontid=0)
+        want = """
+<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px, left: 0px, height: 100px, width: 100px">plaintext <a href="http://example.org/" rel="dcterms:references">link</a> raw string</p>
+"""
+        self._test_asxhtml(want, body)
+
+        # remove the last str so that the linksubject becomes the last item
+        body[:] = body[:-1]
+        want = """
+<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px, left: 0px, height: 100px, width: 100px">plaintext <a href="http://example.org/" rel="dcterms:references">link</a></p>
+"""
+        self._test_asxhtml(want, body)

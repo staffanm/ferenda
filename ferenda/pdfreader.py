@@ -1029,19 +1029,25 @@ all text in a Textbox has the same font and size.
         first = True
         prevpart = None
         for subpart in self:
-            if not first and subpart.tag == prevpart.tag:
+            if (not first and
+                type(subpart) == type(prevpart) and
+                getattr(subpart, 'tag', None) == getattr(prevpart, 'tag', None)):
                 prevpart = prevpart + subpart
             elif prevpart:
                 # make sure Textelements w/o a tag doesn't render with
                 # as_xhtml as this adds a meaningless <span>
-                if hasattr(prevpart, 'as_xhtml') and prevpart.tag:
+                if (hasattr(prevpart, 'as_xhtml') and
+                    (not isinstance(prevpart, Textelement) or
+                     prevpart.tag)):
                     prevpart = prevpart.as_xhtml(uri, parent_uri)
                 children.append(prevpart)
                 prevpart = subpart
             else:
                 prevpart = subpart
             first = False
-        if hasattr(prevpart, 'as_xhtml') and prevpart.tag:
+        if (hasattr(prevpart, 'as_xhtml') and
+            (not isinstance(prevpart, Textelement) or
+             prevpart.tag)):
             prevpart = prevpart.as_xhtml(uri, parent_uri)
         children.append(prevpart)
         element = E("p", {'class': 'textbox'}, *children)
