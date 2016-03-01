@@ -567,6 +567,11 @@ class DV(SwedishLegalSource):
               'Avgörandedatum': RPUBL.avgorandedatum,
               }
 
+    def remote_url(self, basefile):
+        # There is no publicly available URL where the source document
+        # could be fetched.
+        return None
+
     def parse_open(self, basefile, attachment=None):
         intermediate_path = self.store.intermediate_path(basefile)
         if self.config.compress == "bz2":

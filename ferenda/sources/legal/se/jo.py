@@ -55,7 +55,6 @@ class JO(FixedLayoutSource):
     start_url = "http://www.jo.se/sv/JO-beslut/Soka-JO-beslut/?query=*&pn=1"
     document_url_regex = "http://www.jo.se/PageFiles/(?P<dummy>\d+)/(?P<basefile>\d+\-\d+)(?P<junk>[,%\d\-]*).pdf"
     headnote_url_template = "http://www.jo.se/sv/JO-beslut/Soka-JO-beslut/?query=%(basefile)s&pn=1"
-
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
     parse_types = []
     storage_policy = "dir"
@@ -132,6 +131,10 @@ class JO(FixedLayoutSource):
                 self.log.warning("Could not find unique headnote for %s at %s" %
                                  (basefile, headnote_url))
         return ret
+
+    def source_url(self, basefile):
+        return ("http://www.jo.se/sv/JO-beslut/Soka-JO-beslut/"
+                "?query=%(basefile)s&caseNumber=%(basefile)s" % locals())
 
     def extract_head(self, fp, basefile):
         if "headnote.html" in list(self.store.list_attachments(basefile,
