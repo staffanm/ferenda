@@ -1,0 +1,71 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://lagen.nu/prop/1999/2000:17#PS1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1999/2000:17> ;
+    dcterms:references <https://lagen.nu/sfs/1996:1512> ;
+    dcterms:title "Propositionens huvudsakliga innehåll"@sv .
+
+<https://lagen.nu/prop/1999/2000:17#S1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1999/2000:17> ;
+    dcterms:references <https://lagen.nu/sfs/1996:1512>,
+        <https://lagen.nu/sfs/1999:639> ;
+    dcterms:title "Förslag till riksdagsbeslut"@sv ;
+    bibo:chapter "1"@sv .
+
+<https://lagen.nu/prop/1999/2000:17#S2.1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1999/2000:17#S2> ;
+    dcterms:references <https://lagen.nu/sfs/1996:1512> ;
+    dcterms:title "Förslag till lag om ändring i lagen (1996:1512) om dubbelbeskattningsavtal mellan de nordiska länderna"@sv ;
+    bibo:chapter "2.1"@sv .
+
+<https://lagen.nu/prop/1999/2000:17#S2.2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1999/2000:17#S2> ;
+    dcterms:references <https://lagen.nu/sfs/1996:1512>,
+        <https://lagen.nu/sfs/1996:1512#P1>,
+        <https://lagen.nu/sfs/1999:639> ;
+    dcterms:title "Förslag till lag om ändring i lagen (1999:639) om ändring i lagen (1996:1512) om dubbelbeskattningsavtal mellan de nordiska länderna"@sv ;
+    bibo:chapter "2.2"@sv .
+
+<https://lagen.nu/prop/1999/2000:17#S3> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1999/2000:17> ;
+    dcterms:references <https://lagen.nu/sfs/1996:1512> ;
+    dcterms:title "Ärendet och dess beredning"@sv ;
+    bibo:chapter "3"@sv .
+
+<https://lagen.nu/prop/1999/2000:17#S4> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1999/2000:17> ;
+    dcterms:title "Dubbelbeskattningsavtalet mellan de nordiska länderna"@sv ;
+    bibo:chapter "4"@sv .
+
+<https://lagen.nu/prop/1999/2000:17#S5> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1999/2000:17> ;
+    dcterms:title "Nordiskt preliminärskatteavdrag"@sv ;
+    bibo:chapter "5"@sv .
+
+<https://lagen.nu/prop/1999/2000:17?attachment=avtal-mellan-sverige-och-danmark-om-beskattning-av-anstallda-ombord-pa-farjor-och-tag-m.m&repo=propregeringen&dir=downloaded> rdfs:label "Avtal mellan Sverige och Danmark om beskattning av anställda ombord på färjor och tåg m.m. (pdf 56 kB)"@sv .
+
+<https://lagen.nu/prop/1999/2000:17#S2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1999/2000:17> ;
+    dcterms:title "Lagtext"@sv ;
+    bibo:chapter "2"@sv .
+
+<https://lagen.nu/prop/1999/2000:17> a rpubl:Proposition ;
+    dcterms:abstract ""@sv ;
+    dcterms:identifier "Prop. 1999/2000:17" ;
+    dcterms:issued "1999-10-14"^^xsd:date ;
+    dcterms:title "Avtal mellan Sverige och Danmark om beskattning av anställda ombord på färjor och tåg m.m."@sv ;
+    rpubl:arsutgava "1999/2000" ;
+    rpubl:departement <https://lagen.nu/org/2008/finansdepartementet> ;
+    rpubl:lopnummer "17" ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/prop/1999/2000:17> ;
+    prov:wasDerivedFrom <https://lagen.nu/prop/1999/2000:17?attachment=avtal-mellan-sverige-och-danmark-om-beskattning-av-anstallda-ombord-pa-farjor-och-tag-m.m&repo=propregeringen&dir=downloaded> ;
+    prov:wasGeneratedBy "lagen.nu.propositioner.PropRegeringen" .
+

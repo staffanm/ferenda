@@ -1,0 +1,354 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix ns1: <rinfoex:> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://lagen.nu/prop/2005/06:173#B2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
+    dcterms:references <https://lagen.nu/prop/2005/06:173>,
+        <https://lagen.nu/sfs/1980:100>,
+        <https://lagen.nu/sfs/1980:100#K1>,
+        <https://lagen.nu/sfs/1980:100#K1P8>,
+        <https://lagen.nu/sfs/1980:100#K1P9>,
+        <https://lagen.nu/sfs/1980:100#K7P16>,
+        <https://lagen.nu/sfs/1998:204>,
+        <https://lagen.nu/sfs/1998:204#P33> ;
+    dcterms:title "Personuppgiftslagsutredningens författningsförslag"@sv ;
+    bibo:chapter "2"@sv .
+
+<https://lagen.nu/prop/2005/06:173#B4> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
+    dcterms:references <https://lagen.nu/prop/2005/06:173>,
+        <https://lagen.nu/sfs/1998:204> ;
+    dcterms:title "Lagrådsremissens lagförslag"@sv ;
+    bibo:chapter "4"@sv .
+
+<https://lagen.nu/prop/2005/06:173#B5> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
+    dcterms:references <https://lagen.nu/ext/celex/31995L0046>,
+        <https://lagen.nu/sfs/1998:204> ;
+    dcterms:title "Justitiedepartementet"@sv ;
+    bibo:chapter "5"@sv .
+
+<https://lagen.nu/prop/2005/06:173#PS1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
+    dcterms:title "Propositionens huvudsakliga innehåll"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
+    dcterms:references <https://lagen.nu/sfs/1998:204> ;
+    dcterms:title "Förslag till riksdagsbeslut"@sv ;
+    bibo:chapter "1"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S10> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
+    dcterms:references <https://lagen.nu/sfs/1964:163>,
+        <https://lagen.nu/sfs/1964:163#P5S2>,
+        <https://lagen.nu/sfs/1998:204> ;
+    dcterms:title "Ikraftträdande- och övergångsbestämmelser"@sv ;
+    bibo:chapter "10"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S11> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
+    dcterms:references <https://lagen.nu/sfs/1998:204> ;
+    dcterms:title "Kostnadseffekter"@sv ;
+    bibo:chapter "11"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
+    dcterms:references <https://lagen.nu/sfs/1998:204> ;
+    dcterms:title "Förslag till lag om ändring i personuppgifts-lagen (1998:204)"@sv ;
+    bibo:chapter "2"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S3> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
+    dcterms:references <https://lagen.nu/sfs/1980:100#K7P16>,
+        <https://lagen.nu/sfs/1998:204> ;
+    dcterms:title "Ärendet och dess beredning"@sv ;
+    bibo:chapter "3"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S4.1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S4> ;
+    dcterms:references <https://lagen.nu/sfs/1998:204> ;
+    dcterms:title "Regeringsformen"@sv ;
+    bibo:chapter "4.1"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S4.2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S4> ;
+    dcterms:title "Europakonventionen"@sv ;
+    bibo:chapter "4.2"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S4.3> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S4> ;
+    dcterms:title "EG-direktivet om personuppgifter"@sv ;
+    bibo:chapter "4.3"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S4.4> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S4> ;
+    dcterms:references <https://lagen.nu/bet/1997/98:KU18>,
+        <https://lagen.nu/prop/1997/98:44>,
+        <https://lagen.nu/prop/1997/98:44#s36>,
+        <https://lagen.nu/rskr/1997/98:180>,
+        <https://lagen.nu/sfs/1973:289>,
+        <https://lagen.nu/sfs/1998:204> ;
+    dcterms:title "Personuppgiftslagen"@sv ;
+    bibo:chapter "4.4"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S4.5> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S4> ;
+    dcterms:title "Europarådets dataskyddskonvention"@sv ;
+    bibo:chapter "4.5"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S5.1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S5> ;
+    dcterms:references <https://lagen.nu/sfs/1998:204> ;
+    dcterms:title "Vad avses med en missbruksmodell respektive han-teringsmodell?"@sv ;
+    bibo:chapter "5.1"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S5.2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S5> ;
+    dcterms:references <https://lagen.nu/bet/1998/99:KU15>,
+        <https://lagen.nu/bet/1999/2000:KU7>,
+        <https://lagen.nu/bet/2000/01:KU19>,
+        <https://lagen.nu/bet/2001/02:KU22>,
+        <https://lagen.nu/prop/1997/98:44#s37>,
+        <https://lagen.nu/rskr/1998/99:147>,
+        <https://lagen.nu/sfs/1998:204> ;
+    dcterms:title "Uttalanden från regeringen och riksdagen i samband med genomförandet av EG-direktivet om personupp-gifter"@sv ;
+    bibo:chapter "5.2"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S5.3> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S5> ;
+    dcterms:references <https://lagen.nu/bet/1999/2000:KU7>,
+        <https://lagen.nu/prop/1999/2000:11>,
+        <https://lagen.nu/rskr/1999/2000:51>,
+        <https://lagen.nu/sfs/1998:1191>,
+        <https://lagen.nu/sfs/1998:204>,
+        <https://lagen.nu/sfs/1998:204#P33> ;
+    dcterms:title "Vidtagna åtgärder i syfte att åstadkomma en mer missbruksinriktad regleringsmodell"@sv ;
+    bibo:chapter "5.3"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S6.1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S6> ;
+    dcterms:references <https://lagen.nu/sfs/1998:204> ;
+    dcterms:title "Allmänt om begreppet personlig integritet"@sv ;
+    bibo:chapter "6.1"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S6.2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S6> ;
+    dcterms:references <https://lagen.nu/sfs/1998:204> ;
+    dcterms:title "Särskilt om personlig integritet vid automatiserad behandling av personuppgifter"@sv ;
+    bibo:chapter "6.2"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S6.3> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S6> ;
+    dcterms:references <https://lagen.nu/prop/1973:33#s89> ;
+    dcterms:title "Motstående intressen"@sv ;
+    bibo:chapter "6.3"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S6.4> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S6> ;
+    dcterms:title "Integritetsskyddskommittén"@sv ;
+    bibo:chapter "6.4"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S7> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
+    dcterms:references <https://lagen.nu/sfs/1998:204>,
+        <https://lagen.nu/sfs/1998:204#P6> ;
+    dcterms:title "Några utgångspunkter"@sv ;
+    bibo:chapter "7"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S8.1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S8> ;
+    dcterms:references <https://lagen.nu/sfs/1980:100#K15P2>,
+        <https://lagen.nu/sfs/1998:204> ;
+    dcterms:title "Missbruksmodell för personuppgiftsbehandling i ostrukturerat material"@sv ;
+    bibo:chapter "8.1"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S8.2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S8> ;
+    dcterms:references <https://lagen.nu/sfs/1998:204>,
+        <https://lagen.nu/sfs/1998:204#P1>,
+        <https://lagen.nu/sfs/1998:204#P10> ;
+    dcterms:title "Behandlingen får inte innebära en kränkning av den registrerades personliga integritet"@sv ;
+    bibo:chapter "8.2"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S8.3> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S8> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#s49>,
+        <https://lagen.nu/prop/1999/2000:11#s11>,
+        <https://lagen.nu/sfs/1998:1191#P4>,
+        <https://lagen.nu/sfs/1998:204>,
+        <https://lagen.nu/sfs/1998:204#P10S1Nf>,
+        <https://lagen.nu/sfs/1998:204#P23>,
+        <https://lagen.nu/sfs/1998:204#P25>,
+        <https://lagen.nu/sfs/1998:204#P29>,
+        <https://lagen.nu/sfs/1998:204#P3>,
+        <https://lagen.nu/sfs/1998:204#P36S1>,
+        <https://lagen.nu/sfs/1998:204#P42>,
+        <https://lagen.nu/sfs/1998:204#P48>,
+        <https://lagen.nu/sfs/1998:204#P49>,
+        <https://lagen.nu/sfs/1998:204#P6>,
+        <https://lagen.nu/sfs/1998:204#P9> ;
+    dcterms:title "Förslagets förenlighet med EG-direktivet om skydd för personuppgifter"@sv ;
+    bibo:chapter "8.3"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S8.4> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S8> ;
+    dcterms:references <https://lagen.nu/sfs/1998:204>,
+        <https://lagen.nu/sfs/1998:204#P10>,
+        <https://lagen.nu/sfs/1998:204#P10S1Nf>,
+        <https://lagen.nu/sfs/1998:204#P22>,
+        <https://lagen.nu/sfs/1998:204#P26>,
+        <https://lagen.nu/sfs/1998:204#P28>,
+        <https://lagen.nu/sfs/1998:204#P36>,
+        <https://lagen.nu/sfs/1998:204#P42> ;
+    dcterms:title "Vilka bestämmelser i personuppgiftslagen bör undan-taget omfatta?"@sv ;
+    bibo:chapter "8.4"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S8.5> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S8> ;
+    dcterms:references <https://lagen.nu/sfs/1972:207>,
+        <https://lagen.nu/sfs/1998:1191>,
+        <https://lagen.nu/sfs/1998:204>,
+        <https://lagen.nu/sfs/1998:204#P13>,
+        <https://lagen.nu/sfs/1998:204#P21>,
+        <https://lagen.nu/sfs/1998:204#P32>,
+        <https://lagen.nu/sfs/1998:204#P33>,
+        <https://lagen.nu/sfs/1998:204#P35>,
+        <https://lagen.nu/sfs/1998:204#P43>,
+        <https://lagen.nu/sfs/1998:204#P47>,
+        <https://lagen.nu/sfs/1998:204#P48>,
+        <https://lagen.nu/sfs/1998:204#P49> ;
+    dcterms:title "Skadestånd, straff och tillsyn"@sv ;
+    bibo:chapter "8.5"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S9.1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S9> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#s108>,
+        <https://lagen.nu/prop/1999/2000:11#s18>,
+        <https://lagen.nu/sfs/1998:204> ;
+    dcterms:title "Avkriminalisering"@sv ;
+    bibo:chapter "9.1"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S9.2> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S9> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#s82>,
+        <https://lagen.nu/sfs/1973:289>,
+        <https://lagen.nu/sfs/1980:100>,
+        <https://lagen.nu/sfs/1998:204>,
+        <https://lagen.nu/sfs/1998:204#P26> ;
+    dcterms:title "Registerutdrag"@sv ;
+    bibo:chapter "9.2"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S9.3> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S9> ;
+    dcterms:references <https://lagen.nu/prop/2000/01:54#s77>,
+        <https://lagen.nu/prop/2002/03:40#s241>,
+        <https://lagen.nu/sfs/1980:100#K15P7S3>,
+        <https://lagen.nu/sfs/1989:186>,
+        <https://lagen.nu/sfs/1989:186#P4S2>,
+        <https://lagen.nu/sfs/1998:204>,
+        <https://lagen.nu/sfs/1998:204#P2>,
+        <https://lagen.nu/sfs/1998:204#P26> ;
+    dcterms:title "Överklagande av myndighetsbeslut"@sv ;
+    bibo:chapter "9.3"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S9.4> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S9> ;
+    dcterms:references <https://lagen.nu/prop/1997/98:44#s38>,
+        <https://lagen.nu/prop/1997/98:44#s47>,
+        <https://lagen.nu/sfs/1998:1191#P7>,
+        <https://lagen.nu/sfs/1998:204>,
+        <https://lagen.nu/sfs/1998:204#P23>,
+        <https://lagen.nu/sfs/1998:204#P25>,
+        <https://lagen.nu/sfs/1998:204#P42>,
+        <https://lagen.nu/sfs/1998:204#P9> ;
+    dcterms:title "Undantag enligt artikel 13 i EG-direktivet om per-sonuppgifter"@sv ;
+    bibo:chapter "9.4"@sv .
+
+<https://lagen.nu/prop/2005/06:173#kommentar-1998:204#P49> ns1:kommentarTill <https://lagen.nu/sfs/1998:204#P49> .
+
+<https://lagen.nu/prop/2005/06:173#kommentar-1998:204#P51> ns1:kommentarTill <https://lagen.nu/sfs/1998:204#P51> .
+
+<https://lagen.nu/prop/2005/06:173#kommentar-1998:204#P52> ns1:kommentarTill <https://lagen.nu/sfs/1998:204#P52> .
+
+<https://lagen.nu/prop/2005/06:173#kommentar-1998:204#P53> ns1:kommentarTill <https://lagen.nu/sfs/1998:204#P53> .
+
+<https://lagen.nu/prop/2005/06:173#kommentar-1998:204#P5a> ns1:kommentarTill <https://lagen.nu/sfs/1998:204#P5a> .
+
+<https://lagen.nu/prop/2005/06:173#kommentar-1998:204#P7> ns1:kommentarTill <https://lagen.nu/sfs/1998:204#P7> .
+
+<https://lagen.nu/prop/2005/06:173#kommentar-1998:204#P8a> ns1:kommentarTill <https://lagen.nu/sfs/1998:204#P8a> .
+
+<https://lagen.nu/prop/2005/06:173?attachment=oversyn-av-personuppgiftslagen-prop.-200506173&repo=propregeringen&dir=downloaded> rdfs:label "Översyn av personuppgiftslagen, prop. 2005/06:173 (pdf 403 kB)"@sv .
+
+<https://lagen.nu/sfs/1998:204#P51> dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S12> .
+
+<https://lagen.nu/sfs/1998:204#P52> dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S12> ;
+    dcterms:references <https://lagen.nu/sfs/1998:204> .
+
+<https://lagen.nu/sfs/1998:204#P53> dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S12> ;
+    dcterms:references <https://lagen.nu/prop/2005/06:173>,
+        <https://lagen.nu/sfs/1998:204> .
+
+<https://lagen.nu/sfs/1998:204#P5a> dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S12> ;
+    dcterms:references <https://lagen.nu/sfs/1998:204> .
+
+<https://lagen.nu/sfs/1998:204#P7> dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S12> ;
+    dcterms:references <https://lagen.nu/sfs/1998:204> .
+
+<https://lagen.nu/sfs/1998:204#P8a> dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S12> ;
+    dcterms:references <https://lagen.nu/sfs/1998:204> .
+
+<https://lagen.nu/prop/2005/06:173#S5> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
+    dcterms:title "Steg mot en missbruksmodell"@sv ;
+    bibo:chapter "5"@sv .
+
+<https://lagen.nu/sfs/1998:204#P49> dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S12> ;
+    dcterms:references <https://lagen.nu/sfs/1998:204> .
+
+<https://lagen.nu/prop/2005/06:173#S6> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
+    dcterms:title "Personlig integritet"@sv ;
+    bibo:chapter "6"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S9> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
+    dcterms:title "Övriga förslag"@sv ;
+    bibo:chapter "9"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S4> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
+    dcterms:title "Allmänt om den rättsliga regleringen av be-handling av personuppgifter"@sv ;
+    bibo:chapter "4"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S8> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
+    dcterms:title "Vardaglig behandling av personuppgifter un-derlättas"@sv ;
+    bibo:chapter "8"@sv .
+
+<https://lagen.nu/prop/2005/06:173#S12> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
+    dcterms:title "Författningskommentar"@sv ;
+    bibo:chapter "12"@sv .
+
+<https://lagen.nu/prop/2005/06:173> a rpubl:Proposition ;
+    dcterms:abstract "I propositionen föreslår regeringen reformer som syftar till att underlätta behandlingen av personuppgifter. Personuppgiftslagen utformas i viss utsträckning enligt en missbruksmodell. Den innebär att regleringen inte tar sikte på själva hanteringen av personuppgifterna utan på att uppgifterna inte får missbrukas till skada för någons personliga integritet. Behandling av personuppgifter i ostrukturerat material, t.ex. löpande text och enstaka ljud- och bildupptagningar, ska undantas från de flesta av personuppgiftslagens detaljerade hanteringsregler. Sådan behandling ska vara tilllåten utan andra restriktioner än att den registrerades personliga integritet inte får kränkas. Personuppgiftslagens bestämmelser om skadestånd ska gälla även för förfaranden i strid med den föreslagna missbruksregeln. Vidare ska det vara straffbart att i strid med missbruksregeln uppsåtligen eller av grov oaktsamhet behandla känsliga personuppgifter och uppgifter om lagöverträdelser m.m. på ett sätt som kränker den registrerades personliga integritet. Detsamma ska gälla för den som i strid med missbruksregeln för över personuppgifter till tredje land som saknar en adekvat nivå för skyddet av personuppgifter. Straffskalan ska vara densamma som för övriga brott enligt personuppgiftslagen. Gärningar som begås av oaktsamhet av normalgraden ska inte längre vara straffbara. I personuppgiftslagen införs en bestämmelse om att vissa beslut enligt lagen som fattats av myndigheter ska kunna överklagas till allmän förvaltningsdomstol. Prövningstillstånd ska krävas vid överklagande till kammarrätt. Vidare införs ett bemyndigande för regeringen att meddela föreskrifter om sådana undantag som är tillåtna enligt artikel 13.1 i EG-direktivet om personuppgifter. I propositionen görs bedömningen att förslagen är förenliga med EG-direktivet om personuppgifter (95/46/EG). Lagändringarna ska enligt förslaget träda i kraft den 1 januari 2007."@sv ;
+    dcterms:identifier "Prop. 2005/06:173" ;
+    dcterms:issued "2006-03-16"^^xsd:date ;
+    dcterms:title "Översyn av personuppgiftslagen"@sv ;
+    rpubl:arsutgava "2005/06" ;
+    rpubl:departement <https://lagen.nu/org/2008/justitiedepartementet> ;
+    rpubl:lopnummer "173" ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/prop/2005/06:173> ;
+    prov:wasDerivedFrom <https://lagen.nu/prop/2005/06:173?attachment=oversyn-av-personuppgiftslagen-prop.-200506173&repo=propregeringen&dir=downloaded> ;
+    prov:wasGeneratedBy "lagen.nu.propositioner.PropRegeringen" .
+

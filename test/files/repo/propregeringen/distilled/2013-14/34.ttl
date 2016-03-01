@@ -1,5 +1,6 @@
 @prefix bibo: <http://purl.org/ontology/bibo/> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix ns1: <rinfoex:> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -10,11 +11,13 @@
 
 <https://lagen.nu/prop/2013/14:34#B1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2013/14:34> ;
+    dcterms:references <https://lagen.nu/sfs/2010:1846> ;
     dcterms:title "Sammanfattning av departementspromemorian Straffavgift vid bristande kreditprövning (Ds 2013:17)"@sv ;
     bibo:chapter "1"@sv .
 
 <https://lagen.nu/prop/2013/14:34#B2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2013/14:34> ;
+    dcterms:references <https://lagen.nu/sfs/2010:1846> ;
     dcterms:title "Promemorians lagförslag"@sv ;
     bibo:chapter "2"@sv .
 
@@ -25,6 +28,8 @@
 
 <https://lagen.nu/prop/2013/14:34#B4> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2013/14:34> ;
+    dcterms:references <https://lagen.nu/ext/celex/32008L0048>,
+        <https://lagen.nu/sfs/2010:1846> ;
     dcterms:title "Lagrådets yttrande"@sv ;
     bibo:chapter "4"@sv .
 
@@ -34,16 +39,19 @@
 
 <https://lagen.nu/prop/2013/14:34#S1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2013/14:34> ;
+    dcterms:references <https://lagen.nu/sfs/2010:1846> ;
     dcterms:title "Förslag till riksdagsbeslut"@sv ;
     bibo:chapter "1"@sv .
 
 <https://lagen.nu/prop/2013/14:34#S2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2013/14:34> ;
+    dcterms:references <https://lagen.nu/sfs/2010:1846> ;
     dcterms:title "Förslag till lag om ändring i konsumentkreditlagen (2010:1846)"@sv ;
     bibo:chapter "2"@sv .
 
 <https://lagen.nu/prop/2013/14:34#S3> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2013/14:34> ;
+    dcterms:references <https://lagen.nu/sfs/2010:1846> ;
     dcterms:title "Ärendet och dess beredning"@sv ;
     bibo:chapter "3"@sv .
 
@@ -54,12 +62,12 @@
 
 <https://lagen.nu/prop/2013/14:34#S5.1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2013/14:34#S5> ;
+    dcterms:references <https://lagen.nu/sfs/2010:1846>,
+        <https://lagen.nu/sfs/2010:1846#P49> ;
     dcterms:title "Konsumentverket ska få besluta om sanktionsavgift"@sv ;
     bibo:chapter "5.1"@sv .
 
-<https://lagen.nu/prop/2013/14:34#US1> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/2013/14:34#S9> ;
-    dcterms:title "Förslaget till lag om ändring i konsumentkreditlagen (2010:1846)"@sv .
+<https://lagen.nu/prop/2013/14:34#kommentar-2010:1846#P52> ns1:kommentarTill <https://lagen.nu/sfs/2010:1846#P52> .
 
 <https://lagen.nu/prop/2013/14:34#S5> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2013/14:34> ;
@@ -68,8 +76,14 @@
 
 <https://lagen.nu/prop/2013/14:34#S9> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2013/14:34> ;
+    dcterms:references <https://lagen.nu/prop/2009/10:242#s99>,
+        <https://lagen.nu/sfs/2010:1846> ;
     dcterms:title "Författningskommentar"@sv ;
     bibo:chapter "9"@sv .
+
+<https://lagen.nu/prop/2013/14:34?attachment=sanktionsavgift-vid-bristande-kreditprovningar-prop.-20131434&repo=propregeringen&dir=downloaded> rdfs:label "Sanktionsavgift vid bristande kreditprövningar, Prop. 2013/14:34 (pdf 137 kB)"@sv .
+
+<https://lagen.nu/sfs/2010:1846#P52> dcterms:isPartOf <https://lagen.nu/prop/2013/14:34#S9> .
 
 <https://lagen.nu/prop/2013/14:34> a rpubl:Proposition ;
     dcterms:abstract "I propositionen föreslår regeringen att Konsumentverket ska kunna ta ut en sanktionsavgift av näringsidkare som vid kreditgivning till konsumenter inte gör ordentliga kreditprövningar. Förslaget syftar till att stärka konsumentskyddet vid kreditgivning och därigenom minska överskuldsättningen bland konsumenter. Bakgrunden till förslaget är att konsumtionskrediter under senare år har blivit allt mer lättillgängliga, bl.a. genom möjlighet till s.k. sms-lån (snabblån). När tillgängligheten ökar ställs det också höga krav på kreditgivarna att noggrant undersöka den enskilda konsumentens förutsättningar att betala tillbaka lånet. Konsumentverkets tillsyn visar dock att det finns brister vid kreditprövningarna. I propositionen föreslås också att det införs tydliga kriterier för när Konsumentverket ska få förelägga en näringsidkare att upphöra med att lämna krediter. Lagändringarna föreslås träda i kraft den 1 april 2014."@sv ;
@@ -81,5 +95,6 @@
     rpubl:lopnummer "34" ;
     rpubl:utgarFran <https://lagen.nu/utr/ds/2013:17> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/prop/2013/14:34> ;
+    prov:wasDerivedFrom <https://lagen.nu/prop/2013/14:34?attachment=sanktionsavgift-vid-bristande-kreditprovningar-prop.-20131434&repo=propregeringen&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.propositioner.PropRegeringen" .
 

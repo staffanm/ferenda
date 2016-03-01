@@ -1,0 +1,6 @@
+name                                 type              encoding         emb sub uni object ID
+------------------------------------ ----------------- ---------------- --- --- --- ---------
+Times-Roman                          Type 1            Standard         no  no  no      65  0
+Times-Roman                          Type 1            Custom           no  no  no      68  0
+CBGMAD+Times.New.Roman.Kursiv0104    Type 1            Custom           yes yes no      70  0
+CBGMAF+Times.New.Roman.Fet0104       Type 1            Custom           yes yes no      31  0

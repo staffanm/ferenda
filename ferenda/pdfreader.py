@@ -426,7 +426,7 @@ class PDFReader(CompoundElement):
                        "CID Type 0C (OT)": "CIDType0C(OT)",
                        "CID TrueType": "CIDTrueType",
                        "CID TrueType (OT)": "CIDTrueType(OT)"}
-        
+
         fontinfofile = filename + ".fontinfo"
         # print("Looking for %s (%s)" % (fontinfofile, os.path.exists(fontinfofile)))
         if os.path.exists(fontinfofile):
@@ -1025,6 +1025,23 @@ all text in a Textbox has the same font and size.
 #            
 
     def as_xhtml(self, uri, parent_uri=None):
+        if self._fontspec[self.fontid].get("encoding") == "Custom":
+            # Only textboxes know that their text is encoded,
+            # underlying textelements do not. But it's those objects
+            # that contain the actual encoded text. So we exchange
+            # those objects for decoded replicas. This might be a good
+            # place to do it.
+
+            # NOTE: This weird checking for occurrences of 'i'
+            # tags is needed for functionalSources.
+            # TestPropRegeringen.test_parse_1999_2000_17 to pass
+            # (and matches encoding usage in practice)
+            decode_all = not('i' in [x.tag for x in self])
+            for idx, subpart in enumerate(self):
+                if (isinstance(subpart, Textelement) and
+                    (decode_all or subpart.tag == 'i')):
+                    self[idx] = Textelement(self.decode(subpart),
+                                            tag=subpart.tag)
         children = []
         first = True
         prevpart = None
@@ -1040,7 +1057,8 @@ all text in a Textbox has the same font and size.
                     (not isinstance(prevpart, Textelement) or
                      prevpart.tag)):
                     prevpart = prevpart.as_xhtml(uri, parent_uri)
-                children.append(prevpart)
+                if prevpart is not None:
+                    children.append(prevpart)
                 prevpart = subpart
             else:
                 prevpart = subpart
@@ -1049,7 +1067,8 @@ all text in a Textbox has the same font and size.
             (not isinstance(prevpart, Textelement) or
              prevpart.tag)):
             prevpart = prevpart.as_xhtml(uri, parent_uri)
-        children.append(prevpart)
+        if prevpart is not None:
+            children.append(prevpart)
         element = E("p", {'class': 'textbox'}, *children)
         # FIXME: we should output these positioned style attributes
         # only when the resulting document is being serialized in a
