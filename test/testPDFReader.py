@@ -235,6 +235,8 @@ class Read(unittest.TestCase):
 class AsXHTML(unittest.TestCase, FerendaTestCase):
 
     def _test_asxhtml(self, want, body):
+        body._fontspec = {0: {'family': 'Times'},
+                          1: {'family': 'Comic sans', 'encoding': 'Custom'}}
         got = etree.tostring(body.as_xhtml(None), pretty_print=True)
         self.assertEqualXML(want, got)
 
@@ -295,3 +297,19 @@ class AsXHTML(unittest.TestCase, FerendaTestCase):
 <p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px, left: 0px, height: 100px, width: 100px">plaintext <a href="http://example.org/" rel="dcterms:references">link</a></p>
 """
         self._test_asxhtml(want, body)
+
+
+    def test_encoded_element(self):
+        body = Textbox([Textelement("*|UDQ\x033HUVVRQ", tag=None)
+        ], top=0, left=0, width=100, height=100, fontid=1)
+        want = """
+<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px, left: 0px, height: 100px, width: 100px">Göran Persson</p>
+"""
+        self._test_asxhtml(want, body)
+
+        body = Textbox([Textelement("Ansvarig: ", tag=None),
+                        Textelement("*|UDQ\x033HUVVRQ", tag="i")
+        ], top=0, left=0, width=100, height=100, fontid=1)
+        want = """
+<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px, left: 0px, height: 100px, width: 100px">Ansvarig: <i>Göran Persson</i></p>
+"""
