@@ -1718,14 +1718,12 @@ with the *config* object as single parameter.
                 elif reltriples:
                     self.relate_triples(basefile, removesubjects=True)
                     entry.indexed_ts = datetime.now()
-
+            # When otherrepos = [], should we still provide self as one repo? Yes.
+            if self not in otherrepos:
+                otherrepos.append(self)
             if reldependencies:
-                # When otherrepos = [], should we still provide self as one repo? Yes.
-                if self not in otherrepos:
-                    otherrepos.append(self)
                 self.relate_dependencies(basefile, otherrepos)
                 entry.indexed_dep = datetime.now()
-
             if self.config.fulltextindex and relfulltext:
                 self.relate_fulltext(basefile, otherrepos)
                 entry.indexed_ft = datetime.now()

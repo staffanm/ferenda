@@ -67,7 +67,7 @@ class WSGI(RepoTester): # base class w/o tests
         if not store:
             store = self.repo.store
         g = Graph()
-        g.parse(source=codecs.open(inpath, encoding="utf-8"), format="turtle")
+        g.parse(data=util.readfile(inpath, encoding="utf-8"), format="turtle")
         with store._open(outpath, "wb") as fp:
             fp.write(g.serialize(format="pretty-xml"))
         return g

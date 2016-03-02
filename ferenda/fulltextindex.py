@@ -5,14 +5,14 @@ from builtins import *
 from future import standard_library
 standard_library.install_aliases()
 
+from datetime import date, datetime, MAXYEAR, MINYEAR
+from urllib.parse import quote
+import itertools
 import json
 import math
 import re
 import shutil
-import itertools
-from datetime import date, datetime, MAXYEAR, MINYEAR
-from urllib.parse import quote
-
+import tempfile
 
 import requests
 import requests.exceptions
@@ -682,7 +682,28 @@ class ElasticSearchIndex(RemoteIndex):
                      {"type": "string", "index": "not_analyzed", "boost": 1.1, "norms": {"enabled": True}}),
                     )
 
+    def __init__(self, location, repos):
+        self._writer = None
+        super(ElasticSearchIndex, self).__init__(location, repos)
+
+    def close(self):
+        return self.commit()
+
     def commit(self):
+        if not self._writer:
+            return  # no pending changes to commit
+        self._writer.seek(0)
+        res = requests.put(self.location + "/_bulk", data=self._writer)
+        self._writer.close()
+        self._writer = None
+        try:
+            res.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            raise errors.IndexingError(str(e) + ": '%s'" % res.text)
+        # make sure everything is really comitted (available for
+        # search) before continuing? TODO: Check if this slows
+        # multi-basefile (and multi-threaded) indexing down noticably,
+        # we could just do it at the end of relate_all_teardown.
         r = requests.post(self.location + "_refresh")
         r.raise_for_status()
 
@@ -708,7 +729,20 @@ class ElasticSearchIndex(RemoteIndex):
                    "basefile": basefile,
                    "text": text}
         payload.update(kwargs)
-        return relurl, json.dumps(payload, default=util.json_default_date, indent=4)
+        return relurl, json.dumps(payload, default=util.json_default_date)
+
+    def update(self, uri, repo, basefile, text, **kwargs):
+        if not self._writer:
+            self._writer = tempfile.TemporaryFile()
+        relurl, payload = self._update_payload(
+            uri, repo, basefile, text, **kwargs)
+        if "#" in uri:
+            basefile += uri.split("#", 1)[1]
+        metadata = '{ "index" : { "_type" : "%(repo)s", "_id" : "%(basefile)s" } }\n' % locals()
+        assert "\n" not in payload, "payload contains newlines, must be encoded for bulk API"
+        self._writer.write(metadata.encode("utf-8"))
+        self._writer.write(payload.encode("utf-8"))
+        self._writer.write(b"\n")
 
     def _query_payload(self, q, pagenum=1, pagelen=10, **kwargs):
         relurl = "_search?from=%s&size=%s" % ((pagenum - 1) * pagelen, pagelen)

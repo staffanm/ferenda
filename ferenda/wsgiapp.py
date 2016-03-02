@@ -288,7 +288,7 @@ Examined %s repos.""" % (environ['PATH_INFO'],
         self.log.debug("stats: Loading resources %s into a common resource graph" %
                        list(ttlfiles))
         for filename in ttlfiles:
-            resource_graph.parse(filename, format="turtle")
+            resource_graph.parse(data=util.readfile(filename), format="turtle")
         pkg_resources.cleanup_resources()
 
 
