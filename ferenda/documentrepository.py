@@ -1320,6 +1320,13 @@ with the *config* object as single parameter.
                              encoding='utf-8',
                              # doctype=doctype
                              )
+        err = self.render_xhtml_validate(xhtmldoc)
+        if err:
+            util.ensure_dir(outfile)
+            with open(outfile+".invalid", "wb") as fp:
+                fp.write(res)
+            raise errors.InvalidTree("%s. Invalid tree saved as %s.invalid" % (err, outfile))
+
         fileno, tmpfile = mkstemp()
         fp = os.fdopen(fileno)
         fp.close()
@@ -1502,6 +1509,23 @@ with the *config* object as single parameter.
             bodycontent,
         )
         return xhtmldoc
+
+    def render_xhtml_validate(self, xhtmldoc):
+        # the default validator makes sure we haven't created
+        # duplicate sub-resources, and that we haven't created too
+        # many resources.
+        resources = set()
+        # it's important that we only search for divs, since spans are
+        # used inside divs with same @abouts to add extra metadata to
+        # the @about resource
+        for divnode in xhtmldoc.xpath(".//x:div[@about]",
+                                      namespaces={'x': 'http://www.w3.org/1999/xhtml'}):
+            if divnode.get("about") in resources:
+                return "Resource %s encountered twice" % divnode.get("about")
+            resources.add(divnode.get("about"))
+        if len(resources) > 1000:
+            return "Encounted over 1000 resources, that's probably not right"
+        return None  # no news is good news
 
     def parsed_url(self, basefile):
         """Get the full local url for the parsed file for the

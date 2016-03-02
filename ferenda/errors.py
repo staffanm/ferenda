@@ -60,6 +60,10 @@ class NoDownloadedFileError(ParseError):
 exist a downloaded file."""
 
 
+class InvalidTree(ParseError):
+    """Raised when the parsed XHTML tree fails internal validation."""
+
+
 class AttachmentNameError(ValueError):
     """Raised whenever an invalid attachment name is used with any method
     of :py:class:`~ferenda.DocumentStore`."""
