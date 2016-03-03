@@ -371,10 +371,18 @@ class PDFAnalyzer(object):
             styledefs['title'] = self.fontdict(ts)
 
         # h1 - h3: Take all styles larger than or equal to default, with
-        # significant use (each > 0.5 % of all chars from page 2 onwards,
+        # significant use (each > 0.2 % of all chars from page 2 onwards,
         # as the front page often uses nontypical styles), then order
         # styles by font size.
-        significantuse = sum(rest_styles.values()) * 0.005
+        #
+        # NOTE: The cutoff used to be 0.5 %, but for prop 2015/16:82
+        # that wasn't enough since that doc has large swaths of text
+        # that do not use h1/h2 style headers at all. A better way
+        # would be to identify pages (appendixes, most likely) that do
+        # not use the default styles and not include these in
+        # rest_styles. This should possibly be done by documents() --
+        # but how should that be determined?
+        significantuse = sum(rest_styles.values()) * 0.002
         sortedstyles = sorted(rest_styles, key=self.fontsize_key, reverse=True)
         largestyles = [x for x in sortedstyles if
                        (self.fontsize_key(x) > self.fontsize_key(ds) and

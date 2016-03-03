@@ -1157,7 +1157,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         elif (int(chunk.font.size) == metrics.default.size and
               (chunk.right < metrics_leftmargin() or
                chunk.left > metrics_rightmargin())):
-            m = re.search("Bilaga (\d)", str(chunk))
+            m = re.search("Bilaga (\d+)", str(chunk))
             if m:
                 ordinal = int(m.group(1))
                 if ordinal != state.appendixno:
@@ -1216,7 +1216,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             chunk = parser.reader.next()
             if isinstance(chunk, Page):
                 continue
-            m = re.search("Bilaga (\d)", str(chunk))
+            m = re.search("Bilaga (\d+)", str(chunk))
             if m:
                 state.appendixno = int(m.group(1))
             if int(chunk.font.size) >= metrics.h2.size:
