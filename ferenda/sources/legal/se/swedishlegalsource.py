@@ -669,7 +669,7 @@ class SwedishLegalSource(DocumentRepository):
             metrics_path = self.store.path(basefile, 'intermediate',
                                            '.metrics.json')
 
-            if os.environ.get("FERENDA_DEBUGANALYSIS"):
+            if os.environ.get("FERENDA_PLOTANALYSIS"):
                 plot_path = self.store.path(basefile, 'intermediate',
                                             '.plot.png')
             else:
@@ -993,12 +993,12 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         metrics = {}
     defaultmetrics = {'header': 0,  # fix these
                       'footer': 1000,  # -""-
-                      'odd_leftmargin': 172,
+                      'leftmargin': 172,
                       'odd_parindent': 187,
-                      'odd_rightmargin': 619,
-                      'even_leftmargin': 278,
+                      'rightmargin': 619,
+                      'leftmargin_even': 278,
                       'even_parindent': 293,
-                      'even_rightmargin': 725,
+                      'rightmargin_even': 725,
                       'bottommargin': 800,
                       'topmargin': 100,
                       'h1': {'family': 'TimesNewRomanPS-BoldMT',  # should also be weight: bold?
@@ -1298,15 +1298,15 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
     def metrics_leftmargin():
         if state.pageno % 2 == 0:  # even page
-            return metrics.even_leftmargin
+            return metrics.leftmargin_even
         else:
-            return metrics.odd_leftmargin
+            return metrics.leftmargin
 
     def metrics_rightmargin():
         if state.pageno % 2 == 0:  # even page
-            return metrics.even_rightmargin
+            return metrics.rightmargin_even
         else:
-            return metrics.odd_rightmargin
+            return metrics.rightmargin
 
     p = FSMParser()
 
