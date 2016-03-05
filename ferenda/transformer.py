@@ -18,7 +18,6 @@ from ferenda import ResourceLoader
 # you want to use a different template, create a different
 # transformer.
 
-
 class Transformer(object):
 
     """Transforms parsed "pure content" documents into "browser-ready"
@@ -241,7 +240,8 @@ class XSLTTransform(TransformerEngine):
                 config = config.replace(os.sep, "/")
             # print("Tranform: Using config %s. Contents:" % config)
             # print(util.readfile(config))
-            strparams['configurationfile'] = XSLT.strparam(config)
+            config_fullpath = os.path.abspath(config)
+            strparams['configurationfile'] = XSLT.strparam(config_fullpath)
         for key, value in parameters.items():
             if key.endswith("file"):
                 # relativize path of file relative to the XSL file
