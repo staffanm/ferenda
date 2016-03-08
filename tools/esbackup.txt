@@ -5,6 +5,18 @@
 
 DAEMON_OPTS="-d -p $PID_FILE --default.path.home=$ES_HOME --default.path.logs=$LOG_DIR --default.path.data=$DATA_DIR --default.path.conf=$CONF_DIR --default.path.repo=/tmp/elasticsearch/snapshot"
 
-2. Run curl -T tools/backupsettings.json http://localhost:9200/_snapshot/lagen_backup
+2. Setup snapshot configuration: curl -T tools/backupsettings.json http://localhost:9200/_snapshot/lagen_backup
 
-3. Confirm that snapshotting is running: curl http://localhost:9200/_snapshot/lagen_backup/_status?pretty=true
+3. Create a snaphost: curl -XPUT http://localhost:9200/_snapshot/lagen_backup/snapshot_1?wait_for_completion=true
+
+   N.B. this should probably have a json config body that specifies that only the lagen index should be snapshotted
+
+4. List all existing snaphosts: curl http://localhost:9200/_snapshot/lagen_backup/_all?pretty=true
+
+5. Move snapshot data to other machine: scp /tmp/elasticsearch/* staffan@colo.tomtebo.org:/tmp/elasticsearch/*
+
+6. On other machine, setup the same snapshot configuration as in 2)
+
+7. Run a restore job: curl -XPOST http://localhost:9200/_snapshot/lagen_backup/snapshot_1/_restore?pretty=true
+
+8. Confirm that the new machine now has data: curl http://localhost:9200/lagen/_search?q=avtal&pretty=true

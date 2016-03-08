@@ -1,0 +1,14 @@
+# instructions on how to deploy the state of the dev machine to the
+  staging machine. This'll go into a script later.
+
+1) Snapshot the ES and restore it on target, see esbackup.txt
+
+2) rsync -azP --delete --exclude '*downloaded*' --exclude '*archive*' /mnt/diskstation-home/staffan/wds/ferenda/tng.lagen.nu/data/ staffan@colo.tomtebo.org:/home/staffan/www/ferenda.lagen.nu/data
+
+3) Pull latest code on target
+   cd /home/staffan/wds/ferenda && git pull
+
+4) Import all .nt files (synced in step 2) into fuseki. NOTE: need to write the rdfimport command first.
+   cd /home/staffan/www/ferenda.lagen.nu/ && ./ferenda-build devel rdfimport 
+
+
