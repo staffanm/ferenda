@@ -492,18 +492,12 @@ class DocumentRepository(object):
             'tabs': True,
             'class': cls.__module__ + "." + cls.__name__,
             # FIXME: These only make sense at a global level, and
-            # furthermore are duplicated in manager._load_config
-            'cssfiles': ['http://fonts.googleapis.com/css?family=Raleway:200,100',
-                         'css/normalize-1.1.3.css',
-                         'css/main.css',
-                         'css/ferenda.css'],
-            'jsfiles': ['js/jquery-1.10.2.js',
-                        'js/modernizr-2.6.3.js',
-                        'js/respond-1.3.0.js',
-                        'js/ferenda.js'],
-            'imgfiles': ['img/navmenu-small-black.png',
-                         'img/navmenu.png',
-                         'img/search.png'],
+            # furthermore are duplicated in manager._load_config. We
+            # now hardcode CDN paths to bootstrap and jquery into
+            # base.xsl
+            'cssfiles': ['css/ferenda.css'],
+            'jsfiles': ['js/ferenda.js'],
+            'imgfiles': [],
             'storetype': 'SQLITE',
             'storelocation': 'data/ferenda.sqlite',
             'storerepository': 'ferenda',

@@ -112,25 +112,8 @@ class Resources(object):
             E.sitename(self.config.sitename),
             E.sitedescription(self.config.sitedescription),
             E.url(self.config.url),
-            E.tabs(
-                E.nav(
-                    E.a({'class': 'navbutton',
-                         'href': '#menu'},
-                        E.img({'src': 'rsrc/img/navmenu.png'})),
-                    E.ul(*self._links('tabs'))
-                )
-            ),
-            E.footerlinks(
-                E.nav(
-                    E.ul(*self._links('footer'))
-                )
-            ),
-            E.tocbutton(
-                E.a({'class': 'tocbutton',
-                     'href': '#menu'},
-                    E.img({'src': 'rsrc/img/navmenu-small-black.png'})
-                    )
-            ),
+            E.tabs(*self._links('tabs')),
+            E.footerlinks(*self._links('footer')),
             E.stylesheets(*self._li_wrap(cssfiles, 'link', 'href', rel="stylesheet")),
             E.javascripts(*self._li_wrap(jsfiles, 'script', 'src', text=" "))
         )
@@ -138,16 +121,7 @@ class Resources(object):
         if not self.config.staticsite:
             root.append(
                 E.search(
-                    E.form({'action': self.config.searchendpoint,
-                            'type': 'search',
-                            'name': 'q'},
-                           E.input({'type': 'search',
-                                    'name': 'q'}),
-                           E.a({'href': '#search',
-                                'class': 'searchbutton'},
-                               E.img({'src': 'rsrc/img/search.png'})
-                               )
-                           )
+                    E.endpoint(self.config.searchendpoint)
                 )
             )
 

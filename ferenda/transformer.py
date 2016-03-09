@@ -144,7 +144,9 @@ class Transformer(object):
             log = logging.getLogger("ferenda.transformer")
             if self.config:
                 xslfile = self.resourceloader.filename(self.t.orig_template)
-                p = parameters.copy()
+                p = {}
+                if parameters:
+                    p.update(parameters.copy())
                 for key, value in p.items():
                     if key.endswith("file"):
                         p[key] = os.path.relpath(value,

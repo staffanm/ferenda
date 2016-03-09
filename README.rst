@@ -59,8 +59,8 @@ Copyright and license
 Most of the code written by Staffan Malmgren, licensed under the main
 2-clause BSD license.
 
-Some bundled code and other creative works are written by other
-authors, included in accordance with their respective licenses:
+Some bundled code are written by other authors, included in accordance
+with their respective licenses:
 
 * `rdflib-sqlite <https://github.com/RDFLib/rdflib-sqlite>`_ by Graham
   Higgins, BSD
@@ -75,12 +75,5 @@ authors, included in accordance with their respective licenses:
 * `httpheader <http://deron.meranda.us/python/httpheader/>`_ by Deron
   Meranda, LGPL
 * `smc.mw <https://pypi.python.org/pypi/smc.mw>`_ by Marcus Brinkmann, BSD
-* `normalize.css <http://git.io/normalize>`_, MIT
-* `responsive template <http://verekia.com/initializr/responsive-template>`_, PD
-* `jquery <http://jquery.com>`_ , MIT
-* `modernizr <http://modernizr.com>`_, MIT
-* `respond.js <http://github.com/scottjehl/Respond>`_, MIT/GPL
-* `Gentleface wireframe toolbar icons
-  <http://gentleface.com/free_icon_set.html>`_, CC-BY-NC
   
  
