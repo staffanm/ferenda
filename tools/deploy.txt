@@ -8,7 +8,7 @@
 3) Pull latest code on target
    cd /home/staffan/wds/ferenda && git pull
 
-4) Import all .nt files (synced in step 2) into fuseki. NOTE: need to write the rdfimport command first.
-   cd /home/staffan/www/ferenda.lagen.nu/ && ./ferenda-build devel rdfimport 
+4) Import all .nt files (synced in step 2) into fuseki. 
+   cd /home/staffan/www/ferenda.lagen.nu/ && ~/.virtualenvs/lagen.nu/bin/python ./ferenda-build.py all relate --all --upload
 
 

@@ -25,7 +25,8 @@ def copy_elastic():
     sudo("chown -R staffan:staffan %s" % snapshotdir)
     rsync_project(local_dir=snapshotdir,
                   remote_dir=snapshotdir,
-                  delete=True)
+                  delete=True,
+                  default_opts="-azi")
     sudo("chown -R elasticsearch:elasticsearch %s" % snapshotdir)
 
     # on target, curl POST to restore snapshot (close index beforehand
@@ -45,8 +46,8 @@ def copy_files():
     rsync_project(local_dir="/mnt/diskstation-home/staffan/wds/ferenda/tng.lagen.nu/data/",
                   remote_dir="/home/staffan/www/ferenda.lagen.nu/data",
                   exclude=["*downloaded*", "*archive*"],
-                  # delete=True,
-                  default_opts="avz")
+                  delete=True,
+                  default_opts="-azi")
 
 
 def git_pull():
@@ -54,13 +55,13 @@ def git_pull():
         run("git pull --rebase")
 
 
-def import_rdf():
+def upload_rdf():
     with cd("~/www/ferenda.lagen.nu"):
-        run("~/.virtualenvs/lagen.nu/bin/python ./ferenda-build.py devel rdfimport")
+        run("~/.virtualenvs/lagen.nu/bin/python ./ferenda-build.py all relate --all --upload")
 
 
 def deploy():
+    copy_elastic()  # requires password b/c of sudo() so we do it first
     git_pull()
     copy_files()
-    copy_elastic()
-    # import_rdf()
+    upload_rdf()
