@@ -528,7 +528,6 @@ class Devel(object):
             # data/sfs/register/1998/204.html. Maybe we should use
             # storage_policy="dir" and handle those things as
             # attachments?
-            
             if os.path.exists(sourcerepo.store.path(basefile, "register", ".html")):
                 dst = destrepo.store.path(basefile, "register", ".html")
                 util.ensure_dir(dst)
@@ -553,6 +552,11 @@ class Devel(object):
             destrepo = self._repo_from_alias(alias)
             if destrepo.__class__ in classes:
                 print("...skipping class %r" % destrepo.__class__)
+                continue
+            if ('parse' in self.config._parent._subsections[alias] and
+                self.config._parent._subsections[alias].parse in
+                (False, 'False')):
+                print("...skipping class %r (parse=False)" % destrepo.__class__)
                 continue
             if isinstance(destrepo, CompositeRepository):
                 sourcerepo = self._repo_from_alias(alias)
