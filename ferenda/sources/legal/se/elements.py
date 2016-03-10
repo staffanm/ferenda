@@ -128,6 +128,15 @@ class Paragraf(CompoundElement, OrdinalElement):
         self.uri = kwargs.get("uri", None)
         super(Paragraf, self).__init__(*args, **kwargs)
 
+    def as_xhtml(self, uri=None, parent_uri=None):
+        res = super(Paragraf, self).as_xhtml()
+        # NOTE: we insert the paragrafbeteckning within the first
+        # stycke. This makes XSLT rendering easier and is probably not
+        # semantically incorrect.
+        res[0].insert(0, E('span', {'class': 'paragrafbeteckning'}, self.ordinal + " §"))
+        return res
+
+
 
 # kan innehålla nästlade numrerade listor
 class Listelement(CompoundElement, OrdinalElement):

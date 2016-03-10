@@ -174,6 +174,7 @@ class SFS(Trips):
         opts['keepexpired'] = False
         opts['revisit'] = list
         opts['next_sfsnr'] = str
+        opts['css'] = ['css/sfs.css']
         return opts
 
     def download(self, basefile=None):
@@ -752,8 +753,9 @@ class SFS(Trips):
                                 "%s is expired (time-limited) SFS" % basefile,
                                 dummyfile=self.store.parsed_path(basefile))
                 else:
-                    self.log.warning(
-                        '%s: Obekant nyckel [\'%s\']' % (basefile, key))
+                    if not (key.startswith("http://") or key.startswith("https://")):
+                        self.log.warning(
+                            '%s: Obekant nyckel [\'%s\']' % (basefile, key))
             utfardandedatum = self._find_utfardandedatum(rowdict['SFS-nummer'])
             if utfardandedatum:
                 d[docuri]["rpubl:utfardandedatum"] = utfardandedatum

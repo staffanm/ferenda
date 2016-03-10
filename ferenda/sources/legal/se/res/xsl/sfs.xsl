@@ -207,8 +207,8 @@
       <xsl:if test="$marker != ''">
 	<a href="#{@id}" title="Permalänk till detta stycke"><img class="platsmarkor" src="../../../rsrc/img/{$marker}.png"/></a>
       </xsl:if>
-      <xsl:if test="span[@class='paragrafbeteckning']">
-	<a href="#{@id}" class="paragrafbeteckning" title="Permalänk till detta stycke"><xsl:copy-of select="span[@class='paragrafbeteckning']"/></a>
+      <xsl:if test="xhtml:span[@class='paragrafbeteckning']">
+	<a href="#{@id}" class="paragrafbeteckning" title="Permalänk till detta stycke"><xsl:copy-of select="xhtml:span[@class='paragrafbeteckning']"/></a>&#160;
       </xsl:if>
       <xsl:apply-templates/>
     </p>
