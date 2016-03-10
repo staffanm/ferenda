@@ -200,6 +200,7 @@ class DV(OrigDV, SameAs):
         r = [Strong([Link(row['dcterms_identifier'],
                           uri=row['uri'])])]
         if 'rpubl_referatrubrik' in row:
+            r.append(": ")
             r.append(row['rpubl_referatrubrik'])
         return r
 

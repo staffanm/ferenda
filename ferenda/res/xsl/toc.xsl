@@ -12,11 +12,8 @@ It's a generic template for TOC pages (assumes that there exists a <ul role="nav
 		xmlns:rinfo="http://rinfo.lagrummet.se/taxo/2007/09/rinfo/pub#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
 		exclude-result-prefixes="xhtml rdf dcterms rinfo rinfoex">
-
-  <!-- <xsl:import href="uri.xsl"/> -->
+  <xsl:strip-space elements="*"/>
   <xsl:include href="base.xsl"/>
-
-
   <xsl:template name="headtitle"><xsl:value-of select="xhtml:title"/></xsl:template>
   <xsl:template name="metarobots"><xsl:comment>Robot metatag goes here</xsl:comment></xsl:template>
   <xsl:template name="linkalternate"><xsl:comment>Alternate link(s)</xsl:comment></xsl:template>

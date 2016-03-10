@@ -106,6 +106,11 @@ class Kapitel(CompoundElement, OrdinalElement):
         self.uri = kwargs.get("uri", None)
         super(Kapitel, self).__init__(*args, **kwargs)
 
+    def as_xhtml(self, uri=None, parent_uri=None):
+        res = super(Kapitel, self).as_xhtml()
+        res.insert(0, E('h1', self.rubrik))
+        return res
+
 
 class UpphavdParagraf(UnicodeElement, OrdinalElement):
     pass

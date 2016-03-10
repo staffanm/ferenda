@@ -77,7 +77,7 @@
   </xsl:template>
 
   <xsl:template name="docmetadata">
-    <dl id="refs-dokument">
+    <dl id="refs-dokument" class="dl-horizontal">
       <dt>Departement</dt>
       <dd><xsl:value-of select="//xhtml:link[@rel='dcterms:creator']/@href"/></dd>
       <dt>Utfärdad</dt>
@@ -91,7 +91,7 @@
       <dt>Källa</dt>
       <dd rel="dcterms:publisher" resource="http://lagen.nu/org/2008/regeringskansliet"><a href="http://62.95.69.15/cgi-bin/thw?%24%7BHTML%7D=sfst_lst&amp;%24%7BOOHTML%7D=sfst_dok&amp;%24%7BSNHTML%7D=sfst_err&amp;%24%7BBASE%7D=SFST&amp;%24%7BTRIPSHOW%7D=format%3DTHW&amp;BET={//span[@property='rpubl:arsutgava'][1]}:{//span[@property='rpubl:lopnummer'][1]}">Regeringskansliets rättsdatabaser</a></dd>
       <dt>Senast hämtad</dt>
-      <dd><xsl:value-of select="//xhtml:meta[@property='rinfoex:senastHamtad']/@content"/></dd>
+      <dd><xsl:value-of select="substring(//xhtml:meta[@property='rinfoex:senastHamtad']/@content, 1, 10)"/></dd>
       <xsl:if test="//xhtml:meta[@property='rdfs:comment']/@content">
 	<dt>Övrigt</dt>
 	<dd><xsl:value-of select="//xhtml:meta[@property='rdfs:comment']/@content"/></dd>

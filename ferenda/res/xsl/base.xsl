@@ -16,6 +16,7 @@
   <xsl:variable name="annotations" select="document($annotationfile)/graph"/>
   <xsl:param name="configurationfile"/>
   <xsl:variable name="configuration" select="document($configurationfile)/configuration"/>
+  <xsl:include href="nav-search-form.xsl"/>
   <xsl:output method="html"
 	      omit-xml-declaration="yes"
 	      encoding='utf-8'
@@ -93,26 +94,23 @@
 	      <xsl:call-template name="decorate-nav"/>
 	    </ul>
 	    <xsl:if test="$configuration/search">
-	      <form class="navbar-form navbar-right" role="search" action="{$configuration/search/endpoint}">
-		<div class="form-group">
-		  <input type="text" class="form-control" placeholder="Search"/>
-		</div>
-		<!-- <button type="submit" class="btn btn-default">Submit</button> -->
-	      </form>
+	      <xsl:call-template name="nav-search-form"/>
 	    </xsl:if>
 	  </div><!-- /.navbar-collapse -->
 	</div><!-- /.container-fluid -->
       </nav>
-      <nav id="toc">
-	<ul>
-	  <xsl:apply-templates mode="toc"/>
-	</ul>
-      </nav>
-      <article>
-	<xsl:call-template name="pagetitle"/>
-	<xsl:apply-templates/>
-	<!-- Main document text: header, sections (possibly nested) and footer goes here -->
-      </article>
+      <div class="row">
+	<nav id="toc" class="col-sm-3">
+	  <ul>
+	    <xsl:apply-templates mode="toc"/>
+	  </ul>
+	</nav>
+	<article class="col-sm-9">
+	  <xsl:call-template name="pagetitle"/>
+	  <xsl:apply-templates/>
+	  <!-- Main document text: header, sections (possibly nested) and footer goes here -->
+	</article>
+      </div>
       <div class="footer-container">
 	<footer>
 	  <nav>

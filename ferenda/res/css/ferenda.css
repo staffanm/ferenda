@@ -26,6 +26,24 @@
 /* PART 2: The main content area (including document TOC) */
 
 @media only screen and (min-width: 480px) {
+    body.toc nav#toc li {
+	list-style: none;
+    }
+    body.toc nav#toc > ul > li > ul  {
+	padding: 0;
+    }
+    body.toc nav#toc > ul > li > ul > li {
+	display: inline;
+    }
+    body.toc nav#toc > ul > li > p {
+	font-weight: bold;
+	margin-bottom: 0;
+	margin-top: 0.5em;
+    }
+    body.toc article ul {
+	padding: 0;
+	list-style: none;
+    }
 }
 
 
