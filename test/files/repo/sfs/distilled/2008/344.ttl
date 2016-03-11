@@ -53,7 +53,7 @@
     rpubl:konsoliderar <https://lagen.nu/sfs/2008:344> ;
     rpubl:konsolideringsunderlag <https://lagen.nu/sfs/2008:344>,
         <https://lagen.nu/sfs/2009:1550>,
-        <https://lagen.nu/sfs/2013:411> ,
+        <https://lagen.nu/sfs/2013:411>,
         <https://lagen.nu/sfs/2013:647> ;
     rpubl:utfardandedatum "2008-05-22"^^xsd:date ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2008:344/konsolidering/2013-07-02> ;
@@ -66,6 +66,7 @@
     rpubl:andrar "ändr. 4 §" ;
     rpubl:arsutgava "2009" ;
     rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
+    rpubl:ersatter <https://lagen.nu/sfs/2009:1550#P4> ;
     rpubl:forarbete <https://lagen.nu/bet/2009/10:SfU8>,
         <https://lagen.nu/prop/2009/10:31>,
         <https://lagen.nu/rskr/2009/10:133> ;
@@ -82,14 +83,33 @@
     rpubl:andrar "ändr. 4 §; ny 1 a §" ;
     rpubl:arsutgava "2013" ;
     rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
+    rpubl:ersatter <https://lagen.nu/sfs/2013:411#P4> ;
     rpubl:forarbete <https://lagen.nu/bet/2012/13:SoU20>,
         <https://lagen.nu/prop/2012/13:109>,
         <https://lagen.nu/rskr/2012/13:230> ;
     rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
     rpubl:ikrafttradandedatum "2013-07-01"^^xsd:date ;
+    rpubl:inforsI <https://lagen.nu/sfs/2013:411#P1a> ;
     rpubl:lopnummer "411" ;
     rpubl:utfardandedatum "2013-05-30"^^xsd:date ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2013:411> .
+
+<https://lagen.nu/sfs/2013:647> a rpubl:Lag ;
+    dcterms:identifier "SFS 2013:647" ;
+    dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
+    dcterms:title "Lag (2013:647) om ändring i lagen (2008:344) om hälso- och sjukvård åt asylsökande m.fl."@sv ;
+    rpubl:andrar "ändr. 4 §" ;
+    rpubl:arsutgava "2013" ;
+    rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
+    rpubl:ersatter <https://lagen.nu/sfs/2013:647#P4> ;
+    rpubl:forarbete <https://lagen.nu/bet/2012/13:SfU8>,
+        <https://lagen.nu/prop/2012/13:125>,
+        <https://lagen.nu/rskr/2012/13:274> ;
+    rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
+    rpubl:ikrafttradandedatum "2013-08-01"^^xsd:date ;
+    rpubl:lopnummer "647" ;
+    rpubl:utfardandedatum "2013-07-02"^^xsd:date ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2013:647> .
 
 <https://lagen.nu/sfs/2008:344> a rpubl:Lag ;
     dcterms:identifier "SFS 2008:344" ;

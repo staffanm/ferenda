@@ -972,13 +972,13 @@ class SFS(Trips):
 
     def _find_utfardandedatum(self, sfsnr):
         # FIXME: Code to instantiate a SFSTryck object and muck about goes here
-        fake = {'2013:363': date(2013, 5, 23),
+        fake = {'1994:1809':date(1994, 12, 31), # we really don't know
+                '2013:363': date(2013, 5, 23),
                 '2008:344': date(2008, 5, 22),
                 '2009:1550': date(2009, 12, 17),
                 '2013:411': date(2013, 5, 30),
                 '2013:647': date(2013, 7, 2),
-                '2013:647': date(2013, 7, 2),
-                '2010:447': date(2010, 6, 8),
+                '2010:448': date(2010, 6, 8),
                 }
         return fake.get(sfsnr, None)
 

@@ -1448,6 +1448,7 @@ with the *config* object as single parameter.
                     children.append(E.meta(attrs))
 
             return E.head({'about': uri}, *children)
+        # from pudb import set_trace; set_trace()
         bodycontent = doc.body.as_xhtml(doc.uri)
         headcontent = render_head(doc.meta, doc.uri)
 

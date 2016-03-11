@@ -74,7 +74,7 @@
 <https://lagen.nu/sfs/1994:1809/konsolidering/2014:686> a rpubl:KonsolideradGrundforfattning ;
     dcterms:creator <https://lagen.nu/org/2008/forsvarsdepartementet> ;
     dcterms:identifier "SFS 1994:1809 i lydelse enligt SFS 2014:686" ;
-    dcterms:issued "2016-03-10T22:04:04.006345"^^xsd:dateTime ;
+    dcterms:issued "2010-06-08"^^xsd:date ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
     dcterms:title "Lag (1994:1809) om totalförsvarsplikt"@sv ;
     rpubl:konsoliderar <https://lagen.nu/sfs/1994:1809> ;
@@ -82,7 +82,7 @@
         <https://lagen.nu/sfs/2010:448>,
         <https://lagen.nu/sfs/2014:686> ;
     rpubl:utfardandedatum "1994-12-15"^^xsd:date ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1994:1809/konsolidering/2016-03-10t22:04:04.006345> ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1994:1809/konsolidering/2010-06-08> ;
     prov:wasGeneratedBy "lagen.nu.sfs.SFS" .
 
 <https://lagen.nu/sfs/2010:448> a rpubl:Lag ;
@@ -99,6 +99,7 @@
     rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
     rpubl:ikrafttradandedatum "2011-01-01"^^xsd:date ;
     rpubl:lopnummer "448" ;
+    rpubl:utfardandedatum "2010-06-08"^^xsd:date ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2010:448> .
 
 <https://lagen.nu/sfs/1994:1809> a rpubl:Lag ;
@@ -114,6 +115,7 @@
     rpubl:forfattningssamling <https://lagen.nu/dataset/sfs> ;
     rpubl:ikrafttradandedatum "1995-07-01"^^xsd:date ;
     rpubl:lopnummer "1809" ;
+    rpubl:utfardandedatum "1994-12-31"^^xsd:date ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/1994:1809> .
 
 <https://lagen.nu/sfs/1994:1809#K1> a rpubl:Kapitel .

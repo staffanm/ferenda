@@ -21,6 +21,8 @@
 
 <https://lagen.nu/bet/2012/13:JuU22> dcterms:identifier "bet. 2012/13:JuU22" .
 
+<https://lagen.nu/ext/celex/31995L0046> rpubl:celexNummer "31995L0046" .
+
 <https://lagen.nu/prop/2012/13:115> dcterms:identifier "Prop. 2012/13:115" .
 
 <https://lagen.nu/rskr/2012/13:252> dcterms:identifier "rskr. 2012/13:252" .
@@ -42,8 +44,6 @@
     rpubl:utfardandedatum "2013-05-30"^^xsd:date ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/sfs/2013:460/konsolidering/2013-05-30> ;
     prov:wasGeneratedBy "lagen.nu.sfs.SFS" .
-
-<https://lagen.nu/ext/celex/31995L0046> rpubl:celexNummer "31995L0046" .
 
 <https://lagen.nu/sfs/2013:460> a rpubl:Lag ;
     dcterms:identifier "SFS 2013:460" ;

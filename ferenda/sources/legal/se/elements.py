@@ -129,11 +129,12 @@ class Paragraf(CompoundElement, OrdinalElement):
         super(Paragraf, self).__init__(*args, **kwargs)
 
     def as_xhtml(self, uri=None, parent_uri=None):
-        res = super(Paragraf, self).as_xhtml()
+        res = super(Paragraf, self).as_xhtml(uri, parent_uri)
         # NOTE: we insert the paragrafbeteckning within the first
-        # stycke. This makes XSLT rendering easier and is probably not
-        # semantically incorrect.
-        res[0].insert(0, E('span', {'class': 'paragrafbeteckning'}, self.ordinal + " §"))
+        # stycke (res[0] is a dcterms:isPartOf <span>, res[1] is the
+        # first Stycke). This makes XSLT rendering easier and is
+        # probably not semantically incorrect.
+        res[1].insert(0, E('span', {'class': 'paragrafbeteckning'}, self.ordinal + " §"))
         return res
 
 
