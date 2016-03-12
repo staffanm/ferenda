@@ -256,6 +256,8 @@ class XSLTTransform(TransformerEngine):
             return self._transformer(indata, **strparams)
         except etree.XSLTApplyError as e:
             raise errors.TransformError(str(e))
+        # FIXME: This can never be reached, if _transformer() does not
+        # raise an error, the above returns immediately.
         if len(self._transformer.error_log) > 0:
             raise errors.TransformError(str(_transformer.error_log))
 

@@ -44,6 +44,13 @@
 	padding: 0;
 	list-style: none;
     }
+
+    nav[data-toggle='toc'] {
+	width: 23%;
+	/* a little thinner than .col-sm-3, so as to not collide with
+    the left-shifted <span class="platsmarkor> elements in teh main
+    columm */ 
+    } 
 }
 
 

@@ -374,19 +374,34 @@
 
   
   <!-- TABLE OF CONTENTS (TOC) HANDLING -->
+
+  <!--
+  <xsl:template match="xhtml:div[@typeof='rpubl:Kapitel']" mode="toc">
+    <xsl:message>found a chapter</xsl:message>
+    <li class="toc-kapitel"><a href="#{@id}"><xsl:value-of select="xhtml:h1"/></a>
+    <xsl:if test="xhtml:h2|xhtml:h3">
+      <ul>
+	<xsl:apply-templates mode="toc"/>
+      </ul>
+    </xsl:if>
+    </li>
+  </xsl:template>
   
   <xsl:template match="xhtml:h2" mode="toc">
-    <li class="toc-rubrik"><a href="#{@id}"><xsl:value-of select="."/></a>
-    </li>
+    <xsl:message>found a h2</xsl:message>
+    <li class="toc-rubrik"><a href="#{@id}"><xsl:value-of select="."/></a></li>
   </xsl:template>
 
   <xsl:template match="xhtml:h3" mode="toc">
+    <xsl:message>found a h3</xsl:message>
     <li class="toc-underrubrik"><a href="#{@id}"><xsl:value-of select="."/></a></li>
   </xsl:template>
-
+  -->
 
 
   <!-- toc handling (do nothing) -->
-  <xsl:template match="@*|node()" mode="toc"/>
+  <xsl:template match="@*|node()" mode="toc">
+    <xsl:message>mode doc do nothing (<xsl:value-of select="name(.)"/> @about=<xsl:value-of select="@about"/>)</xsl:message>
+  </xsl:template>
 
 </xsl:stylesheet>

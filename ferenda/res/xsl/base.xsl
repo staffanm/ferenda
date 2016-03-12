@@ -48,6 +48,7 @@
 
       <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous"/>
       <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css" integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r" crossorigin="anonymous"/>
+      <link rel="stylesheet" href="https://cdn.rawgit.com/afeld/bootstrap-toc/v0.3.0/dist/bootstrap-toc.min.css"/>      
       <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
       <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
       <!--[if lt IE 9]>
@@ -76,7 +77,7 @@
 
   <xsl:template match="xhtml:body">
     <xsl:variable name="bodyclass"><xsl:call-template name="bodyclass"/></xsl:variable>
-    <body class="{$bodyclass}">
+    <body class="{$bodyclass}" data-spy="scroll" data-target="#toc">
       <nav class="navbar navbar-default">
 	<div class="container-fluid">
 	  <div class="navbar-header">
@@ -100,11 +101,18 @@
 	</div><!-- /.container-fluid -->
       </nav>
       <div class="row">
-	<nav id="toc" class="col-sm-3">
-	  <ul>
-	    <xsl:apply-templates mode="toc"/>
-	  </ul>
-	</nav>
+	<div class="col-sm-3">
+	  <nav id="toc" data-spy="affix" data-toggle="toc">
+	    <ul>
+	      <!-- pre-generated toc is not needed now that the
+	           bootstrap-toc plugin generates them dynamically
+	      -->
+	      <!-- 
+		   <xsl:apply-templates mode="toc"/>
+	      -->
+	    </ul>
+	  </nav>
+	</div>
 	<article class="col-sm-9">
 	  <xsl:call-template name="pagetitle"/>
 	  <xsl:apply-templates/>
@@ -120,6 +128,7 @@
       </div>
       <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js">&#160;</script>
       <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous">&#160;</script>
+      <script src="https://cdn.rawgit.com/afeld/bootstrap-toc/v0.3.0/dist/bootstrap-toc.min.js">&#160;</script>      
       <xsl:copy-of select="$configuration/javascripts/*"/>
     </body>
   </xsl:template>
