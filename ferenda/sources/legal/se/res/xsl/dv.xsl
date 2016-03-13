@@ -43,7 +43,7 @@
     <xsl:variable name="domuri" select="//xhtml:link[@rel='rpubl:referatAvDomstolsavgorande']/@href"/>
     <aside class="metadata">
       <h2>Metadata</h2>
-      <dl>
+      <dl class="dl-horizontal">
 	<dt>Domstol</dt>
 	<dd><xsl:value-of select="//xhtml:link[@rel='dcterms:publisher' and @about=$domuri]/@href"/></dd>
 	<dt>Avgörandedatum</dt>
@@ -79,13 +79,20 @@
       </dl>
     </aside>
 
-    <aside class="annotations rattsfall">
-      <h2>Rättsfall som hänvisar till detta</h2>
-      <xsl:for-each select="$annotations/resource/dcterms:references[@ref=$uri]">
-	<li>Data for <xsl:value-of select="../@uri"/> goes here</li>
-      </xsl:for-each>
-    </aside>
-    
+    <xsl:if test="$annotations/resource/dcterms:references[@ref=$uri]">
+      <aside class="annotations rattsfall">
+	<h2>Rättsfall som hänvisar till detta</h2>
+	<xsl:for-each select="$annotations/resource/dcterms:references[@ref=$uri]">
+	  <li>Data for <xsl:value-of select="../@uri"/> goes here</li>
+	</xsl:for-each>
+      </aside>
+    </xsl:if>
+
+    <!--
+	FIXME: What was the actual point of this (a list of cases that
+	this case references)? Shouldn't such a list be part of the
+	main metadata, like Lagrum?)
+	
     <xsl:variable name="rattsfall" select="$annotations/resource[a/rpubl:Rattsfallsreferat]"/>
     <xsl:if test="$rattsfall">
       <aside class="annotations rattsfall">
@@ -94,10 +101,13 @@
 	  <xsl:with-param name="rattsfall" select="$rattsfall"/>
 	</xsl:call-template>
       </aside>
-    </xsl:if>
+      </xsl:if>
+    -->
   </xsl:template>
   
-  <!-- FIXME: this template is copied from sfs.xsl, and should probably be in a lib that dv.xsl, sfs.xsl and lnkeyword.xsl can share. -->
+  <!-- FIXME: this template is copied from sfs.xsl, and should
+       probably be in a lib that dv.xsl, sfs.xsl and lnkeyword.xsl can
+       share. -->
   <xsl:template name="rattsfall">
     <xsl:param name="rattsfall"/>
       <xsl:for-each select="$rattsfall">
