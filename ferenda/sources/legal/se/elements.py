@@ -240,8 +240,13 @@ class DomElement(CompoundElement):
 
 
 class Delmal(DomElement):
-    prop = ('ordinal', 'dcterms:identifier')
-
+    # FIXME: We must make sure that every Delmal gets its own URI
+    # before we can give them dcterms:identifiers, otherwise they'll
+    # clash with the main dcterms:identifier. Also, a Delmals
+    # identifier should not be "II", it should be "NJA 2014 s. 499
+    # (II)"
+    # prop = ('ordinal', 'dcterms:identifier')
+    pass
 
 class Instans(DomElement):
     prop = ('court', 'dcterms:creator')

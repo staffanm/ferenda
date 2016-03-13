@@ -93,3 +93,18 @@ class LNKeyword(keyword.Keyword):
 
     def tabs(self):
         return [("Begrepp", self.dataset_uri())]
+
+    def frontpage_content(self, primary=False):
+        if not self.config.tabs:
+            self.log.debug("%s: Not doing frontpage content (config has tabs=False)" % self.alias)
+            return
+        x = self.tabs()[0]
+        label = x[0]
+        uri = x[1]
+        body = self.frontpage_content_body()
+        return ("<h2><a href='%(uri)s'>%(label)s</a></h2>"
+                "<p>%(body)s</p>" % locals())
+
+    def frontpage_content_body(self):
+        return "%s begrepp" % len(set([row['uri'] for row in self.faceted_data()]))
+        

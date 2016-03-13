@@ -104,12 +104,15 @@
 	<div class="col-sm-3">
 	  <nav id="toc" data-spy="affix" data-toggle="toc">
 	    <ul>
-	      <!-- pre-generated toc is not needed now that the
-	           bootstrap-toc plugin generates them dynamically
+	      <!--
+		  pre-generated toc is generally not needed now that
+		  the bootstrap-toc plugin generates them
+		  dynamically. However, toc pages still needs
+		  it. Other page types should just skip everything by
+		  an empty <xsl:template match="@*|node()"
+		  mode="toc"/> rule
 	      -->
-	      <!-- 
-		   <xsl:apply-templates mode="toc"/>
-	      -->
+	      <xsl:apply-templates mode="toc"/>
 	    </ul>
 	  </nav>
 	</div>
