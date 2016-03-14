@@ -1355,7 +1355,7 @@ class Generate(RepoTester):
         # assert that no typeof/class attributes from the XHTML has been trasnformed into HTML
         self.assertEqual([], tree.xpath(".//*[contains(text(), 'bibo:chapter')]"))
         self.assertEqual([], tree.xpath(".//*[contains(text(), 'noteHeaderNote')]"))
-        self.assertEqual([], tree.findall(".//span"))
+        self.assertEqual([], tree.findall(".//span[@property]"))
 
     def test_headers(self):
         tree = self._generate_complex()

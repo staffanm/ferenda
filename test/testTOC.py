@@ -169,14 +169,14 @@ class TOC(RepoTester):
         # Various other tests on a.html
         # 2.1 CSS links, relativized correctly?
         css = t.findall("head/link[@rel='stylesheet']")
-        self.assertEqual(len(css),4) # normalize, main, ferenda, and fonts.googleapis.com
+        self.assertEqual(len(css),5) # bootstrap, bootstrap-theme, bootstrap-toc, ferenda and sfs (?!)
         
-        self.assertRegex(css[0].get('href'), '^../../../rsrc/css')
+        self.assertRegex(css[4].get('href'), '^../../../rsrc/css')
         
         # 2.2 JS links, relativized correctly?
-        js = t.findall("head/script")
-        self.assertEqual(len(js),4) # jquery, modernizr, respond and ferenda
-        self.assertRegex(js[0].get('src'), '^../../../rsrc/js')
+        js = t.findall("body/script")
+        self.assertEqual(len(js), 4) # jquery, bootstrap, bootstrap-toc, ferenda
+        self.assertRegex(js[3].get('src'), '^../../../rsrc/js')
         # 2.3 <nav id="toc"> correct (c.f 1.2)
         navlinks = t.findall(".//nav[@id='toc']//li/a")
         self.assertEqual(len(navlinks),9)
@@ -191,12 +191,12 @@ class TOC(RepoTester):
         self.assertEqual(docs[0].text, 'And Then There Were None')
         self.assertEqual(docs[0].attrib['href'], 'http://example.org/books/And_Then_There_Were_None')
         
-        # 2.5 <header><h1><a> correct?
-        header = t.find(".//header/h1/a")
+        # 2.5 site name correct  
+        header = t.find(".//div[@class='navbar-header']/a")
         self.assertEqual(header.text, 'testsite')
        
-        # 2.6 div[@class='main-container']/h1 correct?
-        header = t.find(".//div[@class='main-container']//h1")
+        # 2.6 main article header correct?
+        header = t.find(".//article/h1")
         self.assertEqual(header.text, 'Documents starting with "a"')
 
     def test_generate_page_staticsite(self):
@@ -211,11 +211,11 @@ class TOC(RepoTester):
         self.assertEqual('d.html', navlinks[0].get("href"))
         self.assertEqual('../dcterms_issued/1791.html', navlinks[3].get("href"))
 
-        header = t.find(".//header/h1/a")
+        header = t.find(".//div[@class='navbar-header']/a")
         # from /base/toc/title/a.html -> /index.html = 3 levels up
         self.assertEqual('../../../index.html', header.get("href"))
 
-        headernavlinks = t.findall(".//header/nav/ul/li/a")    
+        headernavlinks = t.findall(".//ul[@class='nav navbar-nav']/li/a")
         self.assertEqual('../index.html', headernavlinks[0].get("href"))
 
         # docs (which in this case use non-base-repo-contained URIs, should be unaffected
@@ -242,7 +242,7 @@ class TOC(RepoTester):
         # (NOTE: the first page in the first pageset (by title/a) isn't linked. The second one (by title/d) is).
         self.assertEqual("http://localhost:8000/dataset/base?dcterms_title=d",
                          tree.find(".//nav[@id='toc']").findall(".//a")[0].get("href"))
-        self.assertEqual("../../rsrc/css/normalize-1.1.3.css",
+        self.assertEqual("https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css",
                          tree.find(".//link").get("href"))
                          
         self.assertEqual('Documents starting with "a"',

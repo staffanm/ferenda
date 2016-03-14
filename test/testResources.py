@@ -47,6 +47,8 @@ class=testManager.staticmockclass2
     def tearDown(self):
         if os.path.exists("ferenda.ini"):
             os.remove("ferenda.ini")
+        if os.path.exists("res"):
+            shutil.rmtree("res")
         shutil.rmtree(self.tempdir)
         
 
@@ -97,15 +99,36 @@ class=testManager.staticmockclass2
                 'img': [],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
         }
-        got = Resources([staticmockclass(),staticmockclass2()],self.tempdir+os.sep+'rsrc',
-                        combineresources=True,
-                        cssfiles=['res/css/normalize-1.1.3.css',
-                                  'res/css/main.css'],
-                        jsfiles=['res/js/jquery-1.10.2.js',
-                                 'res/js/modernizr-2.6.3.js',
-                                 'res/js/respond-1.3.0.js'],
-                        sitename="Blahonga",
-                        sitedescription="A non-default value").make(api=False)
+        testcss = ["css/ferenda.css",
+                   "res/css/fake1.css",
+                   "res/css/fake2.css"]
+        testjs = ["js/ferenda.js",
+                  "res/js/fake1.js",
+                  "res/js/fake2.js"]
+        resources = Resources([staticmockclass(),staticmockclass2()],self.tempdir+os.sep+'rsrc',
+                              combineresources=True,
+                              cssfiles=testcss,
+                              jsfiles=testjs,
+                              sitename="Blahonga",
+                              sitedescription="A non-default value")
+        rl = resources.resourceloader
+        testcssfiles = []
+        testjsfiles = []
+        for cssfile in testcss:
+            try:
+                testcssfiles.append(rl.filename(cssfile))
+            except errors.ResourceNotFound:
+                util.writefile(cssfile, "/* this is a faked css file: %s */" % cssfile*1000)
+                testcssfiles.append(cssfile)
+
+        for jsfile in testjs:
+            try:
+                testjsfiles.append(rl.filename(jsfile))
+            except errors.ResourceNotFound:
+                util.writefile(jsfile, "/* this is a faked js file: %s */" % jsfile*1000)
+                testjsfiles.append(jsfile)
+
+        got = resources.make(api=False)
         self.assertEqual(want,got)
         tree = ET.parse(self.tempdir+'/'+got['xml'][0])
         stylesheets=tree.find("stylesheets").getchildren()
@@ -119,14 +142,10 @@ class=testManager.staticmockclass2
         self.assertTrue(os.path.exists(self.tempdir+'/rsrc/css/combined.css'))
         self.assertTrue(os.path.exists(self.tempdir+'/rsrc/js/combined.js'))
         # check that the combining/minifying indeed saved us some space
-        # physical path for these: relative to the location of ferenda/manager.py.
         self.assertLess(os.path.getsize(self.tempdir+'/rsrc/css/combined.css'),
-                        sum([os.path.getsize(x) for x in ("ferenda/res/css/normalize-1.1.3.css",
-                                                          "ferenda/res/css/main.css")]))
+                        sum([os.path.getsize(x) for x in testcssfiles]))
         self.assertLess(os.path.getsize(self.tempdir+'/rsrc/js/combined.js'),
-                        sum([os.path.getsize(x) for x in ("ferenda/res/js/jquery-1.10.2.js",
-                                                          "ferenda/res/js/modernizr-2.6.3.js",
-                                                          "ferenda/res/js/respond-1.3.0.js")]))
+                        sum([os.path.getsize(x) for x in testjsfiles]))
 
     def test_default_docrepo(self):
         # Test3: No combining, make sure that a non-customized
@@ -140,16 +159,9 @@ class=testManager.staticmockclass2
                         jsfiles=[],
                         imgfiles=[]).make(api=False)
         s = os.sep
-        want = {'css':[s.join(['rsrc', 'css','normalize-1.1.3.css']),
-                       s.join(['rsrc', 'css','main.css']),
-                       s.join(['rsrc', 'css','ferenda.css'])],
-                'img':[s.join(['rsrc', 'img','navmenu-small-black.png']),
-                       s.join(['rsrc', 'img','navmenu.png']),
-                       s.join(['rsrc', 'img','search.png'])],
-                'js':[s.join(['rsrc', 'js','jquery-1.10.2.js']),
-                      s.join(['rsrc', 'js','modernizr-2.6.3.js']),
-                      s.join(['rsrc', 'js','respond-1.3.0.js']),
-                      s.join(['rsrc', 'js','ferenda.js'])],
+        want = {'css':[s.join(['rsrc', 'css','ferenda.css'])],
+                'img':[],
+                'js':[s.join(['rsrc', 'js','ferenda.js'])],
                 'xml':[s.join(['rsrc', 'resources.xml'])]
                       }
         self.assertEqual(want,got)
@@ -193,7 +205,7 @@ class=testManager.staticmockclass2
         want = {'xml':[s.join(['rsrc', 'resources.xml'])]}
         self.assertEqual(want, got)
         tree = ET.parse(self.tempdir+os.sep+got['xml'][0])
-        footerlinks=tree.findall("footerlinks/nav/ul/li")
+        footerlinks=tree.findall("footerlinks/li")
         self.assertTrue(footerlinks)
         self.assertEqual(3,len(footerlinks))
 

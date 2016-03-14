@@ -219,7 +219,7 @@ class=testManager.staticmockclass2
                                 path=outfile)
         self.assertTrue(res)
         tree = ET.parse(outfile)
-        header = tree.find(".//header/h1/a")
+        header = tree.find(".//div[@class='navbar-header']/a")
         self.assertEqual(header.get("href"), 'http://localhost:8000/')
         # FIXME: check that tree contains 2 divs, that they have id
         # staticmock and staticmock2, that the p text is "Handles
@@ -243,10 +243,9 @@ class=testManager.staticmockclass2
         # print(util.readfile(outfile))
         # print("==============================================")
         t = ET.parse(outfile)
-        header = t.find(".//header/h1/a")
+        header = t.find(".//div[@class='navbar-header']/a")
         self.assertEqual(header.get("href"), 'index.html')
-
-        headernavlinks = t.findall(".//header/nav/ul/li/a")
+        headernavlinks = t.findall(".//ul[@class='nav navbar-nav']/li/a")
         self.assertEqual(headernavlinks[0].get("href"), 'staticmock/toc/index.html')
         self.assertEqual(headernavlinks[1].get("href"), 'staticmock2/toc/index.html')
 
@@ -868,19 +867,10 @@ imgfiles = []
                 'json': [s.join(['rsrc','api','context.json']),
                          s.join(['rsrc','api','common.json']),
                          s.join(['rsrc','api','terms.json'])],
-                'img': [s.join(['rsrc', 'img', 'navmenu-small-black.png']),
-                        s.join(['rsrc', 'img', 'navmenu.png']),
-                        s.join(['rsrc', 'img', 'search.png']),
-                        s.join(['rsrc', 'img', 'test.png'])],
-                'css': ['http://fonts.googleapis.com/css?family=Raleway:200,100',
-                        s.join(['rsrc', 'css', 'normalize-1.1.3.css']),
-                        s.join(['rsrc', 'css', 'main.css']),
-                        s.join(['rsrc', 'css', 'ferenda.css']),
+                'img': [s.join(['rsrc', 'img', 'test.png'])],
+                'css': [s.join(['rsrc', 'css', 'ferenda.css']),
                         s.join(['rsrc', 'css', 'test.css'])],
-                'js': [s.join(['rsrc', 'js', 'jquery-1.10.2.js']),
-                       s.join(['rsrc', 'js', 'modernizr-2.6.3.js']),
-                       s.join(['rsrc', 'js', 'respond-1.3.0.js']),
-                       s.join(['rsrc', 'js', 'ferenda.js']),
+                'js': [s.join(['rsrc', 'js', 'ferenda.js']),
                        s.join(['rsrc', 'js', 'test.js'])]}
         self.assertEqual(want, got)
 
