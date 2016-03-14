@@ -147,17 +147,34 @@ Environ: %s
                 [html.H2([elements.Link(r['dcterms_title'], uri=r['uri'])]),
                  r.get('text', '')], **{'class': 'hit'}))
 
-        pages = [
-            html.P(["Results %(firstresult)s-%(lastresult)s of %(totalresults)s" % pager])]
-        for pagenum in range(pager['pagecount']):
+        # Create some HTML code for the pagination. FIXME: This should
+        # really be in search.xsl instead
+        pages = []
+        pagenum = pager['pagenum']
+        startpage = max([0, pager['pagenum'] - 4])
+        endpage = min([pager['pagecount'], pager['pagenum'] + 3])
+        if startpage > 0:
+            querystring['p'] = str(pagenum - 2)
+            url = environ['PATH_INFO'] + "?" + urlencode(querystring)
+            pages.append(html.LI([html.A(["«"], href=url)]))
+
+        for pagenum in range(startpage, endpage):
+            querystring['p'] = str(pagenum + 1)
+            url = environ['PATH_INFO'] + "?" + urlencode(querystring)
+            attrs = {}
             if pagenum + 1 == pager['pagenum']:
-                pages.append(html.Span([str(pagenum + 1)], **{'class': 'page'}))
-            else:
-                querystring['p'] = str(pagenum + 1)
-                url = environ['PATH_INFO'] + "?" + urlencode(querystring)
-                pages.append(html.A([str(pagenum + 1)], **{'class': 'page',
-                                                           'href': url}))
-        doc.body.append(html.Div(pages, **{'class': 'pager'}))
+                attrs['class'] = 'active'
+            pages.append(html.LI([html.A([str(pagenum + 1)], href=url)],
+                                 **attrs))
+
+        if endpage < pager['pagecount']:
+            querystring['p'] = str(pagenum + 2)
+            url = environ['PATH_INFO'] + "?" + urlencode(querystring)
+            pages.append(html.LI([html.A(["»"], href=url)]))
+
+        doc.body.append(html.Div([
+            html.P(["Results %(firstresult)s-%(lastresult)s of %(totalresults)s" % pager]),
+            html.UL(pages, **{'class': 'pagination'})]))
         # Transform that XHTML into HTML5
         conffile = os.sep.join([self.config.documentroot, 'rsrc',
                                 'resources.xml'])
