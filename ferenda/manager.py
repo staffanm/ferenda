@@ -214,7 +214,8 @@ def runserver(repos,
               'indexlocation': indexlocation,
               'legacyapi': legacyapi,
               'repos': repos}
-    httpd = make_server('', port, make_wsgi_app(None, **kwargs))
+    inifile = _find_config_file()
+    httpd = make_server('', port, make_wsgi_app(inifile, **kwargs))
     httpd.serve_forever()
 
 
@@ -238,6 +239,7 @@ def make_wsgi_app(inifile=None, **kwargs):
             inifile), "INI file %s doesn't exist (relative to %s)" % (inifile, os.getcwd())
         config = _load_config(inifile)
         args = _setup_runserver_args(config, inifile)
+        args['inifile'] = inifile
     else:
         args = kwargs  # sanity check: is documentroot, searchendpoint and
         # apiendpoint defined?

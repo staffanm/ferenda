@@ -5,7 +5,7 @@
   <xsl:template name="nav-search-form">
     <form class="navbar-form navbar-right" role="search" action="{$configuration/search/endpoint}">
       <div class="form-group">
-	<input type="text" class="form-control" placeholder="Sök"/>
+	<input type="text" name="q" class="form-control" placeholder="Sök"/>
       </div>
     </form>
   </xsl:template>

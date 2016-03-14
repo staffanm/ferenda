@@ -119,8 +119,8 @@ Environ: %s
         # FIXME: QUERY_STRING should probably be sanitized before calling
         # .query() - but in what way?
         querystring = OrderedDict(parse_qsl(environ['QUERY_STRING']))
-        query = querystring['q']
-        if not isinstance(query, str):  # happens on py26
+        query = querystring.get('q')
+        if isinstance(query, bytes):  # happens on py26
             query = query.decode("utf-8")  # pragma: no cover
         pagenum = int(querystring.get('p', '1'))
         res, pager = idx.query(query, pagenum=pagenum)
@@ -145,7 +145,7 @@ Environ: %s
                 r['dcterms_title'] = r['dcterms_identifier'] + ": " + r['dcterms_title']
             doc.body.append(html.Div(
                 [html.H2([elements.Link(r['dcterms_title'], uri=r['uri'])]),
-                 r['text']], **{'class': 'hit'}))
+                 r.get('text', '')], **{'class': 'hit'}))
 
         pages = [
             html.P(["Results %(firstresult)s-%(lastresult)s of %(totalresults)s" % pager])]
@@ -166,8 +166,12 @@ Environ: %s
                                   config=conffile)
         # '/mysearch/' = depth 1
         depth = len(self.config.searchendpoint.split("/")) - 2
-        repo = DocumentRepository()
-        tree = transformer.transform(repo.render_xhtml_tree(doc), depth)
+        repo = DocumentRepository(url=self.config.url)
+        # we must take develurl into account
+        if 'develurl' in self.config:
+            urltransform = repo.get_url_transform_func(develurl=self.config.develurl)
+
+        tree = transformer.transform(repo.render_xhtml_tree(doc), depth, uritransform=urltransform)
         data = transformer.t.html5_doctype_workaround(etree.tostring(tree))
         start_response(self._str("200 OK"), [
             (self._str("Content-Type"), self._str("text/html; charset=utf-8")),
