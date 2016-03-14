@@ -835,8 +835,12 @@ class ElasticSearchIndex(RemoteIndex):
             if 'highlight' in hit:
                 # wrap highlighted field in P, convert to
                 # elements. 
-                hltext = " ... ".join([x.strip() for x in hit['highlight']['_all']])
-                soup = BeautifulSoup("<p>%s</p>" % re.sub("\s+", " ", hltext), "lxml")
+                hltext = re.sub("\s+", " ", " ... ".join([x.strip() for x in hit['highlight']['_all']]))
+                # FIXME: BeautifulSoup/lxml returns empty soup if
+                # first char is '§' or some other non-ascii char (like
+                # a smart quote). Padding with a space makes problem
+                # disappear, but need to find root cause.
+                soup = BeautifulSoup("<p> %s</p>" % hltext, "lxml")
                 h['text'] = html.elements_from_soup(soup.html.body.p)
             res.append(h)
         pager = {'pagenum': pagenum,
