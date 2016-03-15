@@ -134,6 +134,7 @@ class LNMediaWiki(wiki.MediaWiki):
         newbody = etree.Element("body")
 
         curruri = uri
+        self.parser._currenturl = curruri
         currdiv = etree.SubElement(newbody, "div")
         currdiv.set("about", curruri)
         currdiv.set("property", "dcterms:description")
@@ -151,7 +152,18 @@ class LNMediaWiki(wiki.MediaWiki):
                         txt = child.text.decode("utf-8")
                     else:
                         txt = child.text
-                    self.parser._currenturl = curruri
+                    # we probably SHOULDN'T keep track of the current
+                    # subdocument URI. Instead, demand that all
+                    # references are document-global (ie "4 kap. 2 §",
+                    # not just "2 §", even though we might have
+                    # processed "4 kap." earlier). This ensures that
+                    # we don't have to create (possibly empty)
+                    # comments for chapters, and frees us of keeping
+                    # track whether a statute has "real" chapters or
+                    # if the chapters are just "dividers" (like for
+                    # SFS 1915:218, 1960:729 et al)
+                    # 
+                    # self.parser._currenturl = curruri
                     nodes = self.parser.parse_string(txt, None)
                     curruri = nodes[0].uri
                 # body.remove(child)
