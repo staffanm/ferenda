@@ -972,7 +972,10 @@ class SFS(Trips):
 
     def _find_utfardandedatum(self, sfsnr):
         # FIXME: Code to instantiate a SFSTryck object and muck about goes here
-        fake = {'1994:1809':date(1994, 12, 31), # we really don't know
+        fake = {'1915:218': date(1915, 12, 31),  # we really don't know
+                '1987:329': date(1987, 12, 31),  #        -""-
+                '1994:1513': date(1994, 12, 31), #        -""-
+                '1994:1809':date(1994, 12, 31),  #        -""-
                 '2013:363': date(2013, 5, 23),
                 '2008:344': date(2008, 5, 22),
                 '2009:1550': date(2009, 12, 17),
@@ -1240,7 +1243,7 @@ class SFS(Trips):
         else:
             self.skipfragments = [('rinfoex:avdelningnummer',
                                    'rpubl:kapitelnummer')]
-        return False  # run only on root element
+        return None  # run only on root element
 
     def get_parser(self, basefile, sanitized):
         # this should work something like offtryck_parser
