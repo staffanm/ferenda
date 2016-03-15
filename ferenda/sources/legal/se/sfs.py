@@ -618,6 +618,11 @@ class SFS(Trips):
         return d
 
     def extract_metadata_register(self, soup, basefile):
+        # any change metadata (found below) should result in triples
+        # like <.../1977:672> rpubl:ersatter <.../1915:218#P27>
+        # ie. the object should be a URI based on the base act, not
+        # the change act itself
+        self.lagrum_parser._currenturl = self.canonical_uri(basefile)
         d = {}
         content = soup.find('div', 'search-results-content')
         innerboxes = content.findAll('div', 'result-inner-box')
@@ -716,14 +721,11 @@ class SFS(Trips):
                                 "%s: Ok\xe4nd omfattningstyp %r" %
                                 (basefile, changecat))
                             pred = None
-                        old_currenturl = self.lagrum_parser._currenturl
-                        self.lagrum_parser._currenturl = docuri
                         for node in self.lagrum_parser.parse_string(changecat,
                                                                     pred):
                             if hasattr(node, 'predicate'):
                                 qname = g.qname(node.predicate)
                                 d[docuri][qname] = node.uri
-                        self.lagrum_parser._currenturl = old_currenturl
                     # Secondly, preserve the entire text
                     d[docuri]["rpubl:andrar"] = val
                 elif key == 'F\xf6rarbeten':
@@ -1424,19 +1426,14 @@ class SFS(Trips):
             if not lagrum in stuff:
                 stuff[lagrum] = {}
             stuff[lagrum]['desc'] = row['desc']
-
-        # pprint(wikidesc)
         # (4. eurlex.nu data (mapping CELEX ids to titles))
         # (5. Propositionstitlar)
         # 6. change entries for each section
-        # NOTE: The SFS RDF data does not yet contain change entries, this query
-        # always returns 0 rows
         changes = self.time_store_select(store,
                                          "sparql/sfs_changes.rq",
                                          basefile,
-                                         sfsdataset,
+                                         None,
                                          "change annotations")
-
         for row in changes:
             lagrum = row['lagrum']
             if not lagrum in stuff:

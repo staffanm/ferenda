@@ -3,5 +3,5 @@ PREFIX dct:<http://purl.org/dc/terms/>
 SELECT ?lagrum ?desc
 WHERE {
    ?lagrum dct:description ?desc .
-   ?lagrum dct:isPartOf* <%(uri)s>
+    FILTER(STRSTARTS(STR(?lagrum), "%(uri)s"))
 }
