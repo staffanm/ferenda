@@ -135,7 +135,7 @@ class Trips(SwedishLegalSource):
         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
         return a
 
-    def _extract_plaintext(self, basefile, attachment=None):
+    def _extract_text(self, basefile, attachment=None):
         intermediate_path = self.store.path(basefile, 'intermediate', '.txt')
         if not attachment and self.store.storage_policy == "dir":
             attachment = "index.html"

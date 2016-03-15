@@ -81,7 +81,7 @@ class DirTrips(Trips):
 
 
     def downloaded_to_intermediate(self, basefile):
-        return self._extract_plaintext(basefile)
+        return self._extract_text(basefile)
 
     def extract_head(self, fp, basefile):
         textheader = fp.read(2048)

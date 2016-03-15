@@ -570,7 +570,7 @@ class SFS(Trips):
                     self.log.debug('%s: Expired' % basefile)
                     raise UpphavdForfattning("%s is an expired SFS" % basefile,
                                              dummyfile=self.store.parsed_path(basefile))
-        return self._extract_plaintext(basefile)
+        return self._extract_text(basefile)
 
     def patch_if_needed(self, fp, basefile):
         fp = super(SFS, self).patch_if_needed(fp, basefile)

@@ -387,14 +387,14 @@ class PropTrips(Trips, FixedLayoutSource):
     def downloaded_to_intermediate(self, basefile):
         downloaded_path = self.store.downloaded_path(basefile)
         if downloaded_path.endswith(".html"):
-            return self._extract_plaintext(basefile)
+            return self._extract_text(basefile)
         else:
             return super(PropTrips, self).downloaded_to_intermediate(basefile)
 
     def extract_head(self, fp, basefile):
         # get metadata from plaintext html even if we have doc/pdf,
         # since plaintext is easiest to extract basic metadata from
-        txtfp = self._extract_plaintext(basefile)
+        txtfp = self._extract_text(basefile)
         txt = txtfp.read(1000).decode(self.source_encoding)
         txtfp.close()
         return txt.split("-"*64)[0]
