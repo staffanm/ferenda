@@ -50,7 +50,25 @@
 	/* a little thinner than .col-sm-3, so as to not collide with
     the left-shifted <span class="platsmarkor> elements in teh main
     columm */ 
-    } 
+    }
+    body.forarbete section {
+	border-left: solid 1px black;
+	border-right: solid 1px black;
+    }
+    body.forarbete div.sida {
+	margin-left: -16px;
+	margin-right: -16px;
+	border-top: solid 1px black;
+	border-bottom: solid 1px black;
+	border-left: none;
+	border-right: none;
+	background-color: white;
+    }
+    body.forarbete div.sida p {
+	margin: 0;
+	padding-top: 12pt;
+	text-align: right;
+    }
 }
 
 

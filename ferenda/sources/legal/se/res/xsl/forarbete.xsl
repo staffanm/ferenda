@@ -24,21 +24,26 @@ It's a generic template for any kind of content
   <xsl:template name="metarobots"/>
   <xsl:template name="linkalternate"/>
   <xsl:template name="headmetadata"/>
-  <xsl:template name="bodyclass">generic</xsl:template>
+  <xsl:template name="bodyclass">forarbete</xsl:template>
   <xsl:template name="pagetitle">
-    <div class="section-wrapper toplevel">
-      <section>
-	<h1><xsl:value-of select="../xhtml:head/xhtml:meta[@property='dcterms:identifier']/@content"/></h1>
-	<h2><xsl:value-of select="../xhtml:head/xhtml:title"/></h2>
+    <div class="row toplevel">
+      <section class="col-sm-8">
+	<p style="font-size: 24pt;"><xsl:value-of select="../xhtml:head/xhtml:meta[@property='dcterms:identifier']/@content"/></p>
+	<p style="font-size: 20pt;"><xsl:value-of select="../xhtml:head/xhtml:title"/></p>
       </section>
-      <aside class="source">
+      <aside class="source col-sm-4">
 	<xsl:variable name="docuri" select="@about"/>
 	<xsl:variable name="derivedfrom" select="$annotations/resource[@uri=$docuri]/prov:wasDerivedFrom/@ref"/>
 	Originaldokument: <a href="{$derivedfrom}"><xsl:value-of select="$annotations/resource[@uri=$derivedfrom]/rdfs:label"/></a>, <a href="{$annotations/resource[@uri=$docuri]/prov:alternateOf/@ref}">Källa</a>
       </aside>
     </div>
   </xsl:template>
-      
+
+  <!-- these headings shouldn't be expressed with <h*> tags, but
+       rather with RDFa attribs in <div class="section"> element. Just
+       ignore them for now -->
+  <xsl:template match="xhtml:h1|xhtml:h2"/>
+  
   <xsl:template match="xhtml:a">
     <xsl:call-template name="link"/>
   </xsl:template>
@@ -46,20 +51,20 @@ It's a generic template for any kind of content
   <xsl:template name="aside-annotations">
     <xsl:param name="uri"/>
     <xsl:if test="$annotations/resource[@uri=$uri]">
-      <aside class="annotations">
+      <div class="col-sm-4">
 	<h2>Annotations for <xsl:value-of select="substring-after($uri,'http://localhost:8000/res/')"/></h2>
 	<xsl:for-each select="$annotations/resource[@uri=$uri]/dcterms:isReferencedBy">
 	  <xsl:variable name="referencing" select="@ref"/>
 	  <a href="{@ref}"><xsl:value-of select="$annotations/resource[@uri=$referencing]/dcterms:identifier"/></a>
 	</xsl:for-each>
-      </aside>
+      </div>
     </xsl:if>
   </xsl:template>
 
 
   <xsl:template match="xhtml:body/xhtml:div">
-    <div class="section-wrapper toplevel">
-      <section id="{substring-after(@about,'#')}">
+    <div class="row toplevel">
+      <section id="{substring-after(@about,'#')}" class="col-sm-8">
 	<h2><xsl:value-of select="@content"/></h2>
 	<xsl:apply-templates select="*[not(xhtml:div[@about])]"/>
       </section>
@@ -77,8 +82,8 @@ It's a generic template for any kind of content
   <!-- everything that has an @about attribute, i.e. _is_ something
        (with a URI) gets a <section> with an <aside> for inbound links etc -->
   <xsl:template match="xhtml:div[@about]">
-    <div class="section-wrapper" about="{@about}"><!-- needed? -->
-      <section id="{substring-after(@about,'#')}">
+    <div class="row" about="{@about}"><!-- needed? -->
+      <section id="{substring-after(@about,'#')}" class="col-sm-8">
 	<xsl:variable name="sectionheading"><xsl:if test="xhtml:span/@content"><xsl:value-of select="xhtml:span/@content"/>. </xsl:if><xsl:value-of select="@content"/></xsl:variable>
 	<xsl:if test="count(ancestor::*) = 2">
 	    <h2><xsl:value-of select="$sectionheading"/></h2>
@@ -109,18 +114,21 @@ It's a generic template for any kind of content
   <xsl:template match="xhtml:span[@property and @content and not(text())]"/>
 
   
+  <!--
   <xsl:template match="xhtml:div[@about]" mode="toc">
     <li><a href="#{substring-after(@about,'#')}"><xsl:if test="xhtml:span/@content"><xsl:value-of select="xhtml:span/@content"/>. </xsl:if><xsl:value-of select="@content"/></a><xsl:if test="xhtml:div[@about]">
     <ul><xsl:apply-templates mode="toc"/></ul>
     </xsl:if></li>
   </xsl:template>
-
+  -->
+  
+  <xsl:template match="xhtml:div[@about]" mode="toc"/>
 
   <xsl:template match="xhtml:span[@class='sidbrytning']">
     <xsl:element name="div">
       <xsl:attribute name="id"><xsl:value-of select="@id"/></xsl:attribute>
-      <p class="sidbrytning" style="border-top: solid 1px black; margin-right: -100px; text-align: right;"><i>Sida
-      <xsl:value-of select="substring(@id,4)"/></i></p>
+      <xsl:attribute name="class">sida</xsl:attribute>
+      <p class="sidbrytning"><i>Sida <xsl:value-of select="substring(@id,4)"/></i></p>
     </xsl:element>
   </xsl:template>
 
