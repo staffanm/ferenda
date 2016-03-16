@@ -174,7 +174,8 @@ Environ: %s
 
         doc.body.append(html.Div([
             html.P(["Results %(firstresult)s-%(lastresult)s of %(totalresults)s" % pager]),
-            html.UL(pages, **{'class': 'pagination'})]))
+            html.UL(pages, **{'class': 'pagination'})],
+                                 **{'class':'pager'}))
         # Transform that XHTML into HTML5
         conffile = os.sep.join([self.config.documentroot, 'rsrc',
                                 'resources.xml'])
@@ -185,10 +186,12 @@ Environ: %s
         depth = len(self.config.searchendpoint.split("/")) - 2
         repo = DocumentRepository(url=self.config.url)
         # we must take develurl into account
+        urltransform = None
         if 'develurl' in self.config:
-            urltransform = repo.get_url_transform_func(develurl=self.config.develurl)
-
-        tree = transformer.transform(repo.render_xhtml_tree(doc), depth, uritransform=urltransform)
+            urltransform = repo.get_url_transform_func(
+                develurl=self.config.develurl)
+        tree = transformer.transform(repo.render_xhtml_tree(doc), depth,
+                                     uritransform=urltransform)
         data = transformer.t.html5_doctype_workaround(etree.tostring(tree))
         start_response(self._str("200 OK"), [
             (self._str("Content-Type"), self._str("text/html; charset=utf-8")),

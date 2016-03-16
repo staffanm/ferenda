@@ -617,7 +617,7 @@ class Search(WSGI):
         self.env['QUERY_STRING'] = "q=subsection"
         res = ([{'dcterms_title': 'Result #1',
                  'uri': 'http://example.org',
-                 'text': ['Text that contains the subsection term']}],
+                 'text': 'Text that contains the subsection term'}],
                {'pagenum': 1,
                 'pagecount': 1,
                 'firstresult': 1,
@@ -730,6 +730,9 @@ class Search(WSGI):
                             namespace_aware=False)
 
     def test_paged(self):
+        # FIXME: This should check overflow, ie when results are so
+        # many that the pager cannot show all pages and uses »
+        # characters.
         def mkres(page=1, pagesize=10, total=25):
             hits = []
             for i in range((page-1)*pagesize, min(page*pagesize, total)):
@@ -743,8 +746,7 @@ class Search(WSGI):
                      'firstresult': (page - 1) * pagesize + 1,
                      'lastresult': (page - 1) * pagesize + len(hits),
                      'totalresults': total})
-                
-            
+
         self.env['QUERY_STRING'] = "q=needle"
         res = mkres()
         
@@ -759,21 +761,24 @@ class Search(WSGI):
         t = etree.fromstring(content)
         docs = t.findall(".//section[@class='hit']")
         self.assertEqual(10, len(docs)) # default page size (too small?)
-        pager = t.find(".//div[@class='pager']")
-        
         # assert that pager looks smth like this:
         # <div class="pager">
         #   <p class="label">Results 1-10 of 25</p>
-        #   <span class="page">1</span>
-        #   <a href="/mysearch/?q=needle&p=2" class="page">2</a>
-        #   <a href="/mysearch/?q=needle&p=3" class="page">3</a>
+        #   <ul class="pagination">
+        #     <li class="active"><a href="/mysearch/?q=needle&p=1">1</a>
+        #     <li><a href="/mysearch/?q=needle&p=2">2</a>
+        #     <li><a href="/mysearch/?q=needle&p=3">2</a>
+        #   </ul>
         # </div>
-        self.assertEqual(4,len(pager))
-        self.assertEqual('p',pager[0].tag)
-        self.assertEqual('Results 1-10 of 25',pager[0].text)
-        self.assertEqual('span',pager[1].tag)
-        self.assertEqual('a',pager[2].tag)
-        self.assertEqual('/mysearch/?q=needle&p=2',pager[2].get('href'))
+        pager = t.find(".//div[@class='pager']")
+        pagination = pager.find("ul[@class='pagination']")
+        self.assertEqual('p', pager[0].tag)
+        self.assertEqual('Results 1-10 of 25', pager[0].text)
+        self.assertEqual(3, len(pagination))
+        self.assertEqual('li', pagination[0].tag)
+        self.assertEqual('a', pagination[1][0].tag)
+        self.assertEqual('/mysearch/?q=needle&p=2',
+                         pagination[1][0].get('href'))
 
         self.env['QUERY_STRING'] = "q=needle&p=2"
         res = mkres(page=2)
@@ -782,11 +787,12 @@ class Search(WSGI):
             status, headers, content = self.call_wsgi(self.env)
         t = etree.fromstring(content)
         docs = t.findall(".//section[@class='hit']")
-        self.assertEqual(10, len(docs)) 
+        self.assertEqual(10, len(docs))
         pager = t.find(".//div[@class='pager']")
-        self.assertEqual(4,len(pager))
+        pagination = pager.find("ul[@class='pagination']")
         self.assertEqual('Results 11-20 of 25',pager[0].text)
-        self.assertEqual('/mysearch/?q=needle&p=1',pager[1].get('href'))
+        self.assertEqual(3,len(pagination))
+        self.assertEqual('/mysearch/?q=needle&p=1',pagination[0][0].get('href'))
 
         self.env['QUERY_STRING'] = "q=needle&p=3"
         res = mkres(page=3)
@@ -795,8 +801,9 @@ class Search(WSGI):
             status, headers, content = self.call_wsgi(self.env)
         t = etree.fromstring(content)
         docs = t.findall(".//section[@class='hit']")
-        self.assertEqual(5, len(docs)) # only 5 remaining docs
+        self.assertEqual(5, len(docs))  # only 5 remaining docs
         pager = t.find(".//div[@class='pager']")
-        self.assertEqual(4,len(pager))
-        self.assertEqual('Results 21-25 of 25',pager[0].text)
+        pagination = pager.find("ul[@class='pagination']")
+        self.assertEqual(3, len(pagination))
+        self.assertEqual('Results 21-25 of 25', pager[0].text)
 

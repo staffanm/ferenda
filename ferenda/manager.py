@@ -214,7 +214,10 @@ def runserver(repos,
               'indexlocation': indexlocation,
               'legacyapi': legacyapi,
               'repos': repos}
-    inifile = _find_config_file()
+    try:
+        inifile = _find_config_file()
+    except errors.ConfigurationError:
+        inifile = None
     httpd = make_server('', port, make_wsgi_app(inifile, **kwargs))
     httpd.serve_forever()
 
