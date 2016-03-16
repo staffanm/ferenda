@@ -239,6 +239,7 @@ class SOU(CompositeRepository):
     subrepos = (SOURegeringen, SOUKB)
     urispace_segment = "utr/sou"
     documentstore_class = SOUStore
+    xslt_template = "xsl/forarbete.xsl"
 
     # NB: The same logic as in
     # ferenda.sources.legal.se.{Regeringen,Riksdagen}.metadata_from_basefile
