@@ -489,7 +489,12 @@ class SFS(Trips):
             # the intermediate file at ready
             # FIXME: this is broken
             fp = self.downloaded_to_intermediate(basefile)
-            t = TextReader(string=fp.read(2048).decode(self.source_encoding))
+            textheader = fp.read(2048)
+            # see comments in DirTrips.extract_head
+            if textheader[-1] == ord(bytes(b'\xc3')):
+                textheader = textheader[:-1]
+
+            t = TextReader(string=textheader.decode(self.source_encoding))
             fp.close()
             uppdaterad_tom = self._find_uppdaterad_tom(basefile, reader=t)
             doc.uri = self.canonical_uri(basefile, uppdaterad_tom)
@@ -598,6 +603,8 @@ class SFS(Trips):
         if notfound:
             raise InteExisterandeSFS(str(notfound))
         textheader = fp.read(2048)
+        if textheader[-1] == ord(bytes(b'\xc3')):
+            textheader = textheader[:-1]
         if not isinstance(textheader, str):
             # Depending on whether the fp is opened through standard
             # open() or bz2.BZ2File() in self.parse_open(), it might
@@ -1451,7 +1458,6 @@ class SFS(Trips):
         
         start = time()
         # compatibility hack to enable lxml to process qnames for namespaces
-
         def ns(string):
             if ":" in string:
                 prefix, tag = string.split(":", 1)
@@ -1484,7 +1490,10 @@ class SFS(Trips):
                         (uri, fragment) = (inbound[i]['uri'], None)
 
                     # 1) if the baseuri differs from the previous one,
-                    # create a new dcterms:references node
+                    # create a new dcterms:references node. FIXME:
+                    # shouldn't we use dcterms:isReferencedBy (or does
+                    # that not exist? well rpubl:isLagrumFor doesn't
+                    # either...)
                     if uri != prev_uri:
                         references_node = etree.Element(ns("dcterms:references"))
                         # 1.1) if the baseuri is the same as the uri

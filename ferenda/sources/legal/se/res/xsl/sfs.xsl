@@ -6,6 +6,7 @@
 		xmlns:dcterms="http://purl.org/dc/terms/"
 		xmlns:rpubl="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
 		xmlns:rinfoex="http://lagen.nu/terms#"
+		xmlns:ext="http://exslt.org/common"
 		exclude-result-prefixes="xhtml rdf rpubl">
 
   <xsl:import href="uri.xsl"/>
@@ -34,11 +35,11 @@
   <xsl:variable name="sfsannotations" select="document($annotationfile)/rdf:RDF"/>
 
   <xsl:template name="pagetitle">
-    <xsl:message>pagetitle <xsl:value-of select="$documenturi"/></xsl:message>
+    <xsl:message>pagetitle: documenturi is <xsl:value-of select="$documenturi"/></xsl:message>
     <xsl:variable name="rattsfall" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/rpubl:isLagrumFor/rdf:Description"/>
     <xsl:variable name="kommentar" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/dcterms:description/xhtml:div/*"/>
-    <div class="section-wrapper toplevel">
-      <section id="top">
+    <div class="row">
+      <section id="top" class="col-sm-8">
 	<h1><xsl:value-of select="../xhtml:head/xhtml:title"/></h1>
 	<xsl:call-template name="docmetadata"/>
 	<xsl:if test="../../xhtml:head/xhtml:meta[@rel='rinfoex:upphavdAv']">
@@ -59,19 +60,29 @@
 	  </div>
 	</xsl:if>
       </section>
-      <xsl:if test="$kommentar">
-	<aside class="annotations kommentarer">
-	  <h2>Kommentar<a style="display:inline" title="Var kommer  de här kommentarerna från? Läs mer..." href="/om/ansvarsfriskrivning.html"><span class="ui-icon ui-icon-info" style="right: 0.5em; left: auto;"></span></a></h2>
-	  <xsl:apply-templates select="$kommentar"/>
-	</aside>
-      </xsl:if>
-      <xsl:if test="$rattsfall">
-	<aside class="annotations rattsfall">
-	  <h2>Rättsfall (<xsl:value-of select="count($rattsfall)"/>)</h2>
-	  <xsl:call-template name="rattsfall">
-	    <xsl:with-param name="rattsfall" select="$rattsfall"/>
-	  </xsl:call-template>
-	</aside>
+      <xsl:if test="$kommentar or $rattsfall">
+	<xsl:variable name="expanded" select="'true'"/>
+	<div class="panel-group col-sm-4" role="tablist" id="panel-top" aria-multiselectable="true">
+	  <xsl:if test="$kommentar">
+	    <xsl:call-template name="aside-annotations-panel">
+	      <xsl:with-param name="title">Kommentar</xsl:with-param>
+	      <xsl:with-param name="badgecount"/>
+	      <xsl:with-param name="nodeset" select="$kommentar"/>
+	      <xsl:with-param name="panelid">top</xsl:with-param>
+	      <xsl:with-param name="paneltype">k</xsl:with-param>
+	      <xsl:with-param name="expanded" select="$expanded"/>
+	    </xsl:call-template>
+	  </xsl:if>
+	  <xsl:if test="$rattsfall">
+	    <xsl:call-template name="aside-annotations-panel">
+	      <xsl:with-param name="title">Rättsfall</xsl:with-param>
+	      <xsl:with-param name="badgecount" select="count($rattsfall)"/>
+	      <xsl:with-param name="nodeset" select="$rattsfall"/>
+	      <xsl:with-param name="panelid">top</xsl:with-param>
+	      <xsl:with-param name="paneltype">r</xsl:with-param>
+	    </xsl:call-template>
+	  </xsl:if>
+	</div>
       </xsl:if>
     </div>
   </xsl:template>
@@ -104,8 +115,8 @@
   </xsl:template>
 
   <xsl:template match="xhtml:div">
-    <tr>
-      <td>
+    <div class="row">
+      <div>
 	<xsl:if test="@id">
 	  <xsl:attribute name="id"><xsl:value-of select="@id"/></xsl:attribute>
 	  <xsl:attribute name="about"><xsl:value-of select="//html/@about"/>#<xsl:value-of select="@id"/></xsl:attribute>
@@ -114,15 +125,14 @@
 	  <xsl:attribute name="class"><xsl:value-of select="@class"/></xsl:attribute>
 	</xsl:if>
 	<xsl:apply-templates/>
-      </td>
-      <td></td>
-    </tr>
+      </div>
+    </div>
   </xsl:template>
 
  
   <xsl:template match="xhtml:div[@typeof='rpubl:Paragraf']">
-    <div class="section-wrapper" about="{//html/@about}#{@id}">
-      <section id="{@id}">
+    <div class="row" about="{//html/@about}#{@id}">
+      <section id="{@id}" class="col-sm-8">
 	<xsl:apply-templates mode="in-paragraf"/>
       </section>
       <xsl:call-template name="aside-annotations">
@@ -140,59 +150,106 @@
     <xsl:variable name="inford" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rpubl:isEnactedBy"/>
     <xsl:variable name="andrad" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rpubl:isChangedBy"/>
     <xsl:variable name="upphavd" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rpubl:isRemovedBy"/>
-
-    <xsl:if test="$kommentar">
-      <aside class="annotations kommentarer">
-	<h2>Kommentar</h2>
-	<xsl:apply-templates select="$kommentar"/>
-      </aside>
-    </xsl:if>
-
-    <xsl:if test="$rattsfall">
-      <aside class="annotations rattsfall">
-	<h2>Rättsfall (<xsl:value-of select="count($rattsfall)"/>)</h2>
-	<xsl:call-template name="rattsfall">
-	  <xsl:with-param name="rattsfall" select="$rattsfall"/>
-	</xsl:call-template>
-      </aside>
-    </xsl:if>
-
-    <xsl:if test="$inbound">
-      <aside class="annotations lagrumshanvisningar">
-	<h2>Lagrumshänvisningar hit (<xsl:value-of select="count($inbound/rdf:Description)"/>)</h2>
-	<!-- call the template -->
-	<xsl:call-template name="inbound">
-	  <xsl:with-param name="inbound" select="$inbound"/>
-	</xsl:call-template>
-      </aside>
-    </xsl:if>
-
-    <xsl:if test="$inford or $andrad or $upphavd">
-      <aside class="annotations andringar">
-	<h2>Ändringar/Förarbeten (<xsl:value-of select="count($inford)+count($andrad)+count($upphavd)"/>)</h2>
-	<xsl:call-template name="andringsnoteringar">
-	  <xsl:with-param name="typ" select="'Införd'"/>
-	  <xsl:with-param name="andringar" select="$inford"/>
-	</xsl:call-template>
-	<xsl:call-template name="andringsnoteringar">
-	  <xsl:with-param name="typ" select="'Ändrad'"/>
-	  <xsl:with-param name="andringar" select="$andrad"/>
-	</xsl:call-template>
-	<xsl:call-template name="andringsnoteringar">
-	  <xsl:with-param name="typ" select="'Upphävd'"/>
-	  <xsl:with-param name="andringar" select="$upphavd"/>
-	</xsl:call-template>
-      </aside>
+    <xsl:variable name="panelid" select="substring-after($uri, '#')"/>
+    <xsl:variable name="expanded" select="'true'"/>
+    <xsl:if test="$kommentar or $rattsfall or $inbound or $inford or $andrad or $upphavd">
+      <div class="panel-group col-sm-4" role="tablist" id="panel-{$panelid}" aria-multiselectable="true">
+	<xsl:if test="$kommentar">
+	  <xsl:call-template name="aside-annotations-panel">
+	    <xsl:with-param name="title">Kommentar</xsl:with-param>
+	    <xsl:with-param name="badgecount"/>
+	    <xsl:with-param name="nodeset" select="$kommentar"/>
+	    <xsl:with-param name="panelid" select="$panelid"/>
+	    <xsl:with-param name="paneltype">k</xsl:with-param>
+	    <xsl:with-param name="expanded" select="$expanded"/>
+	  </xsl:call-template>
+	</xsl:if>
+	<xsl:if test="$rattsfall">
+	  <xsl:call-template name="aside-annotations-panel">
+	    <xsl:with-param name="title">Rättsfall</xsl:with-param>
+	    <xsl:with-param name="badgecount" select="count($rattsfall)"/>
+	    <xsl:with-param name="nodeset" select="$rattsfall"/>
+	    <xsl:with-param name="panelid" select="$panelid"/>
+	    <xsl:with-param name="paneltype">r</xsl:with-param>
+	  </xsl:call-template>
+	</xsl:if>
+	<xsl:if test="$inbound">
+	  <xsl:call-template name="aside-annotations-panel">
+	    <xsl:with-param name="title">Lagrumshänvisningar hit</xsl:with-param>
+	    <xsl:with-param name="badgecount" select="count($inbound/rdf:Description)"/>
+	    <xsl:with-param name="nodeset" select="$inbound"/>
+	    <xsl:with-param name="panelid" select="$panelid"/>
+	    <xsl:with-param name="paneltype">l</xsl:with-param>
+	  </xsl:call-template>
+	</xsl:if>
+	<xsl:if test="$inford or $andrad or $upphavd">
+	  <xsl:variable name="andringar">
+	      <xsl:call-template name="andringsnoteringar">
+		<xsl:with-param name="typ" select="'Införd'"/>
+		<xsl:with-param name="andringar" select="$inford"/>
+	      </xsl:call-template>
+	      <xsl:call-template name="andringsnoteringar">
+		<xsl:with-param name="typ" select="'Ändrad'"/>
+		<xsl:with-param name="andringar" select="$andrad"/>
+	      </xsl:call-template>
+	      <xsl:call-template name="andringsnoteringar">
+		<xsl:with-param name="typ" select="'Upphävd'"/>
+		<xsl:with-param name="andringar" select="$upphavd"/>
+	      </xsl:call-template>
+	  </xsl:variable>
+	  <xsl:call-template name="aside-annotations-panel">
+	    <xsl:with-param name="title">Lagrumshänvisningar hit</xsl:with-param>
+	    <xsl:with-param name="badgecount" select="count($inbound/rdf:Description)"/>
+	    <xsl:with-param name="panelid" select="$panelid"/>
+	    <xsl:with-param name="paneltype">a</xsl:with-param>
+	    <xsl:with-param name="nodeset" select="ext:node-set($andringar)"/>
+	  </xsl:call-template>
+	</xsl:if>
+      </div>
     </xsl:if>
   </xsl:template>
 
+  <xsl:template name="aside-annotations-panel">
+    <xsl:param name="title"/>
+    <xsl:param name="badgecount"/>
+    <xsl:param name="nodeset"/>
+    <xsl:param name="paneltype"/>
+    <xsl:param name="panelid"/>
+    <xsl:param name="expanded" select="'false'"/>
+    <xsl:variable name="expanded-class"><xsl:if test="$expanded = 'true'">in</xsl:if></xsl:variable>
+    <xsl:message><xsl:value-of select="$paneltype"/>-<xsl:value-of select="$panelid"/>: expanded-class='<xsl:value-of select="$expanded-class"/>'</xsl:message>
+    <div class="panel panel-default">
+      <div class="panel-heading" role="tab" id="heading-{$paneltype}-{$panelid}">
+	<h4 class="panel-title">
+        <a role="button" data-toggle="collapse" data-parent="#panel-{$panelid}" href="#collapse-{$paneltype}-{$panelid}" aria-expanded="{$expanded}" aria-controls="collapse-{$paneltype}-{$panelid}">
+	  <xsl:value-of select="$title"/>
+	  <xsl:if test="$badgecount">
+	    <span class="badge pull-right"><xsl:value-of select="$badgecount"/></span>
+	  </xsl:if>
+        </a>
+      </h4>
+    </div>
+    <div id="collapse-{$paneltype}-{$panelid}" class="panel-collapse collapse {$expanded-class}" role="tabpanel" aria-labelledby="heading-{$paneltype}-{$panelid}">
+      <div class="panel-body">
+	<xsl:if test="$nodeset">
+	  <xsl:apply-templates select="$nodeset"/>
+	</xsl:if>
+      </div>
+    </div>
+  </div>    
+  </xsl:template>
+
+  <!-- FIXME: This is identical to the template that matches rpubl:Paragraf, that template should match this one as well. -->
   <xsl:template match="xhtml:p[@typeof='rinfoex:Stycke']">
-    <tr>
-      <td><xsl:apply-templates mode="in-paragraf"/></td>
-      <td><!-- here goes the boxes for commentary etc, but that's not supported for standalone Stycke nodes yet --></td>
-    </tr>
+    <div class="row" about="{//html/@about}#{@id}">
+      <section id="{@id}" class="col-sm-8">
+	<xsl:apply-templates mode="in-paragraf"/>
+      </section>
+      <xsl:call-template name="aside-annotations">
+	<xsl:with-param name="uri" select="@about"/>
+      </xsl:call-template>
+    </div>
   </xsl:template>
-
 
   <xsl:template match="xhtml:p[@typeof='rinfoex:Stycke']" mode="in-paragraf">
     <xsl:variable name="marker">
