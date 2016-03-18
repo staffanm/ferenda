@@ -1,0 +1,28 @@
+@prefix bibo: <http://purl.org/ontology/bibo/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://lagen.nu/prop/2013/14:167#PS1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:167> ;
+    dcterms:title "Propositionens huvudsakliga innehåll"@sv .
+
+<https://lagen.nu/prop/2013/14:167> a rpubl:Proposition ;
+    dcterms:abstract "I propositionen föreslås att riksdagen godkänner associeringsavtalet mellan Europeiska unionen och dess medlemsstater, å ena sidan, och Centralamerika, å andra sidan. Avtalsparter på den centralamerikanska sidan är republikerna Costa Rica, El Salvador, Guatemala, Honduras, Nicaragua och Panama. Förhandlingar om ett associeringsavtal med Costa Rica, El Salvador, Guatemala, Honduras och Nicaragua inleddes 2007. Panama anslöt sig till förhandlingarna i januari 2010. Avtalet undertecknades i juni 2012 och i december 2012 godkände Europaparlamentet associeringsavtalet. Avtalet ger en rättslig ram för alla aspekter av EU:s förbindelser med Centralamerika och består av tre pelare: politisk dialog, samarbete och handel. Målet med den politiska dialogen är att upprätta ett politiskt partnerskap som grundar sig på respekten för bl.a. demokrati, fred och en hållbar utveckling. Avtalet innehåller också rättsligt bindande åtaganden om respekt för mänskliga rättigheter och skyldigheter i fråga om ickespridning av massförstörelsevapen. Genom avtalet upprättas också ett frihandelsområde för varor och tjänster. Parterna kommer att öppna sina marknader genom att avveckla tullar och andra tariffära och icke-tariffära handelshinder. Andra områden som liberaliseras är tjänstehandel och etableringar. Avtalet förväntas öka den ekonomiska tillväxten och sysselsättningen i Centralamerika samt bidra till en ökad förutsägbarhet i affärs- och investeringsklimatet i de centralamerikanska länderna. En avsikt med avtalet är också att stärka den regionala ekonomiska integrationen i Centralamerika, något som i ett långsiktigt perspektiv främjar stabilitetet och en hållbar utveckling i regionen."@sv ;
+    dcterms:identifier "Prop. 2013/14:167" ;
+    dcterms:issued "2014-03-06"^^xsd:date ;
+    dcterms:title "Associeringsavtal mellan Europeiska unionen och dess medlemsstater, å ena sidan, och Centralamerika, å andra sidan"@sv ;
+    rpubl:arsutgava "2013/14" ;
+    rpubl:departement <https://lagen.nu/org/2008/utrikesdepartementet> ;
+    rpubl:lopnummer "167" ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/prop/2013/14:167> ;
+    prov:wasDerivedFrom <https://lagen.nu/prop/2013/14:167?attachment=associeringsavtal-mellan-europeiska-unionen-och-dess-medlemsstater-a-ena-sidan-och-centralamerika-a-andra-sidan-prop.-201314167&repo=propregeringen&dir=downloaded> ;
+    prov:wasGeneratedBy "lagen.nu.propositioner.PropRegeringen" .
+
+<https://lagen.nu/prop/2013/14:167?attachment=associeringsavtal-mellan-europeiska-unionen-och-dess-medlemsstater-a-ena-sidan-och-centralamerika-a-andra-sidan-prop.-201314167&repo=propregeringen&dir=downloaded> rdfs:label "Associeringsavtal mellan Europeiska unionen och dess medlemsstater, å ena sidan, och Centralamerika, å andra sidan Prop. 2013/14:167 (pdf 21 MB)"@sv .
+

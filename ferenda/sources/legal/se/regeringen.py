@@ -428,21 +428,23 @@ class Regeringen(SwedishLegalSource):
             a["rpubl:utrSerie"] = self.lookup_resource(altlabel, SKOS.altLabel)
         return a
 
-    # FIXME: This is hackish -- need to rethink which parts of the
-    # parse steps needs access to which data
     def polish_metadata(self, sane_attribs):
         resource = super(Regeringen, self).polish_metadata(sane_attribs)
+        # FIXME: This is hackish -- need to rethink which parts of the
+        # parse steps needs access to which data
         self._resource = resource
         return resource
 
     def sanitize_body(self, rawbody):
-        return super(Regeringen, self).sanitize_body(rawbody)
-
+        sanitized = super(Regeringen, self).sanitize_body(rawbody)
+        sanitized.analyzer = self.get_analyzer(sanitized)
+        return sanitized
 
     def extract_body(self, fp, basefile):
-        if (self.document_type == self.PROPOSITION and 
+        if (self.document_type == self.PROPOSITION and
             basefile.split(":")[1] in ("1", "100")):
-            self.log.warning("%s: Will only process metadata, creating placeholder for body text" % basefile)
+            self.log.warning("%s: Will only process metadata, creating"
+                             " placeholder for body text" % basefile)
             # means vår/höstbudget. Create minimal placeholder text
             return ["Dokumentttext saknas (se originaldokument)"]
         # reset global state
@@ -465,6 +467,41 @@ class Regeringen(SwedishLegalSource):
 #                   LegalRef.EULAGSTIFTNING,
 #                   LegalRef.EURATTSFALL
     )
+
+    def parse_body(self, fp, basefile):
+        # this version knows how to use an appropriate analyzer to
+        # segment documents into subdocs and use the appropritate
+        # parsing method on each subdoc. FIXME: This should really be
+        # available to all classes that make use of
+        # SwedishLegalSource.offtryck_{parser,gluefunc}
+        rawbody = self.extract_body(fp, basefile)
+        sanitized = self.sanitize_body(rawbody)
+        allbody = Body()
+        for (startpage, pagecount, tag) in sanitized.analyzer.documents():
+            if tag == 'main':
+                parser = self.get_parser(basefile, sanitized)
+                tokenstream = sanitized.textboxes(offtryck_gluefunc,
+                                                  pageobjects=True,
+                                                  startpage=startpage,
+                                                  pagecount=pagecount)
+                # FIXME: We need some way of initializing the state to
+                # a particular page number, for multi-section docs
+                body = parser(tokenstream)
+                for func, initialstate in self.visitor_functions(basefile):
+                    # could be functions for assigning URIs to particular
+                    # nodes, extracting keywords from text etc. Note: finding
+                    # references in text with LegalRef is done afterwards
+                    self.visit_node(body, func, initialstate)
+                if self.config.parserefs and self.parse_types:
+                    body = self.refparser.parse_recursive(body)
+            else:
+                # copy pages verbatim -- make no attempt to glue
+                # textelements together, parse references etc. In
+                # effect, this will yield pages full of absolute
+                # positioned textboxes that don't reflow etc
+                body = Body(sanitized[startpage:startpage+pagecount])
+            allbody += body[:]
+        return allbody
 
     def postprocess_doc(self, doc):
         # loop through leading  textboxes and try to find dcterms:identifier,
@@ -725,15 +762,6 @@ class Regeringen(SwedishLegalSource):
 
     # returns a list of (PDFReader, metrics) tuples, one for each PDF
     def read_pdfs(self, basefile, pdffiles, identifier=None):
-        metrics_path = self.store.intermediate_path(basefile,
-                                                    attachment="metrics.json")
-        pdfdebug_path = self.store.intermediate_path(basefile,
-                                                     attachment="debug.pdf")
-        if os.environ.get("FERENDA_PLOTANALYSIS"):
-            plot_path = self.store.intermediate_path(basefile,
-                                                     attachment="plot.png")
-        else:
-            plot_path = None
         reader = None
         for pdffile in pdffiles:
             basepath = pdffile.split("/")[-1]
@@ -745,26 +773,22 @@ class Regeringen(SwedishLegalSource):
             if not reader:
                 reader = self.parse_pdf(pdf_path, intermediate_dir)
             else:
-                # FIXME: PDF Reader object must be able to be combined
-                # (implement __iadd__)
                 reader += self.parse_pdf(pdf_path, intermediate_dir)
-        # Grab correct analyzer class
+        return reader
+
+    def get_analyzer(self, reader):
         if self.document_type == self.KOMMITTEDIREKTIV:
             from ferenda.sources.legal.se.direktiv import DirAnalyzer
             analyzer = DirAnalyzer(reader)
         elif self.document_type == self.SOU:
             from ferenda.sources.legal.se.sou import SOUAnalyzer
             analyzer = SOUAnalyzer(reader)
+        elif self.document_type == self.PROPOSITION:
+            from ferenda.sources.legal.se.propositioner import PropAnalyzer
+            analyzer = PropAnalyzer(reader)
         else:
             analyzer = PDFAnalyzer(reader)
-
-        metrics = analyzer.metrics(metrics_path, plot_path,
-                                   force=self.config.force)
-        if os.environ.get("FERENDA_DEBUGANALYSIS"):
-            analyzer.drawboxes(pdfdebug_path, offtryck_gluefunc,
-                               metrics=metrics)
-        reader.metrics = metrics
-        return reader
+        return analyzer
 
     def create_external_resources(self, doc):
         """Optionally create external files that go together with the

@@ -400,7 +400,7 @@ class PropHuvudrubrik(UnicodeElement):
     tagname = "h1"
     classname = "prophuvudrubrik"
     
-class PropRubrik(CompoundElement):
+class PropRubrik(UnicodeElement):
     # This is the actual dcterms:title of the document
     tagname = "h1"  # even though traditionally set in smaller font
     classname = "proprubrik"

@@ -26,15 +26,26 @@ from . import (Trips, NoMoreLinks, Regeringen, Riksdagen,
                SwedishLegalSource, SwedishLegalStore, RPUBL)
 from .fixedlayoutsource import FixedLayoutStore, FixedLayoutSource
 
+
 class PropAnalyzer(PDFAnalyzer):
+
     def documents(self):
-        for page in self.pdf:
-            pass 
-            # determine dominant font:
-            # if EUAlbertina:
-            #    currentdoc = 'eudok'
-            # else:
-            #     currentdoc = 'main'
+        documents = []
+        for pageidx, page in enumerate(self.pdf):
+            styles = self.count_styles(pageidx, 1)['rest_styles']
+
+            # find the most dominant style on the page. If it uses the
+            # EU font, it's a separate section.
+            if styles and styles.most_common(1)[0][0][0].startswith("EUAlbertina"):
+                currentdoc = 'eudok'
+            else:
+                currentdoc = 'main'
+            # update the current document segment tuple or start a new one
+            if documents and documents[-1][2] == currentdoc:
+                documents[-1][1] += 1
+            else:
+                documents.append([pageidx, 1, currentdoc])
+        return documents
 
     def metrics(self, metricspath=None, plotpath=None, startpage=0,
                 pagecount=None, force=False):
@@ -48,11 +59,11 @@ class PropAnalyzer(PDFAnalyzer):
             r = []
             exclude = []
             for startpage, pagecount, tag in docsegments:
-                r.append = super(PropAnalyzer,
+                r.append(super(PropAnalyzer,
                                  self).metrics(startpage=startpage,
-                                               pagecount=pagecount)
+                                               pagecount=pagecount))
                 if tag != 'main':
-                    exclude.extend(list(range(startpage, pagecount)))
+                    exclude.extend(list(range(startpage, startpage+pagecount)))
         r[0]['excludedpages'] = exclude
         return r[0]
 

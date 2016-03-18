@@ -587,7 +587,7 @@ class PDFReader(CompoundElement):
     def is_empty(self):
         return 0 == sum([len(x) for x in self])
 
-    def textboxes(self, gluefunc=None, pageobjects=False, keepempty=False):
+    def textboxes(self, gluefunc=None, pageobjects=False, keepempty=False, startpage=0, pagecount=None):
         """Return an iterator of the textboxes available.
 
         ``gluefunc`` should be a callable that is called with
@@ -607,7 +607,11 @@ class PDFReader(CompoundElement):
             glue = gluefunc
         else:
             glue = self._default_glue
-        for page in self:
+        if pagecount:
+            pages = self[startpage:startpage+pagecount]
+        else:
+            pages = self
+        for page in pages:
             if pageobjects:
                 yield page
             for nextbox in page:

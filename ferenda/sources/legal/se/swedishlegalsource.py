@@ -33,7 +33,7 @@ from ferenda.elements import Section, Body, CompoundElement
 from ferenda.pdfreader import Page
 from ferenda.pdfreader import PDFReader
 from ferenda.pdfanalyze import PDFAnalyzer
-from ferenda.decorators import action, managedparsing
+from ferenda.decorators import action, managedparsing, newstate
 from ferenda.thirdparty.coin import URIMinter
 from . import RPUBL
 from .elements import *
@@ -637,33 +637,31 @@ class SwedishLegalSource(DocumentRepository):
         return soup.body
 
     def sanitize_body(self, rawbody):
-        """Given an object representing the document content, return the same or a similar 
-        object, with some basic sanitation performed. 
+        """Given an object representing the document content, return the same
+        or a similar object, with some basic sanitation performed.
         
         The default implementation returns its input unchanged.
+
         """
         return rawbody
-
-    def get_pdf_analyzer(self, pdf):
-        return PDFAnalyzer(pdf)
 
     def get_parser(self, basefile, sanitized):
         """should return a function that gets any iterable (the output
         from tokenize) and returns a ferenda.elements.Body object.
         
         The default implementation calls :py:func:`offtryck_parser` to
-        create a function/closure which is returned IF the sanitized 
+        create a function/closure which is returned IF the sanitized
         body data is a PDFReader object. Otherwise, returns a function that
         justs packs every item in a recieved iterable into a Body object.
         
-        If your docrepo requires a FSMParser-created parser, you should 
+        If your docrepo requires a FSMParser-created parser, you should
         instantiate and return it here.
         """
         if isinstance(sanitized, PDFReader):
             # If our sanitized body is a PDFReader, it's most likely
             # something that can be handled by the offtryck_parser.
-
-            analyzer = self.get_pdf_analyzer(sanitized)
+            analyzer = sanitized.analyzer
+            startpage, pagecount, tag = analyzer.documents()[0]
             if "hocr" in sanitized.filename:
                 analyzer.scanned_source = True
             metrics_path = self.store.path(basefile, 'intermediate',
@@ -674,8 +672,12 @@ class SwedishLegalSource(DocumentRepository):
                                             '.plot.png')
             else:
                 plot_path = None
-            self.log.debug("%s: Calculating PDF metrics" % basefile)
-            metrics = analyzer.metrics(metrics_path, plot_path, force=self.config.force)
+            self.log.debug("%s: Calculating PDF metrics for %s pages "
+                           "starting at %s" % (basefile, pagecount, startpage))
+            metrics = analyzer.metrics(metrics_path, plot_path,
+                                       startpage=startpage,
+                                       pagecount=pagecount,
+                                       force=self.config.force)
             if os.environ.get("FERENDA_DEBUGANALYSIS"):
                 pdfdebug_path = self.store.path(basefile, 'intermediate',
                                                 '.debug.pdf')
@@ -1019,8 +1021,15 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                                     'page': None,
                                     'appendixno': None,
                                     'preset': preset}))
+
     def is_pagebreak(parser):
         return isinstance(parser.reader.peek(), Page)
+
+#    def is_verbatimpage(parser):
+#        if is_pagebreak(parser):
+#            from pudb import set_trace; set_trace()
+#        return (is_pagebreak(parser) and
+#                state.pageno in metrics.excludepages!)
 
     # page numbers, headers
     def is_nonessential(parser):
@@ -1166,9 +1175,9 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     def is_paragraph(parser):
         return True
 
+    @newstate('body')
     def make_body(parser):
         return p.make_children(Body())
-    setattr(make_body, 'newstate', 'body')
 
     def make_prophuvudrubrik(parser):
         return PropHuvudrubrik(str(parser.reader.next()).strip())
@@ -1181,32 +1190,36 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         #     raise ValueError("OK DONE")
         return parser.reader.next()
 
+    @newstate('coverpage')
     def make_coverpage(parser):
         state.pageno += 1
         parser.reader.next()  # throwaway the Page object itself
         c = Coverpage()
         return parser.make_children(c)
-    setattr(make_coverpage, 'newstate', 'coverpage')
 
+    @newstate('preamblesection')
     def make_preamblesection(parser):
         s = PreambleSection(title=str(parser.reader.next()).strip())
         if s.title == "Innehållsförteckning":
-            parser.make_children(s)  # throw away
+            parser.make_children(s)  # throw away -- FIXME: should we
+                                     # really do that right in the
+                                     # parsing step? shouldn't we wait
+                                     # until postprocess_doc?
             return None
         else:
             return parser.make_children(s)
-    setattr(make_preamblesection, 'newstate', 'preamblesection')
 
+    @newstate('unorderedsection')
     def make_unorderedsection(parser):
         s = UnorderedSection(title=str(parser.reader.next()).strip())
         return parser.make_children(s)
-    setattr(make_unorderedsection, 'newstate', 'unorderedsection')
 
+    @newstate('unorderedsubsection')
     def make_unorderedsubsection(parser):
         s = UnorderedSection(title=str(parser.reader.next()).strip())
         return parser.make_children(s)
-    setattr(make_unorderedsubsection, 'newstate', 'unorderedsubsection')
 
+    @newstate('appendix')
     def make_appendix(parser):
         # now, an appendix can begin with either the actual
         # headline-like title, or by the sidenote in the
@@ -1225,10 +1238,10 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                      ordinal=str(state.appendixno),
                      uri=None)
         return parser.make_children(s)
-    setattr(make_appendix, 'newstate', 'appendix')
 
     # this is used for subsections and subsubsections as well --
     # probably wont work due to the newstate property
+    @newstate('section')
     def make_section(parser):
         ordinal, headingtype, title = analyze_sectionstart(parser, parser.reader.next())
         if ordinal:
@@ -1237,7 +1250,6 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         else:
             s = Section(title=str(title))
         return parser.make_children(s)
-    setattr(make_section, 'newstate', 'section')
 
     def skip_nonessential(parser):
         parser.reader.next()
@@ -1250,6 +1262,12 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         sb = Sidbrytning()
         sb.ordinal = state.pageno
         return sb
+
+#     @newstate('verbatim')
+#     def make_verbatimpage(parser):
+#         vp = VerbatimPage()
+#         vp.ordinal = state.pageno
+#         return parser.make_children(vp)
 
     re_sectionstart = re.compile("^(\d[\.\d]*) +(.*[^\.])$").match
 
@@ -1310,7 +1328,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
     p = FSMParser()
 
-    recognizers = [is_pagebreak,
+    recognizers = [#is_verbatimpage,
+                   is_pagebreak,
                    is_appendix,
                    is_nonessential,
                    is_section,
@@ -1331,45 +1350,47 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     commonstates = ("body", "preamblesection", "section", "subsection",
                     "unorderedsection", "unorderedsubsection", "subsubsection",
                     "appendix")
-
+    commonbodystates = commonstates[1:]
     p.set_transitions({(commonstates, is_nonessential): (skip_nonessential, None),
+#                       (commonbodystates, is_verbatimpage): (False, None),
                        (commonstates, is_pagebreak): (skip_pagebreak, None),
                        (commonstates, is_paragraph): (make_paragraph, None),
+                       ("body", is_appendix): (make_appendix, "appendix"),
                        ("body", is_coverpage): (make_coverpage, "coverpage"),
                        ("body", is_preamblesection): (make_preamblesection, "preamblesection"),
                        ("body", is_prophuvudrubrik): (make_prophuvudrubrik, None),
                        ("body", is_proprubrik): (make_proprubrik, None),
-                       ("coverpage", is_coverpage): (False, None),
-                       ("coverpage", is_preamblesection): (False, None),
-                       ("coverpage", is_paragraph): (make_paragraph, None),
-                       ("coverpage", is_pagebreak): (False, None),
-                       ("preamblesection", is_preamblesection): (False, None),
-                       ("preamblesection", is_section): (False, None),
                        ("body", is_section): (make_section, "section"),
                        ("body", is_unorderedsection): (make_unorderedsection, "unorderedsection"),
+#                       ("body", is_verbatimpage): (make_verbatimpage, "verbatim"),
+                       ("coverpage", is_coverpage): (False, None),
+                       ("coverpage", is_pagebreak): (False, None),
+                       ("coverpage", is_paragraph): (make_paragraph, None),
+                       ("coverpage", is_preamblesection): (False, None),
+                       ("preamblesection", is_preamblesection): (False, None),
+                       ("preamblesection", is_section): (False, None),
                        ("section", is_section): (False, None),
                        ("section", is_subsection): (make_section, "subsection"),
                        ("section", is_unorderedsection): (make_unorderedsection, "unorderedsection"),
                        ("section", is_unorderedsubsection): (make_unorderedsection, "unorderedsubsection"),
-                       ("unorderedsection", is_section): (False, None),
+                       ("subsection", is_section): (False, None),
+                       ("subsection", is_subsection): (False, None),
+                       ("subsection", is_subsubsection): (make_section, "subsubsection"),
+                       ("subsubsection", is_section): (False, None),
+                       ("subsubsection", is_subsection): (False, None),
+                       ("subsubsection", is_subsubsection): (False, None),
                        ("unorderedsection", is_appendix): (False, None),
                        ("unorderedsection", is_preamblesection): (False, None),
+                       ("unorderedsection", is_section): (False, None),
                        ("unorderedsection", is_unorderedsection): (False, None),
                        ("unorderedsection", is_unorderedsubsection): (make_unorderedsubsection, "unorderedsubsection"),
-                       ("unorderedsubsection", is_section): (False, None),
                        ("unorderedsubsection", is_appendix): (False, None),
                        ("unorderedsubsection", is_preamblesection): (False, None),
+                       ("unorderedsubsection", is_section): (False, None),
                        ("unorderedsubsection", is_unorderedsection): (False, None),
                        ("unorderedsubsection", is_unorderedsubsection): (False, None),
-                       ("subsection", is_subsection): (False, None),
-                       ("subsection", is_section): (False, None),
-                       ("subsection", is_subsubsection): (make_section, "subsubsection"),
-                       ("subsubsection", is_subsubsection): (False, None),
-                       ("subsubsection", is_subsection): (False, None),
-                       ("subsubsection", is_section): (False, None),
-                       ("body", is_appendix): (make_appendix, "appendix"),
-                       (("appendix", "subsubsection", "subsection", "section"), is_appendix):
-                       (False, None)
+#                       ("verbatim", is_pagebreak): (False, None),
+                       (("appendix", "subsubsection", "subsection", "section"), is_appendix): (False, None)
                        })
 
     p.initial_state = "body"
@@ -1392,10 +1413,33 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
     # text in a <b> element). Maybe achiveable through
     # FontmappingPDFReader?
 
-    # if we're using hOCR data, take advantage of the paragraph segmentation that tesseract does through the p.ocr_par mechanism
-    if hasattr(prevbox, 'parid') and hasattr(nextbox, 'parid') and prevbox.parid == nextbox.parid:
+    # if we're using hOCR data, take advantage of the paragraph
+    # segmentation that tesseract does through the p.ocr_par mechanism
+    if (hasattr(prevbox, 'parid') and hasattr(nextbox, 'parid') and
+        prevbox.parid == nextbox.parid):
         return True
+
+    # numbered section headings can have large space between the
+    # leading number and the rest of the heading, and the top/bottom
+    # of the leading number box might differ from the heading with one
+    # or a few points. These special conditions helps glue these parts
+    # *vertically* by checking that the vertical space is not
+    # unreasonable and that horizontal alignment is at least 50 %
+    # overlapping
+    if nextbox.font.size > 13: # might be a heading -- but we have no
+                              # real way of guessing this at this
+                              # stage (metrics are not available to
+                              # this function)
+        if (textbox.font.size == nextbox.font.size and
+            textbox.font.family == nextbox.font.family and
+            nextbox.top < prevbox.top + (prevbox.height / 2) < nextbox.top + nextbox.height and
+            textbox.left - (prevbox.left + prevbox.width) < (prevbox.width * 3)):
+            return True
+        
+            
     
+
+    # These final conditions glue primarily *horizontally*
     if (textbox.font.size == nextbox.font.size and
         textbox.font.family == nextbox.font.family and
         textbox.top + textbox.height + linespacing > nextbox.top and
