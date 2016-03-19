@@ -303,6 +303,9 @@ class AnonStycke(Paragraph):
 class Sektion(Section):
     pass
 
+class VerbatimSection(CompoundElement):
+    tagname = "div"
+    classname = "verbatim"
 
 class Sidbrytning(OrdinalElement):
     def as_xhtml(self, uri, parent_uri=None):

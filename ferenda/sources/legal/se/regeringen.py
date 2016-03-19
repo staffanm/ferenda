@@ -21,13 +21,13 @@ from cached_property import cached_property
 from ferenda import Describer, DocumentEntry, PDFAnalyzer
 from ferenda import util
 from ferenda.decorators import recordlastdownload, downloadmax
-from ferenda.elements import Section, Link, Body
+from ferenda.elements import Section, Link, Body, CompoundElement
 from ferenda.pdfreader import PDFReader, Textbox
 from ferenda.errors import DocumentRemovedError
 from . import SwedishLegalSource, RPUBL
 from .legalref import LegalRef
 from .swedishlegalsource import offtryck_gluefunc
-from .elements import PreambleSection, UnorderedSection, Lagrumskommentar
+from .elements import PreambleSection, UnorderedSection, Lagrumskommentar, Sidbrytning, VerbatimSection
 
 class FontmappingPDFReader(PDFReader):
     # Fonts in Propositioner get handled wierdly by pdf2xml
@@ -477,15 +477,15 @@ class Regeringen(SwedishLegalSource):
         rawbody = self.extract_body(fp, basefile)
         sanitized = self.sanitize_body(rawbody)
         allbody = Body()
+        initialstate = {'pageno': 1}
         for (startpage, pagecount, tag) in sanitized.analyzer.documents():
             if tag == 'main':
-                parser = self.get_parser(basefile, sanitized)
+                initialstate['pageno'] -= 1  # argh....
+                parser = self.get_parser(basefile, sanitized, initialstate)
                 tokenstream = sanitized.textboxes(offtryck_gluefunc,
                                                   pageobjects=True,
                                                   startpage=startpage,
                                                   pagecount=pagecount)
-                # FIXME: We need some way of initializing the state to
-                # a particular page number, for multi-section docs
                 body = parser(tokenstream)
                 for func, initialstate in self.visitor_functions(basefile):
                     # could be functions for assigning URIs to particular
@@ -499,9 +499,28 @@ class Regeringen(SwedishLegalSource):
                 # textelements together, parse references etc. In
                 # effect, this will yield pages full of absolute
                 # positioned textboxes that don't reflow etc
-                body = Body(sanitized[startpage:startpage+pagecount])
+                s = VerbatimSection()
+                for relidx, page in enumerate(sanitized[startpage:startpage+pagecount]):
+                    sb = Sidbrytning()
+                    sb.ordinal = initialstate['pageno']+relidx
+                    s.append(sb)
+                    s.append(page)
+                body = Body([s])
+            # regardless of wether we used real parsing or verbatim
+            # copying, we need to update the current page number
+            lastpagebreak = self._find_last(body, Sidbrytning)
+            initialstate['pageno'] = lastpagebreak.ordinal + 1
             allbody += body[:]
         return allbody
+
+    def _find_last(self, node, cls):
+        if isinstance(node, cls):
+            return node
+        elif isinstance(node, CompoundElement):
+            for subnode in reversed(node):
+                res = self._find_last(subnode, cls)
+                if isinstance(res, cls):
+                    return res
 
     def postprocess_doc(self, doc):
         # loop through leading  textboxes and try to find dcterms:identifier,

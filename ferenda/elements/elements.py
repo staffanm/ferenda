@@ -176,6 +176,9 @@ properties (such as ordinal label, date of enactment, etc)."""
 
     def as_xhtml(self, uri=None, parent_uri=None):
         res = super(UnicodeElement, self).as_xhtml(uri, parent_uri)
+        if self.classname is not None:
+            res.set('class', self.classname)
+        
         # elements with no actual text gets stripped
         if str(self).strip():
             res.text = str(self)

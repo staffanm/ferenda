@@ -645,7 +645,7 @@ class SwedishLegalSource(DocumentRepository):
         """
         return rawbody
 
-    def get_parser(self, basefile, sanitized):
+    def get_parser(self, basefile, sanitized, initialstate=None):
         """should return a function that gets any iterable (the output
         from tokenize) and returns a ferenda.elements.Body object.
         
@@ -697,7 +697,8 @@ class SwedishLegalSource(DocumentRepository):
                 preset = 'default'
             parser = offtryck_parser(basefile, metrics=metrics, preset=preset,
                                      identifier=self.infer_identifier(basefile),
-                                     debug=os.environ.get('FERENDA_FSMDEBUG', 0))
+                                     debug=os.environ.get('FERENDA_FSMDEBUG', 0),
+                                     initialstate=initialstate)
             return parser.parse
         else:
             def default_parser(iterable):
@@ -987,7 +988,7 @@ class SwedishLegalSource(DocumentRepository):
 
 
 def offtryck_parser(basefile="0", metrics=None, preset=None,
-                    identifier=None, debug=False):
+                    identifier=None, debug=False, initialstate=None):
     # First: merge the metrics we're provided with with a set of
     # defaults (for fallback), and wrap them in a LayeredConfig
     # structure
@@ -1017,10 +1018,13 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
     # another mutable variable, which is accessible from the nested
     # functions
-    state = LayeredConfig(Defaults({'pageno': 0,
-                                    'page': None,
-                                    'appendixno': None,
-                                    'preset': preset}))
+    defaultstate = {'pageno': 0,
+                    'page': None,
+                    'appendixno': None,
+                    'preset': preset}
+    if initialstate:
+        defaultstate.update(initialstate)
+    state = LayeredConfig(Defaults(defaultstate))
 
     def is_pagebreak(parser):
         return isinstance(parser.reader.peek(), Page)
