@@ -289,80 +289,6 @@ class FerendaTestCase(object):
             return super(FerendaTestCase, self).assertRegex(test, expected_regexp, msg)
 
 
-class RepoTesterStore(object):
-
-    """This is an internal class used by RepoTester in order to control
-    where source documents are read from.
-
-    It purposefully does not derive from DocumentStore, even though it
-    uses one in a compositing way.
-
-    """
-
-    def __init__(self, origstore, downloaded_file=None):
-        self.origstore = origstore
-        self.downloaded_file = downloaded_file
-
-        self.datadir = origstore.datadir
-        self.downloaded_suffix = origstore.downloaded_suffix
-        self.storage_policy = origstore.storage_policy
-
-    def list_attachments(self, basefile, action, version=None):
-        if action == "downloaded":
-            for f in os.listdir(os.path.dirname(self.downloaded_file)):
-                if f != os.path.basename(self.downloaded_file):
-                    yield f
-        else:
-            for x in super(self, RepoTesterStore).list_attachments(
-                    basefile, action, version):
-                yield x
-
-    def path(self, basefile, maindir, suffix, version=None,
-                attachment=None, storage_policy=None):
-        p = self.origstore.path(basefile, maindir, suffix, version, attachment)
-        if maindir == "downloaded":
-            if attachment:
-                return "%s%s%s" % (os.path.dirname(self.downloaded_file),
-                                   os.sep, attachment)
-            else:
-                return self.downloaded_file
-        elif maindir in ("intermediate", "entries"):
-            origdir = self.downloaded_file[:self.downloaded_file.index(os.sep+"downloaded"+os.sep)]
-            return p.replace(self.datadir, origdir)
-        else:
-            return p
-
-    def downloaded_path(self, basefile, version=None, attachment=None):
-        return self.path(basefile, 'downloaded',
-                         self.downloaded_suffix, version, attachment)
-
-    def open_downloaded(self, basefile, mode="r", version=None, attachment=None):
-        filename = self.downloaded_path(basefile, version, attachment)
-        return self.origstore._open(filename, mode)
-
-    def documententry_path(self, basefile, version=None):
-        return self.path(basefile, 'entries', '.json', version,
-                            storage_policy="file")
-
-    def intermediate_path(self, basefile, version=None, attachment=None):
-        return self.path(basefile, 'intermediate', '.xml', version, attachment)
-
-    def open_intermediate(self, basefile, mode="r", version=None,
-                          attachment=None):
-        filename = self.intermediate_path(basefile, version, attachment)
-        return self.origstore._open(filename, mode)
-
-
-    def documententry_path(self, basefile, version=None):
-        return self.path(basefile, 'entries', '.json', version,
-                            storage_policy="file")
-
-    # To handle any other DocumentStore method, just return whatever
-    # our origstore would.
-    def __getattr__(self, name):
-        return getattr(self.origstore, name)
-
-
 class RepoTester(unittest.TestCase, FerendaTestCase):
 
     """A unittest.TestCase-based convenience class for creating file-based
@@ -413,6 +339,28 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         cls.setupclass = True
     
     def setUp(self):
+        # if test_download, copy only self.docroot + "/source" (all of
+        # it) if test_{parse,distill}, copy all of self.docroot (can
+        # omit /source, but must include intermediate, entries etc) to
+        # self.datadir. Note that this means that we copy files for
+        # all tests when running a single test, and that we remove
+        # them for each test as well. This might make it impractical
+        # to run 10+ tests for a single repo.
+
+        method = self._testMethodName
+        if method.startswith("test_download_"):
+            source = self.docroot + os.sep + "source"
+            dest = os.sep.join([self.datadir, self.repo.alias, "source"])
+            ignore = None
+        elif (method.startswith("test_parse_") or
+              method.startswith("test_distill_")):
+            source = self.docroot
+            dest = self.datadir + os.sep + self.repo.alias
+            ignore = shutil.ignore_patterns('source', 'parsed')
+        if os.path.exists(dest):
+            shutil.rmtree(dest)
+        shutil.copytree(source, dest, ignore=ignore)
+        
         if not hasattr(self, 'repo'):
             self.datadir = tempfile.mkdtemp()
             if isinstance(self.datadir, bytes):
@@ -429,7 +377,6 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         if not self.setupclass and os.path.exists(self.datadir):
             # print("Not removing %s" % self.datadir)
             shutil.rmtree(self.datadir)
-
     
     def filename_to_basefile(self, filename):
         """Converts a test filename to a basefile. Default implementation
@@ -671,23 +618,18 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
 
         """
         basefile = self.filename_to_basefile(downloaded_file)
-        origstore = self.repo.store
-        self.repo.store = RepoTesterStore(origstore, downloaded_file)
-        try:
-            self.repo.parse(basefile)
-            if 'FERENDA_SET_TESTFILE' in os.environ:
-                print("Overwriting %r with result of parse (%r)" % (rdf_file, basefile))
-                g = rdflib.Graph()
-                g.parse(data=util.readfile(self.repo.store.distilled_path(basefile)))
-                util.robust_rename(rdf_file, rdf_file + "~")
-                with open(rdf_file, "wb") as fp:
-                    fp.write(g.serialize(format="turtle"))
-                return
-            self.assertEqualGraphs(rdf_file,
-                                   self.repo.store.distilled_path(basefile),
-                                   exact=False)
-        finally:
-            self.repo.store = origstore
+        self.repo.parse(basefile)
+        if 'FERENDA_SET_TESTFILE' in os.environ:
+            print("Overwriting %r with result of parse (%r)" % (rdf_file, basefile))
+            g = rdflib.Graph()
+            g.parse(data=util.readfile(self.repo.store.distilled_path(basefile)))
+            util.robust_rename(rdf_file, rdf_file + "~")
+            with open(rdf_file, "wb") as fp:
+                fp.write(g.serialize(format="turtle"))
+            return
+        self.assertEqualGraphs(rdf_file,
+                               self.repo.store.distilled_path(basefile),
+                               exact=False)
 
     def parse_test(self, downloaded_file, xhtml_file, docroot):
         """This test is run once for each basefile found in
@@ -699,22 +641,16 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         # patch method so we control where the downloaded doc is
         # loaded from.
         basefile = self.filename_to_basefile(downloaded_file)
-        origstore = self.repo.store
-        # make a fakestore
-        self.repo.store = RepoTesterStore(origstore, downloaded_file)
-        try:
-            self.repo.parse(basefile)
-            if 'FERENDA_SET_TESTFILE' in os.environ:
-                print("Overwriting %r with result of parse (%r)" % (xhtml_file, basefile))
-                util.robust_rename(xhtml_file, xhtml_file + "~")
-                shutil.copy2(self.repo.store.parsed_path(basefile), xhtml_file)
-                return
-            self.assertEqualXML(util.readfile(xhtml_file),
-                                util.readfile(self.repo.store.parsed_path(basefile)),
-                                tidy_xhtml=True)
+        self.repo.parse(basefile)
+        if 'FERENDA_SET_TESTFILE' in os.environ:
+            print("Overwriting %r with result of parse (%r)" % (xhtml_file, basefile))
+            util.robust_rename(xhtml_file, xhtml_file + "~")
+            shutil.copy2(self.repo.store.parsed_path(basefile), xhtml_file)
+            return
+        self.assertEqualXML(util.readfile(xhtml_file),
+                            util.readfile(self.repo.store.parsed_path(basefile)),
+                            tidy_xhtml=True)
 
-        finally:
-            self.repo.store = origstore
 
     # for win32 compatibility and simple test case code
     def p(self, path, prepend_datadir=True):

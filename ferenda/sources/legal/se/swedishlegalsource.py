@@ -660,8 +660,13 @@ class SwedishLegalSource(DocumentRepository):
         if isinstance(sanitized, PDFReader):
             # If our sanitized body is a PDFReader, it's most likely
             # something that can be handled by the offtryck_parser.
-            analyzer = sanitized.analyzer
-            startpage, pagecount, tag = analyzer.documents()[0]
+            startpage = 0
+            pagecount = len(sanitized)
+            if hasattr(sanitized, 'analyzer'):
+                analyzer = sanitized.analyzer
+                startpage, pagecount, tag = analyzer.documents()[0]
+            else:
+                analyzer = self.get_pdf_analyzer(sanitized)
             if "hocr" in sanitized.filename:
                 analyzer.scanned_source = True
             metrics_path = self.store.path(basefile, 'intermediate',
@@ -705,6 +710,10 @@ class SwedishLegalSource(DocumentRepository):
                 return Body(list(iterable))
             return default_parser
     
+    def get_pdf_analyzer(self, sanitized):
+        return PDFAnalyzer(sanitized)
+    
+
     def tokenize(self, body):
         """Given a document format-specific object (like a PDFReader or a BeautifulSoup object),
         return a list or other iterable of suitable "chunks" for your parser function. 

@@ -437,7 +437,7 @@ class Regeringen(SwedishLegalSource):
 
     def sanitize_body(self, rawbody):
         sanitized = super(Regeringen, self).sanitize_body(rawbody)
-        sanitized.analyzer = self.get_analyzer(sanitized)
+        sanitized.analyzer = self.get_pdf_analyzer(sanitized)
         return sanitized
 
     def extract_body(self, fp, basefile):
@@ -473,7 +473,10 @@ class Regeringen(SwedishLegalSource):
         # segment documents into subdocs and use the appropritate
         # parsing method on each subdoc. FIXME: This should really be
         # available to all classes that make use of
-        # SwedishLegalSource.offtryck_{parser,gluefunc}
+        # SwedishLegalSource.offtryck_{parser,gluefunc}. NOTE: this
+        # requires that sanitize_body has set up a PDFAnalyzer
+        # subclass instance as a property on the sanitized object
+        # (normally a PDFReader or StreamingPDFReader)
         rawbody = self.extract_body(fp, basefile)
         sanitized = self.sanitize_body(rawbody)
         allbody = Body()
@@ -795,7 +798,7 @@ class Regeringen(SwedishLegalSource):
                 reader += self.parse_pdf(pdf_path, intermediate_dir)
         return reader
 
-    def get_analyzer(self, reader):
+    def get_pdf_analyzer(self, reader):
         if self.document_type == self.KOMMITTEDIREKTIV:
             from ferenda.sources.legal.se.direktiv import DirAnalyzer
             analyzer = DirAnalyzer(reader)
