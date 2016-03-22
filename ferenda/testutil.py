@@ -278,8 +278,8 @@ class FerendaTestCase(object):
             if not filecmp.cmp(os.path.join(want, f),
                                os.path.join(got, f),
                                shallow=False):
-                self.assertEqual(util.readfile(os.path.join(want, f)),
-                                 util.readfile(os.path.join(got, f)))
+                self.assertEqual(util.readfile(os.path.join(want, f), mode="rb"),
+                                 util.readfile(os.path.join(got, f), mode="rb"))
 
     def assertRegex(self, test, expected_regexp, msg=None):
         # in older versions of unittest, this method was named assertRegexpMatches
@@ -348,6 +348,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         # to run 10+ tests for a single repo.
 
         method = self._testMethodName
+        dest = None
         if method.startswith("test_download_"):
             source = self.docroot + os.sep + "source"
             dest = os.sep.join([self.datadir, self.repo.alias, "source"])
@@ -357,9 +358,12 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             source = self.docroot
             dest = self.datadir + os.sep + self.repo.alias
             ignore = shutil.ignore_patterns('source', 'parsed')
-        if os.path.exists(dest):
-            shutil.rmtree(dest)
-        shutil.copytree(source, dest, ignore=ignore)
+        if dest:
+            if os.path.exists(dest):
+                shutil.rmtree(dest)
+            # FIXME: maybe we could warn or fail if this copy operation
+            # takes more than, say, 0.5 seconds?
+            shutil.copytree(source, dest, ignore=ignore)
         
         if not hasattr(self, 'repo'):
             self.datadir = tempfile.mkdtemp()
@@ -374,9 +378,7 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             shutil.rmtree(cls.datadir)
 
     def tearDown(self):
-        if not self.setupclass and os.path.exists(self.datadir):
-            # print("Not removing %s" % self.datadir)
-            shutil.rmtree(self.datadir)
+        shutil.rmtree(self.datadir)
     
     def filename_to_basefile(self, filename):
         """Converts a test filename to a basefile. Default implementation

@@ -1,0 +1,53 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://lagen.nu/rf/nja/2007s650#HDO> dcterms:creator "Högsta domstolen"@sv ;
+    dcterms:isPartOf <https://lagen.nu/rf/nja/2007s650> ;
+    dcterms:references <https://lagen.nu/rf/nja/1936s605>,
+        <https://lagen.nu/rf/nja/2002s129>,
+        <https://lagen.nu/sfs/1942:740> .
+
+<https://lagen.nu/rf/nja/2007s650#HGO> dcterms:creator "Göta hovrätt"@sv ;
+    dcterms:isPartOf <https://lagen.nu/rf/nja/2007s650> .
+
+<https://lagen.nu/rf/nja/2007s650#TVA> dcterms:creator "Växjö tingsrätt"@sv ;
+    dcterms:isPartOf <https://lagen.nu/rf/nja/2007s650> .
+
+<https://lagen.nu/dom/hd/Ö2668-07/2007-10-05> a rpubl:VagledandeDomstolsavgorande ;
+    dcterms:publisher <https://lagen.nu/org/2008/hogsta-domstolen> ;
+    dcterms:subject <https://lagen.nu/concept/Avvisning>,
+        <https://lagen.nu/concept/Redbarhet>,
+        <https://lagen.nu/concept/Rättegångsombud> ;
+    dcterms:title "Fråga om tidigare brottslighet utgjort skäl att avvisa en person som rättegångsombud på grund av bristande redbarhet."@sv ;
+    rpubl:avdelning "1" ;
+    rpubl:avgorandedatum "2007-10-05"^^xsd:date ;
+    rpubl:lagrum <https://lagen.nu/sfs/1942:740#K12P2> ;
+    rpubl:malnummer "Ö2668-07" ;
+    rpubl:rattsfall <https://lagen.nu/rf/nja/1936s605>,
+        <https://lagen.nu/rf/nja/2002s129> ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/oe2668-07/2007-10-05> .
+
+<https://lagen.nu/rf/nja/2007s650?repo=dv&dir=downloaded> rdfs:label "NJA 2007 s. 650"@sv .
+
+<https://lagen.nu/rf/nja/2007s650> a rpubl:Rattsfallsreferat ;
+    dcterms:bibliographicCitation "NJA 2007:79" ;
+    dcterms:identifier "NJA 2007 s. 650" ;
+    dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
+    dcterms:references <https://lagen.nu/rf/nja/1936s605>,
+        <https://lagen.nu/rf/nja/2002s129> ;
+    rpubl:arsutgava "2007" ;
+    rpubl:lopnummer "79" ;
+    rpubl:rattsfallspublikation <https://lagen.nu/dataset/nja> ;
+    rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/hd/Ö2668-07/2007-10-05> ;
+    rpubl:referatrubrik "Fråga om tidigare brottslighet utgjort skäl att avvisa en person som rättegångsombud på grund av bristande redbarhet."@sv ;
+    rpubl:sidnummer "650" ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rf/nja/2007/s_650> ;
+    prov:wasDerivedFrom <https://lagen.nu/rf/nja/2007s650?repo=dv&dir=downloaded> ;
+    prov:wasGeneratedBy "lagen.nu.dv.DV" .
+

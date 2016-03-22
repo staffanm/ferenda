@@ -1186,6 +1186,7 @@ class DV(SwedishLegalSource):
         domdesc.rdftype(RPUBL.VagledandeDomstolsavgorande)
         refdesc.rel(RPUBL.referatAvDomstolsavgorande, domuri)
         refdesc.value(PROV.wasGeneratedBy, self.qualified_class_name())
+        self._canonical_uri = refuri
         return refdesc.graph.resource(refuri)
 
     def add_keyword_to_metadata(self, domdesc, keyword):
@@ -1196,7 +1197,6 @@ class DV(SwedishLegalSource):
         with domdesc.rel(DCTERMS.subject):
             domdesc.value(RDFS.label, keyword, lang=self.lang)
 
-    # FIXME: temporary code we use while we get basefile_from_uri to work
     def postprocess_doc(self, doc):
         # append to mapfile -- duplicates are OK at this point
         mapfile = self.store.path("uri", "generated", ".map")
@@ -1206,8 +1206,6 @@ class DV(SwedishLegalSource):
             fp.write("%s\t%s\n" % (doc.uri[idx:], doc.basefile))
             if hasattr(self, "_basefilemap"):
                 delattr(self, "_basefilemap")
-
-        # FIXME: temporary code we use while we get basefile_from_uri to work
 
         # NB: This cannot be made to work 100% as there is not a 1:1
         # mapping between basefiles and URIs since multiple basefiles
@@ -1222,6 +1220,22 @@ class DV(SwedishLegalSource):
         # another (and that that one is parsed)
         computed_basefile = self.basefile_from_uri(doc.uri)
         assert doc.basefile == computed_basefile, "%s -> %s -> %s" % (doc.basefile, doc.uri, computed_basefile)
+
+        # remove empty Instans objects (these can happen when both a
+        # separate heading, as well as a clue in a paragraph,
+        # indicates a new court).
+        roots = []
+        for node in doc.body:
+            if isinstance(node, Delmal):
+                roots.append(node)
+        if roots == []:
+            roots.append(doc.body)
+
+        for root in roots:
+            for node in list(root):
+                if isinstance(node, Instans) and len(node) == 0:
+                    # print("Removing Instans %r" % node.court)
+                    root.remove(node)
 
 
     def infer_identifier(self, basefile):
@@ -1568,7 +1582,7 @@ class DV(SwedishLegalSource):
 
         def is_endmeta(parser):
             strchunk = str(parser.reader.peek())
-            return re.match("HD:s (beslut|dom) meddela(de|d|t): den", strchunk)
+            return re.match("HD:s (beslut|dom|domar) meddela(de|d|t): den", strchunk)
 
         def is_paragraph(parser):
             return True
@@ -1903,6 +1917,7 @@ class DV(SwedishLegalSource):
             # part of the dom, but rather an appendix
             ("dom", is_tillagg): (False, None),
             ("dom", is_endmeta): (False, None),
+            ("dom", is_delmal): (False, None),
             ("domskal", is_delmal): (False, None),
             ("domskal", is_domslut): (False, None),
             ("domskal", is_instans): (False, None),
@@ -1918,6 +1933,7 @@ class DV(SwedishLegalSource):
             ("skiljaktig", is_skiljaktig): (False, None),
             ("skiljaktig", is_tillagg): (False, None),
             ("skiljaktig", is_delmal): (False, None),
+            ("skiljaktig", is_endmeta): (False, None),
             ("tillagg", is_tillagg): (False, None),
             ("tillagg", is_delmal): (False, None),
             ("tillagg", is_endmeta): (False, None),
@@ -1981,6 +1997,92 @@ class DV(SwedishLegalSource):
                 else:
                     current_r = r
         return soup
+
+    # FIXME: Get this information from self.commondata and the slugs
+    # file. However, that data does not contain lower-level
+    # courts. For now, we use the slugs used internally at
+    # Domstolsverket, but lower-case. Also, this list does not attempt
+    # to bridge when a court changes name (eg. LST and FST are
+    # distinct, even though they refer to the "same" court). In the
+    # caxe of adminstrative decisions, this also includes slugs for
+    # commmon administrative agencies.
+    
+    courtslugs = {"Umeå tingsrätt": "TUM",
+                  "Hovrätten för Övre Norrland": "HON",
+                  "Förvaltningsrätten i Göteborg": "FGO",
+                  "Försäkringskassan": "FSK",
+                  "Växjö tingsrätt": "TVA",
+                  "Förvaltningsrätten i Malmö, migrationsdomstolen": "MFM",
+                  "Lunds tingsrätt": "TLU",
+                  "Linköpings tingsrätt": "TLI",
+                  "Malmö TR": "TMA",
+                  "Hovrätten för Nedre Norrland": "HNN",
+                  "Förvaltningsrätten i Stockholm, migrationsdomstolen": "MFS",
+                  "HovR:n för Övre Norrland": "HON",
+                  "Solna tingsrätt": "TSO",
+                  "Skatteverket": "SKV",
+                  "Förvaltningsrätten i Stockholm": "FST",
+                  "Göteborgs TR": "TGO",
+                  "Länsrätten i Göteborg": "LGO",
+                  "Länsrätten i Stockholms län, migrationsdomstolen": "MLS",
+                  "Hovrätten för Västra Sverige": "HVS",
+                  "Hovrätten över Skåne och Blekinge": "HSB",
+                  "HovR:n för Nedre Norrland": "HNN",
+                  "Länsrätten i Skåne län": "LSK",
+                  "Malmö tingsrätt": "TMA",
+                  "Migrationsverket": "MIV",
+                  "Göteborgs tingsrätt": "TGO",
+                  "Göta hovrätt": "HGO",
+                  "Hovrätten över Skåne och Blekinge": "HSB",
+                  "Kammarrätten i Sundsvall": "KSU",
+                  "Hovrätten för Västra Sverige": "HVS",
+                  "Stockholms TR": "TST",
+                  "Göta HovR": "HGO",
+                  "HovR:n över Skåne och Blekinge": "HSB",
+                  "Kammarrätten i Jönköping": "KJO",
+                  "HovR:n för Västra Sverige": "HVS",
+                  "Skatterättsnämnden": "SRN",
+                  "Stockholms tingsrätt": "TST",
+                  "Kammarrätten i Stockholm, Migrationsöverdomstolen": "MIG",
+                  "Kammarrätten i Göteborg": "KGO",
+                  "Högsta förvaltningsdomstolen": "HFD",
+                  "Länsrätten i Stockholms län": "LST",
+                  "Kammarrätten i Stockholm": "KST",
+                  "Regeringsrätten": "REG",
+                  "Svea hovrätt": "HSV",
+                  "Svea HovR": "HSV",
+                  "Högsta domstolen": "HDO",
+                  "HD": "HDO"
+                  }
+
+    def construct_id(self, node, state):
+        if isinstance(node, Delmal):
+            state = dict(state)
+            node.uri = state['uri'] + "#" + node.ordinal
+        elif isinstance(node, Instans):
+            if node.court:
+                state = dict(state)
+                courtslug = self.courtslugs.get(node.court, "XXX")
+                if "#" not in state['uri']:
+                    state['uri'] += "#"
+                else:
+                    state['uri'] += "/"
+                node.uri = state['uri'] + courtslug
+            else:
+                return state
+        elif isinstance(node, Body):
+            return state
+        else:
+            return None
+        state['uri'] = node.uri
+        return state
+
+    
+    def visitor_functions(self, basefile):
+        return (
+            (self.construct_id, {'uri': self._canonical_uri}),
+        )
+
 
     def tabs(self):
         return [("Vägledande rättsfall", self.dataset_uri())]

@@ -7,25 +7,21 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/rf/mig/2009:30> a rpubl:Rattsfallsreferat ;
-    dcterms:creator "Kammarrätten i Stockholm, Migrationsöverdomstolen"@sv,
-        "Länsrätten i Stockholms län, migrationsdomstolen"@sv ;
-    dcterms:identifier "MIG 2009:30" ;
-    dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
-    dcterms:references <https://lagen.nu/rf/mig/2006:9>,
-        <https://lagen.nu/prop/1971:30>,
+<https://lagen.nu/rf/mig/2009:30#MIG> dcterms:creator "Kammarrätten i Stockholm, Migrationsöverdomstolen"@sv ;
+    dcterms:isPartOf <https://lagen.nu/rf/mig/2009:30> ;
+    dcterms:references <https://lagen.nu/prop/1971:30>,
         <https://lagen.nu/prop/2004/05:170#s105>,
         <https://lagen.nu/prop/2004/05:170#s129>,
+        <https://lagen.nu/rf/mig/2006:9>,
         <https://lagen.nu/sfs/1971:291#P9>,
         <https://lagen.nu/sfs/2005:716>,
-        <https://lagen.nu/sfs/2005:716#K16P5S2> ;
-    rpubl:arsutgava "2009" ;
-    rpubl:lopnummer "30" ;
-    rpubl:rattsfallspublikation <https://lagen.nu/dataset/mig> ;
-    rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/mig/UM7867-08/2009-11-03> ;
-    rpubl:referatrubrik "Behovet av muntlig förhandling är särskilt framträdande i mål som rör avvisning eller utvisning av en utlänning som ansöker om uppehållstillstånd på grund av uppgivet flyktingskap eller såsom skyddsbehövande i övrigt och där en bedömning av trovärdigheten i den lämnade berättelsen har omedelbar betydelse för frågan om uppehållstillstånd. Är innehållet i de åberopade uppgifterna och utlänningens agerande sådant att det framstår som klart att uppgifterna är oförenliga och inte överensstämmer med verkligheten behöver inte någon muntlig förhandling hållas, trots att utlänningen begärt detta."@sv ;
-    owl:sameAs <http://rinfo.lagrummet.se/publ/rf/mig/2009:30> ;
-    prov:wasGeneratedBy "lagen.nu.dv.DV" .
+        <https://lagen.nu/sfs/2005:716#K16P5S2> .
+
+<https://lagen.nu/rf/mig/2009:30#MIV> dcterms:creator "Migrationsverket"@sv ;
+    dcterms:isPartOf <https://lagen.nu/rf/mig/2009:30> .
+
+<https://lagen.nu/rf/mig/2009:30#MLS> dcterms:creator "Länsrätten i Stockholms län, migrationsdomstolen"@sv ;
+    dcterms:isPartOf <https://lagen.nu/rf/mig/2009:30> .
 
 <https://lagen.nu/dom/mig/UM7867-08/2009-11-03> a rpubl:VagledandeDomstolsavgorande ;
     dcterms:publisher <https://lagen.nu/org/2008/migrationsoverdomstolen> ;
@@ -43,4 +39,18 @@
     rpubl:malnummer "UM7867-08" ;
     rpubl:rattsfall <https://lagen.nu/rf/mig/2006:9> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/mig/um7867-08/2009-11-03> .
+
+<https://lagen.nu/rf/mig/2009:30?repo=dv&dir=downloaded> rdfs:label "MIG 2009:30"@sv .
+
+<https://lagen.nu/rf/mig/2009:30> a rpubl:Rattsfallsreferat ;
+    dcterms:identifier "MIG 2009:30" ;
+    dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
+    rpubl:arsutgava "2009" ;
+    rpubl:lopnummer "30" ;
+    rpubl:rattsfallspublikation <https://lagen.nu/dataset/mig> ;
+    rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/mig/UM7867-08/2009-11-03> ;
+    rpubl:referatrubrik "Behovet av muntlig förhandling är särskilt framträdande i mål som rör avvisning eller utvisning av en utlänning som ansöker om uppehållstillstånd på grund av uppgivet flyktingskap eller såsom skyddsbehövande i övrigt och där en bedömning av trovärdigheten i den lämnade berättelsen har omedelbar betydelse för frågan om uppehållstillstånd. Är innehållet i de åberopade uppgifterna och utlänningens agerande sådant att det framstår som klart att uppgifterna är oförenliga och inte överensstämmer med verkligheten behöver inte någon muntlig förhandling hållas, trots att utlänningen begärt detta."@sv ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rf/mig/2009:30> ;
+    prov:wasDerivedFrom <https://lagen.nu/rf/mig/2009:30?repo=dv&dir=downloaded> ;
+    prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
