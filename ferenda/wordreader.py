@@ -91,7 +91,7 @@ class WordReader(object):
                 "Docbook conversion failed: %s" % stderr.strip())
 
         tree = ET.parse(tmpfile)
-        for element in tree.getiterator():
+        for element in tree.iter():
             if element.text and element.text.strip() != "":
                 replacement = ""
                 for p in element.text.split("\n"):
