@@ -347,24 +347,23 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         # them for each test as well. This might make it impractical
         # to run 10+ tests for a single repo.
 
-        method = self._testMethodName
-        dest = None
-        if method.startswith("test_download_"):
-            source = self.docroot + os.sep + "source"
-            dest = os.sep.join([self.datadir, self.repo.alias, "source"])
-            ignore = None
-        elif (method.startswith("test_parse_") or
-              method.startswith("test_distill_")):
-            source = self.docroot
-            dest = self.datadir + os.sep + self.repo.alias
-            ignore = shutil.ignore_patterns('source', 'parsed')
-        if dest:
+        if self.docroot != '/tmp':
+            method = self._testMethodName
+            dest = source = None
+            if method.startswith("test_download_"):
+                source = self.docroot + os.sep + "source"
+                dest = os.sep.join([self.datadir, self.repo.alias, "source"])
+                ignore = None
+            elif (method.startswith("test_parse_") or
+                  method.startswith("test_distill_")):
+                source = self.docroot
+                dest = self.datadir + os.sep + self.repo.alias
+                ignore = shutil.ignore_patterns('source', 'parsed')
             if os.path.exists(dest):
                 shutil.rmtree(dest)
             # FIXME: maybe we could warn or fail if this copy operation
             # takes more than, say, 0.5 seconds?
             shutil.copytree(source, dest, ignore=ignore)
-        
         if not hasattr(self, 'repo'):
             self.datadir = tempfile.mkdtemp()
             if isinstance(self.datadir, bytes):
@@ -378,7 +377,8 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             shutil.rmtree(cls.datadir)
 
     def tearDown(self):
-        shutil.rmtree(self.datadir)
+        if os.path.exists(self.datadir):
+            shutil.rmtree(self.datadir)
     
     def filename_to_basefile(self, filename):
         """Converts a test filename to a basefile. Default implementation

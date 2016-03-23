@@ -87,7 +87,8 @@ class Analyze(unittest.TestCase):
                            'h1': {'family': 'Cambria,Bold', 'size': 19},
                            'h2': {'family': 'Cambria,Bold', 'size': 17},
                            'h3': {'family': 'Cambria,Bold', 'size': 14},
-                           'title': {'family': 'Cambria', 'size': 37}},
+                           'title': {'family': 'Cambria', 'size': 37},
+                           'scanned_source': False},
                           stylemetrics)
 
     # this is more of a functional test
@@ -106,7 +107,8 @@ class Analyze(unittest.TestCase):
                            'pagewidth': 892,
                            'rightmargin': 784,
                            'rightmargin_even': 748,
-                           'title': {'family': 'Cambria', 'size': 37}},
+                           'title': {'family': 'Cambria', 'size': 37},
+                           'scanned_source': False},
                           metrics)
         self.assertTrue(os.path.exists(jsonpath))
         util.robust_remove(jsonpath)

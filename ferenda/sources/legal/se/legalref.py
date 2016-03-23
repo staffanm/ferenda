@@ -276,23 +276,23 @@ class LegalRef:
         # vi indatasträngen och stoppar in ett '|'-tecken innan vissa
         # suffix. Vi transformerar även 'Radio- och TV-lagen' till
         # 'Radio-_och_TV-lagen'
-        fixedindata = indata  # FIXME: Nonsensical
+
         if self.LAGRUM in self.args:
-            fixedindata = self.re_escape_compound.sub(
-                r'\1_\2_\3\4', fixedindata)
-            fixedindata = self.re_escape_named.sub(r'|\1', fixedindata)
-        # print "After: %r" % type(fixedindata)
+            indata = self.re_escape_compound.sub(
+                r'\1_\2_\3\4', indata)
+            indata = self.re_escape_named.sub(r'|\1', indata)
+        # print "After: %r" % type(indata)
 
         if self.verbose:
-            print("calling tag with '%s'" % (fixedindata))
+            print("calling tag with '%s'" % (indata))
 
         # Parsea texten med TextTools.tag - inte det enklaste sättet
         # att göra det, men om man gör enligt
         # Simpleparse-dokumentationen byggs taggertabellen om för
         # varje anrop till parse()
-        taglist = tag(fixedindata, self.tagger, 0, len(fixedindata))
+        taglist = tag(indata, self.tagger, 0, len(indata))
         result = []
-        root = NodeTree(taglist, fixedindata)
+        root = NodeTree(taglist, indata)
         for part in root.nodes:
             if part.tag != 'plain' and self.verbose:
                 sys.stdout.write(self.prettyprint(part))
@@ -315,9 +315,9 @@ class LegalRef:
                 self.lastlaw = self.currentlaw
             self.currentlaw = None
 
-        if taglist[-1] != len(fixedindata):
+        if taglist[-1] != len(indata):
             # log.error('Problem (%d:%d) with %r / %r' % (
-            #     taglist[-1] - 8, taglist[-1] + 8, fixedindata, indata))
+            #     taglist[-1] - 8, taglist[-1] + 8, indata, indata))
             raise RefParseError(
                 "parsed %s chars of %s (...%s...)" % (taglist[-1], len(indata),
                                                       indata[max(0, taglist[-1] - 4):taglist[-1] + 5]))

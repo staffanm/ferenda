@@ -495,6 +495,7 @@ class Regeringen(SwedishLegalSource):
                     # nodes, extracting keywords from text etc. Note: finding
                     # references in text with LegalRef is done afterwards
                     self.visit_node(body, func, initialstate)
+                # print("%s: self.config.parserefs: %s, self.parse_types: %s" % (basefile, self.config.parserefs, self.parse_types))
                 if self.config.parserefs and self.parse_types:
                     body = self.refparser.parse_recursive(body)
             else:

@@ -134,9 +134,14 @@ class SwedishLegalSource(DocumentRepository):
 
     @cached_property
     def refparser(self):
+        cd = self.commondata
+        if self.alias != "sfs" and self.resourceloader.exists("extra/sfs.ttl"):
+            with self.resourceloader.open("extra/sfs.ttl") as fp:
+                cd.parse(data=fp.read(), format="turtle")
+                
         return SwedishCitationParser(LegalRef(*self.parse_types),
                                      self.minter,
-                                     self.commondata,
+                                     cd,
                                      allow_relative=self.parse_allow_relative)
     
     @property

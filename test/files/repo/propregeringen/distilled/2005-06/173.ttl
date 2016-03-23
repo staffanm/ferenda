@@ -37,7 +37,8 @@
 
 <https://lagen.nu/prop/2005/06:173#B4> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
-    dcterms:references <https://lagen.nu/sfs/1998:204> ;
+    dcterms:references <https://lagen.nu/sfs/1991:1469>,
+        <https://lagen.nu/sfs/1998:204> ;
     dcterms:title "Lagrådsremissens lagförslag"@sv ;
     bibo:chapter "4"@sv .
 
@@ -51,6 +52,7 @@
 
 <https://lagen.nu/prop/2005/06:173#PS1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
+    dcterms:references <https://lagen.nu/sfs/1998:204> ;
     dcterms:title "Propositionens huvudsakliga innehåll"@sv .
 
 <https://lagen.nu/prop/2005/06:173#S1> a bibo:DocumentPart ;
@@ -61,7 +63,8 @@
 
 <https://lagen.nu/prop/2005/06:173#S10> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
-    dcterms:references <https://lagen.nu/sfs/1964:163>,
+    dcterms:references <https://lagen.nu/sfs/1962:700>,
+        <https://lagen.nu/sfs/1964:163>,
         <https://lagen.nu/sfs/1964:163#P5S2>,
         <https://lagen.nu/sfs/1998:204> ;
     dcterms:title "Ikraftträdande- och övergångsbestämmelser"@sv ;
@@ -75,7 +78,8 @@
 
 <https://lagen.nu/prop/2005/06:173#S2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173> ;
-    dcterms:references <https://lagen.nu/sfs/1998:204> ;
+    dcterms:references <https://lagen.nu/sfs/1991:1469>,
+        <https://lagen.nu/sfs/1998:204> ;
     dcterms:title "Förslag till lag om ändring i personuppgifts-lagen (1998:204)"@sv ;
     bibo:chapter "2"@sv .
 
@@ -149,7 +153,9 @@
 
 <https://lagen.nu/prop/2005/06:173#S6.1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S6> ;
-    dcterms:references <https://lagen.nu/sfs/1998:204> ;
+    dcterms:references <https://lagen.nu/sfs/1974:152>,
+        <https://lagen.nu/sfs/1974:152#K2>,
+        <https://lagen.nu/sfs/1998:204> ;
     dcterms:title "Allmänt om begreppet personlig integritet"@sv ;
     bibo:chapter "6.1"@sv .
 
@@ -167,6 +173,8 @@
 
 <https://lagen.nu/prop/2005/06:173#S6.4> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S6> ;
+    dcterms:references <https://lagen.nu/sfs/1974:152#K2>,
+        <https://lagen.nu/sfs/1974:152#K2P3S2> ;
     dcterms:title "Integritetsskyddskommittén"@sv ;
     bibo:chapter "6.4"@sv .
 
@@ -186,7 +194,9 @@
 
 <https://lagen.nu/prop/2005/06:173#S8.2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S8> ;
-    dcterms:references <https://lagen.nu/sfs/1998:204>,
+    dcterms:references <https://lagen.nu/sfs/1962:700#K5P1S1>,
+        <https://lagen.nu/sfs/1962:700#K5P3>,
+        <https://lagen.nu/sfs/1998:204>,
         <https://lagen.nu/sfs/1998:204#P1>,
         <https://lagen.nu/sfs/1998:204#P10> ;
     dcterms:title "Behandlingen får inte innebära en kränkning av den registrerades personliga integritet"@sv ;
@@ -196,6 +206,9 @@
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S8> ;
     dcterms:references <https://lagen.nu/prop/1997/98:44#s49>,
         <https://lagen.nu/prop/1999/2000:11#s11>,
+        <https://lagen.nu/sfs/1949:105>,
+        <https://lagen.nu/sfs/1974:152>,
+        <https://lagen.nu/sfs/1974:152#K2P1S1N2>,
         <https://lagen.nu/sfs/1998:1191#P4>,
         <https://lagen.nu/sfs/1998:204>,
         <https://lagen.nu/sfs/1998:204#P10S1Nf>,
@@ -228,6 +241,7 @@
 <https://lagen.nu/prop/2005/06:173#S8.5> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S8> ;
     dcterms:references <https://lagen.nu/sfs/1972:207>,
+        <https://lagen.nu/sfs/1972:207#K2P3>,
         <https://lagen.nu/sfs/1998:1191>,
         <https://lagen.nu/sfs/1998:204>,
         <https://lagen.nu/sfs/1998:204#P13>,
@@ -355,7 +369,7 @@
     dcterms:abstract "I propositionen föreslår regeringen reformer som syftar till att underlätta behandlingen av personuppgifter. Personuppgiftslagen utformas i viss utsträckning enligt en missbruksmodell. Den innebär att regleringen inte tar sikte på själva hanteringen av personuppgifterna utan på att uppgifterna inte får missbrukas till skada för någons personliga integritet. Behandling av personuppgifter i ostrukturerat material, t.ex. löpande text och enstaka ljud- och bildupptagningar, ska undantas från de flesta av personuppgiftslagens detaljerade hanteringsregler. Sådan behandling ska vara tilllåten utan andra restriktioner än att den registrerades personliga integritet inte får kränkas. Personuppgiftslagens bestämmelser om skadestånd ska gälla även för förfaranden i strid med den föreslagna missbruksregeln. Vidare ska det vara straffbart att i strid med missbruksregeln uppsåtligen eller av grov oaktsamhet behandla känsliga personuppgifter och uppgifter om lagöverträdelser m.m. på ett sätt som kränker den registrerades personliga integritet. Detsamma ska gälla för den som i strid med missbruksregeln för över personuppgifter till tredje land som saknar en adekvat nivå för skyddet av personuppgifter. Straffskalan ska vara densamma som för övriga brott enligt personuppgiftslagen. Gärningar som begås av oaktsamhet av normalgraden ska inte längre vara straffbara. I personuppgiftslagen införs en bestämmelse om att vissa beslut enligt lagen som fattats av myndigheter ska kunna överklagas till allmän förvaltningsdomstol. Prövningstillstånd ska krävas vid överklagande till kammarrätt. Vidare införs ett bemyndigande för regeringen att meddela föreskrifter om sådana undantag som är tillåtna enligt artikel 13.1 i EG-direktivet om personuppgifter. I propositionen görs bedömningen att förslagen är förenliga med EG-direktivet om personuppgifter (95/46/EG). Lagändringarna ska enligt förslaget träda i kraft den 1 januari 2007."@sv ;
     dcterms:identifier "Prop. 2005/06:173" ;
     dcterms:issued "2006-03-16"^^xsd:date ;
-    dcterms:references <https://lagen.nu/prop/2005/06:173> ;
+    dcterms:references <https://lagen.nu/sfs/1998:204> ;
     dcterms:title "Översyn av personuppgiftslagen"@sv ;
     rpubl:arsutgava "2005/06" ;
     rpubl:departement <https://lagen.nu/org/2008/justitiedepartementet> ;
