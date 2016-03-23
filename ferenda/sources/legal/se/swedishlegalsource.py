@@ -1196,11 +1196,17 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         return PropHuvudrubrik(str(parser.reader.next()).strip())
 
     def make_proprubrik(parser):
-        return PropRubrik(str(parser.reader.next()).strip())
+        s = str(parser.reader.next()).strip()
+        # it's common that offtryck_gluefunc incorrectly glues the
+        # heading and the identifier (which is at same height and same
+        # size, but really outside in the margin). The easist place to
+        # fix is really here (even though it would be better in
+        # offtryck_gluefunc).
+        if s.endswith(parser.current_identifier):
+            s = s[:-len(parser.current_identifier)].strip()
+        return PropRubrik(s)
 
     def make_paragraph(parser):
-        # if "Regeringen beslutade den 8 april 2010 att" in str(parser.reader.peek()):
-        #     raise ValueError("OK DONE")
         return parser.reader.next()
 
     @newstate('coverpage')
