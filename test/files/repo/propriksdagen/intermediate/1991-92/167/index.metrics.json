@@ -25,5 +25,6 @@
     "h2": {
         "size": 9, 
         "family": "unknown"
-    }
+    },
+    "scanned_source": true
 }

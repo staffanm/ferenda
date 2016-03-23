@@ -243,7 +243,6 @@ class Examples(unittest.TestCase, FerendaTestCase):
         self.verbose = True
         workingdir = tempfile.mkdtemp()
         shutil.copy2("doc/examples/w3cstandards.py", workingdir)
-        # from pudb import set_trace; set_trace()
         self._test_shfile("doc/examples/firststeps.sh", workingdir,
                           {'FERENDA_DOWNLOADMAX': '3',
                            'PYTHONPATH': os.getcwd(),

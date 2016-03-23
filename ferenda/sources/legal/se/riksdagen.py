@@ -409,7 +409,6 @@ class Riksdagen(FixedLayoutSource):
         convert_to_pdf = not downloaded_path.endswith(".pdf")
         keep_xml = "bz2" if self.config.compress == "bz2" else True
         reader = StreamingPDFReader()
-        from pudb import set_trace; set_trace()
         try:
             res = reader.convert(filename=downloaded_path,
                                  workdir=intermediate_dir,

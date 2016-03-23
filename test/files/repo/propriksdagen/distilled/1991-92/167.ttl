@@ -8,15 +8,30 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<https://lagen.nu/prop/1991/92:167#PS28> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1991/92:167#B5> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:references <https://lagen.nu/sfs/1988:1385>,
+        <https://lagen.nu/sfs/1991:980> ;
+    dcterms:title "Lagrådsremissens lagförslag"@sv ;
+    bibo:chapter "5"@sv .
+
+<https://lagen.nu/prop/1991/92:167#B7> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:title "Innehåll"@sv ;
+    bibo:chapter "7"@sv .
+
+<https://lagen.nu/prop/1991/92:167#PS1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
     dcterms:title "Propositionens huvudsakliga innehåll"@sv .
 
-<https://lagen.nu/prop/1991/92:167#PS29> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1991/92:167#PS2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:references <https://lagen.nu/sfs/1981:1361>,
+        <https://lagen.nu/sfs/1988:1385>,
+        <https://lagen.nu/sfs/1991:980> ;
     dcterms:title "Propositionens lagförslag"@sv .
 
-<https://lagen.nu/prop/1991/92:167#PS30> a bibo:DocumentPart ;
+<https://lagen.nu/prop/1991/92:167#PS3> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
     dcterms:title "Justitiedepartementet"@sv .
 
@@ -32,12 +47,12 @@
 
 <https://lagen.nu/prop/1991/92:167#S2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
-    dcterms:title "Detta direktiv skall inte gälla:"@sv,
-        "EG-reglemas införlivande i svensk rätt"@sv ;
+    dcterms:title "EG-reglemas införlivande i svensk rätt"@sv ;
     bibo:chapter "2"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S3.1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
+    dcterms:references <https://lagen.nu/prop/1971:86#s89> ;
     dcterms:title "Förvärvets syfte"@sv ;
     bibo:chapter "3.1"@sv .
 
@@ -46,23 +61,41 @@
     dcterms:title "Lagens benämning"@sv ;
     bibo:chapter "3.10"@sv .
 
+<https://lagen.nu/prop/1991/92:167#S3.12> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
+    dcterms:title "Ikraftträdande"@sv ;
+    bibo:chapter "3.12"@sv .
+
 <https://lagen.nu/prop/1991/92:167#S3.2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
+    dcterms:references <https://lagen.nu/prop/1981/82:40#s23> ;
     dcterms:title "Begreppet näringsidkare"@sv ;
     bibo:chapter "3.2"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S3.3> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
+    dcterms:references <https://lagen.nu/prop/1981/82:40#s41>,
+        <https://lagen.nu/sfs/1985:716#P2>,
+        <https://lagen.nu/sfs/1990:932>,
+        <https://lagen.nu/sfs/1990:932#P2> ;
     dcterms:title "Avtalstyperna"@sv ;
     bibo:chapter "3.3"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S3.4> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
+    dcterms:references <https://lagen.nu/prop/1981/82:40#s24>,
+        <https://lagen.nu/prop/1981/82:40#s41> ;
     dcterms:title "Avtalssituationen"@sv ;
     bibo:chapter "3.4"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S3.6> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
+    dcterms:references <https://lagen.nu/prop/1971:86#s66>,
+        <https://lagen.nu/prop/1971:86#s97>,
+        <https://lagen.nu/sfs/1985:716>,
+        <https://lagen.nu/sfs/1988:1385>,
+        <https://lagen.nu/sfs/1990:931>,
+        <https://lagen.nu/sfs/1991:980> ;
     dcterms:title "Undantag från hemförsäljningslagen för vissa prestationer"@sv ;
     bibo:chapter "3.6"@sv .
 
@@ -71,11 +104,6 @@
     dcterms:title "Regleringens tvingande karaktär"@sv ;
     bibo:chapter "3.9"@sv .
 
-<https://lagen.nu/prop/1991/92:167#S36> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
-    dcterms:title "41       42       48       49"@sv ;
-    bibo:chapter "36"@sv .
-
 <https://lagen.nu/prop/1991/92:167#S4> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
     dcterms:title "Upprättat lagförslag"@sv ;
@@ -83,17 +111,25 @@
 
 <https://lagen.nu/prop/1991/92:167#S5> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:references <https://lagen.nu/prop/1971:86#s90>,
+        <https://lagen.nu/prop/1981/82:40#s24>,
+        <https://lagen.nu/prop/1981/82:40#s35>,
+        <https://lagen.nu/sfs/1988:1385>,
+        <https://lagen.nu/sfs/1990:931#P2S1N2>,
+        <https://lagen.nu/sfs/1991:980> ;
     dcterms:title "Specialmotiverin g"@sv ;
     bibo:chapter "5"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S6> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
-    dcterms:title "Hemställan"@sv,
-        "avtalet ingås vid ett hembe-       sök som äger rum på konsumen-       tens uttryckliga begäran och       avtalet gäller en vara eller en       t/'ärtst som omfattas av konsu-"@sv ;
+    dcterms:references <https://lagen.nu/sfs/1981:1361> ;
+    dcterms:title "Hemställan"@sv ;
     bibo:chapter "6"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S7> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:references <https://lagen.nu/sfs/1981:1361>,
+        <https://lagen.nu/sfs/1985:571> ;
     dcterms:title "Beslut"@sv ;
     bibo:chapter "7"@sv .
 
@@ -108,8 +144,7 @@
 
 <https://lagen.nu/prop/1991/92:167#S3> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
-    dcterms:title "12 Ikraftträdande"@sv,
-        "Behovet av ändringar i hemförsäljningslagen"@sv ;
+    dcterms:title "Behovet av ändringar i hemförsäljningslagen"@sv ;
     bibo:chapter "3"@sv .
 
 <https://lagen.nu/prop/1991/92:167> a rpubl:Proposition ;

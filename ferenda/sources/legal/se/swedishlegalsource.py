@@ -18,7 +18,6 @@ from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
 OLO = Namespace("http://purl.org/ontology/olo/core#")
 from rdflib.resource import Resource
-from rdflib.collection import Collection
 from rdflib.namespace import DCTERMS, SKOS, FOAF, RDFS
 from six import text_type as str
 import bs4
@@ -1073,8 +1072,9 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             return True
         
         # Direktiv first page has a similar identifier, but it starts
-        # slightly before the right margin (hence +10), and is set in larger type.
-        if (chunk.left + 10 < metrics_rightmargin() and
+        # slightly before the right margin (hence +10), and is set in
+        # larger type.
+        if (chunk.left + 10 > metrics_rightmargin() and
                 strchunk == parser.current_identifier):
             return True
 
@@ -1310,13 +1310,19 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             return (None, None, chunk)
         strchunk = str(chunk).strip()
         if (strchunk.endswith(",") or
+            strchunk.endswith(".") or
             strchunk.endswith("och") or
             strchunk.endswith("eller") or
-            strchunk.endswith(".")):
+            strchunk.endswith(":")):
             # sections doesn't end like that
             return (None, None, chunk)
-        if strchunk.startswith("l "): # probable OCR mistake
-            strchunk = "1" + strchunk[1:]
+
+        if metrics.scanned_source:
+            if strchunk.startswith("l "): # probable OCR mistake
+                strchunk = "1" + strchunk[1:]
+            # "3. 12" -> "3.12" FIXME: Generalize to handle phantom
+            # spaces in other places (3- or 4 level section headings)
+            strchunk = re.sub("(\d+)\.\s+(\d+)", r"\1.\2", strchunk)
 
         m = re_sectionstart(strchunk)
         if m:

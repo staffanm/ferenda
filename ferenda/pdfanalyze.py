@@ -159,7 +159,6 @@ class PDFAnalyzer(object):
         Subclasses might add (or remove) from the above.
 
         """
-
         if (not force and
                 metricspath and
                 util.outfile_is_newer([self.pdf.filename], metricspath)):
@@ -180,6 +179,7 @@ class PDFAnalyzer(object):
 
         margincounters = dict(chain(hcounters.items(), vcounters.items()))
         allmetrics = dict(chain(hmetrics.items(), vmetrics.items(), stylemetrics.items()))
+        allmetrics['scanned_source'] = self.scanned_source
 
         if plotpath:
             self.plot(plotpath, margincounters, stylecounters, allmetrics)
