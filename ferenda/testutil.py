@@ -346,7 +346,6 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         # all tests when running a single test, and that we remove
         # them for each test as well. This might make it impractical
         # to run 10+ tests for a single repo.
-
         if self.docroot != '/tmp':
             method = self._testMethodName
             dest = source = None

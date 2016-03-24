@@ -87,8 +87,7 @@ class Analyze(unittest.TestCase):
                            'h1': {'family': 'Cambria,Bold', 'size': 19},
                            'h2': {'family': 'Cambria,Bold', 'size': 17},
                            'h3': {'family': 'Cambria,Bold', 'size': 14},
-                           'title': {'family': 'Cambria', 'size': 37},
-                           'scanned_source': False},
+                           'title': {'family': 'Cambria', 'size': 37}},
                           stylemetrics)
 
     # this is more of a functional test
@@ -125,7 +124,8 @@ class Analyze(unittest.TestCase):
                            'topmargin': 53,
                            'leftmargin_even': 108,
                            'pagewidth': 892,
-                           'rightmargin_even': 748},
+                           'rightmargin_even': 748,
+                           'scanned_source': False},
                           metrics)
 
     def test_plot(self):

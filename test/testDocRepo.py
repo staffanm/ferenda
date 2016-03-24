@@ -1563,10 +1563,14 @@ class Storage(RepoTester):
                  "base/downloaded/124/a.html",
                  "base/downloaded/124/b.html"]
         basefiles = ["124/b", "124/a", "123/b", "123/a"]
+        # need to set these, even though "file" is default, since we
+        # now avoid reinitializing self.repo for new tests
+        self.repo.storage_policy = "file"
+        self.repo.store.storage_policy = "file"
         for f in files:
             util.writefile(self.p(f),"Nonempty")
-        self.assertEqual(list(self.repo.store.list_basefiles_for("parse")),
-                         basefiles)
+        self.assertEqual(basefiles,
+                         list(self.repo.store.list_basefiles_for("parse")))
 
     def test_list_basefiles_dir(self):
         files = ["base/downloaded/123/a/index.html",

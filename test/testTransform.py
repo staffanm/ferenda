@@ -15,6 +15,7 @@ class Transform(RepoTester):
 
     def test_transform_html(self):
         base = self.datadir+os.sep
+        util.ensure_dir(base+"teststyle.xslt")
         with open(base+"teststyle.xslt","w") as fp:
             fp.write("""<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
     <xsl:param name="value"/>
