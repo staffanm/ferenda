@@ -393,9 +393,11 @@ class SwedishLegalSource(DocumentRepository):
         :type  doc: ferenda.Document
 
         """
-        # reset global state
+        # reset some global state
         UnorderedSection.counter = 0
         PreambleSection.counter = 0
+        self.refparser._legalrefparser.namedlaws = {}
+
         fp = self.parse_open(doc.basefile)
         resource = self.parse_metadata(fp, doc.basefile)
         doc.meta = resource.graph
