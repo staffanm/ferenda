@@ -86,6 +86,7 @@
       </xsl:if>
     </div>
   </xsl:template>
+  <xsl:param name="dyntoc" select="true()"/>
 
   <xsl:template name="docmetadata">
     <dl id="refs-dokument" class="dl-horizontal">

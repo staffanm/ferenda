@@ -102,19 +102,20 @@
       </nav>
       <div class="row">
 	<div class="col-sm-3">
-	  <nav id="toc" data-spy="affix" data-toggle="toc">
-	    <ul>
-	      <!--
-		  pre-generated toc is generally not needed now that
-		  the bootstrap-toc plugin generates them
-		  dynamically. However, toc pages still needs
-		  it. Other page types should just skip everything by
-		  an empty <xsl:template match="@*|node()"
-		  mode="toc"/> rule
-	      -->
-	      <xsl:apply-templates mode="toc"/>
-	    </ul>
-	  </nav>
+	  <!-- note: importing stylesheet MUST define <xsl:param name="dyntoc" select="false()"/> (or true()) -->
+	  <xsl:comment>dyntoc: <xsl:value-of select="$dyntoc"/></xsl:comment>
+	  <xsl:choose>
+	    <xsl:when test="$dyntoc">
+	      <nav id="toc" data-spy="affix" data-toggle="toc"></nav>
+	    </xsl:when>
+	    <xsl:otherwise>
+	      <nav id="toc">
+		<ul>
+		  <xsl:apply-templates mode="toc"/>
+		</ul>
+	      </nav>
+	    </xsl:otherwise>
+	  </xsl:choose>
 	</div>
 	<article class="col-sm-9">
 	  <xsl:call-template name="pagetitle"/>

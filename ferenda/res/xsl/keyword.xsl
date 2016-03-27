@@ -33,8 +33,8 @@
 	<xsl:with-param name="uri" select="@about"/>
       </xsl:call-template>
     </div>
-    
   </xsl:template>
+  <xsl:param name="dyntoc" select="true()"/>
       
 
   <xsl:template match="xhtml:a">

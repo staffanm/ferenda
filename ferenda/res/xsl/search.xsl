@@ -25,6 +25,7 @@ It's a generic template for search result pages.
   <xsl:template name="pagetitle">
     <h1><xsl:value-of select="../xhtml:head/xhtml:title"/></h1>
   </xsl:template>
+  <xsl:param name="dyntoc" select="false()"/>
       
   <xsl:template match="xhtml:div[@class='hit']">
     <section class="hit">

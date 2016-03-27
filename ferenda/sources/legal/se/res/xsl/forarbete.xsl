@@ -38,6 +38,7 @@ It's a generic template for any kind of content
       </aside>
     </div>
   </xsl:template>
+  <xsl:param name="dyntoc" select="true()"/>
 
   <!-- these headings shouldn't be expressed with <h*> tags, but
        rather with RDFa attribs in <div class="section"> element. Just
