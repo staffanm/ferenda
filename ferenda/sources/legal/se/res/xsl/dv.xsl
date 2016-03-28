@@ -23,7 +23,7 @@
     <div class="section-wrapper toplevel">
       <section class="col-sm-8">
 	<h1><xsl:value-of select="//xhtml:meta[@property='dcterms:identifier']/@content"/></h1>
-	<h2><xsl:value-of select="//xhtml:meta[@property='rpubl:referatrubrik']/@content"/></h2>
+	<p class="lead"><xsl:value-of select="//xhtml:meta[@property='rpubl:referatrubrik']/@content"/></p>
       </section>
       <xsl:call-template name="aside-annotations">
 	<xsl:with-param name="uri" select="@about"/>
@@ -143,7 +143,9 @@
 
   <xsl:template match="xhtml:div[@class='instans']">
     <div>
-    <h2><xsl:value-of select="@content"/></h2>
+      <xsl:if test="@content">
+	<h2><xsl:value-of select="@content"/></h2>
+      </xsl:if>
     <xsl:apply-templates/>
     </div>
   </xsl:template>
@@ -182,7 +184,7 @@
 
   <xsl:template match="xhtml:div[@class='endmeta']">
     <div>
-      <h3>endmeta</h3>
+      <!-- <h3>Metadata</h3> -->
       <xsl:apply-templates/>
     </div>
   </xsl:template>

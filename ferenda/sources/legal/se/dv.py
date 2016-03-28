@@ -721,15 +721,25 @@ class DV(SwedishLegalSource):
             header = []
             done = False
             while not done and iterator:
+                line = iterator[0].get_text().strip()
                 # can possibly be "Not 1a." (RÅ 1994 not 1) or "Not. 109." (RÅ 1998 not 109)
-                if re.match("Not(is|)\.? \d+[abc]?\.? ", iterator[0].get_text().strip()):
+                if re.match("Not(is|)\.? \d+[abc]?\.? ", line):
                     done = True
+                    if ". - " in line[:2000]:
+                        # Split out "Not 56" and the first
+                        # sentence up to ". -", signalling that is the
+                        # equiv of referatrubrik
+                        rubr = line.split(". - ", 1)[0]
+                        rubr = re.sub("Not(is|)\.? \d+[abc]?\.? ", "", rubr)
+                        head['Rubrik'] = rubr
                 else:
                     tmp = iterator.pop(0)
                     if tmp.get_text().strip():
                         # REG specialcase
-                        if header and header[-1].get_text() == "Lagrum:":
-                            header[-1].append(list(tmp.children)[0])
+                        if header and header[-1].get_text().strip() == "Lagrum:":
+                            # get the first bs4.element.Tag child
+                            children = [x for x in tmp.children if hasattr(x, 'get_text')]
+                            header[-1].append(children[0])
                         else:
                             header.append(tmp)
             if not done:

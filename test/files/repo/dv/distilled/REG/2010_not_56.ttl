@@ -1,0 +1,50 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://lagen.nu/rf/ra/2010/not/56> a rpubl:Rattsfallsnotis ;
+    dcterms:identifier "RÅ 2010 not 56" ;
+    dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
+    dcterms:references <https://lagen.nu/sfs/1971:291#P30S1>,
+        <https://lagen.nu/sfs/1971:948>,
+        <https://lagen.nu/sfs/1971:948#P3a>,
+        <https://lagen.nu/sfs/1971:948#P40>,
+        <https://lagen.nu/sfs/1971:948#P77>,
+        <https://lagen.nu/sfs/1974:152>,
+        <https://lagen.nu/sfs/1974:152#K11P14>,
+        <https://lagen.nu/sfs/1986:223>,
+        <https://lagen.nu/sfs/1986:223#P11>,
+        <https://lagen.nu/sfs/1986:223#P12>,
+        <https://lagen.nu/sfs/1998:808>,
+        <https://lagen.nu/sfs/1998:808#K16P5>,
+        <https://lagen.nu/sfs/1998:808#K4>,
+        <https://lagen.nu/sfs/1998:808#K5P3> ;
+    rpubl:arsutgava "2010" ;
+    rpubl:lopnummer "56" ;
+    rpubl:rattsfallspublikation <https://lagen.nu/dataset/ra> ;
+    rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/regr/1754-10/2010-06-14> ;
+    rpubl:referatrubrik "Ansökan av Sweets Konfektyr i Partille AB (bolaget) om rättsprövning av beslut om spärrning av enskild anslutning till väg"@sv ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/rf/ra/2010/not/56> ;
+    prov:wasDerivedFrom <https://lagen.nu/rf/ra/2010/not/56?repo=dv&dir=downloaded> ;
+    prov:wasGeneratedBy "lagen.nu.dv.DV" .
+
+<https://lagen.nu/dom/regr/1754-10/2010-06-14> a rpubl:VagledandeDomstolsavgorande ;
+    dcterms:publisher <https://lagen.nu/org/2008/regeringsratten> ;
+    dcterms:subject <https://lagen.nu/concept/Rättsprövning_enligt_lagen_(2006:304)_om_rättsprövning_av_vissa_regeringsbeslut>,
+        <https://lagen.nu/concept/Väglagen_-_beslut_om_spärrning_av_enskild_anslutning_till_väg_(avslag)>,
+        <https://lagen.nu/concept/Övriga_frågor> ;
+    dcterms:title "Ansökan av Sweets Konfektyr i Partille AB (bolaget) om rättsprövning av beslut om spärrning av enskild anslutning till väg"@sv ;
+    rpubl:avgorandedatum "2010-06-14"^^xsd:date ;
+    rpubl:lagrum <https://lagen.nu/sfs/1971:948#P40>,
+        <https://lagen.nu/sfs/2006:304>,
+        <https://lagen.nu/sfs/2006:304#P1> ;
+    rpubl:malnummer "1754-10" ;
+    owl:sameAs <http://rinfo.lagrummet.se/publ/dom/regr/1754-10/2010-06-14> .
+
+<https://lagen.nu/rf/ra/2010/not/56?repo=dv&dir=downloaded> rdfs:label "RÅ 2010 not 56"@sv .
+

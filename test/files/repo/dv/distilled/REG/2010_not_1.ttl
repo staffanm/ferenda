@@ -18,7 +18,9 @@
     rpubl:lopnummer "1" ;
     rpubl:rattsfallspublikation <https://lagen.nu/dataset/ra> ;
     rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/regr/5267-09/2010-01-04> ;
+    rpubl:referatrubrik "Ansökningar av H.J., A.W. och Odlarföreningen Gränbyodlarna (föreningen) om rättsprövning av ett beslut att anta detaljplan"@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/ra/2010/not/1> ;
+    prov:wasDerivedFrom <https://lagen.nu/rf/ra/2010/not/1?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
 <https://lagen.nu/dom/regr/5267-09/2010-01-04> a rpubl:VagledandeDomstolsavgorande ;
@@ -29,6 +31,7 @@
         <https://lagen.nu/concept/Förutsättningar_för_beslut_av_byggnadsnämnden_ansågs_uppfyllda_(avslag)>,
         <https://lagen.nu/concept/Plan-_och_bygglagen>,
         <https://lagen.nu/concept/Rättsprövning_enligt_lagen_(2006:304)_om_rättsprövning_av_vissa_regeringsbeslut> ;
+    dcterms:title "Ansökningar av H.J., A.W. och Odlarföreningen Gränbyodlarna (föreningen) om rättsprövning av ett beslut att anta detaljplan"@sv ;
     rpubl:avgorandedatum "2010-01-04"^^xsd:date ;
     rpubl:lagrum <https://lagen.nu/sfs/1987:10#K5P29>,
         <https://lagen.nu/sfs/2006:304>,
@@ -36,4 +39,6 @@
         <https://lagen.nu/sfs/2007:845#P4> ;
     rpubl:malnummer "5267-09" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/regr/5267-09/2010-01-04> .
+
+<https://lagen.nu/rf/ra/2010/not/1?repo=dv&dir=downloaded> rdfs:label "RÅ 2010 not 1"@sv .
 
