@@ -26,7 +26,7 @@ It's a generic template for any kind of content
   <xsl:template name="pagetitle">
     <h1><xsl:value-of select="../xhtml:head/xhtml:title"/></h1>
   </xsl:template>
-  <xsl:param name="dyntoc" select="true()"/>
+  <xsl:param name="dyntoc" select="false()"/>
       
   <xsl:template match="xhtml:a">
     <xsl:call-template name="link"/>
