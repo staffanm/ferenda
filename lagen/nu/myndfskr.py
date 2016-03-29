@@ -7,6 +7,8 @@ from operator import attrgetter
 from collections import Counter
 import re
 import os
+from urllib.parse import unquote
+from wsgiref.util import request_uri
 
 from rdflib import RDF, URIRef
 from rdflib.namespace import DCTERMS, SKOS
@@ -224,3 +226,22 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
         c = Counter([row['rpubl_forfattningssamling'] for row in self.faceted_data()])
         return ("%s författningar från %s författningssamlingar" % (
             sum(c.values()), len(c)))
+
+    def http_handle(self, environ):
+        from pudb import set_trace; set_trace()
+        segment = environ['PATH_INFO'].split("/")[1]
+        if segment in [cls.alias for cls in self.subrepos]:
+            url = unquote(request_uri(environ))
+            if 'develurl' in self.config:
+                url = url.replace(self.config.develurl, self.config.url)
+            basefile = self.basefile_from_uri(url)
+            path = self.store.generated_path(basefile)
+            return (open(path, 'rb'),
+                    os.path.getsize(path),
+                    200,
+                    "text/html")
+        else:
+            # handle the /dataset case
+            return super(MyndFskr, self).http_handle(environ)   
+        
+

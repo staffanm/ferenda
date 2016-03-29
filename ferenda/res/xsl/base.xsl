@@ -104,11 +104,9 @@
 	<div class="col-sm-3">
 	  <!-- note: importing stylesheet MUST define <xsl:param name="dyntoc" select="false()"/> (or true()) -->
 	  <xsl:comment>dyntoc: <xsl:value-of select="$dyntoc"/></xsl:comment>
-	  <xsl:choose>
-	    <xsl:when test="$dyntoc">
+	  <xsl:choose><xsl:when test="$dyntoc">
 	      <nav id="toc" data-spy="affix" data-toggle="toc"></nav>
-	    </xsl:when>
-	    <xsl:otherwise>
+	    </xsl:when><xsl:otherwise>
 	      <nav id="toc">
 		<ul>
 		  <xsl:apply-templates mode="toc"/>
