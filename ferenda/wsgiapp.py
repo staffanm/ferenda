@@ -101,43 +101,27 @@ Environ: %s
 
             """ % (tbstr, url, environ['QUERY_STRING'], environ['PATH_INFO'], sys.path, os.getcwd(), pformat(environ))
             msg = msg.encode('ascii')
-            start_response("500 Internal Server Error", [
-                ("Content-Type", "text/plain"),
-                ("Content-Length", str(len(msg)))
-            ])
-            return iter([msg])
-            
+            return self._return_response(msg, start_response,
+                                         status="500 Internal Server Error",
+                                         contenttype="text/plain")
+
     ################################################################
     # WSGI methods
 
     def search(self, environ, start_response):
         """WSGI method, called by the wsgi app for requests that matches
            ``searchendpoint``."""
-        idx = FulltextIndex.connect(self.config.indextype,
-                                    self.config.indexlocation,
-                                    self.repos)
-        # FIXME: QUERY_STRING should probably be sanitized before calling
-        # .query() - but in what way?
-        querystring = OrderedDict(parse_qsl(environ['QUERY_STRING']))
-        query = querystring.get('q')
-        if isinstance(query, bytes):  # happens on py26
-            query = query.decode("utf-8")  # pragma: no cover
-        pagenum = int(querystring.get('p', '1'))
-        res, pager = idx.query(query, pagenum=pagenum)
+        queryparams = self._search_parse_query(environ['QUERY_STRING'])
+        res, pager = self._search_run_query(queryparams)
+        
         if pager['totalresults'] == 1:
             resulthead = "1 match"
         else:
             resulthead = "%s matches" % pager['totalresults']
-        resulthead += " for '%s'" % query  # query will be escaped later
+        resulthead += " for '%s'" % queryparams.get("q")
 
-        # Creates simple XHTML result page
-        repo = self.repos[0]
-        doc = repo.make_document()
-        doc.uri = "http://example.org/"
-        doc.meta.add((URIRef(doc.uri),
-                      Namespace(util.ns['dcterms']).title,
-                      Literal(resulthead, lang="en")))
-        doc.body = elements.Body()
+        doc = self._search_create_page(resulthead)
+
         for r in res:
             if not 'dcterms_title' in r or r['dcterms_title'] is None:
                 r['dcterms_title'] = r['uri']
@@ -146,55 +130,19 @@ Environ: %s
             doc.body.append(html.Div(
                 [html.H2([elements.Link(r['dcterms_title'], uri=r['uri'])]),
                  r.get('text', '')], **{'class': 'hit'}))
-
-        # Create some HTML code for the pagination. FIXME: This should
-        # really be in search.xsl instead
-        pages = []
-        pagenum = pager['pagenum']
-        startpage = max([0, pager['pagenum'] - 4])
-        endpage = min([pager['pagecount'], pager['pagenum'] + 3])
-        if startpage > 0:
-            querystring['p'] = str(pagenum - 2)
-            url = environ['PATH_INFO'] + "?" + urlencode(querystring)
-            pages.append(html.LI([html.A(["«"], href=url)]))
-
-        for pagenum in range(startpage, endpage):
-            querystring['p'] = str(pagenum + 1)
-            url = environ['PATH_INFO'] + "?" + urlencode(querystring)
-            attrs = {}
-            if pagenum + 1 == pager['pagenum']:
-                attrs['class'] = 'active'
-            pages.append(html.LI([html.A([str(pagenum + 1)], href=url)],
-                                 **attrs))
-
-        if endpage < pager['pagecount']:
-            querystring['p'] = str(pagenum + 2)
-            url = environ['PATH_INFO'] + "?" + urlencode(querystring)
-            pages.append(html.LI([html.A(["»"], href=url)]))
-
+        pagerelem = self._search_render_pager(pager, queryparams,
+                                              environ['PATH_INFO'])
         doc.body.append(html.Div([
-            html.P(["Results %(firstresult)s-%(lastresult)s of %(totalresults)s" % pager]),
-            html.UL(pages, **{'class': 'pagination'})],
+            html.P(["Results %(firstresult)s-%(lastresult)s "
+                    "of %(totalresults)s" % pager]), pagerelem],
                                  **{'class':'pager'}))
-        # Transform that XHTML into HTML5
-        conffile = os.sep.join([self.config.documentroot, 'rsrc',
-                                'resources.xml'])
-        transformer = Transformer('XSLT', "xsl/search.xsl", "xsl",
-                                  resourceloader=self.resourceloader,
-                                  config=conffile)
-        # '/mysearch/' = depth 1
-        depth = len(self.config.searchendpoint.split("/")) - 2
-        repo = DocumentRepository(url=self.config.url)
-        # we must take develurl into account
-        urltransform = None
-        if 'develurl' in self.config:
-            urltransform = repo.get_url_transform_func(
-                develurl=self.config.develurl)
-        tree = transformer.transform(repo.render_xhtml_tree(doc), depth,
-                                     uritransform=urltransform)
-        data = transformer.t.html5_doctype_workaround(etree.tostring(tree))
-        start_response(self._str("200 OK"), [
-            (self._str("Content-Type"), self._str("text/html; charset=utf-8")),
+        data = self._search_transform_doc(doc)
+        return self._return_response(data, start_response)
+
+    def _return_response(self, data, start_response, status="200 OK",
+                         contenttype="text/html; charset=utf-8"):
+        start_response(self._str(status), [
+            (self._str("Content-Type"), self._str(contenttype)),
             (self._str("Content-Length"), self._str(str(len(data))))
         ])
         return iter([data])
@@ -209,11 +157,8 @@ Environ: %s
             d = self.query(environ)
         data = json.dumps(d, indent=4, default=util.json_default_date,
                           sort_keys=True).encode('utf-8')
-        start_response(self._str("200 OK"), [
-            (self._str("Content-Type"), self._str("application/json")),
-            (self._str("Content-Length"), self._str(str(len(data))))
-        ])
-        return iter([data])
+        return self._return_response(data, start_response,
+                                     contenttype="application/json")
 
     def static(self, environ, start_response):
         """WSGI method, called by the wsgi app for all other requests not
@@ -608,6 +553,82 @@ Examined %s repos.""" % (environ['PATH_INFO'],
 
         return q, filtered, pagenum, pagelen, stats
 
+    def _search_parse_query(self, querystring):
+        # FIXME: querystring should probably be sanitized before
+        # calling .query() - but in what way?
+        queryparams = OrderedDict(parse_qsl(querystring))
+        return queryparams
+    
+    def _search_run_query(self, queryparams):
+        idx = FulltextIndex.connect(self.config.indextype,
+                                    self.config.indexlocation,
+                                    self.repos)
+        query = queryparams.get('q')
+        if isinstance(query, bytes):  # happens on py26
+            query = query.decode("utf-8")  # pragma: no cover
+        pagenum = int(queryparams.get('p', '1'))
+        res, pager = idx.query(query, pagenum=pagenum)
+        return res, pager
+
+    def _search_create_page(self, resulthead):
+        # Creates simple XHTML result page
+        repo = self.repos[0]
+        doc = repo.make_document()
+        doc.uri = "http://example.org/"
+        doc.meta.add((URIRef(doc.uri),
+                      Namespace(util.ns['dcterms']).title,
+                      Literal(resulthead, lang="en")))
+        doc.body = elements.Body()
+        return doc
+
+    def _search_render_pager(self, pager, queryparams, path_info):
+        # Create some HTML code for the pagination. FIXME: This should
+        # really be in search.xsl instead
+        pages = []
+        pagenum = pager['pagenum']
+        startpage = max([0, pager['pagenum'] - 4])
+        endpage = min([pager['pagecount'], pager['pagenum'] + 3])
+        if startpage > 0:
+            queryparams['p'] = str(pagenum - 2)
+            url = path_info + "?" + urlencode(queryparams)
+            pages.append(html.LI([html.A(["«"], href=url)]))
+
+        for pagenum in range(startpage, endpage):
+            queryparams['p'] = str(pagenum + 1)
+            url = path_info + "?" + urlencode(queryparams)
+            attrs = {}
+            if pagenum + 1 == pager['pagenum']:
+                attrs['class'] = 'active'
+            pages.append(html.LI([html.A([str(pagenum + 1)], href=url)],
+                                 **attrs))
+
+        if endpage < pager['pagecount']:
+            queryparams['p'] = str(pagenum + 2)
+            url = path_info + "?" + urlencode(queryparams)
+            pages.append(html.LI([html.A(["»"], href=url)]))
+
+        return html.UL(pages, **{'class': 'pagination'})
+                       
+    def _search_transform_doc(self, doc):
+        # Transform that XHTML into HTML5
+        conffile = os.sep.join([self.config.documentroot, 'rsrc',
+                                'resources.xml'])
+        transformer = Transformer('XSLT', "xsl/search.xsl", "xsl",
+                                  resourceloader=self.resourceloader,
+                                  config=conffile)
+        # '/mysearch/' = depth 1
+        depth = len(self.config.searchendpoint.split("/")) - 2
+        repo = DocumentRepository(url=self.config.url)
+        # we must take develurl into account
+        urltransform = None
+        if 'develurl' in self.config:
+            urltransform = repo.get_url_transform_func(
+                develurl=self.config.develurl)
+        tree = transformer.transform(repo.render_xhtml_tree(doc), depth,
+                                     uritransform=urltransform)
+        data = transformer.t.html5_doctype_workaround(etree.tostring(tree))
+        return data
+    
     def _str(self, s, encoding="ascii"):
         """If running under python2, return byte string version of the
         argument, otherwise return the argument unchanged.

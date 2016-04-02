@@ -228,7 +228,6 @@ class MyndFskr(CompositeRepository, SwedishLegalSource):
             sum(c.values()), len(c)))
 
     def http_handle(self, environ):
-        from pudb import set_trace; set_trace()
         segment = environ['PATH_INFO'].split("/")[1]
         if segment in [cls.alias for cls in self.subrepos]:
             url = unquote(request_uri(environ))

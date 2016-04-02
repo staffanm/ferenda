@@ -84,9 +84,9 @@
 	    <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
               <span class="sr-only">Toggle navigation</span>
 	      <!-- this is a hamburger menu... -->
-              <span class="icon-bar"></span>
-              <span class="icon-bar"></span>
-              <span class="icon-bar"></span>
+              <span class="icon-bar">&#8204;</span>
+              <span class="icon-bar">&#8204;</span>
+              <span class="icon-bar">&#8204;</span>
 	    </button>
 	    <a class="navbar-brand" href="{$configuration/url}"><xsl:value-of select="$configuration/sitename"/></a>
 	  </div>
