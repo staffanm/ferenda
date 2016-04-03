@@ -1655,6 +1655,12 @@ class SFS(Trips):
                       dimension_label="utgiven")
                 ]
 
+    def _relate_fulltext_resources(self, body):
+        # only return K1, K1P1 or B1, not more fine-grained resources
+        # like K1P1S1N1
+        return [body] + [r for r in body.findall(".//*[@about]") if re.search("#[KPBS]\d+\w?(P\d+\w?|)$", r.get("about"))]
+    
+
     def toc_item(self, binding, row):
         """Returns a formatted version of row, using Element objects"""
         title = self._forfattningskey(row['titel'])

@@ -1889,7 +1889,8 @@ parsed document path to that documents dependency file."""
             qname_graph = self.make_graph()
             body = tree.find(".//{http://www.w3.org/1999/xhtml}body")
             common_graph = self.commondata
-            for resource in [body] + body.findall(".//*[@about]"):
+            resources = self._relate_fulltext_resources(body)
+            for resource in resources:
                 if resource.tag == "{http://www.w3.org/1999/xhtml}head":
                     continue
                 about = resource.get('about')
@@ -1901,7 +1902,7 @@ parsed document path to that documents dependency file."""
                 repo = self.alias
                 if isinstance(repo, bytes):  # again, py2
                     repo = repo.decode()     # pragma: no cover
-                plaintext = util.normalize_space(self._extract_plaintext(resource))
+                plaintext = util.normalize_space(self._extract_plaintext(resource, resources))
 
                 kwargs = {}
                 for facet in self.facets():
@@ -1955,14 +1956,17 @@ parsed document path to that documents dependency file."""
 
             indexer.commit()  # NB: Destroys indexer._writer
 
-    def _extract_plaintext(self, node):
+    def _relate_fulltext_resources(self, body):
+        return [body] + body.findall(".//*[@about]")
+
+    def _extract_plaintext(self, node, resources):
         # helper to extract any text from a elementtree node,
-        # excluding subnodes that are resources themselves (ie they
-        # have an @about node)
+        # excluding subnodes that are resources themselves (as
+        # determined by _relate_fulltext_resources)
         plaintext = node.text if node.text else ""
         for subnode in node:
-            if not subnode.get('about'):
-                plaintext += self._extract_plaintext(subnode)
+            if subnode not in resources:
+                plaintext += self._extract_plaintext(subnode, resources)
         if node.tail:
             plaintext += node.tail
         # append trailing space for block-level elements (including
