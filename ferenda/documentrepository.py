@@ -1888,7 +1888,6 @@ parsed document path to that documents dependency file."""
                         self.store.distilled_path(basefile))))
             qname_graph = self.make_graph()
             body = tree.find(".//{http://www.w3.org/1999/xhtml}body")
-            common_graph = self.commondata
             resources = self._relate_fulltext_resources(body)
             for resource in resources:
                 if resource.tag == "{http://www.w3.org/1999/xhtml}head":
@@ -1906,45 +1905,10 @@ parsed document path to that documents dependency file."""
 
                 kwargs = {}
                 for facet in self.facets():
-                    if facet.toplevel_only and resource != body:
-                        continue
-
-                    # facets don't tell whether their sought subjects
-                    # are URIRefs or Literals. Look for both.
-                    v = desc.getrels(facet.rdftype)
-                    if isinstance(facet.indexingtype, fulltextindex.Resource):
-                        newv = []
-                        for value in sorted(v):
-                            # abuse the resourcelabel func a little
-                            label = facet.resourcelabel({None: value}, None, common_graph)
-                            newv.append({'iri': value,
-                                         'label': label})
-                        v = newv
-                    elif not v:
-                        v = sorted(desc.getvalues(facet.rdftype))
-
+                    k, v = self._relate_fulltext_value(facet, resource, desc)
                     if v:
-                        if facet.multiple_values:
-                            v = v
-                        elif len(v) > 1:
-                            self.log.warning(
-                                "%s (%s/%s) had multiple values for %s but multiple_values was not specified, randomly selecting one" %
-                                (about, repo, basefile, facet.rdftype))
-                            v = v[0]
-                        else:
-                            v = v[0]
-                        # FIXME: use facet.dimension_label iff present
-                        if facet.dimension_label:
-                            k = facet.dimension_label
-                            # if dimension_label specified, we
-                            # probably have a custom selector and a
-                            # synthesized property. Synthesize the
-                            # value by calling the selector (in a
-                            # roundabout way since selector expects a
-                            # dict and a key)
-                            v = facet.selector({None: v}, None, self.commondata)
-                        else:
-                            k = qname_graph.qname(facet.rdftype).replace(":", "_")
+                        if k is None:
+                            k = qname_graph.qname(facet.rdftype).replace(":", "_")                            
                         kwargs[k] = v
                 indexer.update(uri=about,
                                repo=repo,
@@ -1958,6 +1922,49 @@ parsed document path to that documents dependency file."""
 
     def _relate_fulltext_resources(self, body):
         return [body] + body.findall(".//*[@about]")
+
+    def _relate_fulltext_value(self, facet, resource, desc):
+        if facet.toplevel_only and resource.tag != '{http://www.w3.org/1999/xhtml}body':
+            return None, None
+
+        # facets don't tell whether their sought subjects
+        # are URIRefs or Literals. Look for both.
+        v = desc.getrels(facet.rdftype)
+        if isinstance(facet.indexingtype, fulltextindex.Resource):
+            newv = []
+            for value in sorted(v):
+                # abuse the resourcelabel func a little
+                label = facet.resourcelabel({None: value}, None, self.commondata)
+                newv.append({'iri': value,
+                             'label': label})
+            v = newv
+        elif not v:
+            v = sorted(desc.getvalues(facet.rdftype))
+
+        if not v:
+            return None, None
+        if facet.multiple_values:
+            v = v
+        elif len(v) > 1:
+            self.log.warning(
+                "%s (%s/%s) had multiple values for %s but multiple_values was not specified, randomly selecting one" %
+                (about, repo, basefile, facet.rdftype))
+            v = v[0]
+        else:
+            v = v[0]
+        # FIXME: use facet.dimension_label iff present
+        if facet.dimension_label:
+            k = facet.dimension_label
+            # if dimension_label specified, we
+            # probably have a custom selector and a
+            # synthesized property. Synthesize the
+            # value by calling the selector (in a
+            # roundabout way since selector expects a
+            # dict and a key)
+            v = facet.selector({None: v}, None, self.commondata)
+        else:
+            k = None
+        return k, v
 
     def _extract_plaintext(self, node, resources):
         # helper to extract any text from a elementtree node,

@@ -1652,7 +1652,12 @@ class SFS(Trips):
                       label="Ordnade efter utgivnings\xe5r",
                       pagetitle='F\xf6rfattningar utgivna %(selected)s',
                       key=forfattningskey,
-                      dimension_label="utgiven")
+                      dimension_label="utgiven"),
+                Facet(RDFS.label,
+                      use_for_toc=False,
+                      use_for_feed=False,
+                      toplevel_only=False,
+                      )
                 ]
 
     def _relate_fulltext_resources(self, body):

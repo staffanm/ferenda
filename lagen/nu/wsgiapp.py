@@ -25,6 +25,7 @@ lagen.nu."""
         doc = self._search_create_page(resulthead)
         
         for r in res:
+            from pudb import set_trace; set_trace()
             if not 'dcterms_title' in r or r['dcterms_title'] is None:
                 r['dcterms_title'] = r['uri']
             if r.get('dcterms_identifier', False):
