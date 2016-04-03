@@ -243,19 +243,20 @@ def make_wsgi_app(inifile=None, **kwargs):
         config = _load_config(inifile)
         args = _setup_runserver_args(config, inifile)
         args['inifile'] = inifile
+        # make it possible to specify a different class that implements
+        # the wsgi application
+        classname = getattr(config, "wsgiappclass", "ferenda.WSGIApp")
+        cls = _load_class(classname)
     else:
         args = kwargs  # sanity check: is documentroot, searchendpoint and
         # apiendpoint defined?
+        cls = WSGIApp
 
     # if we have an inifile, we should provide that instead of the
     # **args we've got from _setup_runserver_args()
     repos = args['repos']
     del args['repos']
 
-    # make it possible to specify a different class that implements
-    # the wsgi application
-    classname = getattr(config, "wsgiappclass", "ferenda.WSGIApp")
-    cls = _load_class(classname)
     return cls(repos, **args)
 
 
