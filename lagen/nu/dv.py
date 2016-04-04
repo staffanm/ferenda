@@ -7,7 +7,7 @@ from collections import Counter
 from operator import attrgetter
 
 from rdflib import RDF, URIRef, BNode, Graph
-from rdflib.namespace import DCTERMS, OWL
+from rdflib.namespace import DCTERMS, OWL, RDFS
 from cached_property import cached_property
 
 from ferenda import Facet, Describer, TocPageset, TocPage, Feed, Feedset
@@ -123,9 +123,33 @@ class DV(OrigDV, SameAs):
                       # or else the data from faceted_data() won't be
                       # usable by wsgi.stats
                       # key=  # FIXME add useful key method for sorting docs
-                      identificator=lambda x, y, z: None)
+                      identificator=lambda x, y, z: None),
+                self.labelfacet
                 ]
 
+    def _relate_fulltext_value(self, facet, resource, desc):
+        def rootlabel(desc):
+            return desc.getvalue(DCTERMS.identifier)
+        if facet.rdftype == RDFS.label:
+            if "#" in resource.get("about"):
+                rooturi = resource.get("about").split("#")[0]
+                oldabout = desc._current()
+                desc.about(rooturi)
+                v = rootlabel(desc)
+                desc.about(oldabout)
+                if desc.getvalue(DCTERMS.creator):
+                    court = desc.getvalue(DCTERMS.creator)
+                else:
+                    court = resource.get("about").split("#")[1]
+                v = "%s (%s)" % (v, court)
+            else:
+                v = rootlabel(desc)
+            # print("%s -> %s" % (resource.get("about"), v))
+            return None, v
+        else:
+            return super(DV, self)._relate_fulltext_value(facet, resource, desc
+)
+    
     def toc_pagesets(self, data, facets):
         # our primary facet is RPUBL.rattsfallspublikation, but we
         # need to create one pageset for each value thereof.

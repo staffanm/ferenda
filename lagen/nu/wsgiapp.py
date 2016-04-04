@@ -23,15 +23,15 @@ lagen.nu."""
         resulthead += " för '%s'" % queryparams.get("q")
 
         doc = self._search_create_page(resulthead)
-        
         for r in res:
-            from pudb import set_trace; set_trace()
-            if not 'dcterms_title' in r or r['dcterms_title'] is None:
-                r['dcterms_title'] = r['uri']
-            if r.get('dcterms_identifier', False):
-                r['dcterms_title'] = r['dcterms_identifier'] + ": " + r['dcterms_title']
+            if 'rdfs_label' not in r:
+                label = r['uri']
+            elif isinstance(r['rdfs_label'], list):
+                label = r['rdfs_label'][0]
+            else:
+                label = r['rdfs_label']
             doc.body.append(html.Div(
-                [html.H2([elements.Link(r['dcterms_title'], uri=r['uri'])]),
+                [html.H2([elements.Link(label, uri=r['uri'])]),
                  r.get('text', '')], **{'class': 'hit'}))
         pagerelem = self._search_render_pager(pager, queryparams,
                                               environ['PATH_INFO'])

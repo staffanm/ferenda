@@ -12,8 +12,8 @@ import codecs
 from datetime import datetime, timedelta
 
 from bs4 import BeautifulSoup
-from rdflib import Literal, URIRef
-from rdflib.namespace import DCTERMS, XSD
+from rdflib import Literal, URIRef, Namespace
+from rdflib.namespace import DCTERMS, XSD, RDFS
 import requests
 
 from . import (SwedishLegalSource, SwedishLegalStore, FixedLayoutSource,
@@ -343,3 +343,4 @@ class Direktiv(CompositeRepository, SwedishLegalSource):
         a = super(Direktiv, self).metadata_from_basefile(basefile)
         a["rpubl:arsutgava"], a["rpubl:lopnummer"] = basefile.split(":", 1)
         return a
+

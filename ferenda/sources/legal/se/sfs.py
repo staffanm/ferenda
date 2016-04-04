@@ -16,7 +16,7 @@ from urllib.parse import quote, unquote
 
 # 3rdparty libs
 from rdflib import URIRef, Literal, RDF, Graph, BNode
-from rdflib.namespace import DCTERMS, SKOS
+from rdflib.namespace import DCTERMS, SKOS, RDFS
 from lxml import etree
 from bs4 import BeautifulSoup
 import requests
@@ -1576,12 +1576,12 @@ class SFS(Trips):
                 store = TripleStore.connect(self.config.storetype,
                                             self.config.storelocation,
                                             self.config.storerepository)
-
                 changes = self.store_select(
                     store,
                     "sparql/sfs_title.rq",
                     uri,
-                    self.dataset_uri())
+                    None # self.dataset_uri()
+                )
                 if changes:
                     self._document_name_cache[parts[
                         'law']] = changes[0]['title']
@@ -1653,11 +1653,7 @@ class SFS(Trips):
                       pagetitle='F\xf6rfattningar utgivna %(selected)s',
                       key=forfattningskey,
                       dimension_label="utgiven"),
-                Facet(RDFS.label,
-                      use_for_toc=False,
-                      use_for_feed=False,
-                      toplevel_only=False,
-                      )
+                self.labelfacet
                 ]
 
     def _relate_fulltext_resources(self, body):
@@ -1665,6 +1661,14 @@ class SFS(Trips):
         # like K1P1S1N1
         return [body] + [r for r in body.findall(".//*[@about]") if re.search("#[KPBS]\d+\w?(P\d+\w?|)$", r.get("about"))]
     
+    def _relate_fulltext_value(self, facet, resource, desc):
+        if facet.rdftype == RDFS.label:
+            v = self.display_title(resource.get("about"))
+            # print("%s -> %s" % (resource.get("about"), v))
+            return None, v
+        else:
+            return super(SFS, self)._relate_fulltext_value(facet, resource, desc)
+
 
     def toc_item(self, binding, row):
         """Returns a formatted version of row, using Element objects"""

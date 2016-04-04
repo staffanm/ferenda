@@ -16,15 +16,16 @@ from wsgiref.util import request_uri
 
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
-OLO = Namespace("http://purl.org/ontology/olo/core#")
 from rdflib.resource import Resource
 from rdflib.namespace import DCTERMS, SKOS, FOAF, RDFS
+BIBO = Namespace("http://purl.org/ontology/bibo/")
+OLO = Namespace("http://purl.org/ontology/olo/core#")
 from six import text_type as str
 import bs4
 from cached_property import cached_property
 
 from ferenda import (DocumentRepository, DocumentStore, FSMParser,
-                     CitationParser, Describer)
+                     CitationParser, Describer, Facet)
 from ferenda import util
 from ferenda.sources.legal.se.legalref import Link, LegalRef, RefParseError
 from ferenda.elements.html import A, H1, H2, H3
@@ -909,6 +910,52 @@ class SwedishLegalSource(DocumentRepository):
             return quote(url, safe="/:?$=&%")
         # else return None
 
+    def relate(self, basefile, otherrepos=[]):
+        for repo in otherrepos:
+            # make sure all repos have a (copy of a) minter object for
+            # performance reasons (compare self.get_url_transform_func)
+            repo.minter = self.minter
+        return super(SwedishLegalSource, self).relate(basefile, otherrepos)
+
+    labelfacet = Facet(RDFS.label,
+                       use_for_toc=False,
+                       use_for_feed=False,
+                       toplevel_only=False,
+                       )
+
+    def _relate_fulltext_value(self, facet, resource, desc):
+        def rootlabel(desc):
+            return "%s: %s" % (desc.getvalue(DCTERMS.identifier),
+                               desc.getvalue(DCTERMS.title))
+
+        if facet.rdftype == RDFS.label:
+            k = None  # let caller figure it out
+            if "#" in resource.get("about"):
+                # need to get the dcterms:identifier and :title of the
+                # root object, then append the bibo:chapter or
+                # dcterms:title of tih resource.
+                rooturi = resource.get("about").split("#")[0]
+                oldabout = desc._current()
+                desc.about(rooturi)
+                v = rootlabel(desc)
+                desc.about(oldabout)
+                if desc.getvalues(BIBO.chapter):
+                    v = "%s, avsnitt %s '%s'" % (v,
+                                                 desc.getvalue(BIBO.chapter),
+                                                 desc.getvalue(DCTERMS.title))
+                else:
+                    v = "%s, '%s'" % (v, desc.getvalue(DCTERMS.title))
+            else:
+                # this IS the root object
+                v = rootlabel(desc)
+            # print("%s -> %s" % (resource.get("about"), v))
+            return k, [v]
+        else:
+            return super(SwedishLegalSource, self)._relate_fulltext_value(facet, resource, desc)
+
+    def facets(self):
+        return super(SwedishLegalSource, self).facets() + [self.labelfacet]
+        
     def frontpage_content(self, primary=False):
         if not self.config.tabs:
             self.log.debug("%s: Not doing frontpage content (config has tabs=False)" % self.alias)

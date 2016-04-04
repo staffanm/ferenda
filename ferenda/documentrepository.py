@@ -1921,7 +1921,13 @@ parsed document path to that documents dependency file."""
             indexer.commit()  # NB: Destroys indexer._writer
 
     def _relate_fulltext_resources(self, body):
-        return [body] + body.findall(".//*[@about]")
+        res = []
+        uris = set()
+        for r in body.findall(".//*[@about]"):
+            if r.get("about") not in uris:
+                uris.add(r.get("about"))
+                res.append(r)
+        return [body] + res
 
     def _relate_fulltext_value(self, facet, resource, desc):
         if facet.toplevel_only and resource.tag != '{http://www.w3.org/1999/xhtml}body':
