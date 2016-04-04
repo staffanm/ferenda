@@ -31,8 +31,8 @@ lagen.nu."""
             else:
                 label = r['rdfs_label']
             doc.body.append(html.Div(
-                [html.H2([elements.Link(label, uri=r['uri'])]),
-                 r.get('text', '')], **{'class': 'hit'}))
+                [html.B([elements.Link(label, uri=r['uri'])]),
+                 html.P([r.get('text', '')])], **{'class': 'hit'}))
         pagerelem = self._search_render_pager(pager, queryparams,
                                               environ['PATH_INFO'])
         doc.body.append(html.Div([
