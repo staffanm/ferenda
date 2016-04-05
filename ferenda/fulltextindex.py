@@ -31,6 +31,8 @@ class FulltextIndex(object):
 
     """
 
+    
+    
     @staticmethod
     def connect(indextype, location, repos):
         """Open a fulltext index (creating it if it doesn't already exists).
@@ -684,6 +686,7 @@ class ElasticSearchIndex(RemoteIndex):
 
     def __init__(self, location, repos):
         self._writer = None
+        self._repos = repos
         super(ElasticSearchIndex, self).__init__(location, repos)
 
     def close(self):
@@ -809,7 +812,8 @@ class ElasticSearchIndex(RemoteIndex):
             else:
                 query = {"match_all": match}
 
-        payload = {'query': query}
+        payload = {'query': query,
+                   'aggs': self._aggregation_payload()}
         if q:
             payload['highlight'] = {'fields': {'_all': {}},
                                     'pre_tags': ["<strong class='match'>"],
@@ -817,9 +821,28 @@ class ElasticSearchIndex(RemoteIndex):
                                     'fragment_size': '40'}
         # Don't include the full text of every document in every hit
         payload['_source'] = {'exclude': ['text']}
+        
         return relurl, json.dumps(payload, indent=4, default=util.json_default_date)
 
+    def _aggregation_payload(self):
+        aggs = {'type': {'terms': {'field': '_type'}}}
+        for repo in self._repos:
+            for facet in repo.facets():
+                if (facet.dimension_label in ('creator', 'issued') and
+                    facet.dimension_label not in aggs and
+                    facet.dimension_type in ('year', 'ref', 'type')):
+                    if facet.dimension_type == "year":
+                        agg = {'date_histogram': {'field': facet.dimension_label,
+                                                  'interval': 'year',
+                                                  'format': 'yyyy',
+                                                  'min_doc_count': 1}}
+                    else:
+                        agg = {'terms': {'field': facet.dimension_label}}
+                    aggs[facet.dimension_label] = agg
+        return aggs
+
     def _decode_query_result(self, response, pagenum, pagelen):
+        
         # attempt to decode iso-formatted datetimes
         # ("2013-02-14T14:06:00"). Note that this will incorrectly
         # decode anything that looks like a ISO date, even though it
@@ -827,7 +850,6 @@ class ElasticSearchIndex(RemoteIndex):
         # (at this stage -- we could look at self.schema() though)
         jsonresp = json.loads(response.text,
                               object_hook=util.make_json_date_object_hook())
-
         res = []
         for hit in jsonresp['hits']['hits']:
             h = hit['_source']
@@ -882,6 +904,8 @@ class ElasticSearchIndex(RemoteIndex):
         return schema
 
     def _create_schema_payload(self, repos):
+        language = {'en': 'English',
+                    'sv': 'Swedish'}.get(repos[0].lang, "English")
         payload = {
             # cargo cult configuration
             "settings": {"number_of_shards": 1,
@@ -896,7 +920,7 @@ class ElasticSearchIndex(RemoteIndex):
                              "filter": {
                                  "snowball": {
                                      "type": "snowball",
-                                     "language": "English"
+                                     "language": language
                                  }
                              }
                          }
