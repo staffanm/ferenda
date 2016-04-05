@@ -917,44 +917,80 @@ class SwedishLegalSource(DocumentRepository):
             repo.minter = self.minter
         return super(SwedishLegalSource, self).relate(basefile, otherrepos)
 
-    labelfacet = Facet(RDFS.label,
-                       use_for_toc=False,
-                       use_for_feed=False,
-                       toplevel_only=False,
-                       )
+    standardfacets = [Facet(RDFS.label,
+                            use_for_toc=False,
+                            use_for_feed=False,
+                            toplevel_only=False,
+                            dimension_label="label",
+                            dimension_type="value",
+                            multiple_values=False),
+                      Facet(DCTERMS.creator,
+                            use_for_toc=False,
+                            use_for_feed=False,
+                            toplevel_only=False,
+                            dimension_label="creator",
+                            dimension_type="ref",
+                            multiple_values=False),
+                      Facet(DCTERMS.issued,
+                            use_for_toc=False,
+                            use_for_feed=False,
+                            toplevel_only=False,
+                            dimension_label="issued",
+                            dimension_type="year",
+                            multiple_values=False)]
 
+
+    _relate_fulltext_value_cache = {}
+    _relate_fulltext_default_creator = "Regeringen"
+    def _relate_fulltext_value_rootlabel(self, desc):
+        return "%s: %s" % (desc.getvalue(DCTERMS.identifier),
+                           desc.getvalue(DCTERMS.title))
+    
     def _relate_fulltext_value(self, facet, resource, desc):
-        def rootlabel(desc):
-            return "%s: %s" % (desc.getvalue(DCTERMS.identifier),
-                               desc.getvalue(DCTERMS.title))
-
-        if facet.rdftype == RDFS.label:
-            k = None  # let caller figure it out
-            if "#" in resource.get("about"):
-                # need to get the dcterms:identifier and :title of the
-                # root object, then append the bibo:chapter or
-                # dcterms:title of tih resource.
-                rooturi = resource.get("about").split("#")[0]
-                oldabout = desc._current()
-                desc.about(rooturi)
-                v = rootlabel(desc)
-                desc.about(oldabout)
-                if desc.getvalues(BIBO.chapter):
-                    v = "%s, avsnitt %s '%s'" % (v,
-                                                 desc.getvalue(BIBO.chapter),
-                                                 desc.getvalue(DCTERMS.title))
+        if facet.dimension_label in ("label", "creator", "issued"):
+            # "creator" and "issued" should be identical for the root
+            # resource and all contained subresources. "label" can
+            # change slighly.
+            resourceuri = resource.get("about")
+            rooturi = resourceuri.split("#")[0]
+            if "#" not in resourceuri:
+                l = self._relate_fulltext_value_rootlabel(desc)
+                if desc.getrels(RPUBL.departement):
+                    c = self.lookup_label(desc.getrel(RPUBL.departement))
                 else:
-                    v = "%s, '%s'" % (v, desc.getvalue(DCTERMS.title))
-            else:
-                # this IS the root object
-                v = rootlabel(desc)
-            # print("%s -> %s" % (resource.get("about"), v))
-            return k, [v]
+                    c = self._relate_fulltext_default_creator
+                if desc.getvalues(DCTERMS.issued):
+                    i = desc.getvalue(DCTERMS.issued)
+                else:
+                    # we have no knowledge of when this was issued. It
+                    # should be in the doc itself, but for now we fake
+                    # one -- NB it'll be a year off 50% of the time
+                    i = date(int(desc.getvalue(RPUBL.arsutgava).split("/")[0]), 12, 31)
+                self._relate_fulltext_value_cache[rooturi] = {
+                    "creator": c,
+                    "issued": i,
+                    "label": l
+                }
+            v = self._relate_fulltext_value_cache[rooturi][facet.dimension_label]
+            if facet.dimension_label == "label" and "#" in resourceuri:
+                if desc.getvalues(DCTERMS.title):
+                    if desc.getvalues(BIBO.chapter):
+                        v = "%s, avsnitt %s '%s'" % (v,
+                                                     desc.getvalue(BIBO.chapter),
+                                                     desc.getvalue(DCTERMS.title))
+                    else:
+                        v = "%s, '%s'" % (v, desc.getvalue(DCTERMS.title))
+                else:
+                    # we don't have any title for whatever
+                    # reason. Uniquify this rdfs:label by using the
+                    # URI fragment
+                    v = "%s, %s" % (v, resourceuri.split("#", 1)[1])
+            return facet.dimension_label, v
         else:
             return super(SwedishLegalSource, self)._relate_fulltext_value(facet, resource, desc)
 
     def facets(self):
-        return super(SwedishLegalSource, self).facets() + [self.labelfacet]
+        return super(SwedishLegalSource, self).facets() + self.standardfacets
         
     def frontpage_content(self, primary=False):
         if not self.config.tabs:

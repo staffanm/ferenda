@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
@@ -29,9 +30,9 @@ from lxml import etree
 from bs4 import BeautifulSoup, NavigableString
 
 # my libs
-from ferenda import (Document, DocumentStore, Describer, WordReader, FSMParser)
+from ferenda import (Document, DocumentStore, Describer, WordReader, FSMParser, Facet)
 from ferenda.decorators import newstate
-from ferenda import util, errors
+from ferenda import util, errors, fulltextindex
 from ferenda.sources.legal.se.legalref import LegalRef
 from ferenda.elements import (Body, Paragraph, CompoundElement, OrdinalElement,
                               Heading, Link)
@@ -2093,6 +2094,83 @@ class DV(SwedishLegalSource):
             (self.construct_id, {'uri': self._canonical_uri}),
         )
 
+    def facets(self):
+        # NOTE: it's important that RPUBL.rattsfallspublikation is the
+        # first facet (toc_pagesets depend on it)
+        def myselector(row, binding, resource_graph=None):
+            return (util.uri_leaf(row['rpubl_rattsfallspublikation']),
+                    row['rpubl_arsutgava'])
+
+        def mykey(row, binding, resource_graph=None):
+            if binding == "main":
+                # we'd really like
+                # rpubl:VagledandeDomstolsavgorande/rpubl:avgorandedatum,
+                # but that requires modifying facet_query
+                return row['update']
+            else:
+                return util.split_numalpha(row['dcterms_identifier'])
+
+        return [Facet(RPUBL.rattsfallspublikation,
+                      indexingtype=fulltextindex.Resource(),
+                      use_for_toc=True,
+                      use_for_feed=True,
+                      selector=myselector,  # => ("ad","2001"), ("nja","1981")
+                      key=Facet.resourcelabel,
+                      identificator=Facet.defaultselector,
+                      dimension_type='ref'),
+                Facet(RPUBL.referatrubrik,
+                      indexingtype=fulltextindex.Text(boost=4),
+                      toplevel_only=True,
+                      use_for_toc=False),
+                Facet(DCTERMS.identifier,
+                      use_for_toc=False),
+                Facet(RPUBL.arsutgava,
+                      indexingtype=fulltextindex.Label(),
+                      use_for_toc=False,
+                      selector=Facet.defaultselector,
+                      key=Facet.defaultselector,
+                      dimension_type='value'),
+                Facet(RDF.type,
+                      use_for_toc=False,
+                      use_for_feed=True,
+                      # dimension_label="main", # FIXME:
+                      # dimension_label must be calculated as rdf_type
+                      # or else the data from faceted_data() won't be
+                      # usable by wsgi.stats
+                      # key=  # FIXME add useful key method for sorting docs
+                      identificator=lambda x, y, z: None),
+                ] + self.standardfacets
+
+    _relate_fulltext_value_cache = {}
+    def _relate_fulltext_value(self, facet, resource, desc):
+        def rootlabel(desc):
+            return desc.getvalue(DCTERMS.identifier)
+        if facet.dimension_label in ("label", "creator", "issued"):
+            # "creator" and "issued" should be identical for the root
+            # resource and all contained subresources. "label" can
+            # change slighly.
+            resourceuri = resource.get("about")
+            rooturi = resourceuri.split("#")[0]
+            if "#" not in resourceuri:
+                l = rootlabel(desc)
+                desc.about(desc.getrel(RPUBL.referatAvDomstolsavgorande))
+                self._relate_fulltext_value_cache[rooturi] = {
+                    "creator": self.lookup_label(desc.getrel(DCTERMS.publisher)),
+                    "issued": desc.getvalue(RPUBL.avgorandedatum),
+                    "label": l
+                }
+                desc.about(resourceuri)
+            v = self._relate_fulltext_value_cache[rooturi][facet.dimension_label]
+            
+            if facet.dimension_label == "label" and "#" in resourceuri:
+                if desc.getvalues(DCTERMS.creator):
+                    court = desc.getvalue(DCTERMS.creator)
+                else:
+                    court = resource.get("about").split("#")[1]
+                v = "%s (%s)" % (v, court)
+            return facet.dimension_label, v
+        else:
+            return super(DV, self)._relate_fulltext_value(facet, resource, desc)
 
     def tabs(self):
         return [("Vägledande rättsfall", self.dataset_uri())]

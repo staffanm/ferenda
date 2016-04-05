@@ -1653,22 +1653,39 @@ class SFS(Trips):
                       pagetitle='F\xf6rfattningar utgivna %(selected)s',
                       key=forfattningskey,
                       dimension_label="utgiven"),
-                self.labelfacet
-                ]
+                ] + self.standardfacets
 
     def _relate_fulltext_resources(self, body):
         # only return K1, K1P1 or B1, not more fine-grained resources
         # like K1P1S1N1
         return [body] + [r for r in body.findall(".//*[@about]") if re.search("#[KPBS]\d+\w?(P\d+\w?|)$", r.get("about"))]
     
+    _relate_fulltext_value_cache = {}
     def _relate_fulltext_value(self, facet, resource, desc):
-        if facet.rdftype == RDFS.label:
-            v = self.display_title(resource.get("about"))
-            # print("%s -> %s" % (resource.get("about"), v))
-            return None, v
+        def rootlabel(desc):
+            return desc.getvalue(DCTERMS.identifier)
+        if facet.dimension_label in ("label", "creator", "issued"):
+            # "creator" and "issued" should be identical for the root
+            # resource and all contained subresources. "label" can
+            # change slighly.
+            resourceuri = resource.get("about")
+            rooturi = resourceuri.split("#")[0]
+            if "#" not in resourceuri:
+                if desc.getvalues(RPUBL.utfardandedatum):
+                    utfardandedatum = desc.getvalue(RPUBL.utfardandedatum)
+                else:
+                    utfardandedatum = date(int(desc.getvalue(RPUBL.arsutgava)), 12, 31)
+                self._relate_fulltext_value_cache[rooturi] = {
+                    "creator": self.lookup_label(desc.getrel(RPUBL.departement)),
+                    "issued": utfardandedatum
+                }
+            if facet.dimension_label == "label":
+                v = self.display_title(resourceuri)
+            else:
+                v = self._relate_fulltext_value_cache[rooturi][facet.dimension_label]
+            return facet.dimension_label, v
         else:
             return super(SFS, self)._relate_fulltext_value(facet, resource, desc)
-
 
     def toc_item(self, binding, row):
         """Returns a formatted version of row, using Element objects"""

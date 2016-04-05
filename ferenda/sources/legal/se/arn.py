@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 import requests
 import requests.exceptions
 from rdflib import Literal
+from rdflib.namespace import DCTERMS
 
 # My own stuff
 from ferenda import util
@@ -260,6 +261,11 @@ class ARN(FixedLayoutSource):
 
     def create_external_resources(self, doc):
         pass
+
+    _relate_fulltext_default_creator = "Allmänna reklamationsnämnden"
+    
+    def _relate_fulltext_value_rootlabel(self, desc):
+        return desc.getvalue(DCTERMS.identifier)
 
     def tabs(self):
         if self.config.tabs:

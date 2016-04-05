@@ -10,7 +10,7 @@ from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
-from rdflib.namespace import SKOS
+from rdflib.namespace import SKOS, DCTERMS
 
 from . import SwedishLegalSource, SwedishLegalStore, RPUBL
 from .elements import *
@@ -212,6 +212,11 @@ class JK(SwedishLegalSource):
         p.initial_constructor = make_body
         p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
         return p.parse
+
+    _relate_fulltext_default_creator = "Justitiekanslern"
+
+    def _relate_fulltext_value_rootlabel(self, desc):
+        return desc.getvalue(DCTERMS.identifier)
 
     def tabs(self):
         if self.config.tabs:

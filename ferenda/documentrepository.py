@@ -1908,8 +1908,9 @@ parsed document path to that documents dependency file."""
                     k, v = self._relate_fulltext_value(facet, resource, desc)
                     if v:
                         if k is None:
-                            k = qname_graph.qname(facet.rdftype).replace(":", "_")                            
+                            k = qname_graph.qname(facet.rdftype).replace(":", "_")
                         kwargs[k] = v
+                # print("%s -> %s" % (about, kwargs))
                 indexer.update(uri=about,
                                repo=repo,
                                basefile=basefile,
