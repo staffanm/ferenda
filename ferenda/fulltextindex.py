@@ -321,6 +321,11 @@ class Between(SearchModifier):
         self.max = max
 
 
+class Results(list):
+    # this is just so that we can add arbitrary attributes to a
+    # list-like object
+    pass
+
 import whoosh.index
 import whoosh.fields
 import whoosh.analysis
@@ -546,7 +551,7 @@ class WhooshIndex(FulltextIndex):
     def _convert_result(self, res):
         # converts a whoosh.searching.ResultsPage object to a plain
         # list of dicts
-        l = []
+        l = Results()
         hl = whoosh.highlight.Highlighter(formatter=ElementsFormatter())
         resourcefields = []
         for key, fldobj in self.schema().items():
@@ -850,7 +855,8 @@ class ElasticSearchIndex(RemoteIndex):
         # (at this stage -- we could look at self.schema() though)
         jsonresp = json.loads(response.text,
                               object_hook=util.make_json_date_object_hook())
-        res = []
+
+        res = Results()
         for hit in jsonresp['hits']['hits']:
             h = hit['_source']
             h['repo'] = hit['_type']
@@ -870,6 +876,11 @@ class ElasticSearchIndex(RemoteIndex):
                  'firstresult': (pagenum - 1) * pagelen + 1,
                  'lastresult': (pagenum - 1) * pagelen + len(jsonresp['hits']['hits']),
                  'totalresults': jsonresp['hits']['total']}
+        setattr(res, 'pagenum', pager['pagenum'])
+        setattr(res, 'pagecount', pager['pagecount'])
+        setattr(res, 'lastresult', pager['lastresult'])
+        setattr(res, 'totalresults', pager['totalresults'])
+        setattr(res, 'aggregations', jsonresp['aggregations'])
         return res, pager
 
     def _count_payload(self):

@@ -964,7 +964,7 @@ class SwedishLegalSource(DocumentRepository):
                 else:
                     # we have no knowledge of when this was issued. It
                     # should be in the doc itself, but for now we fake
-                    # one -- NB it'll be a year off 50% of the time
+                    # one -- NB it'll be a year off 50% of the time.
                     i = date(int(desc.getvalue(RPUBL.arsutgava).split("/")[0]), 12, 31)
                 self._relate_fulltext_value_cache[rooturi] = {
                     "creator": c,

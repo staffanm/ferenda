@@ -45,6 +45,13 @@ It's a generic template for search result pages.
   <xsl:template match="@*">
     <xsl:copy><xsl:apply-templates/></xsl:copy>
   </xsl:template>
+
+  <xsl:template match="xhtml:div[@class='facets']">
+  </xsl:template>
+
+  <xsl:template match="xhtml:div[@class='facets']" mode="toc">
+    <xsl:apply-templates/>
+  </xsl:template>
   <!--
   <xsl:template match="@*|node()">
     <xsl:copy>

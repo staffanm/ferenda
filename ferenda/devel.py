@@ -468,6 +468,8 @@ class Devel(object):
 
         start_response = Mock()
         for chunk in app(environ, start_response):
+            if isinstance(chunk, bytes):
+                chunk = chunk.decode("utf-8")
             sys.stdout.write(chunk)
 
     @decorators.action
