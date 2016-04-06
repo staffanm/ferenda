@@ -213,7 +213,7 @@ class JK(SwedishLegalSource):
         p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
         return p.parse
 
-    _relate_fulltext_default_creator = "Justitiekanslern"
+    _default_creator = "Justitiekanslern"
 
     def _relate_fulltext_value_rootlabel(self, desc):
         return desc.getvalue(DCTERMS.identifier)

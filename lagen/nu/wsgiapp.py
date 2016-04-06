@@ -2,6 +2,9 @@ from ferenda import WSGIApp as OrigWSGIApp
 from ferenda import elements
 from ferenda.elements import html
 
+from rdflib import URIRef
+from rdflib.namespace import SKOS, FOAF
+
 class WSGIApp(OrigWSGIApp):
     """Subclass that overrides the search() method with specific features for
 lagen.nu."""
@@ -44,15 +47,39 @@ lagen.nu."""
         data = self._search_transform_doc(doc)
         return self._return_response(data, start_response)
 
+    repolabels = {'sfs': 'Författningar',
+                  'prop': 'Propositioner',
+                  'ds': 'Ds',
+                  'sou': 'SOU:er',
+                  'myndfs': 'Myndighetsföreskrifter',
+                  'dir': 'Kommittedirektiv',
+                  'mediawiki': 'Lagkommentarer',
+                  'arn': 'Beslut från ARN',
+                  'dv': 'Domar',
+                  'jk': 'Beslut från JK'}
+    facetlabels = {'type': 'Dokumenttyp',
+                   'creator': 'Källa',
+                   'issued': 'År'}
     def _search_render_facets(self, facets):
         facetgroups = []
+        commondata = self.repos[0].commondata
         for facetresult in ('type', 'creator', 'issued'):
             if facetresult in facets:
                 facetgroup = []
                 for bucket in facets[facetresult]['buckets']:
-                    facetgroup.append(html.LI([
-                        "%s(%s)" % (bucket.get('key_as_string', bucket['key']),
-                                     bucket['doc_count'])]))
-                facetgroups.append(html.LI([html.P([facetresult]),
+                    if facetresult == 'type':
+                        lbl = self.repolabels.get(bucket['key'], bucket['key'])
+                        key = bucket['key']
+                    elif facetresult == 'creator':
+                        k = URIRef(bucket['key'])
+                        pred = SKOS.altLabel if commondata.value(k, SKOS.altLabel) else FOAF.name
+                        lbl = commondata.value(k, pred)
+                        key = bucket['key']
+                    elif facetresult == "issued":
+                        lbl = bucket["key_as_string"]
+                        key = lbl
+                    facetgroup.append(html.LI([html.A(
+                        "%s(%s)" % (lbl, bucket['doc_count']), **{'href': key})]))
+                facetgroups.append(html.LI([html.A(self.facetlabels.get(facetresult, facetresult), **{'href': facetresult}),
                                             html.UL(facetgroup)]))
         return html.Div(facetgroups, **{'class': 'facets'})

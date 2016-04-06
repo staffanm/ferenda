@@ -880,7 +880,8 @@ class ElasticSearchIndex(RemoteIndex):
         setattr(res, 'pagecount', pager['pagecount'])
         setattr(res, 'lastresult', pager['lastresult'])
         setattr(res, 'totalresults', pager['totalresults'])
-        setattr(res, 'aggregations', jsonresp['aggregations'])
+        if 'aggregations' in jsonresp:
+            setattr(res, 'aggregations', jsonresp['aggregations'])
         return res, pager
 
     def _count_payload(self):

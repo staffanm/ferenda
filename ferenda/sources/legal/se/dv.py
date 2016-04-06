@@ -2155,7 +2155,7 @@ class DV(SwedishLegalSource):
                 l = rootlabel(desc)
                 desc.about(desc.getrel(RPUBL.referatAvDomstolsavgorande))
                 self._relate_fulltext_value_cache[rooturi] = {
-                    "creator": self.lookup_label(desc.getrel(DCTERMS.publisher)),
+                    "creator": desc.getrel(DCTERMS.publisher),
                     "issued": desc.getvalue(RPUBL.avgorandedatum),
                     "label": l
                 }

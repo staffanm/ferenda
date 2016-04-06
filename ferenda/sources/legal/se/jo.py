@@ -303,7 +303,7 @@ class JO(FixedLayoutSource):
         p.debug = os.environ.get('FERENDA_FSMDEBUG', False)
         return p.parse
 
-    _relate_fulltext_default_creator = "Riksdagens ombudsmän"
+    _default_creator = "Riksdagens ombudsmän"
 
     def _relate_fulltext_value_rootlabel(self, desc):
         return desc.getvalue(DCTERMS.identifier)

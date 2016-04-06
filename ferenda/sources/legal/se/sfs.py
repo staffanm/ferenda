@@ -1676,7 +1676,7 @@ class SFS(Trips):
                 else:
                     utfardandedatum = date(int(desc.getvalue(RPUBL.arsutgava)), 12, 31)
                 self._relate_fulltext_value_cache[rooturi] = {
-                    "creator": self.lookup_label(desc.getrel(RPUBL.departement)),
+                    "creator": desc.getrel(RPUBL.departement),
                     "issued": utfardandedatum
                 }
             if facet.dimension_label == "label":

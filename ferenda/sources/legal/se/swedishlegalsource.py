@@ -26,7 +26,7 @@ from cached_property import cached_property
 
 from ferenda import (DocumentRepository, DocumentStore, FSMParser,
                      CitationParser, Describer, Facet)
-from ferenda import util
+from ferenda import util, fulltextindex
 from ferenda.sources.legal.se.legalref import Link, LegalRef, RefParseError
 from ferenda.elements.html import A, H1, H2, H3
 from ferenda.elements import Section, Body, CompoundElement
@@ -923,14 +923,16 @@ class SwedishLegalSource(DocumentRepository):
                             toplevel_only=False,
                             dimension_label="label",
                             dimension_type="value",
-                            multiple_values=False),
+                            multiple_values=False,
+                            indexingtype=fulltextindex.Label(boost=16)),
                       Facet(DCTERMS.creator,
                             use_for_toc=False,
                             use_for_feed=False,
                             toplevel_only=False,
                             dimension_label="creator",
                             dimension_type="ref",
-                            multiple_values=False),
+                            multiple_values=False,
+                            indexingtype=fulltextindex.URI()),
                       Facet(DCTERMS.issued,
                             use_for_toc=False,
                             use_for_feed=False,
@@ -941,7 +943,7 @@ class SwedishLegalSource(DocumentRepository):
 
 
     _relate_fulltext_value_cache = {}
-    _relate_fulltext_default_creator = "Regeringen"
+    _default_creator = "Regeringen"
     def _relate_fulltext_value_rootlabel(self, desc):
         return "%s: %s" % (desc.getvalue(DCTERMS.identifier),
                            desc.getvalue(DCTERMS.title))
@@ -956,16 +958,17 @@ class SwedishLegalSource(DocumentRepository):
             if "#" not in resourceuri:
                 l = self._relate_fulltext_value_rootlabel(desc)
                 if desc.getrels(RPUBL.departement):
-                    c = self.lookup_label(desc.getrel(RPUBL.departement))
+                    c = desc.getrel(RPUBL.departement)
                 else:
-                    c = self._relate_fulltext_default_creator
+                    c = self.lookup_resource(self._default_creator)
                 if desc.getvalues(DCTERMS.issued):
                     i = desc.getvalue(DCTERMS.issued)
                 else:
                     # we have no knowledge of when this was issued. It
                     # should be in the doc itself, but for now we fake
                     # one -- NB it'll be a year off 50% of the time.
-                    i = date(int(desc.getvalue(RPUBL.arsutgava).split("/")[0]), 12, 31)
+                    y = int(desc.getvalue(RPUBL.arsutgava).split("/")[0])
+                    i = date(y, 12, 31)
                 self._relate_fulltext_value_cache[rooturi] = {
                     "creator": c,
                     "issued": i,

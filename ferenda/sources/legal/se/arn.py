@@ -262,7 +262,7 @@ class ARN(FixedLayoutSource):
     def create_external_resources(self, doc):
         pass
 
-    _relate_fulltext_default_creator = "Allmänna reklamationsnämnden"
+    _default_creator = "Allmänna reklamationsnämnden"
     
     def _relate_fulltext_value_rootlabel(self, desc):
         return desc.getvalue(DCTERMS.identifier)
