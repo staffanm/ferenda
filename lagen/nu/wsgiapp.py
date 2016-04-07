@@ -1,9 +1,14 @@
-from ferenda import WSGIApp as OrigWSGIApp
-from ferenda import elements
-from ferenda.elements import html
+from urllib.parse import urlencode
+from wsgiref.util import request_uri
+from datetime import datetime
 
 from rdflib import URIRef
 from rdflib.namespace import SKOS, FOAF
+
+from ferenda import WSGIApp as OrigWSGIApp
+from ferenda import elements
+from ferenda.elements import html
+from ferenda.fulltextindex import Between
 
 class WSGIApp(OrigWSGIApp):
     """Subclass that overrides the search() method with specific features for
@@ -17,7 +22,15 @@ lagen.nu."""
         """WSGI method, called by the wsgi app for requests that matches
            ``searchendpoint``."""
         queryparams = self._search_parse_query(environ['QUERY_STRING'])
+        # massage queryparams['issued'] if present, then restore it
+        y = None
+        if 'issued' in queryparams:
+            y = int(queryparams['issued'])
+            queryparams['issued'] = Between(datetime(y, 1, 1),
+                                            datetime(y, 12, 31, 23, 59, 59))
         res, pager = self._search_run_query(queryparams)
+        if y:
+            queryparams['issued'] = str(y)
 
         if pager['totalresults'] == 1:
             resulthead = "1 träff"
@@ -27,7 +40,7 @@ lagen.nu."""
 
         doc = self._search_create_page(resulthead)
         if hasattr(res, 'aggregations'):
-            doc.body.append(self._search_render_facets(res.aggregations))
+            doc.body.append(self._search_render_facets(res.aggregations, queryparams, environ))
         for r in res:
             if 'label' not in r:
                 label = r['uri']
@@ -56,30 +69,59 @@ lagen.nu."""
                   'mediawiki': 'Lagkommentarer',
                   'arn': 'Beslut från ARN',
                   'dv': 'Domar',
-                  'jk': 'Beslut från JK'}
+                  'jk': 'Beslut från JK',
+                  'jo': 'Beslut från JO'}
     facetlabels = {'type': 'Dokumenttyp',
                    'creator': 'Källa',
                    'issued': 'År'}
-    def _search_render_facets(self, facets):
+    def _search_render_facets(self, facets, queryparams, environ):
         facetgroups = []
         commondata = self.repos[0].commondata
+        searchurl = request_uri(environ, include_query=False)
         for facetresult in ('type', 'creator', 'issued'):
             if facetresult in facets:
-                facetgroup = []
-                for bucket in facets[facetresult]['buckets']:
-                    if facetresult == 'type':
-                        lbl = self.repolabels.get(bucket['key'], bucket['key'])
-                        key = bucket['key']
-                    elif facetresult == 'creator':
-                        k = URIRef(bucket['key'])
-                        pred = SKOS.altLabel if commondata.value(k, SKOS.altLabel) else FOAF.name
-                        lbl = commondata.value(k, pred)
-                        key = bucket['key']
-                    elif facetresult == "issued":
-                        lbl = bucket["key_as_string"]
-                        key = lbl
-                    facetgroup.append(html.LI([html.A(
-                        "%s(%s)" % (lbl, bucket['doc_count']), **{'href': key})]))
-                facetgroups.append(html.LI([html.A(self.facetlabels.get(facetresult, facetresult), **{'href': facetresult}),
-                                            html.UL(facetgroup)]))
+                if facetresult in queryparams:
+                    # the user has selected a value for this
+                    # particular facet, we should not display all
+                    # buckets (but offer a link to reset the value)
+                    qpcopy = dict(queryparams)
+                    del qpcopy[facetresult]
+                    href = "%s?%s" % (searchurl, urlencode(qpcopy))
+                    val = queryparams[facetresult]
+                    if facetresult == "creator":
+                        val = self.repos[0].lookup_label(val)
+                    elif facetresult == "type":
+                        val = self.repolabels.get(val, val)
+                    lbl = "%s: %s" % (self.facetlabels.get(facetresult,
+                                                           facetresult),
+                                      val)
+                    facetgroups.append(
+                        html.LI([lbl,
+                                 html.A("\xa0",
+                                        **{'href': href,
+                                           'class': 'glyphicon glyphicon-remove'})]))
+                else:
+                    facetgroup = []
+                    for bucket in facets[facetresult]['buckets']:
+                        if facetresult == 'type':
+                            lbl = self.repolabels.get(bucket['key'], bucket['key'])
+                            key = bucket['key']
+                        elif facetresult == 'creator':
+                            k = URIRef(bucket['key'])
+                            pred = SKOS.altLabel if commondata.value(k, SKOS.altLabel) else FOAF.name
+                            lbl = commondata.value(k, pred)
+                            key = bucket['key']
+                        elif facetresult == "issued":
+                            lbl = bucket["key_as_string"]
+                            key = lbl
+                        qpcopy = dict(queryparams)
+                        qpcopy[facetresult] = key
+                        href = "%s?%s" % (searchurl, urlencode(qpcopy))
+                        facetgroup.append(html.LI([html.A(
+                            "%s" % (lbl), **{'href': href}),
+                                                   html.Span([str(bucket['doc_count'])], **{'class': 'badge pull-right'})]))
+                    lbl = self.facetlabels.get(facetresult, facetresult)
+                    facetgroups.append(html.LI([lbl,
+                                                html.UL(facetgroup)]))
         return html.Div(facetgroups, **{'class': 'facets'})
+

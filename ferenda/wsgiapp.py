@@ -567,7 +567,11 @@ Examined %s repos.""" % (environ['PATH_INFO'],
         if isinstance(query, bytes):  # happens on py26
             query = query.decode("utf-8")  # pragma: no cover
         pagenum = int(queryparams.get('p', '1'))
-        res, pager = idx.query(query, pagenum=pagenum)
+        qpcopy = dict(queryparams)
+        for x in ('q', 'p'):
+            if x in qpcopy:
+                del qpcopy[x]
+        res, pager = idx.query(query, pagenum=pagenum, **qpcopy)
         return res, pager
 
     def _search_create_page(self, resulthead):

@@ -1901,8 +1901,9 @@ parsed document path to that documents dependency file."""
                 repo = self.alias
                 if isinstance(repo, bytes):  # again, py2
                     repo = repo.decode()     # pragma: no cover
+                
                 plaintext = util.normalize_space(self._extract_plaintext(resource, resources))
-
+                # print("%s -> %s" % (resource.get("about"), plaintext))
                 kwargs = {}
                 for facet in self.facets():
                     k, v = self._relate_fulltext_value(facet, resource, desc)

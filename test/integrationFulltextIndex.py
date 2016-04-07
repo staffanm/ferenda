@@ -329,6 +329,17 @@ class CustomQuery(object):
         self.assertEqual(len(res),1)
         self.assertEqual(res[0]['dcterms_identifier'], 'R1 D1') 
 
+    def test_combined(self):
+        self.load(custom_dataset)
+        res, p = self.index.query("long",
+                                  dc_subject="green",
+                                  dcterms_publisher="*/publ1",
+                                  dcterms_issued=Between(datetime(2013,2,1),
+                                                         datetime(2013,4,1)))
+        self.assertEqual(len(res),1)
+        self.assertEqual(res[0]['dcterms_identifier'], 'R1 D1') 
+        
+
 #----------------------------------------------------------------
 #
 # Additional base classes used together with above testcases to yield

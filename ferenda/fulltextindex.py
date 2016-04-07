@@ -762,7 +762,7 @@ class ElasticSearchIndex(RemoteIndex):
         for k, v in kwargs.items():
             if isinstance(v, SearchModifier):
                 continue
-            if k == "repo":
+            if k in ("type", "repo"):  # FIXME: maybe should only be "repo"
                 k = "_type"
             elif isinstance(schema[k], Resource):
                 # also map k to "%s.iri" % k if k is Resource
@@ -799,16 +799,15 @@ class ElasticSearchIndex(RemoteIndex):
                      {"filter": {}
                       }
                      }
-            if filterterms:
-                if len(filterterms) > 1:
-                    ts = [{"term": {k: v}} for (k, v) in filterterms.items()]
-                    query["filtered"]["filter"]["bool"] = {"must": ts}
-                else:
-                    query["filtered"]["filter"]["term"] = filterterms
-            if filterregexps:
-                query["filtered"]["filter"]["regexp"] = filterregexps
-            if filterranges:
-                query["filtered"]["filter"]["range"] = filterranges
+            filters = []
+            for key, val in (("term", filterterms),
+                             ("regexp", filterregexps),
+                             ("range", filterranges)):
+                filters.extend([{key: {k: v}} for (k, v) in val.items()])
+            if len(filters) > 1:
+                query["filtered"]["filter"]["bool"] = {"must": filters}
+            else:
+                query["filtered"]["filter"] = filters[0]
             if match:
                 query["filtered"]["query"] = {"match": match}
         else:
