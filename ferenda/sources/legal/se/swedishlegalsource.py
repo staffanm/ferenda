@@ -777,11 +777,17 @@ class SwedishLegalSource(DocumentRepository):
         if hasattr(sup, 'infer_metadata'):
             sup.infer_metadata(resource, basefile)
         d = Describer(resource.graph, resource.identifier)
-        if not resource.value(DCTERMS.identifier):
+        identifier = resource.value(DCTERMS.identifier)
+        if not identifier:
+            if identifier is not None:
+                # there is a dcterms:identifier triple, but the object
+                # is falsy (proably an emptry string). remove that.
+                resource.graph.remove((resource.identifier, DCTERMS.identifier, identifier))
             identifier = self.infer_identifier(basefile)
             # self.log.warning(
             #     "%s: No dcterms:identifier, assuming %s" % (basefile,
             #                                                 identifier))
+            
             d.value(DCTERMS.identifier, identifier)
 
         if not resource.value(PROV.alternateOf):
@@ -1230,7 +1236,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     def is_section(parser):
         (ordinal, headingtype, title) = analyze_sectionstart(parser)
         if ordinal:
-            analyze_sectionstart(parser)
+            # analyze_sectionstart(parser)
             return headingtype == "h1" and ordinal.count(".") == 0
 
     def is_subsection(parser):
@@ -1381,7 +1387,11 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 #         vp.ordinal = state.pageno
 #         return parser.make_children(vp)
 
-    re_sectionstart = re.compile("^(\d[\.\d]*) +(.*[^\.])$").match
+    # the title of a section must start with a uppercase char (This
+    # eliminates misinterpretation of things like "5 a
+    # kap. Referensland för..." being interpreted as ordinal "5" and
+    # title "a kap. Referensland för...")
+    re_sectionstart = re.compile("^(\d[\.\d]*) +([A-ZÅÄÖ].*[^\.])$").match
 
     def analyze_sectionstart(parser, chunk=None):
         """returns (ordinal, headingtype, text) if it looks like a section
