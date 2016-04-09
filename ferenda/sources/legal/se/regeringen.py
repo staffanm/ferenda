@@ -648,7 +648,16 @@ class Regeringen(SwedishLegalSource):
             para = None
             for idx, subnode in enumerate(section):
                 text = str(subnode).strip()
-                if len(text) < 20 and text.endswith("§"):
+                if len(text) < 20 and text.endswith(" kap."):
+                    # subsection heading indicating the start of a new
+                    # chapter. alter the parsing context from law to
+                    # chapter in law
+                    law = self._parse_uri_from_text(text, state['basefile'], law)
+                    if para is None:
+                        paras.append(subnode)
+                    else:
+                        para.append(subnode)
+                elif len(text) < 20 and text.endswith("§"):
                     comment_on = self._parse_uri_from_text(text, state['basefile'], law)
                     page = self._find_subnode(section[idx:], Sidbrytning, reverse=False)
                     if page:
