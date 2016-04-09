@@ -8,7 +8,7 @@ standard_library.install_aliases()
 import re
 import os
 from datetime import datetime
-from collections import OrderedDict
+from collections import OrderedDict, Counter
 import codecs
 from urllib.parse import urljoin
 
@@ -30,16 +30,35 @@ from .fixedlayoutsource import FixedLayoutStore, FixedLayoutSource
 class PropAnalyzer(PDFAnalyzer):
 
     def documents(self):
+        def boxmatch(page, textpattern):
+            for box in page.boundingbox(bottom=page.height / 5):
+                m = re.match(textpattern, str(box))
+                if m:
+                    return m.group(1)
+            return False
         documents = []
+        mainstyles = Counter()
+        currentappendix = None
         for pageidx, page in enumerate(self.pdf):
             styles = self.count_styles(pageidx, 1)['rest_styles']
-
+            appendix = boxmatch(page, "Bilaga (\d)\s*$")
+            
             # find the most dominant style on the page. If it uses the
             # EU font, it's a separate section.
             if styles and styles.most_common(1)[0][0][0].startswith("EUAlbertina"):
                 currentdoc = 'eudok'
+                currentappendix = appendix
             else:
-                currentdoc = 'main'
+                # if there is a text box matching "Bilaga \d" in top
+                # margin and the bilagenummer is new and dominant
+                # style is different from currrent dominant style:
+                if appendix and appendix != currentappendix and mainstyles.most_common(1)[0][0] != styles.most_common(1)[0][0]:
+                    currentdoc = 'appendix'
+                else:
+                    currentdoc = 'main'
+                    currentappendix = appendix
+            if currentdoc == "main":
+                mainstyles += styles
             # update the current document segment tuple or start a new one
             if documents and documents[-1][2] == currentdoc:
                 documents[-1][1] += 1

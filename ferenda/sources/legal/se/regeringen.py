@@ -481,7 +481,10 @@ class Regeringen(SwedishLegalSource):
         sanitized = self.sanitize_body(rawbody)
         allbody = Body()
         initialstate = {'pageno': 1}
-        for (startpage, pagecount, tag) in sanitized.analyzer.documents():
+        documents = sanitized.analyzer.documents()
+        if len(documents) > 1:
+            self.log.warning("%s: segmented into docs %s" % (basefile, documents))
+        for (startpage, pagecount, tag) in documents:
             if tag == 'main':
                 initialstate['pageno'] -= 1  # argh....
                 parser = self.get_parser(basefile, sanitized, initialstate)

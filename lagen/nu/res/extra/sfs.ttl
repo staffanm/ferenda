@@ -233,3 +233,4 @@
 <https://lagen.nu/sfs/2009:400> rdfs:label "offentlighets- och sekretesslagen" ; dcterms:alternate "OSL" .
 <https://lagen.nu/sfs/2009:600> rdfs:label "språklagen" .
 <https://lagen.nu/sfs/2009:865> rdfs:label "kommissionslagen" .
+<https://lagen.nu/sfs/2010:110> rdfs:label "socialförsäkringsbalken" .
