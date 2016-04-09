@@ -512,17 +512,23 @@ class Regeringen(SwedishLegalSource):
                 body = Body([s])
             # regardless of wether we used real parsing or verbatim
             # copying, we need to update the current page number
-            lastpagebreak = self._find_last(body, Sidbrytning)
+            lastpagebreak = self._find_subnode(body, Sidbrytning)
             initialstate['pageno'] = lastpagebreak.ordinal + 1
             allbody += body[:]
         return allbody
 
-    def _find_last(self, node, cls):
+    def _find_subnode(self, node, cls, reverse=True):
+        # Finds the first (or last if reversed=True) subnode of a
+        # certain type in the given node, recursively
         if isinstance(node, cls):
             return node
-        elif isinstance(node, CompoundElement):
-            for subnode in reversed(node):
-                res = self._find_last(subnode, cls)
+        elif isinstance(node, (CompoundElement, list)):
+            if reverse:
+                iterable = reversed(node)
+            else:
+                iterable = node
+            for subnode in iterable:
+                res = self._find_subnode(subnode, cls)
                 if isinstance(res, cls):
                     return res
 
@@ -622,6 +628,8 @@ class Regeringen(SwedishLegalSource):
     def find_commentary(self, node, state):
         if not isinstance(node, Section) or (node.title != "Författningskommentar"):
             if isinstance(node, Body):
+                if 'commented_paras' not in state:
+                    state['commented_paras'] = {}
                 return state
             else:
                 return None  # visit_node won't call any subnode
@@ -638,14 +646,30 @@ class Regeringen(SwedishLegalSource):
         for law, section in commentary:
             paras = []
             para = None
-            for subnode in section:
+            for idx, subnode in enumerate(section):
                 text = str(subnode).strip()
                 if len(text) < 20 and text.endswith("§"):
                     comment_on = self._parse_uri_from_text(text, state['basefile'], law)
-                    para = Lagrumskommentar(title=text,
-                                            comment_on=comment_on,
-                                            uri=None)  # the URI is dynamically constructed in Lagrumskommentar.as_xhtml
-                    paras.append(para)
+                    page = self._find_subnode(section[idx:], Sidbrytning, reverse=False)
+                    if page:
+                        pageno = page.ordinal - 1 
+                    else:
+                        pageno = None
+                    if comment_on not in state['commented_paras']:
+                        para = Lagrumskommentar(title=text,
+                                                comment_on=comment_on,
+                                                uri=None)
+                        # the URI to the above Lagrumskommentar is
+                        # dynamically constructed in
+                        # Lagrumskommentar.as_xhtml
+                        paras.append(para)
+                        state['commented_paras'][comment_on] = pageno
+                    else:
+                        self.log.warning("Found another comment on %s at p %s (previous at %s), ignoring" % (comment_on, pageno, state['commented_paras'][comment_on]))
+                        if para is None:
+                            paras.append(subnode)
+                        else:
+                            para.append(subnode)
                 else:
                     if para is None:
                         paras.append(subnode)
