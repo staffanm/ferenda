@@ -653,10 +653,8 @@ class Regeringen(SwedishLegalSource):
                     lawname = subsection.title.split(" ", 2)[-1]
                     slug = re.sub('\W+', '', lawname).lower()
                     slug = slug.replace("å", "aa").replace("ä", "ae").replace("ö", "oe").replace("é", "e")
-                    from pudb import set_trace; set_trace()
                     numslug = util.base26encode(slug)
                     assert util.base26decode(numslug) == slug
-                    numslug = sum(ord(c) << i*8 for i, c in enumerate(slug))
                     tmptext = "Fejklag (0000:%s)" % numslug
                     uri =self._parse_uri_from_text(tmptext, state['basefile'])
                 commentary.append((uri, subsection))
