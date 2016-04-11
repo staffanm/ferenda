@@ -14,6 +14,7 @@ import os
 import posixpath
 import re
 import shutil
+import string
 import subprocess
 import sys
 import time
@@ -805,3 +806,14 @@ def location_exception(exc):
                 loc += " (from %s:%s)" % (shortsrc, tbline[1])
                 break
     return loc
+
+base26table = str.maketrans(string.ascii_lowercase, string.digits+string.ascii_lowercase[:16])
+
+def base26encode(string):
+    string = string.translate(base26table)
+    return int(string, base=26)
+
+def base26decode(num):
+    numerals = string.ascii_lowercase
+    b = 26
+    return ((num == 0) and  numerals[0] ) or (base26decode(num // b).lstrip(numerals[0]) + numerals[num % b])

@@ -641,17 +641,21 @@ class Regeringen(SwedishLegalSource):
             if hasattr(subsection, 'title'):
                 # find out which laws this proposition proposes to
                 # change (can be new or existing)
-                if subsection.title.startswith("Förslag till lag om ändring i"):
+                if re.match("Förslag(|et) till lag om ändring i", subsection.title):
                     uri = self._parse_uri_from_text(subsection.title, state['basefile'])
-                elif subsection.title.startswith("Förslag till"):
+                elif re.match("Förslag(|et) till", subsection.title):
                     # create a reference that could pass for a real
                     # SFS-id, but with the name (the only identifying
                     # information we have at this point) encoded into
                     # it. FIXME: the numslug could be shorter if we'd
                     # make sure to only allow lower-case a-z and to a
                     # base26 conversion into an integer
-                    slug = re.sub('\W+', '', subsection.title[12:]).lower()
-
+                    lawname = subsection.title.split(" ", 2)[-1]
+                    slug = re.sub('\W+', '', lawname).lower()
+                    slug = slug.replace("å", "aa").replace("ä", "ae").replace("ö", "oe").replace("é", "e")
+                    from pudb import set_trace; set_trace()
+                    numslug = util.base26encode(slug)
+                    assert util.base26decode(numslug) == slug
                     numslug = sum(ord(c) << i*8 for i, c in enumerate(slug))
                     tmptext = "Fejklag (0000:%s)" % numslug
                     uri =self._parse_uri_from_text(tmptext, state['basefile'])
