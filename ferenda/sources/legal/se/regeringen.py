@@ -437,7 +437,14 @@ class Regeringen(SwedishLegalSource):
 
     def sanitize_body(self, rawbody):
         sanitized = super(Regeringen, self).sanitize_body(rawbody)
-        sanitized.analyzer = self.get_pdf_analyzer(sanitized)
+        try:
+            sanitized.analyzer = self.get_pdf_analyzer(sanitized)
+        except AttributeError:
+            if isinstance(sanitized, list):
+                pass  # means that we use a placeholder text instead
+                      # of a real document
+            else:
+                raise
         return sanitized
 
     def extract_body(self, fp, basefile):
@@ -479,6 +486,10 @@ class Regeringen(SwedishLegalSource):
         # (normally a PDFReader or StreamingPDFReader)
         rawbody = self.extract_body(fp, basefile)
         sanitized = self.sanitize_body(rawbody)
+        if not hasattr(sanitized, 'analyzer'):
+            # sanitized is probably just a placeholder document, not a
+            # real PDFReader
+            return Body(sanitized)
         allbody = Body()
         initialstate = {'pageno': 1}
         documents = sanitized.analyzer.documents()

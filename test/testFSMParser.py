@@ -39,6 +39,20 @@ class TestPeekable(unittest.TestCase):
         self.assertEqual([0,1,2,3], list(pk))
 
 
+    def test_peek_ahead(self):
+        pk = Peekable(range(4))
+        self.assertEqual(pk.peek(4),3)
+        self.assertEqual(pk.peek(3),2)
+        self.assertEqual(pk.peek(2),1)
+        self.assertEqual(pk.peek(1),0)
+        self.assertEqual(pk.next(),0)
+        self.assertEqual(pk.next(),1)
+        self.assertEqual(pk.next(),2)
+        self.assertEqual(pk.next(),3)
+
+        
+
+
 class Parse(unittest.TestCase):
     def run_test_file(self, filename, debug=False):
         # some basic recognizers and constructors to parse a simple

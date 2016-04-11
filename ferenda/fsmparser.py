@@ -244,8 +244,8 @@ class Peekable(object):
     def __iter__(self):
         return self
 
-    def _fillcache(self):
-        while len(self._cache) < 1:
+    def _fillcache(self, cachesize=1):
+        while len(self._cache) < cachesize:
             self._cache.append(next(self._iterable))
 
     def __next__(self):
@@ -256,7 +256,7 @@ class Peekable(object):
     # useful alias
     next = __next__
 
-    def peek(self):
-        self._fillcache()
-        result = self._cache[0]
+    def peek(self, chunkno=1):
+        self._fillcache(chunkno)
+        result = self._cache[chunkno-1]
         return result

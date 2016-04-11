@@ -398,7 +398,6 @@ class SwedishLegalSource(DocumentRepository):
         UnorderedSection.counter = 0
         PreambleSection.counter = 0
         self.refparser._legalrefparser.namedlaws = {}
-
         fp = self.parse_open(doc.basefile)
         resource = self.parse_metadata(fp, doc.basefile)
         doc.meta = resource.graph
@@ -1270,10 +1269,12 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             return headingtype == "h3" and ordinal.count(".") == 2
 
     def is_appendix(parser):
-        chunk = parser.reader.peek()
-        txt = str(chunk).strip()
+        def is_appendix_header(chunk):
+            txt = str(chunk).strip()
+            return (chunk.font.size == metrics.h1.size and txt.startswith("Bilaga "))
 
-        if (chunk.font.size == metrics.h1.size and txt.startswith("Bilaga ")):
+        chunk = parser.reader.peek()
+        if is_appendix_header(chunk):
             return True
         elif (int(chunk.font.size) == metrics.default.size and
               (chunk.right < metrics_leftmargin() or
@@ -1282,7 +1283,15 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             if m:
                 ordinal = int(m.group(1))
                 if ordinal != state.appendixno:
-                    return True
+                    # OK, this can very well be an appendix, but just
+                    # to be sure, keep reading to see if we have a
+                    # Appendix-like heading as well
+                    if (is_appendix_header(parser.reader.peek(2)) or
+                        is_appendix_header(parser.reader.peek(3))):
+                        state.appendixno = ordinal
+                        return False
+                    else:
+                        return True
 
     def is_paragraph(parser):
         return True
