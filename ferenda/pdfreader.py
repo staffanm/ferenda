@@ -376,11 +376,20 @@ class PDFReader(CompoundElement):
                                        height=dim['bottom'] - dim['top'])
                     textelements.append(text)
 
+                # try to determine footnotes by checking if first
+                # element is numeric and way smaller than the
+                # others. in that case, set it's tag to "sup" (for
+                # superscript)
+                if len(textelements):
+                    avgheight = sum([x.height for x in textelements]) // len(textelements)
+                    if textelements[0].strip().isnumeric() and textelements[0].height <= avgheight / 2:
+                        textelements[0].tag = "sup"
+
                 # Now that we know all text elements that should be in
                 # the Textbox, we can guess the font size.
 
                 fontspec = {'family': "unknown",
-                            'size': text.height}
+                            'size': avgheight}
 
                 # find any previous definition of this fontspec
                 fontid = None

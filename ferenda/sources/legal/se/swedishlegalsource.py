@@ -1270,11 +1270,29 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
     def is_appendix(parser):
         def is_appendix_header(chunk):
+            if isinstance(chunk, Page):
+                return False  # this can happen before is_pagebreak
+                              # get's a chance, since we call this
+                              # function with .peek(2) and .peek(3)
+                              # below
             txt = str(chunk).strip()
             return (chunk.font.size == metrics.h1.size and txt.startswith("Bilaga "))
-
+        def is_implicit_appendix(chunk):
+            # The technique of starting a new appendix without stating
+            # so in the margin on the first page of the appendix
+            # occurs in some older props, eg Prop 1997/98:18
+            txt = str(chunk).strip()
+            if chunk.font.size == metrics.h1.size:
+                if txt in ("Promemorians lagförslag", "Lagrådsremissens lagförslag", "Lagrådets yttrande"):
+                    return True
+                elif txt.startswith("Förteckning över remissinstanser"):
+                    return True
+                return False
+            
         chunk = parser.reader.peek()
         if is_appendix_header(chunk):
+            return True
+        elif is_implicit_appendix(chunk):
             return True
         elif (int(chunk.font.size) == metrics.default.size and
               (chunk.right < metrics_leftmargin() or
@@ -1359,6 +1377,12 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             m = re.search("Bilaga (\d+)", str(chunk))
             if m:
                 state.appendixno = int(m.group(1))
+            else:
+                if state.appendixno:
+                    state.appendixno += 1
+                else:
+                    state.appendixno = 1
+                
             if int(chunk.font.size) >= metrics.h2.size:
                 done = True
         s = Appendix(title=str(chunk).strip(),
@@ -1427,11 +1451,13 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         if chunk.font.size <= min_size:
             return (None, None, chunk)
         strchunk = str(chunk).strip()
+
         if (strchunk.endswith(",") or
             strchunk.endswith(".") or
             strchunk.endswith("och") or
             strchunk.endswith("eller") or
-            strchunk.endswith(":")):
+            strchunk.endswith(":") or
+            strchunk.endswith("-")):
             # sections doesn't end like that
             return (None, None, chunk)
 
@@ -1441,6 +1467,18 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             # "3. 12" -> "3.12" FIXME: Generalize to handle phantom
             # spaces in other places (3- or 4 level section headings)
             strchunk = re.sub("(\d+)\.\s+(\d+)", r"\1.\2", strchunk)
+
+            if re.match("\d Förslag [tl]ill", strchunk):
+                # this is a pattern prevalent in older propositioner
+                # (eg 1972:105) where the text starts with something
+                # that looks like numbered sections (numbered from 1
+                # onwards), that really is a form of preamble
+                # containing only Lagförslag, and then continues with
+                # real sections (again numbered from 1
+                # onwards). Attempt to detect these faux-sections:
+                # NB: This is likely an overbroad heuristic.
+                return (None, None, chunk)
+                
 
         m = re_sectionstart(strchunk)
         if m:

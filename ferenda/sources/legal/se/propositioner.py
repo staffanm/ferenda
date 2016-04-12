@@ -35,24 +35,26 @@ class PropAnalyzer(PDFAnalyzer):
                 m = re.match(textpattern, str(box))
                 if m:
                     return m.group(1)
-            return False
+            return None
         documents = []
         mainstyles = Counter()
         currentappendix = None
         for pageidx, page in enumerate(self.pdf):
             styles = self.count_styles(pageidx, 1)['rest_styles']
-            appendix = boxmatch(page, "Bilaga (\d)\s*$")
             
             # find the most dominant style on the page. If it uses the
             # EU font, it's a separate section.
             if styles and styles.most_common(1)[0][0][0].startswith("EUAlbertina"):
                 currentdoc = 'eudok'
-                currentappendix = appendix
+                currentappendix = boxmatch(page, "Bilaga (\d)\s*$")
             else:
                 # if there is a text box matching "Bilaga \d" in top
                 # margin and the bilagenummer is new and dominant
-                # style is different from currrent dominant style:
-                if appendix and appendix != currentappendix and mainstyles.most_common(1)[0][0] != styles.most_common(1)[0][0]:
+                # style (family and size) is different from any of the
+                # top 3 currrent dominant styles:
+                appendix = boxmatch(page, "Bilaga (\d)\s*$")
+                if appendix and appendix != currentappendix and styles.most_common(1)[0][0] not in [x[0] for x in mainstyles.most_common(3)]:
+                    import pudb; pu.db
                     currentdoc = 'appendix'
                 else:
                     currentdoc = 'main'
