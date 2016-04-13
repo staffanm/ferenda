@@ -72,7 +72,11 @@ class SOUKB(SwedishLegalSource, PDFDocumentRepository):
     download_reverseorder = True
     rdf_type = RPUBL.Utredningsbetankande
     urispace_segment = "utr/sou"
+    # A bit nonsensical, but required for SwedishLegalSource.get_parser
+    document_type = SOU = True
+    PROPOSITION = DS = KOMMITTEDIREKTIV = False
 
+    
     def download(self, basefile=None):
         if basefile:
             resp = self.session.get(self.start_url)
@@ -215,14 +219,26 @@ class SOUKB(SwedishLegalSource, PDFDocumentRepository):
         reader.read(fp)
         return reader
         
-    def get_parser(self, basefile, sanitized):
-        p = offtryck_parser(basefile, preset="dir")
-        p.current_identifier = "SOU %s" % basefile
-        return p.parse
+    def sanitize_body(self, rawbody):
+        sanitized = super(SOUKB, self).sanitize_body(rawbody)
+        sanitized.analyzer = self.get_pdf_analyzer(sanitized)
+        sanitized.analyzer.scanned_source = True  # everything from KB
+                                                  # is scanned, even
+                                                  # though the PDF
+                                                  # includes OCR
+                                                  # information, so
+                                                  # the real source is
+                                                  # not a hOCR file
+        return sanitized
 
-    def tokenize(self, pdfreader):
-        # FIXME: We should probably build a better tokenizer
-        return pdfreader.textboxes(offtryck_gluefunc)
+#    def get_parser(self, basefile, sanitized):
+#        p = offtryck_parser(basefile, preset="dir")
+#        p.current_identifier = "SOU %s" % basefile
+#        return p.parse
+#
+#    def tokenize(self, pdfreader):
+#        # FIXME: We should probably build a better tokenizer
+#        return pdfreader.textboxes(offtryck_gluefunc)
 
     def create_external_resources(self, doc):
         pass
