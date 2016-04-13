@@ -1073,6 +1073,9 @@ class SwedishLegalSource(DocumentRepository):
             day = calendar.monthrange(year, month)[1]
         else:
             # assume strings on the form "3 februari 2010", "8 dec. 1997"
+            # first normalize misformtting like "7juni 2007"
+            datestr = re.sub("([a-z])(\d)", "\\1 \\2", datestr)
+            datestr = re.sub("(\d)([a-z])", "\\1 \\2", datestr)
             components = datestr.split()
             year = int(components[-1])
             if len(components) >= 2:
