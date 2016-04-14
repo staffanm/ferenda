@@ -116,11 +116,24 @@ class Regeringen(SwedishLegalSource):
                         raise e
         finally:
             urlmap_path = self.store.path("urls", "downloaded", ".map", storage_policy="file")
+            util.ensure_dir(urlmap_path)
             with codecs.open(urlmap_path, "w", encoding="utf-8") as fp:
                 for url, identifier in self.urlmap.items():
                     fp.write("%s\t%s\n" % (url, identifier))
 
 
+    misleading_urls = set([
+        "http://www.regeringen.se/rattsdokument/departementsserien-och-promemorior/2015/06/ds-2015342/",  # Ds 2015:34
+        "http://www.regeringen.se/rattsdokument/departementsserien-och-promemorior/2014/05/ds-2014111/",  # Ds 2014:11
+        "http://www.regeringen.se/rattsdokument/departementsserien-och-promemorior/2010/02/ds-2009631/",  # Ds 2009:63 -- but in english!
+        "http://www.regeringen.se/rattsdokument/departementsserien-och-promemorior/2005/12/ds-2005551/",  # Ds 2005:55 -- but in english!
+        "http://www.regeringen.se/rattsdokument/departementsserien-och-promemorior/2005/06/ds-20040551-/",# Ds 2004:51, mislabeled, in easy-reading version
+        "http://www.regeringen.se/rattsdokument/departementsserien-och-promemorior/2004/01/ds-2004171/",  # Ds 2004:17
+        "http://www.regeringen.se/rattsdokument/departementsserien-och-promemorior/2001/01/ds-2001711/",  # Ds 2001:71
+        "http://www.regeringen.se/rattsdokument/departementsserien-och-promemorior/2000/01/ds-2000681/",  # Ds 2000:68
+        "http://www.regeringen.se/rattsdokument/departementsserien-och-promemorior/1999/01/ds-1999241/",  # Ds 1999:24 -- in english
+        "http://www.regeringen.se/rattsdokument/departementsserien-och-promemorior/1998/01/ds-1998141/",  # Ds 1998:14
+    ])
                     
     def attribs_from_url(self, url):
         # Neither search results nor RSS feeds from regeringen.se
@@ -137,7 +150,7 @@ class Regeringen(SwedishLegalSource):
             if m: 
                 (year, ordinal) = m.groups()
                 year = year.replace("_", "")
-        if year and ordinal:
+        if year and ordinal and url not in self.misleading_urls:
             return {'rdf:type': self.urispace_segment.split("/")[-1],
                     'rpubl:arsutgava': year,
                     'rpubl:lopnummer': ordinal}
@@ -297,6 +310,7 @@ class Regeringen(SwedishLegalSource):
     blacklist = set([(SOU, "2008:35"),  # very atypical report
                      (DS, "2002:34"),   # 2-column report, uninteresting
                      (SOU, "2002:11"),  # -""-
+                     (DS, "2007:30"),   # atypical report in english
                     ])
 
     def extract_head(self, fp, basefile):
@@ -663,12 +677,16 @@ class Regeringen(SwedishLegalSource):
                     # base26 conversion into an integer
                     lawname = subsection.title.split(" ", 2)[-1]
                     slug = re.sub('\W+', '', lawname).lower()
+                    slug = re.sub('\d+', '', slug)
                     slug = slug.replace("å", "aa").replace("ä", "ae").replace("ö", "oe").replace("é", "e")
                     numslug = util.base26encode(slug)
-                    assert util.base26decode(numslug) == slug
+                    assert util.base26decode(numslug) == slug, "%s roundtripped as %s" % (slug, util.base26decode(numslug))
                     tmptext = "Fejklag (0000:%s)" % numslug
                     uri =self._parse_uri_from_text(tmptext, state['basefile'])
-                commentary.append((uri, subsection))
+                else:
+                    uri = None
+                if uri:
+                    commentary.append((uri, subsection))
                     
         if commentary == []:  # no subsecs, ie the prop changes a single law
             if 'primarylaw' in state:
@@ -798,7 +816,7 @@ class Regeringen(SwedishLegalSource):
             if (linktext.startswith("Sammanfattning ") or
                     linktext.startswith("Remissammanställning") or
                     linktext.startswith("Sammanställning över remiss") or
-                    "remissinstanser" in linktext):
+                    "emissinstanser" in linktext):
                 pass  # don't add to cleanfiles
             else:
                 cleanfiles.append((pdffile, linktext))
@@ -871,6 +889,9 @@ class Regeringen(SwedishLegalSource):
         elif self.document_type == self.SOU:
             from ferenda.sources.legal.se.sou import SOUAnalyzer
             analyzer = SOUAnalyzer(reader)
+        elif self.document_type == self.DS:
+            from ferenda.sources.legal.se.ds import DsAnalyzer
+            analyzer = DsAnalyzer(reader)
         elif self.document_type == self.PROPOSITION:
             from ferenda.sources.legal.se.propositioner import PropAnalyzer
             analyzer = PropAnalyzer(reader)

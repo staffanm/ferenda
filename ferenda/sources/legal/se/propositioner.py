@@ -54,7 +54,6 @@ class PropAnalyzer(PDFAnalyzer):
                 # top 3 currrent dominant styles:
                 appendix = boxmatch(page, "Bilaga (\d)\s*$")
                 if appendix and appendix != currentappendix and styles.most_common(1)[0][0] not in [x[0] for x in mainstyles.most_common(3)]:
-                    import pudb; pu.db
                     currentdoc = 'appendix'
                 else:
                     currentdoc = 'main'

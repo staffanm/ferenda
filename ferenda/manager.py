@@ -882,13 +882,13 @@ def _run_class(enabled, argv, config):
                 else:
                     # - run the jobs, one by one, in the current process
                     for basefile in iterable:
-                        res.append(
-                            _run_class_with_basefile(
-                                clbl,
-                                basefile,
-                                kwargs,
-                                action,
-                                alias))
+                        r = _run_class_with_basefile(
+                            clbl,
+                            basefile,
+                            kwargs,
+                            action,
+                            alias)
+                        res.append(r)
                 cls.teardown(action, inst.config)
         else:
             # The only thing that kwargs may contain is a

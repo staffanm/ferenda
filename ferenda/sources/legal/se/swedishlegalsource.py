@@ -670,7 +670,9 @@ class SwedishLegalSource(DocumentRepository):
             pagecount = len(sanitized)
             if hasattr(sanitized, 'analyzer'):
                 analyzer = sanitized.analyzer
-                startpage, pagecount, tag = analyzer.documents()[0]
+                for startpage, pagecount, tag in analyzer.documents():
+                    if tag == 'main':
+                        break
             else:
                 analyzer = self.get_pdf_analyzer(sanitized)
             if "hocr" in sanitized.filename:
@@ -1222,13 +1224,15 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         #     return False
         if chunk.font.size <= metrics.default.size:
             return False
-        
+        if "...." in txt:  # probably a line in a TOC
+            return False
         for validheading in ('Propositionens huvudsakliga innehåll',
                              'Innehållsförteckning',
                              'Till statsrådet',
                              'Innehåll',
                              'Sammanfattning',
                              'Propositionens lagförslag', # is preamble in older props
+                             'Författningsförslag',       # and also eg Ds 2008:68
         ):
             if txt.startswith(validheading):
                 return True
@@ -1237,6 +1241,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
     def is_section(parser):
         (ordinal, headingtype, title) = analyze_sectionstart(parser)
+        if "...." in title:  # probably a line in a TOC
+            return False
         if ordinal:
             # analyze_sectionstart(parser)
             return headingtype == "h1" and ordinal.count(".") == 0
@@ -1348,7 +1354,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     @newstate('preamblesection')
     def make_preamblesection(parser):
         s = PreambleSection(title=str(parser.reader.next()).strip())
-        if s.title == "Innehållsförteckning":
+        if s.title in ("Innehållsförteckning"):
             parser.make_children(s)  # throw away -- FIXME: should we
                                      # really do that right in the
                                      # parsing step? shouldn't we wait
@@ -1481,7 +1487,12 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                 # onwards). Attempt to detect these faux-sections:
                 # NB: This is likely an overbroad heuristic.
                 return (None, None, chunk)
-                
+
+        if (parser._state_stack[-1] == 'preamblesection' and
+            re.match("\d Förslag till", strchunk)):
+            # similar to above, but occurs in some modern documents (ds 2008:68)
+            return (None, None, chunk)
+
 
         m = re_sectionstart(strchunk)
         if m:

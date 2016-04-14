@@ -56,7 +56,6 @@ class JO(FixedLayoutSource):
     document_url_regex = "http://www.jo.se/PageFiles/(?P<dummy>\d+)/(?P<basefile>\d+\-\d+)(?P<junk>[,%\d\-]*).pdf"
     headnote_url_template = "http://www.jo.se/sv/JO-beslut/Soka-JO-beslut/?query=%(basefile)s&pn=1"
     rdf_type = RPUBL.VagledandeMyndighetsavgorande
-    parse_types = []
     storage_policy = "dir"
     downloaded_suffix = ".pdf"
     documentstore_class = JOStore
@@ -148,8 +147,8 @@ class JO(FixedLayoutSource):
         return "JO dnr %s" % basefile.replace("/", "-")
         
     def extract_metadata(self, rawhead, basefile):
-        if rawhead:
-            print("FIXME: we should do something with this BeautifulSoup data")
+        # if rawhead:
+        #    print("FIXME: we should do something with this BeautifulSoup data")
         d = self.metadata_from_basefile(basefile)
         return d
 
