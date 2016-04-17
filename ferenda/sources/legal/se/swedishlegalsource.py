@@ -1140,12 +1140,6 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     def is_pagebreak(parser):
         return isinstance(parser.reader.peek(), Page)
 
-#    def is_verbatimpage(parser):
-#        if is_pagebreak(parser):
-#            from pudb import set_trace; set_trace()
-#        return (is_pagebreak(parser) and
-#                state.pageno in metrics.excludepages!)
-
     # page numbers, headers
     def is_nonessential(parser):
         chunk = parser.reader.peek()
@@ -1297,18 +1291,37 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                 elif txt.startswith("Förteckning över remissinstanser"):
                     return True
                 return False
-            
+
         chunk = parser.reader.peek()
+        txtchunk = util.normalize_space(str(chunk))
         if is_appendix_header(chunk):
             return True
         elif is_implicit_appendix(chunk):
             return True
-        elif (int(chunk.font.size) == metrics.default.size and
-              (chunk.right < metrics_leftmargin() or
-               chunk.left > metrics_rightmargin())):
-            m = re.search("Bilaga (\d+)", str(chunk))
+
+        # NOTE: in some cases (prop 1972:105 p 145 and generally
+        # everything before prop 1987/88:69) the "Bilaga" margin
+        # header appears in the (extended) topmargin, not in the
+        # leftmargin.
+        extended_topmargin = metrics.pageheight / 5
+        if abs(metrics.default.size - chunk.font.size) > 2:
+            return False
+        if (parser.current_identifier.startswith("Prop.") and
+            ("Prop. 1987/88:69" < parser.current_identifier and
+             (chunk.right < metrics_leftmargin() or
+              chunk.left > metrics_rightmargin())) or
+            (chunk.bottom < extended_topmargin)):
+            # NOTE: filter out indications of nested
+            # appendicies (eg "Bilaga 5 till RSVs skrivelse")
+            m = re.search("Bilaga( \d+| I|$)(?!(\d| *till))", txtchunk)
             if m:
-                ordinal = int(m.group(1))
+                if m.group(1):
+                    match = m.group(1).strip()
+                    if match == "I":   # correct for OCR mistake
+                        match = "1" 
+                    ordinal = int(match)
+                else:
+                    ordinal = 1
                 if ordinal != state.appendixno:
                     # OK, this can very well be an appendix, but just
                     # to be sure, keep reading to see if we have a
@@ -1319,6 +1332,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                         return False
                     else:
                         return True
+                
 
     def is_paragraph(parser):
         return True
@@ -1379,22 +1393,38 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         # headline-like title, or by the sidenote in the
         # margin. Find out which it is, and plan accordingly.
         done = False
-        while not done:
-            chunk = parser.reader.next()
-            if isinstance(chunk, Page):
-                continue
-            m = re.search("Bilaga (\d+)", str(chunk))
-            if m:
-                state.appendixno = int(m.group(1))
+
+        # First, find either an indicator of the appendix number, or
+        # calculate our own
+        chunk = parser.reader.next()
+        m = re.search("Bilaga( \d+| I|$)", str(chunk))
+        if m and m.group(1):
+            match = m.group(1).strip()
+            if match == "I":   # correct for OCR mistake
+                match = "1" 
+            state.appendixno = int(match)
+        else:
+            # this probably mean that we have an implicit appendix (se
+            # is_appendix for when that's detected)
+            if state.appendixno:
+                state.appendixno += 1
             else:
-                if state.appendixno:
-                    state.appendixno += 1
-                else:
-                    state.appendixno = 1
-                
-            if int(chunk.font.size) >= metrics.h2.size:
+                state.appendixno = 1
+
+        # next up, read the page to find the appendix title
+        while not done:
+            if isinstance(chunk, Page):
+                title = ""
+                # FIXME: we should log a warning here, since it means
+                # we discarded an entire page without finding the
+                # appendix title
                 done = True
-        s = Appendix(title=str(chunk).strip(),
+            if not isinstance(chunk, Page) and int(chunk.font.size) >= metrics.h2.size:
+                title = str(chunk).strip()
+                done = True
+            chunk = parser.reader.next()
+
+        s = Appendix(title=title,
                      ordinal=str(state.appendixno),
                      uri=None)
         return parser.make_children(s)
@@ -1422,12 +1452,6 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         sb = Sidbrytning()
         sb.ordinal = state.pageno
         return sb
-
-#     @newstate('verbatim')
-#     def make_verbatimpage(parser):
-#         vp = VerbatimPage()
-#         vp.ordinal = state.pageno
-#         return parser.make_children(vp)
 
     # the title of a section must start with a uppercase char (This
     # eliminates misinterpretation of things like "5 a
@@ -1488,9 +1512,12 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                 # NB: This is likely an overbroad heuristic.
                 return (None, None, chunk)
 
-        if (parser._state_stack[-1] == 'preamblesection' and
+        if (chunk.font.size < metrics.h1.size and
+            parser._state_stack[-1] == 'preamblesection' and
             re.match("\d Förslag till", strchunk)):
-            # similar to above, but occurs in some modern documents (ds 2008:68)
+            # similar to above, but occurs in some modern documents
+            # (ds 2008:68). only when heading size is less than whats
+            # identified as h1, though.
             return (None, None, chunk)
 
 
@@ -1517,8 +1544,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
     p = FSMParser()
 
-    recognizers = [#is_verbatimpage,
-                   is_pagebreak,
+    recognizers = [is_pagebreak,
                    is_appendix,
                    is_nonessential,
                    is_section,
@@ -1541,7 +1567,6 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                     "appendix")
     commonbodystates = commonstates[1:]
     p.set_transitions({(commonstates, is_nonessential): (skip_nonessential, None),
-#                       (commonbodystates, is_verbatimpage): (False, None),
                        (commonstates, is_pagebreak): (skip_pagebreak, None),
                        (commonstates, is_paragraph): (make_paragraph, None),
                        ("body", is_appendix): (make_appendix, "appendix"),
@@ -1551,7 +1576,6 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                        ("body", is_proprubrik): (make_proprubrik, None),
                        ("body", is_section): (make_section, "section"),
                        ("body", is_unorderedsection): (make_unorderedsection, "unorderedsection"),
-#                       ("body", is_verbatimpage): (make_verbatimpage, "verbatim"),
                        ("coverpage", is_coverpage): (False, None),
                        ("coverpage", is_pagebreak): (False, None),
                        ("coverpage", is_paragraph): (make_paragraph, None),
@@ -1578,7 +1602,6 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                        ("unorderedsubsection", is_section): (False, None),
                        ("unorderedsubsection", is_unorderedsection): (False, None),
                        ("unorderedsubsection", is_unorderedsubsection): (False, None),
-#                       ("verbatim", is_pagebreak): (False, None),
                        (("appendix", "subsubsection", "subsection", "section"), is_appendix): (False, None)
                        })
 
