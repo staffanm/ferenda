@@ -1063,7 +1063,14 @@ class SFS(Trips):
                 self.log.warning("Couldn't mint URI for %s" % type(node))
                 uri = None
             if uri:
-                node.uri = uri
+                # if there's two versions of a para (before and after
+                # a change act), only use a URI for the first one to
+                # avoid having two nodes with identical @about
+                if uri not in state['uris']:
+                    node.uri = uri
+                    state['uris'].add(uri)
+                # else:
+                #     print("Not assigning %s to another node" % uri)
                 if "#" in uri:
                     node.id = uri.split("#", 1)[1]
                 pass
@@ -1261,7 +1268,8 @@ class SFS(Trips):
 
     def visitor_functions(self, basefile):
         return ((self.set_skipfragments, None),
-                (self.construct_id, {'basefile': basefile}),
+                (self.construct_id, {'basefile': basefile,
+                                     'uris': set()}),
                 (self.find_definitions, False))
 
 

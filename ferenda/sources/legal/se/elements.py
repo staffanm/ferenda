@@ -134,7 +134,8 @@ class Paragraf(CompoundElement, OrdinalElement):
         # stycke (res[0] is a dcterms:isPartOf <span>, res[1] is the
         # first Stycke). This makes XSLT rendering easier and is
         # probably not semantically incorrect.
-        res[1].insert(0, E('span', {'class': 'paragrafbeteckning'}, self.ordinal + " §"))
+        idx = 1 if len(res) > 1 else 0
+        res[idx].insert(0, E('span', {'class': 'paragrafbeteckning'}, self.ordinal + " §"))
         return res
 
 
@@ -373,8 +374,21 @@ class Lagrumskommentar(CompoundElement):
             self.uri = uri + "#kommentar-" + self.comment_on.rsplit("/")[-1]
         element = super(Lagrumskommentar, self).as_xhtml(uri, parent_uri)
         if self.comment_on:
-            element.set("rel", "rinfoex:kommentarTill")
-            element.set("href", self.comment_on)
+            span = E("span", {"rel": "rinfoex:kommentarTill",
+                              "href": self.comment_on})
+            # also wrap everything* in a <div about="{comment_on}
+            # property="dcterms:description"
+            # datatype="rdf:XMLLiteral">
+            div = E("div", {'property': 'dcterms:description',
+                            'datatype':'rdf:XMLLiteral'})
+            for child in list(element):
+                if child.tag != "{http://www.w3.org/1999/xhtml}span":
+                    element.remove(child)
+                    div.append(child)
+            assert len(div) > 0, "Lagrumskommentar for %s seems empty" % self.uri
+            element.append(span)
+            element.append(div)
+            
         if hasattr(self, "title"):
             element.set("content", self.title)
         return element
