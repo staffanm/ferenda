@@ -1458,6 +1458,25 @@ class SFS(Trips):
             stuff[lagrum]['changes'].append({'uri': row['change'],
                                              'id': row['id']})
 
+
+        # 7. all forfattnigskommentar
+        forf_kommentar = self.time_store_select(store,
+                                                "sparql/sfs_forfattningskommentar.rq",
+                                                basefile,
+                                                None,  # need both prop and sfs contexts
+                                                "forfattningskommentarer")
+
+        for row in forf_kommentar:
+            if not 'lagrum' in row:
+                lagrum = baseuri
+            else:
+                lagrum = row['lagrum']
+
+            if not lagrum in stuff:
+                stuff[lagrum] = {}
+            link = '<b><a href="%s">%s</a></b>: ' % (row['kommentar'], row['prop'])
+            stuff[lagrum]['kommentar'] = row['desc'].replace(">", ">"+link, 1)
+
         # then, construct a single de-normalized rdf/xml dump, sorted
         # by root/chapter/section/paragraph URI:s. We do this using
         # raw XML, not RDFlib, to avoid normalizing the graph -- we
@@ -1549,6 +1568,14 @@ class SFS(Trips):
                 xhtmlstr = "<div xmlns='http://www.w3.org/1999/xhtml'>%s</div>" % stuff[
                     l]['desc']
                 desc_node.append(etree.fromstring(xhtmlstr.encode('utf-8')))
+
+            if 'kommentar' in stuff[l]:
+                desc_node = etree.SubElement(lagrum_node, ns("rinfoex:forfattningskommentar"))
+                xhtmlstr = "<div xmlns='http://www.w3.org/1999/xhtml'>%s</div>" % stuff[
+                    l]['kommentar']
+                desc_node.append(etree.fromstring(xhtmlstr.encode('utf-8')))
+
+
 
         # tree = etree.ElementTree(root_node)
         treestring = etree.tostring(root_node, encoding="utf-8", pretty_print=True)

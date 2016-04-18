@@ -38,6 +38,7 @@
     <xsl:message>pagetitle: documenturi is <xsl:value-of select="$documenturi"/></xsl:message>
     <xsl:variable name="rattsfall" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/rpubl:isLagrumFor/rdf:Description"/>
     <xsl:variable name="kommentar" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/dcterms:description/xhtml:div/*"/>
+    <xsl:variable name="forfattningskommentar" select="$sfsannotations/rdf:Description[@rdf:about=$documenturi]/rinfoex:forfattningskommentar/xhtml:div/*"/>
     <div class="row">
       <section id="top" class="col-sm-8">
 	<h1><xsl:value-of select="../xhtml:head/xhtml:title"/></h1>
@@ -148,12 +149,13 @@
     <xsl:variable name="rattsfall" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rpubl:isLagrumFor/rdf:Description"/>
     <xsl:variable name="inbound" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/dcterms:references"/>
     <xsl:variable name="kommentar" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/dcterms:description/xhtml:div/*"/>
+    <xsl:variable name="forfattningskommentar" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rinfoex:forfattningskommentar/xhtml:div/*"/>
     <xsl:variable name="inford" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rpubl:isEnactedBy"/>
     <xsl:variable name="andrad" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rpubl:isChangedBy"/>
     <xsl:variable name="upphavd" select="$sfsannotations/rdf:Description[@rdf:about=$uri]/rpubl:isRemovedBy"/>
     <xsl:variable name="panelid" select="substring-after($uri, '#')"/>
     <xsl:variable name="expanded" select="'true'"/>
-    <xsl:if test="$kommentar or $rattsfall or $inbound or $inford or $andrad or $upphavd">
+    <xsl:if test="$kommentar or $forfattningskommentar or $rattsfall or $inbound or $inford or $andrad or $upphavd">
       <div class="panel-group col-sm-4" role="tablist" id="panel-{$panelid}" aria-multiselectable="true">
 	<xsl:if test="$kommentar">
 	  <xsl:call-template name="aside-annotations-panel">
@@ -162,6 +164,16 @@
 	    <xsl:with-param name="nodeset" select="$kommentar"/>
 	    <xsl:with-param name="panelid" select="$panelid"/>
 	    <xsl:with-param name="paneltype">k</xsl:with-param>
+	    <xsl:with-param name="expanded" select="$expanded"/>
+	  </xsl:call-template>
+	</xsl:if>
+	<xsl:if test="$forfattningskommentar">
+	  <xsl:call-template name="aside-annotations-panel">
+	    <xsl:with-param name="title">Författningskommentar</xsl:with-param>
+	    <xsl:with-param name="badgecount"/>
+	    <xsl:with-param name="nodeset" select="$forfattningskommentar"/>
+	    <xsl:with-param name="panelid" select="$panelid"/>
+	    <xsl:with-param name="paneltype">f</xsl:with-param>
 	    <xsl:with-param name="expanded" select="$expanded"/>
 	  </xsl:call-template>
 	</xsl:if>

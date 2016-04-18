@@ -352,7 +352,10 @@ class SwedishLegalSource(DocumentRepository):
             uri = uri.replace(self.config.develurl, self.config.url)
         if uri.startswith(base) and uri[len(base)+1:].startswith(self.urispace_segment):
             offset = 2 if self.urispace_segment else 1
-            return uri[len(base) + len(self.urispace_segment) + offset:]
+            basefile = uri[len(base) + len(self.urispace_segment) + offset:]
+            if "#" in basefile:
+                basefile = basefile.split("#", 1)[0]
+            return basefile
 
     @action
     @managedparsing

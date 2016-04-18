@@ -1453,6 +1453,7 @@ with the *config* object as single parameter.
 
         # examine headcontent and bodycontent to only use prefixes
         # that are actually used
+
         prefixes = dict([(str(x[1]), x[0]) for x in self.ns.items()])
         used = {"http://www.w3.org/1999/xhtml": None}
         for e in bodycontent.iter():
@@ -1463,14 +1464,14 @@ with the *config* object as single parameter.
                     used[ns] = prefixes[ns]
             # Find undeclared prefixes and guess which NS they map to
             # (similarly to the expansion of property/datatype/rel below):
-            if e.get('typeof') and ':' in e.get('typeof'):
-                prefix = e.get('typeof').split(":", 1)[0]
-                ns = str(self.ns[prefix])
-                if ns not in used:
-                    used[ns] = prefixes[ns]
+            for attr in ('typeof', 'rel'):
+                if e.get(attr) and ':' in e.get(attr):
+                    prefix = e.get(attr).split(":", 1)[0]
+                    ns = str(self.ns[prefix])
+                    if ns not in used:
+                        used[ns] = prefixes[ns]
 
         nsmap = dict([(x[1], x[0]) for x in used.items()])
-
         for e in headcontent.iter():
             # examine @property @datatype @rel for CURIEs and make
             # sure they're mapped
@@ -1822,12 +1823,8 @@ parsed document path to that documents dependency file."""
                     continue
                 # for each URIRef in graph
                 if isinstance(o, URIRef):
-                    # in order to minimize calls to
-                    # basefile_from_uri(), it'd be nice if the
-                    # order of repos was dynamically altered
-                    # according to MRU (most recently used)
-                    for repo in repos:
-                        # find out if any docrepo can handle it
+                    # find out if any docrepo can handle it
+                    for repoidx, repo in enumerate(repos):
                         dep_basefile = repo.basefile_from_uri(str(o))
                         if dep_basefile and (
                                 (repo != self) or
@@ -1837,6 +1834,9 @@ parsed document path to that documents dependency file."""
                             res = repo.add_dependency(dep_basefile, pp)
                             values['deps'] += 1
                             break
+                    # reorder repos in MRU order
+                    repos.insert(0, repos.pop(repoidx))
+
         return values['deps']
 
     def add_dependency(self, basefile, dependencyfile):
