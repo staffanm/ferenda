@@ -72,12 +72,12 @@ class Analyze(unittest.TestCase):
         vmetrics = self.analyzer.analyze_vertical_margins(vcounters)
         # this will miscalculate the header zone because the header is
         # so wordy it's considered part of the main document text
-        self.assertEquals(vmetrics, {'bottommargin': 1149, 'topmargin': 53})
+        self.assertEquals(vmetrics, {'bottommargin': 1149, 'pageheight': 1262, 'topmargin': 53})
 
         # try again with double the thresholds
         self.analyzer.header_significance_threshold = 0.004
         vmetrics = self.analyzer.analyze_vertical_margins(vcounters)
-        self.assertEquals(vmetrics, {'bottommargin': 1149, 'topmargin': 107})
+        self.assertEquals(vmetrics, {'bottommargin': 1149, 'pageheight': 1262, 'topmargin': 107})
 
     def test_analyze_styles(self):
         stylecounters = self.analyzer.count_styles(0, 3)
@@ -93,24 +93,27 @@ class Analyze(unittest.TestCase):
     # this is more of a functional test
     def test_margins(self):
         jsonpath = "test/files/pdfanalyze/lipsum.metrics.json"
-        self.assertFalse(os.path.exists(jsonpath))
-        metrics = self.analyzer.metrics(jsonpath)
-        self.assertEquals({'default': {'family': 'Comic Sans MS', 'size': 14},
-                           'bottommargin': 1149,
-                           'h1': {'family': 'Cambria,Bold', 'size': 19},
-                           'h2': {'family': 'Cambria,Bold', 'size': 17},
-                           'h3': {'family': 'Cambria,Bold', 'size': 14},
-                           'topmargin': 53,
-                           'leftmargin': 135,
-                           'leftmargin_even': 108,
-                           'pagewidth': 892,
-                           'rightmargin': 784,
-                           'rightmargin_even': 748,
-                           'title': {'family': 'Cambria', 'size': 37},
-                           'scanned_source': False},
-                          metrics)
-        self.assertTrue(os.path.exists(jsonpath))
-        util.robust_remove(jsonpath)
+        try:
+            self.assertFalse(os.path.exists(jsonpath))
+            metrics = self.analyzer.metrics(jsonpath)
+            self.assertEquals({'default': {'family': 'Comic Sans MS', 'size': 14},
+                               'bottommargin': 1149,
+                               'h1': {'family': 'Cambria,Bold', 'size': 19},
+                               'h2': {'family': 'Cambria,Bold', 'size': 17},
+                               'h3': {'family': 'Cambria,Bold', 'size': 14},
+                               'topmargin': 53,
+                               'leftmargin': 135,
+                               'leftmargin_even': 108,
+                               'pageheight': 1262,
+                               'pagewidth': 892,
+                               'rightmargin': 784,
+                               'rightmargin_even': 748,
+                               'title': {'family': 'Cambria', 'size': 37},
+                               'scanned_source': False},
+                              metrics)
+            self.assertTrue(os.path.exists(jsonpath))
+        finally:
+            util.robust_remove(jsonpath)
 
     def test_margins_subdocument(self):
         self.analyzer.frontmatter = 0
@@ -123,6 +126,7 @@ class Analyze(unittest.TestCase):
                            'h3': {'family': 'Cambria,Bold', 'size': 14},
                            'topmargin': 53,
                            'leftmargin_even': 108,
+                           'pageheight': 1262,
                            'pagewidth': 892,
                            'rightmargin_even': 748,
                            'scanned_source': False},
