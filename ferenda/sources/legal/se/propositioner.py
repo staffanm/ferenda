@@ -29,6 +29,11 @@ from .fixedlayoutsource import FixedLayoutStore, FixedLayoutSource
 
 class PropAnalyzer(PDFAnalyzer):
 
+    # NOTE: The cutoff used to be 0.5% but it turns out that in
+    # particular h2's can be quite rare, occuring maybe two times
+    # in an entire document.
+    style_significance_threshold = 0.001
+
     def documents(self):
         def boxmatch(page, textpattern):
             for box in page.boundingbox(bottom=page.height / 5):
@@ -53,7 +58,10 @@ class PropAnalyzer(PDFAnalyzer):
                 # style (family and size) is different from any of the
                 # top 3 currrent dominant styles:
                 appendix = boxmatch(page, "Bilaga (\d)\s*$")
-                if appendix and appendix != currentappendix and styles.most_common(1)[0][0] not in [x[0] for x in mainstyles.most_common(3)]:
+                if (appendix and
+                    appendix != currentappendix and
+                    styles.most_common(1) and 
+                    styles.most_common(1)[0][0] not in [x[0] for x in mainstyles.most_common(3)]):
                     currentdoc = 'appendix'
                 else:
                     currentdoc = 'main'

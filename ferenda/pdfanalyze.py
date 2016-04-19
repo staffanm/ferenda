@@ -372,14 +372,10 @@ class PDFAnalyzer(object):
             styledefs['title'] = self.fontdict(ts)
 
         # h1 - h3: Take all styles larger than or equal to default,
-        # with significant use (each > 0.15% of all chars from page 2
+        # with significant use (each > 0.5% of all chars from page 2
         # onwards, as the front page often uses nontypical styles),
         # then order styles by font size.
-        #
-        # NOTE: The cutoff used to be 0.5% but it turns out that in
-        # particular h2's can be quite rare, occuring maybe two times
-        # in an entire document.
-        significantuse = sum(rest_styles.values()) * 0.0015
+        significantuse = sum(rest_styles.values()) * self.style_significance_threshold
         sortedstyles = sorted(rest_styles, key=self.fontsize_key, reverse=True)
         largestyles = [x for x in sortedstyles if
                        (self.fontsize_key(x) > self.fontsize_key(ds) and

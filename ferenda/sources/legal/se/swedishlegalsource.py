@@ -1302,18 +1302,24 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         elif is_implicit_appendix(chunk):
             return True
 
+        # check that the chunk in question is not too big
+        tolerance = 2 if metrics.scanned_source else 0
+        if abs(metrics.default.size - chunk.font.size) > tolerance:
+            return False
+
+        # check that the chunk is placed in the correct margin
         # NOTE: in some cases (prop 1972:105 p 145 and generally
         # everything before prop 1987/88:69) the "Bilaga" margin
         # header appears in the (extended) topmargin, not in the
         # leftmargin.
-        extended_topmargin = metrics.pageheight / 5
-        if abs(metrics.default.size - chunk.font.size) > 2:
-            return False
         if (parser.current_identifier.startswith("Prop.") and
-            ("Prop. 1987/88:69" < parser.current_identifier and
-             (chunk.right < metrics_leftmargin() or
-              chunk.left > metrics_rightmargin())) or
-            (chunk.bottom < extended_topmargin)):
+            ("Prop. 1987/88:69" > parser.current_identifier)):
+            extended_topmargin = metrics.pageheight / 5
+            placement = lambda c: c.bottom < extended_topmargin
+        else:
+            placement = lambda c: c.right < metrics_leftmargin() or c.left > metrics_rightmargin()
+
+        if placement(chunk):
             # NOTE: filter out indications of nested
             # appendicies (eg "Bilaga 5 till RSVs skrivelse")
             m = re.search("Bilaga( \d+| I|$)(?!(\d| *till))", txtchunk)
