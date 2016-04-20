@@ -377,7 +377,6 @@ class Riksdagen(FixedLayoutSource):
     def downloaded_to_intermediate(self, basefile):
         # first check against our "blacklist-light":
         if (self.document_type, basefile) in self.metadataonly:
-            from pudb import set_trace; set_trace()
             self.log.warning("%s: Will only process metadata, creating placeholder for body text" % basefile)
             # nb: tokenize() depends on the text being enclosed in <pre> tags
             return StringIO("<pre>Dokumenttext saknas (se originaldokument)</pre>")

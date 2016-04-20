@@ -634,7 +634,7 @@ class SFS(Trips):
         content = soup.find('div', 'search-results-content')
         innerboxes = content.findAll('div', 'result-inner-box')
         d = OrderedDict()
-        d['SFS-nummer'] = innerboxes[0].text.split(u"\xb7")[1].strip()
+        d['SFS-nummer'] = util.normalize_space(innerboxes[0].text.split(u"\xb7")[1])
         d['Rubrik'] = innerboxes[1].text.strip()
         for innerbox in innerboxes[2:]:
             key, val = innerbox.text.split(":", 1)
@@ -679,7 +679,7 @@ class SFS(Trips):
                             "%s: Base SFS %s not in title %r" % (basefile,
                                                                  basefile,
                                                                  val))
-                    d[docuri]["dcterms:title"] = val
+                    d[docuri]["dcterms:title"] = util.normalize_space(val)
                     d[docuri]["rdf:type"] = self._forfattningstyp(val)
                 elif key == 'Observera':
                     d[docuri]["rdfs:comment"] = val
@@ -778,7 +778,7 @@ class SFS(Trips):
         skip = True
         d = {}
         identifier = "SFS " + lines[0].split('\xb7')[1].strip()
-        d["dcterms:title"] = lines[1].strip()
+        d["dcterms:title"] = util.normalize_space(lines[1])
         for line in lines[2:]:
             if ":" not in line:
                 continue
@@ -1655,8 +1655,9 @@ class SFS(Trips):
 
         # these are for better sorting/selecting
         title = re.sub('Kungl\. Maj:ts ', '', title)
+        # if newtitle was selected above, it might not contain the SFSid eg "(2016:123)"
         title = re.sub(
-            '^(Lag|F\xf6rordning|Tillk\xe4nnagivande|[kK]ung\xf6relse) ?\([^\)]+\) ?(av|om|med|ang\xe5ende) ',
+            '^(Lag|F\xf6rordning|Tillk\xe4nnagivande|[kK]ung\xf6relse) ?(\([^\)]+\)|) ?(av|om|med|ang\xe5ende) ',
             '',
             title)
         title = re.sub("^\d{4} \xe5rs ", "", title)
