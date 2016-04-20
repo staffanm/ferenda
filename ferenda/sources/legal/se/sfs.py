@@ -1635,7 +1635,7 @@ class SFS(Trips):
 
     def _forfattningskey(self, title):
         # these last examples should probably be handled in the parse step
-        title = re.sub("^/r1/ ", "", title)
+        title = re.sub("^/r1/ ", "", util.normalize_space(title))
         if title.startswith("/Rubriken"):
             m = re.match(
                 "/Rubriken upph\xf6r att g\xe4lla U:([^/]+)/ *([^/]+)/Rubriken tr\xe4der i kraft I:([^/]+)/ *([^/]+)",

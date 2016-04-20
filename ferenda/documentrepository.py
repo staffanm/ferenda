@@ -2029,6 +2029,21 @@ parsed document path to that documents dependency file."""
             data = json.load(open(cachepath))
         else:
             data = self.facet_select(self.facet_query(self.dataset_uri()))
+            # make sure the dataset contains no duplicate entries (as determined by URI)
+            uris = set()
+            dupes = []
+            for idx, row in enumerate(list(data)):
+                if row['uri'] not in uris:
+                    uris.add(row['uri'])
+                else:
+                    self.log.warning("faceted_data: found duplicate of uri %s at #%s" % (row['uri'], idx))
+                    dupes.append(idx)
+            for idx in reversed(dupes):
+                self.log.warning("faceted_data: popping %s" % idx)
+                data.pop(idx) # note
+            uris = None
+
+
             util.ensure_dir(cachepath)
             with open(cachepath, "w") as fp:
                 self.log.debug("Saving faceted_data to %s" % cachepath)
