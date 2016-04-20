@@ -361,9 +361,9 @@ class UnorderedSection(CompoundElement):
         return element
 
 
-class Lagrumskommentar(CompoundElement):
+class Forfattningskommentar(CompoundElement):
     tagname = "div"
-    classname = "lagrumskommentar"
+    classname = "forfattningskommentar"
     
     def as_xhtml(self, uri, parent_uri=None):
         if not self.uri and self.comment_on:
@@ -372,22 +372,28 @@ class Lagrumskommentar(CompoundElement):
             # 'https://lagen.nu/prop/2013/14:34#2010:1846#P52' --
             # is that even legal?
             self.uri = uri + "#kommentar-" + self.comment_on.rsplit("/")[-1]
-        element = super(Lagrumskommentar, self).as_xhtml(uri, parent_uri)
+        element = super(Forfattningskommentar, self).as_xhtml(uri, parent_uri)
+        element.set("typeof", "rinfoex:Forfattningskommentar")
         if self.comment_on:
             span = E("span", {"rel": "rinfoex:kommentarTill",
                               "href": self.comment_on})
+            div = E("div")
+            for child in list(element):
+                if child.tag != "{http://www.w3.org/1999/xhtml}span" or not child.get("rel"):
+                    element.remove(child)
+                    # remove attribs that don't need to be in the RDF
+                    if child.get("class"):
+                        del child.attrib["class"]
+                    if child.get("style"):
+                        del child.attrib["style"]
+                    div.append(child)
+            assert len(div) > 0, "Författningskommentar for %s seems empty" % self.uri
+            element.append(span)
             # also wrap everything* in a <div about="{comment_on}
             # property="dcterms:description"
             # datatype="rdf:XMLLiteral">
-            div = E("div", {'property': 'dcterms:description',
-                            'datatype':'rdf:XMLLiteral'})
-            for child in list(element):
-                if child.tag != "{http://www.w3.org/1999/xhtml}span":
-                    element.remove(child)
-                    div.append(child)
-            assert len(div) > 0, "Lagrumskommentar for %s seems empty" % self.uri
-            element.append(span)
-            element.append(div)
+            element.append(E("div", div, {'property': 'dcterms:description',
+                                          'datatype':'rdf:XMLLiteral'}))
             
         if hasattr(self, "title"):
             element.set("content", self.title)

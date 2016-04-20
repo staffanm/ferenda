@@ -1213,9 +1213,12 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         txt = str(chunk).strip()
         # Current pdfanalyzer yields a too small metrics.h2 size for
         # propositioner (metrics.h2.size = 17, but should be 23, at
-        # least for prop. 2005/06:173. And since this is hardcoded to
-        # recognize a fixed set of headings we could just make sure
-        # the font is bigger than defalt
+        # least for prop. 2005/06:173. FIXME: check if that's still
+        # true
+        #
+        # And since this is hardcoded to recognize a fixed set of
+        # headings we could just make sure the font is bigger than
+        # defalt
         # 
         # if not metrics.h2.size <= fontsize <= metrics.h1.size:
         #     return False
@@ -1230,6 +1233,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                              'Sammanfattning',
                              'Propositionens lagförslag', # is preamble in older props
                              'Författningsförslag',       # and also eg Ds 2008:68
+                             'Referenser'                 # more like PostambleSection (eg SOU 2007:72 p 377)
         ):
             if txt.startswith(validheading):
                 return True
@@ -1304,7 +1308,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
         # check that the chunk in question is not too big
         tolerance = 2 if metrics.scanned_source else 0
-        if abs(metrics.default.size - chunk.font.size) > tolerance:
+        if metrics.default.size + tolerance < chunk.font.size:
             return False
 
         # check that the chunk is placed in the correct margin
@@ -1591,6 +1595,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                        ("coverpage", is_preamblesection): (False, None),
                        ("preamblesection", is_preamblesection): (False, None),
                        ("preamblesection", is_section): (False, None),
+                       ("preamblesection", is_appendix): (False, None),
                        ("section", is_section): (False, None),
                        ("section", is_subsection): (make_section, "subsection"),
                        ("section", is_unorderedsection): (make_unorderedsection, "unorderedsection"),
@@ -1611,6 +1616,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                        ("unorderedsubsection", is_section): (False, None),
                        ("unorderedsubsection", is_unorderedsection): (False, None),
                        ("unorderedsubsection", is_unorderedsubsection): (False, None),
+                       (("subsubsection", "subsection", "section"), is_preamblesection): (False, None),
                        (("appendix", "subsubsection", "subsection", "section"), is_appendix): (False, None)
                        })
 

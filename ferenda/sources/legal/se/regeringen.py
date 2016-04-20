@@ -27,7 +27,7 @@ from ferenda.errors import DocumentRemovedError
 from . import SwedishLegalSource, RPUBL
 from .legalref import LegalRef
 from .swedishlegalsource import offtryck_gluefunc
-from .elements import PreambleSection, UnorderedSection, Lagrumskommentar, Sidbrytning, VerbatimSection
+from .elements import PreambleSection, UnorderedSection, Forfattningskommentar, Sidbrytning, VerbatimSection
 
 class FontmappingPDFReader(PDFReader):
     # Fonts in Propositioner get handled wierdly by pdf2xml
@@ -715,12 +715,12 @@ class Regeringen(SwedishLegalSource):
                     else:
                         pageno = None
                     if comment_on not in state['commented_paras']:
-                        para = Lagrumskommentar(title=text,
+                        para = Forfattningskommentar(title=text,
                                                 comment_on=comment_on,
                                                 uri=None)
-                        # the URI to the above Lagrumskommentar is
+                        # the URI to the above Forfattningskommentar is
                         # dynamically constructed in
-                        # Lagrumskommentar.as_xhtml
+                        # Forfattningskommentar.as_xhtml
                         paras.append(para)
                         state['commented_paras'][comment_on] = pageno
                     else:
