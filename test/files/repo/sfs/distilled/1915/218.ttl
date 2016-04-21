@@ -60,8 +60,7 @@
 <https://lagen.nu/sfs/1987:329> a rpubl:Lag ;
     dcterms:identifier "SFS 1987:329" ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
-    dcterms:title """Lag (1987:329) om ändring i lagen (1915:218) om avtal och\r
-andra rättshandlingar på förmögenhetsrättens område"""@sv ;
+    dcterms:title "Lag (1987:329) om ändring i lagen (1915:218) om avtal och andra rättshandlingar på förmögenhetsrättens område"@sv ;
     rpubl:andrar "ändr. 31 §" ;
     rpubl:arsutgava "1987" ;
     rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;
@@ -76,8 +75,7 @@ andra rättshandlingar på förmögenhetsrättens område"""@sv ;
 <https://lagen.nu/sfs/1994:1513> a rpubl:Lag ;
     dcterms:identifier "SFS 1994:1513" ;
     dcterms:publisher <https://lagen.nu/org/2008/regeringskansliet> ;
-    dcterms:title """Lag (1994:1513) om ändring i lagen (1915:218) om avtal och andra \r
-rättshandlingar på förmögenhetsrättens område"""@sv ;
+    dcterms:title "Lag (1994:1513) om ändring i lagen (1915:218) om avtal och andra rättshandlingar på förmögenhetsrättens område"@sv ;
     rpubl:andrar "ändr. 36 §" ;
     rpubl:arsutgava "1994" ;
     rpubl:beslutadAv <https://lagen.nu/org/2008/regeringskansliet> ;

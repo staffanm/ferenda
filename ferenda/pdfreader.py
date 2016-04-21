@@ -127,7 +127,7 @@ class PDFReader(CompoundElement):
                 os.path.splitext(os.path.basename(filename))[0] + ".pdf"
             if not os.path.exists(newfilename):
                 util.ensure_dir(newfilename)
-                cmdline = "soffice --headless -convert-to pdf -outdir '%s' %s" % (
+                cmdline = "soffice --headless --convert-to pdf --outdir '%s' %s" % (
                     workdir, filename)
                 self.log.debug("%s: Converting to PDF: %s" % (filename, cmdline))
                 (ret, stdout, stderr) = util.runcmd(
@@ -731,7 +731,7 @@ class StreamingPDFReader(PDFReader):
                 os.path.splitext(os.path.basename(filename))[0] + ".pdf"
             if not os.path.exists(newfilename):
                 util.ensure_dir(newfilename)
-                cmdline = "soffice --headless -convert-to pdf -outdir '%s' %s" % (
+                cmdline = "soffice --headless --convert-to pdf --outdir '%s' %s" % (
                     workdir, filename)
                 self.log.debug("%s: Converting to PDF: %s" % (filename, cmdline))
                 (ret, stdout, stderr) = util.runcmd(

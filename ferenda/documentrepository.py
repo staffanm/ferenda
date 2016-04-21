@@ -193,6 +193,14 @@ class DocumentRepository(object):
 
     """
 
+    max_resources = 1000
+    """The maximum number of sub-resources (as defined by having a
+    specific URI) that documents in this repo can have. This is
+    checked in a validation step at the end of parse. If set to None,
+    no validation of the number of resources is done.
+
+    """
+
     #
     # download() related class properties
 
@@ -1518,8 +1526,8 @@ with the *config* object as single parameter.
             if divnode.get("about") in resources:
                 return "Resource %s encountered twice" % divnode.get("about")
             resources.add(divnode.get("about"))
-        if len(resources) > 1000:
-            return "Encounted over 1000 resources, that's probably not right"
+        if self.max_resources and len(resources) > self.max_resources:
+            return "Found over %s resources (%s), that's probably not right" % (self.max_resources, len(resources))
         return None  # no news is good news
 
     def parsed_url(self, basefile):

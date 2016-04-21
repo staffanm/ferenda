@@ -115,7 +115,7 @@
 <https://lagen.nu/sfs/1987:230> rdfs:label "äktenskapsbalken"; dcterms:alternate "ÄktB" .
 <https://lagen.nu/sfs/1987:259> rdfs:label "jaktlagen" .
 <https://lagen.nu/sfs/1987:619> rdfs:label "sparbankslagen" .
-<https://lagen.nu/sfs/1987:672> rdfs:label "konkurslagen" ; dcterms:alternate "KL" .
+<https://lagen.nu/sfs/1987:672> rdfs:label "konkurslagen" .
 <https://lagen.nu/sfs/1987:822> dcterms:alternate "CISG" .
 <https://lagen.nu/sfs/1988:220> rdfs:label "strålskyddslagen" .
 <https://lagen.nu/sfs/1988:254> rdfs:label "knivlagen" .

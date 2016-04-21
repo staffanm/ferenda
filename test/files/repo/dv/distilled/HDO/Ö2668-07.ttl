@@ -11,10 +11,12 @@
     dcterms:isPartOf <https://lagen.nu/rf/nja/2007s650> ;
     dcterms:references <https://lagen.nu/rf/nja/1936s605>,
         <https://lagen.nu/rf/nja/2002s129>,
-        <https://lagen.nu/sfs/1942:740> .
+        <https://lagen.nu/sfs/1942:740>,
+        <https://lagen.nu/sfs/1942:740#K12P2S1> .
 
 <https://lagen.nu/rf/nja/2007s650#HGO> dcterms:creator "Göta hovrätt"@sv ;
-    dcterms:isPartOf <https://lagen.nu/rf/nja/2007s650> .
+    dcterms:isPartOf <https://lagen.nu/rf/nja/2007s650> ;
+    dcterms:references <https://lagen.nu/sfs/1942:740#K12P2S1> .
 
 <https://lagen.nu/rf/nja/2007s650#TVA> dcterms:creator "Växjö tingsrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2007s650> .
@@ -40,7 +42,8 @@
     dcterms:identifier "NJA 2007 s. 650" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
     dcterms:references <https://lagen.nu/rf/nja/1936s605>,
-        <https://lagen.nu/rf/nja/2002s129> ;
+        <https://lagen.nu/rf/nja/2002s129>,
+        <https://lagen.nu/sfs/1942:740#K12P2> ;
     rpubl:arsutgava "2007" ;
     rpubl:lopnummer "79" ;
     rpubl:rattsfallspublikation <https://lagen.nu/dataset/nja> ;

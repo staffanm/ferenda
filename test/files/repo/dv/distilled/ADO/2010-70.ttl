@@ -16,6 +16,7 @@
     rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/ad/B-117-2009/2010-10-13> ;
     rpubl:referatrubrik "Målet gällde skadestånd. Domen innebar att tingsrättens domslut fastställdes."@sv ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/ad/2010:70> ;
+    prov:wasDerivedFrom <https://lagen.nu/rf/ad/2010:70?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
 <https://lagen.nu/dom/ad/B-117-2009/2010-10-13> a rpubl:VagledandeDomstolsavgorande ;
@@ -25,4 +26,6 @@
     rpubl:domsnummer "2010-70" ;
     rpubl:malnummer "B-117-2009" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/ad/b-117-2009/2010-10-13> .
+
+<https://lagen.nu/rf/ad/2010:70?repo=dv&dir=downloaded> rdfs:label "AD 2010 nr 70"@sv .
 

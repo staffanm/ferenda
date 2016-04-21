@@ -247,6 +247,17 @@ class JO(FixedLayoutSource):
             return parser.make_children(b)
 
         def make_paragraph(parser):
+            # A Paragraph containing PDFReader.Textelement object will
+            # render these as <span> objects (the default rendering. A
+            # PDFReader.Textbox object containing same will render
+            # unstyled Textelements as plain strings, cutting down on
+            # unneccesary <span> elements. However, these themselves
+            # render with unneccessary @style and @class attributes,
+            # which we don't want. For now, lets stick with Paragraphs
+            # as containers and maybe later figure out how to get
+            # PDFReader.Textelements to render themselves sanely.
+            # 
+            # p = parser.reader.next()
             p = Paragraph(parser.reader.next())
             return p
 

@@ -11,7 +11,9 @@
     dcterms:identifier "RÅ 2010 not 1" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
     dcterms:references <https://lagen.nu/prop/1985/86:1>,
+        <https://lagen.nu/sfs/1987:10#K4>,
         <https://lagen.nu/sfs/1987:10#K5P27>,
+        <https://lagen.nu/sfs/1987:10#K5P29>,
         <https://lagen.nu/sfs/2007:845>,
         <https://lagen.nu/sfs/2007:845#P4> ;
     rpubl:arsutgava "2010" ;

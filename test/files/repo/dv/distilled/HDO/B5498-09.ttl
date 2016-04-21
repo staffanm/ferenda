@@ -12,7 +12,8 @@
     dcterms:isPartOf <https://lagen.nu/rf/nja/2010s168#I> .
 
 <https://lagen.nu/rf/nja/2010s168#I/HGO> dcterms:creator "Göta hovrätt"@sv ;
-    dcterms:isPartOf <https://lagen.nu/rf/nja/2010s168#I> .
+    dcterms:isPartOf <https://lagen.nu/rf/nja/2010s168#I> ;
+    dcterms:references <https://lagen.nu/sfs/1942:740#K30P9> .
 
 <https://lagen.nu/rf/nja/2010s168#I/TLI> dcterms:creator "Linköpings tingsrätt"@sv ;
     dcterms:isPartOf <https://lagen.nu/rf/nja/2010s168#I> ;

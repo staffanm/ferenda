@@ -72,7 +72,7 @@ class SwedishLegalSource(DocumentRepository):
 
     rdf_type = RPUBL.Rattsinformationsdokument  # subclasses override this
 
-    parse_types = LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.FORARBETEN
+    parse_types = LegalRef.RATTSFALL, LegalRef.LAGRUM, LegalRef.KORTLAGRUM, LegalRef.FORARBETEN
     parse_allow_relative = False
     sparql_annotations = "sparql/describe-base.rq"
     
@@ -139,7 +139,6 @@ class SwedishLegalSource(DocumentRepository):
         if self.alias != "sfs" and self.resourceloader.exists("extra/sfs.ttl"):
             with self.resourceloader.open("extra/sfs.ttl") as fp:
                 cd.parse(data=fp.read(), format="turtle")
-                
         return SwedishCitationParser(LegalRef(*self.parse_types),
                                      self.minter,
                                      cd,
@@ -1100,6 +1099,11 @@ class SwedishLegalSource(DocumentRepository):
         else:
             return util.gYear(year)
 
+    # hook for RepoTester to call
+    def tearDown(self, testcase):
+        self.refparser._legalrefparser.namedlaws = {}
+        self.refparser._legalrefparser.currentlynamedlaws = {}
+
 
 def offtryck_parser(basefile="0", metrics=None, preset=None,
                     identifier=None, debug=False, initialstate=None):
@@ -1237,7 +1241,14 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         ):
             if txt.startswith(validheading):
                 return True
-            if txt.endswith("departementet"): # older props 
+            if txt.endswith("departementet"): # older props, also used
+                                              # for a appendix-like
+                                              # "utdrag ur protokoll
+                                              # vid
+                                              # regeringssammanträde"
+                                              # formal section
+                                              # normally at the very
+                                              # end.
                 return True
 
     def is_section(parser):

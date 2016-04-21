@@ -10,11 +10,11 @@
 <https://lagen.nu/rf/nja/2007/not/19> a rpubl:Rattsfallsnotis ;
     dcterms:identifier "NJA 2007 not 19" ;
     dcterms:publisher <https://lagen.nu/org/2008/domstolsverket> ;
-    dcterms:references <https://lagen.nu/rf/nja/1994s194>,
+    dcterms:references <https://lagen.nu/prop/1972:5#s518>,
+        <https://lagen.nu/rf/nja/1994s194>,
         <https://lagen.nu/rf/nja/2002s88>,
         <https://lagen.nu/rf/nja/2003s285>,
         <https://lagen.nu/rf/nja/2005s175>,
-        <https://lagen.nu/prop/1972:5#s518>,
         <https://lagen.nu/sfs/1970:428>,
         <https://lagen.nu/sfs/1970:428#P9>,
         <https://lagen.nu/sfs/1970:428#P9S1>,
@@ -24,6 +24,7 @@
     rpubl:rattsfallspublikation <https://lagen.nu/dataset/nja> ;
     rpubl:referatAvDomstolsavgorande <https://lagen.nu/dom/hd/T4459-05/2007-03-22> ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/rf/nja/2007/not/19> ;
+    prov:wasDerivedFrom <https://lagen.nu/rf/nja/2007/not/19?repo=dv&dir=downloaded> ;
     prov:wasGeneratedBy "lagen.nu.dv.DV" .
 
 <https://lagen.nu/dom/hd/T4459-05/2007-03-22> a rpubl:VagledandeDomstolsavgorande ;
@@ -31,4 +32,6 @@
     rpubl:avgorandedatum "2007-03-22"^^xsd:date ;
     rpubl:malnummer "T4459-05" ;
     owl:sameAs <http://rinfo.lagrummet.se/publ/dom/hd/t4459-05/2007-03-22> .
+
+<https://lagen.nu/rf/nja/2007/not/19?repo=dv&dir=downloaded> rdfs:label "NJA 2007 not 19"@sv .
 

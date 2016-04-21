@@ -129,7 +129,7 @@ class SFS(Trips):
     document_sfsr_url_template = "http://rkrattsbaser.gov.se/sfsr?bet=%(basefile)s"
     document_sfsr_change_url_template = "http://rkrattsbaser.gov.se/sfsr?%%C3%%A4bet=%(basefile)s"
     xslt_template = "xsl/sfs.xsl"
-
+    max_resources = 2500  # SFS 2010:110 currently has 2063 legitimate subresources
     documentstore_class = SFSDocumentStore
 
     def __init__(self, config=None, **kwargs):

@@ -376,8 +376,12 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
             shutil.rmtree(cls.datadir)
 
     def tearDown(self):
+        if hasattr(self.repo, 'tearDown'):
+            self.repo.tearDown(self)
+            
         if os.path.exists(self.datadir):
             shutil.rmtree(self.datadir)
+        
     
     def filename_to_basefile(self, filename):
         """Converts a test filename to a basefile. Default implementation

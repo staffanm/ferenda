@@ -237,21 +237,23 @@ class LegalRef:
                 self.namedlaws.update(self.get_relations(RDFS.label,
                                                          self.metadata_graph))
 
-        if self.KORTLAGRUM in self.args and not self.lawlist and "LawAbbreviation ::= " not in self.decl:
+        if self.KORTLAGRUM in self.args:
             d = self.get_relations(DCTERMS.alternate, self.metadata_graph)
             self.namedlaws.update(d)
-            self.lawlist = list(d.keys())
-            # Make sure longer law abbreviations come before shorter
-            # ones (so that we don't mistake "3 § MBL" for "3 § MB"+"L")
-            self.lawlist.sort(key=len, reverse=True)
 
-            # re-do the parser now that we have all law abbrevs (which
-            # must be present in the supplied graph)
-            lawdecl = "LawAbbreviation ::= ('%s')\n" % "'/'".join(
-                self.lawlist)
-            self.decl += lawdecl
-            self.spparser = Parser(self.decl, "root")
-            self.tagger = self.spparser.buildTagger("root")
+            if not self.lawlist and "LawAbbreviation ::= " not in self.decl:
+                self.lawlist = list(d.keys())
+                # Make sure longer law abbreviations come before shorter
+                # ones (so that we don't mistake "3 § MBL" for "3 § MB"+"L")
+                self.lawlist.sort(key=len, reverse=True)
+
+                # re-do the parser now that we have all law abbrevs (which
+                # must be present in the supplied graph)
+                lawdecl = "LawAbbreviation ::= ('%s')\n" % "'/'".join(
+                    self.lawlist)
+                self.decl += lawdecl
+                self.spparser = Parser(self.decl, "root")
+                self.tagger = self.spparser.buildTagger("root")
         if self.RATTSFALL in self.args and not self.namedseries:
             self.namedseries.update(self.get_relations(SKOS.altLabel,
                                                        self.metadata_graph))
