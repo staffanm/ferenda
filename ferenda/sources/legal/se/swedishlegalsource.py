@@ -1417,7 +1417,6 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         # headline-like title, or by the sidenote in the
         # margin. Find out which it is, and plan accordingly.
         done = False
-
         # First, find either an indicator of the appendix number, or
         # calculate our own
         chunk = parser.reader.next()
@@ -1446,7 +1445,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             if not isinstance(chunk, Page) and int(chunk.font.size) >= metrics.h2.size:
                 title = str(chunk).strip()
                 done = True
-            chunk = parser.reader.next()
+            if not done:
+                chunk = parser.reader.next()
 
         s = Appendix(title=title,
                      ordinal=str(state.appendixno),
@@ -1471,8 +1471,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
     def skip_pagebreak(parser):
         # increment pageno
-        state.pageno += 1
         state.page = parser.reader.next()
+        state.pageno = state.page.number
         sb = Sidbrytning()
         sb.ordinal = state.pageno
         return sb

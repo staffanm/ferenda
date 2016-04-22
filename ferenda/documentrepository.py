@@ -1320,6 +1320,7 @@ with the *config* object as single parameter.
                              pretty_print=True,
                              xml_declaration=True,
                              encoding='utf-8',
+                             # method='c14n',  # doesn't seem to produce pretty_print output
                              # doctype=doctype
                              )
         err = self.render_xhtml_validate(xhtmldoc)
