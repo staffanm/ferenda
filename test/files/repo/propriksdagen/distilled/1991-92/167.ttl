@@ -8,16 +8,33 @@
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
+<https://lagen.nu/prop/1991/92:167#B1> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:title "COUNCIL DIRECTIVE       of 20 December 1985       to protect the consumer in respect of contracts negotiated away from       business premises"@sv ;
+    bibo:chapter "1"@sv .
+
+<https://lagen.nu/prop/1991/92:167#B4> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:references <https://lagen.nu/sfs/1981:1361>,
+        <https://lagen.nu/sfs/1985:571> ;
+    dcterms:title "Promemorians lagförslag"@sv ;
+    bibo:chapter "4"@sv .
+
 <https://lagen.nu/prop/1991/92:167#B5> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:title "Förteckning över remissinstanser som har yttrat sig över       departementspromemorian Den svenska hemförsäljnings-       lagens anpassning till EG:s regelverk, Ds 1991:68"@sv ;
+    bibo:chapter "5"@sv .
+
+<https://lagen.nu/prop/1991/92:167#B6> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
     dcterms:references <https://lagen.nu/sfs/1988:1385>,
         <https://lagen.nu/sfs/1991:980> ;
     dcterms:title "Lagrådsremissens lagförslag"@sv ;
-    bibo:chapter "5"@sv .
+    bibo:chapter "6"@sv .
 
 <https://lagen.nu/prop/1991/92:167#B7> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
-    dcterms:title "Innehåll"@sv ;
+    dcterms:title "Lagrådet"@sv ;
     bibo:chapter "7"@sv .
 
 <https://lagen.nu/prop/1991/92:167#PS1> a bibo:DocumentPart ;
@@ -39,11 +56,6 @@
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
     dcterms:title "Inledning"@sv ;
     bibo:chapter "1"@sv .
-
-<https://lagen.nu/prop/1991/92:167#S10> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
-    dcterms:title "§"@sv ;
-    bibo:chapter "10"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
@@ -76,6 +88,7 @@
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
     dcterms:references <https://lagen.nu/prop/1981/82:40#s41>,
         <https://lagen.nu/sfs/1985:716#P2>,
+        <https://lagen.nu/sfs/1990:931>,
         <https://lagen.nu/sfs/1990:932>,
         <https://lagen.nu/sfs/1990:932#P2> ;
     dcterms:title "Avtalstyperna"@sv ;
@@ -128,15 +141,8 @@
 
 <https://lagen.nu/prop/1991/92:167#S7> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
-    dcterms:references <https://lagen.nu/sfs/1981:1361>,
-        <https://lagen.nu/sfs/1985:571> ;
     dcterms:title "Beslut"@sv ;
     bibo:chapter "7"@sv .
-
-<https://lagen.nu/prop/1991/92:167#S9> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
-    dcterms:title "§"@sv ;
-    bibo:chapter "9"@sv .
 
 <http://www.riksdagen.se/sv/Dokument-Lagar/Forslag/Propositioner-och-skrivelser/_GF03167/?text=true> rdfs:label "Källa"@sv .
 

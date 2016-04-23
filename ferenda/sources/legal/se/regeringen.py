@@ -654,7 +654,8 @@ class Regeringen(SwedishLegalSource):
         return None
 
     def find_commentary(self, node, state):
-        if not isinstance(node, Section) or (node.title != "Författningskommentar"):
+        if not isinstance(node, Section) or (node.title not in ("Författningskommentar",
+                                                                "Specialmotivering")):
             if isinstance(node, Body):
                 if 'commented_paras' not in state:
                     state['commented_paras'] = {}

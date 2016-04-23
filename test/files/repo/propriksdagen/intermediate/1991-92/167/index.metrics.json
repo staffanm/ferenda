@@ -1,30 +1,30 @@
 {
-    "rightmargin": 330, 
-    "pagewidth": 447, 
-    "bottommargin": 626, 
-    "leftmargin_even": 30, 
-    "topmargin": 36, 
-    "title": {
-        "size": 18, 
-        "family": "unknown"
-    }, 
-    "rightmargin_even": 330, 
     "default": {
-        "size": 7, 
-        "family": "unknown"
+        "family": "unknown", 
+        "size": 7
     }, 
-    "leftmargin": 20, 
     "h1": {
-        "size": 10, 
-        "family": "unknown"
-    }, 
-    "h3": {
-        "size": 8, 
-        "family": "unknown"
+        "family": "unknown", 
+        "size": 11
     }, 
     "h2": {
-        "size": 9, 
-        "family": "unknown"
-    },
-    "scanned_source": true
+        "family": "unknown", 
+        "size": 10
+    }, 
+    "h3": {
+        "family": "unknown", 
+        "size": 9
+    }, 
+    "title": {
+        "family": "unknown", 
+        "size": 18
+    }, 
+    "bottommargin": 626, 
+    "leftmargin": 20, 
+    "leftmargin_even": 30, 
+    "pagewidth": 447, 
+    "rightmargin": 330, 
+    "rightmargin_even": 330, 
+    "scanned_source": true, 
+    "topmargin": 36
 }

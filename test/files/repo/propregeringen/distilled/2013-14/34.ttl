@@ -1,13 +1,15 @@
+@prefix : <http://www.w3.org/1999/xhtml> .
 @prefix bibo: <http://purl.org/ontology/bibo/> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
-@prefix ns1: <rinfoex:> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rinfoex: <http://lagen.nu/terms#> .
 @prefix rpubl: <http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#> .
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix xsi: <http://www.w3.org/2001/XMLSchema-instance> .
 
 <https://lagen.nu/prop/2013/14:34#B1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2013/14:34> ;
@@ -67,7 +69,30 @@
     dcterms:title "Konsumentverket ska få besluta om sanktionsavgift"@sv ;
     bibo:chapter "5.1"@sv .
 
-<https://lagen.nu/prop/2013/14:34#kommentar-2010:1846#P52> ns1:kommentarTill <https://lagen.nu/sfs/2010:1846#P52> .
+<https://lagen.nu/prop/2013/14:34#kommentar-2010:1846#P52> a rinfoex:Forfattningskommentar ;
+    rinfoex:kommentarTill <https://lagen.nu/sfs/2010:1846#P52> ;
+    dcterms:description """
+          <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
+            <p>
+              <i>tio miljoner kronor. </i>
+            </p>
+            <p>
+              <i>Avgiften får inte överstiga tio procent av näringsidkarens omsättning närmast föregående räkenskapsår. Om överträdelsen har skett under näringsidkarens första verksamhetsår eller om uppgifter om omsättningen annars saknas eller är bristfälliga, får omsättningen uppskattas. </i>
+            </p>
+            <p>
+              <i>När avgiftens storlek bestäms ska särskild hänsyn tas till hur allvarlig den överträdelse är som föranlett varningen. </i>
+            </p>
+            <p>
+              <i>Avgiften får efterges helt eller delvis, om det finns särskilda skäl. </i>
+            </p>
+            <p>Paragrafen, som är ny, innehåller regler för hur sanktionsavgiftens stor-lek ska bestämmas. Övervägandena finns i avsnitt 5.2. </p>
+            <p>I <i>första stycket</i> anges inom vilka beloppsgränser sanktionsavgiften kan bestämmas. Det lägsta beloppet är femtusen kronor och det högsta beloppet är tio miljoner kronor. </p>
+            <span id="sid19"/>
+            <span id="sid20"/>
+            <span id="sid21"/>
+          </div>
+        """^^rdf:XMLLiteral ;
+    dcterms:isPartOf <https://lagen.nu/prop/2013/14:34#S9> .
 
 <https://lagen.nu/prop/2013/14:34#S5> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/2013/14:34> ;
@@ -82,8 +107,6 @@
     bibo:chapter "9"@sv .
 
 <https://lagen.nu/prop/2013/14:34?attachment=sanktionsavgift-vid-bristande-kreditprovningar-prop.-20131434&repo=propregeringen&dir=downloaded> rdfs:label "Sanktionsavgift vid bristande kreditprövningar, Prop. 2013/14:34 (pdf 137 kB)"@sv .
-
-<https://lagen.nu/sfs/2010:1846#P52> dcterms:isPartOf <https://lagen.nu/prop/2013/14:34#S9> .
 
 <https://lagen.nu/prop/2013/14:34> a rpubl:Proposition ;
     dcterms:abstract "I propositionen föreslår regeringen att Konsumentverket ska kunna ta ut en sanktionsavgift av näringsidkare som vid kreditgivning till konsumenter inte gör ordentliga kreditprövningar. Förslaget syftar till att stärka konsumentskyddet vid kreditgivning och därigenom minska överskuldsättningen bland konsumenter. Bakgrunden till förslaget är att konsumtionskrediter under senare år har blivit allt mer lättillgängliga, bl.a. genom möjlighet till s.k. sms-lån (snabblån). När tillgängligheten ökar ställs det också höga krav på kreditgivarna att noggrant undersöka den enskilda konsumentens förutsättningar att betala tillbaka lånet. Konsumentverkets tillsyn visar dock att det finns brister vid kreditprövningarna. I propositionen föreslås också att det införs tydliga kriterier för när Konsumentverket ska få förelägga en näringsidkare att upphöra med att lämna krediter. Lagändringarna föreslås träda i kraft den 1 april 2014."@sv ;

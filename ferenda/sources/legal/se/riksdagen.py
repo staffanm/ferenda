@@ -6,10 +6,10 @@ from future import standard_library
 standard_library.install_aliases()
 
 # A abstract base class for fetching documents from data.riksdagen.se
-
-import os
-from io import StringIO
 from collections import OrderedDict
+from io import StringIO
+import os
+import re
 
 import requests
 import requests.exceptions
@@ -491,10 +491,10 @@ class Riksdagen(FixedLayoutSource):
     def sanitize_body(self, rawbody):
         if isinstance(rawbody, BeautifulSoup):
             return rawbody
-        # if this is a scanned source, examine the front page for some
-        # common OCR errors (the coat of arms logo is sometimes
-        # mistaken for text) and remove those
         if ".hocr." in rawbody.filename:
+            # if this is a scanned source, examine the front page for some
+            # common OCR errors (the coat of arms logo is sometimes
+            # mistaken for text) and remove those
             pageheight = rawbody[0].height
             pagewidth = rawbody[0].width
             for textbox in rawbody[0]:
@@ -510,6 +510,18 @@ class Riksdagen(FixedLayoutSource):
                         textbox.remove(textelement)
                         self.log.debug("sanitize: removing textelement '%s', probable OCR mistake" % textelement)
                     prevright = textelement.left + textelement.width
+            for pageidx, page in enumerate(rawbody):
+                # then, loop through all pages and attempt to find
+                # places where the "Bilaga" ocr_par node has been
+                # placed at the end of the page rather than the start,
+                # and rearrange
+                for idx in (-1, -2):
+                    if page[idx].left > page.width * 0.6:
+                        strchunk = str(page[idx])
+                        if re.search("Bilaga [l\d]", strchunk):
+                            self.log.debug("Rearranging boxes on page %s, moving box %s to page start" % (pageidx+1, idx))
+                            page.insert(0, page.pop(idx))
+                            break
         return rawbody
 
     def tokenize(self, reader):

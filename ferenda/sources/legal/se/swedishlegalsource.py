@@ -1337,11 +1337,11 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         if placement(chunk):
             # NOTE: filter out indications of nested
             # appendicies (eg "Bilaga 5 till RSVs skrivelse")
-            m = re.search("Bilaga( \d+| I|$)(?!(\d| *till))", txtchunk)
+            m = re.search("Bilaga( \d+| I| l|$)(?!(\d| *till))", txtchunk)
             if m:
                 if m.group(1):
                     match = m.group(1).strip()
-                    if match == "I":   # correct for OCR mistake
+                    if match in ("I", "l"):   # correct for OCR mistake
                         match = "1" 
                     ordinal = int(match)
                 else:
@@ -1420,10 +1420,10 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         # First, find either an indicator of the appendix number, or
         # calculate our own
         chunk = parser.reader.next()
-        m = re.search("Bilaga( \d+| I|$)", str(chunk))
+        m = re.search("Bilaga( \d+| I| l|$)", str(chunk))
         if m and m.group(1):
             match = m.group(1).strip()
-            if match == "I":   # correct for OCR mistake
+            if match in ("I", "l"):   # correct for OCR mistake
                 match = "1" 
             state.appendixno = int(match)
         else:
@@ -1656,7 +1656,6 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
     if (hasattr(prevbox, 'parid') and hasattr(nextbox, 'parid') and
         prevbox.parid == nextbox.parid):
         return True
-
     # numbered section headings can have large space between the
     # leading number and the rest of the heading, and the top/bottom
     # of the leading number box might differ from the heading with one
@@ -1664,21 +1663,34 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
     # *vertically* by checking that the vertical space is not
     # unreasonable and that horizontal alignment is at least 50 %
     # overlapping
+
+    if hasattr(nextbox, 'parid'):
+        # scanned_source = True, allow for slight change in fontsize 
+        sizematch = lambda p, n: abs(p.font.size - n.font.size) <= 1
+    else:
+        sizematch = lambda p, n: p.font.size == n.font.size
+
     if nextbox.font.size > 13: # might be a heading -- but we have no
                               # real way of guessing this at this
                               # stage (metrics are not available to
                               # this function)
-        if (textbox.font.size == nextbox.font.size and
+        if (sizematch(textbox, nextbox) and
             textbox.font.family == nextbox.font.family and
             nextbox.top < prevbox.top + (prevbox.height / 2) < nextbox.top + nextbox.height and
             textbox.left - (prevbox.left + prevbox.width) < (prevbox.width * 3)):
             return True
-        
-            
-    
 
+    # these text locutions indicate a new paragraph (normally, this is
+    # also catched by the conditions below, but if prevbox is unusally
+    # short (one line) they might not catch it.:
+    strnextbox = str(nextbox).strip()
+    if re.match("Skälen för (min bedömning|mitt förslag): ", strnextbox):
+        return False
+    if re.match("\d\. +", strnextbox):  # item in ordered list
+        return False
+    
     # These final conditions glue primarily *horizontally*
-    if (textbox.font.size == nextbox.font.size and
+    if (sizematch(textbox, nextbox) and
         textbox.font.family == nextbox.font.family and
         textbox.top + textbox.height + linespacing > nextbox.top and
         prevbox.left < nextbox.right and

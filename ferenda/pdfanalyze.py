@@ -186,7 +186,7 @@ class PDFAnalyzer(object):
         if metricspath:
             util.ensure_dir(metricspath)
             with open(metricspath, "w") as fp:
-                s = json.dumps(allmetrics, indent=4, separators=(', ', ': '))
+                s = json.dumps(allmetrics, indent=4, separators=(', ', ': '), sort_keys=True)
                 fp.write(s)
         return allmetrics
 
