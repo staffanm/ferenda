@@ -12,6 +12,7 @@ import os
 import re
 import tempfile
 import warnings
+import unicodedata
 
 from lxml import etree
 from lxml.builder import ElementMaker
@@ -24,7 +25,6 @@ from .elements import OrdinalElement
 
 E = ElementMaker(namespace="http://www.w3.org/1999/xhtml",
                  nsmap={None: "http://www.w3.org/1999/xhtml"})
-
 
 class PDFReader(CompoundElement):
 
@@ -412,6 +412,7 @@ class PDFReader(CompoundElement):
                           'fontid': fontid}
                 if parid:
                     kwargs['parid'] = parid
+                kwargs['pdf'] = self
                 box = Textbox(**kwargs)
                 for e in textelements:
                     box.append(e)
@@ -436,7 +437,8 @@ class PDFReader(CompoundElement):
                        "CID TrueType": "CIDTrueType",
                        "CID TrueType (OT)": "CIDTrueType(OT)"}
 
-        fontinfofile = filename + ".fontinfo"
+        fontinfofile = filename.replace(".bz2", "") + ".fontinfo"
+        
         # print("Looking for %s (%s)" % (fontinfofile, os.path.exists(fontinfofile)))
         if os.path.exists(fontinfofile):
             with open(fontinfofile) as fp:
@@ -480,9 +482,9 @@ class PDFReader(CompoundElement):
             for b in bytebuffer:
                 if b < 0x20 and b not in (0x9, 0xa, 0xd):
                     # note: We don't use real xml numeric character
-                    # references as "&#3;" as this is as invalid as a
-                    # real 0x03 byte in XML, instead we double-escape
-                    # it.
+                    # references as "&#3;" as this is just as invalid
+                    # as a real 0x03 byte in XML. Instead we
+                    # double-escape it.
                     entity = "&amp;#%s;" % b
                     newfp.write(entity.encode())
                 else:
@@ -554,9 +556,9 @@ class PDFReader(CompoundElement):
                     # all textboxes share the same fontspec dict
                     attribs['fontspec'] = self.fontspec
                     attribs['fontid'] = int(attribs['font'])
+                    attribs['pdf'] = self
                     del attribs['font']
                     b = Textbox(**attribs)
-
                     if element.text and element.text.strip():
                         b.append(Textelement(txt(element.text), tag=None))
                     # The below loop could be done recursively to
@@ -581,6 +583,7 @@ class PDFReader(CompoundElement):
                                 b.append(Textelement(txt(child.tail), tag=None))
                     if element.tail and element.tail.strip():  # can this happen?
                         b.append(Textelement(txt(element.tail), tag=None))
+                    b.lines = 1
                     page.append(b)
             # done reading the page
             self.append(page)
@@ -900,6 +903,7 @@ all text in a Textbox has the same font and size.
         assert 'width' in kwargs, "width attribute missing"
         assert 'height' in kwargs, "height attribute missing"
         assert 'fontid' in kwargs, "font id attribute missing"
+        assert 'pdf' in kwargs, "pdf missing"
 
         self.top = int(kwargs['top'])
         self.left = int(kwargs['left'])
@@ -907,7 +911,8 @@ all text in a Textbox has the same font and size.
         self.height = int(kwargs['height'])
         self.right = self.left + self.width
         self.bottom = self.top + self.height
-
+        self.lines = int(kwargs.get("lines", 0))
+        
         # self._fontspecid = kwargs['fontid']
         self.fontid = kwargs['fontid'] or 0
         if 'fontspec' in kwargs:
@@ -915,6 +920,11 @@ all text in a Textbox has the same font and size.
             del kwargs['fontspec']
         else:
             self._fontspec = {}
+        if 'pdf' in kwargs:
+            self._pdf = kwargs['pdf']
+            del kwargs['pdf']
+        else:
+            self._pdf = None
         del kwargs['top']
         del kwargs['left']
         del kwargs['width']
@@ -926,31 +936,22 @@ all text in a Textbox has the same font and size.
     def __str__(self):
         s = "".join(self)
         if self._fontspec[self.fontid].get("encoding") == "Custom":
-            return self.decode(s)
-        else:
-            return s
+            # NB: This is the same check and partial-decode logic as in
+            # as_xhtml but we need it here as well since the statemachine
+            # in Regeringen._find_commentary_for_law uses str(textbox)
+            if (self._fontspec[self.fontid]['family'] == "Times.New.Roman.Fet0100" and
+                len(s.split(" ", 2)) == 3 and 
+                s.split(" ", 2)[1] == "g"):
+                idx = s.index(" ", s.index(" ")+1)
+                s = self.decode(s[:idx]) + s[idx:]
+            else:
+                s = self.decode(s)
+        return s
 
-
-    customencoding_map = {}
-    # it seems basic characters are coded in the same order as ascii,
-    # but with a 0x1d offset. 
-    for i in range(0x20, 0x7e):
-        customencoding_map[i - 0x1d] = i
-
-    # assume that the rest is coded using windows-1252 but with a 0x7a
-    # offset. We have no basis for this assumption.
-    for i in range(0x80, 0xff):
-        if i - 0x7a in customencoding_map:
-            # print("would have mapped %s to %s but %s was already in customencoding_map" %
-            #       (chr(i - 0x7a), chr(i), chr(customencoding_map[i - 0x7a])))
-            pass
-        else:
-            customencoding_map[i - 0x7a] = i
-            
     def decode(self, s):
         re_xmlcharref = re.compile("&#\d+;")
         s = re_xmlcharref.sub(lambda m: chr(int(m.group(0)[2:-1])), s)
-        return s.translate(self.customencoding_map)
+        return s.translate(self._pdf.customencoding_map)
 
     def __repr__(self):
         # <Textbox 30x18+278+257 "5.1">
@@ -981,10 +982,16 @@ all text in a Textbox has the same font and size.
                     other.left + other.width) - left
         height = max(self.top + self.height,
                      other.top + other.height) - top
-
+        lines = self.lines + other.lines
+        if self.bottom > other.top + (other.height / 2):
+            # self and other is really on the same line
+            lines -= 1
+            
         res = Textbox(top=top, left=left, width=width, height=height,
                       fontid=self.fontid,
-                      fontspec=self._fontspec)
+                      fontspec=self._fontspec,
+                      pdf=self._pdf,
+                      lines=lines)
 
         # add all TextElement objects, concatenating adjacent TE:s if
         # their tags match. 
@@ -1026,6 +1033,10 @@ all text in a Textbox has the same font and size.
                          other.left + other.width) - self.left
         self.height = max(self.top + self.height,
                           other.top + other.height) - self.top
+        self.lines += other.lines
+        if self.bottom <= other.top:
+            # self and other is really on the same line
+            self.lines -= 1
         return self
 #
 #    def append(self, thing):
@@ -1037,24 +1048,48 @@ all text in a Textbox has the same font and size.
 #            return
 #            
 
+
     def as_xhtml(self, uri, parent_uri=None):
         if self._fontspec[self.fontid].get("encoding") == "Custom":
             # Only textboxes know that their text is encoded,
             # underlying textelements do not. But it's those objects
             # that contain the actual encoded text. So we exchange
             # those objects for decoded replicas. This might be a good
-            # place to do it.
-
-            # NOTE: This weird checking for occurrences of 'i'
-            # tags is needed for functionalSources.
-            # TestPropRegeringen.test_parse_1999_2000_17 to pass
-            # (and matches encoding usage in practice)
-            decode_all = not('i' in [x.tag for x in self])
-            for idx, subpart in enumerate(self):
-                if (isinstance(subpart, Textelement) and
-                    (decode_all or subpart.tag == 'i')):
-                    self[idx] = Textelement(self.decode(subpart),
-                                            tag=subpart.tag)
+            # place to do it. FIXME: It's clearly not. This should be
+            # done as part of _parse_xml.
+            # 
+            # extra special hack for prop 1997/98:44 which has
+            # textelements marked as having a font with custom
+            # encoding, but where only the bolded part (which
+            # isn't marked up...) is encoded, while the rest is
+            # unencoded. The "g" is a encoded section sign, which
+            # in these cases is the last encoded char.
+            if self._fontspec[self.fontid]['family'] == "Times.New.Roman.Fet0100":
+                boundary = None
+                if (len(self[0].split(" ", 2)) == 3 and 
+                    self[0].split(" ", 2)[1] == "g"):
+                    boundary = self[0].index(" ", self[0].index(" ")+1)
+                # a similar situation with paragraphs with leading
+                # bold type, where the bold text is fixed
+                else:
+                    m = re.match("(2EGERINGENS F¶RSLAG&#26;w|$ATALAGSKOMMITT©NS F¶RSLAG|2EMISSINSTANSERNA&#26;|3K¤LEN F¶R REGERINGENS F¶RSLAG&#26;)", self[0])
+                    if m:
+                        boundary = m.end()
+                if boundary:
+                    self[0] = Textelement(self.decode(self[0][:boundary]) + self[0][boundary:],
+                                          tag=self[0].tag)
+            else:
+                # NOTE: This weird checking for occurrences of 'i'
+                # tags is needed for functionalSources.
+                # TestPropRegeringen.test_parse_1999_2000_17 to pass
+                # (and matches encoding usage in practice)
+                decode_all = not('i' in [getattr(x, 'tag', None) for x in self])
+                for idx, subpart in enumerate(self):
+                    if (isinstance(subpart, Textelement) and
+                        (decode_all or subpart.tag == 'i')):
+                        self[idx] = Textelement(self.decode(subpart),
+                                                tag=subpart.tag)
+            
         children = []
         first = True
         prevpart = None
@@ -1071,7 +1106,7 @@ all text in a Textbox has the same font and size.
                      prevpart.tag)):
                     prevpart = prevpart.as_xhtml(uri, parent_uri)
                 if prevpart is not None:
-                    children.append(prevpart)
+                    children.append(self._cleanstring(prevpart))
                 prevpart = subpart
             else:
                 prevpart = subpart
@@ -1081,7 +1116,9 @@ all text in a Textbox has the same font and size.
              prevpart.tag)):
             prevpart = prevpart.as_xhtml(uri, parent_uri)
         if prevpart is not None:
-            children.append(prevpart)
+            children.append(self._cleanstring(prevpart))
+
+            
         element = E("p", {'class': 'textbox'}, *children)
         # FIXME: we should output these positioned style attributes
         # only when the resulting document is being serialized in a
@@ -1092,6 +1129,16 @@ all text in a Textbox has the same font and size.
             'style', 'top: %spx, left: %spx, height: %spx, width: %spx' %
             (self.top, self.left, self.height, self.width))
         return element
+
+    def _cleanstring(self, thing):
+        if not isinstance(thing, str):
+            return thing
+        newstring = ""
+        for char in thing:
+            if unicodedata.category(char) != "Cc":
+                newstring += char
+        return newstring
+                
 
     @property
     def font(self):

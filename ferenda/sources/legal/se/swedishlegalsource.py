@@ -1139,6 +1139,10 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     defaultstate = {'pageno': 0,
                     'page': None,
                     'appendixno': None,
+                    'appendixstarted': False,  # reset at every page,
+                                               # set to True once
+                                               # "Bilaga (\n)" found
+                                               # in margin
                     'preset': preset}
     if initialstate:
         defaultstate.update(initialstate)
@@ -1312,10 +1316,12 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
         chunk = parser.reader.peek()
         txtchunk = util.normalize_space(str(chunk))
-        if is_appendix_header(chunk):
-            return True
-        elif is_implicit_appendix(chunk):
-            return True
+        if not state.appendixstarted:
+            if is_appendix_header(chunk):
+                return True
+            elif is_implicit_appendix(chunk):
+                from pudb import set_trace; set_trace()
+                return True
 
         # check that the chunk in question is not too big
         tolerance = 2 if metrics.scanned_source else 0
@@ -1346,7 +1352,11 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                     ordinal = int(match)
                 else:
                     ordinal = 1
-                if ordinal != state.appendixno:
+                if ordinal == state.appendixno:
+                    # this is just one more page of the appendix
+                    # currently being processed
+                    state.appendixstarted = True
+                else:
                     # OK, this can very well be an appendix, but just
                     # to be sure, keep reading to see if we have a
                     # Appendix-like heading as well
@@ -1475,6 +1485,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         state.pageno = state.page.number
         sb = Sidbrytning()
         sb.ordinal = state.pageno
+        state.appendixstarted = False
         return sb
 
     # the title of a section must start with a uppercase char (This
@@ -1645,11 +1656,6 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
                                           # so that lines appear to
                                           # have greater linespacing
     parindent = nextbox.font.size
-    # FIXME: if one textbox has family "TimesNewRomanPSMT@12" and
-    # another "TimesNewRomanPS-BoldMT@12", they should be considered
-    # the same family (and pdfreader/pdftohtml will wrap the latters'
-    # text in a <b> element). Maybe achiveable through
-    # FontmappingPDFReader?
 
     # if we're using hOCR data, take advantage of the paragraph
     # segmentation that tesseract does through the p.ocr_par mechanism
@@ -1670,16 +1676,33 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
     else:
         sizematch = lambda p, n: p.font.size == n.font.size
 
+
+    # a slightly more forgiving matching for prop 1997/98:44, which
+    # sets incorrect font on the first line of some paragraphs
+    # 
+    # FIXME: if one textbox has family "TimesNewRomanPSMT@12" and
+    # another "TimesNewRomanPS-BoldMT@12", they should be considered
+    # the same family (and pdfreader/pdftohtml will wrap the latters'
+    # text in a <b> element). 
+    familymatch = lambda p, n: p.font.family == n.font.family or (p.font.family == "Times.New.Roman.Fet0100" and n.font.family == "Times-Roman")
+
+        
     if nextbox.font.size > 13: # might be a heading -- but we have no
                               # real way of guessing this at this
                               # stage (metrics are not available to
                               # this function)
         if (sizematch(textbox, nextbox) and
-            textbox.font.family == nextbox.font.family and
-            nextbox.top < prevbox.top + (prevbox.height / 2) < nextbox.top + nextbox.height and
-            textbox.left - (prevbox.left + prevbox.width) < (prevbox.width * 3)):
+            familymatch(textbox, nextbox) and 
+            nextbox.top < prevbox.top + (prevbox.height / 2) < nextbox.bottom and
+            textbox.left - (prevbox.right) < (prevbox.width * 3)):
             return True
 
+    # Any line that ONLY contains a section reference should probably
+    # be interpreted as a header
+    strprevbox = str(prevbox).strip()
+    if re.match("(\d+ kap. |)\d+( \w|) §$", strprevbox) and prevbox.bottom <= nextbox.top:
+        return False
+        
     # these text locutions indicate a new paragraph (normally, this is
     # also catched by the conditions below, but if prevbox is unusally
     # short (one line) they might not catch it.:
@@ -1691,7 +1714,7 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
     
     # These final conditions glue primarily *horizontally*
     if (sizematch(textbox, nextbox) and
-        textbox.font.family == nextbox.font.family and
+        familymatch(textbox, nextbox) and
         textbox.top + textbox.height + linespacing > nextbox.top and
         prevbox.left < nextbox.right and
         ((prevbox.top + prevbox.height == nextbox.top + nextbox.height) or  # compare baseline, not topline

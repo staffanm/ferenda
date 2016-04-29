@@ -1,0 +1,26 @@
+{
+    "leftmargin": 85, 
+    "scanned_source": false, 
+    "title": {
+        "family": "Times-Roman", 
+        "size": 34
+    }, 
+    "rightmargin_even": 638, 
+    "rightmargin": 638, 
+    "bottommargin": 1204, 
+    "h1": {
+        "family": "Times-Roman", 
+        "size": 19
+    }, 
+    "topmargin": 81, 
+    "pagewidth": 892, 
+    "leftmargin_even": 85, 
+    "h2": {
+        "family": "Times-Bold", 
+        "size": 16
+    }, 
+    "default": {
+        "family": "Times-Roman", 
+        "size": 16
+    }
+}

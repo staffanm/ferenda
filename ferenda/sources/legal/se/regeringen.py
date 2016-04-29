@@ -22,12 +22,14 @@ from ferenda import Describer, DocumentEntry, PDFAnalyzer
 from ferenda import util
 from ferenda.decorators import recordlastdownload, downloadmax
 from ferenda.elements import Section, Link, Body, CompoundElement
-from ferenda.pdfreader import PDFReader, Textbox
+from ferenda.elements.html import P
+from ferenda.pdfreader import PDFReader, Textbox, Page
 from ferenda.errors import DocumentRemovedError
 from . import SwedishLegalSource, RPUBL
 from .legalref import LegalRef
 from .swedishlegalsource import offtryck_gluefunc
 from .elements import PreambleSection, UnorderedSection, Forfattningskommentar, Sidbrytning, VerbatimSection
+
 
 class FontmappingPDFReader(PDFReader):
     # Fonts in Propositioner get handled wierdly by pdf2xml
@@ -40,8 +42,23 @@ class FontmappingPDFReader(PDFReader):
     # This subclass maps one class of fontnames to another by
     # postprocessing the result of parse_xml
 
+    def __init__(self,
+                 pages=None,
+                 filename=None,
+                 workdir=None,
+                 images=True,
+                 convert_to_pdf=False,
+                 keep_xml=True,
+                 ocr_lang=None,
+                 fontspec=None,
+                 custom_encoding_map=None):
+        super(FontmappingPDFReader, self).__init__(pages, filename, workdir, images, convert_to_pdf, keep_xml, ocr_lang, fontspec)
+        if custom_encoding_map:
+            self.customencoding_map = custom_encoding_map
+
     def _parse_xml(self, xmlfp):
         super(FontmappingPDFReader, self)._parse_xml(xmlfp)
+        remapfontid = None
         for key, val in self.fontspec.items():
             if 'family' in val:
                 # Times New Roman => TimesNewRomanPSMT
@@ -695,48 +712,144 @@ class Regeringen(SwedishLegalSource):
             else:
                 self.log.warning("%s: Författningskommentar does not specify name of law and find_primary_law didn't find it either" % state['basefile'])
         for law, section in commentary:
-            paras = []
-            para = None
-            for idx, subnode in enumerate(section):
-                text = str(subnode).strip()
-                if len(text) < 20 and text.endswith(" kap."):
-                    # subsection heading indicating the start of a new
-                    # chapter. alter the parsing context from law to
-                    # chapter in law
-                    law = self._parse_uri_from_text(text, state['basefile'], law)
-                    if para is None:
-                        paras.append(subnode)
-                    else:
-                        para.append(subnode)
-                elif len(text) < 20 and text.endswith("§"):
-                    comment_on = self._parse_uri_from_text(text, state['basefile'], law)
-                    page = self._find_subnode(section[idx:], Sidbrytning, reverse=False)
-                    if page:
-                        pageno = page.ordinal - 1 
-                    else:
-                        pageno = None
-                    if comment_on not in state['commented_paras']:
-                        para = Forfattningskommentar(title=text,
-                                                comment_on=comment_on,
-                                                uri=None)
-                        # the URI to the above Forfattningskommentar is
-                        # dynamically constructed in
-                        # Forfattningskommentar.as_xhtml
-                        paras.append(para)
-                        state['commented_paras'][comment_on] = pageno
-                    else:
-                        self.log.warning("Found another comment on %s at p %s (previous at %s), ignoring" % (comment_on, pageno, state['commented_paras'][comment_on]))
-                        if para is None:
-                            paras.append(subnode)
-                        else:
-                            para.append(subnode)
-                else:
-                    if para is None:
-                        paras.append(subnode)
-                    else:
-                        para.append(subnode)
+            textnodes = self._find_commentary_for_law(law, section, state)
+            
             # this is kinda risky but wth...
-            section[:] = paras[:]
+            section[:] = textnodes[:]
+
+    def _find_commentary_for_law(self, law, section, state):
+        # this is basically a ad-hoc statemachine. Maybe we should
+        # use FSMParser here (we don't need nesting though, I think)
+        textnodes = []
+        reexamine_state = False
+        comment_on = None
+        current_comment = None
+        parsestate = "commenttext"
+        prevnode = None
+        self.log.debug("Finding commentary for %s" % law)
+        for idx, subnode in enumerate(section):
+            text = str(subnode).strip()
+            self.log.debug("Examining %s..." % text[:60])
+            if reexamine_state:  # meaning the previous node was
+                                 # on the previous page, so any
+                                 # text gap that might have
+                                 # signalled a change from acttext
+                                 # to commenttext was lost.
+                if subnode[0].tag == "i": # indicates section starting with eg "<i>Första stycket</i> innehåller..."
+                    parsestate = "commenttext"
+                elif self._is_headerlike(text):
+                    parsestate = "acttext"
+                elif re.match("\d+(| \w) §", text):
+                    parsestate = "acttext"
+                elif re.match("(Av p|P)aragrafen (framgår|innehåller|har behandlats)", text):
+                    parsestate = "commenttext"
+                else:
+                    pass  # keep parsestate as-is
+
+                # Calculating linespacing easily gives false positives
+                # (eg first para of prop 1997/98:44 p 116, which
+                # misidentifies as acttext due to strangely low
+                # linespacing.
+                    
+#                 if subnode.lines > 1:
+#                     horizontal_scale = 2 / 3
+#                     linespacing = ((subnode.height - (subnode.font.size/horizontal_scale)) /
+#                                    (subnode.lines - 1)) / subnode.font.size
+#                     if linespacing > 1.0:
+#                         parsestate = "commenttext"
+#                     else:
+#                         parsestate = "acttext"
+#                 else:  # probably a header, which is part of the acttext
+#                     parsestate = "acttext"
+                self.log.debug("...Reexamination gives parsestate %s" % parsestate)
+                reexamine_state = False
+
+            if isinstance(subnode, (Page, Sidbrytning)):
+                self.log.debug("...Setting reexamine_state flag")
+                reexamine_state = True
+
+            elif len(text) < 20 and text.endswith(" kap."):
+                # subsection heading indicating the start of a new
+                # chapter. alter the parsing context from law to
+                # chapter in law
+                self.log.debug("...detecting chapter header w/o acttext")
+                law = self._parse_uri_from_text(text, state['basefile'], law)
+
+            elif len(text) < 20 and text.endswith("§"):
+                self.log.debug("...detecting section header w/o acttext")
+                comment_on = self._parse_uri_from_text(text, state['basefile'], law)
+                
+            elif re.match("\d+(| \w) §", text):
+                self.log.debug("...detecting section header with acttext")
+                reftext = text[:text.index("§")+ 1]
+                comment_on = self._parse_uri_from_text(reftext, state['basefile'], law)
+                parsestate = "acttext"
+
+            # any big space signals a switch from acttext ->
+            # commenttext or vice versa
+            elif prevnode and subnode.top - prevnode.bottom > 20:
+                self.log.debug("...node spacing is %s, switching from parsestate %s" % (subnode.top - prevnode.bottom, parsestate))
+                if self._is_headerlike(text) or parsestate == "commenttext":
+                    parsestate = "acttext"
+                elif parsestate == "acttext":
+                    parsestate = "commenttext"
+                self.log.debug("...new parsestate is %s" % parsestate)
+
+            else:
+                self.log.debug("...will just keep on (parsestate %s)" % parsestate)
+
+            if comment_on and parsestate == "commenttext":
+                self.log.debug("Starting new Forfattningskommentar for %s" % comment_on)
+                # OK, a new comment. Let's record which page we found it on
+                page = self._find_subnode(section[idx:], Sidbrytning, reverse=False)
+                if page:
+                    pageno = page.ordinal - 1 
+                else:
+                    pageno = None
+                if comment_on not in state['commented_paras']:
+                    if len(text) > 20:  # means we have a section
+                                        # header with acttext. that
+                                        # acttext should already have
+                                        # been added to textnodes, so
+                                        # current subnode must contain
+                                        # first box of the comment
+                        text=""
+                    current_comment = Forfattningskommentar(title=text,
+                                                            comment_on=comment_on,
+                                                            uri=None)
+                    # the URI to the above Forfattningskommentar is
+                    # dynamically constructed in
+                    # Forfattningskommentar.as_xhtml
+                    textnodes.append(current_comment)
+                    state['commented_paras'][comment_on] = pageno
+                else:
+                    self.log.warning("Found another comment on %s at p %s (previous at %s), ignoring" % (comment_on, pageno, state['commented_paras'][comment_on]))
+                comment_on = None
+
+
+            if parsestate == "commenttext":
+                if subnode:
+                    if current_comment is None:
+                        self.log.debug("...creating Forfattningskommentar for law itself")
+                        current_comment = Forfattningskommentar(title="",
+                                                                comment_on=law,
+                                                                uri=None)
+                        textnodes.append(current_comment)
+                    current_comment.append(subnode)
+            else:
+                textnodes.append(subnode)
+                    
+            if isinstance(subnode, (Page, Sidbrytning)):
+                prevnode = None
+            else:
+                prevnode = subnode
+        return textnodes
+
+
+    def _is_headerlike(self, text):
+        # headers are less than 100 chars and do not end with a period
+        return len(text) < 100 and text[-1] != "."
+    
                         
     def _parse_uri_from_text(self, text, basefile, baseuri=None):
         if baseuri:
@@ -843,17 +956,42 @@ class Regeringen(SwedishLegalSource):
         else:
             return [x[0] for x in cleanfiles]
 
-    def parse_pdf(self, pdffile, intermediatedir):
+
+    # Most PDFs that include a font with a custom encoding use the
+    # "standard" encoding map built into pdfreader.py (each ascii char
+    # shifted 0x1d, etc). At least one uses another, where characters
+    # generally are shifted 0x20, spaces are as-is, etc)
+    other_customencoding = {}
+    for i in range(0x20, 0x7e):
+        other_customencoding[i - 0x20] = i
+    # space is space
+    other_customencoding[0x20] = 0x20
+    # the rest is coded using windows-1252 but with a 0x40 offset.
+    for i in range(0x80, 0xff):
+        if i - 0x40 in other_customencoding:
+            # print("would have mapped %s to %s but %s was already in customencoding_map" %
+            #       (chr(i - 0x7a), chr(i), chr(customencoding_map[i - 0x7a])))
+            pass
+        else:
+            other_customencoding[i - 0x40] = i
+
+    
+    alternate_customencodings = {(PROPOSITION, "1997/98:44"): other_customencoding}
+
+    def parse_pdf(self, pdffile, intermediatedir, basefile):
         # By default, don't create and manage PDF backgrounds files
         # (takes forever, we don't use them yet)
         if self.config.compress == "bz2":
             keep_xml = "bz2"
         else:
             keep_xml = True
+        tup = (self.document_type, basefile)
+        custom_encoding_map = self.alternate_customencodings.get(tup)
         pdf = FontmappingPDFReader(filename=pdffile,
                                    workdir=intermediatedir,
                                    images=self.config.pdfimages,
-                                   keep_xml=keep_xml)
+                                   keep_xml=keep_xml,
+                                   custom_encoding_map=custom_encoding_map)
         if pdf.is_empty():
             self.log.warning("PDF file %s had no textcontent, trying OCR" % pdffile)
             # No use using the FontmappingPDFReader, since OCR:ed
@@ -878,9 +1016,9 @@ class Regeringen(SwedishLegalSource):
                                                          attachment=basepath)
             intermediate_dir = os.path.dirname(intermed_path)
             if not reader:
-                reader = self.parse_pdf(pdf_path, intermediate_dir)
+                reader = self.parse_pdf(pdf_path, intermediate_dir, basefile)
             else:
-                reader += self.parse_pdf(pdf_path, intermediate_dir)
+                reader += self.parse_pdf(pdf_path, intermediate_dir, basefile)
         return reader
 
     def get_pdf_analyzer(self, reader):

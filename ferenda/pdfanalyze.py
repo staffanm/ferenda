@@ -431,7 +431,11 @@ class PDFAnalyzer(object):
                     # page. Only problem is that the image (from the
                     # existing page) obscures those lines (contrary to
                     # documentation)
-                    existing_page.mergePage(new_pdf.getPage(0))
+                    try:
+                        new_page = new_pdf.getPage(0)
+                        existing_page.mergePage(new_page)
+                    except Exception as e:
+                        log.error("Couldn't merge page %s: %s: %s" % (pageidx, type(e), e))
                     output.addPage(existing_page)
 
                     # alternate way: merge the existing page on top of
@@ -462,7 +466,7 @@ class PDFAnalyzer(object):
                 # now draw margins on the page
                 for k, v in metrics.items():
                     if isinstance(v, int):
-                        if k in ('topmargin', 'bottommargin'):
+                        if k in ('topmargin', 'bottommargin', 'pageheight'):
                             # horiz line
                             canvas.line(0, v, tb.width, v)
                             canvas.drawString(0, v, k)
@@ -494,8 +498,20 @@ class PDFAnalyzer(object):
                             tb.width, tb.height)
                 canvas.drawString(tb.left, tb.top, str(tbidx))
                 fonttuple = (tb.font.family, tb.font.size)
+                if tb.lines > 1:  # need at least 2 lines to calc
+                    # linespacing to calculate lineheight, first
+                    # estimate size of box except last line, but
+                    # including the spacing from the previous
+                    # line. Lets hope font.size uses the same scale as
+                    # tb.height! (both should use points, right?)
+                    linespacing = ((tb.height - (tb.font.size/horizontal_scale)) / (tb.lines - 1)) / tb.font.size
+                else:
+                    linespacing = ""
                 if fonttuple in styles:
-                    canvas.drawString(tb.right, tb.bottom, styles[fonttuple])
+                    lbl = "%s (%s) %s" % (styles[fonttuple], tb.lines, linespacing)
+                else:
+                    lbl = "(%s) %s" % (tb.lines, linespacing)
+                canvas.drawString(tb.right, tb.bottom, lbl)
         packet.seek(0)
         canvas.save()
         new_pdf = PyPDF2.PdfFileReader(packet)
