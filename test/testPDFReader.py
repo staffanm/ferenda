@@ -301,7 +301,7 @@ class AsXHTML(unittest.TestCase, FerendaTestCase):
 
     def test_encoded_element(self):
         body = Textbox([Textelement("*|UDQ\x033HUVVRQ", tag=None)
-        ], top=0, left=0, width=100, height=100, fontid=1)
+        ], top=0, left=0, width=100, height=100, fontid=1, pdf=PDFReader())
         want = """
 <p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px, left: 0px, height: 100px, width: 100px">Göran Persson</p>
 """

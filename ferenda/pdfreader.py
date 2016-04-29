@@ -59,6 +59,23 @@ class PDFReader(CompoundElement):
     # properties and methods relating to the initialization of the
     # PDFReader object
 
+
+    customencoding_map = {}
+    # it seems basic characters are coded in the same order as ascii,
+    # but with a 0x1d offset. 
+    for i in range(0x20, 0x7e):
+        customencoding_map[i - 0x1d] = i
+    # assume that the rest is coded using windows-1252 but with a 0x7a
+    # offset. We have no basis for this assumption.
+    for i in range(0x80, 0xff):
+        if i - 0x7a in customencoding_map:
+            # print("would have mapped %s to %s but %s was already in customencoding_map" %
+            #       (chr(i - 0x7a), chr(i), chr(customencoding_map[i - 0x7a])))
+            pass
+        else:
+            customencoding_map[i - 0x7a] = i
+            
+
     def __init__(self,
                  pages=None,
                  filename=None,
@@ -903,7 +920,6 @@ all text in a Textbox has the same font and size.
         assert 'width' in kwargs, "width attribute missing"
         assert 'height' in kwargs, "height attribute missing"
         assert 'fontid' in kwargs, "font id attribute missing"
-        assert 'pdf' in kwargs, "pdf missing"
 
         self.top = int(kwargs['top'])
         self.left = int(kwargs['left'])
