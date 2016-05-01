@@ -1272,7 +1272,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         # Frontpage textboxes (title, identifier and abstract heading)
         # for this doctype should not be thought of as
         # unorderedsections, even though they're set in the same type
-        # as normal sections.
+        # as normal sections. 
         if state.preset == "proposition":
             return False
         chunk = parser.reader.peek()
@@ -1282,8 +1282,6 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     def is_unorderedsubsection(parser):
         # Subsections in "Författningskommentar" sections are
         # not always numbered. As a backup, check font size and family as well
-        if state.preset == "proposition":
-            return False
         chunk = parser.reader.peek()
         return (chunk.font.size == metrics.h2.size and
                 chunk.font.family == metrics.h2.family)

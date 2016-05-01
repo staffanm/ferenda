@@ -124,11 +124,11 @@ class PDFReader(CompoundElement):
         :param ocr_lang: str
 
         """
+        self.log = logging.getLogger('pdfreader')
         if pages:  # special-case: The object has been initialized as a
                   # regular list (by deserialize), we have no need to
                   # parse and create pages.
             return
-        self.log = logging.getLogger('pdfreader')
         if not filename:
             return  # another specialcase: create an empty object so
             # that we can call the ._tesseract in other
@@ -589,8 +589,12 @@ class PDFReader(CompoundElement):
                         if grandchildren != []:
                             if child.text:
                                 b.append(Textelement(txt(child.text), tag=child.tag))
+
+                                
                             b.append(Textelement(
                                 txt(" ".join([x.text or '' for x in grandchildren])), tag="ib"))
+                            if grandchildren[0].tail:
+                                b.append(Textelement(txt(grandchildren[0].tail), tag=child.tag))
                             if child.tail:
                                 b.append(Textelement(txt(child.tail), tag=None))
                         else:

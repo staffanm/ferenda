@@ -11,6 +11,7 @@ from bz2 import BZ2File
 import os
 import shutil
 import tempfile
+from io import BytesIO
 
 from lxml import etree
 
@@ -231,6 +232,33 @@ class Read(unittest.TestCase):
         self.assertEqual("Bosse Ringholm", str(tbs[6]))
         self.assertEqual("(Finansdepartementet)", str(tbs[7]))
 
+
+class TestParseXML(unittest.TestCase):
+
+    def test_grandchildren(self):
+        pdf = PDFReader(pages=True)
+        pdf.fontspec = {}
+        xmlfp = BytesIO(b"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pdf2xml SYSTEM "pdf2xml.dtd">
+<pdf2xml producer="poppler" version="0.24.3">
+<page number="18" position="absolute" top="0" left="0" height="1263" width="892">
+	<fontspec id="12" size="11" family="TimesNewRomanPS-BoldItalicMT" color="#000000"/>
+<text top="270" left="278" width="450" height="12" font="12"><i><b>52 par</b>  Sanktionsavgiften ska </i></text>
+</page>
+</pdf2xml>""")
+        xmlfp.name = "dummy.xml"
+
+        pdf._parse_xml(xmlfp)
+        textbox = pdf[0][0]
+        self.assertIsInstance(textbox, Textbox)
+        self.assertEqual(len(textbox), 2)
+        self.assertEqual(textbox[0].tag, "ib")
+        self.assertEqual(textbox[0], "52 par")
+        self.assertEqual(textbox[1].tag, "i")
+        self.assertEqual(textbox[1], " Sanktionsavgiften ska ")
+
+    # FIXME: write more testcases here
+    
 
 class AsXHTML(unittest.TestCase, FerendaTestCase):
 

@@ -340,11 +340,6 @@
     dcterms:description """
           <div xml:lang="sv" xmlns="http://www.w3.org/1999/xhtml">
             <p>Paragrafen, som är ny, har införts på inrådan av Lagrådet. För att det inte skall råda någon tvekan om att inte bara beslut enligt 51 och 52 §§, utan också länsrätts beslut enligt 47 §, kan överklagas har dock regeringen valt en annan formulering av paragrafen än den av Lagrådet föreslagna. Kravet på prövningstillstånd i andra stycket gäller för beslut som avses i såväl 47 § som 51 och 52 §§. </p>
-            <p>Ikraftträdande- och övergångsbestämmelse </p>
-            <p>Bestämmelsen har behandlats i avsnitt 10. </p>
-            <p>Ändringarna föreslås träda i kraft den 1 januari 2007. Föreskrifterna om </p>
-            <p>överklagande skall dock inte tillämpas i fråga om överklagande av beslut som har meddelats före ikraftträdandet. </p>
-            <span id="sid62"/>
           </div>
         """^^rdf:XMLLiteral ;
     dcterms:isPartOf <https://lagen.nu/prop/2005/06:173#S12> .

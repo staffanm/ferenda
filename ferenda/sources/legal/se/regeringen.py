@@ -723,6 +723,9 @@ class Regeringen(SwedishLegalSource):
         textnodes = []
         reexamine_state = False
         comment_on = None
+        skipheader = False  # whether we should skip adding a subnode
+                            # to current_comment since it's only a
+                            # header (eg "53 §")
         current_comment = None
         parsestate = "commenttext"
         prevnode = None
@@ -735,7 +738,7 @@ class Regeringen(SwedishLegalSource):
                                  # text gap that might have
                                  # signalled a change from acttext
                                  # to commenttext was lost.
-                if subnode[0].tag == "i": # indicates section starting with eg "<i>Första stycket</i> innehåller..."
+                if hasattr(subnode, '__getitem__') and subnode[0].tag == "i": # indicates section starting with eg "<i>Första stycket</i> innehåller..."
                     parsestate = "commenttext"
                 elif self._is_headerlike(text):
                     parsestate = "acttext"
@@ -774,27 +777,40 @@ class Regeringen(SwedishLegalSource):
                 # chapter in law
                 self.log.debug("...detecting chapter header w/o acttext")
                 law = self._parse_uri_from_text(text, state['basefile'], law)
-
+                skipheader = True
+                
             elif len(text) < 20 and text.endswith("§"):
                 self.log.debug("...detecting section header w/o acttext")
                 comment_on = self._parse_uri_from_text(text, state['basefile'], law)
+                skipheader = True
                 
             elif re.match("\d+(| \w) §", text):
                 self.log.debug("...detecting section header with acttext")
                 reftext = text[:text.index("§")+ 1]
                 comment_on = self._parse_uri_from_text(reftext, state['basefile'], law)
                 parsestate = "acttext"
+                skipheader = False
 
             # any big space signals a switch from acttext ->
             # commenttext or vice versa
             elif prevnode and subnode.top - prevnode.bottom > 20:
                 self.log.debug("...node spacing is %s, switching from parsestate %s" % (subnode.top - prevnode.bottom, parsestate))
-                if self._is_headerlike(text) or parsestate == "commenttext":
+                if re.match("\d+(| \w) §$", str(prevnode).strip()):
+                    parsestate == "commenttext"
+                elif self._is_headerlike(text) or parsestate == "commenttext":
                     parsestate = "acttext"
                 elif parsestate == "acttext":
                     parsestate = "commenttext"
                 self.log.debug("...new parsestate is %s" % parsestate)
 
+            # FIXME: This gives too many false positives right now --
+            # need to check distance to prevbox and/or nextbox. Once
+            # header detection works better we can enable it
+            # everywhere, not just at the start of the commentary for
+            # this act.
+            elif current_comment is None and self._is_headerlike(text):  
+                 self.log.debug("...seems like a header part of acttext")
+                 parsestate = "acttext"
             else:
                 self.log.debug("...will just keep on (parsestate %s)" % parsestate)
 
@@ -807,14 +823,16 @@ class Regeringen(SwedishLegalSource):
                 else:
                     pageno = None
                 if comment_on not in state['commented_paras']:
-                    if len(text) > 20:  # means we have a section
-                                        # header with acttext. that
-                                        # acttext should already have
-                                        # been added to textnodes, so
-                                        # current subnode must contain
-                                        # first box of the comment
-                        text=""
-                    current_comment = Forfattningskommentar(title=text,
+                    if not skipheader:  # means we have a section header
+                                        # with acttext. that acttext
+                                        # should already have been added
+                                        # to textnodes, so current subnode
+                                        # must contain first box of the
+                                        # comment
+                        title = ""
+                    else:
+                        title = text
+                    current_comment = Forfattningskommentar(title=title,
                                                             comment_on=comment_on,
                                                             uri=None)
                     # the URI to the above Forfattningskommentar is
@@ -835,7 +853,11 @@ class Regeringen(SwedishLegalSource):
                                                                 comment_on=law,
                                                                 uri=None)
                         textnodes.append(current_comment)
-                    current_comment.append(subnode)
+                    if not skipheader:
+                        current_comment.append(subnode)
+                    else:
+                        skipheader = False
+
             else:
                 textnodes.append(subnode)
                     
@@ -848,7 +870,7 @@ class Regeringen(SwedishLegalSource):
 
     def _is_headerlike(self, text):
         # headers are less than 100 chars and do not end with a period
-        return len(text) < 100 and text[-1] != "."
+        return len(text) < 100 and text[-1] != "." and not text.endswith(" i")
     
                         
     def _parse_uri_from_text(self, text, basefile, baseuri=None):
@@ -1001,8 +1023,6 @@ class Regeringen(SwedishLegalSource):
                             images=self.config.pdfimages,
                             keep_xml=keep_xml,
                             ocr_lang="swe")
-
-            
         return pdf
 
     # returns a list of (PDFReader, metrics) tuples, one for each PDF
