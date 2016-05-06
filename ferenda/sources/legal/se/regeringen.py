@@ -8,6 +8,7 @@ from builtins import *
 import os
 import re
 import codecs
+import json
 from datetime import datetime
 from urllib.parse import urljoin, urlencode
 
@@ -652,10 +653,12 @@ class Regeringen(SwedishLegalSource):
             if title_found and identifier_found and issued_found:
                 break
 
-    # FIXME: Hook this up as a visitor function. Also needs to be
-    # callable form
     def visitor_functions(self, basefile):
-        sharedstate = {'basefile': basefile}
+        # the .metrics.json file must exist at this point
+        with open(self.store.path(basefile, "intermediate", ".metrics.json")) as fp:
+            metrics = json.load(fp)
+        sharedstate = {'basefile': basefile,
+                       'defaultsize': metrics['default']['size']}
         return [(self.find_primary_law, sharedstate),
                 (self.find_commentary, sharedstate)]
 
@@ -680,6 +683,7 @@ class Regeringen(SwedishLegalSource):
             else:
                 return None  # visit_node won't call any subnode
         commentary = []
+        # parser = SwedishLegalSource.forfattningskommentar_parser()
         for subsection in node:
             if hasattr(subsection, 'title'):
                 # find out which laws this proposition proposes to
@@ -717,6 +721,8 @@ class Regeringen(SwedishLegalSource):
             # this is kinda risky but wth...
             section[:] = textnodes[:]
 
+
+
     def _find_commentary_for_law(self, law, section, state):
         # this is basically a ad-hoc statemachine. Maybe we should
         # use FSMParser here (we don't need nesting though, I think)
@@ -727,27 +733,31 @@ class Regeringen(SwedishLegalSource):
                             # to current_comment since it's only a
                             # header (eg "53 §")
         current_comment = None
+        comment_start = False
         parsestate = "commenttext"
         prevnode = None
-        self.log.debug("Finding commentary for %s" % law)
+        # self.log.debug("Finding commentary for %s" % law)
         for idx, subnode in enumerate(section):
             text = str(subnode).strip()
-            self.log.debug("Examining %s..." % text[:60])
+            # self.log.debug("Examining %s..." % text[:60])
             if reexamine_state:  # meaning the previous node was
                                  # on the previous page, so any
                                  # text gap that might have
                                  # signalled a change from acttext
                                  # to commenttext was lost.
+                prev_state = parsestate
                 if hasattr(subnode, '__getitem__') and subnode[0].tag == "i": # indicates section starting with eg "<i>Första stycket</i> innehåller..."
                     parsestate = "commenttext"
                 elif self._is_headerlike(text):
                     parsestate = "acttext"
                 elif re.match("\d+(| \w) §", text):
                     parsestate = "acttext"
-                elif re.match("(Av p|P)aragrafen (framgår|innehåller|har behandlats)", text):
+                elif re.match("(Av p|P)aragrafen (framgår|innehåller|har behandlats|är ny)", text):
                     parsestate = "commenttext"
                 else:
                     pass  # keep parsestate as-is
+                if prev_state == "acttext" and parsestate == "commenttext":
+                    comment_start = True
 
                 # Calculating linespacing easily gives false positives
                 # (eg first para of prop 1997/98:44 p 116, which
@@ -764,44 +774,65 @@ class Regeringen(SwedishLegalSource):
 #                         parsestate = "acttext"
 #                 else:  # probably a header, which is part of the acttext
 #                     parsestate = "acttext"
-                self.log.debug("...Reexamination gives parsestate %s" % parsestate)
+                # self.log.debug("...Reexamination gives parsestate %s" % parsestate)
                 reexamine_state = False
 
             if isinstance(subnode, (Page, Sidbrytning)):
-                self.log.debug("...Setting reexamine_state flag")
+                # self.log.debug("...Setting reexamine_state flag")
                 reexamine_state = True
 
             elif len(text) < 20 and text.endswith(" kap."):
                 # subsection heading indicating the start of a new
                 # chapter. alter the parsing context from law to
                 # chapter in law
-                self.log.debug("...detecting chapter header w/o acttext")
+                # self.log.debug("...detecting chapter header w/o acttext")
                 law = self._parse_uri_from_text(text, state['basefile'], law)
                 skipheader = True
+                textnodes.append(subnode)
+                subnode = None
                 
             elif len(text) < 20 and text.endswith("§"):
-                self.log.debug("...detecting section header w/o acttext")
+                # self.log.debug("...detecting section header w/o acttext")
                 comment_on = self._parse_uri_from_text(text, state['basefile'], law)
                 skipheader = True
+                if state['defaultsize'] >= section[idx+1].font.size + 2:
+                    parsestate = "acttext"
+                    comment_start = False
+                    skipheader = False
+                else:
+                    comment_start = True
+
+            elif re.match("\d+ kap. +[^\d]", text):  # eg "4 kap. Om domare"
+                # self.log.debug("...detecting chapter header with title, no section")
+                law = self._parse_uri_from_text(text, state['basefile'], law)
+                skipheader = True  # really depends on whether the _next_ subnode is acttext or not 
+                textnodes.append(subnode)
+                parsestate = "acttext"
+                subnode = None
                 
             elif re.match("\d+(| \w) §", text):
-                self.log.debug("...detecting section header with acttext")
+                # self.log.debug("...detecting section header with acttext")
                 reftext = text[:text.index("§")+ 1]
                 comment_on = self._parse_uri_from_text(reftext, state['basefile'], law)
+                comment_start = False
                 parsestate = "acttext"
                 skipheader = False
 
             # any big space signals a switch from acttext ->
-            # commenttext or vice versa
-            elif prevnode and subnode.top - prevnode.bottom > 20:
-                self.log.debug("...node spacing is %s, switching from parsestate %s" % (subnode.top - prevnode.bottom, parsestate))
+            # commenttext or vice versa. The height of the gap should
+            # really be dynamically calculated, but how?
+            elif prevnode and subnode.top - prevnode.bottom >= 20:
+                # self.log.debug("...node spacing is %s, switching from parsestate %s" % (subnode.top - prevnode.bottom, parsestate))
                 if re.match("\d+(| \w) §$", str(prevnode).strip()):
+                    comment_start = True
                     parsestate == "commenttext"
                 elif self._is_headerlike(text) or parsestate == "commenttext":
                     parsestate = "acttext"
                 elif parsestate == "acttext":
                     parsestate = "commenttext"
-                self.log.debug("...new parsestate is %s" % parsestate)
+                    skipheader = False
+                    comment_start = True
+                # self.log.debug("...new parsestate is %s" % parsestate)
 
             # FIXME: This gives too many false positives right now --
             # need to check distance to prevbox and/or nextbox. Once
@@ -809,13 +840,19 @@ class Regeringen(SwedishLegalSource):
             # everywhere, not just at the start of the commentary for
             # this act.
             elif current_comment is None and self._is_headerlike(text):  
-                 self.log.debug("...seems like a header part of acttext")
-                 parsestate = "acttext"
-            else:
-                self.log.debug("...will just keep on (parsestate %s)" % parsestate)
+                # self.log.debug("...seems like a header part of acttext")
+                parsestate = "acttext"
 
-            if comment_on and parsestate == "commenttext":
-                self.log.debug("Starting new Forfattningskommentar for %s" % comment_on)
+            elif state['defaultsize'] >= subnode.font.size + 2:
+                # self.log.debug("... set in smallfont, probably acttext, maybe following an sectionheader w/o actttext")  # see prop 2005/06:180 p 62
+                parsestate = "acttext"
+            else:
+                # self.log.debug("...will just keep on (parsestate %s)" % parsestate)
+                pass
+
+            # if comment_on and parsestate == "commenttext":
+            if comment_start:
+                # self.log.debug("Starting new Forfattningskommentar for %s" % comment_on)
                 # OK, a new comment. Let's record which page we found it on
                 page = self._find_subnode(section[idx:], Sidbrytning, reverse=False)
                 if page:
@@ -843,12 +880,13 @@ class Regeringen(SwedishLegalSource):
                 else:
                     self.log.warning("Found another comment on %s at p %s (previous at %s), ignoring" % (comment_on, pageno, state['commented_paras'][comment_on]))
                 comment_on = None
-
+                comment_start = False
 
             if parsestate == "commenttext":
                 if subnode:
                     if current_comment is None:
-                        self.log.debug("...creating Forfattningskommentar for law itself")
+                        # self.log.debug("...creating
+                        # Forfattningskommentar for law itself")
                         current_comment = Forfattningskommentar(title="",
                                                                 comment_on=law,
                                                                 uri=None)
@@ -859,7 +897,8 @@ class Regeringen(SwedishLegalSource):
                         skipheader = False
 
             else:
-                textnodes.append(subnode)
+                if subnode:
+                    textnodes.append(subnode)
                     
             if isinstance(subnode, (Page, Sidbrytning)):
                 prevnode = None

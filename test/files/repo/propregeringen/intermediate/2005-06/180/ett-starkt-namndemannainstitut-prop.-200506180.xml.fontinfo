@@ -1,0 +1,18 @@
+name                                 type              encoding         emb sub uni object ID
+------------------------------------ ----------------- ---------------- --- --- --- ---------
+FDGPDP+TT106o00                      Type 1C           WinAnsi          yes yes no     393  0
+FDGPEA+TT108o00                      Type 1C           WinAnsi          yes yes no     395  0
+FDGPEB+TT109o00                      Type 1C           WinAnsi          yes yes no     392  0
+FDGPFC+TT10Ao00                      Type 1C           WinAnsi          yes yes no     399  0
+FDGPGC+TT10Bo00                      Type 1C           WinAnsi          yes yes no     253  0
+FDGPGD+TT10Co00                      Type 1C           WinAnsi          yes yes no     254  0
+FDGPIE+TT10Do00                      Type 1C           WinAnsi          yes yes no     255  0
+FDGPJE+TT10Eo00                      Type 1C           WinAnsi          yes yes no     256  0
+FDGPJF+TT10Fo00                      Type 1C           WinAnsi          yes yes no     257  0
+FDGPKG+TT111o00                      Type 1C           WinAnsi          yes yes no     258  0
+FDGPKH+TT110o00                      Type 1C           WinAnsi          yes yes no     259  0
+FDGPPG+TT112o00                      Type 1C           WinAnsi          yes yes no     260  0
+FDHACG+TT114o00                      Type 1C           WinAnsi          yes yes no     261  0
+FDHDAF+TT115o00                      Type 1C           WinAnsi          yes yes no     262  0
+FDHDAG+TT116o00                      Type 1C           WinAnsi          yes yes no     263  0
+FDHDPC+TT118o00                      Type 1C           WinAnsi          yes yes no     264  0

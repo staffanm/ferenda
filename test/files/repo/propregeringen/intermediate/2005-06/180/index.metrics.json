@@ -1,0 +1,27 @@
+{
+    "bottommargin": 1189, 
+    "default": {
+        "family": "TT106o00", 
+        "size": 16
+    }, 
+    "h1": {
+        "family": "TT109o00", 
+        "size": 23
+    }, 
+    "h2": {
+        "family": "TT10Do00", 
+        "size": 19
+    }, 
+    "leftmargin": 85, 
+    "leftmargin_even": 85, 
+    "pageheight": 1263, 
+    "pagewidth": 892, 
+    "rightmargin": 643, 
+    "rightmargin_even": 643, 
+    "scanned_source": false, 
+    "title": {
+        "family": "TT108o00", 
+        "size": 34
+    }, 
+    "topmargin": 84
+}

@@ -1187,7 +1187,9 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             return True
 
     def is_coverpage(parser):
-        # first 2 pages of a SOU are coverpages
+        # first 2 pages of a SOU are coverpages. FIXME:
+        # SOUAnalyzer.documents should separate out these two before
+        # this parser ever sees them
         return isinstance(
             parser.reader.peek(), Page) and state.preset == "sou" and state.pageno < 2
 
@@ -1318,7 +1320,6 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             if is_appendix_header(chunk):
                 return True
             elif is_implicit_appendix(chunk):
-                from pudb import set_trace; set_trace()
                 return True
 
         # check that the chunk in question is not too big
@@ -1787,3 +1788,56 @@ class SwedishCitationParser(CitationParser):
             self.log.error(e)
             return [string]
 
+#def forfattningskommentar_parser(lawuri, defaultsize, debug=False):
+#
+#    # root -> is_chaptermarker -> (change_lawuri, None)
+#    #      -> is_sectionmarker (not followed by acttext) -> (change_commenton_and_apppend, None)
+#    #      -> is_acttext -> (change_commenton_and_append, "acttext")
+#    # acttext -> is_space -> (make_forfattningskommentar, "commenttext")
+#    #         -> is_newpage -> (skip_newpage, "reexamine_state")
+#    #         -> is_other -> (append_thing, None)
+#    # commenttext -> is_space (
+#    #
+#    # reexamine_state ->is_reexamined_comment -> (append_thing, "comment")
+#    #                 ->is_reexamined_acttext -> (append_thing, "acttext")
+#    
+#    defaultstate = {'size': 16
+#                    'lawuri': uri}
+#
+#
+#    def is_other(parser):
+#        return True
+#    
+#    def is_acttext(parser):
+#        pass
+#
+#    def is_commentary(parser):
+#        pass
+#
+#    def is_pagebreak(parser):
+#        pass
+#    
+#    
+#    @newstate('forfattningskommentar')
+#    def make_forfattningskommentar(parser):
+#        pass
+#
+#
+#    def make_textnode(parser):
+#        return parser.reader.next()
+#
+#    def make_pagebreak(parser):
+#        return parser.reader.next()
+#
+#    p = FSMParser()
+#    p.set_recognizers(is_pagebreak,
+#                      is_acttext,
+#                      is_commentary,
+#                      is_other)
+#    p.set_transitions({("root", "is_acttext"): (...),
+#                       ("root", "is_commentary"): (...)
+#                       })
+#    p.initial_state = "root"
+#    p.initial_constructor = make_root
+#    p.debug = bool(debug)
+#    return p
