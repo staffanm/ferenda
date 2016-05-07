@@ -643,10 +643,16 @@ class RepoTester(unittest.TestCase, FerendaTestCase):
         docroot/parsed/.
 
         """
-        # patch method so we control where the downloaded doc is
-        # loaded from.
         basefile = self.filename_to_basefile(downloaded_file)
-        self.repo.parse(basefile)
+        def runtest():
+            self.repo.parse(basefile)
+
+        if "FERENDA_PROFILE_TEST" in os.environ:
+            print("Profiling test")
+            import cProfile
+            cProfile.runctx("runtest()", globals(), locals(), sort="cumtime")
+        else:
+            runtest()
         if 'FERENDA_SET_TESTFILE' in os.environ:
             print("Overwriting %r with result of parse (%r)" % (xhtml_file, basefile))
             util.robust_rename(xhtml_file, xhtml_file + "~")

@@ -1710,6 +1710,11 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
         return False
     if re.match("\d\. +", strnextbox):  # item in ordered list
         return False
+    if re.match("\d+ §", strnextbox) and (nextbox.top - prevbox.bottom >= (prevbox.font.size / 3)): # new section (with a suitable (1/3 of a line) space)
+        if strnextbox.startswith("20 §§"):
+            from pudb import set_trace; set_trace()
+        return False
+
     
     # These final conditions glue primarily *horizontally*
     if (sizematch(textbox, nextbox) and

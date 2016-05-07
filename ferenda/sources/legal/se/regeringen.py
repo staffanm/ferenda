@@ -654,11 +654,18 @@ class Regeringen(SwedishLegalSource):
                 break
 
     def visitor_functions(self, basefile):
-        # the .metrics.json file must exist at this point
-        with open(self.store.path(basefile, "intermediate", ".metrics.json")) as fp:
-            metrics = json.load(fp)
+        # the .metrics.json file must exist at this point, but just in
+        # case it doesn't
+        metrics_path = self.store.path(basefile, "intermediate", ".metrics.json")
+        if os.path.exists(metrics_path):
+            with open(metrics_path) as fp:
+                metrics = json.load(fp)
+                defaultsize = metrics['default']['size']
+        else:
+            self.log.warning("%s: visitor_functions: %s doesn't exist" % (basefile, metrics_path))
+            defaultsize = 16
         sharedstate = {'basefile': basefile,
-                       'defaultsize': metrics['default']['size']}
+                       'defaultsize': defaultsize}
         return [(self.find_primary_law, sharedstate),
                 (self.find_commentary, sharedstate)]
 
@@ -724,8 +731,10 @@ class Regeringen(SwedishLegalSource):
 
 
     def _find_commentary_for_law(self, law, section, state):
-        # this is basically a ad-hoc statemachine. Maybe we should
-        # use FSMParser here (we don't need nesting though, I think)
+        # FIXME: this is basically a ad-hoc statemachine, with a lot
+        # of ill-understood conditionals and flag settings. Luckily
+        # there's a decent test harness in the
+        # functionalSources.TestPropRegeringen suite
         textnodes = []
         reexamine_state = False
         comment_on = None
@@ -752,7 +761,7 @@ class Regeringen(SwedishLegalSource):
                     parsestate = "acttext"
                 elif re.match("\d+(| \w) §", text):
                     parsestate = "acttext"
-                elif re.match("(Av p|P)aragrafen (framgår|innehåller|har behandlats|är ny)", text):
+                elif self._is_commentstart(text):
                     parsestate = "commenttext"
                 else:
                     pass  # keep parsestate as-is
@@ -819,11 +828,13 @@ class Regeringen(SwedishLegalSource):
                 skipheader = False
 
             # any big space signals a switch from acttext ->
-            # commenttext or vice versa. The height of the gap should
-            # really be dynamically calculated, but how?
-            elif prevnode and subnode.top - prevnode.bottom >= 20:
+            # commenttext or vice versa (if some other obscure
+            # conditions are met). The height of the gap should really
+            # be dynamically calculated, but how?
+            elif (prevnode and
+                  subnode.top - prevnode.bottom >= 20):
                 # self.log.debug("...node spacing is %s, switching from parsestate %s" % (subnode.top - prevnode.bottom, parsestate))
-                if re.match("\d+(| \w) §$", str(prevnode).strip()):
+                if (re.match("\d+(| \w) §$", str(prevnode).strip())):
                     comment_start = True
                     parsestate == "commenttext"
                 elif self._is_headerlike(text) or parsestate == "commenttext":
@@ -869,14 +880,18 @@ class Regeringen(SwedishLegalSource):
                         title = ""
                     else:
                         title = text
-                    current_comment = Forfattningskommentar(title=title,
-                                                            comment_on=comment_on,
-                                                            uri=None)
-                    # the URI to the above Forfattningskommentar is
-                    # dynamically constructed in
-                    # Forfattningskommentar.as_xhtml
-                    textnodes.append(current_comment)
-                    state['commented_paras'][comment_on] = pageno
+                    if comment_on:
+                        current_comment = Forfattningskommentar(title=title,
+                                                                comment_on=comment_on,
+                                                                uri=None)
+                        # the URI to the above Forfattningskommentar is
+                        # dynamically constructed in
+                        # Forfattningskommentar.as_xhtml
+                        textnodes.append(current_comment)
+                        state['commented_paras'][comment_on] = pageno
+                    # else:
+                    #     from pudb import set_trace; set_trace()
+                    #     print("would start a Forfattningskommentar but have no thing")
                 else:
                     self.log.warning("Found another comment on %s at p %s (previous at %s), ignoring" % (comment_on, pageno, state['commented_paras'][comment_on]))
                 comment_on = None
@@ -909,7 +924,11 @@ class Regeringen(SwedishLegalSource):
 
     def _is_headerlike(self, text):
         # headers are less than 100 chars and do not end with a period
-        return len(text) < 100 and text[-1] != "." and not text.endswith(" i")
+        # or other non-hederish thing
+        return len(text) < 100 and text[-1] != "." and not text[-2:] in (" i", " §")
+
+    def _is_commentstart(self, text):
+        return re.match("(Av p|P)aragrafen (framgår|innehåller|har behandlats|är ny|, som är ny)", text)
     
                         
     def _parse_uri_from_text(self, text, basefile, baseuri=None):
