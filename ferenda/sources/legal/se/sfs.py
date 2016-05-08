@@ -859,6 +859,7 @@ class SFS(Trips):
         # dicts themselves. Convert the subdicts to rdflib.Resource
         # objects.
         post_count = 0
+        r = None
         for k in sorted(list(attributes.keys()), key=util.split_numalpha):
             if isinstance(attributes[k], dict):
                 if len(attributes[k]) > 1:
@@ -891,7 +892,7 @@ class SFS(Trips):
         # assume that dcterms:issued == rpubl:utfardandedatum
         if post_count == 1 and resource.value(RPUBL.utfardandedatum):
             issued = resource.value(RPUBL.utfardandedatum)
-        else:
+        elif r:
             # 2. if the last post in registry contains a
             # rpubl:utfardandedatum, assume that this version of the
             # rpubl:KonsolideradGrundforfattning has the same
@@ -904,7 +905,7 @@ class SFS(Trips):
             resource.graph.add((resource.identifier, DCTERMS.issued, issued))
         else:
             # create a totally incorrect value, otherwise
-            # lagen.nu.SFS.infer_Triples wont be able to generate a
+            # lagen.nu.SFS.infer_triples wont be able to generate a
             # owl:sameAs uri
             resource.graph.add((resource.identifier, DCTERMS.issued, Literal(datetime.today())))
         return resource
@@ -1275,10 +1276,11 @@ class SFS(Trips):
 
     _document_name_cache = {}
     _query_template_cache = {}
-    def store_select(self, store, query_template, uri, context=None):
+    def store_select(self, store, query_template, uri, context=None, extraparams=None):
         params = {'uri': uri,
                   'context': context}
-
+        if extraparams:
+            params.update(extraparams)
         if query_template not in self._query_template_cache:
             with self.resourceloader.open(query_template) as fp:
                 self._query_template_cache[query_template] = fp.read()
@@ -1296,7 +1298,7 @@ class SFS(Trips):
 
     # FIXME: Copied verbatim from keyword.py
     def time_store_select(self, store, query_template, basefile,
-                          context=None, label="things"):
+                          context=None, label="things", extra=None):
         values = {'basefile': basefile,
                   'label': label,
                   'count': None}
@@ -1309,7 +1311,8 @@ class SFS(Trips):
             result = self.store_select(store,
                                        query_template,
                                        uri,
-                                       context)
+                                       context,
+                                       extra)
             values['count'] = len(result)
         return result
 
@@ -1460,17 +1463,26 @@ class SFS(Trips):
 
 
         # 7. all forfattnigskommentar
+        canonical_uri = self.canonical_uri(basefile)
+        tempuri = self.temp_sfs_uri("Personuppgiftslag (1998:204)")
+        extra = {'tempuri': tempuri}
         forf_kommentar = self.time_store_select(store,
                                                 "sparql/sfs_forfattningskommentar.rq",
                                                 basefile,
                                                 None,  # need both prop and sfs contexts
-                                                "forfattningskommentarer")
-
+                                                "forfattningskommentarer",
+                                                extra)
         for row in forf_kommentar:
             if not 'lagrum' in row:
                 lagrum = baseuri
             else:
-                lagrum = row['lagrum']
+                # create canonical uris now that we know them (FIXME:
+                # maybe this could be done with string functions in
+                # the sparql query itself)
+                if row['lagrum'].startswith(tempuri):
+                    lagrum = row['lagrum'].replace(tempuri, canonical_uri)
+                else:
+                    lagrum = row['lagrum']
 
             if not lagrum in stuff:
                 stuff[lagrum] = {}

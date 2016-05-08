@@ -1,11 +1,19 @@
 PREFIX dcterms: <http://purl.org/dc/terms/>
 PREFIX rinfoex: <http://lagen.nu/terms#>
 
-SELECT ?lagrum ?kommentar ?desc ?prop
+SELECT ?lagrum ?kommentar ?prop ?desc
 WHERE  {
-  ?kommentar rinfoex:kommentarTill ?lagrum;
-             dcterms:description ?desc;
-             dcterms:isPartOf+ ?propuri .
-  ?propuri dcterms:identifier ?prop .    
-  FILTER(STRSTARTS(STR(?lagrum), "https://lagen.nu/sfs/1997:238"))
-}
+  {
+    ?kommentar rinfoex:kommentarTill ?lagrum;
+               dcterms:description ?desc;
+               dcterms:isPartOf+ ?propuri .
+    ?propuri dcterms:identifier ?prop .
+    FILTER(STRSTARTS(STR(?lagrum), "%(uri)s"))
+  } UNION {
+    ?kommentar rinfoex:kommentarTill ?lagrum;
+               dcterms:description ?desc;
+               dcterms:isPartOf+ ?propuri .
+    ?propuri dcterms:identifier ?prop .
+    FILTER(STRSTARTS(STR(?lagrum), "%(tempuri)s"))
+  }
+} 

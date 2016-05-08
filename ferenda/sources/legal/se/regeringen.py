@@ -608,7 +608,8 @@ class Regeringen(SwedishLegalSource):
         if self.rdf_type != RPUBL.Proposition:
             return doc.body
 
-        d = Describer(self._resource.graph, self._resource.identifier)
+        # d = Describer(self._resource.graph, self._resource.identifier)
+        d = Describer(doc.meta, doc.uri)
         title_found = identifier_found = issued_found = False
         for idx, element in enumerate(doc.body):
             if not isinstance(element, Textbox):
@@ -682,6 +683,7 @@ class Regeringen(SwedishLegalSource):
 
     def find_commentary(self, node, state):
         if not isinstance(node, Section) or (node.title not in ("Författningskommentar",
+                                                                "Författningskommentarer",
                                                                 "Specialmotivering")):
             if isinstance(node, Body):
                 if 'commented_paras' not in state:
@@ -705,13 +707,7 @@ class Regeringen(SwedishLegalSource):
                     # make sure to only allow lower-case a-z and to a
                     # base26 conversion into an integer
                     lawname = subsection.title.split(" ", 2)[-1]
-                    slug = re.sub('\W+', '', lawname).lower()
-                    slug = re.sub('\d+', '', slug)
-                    slug = slug.replace("å", "aa").replace("ä", "ae").replace("ö", "oe").replace("é", "e")
-                    numslug = util.base26encode(slug)
-                    assert util.base26decode(numslug) == slug, "%s roundtripped as %s" % (slug, util.base26decode(numslug))
-                    tmptext = "Fejklag (0000:%s)" % numslug
-                    uri =self._parse_uri_from_text(tmptext, state['basefile'])
+                    uri = self.temp_sfs_uri(lawname)
                 else:
                     uri = None
                 if uri:
@@ -755,11 +751,14 @@ class Regeringen(SwedishLegalSource):
                                  # signalled a change from acttext
                                  # to commenttext was lost.
                 prev_state = parsestate
-                if hasattr(subnode, '__getitem__') and subnode[0].tag == "i": # indicates section starting with eg "<i>Första stycket</i> innehåller..."
+                # indicates section starting with eg "<i>Första
+                # stycket</i> innehåller..." FIXME: this should be
+                # detected by self._is_commentstart now.
+                if hasattr(subnode, '__getitem__') and (subnode[0].tag == "i"):
                     parsestate = "commenttext"
                 elif self._is_headerlike(text):
                     parsestate = "acttext"
-                elif re.match("\d+(| \w) §", text):
+                elif re.match("\d+(| \w) §", text) and not self._is_commentstart(str(section[idx+1])):
                     parsestate = "acttext"
                 elif self._is_commentstart(text):
                     parsestate = "commenttext"
@@ -790,7 +789,7 @@ class Regeringen(SwedishLegalSource):
                 # self.log.debug("...Setting reexamine_state flag")
                 reexamine_state = True
 
-            elif len(text) < 20 and text.endswith(" kap."):
+            elif len(text) < 20 and (text.endswith(" kap.") or text.endswith(" kap")):
                 # subsection heading indicating the start of a new
                 # chapter. alter the parsing context from law to
                 # chapter in law
@@ -884,14 +883,16 @@ class Regeringen(SwedishLegalSource):
                         current_comment = Forfattningskommentar(title=title,
                                                                 comment_on=comment_on,
                                                                 uri=None)
+                        if parsestate != "commenttext":
+                            self.log.warning("%s, comment on %s, parsestate was '%s', "
+                                             "setting to 'commenttext'" %
+                                             (state['basefile'], comment_on, parsestate))
+                            parsestate = "commenttext"
                         # the URI to the above Forfattningskommentar is
                         # dynamically constructed in
                         # Forfattningskommentar.as_xhtml
                         textnodes.append(current_comment)
                         state['commented_paras'][comment_on] = pageno
-                    # else:
-                    #     from pudb import set_trace; set_trace()
-                    #     print("would start a Forfattningskommentar but have no thing")
                 else:
                     self.log.warning("Found another comment on %s at p %s (previous at %s), ignoring" % (comment_on, pageno, state['commented_paras'][comment_on]))
                 comment_on = None
@@ -928,7 +929,11 @@ class Regeringen(SwedishLegalSource):
         return len(text) < 100 and text[-1] != "." and not text[-2:] in (" i", " §")
 
     def _is_commentstart(self, text):
-        return re.match("(Av p|P)aragrafen (framgår|innehåller|har behandlats|är ny|, som är ny)", text)
+        if re.match("(Av p|P)aragrafen (framgår|innehåller|har behandlats|är ny|, som är ny|avgränsar|innebär)", text):
+            return True
+        elif re.match("(I f|F)örsta stycket", text):
+            return True
+        return False
     
                         
     def _parse_uri_from_text(self, text, basefile, baseuri=None):

@@ -1099,6 +1099,33 @@ class SwedishLegalSource(DocumentRepository):
         else:
             return util.gYear(year)
 
+    def temp_sfs_uri(self, lawname):
+        # Propositions and other preparatory works may suggest new
+        # laws. At that point in time, no SFS number for the proposed
+        # law exists, which makes it hard to mint an URI for the
+        # proposed law (or a section within it) which we need when eg
+        # creating detailed metadata about the commentary on the
+        # section. Later, we may need to recreate that URI based on
+        # information available at a later point in time, when an
+        # official SFS number exists, eg when collecting annotations
+        # on a law, when we want to get commentary from said
+        # preparatory works.
+        # 
+        # This function creates a unique URI, based on a SFS number
+        # derived from the name of the law
+        slug = re.sub('\W+', '', lawname).lower()
+        slug = re.sub('\d+', '', slug)
+        slug = slug.replace("å", "aa").replace("ä", "ae").replace("ö", "oe").replace("é", "e")
+        numslug = util.base26encode(slug)
+        assert util.base26decode(numslug) == slug, "%s roundtripped as %s" % (slug, util.base26decode(numslug))
+        # from pudb import set_trace; set_trace()
+        resource = self.polish_metadata(
+            {"rdf:type": RPUBL.KonsolideradGrundforfattning,
+             "rpubl:arsutgava": "0000",
+             "rpubl:lopnummer": str(numslug),
+             "rpubl:forfattningssamling": URIRef(self.lookup_resource("SFS", SKOS.altLabel))})
+        return str(resource.identifier)
+
     # hook for RepoTester to call
     def tearDown(self, testcase):
         self.refparser._legalrefparser.namedlaws = {}
