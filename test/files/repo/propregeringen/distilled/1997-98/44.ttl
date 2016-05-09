@@ -803,7 +803,7 @@
 
 <https://lagen.nu/prop/1997/98:44> a rpubl:Proposition ;
     dcterms:abstract ""@sv ;
-    dcterms:identifier "prop. 1997/98:44 " ;
+    dcterms:identifier "Prop. 1997/98:44" ;
     dcterms:issued "1997-01-01"^^xsd:date ;
     dcterms:title "Personuppgiftslag"@sv ;
     rpubl:arsutgava "1997/98" ;
