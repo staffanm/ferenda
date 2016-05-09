@@ -211,8 +211,8 @@
 	      </xsl:call-template>
 	  </xsl:variable>
 	  <xsl:call-template name="aside-annotations-panel">
-	    <xsl:with-param name="title">Lagrumshänvisningar hit</xsl:with-param>
-	    <xsl:with-param name="badgecount" select="count($inbound/rdf:Description)"/>
+	    <xsl:with-param name="title">Ändringar</xsl:with-param>
+	    <xsl:with-param name="badgecount" select="count($inford) + count($andrad) + count(upphavd)"/>
 	    <xsl:with-param name="panelid" select="$panelid"/>
 	    <xsl:with-param name="paneltype">a</xsl:with-param>
 	    <xsl:with-param name="nodeset" select="ext:node-set($andringar)"/>

@@ -1,7 +1,7 @@
 PREFIX dcterms: <http://purl.org/dc/terms/>
 PREFIX rinfoex: <http://lagen.nu/terms#>
 
-SELECT ?lagrum ?kommentar ?prop ?desc
+SELECT DISTINCT ?lagrum ?kommentar ?prop ?desc
 WHERE  {
   {
     ?kommentar rinfoex:kommentarTill ?lagrum;

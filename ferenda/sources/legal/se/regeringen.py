@@ -439,7 +439,9 @@ class Regeringen(SwedishLegalSource):
             if k in a:
                 a[k] = util.normalize_space(a[k])
         # trim identifier
-        a["dcterms:identifier"] = a["dcterms:identifier"].replace("ID-nummer: ", "")
+        a["dcterms:identifier"] = self.sanitize_identifier(
+            a["dcterms:identifier"].replace("ID-nummer: ", ""))
+        # FIXME call sanitize_identifier
         # save for later
         self._identifier = a["dcterms:identifier"]
         # it's rare, but in some cases a document can be published by
@@ -964,6 +966,7 @@ class Regeringen(SwedishLegalSource):
 
         try:
             parts = re.split("[\.:/ ]+", identifier.strip())
+            parts[0] = parts[0][0].upper() + parts[0][1:]
             return pattern[self.document_type] % tuple(parts)
         except:
             self.log.warning("Couldn't sanitize identifier %s" % identifier)

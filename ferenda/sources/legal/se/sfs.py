@@ -1487,7 +1487,9 @@ class SFS(Trips):
             if not lagrum in stuff:
                 stuff[lagrum] = {}
             link = '<b><a href="%s">%s</a></b>: ' % (row['kommentar'], row['prop'])
-            stuff[lagrum]['kommentar'] = row['desc'].replace(">", ">"+link, 1)
+            if 'kommentar' not in stuff[lagrum]:
+                stuff[lagrum]['kommentar'] = ""
+            stuff[lagrum]['kommentar'] += row['desc'].replace(">", ">"+link, 1)
 
         # then, construct a single de-normalized rdf/xml dump, sorted
         # by root/chapter/section/paragraph URI:s. We do this using
