@@ -6,13 +6,15 @@ from builtins import *
 # Intermediate base class containing some functionality useful
 # for handling data sources of swedish law, including minting URIs etc..
 
-from datetime import datetime, date
-import re
-import os
-import logging
 from bz2 import BZ2File
+from datetime import datetime, date
 from urllib.parse import quote, unquote
 from wsgiref.util import request_uri
+import difflib
+import logging
+import operator
+import os
+import re
 
 from layeredconfig import LayeredConfig, Defaults
 from rdflib import URIRef, RDF, Namespace, Literal, Graph, BNode
@@ -1187,23 +1189,36 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         if chunk.top > metrics.bottommargin or chunk.bottom < metrics.topmargin:
             return True
 
+        if metrics.scanned_source:
+            digitmatch = lambda s: s.replace("l", "1").isdigit()
+        else:
+            digitmatch = lambda s: s.isdigit()
+
         # pagenumbers can be in the left/right margin as well
         if ((chunk.right < metrics_leftmargin() or
              chunk.left > metrics_rightmargin()) and
-                strchunk.isdigit()):
+                digitmatch(strchunk)):
             return True
 
         # Propositioner has the identifier in the left or right
-        # margin, set in the default style (or smaller)
-        if (int(chunk.font.size) <= metrics.default.size and
+        # margin, set in the default style (or smaller) (but in OCR
+        # source the style might appear to be as much as 2 points
+        # bigger)
+        tolerance = 2 if metrics.scanned_source else 0
+        if metrics.scanned_source:
+            textmatch = lambda a, b: len(difflib.get_close_matches(a, [b], n=1, cutoff=0.6)) == 1
+        else:
+            textmatch = operator.eq
+        
+        if (chunk.font.size <= metrics.default.size + tolerance and
             (chunk.right < metrics_leftmargin() or
              chunk.left > metrics_rightmargin()) and
-                strchunk.startswith(parser.current_identifier)):
+            textmatch(strchunk, parser.current_identifier)):
             # print("%s on p %s is deemed nonessential" % (str(chunk), state.pageno))
             return True
         # the first page of a prop has it in the right margin, with larger font
         if (state.pageno == 1 and chunk.left > metrics_rightmargin() and
-            strchunk == parser.current_identifier):
+            textmatch(strchunk, parser.current_identifier)):
             return True
         
         # Direktiv first page has a similar identifier, but it starts
@@ -1308,11 +1323,20 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         return (chunk.font.size == metrics.h1.size and
                 chunk.font.family == metrics.h1.family)
 
+
     def is_unorderedsubsection(parser):
         # Subsections in "Författningskommentar" sections are
         # not always numbered. As a backup, check font size and family as well
         chunk = parser.reader.peek()
-        return (chunk.font.size == metrics.h2.size and
+        if metrics.scanned_source:
+            # avoid having sectionheaders in
+            # forfattningskommentar/specialmotivering interpreted as
+            # (might otherwise happen due to irregular font size
+            # estimates -- although that should be less common with
+            # the new sizematch() function)
+            if re.match("\.?[l\d]\s*§$", str(chunk).strip()):
+                return False
+        return (sizematch(metrics.h2.size, chunk.font.size, tolerate_less_ocr=0, tolerate_more_ocr=1) and 
                 chunk.font.family == metrics.h2.family)
 
     def is_subsubsection(parser):
@@ -1602,6 +1626,16 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             return metrics.rightmargin_even
         else:
             return metrics.rightmargin
+
+    def sizematch(want, got, tolerate_less_ocr=1, tolerate_more_ocr=1):
+        # matches a size 
+        if metrics.scanned_source:
+            # want: 10, got: 9, tolerate_less_ocr: 1, tolerate_more_ocr: 0 => True
+            # 10 + 0 <= 9 + 1
+            return want + tolerate_more_ocr <= got + tolerate_less_ocr
+        else:
+            return want == got
+        
 
     p = FSMParser()
 

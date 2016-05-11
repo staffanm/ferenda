@@ -346,9 +346,9 @@ class PDFReader(CompoundElement):
         tree = etree.parse(fp)
         for pageelement in tree.findall(
                 "//{http://www.w3.org/1999/xhtml}div[@class='ocr_page']"):
-            pageheight_in_mm = 242  # FIXME: get this from PDF
-            pointsize = 0.352777778  # constant
-            pageheight_in_points = pageheight_in_mm / pointsize
+            pageheight_in_inch = 11.69  # A4 page -- FIXME: use real page dimensions
+            pointsize = 1 / 72
+            pageheight_in_points = pageheight_in_inch / pointsize
             bbox = self.re_dimensions(pageelement.get('title'))
             px_per_point = (int(bbox.group("bottom")) - int(bbox.group("top"))) / pageheight_in_points
             dim = dimensions(pageelement.get('title'))
@@ -404,7 +404,6 @@ class PDFReader(CompoundElement):
 
                 # Now that we know all text elements that should be in
                 # the Textbox, we can guess the font size.
-
                 fontspec = {'family': "unknown",
                             'size': avgheight}
 

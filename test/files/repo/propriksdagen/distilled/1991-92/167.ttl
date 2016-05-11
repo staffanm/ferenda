@@ -10,8 +10,14 @@
 
 <https://lagen.nu/prop/1991/92:167#B1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
-    dcterms:title "COUNCIL DIRECTIVE       of 20 December 1985       to protect the consumer in respect of contracts negotiated away from       business premises"@sv ;
+    dcterms:title "(85/577/EEC)"@sv ;
     bibo:chapter "1"@sv .
+
+<https://lagen.nu/prop/1991/92:167#B3> a bibo:DocumentPart ;
+    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:references <https://lagen.nu/sfs/1981:1361> ;
+    dcterms:title "Prop. 1991/922167       Bilaga 3"@sv ;
+    bibo:chapter "3"@sv .
 
 <https://lagen.nu/prop/1991/92:167#B4> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
@@ -27,13 +33,15 @@
 
 <https://lagen.nu/prop/1991/92:167#B6> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
-    dcterms:references <https://lagen.nu/sfs/1988:1385>,
+    dcterms:references <https://lagen.nu/sfs/1981:1361>,
+        <https://lagen.nu/sfs/1988:1385>,
         <https://lagen.nu/sfs/1991:980> ;
     dcterms:title "Lagrådsremissens lagförslag"@sv ;
     bibo:chapter "6"@sv .
 
 <https://lagen.nu/prop/1991/92:167#B7> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:references <https://lagen.nu/sfs/1981:1361> ;
     dcterms:title "Lagrådet"@sv ;
     bibo:chapter "7"@sv .
 
@@ -50,26 +58,31 @@
 
 <https://lagen.nu/prop/1991/92:167#PS3> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:references <https://lagen.nu/sfs/1981:1361> ;
     dcterms:title "Justitiedepartementet"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:references <https://lagen.nu/sfs/1981:1361> ;
     dcterms:title "Inledning"@sv ;
     bibo:chapter "1"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:references <https://lagen.nu/sfs/1981:1361> ;
     dcterms:title "EG-reglemas införlivande i svensk rätt"@sv ;
     bibo:chapter "2"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S3.1> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
-    dcterms:references <https://lagen.nu/prop/1971:86#s89> ;
+    dcterms:references <https://lagen.nu/prop/1971:86#s89>,
+        <https://lagen.nu/sfs/1981:1361> ;
     dcterms:title "Förvärvets syfte"@sv ;
     bibo:chapter "3.1"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S3.10> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
+    dcterms:references <https://lagen.nu/sfs/1981:1361> ;
     dcterms:title "Lagens benämning"@sv ;
     bibo:chapter "3.10"@sv .
 
@@ -80,13 +93,17 @@
 
 <https://lagen.nu/prop/1991/92:167#S3.2> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
-    dcterms:references <https://lagen.nu/prop/1981/82:40#s23> ;
+    dcterms:references <https://lagen.nu/prop/1981/82:40#s23>,
+        <https://lagen.nu/sfs/1981:1361> ;
     dcterms:title "Begreppet näringsidkare"@sv ;
     bibo:chapter "3.2"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S3.3> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
-    dcterms:references <https://lagen.nu/prop/1981/82:40#s41>,
+    dcterms:references <https://lagen.nu/prop/1981/82:40#s24>,
+        <https://lagen.nu/prop/1981/82:40#s41>,
+        <https://lagen.nu/sfs/1981:1361>,
+        <https://lagen.nu/sfs/1981:1361#P2>,
         <https://lagen.nu/sfs/1985:716#P2>,
         <https://lagen.nu/sfs/1990:931>,
         <https://lagen.nu/sfs/1990:932>,
@@ -94,17 +111,12 @@
     dcterms:title "Avtalstyperna"@sv ;
     bibo:chapter "3.3"@sv .
 
-<https://lagen.nu/prop/1991/92:167#S3.4> a bibo:DocumentPart ;
-    dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
-    dcterms:references <https://lagen.nu/prop/1981/82:40#s24>,
-        <https://lagen.nu/prop/1981/82:40#s41> ;
-    dcterms:title "Avtalssituationen"@sv ;
-    bibo:chapter "3.4"@sv .
-
 <https://lagen.nu/prop/1991/92:167#S3.6> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
     dcterms:references <https://lagen.nu/prop/1971:86#s66>,
         <https://lagen.nu/prop/1971:86#s97>,
+        <https://lagen.nu/sfs/1981:1361>,
+        <https://lagen.nu/sfs/1981:1361#P4>,
         <https://lagen.nu/sfs/1985:716>,
         <https://lagen.nu/sfs/1988:1385>,
         <https://lagen.nu/sfs/1990:931>,
@@ -114,11 +126,13 @@
 
 <https://lagen.nu/prop/1991/92:167#S3.9> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167#S3> ;
+    dcterms:references <https://lagen.nu/sfs/1981:1361> ;
     dcterms:title "Regleringens tvingande karaktär"@sv ;
     bibo:chapter "3.9"@sv .
 
 <https://lagen.nu/prop/1991/92:167#S4> a bibo:DocumentPart ;
     dcterms:isPartOf <https://lagen.nu/prop/1991/92:167> ;
+    dcterms:references <https://lagen.nu/sfs/1981:1361> ;
     dcterms:title "Upprättat lagförslag"@sv ;
     bibo:chapter "4"@sv .
 
@@ -127,6 +141,7 @@
     dcterms:references <https://lagen.nu/prop/1971:86#s90>,
         <https://lagen.nu/prop/1981/82:40#s24>,
         <https://lagen.nu/prop/1981/82:40#s35>,
+        <https://lagen.nu/sfs/1981:1361>,
         <https://lagen.nu/sfs/1988:1385>,
         <https://lagen.nu/sfs/1990:931#P2S1N2>,
         <https://lagen.nu/sfs/1991:980> ;
