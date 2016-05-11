@@ -589,6 +589,32 @@ class Devel(object):
                 print("%s: Copying docs from %s" % (alias, aliasdir))
                 self.samplerepo(alias, aliasdir)
 
+    def statusreport(self, alias=None):
+        # eg ./ferenda-build devel status prop --outfile "160510-prop.html"
+        if hasattr(self.config, 'outfile'):
+            fp = open(outfile, "w")
+        else:
+            fp = sys.stdout
+
+        #  Prop
+        #  ----
+        #  download: 1234 documents 
+        #  parsed: 1111 documents (123 fatal errors, 1413 warnings)
+        #  generated: 999 documents (333 errors)
+        #  ----
+        #  view/hide [E]rrrors, [W]arnings
+        #  ----
+        #  1971:3 OK
+        #  1971:4 WARNINGS: (the warnings)
+        #  1971:5 ERROR: (stacktrace)
+        pass
+        
+    def _statusrepo(self, alias):
+        repo = instantiate_repo(alias)
+        for f in repo.store.list_basefiles_for("parse"):
+            pass
+    # TODO: the rest
+
 
     # FIXME: These are dummy implementations of methods and class
     # variables that manager.py expects all docrepos to have. We don't
