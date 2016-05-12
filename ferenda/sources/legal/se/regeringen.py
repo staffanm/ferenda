@@ -675,7 +675,7 @@ class Regeringen(SwedishLegalSource):
     def find_primary_law(self, node, state):
         if 'primarylaw' in state:
             return None
-        if not isinstance(node, Section) or not re.match("Förslag(|et) till lag om ändring i"):
+        if not isinstance(node, Section) or not re.match("Förslag(|et) till lag om ändring i", node.title):
             if isinstance(node, Body):
                 return state
             else:

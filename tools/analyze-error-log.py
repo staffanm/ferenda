@@ -9,10 +9,16 @@ def analyze_log(filename):
     locationmsg = {}
     with open(filename) as fp:
         for line in fp:
-            timestamp, module, level, message = line.split(" ", 3)
+            try:
+                timestamp, module, level, message = line.split(" ", 3)
+                if module == "2015:98:":
+                    import pudb; pu.db
+            except ValueError:
+                continue
             if level == "ERROR":
-                realmodule = message.split(" ", 1)[0]
-                modules[realmodule] += 1
+                if module == "root":
+                    module = message.split(" ", 1)[0]
+                modules[module] += 1
             m = re.search("\([\w/]+.py:\d+\)", message)
             if m:
                 location = m.group(0)
