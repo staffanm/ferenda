@@ -673,13 +673,15 @@ class Regeringen(SwedishLegalSource):
                 (self.find_commentary, sharedstate)]
 
     def find_primary_law(self, node, state):
-        if not isinstance(node, Section) or not node.title.startswith("Förslag till lag om ändring i"):
+        if 'primarylaw' in state:
+            return None
+        if not isinstance(node, Section) or not re.match("Förslag(|et) till lag om ändring i"):
             if isinstance(node, Body):
                 return state
             else:
                 return None  # visit_node won't call any subnode
         state['primarylaw'] = self._parse_uri_from_text(node.title, state['basefile'])
-        self.log.info("%s: find_primary_law finds %s" % (
+        self.log.debug("%s: find_primary_law finds %s" % (
             state['basefile'], state['primarylaw']))
         return None
 
