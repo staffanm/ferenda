@@ -55,6 +55,11 @@ class LNMediaWiki(wiki.MediaWiki):
         # somehow. This is probably not the best way.
         with self.resourceloader.open("extra/sfs.ttl") as fp:
             self.commondata.parse(data=fp.read(), format="turtle")
+        # actually, to mint URIs for rattsfall we need the
+        # skos:altLabel for the rpubl:Rattsfallspublikation -- so we
+        # need everything
+        with self.resourceloader.open("extra/swedishlegalsource.ttl") as fp:
+            self.commondata.parse(data=fp.read(), format="turtle")
         return SwedishCitationParser(p,
                                      self.minter,
                                      self.commondata,

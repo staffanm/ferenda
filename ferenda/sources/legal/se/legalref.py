@@ -509,22 +509,17 @@ class LegalRef:
 
     def format_generic_link(self, part, uriformatter=None):
         try:
-            uri = self.uriformatter[part.tag](self.find_attributes([part]))
-        except KeyError:
-            if uriformatter:
-                uri = uriformatter(self.find_attributes([part]))
+            if part.tag in self.uriformatter:
+                uri = self.uriformatter[part.tag](self.find_attributes([part]))
             else:
-                uri = self.sfs_format_uri(self.find_attributes([part]))
+                if uriformatter:
+                    uri = uriformatter(self.find_attributes([part]))
+                else:
+                    uri = self.sfs_format_uri(self.find_attributes([part]))
         except AttributeError:
-            # Normal error from eulag_format_uri
+            # This is a common error from eulag_format_uri -- just
+            # return the text
             return part.text
-#        except Exception as e:
-#            # FIXME: We should maybe not swallow all other errors...
-#            # If something else went wrong, just return the plaintext
-#            log.warning("(unknown): Unable to format link for text %s (production %s): %s: %s" %
-#                        (part.text, part.tag, type(e).__name__, e))
-#            return part.text
-#
         if self.verbose:
             print((
                 (". " * self.depth) + "format_generic_link: uri is %s" % uri))
@@ -712,6 +707,7 @@ class LegalRef:
                     "lopnr": RPUBL.lopnummer,
                     "notnr": RPUBL.lopnummer,
                     "rattsfallspublikation": RPUBL.rattsfallspublikation,
+                    "domstol": RPUBL.rattsfallspublikation,
                     "ar": RPUBL.arsutgava,
                     }
 
@@ -751,7 +747,11 @@ class LegalRef:
                     v = Literal(v)
                 g.add((current, self.attributemap[k], v))
             else:
-                log.error("Can't map attribute %s to RDF predicate" % k)
+                # We know that these attribs do not need to be mapped
+                # to RDF predicates (as equivalent information must
+                # exist elsewhere)
+                if k not in ("shortsection", "shortchapter"):
+                    log.error("Can't map attribute %s to RDF predicate" % k)
 
         # add any extra stuff
         for (p, o) in rest:
