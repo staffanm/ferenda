@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
@@ -740,7 +739,8 @@ class DV(SwedishLegalSource):
                         if header and header[-1].get_text().strip() == "Lagrum:":
                             # get the first bs4.element.Tag child
                             children = [x for x in tmp.children if hasattr(x, 'get_text')]
-                            header[-1].append(children[0])
+                            if children:
+                                header[-1].append(children[0])
                         else:
                             header.append(tmp)
             if not done:
