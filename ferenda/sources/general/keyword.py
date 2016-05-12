@@ -7,6 +7,7 @@ from builtins import *
 import re
 import os
 from collections import defaultdict
+import unicodedata
 
 # 3rdparty libs
 import requests
@@ -32,6 +33,11 @@ class KeywordStore(DocumentStore):
         return "%s/%s" % (first, basefile)
 
     def pathfrag_to_basefile(self, pathfrag):
+        # Pathfrags on MacOS, coming from the file system, are unicode
+        # strings in NFD (decompsed), ie 'å' is split into 'a' and
+        # COMBINING CHARACTER RING (or whatever it's called. We need
+        # them in NFC, where 'å' is a single character.
+        pathfrag = unicodedata.normalize("NFC", pathfrag)
         first, basefile = pathfrag.split("/", 1)
         return basefile
 
