@@ -492,6 +492,26 @@ class Devel(object):
             basefiles = islice(sourcerepo.store.list_basefiles_for("parse"),
                                0, samplesize)
         for basefile in basefiles:
+            if isinstance(sourcerepo, CompositeRepository):
+                sourcerepo = self._repo_from_alias(alias)
+                for cls in sourcerepo.subrepos:
+                    subsourcerepo = sourcerepo.get_instance(cls)
+                    subsdestrepo = destrepo.get_instance(cls)
+                    try:
+                        self._samplebasefile(sourcerepo, destrepo, basefile)
+                        break  # everything OK, no need to copy more
+                    except IOError: # or whatever could happen
+                        pass  # try the next one or bail
+                else:
+                    print("None of the subrepos had basefile %s" % basefile)
+            else:
+                self._samplebasefile(sourcerepo, destrepo, basefile)
+
+
+    def copyrepos(self, basefilelist):
+        pass
+                
+    def _samplebasefile(self, sourcerepo, destrepo, basefile):
             print("  %s: copying %s" % (alias, basefile))
             src = sourcerepo.store.downloaded_path(basefile)
             dst = destrepo.store.downloaded_path(basefile)

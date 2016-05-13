@@ -215,16 +215,32 @@ class Read(unittest.TestCase):
         self.assertEqual("EUROPEAN COMPUTER MANUFACTURERS ASSOCIATION",
                          util.normalize_space(str(reader[0][1])))
 
+class Decoding(unittest.TestCase):
 
-    def test_custom_encoding(self):
+    def setUp(self):
+        self.maxDiff = None
+        self.datadir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.datadir)
+
+    def _copy_sample(self):
+        for fname in os.listdir("test/files/pdfreader/intermediate"):
+            shutil.copy("test/files/pdfreader/intermediate/%s" % fname,
+                         self.datadir + os.sep + fname)
+
+    def test_1d_encoding(self):
         try:
+            from ferenda.sources.legal.se.swedishlegalsource import OffsetDecoder1d
             reader = PDFReader(filename="test/files/pdfreader/custom-encoding.pdf",
-                               workdir=self.datadir)
+                               workdir=self.datadir,
+                               textdecoder=OffsetDecoder1d())
         except errors.ExternalCommandError as e:
             print("test_custom_encoding got ExternalCommandError %s, copying sample and retrying" % e)
             self._copy_sample()
             reader = PDFReader(filename="test/files/pdfreader/custom-encoding.pdf",
-                               workdir=self.datadir)
+                               workdir=self.datadir,
+                               textdecoder=OffsetDecoder1d())
         # textbox 5 and 6 uses a font with a custom encoding, make
         # sure that this is properly decoded.
         tbs = list(reader.textboxes())
@@ -232,6 +248,18 @@ class Read(unittest.TestCase):
         self.assertEqual("Bosse Ringholm", str(tbs[6]))
         self.assertEqual("(Finansdepartementet)", str(tbs[7]))
 
+
+    def test_20_encoding(self):
+        # for this file, we don't even have a real PDF file, just some
+        # copypasted excerpts from an intermediate XML file
+        from ferenda.sources.legal.se.swedishlegalsource import OffsetDecoder20
+        self._copy_sample()
+        reader = PDFReader(filename="test/files/pdfreader/custom-encoding.pdf",
+                           workdir=self.datadir,
+                           textdecoder=OffsetDecoder20(kommittenamn="Datalagskommittén"))
+        # FIXME: add some actual tests here. in particular, test that
+        # fontids for sections with fixed leadtext are modified
+        
 
 class TestParseXML(unittest.TestCase):
 

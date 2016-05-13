@@ -32,7 +32,7 @@ from ferenda import util, fulltextindex
 from ferenda.sources.legal.se.legalref import Link, LegalRef, RefParseError
 from ferenda.elements.html import A, H1, H2, H3
 from ferenda.elements import Section, Body, CompoundElement
-from ferenda.pdfreader import Page
+from ferenda.pdfreader import Page, BaseTextDecoder, Textelement
 from ferenda.pdfreader import PDFReader
 from ferenda.pdfanalyze import PDFAnalyzer
 from ferenda.decorators import action, managedparsing, newstate
@@ -1854,56 +1854,142 @@ class SwedishCitationParser(CitationParser):
             self.log.error(e)
             return [string]
 
-#def forfattningskommentar_parser(lawuri, defaultsize, debug=False):
-#
-#    # root -> is_chaptermarker -> (change_lawuri, None)
-#    #      -> is_sectionmarker (not followed by acttext) -> (change_commenton_and_apppend, None)
-#    #      -> is_acttext -> (change_commenton_and_append, "acttext")
-#    # acttext -> is_space -> (make_forfattningskommentar, "commenttext")
-#    #         -> is_newpage -> (skip_newpage, "reexamine_state")
-#    #         -> is_other -> (append_thing, None)
-#    # commenttext -> is_space (
-#    #
-#    # reexamine_state ->is_reexamined_comment -> (append_thing, "comment")
-#    #                 ->is_reexamined_acttext -> (append_thing, "acttext")
-#    
-#    defaultstate = {'size': 16
-#                    'lawuri': uri}
-#
-#
-#    def is_other(parser):
-#        return True
-#    
-#    def is_acttext(parser):
-#        pass
-#
-#    def is_commentary(parser):
-#        pass
-#
-#    def is_pagebreak(parser):
-#        pass
-#    
-#    
-#    @newstate('forfattningskommentar')
-#    def make_forfattningskommentar(parser):
-#        pass
-#
-#
-#    def make_textnode(parser):
-#        return parser.reader.next()
-#
-#    def make_pagebreak(parser):
-#        return parser.reader.next()
-#
-#    p = FSMParser()
-#    p.set_recognizers(is_pagebreak,
-#                      is_acttext,
-#                      is_commentary,
-#                      is_other)
-#    p.set_transitions({("root", "is_acttext"): (...),
-#                       ("root", "is_commentary"): (...)
-#                       })
-#    p.initial_state = "root"
-#    p.initial_constructor = make_root
-#    p.debug = bool(debug)
-#    return p
+class OffsetDecoder1d(BaseTextDecoder):
+    def __init__(self):
+        """Decoder for most PDFs with custom encoding coming from
+        Regeringskansliet.
+        
+        Basic ASCII characters are coded in the same order as ascii,
+        but with a 0x1d offset.
+
+        """
+        self.map = self.encodingmap()
+        self.re_xmlcharref = re.compile("&#\d+;")
+
+    def encodingmap(self):
+        customencoding_map = {}
+        for i in range(0x20, 0x7e):
+            customencoding_map[i - 0x1d] = i
+            # assume that the rest is coded using windows-1252 but with a 0x7a
+            # offset. We have no basis for this assumption.
+            for i in range(0x80, 0xff):
+                if i - 0x7a in customencoding_map:
+                    # print("would have mapped %s to %s but %s was already in customencoding_map" %
+                    #       (chr(i - 0x7a), chr(i), chr(customencoding_map[i - 0x7a])))
+                    pass
+                else:
+                    customencoding_map[i - 0x7a] = i
+        return customencoding_map
+
+    def decode_string(self, s):
+        s = self.re_xmlcharref.sub(lambda m: chr(int(m.group(0)[2:-1])), s)
+        return s.translate(self.map)
+
+    def __call__(self, textbox, fontspecs):
+        if fontspecs[textbox.fontid]['encoding'] != "Custom":
+            return textbox
+        # NOTE: This weird checking for occurrences of 'i'
+        # tags is needed for functionalSources.
+        # TestPropRegeringen.test_parse_1999_2000_17 to pass
+        # (and matches encoding usage in practice)
+        decode_all = not('i' in [getattr(x, 'tag', None) for x in textbox])
+        for idx, subpart in enumerate(textbox):
+            if (isinstance(subpart, Textelement) and
+                (decode_all or subpart.tag == 'i')):
+                textbox[idx] = Textelement(self.decode_string(subpart),
+                                           tag=subpart.tag)
+        return textbox
+
+    def fontspecs(self, fontspecs):
+        # Fonts in Propositioner get handled wierdly by pdf2xml --
+        # sometimes they come out as "Times New Roman,Italic",
+        # sometimes they come out as "TimesNewRomanPS-ItalicMT". Might
+        # be caused by differences in the tool chain that creates the
+        # PDFs.  Sizes seem to be consistent though. This maps them to
+        # be more consistent. NOTE: This might be totally unneccesary
+        # now that we use PDFAnalyzer to determine likely fonts for
+        # headers etc.
+        for key, val in fontspecs.items():
+            if 'family' in val:
+                # Times New Roman => TimesNewRomanPSMT
+                # Times New Roman,Italic => TimesNewRomanPS-ItalicMT
+                if val['family'] == "Times New Roman":
+                    val['family'] = "TimesNewRomanPSMT"
+                if val['family'] == "Times New Roman,Italic":
+                    val['family'] = "TimesNewRomanPS-ItalicMT"
+                # Not 100% sure abt these last two
+                if val['family'] == "Times New Roman,Bold":
+                    val['family'] = "TimesNewRomanPS-BoldMT"
+                if val['family'] == "Times New Roman,BoldItalic":
+                    val['family'] = "TimesNewRomanPS-BoldItalicMT"
+        return fontspecs
+        
+        
+
+class OffsetDecoder20(OffsetDecoder1d):
+    """Alternate decoder for some PDFs (really only Prop. 1997/98:44
+    discovered so far). Custom fields here have characters generally
+    shifted 0x20, spaces are as-is, etc. It's also common with
+    Textelements that are partially encoded (usually text rendered in
+    bold is encoded, but normal text is unencoded -- for some reason
+    pdftohtml renders this as a single textelement).
+
+    """
+    fixedleaders = ["Regeringens bedömning:", "Regeringens förslag:", "Remissinstanserna:", "Skälen för regeringens förslag:", "Skälen för regeringens bedömning och förslag:"]
+    
+    def __init__(self, kommittenamn=None):
+        super(OffsetDecoder20, self).__init__()
+        self.reversemap = dict((v, k) for k, v in self.map.items())
+        if kommittenamn:
+            self.fixedleaders.append(kommittenamn + "s förslag")
+            self.fixedleaders.append(kommittenamn + "s bedömning och förslag")
+        self.re_fixedleaders = re.compile("(%s)" % "|".join([self.encode_string(x) for x in self.fixedleaders]))
+
+    def encode_string(self, s):
+        return s.translate(self.reversemap)
+
+    def encodingmap(self):
+        customencoding_map = {}
+        for i in range(0x20, 0x7e):
+            customencoding_map[i - 0x20] = i
+
+        # space is space
+        customencoding_map[0x20] = 0x20
+
+        # the rest is coded using windows-1252 but with a 0x40 offset.
+        for i in range(0x80, 0xff):
+            if i - 0x40 in customencoding_map:
+                pass
+            else:
+                customencoding_map[i - 0x40] = i
+        return customencoding_map
+
+
+    def __call__(self, textbox, fontspecs):
+        if fontspecs[textbox.fontid]['encoding'] != "Custom":
+            return textbox
+        if fontspecs[textbox.fontid]['family'] == "Times.New.Roman.Fet0100":
+            boundary = None
+            # extra special hack for prop 1997/98:44 which has
+            # textelements marked as having a font with custom
+            # encoding, but where only the bolded part (which
+            # isn't marked up...) is encoded, while the rest is
+            # unencoded. The "g" is a encoded section sign, which
+            # in these cases is the last encoded char.
+            if (len(textbox[0].split(" ", 2)) == 3 and 
+                textbox[0].split(" ", 2)[1] == "g"):
+                boundary = textbox[0].index(" ", textbox[0].index(" ")+1)
+            # a similar situation with paragraphs with leading bold
+            # type, where the bold text is any of 3-4 fixed strings
+            # (Note: the xml data doesn't contain any information
+            # about the text being bold, or rather that the following
+            # text is non-bold)
+            else:
+                m = self.re_fixedleaders.match(textbox[0])
+                if m:
+                    boundary = m.end()
+            if boundary:
+                textbox[0] = Textelement(self.decode_string(textbox[0][:boundary]), tag="b")
+                textbox.insert(1, Textelement(textbox[0][boundary:]))
+        else:
+            return super(OffsetDecoder20, self).__call__(textbox, fontspecs)

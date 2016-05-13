@@ -28,51 +28,9 @@ from ferenda.pdfreader import PDFReader, Textbox, Page
 from ferenda.errors import DocumentRemovedError
 from . import SwedishLegalSource, RPUBL
 from .legalref import LegalRef
-from .swedishlegalsource import offtryck_gluefunc
+from .swedishlegalsource import offtryck_gluefunc, OffsetDecoder1d, OffsetDecoder20
 from .elements import PreambleSection, UnorderedSection, Forfattningskommentar, Sidbrytning, VerbatimSection
 
-
-class FontmappingPDFReader(PDFReader):
-    # Fonts in Propositioner get handled wierdly by pdf2xml
-    # -- sometimes they come out as "Times New
-    # Roman,Italic", sometimes they come out as
-    # "TimesNewRomanPS-ItalicMT". Might be caused by
-    # differences in the tool chain that creates the PDFs.
-    # Sizes seem to be consistent though.
-    #
-    # This subclass maps one class of fontnames to another by
-    # postprocessing the result of parse_xml
-
-    def __init__(self,
-                 pages=None,
-                 filename=None,
-                 workdir=None,
-                 images=True,
-                 convert_to_pdf=False,
-                 keep_xml=True,
-                 ocr_lang=None,
-                 fontspec=None,
-                 custom_encoding_map=None):
-        super(FontmappingPDFReader, self).__init__(pages, filename, workdir, images, convert_to_pdf, keep_xml, ocr_lang, fontspec)
-        if custom_encoding_map:
-            self.customencoding_map = custom_encoding_map
-
-    def _parse_xml(self, xmlfp):
-        super(FontmappingPDFReader, self)._parse_xml(xmlfp)
-        remapfontid = None
-        for key, val in self.fontspec.items():
-            if 'family' in val:
-                # Times New Roman => TimesNewRomanPSMT
-                # Times New Roman,Italic => TimesNewRomanPS-ItalicMT
-                if val['family'] == "Times New Roman":
-                    val['family'] = "TimesNewRomanPSMT"
-                if val['family'] == "Times New Roman,Italic":
-                    val['family'] = "TimesNewRomanPS-ItalicMT"
-                # Not 100% sure abt these last two
-                if val['family'] == "Times New Roman,Bold":
-                    val['family'] = "TimesNewRomanPS-BoldMT"
-                if val['family'] == "Times New Roman,BoldItalic":
-                    val['family'] = "TimesNewRomanPS-BoldItalicMT"
 
 
 class Regeringen(SwedishLegalSource):
@@ -329,6 +287,10 @@ class Regeringen(SwedishLegalSource):
                      (DS, "2002:34"),   # 2-column report, uninteresting
                      (SOU, "2002:11"),  # -""-
                      (DS, "2007:30"),   # atypical report in english
+                     (DS, "2014:32"),   # -""-
+                     (DS, "2008:73"),   # -""-
+                     (DS, "2008:82"),   # -""-            in swedish
+                     # (DS, "2004:46"),   # -""-            in swedish
                     ])
 
     def extract_head(self, fp, basefile):
@@ -1047,26 +1009,10 @@ class Regeringen(SwedishLegalSource):
             return [x[0] for x in cleanfiles]
 
 
-    # Most PDFs that include a font with a custom encoding use the
-    # "standard" encoding map built into pdfreader.py (each ascii char
-    # shifted 0x1d, etc). At least one uses another, where characters
-    # generally are shifted 0x20, spaces are as-is, etc)
-    other_customencoding = {}
-    for i in range(0x20, 0x7e):
-        other_customencoding[i - 0x20] = i
-    # space is space
-    other_customencoding[0x20] = 0x20
-    # the rest is coded using windows-1252 but with a 0x40 offset.
-    for i in range(0x80, 0xff):
-        if i - 0x40 in other_customencoding:
-            # print("would have mapped %s to %s but %s was already in customencoding_map" %
-            #       (chr(i - 0x7a), chr(i), chr(customencoding_map[i - 0x7a])))
-            pass
-        else:
-            other_customencoding[i - 0x40] = i
 
-    
-    alternate_customencodings = {(PROPOSITION, "1997/98:44"): other_customencoding}
+
+    DEFAULT_DECODER = OffsetDecoder1d
+    ALTERNATE_DECODERS = {(PROPOSITION, "1997/98:44"): OffsetDecoder20}
 
     def parse_pdf(self, pdffile, intermediatedir, basefile):
         # By default, don't create and manage PDF backgrounds files
@@ -1076,16 +1022,14 @@ class Regeringen(SwedishLegalSource):
         else:
             keep_xml = True
         tup = (self.document_type, basefile)
-        custom_encoding_map = self.alternate_customencodings.get(tup)
-        pdf = FontmappingPDFReader(filename=pdffile,
-                                   workdir=intermediatedir,
-                                   images=self.config.pdfimages,
-                                   keep_xml=keep_xml,
-                                   custom_encoding_map=custom_encoding_map)
+        decoder = self.ALTERNATE_DECODERS.get(tup, self.DEFAULT_DECODER)()
+        pdf = PDFReader(filename=pdffile,
+                        workdir=intermediatedir,
+                        images=self.config.pdfimages,
+                        keep_xml=keep_xml,
+                        textdecoder=decoder)
         if pdf.is_empty():
             self.log.warning("PDF file %s had no textcontent, trying OCR" % pdffile)
-            # No use using the FontmappingPDFReader, since OCR:ed
-            # files lack the same fonts as that reader can handle.
             pdf = PDFReader(filename=pdffile,
                             workdir=intermediatedir,
                             images=self.config.pdfimages,

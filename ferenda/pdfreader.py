@@ -60,21 +60,6 @@ class PDFReader(CompoundElement):
     # PDFReader object
 
 
-    customencoding_map = {}
-    # it seems basic characters are coded in the same order as ascii,
-    # but with a 0x1d offset. 
-    for i in range(0x20, 0x7e):
-        customencoding_map[i - 0x1d] = i
-    # assume that the rest is coded using windows-1252 but with a 0x7a
-    # offset. We have no basis for this assumption.
-    for i in range(0x80, 0xff):
-        if i - 0x7a in customencoding_map:
-            # print("would have mapped %s to %s but %s was already in customencoding_map" %
-            #       (chr(i - 0x7a), chr(i), chr(customencoding_map[i - 0x7a])))
-            pass
-        else:
-            customencoding_map[i - 0x7a] = i
-            
 
     def __init__(self,
                  pages=None,
@@ -84,7 +69,8 @@ class PDFReader(CompoundElement):
                  convert_to_pdf=False,
                  keep_xml=True,
                  ocr_lang=None,
-                 fontspec=None):
+                 fontspec=None,
+                 textdecoder=None):
         """Initializes a PDFReader object from an existing PDF file. After
         initialization, the PDFReader contains a list of
         :py:class:`~ferenda.pdfreader.Page` objects.
@@ -138,7 +124,11 @@ class PDFReader(CompoundElement):
         self.workdir = workdir
         if self.workdir is None:
             self.workdir = tempfile.mkdtemp()
-
+        if textdecoder is None:
+            self.textdecoder = BaseTextDecoder()
+        else:
+            self.textdecoder = textdecoder
+            
         if convert_to_pdf:
             newfilename = workdir + os.sep + \
                 os.path.splitext(os.path.basename(filename))[0] + ".pdf"
@@ -604,9 +594,11 @@ class PDFReader(CompoundElement):
                     if element.tail and element.tail.strip():  # can this happen?
                         b.append(Textelement(txt(element.tail), tag=None))
                     b.lines = 1
-                    page.append(b)
+                    box = self.textdecoder(b, self.fontspec)
+                    page.append(box)
             # done reading the page
             self.append(page)
+        self.fontspec = self.textdecoder.fontspecs(self.fontspec)
         self.log.debug("PDFReader initialized: %d pages, %d fontspecs" %
                        (len(self), len(self.fontspec)))
         
@@ -954,23 +946,8 @@ all text in a Textbox has the same font and size.
 
     def __str__(self):
         s = "".join(self)
-        if self._fontspec[self.fontid].get("encoding") == "Custom":
-            # NB: This is the same check and partial-decode logic as in
-            # as_xhtml but we need it here as well since the statemachine
-            # in Regeringen._find_commentary_for_law uses str(textbox)
-            if (self._fontspec[self.fontid]['family'] == "Times.New.Roman.Fet0100" and
-                len(s.split(" ", 2)) == 3 and 
-                s.split(" ", 2)[1] == "g"):
-                idx = s.index(" ", s.index(" ")+1)
-                s = self.decode(s[:idx]) + s[idx:]
-            else:
-                s = self.decode(s)
         return s
 
-    def decode(self, s):
-        re_xmlcharref = re.compile("&#\d+;")
-        s = re_xmlcharref.sub(lambda m: chr(int(m.group(0)[2:-1])), s)
-        return s.translate(self._pdf.customencoding_map)
 
     def __repr__(self):
         # <Textbox 30x18+278+257 "5.1">
@@ -1069,46 +1046,6 @@ all text in a Textbox has the same font and size.
 
 
     def as_xhtml(self, uri, parent_uri=None):
-        if self._fontspec[self.fontid].get("encoding") == "Custom":
-            # Only textboxes know that their text is encoded,
-            # underlying textelements do not. But it's those objects
-            # that contain the actual encoded text. So we exchange
-            # those objects for decoded replicas. This might be a good
-            # place to do it. FIXME: It's clearly not. This should be
-            # done as part of _parse_xml.
-            # 
-            # extra special hack for prop 1997/98:44 which has
-            # textelements marked as having a font with custom
-            # encoding, but where only the bolded part (which
-            # isn't marked up...) is encoded, while the rest is
-            # unencoded. The "g" is a encoded section sign, which
-            # in these cases is the last encoded char.
-            if self._fontspec[self.fontid]['family'] == "Times.New.Roman.Fet0100":
-                boundary = None
-                if (len(self[0].split(" ", 2)) == 3 and 
-                    self[0].split(" ", 2)[1] == "g"):
-                    boundary = self[0].index(" ", self[0].index(" ")+1)
-                # a similar situation with paragraphs with leading
-                # bold type, where the bold text is fixed
-                else:
-                    m = re.match("(2EGERINGENS F¶RSLAG&#26;w|$ATALAGSKOMMITT©NS F¶RSLAG|2EMISSINSTANSERNA&#26;|3K¤LEN F¶R REGERINGENS F¶RSLAG&#26;)", self[0])
-                    if m:
-                        boundary = m.end()
-                if boundary:
-                    self[0] = Textelement(self.decode(self[0][:boundary]) + self[0][boundary:],
-                                          tag=self[0].tag)
-            else:
-                # NOTE: This weird checking for occurrences of 'i'
-                # tags is needed for functionalSources.
-                # TestPropRegeringen.test_parse_1999_2000_17 to pass
-                # (and matches encoding usage in practice)
-                decode_all = not('i' in [getattr(x, 'tag', None) for x in self])
-                for idx, subpart in enumerate(self):
-                    if (isinstance(subpart, Textelement) and
-                        (decode_all or subpart.tag == 'i')):
-                        self[idx] = Textelement(self.decode(subpart),
-                                                tag=subpart.tag)
-            
         children = []
         first = True
         prevpart = None
@@ -1236,3 +1173,12 @@ class Textelement(UnicodeElement):
         new = Textelement(str(self) + extraspace + str(other), tag=self.tag, **dims)
         return new
 
+class BaseTextDecoder(object):
+    def __init__(self):
+        pass
+
+    def __call__(self, textbox, fontspecs):
+        return textbox
+
+    def fontspecs(self, fontspecs):
+        return fontspecs

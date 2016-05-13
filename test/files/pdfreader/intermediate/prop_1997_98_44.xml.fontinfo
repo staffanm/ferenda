@@ -1,0 +1,13 @@
+name                                 type              encoding         emb sub uni object ID
+------------------------------------ ----------------- ---------------- --- --- --- ---------
+Times-Roman                          Type 1            Standard         no  no  no     964  0
+Times-Roman                          Type 1            Custom           no  no  no     961  0
+EENIOA+Times.New.Roman.Kursiv0104    Type 1C           Custom           yes yes no     967  0
+EEOALA+Times.New.Roman.Fet0100       Type 1C           Custom           yes yes no     733  0
+Symbol                               Type 1            Symbol           no  no  no     734  0
+Times-Bold                           Type 1            Custom           no  no  no     747  0
+Times-Bold                           Type 1            Standard         no  no  no     748  0
+Times-Italic                         Type 1            Standard         no  no  no     746  0
+Times-Italic                         Type 1            Custom           no  no  no     745  0
+EIBMNA+Times.New.Roman.Kursiv0104    Type 1C           Custom           yes yes no     742  0
+EICEKA+Times.New.Roman.Fet0100       Type 1C           Custom           yes yes no     739  0
