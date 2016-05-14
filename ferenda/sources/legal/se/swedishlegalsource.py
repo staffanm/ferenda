@@ -1935,18 +1935,31 @@ class OffsetDecoder20(OffsetDecoder1d):
     pdftohtml renders this as a single textelement).
 
     """
-    fixedleaders = ["Regeringens bedömning:", "Regeringens förslag:", "Remissinstanserna:", "Skälen för regeringens förslag:", "Skälen för regeringens bedömning och förslag:"]
+    fixedleaders = ["(Skälen för r|R)egeringens (bedömning|förslag|bedömning och förslag):", "Remissinstanserna:"]
     
     def __init__(self, kommittenamn=None):
         super(OffsetDecoder20, self).__init__()
         self.reversemap = dict((v, k) for k, v in self.map.items())
+        # remove some special regex chars from the backwards decoding
+        # (eg. encoding) so that we can use regexes in
+        # self.fixedleaders
+        for c in '|()':
+            self.reversemap[ord(c)] = ord(c)
         if kommittenamn:
-            self.fixedleaders.append(kommittenamn + "s förslag")
-            self.fixedleaders.append(kommittenamn + "s bedömning och förslag")
+            self.fixedleaders.append(kommittenamn + "s (bedömning och |)förslag")
         self.re_fixedleaders = re.compile("(%s)" % "|".join([self.encode_string(x) for x in self.fixedleaders]))
 
     def encode_string(self, s):
-        return s.translate(self.reversemap)
+        s = s.translate(self.reversemap)
+        newstring = ""
+        for c in s:
+            b = ord(c)
+            if b < 0x20 and b not in (0x9, 0xa, 0xd):
+                entity = "&#%s;" % b
+                newstring += entity
+            else:
+                newstring += c
+        return newstring
 
     def encodingmap(self):
         customencoding_map = {}
@@ -1968,7 +1981,7 @@ class OffsetDecoder20(OffsetDecoder1d):
     def __call__(self, textbox, fontspecs):
         if fontspecs[textbox.fontid]['encoding'] != "Custom":
             return textbox
-        if fontspecs[textbox.fontid]['family'] == "Times.New.Roman.Fet0100":
+        if textbox.font.family == "Times.New.Roman.Fet0100":
             boundary = None
             # extra special hack for prop 1997/98:44 which has
             # textelements marked as having a font with custom
@@ -1989,7 +2002,33 @@ class OffsetDecoder20(OffsetDecoder1d):
                 if m:
                     boundary = m.end()
             if boundary:
-                textbox[0] = Textelement(self.decode_string(textbox[0][:boundary]), tag="b")
-                textbox.insert(1, Textelement(textbox[0][boundary:]))
+                orig = str(textbox[0])
+                textbox[0] = Textelement(self.decode_string(orig[:boundary]), tag="b")
+                textbox.insert(1, Textelement(orig[boundary:]))
+                # Find the id for the "real" non-bold font. I think
+                # that in every known case the fontid should simply be
+                # the default font (id=0). Maybe we could hardcode
+                # that right away, like we hardcode the font family
+                # name right now.
+                textbox.fontid = self.find_fontid(fontspecs, "Times-Roman", textbox.font.size)
+            else:
+                textbox[0] = Textelement(self.decode_string(textbox[0]), tag=textbox[0].tag)
         else:
-            return super(OffsetDecoder20, self).__call__(textbox, fontspecs)
+            textbox = super(OffsetDecoder20, self).__call__(textbox, fontspecs)
+            # again, if one or more textelements have an "i" tag, the
+            # font for the entire textbox probably shouldn't be
+            # specced as an italic ("Kursiv")
+            if textbox.font.family == "Times.New.Roman.Kursiv0104" and "i" in [x.tag for x in textbox]:
+                textbox.fontid = self.find_fontid(fontspecs, "Times-Roman", textbox.font.size)
+        return textbox
+                
+                
+
+
+    def find_fontid(self, fontspecs, family, size):
+        for fontid, fontspec in fontspecs.items():
+            if fontspec['family'] == family and fontspec['size'] == size:
+                return fontid
+        else:
+             raise KeyError("No fontspec matching (%s, %s) found" % (family, size))
+        

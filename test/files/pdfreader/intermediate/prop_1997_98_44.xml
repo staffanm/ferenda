@@ -18,14 +18,13 @@
 	<fontspec id="12" size="14" family="EICEKA+Times.New.Roman.Fet0100" color="#000000"/>
 	<fontspec id="13" size="14" family="Times-Roman" color="#000000"/>
 	<!-- this is just a sample of some of the more difficult parts of this encoding scheme -->
-<text top="1176" left="788" width="9" height="17" font="0">1</text>
-<text top="92" left="85" width="353" height="32" font="1">Regeringens proposition</text>
-<text top="134" left="85" width="164" height="32" font="1">1997/98:44</text>
 <text top="198" left="85" width="185" height="23" font="2">Personuppgiftslag</text>
-<text top="295" left="85" width="423" height="17" font="0">Regeringen överlämnar denna proposition till riksdagen.</text>
-<text top="339" left="85" width="246" height="17" font="0">Stockholm den 8 december 1997</text>
 <text top="402" left="85" width="116" height="24" font="3"><i>,AILA &amp;REIVALDS</i></text>
 <text top="451" left="287" width="101" height="24" font="3"><i>0IERRE 3CHORI</i></text>
+<!-- the following three textboxes should glue together, and the
+     middle should be recognized as superscript (compare to the
+     detection that sets .tag = "sup" in _parse_hocr) but that might
+     be for offtryck_gluefunc to do -->
 <text top="300" left="85" width="164" height="17" font="0">Härigenom föreskrivs</text>
 <text top="296" left="249" width="6" height="11" font="5">1</text>
 <text top="300" left="255" width="71" height="17" font="0"> följande.</text>

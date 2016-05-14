@@ -22,7 +22,7 @@ from ferenda.elements import LinkSubject
 
 # SUT
 from ferenda import PDFReader
-from ferenda.pdfreader import Textbox, Textelement
+from ferenda.pdfreader import Textbox, Textelement, BaseTextDecoder
 
 class Read(unittest.TestCase):
     def setUp(self):
@@ -254,11 +254,25 @@ class Decoding(unittest.TestCase):
         # copypasted excerpts from an intermediate XML file
         from ferenda.sources.legal.se.swedishlegalsource import OffsetDecoder20
         self._copy_sample()
-        reader = PDFReader(filename="test/files/pdfreader/custom-encoding.pdf",
+        reader = PDFReader(filename="test/files/pdfreader/prop_1997_98_44.pdf",
                            workdir=self.datadir,
                            textdecoder=OffsetDecoder20(kommittenamn="Datalagskommittén"))
         # FIXME: add some actual tests here. in particular, test that
         # fontids for sections with fixed leadtext are modified
+        page = reader[0]
+        self.assertEqual("Personuppgiftslag", str(page[0]))     # unencoded
+        self.assertEqual("Laila Freivalds", str(page[1]))       # basic encoding
+        self.assertEqual("Pierre Schori", str(page[2]))         # basic encoding
+        self.assertEqual("Härigenom föreskrivs", str(page[3]))  # unencoded
+        self.assertEqual("1", str(page[4]))                     # unencoded (gluefunc should make it into a superscript -- or should we? the gluefunc API doesn't really allow that)
+        self.assertEqual(" följande.", str(page[5]))            # unencoded
+        self.assertEqual("Allmänna bestämmelser", str(page[6])) # basic encoding, 
+        self.assertEqual("Times.New.Roman.Fet0100", page[6].font.family) # font should stay
+        self.assertEqual(None, page[6][0].tag)                  # no tag (font family tells it's bold)
+        self.assertEqual("Syftet med lagen", str(page[7]))      # basic encoding, 
+        self.assertEqual("Times-Roman", page[7].font.family)    # font should be changed to default
+        self.assertEqual("i", page[7][0].tag)                   # since this element is <i>, the main font family should not be an italic
+        # FIXME: add a bunch of more tests
         
 
 class TestParseXML(unittest.TestCase):
@@ -266,6 +280,7 @@ class TestParseXML(unittest.TestCase):
     def test_grandchildren(self):
         pdf = PDFReader(pages=True)
         pdf.fontspec = {}
+        pdf.textdecoder = BaseTextDecoder()
         xmlfp = BytesIO(b"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE pdf2xml SYSTEM "pdf2xml.dtd">
 <pdf2xml producer="poppler" version="0.24.3">
@@ -353,19 +368,3 @@ class AsXHTML(unittest.TestCase, FerendaTestCase):
 <p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px, left: 0px, height: 100px, width: 100px">plaintext <a href="http://example.org/" rel="dcterms:references">link</a></p>
 """
         self._test_asxhtml(want, body)
-
-
-    def test_encoded_element(self):
-        body = Textbox([Textelement("*|UDQ\x033HUVVRQ", tag=None)
-        ], top=0, left=0, width=100, height=100, fontid=1, pdf=PDFReader())
-        want = """
-<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px, left: 0px, height: 100px, width: 100px">Göran Persson</p>
-"""
-        self._test_asxhtml(want, body)
-
-        body = Textbox([Textelement("Ansvarig: ", tag=None),
-                        Textelement("*|UDQ\x033HUVVRQ", tag="i")
-        ], top=0, left=0, width=100, height=100, fontid=1)
-        want = """
-<p xmlns="http://www.w3.org/1999/xhtml" class="textbox" style="top: 0px, left: 0px, height: 100px, width: 100px">Ansvarig: <i>Göran Persson</i></p>
-"""
