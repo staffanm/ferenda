@@ -1011,8 +1011,9 @@ class Regeringen(SwedishLegalSource):
 
 
 
-    DEFAULT_DECODER = OffsetDecoder1d
-    ALTERNATE_DECODERS = {(PROPOSITION, "1997/98:44"): OffsetDecoder20}
+    DEFAULT_DECODER = (OffsetDecoder1d, None)
+    ALTERNATE_DECODERS = {(PROPOSITION, "1997/98:44"): (OffsetDecoder20, "Datalagskommittén")}
+    
 
     def parse_pdf(self, pdffile, intermediatedir, basefile):
         # By default, don't create and manage PDF backgrounds files
@@ -1022,12 +1023,12 @@ class Regeringen(SwedishLegalSource):
         else:
             keep_xml = True
         tup = (self.document_type, basefile)
-        decoder = self.ALTERNATE_DECODERS.get(tup, self.DEFAULT_DECODER)()
+        decoding_class, decoder_arg = self.ALTERNATE_DECODERS.get(tup, self.DEFAULT_DECODER)
         pdf = PDFReader(filename=pdffile,
                         workdir=intermediatedir,
                         images=self.config.pdfimages,
                         keep_xml=keep_xml,
-                        textdecoder=decoder)
+                        textdecoder=decoding_class(decoder_arg))
         if pdf.is_empty():
             self.log.warning("PDF file %s had no textcontent, trying OCR" % pdffile)
             pdf = PDFReader(filename=pdffile,

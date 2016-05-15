@@ -125,9 +125,9 @@ class PDFReader(CompoundElement):
         if self.workdir is None:
             self.workdir = tempfile.mkdtemp()
         if textdecoder is None:
-            self.textdecoder = BaseTextDecoder()
+            self._textdecoder = BaseTextDecoder()
         else:
-            self.textdecoder = textdecoder
+            self._textdecoder = textdecoder
             
         if convert_to_pdf:
             newfilename = workdir + os.sep + \
@@ -486,7 +486,8 @@ class PDFReader(CompoundElement):
             newfp = BytesIO()
             bytebuffer = bytes(xmlfp.read())
             for b in bytebuffer:
-                if b < 0x20 and b not in (0x9, 0xa, 0xd):
+                # leave some control chars as-is (CR/LF but not TAB)
+                if b < 0x20 and b not in (0xa, 0xd):
                     # note: We don't use real xml numeric character
                     # references as "&#3;" as this is just as invalid
                     # as a real 0x03 byte in XML. Instead we
@@ -535,6 +536,7 @@ class PDFReader(CompoundElement):
                 page.background = background
 
             assert pageelement.tag == "page", "Got <%s>, expected <page>" % page.tag
+            after_footnote = False
             for element in pageelement:
                 if element.tag == 'fontspec':
                     fontid = int(element.attrib['id'])
@@ -557,8 +559,45 @@ class PDFReader(CompoundElement):
                             element.text).strip() == "" and not element.getchildren():
                         # print "Skipping empty box"
                         continue
-
                     attribs = dict(element.attrib)
+                    if len(page) > 0:
+                        # detect footnote markers in running text, glue
+                        # these to form a big textbox with multiple
+                        # textelements, where footnote markers are tagged
+                        # as "sup" (similar to what _parse_hocr does)
+                        lastfont = page[-1].font
+                        try:
+                            thisfont = self.fontspec[int(attribs['font'])]
+                        except KeyError as e:
+                            raise e
+                        if (lastfont.family == thisfont['family'] and
+                            lastfont.size > thisfont['size'] and
+                            page[-1].right == int(attribs['left']) and # FIXME: add 1-2pts of tolerance
+                            element.text.isnumeric()):
+                            # add to existing Textbox (removing font
+                            # styling info and also dimensions) as "sup"
+                            # also removes element.tail which shouldn't be
+                            # anything
+                            assert not element.tail.strip(), "Assumed element.tail to be empty, was in fact '%s'" % element.tail
+                            page[-1].append(Textelement(element.text, tag="sup"))
+                            page[-1].right = int(attribs['left']) + int(attribs['width'])
+                            page[-1].width = page[-1].right - page[-1].left
+                            after_footnote = True
+                            continue
+                        
+                        elif (after_footnote and
+                              lastfont.family == thisfont['family'] and
+                              lastfont.size == thisfont['size'] and
+                              page[-1].top == int(attribs['top']) and
+                              page[-1].height == int(attribs['height']) and
+                              page[-1].right == int(attribs['left'])): # FIXME: add tolerance
+                            assert not element.tail.strip(), "Assumed element.tail to be empty, was in fact '%s'" % element.tail
+                            page[-1].append(Textelement(element.text, tag=None))
+                            page[-1].right = int(attribs['left']) + int(attribs['width'])
+                            page[-1].width = page[-1].right - page[-1].left
+                            after_footnote = False
+                            continue
+                        after_footnote = False
                     # all textboxes share the same fontspec dict
                     attribs['fontspec'] = self.fontspec
                     attribs['fontid'] = int(attribs['font'])
@@ -594,11 +633,11 @@ class PDFReader(CompoundElement):
                     if element.tail and element.tail.strip():  # can this happen?
                         b.append(Textelement(txt(element.tail), tag=None))
                     b.lines = 1
-                    box = self.textdecoder(b, self.fontspec)
+                    box = self._textdecoder(b, self.fontspec)
                     page.append(box)
             # done reading the page
             self.append(page)
-        self.fontspec = self.textdecoder.fontspecs(self.fontspec)
+        self.fontspec = self._textdecoder.fontspecs(self.fontspec)
         self.log.debug("PDFReader initialized: %d pages, %d fontspecs" %
                        (len(self), len(self.fontspec)))
         
@@ -1174,7 +1213,7 @@ class Textelement(UnicodeElement):
         return new
 
 class BaseTextDecoder(object):
-    def __init__(self):
+    def __init__(self, dummy=None):
         pass
 
     def __call__(self, textbox, fontspecs):

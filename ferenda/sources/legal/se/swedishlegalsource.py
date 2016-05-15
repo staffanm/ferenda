@@ -1855,7 +1855,7 @@ class SwedishCitationParser(CitationParser):
             return [string]
 
 class OffsetDecoder1d(BaseTextDecoder):
-    def __init__(self):
+    def __init__(self, dummy=None):
         """Decoder for most PDFs with custom encoding coming from
         Regeringskansliet.
         
@@ -1935,7 +1935,7 @@ class OffsetDecoder20(OffsetDecoder1d):
     pdftohtml renders this as a single textelement).
 
     """
-    fixedleaders = ["(Skälen för r|R)egeringens (bedömning|förslag|bedömning och förslag):", "Remissinstanserna:"]
+    fixedleaders = ["(Skälen för r|R)egeringens (bedömning och förslag|bedömning|förslag):", "Remissinstanserna:"]
     
     def __init__(self, kommittenamn=None):
         super(OffsetDecoder20, self).__init__()
@@ -1946,7 +1946,7 @@ class OffsetDecoder20(OffsetDecoder1d):
         for c in '|()':
             self.reversemap[ord(c)] = ord(c)
         if kommittenamn:
-            self.fixedleaders.append(kommittenamn + "s (bedömning och |)förslag")
+            self.fixedleaders.append(kommittenamn + "s (bedömning och förslag|bedömning|förslag)")
         self.re_fixedleaders = re.compile("(%s)" % "|".join([self.encode_string(x) for x in self.fixedleaders]))
 
     def encode_string(self, s):
@@ -1957,6 +1957,8 @@ class OffsetDecoder20(OffsetDecoder1d):
             if b < 0x20 and b not in (0x9, 0xa, 0xd):
                 entity = "&#%s;" % b
                 newstring += entity
+            elif c in ("$"):
+                newstring += "\\" + c
             else:
                 newstring += c
         return newstring
@@ -2004,15 +2006,27 @@ class OffsetDecoder20(OffsetDecoder1d):
             if boundary:
                 orig = str(textbox[0])
                 textbox[0] = Textelement(self.decode_string(orig[:boundary]), tag="b")
-                textbox.insert(1, Textelement(orig[boundary:]))
+                textbox.insert(1, Textelement(orig[boundary:], tag=None))
                 # Find the id for the "real" non-bold font. I think
                 # that in every known case the fontid should simply be
                 # the default font (id=0). Maybe we could hardcode
                 # that right away, like we hardcode the font family
                 # name right now.
-                textbox.fontid = self.find_fontid(fontspecs, "Times-Roman", textbox.font.size)
+                newfontid = self.find_fontid(fontspecs, "Times-Roman", textbox.font.size)
+                expected_length = 2
             else:
                 textbox[0] = Textelement(self.decode_string(textbox[0]), tag=textbox[0].tag)
+                expected_length = 1
+                newfontid = textbox.fontid
+            if len(textbox) > expected_length: # the <text> element contained subelements
+                # save and remove the 1-2 textelements we've processed
+                decoded = textbox[:expected_length]
+                textbox[:] = textbox[expected_length:]
+                # do the default decoding
+                textbox = super(OffsetDecoder20, self).__call__(textbox, fontspecs)
+                # then add the previously procesed elements
+                textbox[:] = decoded + textbox[:]
+            textbox.fontid = newfontid
         else:
             textbox = super(OffsetDecoder20, self).__call__(textbox, fontspecs)
             # again, if one or more textelements have an "i" tag, the
