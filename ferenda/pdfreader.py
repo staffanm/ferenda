@@ -755,9 +755,10 @@ class StreamingPDFReader(PDFReader):
               convert_to_pdf=False,
               keep_xml=True,
               ocr_lang=None,
-              fontspec=None):
+              fontspec=None,
+              textdecoder=None):
         self.read(self.convert(filename, workdir, images, convert_to_pdf,
-                               keep_xml, ocr_lang))
+                               keep_xml, ocr_lang), textdecoder=textdecoder)
 
     def intermediate_filename(self, filename, ocr_lang, keep_xml):
         basename = os.path.basename(filename)
@@ -845,7 +846,11 @@ class StreamingPDFReader(PDFReader):
             fp = open(convertedfile, "rb")
         return fp
 
-    def read(self, fp, parser="xml"):
+    def read(self, fp, parser="xml", textdecoder=None):
+        if textdecoder is None:
+            self._textdecoder = BaseTextDecoder()
+        else:
+            self._textdecoder = textdecoder
         filename = util.name_from_fp(fp)
         self.filename = filename
         if parser == "ocr":

@@ -1120,7 +1120,6 @@ class SwedishLegalSource(DocumentRepository):
         slug = slug.replace("å", "aa").replace("ä", "ae").replace("ö", "oe").replace("é", "e")
         numslug = util.base26encode(slug)
         assert util.base26decode(numslug) == slug, "%s roundtripped as %s" % (slug, util.base26decode(numslug))
-        # from pudb import set_trace; set_trace()
         resource = self.polish_metadata(
             {"rdf:type": RPUBL.KonsolideradGrundforfattning,
              "rpubl:arsutgava": "0000",
@@ -1208,7 +1207,10 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         if metrics.scanned_source:
             textmatch = lambda a, b: len(difflib.get_close_matches(a, [b], n=1, cutoff=0.6)) == 1
         else:
-            textmatch = operator.eq
+            # the match func used to be operator.eq, but we'd like to
+            # match "Prop 2013/14:34\nBilaga 2" as nonessential as
+            # well
+            textmatch = lambda a, b: a.startswith(b)
         
         if (chunk.font.size <= metrics.default.size + tolerance and
             (chunk.right < metrics_leftmargin() or
@@ -1736,15 +1738,7 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
     else:
         sizematch = lambda p, n: p.font.size == n.font.size
 
-
-    # a slightly more forgiving matching for prop 1997/98:44, which
-    # sets incorrect font on the first line of some paragraphs
-    # 
-    # FIXME: if one textbox has family "TimesNewRomanPSMT@12" and
-    # another "TimesNewRomanPS-BoldMT@12", they should be considered
-    # the same family (and pdfreader/pdftohtml will wrap the latters'
-    # text in a <b> element). 
-    familymatch = lambda p, n: p.font.family == n.font.family or (p.font.family == "Times.New.Roman.Fet0100" and n.font.family == "Times-Roman")
+    familymatch = lambda p, n: p.font.family == n.font.family
 
         
     if nextbox.font.size > 13: # might be a heading -- but we have no
@@ -1766,14 +1760,19 @@ def offtryck_gluefunc(textbox, nextbox, prevbox):
     # these text locutions indicate a new paragraph (normally, this is
     # also catched by the conditions below, but if prevbox is unusally
     # short (one line) they might not catch it.:
-    strnextbox = str(nextbox).strip()
+    strnextbox = str(nextbox).strip() 
     if re.match("Skälen för (min bedömning|mitt förslag): ", strnextbox):
         return False
     if re.match("\d\. +", strnextbox):  # item in ordered list
         return False
-    if re.match("\d+ §", strnextbox) and (nextbox.top - prevbox.bottom >= (prevbox.font.size / 3)): # new section (with a suitable (1/3 of a line) space)
-        if strnextbox.startswith("20 §§"):
-            from pudb import set_trace; set_trace()
+    if (re.match("\d+ §", strnextbox) and
+         (strprevbox[-1] not in ("–", "-") and # make sure this isn't really a continuation
+          not strprevbox.endswith("och") and
+          not strprevbox.endswith("enligt") and
+          not strprevbox.endswith("kap.") and
+          not strprevbox.endswith("lagens")   # OK this is getting ridiculous
+         )and
+        (nextbox.top - prevbox.bottom >= (prevbox.font.size * 0.3))):  # new section (with a suitable linespacing (30% of a line))
         return False
 
     
@@ -1885,7 +1884,9 @@ class OffsetDecoder1d(BaseTextDecoder):
         s = self.re_xmlcharref.sub(lambda m: chr(int(m.group(0)[2:-1])), s)
         return s.translate(self.map)
 
-    def __call__(self, textbox, fontspecs):
+    def __call__(self, textbox, fontspecs): 
+        if 'encoding' not in fontspecs[textbox.fontid]:  # only for some testcases
+            return textbox
         if fontspecs[textbox.fontid]['encoding'] != "Custom":
             return textbox
         # NOTE: This weird checking for occurrences of 'i'
