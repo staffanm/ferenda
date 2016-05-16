@@ -389,7 +389,7 @@ class PDFReader(CompoundElement):
                 # superscript)
                 if len(textelements):
                     avgheight = sum([x.height for x in textelements]) // len(textelements)
-                    if textelements[0].strip().isnumeric() and textelements[0].height <= avgheight / 2:
+                    if textelements[0].strip().isdigit() and textelements[0].height <= avgheight / 2:
                         textelements[0].tag = "sup"
 
                 # Now that we know all text elements that should be in
@@ -573,7 +573,7 @@ class PDFReader(CompoundElement):
                         if (lastfont.family == thisfont['family'] and
                             lastfont.size > thisfont['size'] and
                             page[-1].right == int(attribs['left']) and # FIXME: add 1-2pts of tolerance
-                            element.text.isnumeric()):
+                            element.text.isdigit()):
                             # add to existing Textbox (removing font
                             # styling info and also dimensions) as "sup"
                             # also removes element.tail which shouldn't be
