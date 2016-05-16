@@ -579,7 +579,7 @@ class PDFReader(CompoundElement):
                             # also removes element.tail which shouldn't be
                             # anything
                             assert not element.tail.strip(), "Assumed element.tail to be empty, was in fact '%s'" % element.tail
-                            page[-1].append(Textelement(element.text, tag="sup"))
+                            page[-1].append(Textelement(str(element.text), tag="sup"))
                             page[-1].right = int(attribs['left']) + int(attribs['width'])
                             page[-1].width = page[-1].right - page[-1].left
                             after_footnote = True

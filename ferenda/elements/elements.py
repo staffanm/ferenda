@@ -168,7 +168,7 @@ properties (such as ordinal label, date of enactment, etc)."""
     # __new__ method
     def __new__(cls, arg='', *args, **kwargs):
         if not isinstance(arg, str):
-            raise TypeError("%r is not a str" % arg)
+            raise TypeError("%r is not a (unicode) str" % arg)
         # obj = str.__new__(cls, arg)
         obj = str.__new__(cls, arg)
         object.__setattr__(obj, '__initialized', False)
