@@ -1305,6 +1305,12 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         (ordinal, headingtype, title) = analyze_sectionstart(parser)
         if "...." in title:  # probably a line in a TOC
             return False
+
+        if (isinstance(title, str) and
+            re.search("\d+$", title) and
+            "...." in str(parser.reader.peek(2))): # might still be TOC
+            return False
+
         if ordinal:
             # analyze_sectionstart(parser)
             return headingtype == "h1" and ordinal.count(".") == 0
@@ -1386,9 +1392,10 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
         # NOTE: in some cases (prop 1972:105 p 145 and generally
         # everything before prop 1987/88:69) the "Bilaga" margin
         # header appears in the (extended) topmargin, not in the
-        # leftmargin.
-        if (parser.current_identifier.startswith("Prop.") and
-            ("Prop. 1987/88:69" > parser.current_identifier)):
+        # leftmargin. For Ds it always appears in the topmargin
+        if ((parser.current_identifier.startswith("Prop.") and
+             ("Prop. 1987/88:69" > parser.current_identifier)) or
+            parser.current_identifier.startswith("Ds")):
             extended_topmargin = metrics.pageheight / 5
             placement = lambda c: c.bottom < extended_topmargin
         else:
@@ -1456,7 +1463,7 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
     @newstate('preamblesection')
     def make_preamblesection(parser):
         s = PreambleSection(title=str(parser.reader.next()).strip())
-        if s.title in ("Innehållsförteckning"):
+        if s.title in ("Innehållsförteckning", "Innehåll"):
             parser.make_children(s)  # throw away -- FIXME: should we
                                      # really do that right in the
                                      # parsing step? shouldn't we wait
@@ -1600,16 +1607,14 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
                 # onwards). Attempt to detect these faux-sections:
                 # NB: This is likely an overbroad heuristic.
                 return (None, None, chunk)
-
         if (chunk.font.size < metrics.h1.size and
             parser._state_stack[-1] == 'preamblesection' and
             re.match("\d Förslag till", strchunk)):
             # similar to above, but occurs in some modern documents
             # (ds 2008:68). only when heading size is less than whats
-            # identified as h1, though.
+            # identified as h1, though. FIXME: should probably be
+            # moved to is_section?
             return (None, None, chunk)
-
-
         m = re_sectionstart(strchunk)
         if m:
             ordinal = m.group(1).rstrip(".")

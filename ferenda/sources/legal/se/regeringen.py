@@ -982,6 +982,7 @@ class Regeringen(SwedishLegalSource):
         # 2. Filter out obviously extraneous files
         for pdffile, linktext in pdffiles:
             if (linktext.startswith("Sammanfattning ") or
+                    linktext.startswith("Remisslista") or
                     linktext.startswith("Remissammanställning") or
                     linktext.startswith("Sammanställning över remiss") or
                     "emissinstanser" in linktext):

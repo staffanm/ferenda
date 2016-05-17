@@ -14,6 +14,11 @@ from . import Regeringen, RPUBL
 
 
 class DsAnalyzer(PDFAnalyzer):
+    # NOTE: The cutoff used to be 0.5% but it turns out that in
+    # particular h2's can be quite rare, occuring maybe two times
+    # in an entire document.
+    style_significance_threshold = 0.001
+
     def documents(self):
         def titleish(page):
             for textelement in page:

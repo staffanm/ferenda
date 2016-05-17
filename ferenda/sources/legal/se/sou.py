@@ -28,6 +28,11 @@ class SOUAnalyzer(PDFAnalyzer):
     header_significance_threshold = 0.02
     # footers less so (but more than the default .2%), 1 %
     footer_significance_threshold = 0.01
+
+    # h1 / h2's can be a bit rare though.
+    style_significance_threshold = 0.001
+    
+
     # the first two pages (3+ if the actual cover is included) are
     # atypical. A proper way of determining this would be to scan for
     # the first page stating "Till statsråded XX" using a title-ish
