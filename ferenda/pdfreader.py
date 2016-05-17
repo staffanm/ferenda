@@ -612,24 +612,32 @@ class PDFReader(CompoundElement):
                     # but pdftohtml should not create such XML (there
                     # is no such data in the PDF file)
                     for child in element:
-                        grandchildren = child.getchildren()
-                        # special handling of the <i><b> construct
-                        if grandchildren != []:
-                            if child.text:
-                                b.append(Textelement(txt(child.text), tag=child.tag))
-
-                                
-                            b.append(Textelement(
-                                txt(" ".join([x.text or '' for x in grandchildren])), tag="ib"))
-                            if grandchildren[0].tail:
-                                b.append(Textelement(txt(grandchildren[0].tail), tag=child.tag))
-                            if child.tail:
-                                b.append(Textelement(txt(child.tail), tag=None))
+                        if child.tag = "a":
+                           tags = ""
+                           grandchildren = child.getchildren()
+                           if grandchildren != []:
+                              tags += grandchildren[0].tag
+                              greatgrandchildren = grandchildren.getchildren()
+                              if greatgrandchildren != []:
+                                  tags += greatgrandchildren[0].tag
+                           b.append(LinkedTextelement(txt(child.text), uri=child.get("href"), tags)
                         else:
-                            b.append(
-                                Textelement(txt(child.text), tag=child.tag))
-                            if child.tail:
-                                b.append(Textelement(txt(child.tail), tag=None))
+                            grandchildren = child.getchildren()
+                            # special handling of the <i><b> construct
+                            if grandchildren != []:
+                                if child.text:
+                                    b.append(Textelement(txt(child.text), tag=child.tag))
+                                b.append(Textelement(
+                                    txt(" ".join([x.text or '' for x in grandchildren])), tag="ib"))
+                                if grandchildren[0].tail:
+                                    b.append(Textelement(txt(grandchildren[0].tail), tag=child.tag))
+                                if child.tail:
+                                    b.append(Textelement(txt(child.tail), tag=None))
+                            else:
+                                b.append(
+                                    Textelement(txt(child.text), tag=child.tag))
+                                if child.tail:
+                                    b.append(Textelement(txt(child.tail), tag=None))
                     if element.tail and element.tail.strip():  # can this happen?
                         b.append(Textelement(txt(element.tail), tag=None))
                     b.lines = 1
@@ -1214,7 +1222,44 @@ class Textelement(UnicodeElement):
                         'height': other.height}
             else:
                 dims = {}
-        new = Textelement(str(self) + extraspace + str(other), tag=self.tag, **dims)
+        new = self.__class__(str(self) + extraspace + str(other), tag=self.tag, **dims)
+        return new
+
+class LinkedTextelement(TextElement):
+
+    """Like TextElement, but with a uri property.
+    """
+        
+    def __init__(self, *args, **kwargs):
+        super(LinkedTextelement, self).__init__(*args, **kwargs)
+        if not hasattr(self, 'tag'):
+            self.tag = None
+        if not hasattr(self, 'uri'):
+            self.uri = None
+    
+    def _get_tagname(self):
+        return "a"
+    tagname = property(_get_tagname)
+
+    def as_xhtml(self, uri, parent_uri=None):
+        if self.tag:
+            taglist = "a" + self.tag
+        else:
+            taglist = "a"
+
+        for tag in reversed(taglist):
+            if not element:
+                element = E(tag, {}, str(self)
+            else:
+                element = E(tag, {}, element)
+        element.set("href", self.uri)
+	      return element
+
+    def __add__(self, other):
+        assert not isinstance(other, TextElement), "Can't join a LinkedTextelement with a plain TextElement"
+        assert self.uri == other.uri, "Can't join two LinkedTextelemens with different URIs (%s, %s)" % (self.uri, other.uri)
+        new = super(LinkedTextelement, self).__add__(other)
+        new.set("href", self.uri)
         return new
 
 class BaseTextDecoder(object):
