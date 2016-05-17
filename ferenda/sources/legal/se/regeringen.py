@@ -24,7 +24,7 @@ from ferenda import util
 from ferenda.decorators import recordlastdownload, downloadmax
 from ferenda.elements import Section, Link, Body, CompoundElement
 from ferenda.elements.html import P
-from ferenda.pdfreader import PDFReader, Textbox, Page
+from ferenda.pdfreader import PDFReader, Textbox, Page, BaseTextDecoder
 from ferenda.errors import DocumentRemovedError
 from . import SwedishLegalSource, RPUBL
 from .legalref import LegalRef
@@ -1015,7 +1015,11 @@ class Regeringen(SwedishLegalSource):
 
 
     DEFAULT_DECODER = (OffsetDecoder1d, None)
-    ALTERNATE_DECODERS = {(PROPOSITION, "1997/98:44"): (OffsetDecoder20, "Datalagskommittén")}
+    # This just just a list of known different encoding
+    # schemes. FIXME: try to find out whether all Ds documents should
+    # use the (non-decoding) BaseTextDecoder
+    ALTERNATE_DECODERS = {(PROPOSITION, "1997/98:44"): (OffsetDecoder20, "Datalagskommittén"),
+                          (DS, "2004:46"): (BaseTextDecoder, None)}
     
 
     def parse_pdf(self, pdffile, intermediatedir, basefile):

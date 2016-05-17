@@ -4,6 +4,7 @@ from __future__ import (absolute_import, division,
 from builtins import *
 
 import re
+import logging
 
 from rdflib.namespace import SKOS
 
@@ -29,13 +30,18 @@ class DsAnalyzer(PDFAnalyzer):
         for pageidx, page in enumerate(self.pdf):
             # Sanity check: 
             if pageidx > 5 and currentdoc == 'frontmatter':
-                raise ParseError("missed the transition from frontmatter to main")
+                logging.getLogger("pdfanalyze").warn("missed the transition from frontmatter to main")
+                # act as there never was any frontmatter
+                currentdoc = "main"
+                documents[0][-1] = "main"
             pgtitle = titleish(page)
             if pgtitle is not None:
                 # The normal title indicating that the real content
                 # starts is Innehåll, but eg Ds 2009:55 (which is
                 # atypical) uses Innehållsförteckning.
                 if str(pgtitle).strip() in ("Innehåll", "Innehållsförteckning"):
+                    currentdoc = "main"
+                elif re.match("Till \w+minister ", str(pgtitle).strip()):
                     currentdoc = "main"
                 elif re.match("Departementsserien \d+", str(pgtitle).strip()):
                     currentdoc = 'endregister'
