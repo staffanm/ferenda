@@ -892,7 +892,9 @@ class Regeringen(SwedishLegalSource):
     def _is_headerlike(self, text):
         # headers are less than 100 chars and do not end with a period
         # or other non-hederish thing
-        return len(text) < 100 and text[-1] != "." and not text[-2:] in (" i", " §")
+        return (len(text) < 100 and
+                (len(text) < 2 or
+                 (text[-1] != "." and not text[-2:] in (" i", " §"))))
 
     def _is_commentstart(self, text):
         if re.match("(Av p|P)aragrafen (framgår|innehåller|har behandlats|är ny|, som är ny|avgränsar|innebär)", text):

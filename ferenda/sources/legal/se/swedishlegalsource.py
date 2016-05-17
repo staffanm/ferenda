@@ -1369,6 +1369,8 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
 
         chunk = parser.reader.peek()
         txtchunk = util.normalize_space(str(chunk))
+        if ".." in txtchunk:  # probably a line in a TOC
+            return False
         if not state.appendixstarted:
             if is_appendix_header(chunk):
                 return True

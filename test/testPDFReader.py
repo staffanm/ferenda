@@ -22,7 +22,7 @@ from ferenda.elements import LinkSubject
 
 # SUT
 from ferenda import PDFReader
-from ferenda.pdfreader import Textbox, Textelement, BaseTextDecoder
+from ferenda.pdfreader import Textbox, Textelement, BaseTextDecoder, LinkedTextelement
 
 class Read(unittest.TestCase):
     def setUp(self):
@@ -215,6 +215,25 @@ class Read(unittest.TestCase):
         self.assertEqual("EUROPEAN COMPUTER MANUFACTURERS ASSOCIATION",
                          util.normalize_space(str(reader[0][1])))
 
+
+    def test_links(self):
+        # for this file, we don't even have a real PDF file, just some
+        # copypasted excerpts from an intermediate XML file
+        self._copy_sample()
+        reader = PDFReader(filename="test/files/pdfreader/links.pdf",
+                           workdir=self.datadir)
+        page = reader[0]
+        self.assertIsInstance(page[2][0], LinkedTextelement)
+        self.assertEqual("1", page[2][0])
+        self.assertEqual("b", page[2][0].tag)
+        self.assertEqual("nya-avfallsregler-ds-200937.html#7", page[2][0].uri)
+
+        self.assertIsInstance(page[10][0], LinkedTextelement)
+        self.assertEqual("2.1", page[10][0])
+        self.assertEqual(None, page[10][0].tag)
+        self.assertEqual("nya-avfallsregler-ds-200937.html#9", page[10][0].uri)
+
+
 class Decoding(unittest.TestCase):
 
     def setUp(self):
@@ -257,8 +276,6 @@ class Decoding(unittest.TestCase):
         reader = PDFReader(filename="test/files/pdfreader/prop_1997_98_44.pdf",
                            workdir=self.datadir,
                            textdecoder=OffsetDecoder20(kommittenamn="Datalagskommittén"))
-        # FIXME: add some actual tests here. in particular, test that
-        # fontids for sections with fixed leadtext are modified
         page = reader[0]
         self.assertEqual("Personuppgiftslag", str(page[0]))     # unencoded
         self.assertEqual("Laila Freivalds", str(page[1]))       # basic encoding

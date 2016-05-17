@@ -471,7 +471,6 @@ class PDFReader(CompoundElement):
             return re.sub(r"[\s\xa0\xc2]+", " ", str(element_text))
 
         self.log.debug("Loading %s" % filename)
-        
         if "Custom" in [f.get("encoding") for f in fontinfo.values()]:
             # the xmlfp might contain 0x03 (ctrl-C) for text nodes
             # using a custom encoding, where space is really
@@ -573,6 +572,7 @@ class PDFReader(CompoundElement):
                         if (lastfont.family == thisfont['family'] and
                             lastfont.size > thisfont['size'] and
                             page[-1].right == int(attribs['left']) and # FIXME: add 1-2pts of tolerance
+                            element.text and
                             element.text.isdigit()):
                             # add to existing Textbox (removing font
                             # styling info and also dimensions) as "sup"
@@ -612,15 +612,24 @@ class PDFReader(CompoundElement):
                     # but pdftohtml should not create such XML (there
                     # is no such data in the PDF file)
                     for child in element:
-                        if child.tag = "a":
-                           tags = ""
-                           grandchildren = child.getchildren()
-                           if grandchildren != []:
-                              tags += grandchildren[0].tag
-                              greatgrandchildren = grandchildren.getchildren()
-                              if greatgrandchildren != []:
-                                  tags += greatgrandchildren[0].tag
-                           b.append(LinkedTextelement(txt(child.text), uri=child.get("href"), tags)
+                        if child.tag == "a":
+                            tags = ""
+                            text = child.text
+                            # NOTE: This doesn't handle an arbitrary
+                            # sequence of elements and subelements,
+                            # only a simple
+                            # <a><b><i>text...</i></b></a> construct.
+                            grandchildren = child.getchildren()
+                            if grandchildren != []:
+                                tags += grandchildren[0].tag
+                                text = grandchildren[0].text
+                                greatgrandchildren = grandchildren[0].getchildren()
+                                if greatgrandchildren != []:
+                                    text = grandchildren[0].text
+                                    tags += greatgrandchildren[0].tag
+                            if not tags:  # change from "" to None
+                                tags = None 
+                            b.append(LinkedTextelement(txt(text), uri=child.get("href"), tag=tags))
                         else:
                             grandchildren = child.getchildren()
                             # special handling of the <i><b> construct
@@ -1041,7 +1050,7 @@ all text in a Textbox has the same font and size.
                       pdf=self._pdf,
                       lines=lines)
 
-        # add all TextElement objects, concatenating adjacent TE:s if
+        # add all Textelement objects, concatenating adjacent TE:s if
         # their tags match. 
         c = Textelement(tag=self[0].tag)
         for e in itertools.chain(self, other):
@@ -1104,7 +1113,8 @@ all text in a Textbox has the same font and size.
         for subpart in self:
             if (not first and
                 type(subpart) == type(prevpart) and
-                getattr(subpart, 'tag', None) == getattr(prevpart, 'tag', None)):
+                getattr(subpart, 'tag', None) == getattr(prevpart, 'tag', None) and
+                getattr(subpart, 'uri', None) == getattr(prevpart, 'uri', None)):
                 prevpart = prevpart + subpart
             elif prevpart:
                 # make sure Textelements w/o a tag doesn't render with
@@ -1225,9 +1235,9 @@ class Textelement(UnicodeElement):
         new = self.__class__(str(self) + extraspace + str(other), tag=self.tag, **dims)
         return new
 
-class LinkedTextelement(TextElement):
+class LinkedTextelement(Textelement):
 
-    """Like TextElement, but with a uri property.
+    """Like Textelement, but with a uri property.
     """
         
     def __init__(self, *args, **kwargs):
@@ -1246,18 +1256,18 @@ class LinkedTextelement(TextElement):
             taglist = "a" + self.tag
         else:
             taglist = "a"
-
+        element = None
         for tag in reversed(taglist):
-            if not element:
-                element = E(tag, {}, str(self)
+            if element is None:
+                element = E(tag, {}, str(self))
             else:
                 element = E(tag, {}, element)
         element.set("href", self.uri)
-	      return element
+        return element
 
     def __add__(self, other):
-        assert not isinstance(other, TextElement), "Can't join a LinkedTextelement with a plain TextElement"
-        assert self.uri == other.uri, "Can't join two LinkedTextelemens with different URIs (%s, %s)" % (self.uri, other.uri)
+        assert not type(other) == Textelement, "Can't join a LinkedTextelement (%s) with a plain Textelement (%s)" % (self, other)
+        assert self.uri == other.uri, "Can't join two LinkedTextelements with different URIs (%s, %s)" % (self.uri, other.uri)
         new = super(LinkedTextelement, self).__add__(other)
         new.set("href", self.uri)
         return new
