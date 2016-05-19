@@ -1450,7 +1450,7 @@ class SFS(Trips):
         changes = self.time_store_select(store,
                                          "sparql/sfs_changes.rq",
                                          basefile,
-                                         None,
+                                         sfsdataset,
                                          "change annotations")
         for row in changes:
             lagrum = row['lagrum']

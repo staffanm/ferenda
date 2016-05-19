@@ -3,10 +3,11 @@ import sys
 import re
 from collections import defaultdict
 
-def analyze_log(filename):
+def analyze_log(filename, listerrors=False):
     modules = defaultdict(int)
     locations = defaultdict(int)
     locationmsg = {}
+    errors = []
     with open(filename) as fp:
         for line in fp:
             try:
@@ -25,10 +26,18 @@ def analyze_log(filename):
                 locations[location] += 1
                 if location not in locationmsg:
                     locationmsg[location] = message.strip()
-    print("Top error modules:")
-    printdict(modules)
-    print("Top error messages:")
-    printdict(locations, locationmsg) 
+            if listerrors:
+                m = re.match("([\w\.]+) (\w+) ([^ ]*) failed", message)
+                if m:
+                    errors.append((m.group(1), m.group(3)))
+    if listerrors:
+        for repo, basefile in errors:
+            print(repo,basefile)
+    else:
+        print("Top error modules:")
+        printdict(modules)
+        print("Top error messages:")
+        printdict(locations, locationmsg) 
 
 def printdict(d, labels=None):
     # prints out a dict with int values, sorted by these
@@ -41,7 +50,10 @@ def printdict(d, labels=None):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
+    if len(sys.argv) < 2:
         print("USAGE: %s logfilename" % sys.argv[0])
     else:
-        analyze_log(sys.argv[1])
+        listerrors = False
+        if len(sys.argv) > 2 and sys.argv[2] == "--listerrors":
+            listerrors = True
+        analyze_log(sys.argv[1], listerrors)
