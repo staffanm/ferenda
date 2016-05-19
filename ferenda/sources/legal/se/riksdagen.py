@@ -515,6 +515,8 @@ class Riksdagen(FixedLayoutSource):
                 # places where the "Bilaga" ocr_par node has been
                 # placed at the end of the page rather than the start,
                 # and rearrange
+                if len(page) <= 2:
+                    continue # but not for pages with 0-2 textboxes
                 for idx in (-1, -2):
                     if page[idx].left > page.width * 0.6:
                         strchunk = str(page[idx])

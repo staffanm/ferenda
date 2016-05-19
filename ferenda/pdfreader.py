@@ -522,6 +522,10 @@ class PDFReader(CompoundElement):
             if pageelement.tag == "outline":
                 # FIXME: we want to do something with this information
                 continue
+            elif isinstance(pageelement, etree._Comment):
+                # NOTE: comments are never created by pdftohtml, but
+                # might be present in testcases
+                continue
             page = Page(number=int(pageelement.attrib['number']),  # alwaysint?
                         width=int(pageelement.attrib['width']),
                         height=int(pageelement.attrib['height']),

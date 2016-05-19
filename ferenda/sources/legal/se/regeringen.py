@@ -24,7 +24,7 @@ from ferenda import util
 from ferenda.decorators import recordlastdownload, downloadmax
 from ferenda.elements import Section, Link, Body, CompoundElement
 from ferenda.elements.html import P
-from ferenda.pdfreader import PDFReader, Textbox, Page, BaseTextDecoder
+from ferenda.pdfreader import PDFReader, Textbox, Textelement, Page, BaseTextDecoder
 from ferenda.errors import DocumentRemovedError
 from . import SwedishLegalSource, RPUBL
 from .legalref import LegalRef
@@ -803,6 +803,21 @@ class Regeringen(SwedishLegalSource):
                     comment_start = True
                     parsestate == "commenttext"
                 elif self._is_headerlike(text) or parsestate == "commenttext":
+                    if current_comment is not None and len(current_comment) == 0:
+                        # this means we created a
+                        # Forfattningskommentar and then never added
+                        # any text to it. Since we're switching into
+                        # acttext state, replace that object with just
+                        # the title
+                        comment_on = current_comment.comment_on
+                        assert current_comment.title
+                        titlenode = P([current_comment.title])
+                        if current_comment in textnodes:
+                            textnodes[textnodes.index(current_comment)] = titlenode
+                            del state['commented_paras'][comment_on]
+                        else:
+                            self.log.warning("Failed to replace Forfattningskommentar for %s failed" %
+                                             (current_comment.comment_on))
                     parsestate = "acttext"
                 elif parsestate == "acttext":
                     parsestate = "commenttext"
@@ -894,12 +909,14 @@ class Regeringen(SwedishLegalSource):
         # or other non-hederish thing
         return (len(text) < 100 and
                 (len(text) < 2 or
-                 (text[-1] != "." and not text[-2:] in (" i", " §"))))
+                 (text[-1] not in  (".", ")") and text[-2:] not in (" i", " §"))))
 
     def _is_commentstart(self, text):
         if re.match("(Av p|P)aragrafen (framgår|innehåller|har behandlats|är ny|, som är ny|avgränsar|innebär)", text):
             return True
         elif re.match("(I f|F)örsta stycket", text):
+            return True
+        elif re.match("\((Jfr|Paragrafen)", text):
             return True
         return False
     
