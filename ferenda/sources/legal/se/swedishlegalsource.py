@@ -1517,6 +1517,14 @@ def offtryck_parser(basefile="0", metrics=None, preset=None,
             return True
 
         if metrics.scanned_source:
+            # this is some sort of printer's instruction at the bottom
+            # of the page, but not reliably within
+            # metrics.bottommargin
+            if (chunk.top > metrics.pageheight * 0.8 and
+                re.match("\d+ riksdagen \d+\. ?\d saml. nr \d", strchunk, flags=re.IGNORECASE)):
+                return True
+        
+        if metrics.scanned_source:
             digitmatch = lambda s: s.replace("l", "1").isdigit()
         else:
             digitmatch = lambda s: s.isdigit()
