@@ -10,6 +10,7 @@ from collections import OrderedDict
 from io import StringIO
 import os
 import re
+import json
 
 import requests
 import requests.exceptions
@@ -534,6 +535,23 @@ class Riksdagen(FixedLayoutSource):
                 return reader.find_all("pre")
         else:
             return super(Riksdagen, self).tokenize(reader)
+
+    def visitor_functions(self, basefile):
+        # the .metrics.json file must exist at this point, but just in
+        # case it doesn't
+        metrics_path = self.store.path(basefile, "intermediate", ".metrics.json")
+        if os.path.exists(metrics_path):
+            with open(metrics_path) as fp:
+                metrics = json.load(fp)
+                defaultsize = metrics['default']['size']
+        else:
+            self.log.warning("%s: visitor_functions: %s doesn't exist" % (basefile, metrics_path))
+            defaultsize = 8
+        sharedstate = {'basefile': basefile,
+                       'defaultsize': defaultsize}
+        return [(self.find_primary_law, sharedstate),
+                (self.find_commentary, sharedstate)]
+
 
     def sourcefiles(self, basefile, resource=None):
         sourcefile = self.store.downloaded_path(basefile,
