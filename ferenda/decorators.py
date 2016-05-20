@@ -183,16 +183,26 @@ def render(f):
 
         # Validate that all triples specified in doc.meta and any
         # .meta property on any body object is present in the
-        # XHTML+RDFa file.
+        # XHTML+RDFa file.  NOTE: graph_diff has suddenly become
+        # glacial on large graphs (~10000 triples). Maybe we don't
+        # have to validate them?
+        huge_graph = False
         for g in iterate_graphs(doc.body):
             doc.meta += g
+            if len(doc.meta) > 3000:
+                huge_graph = True
+                break
+        if huge_graph:
+            self.log.debug("%s: Graph seems huge, skipping validation" % doc.basefile)
+        else:
+            # self.log.debug("%s: diffing graphs" % doc.basefile)
+            (in_both, in_first, in_second) = graph_diff(doc.meta, distilled_graph)
+            self.log.debug("%s: graphs diffed (-%s, +%s)" % (doc.basefile, len(in_first), len(in_second)))
 
-        (in_both, in_first, in_second) = graph_diff(doc.meta, distilled_graph)
-
-        if in_first:  # original metadata not present in the XHTML filee
-            self.log.warning("%s: %d triple(s) from the original metadata was "
-                             "not found in the serialized XHTML file:\n%s",
-                             doc.basefile, len(in_first), in_first.serialize(format="n3").decode("utf-8"))
+            if in_first:  # original metadata not present in the XHTML filee
+                self.log.warning("%s: %d triple(s) from the original metadata was "
+                                 "not found in the serialized XHTML file:\n%s",
+                                 doc.basefile, len(in_first), in_first.serialize(format="n3").decode("utf-8"))
 
         # Validate that entry.title and entry.id has been filled
         # (might be from doc.meta and doc.uri, might be other things
