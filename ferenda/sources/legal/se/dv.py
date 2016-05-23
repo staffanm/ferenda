@@ -600,6 +600,7 @@ class DV(SwedishLegalSource):
 
     def downloaded_to_intermediate(self, basefile):
         docfile = self.store.downloaded_path(basefile)
+        intermediatefile = self.store.intermediate_path(basefile)
         if os.path.getsize(docfile) == 0:
             raise errors.ParseError("%s: Downloaded file %s is empty, %s should have "
                                     "been created by download() but is missing!" %
@@ -660,8 +661,16 @@ class DV(SwedishLegalSource):
     def sanitize_body(self, rawbody):
         for x in rawbody:
             if isinstance(x, str):
-                x = [x]
-            yield(Paragraph(x))
+                # match smushed-together delmål markers like in "(jfr
+                # 1990 s 772 och s 796)I" and "Domslut HD fastställer
+                # HovR:ns domslut.II"
+                m = re.match("(.*[\.\)])(I+)$", x)
+                if m:
+                    x = [m.group(1), m.group(2)]
+                else:
+                    x = [x]
+            for p in x:
+                yield(Paragraph([p]))
             
 #         for section in rawbody:
 #             # are all sections strings? or what can they be?
@@ -1493,14 +1502,13 @@ class DV(SwedishLegalSource):
                     matchersname[t].append(pat['name'])
 
         def is_delmal(parser):
-            # should handle "IV" and "I (UM1001-08)"
+            # should handle "IV", "I (UM1001-08)" and "I." etc
             strchunk = str(parser.reader.peek())
-            if (len(strchunk) < 20 and
-                    not strchunk.endswith(".") and
-                    strchunk.split(" ", 1)[0] in ("I", "II", "III", "IV")):
-                return {'id': strchunk.split(" ", 1)[0]}
-            else:
-                return {}
+            if len(strchunk) < 20:
+                m = re.match("(I{1,3}|IV)\.?", strchunk.split(" ", 1)[0])
+                if m:
+                    return {'id': m.group(1)}
+            return {}
 
         def is_instans(parser, chunk=None):
             """Determines whether the current position starts a new instans part of the report.
