@@ -23,7 +23,6 @@ from ferenda import Describer, DocumentEntry, PDFAnalyzer
 from ferenda import util
 from ferenda.decorators import recordlastdownload, downloadmax
 from ferenda.elements import Section, Link, Body, CompoundElement
-from ferenda.elements.html import P
 from ferenda.pdfreader import PDFReader, Textbox, Textelement, Page, BaseTextDecoder
 from ferenda.errors import DocumentRemovedError
 from . import SwedishLegalSource, RPUBL

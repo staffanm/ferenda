@@ -14,6 +14,7 @@ import os
 import random
 import shutil
 import sys
+from ast import literal_eval
 
 from rdflib import Graph, URIRef, RDF
 from layeredconfig import LayeredConfig
@@ -508,11 +509,44 @@ class Devel(object):
                 self._samplebasefile(sourcerepo, destrepo, basefile)
 
 
-    def copyrepos(self, basefilelist):
-        pass
-                
+    def copyrepos(self, sourcedir, basefilelist):
+        # To be used with the output of analyze-error-log.py, eg
+        # $ ../tools/analyze-error-log.py data/logs/20160522-120204.log --listerrors > errors.txt
+        # $ ./ferenda-build.py devel copyrepos /path/to/big/external/datadir errors.txt
+        with open(basefilelist) as fp:
+            basefilelist = []
+            for line in fp:
+                if line.startswith("("):
+                    basefilelist.append(literal_eval(line))
+                else:
+                    basefilelist.append(line.strip().split(" ", 1))
+            
+        destrepos = {}
+        sourcerepos = {}
+        for (alias, basefile) in basefilelist:
+            if alias not in destrepos:
+                try:
+                    destrepos[alias] = self._repo_from_alias(alias)
+                    sourcerepos[alias] = self._repo_from_alias(alias, sourcedir + os.sep + alias)
+                except AttributeError: # means the repo alias was wrong
+                    continue
+            destrepo = destrepos[alias]
+            sourcerepo = sourcerepos[alias]
+            if isinstance(sourcerepo, CompositeRepository):
+                for cls in sourcerepo.subrepos:
+                    subsourcerepo = sourcerepo.get_instance(cls)
+                    subsourcerepo.store.datadir = (sourcedir + os.sep +
+                                                   subsourcerepo.alias)
+                    if os.path.exists(subsourcerepo.store.downloaded_path(basefile)):
+                        subdestrepo = destrepo.get_instance(cls)
+                        self._samplebasefile(subsourcerepo, subdestrepo, basefile)
+                        break
+            else:
+                self._samplebasefile(sourcerepo, destrepo, basefile)
+
+
     def _samplebasefile(self, sourcerepo, destrepo, basefile):
-            print("  %s: copying %s" % (alias, basefile))
+            print("  %s: copying %s" % (sourcerepo.alias, basefile))
             src = sourcerepo.store.downloaded_path(basefile)
             dst = destrepo.store.downloaded_path(basefile)
             if os.path.splitext(src)[1] != os.path.splitext(dst)[1]:
@@ -561,12 +595,12 @@ class Devel(object):
                 shutil.copy2(sourcerepo.store.documententry_path(basefile),
                              destrepo.store.documententry_path(basefile))
 
+
     def samplerepos(self, sourcedir):
         if 'samplesize' in self.config:
             samplesize = int(self.config.samplesize)
         else:
             samplesize = 10
-        
         classes = set()
         for alias in self.config._parent._subsections:
             if alias == self.alias:  # ie "devel"
@@ -608,6 +642,7 @@ class Devel(object):
                 aliasdir = sourcedir+os.sep+alias
                 print("%s: Copying docs from %s" % (alias, aliasdir))
                 self.samplerepo(alias, aliasdir)
+
 
     def statusreport(self, alias=None):
         # eg ./ferenda-build devel status prop --outfile "160510-prop.html"

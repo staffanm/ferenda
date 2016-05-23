@@ -30,7 +30,7 @@ from ferenda import (DocumentRepository, DocumentStore, FSMParser,
                      CitationParser, Describer, Facet)
 from ferenda import util, fulltextindex
 from ferenda.sources.legal.se.legalref import Link, LegalRef, RefParseError
-from ferenda.elements.html import A, H1, H2, H3
+from ferenda.elements.html import A, H1, H2, H3, P
 from ferenda.elements import Section, Body, CompoundElement
 from ferenda.pdfreader import Page, BaseTextDecoder, Textelement
 from ferenda.pdfreader import PDFReader

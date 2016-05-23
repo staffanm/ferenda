@@ -434,7 +434,10 @@ class PropTrips(Trips, FixedLayoutSource):
         # get metadata from plaintext html even if we have doc/pdf,
         # since plaintext is easiest to extract basic metadata from
         txtfp = self._extract_text(basefile)
-        txt = txtfp.read(1000).decode(self.source_encoding)
+        # since txtfp is binary, there's always a chance that the
+        # 1000th byte is the first of a two-or-more-bytes char in the
+        # UTF-8 encoding. We therefore ignore all decoding errors.
+        txt = txtfp.read(1000).decode(self.source_encoding, errors="ignore")
         txtfp.close()
         return txt.split("-"*64)[0]
 

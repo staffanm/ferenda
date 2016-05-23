@@ -12,8 +12,6 @@ def analyze_log(filename, listerrors=False):
         for line in fp:
             try:
                 timestamp, module, level, message = line.split(" ", 3)
-                if module == "2015:98:":
-                    import pudb; pu.db
             except ValueError:
                 continue
             if level == "ERROR":
