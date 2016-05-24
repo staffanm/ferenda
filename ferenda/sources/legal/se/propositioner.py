@@ -11,6 +11,7 @@ from datetime import datetime
 from collections import OrderedDict, Counter
 import codecs
 from urllib.parse import urljoin
+import json
 
 from bs4 import BeautifulSoup
 from lxml import etree
@@ -93,6 +94,14 @@ class PropAnalyzer(PDFAnalyzer):
                 if tag != 'main':
                     exclude.extend(list(range(startpage, startpage+pagecount)))
         r[0]['excludedpages'] = exclude
+        # since we don't pass metricspath to super().metrics, that
+        # func does not create a metrics.json cache file. So we
+        # generate that now (using the same data as we return)
+        util.ensure_dir(metricspath)
+        with open(metricspath, "w") as fp:
+            s = json.dumps(r[0], indent=4, separators=(', ', ': '), sort_keys=True)
+            fp.write(s)
+
         return r[0]
 
 class PropRegeringen(Regeringen):

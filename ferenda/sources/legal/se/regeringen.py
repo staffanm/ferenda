@@ -430,8 +430,19 @@ class Regeringen(SwedishLegalSource):
         self._resource = resource
         return resource
 
+
     def sanitize_body(self, rawbody):
         sanitized = super(Regeringen, self).sanitize_body(rawbody)
+        # Sanitize particular files with known issues
+        if rawbody.filename == "data/propregeringen/downloaded/2015-16/83/151608300webb.pdf":
+            for page in rawbody:
+                # remove incorrectly placed "Bilaga 1" markers from p 4 - 11
+                if 3 < page.number < 12:
+                    for box in page:
+                        if str(box).strip() == "Bilaga 1":
+                            page.remove(box)
+                            break
+            
         try:
             sanitized.analyzer = self.get_pdf_analyzer(sanitized)
         except AttributeError:
@@ -442,9 +453,11 @@ class Regeringen(SwedishLegalSource):
                 raise
         return sanitized
 
+    placeholders = set([(PROPOSITION, "2015/16:47")])
     def extract_body(self, fp, basefile):
-        if (self.document_type == self.PROPOSITION and
-            basefile.split(":")[1] in ("1", "100")):
+        if ((self.document_type == self.PROPOSITION and
+             basefile.split(":")[1] in ("1", "100")) or
+            (self.document_type, basefile) in self.placeholders):
             self.log.warning("%s: Will only process metadata, creating"
                              " placeholder for body text" % basefile)
             # means vår/höstbudget. Create minimal placeholder text
