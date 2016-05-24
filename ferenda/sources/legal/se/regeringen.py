@@ -434,7 +434,8 @@ class Regeringen(SwedishLegalSource):
     def sanitize_body(self, rawbody):
         sanitized = super(Regeringen, self).sanitize_body(rawbody)
         # Sanitize particular files with known issues
-        if rawbody.filename == "data/propregeringen/downloaded/2015-16/83/151608300webb.pdf":
+        if (hasattr(rawbody, 'filename') and
+            rawbody.filename == "data/propregeringen/downloaded/2015-16/83/151608300webb.pdf"):
             for page in rawbody:
                 # remove incorrectly placed "Bilaga 1" markers from p 4 - 11
                 if 3 < page.number < 12:

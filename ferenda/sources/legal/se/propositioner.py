@@ -44,10 +44,11 @@ class PropAnalyzer(PDFAnalyzer):
             return None
         documents = []
         mainstyles = Counter()
+        pagedims = {'pagewidth': Counter(),
+                    'pageheight': Counter()}
         currentappendix = None
         for pageidx, page in enumerate(self.pdf):
             styles = self.count_styles(pageidx, 1)['rest_styles']
-            
             # find the most dominant style on the page. If it uses the
             # EU font, it's a separate section.
             if styles and styles.most_common(1)[0][0][0].startswith("EUAlbertina"):
@@ -65,10 +66,20 @@ class PropAnalyzer(PDFAnalyzer):
                     styles.most_common(1)[0][0] not in [x[0] for x in mainstyles.most_common(3)]):
                     currentdoc = 'appendix'
                 else:
-                    currentdoc = 'main'
-                    currentappendix = appendix
+                    if (pagedims['pageheight'] and
+                        (pagedims['pageheight'].most_common(1)[0][0] != page.height or
+                         pagedims['pagewidth'].most_common(1)[0][0] != page.width)):
+                        # if the page dimensions suddenly change,
+                        # that's a dead giveaway that some external
+                        # appendix has been lifted right into the PDF
+                        currentdoc = 'appendix'
+                    else:
+                        currentdoc = 'main'
+                        currentappendix = appendix
             if currentdoc == "main":
                 mainstyles += styles
+                pagedims['pagewidth'][page.width] += 1
+                pagedims['pageheight'][page.height] += 1
             # update the current document segment tuple or start a new one
             if documents and documents[-1][2] == currentdoc:
                 documents[-1][1] += 1
