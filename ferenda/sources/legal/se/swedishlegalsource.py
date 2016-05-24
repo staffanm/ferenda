@@ -1446,8 +1446,8 @@ class SwedishLegalSource(DocumentRepository):
         slug = re.sub('\W+', '', lawname).lower()
         slug = re.sub('\d+', '', slug)
         slug = slug.replace("å", "aa").replace("ä", "ae").replace("ö", "oe").replace("é", "e")
-        numslug = util.base26encode(slug)
-        assert util.base26decode(numslug) == slug, "%s roundtripped as %s" % (slug, util.base26decode(numslug))
+        numslug = util.base27encode(slug)
+        assert util.base27decode(numslug) == slug, "%s roundtripped as %s" % (slug, util.base26decode(numslug))
         resource = self.polish_metadata(
             {"rdf:type": RPUBL.KonsolideradGrundforfattning,
              "rpubl:arsutgava": "0000",

@@ -807,13 +807,14 @@ def location_exception(exc):
                 break
     return loc
 
-base26table = str.maketrans(string.ascii_lowercase, string.digits+string.ascii_lowercase[:16])
 
-def base26encode(string):
-    string = string.translate(base26table)
-    return int(string, base=26)
+base27alphabet = " abcdefghijklmnopqrstuvwxyz"
+base27table = str.maketrans(base27alphabet, string.digits + string.ascii_lowercase[:17])
 
-def base26decode(num):
-    numerals = string.ascii_lowercase
-    b = 26
-    return ((num == 0) and  numerals[0] ) or (base26decode(num // b).lstrip(numerals[0]) + numerals[num % b])
+def base27encode(s):
+    s = s.translate(base27table)
+    return int(s, base=27)
+
+def base27decode(num):
+    b = 27
+    return ((num == 0) and base27alphabet[0] ) or (base27decode(num // b ).lstrip(base27alphabet[0]) + base27alphabet[num % b])
