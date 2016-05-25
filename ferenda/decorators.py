@@ -120,27 +120,31 @@ def updateentry(f):
             success = False
             errortype, errorval, errortb = sys.exc_info()
             raise
+        except KeyboardInterrupt as e:
+            success = None
+            raise
         else:
             return ret
         finally:
             self.log.removeHandler(handler)
-            warnings = logstream.getvalue()
-            entry = DocumentEntry(self.store.documententry_path(basefile))
-            entry.parse['success'] = success
-            entry.parse['date'] = start
-            entry.parse['duration'] = (datetime.now()-start).total_seconds()
-            if warnings:
-                entry.parse['warnings'] = warnings
-            else:
-                clear('warnings', entry.parse)
-            if not success:
-                entry.parse['traceback'] = "".join(format_tb(errortb))
-                entry.parse['error'] = "%s: %s (%s)" % (errorval.__class__.__name__,
-                                                        errorval, util.location_exception(errorval))
-            else:
-                clear('traceback', entry.parse)
-                clear('error', entry.parse)
-            entry.save()
+            if success is not None:
+                warnings = logstream.getvalue()
+                entry = DocumentEntry(self.store.documententry_path(basefile))
+                entry.parse['success'] = success
+                entry.parse['date'] = start
+                entry.parse['duration'] = (datetime.now()-start).total_seconds()
+                if warnings:
+                    entry.parse['warnings'] = warnings
+                else:
+                    clear('warnings', entry.parse)
+                if not success:
+                    entry.parse['traceback'] = "".join(format_tb(errortb))
+                    entry.parse['error'] = "%s: %s (%s)" % (errorval.__class__.__name__,
+                                                            errorval, util.location_exception(errorval))
+                else:
+                    clear('traceback', entry.parse)
+                    clear('error', entry.parse)
+                entry.save()
     return wrapper
 
 
