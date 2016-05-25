@@ -13,11 +13,15 @@ from __future__ import (absolute_import, division,
 from builtins import *
 
 from datetime import datetime
+from traceback import format_tb
+from io import StringIO
 import codecs
 import functools
 import itertools
 import os
+import sys
 import time
+import logging
 
 from rdflib import Graph, URIRef
 from rdflib.compare import graph_diff
@@ -89,6 +93,54 @@ def parseifneeded(f):
         else:
             self.log.debug("%s: Starting", basefile)
             return f(self, basefile)
+    return wrapper
+
+def updateentry(f):
+
+    @functools.wraps(f)
+    def wrapper(self, basefile):
+        def clear(key, d):
+            if key in d:
+                del d[key]
+        logstream = StringIO()
+        handler = logging.StreamHandler(logstream)
+        # FIXME: Think about which format is optimal for storing in
+        # docentry. Do we need eg name and levelname? Should we log
+        # date as well as time?
+        fmt = "%(asctime)s %(name)s %(levelname)s %(message)s"
+        formatter = logging.Formatter(fmt, datefmt="%H:%M:%S")
+        handler.setFormatter(formatter)
+        handler.setLevel(logging.WARNING)
+        self.log.addHandler(handler)
+        start = datetime.now()
+        try:
+            ret = f(self, basefile)
+            success = True
+        except Exception as e:
+            success = False
+            errortype, errorval, errortb = sys.exc_info()
+            raise
+        else:
+            return ret
+        finally:
+            self.log.removeHandler(handler)
+            warnings = logstream.getvalue()
+            entry = DocumentEntry(self.store.documententry_path(basefile))
+            entry.parse['success'] = success
+            entry.parse['date'] = start
+            entry.parse['duration'] = (datetime.now()-start).total_seconds()
+            if warnings:
+                entry.parse['warnings'] = warnings
+            else:
+                clear('warnings', entry.parse)
+            if not success:
+                entry.parse['traceback'] = "".join(format_tb(errortb))
+                entry.parse['error'] = "%s: %s (%s)" % (errorval.__class__.__name__,
+                                                        errorval, util.location_exception(errorval))
+            else:
+                clear('traceback', entry.parse)
+                clear('error', entry.parse)
+            entry.save()
     return wrapper
 
 
@@ -269,10 +321,11 @@ def managedparsing(f):
     :py:func:`~ferenda.decorators.timed`, 
     :py:func:`~ferenda.decorators.render`)"""
     return parseifneeded(
-        makedocument(
-            # handleerror( # is this really a good idea?
-            timed(
-                render(f))))
+        updateentry(
+            makedocument(
+                # handleerror( # is this really a good idea?
+                timed(
+                    render(f)))))
 
 
 def action(f):

@@ -80,6 +80,10 @@ class DocumentEntry(object):
     """A dict that represents metadata about the document RDF metadata
     (such as it's URI, length, MIME-type and MD5 hash)."""
 
+    parse = None
+    """A dict containing various info about the latest attempt to parse
+    the document."""
+
     # files = [{'path': 'data/sfs/downloaded/1999/175.html',
     #           'source': 'http://localhost/1234/567',
     #           'last-modified': '<isodatestring>',
@@ -88,13 +92,17 @@ class DocumentEntry(object):
     def __init__(self, path=None):
         if path and os.path.exists(path):
             with open(path) as fp:
+                # FIXME: make_json_date_object_hook doesn't support
+                # nested fields (parse.date) yet
                 hook = util.make_json_date_object_hook('orig_created',
                                                        'orig_updated',
                                                        'orig_checked',
-                                                       'published', 'updated',
+                                                       'published',
+                                                       'updated',
                                                        'indexed_ts',
                                                        'indexed_dep',
-                                                       'indexed_ft')
+                                                       'indexed_ft',
+                                                       'parse.date')
                 d = json.load(fp, object_hook=hook)
             self.__dict__.update(d)
             self._path = path
@@ -121,13 +129,17 @@ class DocumentEntry(object):
             # included resources)
             self.link = {}
 
+        # silently upgrade old entry JSON files lacking the parse dict
+        if self.parse is None:
+            self.parse = {}
+
     def __repr__(self):
         return '<%s id=%s>' % (self.__class__.__name__, self.id)
 
     def save(self, path=None):
         """Saves the state of the documententry to a JSON file at *path*. If
-*path* is not provided, uses the path that the object was initialized
-with.
+        *path* is not provided, uses the path that the object was initialized
+        with.
 
         """
         if not path:
