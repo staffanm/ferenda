@@ -434,16 +434,24 @@ class Regeringen(SwedishLegalSource):
     def sanitize_body(self, rawbody):
         sanitized = super(Regeringen, self).sanitize_body(rawbody)
         # Sanitize particular files with known issues
-        if (hasattr(rawbody, 'filename') and
-            rawbody.filename == "data/propregeringen/downloaded/2015-16/83/151608300webb.pdf"):
-            for page in rawbody:
-                # remove incorrectly placed "Bilaga 1" markers from p 4 - 11
-                if 3 < page.number < 12:
-                    for box in page:
-                        if str(box).strip() == "Bilaga 1":
-                            page.remove(box)
-                            break
-            
+        if hasattr(rawbody, 'filename'):
+            if rawbody.filename.endswith("2015-16/83/151608300webb.pdf"):
+                for page in rawbody:
+                    # remove incorrectly placed "Bilaga 1" markers from p 4 - 11
+                    if 3 < page.number < 12:
+                        for box in page:
+                            if str(box).strip() == "Bilaga 1":
+                                page.remove(box)
+                                break
+            elif rawbody.filename.endswith("2015-16/78/ett-sarskilt-straffansvar-for-resor-i-terrorismsyfte-prop.-20151678.pdf"):
+                # page 74 is some sort of placeholder before an
+                # external appendix, and it causes off-by-one
+                # pagination in the rest of the appendicies. removing
+                # it fixes pagination and left/right pages. we should
+                # check the printed version, really
+                del rawbody[73]
+                for page in rawbody[73:]:
+                    page.number -= 1
         try:
             sanitized.analyzer = self.get_pdf_analyzer(sanitized)
         except AttributeError:
@@ -454,7 +462,8 @@ class Regeringen(SwedishLegalSource):
                 raise
         return sanitized
 
-    placeholders = set([(PROPOSITION, "2015/16:47")])
+    placeholders = set([(PROPOSITION, "2015/16:47"),
+                        (PROPOSITION, "2015/16:99")])
     def extract_body(self, fp, basefile):
         if ((self.document_type == self.PROPOSITION and
              basefile.split(":")[1] in ("1", "100")) or

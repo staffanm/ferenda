@@ -1067,7 +1067,7 @@ all text in a Textbox has the same font and size.
                 c = c + e
         # it MIGHT be the case that we need to merge c with the last
         # Textelement added to res iff their tags match
-        if len(res) and c.tag == res[-1].tag:
+        if len(res) and c.tag == res[-1].tag and type(c) == type(res[-1]):
             res[-1] = res[-1] + c
         else:
             res.append(c)
@@ -1245,11 +1245,9 @@ class LinkedTextelement(Textelement):
     """
         
     def __init__(self, *args, **kwargs):
+        kwargs['tag'] = kwargs.get('tag')
+        kwargs['uri'] = kwargs.get('uri')
         super(LinkedTextelement, self).__init__(*args, **kwargs)
-        if not hasattr(self, 'tag'):
-            self.tag = None
-        if not hasattr(self, 'uri'):
-            self.uri = None
     
     def _get_tagname(self):
         return "a"
@@ -1273,7 +1271,7 @@ class LinkedTextelement(Textelement):
         assert not type(other) == Textelement, "Can't join a LinkedTextelement (%s) with a plain Textelement (%s)" % (self, other)
         assert self.uri == other.uri, "Can't join two LinkedTextelements with different URIs (%s, %s)" % (self.uri, other.uri)
         new = super(LinkedTextelement, self).__add__(other)
-        new.set("href", self.uri)
+        new.uri = self.uri
         return new
 
 class BaseTextDecoder(object):

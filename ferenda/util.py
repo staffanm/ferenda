@@ -18,6 +18,7 @@ import string
 import subprocess
 import sys
 import time
+from collections import Counter
 from contextlib import contextmanager
 from email.utils import parsedate_tz
 from ast import literal_eval
@@ -63,6 +64,9 @@ class gYear(datetime.date):
     def __str__(self):
         return "%04d-%02d" % (self.year, self.month)
 
+class TopCounter(Counter):
+    def top(self):
+        return self.most_common(1)[0][0]
 
 # util.Namespaces
 # Set up common namespaces and suitable prefixes for them

@@ -44,8 +44,8 @@ class PropAnalyzer(PDFAnalyzer):
             return None
         documents = []
         mainstyles = Counter()
-        pagedims = {'pagewidth': Counter(),
-                    'pageheight': Counter()}
+        pagedims = {'pagewidth': util.TopCounter(),
+                    'pageheight': util.TopCounter()}
         currentappendix = None
         for pageidx, page in enumerate(self.pdf):
             styles = self.count_styles(pageidx, 1)['rest_styles']
@@ -67,8 +67,8 @@ class PropAnalyzer(PDFAnalyzer):
                     currentdoc = 'appendix'
                 else:
                     if (pagedims['pageheight'] and
-                        (pagedims['pageheight'].most_common(1)[0][0] != page.height or
-                         pagedims['pagewidth'].most_common(1)[0][0] != page.width)):
+                        (abs(pagedims['pageheight'].top() - page.height) > 1 or
+                         abs(pagedims['pagewidth'].top() - page.width) > 1)):
                         # if the page dimensions suddenly change,
                         # that's a dead giveaway that some external
                         # appendix has been lifted right into the PDF
