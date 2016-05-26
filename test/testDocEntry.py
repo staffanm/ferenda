@@ -59,6 +59,7 @@ class DocEntry(unittest.TestCase):
   "orig_checked": "2013-03-27T20:46:37", 
   "orig_updated": "2013-03-27T20:59:42.325067", 
   "orig_url": "http://source.example.org/doc/123/a", 
+  "parse": {}, 
   "published": null, 
   "summary": null, 
   "title": null, 

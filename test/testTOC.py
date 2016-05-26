@@ -162,7 +162,6 @@ class TOC(RepoTester):
         # 2. secondly, test resulting HTML file
         self.assertTrue(os.path.exists(path))
         t = etree.parse(path)
-        
         #with open(path) as fp:
         #    print(fp.read().decode('utf-8'))
 

@@ -2,26 +2,28 @@
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 from builtins import *
-
 import builtins
+
+from ast import literal_eval
 from collections import OrderedDict
 from difflib import unified_diff
 from itertools import islice
 from tempfile import mkstemp
 import codecs
 import inspect
+import logging
 import os
 import random
 import shutil
 import sys
-from ast import literal_eval
 
 from rdflib import Graph, URIRef, RDF
 from layeredconfig import LayeredConfig
+from lxml import etree
 
 from ferenda.compat import Mock
 from ferenda import (TextReader, TripleStore, FulltextIndex, WSGIApp,
-                     CompositeRepository)
+                     CompositeRepository, DocumentEntry, Transformer)
 from ferenda.elements import serialize
 from ferenda import decorators, util
 
@@ -429,15 +431,6 @@ class Devel(object):
                self.config.storerepository, triplecount, store.triple_count()))
 
     @decorators.action
-    def report(self, alias):
-        repo = self._repo_from_alias(alias)
-        status = repo.get_status()
-        results = OrderedDict()
-        for key in status:
-            pass
-        # create a odict {basefile: {"download", ...}, {"parse": ...}}
-
-    @decorators.action
     def wsgi(self, path="/"):
         """Runs WSGI calls in-process."""
         globalconfig = self.config._parent
@@ -643,33 +636,69 @@ class Devel(object):
                 print("%s: Copying docs from %s" % (alias, aliasdir))
                 self.samplerepo(alias, aliasdir)
 
-
     def statusreport(self, alias=None):
-        # eg ./ferenda-build devel status prop --outfile "160510-prop.html"
-        if hasattr(self.config, 'outfile'):
-            fp = open(outfile, "w")
+        """Generate report on which files parse()d OK, with errors, or failed.
+
+        Creates a servable HTML file containing information about how
+        the last parse went for each doc in the given repo (or all
+        repos if none given).
+
+        """
+        log = logging.getLogger("devel")
+        if alias:
+            repos = [self._repo_from_alias(alias)]
         else:
-            fp = sys.stdout
+            repos = [self._repo_from_alias(alias) for alias in self.config._parent._subsections]
+        root = etree.fromstring("<status></status>")
 
-        #  Prop
-        #  ----
-        #  download: 1234 documents 
-        #  parsed: 1111 documents (123 fatal errors, 1413 warnings)
-        #  generated: 999 documents (333 errors)
-        #  ----
-        #  view/hide [E]rrrors, [W]arnings
-        #  ----
-        #  1971:3 OK
-        #  1971:4 WARNINGS: (the warnings)
-        #  1971:5 ERROR: (stacktrace)
-        pass
-        
-    def _statusrepo(self, alias):
-        repo = instantiate_repo(alias)
-        for f in repo.store.list_basefiles_for("parse"):
-            pass
-    # TODO: the rest
-
+        for repo in repos:
+            # Find out if this repo is outwardly-responsible for
+            # parsing -- we check against "False" as well since
+            # LayeredConfig may lack typing info for this setting and
+            # so interprets the value in the .ini file as a str, not a
+            # bool...
+            # if 'parse' in repo.config and repo.config.parse in (False, "False"):
+            #     continue
+            basefiles = list(repo.store.list_basefiles_for("parse"))
+            if not basefiles:
+                continue
+            repo_el = etree.SubElement(root, "repo", {"alias": repo.alias})
+            action_el = etree.SubElement(repo_el, "action", {"id": "parse"})
+            for basefile in basefiles:
+                # print("%s/%s" % (repo.alias, basefile))
+                entrypath = repo.store.documententry_path(basefile)
+                if not os.path.exists(entrypath):
+                    log.warning("%s/%s: file %s doesn't exist" % (repo.alias, basefile, entrypath))
+                    continue
+                elif os.path.getsize(entrypath) == 0:
+                    log.warning("%s/%s: file %s is 0 bytes" % (repo.alias, basefile, entrypath))
+                    continue
+                entry = DocumentEntry(entrypath)
+                if not entry.parse:  # an empty dict
+                    log.warning("%s/%s: file %s has no parse sub-dict" % (repo.alias, basefile, entrypath))
+                    continue
+                    
+                doc_el = etree.SubElement(action_el, "basefile",
+                                       {"id": basefile,
+                                        "success": str(entry.parse["success"]),
+                                        "duration": str(entry.parse["duration"]),
+                                        "date": entry.parse["date"]})
+                # add additional (optional) text data if present
+                for optional in ("warnings", "error", "traceback"):
+                    if optional in entry.parse:
+                        opt_el = etree.SubElement(doc_el, optional)
+                        opt_el.text = entry.parse[optional]
+        conffile = os.path.abspath(
+            os.sep.join([self.config.datadir, 'rsrc', 'resources.xml']))
+        transformer = Transformer('XSLT', "xsl/statusreport.xsl", "xsl",
+                                  resourceloader=repos[0].resourceloader,
+                                  config=conffile)
+        xhtmltree = transformer.transform(root, depth=1)
+        outfile = os.sep.join([self.config.datadir, 'status', 'status.html'])
+        util.ensure_dir(outfile)
+        with open(outfile, "wb") as fp:
+            fp.write(etree.tostring(xhtmltree, encoding="utf-8", pretty_print=True))
+        log.info("Wrote %s" % outfile)
 
     # FIXME: These are dummy implementations of methods and class
     # variables that manager.py expects all docrepos to have. We don't

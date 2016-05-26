@@ -48,6 +48,12 @@ nav[data-toggle='toc'] {
   }
 }
 
+body.statusreport div.basefiles p {
+    display: inline;
+    margin: 1px;
+    padding: 1px;
+}
+
 @media only screen and (min-width: 480px) {
     body.toc nav#toc li {
 	list-style: none;

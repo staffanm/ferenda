@@ -38,7 +38,6 @@
     </html>
   </xsl:template>
   
-  
   <xsl:template name="htmlhead">
     <head>
       <meta charset="utf-8" />
@@ -73,8 +72,12 @@
       <link rel="shortcut icon" href="../assets/ico/favicon.png"/>
       -->
     </head>
-
   </xsl:template>
+
+  <xsl:template match="xhtml:head">
+    <xsl:call-template name="htmlhead"/>
+  </xsl:template>
+
 
 
   <xsl:template name="htmlbody">
@@ -138,7 +141,7 @@
   </xsl:template>
 
   <xsl:template match="xhtml:body">
-    <xsl:call-template name="htmlbody">
+    <xsl:call-template name="htmlbody"/>
   </xsl:template>
 
 

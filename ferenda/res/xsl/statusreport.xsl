@@ -30,6 +30,17 @@
 
   <xsl:import href="uri.xsl"/>
   <xsl:include href="base.xsl"/>
+
+  <xsl:template name="headtitle">Status report | <xsl:value-of select="$configuration/sitename"/></xsl:template>
+  <xsl:template name="metarobots"/>
+  <xsl:template name="linkalternate"/>
+  <xsl:template name="headmetadata"/>
+  <xsl:template name="bodyclass">statusreport</xsl:template>
+  <xsl:template name="pagetitle">
+    <h1>Status report</h1>
+  </xsl:template>
+  <xsl:param name="dyntoc" select="false()"/>
+
   <xsl:template match="/">
       <html>
           <xsl:call-template name="htmlhead"/>
@@ -43,25 +54,37 @@
       <xsl:apply-templates/>
   </xsl:template>
 
-  <xsl:template matcH="action">
-      <h3><xsl:value-of select="@action"/></h3>
-      <p><xsl:count select="basefile[@success='true']"/> OK, 
-         <xsl:count select="basefile[@success='false']"/> failed, </p>
-      <div class="basefiles"> <!-- css can hook into this to select a good display mode -->
-         <xsl:apply-templates/>
-      </div>
+  <xsl:template match="action">
+    <!-- action is always "parse" for now -->
+    <!--<h3><xsl:value-of select="@id"/></h3>-->
+    <p><xsl:value-of select="count(basefile[@success='True'])"/> OK, 
+    <xsl:value-of select="count(basefile[@success='False'])"/> failed</p>
+    <div class="basefiles">
+      <xsl:apply-templates/>
+    </div>
   </xsl:template>
 
   <xsl:template match="basefile">
     <xsl:variable name="alerttype">
       <xsl:choose>
-        <xsl:when test="@success='true' and ./warnings">alert-warnings</xsl:when>
-        <xsl:when test="@success='true'">alert-success</xsl:when>
-        <xsl:when test="@success='false'">alert-error</xsl:when>          
+        <xsl:when test="@success='True' and ./warnings">alert-warning</xsl:when>
+        <xsl:when test="@success='True'">alert-success</xsl:when>
+        <xsl:when test="@success='False'">alert-danger</xsl:when>
+      </xsl:choose>
+    </xsl:variable> 
+    <xsl:variable name="tooltip">
       <xsl:choose>
-    </Xsl:variable> 
-    <p class="alert {$alerttype}"><xsl:value-of select="@id"/>
+        <xsl:when test="@success='True' and ./warnings"><xsl:value-of select="./warnings"/></xsl:when>
+        <xsl:when test="@success='False'"><xsl:value-of select="./error"/>
+-------------------	
+<xsl:value-of select="./traceback"/></xsl:when>
+      </xsl:choose>
+    </xsl:variable> 
+    <p class="alert {$alerttype}" title="{$tooltip}"><xsl:value-of select="@id"/>
       <!-- FIXME: add errormsg, warnings, traceback here somehow -->
     </p>
   </xsl:template>
+
+  <xsl:template match="repo" mode="toc"/>
+
 </xsl:stylesheet>

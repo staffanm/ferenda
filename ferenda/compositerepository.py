@@ -9,7 +9,7 @@ from collections import defaultdict, OrderedDict
 
 from ferenda import DocumentRepository, DocumentStore
 from ferenda import util, errors
-
+from ferenda.decorators import updateentry
 
 class CompositeStore(DocumentStore):
     """Custom store for CompositeRepository objects."""
@@ -137,7 +137,10 @@ class CompositeRepository(DocumentRepository):
                 # we got the doc we want, we're done!
                 return
 
-    # NOTE: this impl should NOT use the @managedparsing decorator
+    # NOTE: this impl should NOT use the @managedparsing decorator --
+    # but it can use @updateentry to catch warnings and errors thrown
+    # by a subrepo
+    @updateentry
     def parse(self, basefile):
         # first, check if we really need to parse. If any subrepo
         # returns that parseneeded is false and we have parsed file in
