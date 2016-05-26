@@ -39,7 +39,7 @@
   </xsl:template>
   
   
-  <xsl:template match="xhtml:head">
+  <xsl:template name="htmlhead">
     <head>
       <meta charset="utf-8" />
       <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
@@ -73,9 +73,11 @@
       <link rel="shortcut icon" href="../assets/ico/favicon.png"/>
       -->
     </head>
+
   </xsl:template>
 
-  <xsl:template match="xhtml:body">
+
+  <xsl:template name="htmlbody">
     <xsl:variable name="bodyclass"><xsl:call-template name="bodyclass"/></xsl:variable>
     <body class="{$bodyclass}" data-spy="scroll" data-target="#toc">
       <nav class="navbar navbar-default">
@@ -135,6 +137,11 @@
     </body>
   </xsl:template>
 
+  <xsl:template match="xhtml:body">
+    <xsl:call-template name="htmlbody">
+  </xsl:template>
+
+
   <!-- NOTE: while resources.py makes it possible to define nested
        navbars, currently the lagen.nu site doesn't support it,
        therefore subnavs are dropped. Also bootstraps dropdown system
@@ -151,3 +158,4 @@
   </xsl:template>
   
 </xsl:stylesheet>
+
