@@ -111,7 +111,8 @@ def updateentry(f):
         formatter = logging.Formatter(fmt, datefmt="%H:%M:%S")
         handler.setFormatter(formatter)
         handler.setLevel(logging.WARNING)
-        self.log.addHandler(handler)
+        rootlog = logging.getLogger()
+        rootlog.addHandler(handler)
         start = datetime.now()
         try:
             ret = f(self, basefile)
@@ -126,7 +127,7 @@ def updateentry(f):
         else:
             return ret
         finally:
-            self.log.removeHandler(handler)
+            rootlog.removeHandler(handler)
             if success is not None:
                 warnings = logstream.getvalue()
                 entry = DocumentEntry(self.store.documententry_path(basefile))

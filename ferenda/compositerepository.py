@@ -120,6 +120,26 @@ class CompositeRepository(DocumentRepository):
         opts['failfast'] = False
         return opts
 
+    # FIXME: we have no real need for this property getter override
+    # (it's exactly the same as DocumentRepository.config) itself, but
+    # since we want to override the setter, we need to use this to
+    # define config.setter
+    @property
+    def config(self):
+        return self._config
+
+    @config.setter
+    def config(self, config):
+        # FIXME: This doesn't work (AttributeError: 'super' object has
+        # no attribute 'config'), so we just copy the entire method
+        # super(CompositeRepository, self).config = config
+        self._config = config
+        self.store = self.documentstore_class(
+            config.datadir + os.sep + self.alias,
+            downloaded_suffix=self.downloaded_suffix,
+            storage_policy=self.storage_policy,
+            docrepo_instances=self._instances)
+
     def download(self, basefile=None):
         for c in self.subrepos:
             inst = self.get_instance(c)

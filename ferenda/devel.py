@@ -9,6 +9,7 @@ from collections import OrderedDict
 from difflib import unified_diff
 from itertools import islice
 from tempfile import mkstemp
+from operator import attrgetter
 import codecs
 import inspect
 import logging
@@ -187,13 +188,7 @@ class Devel(object):
                 LayeredConfig.set(repo.config, key, val, "defaults")
         if datadir is None:
             datadir = repo.config.datadir + os.sep + repo.alias
-            
-        repo.store = repo.documentstore_class(
-            datadir,
-            downloaded_suffix=repo.downloaded_suffix,
-            storage_policy=repo.storage_policy)
         return repo
-
 
 
     @decorators.action
@@ -651,14 +646,14 @@ class Devel(object):
             repos = [self._repo_from_alias(alias) for alias in self.config._parent._subsections]
         root = etree.fromstring("<status></status>")
 
-        for repo in repos:
+        for repo in sorted(repos, key=attrgetter("alias")):
             # Find out if this repo is outwardly-responsible for
             # parsing -- we check against "False" as well since
             # LayeredConfig may lack typing info for this setting and
             # so interprets the value in the .ini file as a str, not a
             # bool...
-            # if 'parse' in repo.config and repo.config.parse in (False, "False"):
-            #     continue
+            if 'parse' in repo.config and repo.config.parse in (False, "False"):
+                continue
             basefiles = list(repo.store.list_basefiles_for("parse"))
             if not basefiles:
                 continue
