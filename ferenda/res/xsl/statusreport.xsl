@@ -39,7 +39,7 @@
   <xsl:template name="pagetitle">
     <h1>Status report</h1>
   </xsl:template>
-  <xsl:param name="dyntoc" select="false()"/>
+  <xsl:param name="dyntoc" select="true()"/>
 
   <xsl:template match="/">
       <html>
