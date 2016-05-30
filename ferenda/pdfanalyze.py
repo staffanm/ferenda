@@ -575,14 +575,13 @@ class PDFAnalyzer(object):
                                   xytext=(v * 0.5, 100),
                                   arrowprops={'arrowstyle': '->'})
 
-    def plot_styles(self, plot, stylecounters, metrics, plt):
+    def plot_styles(self, plot, stylecounter, metrics, plt):
         # do a additive vhist. FIXME: label those styles identified in
         # metrics
-        allstyles = Counter(dict(chain(*[x.items() for x in stylecounters.values()])))
         stylenames = [style[0].replace("TimesNewRomanPS",
                                        "Times") + "@" + str(style[1]) for style,
-                      count in allstyles.most_common()]
-        stylecounts = [count for style, count in allstyles.most_common()]
+                      count in stylecounter.most_common()]
+        stylecounts = [count for style, count in stylecounter.most_common()]
         # need access to plt.
         plt.yticks(range(len(stylenames)), stylenames)
         plot.barh(range(len(stylenames)), stylecounts, log=True)

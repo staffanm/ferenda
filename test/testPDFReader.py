@@ -250,7 +250,7 @@ class Decoding(unittest.TestCase):
 
     def test_1d_encoding(self):
         try:
-            from ferenda.sources.legal.se.swedishlegalsource import OffsetDecoder1d
+            from ferenda.sources.legal.se.decoders import OffsetDecoder1d
             reader = PDFReader(filename="test/files/pdfreader/custom-encoding.pdf",
                                workdir=self.datadir,
                                textdecoder=OffsetDecoder1d())
@@ -271,7 +271,7 @@ class Decoding(unittest.TestCase):
     def test_20_encoding(self):
         # for this file, we don't even have a real PDF file, just some
         # copypasted excerpts from an intermediate XML file
-        from ferenda.sources.legal.se.swedishlegalsource import OffsetDecoder20
+        from ferenda.sources.legal.se.decoders import OffsetDecoder20
         self._copy_sample()
         reader = PDFReader(filename="test/files/pdfreader/prop_1997_98_44.pdf",
                            workdir=self.datadir,

@@ -44,14 +44,8 @@ class Analyze(unittest.TestCase):
         self.assertEquals(hcounters['rightmargin'].most_common(1)[0][0], 784)
 
     def test_stylecounters(self):
-        stylecounters = self.analyzer.count_styles(0, 3)
-        self.assertEquals(dict(stylecounters['frontmatter_styles']),
-                          {('Comic Sans MS', 14): 2150,
-                           ('Cambria,Bold', 14): 68,
-                           ('Cambria,Bold', 17): 64,
-                           ('Cambria', 37): 55,
-                           ('Cambria,Bold', 19): 28})
-        self.assertEquals(dict(stylecounters['rest_styles']),
+        stylecounter = self.analyzer.count_styles(1, 2)
+        self.assertEquals(dict(stylecounter),
                           {('Comic Sans MS', 14): 5922,
                            ('Cambria,Bold', 14): 133,
                            ('Cambria,Bold', 17): 128,
@@ -80,13 +74,12 @@ class Analyze(unittest.TestCase):
         self.assertEquals(vmetrics, {'bottommargin': 1149, 'pageheight': 1262, 'topmargin': 107})
 
     def test_analyze_styles(self):
-        stylecounters = self.analyzer.count_styles(0, 3)
-        stylemetrics = self.analyzer.analyze_styles(stylecounters)
+        stylecounter = self.analyzer.count_styles(1, 3)
+        stylemetrics = self.analyzer.analyze_styles(stylecounter)
         self.assertEquals({'default': {'family': 'Comic Sans MS', 'size': 14},
                            'h1': {'family': 'Cambria,Bold', 'size': 19},
                            'h2': {'family': 'Cambria,Bold', 'size': 17},
-                           'h3': {'family': 'Cambria,Bold', 'size': 14},
-                           'title': {'family': 'Cambria', 'size': 37}},
+                           'h3': {'family': 'Cambria,Bold', 'size': 14}},
                           stylemetrics)
 
     # this is more of a functional test
@@ -94,7 +87,7 @@ class Analyze(unittest.TestCase):
         jsonpath = "test/files/pdfanalyze/lipsum.metrics.json"
         try:
             self.assertFalse(os.path.exists(jsonpath))
-            metrics = self.analyzer.metrics(jsonpath)
+            metrics = self.analyzer.metrics(jsonpath, startpage=1)
             self.assertEquals({'default': {'family': 'Comic Sans MS', 'size': 14},
                                'bottommargin': 1149,
                                'h1': {'family': 'Cambria,Bold', 'size': 19},
@@ -105,9 +98,8 @@ class Analyze(unittest.TestCase):
                                'leftmargin_even': 108,
                                'pageheight': 1262,
                                'pagewidth': 892,
-                               'rightmargin': 784,
+                               'rightmargin': 759,
                                'rightmargin_even': 748,
-                               'title': {'family': 'Cambria', 'size': 37},
                                'scanned_source': False},
                               metrics)
             self.assertTrue(os.path.exists(jsonpath))
