@@ -46,13 +46,6 @@ class PDFAnalyzer(object):
 
     """
 
-    frontmatter = 1
-    """The amount of frontmatter pages which might have differing
-    typographic styles compared with the rest of the document. Affects
-    style analysis, particularly how the title style is determined.
-
-    """
-
     style_significance_threshold = 0.005
     """"The amount of use (as compared to the rest of the document that a
     style must have to be considered significant.
@@ -74,10 +67,6 @@ class PDFAnalyzer(object):
     considered part of the footer.
 
     """
-
-    frontmatter = 1
-    """The amount of pages to be considered frontmatter, which might have
-    different typography, special title font etc."""
 
     def __init__(self, pdf):
         # FIXME: in time, we'd like to make it possible to specify
@@ -174,8 +163,7 @@ class PDFAnalyzer(object):
 
         hmetrics = self.analyze_horizontal_margins(hcounters)
         vmetrics = self.analyze_vertical_margins(vcounters)
-        stylemetrics = self.analyze_styles(stylecounters['frontmatter_styles'],
-                                           stylecounters['rest_styles'])
+        stylemetrics = self.analyze_styles(stylecounters)
 
         margincounters = dict(chain(hcounters.items(), vcounters.items()))
         allmetrics = dict(chain(hmetrics.items(), vmetrics.items(), stylemetrics.items()))
@@ -253,20 +241,15 @@ class PDFAnalyzer(object):
         counters['bottommargin'][textbox.bottom] += len(text)
 
     def count_styles(self, startpage, pagecount):
-        counters = {'frontmatter_styles': Counter(),
-                    'rest_styles': Counter()}
+        c = Counter()
         for pagenumber, textbox in self.textboxes(startpage, pagecount):
-            self.count_styles_textbox(pagenumber, textbox, counters)
-        return counters
+            self.count_styles_textbox(pagenumber, textbox, c)
+        return c
 
-    def count_styles_textbox(self, pagenumber, textbox, counters):
+    def count_styles_textbox(self, pagenumber, textbox, counter):
         text = str(textbox).strip()
         fonttuple = (textbox.font.family, textbox.font.size)
-        if pagenumber <= self.frontmatter:
-            cid = "frontmatter_styles"
-        else:
-            cid = "rest_styles"
-        counters[cid][fonttuple] += len(text)
+        counter[fonttuple] += len(text)
 
     def analyze_vertical_margins(self, vcounters):
         # now find probable header and footer zones. default algorithm:
@@ -356,30 +339,22 @@ class PDFAnalyzer(object):
         return {'family': fonttuple[0],
                 'size': fonttuple[1]}
 
-    def analyze_styles(self, frontmatter_styles, rest_styles):
+    def analyze_styles(self, styles):
         styledefs = {}
-        all_styles = frontmatter_styles + rest_styles
 
         # default style: the one that's most common
-        ds = all_styles.most_common(1)[0][0]
+        ds = styles.most_common(1)[0][0]
         styledefs['default'] = self.fontdict(ds)
-
-        # title style: the largest style that exists on the frontpage style
-        # objects are (should be) sortable. for style objects at the same
-        # size, Bold > Italic > Regular
-        if frontmatter_styles:
-            ts = sorted(frontmatter_styles.keys(), key=self.fontsize_key, reverse=True)[0]
-            styledefs['title'] = self.fontdict(ts)
 
         # h1 - h3: Take all styles larger than or equal to default,
         # with significant use (each > 0.5% of all chars from page 2
         # onwards, as the front page often uses nontypical styles),
         # then order styles by font size.
-        significantuse = sum(rest_styles.values()) * self.style_significance_threshold
-        sortedstyles = sorted(rest_styles, key=self.fontsize_key, reverse=True)
+        significantuse = sum(styles.values()) * self.style_significance_threshold
+        sortedstyles = sorted(styles, key=self.fontsize_key, reverse=True)
         largestyles = [x for x in sortedstyles if
                        (self.fontsize_key(x) > self.fontsize_key(ds) and
-                        rest_styles[x] > significantuse)]
+                        styles[x] > significantuse)]
 
         for style in ('h1', 'h2', 'h3'):
             if largestyles:  # any left?

@@ -11,7 +11,7 @@ from rdflib.namespace import SKOS
 from ferenda import PDFAnalyzer
 from ferenda.errors import ParseError
 
-from . import Regeringen, RPUBL
+from . import Regeringen, Offtryck, RPUBL 
 
 
 class DsAnalyzer(PDFAnalyzer):
@@ -54,7 +54,7 @@ class DsAnalyzer(PDFAnalyzer):
 
 
 # See SOU.py for discussion about possible other sources
-class Ds(Regeringen):
+class Ds(Offtryck):
     alias = "ds"
     re_basefile_strict = re.compile(r'Ds (\d{4}:\d+)')
     # Like with re_urlbasefile_*, we must insist on a leading Ds, or

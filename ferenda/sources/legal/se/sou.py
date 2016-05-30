@@ -19,8 +19,7 @@ from ferenda import (PDFAnalyzer, CompositeRepository, DocumentEntry,
                      PDFDocumentRepository, CompositeStore)
 from ferenda import util, decorators
 from ferenda.pdfreader import StreamingPDFReader
-from . import Regeringen, SwedishLegalSource, SwedishLegalStore, RPUBL
-from .swedishlegalsource import offtryck_gluefunc, offtryck_parser
+from . import Regeringen, SwedishLegalSource, SwedishLegalStore, Offtryck, RPUBL
 
 
 class SOUAnalyzer(PDFAnalyzer):
@@ -33,11 +32,34 @@ class SOUAnalyzer(PDFAnalyzer):
     style_significance_threshold = 0.001
     
 
-    # the first two pages (3+ if the actual cover is included) are
-    # atypical. A proper way of determining this would be to scan for
-    # the first page stating "Till statsråded XX" using a title-ish
-    # font.
-    frontmatter = 2
+    def documents(self):
+        from pudb import set_trace; set_trace()
+        def titleish(page):
+            for textelement in page:
+                if textelement.font.size >= 18: # Ds 2009:55 uses size 18. The normal is 26.
+                    return textelement
+        documents = []
+        currentdoc = 'frontmatter'
+        for pageidx, page in enumerate(self.pdf):
+            # Sanity check: 
+            if pageidx > 8 and currentdoc == 'frontmatter':
+                logging.getLogger("pdfanalyze").warn("missed the transition from frontmatter to main")
+                # act as there never was any frontmatter
+                currentdoc = "main"
+                documents[0][-1] = "main"
+            pgtitle = titleish(page)
+            if pgtitle is not None:
+                pgtitle = str(pgtitle).strip()
+                if re.match("(Till s|S)tatsrådet ", pgtitle):
+                    currentdoc = "main"
+                elif pgtitle in ("Innehåll", "Innehållsförteckning"):
+                    currentdoc = "main"
+            # update the current document segment tuple or start a new one
+            if documents and documents[-1][2] == currentdoc:
+                documents[-1][1] += 1
+            else:
+                documents.append([pageidx, 1, currentdoc])
+        return documents
 
     # don't count anything in the frontmatter - these margins are all off
     def count_vertical_textbox(self, pagenumber, textbox, counters):
@@ -68,7 +90,7 @@ class SOURegeringen(Regeringen):
         return self.minter.space.coin_uri(resource) 
 
 
-class SOUKB(SwedishLegalSource, PDFDocumentRepository):
+class SOUKB(Offtryck, PDFDocumentRepository):
     alias = "soukb"
     storage_policy = "dir"
     downloaded_suffix = ".pdf"

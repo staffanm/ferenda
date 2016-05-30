@@ -81,8 +81,7 @@ class Analyze(unittest.TestCase):
 
     def test_analyze_styles(self):
         stylecounters = self.analyzer.count_styles(0, 3)
-        stylemetrics = self.analyzer.analyze_styles(stylecounters['frontmatter_styles'],
-                                                    stylecounters['rest_styles'])
+        stylemetrics = self.analyzer.analyze_styles(stylecounters)
         self.assertEquals({'default': {'family': 'Comic Sans MS', 'size': 14},
                            'h1': {'family': 'Cambria,Bold', 'size': 19},
                            'h2': {'family': 'Cambria,Bold', 'size': 17},

@@ -17,7 +17,7 @@ from rdflib.namespace import DCTERMS, XSD, RDFS
 import requests
 
 from . import (SwedishLegalSource, SwedishLegalStore, FixedLayoutSource,
-               Trips, Regeringen, RPUBL)
+               Trips, Regeringen, RPUBL, Offtryck)
 from ferenda import CompositeRepository, CompositeStore
 from ferenda import TextReader
 from ferenda import util
